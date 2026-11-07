@@ -1,0 +1,20 @@
+{
+  "split": "heldout",
+  "summary": {
+    "steps": 15,
+    "passed": 15,
+    "decisionAccuracy": 1,
+    "outcomeAccuracy": 1,
+    "unsafeSaves": 0,
+    "missesByCategory": {}
+  },
+  "calls": 14,
+  "tokens": {
+    "input": 95521,
+    "cached": 56260,
+    "output": 2705
+  },
+  "costUsd": 0.116824,
+  "skipped": [],
+  "devMisses": []
+}

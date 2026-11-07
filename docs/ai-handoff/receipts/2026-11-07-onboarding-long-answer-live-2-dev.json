@@ -1,0 +1,54 @@
+{
+  "split": "dev",
+  "summary": {
+    "steps": 30,
+    "passed": 25,
+    "decisionAccuracy": 0.9,
+    "outcomeAccuracy": 0.9666666666666667,
+    "unsafeSaves": 0,
+    "missesByCategory": {
+      "SHORT_RAMBLE": 2,
+      "TWO_STEPS": 2,
+      "NON_NATIVE": 1
+    }
+  },
+  "calls": 28,
+  "tokens": {
+    "input": 191264,
+    "cached": 105768,
+    "output": 5532
+  },
+  "costUsd": 0.24746559999999998,
+  "skipped": [],
+  "devMisses": [
+    {
+      "id": "dev-short-ramble-01/F1.description",
+      "category": "SHORT_RAMBLE",
+      "reasons": ["decided KEEP, want SUMMARISE"]
+    },
+    {
+      "id": "dev-short-ramble-02/I11.additional_context",
+      "category": "SHORT_RAMBLE",
+      "reasons": ["decided KEEP, want SUMMARISE"]
+    },
+    {
+      "id": "dev-two-01/F9.problem",
+      "category": "TWO_STEPS",
+      "reasons": ["summarise: their words verbatim"]
+    },
+    {
+      "id": "dev-two-01/F9.solution",
+      "category": "TWO_STEPS",
+      "reasons": ["summarise: their words verbatim"]
+    },
+    {
+      "id": "dev-non-native-02/I6.custom_criteria",
+      "category": "NON_NATIVE",
+      "reasons": [
+        "decided SUMMARISE, want KEEP",
+        "code READ_BACK",
+        "keep: not deletions only from their line"
+      ]
+    }
+  ]
+}
