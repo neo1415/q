@@ -374,6 +374,19 @@ if (STEPS.has("J3")) {
     "Q's reply to an optional skip and a required refusal",
     reply.slice(0, 260),
   );
+  // What is stored for the required step they would rather not give, after
+  // stating it earlier (J1): a decline of an answered required step is
+  // refused, so their earlier answer should still stand.
+  const requiredStep =
+    JOURNEY === "founder" ? "F4.team_size" : "I10.inbound_preference";
+  const stored = ((await view())?.responses ?? []).find(
+    (r) => r.stepKey === requiredStep,
+  );
+  note(
+    "J3",
+    `stored for ${requiredStep}`,
+    JSON.stringify(stored?.value ?? null),
+  );
   check(
     "J3",
     "a required refusal is re-asked with the reason",
@@ -514,7 +527,11 @@ if (STEPS.has("J5")) {
   check(
     "J5",
     "the same open question is picked up",
-    before.length > 0 && resumed.length > 0,
+    before.length > 0 &&
+      resumed.length > 0 &&
+      (/picking up where we left off/i.test(resumed) ||
+        resumed.includes(before.split(/(?<=[.?!])\s+/u).at(-1) ?? before)),
+    `before: ${before.slice(-120)} | after: ${resumed.slice(0, 160)}`,
   );
   await shot("j5-resumed");
   // The form path: one step, leave, come back to the same step.
