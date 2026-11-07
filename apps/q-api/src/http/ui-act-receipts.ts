@@ -219,7 +219,9 @@ export function receiptFacts(
           ? "NOT done: that control is not on their screen"
           : receipt.status === "NOT_APPLICABLE"
             ? "NOT done: that control cannot do that"
-            : "NOT done: it failed on their screen";
+            : receipt.status === "AWAITING_APPROVAL"
+              ? "prepared, NOT done: it waits for their approval of exactly this"
+              : "NOT done: it failed on their screen";
     return `${intent.act} ${on}${item}: ${meaning} (${receipt.status}).`;
   });
 }

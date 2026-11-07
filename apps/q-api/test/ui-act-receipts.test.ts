@@ -270,6 +270,12 @@ describe("UI act receipts reach the Q API as the person (RECOVERY C2)", () => {
       "SELECT_TAB tab.mandate: done on their screen (DONE).",
     ]);
   });
+
+  it("says a prepared act waits for approval, never that it was done (W5)", () => {
+    expect(receiptFacts([report(1, "AWAITING_APPROVAL")])).toEqual([
+      "SELECT_TAB tab.mandate: prepared, NOT done: it waits for their approval of exactly this (AWAITING_APPROVAL).",
+    ]);
+  });
 });
 
 // Owner conversation 2026-10-24 (runs 6785ff95, 875e3ba8): one old move

@@ -30,9 +30,10 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   REHEARSALS: "/rehearsals",
   DOCUMENTS: "/documents",
   DAILY: "/daily",
-  // Q Workspace W3: Results is the CRM's overview (/results redirects
-  // there); its real landing, so a move is verified where it lands.
-  RESULTS: "/relationships?view=overview",
+  // Q Workspace W3: an alias. /results redirects to the CRM's overview
+  // (the page RELATIONSHIPS opens); its own address keeps it a distinct
+  // page for the site map, and the lifecycle verifies the redirect.
+  RESULTS: "/results",
   YOUR_COMPANIES: "/discover?tab=yours",
   WORK: "/work",
   // voice-cards: every remaining page and tab (Explore is never Discover).

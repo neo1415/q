@@ -154,8 +154,25 @@ export const Q_UI_ACT_STATUSES = [
   "NOT_APPLICABLE",
   /** The page's handler threw or the result could not be confirmed. */
   "FAILED",
+  /**
+   * Q Workspace W5: the act prepared a consequential action (approval
+   * class APPROVAL) and it now waits for the person's approval of that
+   * exact payload; nothing was executed. Additive: sent only where the
+   * screen reports the workspace (an older strict reader refuses it).
+   */
+  "AWAITING_APPROVAL",
 ] as const;
 export const QUiActStatusSchema = z.enum(Q_UI_ACT_STATUSES);
+export type QUiActStatus = z.infer<typeof QUiActStatusSchema>;
+
+/**
+ * The status a reader from before W5 accepts: AWAITING_APPROVAL is said
+ * as NOT_APPLICABLE (nothing was done), the rest are unchanged. For a
+ * screen without the workspace (no `screen.workspace`).
+ */
+export function legacyUiActStatus(status: QUiActStatus): QUiActStatus {
+  return status === "AWAITING_APPROVAL" ? "NOT_APPLICABLE" : status;
+}
 
 /** What the page reports after performing (or refusing) a UI act. */
 export const QUiActReceiptSchema = z

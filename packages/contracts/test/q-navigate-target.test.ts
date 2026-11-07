@@ -13,6 +13,9 @@ import {
   Q_CLIENT_ACTION_TOOLS,
   Q_SCREEN_ROUTES,
   QScreenContextSchema,
+  QUiActReceiptSchema,
+  Q_UI_ACT_STATUSES,
+  legacyUiActStatus,
   Q_UI_INTENT_KINDS,
   QOpenRecordPageIntentSchema,
   QProfileSectionKeySchema,
@@ -400,5 +403,39 @@ describe("W3 gaps for W4: sub, and the founders tab as a target", () => {
           .success,
       ).toBe(true);
     }
+  });
+});
+
+describe("W5 AWAITING_APPROVAL receipt status (contract owned by W3)", () => {
+  const actId = "uia_receipt0001";
+  const LegacyStatus = z.enum([
+    "DONE",
+    "TARGET_MISSING",
+    "NOT_APPLICABLE",
+    "FAILED",
+  ]);
+  const LegacyReceipt = QUiActReceiptSchema.extend({
+    status: LegacyStatus,
+  }).strict();
+
+  it("a prepared act's receipt parses; a pre-W5 reader refuses it", () => {
+    const receipt = { actId, status: "AWAITING_APPROVAL", seq: 3 };
+    expect(QUiActReceiptSchema.parse(receipt)).toEqual(receipt);
+    expect(LegacyReceipt.safeParse(receipt).success).toBe(false);
+  });
+
+  it("every receipt from before W5 still parses, and the legacy form is NOT_APPLICABLE", () => {
+    for (const status of LegacyStatus.options) {
+      expect(QUiActReceiptSchema.safeParse({ actId, status }).success).toBe(
+        true,
+      );
+      expect(legacyUiActStatus(status)).toBe(status);
+    }
+    const legacy = legacyUiActStatus("AWAITING_APPROVAL");
+    expect(legacy).toBe("NOT_APPLICABLE");
+    expect(LegacyReceipt.safeParse({ actId, status: legacy }).success).toBe(
+      true,
+    );
+    expect(Q_UI_ACT_STATUSES).toContain("AWAITING_APPROVAL");
   });
 });
