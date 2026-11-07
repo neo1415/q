@@ -77,8 +77,11 @@ export function gradeLongAnswerCase(
     const decided: LongAnswerDecision = given.ownWords ? "KEEP" : "SUMMARISE";
     const decisionExact = decided === e.decision;
     if (!decisionExact) reasons.push(`decided ${decided}, want ${e.decision}`);
-    const check = checkTheirWords(given.value, c.said);
-    // onboarding-port's cleanedTheirWords: the reader's claim, checked.
+    // onboarding-port's cleanedTheirWords: the reader's claim, checked,
+    // a spoken line to the stricter bar.
+    const check = checkTheirWords(given.value, c.said, {
+      spoken: c.mode === "SPOKEN",
+    });
     const outcome = given.ownWords && check.cleaned ? "SAVED" : "READ_BACK";
     const outcomeExact =
       outcome === (e.decision === "KEEP" ? "SAVED" : "READ_BACK");
@@ -93,7 +96,11 @@ export function gradeLongAnswerCase(
     } else {
       const value = wordTokens(given.value);
       const line = wordTokens(c.said);
-      const verbatim = check.cleaned || containsRun(line, value);
+      // Verbatim by the plain bar: the spoken bar must not let their own
+      // words pass as a summary.
+      const verbatim =
+        checkTheirWords(given.value, c.said).cleaned ||
+        containsRun(line, value);
       if (verbatim) reasons.push("summarise: their words verbatim");
       const shorter = value.length < line.length;
       if (!shorter) reasons.push("summarise: not shorter than their line");

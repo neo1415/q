@@ -1010,6 +1010,12 @@ export function createOnboardingPort(input: {
    */
   readonly personTurns: readonly string[];
   /**
+   * Which of personTurns were spoken (the thread's VOICE channel): a long
+   * answer's "their own words" claim is held to the stricter spoken bar
+   * (P1-1 live run 1). Absent: every line is read as typed.
+   */
+  readonly spokenTurns?: ReadonlySet<string> | undefined;
+  /**
    * What Q said just before the person's latest words: a figure Q read
    * back there, which they then confirmed, is theirs to record.
    */
@@ -2980,7 +2986,11 @@ export function createOnboardingPort(input: {
   ): boolean =>
     ownWords === true &&
     input.personTurns.some(
-      (said) => quoteOccursIn(quote, said) && cleanedFromTheirLine(text, said),
+      (said) =>
+        quoteOccursIn(quote, said) &&
+        cleanedFromTheirLine(text, said, {
+          spoken: input.spokenTurns?.has(said) === true,
+        }),
     );
   /**
    * Whether free text is theirs: in their words (the quote, or the turn of

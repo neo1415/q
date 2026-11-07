@@ -123,8 +123,11 @@ export {
   checkTheirWords,
   cleanedFromTheirLine,
   isTokenSubsequence,
+  SPOKEN_MAX_WORDS,
+  SPOKEN_MIN_KEPT,
   THEIR_WORDS_MAX_LEAD_IN,
   THEIR_WORDS_MIN_KEPT,
   wordTokens,
   type TheirWordsCheck,
+  type TheirWordsOptions,
 } from "./their-words.js";

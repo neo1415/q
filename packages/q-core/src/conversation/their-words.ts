@@ -36,6 +36,23 @@ export const THEIR_WORDS_MIN_KEPT = 0.7;
  */
 export const THEIR_WORDS_MAX_LEAD_IN = 5;
 
+/**
+ * A spoken answer is held to a stricter bar (P1-1 live run 1, 7 Nov 2026:
+ * a rambling spoken answer was saved without a read-back; tuned on the dev
+ * split only). Speech carries more filler, restarts and wandering than
+ * typing, and a summary said back costs the person one "yes", so spoken
+ * leans to the read-back:
+ * - at most SPOKEN_MAX_WORDS words: a longer spoken answer is always said
+ *   back (every clear spoken answer in the dev set is 35 words or fewer;
+ *   every rambling one is 42 or more, or a short ramble);
+ * - at least SPOKEN_MIN_KEPT of it kept (clear spoken answers, corrections
+ *   included, keep 0.846-0.97 in the dev set; a ramble's filler and
+ *   restarts take more than that out). The bar is 0.8, below the lowest
+ *   clear one (0.846) and above the plain 0.7 a spoken ramble passed.
+ */
+export const SPOKEN_MAX_WORDS = 40;
+export const SPOKEN_MIN_KEPT = 0.8;
+
 /** Lower-cased letters and digits in any script; punctuation splits. */
 export function wordTokens(text: string): string[] {
   return text
@@ -69,8 +86,17 @@ export type TheirWordsCheck = {
   readonly cleaned: boolean;
 };
 
+export type TheirWordsOptions = {
+  /** The line was spoken: the stricter bar applies. */
+  readonly spoken?: boolean | undefined;
+};
+
 /** The check, with its parts (for evals and logs). */
-export function checkTheirWords(value: string, line: string): TheirWordsCheck {
+export function checkTheirWords(
+  value: string,
+  line: string,
+  options: TheirWordsOptions = {},
+): TheirWordsCheck {
   const theirs = wordTokens(line);
   const given = wordTokens(value);
   const deletionsOnly = given.length > 0 && isTokenSubsequence(given, theirs);
@@ -81,15 +107,24 @@ export function checkTheirWords(value: string, line: string): TheirWordsCheck {
     leadIn >= 0 &&
     leadIn <= THEIR_WORDS_MAX_LEAD_IN &&
     given.every((token, i) => theirs[leadIn + i] === token);
+  const spoken = options.spoken === true;
+  const enough = spoken
+    ? theirs.length <= SPOKEN_MAX_WORDS &&
+      (kept >= SPOKEN_MIN_KEPT || afterLeadIn)
+    : kept >= THEIR_WORDS_MIN_KEPT || afterLeadIn;
   return {
     deletionsOnly,
     kept,
     afterLeadIn,
-    cleaned: deletionsOnly && (kept >= THEIR_WORDS_MIN_KEPT || afterLeadIn),
+    cleaned: deletionsOnly && enough,
   };
 }
 
 /** Whether `value` is `line` in their own words with only filler removed. */
-export function cleanedFromTheirLine(value: string, line: string): boolean {
-  return checkTheirWords(value, line).cleaned;
+export function cleanedFromTheirLine(
+  value: string,
+  line: string,
+  options: TheirWordsOptions = {},
+): boolean {
+  return checkTheirWords(value, line, options).cleaned;
 }

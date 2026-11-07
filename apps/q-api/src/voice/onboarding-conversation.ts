@@ -223,8 +223,10 @@ export function createOnboardingConversation(dependencies: {
     place?: ReturnType<typeof placeOfQuote>,
     affirmed: ReadonlySet<string> = new Set(),
     replaces: ReadonlySet<string> = new Set(),
+    spokenTurns: ReadonlySet<string> = new Set(),
   ) =>
     createOnboardingPort({
+      spokenTurns,
       addsTo,
       replaces,
       affirmed,
@@ -396,6 +398,7 @@ export function createOnboardingConversation(dependencies: {
         readonly role: "PERSON" | "Q";
         readonly text: string;
         readonly createdAt: string;
+        readonly channel: "TEXT" | "VOICE";
         readonly stepKey?: string | undefined;
       }[];
     } = await listOnboardingInterviewTurnSteps(
@@ -422,6 +425,13 @@ export function createOnboardingConversation(dependencies: {
       .map((turn) => turn.text)
       .reverse();
     if (personTurns.length === 0) return;
+    // The lines they spoke: a long answer's own words are held to the
+    // stricter spoken bar (P1-1 live run 1).
+    const spokenTurns = new Set(
+      thread.items
+        .filter((turn) => turn.role === "PERSON" && turn.channel === "VOICE")
+        .map((turn) => turn.text),
+    );
     let state = await portFor(line, personTurns).state();
     if (state.completed) return;
     const optionIds = optionIdsOf(state);
@@ -729,6 +739,7 @@ export function createOnboardingConversation(dependencies: {
           .map((answer) => answer.stepKey),
       ),
       replacing,
+      spokenTurns,
     );
     const recorded =
       stated.length === 0

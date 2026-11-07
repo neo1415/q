@@ -366,6 +366,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V11 } from "./tasks/onboarding-transcript-
 import { ONBOARDING_TRANSCRIPT_READER_V12 } from "./tasks/onboarding-transcript-reader.v12.js";
 import { ONBOARDING_TRANSCRIPT_READER_V13 } from "./tasks/onboarding-transcript-reader.v13.js";
 import { ONBOARDING_TRANSCRIPT_READER_V14 } from "./tasks/onboarding-transcript-reader.v14.js";
+import { ONBOARDING_TRANSCRIPT_READER_V15 } from "./tasks/onboarding-transcript-reader.v15.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { TAXONOMY_CHOICE_V3 } from "./tasks/taxonomy-choice.v3.js";
@@ -576,7 +577,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V13, status: "DEPRECATED" },
     // Onboarding P1-1 (DECISIONS 77): Q judges when to summarise; a clear
     // long answer is their words minus filler, a ramble a summary.
-    ONBOARDING_TRANSCRIPT_READER_V14,
+    { ...ONBOARDING_TRANSCRIPT_READER_V14, status: "DEPRECATED" },
+    // P1-1 live run 1 (dev misses only): two-step lines summarised first;
+    // short rambles and long spoken answers summarised.
+    ONBOARDING_TRANSCRIPT_READER_V15,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.

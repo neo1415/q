@@ -4,7 +4,10 @@ import {
   checkTheirWords,
   cleanedFromTheirLine,
   createDefaultPromptRegistry,
+  SPOKEN_MAX_WORDS,
+  SPOKEN_MIN_KEPT,
   THEIR_WORDS_MIN_KEPT,
+  wordTokens,
 } from "../src/index.js";
 
 /**
@@ -104,19 +107,19 @@ describe("cleanedFromTheirLine", () => {
   });
 });
 
-describe("ONBOARDING_TRANSCRIPT_READER v14 and ONBOARDING_TYPED_REPLY v8 (P1-1)", () => {
+describe("ONBOARDING_TRANSCRIPT_READER v15 and ONBOARDING_TYPED_REPLY v8 (P1-1)", () => {
   const registry = createDefaultPromptRegistry();
   const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
   const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
 
   it("are active", () => {
-    expect(reader.version).toBe(14);
+    expect(reader.version).toBe(15);
     expect(reply.version).toBe(8);
   });
 
   it("the reader judges a LONG_TEXT answer clear (their words, filler removed) or rambling (a summary)", () => {
     expect(reader.template).toMatch(
-      /Judge how they told it, typed or spoken, whatever its length/u,
+      /judge how they told it, typed or spoken, whatever its length/iu,
     );
     expect(reader.template).toMatch(
       /give THEIR OWN WORDS for that step with only filler removed/u,
@@ -129,6 +132,15 @@ describe("ONBOARDING_TRANSCRIPT_READER v14 and ONBOARDING_TYPED_REPLY v8 (P1-1)"
       /keeping every figure, name and place they gave for it, and ownWords false/u,
     );
     expect(reader.template).toMatch(/When unsure, summarise\./u);
+    // Live run 1 (dev misses only): a two-step line is summarised first,
+    // however clear; a short ramble and a long spoken answer are rambling.
+    expect(reader.template).toMatch(
+      /FIRST: when one line of theirs speaks to more than one LONG_TEXT step, never give their own words for any of them, however clear the line/u,
+    );
+    expect(reader.template).toMatch(/RAMBLING, even when short/u);
+    expect(reader.template).toMatch(
+      /a spoken answer that runs long is rambling/u,
+    );
     // The v13 "saved only as Q's summary" rule is gone; agreement stays.
     expect(reader.template).not.toMatch(
       /is saved only as Q's summary that they agreed to/u,
@@ -148,5 +160,33 @@ describe("ONBOARDING_TRANSCRIPT_READER v14 and ONBOARDING_TYPED_REPLY v8 (P1-1)"
     expect(reply.template).toMatch(
       /A summary not confirmed yet always waits for their yes; an answer already saved needs no say-back/u,
     );
+  });
+});
+
+describe("a spoken answer's own words meet a stricter bar (P1-1 live run 1)", () => {
+  const clear =
+    "we run a small studio that, um, makes booking software for physiotherapy clinics in Portugal";
+  const kept =
+    "we run a small studio that makes booking software for physiotherapy clinics in Portugal";
+
+  it("a short clear spoken answer with light filler is still theirs", () => {
+    expect(cleanedFromTheirLine(kept, clear, { spoken: true })).toBe(true);
+  });
+
+  it("a long spoken answer is said back, however cleanly it was cut", () => {
+    const long = `${clear} and ${clear} and ${clear}`;
+    expect(wordTokens(long).length).toBeGreaterThan(SPOKEN_MAX_WORDS);
+    expect(cleanedFromTheirLine(long, long)).toBe(true);
+    expect(cleanedFromTheirLine(long, long, { spoken: true })).toBe(false);
+  });
+
+  it("a spoken cut the plain bar lets through, but not the spoken one, is said back", () => {
+    const said =
+      "so, um, basically, I mean, we sort of help, like, cafes and, you know, bakeries sell leftover bread at night";
+    const cut = "we help cafes and bakeries sell leftover bread at night";
+    const check = checkTheirWords(cut, said);
+    expect(check.deletionsOnly).toBe(true);
+    expect(check.kept).toBeLessThan(SPOKEN_MIN_KEPT);
+    expect(cleanedFromTheirLine(cut, said, { spoken: true })).toBe(false);
   });
 });

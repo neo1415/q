@@ -98,6 +98,29 @@ const answer = async (
   await conversation.flush?.(line);
 };
 
+/** The same, spoken: their words arrive on the voice line (VOICE). */
+const spokenLine: ConversationLine = {
+  ...line,
+  voiceSessionId: "vs_f0000000-0000-4000-8000-000000000111",
+};
+const speak = async (
+  w: ReturnType<typeof world>,
+  r: OnboardingTranscriptReader,
+  said: string,
+) => {
+  const conversation = createOnboardingConversation({
+    apiBaseUrl: "http://api.test",
+    fetch: w.fetch,
+    logger,
+    readAfterMs: 5,
+    reader: r,
+    recommendations: w.recommendations,
+  });
+  conversation.heard(spokenLine, [{ role: "Q", text: ASKED }]);
+  conversation.heard(spokenLine, [{ role: "USER", text: said }]);
+  await conversation.ended(spokenLine);
+};
+
 const pending = (w: ReturnType<typeof world>) =>
   w.heldSuggestions().filter((s) => s.status === "PENDING");
 
@@ -111,6 +134,17 @@ describe("P1-1: Q judges when to summarise a long answer (DECISIONS 77)", () => 
       text: CLEAR_KEPT,
     });
     expect(pending(w)).toEqual([]);
+  });
+
+  it("a long spoken answer the reader claimed as their cleaned words is held for the read-back (P1-1 live run 1)", async () => {
+    // Failed before: the plain bar (deletions only, 70% kept) saved a long
+    // spoken answer as their words with no read-back. Spoken leans to the
+    // read-back: over 40 words it is always said back.
+    const w = world();
+    // The same 45 words the typed answer above saves directly.
+    await speak(w, description(CLEAR_KEPT, CLEAR, true), CLEAR);
+    expect(w.recordedValue("F1.description")).toBeUndefined();
+    expect(pending(w).map((s) => s.stepKey)).toEqual(["F1.description"]);
   });
 
   it("a rambling 27-word answer the reader judged a ramble is held for the read-back, never kept with its filler", async () => {
