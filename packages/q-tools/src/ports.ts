@@ -1,3 +1,4 @@
+import type { MeetingRecordPort } from "./tools/meeting-record.js";
 import type { ProfileMaterialPort } from "./tools/profile-material.js";
 import type { OnboardingTranscriptPort } from "./tools/onboarding-transcript.js";
 import type { PreferenceLearningPort } from "./tools/preference-learning.js";
@@ -657,6 +658,11 @@ export type QToolPorts = {
   readonly profileGaps?: ProfileGapsPort | undefined;
   /** A pitch's transcript around a moment (R18); absent means no pitch tool. */
   readonly pitchMoments?: PitchMomentPort | undefined;
+  /**
+   * W5.3: a recorded call's record, participants only (meeting-record.ts);
+   * absent means no read_meeting tool.
+   */
+  readonly meetings?: MeetingRecordPort | undefined;
   /** A company's published figures (2026-10-23); absent means no read_company_figures. */
   readonly companyFigures?: CompanyFiguresPort | undefined;
   /** A company's team as its page shows it (QA F-16); absent means get_company carries no team. */
