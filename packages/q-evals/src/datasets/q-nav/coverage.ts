@@ -8,7 +8,6 @@ import {
   decide,
   dest,
   investorProfile,
-  overview,
   pick,
   profile,
   relationshipWithCompany,
@@ -123,7 +122,11 @@ const SECTION_ASKS: readonly {
   },
 ];
 
-/** The settings sections in plain words. */
+/**
+ * The settings sections in plain words (W2's site map). Usage, memory and
+ * plan are their own routes; `settings` and `profile` are the page's top
+ * and the profile summary, asked for as the page itself.
+ */
 const SETTINGS_WORDS: Readonly<Record<string, readonly [string, string]>> = {
   account: ["account settings", "my account details"],
   team: ["team settings", "the people on my account"],
@@ -134,14 +137,21 @@ const SETTINGS_WORDS: Readonly<Record<string, readonly [string, string]>> = {
   connections: ["connections", "my connected accounts"],
   billing: ["billing", "my payment details"],
   privacy: ["privacy settings", "my privacy controls"],
-  usage: ["usage settings", "my usage numbers in settings"],
-  memory: ["memory settings", "what Q is allowed to remember"],
-  plan: ["my plan", "my subscription plan"],
+  security: ["security settings", "my two-step sign-in"],
 };
+
+/**
+ * Closed by the contract, yet the side has a page there: a founder's
+ * Discover is its founders' videos tab, which has no destination (a W3
+ * gap), so "open Discover" is no access question for them.
+ */
+const NO_ACCESS_CASE: readonly string[] = ["DISCOVER:FOUNDER"];
 
 function destinations(cases: CaseSet): void {
   const split = cases.split;
   for (const def of Q_NAV_DESTINATIONS) {
+    // A place the decision cannot name (a redirect-only page) is no MOVE.
+    if (def.unreachable !== null) continue;
     const bank = def[split];
     for (const side of def.sides) {
       const { move } = decide(side);
@@ -179,7 +189,11 @@ function destinations(cases: CaseSet): void {
     }
     // The side that may not open it.
     for (const side of ["INVESTOR", "FOUNDER"] as const) {
-      if (def.sides.includes(side)) continue;
+      if (
+        def.sides.includes(side) ||
+        NO_ACCESS_CASE.includes(`${def.page}:${side}`)
+      )
+        continue;
       const [name] = bank.names;
       if (name === undefined) continue;
       const { stay } = decide(side);
@@ -276,22 +290,23 @@ const COMPANY_ASKS: readonly RecordAsk[] = [
     side: "INVESTOR",
     dev: (n) => `What's ${n}'s ARR?`,
     heldout: (n) => `How much revenue is ${n} doing?`,
-    target: (k) => overview(k, "financials"),
-    why: "A company's figure: overview, financials.",
+    target: (k) => profile(k, "overview"),
+    // The site map has no financials section: the overview tab.
+    why: "A company's figure lives on its overview tab.",
   },
   {
     side: "INVESTOR",
     dev: (n) => `What is ${n} raising?`,
     heldout: (n) => `How big a round is ${n} after?`,
-    target: (k) => overview(k, "capital-objective"),
-    why: "A company's raise: overview, capital objective.",
+    target: (k) => profile(k, "overview"),
+    why: "A company's raise lives on its overview tab.",
   },
   {
     side: "INVESTOR",
     dev: (n) => `What evidence backs ${n}'s numbers?`,
     heldout: (n) => `What's ${n}'s proof for its figures?`,
-    target: (k) => overview(k, "evidence"),
-    why: "A company's evidence section.",
+    target: (k) => profile(k, "overview"),
+    why: "A company's evidence lives on its overview tab.",
   },
   {
     side: "INVESTOR",
@@ -404,6 +419,28 @@ function records(cases: CaseSet): void {
         turn(user, founder.move(target, why)),
       ]);
     }
+  }
+  // An investor's profile is open to both sides (W2): a co-investor.
+  const investorSide = decide("INVESTOR");
+  const peers: readonly (readonly [string, string])[] =
+    split === "dev"
+      ? [
+          ["inv-kestrel-lane", "Pull up Kestrel Lane's investor profile."],
+          ["inv-baobab-ridge", "Who are Baobab Ridge, as a fund?"],
+        ]
+      : [
+          [
+            "inv-harbour-angels",
+            "I'd like to size up Harbour Angels as a co-investor.",
+          ],
+        ];
+  for (const [key, user] of peers) {
+    cases.add("RECORD", "INVESTOR", [
+      turn(
+        user,
+        investorSide.move(investorProfile(key), "Another investor's profile."),
+      ),
+    ]);
   }
   const ownAsks: readonly (readonly [string, QNavTarget, string])[] =
     split === "dev"
@@ -544,8 +581,10 @@ function records(cases: CaseSet): void {
       "FOUNDER",
       "Open our seed round.",
       "Bring up the seed round page.",
-      thing("CAPITAL_ROUND", "roundSeed"),
-      "One round of theirs.",
+      // /capital only redirects, so the round has no page of its own to
+      // name: it is a row of the raise tab's rounds (reported to W3).
+      section("CAPITAL_RAISE", "rounds"),
+      "Their round is listed on the raise tab's rounds.",
     ],
     [
       "FOUNDER",

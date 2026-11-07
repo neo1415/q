@@ -5,12 +5,16 @@ import { createLogger } from "@capital-q/observability";
 import type { NavigationDecisionResult } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
+import { Q_SITE_MAP, qSiteMapDigest } from "@capital-q/contracts";
+
 import {
   applyNavigationPolicy,
   createQNavigationDecider,
   decideNavigation,
+  navigationSiteMap,
   resolveNavigationPlace,
-  stubSiteMapDigest,
+  sitePlaceToTarget,
+  targetToSitePlace,
   type QNavigationInput,
   type QNavigationPane,
 } from "../src/q/index.js";
@@ -59,7 +63,7 @@ const input = (over: Partial<QNavigationInput> = {}): QNavigationInput => ({
     things: [{ id: CARD, title: "Call Tunde about the term sheet" }],
     deleted: [{ id: GONE, name: "Harrow Mills" }],
   },
-  siteMap: stubSiteMapDigest(),
+  siteMap: navigationSiteMap("INVESTOR"),
   ...over,
 });
 const proposal = (
@@ -75,7 +79,7 @@ const proposal = (
 const place = (
   over: Partial<NonNullable<NavigationDecisionResult["place"]>>,
 ) => ({
-  page: "COMPANY",
+  route: "/company/[companyId]",
   record: null,
   tab: null,
   document: null,
@@ -99,7 +103,7 @@ describe("the decision call (W4.1)", () => {
   }
   const attribution = { tenantId: "t", userId: "u", correlationId: "c" };
 
-  it("is one cheap call with no thinking, names only, the page text fenced as data", async () => {
+  it("runs on the answer's model with the whole site map, names only, the page text fenced as data", async () => {
     const { gateway, requests } = recording({
       decision: "STAY",
       reason: "chat",
@@ -110,8 +114,10 @@ describe("the decision call (W4.1)", () => {
     );
     expect(out?.decision).toBe("STAY");
     const request = requests[0] ?? {};
-    expect(request["taskClass"]).toBe("FAST_CLASSIFICATION");
-    expect(request["reasoning"]).toBe("NONE");
+    // DECISIONS 73: the answer's class and model, never a smaller one.
+    expect(request["taskClass"]).toBe("NORMAL_DIALOGUE");
+    expect(request["reasoning"]).toBe("LOW");
+    expect(request["reasoningKey"]).toBe("NAVIGATION_DECISION");
     const text = JSON.stringify(request["messages"]);
     expect(text).toContain("Silo Credit");
     // Records go by name; their ids never reach the model.
@@ -182,7 +188,7 @@ describe("resolution: names to the ids they may open (W4.3)", () => {
       resolveNavigationPlace(
         proposal({
           place: place({
-            page: "BOARD",
+            route: "/board",
             record: { kind: "THING", name: "Call Tunde about the term sheet" },
           }),
         }),
@@ -196,7 +202,7 @@ describe("resolution: names to the ids they may open (W4.3)", () => {
       resolveNavigationPlace(
         proposal({
           place: place({
-            page: "RELATIONSHIP_INVESTOR_MESSAGES",
+            route: "/relationships/investor/[investorOrganisationId]/messages",
             record: { kind: "INVESTOR", name: "Kestrel Lane Ventures" },
             position: "latest",
           }),
@@ -361,5 +367,119 @@ describe("the hard constraints, in code (W4.2)", () => {
         config: { movesAllowed: true },
       }).decision,
     ).toBe("STAY");
+  });
+});
+
+describe("the site map in, W3.1 targets out (W2 + W3)", () => {
+  const none = { recordId: null, documentId: null, itemId: null };
+  const at = (
+    route: string,
+    over: Partial<Parameters<typeof sitePlaceToTarget>[0]> = {},
+  ) =>
+    sitePlaceToTarget(
+      {
+        route,
+        tab: null,
+        sectionId: null,
+        slide: null,
+        position: null,
+        ...over,
+      },
+      none,
+    );
+
+  it("gives the model W2's whole digest for the person's side", () => {
+    expect(navigationSiteMap("FOUNDER")).toBe(
+      qSiteMapDigest(Q_SITE_MAP, { side: "FOUNDER" }),
+    );
+  });
+
+  it("folds a tab with its own destination into it, and keeps a record page's tab", () => {
+    expect(at("/work", { tab: "needs" })).toEqual({ page: "WORK_NEEDS" });
+    expect(at("/relationships", { tab: "capital-raise" })).toEqual({
+      page: "CAPITAL_RAISE",
+    });
+    expect(at("/company/data-room", { tab: "deck" })).toEqual({
+      page: "OWN_DECK",
+    });
+    expect(at("/explore")).toEqual({ page: "SEARCH" });
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/company/[companyId]",
+          tab: "deck",
+          sectionId: null,
+          slide: 4,
+          position: null,
+        },
+        { ...none, recordId: SILO },
+      ),
+    ).toEqual({ page: "COMPANY", recordId: SILO, tab: "deck", slide: 4 });
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/relationships/company/[companyId]",
+          tab: "messages",
+          sectionId: null,
+          slide: null,
+          position: "latest",
+        },
+        { ...none, recordId: SILO },
+      ),
+    ).toEqual({
+      page: "RELATIONSHIP_COMPANY_MESSAGES",
+      recordId: SILO,
+      position: "latest",
+    });
+    expect(
+      at("/settings", { sectionId: "notifications", position: "section" }),
+    ).toEqual({
+      page: "SETTINGS",
+      sectionId: "notifications",
+      position: "section",
+    });
+  });
+
+  it("refuses what the site map does not have: a route, a tab, a section, a page with no target", () => {
+    expect(at("/analytics")).toBeNull();
+    expect(at("/work", { tab: "nope" })).toBeNull();
+    expect(
+      at("/settings", { sectionId: "billing-history", position: "section" }),
+    ).toBeNull();
+    // /settings/plan has no destination and shows no record.
+    expect(at("/settings/plan")).toBeNull();
+    // A record on a page that shows none.
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/explore",
+          tab: null,
+          sectionId: null,
+          slide: null,
+          position: null,
+        },
+        { ...none, recordId: SILO },
+      ),
+    ).toBeNull();
+  });
+
+  it("says a target back in the site map's words", () => {
+    expect(targetToSitePlace({ page: "WORK_NEEDS" })).toMatchObject({
+      route: "/work",
+      tab: "needs",
+    });
+    expect(
+      targetToSitePlace({ page: "COMPANY", recordId: SILO, tab: "team" }),
+    ).toMatchObject({ route: "/company/[companyId]", tab: "team" });
+    expect(
+      targetToSitePlace({
+        page: "RELATIONSHIP_COMPANY_MESSAGES",
+        recordId: SILO,
+        position: "latest",
+      }),
+    ).toMatchObject({
+      route: "/relationships/company/[companyId]/messages",
+      position: "latest",
+    });
   });
 });

@@ -1,27 +1,28 @@
 import {
-  Q_COMPANY_PROFILE_TABS,
   Q_NAVIGATE_DESTINATIONS,
   Q_RECORD_PAGES,
-  Q_RELATIONSHIP_TABS,
-  Q_SETTINGS_SECTIONS,
-  Q_UI_COMPANY_SECTIONS,
+  Q_SITE_MAP,
+  QNavigateTargetSchema,
   type QNavigateDestination,
+  type QNavigateTarget,
   type QRecordPage,
+  type QSiteMapPage,
 } from "@capital-q/contracts";
+import { targetToSitePlace } from "@capital-q/model-gateway/q";
 
 import type { QNavSide } from "./contracts.js";
 
 /**
- * Every place Q may move the page pane to, from the contracts as they
- * are (W3.1, feat/q-deep-links f14c5f6a9): every QNavigateDestination
- * and every QRecordPage, with who may open it, its tabs and its sections.
- * The coverage of the eval is generated from these lists, so a new
- * destination or record page fails CI until it has an access rule and
- * phrasings here (test/q-nav.test.ts).
+ * Every place Q may move the page pane to, derived from W2's site map
+ * (`Q_SITE_MAP`, feat/q-site-map a4027887) and W3's contract: each
+ * QNavigateDestination and QRecordPage, the site-map page it lands on, who
+ * may open it (the page's audience; a tab's own when it says so), its tabs
+ * and its sections. Nothing here restates the app: only the phrasing banks
+ * are written by hand, plus the sections W2 is still adding (PROPOSED).
  *
- * Sections are QSection ids (apps/web) and the settings sections, marked
- * EXISTS, or PROPOSED: the four the plan needs that W2/W3 have still to
- * name (relayed 6 Nov). The names change here, in one place.
+ * A place the decision cannot name is listed as unreachable with its
+ * reason (a page that only redirects, or no destination for a side), and
+ * the coverage gate skips it; the reason is reported to W2/W3.
  *
  * Phrasings come in two banks written separately: `dev` (tuned against)
  * and `heldout` (only measured; never read while tuning).
@@ -42,42 +43,32 @@ export type QNavBank = {
 };
 export type QNavDestinationDef = {
   readonly page: QNavigateDestination;
+  readonly route: string | null;
   readonly sides: readonly QNavSide[];
   readonly sections: readonly QNavSectionDef[];
   readonly dev: QNavBank;
   readonly heldout: QNavBank;
+  /** Null when the decision can name it; otherwise why not. */
+  readonly unreachable: string | null;
 };
 
-const BOTH: readonly QNavSide[] = ["INVESTOR", "FOUNDER"];
-const I: readonly QNavSide[] = ["INVESTOR"];
-const F: readonly QNavSide[] = ["FOUNDER"];
 const bank = (names: readonly string[], asks: readonly string[]): QNavBank => ({
   names,
   asks,
 });
-const exists = (id: string, side?: QNavSide): QNavSectionDef => ({
-  id,
-  status: "EXISTS",
-  ...(side === undefined ? {} : { side }),
-});
-const proposed = (id: string, side?: QNavSide): QNavSectionDef => ({
-  id,
-  status: "PROPOSED",
-  ...(side === undefined ? {} : { side }),
-});
 
-export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
+const BANKS: readonly {
+  readonly page: QNavigateDestination;
+  readonly dev: QNavBank;
+  readonly heldout: QNavBank;
+}[] = [
   {
     page: "HOME",
-    sides: BOTH,
-    sections: [],
     dev: bank(["home", "the home page"], []),
     heldout: bank(["my start page"], []),
   },
   {
     page: "PROFILE",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["my profile", "my own profile page"],
       ["What does my profile say about me?"],
@@ -89,15 +80,11 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "CAPITAL",
-    sides: BOTH,
-    sections: [proposed("commitments", "INVESTOR")],
     dev: bank(["Capital", "my Capital page"], []),
     heldout: bank(["the capital section"], []),
   },
   {
     page: "DISCOVER",
-    sides: BOTH,
-    sections: [exists("feed")],
     dev: bank(["Discover", "the discovery feed"], ["What's new in my feed?"]),
     heldout: bank(
       ["the feed of new names"],
@@ -106,8 +93,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "COMPANY_VISIBILITY",
-    sides: F,
-    sections: [exists("visibility")],
     dev: bank(
       ["my visibility settings", "company visibility"],
       ["Who can see my company?"],
@@ -119,8 +104,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "RELATIONSHIPS",
-    sides: BOTH,
-    sections: [exists("hub-overview"), exists("relationships")],
     dev: bank(
       ["my relationships", "Relationships"],
       ["Who am I talking to at the moment?"],
@@ -129,15 +112,11 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "SETTINGS",
-    sides: BOTH,
-    sections: Q_SETTINGS_SECTIONS.map((id) => exists(id)),
     dev: bank(["settings", "my settings"], []),
     heldout: bank(["preferences"], []),
   },
   {
     page: "VERIFICATION",
-    sides: BOTH,
-    sections: [exists("verification")],
     dev: bank(
       ["verification", "the verification page"],
       ["Am I verified yet?"],
@@ -149,8 +128,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "PITCH",
-    sides: F,
-    sections: [exists("pitch")],
     dev: bank(
       ["my pitches", "my pitch videos"],
       ["Which pitch videos have I recorded?"],
@@ -162,8 +139,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "COMPANY_INTEREST",
-    sides: F,
-    sections: [exists("interest"), proposed("deck-views")],
     dev: bank(
       ["my interest page", "investor interest"],
       ["Which investors are interested in us?"],
@@ -175,15 +150,11 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "SAVED",
-    sides: I,
-    sections: [],
     dev: bank(["my saved companies", "Saved"], ["Which companies did I save?"]),
     heldout: bank(["my bookmarks"], ["What did I flag for later?"]),
   },
   {
     page: "INVESTORS",
-    sides: F,
-    sections: [exists("investors")],
     dev: bank(
       ["investors", "the investors page"],
       ["Which investors could fund us?"],
@@ -195,22 +166,16 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "SEARCH",
-    sides: BOTH,
-    sections: [],
     dev: bank(["search"], []),
     heldout: bank(["the search box page"], []),
   },
   {
     page: "GATEWAY",
-    sides: BOTH,
-    sections: [],
     dev: bank(["GateQ", "the gateway"], []),
     heldout: bank(["Gate Q"], []),
   },
   {
     page: "MEMORY",
-    sides: BOTH,
-    sections: [exists("memory")],
     dev: bank(
       ["what Q remembers", "Q's memory page"],
       ["What do you remember about me?"],
@@ -222,8 +187,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "USAGE",
-    sides: BOTH,
-    sections: [exists("usage")],
     dev: bank(
       ["my usage", "the usage page"],
       ["How much have I used Q this month?"],
@@ -232,8 +195,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "NEW_PITCH",
-    sides: F,
-    sections: [exists("pitch")],
     dev: bank(
       ["a new pitch", "the pitch recorder"],
       ["I want to record a pitch video."],
@@ -245,8 +206,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "REHEARSALS",
-    sides: BOTH,
-    sections: [exists("rehearsals")],
     dev: bank(
       ["rehearsals", "my rehearsals"],
       ["Where do I practise a meeting?"],
@@ -255,8 +214,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "DOCUMENTS",
-    sides: BOTH,
-    sections: [exists("documents")],
     dev: bank(
       ["my documents", "Documents"],
       ["Where are the files you made me?"],
@@ -265,15 +222,11 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "DAILY",
-    sides: BOTH,
-    sections: [exists("daily")],
     dev: bank(["Q Daily", "my Daily"], ["What was in my briefing?"]),
     heldout: bank(["the daily brief"], ["What did this morning's digest say?"]),
   },
   {
     page: "RESULTS",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["my results", "rehearsal results"],
       ["How did my last rehearsal go?"],
@@ -282,8 +235,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "PASSED",
-    sides: I,
-    sections: [],
     dev: bank(
       ["companies I passed on", "Passed"],
       ["Which companies did I pass on?"],
@@ -292,8 +243,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "YOUR_COMPANIES",
-    sides: I,
-    sections: [],
     dev: bank(
       ["my companies in Discover", "your companies tab"],
       ["Which companies am I tracking in Discover?"],
@@ -305,22 +254,16 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "WORK",
-    sides: BOTH,
-    sections: [exists("approvals"), exists("work")],
     dev: bank(["Work", "my work page"], []),
     heldout: bank(["the work hub"], []),
   },
   {
     page: "EXPLORE",
-    sides: BOTH,
-    sections: [exists("explore")],
     dev: bank(["Explore", "the explore page"], []),
     heldout: bank(["browse everything"], []),
   },
   {
     page: "PEOPLE_SEARCH",
-    sides: BOTH,
-    sections: [exists("search")],
     dev: bank(
       ["people search", "the people finder"],
       ["Find me a person on Capital Q."],
@@ -332,8 +275,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "WORK_NEEDS",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["what needs me", "my to-dos"],
       ["What needs my attention today?"],
@@ -342,8 +283,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "WORK_PROGRESS",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["work in progress", "what Q is doing"],
       ["What are you working on for me?"],
@@ -352,8 +291,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "WORK_DONE",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["finished work", "the done tab"],
       ["What did you finish for me this week?"],
@@ -362,8 +299,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "WORK_TEAM",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["my team's work", "the team tab in Work"],
       ["What is my team working on?"],
@@ -375,8 +310,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "WORK_COST",
-    sides: BOTH,
-    sections: [],
     dev: bank(
       ["the cost tab", "what my work costs"],
       ["How much has Q's work cost me?"],
@@ -385,8 +318,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "OWN_DATA_ROOM",
-    sides: F,
-    sections: [exists("data-room"), proposed("missing")],
     dev: bank(["my data room", "our data room"], ["What's in my data room?"]),
     heldout: bank(
       ["the room of our documents"],
@@ -395,8 +326,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "OWN_DECK",
-    sides: F,
-    sections: [],
     dev: bank(
       ["my deck", "our pitch deck"],
       ["What does my deck look like now?"],
@@ -405,8 +334,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "GATEQ_INBOX",
-    sides: I,
-    sections: [exists("inbox")],
     dev: bank(
       ["my GateQ inbox", "the GateQ inbox"],
       ["Any new applications to my fund?"],
@@ -418,8 +345,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "GATEQ_FIND",
-    sides: I,
-    sections: [],
     dev: bank(
       ["GateQ find", "the find tab in GateQ"],
       ["Find startups that pass my gate."],
@@ -431,8 +356,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "GATEQ_CLAIM",
-    sides: F,
-    sections: [],
     dev: bank(
       ["GateQ claim", "the claim tab"],
       ["I want to claim my company on GateQ."],
@@ -444,8 +367,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "GATEQ_APPLICATIONS",
-    sides: F,
-    sections: [],
     dev: bank(
       ["my GateQ applications", "the applications tab"],
       ["What came back from the gates I applied to?"],
@@ -457,8 +378,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "SAVED_COMPARE",
-    sides: I,
-    sections: [],
     dev: bank(
       ["the saved comparison", "saved compare"],
       ["Put my saved companies side by side."],
@@ -470,8 +389,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "REVIEWS",
-    sides: BOTH,
-    sections: [exists("reviews")],
     dev: bank(["reviews", "my reviews"], ["What's waiting for my review?"]),
     heldout: bank(
       ["things to check"],
@@ -480,18 +397,11 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "TOP_INVESTORS",
-    sides: F,
-    sections: [exists("top")],
-    dev: bank(
-      ["my top investors", "the top matches"],
-      ["Who are my best-fit investors?"],
-    ),
-    heldout: bank(["the best investors page"], ["Which funds match us best?"]),
+    dev: bank(["my top companies", "the top-fit companies page"], []),
+    heldout: bank(["the best-fit companies page"], []),
   },
   {
     page: "CAPITAL_RAISE",
-    sides: F,
-    sections: [exists("rounds")],
     dev: bank(
       ["my raise", "raise and rounds"],
       ["How much have we raised so far?"],
@@ -500,8 +410,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "CAPITAL_READINESS",
-    sides: F,
-    sections: [],
     dev: bank(
       ["my readiness", "the readiness tab"],
       ["How ready am I to raise?"],
@@ -510,8 +418,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "CAPITAL_ACTION_PLAN",
-    sides: F,
-    sections: [],
     dev: bank(
       ["my action plan", "the raise action plan"],
       ["What are the next steps for my raise?"],
@@ -523,8 +429,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "CAPITAL_PLAN",
-    sides: F,
-    sections: [],
     dev: bank(
       ["my 12-month plan", "the plan tab"],
       ["What's my plan for the year?"],
@@ -536,8 +440,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "CAPITAL_INVESTORS",
-    sides: F,
-    sections: [],
     dev: bank(
       ["the investors tab in Capital", "investors on my raise"],
       ["Which investors are in my round?"],
@@ -549,8 +451,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "CRM_PIPELINE",
-    sides: BOTH,
-    sections: [exists("pipeline")],
     dev: bank(
       ["my pipeline", "the pipeline view"],
       ["Where do my deals stand?"],
@@ -559,8 +459,6 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "Q_PITCH",
-    sides: BOTH,
-    sections: [exists("q-pitch")],
     dev: bank(
       ["Q Pitch", "the Q Pitch tour"],
       ["Show me how Capital Q works."],
@@ -569,15 +467,11 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
   {
     page: "BOARD",
-    sides: BOTH,
-    sections: [exists("board")],
     dev: bank(["my board", "the work board"], ["What's on my board?"]),
     heldout: bank(["my kanban"], ["What cards do I have going?"]),
   },
   {
     page: "MANDATE",
-    sides: I,
-    sections: [],
     dev: bank(["my mandate", "the mandate page"], ["What's my mandate again?"]),
     heldout: bank(
       ["my investment thesis page"],
@@ -586,10 +480,123 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] = [
   },
 ];
 
+/** The sections W2 is adding (relayed 6 Nov); EXISTS once in the site map. */
+const PROPOSED_SECTIONS: readonly (readonly [
+  string,
+  string,
+  QNavSide | undefined,
+])[] = [
+  ["CAPITAL", "commitments", "INVESTOR"],
+  ["COMPANY_INTEREST", "deck-views", "FOUNDER"],
+  ["OWN_DATA_ROOM", "missing", "FOUNDER"],
+  ["RELATIONSHIP_COMPANY_MESSAGES", "draft", undefined],
+  ["RELATIONSHIP_INVESTOR_MESSAGES", "draft", undefined],
+];
+
 /**
- * Places the same route reaches: the same place, whichever name is used
- * (destinations.ts maps SEARCH and EXPLORE both to /explore; /gateq
- * opens each side's own GateQ tab). Graded as equal.
+ * Sides the page's code decides where W2's tab titles say otherwise or
+ * nothing (reported to W2): GateQ's investor inbox and find and its
+ * founder claim (apps/web/app/(app)/gateq/page.tsx); Capital, which gives
+ * the investor its own screen (mandate, commitments), and its raise,
+ * readiness, plan and investors tabs, which only a founder's screen has
+ * (apps/web/src/features/capital/capital-screen.tsx).
+ */
+const TAB_SIDES: Readonly<Record<string, readonly QNavSide[]>> = {
+  GATEQ_INBOX: ["INVESTOR"],
+  GATEQ_FIND: ["INVESTOR"],
+  GATEQ_CLAIM: ["FOUNDER"],
+  CAPITAL: ["INVESTOR", "FOUNDER"],
+  CAPITAL_RAISE: ["FOUNDER"],
+  CAPITAL_READINESS: ["FOUNDER"],
+  CAPITAL_ACTION_PLAN: ["FOUNDER"],
+  CAPITAL_PLAN: ["FOUNDER"],
+  CAPITAL_INVESTORS: ["FOUNDER"],
+};
+
+const BOTH: readonly QNavSide[] = ["INVESTOR", "FOUNDER"];
+const sidesOfAudience = (audience: string): readonly QNavSide[] =>
+  audience === "FOUNDER"
+    ? ["FOUNDER"]
+    : audience === "INVESTOR"
+      ? ["INVESTOR"]
+      : audience === "ANY"
+        ? BOTH
+        : [];
+
+const sitePage = (route: string): QSiteMapPage | undefined =>
+  Q_SITE_MAP.pages.find((page) => page.route === route);
+
+function sectionsOf(
+  page: string,
+  site: QSiteMapPage | undefined,
+  tab: string | null,
+): readonly QNavSectionDef[] {
+  const existing: QNavSectionDef[] = (site?.sections ?? [])
+    .filter((s) => s.tab === undefined || tab === null || s.tab === tab)
+    .map((s) => ({ id: s.id, status: "EXISTS" as const }));
+  for (const [onPage, id, side] of PROPOSED_SECTIONS) {
+    if (onPage === page && !existing.some((s) => s.id === id))
+      existing.push({
+        id,
+        status: "PROPOSED",
+        ...(side === undefined ? {} : { side }),
+      });
+  }
+  return existing;
+}
+
+/** A placeholder record id: only the page decides where it lands. */
+const ANY_RECORD = "00000000-0000-4000-8000-000000000000";
+
+function placeOf(page: QNavigateDestination | QRecordPage): {
+  readonly site: QSiteMapPage | undefined;
+  readonly route: string | null;
+  readonly tab: string | null;
+} {
+  const target: QNavigateTarget = (
+    Q_RECORD_PAGES as readonly string[]
+  ).includes(page)
+    ? QNavigateTargetSchema.parse({ page, recordId: ANY_RECORD })
+    : QNavigateTargetSchema.parse({ page });
+  const place = targetToSitePlace(target);
+  const site = place === null ? undefined : sitePage(place.route);
+  return { site, route: place?.route ?? null, tab: place?.tab ?? null };
+}
+
+export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] =
+  Q_NAVIGATE_DESTINATIONS.map((page) => {
+    const words = BANKS.find((b) => b.page === page);
+    const { site, route, tab } = placeOf(page);
+    const tabTitle =
+      site?.tabs.find((t) => t.id === tab)?.title.toLowerCase() ?? "";
+    const tabSide: readonly QNavSide[] | null = tabTitle.endsWith("(investor)")
+      ? ["INVESTOR"]
+      : tabTitle.endsWith("(founder)")
+        ? ["FOUNDER"]
+        : null;
+    const sides =
+      TAB_SIDES[page] ?? tabSide ?? sidesOfAudience(site?.audience ?? "");
+    const unreachable =
+      site === undefined
+        ? "not in the site map"
+        : site.redirectsTo !== undefined
+          ? `its page only redirects (to ${site.redirectsTo}), so the decision cannot name it`
+          : null;
+    return {
+      page,
+      route,
+      sides,
+      sections: sectionsOf(page, site, tab),
+      dev: words?.dev ?? bank([], []),
+      heldout: words?.heldout ?? bank([], []),
+      unreachable,
+    };
+  });
+
+/**
+ * Same-route and same-place names, graded as equal: destinations.ts sends
+ * SEARCH and EXPLORE to /explore; /gateq opens each side's own GateQ tab;
+ * /mandate redirects to the profile's mandate section.
  */
 export const Q_NAV_SAME_PLACE: Readonly<
   Record<QNavSide, readonly (readonly string[])[]>
@@ -606,115 +613,52 @@ export const Q_NAV_SAME_PLACE: Readonly<
 
 export type QNavRecordPageDef = {
   readonly page: QRecordPage;
+  readonly route: string | null;
   readonly sides: readonly QNavSide[];
-  /** Its tab keys (W3: a record page's tab is `tab`). */
   readonly tabs: readonly string[];
   readonly sections: readonly QNavSectionDef[];
-  /**
-   * The same place under another record page (COMPANY_DECK is COMPANY,
-   * tab deck): graded as equal.
-   */
+  /** The same place under another record page: graded as equal. */
   readonly sameAs?: { readonly page: QRecordPage; readonly tab?: string };
+  readonly unreachable: string | null;
 };
 
-export const Q_NAV_RECORD_PAGES: readonly QNavRecordPageDef[] = [
-  {
-    page: "COMPANY",
-    sides: BOTH,
-    tabs: Q_COMPANY_PROFILE_TABS,
-    sections: Q_UI_COMPANY_SECTIONS.map((s) =>
-      exists(s.toLowerCase().replace(/_/gu, "-")),
-    ),
-  },
-  // The thread is its own page (W3: RELATIONSHIP_*_MESSAGES, with
-  // messageId and "latest"); the relationship's `messages` tab is that page.
-  {
-    page: "RELATIONSHIP_COMPANY",
-    sides: I,
-    tabs: Q_RELATIONSHIP_TABS.filter((t) => t !== "messages"),
-    sections: [],
-  },
-  {
-    page: "RELATIONSHIP_INVESTOR",
-    sides: F,
-    tabs: Q_RELATIONSHIP_TABS.filter((t) => t !== "messages"),
-    sections: [],
-  },
-  {
-    page: "RELATIONSHIP_COMPANY_MESSAGES",
-    sides: I,
-    tabs: [],
-    sections: [exists("chat"), proposed("draft")],
-  },
-  {
-    page: "RELATIONSHIP_INVESTOR_MESSAGES",
-    sides: F,
-    tabs: [],
-    sections: [exists("chat"), proposed("draft")],
-  },
-  { page: "INVESTOR", sides: F, tabs: [], sections: [exists("investor")] },
-  {
-    page: "INVESTOR_REHEARSAL",
-    sides: F,
-    tabs: [],
-    sections: [exists("rehearsal")],
-  },
-  {
-    page: "COMPANY_REHEARSAL",
-    sides: I,
-    tabs: [],
-    sections: [exists("rehearsal")],
-  },
-  {
-    page: "EXTERNAL_REHEARSAL",
-    sides: BOTH,
-    tabs: [],
-    sections: [exists("rehearsal")],
-  },
-  { page: "DOCUMENT", sides: BOTH, tabs: [], sections: [] },
-  { page: "COMPANY_PITCH", sides: BOTH, tabs: [], sections: [exists("pitch")] },
-  // One data-room document: the company profile's data room tab with that
-  // document open (W3: COMPANY, tab dataroom, documentId) is the same place.
-  {
-    page: "DATA_ROOM_DOCUMENT",
-    sides: BOTH,
-    tabs: [],
-    sections: [],
-    sameAs: { page: "COMPANY", tab: "dataroom" },
-  },
-  {
-    page: "COMPANY_ELEVATOR",
-    sides: BOTH,
-    tabs: [],
-    sections: [],
-    sameAs: { page: "COMPANY", tab: "elevator" },
-  },
-  {
-    page: "COMPANY_DATA_ROOM",
-    sides: BOTH,
-    tabs: [],
-    sections: [],
-    sameAs: { page: "COMPANY", tab: "dataroom" },
-  },
-  {
-    page: "COMPANY_DECK",
-    sides: BOTH,
-    tabs: [],
-    sections: [],
-    sameAs: { page: "COMPANY", tab: "deck" },
-  },
-  {
-    page: "COMPANY_TEAM",
-    sides: BOTH,
-    tabs: [],
-    sections: [],
-    sameAs: { page: "COMPANY", tab: "team" },
-  },
-  { page: "WORK_ITEM", sides: BOTH, tabs: [], sections: [exists("work")] },
-  { page: "CAPITAL_ROUND", sides: F, tabs: [], sections: [exists("rounds")] },
-  { page: "GATEQ_APPLICATION", sides: BOTH, tabs: [], sections: [] },
-  { page: "DAILY_EDITION", sides: BOTH, tabs: [], sections: [exists("daily")] },
-];
+/** Record pages that are a profile tab (W3 round-trips both names). */
+const RECORD_ALIASES: Readonly<
+  Partial<
+    Record<QRecordPage, { readonly page: QRecordPage; readonly tab?: string }>
+  >
+> = {
+  COMPANY_ELEVATOR: { page: "COMPANY", tab: "elevator" },
+  COMPANY_DATA_ROOM: { page: "COMPANY", tab: "dataroom" },
+  COMPANY_DECK: { page: "COMPANY", tab: "deck" },
+  COMPANY_TEAM: { page: "COMPANY", tab: "team" },
+  DATA_ROOM_DOCUMENT: { page: "COMPANY", tab: "dataroom" },
+};
+
+export const Q_NAV_RECORD_PAGES: readonly QNavRecordPageDef[] =
+  Q_RECORD_PAGES.map((page) => {
+    const { site, route } = placeOf(page);
+    const isThread = page.endsWith("_MESSAGES");
+    const tabs = (site?.tabs ?? [])
+      .map((t) => t.id)
+      // The thread is its own page: a relationship's messages tab is it.
+      .filter((t) => !(t === "messages" && page.startsWith("RELATIONSHIP_")));
+    const sameAs = RECORD_ALIASES[page];
+    return {
+      page,
+      route,
+      sides: sidesOfAudience(site?.audience ?? ""),
+      tabs: isThread ? [] : tabs,
+      sections: sectionsOf(page, site, null),
+      ...(sameAs === undefined ? {} : { sameAs }),
+      unreachable:
+        site === undefined
+          ? "not in the site map"
+          : site.redirectsTo !== undefined
+            ? `its page only redirects (to ${site.redirectsTo}), so the decision cannot name it`
+            : null,
+    };
+  });
 
 /** Not a page of Capital Q (curveballs ask for them). */
 export const Q_NAV_NO_SUCH_PAGES = [
@@ -734,12 +678,13 @@ export function recordPageDef(page: string): QNavRecordPageDef | undefined {
   return Q_NAV_RECORD_PAGES.find((d) => d.page === page);
 }
 
-/** Who may open a page (destination or record page); none for an unknown. */
+/** Who may open a page; none for an unknown or unreachable one. */
 export function sidesOf(page: string): readonly QNavSide[] {
-  return destinationDef(page)?.sides ?? recordPageDef(page)?.sides ?? [];
+  const def = destinationDef(page) ?? recordPageDef(page);
+  return def === undefined || def.unreachable !== null ? [] : def.sides;
 }
 
-/** Every page a side may never be moved to. */
+/** Every page a side may never be moved to (or that Q cannot name). */
 export function pagesClosedTo(side: QNavSide): readonly string[] {
   return [
     ...Q_NAVIGATE_DESTINATIONS.filter((p) => !sidesOf(p).includes(side)),

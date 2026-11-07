@@ -1696,3 +1696,26 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **N1** (`page-request.ts`): `offeredFirst(request, workspace = "off")`. With the workspace on, a SHOW is not held back for an offer (DECISIONS 71); off is unchanged. Test added.
 - **Not wired yet** into the answer path. It needs W1 (the flag and the pane state on the request), W2 (digest, records, access) and W3 (emit `target` only when workspace ≠ off).
 - **Gates:** package build 54/54; root tsc 0; web tsc 0; vitest q-core/model-gateway/q-specialists/q-evals/contracts 4875 passed; apps/q-api 3131; Q-IQ `CQ_Q_IQ_ALL=1` 6/6; eslint and prettier clean.
+
+## 2026-11-07 — Q Workspace W4, milestone 3: aligned with W2's site map; DECISIONS 73 (`feat/q-navigation-policy`)
+
+- **Merged W2** (`feat/q-site-map` a4027887). The stub digest is gone.
+- **DECISIONS 73.** NAVIGATION_DECISION runs as NORMAL_DIALOGUE with reasoning LOW, keyed `NAVIGATION_DECISION`. The model sees the full digest for its side, `navigationSiteMap(side) = qSiteMapDigest(Q_SITE_MAP, {side})`. No smaller model and no trimmed digest; cheapness comes only from caching.
+- **Proposal in the site map's words:** route, tab, sectionId, record by name, document title, slide and position. `sitePlaceToTarget` and `targetToSitePlace` map between that place and W3's QNavigateTarget. An unknown route, tab or section gives null, so the turn STAYs.
+- **q-nav vocabulary derived from Q_SITE_MAP:** sides come from audience, tabs and sections from the site map. Only the phrasing banks are hand-written.
+  - **PROPOSED sections, pending W2:** CAPITAL#commitments (investor), COMPANY_INTEREST#deck-views, OWN_DATA_ROOM#missing and RELATIONSHIP_*_MESSAGES#draft.
+  - **Side overrides from app code, reported to W2:** the Capital tab is open to both sides; its raise, readiness, action-plan, plan and investors tabs are founder-only; GateQ inbox and find are investor-only; claim is founder-only.
+- **Dataset changes:**
+  - MANDATE becomes PROFILE#mandate; the grader treats them as the same place.
+  - RESULTS and CAPITAL_ROUND are unreachable (redirect-only pages). The seed round is now the CAPITAL_RAISE#rounds section.
+  - Company financials, capital objective and evidence now point at the overview tab.
+  - Settings sections follow the site map.
+  - TOP_INVESTORS is investor-only ("top companies").
+  - The INVESTOR profile is open to both sides, so investor-side cases were added.
+  - Founder DISCOVER has no target, so it gets no coverage and no ACCESS case.
+- **Pipeline proof:** a proposer that ignores every guard lands every turn exactly, apart from the 19 turns pending W2's PROPOSED sections. Those resolve to STAY, never a guess, and the test pins that list.
+- **W3 gaps:**
+  - QNavigateTarget has no `sub`, so "their raise" or "financials" can only land on the overview tab.
+  - The founder's Discover (founders tab) has no destination.
+  - `/settings/plan` has no destination.
+  - CAPITAL_ROUND and RESULTS exist only on redirect pages.

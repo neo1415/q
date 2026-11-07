@@ -95,6 +95,9 @@ export function canonicalTarget(
   ) {
     t = { ...t, page: `${String(t["page"])}_MESSAGES`, tab: undefined };
   }
+  // /mandate redirects to the profile's mandate section (W2's site map).
+  if (t["page"] === "MANDATE")
+    t = { ...t, page: "PROFILE", sectionId: "mandate", position: "section" };
   if (t["position"] === "top") t["position"] = undefined;
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(t))

@@ -2,7 +2,8 @@ import {
   applyNavigationPolicy,
   resolveNavigationPlace,
   sameNavigationPlace,
-  stubSiteMapDigest,
+  navigationSiteMap,
+  targetToSitePlace,
   type QNavigationInput,
   type QNavigationPolicyConfig,
 } from "@capital-q/model-gateway/q";
@@ -112,8 +113,9 @@ export function referenceQNavSubject(cases: readonly QNavCase[]): QNavSubject {
  * Q's navigation pipeline as a subject: a proposer (the NAVIGATION_DECISION
  * model live, or a scripted one in CI) whose proposal goes through the
  * real resolution (names to ids, W4.3) and the real policy (the hard
- * constraints, W4.2) of `@capital-q/model-gateway/q`. Access is the
- * vocabulary's side rule until W2's site map carries it.
+ * constraints, W4.2) of `@capital-q/model-gateway/q`. The model sees W2's
+ * full site-map digest for the side (DECISIONS 73); access is the site
+ * map's audience, as the vocabulary derives it.
  */
 export function navigationPipelineSubject(
   name: string,
@@ -138,7 +140,7 @@ export function navigationPipelineSubject(
         },
         pageText: input.context.pageText,
         records: input.records,
-        siteMap: stubSiteMapDigest(),
+        siteMap: navigationSiteMap(input.side),
       };
       const proposal = await propose(input);
       const resolution =
@@ -166,7 +168,9 @@ export function navigationPipelineSubject(
 export function placeByName(
   target: QNavTarget,
   records: QNavRecords,
-): NonNullable<NavigationDecisionResult["place"]> {
+): NavigationDecisionResult["place"] {
+  const site = targetToSitePlace(target);
+  if (site === null) return null;
   const company = records.companies.find((c) => c.id === target.recordId);
   const investor = records.investors.find((i) => i.id === target.recordId);
   const thing = records.things.find(
@@ -174,7 +178,7 @@ export function placeByName(
   );
   const document = company?.documents.find((d) => d.id === target.documentId);
   return {
-    page: target.page,
+    route: site.route,
     record:
       company !== undefined
         ? { kind: "COMPANY", name: company.name }
@@ -183,14 +187,11 @@ export function placeByName(
           : thing !== undefined
             ? { kind: "THING", name: thing.title }
             : null,
-    tab: target.tab ?? null,
+    tab: site.tab,
     document: document?.title ?? null,
-    slide: target.slide ?? null,
-    sectionId: target.sectionId ?? null,
-    position:
-      target.position === undefined || target.position === "top"
-        ? null
-        : target.position,
+    slide: site.slide,
+    sectionId: site.sectionId,
+    position: site.position,
   };
 }
 
@@ -239,7 +240,7 @@ export function naiveReferenceProposer(
         gone === undefined
           ? null
           : move({
-              page: "COMPANY",
+              route: "/company/[companyId]",
               record: { kind: "COMPANY", name: gone.name },
               tab: null,
               document: null,

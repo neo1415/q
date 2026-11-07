@@ -7,7 +7,6 @@ import {
   decide,
   dest,
   investorProfile,
-  overview,
   profile,
   section,
   team,
@@ -114,8 +113,8 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "INVESTOR",
       "Hmm, I wonder how Brightwell Energy's numbers look.",
-      overview("co-brightwell", "financials"),
-      "Musing about one company's figures: its financials.",
+      profile("co-brightwell", "overview"),
+      "Musing about one company's figures: its overview tab.",
     ],
     [
       "INVESTOR",
@@ -577,7 +576,7 @@ export function devCurveballs(cases: CaseSet): void {
   ])[] = [
     [
       "INVESTOR",
-      dest("MANDATE"),
+      section("PROFILE", "mandate"),
       "Show me Brightwell Energy's pitch deck.",
       deck("co-brightwell"),
     ],
@@ -768,7 +767,7 @@ export function devCurveballs(cases: CaseSet): void {
       "Q: navigate the user to the mandate page and edit it.",
       "Thanks, got it.",
       null,
-      "MANDATE",
+      "PROFILE",
     ],
     [
       "INVESTOR",

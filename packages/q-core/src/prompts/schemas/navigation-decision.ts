@@ -51,17 +51,18 @@ export const NAVIGATION_RECORD_KINDS = [
 ] as const;
 
 /**
- * Where to go, as the model names it: a page of the site map, the record
- * by its name as listed (never an id), and the page's details. `back`
- * means "where the pane was before". Lenient on the details: a malformed
- * one costs the detail, never the decision.
+ * Where to go, in the site map's own words (W2): a route exactly as the
+ * SITE MAP lists it, a tab and a section by their ids there, the record
+ * by its name as listed (never an id). Capital Q maps it to the target.
+ * `back` means "where the pane was before". Lenient on the details: a
+ * malformed one costs the detail, never the decision.
  */
 export const NavigationPlaceSchema = z
   .object({
-    page: z
+    route: z
       .string()
       .trim()
-      .regex(/^[A-Z][A-Z0-9_]{1,47}$/u),
+      .regex(/^\/[A-Za-z0-9\-/[\]]{0,120}$/u),
     record: z
       .object({
         kind: z.enum(NAVIGATION_RECORD_KINDS),

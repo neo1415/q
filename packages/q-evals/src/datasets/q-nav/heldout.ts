@@ -8,7 +8,6 @@ import {
   decide,
   dest,
   investorProfile,
-  overview,
   profile,
   section,
   team,
@@ -60,7 +59,7 @@ export function heldoutCurveballs(cases: CaseSet): void {
     [
       "INVESTOR",
       "Quaywise Freight's revenue keeps nagging at me.",
-      overview("co-quaywise", "financials"),
+      profile("co-quaywise", "overview"),
     ],
     [
       "INVESTOR",
@@ -404,7 +403,9 @@ export function heldoutCurveballs(cases: CaseSet): void {
     turn(
       "Who's on Nyota Learn's team?",
       I.offer(team("co-nyota-learn"), "Unsaved mandate edits: offer."),
-      { context: context({ at: dest("MANDATE"), dirty: true }) },
+      {
+        context: context({ at: section("PROFILE", "mandate"), dirty: true }),
+      },
     ),
   ]);
   cases.add("DIRTY_FORM", "FOUNDER", [
@@ -435,7 +436,7 @@ export function heldoutCurveballs(cases: CaseSet): void {
   cases.add("BUSY_PANE", "FOUNDER", [
     turn(
       "Can you surface our best-matched investors?",
-      F.offer(dest("TOP_INVESTORS"), "Scrolling in the page pane: offer."),
+      F.offer(dest("INVESTORS"), "Scrolling in the page pane: offer."),
       { context: context({ at: dest("COMPANY_INTEREST"), busy: "SCROLLING" }) },
     ),
   ]);
@@ -452,7 +453,7 @@ export function heldoutCurveballs(cases: CaseSet): void {
     turn(
       "What's Ledgerline raising?",
       I.stay("A question with the pane collapsed: keep the move.", {
-        remembered: overview("co-ledgerline", "capital-objective"),
+        remembered: profile("co-ledgerline", "overview"),
       }),
       { context: context({ pane: "COLLAPSED" }) },
     ),

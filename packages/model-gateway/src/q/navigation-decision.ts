@@ -1,13 +1,10 @@
 import {
-  Q_COMPANY_PROFILE_TABS,
-  Q_NAVIGATE_DESTINATIONS,
-  Q_RECORD_PAGES,
-  Q_RELATIONSHIP_TABS,
-  Q_SETTINGS_SECTIONS,
-  Q_UI_COMPANY_SECTIONS,
+  Q_SITE_MAP,
   QNavigateTargetSchema,
-  QRecordPageSchema,
+  qSiteMapDigest,
   type QNavigateTarget,
+  type QSiteMap,
+  type QSiteMapPage,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -99,23 +96,133 @@ export type QNavigationGuard =
   | "BELOW_GATE"
   | "NOTHING_BEFORE";
 
-// --- 0. The site map (a stub until W2's digest publishes) ---------------
+// --- 0. The site map (W2) ---------------------------------------------
 
 /**
- * W2.4 publishes the real digest (pages, tabs, sections with purposes,
- * access). Until then: every destination and record page the contracts
- * name, with their tabs and the sections the contracts list. Same input,
- * same text (cache-friendly).
+ * W2.4's digest of the site map for the person's side, whole (DECISIONS 73:
+ * never a trimmed digest that loses what Q needs to pick the exact place;
+ * it sits in the cached prefix, which is where the cheapness comes from).
  */
-export function stubSiteMapDigest(): string {
-  const lines = [
-    `PAGES: ${Q_NAVIGATE_DESTINATIONS.join(", ")}.`,
-    `RECORD PAGES (name the record): ${Q_RECORD_PAGES.join(", ")}.`,
-    `COMPANY tabs: ${Q_COMPANY_PROFILE_TABS.join(", ")}; overview sections: ${Q_UI_COMPANY_SECTIONS.map((s) => s.toLowerCase().replace(/_/gu, "-")).join(", ")}; a deck slide by number.`,
-    `RELATIONSHIP_COMPANY / RELATIONSHIP_INVESTOR tabs: ${Q_RELATIONSHIP_TABS.filter((t) => t !== "messages").join(", ")}; the thread is RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES, position latest.`,
-    `SETTINGS sections: ${Q_SETTINGS_SECTIONS.join(", ")}.`,
-  ];
-  return lines.join("\n");
+export function navigationSiteMap(
+  side: QNavigationSide,
+  map: QSiteMap = Q_SITE_MAP,
+): string {
+  return qSiteMapDigest(map, { side });
+}
+
+/** A place in the site map's own words: a route, a tab, a section. */
+export type QSitePlace = {
+  readonly route: string;
+  readonly tab: string | null;
+  readonly sectionId: string | null;
+  readonly slide: number | null;
+  readonly position: "section" | "latest" | null;
+};
+
+const pageByRoute = (map: QSiteMap, route: string): QSiteMapPage | undefined =>
+  map.pages.find((page) => page.route === route);
+
+/**
+ * W3.1's target said in the site map's words (where the pane is, for the
+ * model; and the eval's scripted proposer). Null for a page the map does
+ * not have.
+ */
+export function targetToSitePlace(
+  target: QNavigateTarget,
+  map: QSiteMap = Q_SITE_MAP,
+): QSitePlace | null {
+  const common = {
+    sectionId: target.sectionId ?? null,
+    slide: target.slide ?? null,
+    position:
+      target.position === "section" || target.position === "latest"
+        ? target.position
+        : null,
+  };
+  for (const page of map.pages) {
+    const tab = page.tabs.find((t) =>
+      (t.destinations as readonly string[]).includes(target.page),
+    );
+    if (tab !== undefined) return { route: page.route, tab: tab.id, ...common };
+  }
+  for (const page of map.pages) {
+    if ((page.destinations as readonly string[]).includes(target.page))
+      return { route: page.route, tab: target.tab ?? null, ...common };
+  }
+  for (const page of map.pages) {
+    if ((page.recordPages as readonly string[]).includes(target.page))
+      return { route: page.route, tab: target.tab ?? null, ...common };
+  }
+  return null;
+}
+
+/** The ids resolution found for a place's record, document and item. */
+export type QResolvedIds = {
+  readonly recordId: string | null;
+  readonly documentId: string | null;
+  readonly itemId: string | null;
+};
+
+/**
+ * A place in the site map's words, with its resolved ids, as W3.1's
+ * QNavigateTarget. A tab that has its own destination is that destination
+ * (Work's needs tab is WORK_NEEDS); a page that shows a record takes the
+ * record's page (COMPANY, its tab kept); a relationship's messages tab is
+ * its thread page. Null for anything the map does not have: a route, a
+ * tab, a section, or a record on a page that shows none.
+ */
+export function sitePlaceToTarget(
+  place: QSitePlace,
+  ids: QResolvedIds,
+  map: QSiteMap = Q_SITE_MAP,
+): QNavigateTarget | null {
+  const page = pageByRoute(map, place.route);
+  if (page === undefined) return null;
+  const tab =
+    place.tab === null ? undefined : page.tabs.find((t) => t.id === place.tab);
+  if (place.tab !== null && tab === undefined) return null;
+  if (place.sectionId !== null) {
+    const section = page.sections.find((s) => s.id === place.sectionId);
+    if (section === undefined) return null;
+    if (
+      section.tab !== undefined &&
+      tab !== undefined &&
+      section.tab !== tab.id
+    )
+      return null;
+  }
+  const detail = {
+    ...(ids.documentId === null ? {} : { documentId: ids.documentId }),
+    ...(place.slide === null ? {} : { slide: place.slide }),
+    ...(place.sectionId === null ? {} : { sectionId: place.sectionId }),
+    ...(place.position === null ? {} : { position: place.position }),
+  };
+  let candidate: Record<string, unknown>;
+  const [tabDestination] = tab?.destinations ?? [];
+  if (tabDestination !== undefined && ids.recordId === null) {
+    candidate = { page: tabDestination, ...detail };
+  } else if (ids.itemId !== null && page.route === "/board") {
+    candidate = { page: "BOARD", itemId: ids.itemId, ...detail };
+  } else if (ids.recordId !== null) {
+    const [recordPage] = page.recordPages;
+    if (recordPage === undefined) return null;
+    const thread =
+      tab?.id === "messages" &&
+      (recordPage === "RELATIONSHIP_COMPANY" ||
+        recordPage === "RELATIONSHIP_INVESTOR");
+    candidate = {
+      page: thread ? `${recordPage}_MESSAGES` : recordPage,
+      recordId: ids.recordId,
+      ...(tab === undefined || thread ? {} : { tab: tab.id }),
+      ...detail,
+    };
+  } else {
+    const [destination] = page.destinations;
+    if (destination === undefined) return null;
+    candidate = { page: destination, ...detail };
+  }
+  const parsed = QNavigateTargetSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
 }
 
 // --- 1. Decide -------------------------------------------------------------
@@ -131,12 +238,20 @@ export type QNavigationDecider = {
   ) => Promise<NavigationDecisionResult | null>;
 };
 
-/** A small, fast call: no thinking, a short object out. */
+/**
+ * DECISIONS 73 (owner, 6 Nov 2026): never trade Q's intelligence for cost
+ * or speed. The decision runs on the answer's own class and model
+ * (NORMAL_DIALOGUE), never a smaller one, with the whole site map; it is
+ * kept cheap by the cached prefix, and fast by running beside retrieval.
+ * Its reasoning level is keyed, so routing data can raise it.
+ */
+export const NAVIGATION_DECISION_TASK_CLASS = "NORMAL_DIALOGUE" as const;
+export const NAVIGATION_DECISION_REASONING = "LOW" as const;
 const NAVIGATION_DECISION_BUDGET = {
   maxAttempts: 2,
-  maxEstimatedCostUsd: 0.01,
-  maxOutputTokens: 400,
-  attemptTimeoutMs: 6_000,
+  maxEstimatedCostUsd: 0.05,
+  maxOutputTokens: 1_200,
+  attemptTimeoutMs: 9_000,
 } as const;
 
 /** The task's own variables (the renderer supplies the frame). */
@@ -182,7 +297,7 @@ export function navigationVariables(
   };
 }
 
-/** A target said back with names, never ids (the model never sees ids). */
+/** A target said back in the site map's words and names, never ids. */
 function placeOf(
   target: QNavigateTarget,
   records: QNavigationRecords,
@@ -196,13 +311,14 @@ function placeOf(
       "a record"
     );
   };
+  const place = targetToSitePlace(target);
   return {
-    page: target.page,
+    route: place?.route ?? null,
+    ...(place?.tab == null ? {} : { tab: place.tab }),
     ...(target.recordId === undefined ? {} : { record: name(target.recordId) }),
-    ...(target.tab === undefined ? {} : { tab: target.tab }),
+    ...(target.itemId === undefined ? {} : { item: name(target.itemId) }),
     ...(target.sectionId === undefined ? {} : { sectionId: target.sectionId }),
     ...(target.slide === undefined ? {} : { slide: target.slide }),
-    ...(target.itemId === undefined ? {} : { item: name(target.itemId) }),
   };
 }
 
@@ -225,8 +341,8 @@ export function createQNavigationDecider(dependencies: {
         });
         const result = await dependencies.gateway.execute(
           {
-            taskClass: "FAST_CLASSIFICATION",
-            reasoning: "NONE",
+            taskClass: NAVIGATION_DECISION_TASK_CLASS,
+            reasoning: NAVIGATION_DECISION_REASONING,
             reasoningKey: "NAVIGATION_DECISION",
             sensitivity: "CONFIDENTIAL",
             budget: NAVIGATION_DECISION_BUDGET,
@@ -275,12 +391,14 @@ export type QNavigationResolution =
 
 /**
  * The model's place, with every name turned into the id of a record the
- * person may open, checked against the W3.1 contract. Never a guess: two
- * records that fit, or none, is UNRESOLVED.
+ * person may open, mapped through the site map to W3.1's target. Never a
+ * guess: two records that fit, or none, is UNRESOLVED; so is a route,
+ * tab or section the site map does not have.
  */
 export function resolveNavigationPlace(
   proposal: NavigationDecisionResult,
   input: QNavigationInput,
+  map: QSiteMap = Q_SITE_MAP,
 ): QNavigationResolution {
   if (proposal.back) {
     return input.pane.previous === null
@@ -308,10 +426,14 @@ export function resolveNavigationPlace(
     record?.kind === "THING"
       ? byName(input.records.things, (t) => t.title, record.name)
       : null;
-  const recordId = company?.id ?? investor?.id ?? thing?.id ?? null;
-  if (record !== null && recordId === null) return { kind: "UNRESOLVED" };
-
-  let documentId: string | undefined;
+  if (
+    record !== null &&
+    company === null &&
+    investor === null &&
+    thing === null
+  )
+    return { kind: "UNRESOLVED" };
+  let documentId: string | null = null;
   if (place.document !== null) {
     const doc =
       company === null
@@ -320,25 +442,28 @@ export function resolveNavigationPlace(
     if (doc === null) return { kind: "UNRESOLVED" };
     documentId = doc.id;
   }
-  const isRecordPage = QRecordPageSchema.safeParse(place.page).success;
-  const onBoard = place.page === "BOARD" && thing !== null;
-  if (isRecordPage && recordId === null) return { kind: "UNRESOLVED" };
-  const candidate: Record<string, unknown> = {
-    page: place.page,
-    ...(isRecordPage && recordId !== null ? { recordId } : {}),
-    ...(onBoard ? { itemId: thing.id } : {}),
-    ...(place.tab === null ? {} : { tab: place.tab }),
-    ...(documentId === undefined ? {} : { documentId }),
-    ...(place.slide === null ? {} : { slide: place.slide }),
-    ...(place.sectionId === null ? {} : { sectionId: place.sectionId }),
-    ...(place.position === null || place.position === "top"
-      ? {}
-      : { position: place.position }),
-  };
-  const parsed = QNavigateTargetSchema.safeParse(candidate);
-  return parsed.success
-    ? { kind: "TARGET", target: parsed.data }
-    : { kind: "UNRESOLVED" };
+  const onBoard = place.route === "/board" && thing !== null;
+  const target = sitePlaceToTarget(
+    {
+      route: place.route,
+      tab: place.tab,
+      sectionId: place.sectionId,
+      slide: place.slide,
+      position:
+        place.position === "section" || place.position === "latest"
+          ? place.position
+          : null,
+    },
+    {
+      recordId: onBoard
+        ? null
+        : (company?.id ?? investor?.id ?? thing?.id ?? null),
+      documentId,
+      itemId: onBoard ? thing.id : null,
+    },
+    map,
+  );
+  return target === null ? { kind: "UNRESOLVED" } : { kind: "TARGET", target };
 }
 
 // --- 3. Policy -------------------------------------------------------------
