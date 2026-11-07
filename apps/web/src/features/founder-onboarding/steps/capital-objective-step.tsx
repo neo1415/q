@@ -131,7 +131,6 @@ export function CapitalObjectiveStep({
             id="raise-instrument"
             name="instrument"
             legend="Instrument"
-            description={t("Optional.")}
             options={step.instrumentOptions}
             value={instrument}
             disabled={busy}
@@ -141,7 +140,6 @@ export function CapitalObjectiveStep({
             id="raise-timeframe"
             name="timeframe"
             legend="Target close"
-            description={t("Optional.")}
             options={step.timeframeOptions}
             value={timeframe}
             disabled={busy}
@@ -151,7 +149,7 @@ export function CapitalObjectiveStep({
             id="raise-use"
             name="useOfFunds"
             legend="Main use of funds"
-            description={t("Optional. Choose any that apply.")}
+            description={t("Choose any that apply.")}
             options={step.useOfFundsOptions}
             values={useOfFunds}
             disabled={busy}

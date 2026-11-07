@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -24,6 +25,8 @@ import {
 import { QAperture } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { useT } from "@/features/i18n/language";
+
+import { QPaneWidthContext } from "./q-pane-width";
 
 import {
   Q_PANE_DEFAULT,
@@ -77,11 +80,34 @@ function openPageSheet(): void {
 export function WorkspaceQPane({ children }: { readonly children: ReactNode }) {
   const t = useT();
   const session = useQSessionOptional();
+  // R7: the pane's own width for layout decisions made in code; the
+  // stored width first (known before paint), then measured as it changes.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(() => {
+    const layout = getWorkspaceLayout();
+    return layout.pagePane === "open" ? layout.qWidth : null;
+  });
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (body === null || typeof ResizeObserver === "undefined") return;
+    const read = () => {
+      const next = Math.round(body.getBoundingClientRect().width);
+      if (next > 0) setWidth(next);
+    };
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, []);
   // Which of these shows is CSS's call (the `<html>` attributes the boot
   // script sets before paint), so the first frame is already right.
   return (
     <aside className="cq-ws-q" aria-label={t("Q")} data-ws-q>
-      <div className="cq-ws-q-body">{children}</div>
+      <div className="cq-ws-q-body" ref={bodyRef}>
+        <QPaneWidthContext.Provider value={width}>
+          {children}
+        </QPaneWidthContext.Provider>
+      </div>
       <button
         type="button"
         className="cq-ws-q-edge"

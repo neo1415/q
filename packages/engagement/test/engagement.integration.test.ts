@@ -12,6 +12,7 @@ import {
 
 import {
   createEngagementNotices,
+  createInvestorViews,
   createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
   createPostgresMyEngagementReader,
@@ -468,6 +469,83 @@ describe("@capital-q/engagement against local Postgres", () => {
         select company_id from analytics.engagement_events
          where viewer_user_id = ${investor.viewer.userId} and engagement_type = 'Q_CARD_VIEW'`;
       expect(row?.company_id).toBe(company.entityId);
+    });
+  });
+  it("records founders' views of an investor and gives the investor only aggregates", async () => {
+    await scenario(async (tx) => {
+      const investor = await org(tx, "investment_firm");
+      const hidden = await org(tx, "investment_firm");
+      const founders = await Promise.all(
+        [0, 1, 2].map(() => org(tx, "company")),
+      );
+      const actor = (o: Org) => ({
+        tenantId: o.viewer.tenantId,
+        userId: o.viewer.userId,
+        organisationId: o.viewer.organisationId,
+        roles: [],
+      });
+      // The founder's own authorised read: only `investor` is visible.
+      const views = createInvestorViews({
+        sql: tx.sql,
+        mayViewInvestor: (_actor, id) =>
+          Promise.resolve(id === investor.entityId),
+      });
+      const view = (
+        investorOrganisationId: string,
+        clientEventId = clientId(),
+      ) => ({
+        clientEventId,
+        investorOrganisationId,
+        occurredAt: at,
+      });
+
+      const first = founders[0];
+      if (first === undefined) throw new Error("no founder");
+      const once = view(investor.entityId);
+      expect(await views.record(actor(first) as never, once)).toBe("ACCEPTED");
+      expect(await views.record(actor(first) as never, once)).toBe(
+        "DEDUPLICATED",
+      );
+      // Not visible to this founder, and the investor's own team: dropped.
+      expect(
+        await views.record(actor(first) as never, view(hidden.entityId)),
+      ).toBe("DROPPED");
+      expect(
+        await views.record(actor(investor) as never, view(investor.entityId)),
+      ).toBe("DROPPED");
+      const [stamped] = await tx.sql<{ visibility_at_view: string }[]>`
+        select visibility_at_view from analytics.investor_profile_views
+         where client_event_id = ${once.clientEventId}`;
+      expect(stamped?.visibility_at_view).toBe("ORGANISATION_ONLY");
+
+      const mine = () =>
+        views.mine({
+          actorUserId: investor.viewer.userId,
+          organisationId: investor.viewer.organisationId,
+          since: null,
+        });
+      // One founder organisation: below the floor, nothing shown.
+      expect((await mine())?.floorMet).toBe(false);
+      for (const founder of founders.slice(1)) {
+        expect(
+          await views.record(actor(founder) as never, view(investor.entityId)),
+        ).toBe("ACCEPTED");
+      }
+      const shown = await mine();
+      expect(shown?.floorMet).toBe(true);
+      expect(shown?.periods[0]).toMatchObject({
+        organisations: 3,
+        viewers: 3,
+        profileViews: 3,
+      });
+      // A founder is not a member of the investor firm: nothing.
+      expect(
+        await views.mine({
+          actorUserId: first.viewer.userId,
+          organisationId: first.viewer.organisationId,
+          since: null,
+        }),
+      ).toBeNull();
     });
   });
 });

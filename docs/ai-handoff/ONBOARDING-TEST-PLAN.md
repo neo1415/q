@@ -320,3 +320,30 @@ These are reported to the owner rather than made mandatory.
 | Founder F6.min_cheque                                                                                                                                                                                                    | F6.min_cheque (optional)                                      | Rendering on the profile is unverified (deck-derived "Minimum cheque").                                                                                                                                                                        |
 | Founder F9 pitch sections (problem, solution, …)                                                                                                                                                                         | F9.* (optional)                                               | The overview reads the deck, the pitch video and four answers, not F9 answers. It looks unrendered (unverified on the API side).                                                                                                               |
 | Logo, cover, verification, Q findings, Q card, team list, deck and data room, derived numbers, "Your book"                                                                                                               | none                                                          | Uploads, verification state or derived: not onboarding questions.                                                                                                                                                                              |
+
+## 10. Batch 7: the audit decisions as built (`fix/onboarding-3`)
+
+The integration owner's decisions on §9, under the rule that every field the profile shows is mandatory:
+
+- **Founder v10** (migration `20261231460000`):
+  - F1.city and F1.founded_year are asked with the country.
+  - F1.one_line ("in one line", the header tagline that semantic matching reads) comes after the description. Q drafts it from the description for their yes (reader v17, INFERRED, held).
+  - All three are required and write the company's basics.
+  - The year is kept as its first day and shown as the year only.
+- **Investor v5** (migration `20261231470000`):
+  - Every preference list the profile and mandate show is required.
+  - "None" (`NONE_ANSWER_TEXT`) answers each list and holds no value. No "how firm is that?" follows a "None" or an "I don't know": branching EXISTS ignores both.
+  - Q's checklist groups the lists into few natural questions by theme.
+  - On the form, an empty list is "None".
+  - New and required: I11.public_description (the firm's "In your words"), which Q drafts from the mandate for their yes.
+  - The discovery style stays optional.
+- **Legal name:** not asked in onboarding; it belongs to KYB.
+  - It was shown empty in two places: "Not added" on the founder's `/profile` and "Not stated" in the investor-facing Diligence ledger.
+  - Both rows are now hidden until a legal name exists.
+- **Form copy:** "Optional" is gone from every now-mandatory field: website, country, cheques, investment role, role, instrument, timeframe, use of funds, and the attribute lists.
+- **F9 pitch sections: dead, not a rendering bug.**
+  - F9 answers have `writesTo: []`.
+  - The API's `overview.pitchSections` come only from Q's pitch-video readings (`media.pitch_section_readings`, apps/api/src/pitch-claims.ts).
+  - The web Overview fills sections from the deck, then the pitch video, then four answers (summary, sector, team, raise). Nothing reads F9.
+  - F9 answers are shown back only in the founder's own onboarding journey.
+  - Fixing it needs an API source (for example QUESTION-sourced facts in `pitchSections`) plus a branch in `pitch-profile.ts`. That is the owner's call.

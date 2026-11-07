@@ -1,0 +1,28 @@
+account e2e-fou-202611071823-q9vz@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+PASS J1 one dense line answers several topics — F1.country, F1.stage, F1.categories, F4.founder_role, F4.full_time
+NOTE J1 Q's next question (judge: conversational, not a label) — That gives me the company, stage, Lagos base, your CEO role, two full-time founders, and a nine-person team. What’s Tamarind Ledger’s website?
+PASS J2 a ramble is said back for a yes — The company: Tamarind Ledger helps small shops and market traders in Lagos and Ibadan manage informal credit and collect payments. The problem: Many small merchants still track who owes them in notebo
+PASS J2 nothing saved before the yes
+PASS J2 saved after the yes
+NOTE J2 Q after a clear typed answer — That adds useful detail on the scale of the problem. What’s Tamarind Ledger’s website?
+FAIL J2 a clear typed answer is saved in their words, not read back
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood—we’ll leave the website and team size aside for now. You mentioned there are two founders; should I keep that, and what areas does the founding team cover between you—such as product, engineering, sales, partnerships or operations?
+NOTE J3 stored for F4.team_size — null
+FAIL J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. From what you said earlier, founders: 2. Shall I keep that? Say yes, or tell me what it should be.
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying cu
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger (fictional) has nine people, based on what you said earlier. Is that right? And
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before: rind Ledger (fictional) has nine people, based on what you said earlier. Is that right? And how many founders are there? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger (fictional) has nine people, based on w
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — Your company / Your company
+NOTE J6 questions answered from the fact table — [{"q":"And how many founders are there?","answer":"Yes, that's right. That's all for now."},{"q":"What's your website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your website?","answer":"Yes, that's right. That's all for now."},{"q":"Are you raising right now?","answer":"Yes, actively raising."},{"q":"Which currency are you raising in?","answer":"US dollars."},{"q":"How much are you raising?","answer":"One and a half million dollars."},{"q":"5 million Shall I keep that?","answer":"Yes, that's right."},{"q":"What instrument are you raising on?","answer":"Yes, actively raising."},{"q":"What instrument are you raising on?","answer":"Yes, actively raising."},{"q":"What instrument are you raising on?","answer":"Yes, actively raising."},{"q":"What instrument are you raising on?","answer":"Yes, actively raising."},{"q":"What instrument are you raising on?","answer":"Yes, actively raising."}]
+FAIL J6 finish lands on verification — /onboarding/founder
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+3 FAIL; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/onb-e2e3/founder-1440

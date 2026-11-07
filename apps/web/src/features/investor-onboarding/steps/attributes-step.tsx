@@ -28,9 +28,7 @@ function Picker({
   return (
     <fieldset className="flex flex-col gap-2" id={id}>
       <legend className="cq-label text-(--cq-text-primary)">{legend}</legend>
-      <StrengthNote>
-        {t("Recorded as a strong preference. Optional.")}
-      </StrengthNote>
+      <StrengthNote>{t("Recorded as a strong preference.")}</StrengthNote>
       <ul className="flex flex-wrap gap-2" aria-label={legend}>
         {options.map((option) => {
           const pressed = selected.includes(option.nodeId);
@@ -132,7 +130,6 @@ export function AttributesStep({
         id="attributes-capital"
         name="capitalIntensity"
         legend="Capital intensity"
-        description={t("Optional.")}
         options={step.capitalOptions}
         value={capitalIntensity}
         disabled={busy}
@@ -142,7 +139,6 @@ export function AttributesStep({
         id="attributes-regulatory"
         name="regulatoryAppetite"
         legend="Regulated markets"
-        description={t("Optional.")}
         options={step.regulatoryOptions}
         value={regulatoryAppetite}
         disabled={busy}
@@ -152,9 +148,7 @@ export function AttributesStep({
         id="attributes-revenue"
         name="revenueState"
         legend="Revenue expectations"
-        description={t(
-          "Optional. Kept on record; not yet used to filter companies.",
-        )}
+        description={t("Kept on record; not yet used to filter companies.")}
         options={step.revenueOptions}
         value={revenueState}
         disabled={busy}

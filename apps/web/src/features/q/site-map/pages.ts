@@ -308,6 +308,12 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         audience: "FOUNDER",
       },
       {
+        id: "who-viewed-you",
+        title: "Who viewed you",
+        kind: "OTHER",
+        audience: "INVESTOR",
+      },
+      {
         id: "visibility",
         title: "Your visibility",
         kind: "VISIBILITY",
@@ -1107,6 +1113,8 @@ export const SITE_MAP_PURPOSES: Readonly<
       trend: "attention week by week",
       breakdown: "kinds of investors and where",
       documents: "which documents investors opened",
+      "who-viewed-you":
+        "founders who viewed your firm's profile, by week, never by name",
       visibility: "how founders see you",
       "my-activity": "companies you viewed",
       responses: "founders' answers to you",

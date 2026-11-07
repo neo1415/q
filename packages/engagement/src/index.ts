@@ -31,3 +31,4 @@ export {
   noticeSaves,
   type EngagementNotices,
 } from "./notices.js";
+export { createInvestorViews, type InvestorViews } from "./investor-views.js";

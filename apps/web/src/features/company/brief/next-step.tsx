@@ -11,6 +11,8 @@ import type {
 import { Button, buttonClassName } from "@capital-q/ui/button";
 
 import { ExpressInterest } from "@/features/network/express-interest";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 import { useT } from "@/features/i18n/language";
 
@@ -44,6 +46,32 @@ function isPhone(): boolean {
     typeof window.matchMedia === "function" &&
     window.matchMedia(PHONE).matches
   );
+}
+
+/**
+ * R4: the page's questions as an approval payload (flat fields, shown in
+ * full on the approval card: who, then each question), and back.
+ */
+export function questionsPayload(
+  to: string,
+  questions: readonly string[],
+): ApprovalPayload {
+  const fields: Record<string, string> = { To: to };
+  questions.forEach((question, index) => {
+    fields[`Question ${String(index + 1)}`] = question;
+  });
+  return fields;
+}
+
+export function questionsOf(payload: ApprovalPayload): string[] {
+  return Object.entries(payload)
+    .map(([key, value]) => [/^Question (\d+)$/u.exec(key)?.[1], value] as const)
+    .filter(
+      (entry): entry is readonly [string, string] =>
+        entry[0] !== undefined && typeof entry[1] === "string",
+    )
+    .sort((left, right) => Number(left[0]) - Number(right[0]))
+    .map(([, question]) => question);
 }
 
 export { nextCallOf, type NextCall } from "./journey";
@@ -103,6 +131,41 @@ export function NextStepRibbon({
     met,
   });
 
+  // R4 (owner live test 2026-11-07): the page's own "Send questions" is
+  // Q's to use. Asked to "send those questions to Kathryn", Q drafted its
+  // own as a message, then a request: two approvals, neither this one.
+  // Registered with the questions it would send, so Q prepares exactly
+  // this action for their approval (APPROVAL), never a parallel one.
+  const askRef = useRef<HTMLSpanElement>(null);
+  const questions = (brief?.drafts ?? []).map((draft) => draft.question);
+  const who = brief?.who ?? companyName;
+  useQControl({
+    id: "button.send-questions",
+    kind: "BUTTON",
+    ref: askRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.send-questions",
+      summary: (payload) => {
+        const count = questionsOf(payload).length;
+        return `Send ${String(count)} ${count === 1 ? "question" : "questions"} to ${who}`;
+      },
+      prepare: (): ApprovalPayload | null =>
+        brief === null ||
+        brief.route.kind === "NOT_CONNECTED" ||
+        questions.length === 0
+          ? null
+          : questionsPayload(who, questions),
+      items: questionsOf,
+      execute: async (payload, key) => {
+        if (brief === null) return "FAILED";
+        return (await brief.sendQuestions(questionsOf(payload), key))
+          ? "DONE"
+          : "FAILED";
+      },
+    },
+  });
+
   // The ribbon moves on with a brass sweep, never on the first paint.
   const step = journey?.steps[journey.now];
   const signature = step === undefined ? "" : `${step.kind}:${step.title}`;
@@ -134,13 +197,15 @@ export function NextStepRibbon({
     if (words === null) return null;
     if (step.kind === "ASK") {
       return (
-        <Button
-          variant="primary"
-          onClick={() => brief?.openQuestions()}
-          data-next-step="ASK"
-        >
-          {words}
-        </Button>
+        <span ref={askRef} className="contents">
+          <Button
+            variant="primary"
+            onClick={() => brief?.openQuestions()}
+            data-next-step="ASK"
+          >
+            {words}
+          </Button>
+        </span>
       );
     }
     if (step.kind === "DOCUMENTS") {

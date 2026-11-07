@@ -1,9 +1,15 @@
+import { z } from "zod";
+
 import {
   ANALYTICS_SETTINGS_PATH,
   AnalyticsSettingsDtoSchema,
   COMPANY_ENGAGEMENT_PATH,
   CompanyEngagementDtoSchema,
+  INVESTOR_VIEWS_PATH,
+  InvestorViewingDtoSchema,
   MY_ENGAGEMENT_PATH,
+  MY_INVESTOR_VIEWING_PATH,
+  type RecordInvestorViewRequest,
   MyEngagementDtoSchema,
   ENGAGEMENT_EVENTS_PATH,
   RecordEngagementBatchResponseSchema,
@@ -83,4 +89,24 @@ export function getCompanyEngagement(session: ApiSession, companyId: string) {
 /** The person's own engagement: what they viewed and founders' answers. */
 export function getMyEngagement(session: ApiSession) {
   return call(session, "GET", MY_ENGAGEMENT_PATH, MyEngagementDtoSchema);
+}
+
+/** A founder's view of an investor's profile; the answer never says whether it counted. */
+export function recordInvestorView(
+  session: ApiSession,
+  view: RecordInvestorViewRequest,
+) {
+  return call(session, "POST", INVESTOR_VIEWS_PATH, z.object({}).loose(), {
+    body: view,
+  });
+}
+
+/** Who viewed the signed-in investor's firm: aggregates only. */
+export function getMyInvestorViewing(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    MY_INVESTOR_VIEWING_PATH,
+    InvestorViewingDtoSchema,
+  );
 }

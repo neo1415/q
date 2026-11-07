@@ -254,6 +254,52 @@ describe("the Diligence ledger", () => {
   });
 });
 
+describe("the Diligence ledger's company details (batch 7)", () => {
+  function details(overrides: {
+    legalName: string | null;
+    foundedDate: string | null;
+  }) {
+    const base = fixtures.reviewProfile("INVESTOR");
+    if (base.overview === null) throw new Error("fixture has no overview");
+    const profile = {
+      ...base,
+      overview: { ...base.overview, ...overrides },
+    };
+    const folds = diligenceLedger({
+      profile,
+      own: false,
+      sectorLabels: [],
+      deck: null,
+      sections: [],
+      board: null,
+      sharedInDiligence: [],
+      verified: false,
+    });
+    return folds.find((f) => f.id === "company-details")?.rows ?? [];
+  }
+
+  it("shows no legal name row until there is one: it belongs to verification, not onboarding", () => {
+    expect(
+      details({ legalName: null, foundedDate: null }).some(
+        (r) => r.key === "legal",
+      ),
+    ).toBe(false);
+    expect(
+      details({ legalName: "Kora Health Ltd", foundedDate: null }).find(
+        (r) => r.key === "legal",
+      ),
+    ).toMatchObject({ value: "Kora Health Ltd", evidence: "claim" });
+  });
+
+  it("shows the year founded, never a day nobody gave", () => {
+    expect(
+      details({ legalName: null, foundedDate: "2021-01-01" }).find(
+        (r) => r.key === "founded",
+      ),
+    ).toMatchObject({ value: "2021", evidence: "claim" });
+  });
+});
+
 describe("the section-by-section track", () => {
   it("moves with the strip, the arrows and the arrow keys, and says where it is", () => {
     const sections = [

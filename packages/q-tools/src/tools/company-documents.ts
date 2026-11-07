@@ -423,6 +423,7 @@ export function createOpenCompanyDocumentTool(
     version: 1,
     status: "ACTIVE",
     providerName: "open_company_document",
+    movesPagePane: true,
     description:
       "Opens one document from a company's data room on their screen, in the viewer where they are: 'open Halyard's certificate of incorporation', 'show me their incorporation document', 'open the CAC certificate'. Finds it by meaning among the documents that company's Data room shows them. One clear match opens; several likely ones come back for you to ask which (then call again with its documentId); none or on-request ones are said plainly. Only say it is on their screen when this tool returned SCREEN_WILL_DO_IT.",
     classification: "SIDE_EFFECT",

@@ -49,9 +49,21 @@ export {
  * The version new investor sessions pin to (v4: the owner's mandatory set
  * and the firm's headquarters country, DECISIONS 79). A superset of v1-v3.
  */
+/**
+ * The version new investor sessions pin to (v5: every list the profile
+ * shows is mandatory, "None" answers it, and the firm's description).
+ */
+export {
+  INVESTOR_DEFINITION_V5,
+  INVESTOR_DEFINITION_V5 as INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V5_VERSION,
+  INVESTOR_NONE_STEPS,
+  INVESTOR_PUBLIC_DESCRIPTION_STEP,
+  INVESTOR_PUBLIC_DESCRIPTION_WRITE_TARGET,
+  INVESTOR_V5_NOW_REQUIRED,
+} from "./investor-v5.js";
 export {
   INVESTOR_DEFINITION_V4,
-  INVESTOR_DEFINITION_V4 as INVESTOR_DEFINITION_CURRENT,
   INVESTOR_DEFINITION_V4_VERSION,
   INVESTOR_HQ_COUNTRY_STEP,
   INVESTOR_HQ_COUNTRY_WRITE_TARGET,

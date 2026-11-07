@@ -74,6 +74,8 @@ export function useQControl({
                 summary: (payload) =>
                   (latest.current.action ?? action).summary(payload),
                 prepare: () => (latest.current.action ?? action).prepare(),
+                items: (payload) =>
+                  (latest.current.action ?? action).items?.(payload) ?? [],
                 execute: (payload, key) =>
                   (latest.current.action ?? action).execute(payload, key),
               },

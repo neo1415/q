@@ -1,0 +1,23 @@
+account e2e-inv-202611071830-6ybj@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+PASS J1 one dense line answers several topics — I0.investor_type, I0.organisation_name, I1.mandate_context, I2.stages, I2.currency
+NOTE J1 Q's next question (judge: conversational, not a label) — Thanks — I have Kestrel Bay Capital as an actively deploying VC fund, investing $100,000–$500,000 in US dollars at pre-seed and seed. What’s the firm’s website?
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood — we’ll leave geography and founder outreach aside for now. What’s Kestrel Bay Capital’s website?
+NOTE J3 stored for I10.inbound_preference — null
+FAIL J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What's your firm's website?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Noted, I've saved West Africa (geography) and Fintech, Clean Energy (sectors). Noted, I've saved West Africa and Fintech, Clean Energy for Kestrel Bay Capital. 
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /discover
+NOTE J5 Q on return — Noted, I've saved West Africa (geography) and Fintech, Clean Energy (sectors). Shall I make that mandate live so Discover can match companies to it now?
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before: eography) and Fintech, Clean Energy (sectors). Shall I make that mandate live so Discover can match companies to it now? | after: Noted, I've saved West Africa (geography) and Fintech, Clean Energy (sectors). Shall I make that mandate live so Discover can match companies to it now?
+PASS J5 form continue later matches the conversation's destination (P2-1) — /discover
+PASS J5 the form reopens on the same step — How do you invest? / How do you invest?
+NOTE J6 questions answered from the fact table — [{"q":"Shall I make that mandate live so Discover can match companies to it now?","answer":"Show me everything that fits."},{"q":"What’s Kestrel Bay Capital’s website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."},{"q":"What's your firm's website?","answer":"Yes, that's right. That's all for now."}]
+FAIL J6 finish lands on verification — /onboarding/investor
+PASS J7 the edit waits for approval
+FAIL J7 the change shows on the page
+3 FAIL; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/onb-e2e3/investor-1440

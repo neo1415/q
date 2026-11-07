@@ -86,9 +86,19 @@ export {
  * DECISIONS 79). v9 changes only which steps are required and two lines of
  * copy, so everything said of v8 above holds.
  */
+/**
+ * The version new founder sessions pin to (v10: the city, founding year
+ * and one-line summary the profile shows, batch 7).
+ */
+export {
+  FOUNDER_DEFINITION_V10,
+  FOUNDER_DEFINITION_V10 as FOUNDER_DEFINITION_CURRENT,
+  FOUNDER_DEFINITION_V10_VERSION,
+  FOUNDER_ONE_LINE_MAX_LENGTH,
+  FOUNDER_V10_STEPS,
+} from "./founder-v10.js";
 export {
   FOUNDER_DEFINITION_V9,
-  FOUNDER_DEFINITION_V9 as FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V9_VERSION,
   FOUNDER_V9_NOW_OPTIONAL,
   FOUNDER_V9_NOW_REQUIRED,

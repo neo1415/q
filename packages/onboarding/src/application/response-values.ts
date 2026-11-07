@@ -57,20 +57,50 @@ export function isNotKnownAnswer(
 ): boolean {
   return (
     value?.type === "TEXT" &&
-    value.text
-      .normalize("NFKC")
-      .replace(/[\u2018\u2019]/gu, "'")
-      .replace(/\s+/gu, " ")
-      .trim()
-      .replace(/\.$/u, "")
-      .toLocaleLowerCase() === NOT_KNOWN_ANSWER_TEXT.toLocaleLowerCase()
+    plainWords(value.text) === NOT_KNOWN_ANSWER_TEXT.toLocaleLowerCase()
   );
 }
 
-/** Their words for a step; null when unanswered or "I don't know". */
+/**
+ * The answer "None" to a list step (DECISIONS 79, batch 7: every preference
+ * list on the profile is mandatory, and "none" or "no preference" is the
+ * honest answer for many people). Like "I don't know", it settles the step
+ * and holds no value: nothing is preferred, avoided or excluded, and a
+ * follow-up about it ("how firm is that?") is not asked.
+ */
+export const NONE_ANSWER_TEXT = "None";
+
+function plainWords(text: string): string {
+  return text
+    .normalize("NFKC")
+    .replace(/[\u2018\u2019]/gu, "'")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/\.$/u, "")
+    .toLocaleLowerCase();
+}
+
+/** Whether an answer is "None". */
+export function isNoneAnswer(
+  value: OnboardingResponseValue | null | undefined,
+): boolean {
+  return (
+    value?.type === "TEXT" &&
+    plainWords(value.text) === NONE_ANSWER_TEXT.toLocaleLowerCase()
+  );
+}
+
+/** Whether an answer settles its step without holding a value. */
+export function holdsNoValue(
+  value: OnboardingResponseValue | null | undefined,
+): boolean {
+  return isNotKnownAnswer(value) || isNoneAnswer(value);
+}
+
+/** Their words for a step; null when unanswered, "I don't know" or "None". */
 export function text(values: ResponseValues, stepKey: string): string | null {
   const value = values.get(stepKey);
-  if (isNotKnownAnswer(value)) return null;
+  if (holdsNoValue(value)) return null;
   return value?.type === "TEXT" ? value.text.trim() : null;
 }
 

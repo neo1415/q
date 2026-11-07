@@ -355,6 +355,14 @@ export const Q_SITE_MAP: QSiteMap = {
           purpose: "which documents investors opened",
         },
         {
+          id: "who-viewed-you",
+          title: "Who viewed you",
+          kind: "OTHER",
+          audience: "INVESTOR",
+          purpose:
+            "founders who viewed your firm's profile, by week, never by name",
+        },
+        {
           id: "visibility",
           title: "Your visibility",
           kind: "VISIBILITY",

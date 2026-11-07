@@ -2126,3 +2126,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Labs live (fictional investor savanna-seed, Settings toggle on): Q moved to /analytics in 0.3 s, /profile mandate 0.8 s, /work 3.0 s, /discover 0.3 s. Phone: an ambiguous ask got STAY and asked who was meant.
 - Defects (to W1): React #418 hydration error with the workspace on; a redundant "Where this lives / Open X" card after a move.
 - Anthropic test spend is about $33.1 of $50.
+
+## 2026-11-07 — W4: R1 root cause found and fixed on fix/q-nav-workspace-r1 (session_01Wncmn4BQnwUu8PoUpcMjfu)
+
+- **Root cause** (QNAV-R1-ROOT-CAUSE-2026-11-07.md): the run (`create-run.ts`, `screenWithManifest`) and the Context Firewall plan (`firewall.ts`, `screenWithin`) each rebuilt the screen from their own list of fields, and neither list included `workspace` (nor `surface`). So `plan.screen.workspace` was always absent and the D78 decision never started.
+- **Fix:** one contract rule, `screenWithBoundEntities`. Only fields that name an entity are judged; every other field is kept as the strict schema accepted it.
+- **Tests, failing first:** run creation, the firewall plan, and an end-to-end q-api test (gate → run → firewall → `createQPageMoves`).
+- **Keyword-like moves:** they came from the turn reader's NAVIGATE (own destinations only, confirmed by a word match: "Opening your profile.", `answer.ts:1772`) and from the answer model's `open_page` / `open_company_document`. The note proposes making the decision the only page-pane authority in workspace mode; that needs a go-ahead.
+- **Pre-existing failures on integration `d57b87e06`, not this change:** 4 onboarding "I don't know" tests (`onboarding-{granary,acceptance}-1030`, `onboarding-{final-recheck,recheck}-1031`).

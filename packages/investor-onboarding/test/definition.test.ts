@@ -40,6 +40,7 @@ import {
   INVESTOR_STEPS,
   INVESTOR_TYPE_OPTIONS,
   INVESTOR_HQ_COUNTRY_WRITE_TARGET,
+  INVESTOR_PUBLIC_DESCRIPTION_WRITE_TARGET,
   INVESTOR_WEBSITE_WRITE_TARGET,
   INVESTOR_WRITE_TARGETS,
   organisationTypeFor,
@@ -121,6 +122,7 @@ describe("Investor Definition v1", () => {
         ...Object.values(INVESTOR_WRITE_TARGETS),
         INVESTOR_WEBSITE_WRITE_TARGET,
         INVESTOR_HQ_COUNTRY_WRITE_TARGET,
+        INVESTOR_PUBLIC_DESCRIPTION_WRITE_TARGET,
       ].sort(),
     );
     expect([...providers].sort()).toEqual(

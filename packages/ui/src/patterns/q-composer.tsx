@@ -127,6 +127,20 @@ export type QComposerProps = {
   readonly talkLabel?: string | undefined;
 };
 
+// JS fallback for browsers without `field-sizing: content`; the class's
+// max-height caps it, and past the cap the field scrolls. An empty field
+// has no inline height: it is one row (R7, live 2026-11-07: after a long
+// question was sent the empty box kept that question's height, because
+// it was measured before the cleared value had reached the field).
+function resize(element: HTMLTextAreaElement) {
+  if (element.value.length === 0) {
+    element.style.height = "";
+    return;
+  }
+  element.style.height = "auto";
+  element.style.height = `${String(element.scrollHeight)}px`;
+}
+
 export function QComposer({
   id,
   contextScope = "unset",
@@ -227,12 +241,27 @@ export function QComposer({
     for (const file of Array.from(files).slice(0, 5)) void onAttach(file);
   };
 
-  // JS fallback for browsers without `field-sizing: content`; the class's
-  // max-height caps it, and past the cap the field scrolls.
-  function resize(element: HTMLTextAreaElement) {
-    element.style.height = "auto";
-    element.style.height = `${String(element.scrollHeight)}px`;
-  }
+  // Sized from the value the field actually shows, after each change of it.
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (element !== null) resize(element);
+  }, [value]);
+
+  // A height measured at another width is wrong at this one (a pane that
+  // was folded or resized): measured again when the field's width changes.
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (element === null || typeof ResizeObserver === "undefined") return;
+    let width = element.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      const next = element.getBoundingClientRect().width;
+      if (Math.abs(next - width) < 1) return;
+      width = next;
+      resize(element);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   async function submit() {
     if (trimmed.length === 0 && !ready) {

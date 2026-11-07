@@ -148,6 +148,13 @@ export type ApprovalAction = {
   readonly summary: (payload: ApprovalPayload) => string;
   /** The exact payload the action would carry now (its draft, its amount). */
   readonly prepare: () => ApprovalPayload | null;
+  /**
+   * R4: the items the payload carries, as the person reads them (the
+   * questions it would send), so Q can tell the page's own action from one
+   * it would compose. Shown to Q only, bounded; never authority.
+   */
+  readonly items?:
+    ((payload: ApprovalPayload) => readonly string[]) | undefined;
   /** Runs it with the approved payload; only `executeApproved` calls it. */
   readonly execute: (
     payload: ApprovalPayload,

@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 
-import { getCompanyEngagement, getMyEngagement } from "@capital-q/api-client";
+import {
+  getCompanyEngagement,
+  getMyEngagement,
+  getMyInvestorViewing,
+} from "@capital-q/api-client";
 import type {
   CompanyEngagementDto,
   EngagementViewerDto,
   IntentSignalDto,
+  InvestorViewingDto,
   MyEngagementDto,
 } from "@capital-q/contracts";
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
@@ -14,6 +19,7 @@ import {
   PageSection,
 } from "@/components/app-shell/page-container";
 import { when } from "@/features/admin/words";
+import { InvestorViewers } from "@/features/engagement/investor-viewers";
 import { VisibilityChoice } from "@/features/engagement/visibility-choice";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
@@ -69,7 +75,11 @@ export default async function AnalyticsPage() {
       </PageContainer>
     );
   }
-  const mine = await getMyEngagement(session).catch(() => null);
+  const [mine, viewing] = await Promise.all([
+    getMyEngagement(session).catch(() => null),
+    // Who viewed you: only for a member of an investor firm (404 otherwise).
+    getMyInvestorViewing(session).catch(() => null),
+  ]);
   return (
     <PageContainer className="flex flex-col gap-8">
       {mine === null ? (
@@ -78,7 +88,7 @@ export default async function AnalyticsPage() {
           description={t("Try again in a moment.")}
         />
       ) : (
-        <InvestorAnalytics data={mine} t={t} />
+        <InvestorAnalytics data={mine} viewing={viewing} t={t} />
       )}
     </PageContainer>
   );
@@ -366,13 +376,25 @@ const ANSWER: Record<MyEngagementDto["responses"][number]["state"], string> = {
 
 function InvestorAnalytics({
   data,
+  viewing,
   t,
 }: {
   readonly data: MyEngagementDto;
+  readonly viewing: InvestorViewingDto | null;
   readonly t: T;
 }) {
   return (
     <>
+      {viewing === null ? null : (
+        <QSection
+          id="who-viewed-you"
+          kind="OTHER"
+          total={viewing.periods.length}
+          label={t("who viewed your profile")}
+        >
+          <InvestorViewers data={viewing} t={t} />
+        </QSection>
+      )}
       <QSection id="visibility" kind="VISIBILITY" label={t("your visibility")}>
         <PageSection
           id="visibility"

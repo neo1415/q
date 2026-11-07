@@ -264,8 +264,11 @@ export function createQToolRegistry(
     // purposes), and this purpose's tools in the turn's areas. A tool no
     // capability lists has no area to judge it by, so it is kept.
     const readsOnly = focus?.readsOnly === true;
+    // The Q Workspace: the page pane moves only on Q's page-move decision.
+    const workspace = context.plan.screen?.workspace !== undefined;
     const relevant = (record: QToolRecord): boolean => {
       const name = record.definition.providerName;
+      if (workspace && record.definition.movesPagePane === true) return false;
       // A question keeps the core's reads, its browser actions (Q shows
       // and navigates while it answers) and use_capability; the core's
       // own change-makers (approve, edit, stop) wait for a request to act.

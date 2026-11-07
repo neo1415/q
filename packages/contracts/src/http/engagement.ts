@@ -23,6 +23,11 @@ export const COMPANY_ENGAGEMENT_PATH =
   "/v1/engagement/companies/:companyId" as const;
 /** An investor's own engagement: what they viewed and how founders answered. */
 export const MY_ENGAGEMENT_PATH = "/v1/engagement/me" as const;
+/** A founder's view of an investor's profile (who viewed an investor). */
+export const INVESTOR_VIEWS_PATH = "/v1/engagement/investor-views" as const;
+/** The signed-in investor's own "who viewed you" aggregate. */
+export const MY_INVESTOR_VIEWING_PATH =
+  "/v1/engagement/investor-viewing" as const;
 
 export const ENGAGEMENT_VERSION = "engagement.v1" as const;
 
@@ -575,3 +580,61 @@ export const MyEngagementDtoSchema = z
   })
   .strict();
 export type MyEngagementDto = z.infer<typeof MyEngagementDtoSchema>;
+
+// ---------------------------------------------------------------------------
+// Who viewed an investor (owner live test 7 Nov 2026;
+// docs/specs/q-workspace/ANALYTICS_INVESTOR_VIEWERS.md).
+// ---------------------------------------------------------------------------
+
+export const RecordInvestorViewRequestSchema = z
+  .object({
+    clientEventId: z.string().regex(/^[A-Za-z0-9_:-]{8,64}$/),
+    sessionId: z
+      .string()
+      .regex(/^[A-Za-z0-9_:-]{8,64}$/)
+      .optional(),
+    occurredAt: z.iso.datetime({ offset: true }),
+    investorOrganisationId: UuidSchema,
+  })
+  .strict();
+export type RecordInvestorViewRequest = z.infer<
+  typeof RecordInvestorViewRequestSchema
+>;
+
+/**
+ * Aggregates only (the specification default; investors never pay for
+ * identity): completed batches at or above the floor, and slices by the
+ * viewing company's stage and country.
+ */
+export const InvestorViewingDtoSchema = z
+  .object({
+    investorOrganisationId: UuidSchema,
+    since: z.iso.datetime({ offset: true }).nullable(),
+    floorMet: z.boolean(),
+    floor: z.number().int().min(3),
+    sliceFloor: z.number().int().min(5),
+    passiveBatch: z.enum(["WEEKLY", "DAILY"]),
+    periods: z.array(
+      z
+        .object({
+          periodStart: z.iso.date(),
+          organisations: z.number().int().min(0),
+          viewers: z.number().int().min(0),
+          profileViews: z.number().int().min(0),
+        })
+        .strict(),
+    ),
+    slices: z.array(
+      z
+        .object({
+          dimension: z.enum(["STAGE", "GEOGRAPHY"]),
+          /** OTHER for the merged, suppressed slices. */
+          slice: z.string(),
+          organisations: z.number().int().min(0).nullable(),
+          suppressed: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type InvestorViewingDto = z.infer<typeof InvestorViewingDtoSchema>;

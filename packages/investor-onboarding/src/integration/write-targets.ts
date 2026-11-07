@@ -82,6 +82,10 @@ import {
   investorHqCountryOf,
 } from "../definition/investor-v4.js";
 import {
+  INVESTOR_PUBLIC_DESCRIPTION_STEP,
+  INVESTOR_PUBLIC_DESCRIPTION_WRITE_TARGET,
+} from "../definition/investor-v5.js";
+import {
   createInvestorDomainServices,
   type InvestorDomainDependencies,
   type InvestorDomainServices,
@@ -1051,6 +1055,34 @@ export function createInvestorWriteTargets(
           UpdateInvestorOrganisationRequestSchema,
           { expectedVersion: investor.version, websiteUrl },
           "That isn't a web address.",
+        ),
+        correlationId: context.correlationId,
+      });
+    },
+
+    // The firm's description as the profile shows it (v5): their words, or
+    // Q's draft they agreed to. "I don't know" or "None" leaves it unknown.
+    [INVESTOR_PUBLIC_DESCRIPTION_WRITE_TARGET]: async (
+      services,
+      context,
+      values,
+    ) => {
+      const bound = await boundOrBootstrapped(services, context, values);
+      const publicDescription = text(values, INVESTOR_PUBLIC_DESCRIPTION_STEP);
+      const investor = await services.investors.getInvestorOrganisation({
+        actor: bound.context,
+        investorOrganisationId: bound.investorOrganisationId,
+      });
+      if (investor.publicDescription === publicDescription) {
+        return;
+      }
+      await services.investors.updateInvestorOrganisation({
+        actor: bound.context,
+        investorOrganisationId: bound.investorOrganisationId,
+        input: parseContract(
+          UpdateInvestorOrganisationRequestSchema,
+          { expectedVersion: investor.version, publicDescription },
+          "The description is not valid.",
         ),
         correlationId: context.correlationId,
       });

@@ -1,5 +1,21 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 7 November 2026, 17:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: batch 5 `041e754f0` (rollback `2262fed36`). Workspace LABS is on (web and q-api CQ_WORKSPACE_MODE=labs; q-api CQ_Q_NAV_MOVES_ALLOWED=1). Batch 6 `6ef854dc8` is in CI: onboarding D78/D79 (migrations 440000/450000), metrics P1-7, W1 hydration and place card.
+
+**Owner live test, 16:07–16:34: not yet usable.** Findings are in LIVE-FINDINGS-2026-11-07-OWNER.md. The owner's rule: root cause, no patches.
+
+| Root cause                                                                                                                                            | Lane                                       | State                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| R1/R5: the navigation decision never ran (0/36 runs carry screen.workspace); old keyword paths pre-empt it; F5 "X's profile" goes to own profile      | W4 session_01Wncmn4BQnwUu8PoUpcMjfu        | investigating                                                              |
+| R2/R3/R6: no single focus (8 competing sources); "me" maps to the screen; no own-firm facts; research off on corrections; third-person facts parroted | W3 session_01Wncmn6yZzXx1xtFxaXwp9b        | root cause DONE; building F1–F4 (one FOCUS block)                          |
+| R4: page awareness (the page's own actions ignored)                                                                                                   | W5 session_01Wncmn7LanmxRBs1Eoe8por        | investigating; also onboarding-3 (profile audit, migrations 460000/470000) |
+| R7: chat cards not container-responsive; tall input; double scroll                                                                                    | W1 session_01Wncmn4AftvVnCCbs7qHobz        | investigating; CLS fix 928e0b7 done (batch 7)                              |
+| "who viewed me" for investors (no data)                                                                                                               | Analytics session_01Wncmn6n2wuJcJPM1ZeWXX3 | building (migration 480000); owner Q: show founder names to investors?     |
+
+Anthropic test spend: about $33.1 of $50.
+
 ## Live board — 7 November 2026, 13:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7) — PAUSED FOR OWNER DECISIONS
 
 Production: **batch 4 `2262fed36`** on all four services (12:05; CI 42368232859 green; live-checked as investor and founder). Rollback `b87961156`. Hosted migrations **286**. `CQ_WORKSPACE_MODE` off; `CQ_Q_NAV_MOVES_ALLOWED` unset (OFFER-only).

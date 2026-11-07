@@ -23,6 +23,7 @@ import {
   INVESTOR_CONCEPT_FAMILIES,
   INVESTOR_COVERAGE_PROFILE,
   INVESTOR_HQ_COUNTRY_STEP,
+  INVESTOR_NONE_STEPS,
   INVESTOR_STEPS,
   INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
@@ -31,8 +32,10 @@ import {
 import {
   deriveOnboardingCoverage,
   isLocalFigureProposal,
+  isNoneAnswer,
   isNotKnownAnswer,
   isTransientOnboardingFailure,
+  NONE_ANSWER_TEXT,
   NOT_KNOWN_ANSWER_TEXT,
   waitsForContext,
   clausesOf,
@@ -4916,7 +4919,12 @@ export function createOnboardingPort(input: {
         const question = (
           SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
         ).slice(0, 400);
-        if (step.required) {
+        // A mandatory preference list (investor v5) that has nothing for
+        // them ("no preference", "none") is answered "None": settled, and
+        // nothing preferred, avoided or excluded.
+        const noneIsAnswer =
+          step.required && INVESTOR_NONE_STEPS.has(step.stepKey);
+        if (step.required && !noneIsAnswer) {
           results.push({
             stepKey: step.stepKey,
             outcome: "REJECTED",
@@ -4945,6 +4953,29 @@ export function createOnboardingPort(input: {
             });
             continue;
           }
+        }
+        if (noneIsAnswer) {
+          try {
+            const onRecord = (await current()).responses.find(
+              (r) => r.stepKey === step.stepKey,
+            );
+            if (!isNoneAnswer(onRecord?.value)) {
+              await submit(step.stepKey, {
+                type: "TEXT",
+                text: NONE_ANSWER_TEXT,
+              });
+              written.push(step.stepKey);
+            }
+            results.push({
+              stepKey: step.stepKey,
+              outcome: "COMMITTED",
+              question,
+              recorded: NONE_ANSWER_TEXT,
+            });
+          } catch (error: unknown) {
+            results.push(refused(step.stepKey, error));
+          }
+          continue;
         }
         try {
           const view = await current();

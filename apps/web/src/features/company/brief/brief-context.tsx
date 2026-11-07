@@ -105,6 +105,15 @@ type Brief = {
   readonly addGap: (key: string, topic: string, question: string) => void;
   readonly hasGap: (key: string) => boolean;
   readonly openQuestions: () => void;
+  /**
+   * R4: sends exactly these questions (the payload the person approved
+   * when Q prepared the page's own "Send questions"), under that
+   * approval's idempotency key. False when nothing went.
+   */
+  readonly sendQuestions: (
+    questions: readonly string[],
+    idempotencyKey: string,
+  ) => Promise<boolean>;
   readonly requested: ReadonlySet<string>;
   readonly requestDocuments: (target: RoomRequestTarget) => void;
   readonly markRequested: (target: RoomRequestTarget) => void;
@@ -220,6 +229,44 @@ export function BriefProvider({
       gaps.some((draft) => draft.id === `gap:${key}`) || sent.has(`gap:${key}`),
     [gaps, sent],
   );
+  const onSent = useCallback(
+    (ids: readonly string[], via: string) => {
+      setSent((previous) => new Set([...previous, ...ids]));
+      setSentAt(new Date().toISOString());
+      setSheet(false);
+      notify(
+        via === "DILIGENCE_REQUEST"
+          ? `${String(ids.length)} ${ids.length === 1 ? "question" : "questions"} sent to ${who}. They see them on their diligence checklist.`
+          : `${String(ids.length)} ${ids.length === 1 ? "question" : "questions"} sent to ${who} in your chat.`,
+      );
+    },
+    [notify, who],
+  );
+  const sendQuestions = useCallback(
+    async (questions: readonly string[], idempotencyKey: string) => {
+      if (route.kind === "NOT_CONNECTED" || questions.length === 0) {
+        return false;
+      }
+      // The drafts these words are, for what each is about; a question the
+      // page no longer holds still goes, as approved.
+      const matched = questions.map((question) =>
+        drafts.find((draft) => draft.question.trim() === question.trim()),
+      );
+      const result = await sendQuestionsAction({
+        relationshipId: route.relationshipId,
+        questions: [...questions],
+        about: matched.map((draft) => draft?.about ?? null),
+        idempotencyKey,
+      });
+      if (!result.ok) return false;
+      onSent(
+        matched.flatMap((draft) => (draft === undefined ? [] : [draft.id])),
+        result.value.via,
+      );
+      return true;
+    },
+    [route, drafts, onSent],
+  );
   const markRequested = useCallback(
     (target: RoomRequestTarget) =>
       setRequested(
@@ -242,6 +289,7 @@ export function BriefProvider({
       addGap,
       hasGap,
       openQuestions: () => setSheet(true),
+      sendQuestions,
       requested,
       requestDocuments: setAsking,
       markRequested,
@@ -258,6 +306,7 @@ export function BriefProvider({
       sentAt,
       addGap,
       hasGap,
+      sendQuestions,
       requested,
       markRequested,
       notify,
@@ -274,16 +323,7 @@ export function BriefProvider({
         who={who}
         companyName={companyName}
         route={route}
-        onSent={(ids, via) => {
-          setSent((previous) => new Set([...previous, ...ids]));
-          setSentAt(new Date().toISOString());
-          setSheet(false);
-          notify(
-            via === "DILIGENCE_REQUEST"
-              ? `${String(ids.length)} ${ids.length === 1 ? "question" : "questions"} sent to ${who}. They see them on their diligence checklist.`
-              : `${String(ids.length)} ${ids.length === 1 ? "question" : "questions"} sent to ${who} in your chat.`,
-          );
-        }}
+        onSent={onSent}
       />
       <RequestSheet
         companyId={companyId}

@@ -6,8 +6,6 @@ import {
   type DeckSectionCode,
 } from "@capital-q/contracts";
 
-import { formatLongDay } from "@/components/date-format";
-
 import { countryLabel } from "../declared-labels";
 import { compactMoneyText, moneyText } from "../money-text";
 import type { PitchProfileSection } from "../pitch-profile";
@@ -369,23 +367,25 @@ export function diligenceLedger(input: {
   // 6. Company details.
   const founded = /^\d{4}/u.exec(overview.foundedDate ?? "")?.[0] ?? null;
   const detailRows: LedgerRow[] = [
-    {
-      key: "legal",
-      label: "Legal name",
-      value: overview.legalName,
-      evidence: overview.legalName === null ? "unk" : "claim",
-      where:
-        overview.legalName === null
-          ? "Not declared"
-          : "Declared by the company",
-    },
+    // The legal name belongs to verification (KYB), never onboarding: the
+    // row shows only once there is one (batch 7).
+    ...(overview.legalName === null
+      ? []
+      : [
+          {
+            key: "legal",
+            label: "Legal name",
+            value: overview.legalName,
+            evidence: "claim" as const,
+            where: "Declared by the company",
+          },
+        ]),
     {
       key: "founded",
       label: "Founded",
-      value:
-        overview.foundedDate === null
-          ? null
-          : formatLongDay(overview.foundedDate),
+      // Onboarding asks the year (founder v10, kept as its first day): the
+      // year is what is known, never a day nobody gave.
+      value: founded,
       evidence: overview.foundedDate === null ? "unk" : "claim",
       where:
         overview.foundedDate === null

@@ -53,8 +53,8 @@ const optionKeysOf = (manifest: typeof INVESTOR_DEFINITION_V3) => {
 };
 
 describe("Investor Definition v3", () => {
-  it("is v2 with 'Not sure yet' last on the required deployment step, and superseded by v4", () => {
-    expect(INVESTOR_DEFINITION_CURRENT.version).toBe(4);
+  it("is v2 with 'Not sure yet' last on the required deployment step, and superseded", () => {
+    expect(INVESTOR_DEFINITION_CURRENT.version).toBeGreaterThan(3);
     expect(INVESTOR_DEFINITION_V3.version).toBe(3);
     expect(() =>
       validateOnboardingManifest(INVESTOR_DEFINITION_V3),

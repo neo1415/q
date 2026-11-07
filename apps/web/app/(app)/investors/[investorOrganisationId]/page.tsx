@@ -15,6 +15,7 @@ import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { founderFormContext } from "@/features/gateq/form/founder-prefill";
+import { InvestorViewBeacon } from "@/features/engagement/investor-view-beacon";
 import { InvestorProfile } from "@/features/investors/investor-profile";
 import { gateFor, investorGates } from "@/features/investors/investor-reads";
 import { ownRelationships } from "@/features/relationships/relationship-data";
@@ -138,6 +139,9 @@ export default async function InvestorPage({
     // Warm charcoal (the chosen option): its primary buttons, logo tile and
     // open tab in warm charcoal; everything else follows the theme.
     <PageContainer className="cq-charcoal">
+      {/* Who viewed an investor: one view, counted only if the server says
+          this founder may see them (never their own firm). */}
+      <InvestorViewBeacon investorOrganisationId={id} />
       {section(
         <InvestorProfile
           reads={{

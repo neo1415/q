@@ -150,6 +150,23 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   "Nothing to review yet": "لا شيء للمراجعة بعد",
   "Notifications on this device": "الإشعارات على هذا الجهاز",
   "Optional for now. Search for the country.": "اختياري الآن. ابحث عن الدولة.",
+  // Batch 7 (DECISIONS 79): the same lines without "Optional", for fields
+  // that are mandatory now.
+  "Choose any that apply.": "اختر ما ينطبق.",
+  City: "المدينة",
+  "Enter the year, like 2021.": "أدخل السنة، مثل 2021.",
+  "Exact figures in one currency.": "أرقام محددة بعملة واحدة.",
+  "Founders can see who you are before they reply.":
+    "يمكن للمؤسسين معرفة من أنت قبل أن يردّوا.",
+  "Kept on record; not yet used to filter companies.":
+    "يُحفظ في السجل؛ ولا يُستخدم بعد لتصفية الشركات.",
+  "No website yet? Leave it empty; that's fine.":
+    "لا يوجد موقع بعد؟ اتركه فارغاً، لا بأس.",
+  "Recorded as a strong preference.": "يُسجَّل كتفضيل قوي.",
+  "Search for the country.": "ابحث عن الدولة.",
+  "Shown with your name; it changes nothing you can do.":
+    "يظهر مع اسمك؛ ولا يغيّر شيئاً مما يمكنك فعله.",
+  "Year founded": "سنة التأسيس",
   "On live voice: small reactions while you talk, and a short line while an answer takes a moment.":
     "في الصوت المباشر: تفاعلات صغيرة أثناء حديثك، وجملة قصيرة حين تستغرق الإجابة لحظة.",
   "Once your firm is named you can add a fund deck, thesis or LP letter here. Optional.":

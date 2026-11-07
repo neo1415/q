@@ -93,7 +93,12 @@ const SO_FAR = {
  * they invest and their sectors are mandatory from investor v4 (DECISIONS
  * 79), so the other category steps stand in for them.
  */
-const OPTIONAL = [
+const OPTIONAL = ["I9.discovery_mode"];
+/**
+ * Batch 7 (investor v5): every preference list is mandatory, and "None"
+ * answers it. Declining one records "None": settled, holding nothing.
+ */
+const LISTS = [
   "I3.sectors_avoid",
   "I4.customer_types",
   "I7.avoid",
@@ -143,7 +148,7 @@ describe("a declined optional step is set aside, never recorded as a value", () 
     }
   });
 
-  it("declining what they had answered takes it back, with history, and sets it aside", async () => {
+  it('declining a list they had answered replaces it with "None", with history (batch 7: lists are mandatory)', async () => {
     const world = investorSession({
       currentStepKey: "I7.avoid",
       recorded: { ...SO_FAR, "I7.avoid": "gambling" },
@@ -157,8 +162,32 @@ describe("a declined optional step is set aside, never recorded as a value", () 
       delegation: readerOf(reading({ declined: ["I7.avoid"] })),
     }).turn({ ...turn(world, "actually, no preference"), actor });
 
-    expect(world.recordedValue("I7.avoid")).toBeUndefined();
-    expect(world.skippedSteps()).toContain("I7.avoid");
+    expect(world.recordedValue("I7.avoid")).toEqual({
+      type: "TEXT",
+      text: "None",
+    });
+  });
+
+  it('a mandatory list they decline is answered "None", replacing what was there (batch 7)', async () => {
+    for (const stepKey of LISTS) {
+      const world = investorSession({
+        currentStepKey: stepKey,
+        recorded: SO_FAR,
+      });
+      const { gateway } = settingAside(stepKey, "no preference");
+      await createInterviewAgent({
+        gateway,
+        firewall: firewall(),
+        logger,
+        recommendations: world.recommendations,
+        delegation: readerOf(reading({ declined: [stepKey] })),
+      }).turn({ ...turn(world, "no preference"), actor });
+      expect(world.recordedValue(stepKey), stepKey).toEqual({
+        type: "TEXT",
+        text: "None",
+      });
+      expect(world.skippedSteps(), stepKey).not.toContain(stepKey);
+    }
   });
 
   it("never sets aside a required step, nor one the reading did not find declined", async () => {

@@ -7,17 +7,22 @@ import {
   CompanyEngagementQuerySchema,
   createProblemDetails,
   ENGAGEMENT_EVENTS_PATH,
+  INVESTOR_VIEWS_PATH,
+  InvestorViewingDtoSchema,
   MY_ENGAGEMENT_PATH,
+  MY_INVESTOR_VIEWING_PATH,
   MyEngagementDtoSchema,
   PROBLEM_CONTENT_TYPE,
   RecordEngagementBatchRequestSchema,
   RecordEngagementBatchResponseSchema,
+  RecordInvestorViewRequestSchema,
   VIEWING_PRIVACY_PATH,
   ViewingPrivacyDtoSchema,
 } from "@capital-q/contracts";
 import type {
   CompanyEngagementReader,
   EngagementService,
+  InvestorViews,
   MyEngagementReader,
 } from "@capital-q/engagement";
 
@@ -43,6 +48,8 @@ export type EngagementRoutesDependencies = ActorContextDependencies & {
   readonly engagement: EngagementService;
   readonly companyEngagement: CompanyEngagementReader;
   readonly myEngagement: MyEngagementReader;
+  /** Who viewed an investor. Absent: those two routes do not register. */
+  readonly investorViews?: InvestorViews | undefined;
 };
 
 export function registerEngagementRoutes(
@@ -109,6 +116,65 @@ export function registerEngagementRoutes(
       return MyEngagementDtoSchema.parse(mine);
     },
   );
+
+  const investorViews = dependencies.investorViews;
+  if (investorViews !== undefined) {
+    /**
+     * A founder's view of an investor's profile. 202 whatever happened: a
+     * view of an investor the founder may not see, of their own firm, or a
+     * duplicate are all indistinguishable, so this cannot probe existence.
+     */
+    app.post(
+      INVESTOR_VIEWS_PATH,
+      { onRequest: withContext, bodyLimit: 4 * 1024 },
+      async (request, reply) => {
+        const body = RecordInvestorViewRequestSchema.safeParse(request.body);
+        if (!body.success) {
+          const problem = invalid(request.id, "The view is not valid.");
+          return reply
+            .status(problem.status)
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(problem);
+        }
+        await investorViews.record(getActorContext(request), body.data);
+        void reply.header("Cache-Control", "no-store");
+        return reply.status(202).send({});
+      },
+    );
+
+    /**
+     * Who viewed the signed-in investor's firm: aggregates only, decided in
+     * SQL. Not a member of an investor firm: 404.
+     */
+    app.get(
+      MY_INVESTOR_VIEWING_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const query = CompanyEngagementQuerySchema.safeParse(
+          request.query ?? {},
+        );
+        if (!query.success) {
+          const problem = invalid(request.id, "Choose a date.");
+          return reply
+            .status(problem.status)
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(problem);
+        }
+        const actor = getActorContext(request);
+        const result = await investorViews.mine({
+          actorUserId: actor.userId,
+          organisationId: actor.organisationId ?? null,
+          since: query.data.since ?? null,
+        });
+        if (result === null) {
+          reply.callNotFound();
+          return undefined;
+        }
+        void reply.header("Cache-Control", "no-store");
+        return InvestorViewingDtoSchema.parse(result);
+      },
+    );
+  }
 
   /**
    * A3: the company's engagement, read by a member of its own

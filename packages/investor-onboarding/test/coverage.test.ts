@@ -61,9 +61,10 @@ describe("investor coverage", () => {
     expect(next).not.toContain(INVESTOR_STEPS.organisationName);
     expect(next).not.toContain(INVESTOR_STEPS.investorType);
     expect(c.next.every((n) => n.reason === "ESSENTIAL_MISSING")).toBe(true);
-    // Optional nuance (green flags) is deferrable, never pressed.
+    // What stays optional (the discovery style; every list is mandatory
+    // from v5) is deferrable, never pressed.
     expect(
-      c.fields.find((f) => f.fieldKey === INVESTOR_STEPS.greenFlags)?.state,
+      c.fields.find((f) => f.fieldKey === INVESTOR_STEPS.discoveryMode)?.state,
     ).toBe("DEFERRABLE");
   });
 

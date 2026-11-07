@@ -117,9 +117,7 @@ export function InvestorRoleStep({
         <Input
           id="investor-website"
           label={t("Your firm's website")}
-          description={t(
-            "Optional. Founders can see who you are before they reply.",
-          )}
+          description={t("Founders can see who you are before they reply.")}
           placeholder="example.com"
           // A text field with the URL keyboard, not type="url": the browser
           // refuses "example.com", which the write path reads as https.
@@ -136,9 +134,7 @@ export function InvestorRoleStep({
       <Input
         id="investor-title"
         label={t("Your role there")}
-        description={t(
-          "Optional. Shown with your name; it changes nothing you can do.",
-        )}
+        description={t("Shown with your name; it changes nothing you can do.")}
         placeholder={t("Partner, Principal, Angel")}
         autoComplete="organization-title"
         value={businessTitle}
