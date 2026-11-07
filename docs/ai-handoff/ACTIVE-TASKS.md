@@ -1,5 +1,20 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 7 November 2026, 02:55 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: `d09aec914` until the batch-1 deploy. Hosted migrations **283**: the analytics migrations 370000 and 380000 were applied 02:50 after pgTAP passed. **Batch 1 `7fe7f5f0c` is in CI**: W1 shell, W2 site map, W3 deep links, W4 navigation (OFFER-only; `CQ_Q_NAV_MOVES_ALLOWED` unset), analytics M1, the claim check. The workspace flag `CQ_WORKSPACE_MODE` is unset (off).
+
+| Lane                      | Session                          | State                                                                                                                                                                                                  |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| W1 shell                  | session_01Wncmn4AftvVnCCbs7qHobz | DONE for batch 1 (57f3ede); waiting for live-check fixes                                                                                                                                               |
+| W2 site map               | session_01Wncmn4SKUdLWXcpXd7KKVm | DONE for batch 1 (46e9a85: audience audit, side-neutral purposes, resolver kinds)                                                                                                                      |
+| W3 deep links + contracts | session_01Wncmn6yZzXx1xtFxaXwp9b | DONE for batch 1 (cd46eae); next: the AWAITING_APPROVAL receipt status for W5                                                                                                                          |
+| W4 navigation             | session_01Wncmn4BQnwUu8PoUpcMjfu | q-nav live dev (Anthropic): r1 72.9% pass / move-target 70.7% / wrong-page 6.9% / forbidden 0 ($1.97); r2 89.8% / 89.5% / 6.0% / 0 ($2.02). Round 3 (wrong-page focus) in progress; then held-out once |
+| W5 page actions           | session_01Wncmn7LanmxRBs1Eoe8por | feat/q-page-actions b2b6b73: W5.1 approval classes, W5.3 meetings (read_meeting, participants only), W5.4 dirty forms. Next: W5.2 arrival, W5.1b consequential buttons as APPROVAL                     |
+| Analytics                 | session_01Wncmn6n2wuJcJPM1ZeWXX3 | M1 in batch 1. M2: /analytics page (founder + investor), intent signals (migration 20261231400000), collection points, Q tools, notifications                                                          |
+
+Anthropic test spend: about $11.9 of $50.
+
 ## Live board — 6 November 2026, 22:45 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7, acting admin per DECISIONS 58/60)
 
 Production: all four services on `d09aec914` (21:44). Hosted migrations 281. Routes v2: OpenAI first, Claude Sonnet backup throughout. Rollback: `c2346a404`. Governing decisions: 68–71.
