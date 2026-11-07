@@ -189,8 +189,9 @@ describe("ONBOARDING_TRANSCRIPT_READER v13 and ONBOARDING_TYPED_REPLY v7 (live c
   const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
 
   it("are the active versions and keep the rules before them", () => {
-    expect(reader.version).toBe(13);
-    expect(reply.version).toBe(7);
+    // P1-1 (2026-11-07) moved both on (reader v14, reply v8); these rules stay.
+    expect(reader.version).toBeGreaterThanOrEqual(13);
+    expect(reply.version).toBeGreaterThanOrEqual(7);
     expect(reader.template).toMatch(
       /An approximate answer to a number step is an answer/u,
     );

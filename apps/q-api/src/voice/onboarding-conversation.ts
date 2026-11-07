@@ -223,8 +223,10 @@ export function createOnboardingConversation(dependencies: {
     place?: ReturnType<typeof placeOfQuote>,
     affirmed: ReadonlySet<string> = new Set(),
     replaces: ReadonlySet<string> = new Set(),
+    spokenTurns: ReadonlySet<string> = new Set(),
   ) =>
     createOnboardingPort({
+      spokenTurns,
       addsTo,
       replaces,
       affirmed,
@@ -236,9 +238,10 @@ export function createOnboardingConversation(dependencies: {
               dependencies.wordsCheck?.(line.actor, question, words) ??
               Promise.resolve(null),
           }),
-      // Owner 2026-10-17, re-agreed 2026-10-30: a narrative answer is
-      // saved as Q's summary they agreed to in the conversation, never
-      // as their raw words; a summary not yet agreed is held for it.
+      // Owner 2026-10-17, re-agreed 2026-10-30, DECISIONS 77 (P1-1): a
+      // narrative answer is saved as Q's summary they agreed to, or as
+      // their words minus filler when it was clear; never a raw ramble. A
+      // summary not yet agreed is held for their yes.
       narrativeFromReadBackOnly: true,
       ...(place === undefined
         ? {}
@@ -395,6 +398,7 @@ export function createOnboardingConversation(dependencies: {
         readonly role: "PERSON" | "Q";
         readonly text: string;
         readonly createdAt: string;
+        readonly channel: "TEXT" | "VOICE";
         readonly stepKey?: string | undefined;
       }[];
     } = await listOnboardingInterviewTurnSteps(
@@ -421,6 +425,13 @@ export function createOnboardingConversation(dependencies: {
       .map((turn) => turn.text)
       .reverse();
     if (personTurns.length === 0) return;
+    // The lines they spoke: a long answer's own words are held to the
+    // stricter spoken bar (P1-1 live run 1).
+    const spokenTurns = new Set(
+      thread.items
+        .filter((turn) => turn.role === "PERSON" && turn.channel === "VOICE")
+        .map((turn) => turn.text),
+    );
     let state = await portFor(line, personTurns).state();
     if (state.completed) return;
     const optionIds = optionIdsOf(state);
@@ -728,6 +739,7 @@ export function createOnboardingConversation(dependencies: {
           .map((answer) => answer.stepKey),
       ),
       replacing,
+      spokenTurns,
     );
     const recorded =
       stated.length === 0
@@ -1494,7 +1506,9 @@ export function briefOf(
           // Live check 2026-10-31 (Grannskap): one ramble told four of
           // them and only the description was said back; the rest came one
           // yes at a time, and the lead-ins Q used were saved with them.
-          "Topics marked (say back) are told at length. As soon as they have told you about any of them, needed or optional, say back what you understood for every one of those topics they told you, all in one say-back, one short line a topic (its name, then its content as it should read on their profile, never framed as you telling them), and ask once if that's right, before you ask anything else. One yes then settles them all: never say one back now and the others later. What they agree to is what is saved, so never move on to a new question in that same message. Summaries waiting for their yes (not confirmed yet) are said back the same way, all together.",
+          // DECISIONS 77 (P1-1): Q judges when to summarise, never every
+          // time: a clear answer is kept in their words (reader v14).
+          "Topics marked (say back) are told at length, and Capital Q judges how each was told. A clear answer, typed or spoken, whatever its length, is kept in their own words with only filler removed: never say it back, acknowledge it briefly and go on. When they told you about any of them in a rambling way (repeating, backtracking, wandering), needed or optional, say back what you understood for every one of those topics they told you, all in one say-back, one short line a topic (its name, then its content as it should read on their profile, never framed as you telling them), and ask once if that's right, before you ask anything else. One yes then settles them all: never say one back now and the others later. What they agree to is what is saved, so never move on to a new question in that same message. Summaries waiting for their yes (not confirmed yet) are always said back the same way, all together; an answer already saved needs no say-back.",
         ]
       : []),
     ...(groups.length === 0
