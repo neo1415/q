@@ -168,9 +168,7 @@ export async function loadProfileAnswers(
         })
       : Promise.resolve(null),
     context.kind === "INVESTOR"
-      ? within(() =>
-          activeMandateOf(session, context.investorOrganisationId),
-        )
+      ? within(() => activeMandateOf(session, context.investorOrganisationId))
       : Promise.resolve(null),
   ]);
 
