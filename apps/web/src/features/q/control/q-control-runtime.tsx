@@ -14,6 +14,8 @@ import {
   type UiActReport,
 } from "../ui-act-controller";
 import { startReceiptReporter } from "./receipt-reporter";
+import { heldReason } from "./approval-requests";
+import { QActPrompts } from "./q-act-prompts";
 
 /**
  * RECOVERY-2026-10 (C2/C3): the shell's part of Q's control of the app,
@@ -99,18 +101,22 @@ export function QControlRuntime({
   }, []);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      data-q-self
-      className={
-        notice === null
-          ? "sr-only"
-          : "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto w-fit max-w-[min(32rem,calc(100vw-2rem))] rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-2 cq-caption text-(--cq-text-secondary) shadow-(--cq-shadow-overlay)"
-      }
-    >
-      {notice}
-    </div>
+    <>
+      {/* W5.1: what Q asks the person to confirm or approve. */}
+      <QActPrompts />
+      <div
+        role="status"
+        aria-live="polite"
+        data-q-self
+        className={
+          notice === null
+            ? "sr-only"
+            : "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto w-fit max-w-[min(32rem,calc(100vw-2rem))] rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-2 cq-caption text-(--cq-text-secondary) shadow-(--cq-shadow-overlay)"
+        }
+      >
+        {notice}
+      </div>
+    </>
   );
 }
 
@@ -126,6 +132,19 @@ export function noticeOf(report: UiActReport): string | null {
         ? "Q couldn't find that item in the list on this page."
         : "Q couldn't find that on this page.";
     case "NOT_APPLICABLE":
+      // W5.1: why Q held it, when it did (approval-requests.ts).
+      switch (heldReason(report.receipt.actId)) {
+        case "AWAITING_APPROVAL":
+        case "DECLINED":
+          // The approval card is on screen, or the person said no.
+          return null;
+        case "NOTHING_PREPARED":
+          return "There's nothing ready to approve there yet.";
+        case "NEVER":
+          return "Q never does that for you. Moving money or signing is always yours to do.";
+        default:
+          break;
+      }
       return report.intent.act === "BACK"
         ? "There's no earlier page here to go back to."
         : "Q can't do that with this part of the page.";

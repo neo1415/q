@@ -2,6 +2,7 @@ import type { QUiActIntent, QUiActReceipt } from "@capital-q/contracts";
 
 import { manifestVersion } from "./manifest";
 import { performOnControl } from "./control/perform";
+import type { ApprovalClass } from "./control/approval";
 import { controlOf, kindOfId, registerControl } from "./control/registry";
 import {
   activeNavigation,
@@ -76,12 +77,15 @@ const ledger: UiActReport[] = [];
 export function registerUiControl(
   id: string,
   handler: UiActHandler,
+  /** W5.1: required for a clickable kind (control/approval.ts). */
+  approval?: ApprovalClass,
 ): () => void {
   const kind = kindOfId(id);
   if (kind === null) return () => undefined;
   return registerControl({
     id,
     kind,
+    approval,
     // A handler-only control has no element of its own; it acts anywhere.
     element: () =>
       typeof document === "undefined" ? null : document.documentElement,

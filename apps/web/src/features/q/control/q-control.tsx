@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 
 import type { QControlKind } from "@capital-q/contracts";
 
+import type { ApprovalAction, ApprovalClass } from "./approval";
 import { registerControl, type ControlHandler } from "./registry";
 
 /**
@@ -24,6 +25,9 @@ export function useQControl({
   ref,
   onAct,
   count,
+  approval,
+  confirmSummary,
+  action,
 }: {
   readonly id: string;
   readonly kind: QControlKind;
@@ -31,11 +35,20 @@ export function useQControl({
   readonly onAct?: ControlHandler | undefined;
   /** LIST: the page's own count, when the DOM holds only the first few. */
   readonly count?: number | undefined;
+  /**
+   * W5.1: what acting on it means (approval.ts). A button, toggle, input
+   * or list item without one is never operated by Q.
+   */
+  readonly approval?: ApprovalClass | undefined;
+  /** CONFIRM: what the person confirms, in the page's words. */
+  readonly confirmSummary?: (() => string) | undefined;
+  /** APPROVAL: what Q prepares for the person's approval. */
+  readonly action?: ApprovalAction | undefined;
 }): void {
   // The latest handler and count, without re-registering on every render.
-  const latest = useRef({ onAct, count });
+  const latest = useRef({ onAct, count, confirmSummary, action });
   useEffect(() => {
-    latest.current = { onAct, count };
+    latest.current = { onAct, count, confirmSummary, action };
   });
   useEffect(
     () =>
@@ -48,8 +61,27 @@ export function useQControl({
             ? "NOT_APPLICABLE"
             : latest.current.onAct(intent),
         count: () => latest.current.count,
+        approval,
+        confirmSummary: () =>
+          latest.current.confirmSummary?.() ??
+          "Q would like to do this on the page.",
+        // The action as it is now: its prepare() reads the page's latest draft.
+        ...(action === undefined
+          ? {}
+          : {
+              action: {
+                id: action.id,
+                summary: (payload) =>
+                  (latest.current.action ?? action).summary(payload),
+                prepare: () => (latest.current.action ?? action).prepare(),
+                execute: (payload, key) =>
+                  (latest.current.action ?? action).execute(payload, key),
+              },
+            }),
       }),
-    [id, kind, ref],
+    // A change of class re-registers; the action's own changes are read live.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `action` is read through `latest`
+    [id, kind, ref, approval, action === undefined],
   );
 }
 
@@ -62,10 +94,13 @@ export function useQControlGroup({
   kind,
   ref,
   ids,
+  approval,
 }: {
   readonly kind: QControlKind;
   readonly ref: RefObject<HTMLElement | null>;
   readonly ids: Readonly<Record<string, string>>;
+  /** W5.1: one class for every control in the group (approval.ts). */
+  readonly approval?: ApprovalClass | undefined;
 }): void {
   const key = JSON.stringify(ids);
   useEffect(() => {
@@ -76,12 +111,13 @@ export function useQControlGroup({
         kind,
         element: () =>
           ref.current?.querySelector<HTMLElement>(selector) ?? null,
+        approval,
       }),
     );
     return () => {
       for (const stop of stops) stop();
     };
-  }, [key, kind, ref]);
+  }, [key, kind, ref, approval]);
 }
 
 /**
@@ -94,15 +130,18 @@ export function QControl({
   id,
   kind,
   count,
+  approval,
   children,
 }: {
   readonly id: string;
   readonly kind: QControlKind;
   readonly count?: number | undefined;
+  /** W5.1: required for a clickable kind (approval.ts). */
+  readonly approval?: ApprovalClass | undefined;
   readonly children?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useQControl({ id, kind, ref, count });
+  useQControl({ id, kind, ref, count, approval });
   return (
     <div ref={ref} data-q-control={id} className="contents">
       {children}

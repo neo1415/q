@@ -873,4 +873,13 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   // Q voice room in a conversation (owner 2026-11-06)
   "See all in Chat": "عرض الكل في المحادثة",
   "Cards in this answer": "البطاقات في هذه الإجابة",
+  // W5.1: what Q asks before it acts on a page
+  "Confirm what Q will do": "أكّد ما سيفعله Q",
+  "Q prepared this for your approval": "أعدّ Q هذا لموافقتك",
+  "It changed after Q prepared it. Ask Q again to approve the new version.":
+    "تغيّر بعد أن أعدّه Q. اطلب من Q مرة أخرى لتوافق على النسخة الجديدة.",
+  "Q never does that for you. Moving money or signing is always yours to do.":
+    "لا يقوم Q بذلك نيابةً عنك أبدًا. تحويل الأموال أو التوقيع يبقى قرارك أنت دائمًا.",
+  "There's nothing ready to approve there yet.":
+    "لا يوجد شيء جاهز للموافقة عليه هناك بعد.",
 };

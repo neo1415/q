@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 
 import type {
   CommitmentLevel,
@@ -22,6 +28,8 @@ import {
   withdrawCommitmentAction,
 } from "./commitment-actions";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 
 /**
  * The relationship's commitment (spec 6.6.14): one side records money and
@@ -86,6 +94,143 @@ export function RelationshipCommitment({
     };
   }, [relationshipId, initial]);
 
+  // W5.1 (plan §7): what Q may do here, by class, in code. Opening the
+  // form is NONE; recording, confirming, withdrawing or adopting money is
+  // binding, so APPROVAL: Q prepares it with its exact payload and it runs
+  // only on the person's approval of that payload. The level comes only
+  // from the person's own choice on the form -- never Q's -- so "invested"
+  // (the money moved) is always their own statement (W5.3).
+  const openRef = useRef<HTMLSpanElement>(null);
+  const recordRef = useRef<HTMLSpanElement>(null);
+  const confirmRef = useRef<HTMLSpanElement>(null);
+  const withdrawRef = useRef<HTMLSpanElement>(null);
+  const adoptRef = useRef<HTMLSpanElement>(null);
+  const settle = async (
+    work: () => ReturnType<typeof readCommitmentsAction>,
+  ): Promise<"DONE" | "FAILED"> => {
+    const result = await work();
+    if (!result.ok) {
+      setMessage(result.message);
+      return "FAILED";
+    }
+    setState(result.value);
+    setEditing(false);
+    return "DONE";
+  };
+  const levelWords = (value: CommitmentLevel): string =>
+    value === "INVESTED"
+      ? "Invested: you confirm the money has moved"
+      : (LEVELS.find((option) => option.level === value)?.label ?? value);
+  useQControl({
+    id: "button.commitment-open",
+    kind: "BUTTON",
+    ref: openRef,
+    approval: "NONE",
+  });
+  useQControl({
+    id: "button.commitment-record",
+    kind: "BUTTON",
+    ref: recordRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.commitment-record",
+      summary: (payload) =>
+        `Record a commitment of ${String(payload["currency"])} ${formatAmountForDisplay(String(payload["amount"]))} with ${counterpart}, for them to confirm`,
+      prepare: (): ApprovalPayload | null =>
+        !editing || money.amount === ""
+          ? null
+          : {
+              with: counterpart,
+              amount: money.amount,
+              currency: money.currency,
+              level: levelWords(level),
+            },
+      execute: (payload, key) =>
+        settle(() =>
+          stateCommitmentAction(
+            relationshipId,
+            {
+              amount: String(payload["amount"]),
+              currencyCode: String(payload["currency"]),
+              level,
+            },
+            key,
+          ),
+        ),
+    },
+  });
+  const current0 = state?.current ?? null;
+  useQControl({
+    id: "button.commitment-confirm",
+    kind: "BUTTON",
+    ref: confirmRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.commitment-confirm",
+      summary: () => `Confirm ${counterpart}'s commitment`,
+      prepare: (): ApprovalPayload | null =>
+        current0 === null || !current0.canConfirm
+          ? null
+          : {
+              with: counterpart,
+              amount: current0.amount,
+              currency: current0.currencyCode,
+              level: levelWords(current0.level),
+            },
+      execute: () =>
+        current0 === null
+          ? Promise.resolve("FAILED")
+          : settle(() => confirmCommitmentAction(current0.id)),
+    },
+  });
+  useQControl({
+    id: "button.commitment-withdraw",
+    kind: "BUTTON",
+    ref: withdrawRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.commitment-withdraw",
+      summary: () => `Withdraw the commitment with ${counterpart}`,
+      prepare: (): ApprovalPayload | null =>
+        current0 === null || !current0.canWithdraw
+          ? null
+          : {
+              with: counterpart,
+              amount: current0.amount,
+              currency: current0.currencyCode,
+            },
+      execute: () =>
+        current0 === null
+          ? Promise.resolve("FAILED")
+          : settle(() => withdrawCommitmentAction(current0.id)),
+    },
+  });
+  const heard = state?.detected.find((item) => item.canAdopt) ?? null;
+  useQControl({
+    id: "button.commitment-adopt",
+    kind: "BUTTON",
+    ref: adoptRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.commitment-adopt",
+      summary: () =>
+        `Record what Q heard in your call with ${counterpart}, for them to confirm`,
+      prepare: (): ApprovalPayload | null =>
+        heard === null
+          ? null
+          : {
+              with: counterpart,
+              amount: heard.amount,
+              currency: heard.currencyCode,
+              heard: heard.quote ?? "",
+            },
+      execute: (_payload, key) =>
+        heard === null
+          ? Promise.resolve("FAILED")
+          : settle(() => adoptCommitmentAction(heard.id, key)),
+    },
+  });
+
   if (state === null || !state.connected) return null;
   const current = state.current;
 
@@ -122,15 +267,20 @@ export function RelationshipCommitment({
             )}
             <div className="flex flex-wrap gap-2">
               {item.canAdopt ? (
-                <Button
-                  size="compact"
-                  disabled={pending}
-                  onClick={() =>
-                    act(() => adoptCommitmentAction(item.id, newKey()))
-                  }
+                <span
+                  ref={item.id === heard?.id ? adoptRef : undefined}
+                  className="contents"
                 >
-                  {t("That's right")}
-                </Button>
+                  <Button
+                    size="compact"
+                    disabled={pending}
+                    onClick={() =>
+                      act(() => adoptCommitmentAction(item.id, newKey()))
+                    }
+                  >
+                    {t("That's right")}
+                  </Button>
+                </span>
               ) : null}
               {item.canDispute ? (
                 <Button
@@ -157,9 +307,11 @@ export function RelationshipCommitment({
   if (editing || current === null) {
     if (!editing) {
       return withDetected(
-        <Button variant="secondary" onClick={() => setEditing(true)}>
-          {t("Record a commitment")}
-        </Button>,
+        <span ref={openRef} className="contents">
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            {t("Record a commitment")}
+          </Button>
+        </span>,
       );
     }
     return withDetected(
@@ -210,9 +362,13 @@ export function RelationshipCommitment({
           ))}
         </div>
         <div className="flex gap-2">
-          <Button type="submit" disabled={pending || money.amount === ""}>
-            {pending ? t("Recording…") : t(`Send to ${counterpart} to confirm`)}
-          </Button>
+          <span ref={recordRef} className="contents">
+            <Button type="submit" disabled={pending || money.amount === ""}>
+              {pending
+                ? t("Recording…")
+                : t(`Send to ${counterpart} to confirm`)}
+            </Button>
+          </span>
           <Button
             type="button"
             variant="quiet"
@@ -251,13 +407,15 @@ export function RelationshipCommitment({
       </span>
       <div className="flex flex-wrap gap-2">
         {current.canConfirm ? (
-          <Button
-            size="compact"
-            disabled={pending}
-            onClick={() => act(() => confirmCommitmentAction(current.id))}
-          >
-            {t("Confirm")}
-          </Button>
+          <span ref={confirmRef} className="contents">
+            <Button
+              size="compact"
+              disabled={pending}
+              onClick={() => act(() => confirmCommitmentAction(current.id))}
+            >
+              {t("Confirm")}
+            </Button>
+          </span>
         ) : null}
         <Button
           variant="quiet"
@@ -275,14 +433,16 @@ export function RelationshipCommitment({
           {t("Change")}
         </Button>
         {current.canWithdraw ? (
-          <Button
-            variant="quiet"
-            size="compact"
-            disabled={pending}
-            onClick={() => act(() => withdrawCommitmentAction(current.id))}
-          >
-            {t("Withdraw")}
-          </Button>
+          <span ref={withdrawRef} className="contents">
+            <Button
+              variant="quiet"
+              size="compact"
+              disabled={pending}
+              onClick={() => act(() => withdrawCommitmentAction(current.id))}
+            >
+              {t("Withdraw")}
+            </Button>
+          </span>
         ) : null}
       </div>
       {message === null ? null : (
