@@ -545,11 +545,19 @@ export function createTypedOnboarding(dependencies: {
                 ...shown,
                 pending: waitingOnYes(now, suggestions, labelOf),
               };
-        // Already finishing, Q's last line asked a needed step, and their
-        // answer left it open: it is not put again word for word.
-        const unsettled = stillFinishing
+        // Already finishing, Q's last line asked a needed step, and they
+        // said they would rather not answer it: it is let go for now, not
+        // put again word for word. A reply that only missed the question
+        // (e2e run 2: "Yes, actively raising." to "Which currency…") is not
+        // a decline, so the question is asked again.
+        const lastAskedKey = stillFinishing
           ? lastAsked.get(input.onboardingSessionId)
           : undefined;
+        const unsettled =
+          lastAskedKey !== undefined &&
+          authority?.declined.has(lastAskedKey) === true
+            ? lastAskedKey
+            : undefined;
         const said = finishingLine(input.journeyType, finished, {
           labelOf,
           questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,

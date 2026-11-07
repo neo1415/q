@@ -235,6 +235,31 @@ describe("2-3. a held suggestion is put to them for its yes, and that yes never 
     );
   });
 
+  it("an off-target reply to a needed question is asked again, never taken as 'come back to it' (e2e run 2)", async () => {
+    // Production e2e run 2: Q asked "Which currency are you raising in?",
+    // the person said "Yes, actively raising." (not an answer), and Q said
+    // "That's fine, we can come back to that one" and moved on.
+    const { say } = world([
+      () => authorityReading({ finishing: true }),
+      () => authorityReading({}),
+    ]);
+    const first = await say("That's all for now.");
+    expect(first.outcome.asking?.stepKey ?? first.outcome.asking).toBeTruthy();
+    const offTarget = await say("Yes, actively raising.");
+    expect(offTarget.outcome.reply).not.toMatch(/come back to that/u);
+    expect(offTarget.outcome.reply).not.toMatch(/^That's fine/u);
+  });
+
+  it("a needed question they said they would rather not answer is let go for now, as before", async () => {
+    const { say } = world([
+      () => authorityReading({ finishing: true }),
+      () => authorityReading({ declined: [INBOUND] }),
+    ]);
+    await say("That's all for now.");
+    const declined = await say("I'd rather not say for now.");
+    expect(declined.outcome.reply).toMatch(/^That's fine/u);
+  });
+
   it("a reply that does not approve it accepts nothing", async () => {
     const { w, say } = world([
       () => authorityReading({ finishing: true }),
