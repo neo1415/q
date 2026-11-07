@@ -6604,6 +6604,8 @@ export function createSpecialistQAnswer(
         : researchDirectiveFor(state, readingFromTurnReader(read), {
             available: dependencies.researchAvailable ?? true,
             aboutNamedOther: read.aboutNamedOther,
+            // Owner replay batch 8 (#10): asking for the web, by meaning.
+            asksForWeb: read.asksForWeb ?? false,
           }),
     );
     if (read !== null) {
