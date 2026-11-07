@@ -72,6 +72,7 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   // Sweep 2026-10-29: the bare address, resolved on the server to the
   // investor's mandate on their profile.
   MANDATE: "/mandate",
+  ANALYTICS: "/analytics",
 };
 
 /**
