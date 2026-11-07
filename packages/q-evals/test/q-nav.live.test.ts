@@ -34,6 +34,8 @@ import { navigationPipelineSubject, runQNav } from "../src/runner/q-nav.js";
  * are reported by category only, never turn by turn, so nobody tunes
  * against it). CQ_QNAV_LIMIT=n: only the first n cases (a smoke run).
  * CQ_QNAV_REPORT=<file>: the JSON summary (dev: with every miss).
+ * CQ_QNAV_PROMPT_VERSION=n: render that NAVIGATION_DECISION version (A/B).
+ * CQ_QNAV_CATEGORIES=A,B: only those categories (a focused subset).
  * CQ_QNAV_CONCURRENCY=n: cases decided at once (default 4; latency is
  * per turn either way).
  * Prints calls, tokens, cost and the gates; never the key.
@@ -49,6 +51,16 @@ const SPLIT =
 const LIMIT = Number(process.env["CQ_QNAV_LIMIT"] ?? "0");
 const REPORT = process.env["CQ_QNAV_REPORT"];
 const CONCURRENCY = Number(process.env["CQ_QNAV_CONCURRENCY"] ?? "4");
+/** A/B: a registered NAVIGATION_DECISION version (default: the active one). */
+const PROMPT_VERSION =
+  process.env["CQ_QNAV_PROMPT_VERSION"] === undefined
+    ? undefined
+    : Number(process.env["CQ_QNAV_PROMPT_VERSION"]);
+/** Only these categories (comma-separated), e.g. a focused dev subset. */
+const CATEGORIES = (process.env["CQ_QNAV_CATEGORIES"] ?? "")
+  .split(",")
+  .map((c) => c.trim())
+  .filter((c) => c.length > 0);
 
 /** The p-th percentile (nearest rank) of milliseconds. */
 function percentile(values: readonly number[], p: number): number {
@@ -144,8 +156,13 @@ describe.skipIf(!LIVE || KEY === undefined)(
           ]),
           usage,
         }),
+        promptVersion: PROMPT_VERSION,
       });
-      const all = Q_NAV_DATASET.cases.filter((c) => c.split === SPLIT);
+      const all = Q_NAV_DATASET.cases.filter(
+        (c) =>
+          c.split === SPLIT &&
+          (CATEGORIES.length === 0 || CATEGORIES.includes(c.category)),
+      );
       const cases = LIMIT > 0 ? all.slice(0, LIMIT) : all;
       // What the model proposed per turn (each sample), before resolution
       // and policy.
@@ -221,6 +238,8 @@ describe.skipIf(!LIVE || KEY === undefined)(
           JSON.stringify(
             {
               split: SPLIT,
+              promptVersion: PROMPT_VERSION ?? "active",
+              categories: CATEGORIES.length === 0 ? "all" : CATEGORIES,
               turns: run.grades.length,
               summary: run.summary,
               missesByCategory: byCategory,

@@ -1475,3 +1475,56 @@ describe("batch 7 replay: the decision reads the same situation as every answer 
     expect(seen.every((s) => s === SITUATION)).toBe(true);
   });
 });
+
+describe("heldout4 follow-up: a record found only by part of its name is offered, never moved to", () => {
+  const attribution = { tenantId: "t", userId: "u", correlationId: "c" };
+  const deciding = (name: string) => ({
+    decide: () =>
+      Promise.resolve(
+        proposal({
+          place: place({ record: company(name), tab: "deck" }),
+        }),
+      ),
+  });
+  const run = (name: string) =>
+    decideNavigation(
+      {
+        decider: deciding(name),
+        canOpen: () => true,
+        config: { movesAllowed: true },
+      },
+      input(),
+      attribution,
+    );
+
+  it("the exact name moves", async () => {
+    expect(await run("Silo Credit")).toMatchObject({
+      decision: "MOVE",
+      target: { page: "COMPANY", recordId: SILO, tab: "deck" },
+    });
+  });
+
+  it("a part, a misspelling's prefix or the words of it is a lookalike: OFFER", async () => {
+    for (const said of ["Silo Cred", "credit silo"]) {
+      expect(await run(said), said).toMatchObject({
+        decision: "OFFER",
+        target: { page: "COMPANY", recordId: SILO, tab: "deck" },
+        guard: "INEXACT_NAME",
+      });
+    }
+  });
+
+  it("with the pane collapsed, a lookalike is only remembered", async () => {
+    const out = await decideNavigation(
+      {
+        decider: deciding("Silo Cred"),
+        canOpen: () => true,
+        config: { movesAllowed: true },
+      },
+      input({ pane: pane({ pane: "COLLAPSED" }) }),
+      attribution,
+    );
+    expect(out).toMatchObject({ decision: "STAY", openPane: false });
+    expect(out.remembered).toMatchObject({ recordId: SILO });
+  });
+});

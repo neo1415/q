@@ -9,6 +9,7 @@ import {
   investorProfile,
   ownMissing,
   profile,
+  relationshipWithInvestor,
   section,
   team,
   threadWithCompany,
@@ -29,6 +30,7 @@ const F = decide("FOUNDER");
 const side = (s: QNavSide) => (s === "INVESTOR" ? I : F);
 
 export function devCurveballs(cases: CaseSet): void {
+  devConversation(cases);
   // --- Stay in chat, and look-alikes ------------------------------------
   const stays: readonly (readonly [QNavSide, string, string])[] = [
     [
@@ -132,14 +134,22 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "I'm curious whether any investors are warming to us.",
-      dest("COMPANY_INTEREST"),
-      "Investor interest: the interest section.",
+      // Dataset correction (after the v10/v11 A/B, 7 Nov): "warming to us"
+      // is the signals (saves, asks for more), Analytics' intent section;
+      // /company/interest is where requests to connect are answered. The
+      // intent section leads Analytics, so its place is the page.
+      dest("ANALYTICS"),
+      "Investors warming to them: Analytics (its intent section leads).",
     ],
     [
       "FOUNDER",
       "Not sure we're ready for diligence, honestly.",
-      ownMissing(),
-      "What's missing in their data room.",
+      // Dataset correction (after the v10/v11 A/B, 7 Nov; flagged in the r3
+      // note): readiness for investors is Capital: Readiness ("how ready
+      // your company looks to investors"); the data room's missing list is
+      // one part of it.
+      dest("CAPITAL_READINESS"),
+      "How ready they look to investors: Capital, Readiness.",
     ],
   ];
   for (const [s, user, target, why] of lookMove)
@@ -870,4 +880,110 @@ export function devCurveballs(cases: CaseSet): void {
         context: context({ at }),
       }),
     ]);
+}
+
+/**
+ * Dev cases for placement driven by the conversation (after the fourth
+ * held-out set, 7 Nov 2026: its categories, never its rows). A record
+ * talked about, then a part of it; a switch to another record; a record
+ * only mentioned inside a wider question; research asked of Q; a listed
+ * name said misspelt.
+ */
+function devConversation(cases: CaseSet): void {
+  const at = (key: string, tab = "overview") =>
+    context({ at: profile(key, tab) });
+  cases.add("FOLLOW_UP", "INVESTOR", [
+    turn(
+      "how's silo credit doing these days?",
+      I.move(
+        profile("co-silo-credit", "overview"),
+        "About one company: its page as it opens (no one tab holds 'how it is doing').",
+      ),
+      { q: "Silo Credit grew its loan book again this quarter." },
+    ),
+    turn(
+      "who's actually running it?",
+      I.move(
+        team("co-silo-credit"),
+        "'It': the company talked about; its team tab.",
+      ),
+      { context: at("co-silo-credit") },
+    ),
+    turn(
+      "ok and their pitch deck",
+      I.move(deck("co-silo-credit"), "The same company's deck tab."),
+      { context: at("co-silo-credit", "team") },
+    ),
+  ]);
+  cases.add("FOLLOW_UP", "INVESTOR", [
+    turn(
+      "so what is the story with brightwell energy",
+      I.move(
+        profile("co-brightwell", "overview"),
+        "The conversation turns to another company: its page.",
+      ),
+      { context: at("co-silo-credit", "team") },
+    ),
+  ]);
+  cases.add("FOLLOW_UP", "INVESTOR", [
+    turn(
+      "what's ledgerline's elevator pitch",
+      I.move(profile("co-ledgerline", "elevator"), "A part that is one tab."),
+      { context: context({ at: dest("DISCOVER") }) },
+    ),
+  ]);
+  cases.add("TYPO", "INVESTOR", [
+    turn(
+      "show me tamarnd pays deck",
+      I.move(
+        deck("co-tamarind-pay"),
+        "A listed name, misspelt: written in full.",
+      ),
+    ),
+  ]);
+  cases.add("STAY_IN_CHAT", "INVESTOR", [
+    turn(
+      "how does silo credit stack up against tamarind pay on growth?",
+      I.stay("A comparison made for the question: chat."),
+      { context: at("co-silo-credit") },
+    ),
+  ]);
+  cases.add("LOOKALIKE_STAY", "INVESTOR", [
+    turn(
+      "is digital lending in nigeria getting crowded, beyond silo credit?",
+      I.stay("A market question that only mentions one company."),
+    ),
+  ]);
+  cases.add("STAY_IN_CHAT", "FOUNDER", [
+    turn(
+      "what can you dig up about me online?",
+      F.stay("Research Q is asked to do about them: answered in chat."),
+    ),
+  ]);
+  cases.add("STAY_IN_CHAT", "INVESTOR", [
+    turn(
+      "look up quaywise online for me",
+      I.stay("Research Q is asked to do: answered in chat, not a page."),
+    ),
+  ]);
+  cases.add("FOLLOW_UP", "FOUNDER", [
+    turn(
+      "what does baobab ridge invest in?",
+      F.move(
+        investorProfile("inv-baobab-ridge"),
+        "About one investor: their page.",
+      ),
+      { q: "Baobab Ridge backs early climate and agri companies." },
+    ),
+    turn(
+      "have we talked to them before?",
+      // Dataset correction (after the v10/v11 A/B, 7 Nov): "talked" is
+      // calls as well as messages; the relationship page holds both.
+      F.move(
+        relationshipWithInvestor("inv-baobab-ridge"),
+        "'Them': the investor talked about; where things stand with them.",
+      ),
+      { context: context({ at: investorProfile("inv-baobab-ridge") }) },
+    ),
+  ]);
 }

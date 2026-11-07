@@ -134,7 +134,9 @@ export type QNavigationGuard =
   | "TWO_PLACES"
   | "NOTHING_BEFORE"
   /** Decision 78: the samples did not all name one place. */
-  | "SPLIT_VOTE";
+  | "SPLIT_VOTE"
+  /** The record was found only by part of the name said: a lookalike. */
+  | "INEXACT_NAME";
 
 // --- 0. The site map (W2) ---------------------------------------------
 
@@ -698,6 +700,11 @@ function placeOf(
 export function createQNavigationDecider(dependencies: {
   readonly gateway: ModelGateway;
   readonly logger?: Logger | undefined;
+  /**
+   * Evals only: a registered NAVIGATION_DECISION version to render, for an
+   * A/B on the same cases. Absent (production): the active version.
+   */
+  readonly promptVersion?: number | undefined;
 }): QNavigationDecider {
   const registry = createDefaultPromptRegistry();
   return {
@@ -705,6 +712,9 @@ export function createQNavigationDecider(dependencies: {
       try {
         const rendered = renderPrompt<NavigationDecisionVariables>(registry, {
           task: "NAVIGATION_DECISION",
+          ...(dependencies.promptVersion === undefined
+            ? {}
+            : { taskVersion: dependencies.promptVersion }),
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
           communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -772,12 +782,24 @@ function byName<T>(
   nameOf: (item: T) => string,
   said: string,
 ): T | null {
+  return byNameMatch(list, nameOf, said)?.item ?? null;
+}
+
+/** byName, saying whether the name matched exactly or only in part. */
+function byNameMatch<T>(
+  list: readonly T[],
+  nameOf: (item: T) => string,
+  said: string,
+): { readonly item: T; readonly exact: boolean } | null {
   const wanted = norm(said);
   const exact = list.filter((item) => norm(nameOf(item)) === wanted);
-  if (exact.length === 1) return exact[0] ?? null;
+  if (exact.length === 1 && exact[0] !== undefined)
+    return { item: exact[0], exact: true };
   if (exact.length > 1) return null;
+  const inexact = (item: T | undefined) =>
+    item === undefined ? null : { item, exact: false };
   const partial = list.filter((item) => norm(nameOf(item)).includes(wanted));
-  if (partial.length === 1) return partial[0] ?? null;
+  if (partial.length === 1) return inexact(partial[0]);
   if (partial.length > 1) return null;
   const saidWords = new Set(nameWords(said));
   if (saidWords.size === 0) return null;
@@ -789,11 +811,19 @@ function byName<T>(
         [...saidWords].every((w) => words.includes(w)))
     );
   });
-  return byWords.length === 1 ? (byWords[0] ?? null) : null;
+  return byWords.length === 1 ? inexact(byWords[0]) : null;
 }
 
 export type QNavigationResolution =
-  | { readonly kind: "TARGET"; readonly target: QNavigateTarget }
+  | {
+      readonly kind: "TARGET";
+      readonly target: QNavigateTarget;
+      /**
+       * heldout4 follow-up: the record was found only by part of the name
+       * said (a lookalike, never its exact name): offered, never moved to.
+       */
+      readonly inexact?: true;
+    }
   | { readonly kind: "UNRESOLVED" | "DELETED" | "NOTHING_BEFORE" };
 
 /** What the model named: a record (and maybe its document) on a page. */
@@ -814,6 +844,12 @@ export type QNavigationRecordFound =
       readonly status: "FOUND";
       readonly recordId: string;
       readonly documentId: string | null;
+      /**
+       * False: found only by part of the name said (or of the document's
+       * title), a lookalike rather than the record named. Absent: the port
+       * cannot tell (it is then treated as named).
+       */
+      readonly exact?: boolean;
     }
   | { readonly status: "NONE" | "WHICH_ONE" | "DELETED" }
   /** A record with no page of its own: the place named stands without it. */
@@ -835,29 +871,45 @@ export function findListedRecord(
 ): QNavigationRecordFound {
   if (byName(records.deleted, (d) => d.name, ask.name) !== null)
     return { status: "DELETED" };
-  const company =
+  const companyMatch =
     ask.kind === "COMPANY"
-      ? byName(records.companies, (c) => c.name, ask.name)
+      ? byNameMatch(records.companies, (c) => c.name, ask.name)
       : null;
-  const found =
-    company ??
+  const company = companyMatch?.item ?? null;
+  const match =
+    companyMatch ??
     (ask.kind === "INVESTOR"
-      ? byName(records.investors, (i) => i.name, ask.name)
+      ? byNameMatch(records.investors, (i) => i.name, ask.name)
       : ask.kind === "THING"
-        ? byName(records.things, (t) => t.title, ask.name)
+        ? byNameMatch(records.things, (t) => t.title, ask.name)
         : null);
-  if (found === null) return { status: "NONE" };
+  if (match === null) return { status: "NONE" };
+  const found = match.item;
+  // A company or investor has one name: part of it is a lookalike. Board
+  // items and documents are named by what they are about, so a part of
+  // their title is how people name them.
+  const exact = ask.kind === "THING" || match.exact;
   if (ask.kind === "THING" && "route" in found && found.route === null)
     return { status: "NO_PAGE" };
   if (ask.document === null)
-    return { status: "FOUND", recordId: found.id, documentId: null };
+    return {
+      status: "FOUND",
+      recordId: found.id,
+      documentId: null,
+      exact,
+    };
   const doc =
     company === null
       ? null
-      : byName(company.documents ?? [], (d) => d.title, ask.document);
+      : byNameMatch(company.documents ?? [], (d) => d.title, ask.document);
   return doc === null
     ? { status: "NONE" }
-    : { status: "FOUND", recordId: found.id, documentId: doc.id };
+    : {
+        status: "FOUND",
+        recordId: found.id,
+        documentId: doc.item.id,
+        exact,
+      };
 }
 
 export function listedRecordResolver(
@@ -902,7 +954,10 @@ function placeTarget(
     },
     map,
   );
-  return target === null ? { kind: "UNRESOLVED" } : { kind: "TARGET", target };
+  if (target === null) return { kind: "UNRESOLVED" };
+  return found?.status === "FOUND" && found.exact === false
+    ? { kind: "TARGET", target, inexact: true }
+    : { kind: "TARGET", target };
 }
 
 /**
@@ -957,7 +1012,7 @@ function asOwnRecord(
   records: QNavigationRecords,
 ): QNavigationResolution {
   return resolution.kind === "TARGET"
-    ? { kind: "TARGET", target: ownPlace(resolution.target, records) }
+    ? { ...resolution, target: ownPlace(resolution.target, records) }
     : resolution;
 }
 
@@ -1104,11 +1159,13 @@ export function applyNavigationPolicy(input: {
   if (!input.canOpen(target.page)) return STAY("NO_ACCESS");
   if (pane.at !== null && samePlace(target, pane.at))
     return STAY("ALREADY_THERE");
+  const lookalike = resolution.inexact === true;
   if (pane.pane === "COLLAPSED") {
     // Open the pane only for a page they asked to see; otherwise keep it.
     return proposal.decision === "MOVE" &&
       proposal.askedForPage &&
       proposal.sure !== false &&
+      !lookalike &&
       !secondPlace(target, input.alternative, input.canOpen, records)
       ? {
           decision: "MOVE",
@@ -1132,6 +1189,8 @@ export function applyNavigationPolicy(input: {
   if (proposal.sure === false) return offer("UNSURE");
   if (secondPlace(target, input.alternative, input.canOpen, records))
     return offer("TWO_PLACES");
+  // A record found only by part of the name said: never moved to a guess.
+  if (lookalike) return offer("INEXACT_NAME");
   if (proposal.decision === "OFFER") return offer(null);
   if (!input.config.movesAllowed) return offer("BELOW_GATE");
   return {

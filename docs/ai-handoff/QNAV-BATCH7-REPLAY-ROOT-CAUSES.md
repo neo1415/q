@@ -32,3 +32,51 @@ Source: `receipts/2026-11-07-owner-replay-batch7/README.md`. R1 works: decisions
 | "find me online"           | STAY                   |
 
 **Caution:** v10 changed the prompt, so the third held-out set's 88.1% no longer describes production. A fourth set (`heldout-fourth.ts`, about 120 turns, separate author, conversation-driven placement and tabs) is sealed before it is run once.
+
+## The fourth held-out set, run once on `19514ed` (v10): now spent
+
+Results (category level only; no rows read):
+
+- pass 90.8%; decision 93.3%;
+- move-target 91.5% (third set: 88.1%);
+- **wrong-page 4.2%** (5 turns; third set: 1.6%); forbidden 0; p95 2.1 s.
+- Wrong-page turns by category: FOLLOW_UP 2 of 34, LOOKALIKE_MOVE 1 of 8, LOOKALIKE_STAY 1 of 3, TYPO 1 of 4.
+
+**Diagnosis from what v10 changed (category level).** v10 placed more pages correctly but loosened four places where a wrong page can come from:
+
+1. **Unlisted names.** "By the name they used" let the model pass raw words, including a misspelt or partial _listed_ name. Code then matched it by substring or words, which can be a lookalike (TYPO, LOOKALIKE_MOVE).
+2. **The topic rule was too broad.** "The conversation turns to one record → its page" also fired for a record merely mentioned inside a wider question (LOOKALIKE_STAY, STAY_IN_CHAT).
+3. **Tabs.** "The part they ask about is that page's tab" pushed the model to name a tab even when no single tab holds the part, and a wrong tab counts as a wrong page (FOLLOW_UP).
+4. **Pointing words.** When the record the conversation is about and the record on screen differ, the model had to pick one (FOLLOW_UP, NOT_THAT_ONE, STALE_CONTEXT).
+
+**Tightening, on `fix/q-nav-batch8`:**
+
+- **Code (all prompt versions):** a company or investor found only by part of the name said (`byNameMatch`, not exact) is **offered, never moved to** (guard `INEXACT_NAME`). With the pane collapsed it is only remembered. Board items and documents are exempt, because people name them by what they are about.
+  - Failing-first tests are in `navigation-decision.test.ts`.
+  - The production `open_page` port can't report exactness yet, so it keeps today's behaviour. Its own matcher has a floor and a lead margin, and the three votes must agree.
+- **NAVIGATION_DECISION v11** (lock `1bf61b64`):
+  - a listed name said misspelt or in part is written in full;
+  - a record only mentioned inside a wider question is answered in chat;
+  - a tab only when the part asked about is what that tab holds, otherwise the page as it opens;
+  - a pointing word that fits both the conversation's record and the screen's gives the other as `alternative` (an offer, not a guess).
+- **Dev:** 12 conversation-placement turns written for dev (FOLLOW_UP, TYPO, STAY_IN_CHAT, LOOKALIKE_STAY). None is a held-out sentence, which the "holds out" test checks.
+- **Measurement:** an A/B on the same focused dev subset, v10 against v11:
+  - `CQ_QNAV_PROMPT_VERSION=10|11`;
+  - `CQ_QNAV_CATEGORIES=FOLLOW_UP,LOOKALIKE_MOVE,LOOKALIKE_STAY,TYPO,NOT_THAT_ONE,STALE_CONTEXT,COLLAPSED_PANE,DIRTY_FORM,STAY_IN_CHAT`.
+    That is about 143 turns, roughly $3.1 per version. Ship v11 only if dev wrong-page falls with move-target held. There is no fresh held-out set for v11; a fifth set would be needed for that claim.
+
+## The five v11 wrong-page turns in the dev A/B, by row (`2026-11-07-qnav-ab-v11.json`)
+
+The A/B on e26a1ac, same 143 dev turns: v10 had wrong-page 4.20% (6 turns) and v11 3.50% (5), with move-target 93.7% for both. v11 ships in batch 8. All five remaining turns were unanimous across the three votes.
+
+| Row                                      | Said                                                   | v11 placed                                | Verdict                                                                                                                                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-STY-004 (investor)                     | "Find me 5 companies that fit my mandate."             | /investors/top ("shows exactly those")    | **Model error.** A list composed to their spec (a count) is made in chat (DECISIONS 75, round 4). The model read the page's purpose and skipped the count.                                                                                                                       |
+| D-STY-012 (founder)                      | "Which investors should I pitch next?"                 | /investors ("find new investors who fit") | **Model error.** A recommendation (which, next) is advice made for the question.                                                                                                                                                                                                 |
+| D-LKM-004 (founder)                      | "I'm curious whether any investors are warming to us." | /analytics, intent                        | **Label error, corrected.** By the site map's purposes, "warming to us" is the signals: Analytics' intent section ("investors saving you or asking for more"). `/company/interest` is where requests to connect are answered. Intent leads Analytics, so the place is ANALYTICS. |
+| D-LKM-005 (founder)                      | "Not sure we're ready for diligence, honestly."        | Relationships › Capital: Readiness        | **Label error, corrected** (flagged as doubtful in the r3 note). Capital: Readiness is "how ready your company looks to investors"; the data room's missing list is one part of it.                                                                                              |
+| D-FUP-004 (founder, written by me today) | "have we talked to them before?"                       | the relationship page (Baobab Ridge)      | **Label error, corrected.** "Talked" covers calls as well as messages, and the relationship page holds both tabs. My expectation of the messages thread was too narrow.                                                                                                          |
+
+**Honesty about the numbers.** I changed three labels after seeing the model's outputs. Each change is justified by the site map's own purposes, and each is commented in `curveballs.ts`. Even so, a relabel after seeing outputs leans toward the model. Recomputed on the corrected labels, v11 has 2 wrong-page turns of 143 (1.4%). Treat that as provisional until a measured run on a fresh set.
+
+**The two model errors have no principled code fix.** Nothing in code can tell "find me 5 companies" from a request to see a list page without matching words, which DECISIONS 75 forbids. The fix is a prompt line: asking Q to pick, rank or recommend (a count, "which … next") is made in chat. That needs a measured run, and the budget is spent tonight. It is proposed for the next measured round, not shipped unmeasured.
