@@ -653,7 +653,6 @@ describe("voice onboarding, owner live run 2026-10-28 (Tiara)", () => {
     // DECISIONS 79: Q never advertises optionality.
     expect(brief).not.toMatch(/they can skip|they may skip/u);
     expect(brief).toMatch(/- Group 1: /);
-    expect(brief).toMatch(/- Group 2: /);
     expect(brief).toContain(
       "Finish only when every topic has been asked or they declined it, or they ask to finish.",
     );
@@ -678,13 +677,18 @@ describe("voice onboarding, owner live run 2026-10-28 (Tiara)", () => {
   });
 
   it("the read-back counts the optional topics left until each is asked or declined", async () => {
+    // From investor v5 the discovery style is the one optional topic.
     const world = investorSession({
-      currentStepKey: INVESTOR_STEPS.investmentRole,
-      recorded: SPOKEN_REQUIRED,
+      currentStepKey: INVESTOR_STEPS.discoveryMode,
+      recorded: Object.fromEntries(
+        Object.entries(SPOKEN_REQUIRED).filter(
+          ([key]) => key !== INVESTOR_STEPS.discoveryMode,
+        ),
+      ),
     });
     const state = await stateOf(world);
     const said = readBack(state);
-    expect(said).toMatch(/The essentials are in\. \d+ optional topics left/);
+    expect(said).toMatch(/The essentials are in\. \d+ optional topics? left/);
     expect(said).not.toContain("Everything needed is in");
     expect(said).toContain("Do not wrap up yet");
     const declinedAll = readBack({

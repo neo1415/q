@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { OnboardingTranscriptReader } from "@capital-q/model-gateway/q";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 
@@ -7,7 +8,6 @@ import {
   briefOf,
   createOnboardingConversation,
   type ConversationLine,
-  type OnboardingTranscriptReader,
 } from "../src/voice/onboarding-conversation.js";
 import { createOnboardingPort } from "../src/voice/onboarding-port.js";
 

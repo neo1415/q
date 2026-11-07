@@ -194,9 +194,9 @@ describe("1. only what the person stated is saved; Q's inference waits for their
     });
   });
 
-  it("not knowing an optional step sets it aside (the role is mandatory from investor v4, so capital intensity stands in)", async () => {
+  it("not knowing an optional step sets it aside (from investor v5 the discovery style is the optional step)", async () => {
     const world = investorSession({
-      currentStepKey: "I4.capital_intensity",
+      currentStepKey: "I9.discovery_mode",
       subject: FIRM,
       recorded: { "I0.investor_type": "vc" },
     });
@@ -210,15 +210,15 @@ describe("1. only what the person stated is saved; Q's inference waits for their
           answers: [],
           declined: [],
           notKnown: [
-            { stepKey: "I4.capital_intensity", quote: "not sure yet" },
+            { stepKey: "I9.discovery_mode", quote: "not sure yet" },
           ],
         },
       ]),
     });
     await conversation.said?.(line, "PERSON", "not sure yet");
     await conversation.flush?.(line);
-    expect(world.recordedValue("I4.capital_intensity")).toBeUndefined();
-    expect(world.skippedSteps()).toContain("I4.capital_intensity");
+    expect(world.recordedValue("I9.discovery_mode")).toBeUndefined();
+    expect(world.skippedSteps()).toContain("I9.discovery_mode");
   });
 
   it("the model reader's reading must say, per value, stated or inferred: one that does not is not used", async () => {

@@ -346,7 +346,7 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     expect(second.reply).toMatch(/saved and live/u);
   });
 
-  it('"skip that" sets an optional topic aside and the next question follows', async () => {
+  it('"skip that" on a mandatory list answers it "None" (batch 7), and the next question follows', async () => {
     const world = investorSession({
       currentStepKey: "I8.portfolio",
       subject: FIRM,
@@ -372,8 +372,11 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     });
     const outcome = await say("skip that");
     expect(outcome.asking?.stepKey).toBe("I2.stages");
-    await settled(() => world.skippedSteps().includes("I8.portfolio"));
-    expect(world.skippedSteps()).toContain("I8.portfolio");
+    await settled(() => world.recordedValue("I8.portfolio") !== undefined);
+    expect(world.recordedValue("I8.portfolio")).toEqual({
+      type: "TEXT",
+      text: "None",
+    });
   });
 
   it('"what do you have so far" is read back from the record, after what they said is saved', async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import { INVESTOR_DEFINITION_CURRENT } from "@capital-q/investor-onboarding";
 
 import { PERSONALITY_NOTES } from "../src/voice/standing.js";
 import { SPOKEN_QUESTIONS } from "../src/voice/step-copy.js";
@@ -87,7 +87,7 @@ describe("the questions code adds, in the person's language", () => {
   });
 
   it("Arabic's hand copy covers every founder and investor step", () => {
-    const missing = [...founderSteps, ...INVESTOR_DEFINITION_V1.steps].filter(
+    const missing = [...founderSteps, ...INVESTOR_DEFINITION_CURRENT.steps].filter(
       (step) => SPOKEN_QUESTIONS_AR[step.stepKey] === undefined,
     );
     expect(missing.map((step) => step.stepKey)).toEqual([]);

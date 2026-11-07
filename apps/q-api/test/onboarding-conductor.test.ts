@@ -58,7 +58,11 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-const FOUNDER_KEYS = FOUNDER_DEFINITION_CURRENT.steps.map((s) => s.stepKey);
+const FOUNDER_KEYS = FOUNDER_DEFINITION_CURRENT.steps
+  .map((s) => s.stepKey)
+  // The views here are pinned to an older version: before v10 added the
+  // city and founding year.
+  .filter((key) => key !== "F1.city" && key !== "F1.founded_year");
 
 /** A founder session as the service reports it: F0.intent still open. */
 function stuckView(
