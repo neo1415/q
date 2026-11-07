@@ -297,6 +297,19 @@ describe("Q Story Q Card (#48-49)", () => {
       true,
     );
   });
+
+  it("follows the product's band cap: never Investable or Strong at Low confidence (owner decision 78)", async () => {
+    const { storyQCard } = await import("@/features/q-pitch/story/story-qcard");
+    const field = storyQCard("https://example.test").fields.find(
+      (f) => f.key === "investabilitySummary",
+    );
+    const detail = field?.detail;
+    if (detail?.kind !== "INTELLIGENCE") throw new Error("no investability");
+    expect(detail.confidence).toBe("Low confidence");
+    expect(["Not yet investable", "Developing"]).toContain(detail.band);
+    expect(field?.value).toBe(detail.band);
+    expect(detail.method).toBe("FDN InvestIQ v3");
+  });
 });
 
 describe("Q Story audio bank (budgeted preload)", () => {
@@ -391,5 +404,23 @@ describe("Q Story offer under a 'what is Capital Q?' answer", () => {
     expect(askedBefore(turns, "q2")).toBe("What is Capital Q?");
     expect(askedBefore(turns, "q1")).toBe("show me deals");
     expect(askedBefore(turns, "nope")).toBeNull();
+  });
+});
+
+describe("Q Story top three follows the product's score rules (owner decision 78)", () => {
+  it("never shows a band its confidence does not allow", async () => {
+    const { STORY_TOP_THREE } =
+      await import("@/features/q-pitch/story/story-stage");
+    expect(STORY_TOP_THREE).toHaveLength(3);
+    for (const row of STORY_TOP_THREE) {
+      // Investability above Developing needs Moderate confidence or more.
+      if (row.investability.confidence === "LOW") {
+        expect(["EARLY", "DEVELOPING"]).toContain(row.investability.band);
+      }
+      // A Strong fit needs High confidence.
+      if (row.fit.band === "STRONG_FIT") {
+        expect(row.fit.confidence).toBe("HIGH");
+      }
+    }
   });
 });

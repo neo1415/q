@@ -4,6 +4,7 @@ import {
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
   INVESTABILITY_BAND_LABELS,
+  INVESTABILITY_PARTS,
   SCORE_CONFIDENCE_LABELS,
   investabilityLine,
   investabilityMethodLabel,
@@ -94,6 +95,61 @@ function Factors({
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * Investability's two parts under its headline (audit P1-7, owner decision
+ * 78): plain names, one sentence each, the number or plain words. Shape and
+ * words carry the meaning, never colour.
+ */
+export function InvestabilityParts({
+  investability,
+}: {
+  readonly investability: InvestabilityDto;
+}) {
+  const t = useT();
+  const parts = investability.parts;
+  if (parts === undefined) return null;
+  return (
+    <dl
+      className="mt-1 flex flex-col gap-2 border-t border-(--cq-border-subtle) pt-2"
+      data-investability-parts
+    >
+      {INVESTABILITY_PARTS.map(({ key, name, sentence }) => {
+        const part = parts[key];
+        const graded = part.score !== null && part.band !== null;
+        return (
+          <div key={key} className="flex min-w-0 flex-col" data-part={key}>
+            <dt className="flex items-baseline justify-between gap-3">
+              <span className="cq-body-sm text-(--cq-text-primary)">
+                {t(name)}
+              </span>
+              <span className="cq-body-sm cq-numeric shrink-0 text-(--cq-text-primary)">
+                {graded ? (
+                  String(part.score)
+                ) : (
+                  <>
+                    <span aria-hidden="true">—</span>
+                    <span className="sr-only">{t("No number yet")}</span>
+                  </>
+                )}
+              </span>
+            </dt>
+            <dd className="cq-caption text-(--cq-text-secondary)">
+              {graded && part.band !== null
+                ? `${t(INVESTABILITY_BAND_LABELS[part.band])}${part.confidence === null ? "" : ` · ${t(SCORE_CONFIDENCE_LABELS[part.confidence])}`}`
+                : part.factors.onRecord === 0
+                  ? t("Nothing shared yet")
+                  : `${String(part.factors.onRecord)} ${t("of")} ${String(part.factors.applicable)} ${t("factors on record, not enough to grade yet")}`}
+            </dd>
+            <dd className="cq-caption text-(--cq-text-tertiary)">
+              {t(sentence)}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 
@@ -273,6 +329,7 @@ export function CompanyScores({
             : `Based on ${inv.coverage.criteriaScored} of ${inv.coverage.criteriaApplicable} factors · ${inv.coverage.areasScored} of ${inv.coverage.areasTotal} areas${inv.range === undefined ? "" : ` · evidence range ${String(inv.range.low)}–${String(inv.range.high)}`}`
         }
       >
+        <InvestabilityParts investability={inv} />
         <Why
           id={`${scores.companyId}-investability`}
           up={inv.up}
