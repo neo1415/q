@@ -50,6 +50,19 @@ export const Q_SITE_MAP: QSiteMap = {
       sections: [],
     },
     {
+      route: "/admin/analytics",
+      title: "Analytics privacy",
+      purpose: "Analytics privacy settings across the platform.",
+      audience: "ADMIN",
+      params: [],
+      shows: [],
+      destinations: [],
+      recordPages: [],
+      settingsSections: [],
+      tabs: [],
+      sections: [],
+    },
+    {
       route: "/admin/audit",
       title: "Audit",
       purpose: "The audit history.",
@@ -532,6 +545,12 @@ export const Q_SITE_MAP: QSiteMap = {
         {
           id: "data-room",
           title: "Data room",
+          kind: "DATA_ROOM",
+          tab: "dataroom",
+        },
+        {
+          id: "missing",
+          title: "Still to add (owner)",
           kind: "DATA_ROOM",
           tab: "dataroom",
         },
@@ -1034,8 +1053,13 @@ export const Q_SITE_MAP: QSiteMap = {
       sections: [
         {
           id: "q",
-          title: "Ask Q",
+          title: "Ask Q (workspace off)",
           kind: "OTHER",
+        },
+        {
+          id: "board",
+          title: "Your board (workspace on)",
+          kind: "WORK_LIST",
         },
         {
           id: "q-room-card",
@@ -1555,7 +1579,7 @@ export const Q_SITE_MAP: QSiteMap = {
         },
         {
           id: "capital",
-          title: "Capital (founder)",
+          title: "Capital",
           href: "/relationships?view=capital",
           destinations: ["CAPITAL"],
           subs: [],
@@ -1613,6 +1637,18 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "relationships",
           title: "Relationships",
           kind: "RELATIONSHIP_LIST",
+        },
+        {
+          id: "mandate",
+          title: "Your mandate",
+          kind: "OTHER",
+          tab: "capital",
+        },
+        {
+          id: "commitments",
+          title: "Your book (commitments)",
+          kind: "CAPITAL_ROUNDS",
+          tab: "capital",
         },
         {
           id: "capital-overview",
@@ -1823,6 +1859,11 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "CHAT",
         },
         {
+          id: "draft",
+          title: "Your reply (Q's draft)",
+          kind: "CHAT",
+        },
+        {
           id: "calls",
           title: "Calls",
           kind: "SCHEDULE",
@@ -2002,6 +2043,11 @@ export const Q_SITE_MAP: QSiteMap = {
         {
           id: "chat",
           title: "Messages",
+          kind: "CHAT",
+        },
+        {
+          id: "draft",
+          title: "Your reply (Q's draft)",
           kind: "CHAT",
         },
         {

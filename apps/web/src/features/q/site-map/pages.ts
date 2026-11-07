@@ -129,6 +129,7 @@ function relationshipPage(
       part === "messages"
         ? [
             { id: "chat", title: "Messages", kind: "CHAT" },
+            { id: "draft", title: "Your reply (Q's draft)", kind: "CHAT" },
             ...RELATIONSHIP_SECTIONS,
           ]
         : RELATIONSHIP_SECTIONS,
@@ -154,6 +155,10 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/admin": ADMIN("Operations", "Capital Q's operations console."),
   "/admin/accounts": ADMIN("Accounts", "Accounts on the platform."),
   "/admin/accounts/[userId]": ADMIN("Account", "One account."),
+  "/admin/analytics": ADMIN(
+    "Analytics privacy",
+    "Analytics privacy settings across the platform.",
+  ),
   "/admin/audit": ADMIN("Audit", "The audit history."),
   "/admin/billing": ADMIN("Billing", "Plans and billing across accounts."),
   "/admin/brand": ADMIN("Brand", "Capital Q's brand settings."),
@@ -246,7 +251,10 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     purpose: "Talk to Q: answers, cards, documents and the Board.",
     audience: "ANY",
     sections: [
-      { id: "q", title: "Ask Q", kind: "OTHER" },
+      // Workspace off: Home is Q itself. On: Q is the layout pane and
+      // Home's page side is the work board (W1.2).
+      { id: "q", title: "Ask Q (workspace off)", kind: "OTHER" },
+      { id: "board", title: "Your board (workspace on)", kind: "WORK_LIST" },
       { id: "q-room-card", title: "Q's card", kind: "Q_ROOM_CARD" },
     ],
   },
@@ -457,6 +465,12 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         kind: "DATA_ROOM",
         tab: "dataroom",
       },
+      {
+        id: "missing",
+        title: "Still to add (owner)",
+        kind: "DATA_ROOM",
+        tab: "dataroom",
+      },
       { id: "deck", title: "Pitch deck", kind: "DECK", tab: "deck" },
       { id: "team", title: "Team", kind: "TEAM", tab: "team" },
     ],
@@ -525,7 +539,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       },
       {
         id: "capital",
-        title: "Capital (founder)",
+        title: "Capital",
         href: "/relationships?view=capital",
       },
       {
@@ -571,6 +585,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         id: "relationships",
         title: "Relationships",
         kind: "RELATIONSHIP_LIST",
+      },
+      { id: "mandate", title: "Your mandate", kind: "OTHER", tab: "capital" },
+      {
+        id: "commitments",
+        title: "Your book (commitments)",
+        kind: "CAPITAL_ROUNDS",
+        tab: "capital",
       },
       {
         id: "capital-overview",

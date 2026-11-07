@@ -2,10 +2,13 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  Q_NAVIGATE_DESTINATIONS,
+  Q_RECORD_PAGES,
   Q_SITE_MAP,
   Q_SITE_MAP_DIGEST_MAX_CHARS,
   QSiteMapSchema,
   qSiteMapDigest,
+  qSiteMapLandingFor,
   qSiteMapPageFor,
 } from "@capital-q/contracts";
 import { describe, expect, it } from "vitest";
@@ -42,6 +45,19 @@ describe("the Q site map (W2)", () => {
       return;
     }
     expect(QSiteMapSchema.parse(Q_SITE_MAP)).toEqual(built);
+  });
+
+  it("every navigation target page (destination or record page) lands on its entry (W3 keys)", () => {
+    for (const key of [...Q_NAVIGATE_DESTINATIONS, ...Q_RECORD_PAGES]) {
+      expect(qSiteMapLandingFor(built, key), key).not.toBeNull();
+    }
+    expect(qSiteMapLandingFor(built, "CAPITAL_RAISE")?.tab?.id).toBe(
+      "capital-raise",
+    );
+    expect(qSiteMapLandingFor(built, "COMPANY_DECK")?.page.route).toBe(
+      "/company/[companyId]",
+    );
+    expect(qSiteMapLandingFor(built, "NOT_A_PAGE")).toBeNull();
   });
 
   it("maps a concrete path to its page, literal routes first", () => {
