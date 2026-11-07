@@ -406,3 +406,21 @@ describe("Q Story offer under a 'what is Capital Q?' answer", () => {
     expect(askedBefore(turns, "nope")).toBeNull();
   });
 });
+
+describe("Q Story top three follows the product's score rules (owner decision 78)", () => {
+  it("never shows a band its confidence does not allow", async () => {
+    const { STORY_TOP_THREE } =
+      await import("@/features/q-pitch/story/story-stage");
+    expect(STORY_TOP_THREE).toHaveLength(3);
+    for (const row of STORY_TOP_THREE) {
+      // Investability above Developing needs Moderate confidence or more.
+      if (row.investability.confidence === "LOW") {
+        expect(["EARLY", "DEVELOPING"]).toContain(row.investability.band);
+      }
+      // A Strong fit needs High confidence.
+      if (row.fit.band === "STRONG_FIT") {
+        expect(row.fit.confidence).toBe("HIGH");
+      }
+    }
+  });
+});

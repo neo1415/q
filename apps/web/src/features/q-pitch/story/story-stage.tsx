@@ -8,6 +8,16 @@ import {
   type StoryMood,
   type StoryVisual,
 } from "@capital-q/q-pitch";
+import {
+  FIT_BAND_LABELS,
+  FIT_CONFIDENCE_LABELS,
+  INVESTABILITY_BAND_LABELS,
+  SCORE_CONFIDENCE_LABELS,
+  type FitBand,
+  type FitConfidence,
+  type InvestabilityBand,
+  type ScoreConfidence,
+} from "@capital-q/contracts";
 import type { CSSProperties, ReactNode } from "react";
 
 import { StoryQCard } from "./story-qcard";
@@ -421,15 +431,17 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
             Your top three, against your mandate
           </p>
           <ol className="cq-story-cards">
-            {[
-              ["Harbourline Cargo", "Strong fit", "Investable"],
-              ["Clinicrest", "Good fit", "Developing"],
-              ["Maji Loop", "Good fit", "Early"],
-            ].map(([name, fit, inv], i) => (
+            {STORY_TOP_THREE.map(({ name, fit, investability }, i) => (
               <li key={name} style={{ ["--i" as string]: i }}>
                 <strong>{name}</strong>
-                <span>Suitability: {fit}</span>
-                <span>Investability: {inv}</span>
+                <span>
+                  Suitability: {FIT_BAND_LABELS[fit.band]} ·{" "}
+                  {FIT_CONFIDENCE_LABELS[fit.confidence]}
+                </span>
+                <span>
+                  Investability: {INVESTABILITY_BAND_LABELS[investability.band]}{" "}
+                  · {SCORE_CONFIDENCE_LABELS[investability.confidence]}
+                </span>
               </li>
             ))}
           </ol>
@@ -667,3 +679,36 @@ export function StoryStage({
     </div>
   );
 }
+
+/**
+ * The story's top three (fictional), in the product's own words and under
+ * its own score rules (owner decision 78): Investability above Developing
+ * needs Moderate confidence or more, and a Strong fit needs High
+ * confidence. Harbourline's fit rests on document-supported evidence (the
+ * comparison panel), so it may be Strong; every Investability here is Low
+ * confidence, as on production today, so none is above Developing.
+ */
+export const STORY_TOP_THREE: readonly {
+  readonly name: string;
+  readonly fit: { readonly band: FitBand; readonly confidence: FitConfidence };
+  readonly investability: {
+    readonly band: InvestabilityBand;
+    readonly confidence: ScoreConfidence;
+  };
+}[] = [
+  {
+    name: "Harbourline Cargo",
+    fit: { band: "STRONG_FIT", confidence: "HIGH" },
+    investability: { band: "DEVELOPING", confidence: "LOW" },
+  },
+  {
+    name: "Clinicrest",
+    fit: { band: "GOOD_FIT", confidence: "MEDIUM" },
+    investability: { band: "DEVELOPING", confidence: "LOW" },
+  },
+  {
+    name: "Maji Loop",
+    fit: { band: "GOOD_FIT", confidence: "MEDIUM" },
+    investability: { band: "EARLY", confidence: "LOW" },
+  },
+];
