@@ -76,6 +76,8 @@ export type InvestorWorld = {
 export type WorldOptions = {
   /** The journey the session follows (default investor). */
   readonly journey?: "founder" | "investor" | undefined;
+  /** The definition's steps (default: investor v1, or founder v3). */
+  readonly steps?: typeof INVESTOR_STEPS | undefined;
   readonly currentStepKey: string;
   /** Option keys or text already answered, by step. */
   readonly recorded?: Readonly<Record<string, string>> | undefined;
@@ -218,7 +220,9 @@ function valueFor(
 
 export function investorSession(options: WorldOptions): InvestorWorld {
   const journey = options.journey ?? "investor";
-  const STEPS = journey === "founder" ? FOUNDER_STEPS_V3 : INVESTOR_STEPS;
+  const STEPS =
+    options.steps ??
+    (journey === "founder" ? FOUNDER_STEPS_V3 : INVESTOR_STEPS);
   const held = new Map<string, OnboardingResponseValue>(
     Object.entries(options.recorded ?? {}).map(([key, raw]) => [
       key,

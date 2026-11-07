@@ -93,6 +93,7 @@ import {
 } from "./onboarding-port.js";
 import type { HeldWritesStore } from "./held-writes.js";
 import { codeReading } from "./code-reading.js";
+import { listsSettledByAnswer } from "./list-settle.js";
 import { createReplySentenceStream } from "./reply-stream.js";
 import { languageInfo, listSeparator } from "@capital-q/q-core/language";
 import {
@@ -2897,6 +2898,51 @@ export function createInterviewAgent(
         result.raised.filter((id) => open.has(id)),
       );
     }
+    // e2e run 4 (owner: one answer fills several lists): the lists a
+    // themed question asked that their answer left out, and a concept they
+    // said "None" to, are settled by code -- never asked one by one.
+    const settledByCode = new Set<string>();
+    if (input.journeyType === "investor" && !opening) {
+      const now = port.view();
+      if (now !== null) {
+        const answers = new Map(
+          now.responses.map((r) => [r.stepKey, r.value] as const),
+        );
+        const open = new Set(
+          now.progress.eligibleSteps
+            .filter(
+              (e) =>
+                e.status !== "COMPLETED" &&
+                e.status !== "SKIPPED" &&
+                !answers.has(e.stepKey),
+            )
+            .map((e) => e.stepKey),
+        );
+        const toNone = listsSettledByAnswer({
+          lastQTurn,
+          utterance,
+          recordedThisTurn: port.recorded(),
+          open,
+          answers,
+        });
+        if (toNone.length > 0) {
+          const results = await port
+            .recordNone(
+              toNone.map((stepKey) => ({ stepKey, quote: utterance })),
+            )
+            .catch(() => []);
+          for (const item of results) {
+            if (item.outcome === "COMMITTED") settledByCode.add(item.stepKey);
+          }
+          if (settledByCode.size > 0) {
+            logger.info(
+              { settled: [...settledByCode] },
+              "lists their answer left out settled as None",
+            );
+          }
+        }
+      }
+    }
     const recorded = port.recorded();
     const fallbackLine =
       recorded.length > 0
@@ -3177,7 +3223,9 @@ export function createInterviewAgent(
         reply,
         result.asking,
         stateAfter,
-        recorded,
+        // A list code settled is not "answered this turn" for a reply to
+        // confirm: a question about it goes, and the next is asked.
+        recorded.filter((stepKey) => !settledByCode.has(stepKey)),
       );
       if (cut !== reply) {
         logger.info(
