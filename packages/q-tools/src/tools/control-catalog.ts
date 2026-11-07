@@ -145,6 +145,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "section.viewers", kind: "SECTION" },
   { id: "section.visibility", kind: "SECTION" },
   { id: "section.what-i-did", kind: "SECTION" },
+  { id: "section.who-viewed-you", kind: "SECTION" },
   { id: "section.work-done", kind: "SECTION" },
   { id: "section.work-in-progress", kind: "SECTION" },
   { id: "section.work-needs-you", kind: "SECTION" },
