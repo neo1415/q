@@ -601,17 +601,20 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] =
 /**
  * Same-route and same-place names, graded as equal: destinations.ts sends
  * SEARCH and EXPLORE to /explore; /gateq opens each side's own GateQ tab;
- * /mandate redirects to the profile's mandate section.
+ * /mandate redirects to the profile's mandate section; RESULTS lands on
+ * Relationships' overview (W3 cd46eae), the place RELATIONSHIPS is.
  */
 export const Q_NAV_SAME_PLACE: Readonly<
   Record<QNavSide, readonly (readonly string[])[]>
 > = {
   INVESTOR: [
     ["SEARCH", "EXPLORE"],
+    ["RELATIONSHIPS", "RESULTS"],
     ["GATEWAY", "GATEQ_INBOX"],
   ],
   FOUNDER: [
     ["SEARCH", "EXPLORE"],
+    ["RELATIONSHIPS", "RESULTS"],
     ["GATEWAY", "GATEQ_APPLICATIONS"],
   ],
 };

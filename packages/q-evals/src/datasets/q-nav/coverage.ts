@@ -582,10 +582,15 @@ function records(cases: CaseSet): void {
       "FOUNDER",
       "Open our seed round.",
       "Bring up the seed round page.",
-      // /capital only redirects, so the round has no page of its own to
-      // name: it is a row of the raise tab's rounds (reported to W3).
-      dest("CAPITAL_RAISE"),
-      "Their round is listed on the raise tab's rounds.",
+      thing("CAPITAL_ROUND", "roundSeed"),
+      "One round: Capital, at that round (W3 cd46eae).",
+    ],
+    [
+      "INVESTOR",
+      "Open the Ledgerfold seed round.",
+      "Bring up Ledgerfold's seed round.",
+      thing("CAPITAL_ROUND", "roundSeed"),
+      "One round: Capital, at that round (W3 cd46eae).",
     ],
     [
       "FOUNDER",

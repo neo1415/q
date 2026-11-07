@@ -1880,3 +1880,15 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - /search vs /explore titles;
   - per-tab purposes on the company profile (overview = headline figures);
   - /work Team tab title ("Q's team").
+
+## 2026-11-07 — q-nav fix for the batch-1 deploy (CI 42329939198)
+
+- **Cause:** W3 cd46eae points RESULTS at its real landing (/relationships, overview tab) and makes CAPITAL_ROUND a record page on Relationships (both sides). The q-nav lint and the pipeline proof still expected RESULTS as its own place and had no CAPITAL_ROUND cases.
+- **Fix:**
+  - RESULTS ≡ RELATIONSHIPS in `Q_NAV_SAME_PLACE`, like SEARCH ≡ EXPLORE;
+  - the seed round is a CAPITAL_ROUND record again (founder and investor rows, both splits).
+- **Gates on integration (fix/resume-asking-cv9ru3) merged in:**
+  - package build 55/55;
+  - vitest q-evals/q-core/q-specialists/model-gateway/contracts: 4928 passed;
+  - root tsc 0;
+  - eslint and prettier clean.
