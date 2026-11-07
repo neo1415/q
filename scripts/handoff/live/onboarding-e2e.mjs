@@ -57,7 +57,7 @@ const ORG =
 // ---- the plan, when not told to run ---------------------------------------
 const PLAN = {
   J1: "chat interview: one greeting; a dense line answers several topics; none re-asked",
-  J2: "long answers: a ramble is said back for a yes; a clear typed answer is kept whole (DECISIONS 77; known P1-1)",
+  J2: "long answers: a ramble is said back for a yes; a clear typed answer is kept whole (DECISIONS 77; P1-1 reader v15)",
   J3: "required vs optional: optional skip set aside; required refusal re-asked WITH the reason (P0-2)",
   J4: "chat → voice (HTTP) → chat: no re-greeting (P0-1), no repeated topic, voice turns in the thread",
   J5: "continue later and resume, conversation then form: same open question / same step, nothing lost",
@@ -182,7 +182,8 @@ const greetingsAfterFirstPerson = (all) => {
 
 // ---- the browser --------------------------------------------------------------
 const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
+  executablePath:
+    process.env.CQ_E2E_CHROMIUM_PATH ?? "/opt/pw-browsers/chromium",
   ...(process.env.HTTPS_PROXY
     ? { proxy: { server: process.env.HTTPS_PROXY } }
     : {}),
@@ -314,6 +315,22 @@ if (STEPS.has("J2") && JOURNEY === "founder") {
     (await answered()).includes("F1.description"),
   );
   await shot("j2-readback");
+  // P1-1 (reader v15): a clear typed answer is kept in their words and
+  // saved without a read-back.
+  const CLEAR =
+    "The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkward to send, and there is no simple way for a customer to pay a debt by transfer.";
+  const before = new Set(await answered());
+  await say(CLEAR);
+  const reply = await lastQ();
+  const gained = (await answered()).filter((key) => !before.has(key));
+  note("J2", "Q after a clear typed answer", reply.slice(0, 200));
+  check(
+    "J2",
+    "a clear typed answer is saved in their words, not read back",
+    gained.some((key) => key.startsWith("F9.")) &&
+      !/is that right|did I get that|shall I save/i.test(reply),
+    gained.join(", "),
+  );
 }
 
 // ---- J3 required vs optional ---------------------------------------------------------
@@ -397,18 +414,47 @@ if (STEPS.has("J4")) {
             : "We focus on fintech and climate across West Africa.",
       },
     ];
-    const answer = await fetch(think.url, {
-      method: "POST",
-      headers: { ...think.headers, "content-type": "application/json" },
-      body: JSON.stringify({
-        model: "capital-q",
-        stream: false,
-        messages: history,
-      }),
-    })
-      .then((r) => r.text())
-      .catch(() => "");
-    note("J4", "Q by voice", answer.replace(/\s+/g, " ").slice(0, 200));
+    // As the speech provider calls it (voice-http.mjs): a streamed reply.
+    let answer = "";
+    try {
+      const response = await fetch(think.url, {
+        method: "POST",
+        headers: { ...think.headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "capital-q",
+          stream: true,
+          messages: history,
+        }),
+      });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let at;
+        while ((at = buffer.indexOf("\n\n")) >= 0) {
+          const data = buffer.slice(0, at).replace(/^data: /, "");
+          buffer = buffer.slice(at + 2);
+          if (data === "[DONE]") continue;
+          try {
+            answer += JSON.parse(data).choices?.[0]?.delta?.content ?? "";
+          } catch {
+            // keep-alive or partial frame
+          }
+        }
+      }
+    } catch (error) {
+      note("J4", "think failed", String(error?.message ?? error));
+    }
+    check("J4", "Q answers by voice", answer.trim().length > 0);
+    check(
+      "J4",
+      "the voice turn greets nobody again",
+      !GREETING.test(answer),
+      answer.replace(/\s+/g, " ").slice(0, 200),
+    );
   }
   await page.reload({ waitUntil: "domcontentloaded" });
   await settle(10000);
@@ -504,6 +550,16 @@ if (STEPS.has("J5")) {
 
 // ---- J6 finish ------------------------------------------------------------------------
 if (STEPS.has("J6")) {
+  // J5 may have left the form open: finish in the conversation.
+  await page.goto(`${WEB}/onboarding/${JOURNEY}?from=home`, {
+    waitUntil: "domcontentloaded",
+  });
+  await settle(8000);
+  const backToQ = page.getByRole("button", { name: /back to q/i });
+  if (await backToQ.isVisible().catch(() => false)) {
+    await backToQ.click();
+    await settle(6000);
+  }
   // Answer what Q asks from the fact table, a few turns at most.
   const FACTS =
     JOURNEY === "founder"
