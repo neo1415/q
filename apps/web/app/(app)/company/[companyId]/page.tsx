@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import {
   getCompanyAssumptions,
@@ -17,6 +18,8 @@ import {
 import {
   isMatchedRelationshipState,
   RelationshipStateV2Schema,
+  type CompanyDeckView,
+  type DataRoomView,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -37,6 +40,8 @@ import {
   ProfileTabs,
 } from "@/features/company/profile-tabs";
 import { QSection } from "@/features/q/q-section";
+import { ArrivalFacts } from "@/features/q/arrival-news-line";
+import { companyArrivalFacts } from "@/features/q/arrival-page-facts";
 import { QPageSubject } from "@/features/q/q-subject";
 import { serverT } from "@/features/i18n/server";
 
@@ -325,6 +330,17 @@ export default async function CompanyPage({
         {profile.viewer === "OWNER" ? null : (
           <EngagementView type="PROFILE_VIEW" companyId={profile.companyId} />
         )}
+        {/* W5.2: what is new here since the investor last looked. */}
+        {profile.viewer === "OWNER" ? null : (
+          <Suspense fallback={null}>
+            <CompanyArrival
+              companyId={profile.companyId}
+              name={profile.canonicalName}
+              deck={deck}
+              dataRoom={dataRoom}
+            />
+          </Suspense>
+        )}
         <CompanyProfileView
           translate={t}
           profile={profile}
@@ -353,5 +369,26 @@ export default async function CompanyPage({
         />
       </ProfileTabs>
     </PageContainer>
+  );
+}
+
+/** W5.2: the deck streams; its version is compared once it lands. */
+async function CompanyArrival({
+  companyId,
+  name,
+  deck,
+  dataRoom,
+}: {
+  readonly companyId: string;
+  readonly name: string;
+  readonly deck: Promise<CompanyDeckView | null> | null;
+  readonly dataRoom: DataRoomView | null;
+}) {
+  const read = deck === null ? null : await deck;
+  return (
+    <ArrivalFacts
+      page={`company:${companyId}`}
+      facts={companyArrivalFacts(read, dataRoom, name)}
+    />
   );
 }

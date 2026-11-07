@@ -882,4 +882,37 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
     "لا يقوم Q بذلك نيابةً عنك أبدًا. تحويل الأموال أو التوقيع يبقى قرارك أنت دائمًا.",
   "There's nothing ready to approve there yet.":
     "لا يوجد شيء جاهز للموافقة عليه هناك بعد.",
+  // W5.2: what is new on a page since the person last looked
+  "This relationship has moved to a new stage since you were last here.":
+    "انتقلت هذه العلاقة إلى مرحلة جديدة منذ زيارتك الأخيرة.",
+  "What changed in this relationship since I last looked?":
+    "ما الذي تغيّر في هذه العلاقة منذ آخر مرة اطّلعت عليها؟",
+  "sent a new message since you were last here.":
+    "أرسل رسالة جديدة منذ زيارتك الأخيرة.",
+  "What did they say in their latest message?":
+    "ماذا قالوا في رسالتهم الأخيرة؟",
+  "booked a call since you were last here.": "حجز مكالمة منذ زيارتك الأخيرة.",
+  "What is the call they booked about, and what should I prepare?":
+    "عمّ تدور المكالمة التي حجزوها، وما الذي عليّ تحضيره؟",
+  "A new decision is waiting on you here.": "هناك قرار جديد بانتظارك هنا.",
+  "What decision is waiting on me here?": "ما القرار الذي ينتظرني هنا؟",
+  "shared new documents with you since you were last here.":
+    "شارك معك مستندات جديدة منذ زيارتك الأخيرة.",
+  "What did they share, and what stands out?":
+    "ماذا شاركوا، وما الذي يلفت الانتباه؟",
+  "asked for something new in diligence since you were last here.":
+    "طلب شيئًا جديدًا في العناية الواجبة منذ زيارتك الأخيرة.",
+  "What did they ask for in diligence, and what do we have ready?":
+    "ماذا طلبوا في العناية الواجبة، وما الجاهز لدينا؟",
+  "posted a new deck since you were last here.":
+    "نشر عرضًا تقديميًا جديدًا منذ زيارتك الأخيرة.",
+  "What changed in their latest deck?":
+    "ما الذي تغيّر في عرضهم التقديمي الأخير؟",
+  "added documents you can open in their data room since you were last here.":
+    "أضاف مستندات يمكنك فتحها في غرفة بياناتهم منذ زيارتك الأخيرة.",
+  "What did they add to their data room?": "ماذا أضافوا إلى غرفة بياناتهم؟",
+  "There's more new here too.": "وهناك المزيد من الجديد هنا أيضًا.",
+  // W5.4: leaving unsaved work
+  "You have changes that aren't saved. Leave this page anyway?":
+    "لديك تغييرات غير محفوظة. هل تريد مغادرة هذه الصفحة على أي حال؟",
 };

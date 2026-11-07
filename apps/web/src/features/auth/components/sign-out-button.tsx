@@ -3,6 +3,7 @@
 import { signOutAction } from "@/auth/actions";
 import { clearMediaCache } from "@/features/discover/player/media-cache";
 import { forgetActiveConversations } from "@/features/q/active-conversation";
+import { clearArrivalSnapshots } from "@/features/q/arrival-news";
 
 import { cx } from "@capital-q/ui";
 import { ICON_SIZE, ICON_STROKE, LogOut } from "@capital-q/ui/icons";
@@ -13,11 +14,14 @@ import { useT } from "@/features/i18n/language";
 
 /**
  * What this browser keeps for the person signing out: which chat each Q
- * surface was in, and the pitches cached on the device (ADR 0064). The
+ * surface was in, what they last saw on each page (W5.2), and the
+ * pitches cached on the device (ADR 0064). The
  * next person to sign in here starts with neither.
  */
 function forgetThisPerson(): void {
   forgetActiveConversations();
+  // W5.2: what they last saw on each page.
+  clearArrivalSnapshots();
   void clearMediaCache();
 }
 

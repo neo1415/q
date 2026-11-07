@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { registerClientPrefetch, registerShellRouter } from "../client-actions";
 import { registerNavigationViewer, type NavigationViewer } from "./app-routes";
@@ -16,7 +16,9 @@ import {
 import { startReceiptReporter } from "./receipt-reporter";
 import { heldReason } from "./approval-requests";
 import { QActPrompts } from "./q-act-prompts";
+import { QArrivalNews } from "@/features/q/arrival-news-line";
 import { watchDirtyForms } from "@/features/workspace/dirty-forms";
+import { useT } from "@/features/i18n/language";
 import { pagesHoldDirtyWork } from "@/features/workspace/workspace-screen";
 
 /**
@@ -64,8 +66,18 @@ export function QControlRuntime({
 
   // W5.4: unsaved work on editing pages -- Q's moves offer instead, and
   // the person's own leaving asks first (dirty-forms.ts).
+  // The question is asked in the person's language.
+  const t = useT();
+  const translate = useRef(t);
+  useEffect(() => {
+    translate.current = t;
+  }, [t]);
   useEffect(
-    () => watchDirtyForms(document, { alsoDirty: pagesHoldDirtyWork }),
+    () =>
+      watchDirtyForms(document, {
+        alsoDirty: pagesHoldDirtyWork,
+        ask: (question) => window.confirm(translate.current(question)),
+      }),
     [],
   );
 
@@ -113,6 +125,8 @@ export function QControlRuntime({
     <>
       {/* W5.1: what Q asks the person to confirm or approve. */}
       <QActPrompts />
+      {/* W5.2: what is new on this page since the person last looked. */}
+      <QArrivalNews />
       <div
         role="status"
         aria-live="polite"
