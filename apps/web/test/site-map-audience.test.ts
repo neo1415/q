@@ -260,7 +260,7 @@ describe("overlapping places are told apart (W4 held-out, by category)", () => {
     const hub = page("/relationships");
     expect(
       hub.tabs.find((tab) => tab.id === "capital-investors")?.purpose,
-    ).toMatch(/already in touch/u);
+    ).toMatch(/investors in touch/u);
     expect(page("/investors").purpose).toMatch(/new investors/u);
     expect(hub.tabs.find((tab) => tab.id === "overview")?.purpose).toMatch(
       /all your relationships/u,
@@ -288,5 +288,23 @@ describe("W4 r1: data room, interest vs analytics, GateQ inbox", () => {
     expect(inbox).toBeDefined();
     expect(view).toMatch(/search or folder/u);
     expect(inbox).not.toBe(view);
+  });
+});
+
+describe("W4 r2: Raise vs Investors; the tour vs the pitch", () => {
+  it("Raise is the round itself; Investors is the people in it", () => {
+    const hub = page("/relationships");
+    const raise = hub.tabs.find((tab) => tab.id === "capital-raise")?.purpose;
+    const investors = hub.tabs.find(
+      (tab) => tab.id === "capital-investors",
+    )?.purpose;
+    expect(raise).toMatch(/size, terms/u);
+    expect(raise).not.toMatch(/who is in it/u);
+    expect(investors).toMatch(/the people/u);
+  });
+
+  it("the Capital Q tour and the Capital Q pitch say which is which", () => {
+    expect(page("/q-pitch").purpose).toMatch(/guided story/u);
+    expect(page("/q-pitch/capital-q").purpose).toMatch(/Read Capital Q's own/u);
   });
 });
