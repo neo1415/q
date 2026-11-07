@@ -21,10 +21,9 @@ import { FOUNDER_DEFINITION_V8 } from "./founder-v8.js";
  *   (pilots, customers, growth; instrument, timeframe, use of funds, each
  *   only on the path that asks it).
  * - Now optional: why they came (F0.intent writes nothing; F6.raising holds
- *   the fact).
+ *   the fact), and the team counts (owner: the founder's role is enough).
  * - Unchanged: the deck is encouraged, never blocking (F2.materials stays
- *   optional); the founder's role is the founder information asked for
- *   (owner); every other step.
+ *   optional); the founder's role stays required; every other step.
  *
  * The copy no longer calls a mandatory step optional. Step keys, types,
  * options, branches and write targets are all as in v8, so an answer valid
@@ -46,9 +45,16 @@ export const FOUNDER_V9_NOW_REQUIRED: ReadonlySet<string> = new Set([
   FOUNDER_STEPS.useOfFunds,
 ]);
 
-/** Steps v9 makes optional. */
+/**
+ * Steps v9 makes optional: why they came (it writes nothing) and the team
+ * counts (the owner: the founder's role is enough; `/profile` renders no
+ * team-count rows).
+ */
 export const FOUNDER_V9_NOW_OPTIONAL: ReadonlySet<string> = new Set([
   FOUNDER_STEPS.intent,
+  FOUNDER_STEPS.founderCount,
+  FOUNDER_STEPS.fullTime,
+  FOUNDER_STEPS.teamSize,
 ]);
 
 /** Copy that called a now-mandatory step optional. */

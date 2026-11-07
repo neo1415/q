@@ -214,7 +214,7 @@ What was missing:
 
 ## 8. Proposed mandatory set (D-OWN-2, DECISIONS 78), for the owner's approval
 
-**Status: proposed, not enforced.**
+**Status: approved by the owner (DECISIONS 79, 2026-11-07) and implemented on `fix/onboarding-2` as founder v9 and investor v4. See §9 for what was built and what still needs the owner's call.**
 
 **The rule:** mandatory = what the profile needs, plus what creating the investor's mandate needs, plus what founder matching and verification need. Everything else is optional and kept as context for Q. "I don't know" to a mandatory question is recorded as unknown and counts as answered (D-OWN-1).
 
@@ -283,3 +283,40 @@ Short names used below:
 8. **Gap: discovery visibility (the F10 choice)** is required by readiness but is not an onboarding step.
 9. **D-OWN-1 needs an "unknown" answer on every mandatory step.** Steps without "Not sure" today: F1.country, F1.categories, F1.website, I3.geography, I3.sectors and the cheque amounts.
 10. **The reason Q gives.** On a re-asked mandatory question, it should name the real use (the profile, matching, verification), not always "verification".
+
+## 9. DECISIONS 79 as built, and the profile audit
+
+### What was built (`fix/onboarding-2`)
+
+- **Founder v9** (migration `20261231440000`):
+  - Now required: F1.website, F1.country, F1.description and F1.categories. On their own paths: F5.pilots, F5.customers, F5.growth, F6.instrument, F6.timeframe and F6.use_of_funds.
+  - Now optional: F0.intent.
+  - Unchanged: the deck (F2.materials) stays optional. The founder's role is the founder information asked for. The team counts stay required, as before.
+- **Investor v4** (migration `20261231450000`):
+  - New, required: I0.hq_country (one geography country, after the role). It writes `core.investor_organisations.hq_country`.
+  - Now required: I0.website, I0.business_title, I2.cheque_min, I2.cheque_typical, I2.cheque_max, I2.investment_role, I3.geography and I3.sectors.
+  - Now optional: I9.discovery_mode.
+- **Unknown on every mandatory step:**
+  - "I don't know" (`NOT_KNOWN_ANSWER_TEXT`, `isNotKnownAnswer` in `@capital-q/onboarding`) settles any step, taxonomy steps included.
+  - No write target reads it as a value. `text()` returns null for it, so a website or description is never saved as "I don't know".
+  - On the form, Skip on a required step sends it.
+  - Reader v16: "no website yet" on a required step is not known.
+- **Q stops advertising optionality:**
+  - Typed reply v9.
+  - The checklist and live-call prompt never say a topic is optional or can be skipped.
+  - The code no longer appends "We can come back to this if you'd rather skip it."
+  - "Anything you're not sure of can wait" stays, once, in the opening.
+
+### Profile audit: fields on the profile that onboarding does not make mandatory
+
+These are reported to the owner rather than made mandatory.
+
+| Profile field (where)                                                                                                                                                                                                    | Onboarding step                                               | Why not mandatory now                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Founder "In one line" / header tagline (`short_description`)                                                                                                                                                             | none                                                          | No step writes it, and semantic matching reads it (§8 gap 7). It needs a new step, or the description to write it: owner's call.                                                                                                               |
+| Founder city, founded year, legal name (`/profile`)                                                                                                                                                                      | none                                                          | No step. City can go in the country note. Legal name and founding year are KYB facts. Owner's call.                                                                                                                                            |
+| Investor description "In your words" (`publicDescription`)                                                                                                                                                               | none                                                          | No step.                                                                                                                                                                                                                                       |
+| Investor geography / sector strength, sectors to avoid, business models, customer types, capital intensity, regulated markets, revenue, founder fit, green flags, exclusions, portfolio, thesis (`/profile`, `/capital`) | I3 strengths, I3.sectors_avoid, I4-I8, I11.additional_context | "None" or "no preference" is the honest answer for most people. A required step cannot be declined, so making these mandatory would re-ask them until the person says "I don't know". This needs a "none" option per step first. Owner's call. |
+| Founder F6.min_cheque                                                                                                                                                                                                    | F6.min_cheque (optional)                                      | Rendering on the profile is unverified (deck-derived "Minimum cheque").                                                                                                                                                                        |
+| Founder F9 pitch sections (problem, solution, …)                                                                                                                                                                         | F9.* (optional)                                               | The overview reads the deck, the pitch video and four answers, not F9 answers. It looks unrendered (unverified on the API side).                                                                                                               |
+| Logo, cover, verification, Q findings, Q card, team list, deck and data room, derived numbers, "Your book"                                                                                                               | none                                                          | Uploads, verification state or derived: not onboarding questions.                                                                                                                                                                              |

@@ -113,12 +113,10 @@ export function onboardingLanguageNote(language: string | null): string {
 
 /** Optional-step and finish lines the code adds, in Arabic (hand-written). */
 export const ARABIC_OPTIONAL_TAIL = " يمكننا العودة إلى هذا إن فضّلت تخطيه.";
-export const ARABIC_FINISH_OR_CONTINUE =
-  "هل تودّ الإنهاء الآن، أم المتابعة بالتفاصيل الاختيارية؟";
+export const ARABIC_FINISH_OR_CONTINUE = "هل تودّ الإنهاء الآن، أم المتابعة؟";
 
 const OPTIONAL_TAIL_EN = " We can come back to this if you'd rather skip it.";
-const FINISH_OR_CONTINUE_EN =
-  "Would you like to finish now, or keep going with the optional details?";
+const FINISH_OR_CONTINUE_EN = "Would you like to finish now, or keep going?";
 
 type Step = {
   readonly stepKey: string;

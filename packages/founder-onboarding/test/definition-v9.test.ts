@@ -58,8 +58,12 @@ describe("founder definition v9", () => {
     ]) {
       expect(required(key), key).toBe(true);
     }
-    // Why they came writes nothing; the deck is encouraged, never blocking.
+    // Why they came writes nothing; the deck is encouraged, never blocking;
+    // the founder's role is enough (owner), so the team counts are not.
     expect(required(FOUNDER_STEPS.intent)).toBe(false);
+    expect(required(FOUNDER_STEPS.founderCount)).toBe(false);
+    expect(required(FOUNDER_STEPS.fullTime)).toBe(false);
+    expect(required(FOUNDER_STEPS.teamSize)).toBe(false);
     expect(required(FOUNDER_STEPS.materials)).toBe(false);
   });
 

@@ -371,6 +371,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V12 } from "./tasks/onboarding-transcript-
 import { ONBOARDING_TRANSCRIPT_READER_V13 } from "./tasks/onboarding-transcript-reader.v13.js";
 import { ONBOARDING_TRANSCRIPT_READER_V14 } from "./tasks/onboarding-transcript-reader.v14.js";
 import { ONBOARDING_TRANSCRIPT_READER_V15 } from "./tasks/onboarding-transcript-reader.v15.js";
+import { ONBOARDING_TRANSCRIPT_READER_V16 } from "./tasks/onboarding-transcript-reader.v16.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { TAXONOMY_CHOICE_V3 } from "./tasks/taxonomy-choice.v3.js";
@@ -382,6 +383,7 @@ import { ONBOARDING_TYPED_REPLY_V5 } from "./tasks/onboarding-typed-reply.v5.js"
 import { ONBOARDING_TYPED_REPLY_V6 } from "./tasks/onboarding-typed-reply.v6.js";
 import { ONBOARDING_TYPED_REPLY_V7 } from "./tasks/onboarding-typed-reply.v7.js";
 import { ONBOARDING_TYPED_REPLY_V8 } from "./tasks/onboarding-typed-reply.v8.js";
+import { ONBOARDING_TYPED_REPLY_V9 } from "./tasks/onboarding-typed-reply.v9.js";
 import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
 import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
 // DAILY block
@@ -584,7 +586,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TRANSCRIPT_READER_V14, status: "DEPRECATED" },
     // P1-1 live run 1 (dev misses only): two-step lines summarised first;
     // short rambles and long spoken answers summarised.
-    ONBOARDING_TRANSCRIPT_READER_V15,
+    { ...ONBOARDING_TRANSCRIPT_READER_V15, status: "DEPRECATED" },
+    // DECISIONS 79: a required step they do not have is not known.
+    ONBOARDING_TRANSCRIPT_READER_V16,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.
@@ -609,7 +613,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...ONBOARDING_TYPED_REPLY_V7, status: "DEPRECATED" },
     // Onboarding P1-1 (DECISIONS 77): a clear long answer is kept, never
     // said back; a ramble or a summary not confirmed yet is.
-    ONBOARDING_TYPED_REPLY_V8,
+    { ...ONBOARDING_TYPED_REPLY_V8, status: "DEPRECATED" },
+    // DECISIONS 79: Q never advertises optionality; it just asks.
+    ONBOARDING_TYPED_REPLY_V9,
     WELCOME_CONDUCTOR_V1,
     WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,

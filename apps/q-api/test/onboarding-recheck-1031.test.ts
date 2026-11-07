@@ -194,9 +194,9 @@ describe("1. only what the person stated is saved; Q's inference waits for their
     });
   });
 
-  it("not knowing an optional step sets it aside", async () => {
+  it("not knowing an optional step sets it aside (the role is mandatory from investor v4, so capital intensity stands in)", async () => {
     const world = investorSession({
-      currentStepKey: "I0.business_title",
+      currentStepKey: "I4.capital_intensity",
       subject: FIRM,
       recorded: { "I0.investor_type": "vc" },
     });
@@ -209,14 +209,16 @@ describe("1. only what the person stated is saved; Q's inference waits for their
         {
           answers: [],
           declined: [],
-          notKnown: [{ stepKey: "I0.business_title", quote: "not sure yet" }],
+          notKnown: [
+            { stepKey: "I4.capital_intensity", quote: "not sure yet" },
+          ],
         },
       ]),
     });
     await conversation.said?.(line, "PERSON", "not sure yet");
     await conversation.flush?.(line);
-    expect(world.recordedValue("I0.business_title")).toBeUndefined();
-    expect(world.skippedSteps()).toContain("I0.business_title");
+    expect(world.recordedValue("I4.capital_intensity")).toBeUndefined();
+    expect(world.skippedSteps()).toContain("I4.capital_intensity");
   });
 
   it("the model reader's reading must say, per value, stated or inferred: one that does not is not used", async () => {

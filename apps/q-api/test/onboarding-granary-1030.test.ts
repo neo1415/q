@@ -301,11 +301,12 @@ describe("live 2026-10-30 (Granary): a long typed answer is said back and saved 
 });
 
 describe("live 2026-10-30 item 5: 'No website yet' settles the website", () => {
-  it("a stated absence read as declined sets the optional step aside; it is not left open", async () => {
+  it("a stated absence settles the website as not known (mandatory from founder v9, DECISIONS 79); it is not left open", async () => {
     const w = world();
     const { reader } = readings({
       answers: [],
-      declined: [{ stepKey: "F1.website", quote: "No website yet." }],
+      declined: [],
+      notKnown: [{ stepKey: "F1.website", quote: "No website yet." }],
     });
     const conversation = createOnboardingConversation({
       apiBaseUrl: "http://api.test",
@@ -327,8 +328,12 @@ describe("live 2026-10-30 item 5: 'No website yet' settles the website", () => {
       "No website yet. We're based in Lublin, Poland.",
     );
     await conversation.flush?.(line);
-    expect(w.skippedSteps()).toContain("F1.website");
-    expect(w.recordedValue("F1.website")).toBeUndefined();
+    // Recorded as "I don't know": an answer that holds no address (the
+    // write target reads it as unknown), never their sentence as a website.
+    expect(w.recordedValue("F1.website")).toEqual({
+      type: "TEXT",
+      text: "I don't know",
+    });
   });
 
   it("the reader's prompt reads a stated absence as declined, and a long-text step as Q's agreed summary", () => {

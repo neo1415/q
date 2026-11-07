@@ -4,8 +4,10 @@
 -- need. Now required: F1.website, F1.country, F1.description,
 -- F1.categories, and on their own paths F5.pilots, F5.customers, F5.growth,
 -- F6.instrument, F6.timeframe and F6.use_of_funds. Now optional: F0.intent
--- (it writes nothing). "I don't know" answers every required step and is
--- recorded as unknown (the runtime's isNotKnownAnswer), never as a value.
+-- (it writes nothing) and the team counts F4.founder_count, F4.full_time and
+-- F4.team_size (owner: the founder's role is enough). "I don't know"
+-- answers every required step and is recorded as unknown (the runtime's
+-- isNotKnownAnswer), never as a value.
 -- Two lines of copy no longer call a required step optional.
 --
 -- v8 (and v1-v7) stay published and immutable: sessions pinned to them keep
@@ -26,7 +28,7 @@ on conflict (journey_type) do nothing;
 insert into onboarding.definition_versions (id, definition_id, version, schema, manifest_hash)
 select '73118771-5f1d-56e1-a96c-7b9a99160b86', d.id, 9,
        $cq${"schemaVersion":1,"phases":[{"phaseKey":"F0","label":"Welcome"},{"phaseKey":"F1","label":"Company"},{"phaseKey":"F2","label":"Materials"},{"phaseKey":"F3","label":"Review"},{"phaseKey":"F4","label":"Team"},{"phaseKey":"F5","label":"Traction"},{"phaseKey":"F6","label":"Raise"},{"phaseKey":"F9","label":"Company profile"},{"phaseKey":"F7","label":"A few questions"},{"phaseKey":"F8","label":"Snapshot"}],"runtime":{"subjectType":"COMPANY","allowUnboundStart":true}}$cq$::jsonb,
-       '374213a96abae95d6078243353dbc4aee5c42baee1da9474e64e3771570e2bb8'
+       '269efbaea1a4b80419b3dbffa95284ac0ae8784209535bb9b0f6af47b64363b1'
   from onboarding.definitions d
  where d.journey_type = $cq$founder$cq$;
 
@@ -73,15 +75,15 @@ values
    $cq${"prompt":"Your role","phaseKey":"F4","options":[{"optionKey":"ceo","label":"CEO"},{"optionKey":"cto","label":"CTO"},{"optionKey":"coo","label":"COO"},{"optionKey":"cpo","label":"Product"},{"optionKey":"other","label":"Something else"}]}$cq$::jsonb,
    null,
    $cq$[{"targetKey":"founder.membership"}]$cq$::jsonb),
-  ('37997864-b65b-5c67-a2d6-30881ec4fc3c', '73118771-5f1d-56e1-a96c-7b9a99160b86', $cq$F4.founder_count$cq$, 10, $cq$range$cq$, true,
+  ('37997864-b65b-5c67-a2d6-30881ec4fc3c', '73118771-5f1d-56e1-a96c-7b9a99160b86', $cq$F4.founder_count$cq$, 10, $cq$range$cq$, false,
    $cq${"prompt":"How many founders?","phaseKey":"F4","min":"1","max":"50","step":"1"}$cq$::jsonb,
    null,
    $cq$[{"targetKey":"company.team_facts"}]$cq$::jsonb),
-  ('539c37de-274e-5cc0-a6cb-f3e3ce350c36', '73118771-5f1d-56e1-a96c-7b9a99160b86', $cq$F4.full_time$cq$, 11, $cq$single_select$cq$, true,
+  ('539c37de-274e-5cc0-a6cb-f3e3ce350c36', '73118771-5f1d-56e1-a96c-7b9a99160b86', $cq$F4.full_time$cq$, 11, $cq$single_select$cq$, false,
    $cq${"prompt":"Are the founders full-time?","phaseKey":"F4","options":[{"optionKey":"all","label":"All founders are full-time"},{"optionKey":"some","label":"Some founders are full-time"},{"optionKey":"none","label":"Not full-time yet"}]}$cq$::jsonb,
    null,
    $cq$[{"targetKey":"company.team_facts"}]$cq$::jsonb),
-  ('03ba059d-4912-52e3-a3c7-607c7f1c67ae', '73118771-5f1d-56e1-a96c-7b9a99160b86', $cq$F4.team_size$cq$, 12, $cq$range$cq$, true,
+  ('03ba059d-4912-52e3-a3c7-607c7f1c67ae', '73118771-5f1d-56e1-a96c-7b9a99160b86', $cq$F4.team_size$cq$, 12, $cq$range$cq$, false,
    $cq${"prompt":"How many people work on the company today?","supportingText":"Founders included.","phaseKey":"F4","min":"1","max":"100000","step":"1"}$cq$::jsonb,
    null,
    $cq$[{"targetKey":"company.team_facts"}]$cq$::jsonb),

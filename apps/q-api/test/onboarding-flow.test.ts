@@ -38,7 +38,7 @@ const state = (
 });
 
 describe("onboarding flow (owner 2026-10-16)", () => {
-  it("offers a skip on an optional next question", () => {
+  it("asks an optional next question plainly, never offering a skip (DECISIONS 79)", () => {
     const flow = onboardingFlowFor({
       journey: "founder",
       opening: false,
@@ -49,8 +49,10 @@ describe("onboarding flow (owner 2026-10-16)", () => {
       firstName: null,
       knownName: null,
     });
-    expect(flow.note).toMatch(/we can come back to this/);
-    expect(withNextQuestion("Saved.", flow, false)).toMatch(/\?.*skip it\.$/);
+    expect(flow.note).not.toMatch(/we can come back to this|skip/iu);
+    const asked = withNextQuestion("Saved.", flow, false);
+    expect(asked).toMatch(/\?$/u);
+    expect(asked).not.toMatch(/skip/iu);
   });
 
   it("when essentials are done: says so, names what is optional, offers to finish or go on", () => {
@@ -179,7 +181,7 @@ describe("a saved answer that wants evidence is never asked again (QA F-132, 25 
     expect(flow.next?.evidence).toBe(true);
   });
 
-  it("the skip offer is said once, after the one question", () => {
+  it("an old skip offer goes with its question, and none is added (DECISIONS 79)", () => {
     const reply = withNextQuestion(
       withoutAnsweredQuestions(
         "Thanks, I've noted Logistics (sector). How many paying customers do you have? We can come back to this if you'd rather skip it.",
@@ -190,7 +192,7 @@ describe("a saved answer that wants evidence is never asked again (QA F-132, 25 
       false,
     );
     expect(reply).toBe(
-      "Thanks, I've noted Logistics (sector). Do you have something that shows your paying customers, such as a customer list or your accounts? We can come back to this if you'd rather skip it.",
+      "Thanks, I've noted Logistics (sector). Do you have something that shows your paying customers, such as a customer list or your accounts?",
     );
   });
 });

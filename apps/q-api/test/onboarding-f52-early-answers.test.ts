@@ -627,9 +627,15 @@ describe("QO-29: once the essentials are in, making the mandate live is asked ne
       recorded: {
         "I0.investor_type": "vc",
         "I0.organisation_name": "Benali Atlas Capital",
+        // Mandatory from investor v4 (DECISIONS 79).
+        "I0.business_title": "Partner",
         "I1.deployment_status": "actively_investing",
         "I2.stages": "pre_seed,seed",
         "I2.currency": "usd",
+        "I2.cheque_min": "100000",
+        "I2.cheque_typical": "250000",
+        "I2.cheque_max": "500000",
+        "I2.investment_role": "lead",
         "I3.geography": "c1000000-0000-4000-8000-000000000001",
         "I3.sectors": "c1000000-0000-4000-8000-000000000003",
         "I9.discovery_mode": "focused",

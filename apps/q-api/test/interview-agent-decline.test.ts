@@ -88,10 +88,14 @@ const SO_FAR = {
   "I1.deployment_status": "actively_investing",
 };
 
-/** Optional steps of several kinds, and ways a person declines them. */
+/**
+ * Optional steps of several kinds, and ways a person declines them. Where
+ * they invest and their sectors are mandatory from investor v4 (DECISIONS
+ * 79), so the other category steps stand in for them.
+ */
 const OPTIONAL = [
-  "I3.geography",
-  "I3.sectors",
+  "I3.sectors_avoid",
+  "I4.customer_types",
   "I7.avoid",
   "I7.sector_exclusions",
   "I4.business_models",

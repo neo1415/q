@@ -5,7 +5,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(5);
+select plan(6);
 
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
@@ -26,6 +26,14 @@ select is(
      join onboarding.definitions d on d.id = v.definition_id
     where d.journey_type = 'founder' and v.version = 9 and s.step_key = 'F0.intent'),
   false, 'v9 makes why they came optional');
+
+select is(
+  (select count(*)::int from onboarding.steps s
+     join onboarding.definition_versions v on v.id = s.definition_version_id
+     join onboarding.definitions d on d.id = v.definition_id
+    where d.journey_type = 'founder' and v.version = 9 and s.required
+      and s.step_key in ('F4.founder_count', 'F4.full_time', 'F4.team_size')),
+  0, 'v9: the founder''s role is enough; the team counts are optional');
 
 select is(
   (select s.required from onboarding.steps s
