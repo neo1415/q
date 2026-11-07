@@ -183,6 +183,17 @@ const OPENS_AS: Readonly<Record<string, string>> = {
   "/company/data-room": "/company/[companyId]",
 };
 
+/**
+ * Views a page folds into one scroll (work/page.tsx pageViewOf: needs,
+ * progress and done all open /work): their destinations land on the page,
+ * and each is a section of it, not a tab.
+ */
+const FOLDED_VIEWS: ReadonlySet<string> = new Set([
+  "/work?view=needs",
+  "/work?view=progress",
+  "/work?view=done",
+]);
+
 const siteMap = new Map(Q_SITE_MAP.pages.map((page) => [page.route, page]));
 
 describe("the site map covers every page, tab and section (W2.2)", () => {
@@ -278,7 +289,11 @@ describe("the site map covers every page, tab and section (W2.2)", () => {
         problems.push(`${destination}: ${path} is on no site-map page`);
         continue;
       }
-      if (/[?&](?:tab|view)=/u.test(path) && landing.tab === null) {
+      if (
+        /[?&](?:tab|view)=/u.test(path) &&
+        landing.tab === null &&
+        !FOLDED_VIEWS.has(path)
+      ) {
         problems.push(`${destination}: ${path} opens a tab the site map lacks`);
       }
     }
@@ -293,6 +308,18 @@ describe("the site map covers every page, tab and section (W2.2)", () => {
       expect(siteMap.get(landing?.route ?? "")?.recordPages, page).toContain(
         page,
       );
+    }
+  });
+
+  it("a folded view is still the page's own view, and a section of it", () => {
+    const work = read(join(APP, "(app)/work/page.tsx"));
+    expect(work).toMatch(
+      /view === "team" \|\| view === "cost" \? view : "work"/u,
+    );
+    const ids = siteMap.get("/work")?.sections.map((s) => s.id) ?? [];
+    for (const path of FOLDED_VIEWS) {
+      const view = new URLSearchParams(path.split("?")[1]).get("view");
+      expect(ids, path).toContain(view);
     }
   });
 
