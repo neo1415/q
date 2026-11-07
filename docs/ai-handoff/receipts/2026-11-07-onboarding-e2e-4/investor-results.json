@@ -1,0 +1,133 @@
+{
+  "email": "e2e-inv-202611072215-0st9@fictional.capitalq.local",
+  "journey": "investor",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": true,
+      "detail": "1 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": true,
+      "detail": "I0.investor_type, I0.organisation_name, I1.mandate_context, I2.stages, I2.currency"
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": "Understood — Kestrel Bay Capital is a venture capital fund, actively deploying $100,000–$500,000 in US dollars at pre-seed and seed. What’s the firm’s website?"
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": "Understood — we’ll leave the discovery style for now. Your inbound preference is used for matching and deciding how founders may reach you; you can answer it later or say “I don’t know.” What’s Kestrel Bay Capital’s website?"
+    },
+    {
+      "journey": "J3",
+      "name": "stored for I10.inbound_preference",
+      "ok": null,
+      "detail": "null"
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": true,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. What's your firm's website?"
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Shall I make the mandate live so Discover can match companies to it now? "
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/discover"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": "Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Shall I make the mandate live so Discover can match companies to it now?"
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": true,
+      "detail": "before: n Energy (sectors) and West Africa (geography). Shall I make the mandate live so Discover can match companies to it now? | after: Noted, I've saved Fintech, Clean Energy (sectors) and West Africa (geography). Shall I make the mandate live so Discover can match companies to it now?"
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/discover"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "How do you invest? / How do you invest?"
+    },
+    {
+      "journey": "J6",
+      "name": "questions answered from the fact table",
+      "ok": null,
+      "detail": "[{\"q\":\"Shall I make the mandate live so Discover can match companies to it now?\",\"answer\":\"Show me everything that fits.\"},{\"q\":\"What’s Kestrel Bay Capital’s website?\",\"answer\":\"wadden.example\"},{\"q\":\"What’s your role at Kestrel Bay Capital?\",\"answer\":\"Partner.\"},{\"q\":\"Which country is Kestrel Bay Capital based in?\",\"answer\":\"The Netherlands.\"},{\"q\":\"You’re actively deploying; should I keep that as your current status?\",\"answer\":\"Yes, that's right.\"},{\"q\":\"For your cheque range, should I use $100,000 as the minimum and $500,000 as the maximum, with $100,000 as typical?\",\"answer\":\"$250,000.\"},{\"q\":\"Thanks — should I take $250,000 as your typical cheque, with $100,000 minimum and $500,000 maximum?\",\"answer\":\"$250,000.\"},{\"q\":\"Which should I use as the typical amount?\",\"answer\":\"$500,000.\"},{\"q\":\"Which should I use as your typical amount?\",\"answer\":\"$500,000.\"},{\"q\":\"Should I use $100,000 as the minimum and $500,000 as the maximum as well?\",\"answer\":\"$250,000.\"},{\"q\":\"You’ve now said $250,000 after I asked about the maximum — should I use $250,000 as your maximum instead of $500,000?\",\"answer\":\"$1,000,000.\"},{\"q\":\"Which minimum, typical, and maximum should I use?\",\"answer\":\"$250,000.\"},{\"q\":\"I want to make sure I have the range right: should your minimum, typical, and maximum cheques be $100,000, $250,000, and\",\"answer\":\"$250,000.\"},{\"q\":\"Let’s settle the cheque range cleanly: what should I use for your minimum, typical, and maximum cheque?\",\"answer\":\"$250,000.\"},{\"q\":\"Understood — should I use $250,000 for your minimum, typical and maximum cheque?\",\"answer\":\"$250,000.\"},{\"q\":\"Do you usually lead rounds, or invest alongside a lead?\",\"answer\":\"We lead and co-invest.\"},{\"q\":\"How firm is your focus on West Africa: must-match, a strong preference, or simply nice to have?\",\"answer\":\"A strong preference.\"},{\"q\":\"How firm is your focus on fintech and clean energy: must-match, a strong preference, or a nice-to-have?\",\"answer\":\"A strong preference.\"},{\"q\":\"Are there any sectors you’d rather not see, or is none an answer?\",\"answer\":\"None.\"},{\"q\":\"Which business models and customer types do you back—for example, subscription or marketplace businesses serving consume\",\"answer\":\"No preference.\"},{\"q\":\"How do you feel about capital intensity and regulation: are you open to hardware-heavy or capital-intensive businesses, \",\"answer\":\"None.\"},{\"q\":\"What stage of revenue do you generally expect: is pre-revenue fine, do you prefer some revenue, or do you expect revenue\",\"answer\":\"No preference.\"},{\"q\":\"Which founding-team qualities matter most to you, such as technical capability, repeat-founder experience, deep domain e\",\"answer\":\"Repeat founders and capital efficiency.\"},{\"q\":\"What other signals are green flags for you, such as strong revenue growth, enterprise customers, high retention or a dis\",\"answer\":\"No preference.\"},{\"q\":\"How open are you to founders reaching out to you: only well-matched ones, anyone, or nobody for now?\",\"answer\":\"Repeat founders and capital efficiency.\"},{\"q\":\"How firm is that preference: must-match, a strong preference, or a nice-to-have?\",\"answer\":\"A strong preference.\"},{\"q\":\"Beyond that, is there anything else you look for that we haven’t covered?\",\"answer\":\"Repeat founders and capital efficiency.\"},{\"q\":\"What would you rather not see or never be shown—for example gambling, tobacco, weapons, speculative crypto, hardware-hea\",\"answer\":\"Yes, that's right.\"},{\"q\":\"I still need the exclusions themselves: what would you rather not see, what should never be shown, and are there any sec\",\"answer\":\"Yes, that's right.\"},{\"q\":\"I need the actual exclusions to complete your matching profile: what would you rather not see, what should never be show\",\"answer\":\"Yes, that's right.\"}]"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": false,
+      "detail": "/onboarding/investor"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": false,
+      "detail": ""
+    }
+  ]
+}

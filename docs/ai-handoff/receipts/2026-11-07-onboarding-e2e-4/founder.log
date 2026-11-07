@@ -1,0 +1,29 @@
+account e2e-fou-202611072204-k1t1@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+PASS J1 one dense line answers several topics — F1.country, F1.city, F1.stage, F1.categories, F4.founder_role, F4.full_time
+NOTE J1 Q's next question (judge: conversational, not a label) — Thanks, Ada — Tamarind Ledger is a seed-stage fintech based in Lagos, Nigeria; you’re the CEO, one of two full-time founders, and the team has nine people. What’s the company website?
+PASS J2 a ramble is said back for a yes — The company: Tamarind Ledger helps small shops and market traders in Lagos and Ibadan manage informal customer debts digitally. The problem: Many small merchants still track credit sales in notebooks,
+PASS J2 nothing saved before the yes
+PASS J2 saved after the yes
+NOTE J2 Q after a clear typed answer — That adds useful detail on the cost of the problem. What’s Tamarind Ledger’s website?
+NOTE J2 F9.problem before → after — Many small merchants still track credit sales in notebooks, making it difficult  → small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkwa
+PASS J2 a clear typed answer is saved in their words, not read back — small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkwa
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood — we’ll leave the team size aside for now. The website helps with your profile, investor matching and verification; you can provide it later or say “I don’t know.” What year was Tamarind Ledger founded?
+NOTE J3 stored for F1.website — {"type":"TEXT","text":"I don't know"}
+PASS J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What year was the company founded?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier — “one of two full-time founders” and “there are nine of us” — I fou
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier — “one of two full-time founders” and “there are nine of us” — I fou
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before: r — “one of two full-time founders” and “there are nine of us” — I found two founders and a team of nine; is that right? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier — “one of two full-time foun
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — Your company / Your company
+NOTE J6 questions answered from the fact table — [{"q":"From what you said earlier — “one of two full-time founders” and “there are nine of us” — I found two founders and a tea","answer":"Yes, that's right."},{"q":"What year was Tamarind Ledger founded?","answer":"2021."},{"q":"” Should I keep that wording?","answer":"Yes, that's right."},{"q":"Between the two of you, which parts of the business does the founding team cover — for example product, engineering, sal","answer":"Product, engineering and sales."},{"q":"Also, has revenue been growing, flat, declining, or lumpy lately?","answer":"Growing about ten percent a month."},{"q":"What currency do you report in, and roughly what were last month’s billings, gross margin, monthly spend above revenue, ","answer":"US dollars."},{"q":"Roughly how much did you bill last month?","answer":"One and a half million dollars."},{"q":"Roughly what were your gross margin, monthly spend above revenue, cash in the bank, and runway in months?","answer":"Product and hiring."},{"q":"What are the approximate gross margin, monthly spend above revenue, cash in the bank, and runway in months?","answer":"Product and hiring."},{"q":"Product and hiring are the main spending areas; I still need the figures: roughly what’s your gross margin, monthly spen","answer":"Product and hiring."},{"q":"What was your gross margin last month, as a percentage—or should I mark it as “I don’t know” for now?","answer":"Yes, that's right. That's all for now."},{"q":"From what you said: What year was the company founded: 2,021 Shall I keep that?","answer":"Yes, that's right."},{"q":"Are you raising right now?","answer":"Yes, actively raising."},{"q":"Are you raising right now?","answer":"Yes, actively raising."},{"q":"Which currency are you raising in?","answer":"US dollars."},{"q":"Which currency are you raising in?","answer":"US dollars."},{"q":"How much are you raising?","answer":"One and a half million dollars."},{"q":"How much are you raising?","answer":"One and a half million dollars."},{"q":"5 million Shall I keep that?","answer":"Yes, that's right."},{"q":"What instrument are you raising on?","answer":"A SAFE."},{"q":"When are you hoping to close the round?","answer":"Within six months."},{"q":"When are you hoping to close the round?","answer":"Within six months."},{"q":"5 million Is that all right?","answer":"Yes, that's right."},{"q":"5 million Is that all right?","answer":"Yes, that's right."}]
+PASS J6 finish lands on verification — /verification
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+ALL PASS; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/onb-e2e4/founder-1440

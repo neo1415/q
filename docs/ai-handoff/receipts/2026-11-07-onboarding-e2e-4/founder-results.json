@@ -1,0 +1,169 @@
+{
+  "email": "e2e-fou-202611072204-k1t1@fictional.capitalq.local",
+  "journey": "founder",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": true,
+      "detail": "1 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": true,
+      "detail": "F1.country, F1.city, F1.stage, F1.categories, F4.founder_role, F4.full_time"
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": "Thanks, Ada — Tamarind Ledger is a seed-stage fintech based in Lagos, Nigeria; you’re the CEO, one of two full-time founders, and the team has nine people. What’s the company website?"
+    },
+    {
+      "journey": "J2",
+      "name": "a ramble is said back for a yes",
+      "ok": true,
+      "detail": "The company: Tamarind Ledger helps small shops and market traders in Lagos and Ibadan manage informal customer debts digitally. The problem: Many small merchants still track credit sales in notebooks,"
+    },
+    {
+      "journey": "J2",
+      "name": "nothing saved before the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "saved after the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "Q after a clear typed answer",
+      "ok": null,
+      "detail": "That adds useful detail on the cost of the problem. What’s Tamarind Ledger’s website?"
+    },
+    {
+      "journey": "J2",
+      "name": "F9.problem before → after",
+      "ok": null,
+      "detail": "Many small merchants still track credit sales in notebooks, making it difficult  → small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkwa"
+    },
+    {
+      "journey": "J2",
+      "name": "a clear typed answer is saved in their words, not read back",
+      "ok": true,
+      "detail": "small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkwa"
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": "Understood — we’ll leave the team size aside for now. The website helps with your profile, investor matching and verification; you can provide it later or say “I don’t know.” What year was Tamarind Ledger founded?"
+    },
+    {
+      "journey": "J3",
+      "name": "stored for F1.website",
+      "ok": null,
+      "detail": "{\"type\":\"TEXT\",\"text\":\"I don't know\"}"
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": true,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. What year was the company founded?"
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier — “one of two full-time founders” and “there are nine of us” — I fou"
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier — “one of two full-time founders” and “there are nine of us” — I fou"
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": true,
+      "detail": "before: r — “one of two full-time founders” and “there are nine of us” — I found two founders and a team of nine; is that right? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier — “one of two full-time foun"
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "Your company / Your company"
+    },
+    {
+      "journey": "J6",
+      "name": "questions answered from the fact table",
+      "ok": null,
+      "detail": "[{\"q\":\"From what you said earlier — “one of two full-time founders” and “there are nine of us” — I found two founders and a tea\",\"answer\":\"Yes, that's right.\"},{\"q\":\"What year was Tamarind Ledger founded?\",\"answer\":\"2021.\"},{\"q\":\"” Should I keep that wording?\",\"answer\":\"Yes, that's right.\"},{\"q\":\"Between the two of you, which parts of the business does the founding team cover — for example product, engineering, sal\",\"answer\":\"Product, engineering and sales.\"},{\"q\":\"Also, has revenue been growing, flat, declining, or lumpy lately?\",\"answer\":\"Growing about ten percent a month.\"},{\"q\":\"What currency do you report in, and roughly what were last month’s billings, gross margin, monthly spend above revenue, \",\"answer\":\"US dollars.\"},{\"q\":\"Roughly how much did you bill last month?\",\"answer\":\"One and a half million dollars.\"},{\"q\":\"Roughly what were your gross margin, monthly spend above revenue, cash in the bank, and runway in months?\",\"answer\":\"Product and hiring.\"},{\"q\":\"What are the approximate gross margin, monthly spend above revenue, cash in the bank, and runway in months?\",\"answer\":\"Product and hiring.\"},{\"q\":\"Product and hiring are the main spending areas; I still need the figures: roughly what’s your gross margin, monthly spen\",\"answer\":\"Product and hiring.\"},{\"q\":\"What was your gross margin last month, as a percentage—or should I mark it as “I don’t know” for now?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"From what you said: What year was the company founded: 2,021 Shall I keep that?\",\"answer\":\"Yes, that's right.\"},{\"q\":\"Are you raising right now?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"Are you raising right now?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"Which currency are you raising in?\",\"answer\":\"US dollars.\"},{\"q\":\"Which currency are you raising in?\",\"answer\":\"US dollars.\"},{\"q\":\"How much are you raising?\",\"answer\":\"One and a half million dollars.\"},{\"q\":\"How much are you raising?\",\"answer\":\"One and a half million dollars.\"},{\"q\":\"5 million Shall I keep that?\",\"answer\":\"Yes, that's right.\"},{\"q\":\"What instrument are you raising on?\",\"answer\":\"A SAFE.\"},{\"q\":\"When are you hoping to close the round?\",\"answer\":\"Within six months.\"},{\"q\":\"When are you hoping to close the round?\",\"answer\":\"Within six months.\"},{\"q\":\"5 million Is that all right?\",\"answer\":\"Yes, that's right.\"},{\"q\":\"5 million Is that all right?\",\"answer\":\"Yes, that's right.\"}]"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": true,
+      "detail": "/verification"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
