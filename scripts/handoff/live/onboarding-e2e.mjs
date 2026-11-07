@@ -6,8 +6,8 @@
 // step. Voice is driven over HTTP the way voice-http.mjs does it: a real
 // q-api voice session, opened on the onboarding session, with the speech
 // provider's part played by this script (transcript text to the think
-// endpoint). Q's lines are read back from onboarding.interview_turns with
-// a read-only query, never guessed from the page.
+// endpoint). Q's lines and the saved answers are read through the product
+// API as the person (their own session), never guessed from the page.
 //
 // Nothing runs against production unless CQ_E2E_GO=1: without it the
 // script prints what it would do and exits 0. Q turns are kept few (dense
@@ -17,7 +17,7 @@
 //   CQ_E2E_GO=1 NODE_USE_ENV_PROXY=1 JOURNEY=founder|investor \
 //   STEPS=J1,J2,J3,J4,J5,J6,J7 VIEWPORT=1440|390 OUT=<dir> \
 //   SB_URL=... SB_KEY=<admin, for creating the account only> \
-//   SB_PUBLISHABLE=... CQ_SEED_ACCOUNT_PASSWORD=... SUPABASE_ACCESS_TOKEN=... \
+//   SB_PUBLISHABLE=... CQ_SEED_ACCOUNT_PASSWORD=... \
 //   node scripts/handoff/live/onboarding-e2e.mjs
 //
 // Secrets are read from env by name and never printed.
@@ -30,7 +30,6 @@ const API =
 const QAPI =
   process.env.CQ_Q_API_URL ??
   "https://capital-qq-api-production.up.railway.app";
-const PROJECT = process.env.SUPABASE_PROJECT ?? "vcohxiqsmnkzxnvawgri";
 const JOURNEY = process.env.JOURNEY === "investor" ? "investor" : "founder";
 const STEPS = new Set(
   (process.env.STEPS ?? "J1,J2,J3,J4,J5,J6").split(",").map((s) => s.trim()),
@@ -79,7 +78,6 @@ for (const name of [
   "SB_KEY",
   "SB_PUBLISHABLE",
   "CQ_SEED_ACCOUNT_PASSWORD",
-  "SUPABASE_ACCESS_TOKEN",
 ]) {
   if (!process.env[name]) {
     console.error(`missing ${name}`);
@@ -136,34 +134,64 @@ const note = (journey, name, detail) => {
   console.log(`account ${EMAIL}`);
 }
 
-// ---- read-only reads of the hosted record -----------------------------------
-const sql = async (query) => {
-  const r = await fetch(
-    `https://api.supabase.com/v1/projects/${PROJECT}/database/query`,
+// ---- reads of the record, as the person (their own data, the product API) --
+// Run 1 (7 Nov) read these through the management API, and every read came
+// back empty: a refused or failed query was taken for "no rows". These are
+// the person's own onboarding session and thread, read with their own
+// session, and a failed read stops the run instead of passing for empty.
+let accessToken = null;
+const token = async () => {
+  if (accessToken !== null) return accessToken;
+  const signedIn = await fetch(
+    `${process.env.SB_URL}/auth/v1/token?grant_type=password`,
     {
       method: "POST",
       headers: {
-        authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
+        apikey: process.env.SB_PUBLISHABLE,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ query, read_only: true }),
+      body: JSON.stringify({
+        email: EMAIL,
+        password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
+      }),
     },
   );
-  const rows = await r.json().catch(() => []);
-  return Array.isArray(rows) ? rows : [];
+  if (!signedIn.ok) throw new Error(`HTTP sign-in: ${signedIn.status}`);
+  accessToken = (await signedIn.json()).access_token;
+  return accessToken;
 };
-const quoted = EMAIL.replace(/'/g, "''");
-const SESSION_OF = `select s.id from onboarding.sessions s join identity.user_profiles p on p.id=s.user_id join auth.users u on u.id=p.auth_user_id where u.email='${quoted}' order by s.created_at desc limit 1`;
-const turns = async () =>
-  sql(
-    `select t.role, t.channel, t.text, t.created_at from onboarding.interview_turns t where t.session_id=(${SESSION_OF}) order by t.created_at`,
+const apiGet = async (path) => {
+  const response = await fetch(`${API}${path}`, {
+    headers: { authorization: `Bearer ${await token()}` },
+  });
+  if (!response.ok) {
+    throw new Error(`read ${path.split("?")[0]}: HTTP ${response.status}`);
+  }
+  return response.json();
+};
+/** The person's current onboarding session view (null before one exists). */
+const view = async () => {
+  try {
+    return await apiGet(
+      `/v1/onboarding/sessions/current?journeyType=${JOURNEY}`,
+    );
+  } catch (error) {
+    if (String(error.message).includes("HTTP 404")) return null;
+    throw error;
+  }
+};
+/** The interview thread, oldest first: role, text, channel, createdAt. */
+const turns = async () => {
+  const current = await view();
+  if (current === null) return [];
+  const listed = await apiGet(
+    `/v1/onboarding/sessions/${current.session.id}/turns?limit=100`,
   );
+  return listed.items ?? [];
+};
+/** Step keys with a current response. */
 const answered = async () =>
-  (
-    await sql(
-      `select r.step_key from onboarding.responses r where r.session_id=(${SESSION_OF}) and r.superseded_by_response_id is null`,
-    )
-  ).map((row) => String(row.step_key));
+  ((await view())?.responses ?? []).map((r) => String(r.stepKey));
 const lastQ = async () => {
   const all = await turns();
   return String(all.filter((t) => t.role === "Q").at(-1)?.text ?? "");
@@ -357,30 +385,12 @@ if (STEPS.has("J3")) {
 
 // ---- J4 chat → voice → chat -----------------------------------------------------------
 if (STEPS.has("J4")) {
-  // The voice leg signs in over HTTP, as voice-http.mjs does.
-  const signIn = await fetch(
-    `${process.env.SB_URL}/auth/v1/token?grant_type=password`,
-    {
-      method: "POST",
-      headers: {
-        apikey: process.env.SB_PUBLISHABLE,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        email: EMAIL,
-        password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
-      }),
-    },
-  );
-  const { access_token: accessToken } = await signIn.json();
+  // The voice leg, as voice-http.mjs drives it, with the person's token.
   const authed = {
-    authorization: `Bearer ${accessToken}`,
+    authorization: `Bearer ${await token()}`,
     "content-type": "application/json",
   };
-  const current = await fetch(
-    `${API}/v1/onboarding/sessions/current?journeyType=${JOURNEY}`,
-    { headers: authed },
-  ).then((r) => r.json());
+  const current = await view();
   const sessionId = current?.session?.id;
   const onScreen = await lastQ();
   // As talkWithQ sends it when the on-screen question is Q's own.
