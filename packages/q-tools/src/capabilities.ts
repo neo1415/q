@@ -810,6 +810,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Sets how much Q moves on this device: full, calm or off.",
     { acts: true },
   ),
+  // Q Workspace W1.5 (ADR 0077): the workspace's panes, by word or voice.
+  tool(
+    "set_layout",
+    "NAVIGATION",
+    'Opens or collapses the panes of their Q Workspace: the Q pane and the page beside it ("hide the pages", "close the chat").',
+    { acts: true },
+  ),
   tool(
     "set_voice",
     "SETTINGS",

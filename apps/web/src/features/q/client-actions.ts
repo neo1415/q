@@ -29,6 +29,7 @@ import {
 import { performUiAct, requestMove } from "./ui-act-controller";
 import { announceLanguage } from "@/features/i18n/language";
 import { openDocumentViewer } from "@/features/documents/document-ready";
+import { performLayoutSet } from "@/features/workspace/layout-action";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -643,6 +644,8 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   setLanguage: (language) => {
     announceLanguage(language);
   },
+  // W1.5: the workspace panes, as their own controls set them.
+  setLayout: (layout) => performLayoutSet(layout),
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
