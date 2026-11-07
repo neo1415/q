@@ -159,10 +159,10 @@ describe("W3.2 every deep link's path", () => {
       "/company/data-room?tab=deck&sub=use_of_funds",
     ],
     [{ page: "DISCOVER", tab: "founders" }, "/discover?tab=founders"],
-    [{ page: "RESULTS" }, "/relationships?view=overview"],
+    [{ page: "RESULTS" }, "/results"],
     [
       { page: "CAPITAL_ROUND", recordId: COMPANY },
-      `/relationships?view=capital&round=${COMPANY}#round-${COMPANY}`,
+      `/capital?round=${COMPANY}#round-${COMPANY}`,
     ],
   ] as const)("%o → %s", (target, path) => {
     expect(pathOf(target)).toBe(path);
