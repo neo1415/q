@@ -21,7 +21,7 @@ import {
 
 /**
  * LIVE ONBOARDING-LONG-ANSWER (onboarding P1-1; the owner's paid check,
- * DECISIONS 72/73): the real ONBOARDING_TRANSCRIPT_READER (v14, the active
+ * DECISIONS 72/73): the real ONBOARDING_TRANSCRIPT_READER (the active
  * version) through the Q Model Gateway, on Anthropic only, Claude Sonnet
  * 5.5 at its hosted price (no small model, DECISIONS 73). Synthetic cases
  * only. Approved cap $2; this run stops itself before $1.80.
