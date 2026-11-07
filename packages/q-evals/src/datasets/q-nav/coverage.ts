@@ -8,6 +8,7 @@ import {
   decide,
   dest,
   investorProfile,
+  ownMissing,
   pick,
   profile,
   relationshipWithCompany,
@@ -63,15 +64,13 @@ const form = (split: QNavSplit, seed: string, name: string): string => {
 
 /** Asks whose answer is one section of a page. */
 const SECTION_ASKS: readonly {
-  readonly page: string;
-  readonly sectionId: string;
+  readonly target: QNavTarget;
   readonly side: QNavSide;
   readonly dev: readonly string[];
   readonly heldout: readonly string[];
 }[] = [
   {
-    page: "CAPITAL",
-    sectionId: "commitments",
+    target: section("CAPITAL", "commitments"),
     side: "INVESTOR",
     dev: [
       "How much have I invested so far?",
@@ -80,18 +79,18 @@ const SECTION_ASKS: readonly {
     heldout: ["What's my total cheque count so far?"],
   },
   {
-    page: "COMPANY_INTEREST",
-    sectionId: "deck-views",
+    // Deck views are not built (W2): asking for them is a STAY
+    // (curveballs); investor interest is the interest section.
+    target: section("COMPANY_INTEREST", "interest"),
     side: "FOUNDER",
     dev: [
-      "Who's looked at my deck this week?",
-      "Which investors opened my deck?",
+      "Which investors have shown interest in us?",
+      "Who's signalled interest this week?",
     ],
-    heldout: ["Has anybody been reading our deck?"],
+    heldout: ["Is any fund warming up to us?"],
   },
   {
-    page: "OWN_DATA_ROOM",
-    sectionId: "missing",
+    target: ownMissing(),
     side: "FOUNDER",
     dev: [
       "Is my data room ready for diligence?",
@@ -100,22 +99,19 @@ const SECTION_ASKS: readonly {
     heldout: ["What would a diligence team find missing in our files?"],
   },
   {
-    page: "WORK",
-    sectionId: "approvals",
+    target: section("WORK", "approvals"),
     side: "INVESTOR",
     dev: ["What's waiting for my approval?"],
     heldout: ["Anything I need to sign off on?"],
   },
   {
-    page: "WORK",
-    sectionId: "approvals",
+    target: section("WORK", "approvals"),
     side: "FOUNDER",
     dev: ["What do I need to approve?"],
     heldout: ["Is anything blocked on my yes?"],
   },
   {
-    page: "CAPITAL_RAISE",
-    sectionId: "rounds",
+    target: section("CAPITAL_RAISE", "rounds"),
     side: "FOUNDER",
     dev: ["Show me all my rounds."],
     heldout: ["List every round we've done, on screen."],
@@ -212,10 +208,7 @@ function destinations(cases: CaseSet): void {
       cases.add("COVERAGE", s.side, [
         turn(
           ask,
-          move(
-            section(s.page, s.sectionId),
-            `The answer is a section of ${s.page}.`,
-          ),
+          move(s.target, `The answer is a section of ${s.target.page}.`),
         ),
       ]);
     }

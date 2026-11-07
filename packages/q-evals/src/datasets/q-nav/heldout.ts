@@ -8,6 +8,7 @@ import {
   decide,
   dest,
   investorProfile,
+  ownMissing,
   profile,
   section,
   team,
@@ -79,7 +80,7 @@ export function heldoutCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "Something tells me our files aren't diligence-proof yet.",
-      section("OWN_DATA_ROOM", "missing"),
+      ownMissing(),
     ],
   ];
   for (const [s, user, target] of lookMove)
@@ -127,8 +128,8 @@ export function heldoutCurveballs(cases: CaseSet): void {
     ["INVESTOR", "shwo me kora farms deck", deck("co-kora-farms")],
     [
       "FOUNDER",
-      "whos lookd at my dekc",
-      section("COMPANY_INTEREST", "deck-views"),
+      "whos intrested in us latley",
+      section("COMPANY_INTEREST", "interest"),
     ],
     ["FOUNDER", "open my raedines", dest("CAPITAL_READINESS")],
   ];
@@ -192,8 +193,8 @@ export function heldoutCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "pt",
-      "Quem viu o nosso deck esta semana?",
-      section("COMPANY_INTEREST", "deck-views"),
+      "Que investidores mostraram interesse em nós?",
+      section("COMPANY_INTEREST", "interest"),
     ],
     ["FOUNDER", "fr", "Ouvre mon plan d'action.", dest("CAPITAL_ACTION_PLAN")],
     [
@@ -291,13 +292,13 @@ export function heldoutCurveballs(cases: CaseSet): void {
     turn(
       "Take me back.",
       F.move(
-        section("COMPANY_INTEREST", "deck-views"),
+        section("COMPANY_INTEREST", "interest"),
         "Back: the previous place.",
       ),
       {
         context: context({
           at: dest("CAPITAL_PLAN"),
-          previous: section("COMPANY_INTEREST", "deck-views"),
+          previous: section("COMPANY_INTEREST", "interest"),
         }),
       },
     ),
@@ -474,6 +475,13 @@ export function heldoutCurveballs(cases: CaseSet): void {
       turn(`Can you take me to ${name}?`, side(s).stay("No such page.")),
     ]);
   });
+  // Deck views are not built yet (W2: the analytics page, A3).
+  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+    turn(
+      "Has anybody been reading our deck?",
+      F.stay("No page shows deck views yet: say so, move nowhere."),
+    ),
+  ]);
   cases.add("DELETED_RECORD", "INVESTOR", [
     turn(
       `What's in ${Q_NAV_DELETED_COMPANY.name}'s data room?`,

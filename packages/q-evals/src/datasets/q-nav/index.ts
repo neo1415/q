@@ -91,6 +91,7 @@ export function targetProblems(target: QNavTarget, side: QNavSide): string[] {
       !sections.some(
         (s) =>
           s.id === target.sectionId &&
+          s.status === "EXISTS" &&
           (s.side === undefined || s.side === side),
       )
     )

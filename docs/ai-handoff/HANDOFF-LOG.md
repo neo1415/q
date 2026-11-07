@@ -1719,3 +1719,26 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - The founder's Discover (founders tab) has no destination.
   - `/settings/plan` has no destination.
   - CAPITAL_ROUND and RESULTS exist only on redirect pages.
+
+## 2026-11-07 — W4 milestone 3b: integration bc8f7ac and W2 e26564a merged (`feat/q-navigation-policy`)
+
+- **Merged:** integration `fix/resume-asking-cv9ru3` @ bc8f7ac (W1 `workspaceScreen()`, set_layout, W3 deep links) and W2 `e26564a`, which adds the sections and `qSiteMapLandingFor`.
+- **`targetToSitePlace` uses W2's `qSiteMapLandingFor`.**
+- **Sections:**
+  - commitments (CAPITAL) and draft (both thread pages) now EXIST in the site map.
+  - `missing` lives on `/company/[companyId]` tab dataroom. `/company/data-room` redirects a founder there, so those turns now target the founder's own COMPANY record, data-room tab, section `missing` (`ownMissing()`).
+  - deck-views is PLANNED, not built (W2: the analytics page, A3), and the lint refuses it as a target. Its turns became one of two things:
+    - investor interest asks to `/company/interest#interest`, with the wording changed to ask about interest;
+    - NO_SUCH_PAGE STAY turns for "who looked at my deck": 2 dev, 1 held-out. Viewing is not interest.
+- **Pipeline proof:** every turn is exact again. No pending list; labs and on gates pass.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0, web tsc 0;
+  - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4890 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+  - apps/q-api was not re-run; no q-api files changed since the 4932 pass beyond the merge itself.
+- **Open:**
+  - `screen.workspace` sends `at`/`previous` as paths; W4 needs path → QNavigateTarget, either from W3 or from site-map route matching.
+  - resolve_page_target as the resolver port in decideNavigation.
+  - Wiring in answer.ts waits on W3's schema SHA.

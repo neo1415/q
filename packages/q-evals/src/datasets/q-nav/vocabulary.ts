@@ -18,7 +18,7 @@ import type { QNavSide } from "./contracts.js";
  * QNavigateDestination and QRecordPage, the site-map page it lands on, who
  * may open it (the page's audience; a tab's own when it says so), its tabs
  * and its sections. Nothing here restates the app: only the phrasing banks
- * are written by hand, plus the sections W2 is still adding (PROPOSED).
+ * are written by hand, plus the sections W2 says are not built (PLANNED).
  *
  * A place the decision cannot name is listed as unreachable with its
  * reason (a page that only redirects, or no destination for a side), and
@@ -28,7 +28,7 @@ import type { QNavSide } from "./contracts.js";
  * and `heldout` (only measured; never read while tuning).
  */
 
-export type QNavPlaceStatus = "EXISTS" | "PROPOSED";
+export type QNavPlaceStatus = "EXISTS" | "PLANNED";
 export type QNavSectionDef = {
   readonly id: string;
   readonly status: QNavPlaceStatus;
@@ -480,18 +480,16 @@ const BANKS: readonly {
   },
 ];
 
-/** The sections W2 is adding (relayed 6 Nov); EXISTS once in the site map. */
-const PROPOSED_SECTIONS: readonly (readonly [
+/**
+ * Sections W2 says are not built (relayed 7 Nov): no page shows a
+ * founder's deck views yet (the analytics page, A3). Listed so the lint
+ * refuses them as a target: asking for one is a STAY.
+ */
+const PLANNED_SECTIONS: readonly (readonly [
   string,
   string,
   QNavSide | undefined,
-])[] = [
-  ["CAPITAL", "commitments", "INVESTOR"],
-  ["COMPANY_INTEREST", "deck-views", "FOUNDER"],
-  ["OWN_DATA_ROOM", "missing", "FOUNDER"],
-  ["RELATIONSHIP_COMPANY_MESSAGES", "draft", undefined],
-  ["RELATIONSHIP_INVESTOR_MESSAGES", "draft", undefined],
-];
+])[] = [["COMPANY_INTEREST", "deck-views", "FOUNDER"]];
 
 /**
  * Sides the page's code decides where W2's tab titles say otherwise or
@@ -534,11 +532,11 @@ function sectionsOf(
   const existing: QNavSectionDef[] = (site?.sections ?? [])
     .filter((s) => s.tab === undefined || tab === null || s.tab === tab)
     .map((s) => ({ id: s.id, status: "EXISTS" as const }));
-  for (const [onPage, id, side] of PROPOSED_SECTIONS) {
+  for (const [onPage, id, side] of PLANNED_SECTIONS) {
     if (onPage === page && !existing.some((s) => s.id === id))
       existing.push({
         id,
-        status: "PROPOSED",
+        status: "PLANNED",
         ...(side === undefined ? {} : { side }),
       });
   }

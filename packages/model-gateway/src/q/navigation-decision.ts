@@ -2,6 +2,7 @@ import {
   Q_SITE_MAP,
   QNavigateTargetSchema,
   qSiteMapDigest,
+  qSiteMapLandingFor,
   type QNavigateTarget,
   type QSiteMap,
   type QSiteMapPage,
@@ -139,21 +140,14 @@ export function targetToSitePlace(
         ? target.position
         : null,
   };
-  for (const page of map.pages) {
-    const tab = page.tabs.find((t) =>
-      (t.destinations as readonly string[]).includes(target.page),
-    );
-    if (tab !== undefined) return { route: page.route, tab: tab.id, ...common };
-  }
-  for (const page of map.pages) {
-    if ((page.destinations as readonly string[]).includes(target.page))
-      return { route: page.route, tab: target.tab ?? null, ...common };
-  }
-  for (const page of map.pages) {
-    if ((page.recordPages as readonly string[]).includes(target.page))
-      return { route: page.route, tab: target.tab ?? null, ...common };
-  }
-  return null;
+  // W2's own landing: the page (and tab) a destination or record page opens.
+  const landing = qSiteMapLandingFor(map, target.page);
+  if (landing === null) return null;
+  return {
+    route: landing.page.route,
+    tab: landing.tab?.id ?? target.tab ?? null,
+    ...common,
+  };
 }
 
 /** The ids resolution found for a place's record, document and item. */

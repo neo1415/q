@@ -9,7 +9,12 @@ import type {
   QNavTurn,
 } from "./contracts.js";
 import { pagesClosedTo } from "./vocabulary.js";
-import { company, investor, Q_NAV_THINGS } from "./world.js";
+import {
+  company,
+  investor,
+  Q_NAV_FOUNDER_COMPANY_KEY,
+  Q_NAV_THINGS,
+} from "./world.js";
 
 /** The building blocks every Q-NAV case is made of. */
 
@@ -154,6 +159,16 @@ export const dest = (
 ): QNavTarget => ({ page, ...extra }) as QNavTarget;
 export const section = (page: string, sectionId: string): QNavTarget =>
   dest(page, { sectionId, position: "section" });
+/**
+ * What the founder's data room still lacks: /company/data-room redirects
+ * a founder to their own profile's data-room tab, whose `missing` section
+ * it is (W2), so the place is their own company record.
+ */
+export const ownMissing = (): QNavTarget => ({
+  ...profile(Q_NAV_FOUNDER_COMPANY_KEY, "dataroom"),
+  sectionId: "missing",
+  position: "section",
+});
 export const profile = (key: string, tab?: string): QNavTarget => ({
   page: "COMPANY",
   recordId: company(key).id,

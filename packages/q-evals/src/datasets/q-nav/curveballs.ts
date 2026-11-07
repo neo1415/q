@@ -7,6 +7,7 @@ import {
   decide,
   dest,
   investorProfile,
+  ownMissing,
   profile,
   section,
   team,
@@ -130,14 +131,14 @@ export function devCurveballs(cases: CaseSet): void {
     ],
     [
       "FOUNDER",
-      "I'm curious whether anyone's been reading our deck.",
-      section("COMPANY_INTEREST", "deck-views"),
-      "Their deck views.",
+      "I'm curious whether any investors are warming to us.",
+      section("COMPANY_INTEREST", "interest"),
+      "Investor interest: the interest section.",
     ],
     [
       "FOUNDER",
       "Not sure we're ready for diligence, honestly.",
-      section("OWN_DATA_ROOM", "missing"),
+      ownMissing(),
       "What's missing in their data room.",
     ],
   ];
@@ -238,7 +239,7 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "uh is my data room you know ready",
-      section("OWN_DATA_ROOM", "missing"),
+      ownMissing(),
       "What's missing, by voice.",
     ],
     [
@@ -279,8 +280,8 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "fr",
-      "Qui a regardé mon deck cette semaine ?",
-      section("COMPANY_INTEREST", "deck-views"),
+      "Quels investisseurs s'intéressent à nous cette semaine ?",
+      section("COMPANY_INTEREST", "interest"),
     ],
     [
       "FOUNDER",
@@ -592,12 +593,7 @@ export function devCurveballs(cases: CaseSet): void {
       "Open my pipeline.",
       dest("CRM_PIPELINE"),
     ],
-    [
-      "FOUNDER",
-      dest("NEW_PITCH"),
-      "Is my data room ready?",
-      section("OWN_DATA_ROOM", "missing"),
-    ],
+    ["FOUNDER", dest("NEW_PITCH"), "Is my data room ready?", ownMissing()],
     [
       "FOUNDER",
       dest("CAPITAL_PLAN"),
@@ -648,8 +644,8 @@ export function devCurveballs(cases: CaseSet): void {
       "FOUNDER",
       "SCROLLING",
       dest("OWN_DATA_ROOM"),
-      "Who viewed my deck?",
-      section("COMPANY_INTEREST", "deck-views"),
+      "Who's shown interest in us?",
+      section("COMPANY_INTEREST", "interest"),
     ],
   ];
   for (const [s, what, at, user, target] of busy)
@@ -721,6 +717,19 @@ export function devCurveballs(cases: CaseSet): void {
       ),
     ]);
   });
+  // Deck views are not built yet (W2: the analytics page, A3).
+  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+    turn(
+      "Who's looked at my deck this week?",
+      F.stay("No page shows deck views yet: say so, move nowhere."),
+    ),
+  ]);
+  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+    turn(
+      "Qui a regardé mon deck cette semaine ?",
+      F.stay("No page shows deck views yet, in French: move nowhere."),
+    ),
+  ]);
   cases.add("DELETED_RECORD", "INVESTOR", [
     turn(
       `Open ${Q_NAV_DELETED_COMPANY.name}'s profile.`,
