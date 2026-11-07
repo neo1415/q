@@ -1,0 +1,80 @@
+{
+  "split": "all",
+  "summary": {
+    "steps": 45,
+    "passed": 32,
+    "decisionAccuracy": 0.7111111111111111,
+    "outcomeAccuracy": 0.9555555555555556,
+    "unsafeSaves": 1,
+    "missesByCategory": {
+      "SHORT_RAMBLE": 4,
+      "TWO_STEPS": 6,
+      "NON_NATIVE": 1,
+      "FIGURES": 1,
+      "RAMBLING_SPOKEN": 1
+    }
+  },
+  "calls": 42,
+  "tokens": {
+    "input": 282417,
+    "cached": 157934,
+    "output": 8372
+  },
+  "costUsd": 0.3642728,
+  "skipped": [],
+  "devMisses": [
+    {
+      "id": "dev-short-ramble-01/F1.description",
+      "category": "SHORT_RAMBLE",
+      "reasons": ["decided KEEP, want SUMMARISE"]
+    },
+    {
+      "id": "dev-short-ramble-02/I11.additional_context",
+      "category": "SHORT_RAMBLE",
+      "reasons": ["decided KEEP, want SUMMARISE"]
+    },
+    {
+      "id": "dev-two-01/F9.problem",
+      "category": "TWO_STEPS",
+      "reasons": [
+        "decided KEEP, want SUMMARISE",
+        "summarise: their words verbatim"
+      ]
+    },
+    {
+      "id": "dev-two-01/F9.solution",
+      "category": "TWO_STEPS",
+      "reasons": [
+        "decided KEEP, want SUMMARISE",
+        "summarise: their words verbatim"
+      ]
+    },
+    {
+      "id": "dev-two-02/I6.custom_criteria",
+      "category": "TWO_STEPS",
+      "reasons": [
+        "decided KEEP, want SUMMARISE",
+        "summarise: their words verbatim"
+      ]
+    },
+    {
+      "id": "dev-two-02/I8.portfolio",
+      "category": "TWO_STEPS",
+      "reasons": ["decided KEEP, want SUMMARISE"]
+    },
+    {
+      "id": "dev-non-native-02/I6.custom_criteria",
+      "category": "NON_NATIVE",
+      "reasons": [
+        "decided SUMMARISE, want KEEP",
+        "code READ_BACK",
+        "keep: not deletions only from their line"
+      ]
+    },
+    {
+      "id": "dev-figures-02/F9.business_model",
+      "category": "FIGURES",
+      "reasons": ["decided KEEP, want SUMMARISE"]
+    }
+  ]
+}
