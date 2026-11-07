@@ -302,7 +302,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/analytics",
       title: "Analytics",
       purpose:
-        "Intent and investor viewing of your company (deck by slide, who viewed, by week); an investor's own visibility and answers.",
+        "A founder's intent signals and investor viewing by week and slide; an investor's own visibility, views and founders' answers.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY"],
