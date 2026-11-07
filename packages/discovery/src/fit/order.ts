@@ -143,7 +143,36 @@ export const FIT_ORDER_V4 = Object.freeze({
   description:
     "Discover order: v3's order, with its declared tier over the whole feed: when the investor declared their geography Must or Strong, every company outside it (scored or not) follows those that are not (an unknown location is not outside), and companies in the declared geography are candidates in every window; within each tier, scored companies are ordered by 0.75 × Suitability + 0.25 × Investability, then the fit tie-break, then the base rank, and unscored ones keep their places; exploration and diversity moves are labelled.",
 } as const);
-export const FIT_ORDER_CURRENT = FIT_ORDER_V4;
+/**
+ * `fit-order.v5` (metrics audit 2026-11-07, P0-5/P1-2): fit first, as the
+ * feed says. v2-v4 blended 0.25 × Investability into the order value, so
+ * a 6/10 fit with Investability 100 (70) sat above an 8/10 with 0 (60)
+ * while the feed promised "a higher fit out of 10 is never below a lower
+ * one", and an unknown Investability counted as equal to the fit, so
+ * sharing less evidence could rank higher.
+ *
+ * v5 keeps v4's tier and rules and makes Investability a tie-break only:
+ *  - within each tier, scored candidates are ordered by the fit out of 10
+ *    the reader sees (desc), then the fit config's merit tie-break, then
+ *    the base rank;
+ *  - within a run of equal fit out of 10, the candidates with a scored
+ *    (current, non-provisional) Investability refill their own positions
+ *    by Investability (desc); candidates with none keep their positions,
+ *    so unknown is neither promoted nor buried;
+ *  - unscored candidates keep their places in the tier, as before.
+ * No weights: nothing is blended. No model, no engagement, no pay-to-rank.
+ */
+export const FIT_ORDER_V5 = Object.freeze({
+  version: "fit-order.v5",
+  fitConfigVersion: FIT_CONFIG_CURRENT.version,
+  baseRankingConfigVersion: RANKING_CONFIG_CURRENT.version,
+  geographyFirst: FIT_ORDER_V3.geographyFirst,
+  /** Investability's only role: ordering within an equal fit out of 10. */
+  investability: "TIE_BREAK_WITHIN_EQUAL_FIT",
+  description:
+    "Discover order: fit first. Within the declared geography tier (v4), companies the fit can score are ordered by their fit out of 10, then the fit tie-break, then the base rank; among equal fits, those with a scored Investability are ordered by it and those without keep their places; unscored companies keep their places; exploration and diversity moves are labelled.",
+} as const);
+export const FIT_ORDER_CURRENT = FIT_ORDER_V5;
 
 /**
  * Whether a candidate falls outside a geography the investor declared at
@@ -206,6 +235,11 @@ export type FitOrderKey = {
    * Strong (outsideDeclaredGeography). Absent: no such tier.
    */
   readonly outsideDeclaredGeography?: boolean | undefined;
+  /**
+   * fit-order.v5: the scored Investability (0-100), a tie-break among
+   * equal fits only. Absent or null: unknown, keeps its position.
+   */
+  readonly investability?: number | null | undefined;
 };
 
 export type FitOrderedCandidate = {
@@ -231,6 +265,8 @@ export function fitOrderScore(assessment: FitAssessment | null): number | null {
  * Used by the slate order and Q's side-by-side top N.
  */
 export function compareFitOrder(a: FitOrderKey, b: FitOrderKey): number {
+  // fit-order.v5: the fit out of 10 alone; a v2-v4 blended order value is
+  // still honoured when a caller supplies one (historical replays).
   const valueOf = (k: FitOrderKey) =>
     k.orderValue ?? (k.score === null ? -1 : k.score * 10);
   const sa = valueOf(a);
@@ -246,6 +282,48 @@ export function compareFitOrder(a: FitOrderKey, b: FitOrderKey): number {
 const tierOf = (key: FitOrderKey) =>
   key.outsideDeclaredGeography === true ? 1 : 0;
 
+/**
+ * fit-order.v5: within each run of equal fit out of 10, the candidates
+ * with a known Investability refill their own positions by it (desc; a
+ * tie keeps the run's order). Unknown keeps its position.
+ */
+function withinEqualFitByInvestability(
+  sorted: readonly FitOrderEntry[],
+  keyOf: (companyId: string) => FitOrderKey,
+): FitOrderEntry[] {
+  const out = [...sorted];
+  const known = (entry: FitOrderEntry) => {
+    const value = keyOf(entry.companyId).investability;
+    return value === null || value === undefined ? null : value;
+  };
+  let start = 0;
+  while (start < out.length) {
+    const fit = keyOf(out[start]?.companyId ?? "").score;
+    let end = start + 1;
+    while (end < out.length && keyOf(out[end]?.companyId ?? "").score === fit) {
+      end += 1;
+    }
+    const run = out.slice(start, end);
+    const withScore = run
+      .map((entry, index) => ({ entry, index, value: known(entry) }))
+      .filter(
+        (
+          item,
+        ): item is { entry: FitOrderEntry; index: number; value: number } =>
+          item.value !== null,
+      );
+    const reordered = [...withScore].sort(
+      (x, y) => y.value - x.value || x.index - y.index,
+    );
+    withScore.forEach((slot, i) => {
+      const placed = reordered[i];
+      if (placed !== undefined) out[start + slot.index] = placed.entry;
+    });
+    start = end;
+  }
+  return out;
+}
+
 /** Pure: the fit order of a base-ranked list (see step 3 above). */
 export function orderByFit(
   base: readonly FitOrderEntry[],
@@ -260,13 +338,16 @@ export function orderByFit(
     const members = ordered.filter(
       (entry) => tierOf(keyOf(entry.companyId)) === tier,
     );
-    const scored = members
-      .filter((entry) => keyOf(entry.companyId).score !== null)
-      .sort(
-        (a, b) =>
-          compareFitOrder(keyOf(a.companyId), keyOf(b.companyId)) ||
-          a.baseRank - b.baseRank,
-      );
+    const scored = withinEqualFitByInvestability(
+      members
+        .filter((entry) => keyOf(entry.companyId).score !== null)
+        .sort(
+          (a, b) =>
+            compareFitOrder(keyOf(a.companyId), keyOf(b.companyId)) ||
+            a.baseRank - b.baseRank,
+        ),
+      keyOf,
+    );
     let next = 0;
     return members.map((entry) =>
       keyOf(entry.companyId).score === null ? entry : scored[next++],
@@ -381,10 +462,7 @@ export function createFitOrdering(dependencies: {
               observed.observations.GEOGRAPHY.outcome,
               found?.declared.geographyStrength,
             ),
-          orderValue: discoverOrderValue(
-            score,
-            investability.get(candidate.companyId) ?? null,
-          ),
+          investability: investability.get(candidate.companyId) ?? null,
         });
       }
       const ordered = orderByFit(input.candidates, keys);

@@ -3,27 +3,24 @@ import { describe, expect, it } from "vitest";
 import {
   FIT_ORDER_CURRENT,
   FIT_ORDER_V2,
+  FIT_ORDER_V5,
   discoverOrderValue,
   orderByFit,
   type FitOrderKey,
 } from "../src/fit/order.js";
 
 /**
- * fit-order.v2 (owner 2026-10-16): Investability enters the Discover order
- * only through the versioned weights, after explicit fit. Unknown
- * Investability is absent (never low); a candidate with no fit score keeps
- * its base position whatever its Investability.
+ * fit-order.v5 (metrics audit P0-5/P1-2): fit first, as the feed says.
+ * Investability orders only among equal fits out of 10; unknown
+ * Investability keeps its position (never read as low or as high); a
+ * candidate with no fit score keeps its base position.
  */
 
 const ID = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 function key(fit: number | null, investability: number | null): FitOrderKey {
-  return {
-    assessment: null,
-    score: fit,
-    orderValue: discoverOrderValue(fit, investability),
-  };
+  return { assessment: null, score: fit, investability };
 }
 
 const base = (n: number) =>
@@ -32,23 +29,24 @@ const base = (n: number) =>
     baseRank: i + 1,
   }));
 
-describe("discover order with Investability (fit-order.v2)", () => {
-  it("is the current, versioned policy with explicit weights", () => {
-    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v4");
-    expect(FIT_ORDER_V2.weights.suitability).toBeGreaterThan(
-      FIT_ORDER_V2.weights.investability,
-    );
-    expect(Object.isFrozen(FIT_ORDER_V2.weights)).toBe(true);
+const ids = (order: readonly { companyId: string }[]) =>
+  order.map((o) => o.companyId);
+
+describe("discover order with Investability (fit-order.v5)", () => {
+  it("is the current, versioned policy, with nothing blended", () => {
+    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v5");
+    expect(FIT_ORDER_V5.investability).toBe("TIE_BREAK_WITHIN_EQUAL_FIT");
+    expect("weights" in FIT_ORDER_V5).toBe(false);
+    // The v2 blend stays reproducible for history.
+    expect(discoverOrderValue(8, 40, FIT_ORDER_V2.weights)).toBeCloseTo(70);
   });
 
-  it("computes the order value from the config, never from absent evidence", () => {
-    expect(discoverOrderValue(null, 90)).toBeNull();
-    expect(discoverOrderValue(8, null)).toBe(80);
-    expect(discoverOrderValue(8, 40)).toBeCloseTo(0.75 * 80 + 0.25 * 40, 10);
-    // The weights are the config's: a different config orders differently.
-    expect(
-      discoverOrderValue(8, 40, { suitability: 1, investability: 1 }),
-    ).toBe(60);
+  it("a higher fit out of 10 is never below a lower one, whatever Investability says", () => {
+    const keys = new Map([
+      [ID(1), key(6, 100)],
+      [ID(2), key(8, 0)],
+    ]);
+    expect(ids(orderByFit(base(2), keys))).toEqual([ID(2), ID(1)]);
   });
 
   it("orders equally fitting companies by Investability", () => {
@@ -56,21 +54,26 @@ describe("discover order with Investability (fit-order.v2)", () => {
       [ID(1), key(8, 40)],
       [ID(2), key(8, 80)],
     ]);
-    expect(orderByFit(base(2), keys).map((o) => o.companyId)).toEqual([
-      ID(2),
-      ID(1),
-    ]);
+    expect(ids(orderByFit(base(2), keys))).toEqual([ID(2), ID(1)]);
   });
 
-  it("keeps fit first: Investability cannot overturn a large fit gap", () => {
+  it("unknown Investability keeps its position among equal fits", () => {
     const keys = new Map([
-      [ID(1), key(6, 100)],
-      [ID(2), key(10, 0)],
+      [ID(1), key(8, 30)],
+      [ID(2), key(8, null)],
+      [ID(3), key(8, 90)],
     ]);
-    expect(orderByFit(base(2), keys).map((o) => o.companyId)).toEqual([
-      ID(2),
-      ID(1),
+    // Positions 1 and 3 hold the known ones, refilled by Investability;
+    // the unknown keeps position 2: neither promoted nor buried.
+    expect(ids(orderByFit(base(3), keys))).toEqual([ID(3), ID(2), ID(1)]);
+  });
+
+  it("sharing less evidence never ranks higher", () => {
+    const keys = new Map([
+      [ID(1), key(7, null)],
+      [ID(2), key(8, 10)],
     ]);
+    expect(ids(orderByFit(base(2), keys))).toEqual([ID(2), ID(1)]);
   });
 
   it("never promotes a company the fit cannot score", () => {
@@ -80,21 +83,13 @@ describe("discover order with Investability (fit-order.v2)", () => {
       [ID(3), key(9, 60)],
     ]);
     const order = orderByFit(base(3), keys);
-    // The unscored candidate keeps its base position 2.
     expect(order[1]?.companyId).toBe(ID(2));
-    expect(order.map((o) => o.companyId)).toEqual([ID(3), ID(2), ID(1)]);
+    expect(ids(order)).toEqual([ID(3), ID(2), ID(1)]);
   });
 
-  it("unknown Investability is never read as low", () => {
-    const keys = new Map([
-      [ID(1), key(8, null)],
-      [ID(2), key(8, 80)],
-      [ID(3), key(8, null)],
-    ]);
-    const order = orderByFit(base(3), keys);
-    // 80 (unknown: fit alone) ties 80 (known 80): the base rank decides.
-    expect(order.map((o) => o.companyId)).toEqual([ID(1), ID(2), ID(3)]);
-    expect(order.every((o) => o.internalScore === 0.8)).toBe(true);
+  it("the internal score is the fit alone", () => {
+    const keys = new Map([[ID(1), key(8, 100)]]);
+    expect(orderByFit(base(1), keys)[0]?.internalScore).toBe(0.8);
   });
 
   it("is deterministic", () => {
@@ -103,8 +98,6 @@ describe("discover order with Investability (fit-order.v2)", () => {
       [ID(2), key(7, 90)],
       [ID(3), key(5, 100)],
     ]);
-    const a = orderByFit(base(3), keys);
-    const b = orderByFit(base(3), keys);
-    expect(a).toEqual(b);
+    expect(orderByFit(base(3), keys)).toEqual(orderByFit(base(3), keys));
   });
 });

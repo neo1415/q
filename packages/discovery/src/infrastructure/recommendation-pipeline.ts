@@ -479,7 +479,7 @@ export function createRecommendationPipeline(
   const suppression = createProactiveSuppression({ signals });
   const fitOrdering = createFitOrdering({
     clock,
-    // fit-order.v2: Investability after explicit fit; Suitability recorded.
+    // fit-order.v5: Investability only among equal fits; Suitability recorded.
     investability:
       dependencies.investabilityMethodVersion === undefined
         ? () => Promise.resolve(new Map<string, number>())
