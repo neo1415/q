@@ -87,3 +87,12 @@ export const STRONG_REQUIRES = Object.freeze({
   ] as const satisfies readonly GradedDimension[]),
   minDimensionScore: 2.5,
 });
+
+/**
+ * Bühlmann credibility constant k in Z = n_eff / (n_eff + k) (JUDGMENT;
+ * Bühlmann credibility, SOA study note; Efron & Morris 1975 on shrinking
+ * small-sample means toward the group). k = 2: two fully verified facts
+ * (or four self-reported ones) earn half the distance from the stage norm.
+ * To be fitted as EPV/VHM once Capital Q has outcomes.
+ */
+export const CREDIBILITY_K = 2;

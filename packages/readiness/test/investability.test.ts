@@ -432,6 +432,33 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     expect(width(doc)).toBeLessThan(width(self));
   });
 
+  it("investiq/v3 credibility: the same facts verified move further from the norm", () => {
+    const deck = (evidenceStatus: DeckFact["evidenceStatus"]) =>
+      fullDeck(
+        Object.fromEntries(
+          DECK_SECTIONS.map((code) => [
+            code,
+            section(
+              code,
+              (fullDeck().find((x) => x.section === code)?.facts ?? []).map(
+                (f) => ({ ...f, evidenceStatus }),
+              ),
+            ),
+          ]),
+        ),
+      );
+    const self = assessInvestability(inputs({}, deck("SELF_REPORTED")), AS_OF)
+      .view.score;
+    const verified = assessInvestability(
+      inputs({}, deck("EXTERNALLY_VERIFIED")),
+      AS_OF,
+    ).view.score;
+    if (self === null || verified === null) throw new Error("unscored");
+    // Above the norm (50) in both; more evidence, more of the distance.
+    expect(self).toBeGreaterThan(50);
+    expect(verified).toBeGreaterThan(self);
+  });
+
   it("more recorded information never dilutes a strength", () => {
     const strong = assessInvestability(
       inputs({

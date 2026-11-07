@@ -20,7 +20,11 @@ import {
   type GradedDimension,
   type ReadinessBand,
 } from "../investiq/method-v1.js";
-import { STAGE_WEIGHTS_V3, STRONG_REQUIRES } from "../investiq/method-v3.js";
+import {
+  CREDIBILITY_K,
+  STAGE_WEIGHTS_V3,
+  STRONG_REQUIRES,
+} from "../investiq/method-v3.js";
 import {
   INVESTOR_ELIGIBLE_SCOPES,
   type InvestabilityInputs,
@@ -253,18 +257,23 @@ function hasMaterial(inputs: InvestabilityInputs): boolean {
  *                weight shared over the dimension's applicable criteria
  */
 /**
- * Credibility by how many factors are graded (not by evidence weight): one
- * graded factor cannot make a company Strong or Early on its own. The
- * graded mean's distance from the stage norm (2) counts in full from four
- * graded factors: z = min(1, n / 4).
+ * investiq/v3 credibility (Bühlmann): the graded mean's distance from the
+ * stage norm (2) is trusted in proportion to the evidence behind it,
+ *
+ *   n_eff = Σ evidence weight of each graded fact's deciding observation
+ *   Z     = n_eff / (n_eff + k),  k = CREDIBILITY_K (method-v3.ts)
+ *   point = 2 + Z × (raw − 2)
+ *
+ * so four self-reported facts (weight 0.5 each, n_eff 2) count half, and
+ * four verified ones (n_eff 4) two thirds. v2 used min(1, n / 3), which
+ * trusted three self-reported facts in full.
  */
-export const FULL_CREDIBILITY_FACTORS = 3;
-
 function pointEstimate(
   a: InvestIQV1Assessment,
-  graded: ReadonlySet<string>,
+  credibility: ReadonlyMap<string, number>,
   banded: boolean,
 ): number | null {
+  const graded = new Set(credibility.keys());
   // One weighting for every company, whatever the coverage gates say: a
   // graded fact counts by its dimension's stage weight shared over the
   // dimension's applicable criteria. The gates decide confidence and the
@@ -281,7 +290,16 @@ function pointEstimate(
   ).length;
   // Nothing content-graded: unknown, never the stage norm (metrics audit P0-2).
   if (n === 0) return null;
-  const z = Math.min(1, n / FULL_CREDIBILITY_FACTORS);
+  let nEff = 0;
+  for (const [key, weight] of credibility) {
+    const scored = a.dimensions.some((d) =>
+      d.criteria.some(
+        (c) => c.criterion === key && c.graded && c.state === "SCORED",
+      ),
+    );
+    if (scored) nEff += weight;
+  }
+  const z = nEff / (nEff + CREDIBILITY_K);
   return 2 + (raw - 2) * z;
 }
 
@@ -498,6 +516,10 @@ function viewOf(
     methodVersion: INVESTABILITY_METHOD_VERSION,
   };
   const viewSchema = InvestabilityDtoSchema.omit({ assessedAt: true });
+  // Each content-graded fact with the evidence weight of what decided it.
+  const credibility = new Map(
+    [...contentGraded].map((key) => [key, deciding.get(key) ?? 0] as const),
+  );
   const range = evidenceRange(a, deciding);
   const rangeAround = (score: number) =>
     range === null
@@ -542,7 +564,7 @@ function viewOf(
   ) {
     // Score and confidence are separate (lead 2026-10-16): the band says
     // where the score is; confidence says how far to trust it, and caps it.
-    const point = pointEstimate(a, contentGraded, true);
+    const point = pointEstimate(a, credibility, true);
     if (point === null) return insufficient();
     const score = Math.round(point * INVESTABILITY_SCALE);
     const confidence = overall.confidence ?? "LOW";
@@ -564,7 +586,7 @@ function viewOf(
   }
   // ADR 0075: a number when something is content-graded; a thin basis is
   // Low confidence and the band is held at Developing at most.
-  const provisional = pointEstimate(a, contentGraded, false);
+  const provisional = pointEstimate(a, credibility, false);
   if (provisional === null) return insufficient();
   const score = Math.round(provisional * INVESTABILITY_SCALE);
   const { band, capped } = cappedBand(
