@@ -30,7 +30,9 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   REHEARSALS: "/rehearsals",
   DOCUMENTS: "/documents",
   DAILY: "/daily",
-  RESULTS: "/results",
+  // Q Workspace W3: Results is the CRM's overview (/results redirects
+  // there); its real landing, so a move is verified where it lands.
+  RESULTS: "/relationships?view=overview",
   YOUR_COMPANIES: "/discover?tab=yours",
   WORK: "/work",
   // voice-cards: every remaining page and tab (Explore is never Discover).
@@ -66,6 +68,9 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   // Sweep 2026-10-29: the bare /mandate is resolved on the server (their
   // profile's mandate, or the setup that creates one).
   MANDATE: "/mandate",
+  // Q Workspace W3 (W4's gaps).
+  DISCOVER_FOUNDERS: "/discover?tab=founders",
+  SETTINGS_PLAN: "/settings/plan",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

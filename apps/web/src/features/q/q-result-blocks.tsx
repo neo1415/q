@@ -334,6 +334,8 @@ const DESTINATION_LABELS: Readonly<
   Q_PITCH: "Start Q Pitch",
   BOARD: "Open your board",
   MANDATE: "Open your mandate",
+  DISCOVER_FOUNDERS: "Open founders' videos",
+  SETTINGS_PLAN: "Open your plan",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

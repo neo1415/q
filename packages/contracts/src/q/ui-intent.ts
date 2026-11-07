@@ -187,6 +187,10 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "BOARD",
   // Sweep 2026-10-29: the investor's mandate, by its own name.
   "MANDATE",
+  // Q Workspace W3 (W4's gaps): a founder's Discover tab of founders'
+  // videos, and Settings' plan page.
+  "DISCOVER_FOUNDERS",
+  "SETTINGS_PLAN",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -224,6 +228,17 @@ export const QNavigateSectionIdSchema = z
   .string()
   .regex(/^[a-z][a-z0-9-]{0,39}$/u);
 
+/**
+ * Lane ov 2026-10-16: one section of a company profile's Overview (the
+ * founder profile's standard sections, `FOUNDER_PROFILE_SECTIONS` in
+ * @capital-q/founder-onboarding), by its key. An identifier, never text:
+ * the list itself is versioned there, so the contract bounds the shape and
+ * the browser follows only keys its own copy of the list has.
+ */
+export const QProfileSectionKeySchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]{0,47}$/u);
+
 /** A deck's slides are numbered from 1; the bound is a sanity limit. */
 export const Q_NAVIGATE_SLIDE_MAX = 500;
 
@@ -240,6 +255,14 @@ const QNavigateTargetDetailShape = {
   messageId: UuidSchema.optional(),
   /** One section of the page to scroll to and mark. */
   sectionId: QNavigateSectionIdSchema.optional(),
+  /**
+   * A part within the page's tab (`?sub=`): a company Overview section by
+   * its key ("raise", "financials") or a deck section by its code in
+   * lower case ("use_of_funds"). The page follows only keys its own list
+   * has. On a record page it stands in for the intent's own `section` /
+   * `subTab`, never beside them.
+   */
+  sub: QProfileSectionKeySchema.optional(),
   /** One item on the page (a Board item) to scroll to and mark. */
   itemId: UuidSchema.optional(),
   /** Where the page lands: its top, the section, or the latest entry. */
@@ -486,17 +509,6 @@ export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
   return false;
 }
 
-/**
- * Lane ov 2026-10-16: one section of a company profile's Overview (the
- * founder profile's standard sections, `FOUNDER_PROFILE_SECTIONS` in
- * @capital-q/founder-onboarding), by its key. An identifier, never text:
- * the list itself is versioned there, so the contract bounds the shape and
- * the browser follows only keys its own copy of the list has.
- */
-export const QProfileSectionKeySchema = z
-  .string()
-  .regex(/^[a-z][a-z0-9_]{0,47}$/u);
-
 /** An element id inside a Q Daily edition page (story or section). */
 export const QDailyAnchorSchema = z
   .string()
@@ -540,6 +552,16 @@ export const QOpenRecordPageIntentSchema = z
     {
       message: "a record page's tab is `tab`, not `target.tab`",
       path: ["target", "tab"],
+    },
+  )
+  .refine(
+    (intent) =>
+      intent.target?.sub === undefined ||
+      (intent.section === undefined && intent.subTab === undefined),
+    {
+      message:
+        "a part of the tab is `target.sub` or the intent's own, not both",
+      path: ["target", "sub"],
     },
   )
   .refine(

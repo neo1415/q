@@ -145,6 +145,26 @@ describe("W3.2 every deep link's path", () => {
       "/relationships?view=pipeline#section-pipeline",
     ],
     [{ page: "CAPITAL" }, "/relationships?view=capital"],
+    [
+      {
+        page: "COMPANY",
+        recordId: COMPANY,
+        tab: "overview",
+        sub: "financials",
+      },
+      `/company/${COMPANY}?tab=overview&sub=financials`,
+    ],
+    [
+      { page: "OWN_DECK", sub: "use_of_funds" },
+      "/company/data-room?tab=deck&sub=use_of_funds",
+    ],
+    [{ page: "DISCOVER_FOUNDERS" }, "/discover?tab=founders"],
+    [{ page: "SETTINGS_PLAN" }, "/settings/plan"],
+    [{ page: "RESULTS" }, "/relationships?view=overview"],
+    [
+      { page: "CAPITAL_ROUND", recordId: COMPANY },
+      `/relationships?view=capital&round=${COMPANY}#round-${COMPANY}`,
+    ],
   ] as const)("%o → %s", (target, path) => {
     expect(pathOf(target)).toBe(path);
   });

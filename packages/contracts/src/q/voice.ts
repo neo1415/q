@@ -798,6 +798,10 @@ export const Q_VOICE_DESTINATIONS = [
   // 18 s): an investor's mandate (/mandate, resolved on the server to their
   // profile's mandate, or the setup that creates one).
   "MANDATE",
+  // Q Workspace W3 (W4's gaps): a founder's Discover, investors' videos
+  // tab (/discover?tab=founders); Settings' plan page (/settings/plan).
+  "DISCOVER_FOUNDERS",
+  "SETTINGS_PLAN",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",
