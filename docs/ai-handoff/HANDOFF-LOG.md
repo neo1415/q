@@ -1932,6 +1932,36 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - root tsc 0;
   - eslint and prettier clean.
 
+## 2026-11-07 — Decision 75: q-nav to the labs gate. Fresh sealed held-out set, v5, code gaps (`feat/q-navigation-policy`)
+
+- **Fresh held-out set:**
+  - written by a separate author (a subagent that never saw the dev phrasing) from each place's purpose, never its title;
+  - 264 turns, every category on both sides, every reachable page and side covered;
+  - 4 sentences that matched dev were reworded before sealing;
+  - sealed: `heldout-seal.ts` holds the SHA-256, and a test fails on any change;
+  - the old held-out set (`heldout.ts`) is retired.
+- **NAVIGATION_DECISION v5** (schema 3):
+  - a reasoning procedure: their goal, then the place whose PURPOSE serves it (no word matching, no synonym tables);
+  - `alternative` replaces `sure`: code offers (guard TWO_PLACES) only when it resolves to a different place they may open;
+  - a listed record goes in record;
+  - viewing is not interest.
+  - v1–v4 are unchanged; v4's `sure` is still honoured.
+- **Code gaps:**
+  - a document named by title on a page whose record is a DOCUMENT is that record;
+  - a sub-route is its parent's section of the same id or the same TITLE (/settings/plan → billing).
+- **Dev fixes, documented:**
+  - voice "led your line" expects STAY (two names);
+  - voice "ask me" became "last say to me";
+  - no investor ACCESS case for "my GateQ applications" (to them it is their inbox).
+- **Gaps for W3:**
+  - QRecordTab has no "deal", so a relationship's deal tab cannot be a target (the author found it);
+  - Usage vs Work Cost vs billing overlap in purpose.
+- **Gates:**
+  - package build 55/55;
+  - vitest packages: 4936 passed;
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.
 ## 2026-11-07 07:10 UTC — batch 2 deployed (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 - CI 42344043063 on 64d51b965 was green, pgTAP included. The live notifications_kind_check was read first: 25 kinds, a strict subset of the new 27, and every stored kind is still allowed. Applied 20261231400000 then 20261231410000; hosted is now at 285.
@@ -1941,3 +1971,75 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Investor Analytics defaults visibility to "Only my organisation".
 - Owner decision 75, plus its amendment: q-nav understands people's own words with no keywords; 98% is the target, and if it plateaus the best result ships with wrong-page very low and forbidden at 0. W4 has the prompt (v5) and a fresh held-out set; W2 has the purposes.
 - Talent Q study, read-only: its navigation is keyword-first and about 50% correct on its own 20 navigate cases. Only its safety habits were passed to W4.
+
+## 2026-11-07 — Decision 75 dev round 2 (`feat/q-navigation-policy`)
+
+- **D75 r1** (v5, 00675884e): 500 turns, 86.0% pass, move-target 84.6%, wrong-page 1.0%, forbidden 0, $2.30. Receipt: `receipts/2026-11-07-qnav-d75-r1.json`.
+- **Root causes, by replaying every proposal:**
+  - Code:
+    - the model copies the digest's `id@tab` into sectionId, so the section fails (8);
+    - a thread route plus a redundant `messages` tab (3);
+    - a listed thing with no page of its own blocked the place (1).
+  - Prompt: `alternative` overused (about 30 OFFERs), often two parts of one page.
+  - Access: an other-side page swapped for a related own page (4). The model never saw the other side's places.
+- **Code fixes:**
+  - `id@tab` is read as the section on that tab;
+  - a tab the route already is gets dropped;
+  - a thing with `route: null` leaves the place it is listed on;
+  - an alternative on the same page and record is no second place, and two sections of one tab land on the tab;
+  - the site map variable ends with "ONLY THE OTHER SIDE HAS: titles". Titles their own side also has are excluded.
+- **NAVIGATION_DECISION v6:**
+  - an alternative only when both purposes leave it open, never parts of one page;
+  - a tab whose purpose serves the goal is named;
+  - the other side's places mean STAY;
+  - opensOn null.
+- **Dataset, documented:**
+  - W3's Analytics ask is side-neutral ("engagement"), since investors have no deck;
+  - the People search ask is "public web" (its purpose).
+- **Replaying r1's proposals:** code alone recovers 19 of 70.
+- **Gates:**
+  - vitest packages: 4940 passed;
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.
+
+## 2026-11-07 — Decision 75 dev round 3 (`feat/q-navigation-policy`)
+
+- **D75 r2** (v6, 37e5fcb): 500 turns, 94.4% pass, move-target 93.8%, wrong-page 0.8%, forbidden 0, ACCESS 100%, $2.32. Receipt: `receipts/2026-11-07-qnav-d75-r2.json`.
+- **The 4 wrong-page moves:**
+  - "Which investors are in my round?" went to Raise, not Investors. My r2 same-route rule let a sibling tab win. Now only two sections of one TAB count as one place; sibling tabs are an OFFER.
+  - "Find me 5 companies that fit my mandate" went to Discover. v7: a list Q is asked to make is made in chat.
+  - The Yoruba "open Harbour Angels' page" went to the relationship page. v7: someone's own page is their profile, and the relationship is where things stand between you.
+  - "Open today's Daily" went to /daily, which W2 describes as "Today's Q Daily", so it is right. Dataset fix: the founder's edition case is a dated edition.
+- **Other misses:**
+  - most predate W2 a4e3c5d (data-room "missing", Interest vs Analytics intent, the GateQ inbox), now merged;
+  - stray OFFERs from `sure`: schema 4 drops it;
+  - a question across several parts of one page now goes to the page (v7).
+- **Merged** integration with W3's deal tab f8b83c1 and W2 a4e3c5d.
+- **Gates:**
+  - vitest packages: 4942 passed (the seal is intact);
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.
+
+## 2026-11-07 — Decision 75 dev round 4, the last (`feat/q-navigation-policy`)
+
+- **D75 r3** (v7, 9d9207f): 500 turns, 93.0% pass, move-target 91.8%, wrong-page 0.4% (meets ≤0.5%), forbidden 0, $2.33. Receipt: `receipts/2026-11-07-qnav-d75-r3.json`.
+- **Over-corrections in r3:**
+  - the sibling-tab OFFER rule (Overview/Pipeline, Raise/Investors): kept for safety;
+  - the list rule: "Find startups that pass my gate" stayed although GateQ Find exists for exactly that. v8 refines it: a list composed to their spec is made in chat; a place made to show or find those things serves seeing them;
+  - `alternative` still given for places that share a topic. v8: only when their words leave two goals open.
+- **Code bug:** the leading-section rule took a tab's first section before the page's own, so the data room's `missing` was dropped (4 misses). Now the leading section is the first section shown there, or the section bearing the tab's id.
+- **Wrong-page, both r3 moves:**
+  - "Open what Q is doing" went to /work, not In progress;
+  - "What needs my attention" went to /work#approvals.
+  - Work's needs, progress and done are ONE decision scroll in the app (pageViewOf), so WORK ≡ WORK_NEEDS ≡ WORK_PROGRESS ≡ WORK_DONE as the same place (documented with the code cite; Team and Cost stay separate). For W2/W3: the site map lists them as tabs.
+- **Dataset, documented:**
+  - "who looked at my deck" (EN, FR) expects Analytics#viewers (W2's sections define it);
+  - the Analytics bank ask is page-level.
+- **Replay:** r3's proposals now pass 6 of 35 on code and data alone.
+- **Gates:**
+  - vitest packages: 4944 passed (the seal is intact);
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.

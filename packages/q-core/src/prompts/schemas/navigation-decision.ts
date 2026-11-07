@@ -122,6 +122,37 @@ export const NavigationDecisionResultV2Schema = z
     sure: z.boolean().optional().catch(undefined),
   })
   .strict();
+/**
+ * Schema version 3 (NAVIGATION_DECISION v5, owner decision 75):
+ * `alternative` is a second place, in the same shape as `place`, that
+ * would serve what they mean about as well. Code offers only when it
+ * resolves to a different place the person may open; otherwise the
+ * proposal stands. It replaces v4's `sure` (still read from v4 output).
+ */
+export const NAVIGATION_DECISION_SCHEMA_VERSION_3 = 3;
+export const NavigationDecisionResultV3Schema = z
+  .object({
+    ...NavigationDecisionResultV2Schema.shape,
+    alternative: NavigationPlaceSchema.nullable().optional().catch(undefined),
+  })
+  .strict();
 export type NavigationDecisionResult = z.infer<
-  typeof NavigationDecisionResultV2Schema
+  typeof NavigationDecisionResultV3Schema
 >;
+
+/**
+ * Schema version 4 (NAVIGATION_DECISION v7): v3 without `sure`, which the
+ * model still filled in now and then. `alternative` alone carries doubt.
+ * Parsed with the v3 schema in code (a superset), so nothing else changes.
+ */
+export const NAVIGATION_DECISION_SCHEMA_VERSION_4 = 4;
+export const NavigationDecisionResultV4Schema = z
+  .object({
+    decision: NavigationDecisionResultSchema.shape.decision,
+    place: NavigationDecisionResultSchema.shape.place,
+    back: NavigationDecisionResultSchema.shape.back,
+    askedForPage: NavigationDecisionResultSchema.shape.askedForPage,
+    reason: NavigationDecisionResultSchema.shape.reason,
+    alternative: NavigationDecisionResultV3Schema.shape.alternative,
+  })
+  .strict();

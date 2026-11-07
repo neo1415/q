@@ -515,9 +515,18 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
       none,
     );
 
-  it("gives the model W2's whole digest for the person's side", () => {
-    expect(navigationSiteMap("FOUNDER")).toBe(
-      qSiteMapDigest(Q_SITE_MAP, { side: "FOUNDER" }),
+  it("gives the model W2's whole digest for the person's side, then what only the other side has", () => {
+    const founder = navigationSiteMap("FOUNDER");
+    expect(
+      founder.startsWith(qSiteMapDigest(Q_SITE_MAP, { side: "FOUNDER" })),
+    ).toBe(true);
+    const others = founder.split("\n").at(-1) ?? "";
+    expect(others).toMatch(/^ONLY THE OTHER SIDE HAS/u);
+    expect(others).toContain("GateQ: Inbox");
+    // Each side has its own relationship pages: never listed as theirs only.
+    expect(others).not.toMatch(/\bMessages\b/u);
+    expect(navigationSiteMap("INVESTOR").split("\n").at(-1)).toContain(
+      "New pitch",
     );
   });
 
@@ -576,8 +585,12 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
     expect(
       at("/settings", { sectionId: "billing-history", position: "section" }),
     ).toBeNull();
-    // /settings/plan has no destination and shows no record.
-    expect(at("/settings/plan")).toBeNull();
+    // /settings/plan is the billing section of Settings (same title, v5).
+    expect(at("/settings/plan")).toEqual({
+      page: "SETTINGS",
+      sectionId: "billing",
+      position: "section",
+    });
     // A record on a page that shows none.
     expect(
       sitePlaceToTarget(
@@ -1061,5 +1074,202 @@ describe("q-nav round 3: unsure moves, sub-routes, their own data room", () => {
     expect(
       JSON.stringify(navigationVariables(input({ records }))),
     ).not.toContain(OWN);
+  });
+});
+
+describe("v5 (owner decision 75): a real second place, documents by title, sub-routes by title", () => {
+  it("offers only when the alternative resolves to a different place they may open", () => {
+    const target = { page: "WORK" } as const;
+    const policy = (
+      alternative: Parameters<typeof applyNavigationPolicy>[0]["alternative"],
+      canOpen: (page: string) => boolean = () => true,
+    ) =>
+      applyNavigationPolicy({
+        proposal: proposal({}),
+        resolution: { kind: "TARGET", target },
+        pane: pane(),
+        canOpen,
+        config: { movesAllowed: true },
+        alternative,
+      });
+    expect(policy({ kind: "TARGET", target: { page: "BOARD" } })).toMatchObject(
+      { decision: "OFFER", guard: "TWO_PLACES" },
+    );
+    // No rival, the same place, an unresolved or a closed one: it moves.
+    expect(policy(null).decision).toBe("MOVE");
+    expect(policy({ kind: "TARGET", target }).decision).toBe("MOVE");
+    expect(policy({ kind: "UNRESOLVED" }).decision).toBe("MOVE");
+    expect(
+      policy(
+        { kind: "TARGET", target: { page: "BOARD" } },
+        (p) => p !== "BOARD",
+      ).decision,
+    ).toBe("MOVE");
+  });
+
+  it("a document named by title on the documents page is that record", () => {
+    const records = {
+      ...input().records,
+      things: [{ id: CARD, title: "Diligence brief: Ledgerline" }],
+    };
+    expect(
+      resolveNavigationPlace(
+        proposal({
+          place: place({
+            route: "/documents",
+            document: "Diligence brief: Ledgerline",
+          }),
+        }),
+        input({ records }),
+      ),
+    ).toMatchObject({
+      kind: "TARGET",
+      target: { page: "DOCUMENT", recordId: CARD },
+    });
+  });
+
+  it("a sub-route is its parent's section of the same title", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/settings/plan",
+          tab: null,
+          sectionId: null,
+          slide: null,
+          position: null,
+        },
+        { recordId: null, documentId: null, itemId: null },
+      ),
+    ).toEqual({ page: "SETTINGS", sectionId: "billing", position: "section" });
+  });
+});
+
+describe("decision 75 round 2: the digest's notation, redundant tabs, records with no page, one page's parts", () => {
+  const at = (
+    route: string,
+    over: Partial<{
+      tab: string;
+      sectionId: string;
+      position: "section" | "latest";
+    }> = {},
+    recordId: string | null = null,
+  ) =>
+    sitePlaceToTarget(
+      {
+        route,
+        tab: over.tab ?? null,
+        sectionId: over.sectionId ?? null,
+        slide: null,
+        position: over.position ?? null,
+      },
+      { recordId, documentId: null, itemId: null },
+    );
+
+  it("reads the digest's id@tab as the section on that tab", () => {
+    expect(
+      at("/relationships", {
+        sectionId: "commitments@capital",
+        position: "section",
+      }),
+    ).toEqual({
+      page: "CAPITAL",
+      sectionId: "commitments",
+      position: "section",
+    });
+  });
+
+  it("drops a tab the route already is (the messages route)", () => {
+    expect(
+      at(
+        "/relationships/company/[companyId]/messages",
+        { tab: "messages", position: "latest" },
+        SILO,
+      ),
+    ).toEqual({
+      page: "RELATIONSHIP_COMPANY_MESSAGES",
+      recordId: SILO,
+      position: "latest",
+    });
+  });
+
+  it("a record with no page of its own leaves the place it is listed on", () => {
+    const records = {
+      ...input().records,
+      things: [{ id: CARD, title: "Our seed round", route: null }],
+    };
+    expect(
+      resolveNavigationPlace(
+        proposal({
+          place: place({
+            route: "/relationships",
+            record: { kind: "THING", name: "Our seed round" },
+            tab: "capital-raise",
+          }),
+        }),
+        input({ side: "FOUNDER", records }),
+      ),
+    ).toEqual({ kind: "TARGET", target: { page: "CAPITAL_RAISE" } });
+  });
+
+  it("two sections of one tab are no second place (their tab is the place); sibling tabs are", () => {
+    const move = (target: QNavigateTarget, other: QNavigateTarget) =>
+      applyNavigationPolicy({
+        proposal: proposal({}),
+        resolution: { kind: "TARGET", target },
+        pane: pane(),
+        canOpen: () => true,
+        config: { movesAllowed: true },
+        alternative: { kind: "TARGET", target: other },
+      });
+    expect(
+      move(
+        { page: "ANALYTICS", sectionId: "viewers", position: "section" },
+        { page: "ANALYTICS", sectionId: "deck-views", position: "section" },
+      ),
+    ).toMatchObject({ decision: "MOVE", target: { page: "ANALYTICS" } });
+    // Sibling tabs are separate places (round 3): a wrong tab is a wrong
+    // page, so two tabs that both fit are an offer, never a guess.
+    expect(move({ page: "CAPITAL" }, { page: "CAPITAL_RAISE" })).toMatchObject({
+      decision: "OFFER",
+      guard: "TWO_PLACES",
+    });
+    // On another page it is a real second place: an offer.
+    expect(move({ page: "BOARD" }, { page: "WORK" }).decision).toBe("OFFER");
+  });
+});
+
+describe("decision 75 round 4: the leading section is the first one shown", () => {
+  it("keeps a tab's later section when the page's own section leads (data room: missing)", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/company/data-room",
+          tab: "dataroom",
+          sectionId: "missing",
+          slide: null,
+          position: "section",
+        },
+        { recordId: null, documentId: null, itemId: null },
+      ),
+    ).toEqual({
+      page: "OWN_DATA_ROOM",
+      sectionId: "missing",
+      position: "section",
+    });
+  });
+
+  it("a section bearing its tab's id is the tab itself", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/company/[companyId]",
+          tab: "overview",
+          sectionId: "overview",
+          slide: null,
+          position: "section",
+        },
+        { recordId: SILO, documentId: null, itemId: null },
+      ),
+    ).toEqual({ page: "COMPANY", recordId: SILO, tab: "overview" });
   });
 });

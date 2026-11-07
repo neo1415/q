@@ -1,6 +1,8 @@
 import {
   applyNavigationPolicy,
-  resolveNavigationPlace,
+  listedRecordResolver,
+  resolveAlternative,
+  resolveNavigationPlaceWith,
   sameNavigationPlace,
   navigationSiteMap,
   targetToSitePlace,
@@ -161,10 +163,14 @@ export function navigationPipelineSubject(
         siteMap: navigationSiteMap(input.side),
       };
       const proposal = await propose(input, pipelineInput);
-      const resolution =
+      const resolver = listedRecordResolver(pipelineInput.records);
+      const [resolution, alternative] =
         proposal === null || proposal.decision === "STAY"
-          ? null
-          : resolveNavigationPlace(proposal, pipelineInput);
+          ? [null, null]
+          : await Promise.all([
+              resolveNavigationPlaceWith(proposal, pipelineInput, resolver),
+              resolveAlternative(proposal, pipelineInput, resolver),
+            ]);
       const outcome = applyNavigationPolicy({
         proposal,
         resolution,
@@ -172,6 +178,7 @@ export function navigationPipelineSubject(
         canOpen: (page) => sidesOf(page).includes(input.side),
         config,
         records: input.records,
+        alternative,
       });
       return {
         decision: outcome.decision,

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,6 +20,7 @@ import {
   type QNavReply,
   type QNavTarget,
 } from "../src/datasets/q-nav/index.js";
+import { Q_NAV_HELDOUT_SEAL } from "../src/datasets/q-nav/heldout-seal.js";
 import { canonicalTarget, gradeQNavTurn } from "../src/graders/q-nav.js";
 import {
   naiveReferenceProposer,
@@ -74,6 +77,17 @@ describe("Q-NAV dataset", () => {
       .flatMap((c) => c.turns.map((t) => t.user))
       .filter((user) => dev.has(user.toLowerCase()));
     expect(repeated).toEqual([]);
+  });
+
+  it("keeps the held-out split sealed: its cases hash to the recorded seal", () => {
+    const held = Q_NAV_DATASET.cases.filter((c) => c.split === "heldout");
+    expect({
+      sha256: createHash("sha256").update(JSON.stringify(held)).digest("hex"),
+      turns: turns(held),
+    }).toEqual({
+      sha256: Q_NAV_HELDOUT_SEAL.sha256,
+      turns: Q_NAV_HELDOUT_SEAL.turns,
+    });
   });
 
   it("is deterministic: built twice, the same cases", () => {

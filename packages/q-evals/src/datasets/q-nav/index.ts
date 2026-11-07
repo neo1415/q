@@ -16,7 +16,7 @@ import {
 } from "./contracts.js";
 import { coverage } from "./coverage.js";
 import { devCurveballs } from "./curveballs.js";
-import { heldoutCurveballs } from "./heldout.js";
+import { heldoutFresh } from "./heldout-fresh.js";
 import {
   destinationDef,
   Q_NAV_CONTRACT_PAGES,
@@ -52,9 +52,11 @@ export function buildQNavCases(): QNavCase[] {
   const dev = new CaseSet("dev");
   coverage(dev);
   devCurveballs(dev);
+  // The held-out split (owner decision 75): written fresh, by a separate
+  // author, from each place's purpose; sealed (heldout-seal.ts). The
+  // earlier held-out set was measured once and is retired.
   const heldout = new CaseSet("heldout");
-  coverage(heldout);
-  heldoutCurveballs(heldout);
+  heldoutFresh(heldout);
   return [...dev.out, ...heldout.out].map((c) => QNavCaseSchema.parse(c));
 }
 

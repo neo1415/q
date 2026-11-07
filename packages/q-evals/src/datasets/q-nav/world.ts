@@ -187,7 +187,7 @@ export type QNavRecords = {
   readonly things: readonly {
     readonly id: string;
     readonly title: string;
-    readonly route?: string;
+    readonly route?: string | null;
   }[];
   /** Their own company or firm, by name. */
   readonly own?: {
@@ -220,7 +220,8 @@ export const Q_NAV_RECORDS: QNavRecords = {
     return {
       id: t.id,
       title: t.title,
-      ...(place === null ? {} : { route: place.route }),
+      // Null: no page of its own (the round lives on Capital's raise tab).
+      route: place?.route ?? null,
     };
   }),
   deleted: [{ id: Q_NAV_DELETED_COMPANY.id, name: Q_NAV_DELETED_COMPANY.name }],

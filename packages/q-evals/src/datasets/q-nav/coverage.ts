@@ -143,9 +143,12 @@ const SETTINGS_WORDS: Readonly<Record<string, readonly [string, string]>> = {
  */
 // An investor's "visibility settings" are plainly their privacy settings
 // to a human (a page of theirs), so not a founder-only access question.
+// To an investor, "my GateQ applications" are the ones they received:
+// their inbox, a page of theirs (r3 report), not a founder-only question.
 const NO_ACCESS_CASE: readonly string[] = [
   "DISCOVER:FOUNDER",
   "COMPANY_VISIBILITY:INVESTOR",
+  "GATEQ_APPLICATIONS:INVESTOR",
 ];
 
 function destinations(cases: CaseSet): void {
@@ -538,10 +541,12 @@ function records(cases: CaseSet): void {
     ],
     [
       "FOUNDER",
-      "Open today's Daily.",
-      "What's in this morning's briefing?",
-      thing("DAILY_EDITION", "dailyToday"),
-      "One Daily edition.",
+      // Dataset fix (D75 r2): /daily is "Today's Q Daily", so today's
+      // edition is that page, not a record; one dated edition is.
+      "Pull up the Q Daily from 5 November.",
+      "What did the 5 November briefing say?",
+      thing("DAILY_EDITION", "dailyYesterday"),
+      "One dated Daily edition.",
     ],
     [
       "FOUNDER",
