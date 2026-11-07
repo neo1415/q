@@ -142,7 +142,8 @@ export function noticeOf(report: UiActReport): string | null {
           return "There's nothing ready to approve there yet.";
         case "NEVER":
           return "Q never does that for you. Moving money or signing is always yours to do.";
-        default:
+        case "UNCLASSIFIED":
+        case undefined:
           break;
       }
       return report.intent.act === "BACK"
