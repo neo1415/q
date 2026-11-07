@@ -339,3 +339,66 @@ describe("Q Workspace screen context and set_layout (W1/W4 via W3)", () => {
     );
   });
 });
+
+describe("W3 gaps for W4: sub, and the founders tab as a target", () => {
+  it("a target names a part of its tab by key", () => {
+    const intent = navigateTargetToIntent({
+      page: "COMPANY",
+      recordId: COMPANY,
+      tab: "overview",
+      sub: "financials",
+    });
+    expect(intent).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY",
+      id: COMPANY,
+      tab: "overview",
+      target: { sub: "financials" },
+    });
+    expect(
+      QNavigateIntentSchema.safeParse({
+        kind: "NAVIGATE",
+        destination: "OWN_DECK",
+        target: { sub: "use_of_funds" },
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([["Financials"], ["a b"], ["../x"], ["x".repeat(49)]])(
+    "refuses the sub %s",
+    (sub) => {
+      expect(
+        QNavigateTargetSchema.safeParse({ page: "OWN_DECK", sub }).success,
+      ).toBe(false);
+    },
+  );
+
+  it("sub never stands beside the intent's own section or sub-tab", () => {
+    expect(
+      QOpenRecordPageIntentSchema.safeParse({
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: COMPANY,
+        tab: "overview",
+        section: "raise",
+        target: { sub: "financials" },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("founders' Discover is DISCOVER at its founders tab; RESULTS still parses", () => {
+    expect(
+      navigateTargetToIntent({ page: "DISCOVER", tab: "founders" }),
+    ).toEqual({
+      kind: "NAVIGATE",
+      destination: "DISCOVER",
+      target: { tab: "founders" },
+    });
+    for (const destination of ["DISCOVER", "RESULTS"]) {
+      expect(
+        QNavigateIntentSchema.safeParse({ kind: "NAVIGATE", destination })
+          .success,
+      ).toBe(true);
+    }
+  });
+});

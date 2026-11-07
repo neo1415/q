@@ -155,7 +155,7 @@ describe("deep links (R2)", () => {
     );
     expect(recordPagePath("WORK_ITEM", id(9))).toBe(`/work/${id(9)}`);
     expect(recordPagePath("CAPITAL_ROUND", id(9))).toBe(
-      `/capital?round=${id(9)}#round-${id(9)}`,
+      `/relationships?view=capital&round=${id(9)}#round-${id(9)}`,
     );
     expect(recordPagePath("GATEQ_APPLICATION", id(9))).toBe(
       `/gateq?item=${id(9)}`,

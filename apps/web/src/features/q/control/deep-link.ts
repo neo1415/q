@@ -16,6 +16,7 @@ import { destinationPath } from "@/features/voice/destinations";
  *   ?message=<id>   the thread scrolls to that message and marks it
  *   ?item=<id>      the Board scrolls to that item and marks it
  *   ?tab=<key>      the page's own tab (an investor page's "looks-for")
+ *   ?sub=<key>      a part of that tab (an Overview section, a deck section)
  *   #section-<id>   the page scrolls to that QSection and marks it
  *   #latest         the page's latest entry (the end of a thread)
  *
@@ -43,6 +44,7 @@ export function withNavigateTarget(
   if (url.origin !== BASE) return path;
   const params = url.searchParams;
   if (target.tab !== undefined) params.set("tab", target.tab);
+  if (target.sub !== undefined) params.set("sub", target.sub);
   if (target.documentId !== undefined) {
     params.set("doc", target.documentId.toLowerCase());
   }
