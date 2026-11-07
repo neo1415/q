@@ -504,15 +504,14 @@ const BANKS: readonly {
 ];
 
 /**
- * Sections W2 says are not built (relayed 7 Nov): no page shows a
- * founder's deck views yet (the analytics page, A3). Listed so the lint
- * refuses them as a target: asking for one is a STAY.
+ * Sections not built yet, listed so the lint refuses them as a target.
+ * None now: deck views live on Analytics (batch 2, W3 8bbd707).
  */
 const PLANNED_SECTIONS: readonly (readonly [
   string,
   string,
   QNavSide | undefined,
-])[] = [["COMPANY_INTEREST", "deck-views", "FOUNDER"]];
+])[] = [];
 
 const BOTH: readonly QNavSide[] = ["INVESTOR", "FOUNDER"];
 const sidesOfAudience = (audience: string): readonly QNavSide[] =>
@@ -679,7 +678,8 @@ export const Q_NAV_RECORD_PAGES: readonly QNavRecordPageDef[] =
 
 /** Not a page of Capital Q (curveballs ask for them). */
 export const Q_NAV_NO_SUCH_PAGES = [
-  "the analytics dashboard",
+  // Not "the analytics dashboard": Analytics exists since batch 2.
+  "the token exchange",
   "the marketplace",
   "my wallet",
   "the leaderboard",

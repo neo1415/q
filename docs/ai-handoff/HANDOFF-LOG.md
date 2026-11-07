@@ -1914,3 +1914,20 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - root tsc 0;
   - eslint and prettier clean.
 - **Next:** held-out runs once on this SHA. The v5 `alternative` proposal and the dataset items in QNAV-R3-ROOT-CAUSES.md wait for the owner.
+
+## 2026-11-07 — q-nav dataset fix: deck views live on Analytics (batch 3)
+
+- **Merged** integration 64d51b965 (batch 2, with W3 8bbd707 ANALYTICS banks).
+- **Dataset correctness fix**, owner-approved, documented, no tuning and no prompt or code change:
+  - deck views now live on Analytics, so three former NO_SUCH_PAGE STAYs became MOVEs to ANALYTICS:
+    - dev "Who's looked at my deck this week?" (COVERAGE);
+    - dev French (NON_ENGLISH);
+    - held-out "Has anybody been reading our deck?" (COVERAGE);
+  - NO_SUCH_PAGE replacements for pages Capital Q does not have: 2 dev, 1 held-out;
+  - "the analytics dashboard" removed from Q_NAV_NO_SUCH_PAGES (it exists now), replaced by "the token exchange";
+  - the PLANNED deck-views section dropped (none planned now).
+- **Gates:**
+  - package build 55/55;
+  - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4932 passed (q-nav 15/15);
+  - root tsc 0;
+  - eslint and prettier clean.

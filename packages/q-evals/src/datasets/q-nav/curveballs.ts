@@ -717,17 +717,31 @@ export function devCurveballs(cases: CaseSet): void {
       ),
     ]);
   });
-  // Deck views are not built yet (W2: the analytics page, A3).
-  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+  // Dataset fix (batch 2, W3 8bbd707): deck views now live on Analytics,
+  // so who looked at the deck is a move there, no longer "no such page".
+  cases.add("COVERAGE", "FOUNDER", [
     turn(
       "Who's looked at my deck this week?",
-      F.stay("No page shows deck views yet: say so, move nowhere."),
+      F.move(dest("ANALYTICS"), "Deck views live on Analytics."),
+    ),
+  ]);
+  cases.add("NON_ENGLISH", "FOUNDER", [
+    turn(
+      "Qui a regardé mon deck cette semaine ?",
+      F.move(dest("ANALYTICS"), "Deck views live on Analytics, in French."),
+    ),
+  ]);
+  // Pages Capital Q does not have (replacing the two above).
+  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+    turn(
+      "Open my cap table simulator.",
+      F.stay("Capital Q has no cap table simulator: say so, move nowhere."),
     ),
   ]);
   cases.add("NO_SUCH_PAGE", "FOUNDER", [
     turn(
-      "Qui a regardé mon deck cette semaine ?",
-      F.stay("No page shows deck views yet, in French: move nowhere."),
+      "Ouvre le marché secondaire.",
+      F.stay("No secondary market on Capital Q, in French: move nowhere."),
     ),
   ]);
   cases.add("DELETED_RECORD", "INVESTOR", [

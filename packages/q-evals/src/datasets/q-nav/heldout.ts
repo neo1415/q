@@ -468,11 +468,18 @@ export function heldoutCurveballs(cases: CaseSet): void {
       turn(`Can you take me to ${name}?`, side(s).stay("No such page.")),
     ]);
   });
-  // Deck views are not built yet (W2: the analytics page, A3).
-  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+  // Dataset fix (batch 2, W3 8bbd707): deck views now live on Analytics.
+  cases.add("COVERAGE", "FOUNDER", [
     turn(
       "Has anybody been reading our deck?",
-      F.stay("No page shows deck views yet: say so, move nowhere."),
+      F.move(dest("ANALYTICS"), "Deck views live on Analytics."),
+    ),
+  ]);
+  // A page Capital Q does not have (replacing the one above).
+  cases.add("NO_SUCH_PAGE", "FOUNDER", [
+    turn(
+      "Could you bring up the investor auction room?",
+      F.stay("No such page: say so, move nowhere."),
     ),
   ]);
   cases.add("DELETED_RECORD", "INVESTOR", [
