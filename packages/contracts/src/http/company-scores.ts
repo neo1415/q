@@ -161,6 +161,14 @@ export type InvestabilityDto = z.infer<typeof InvestabilityDtoSchema>;
  * (metrics audit P1-6: the label said v1 over v2 arithmetic), e.g.
  * `investiq/v2+investability-inputs.v5` -> "FDN InvestIQ v2".
  */
+/**
+ * The Investability method new assessments are recorded under, for
+ * surfaces that cannot import the scoring package (the browser). The
+ * readiness package's INVESTABILITY_METHOD_VERSION must equal it (tested).
+ */
+export const INVESTABILITY_CURRENT_METHOD_VERSION =
+  "investiq/v3+investability-inputs.v5";
+
 export function investabilityMethodLabel(methodVersion: string): string {
   const major = /^investiq\/v(\d+)/u.exec(methodVersion)?.[1];
   return major === undefined ? "FDN InvestIQ" : `FDN InvestIQ v${major}`;

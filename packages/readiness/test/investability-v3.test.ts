@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { INVESTABILITY_CURRENT_METHOD_VERSION } from "@capital-q/contracts";
+
 import type { InvestIQV1Assessment } from "../src/investiq/assess-v1.js";
 import {
   INVESTIQ_V2_ARITHMETIC,
@@ -29,6 +31,10 @@ describe("Investability investiq/v3", () => {
   it("is the current method, and every stage's weights sum to 100", () => {
     expect(INVESTABILITY_METHOD_VERSION).toBe(
       "investiq/v3+investability-inputs.v5",
+    );
+    // The browser-safe copy in contracts never drifts from the scorer.
+    expect(INVESTABILITY_CURRENT_METHOD_VERSION).toBe(
+      INVESTABILITY_METHOD_VERSION,
     );
     for (const stage of STAGE_BANDS) {
       const sum = GRADED_DIMENSIONS.reduce(
