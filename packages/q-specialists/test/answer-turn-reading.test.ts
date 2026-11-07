@@ -1716,7 +1716,7 @@ describe("a general turn is read before it is answered", () => {
           discover: null,
           subject: null,
         },
-      },
+      } as TurnReaderResult,
       outcomes: [],
     });
     await answer.answer(request());
