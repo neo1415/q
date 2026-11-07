@@ -38,7 +38,7 @@ The sources, with links, are in [SOURCES.md](SOURCES.md).
 
 **Purpose.** How investable the company looks from the evidence investors can see, at its stage. It answers "how strong and how ready is this company, as far as the evidence shows?" It does not say how well the company fits a given investor; Suitability answers that.
 
-**Version.** `investiq/v3+investability-inputs.v5`. Grading version: `investability-grading.v2`.
+**Version.** `investiq/v3+investability-inputs.v6`. Grading version: `investability-grading.v2`.
 
 ### Equation
 
@@ -69,6 +69,19 @@ Evidence weights e_c, which come from the evidence status of the deciding observ
 | Several sources         | 0.85 |
 | Verified                | 1    |
 | Q's unconfirmed reading | 0.25 |
+
+### Its two parts (owner decision 78, PADL #060–#062)
+
+Under the headline number, each part is scored by the same equation, the same credibility and the same caps, but over its own dimensions only:
+
+| Part                     | Plain sentence shown                                                                      | Dimensions                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| **Business quality**     | "How strong the business looks: the team, the product and market, traction and finances." | Team, Fundamentals, Commercial, Financial     |
+| **Investment readiness** | "How prepared it is for investors: governance, legal basics, the raise and diligence."    | Governance, Legal, Investment case, Diligence |
+
+A part with no graded evidence has no number. It reads "N of M factors on record, not enough to grade yet", or "Nothing shared yet". Readiness facts are mostly only on record today, not graded against a stage benchmark, so Investment readiness will often show the count. That is honest: presence alone never scores (audit P0-2).
+
+The parts are recorded from `investability-inputs.v6` on; older assessments show no parts. Code: `partOf` in `packages/readiness/src/investability/assess.ts`; `INVESTABILITY_PARTS` and `investabilityPartLines` in `packages/contracts/src/http/company-scores.ts`.
 
 ### Inputs and their sources in our data
 
