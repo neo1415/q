@@ -3,6 +3,7 @@ import {
   listedRecordResolver,
   sameNavigationPlace,
   navigationSiteMap,
+  situationHeader,
   targetToSitePlace,
   type QNavigationInput,
   type QNavigationPolicyConfig,
@@ -180,6 +181,7 @@ export function navigationPipelineSubject(
         pageText: input.context.pageText,
         records: input.records,
         siteMap: navigationSiteMap(input.side),
+        situation: evalSituation(input),
       };
       // The production pipeline itself: decide (voted), resolve, policy.
       const outcome = await decideNavigation(
@@ -205,6 +207,50 @@ export function navigationPipelineSubject(
       };
     },
   };
+}
+
+/**
+ * The situation production gives the decision (situationHeader, W3's
+ * FOCUS), from the turn's own synthetic world: their side, a founder's own
+ * company as theirs, and the record on the page pane by name. A fixed
+ * date, so a run is reproducible.
+ */
+function evalSituation(input: QNavDecisionInput): string {
+  const at = input.context.at;
+  const company = input.records.companies.find((c) => c.id === at.recordId);
+  const investor = input.records.investors.find((i) => i.id === at.recordId);
+  const own = input.records.own;
+  return situationHeader({
+    now: new Date("2026-11-06T09:00:00.000Z"),
+    asker: {
+      displayName: null,
+      role: input.side,
+      organisation: own?.name ?? null,
+      timeZone: null,
+      ...(own === undefined
+        ? {}
+        : {
+            own: {
+              kind: "COMPANY" as const,
+              city: null,
+              country: null,
+              website: null,
+            },
+          }),
+      ...(company !== undefined
+        ? { onScreen: { kind: "COMPANY" as const, name: company.name } }
+        : investor !== undefined
+          ? {
+              onScreen: {
+                kind: "INVESTOR_ORGANISATION" as const,
+                name: investor.name,
+              },
+            }
+          : {}),
+    },
+    surface: "DOCK",
+    page: null,
+  });
 }
 
 /** The place said back by names, as the model would (never an id). */

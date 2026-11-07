@@ -100,6 +100,13 @@ export type QNavigationInput = {
   readonly pageText: string | null;
   readonly records: QNavigationRecords;
   readonly siteMap: string;
+  /**
+   * Batch 7 replay: the one situation every reader and answer gets (W3's
+   * FOCUS, situationHeader): who they are, their own organisation, the
+   * record on their screen by name, and how me/my and their/it resolve.
+   * Absent: not known.
+   */
+  readonly situation?: string | undefined;
 };
 
 /** The decision after resolution and policy: what the page pane does. */
@@ -656,6 +663,10 @@ export function navigationVariables(
     pageText: (input.pageText ?? "").slice(0, 1_200),
     records: JSON.stringify(records).slice(0, 6_000),
     side: input.side,
+    situation: (input.situation ?? "Nothing is known about them.").slice(
+      0,
+      1_600,
+    ),
   };
 }
 
@@ -1417,6 +1428,12 @@ export function createQPageMoves(dependencies: {
     ((request: QAnswerRequest) => QNavigationRecordResolver) | undefined;
   readonly map?: QSiteMap | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * The run's situation (situationHeader, W3's FOCUS), read as the person
+   * beside their records; absent or failed: the decision is told nothing.
+   */
+  readonly situation?:
+    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
   /** How long a settled answer waits for a decision still running. */
   readonly settleWithinMs?: number | undefined;
 }): QPageMovePort {
@@ -1429,9 +1446,11 @@ export function createQPageMoves(dependencies: {
       if (workspace === undefined || pending.has(request.runId)) return;
       const side = sideOfRequest(request);
       const decided = (async () => {
-        const records =
-          (await dependencies.records?.(request).catch(() => null)) ??
-          NO_RECORDS;
+        const [listed, situation] = await Promise.all([
+          dependencies.records?.(request).catch(() => null),
+          dependencies.situation?.(request).catch(() => null),
+        ]);
+        const records = listed ?? NO_RECORDS;
         const input: QNavigationInput = {
           utterance: turn.utterance,
           recentTurns: turn.recentTurns,
@@ -1440,6 +1459,7 @@ export function createQPageMoves(dependencies: {
           pageText: turn.pageText,
           records,
           siteMap: navigationSiteMap(side, map),
+          ...(situation == null ? {} : { situation }),
         };
         return decideNavigation(
           {

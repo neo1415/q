@@ -12233,6 +12233,36 @@ export {
  * R2 (owner live 7 Nov): the record on their screen, by id, as the firewall
  * passed it on -- what the situation port may name for them.
  */
+/**
+ * The run's situation exactly as the answer builds it (step 1, with W3's
+ * FOCUS: who they are, their own organisation, the record on their screen
+ * by name, how pointing words resolve). Batch 7 replay: the page-move
+ * decision reads this same block, never a second notion of focus.
+ */
+export async function runSituation(
+  request: QAnswerRequest,
+  situationOf: QSituationPort | undefined,
+  now: Date = new Date(),
+): Promise<string> {
+  const asker =
+    situationOf === undefined
+      ? null
+      : await situationOf(
+          request.actor,
+          screenIdsOf(request.plan.screen),
+        ).catch(() => null);
+  return situationHeader({
+    now,
+    asker,
+    deviceTimeZone: request.plan.screen?.timeZone,
+    surface: situationSurfaceOf(
+      request.spoken === true,
+      request.plan.screen?.surface,
+    ),
+    page: request.plan.screen?.route ?? null,
+  });
+}
+
 function screenIdsOf(
   screen:
     | {

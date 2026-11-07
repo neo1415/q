@@ -256,6 +256,7 @@ import { NAVIGATION_DECISION_V6 } from "./tasks/navigation-decision.v6.js";
 import { NAVIGATION_DECISION_V7 } from "./tasks/navigation-decision.v7.js";
 import { NAVIGATION_DECISION_V8 } from "./tasks/navigation-decision.v8.js";
 import { NAVIGATION_DECISION_V9 } from "./tasks/navigation-decision.v9.js";
+import { NAVIGATION_DECISION_V10 } from "./tasks/navigation-decision.v10.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -935,7 +936,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...NAVIGATION_DECISION_V6, status: "DEPRECATED" },
     { ...NAVIGATION_DECISION_V7, status: "DEPRECATED" },
     { ...NAVIGATION_DECISION_V8, status: "DEPRECATED" },
-    NAVIGATION_DECISION_V9,
+    { ...NAVIGATION_DECISION_V9, status: "DEPRECATED" },
+    NAVIGATION_DECISION_V10,
     BRIEFING_COMMAND_V1,
     GATEQ_DOSSIER_SYNTHESIS_V1,
   ];

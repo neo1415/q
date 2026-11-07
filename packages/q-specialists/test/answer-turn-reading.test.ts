@@ -1415,6 +1415,30 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.stored[0]?.blocks ?? []).toEqual([]);
   });
 
+  it("batch 7 replay #7: in the Q Workspace a record's tab the reader cannot name is never said not to exist; the decision places it", async () => {
+    const run = seam({
+      said: "can i see their elevator",
+      // The reader names only their own destinations: a company's
+      // Elevator tab reads to it as a screen Capital Q does not have.
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: null,
+        unknownScreen: { named: "elevator", nearest: "Q_PITCH" },
+        visibility: null,
+      }),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+    });
+    await run.answer.answer(
+      request({
+        route: "COMPANY",
+        workspace: { qPane: "open", pagePane: "open", at: "/home" },
+      }),
+    );
+    expect(run.delegated()).toBe(1);
+    for (const message of run.stored)
+      expect(message.content).not.toMatch(/doesn't have/u);
+  });
+
   it("a named record read as an unknown screen goes to the answer, which can open it (founder report 2026-09-30)", async () => {
     const run = seam({
       said: "open my chat with young field agro",
