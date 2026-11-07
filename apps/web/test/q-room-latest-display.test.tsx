@@ -389,6 +389,18 @@ describe("the same display twice (owner, new voice chat, 2026-10-17)", () => {
     await waitFor(() =>
       expect(view.container.querySelector("[data-q-canvas]")).toBeNull(),
     );
+    // The set flies to the Board first (q-presence-stage `leaving`, up to
+    // LEAVING_MAX_MS, behind a dynamic import): Q's presence is not drawn
+    // until it lands. Waiting only for the canvas raced that import under
+    // a loaded full run; the end state asserted below is unchanged.
+    await waitFor(
+      () =>
+        expect(
+          view.container.querySelector("[data-q-canvas-leaving]"),
+        ).toBeNull(),
+      { timeout: 5_000 },
+    );
+    expect(view.container.querySelector("[data-q-canvas]")).toBeNull();
     expect(view.getByTestId("aperture").dataset.compact).toBe("false");
   });
 });
