@@ -68,6 +68,8 @@ describe("investor onboarding v3 on the web", () => {
     expect(isSupportedVersion(view(3))).toBe(true);
     // v4 (DECISIONS 79): the mandatory set and the firm's country.
     expect(isSupportedVersion(view(4))).toBe(true);
-    expect(isSupportedVersion(view(5))).toBe(false);
+    // v5 (batch 7): every list mandatory, the firm's description.
+    expect(isSupportedVersion(view(5))).toBe(true);
+    expect(isSupportedVersion(view(6))).toBe(false);
   });
 });

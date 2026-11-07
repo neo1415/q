@@ -19,9 +19,9 @@ function displayHost(url: string): string {
 }
 
 /**
- * Name first; website optional; the country searched by name among every
+ * Name first; the website; the country searched by name among every
  * country of the one canonical list (founder v8), with the browser's own
- * suggestions as they type.
+ * suggestions as they type; then (v10) the city and the year founded.
  */
 export function CompanyBasicsStep({
   step,
@@ -37,6 +37,11 @@ export function CompanyBasicsStep({
     step.response?.name === undefined && registered !== null;
   const [name, setName] = useState(step.response?.name ?? registered ?? "");
   const [website, setWebsite] = useState(step.response?.website ?? "");
+  const [city, setCity] = useState(step.response?.city ?? "");
+  const [foundedYear, setFoundedYear] = useState(
+    step.response?.foundedYear ?? "",
+  );
+  const [yearError, setYearError] = useState<string | undefined>(undefined);
   const language = useUiLanguage();
   // Each country in the reader's language (Arabic from the platform's
   // ICU names), the canonical English name otherwise.
@@ -78,11 +83,24 @@ export function CompanyBasicsStep({
       setCountryError(t("Choose a country from the list."));
       return;
     }
+    const year = foundedYear.trim();
+    if (
+      step.asksCityAndYear &&
+      year.length > 0 &&
+      (!/^\d{4}$/u.test(year) || Number(year) > new Date().getFullYear())
+    ) {
+      setYearError(t("Enter the year, like 2021."));
+      return;
+    }
     void actions.submit({
       kind: "company_basics",
       name: trimmed,
       ...(website.trim().length > 0 ? { website: website.trim() } : {}),
       ...(countryCode === undefined ? {} : { countryCode }),
+      ...(step.asksCityAndYear && city.trim().length > 0
+        ? { city: city.trim() }
+        : {}),
+      ...(step.asksCityAndYear && year.length > 0 ? { foundedYear: year } : {}),
     });
   }
 
@@ -115,7 +133,7 @@ export function CompanyBasicsStep({
       <Input
         id="company-website"
         label={t("Website")}
-        description={t("Optional. Q can read a website later to fill gaps.")}
+        description={t("No website yet? Leave it empty; that's fine.")}
         type="text"
         inputMode="url"
         autoComplete="url"
@@ -149,7 +167,7 @@ export function CompanyBasicsStep({
       <Input
         id="company-country"
         label={t("Where is the company based?")}
-        description={t("Optional for now. Search for the country.")}
+        description={t("Search for the country.")}
         placeholder={t("Choose a country")}
         list="company-country-options"
         autoComplete="country-name"
@@ -166,6 +184,32 @@ export function CompanyBasicsStep({
           <option key={country.value} value={country.label} />
         ))}
       </datalist>
+      {step.asksCityAndYear ? (
+        <>
+          <Input
+            id="company-city"
+            label={t("City")}
+            autoComplete="address-level2"
+            value={city}
+            disabled={busy}
+            onChange={(event) => setCity(event.target.value)}
+          />
+          <Input
+            id="company-founded-year"
+            label={t("Year founded")}
+            inputMode="numeric"
+            placeholder="2021"
+            maxLength={4}
+            value={foundedYear}
+            disabled={busy}
+            error={yearError}
+            onChange={(event) => {
+              setFoundedYear(event.target.value);
+              setYearError(undefined);
+            }}
+          />
+        </>
+      ) : null}
     </form>
   );
 }

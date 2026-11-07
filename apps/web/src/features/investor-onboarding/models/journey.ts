@@ -10,9 +10,11 @@ import {
   GEOGRAPHY_VOCABULARIES,
   INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DEFINITION_CURRENT,
-  INVESTOR_DEFINITION_V4_VERSION,
+  INVESTOR_DEFINITION_V5_VERSION,
   INVESTOR_DEFINITION_VERSION,
   INVESTOR_HQ_COUNTRY_STEP,
+  INVESTOR_NONE_STEPS,
+  INVESTOR_PUBLIC_DESCRIPTION_STEP,
   INVESTOR_WEBSITE_STEP,
   INVESTOR_STEPS,
   InvestorHandoffContextSchema,
@@ -21,6 +23,7 @@ import {
   PERSONAL_INVESTING_WORKSPACE,
   SECTOR_VOCABULARIES,
 } from "@capital-q/investor-onboarding/definition";
+import { NONE_ANSWER_TEXT } from "@capital-q/onboarding/response-values";
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
 
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
@@ -66,6 +69,7 @@ export type GroupId =
   | "portfolio"
   | "discovery"
   | "inbound"
+  | "description"
   | "context"
   | "review"
   | "handoff";
@@ -206,6 +210,15 @@ export const GROUPS: readonly Group[] = [
     stepKeys: [S.inboundPreference],
   },
   {
+    // v5 (batch 7): the firm's description, as the profile shows it. A
+    // session pinned to v1-v4 has no such step, so the screen is passed over.
+    id: "description",
+    kind: "narrative",
+    section: "review",
+    title: "How would you describe your firm to a founder?",
+    stepKeys: [INVESTOR_PUBLIC_DESCRIPTION_STEP],
+  },
+  {
     id: "context",
     kind: "narrative",
     section: "review",
@@ -289,13 +302,14 @@ function runtimeState(view: OnboardingSessionView): RuntimeState {
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
   // v1, v2 (the firm's website on the role screen), v3 ("Not sure yet"
   // on the deployment status, an option the step's own list carries) and
-  // v4 (the mandatory set and the firm's country, its own screen). A later
-  // version may add a step this build has no screen for, so it is refused
-  // honestly.
+  // v4 (the mandatory set and the firm's country, its own screen) and v5
+  // (every list mandatory, "None" answers it; the firm's description, its
+  // own screen). A later version may add a step this build has no screen
+  // for, so it is refused honestly.
   const version = view.session.definitionVersion;
   return (
     version >= INVESTOR_DEFINITION_VERSION &&
-    version <= INVESTOR_DEFINITION_V4_VERSION
+    version <= INVESTOR_DEFINITION_V5_VERSION
   );
 }
 
@@ -613,6 +627,7 @@ function buildStep(
       };
     }
     case "portfolio":
+    case "description":
     case "context": {
       const key = group.stepKeys[0];
       const { configuration } = config(key);
@@ -990,6 +1005,27 @@ function movedBetweenBuckets(
 }
 
 export function planSubmissions(
+  group: JourneyGroup,
+  response: StepResponse,
+  view?: OnboardingSessionView,
+): readonly Submission[] {
+  const planned = plannedSubmissions(group, response, view);
+  // v5 (batch 7): every list is mandatory, and a list left empty on the
+  // form has nothing in it for them: "None", an answer holding no value
+  // (never skipped, which the runtime refuses for a required step).
+  if (
+    (view?.session?.definitionVersion ?? 0) < INVESTOR_DEFINITION_V5_VERSION
+  ) {
+    return planned;
+  }
+  return planned.map((submission) =>
+    submission.action === "skip" && INVESTOR_NONE_STEPS.has(submission.stepKey)
+      ? submit(submission.stepKey, { type: "TEXT", text: NONE_ANSWER_TEXT })
+      : submission,
+  );
+}
+
+function plannedSubmissions(
   group: JourneyGroup,
   response: StepResponse,
   view?: OnboardingSessionView,

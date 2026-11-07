@@ -10,7 +10,7 @@ import {
   type OnboardingStepProgressStatus,
 } from "@capital-q/contracts";
 import type { FOUNDER_DEFINITION_V1 } from "@capital-q/founder-onboarding/definition";
-import { isNotKnownAnswer } from "@capital-q/onboarding/response-values";
+import { holdsNoValue } from "@capital-q/onboarding/response-values";
 
 import { OnboardingClientError, type TaxonomyCandidateView } from "./client";
 import type { RuntimePort } from "./runtime-port";
@@ -121,6 +121,8 @@ export function multi(state: FixtureState, key: string) {
 }
 export function text(state: FixtureState, key: string) {
   const v = state.responses[key];
+  // "I don't know" and "None" hold no words, as on the server.
+  if (holdsNoValue(v)) return undefined;
   return v?.type === "TEXT" ? v.text : undefined;
 }
 export function range(state: FixtureState, key: string) {
@@ -230,7 +232,11 @@ function evaluate(
 ): boolean {
   switch (expression.op) {
     case "EXISTS":
-      return snapshot.has(expression.stepKey);
+      // As on the server: "I don't know" or "None" opens no follow-up.
+      return (
+        snapshot.has(expression.stepKey) &&
+        !holdsNoValue(snapshot.get(expression.stepKey))
+      );
     case "EQUALS": {
       const value = snapshot.get(expression.stepKey);
       return value === undefined
@@ -611,10 +617,10 @@ export function createFixtureRuntime(
         );
       }
       const step = eligibleStep(stepKey);
-      // "I don't know" answers any question but a confirmation, as on the
-      // server (DECISIONS 79): it holds no value.
+      // "I don't know" and "None" answer any question but a confirmation,
+      // as on the server (DECISIONS 79): they hold no value.
       if (
-        isNotKnownAnswer(value) &&
+        holdsNoValue(value) &&
         step.configuration.stepType !== "confirmation"
       ) {
         persist(

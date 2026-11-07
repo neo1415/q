@@ -86,8 +86,8 @@ describe("investor journey over the runtime contract", () => {
     });
     const view = await port.start("00000000-0000-4000-8000-000000000001");
     expect(() => OnboardingSessionViewSchema.parse(view)).not.toThrow();
-    // v4 (DECISIONS 79): the mandatory set and the firm's country.
-    expect(view.session.definitionVersion).toBe(4);
+    // v5 (batch 7): every list mandatory, and the firm's description.
+    expect(view.session.definitionVersion).toBe(5);
     expect(view.session.currentStepKey).toBe(INVESTOR_STEPS.investorType);
     const presented = toPresentation(view, SOURCE);
     expect(presented.sections.map((s) => s.id)).toEqual([
@@ -112,6 +112,7 @@ describe("investor journey over the runtime contract", () => {
       "portfolio",
       "discovery",
       "inbound",
+      "description",
       "context",
       "review",
       "handoff",
@@ -253,6 +254,15 @@ describe("investor journey over the runtime contract", () => {
       stepId: "inbound",
       response: { kind: "choice", value: "qualified" },
     });
+    // v5: the firm's description, as the profile shows it.
+    session = await investor.saveResponse({
+      stepId: "description",
+      response: {
+        kind: "narrative",
+        text: "Northbank backs early fintech in West Africa.",
+      },
+    });
+    expect(session.currentStepId).toBe("context");
     session = await investor.skipStep({ stepId: "context" });
 
     // I11: a deterministic projection of what was declared, and nothing else.
@@ -609,11 +619,42 @@ describe("investor journey over the runtime contract", () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 5 } };
+          : { ...view, session: { ...view.session, definitionVersion: 6 } };
       },
     };
     await expect(
       createRuntimeInvestorClient(v4, SOURCE).getSession(),
     ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
+  });
+});
+
+describe("investor v5 on the form (batch 7)", () => {
+  const viewAt = (definitionVersion: number) =>
+    ({ session: { definitionVersion } }) as Parameters<
+      typeof planSubmissions
+    >[2];
+
+  it('a list left empty is "None" on v5, never a skip the runtime refuses; v4 still skips it', () => {
+    const attributes = requireGroup("attributes");
+    const response = {
+      kind: "attributes" as const,
+      businessModelIds: [],
+      customerTypeIds: [],
+      capitalIntensity: "capital_light",
+    };
+    const v5 = planSubmissions(attributes, response, viewAt(5));
+    expect(v5.find((s) => s.stepKey === INVESTOR_STEPS.customerTypes)).toEqual({
+      stepKey: INVESTOR_STEPS.customerTypes,
+      action: "submit",
+      value: { type: "TEXT", text: "None" },
+    });
+    expect(
+      v5.find((s) => s.stepKey === INVESTOR_STEPS.capitalIntensity),
+    ).toMatchObject({ action: "submit" });
+    const v4 = planSubmissions(attributes, response, viewAt(4));
+    expect(v4.find((s) => s.stepKey === INVESTOR_STEPS.customerTypes)).toEqual({
+      stepKey: INVESTOR_STEPS.customerTypes,
+      action: "skip",
+    });
   });
 });

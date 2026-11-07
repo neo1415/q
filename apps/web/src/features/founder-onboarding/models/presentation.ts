@@ -81,6 +81,12 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
     name: z.string().min(1).max(120),
     website: z.string().max(200).optional(),
     countryCode: z.string().min(2).max(8).optional(),
+    // v10 (batch 7): asked with the country.
+    city: z.string().max(120).optional(),
+    foundedYear: z
+      .string()
+      .regex(/^\d{4}$/u)
+      .optional(),
   }),
   z.object({
     kind: z.literal("taxonomy_select"),
@@ -205,6 +211,8 @@ export type StepView =
        * as a one-tap fill, never entered for them (founder live 2026-10-05).
        */
       readonly suggestedWebsite?: string | undefined;
+      /** v10 onward: the city and founding year are asked on this screen. */
+      readonly asksCityAndYear?: boolean | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "company_basics" }> | undefined;
     })

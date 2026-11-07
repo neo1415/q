@@ -567,3 +567,40 @@ describe("the website Q found (founder live 2026-10-05)", () => {
     ).toBeUndefined();
   });
 });
+
+describe("founder v10 on the form (batch 7)", () => {
+  const viewWith = (keys: readonly string[]) =>
+    ({
+      session: { definitionVersion: 10 },
+      progress: { eligibleSteps: keys.map((stepKey) => ({ stepKey })) },
+    }) as unknown as Parameters<typeof planSubmissions>[2];
+  const basics = GROUPS.find((g) => g.id === "company_basics");
+
+  it("sends the city and the founding year with the country, only where the journey asks them", () => {
+    if (basics === undefined) throw new Error("no company screen");
+    const response = {
+      kind: "company_basics" as const,
+      name: "Granary",
+      countryCode: "PL",
+      city: "Lublin",
+      foundedYear: "2021",
+    };
+    const v10 = planSubmissions(
+      basics,
+      response,
+      viewWith(["F1.company_name", "F1.city", "F1.founded_year"]),
+    );
+    expect(v10.find((s) => s.stepKey === "F1.city")).toEqual({
+      stepKey: "F1.city",
+      action: "submit",
+      value: { type: "TEXT", text: "Lublin" },
+    });
+    expect(v10.find((s) => s.stepKey === "F1.founded_year")).toEqual({
+      stepKey: "F1.founded_year",
+      action: "submit",
+      value: { type: "RANGE", value: "2021" },
+    });
+    const v9 = planSubmissions(basics, response, viewWith(["F1.company_name"]));
+    expect(v9.some((s) => s.stepKey === "F1.city")).toBe(false);
+  });
+});
