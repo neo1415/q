@@ -230,27 +230,29 @@ describe("not knowing is an answer (Kortrijk Polder)", () => {
       reader: reader(() => ({
         answers: [],
         declined: [],
-        notKnown: [{ stepKey: "F4.team_size", quote: "I don't know" }],
+        notKnown: [{ stepKey: "F1.country", quote: "I don't know" }],
       })),
       recommendations: w.recommendations,
     });
     await conversation.said?.(
       line,
       "Q",
-      "How many people work on the company?",
-      "F4.team_size",
+      "Where is the company based?",
+      "F1.country",
     );
     await conversation.said?.(line, "PERSON", "I don't know");
     await conversation.flush?.(line);
-    const recorded = w.recordedValue("F4.team_size");
+    // The country (a category step, required from founder v9): the team
+    // counts this used are optional now (DECISIONS 79).
+    const recorded = w.recordedValue("F1.country");
     // Answered: the person carries on, and the step no longer blocks.
     expect(recorded).toBeDefined();
     // Unknown stays unknown: never a number.
     expect(JSON.stringify(recorded)).not.toMatch(
       /"(?:min|max|value|number)":\s*0\b/u,
     );
-    expect(recorded).not.toMatchObject({ type: "RANGE" });
-    expect(w.skippedSteps()).not.toContain("F4.team_size");
+    expect(recorded).toEqual({ type: "TEXT", text: "I don't know" });
+    expect(w.skippedSteps()).not.toContain("F1.country");
   });
 
   it("a decline said to another question leaves what is on record", async () => {
