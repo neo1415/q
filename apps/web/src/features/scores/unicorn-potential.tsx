@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  UNICORN_CONFIDENCE_LABELS,
   UNICORN_POTENTIAL_CAVEAT,
+  UNICORN_POTENTIAL_SHORT_CAVEAT,
   type UnicornPotentialDto,
   type UnicornSource,
 } from "@capital-q/contracts";
@@ -17,11 +19,7 @@ const BANDS = {
   STRONG_SIGNALS: "Strong signals",
   EXCEPTIONAL_SIGNALS: "Exceptional signals",
 } as const;
-const CONFIDENCE = {
-  HIGH: "High confidence",
-  MODERATE: "Moderate confidence",
-  LOW: "Low confidence",
-} as const;
+const CONFIDENCE = UNICORN_CONFIDENCE_LABELS;
 const STAGES = {
   PRE_SEED: "Pre-seed",
   SEED: "Seed",
@@ -53,7 +51,7 @@ function decimal(value: number): string {
 export function unicornPotentialLine(score: UnicornPotentialDto): string {
   return score.overallScore === null
     ? `Unicorn Potential: ${score.status === "NOT_ASSESSED" ? "not assessed yet" : "insufficient evidence"}`
-    : `Unicorn Potential ${String(score.overallScore)}/100`;
+    : `Unicorn Potential ${String(score.overallScore)}/100 · ${CONFIDENCE[score.confidence]} · ${percent(score.coverage)} coverage · ${UNICORN_POTENTIAL_SHORT_CAVEAT}`;
 }
 
 function Source({ source }: { readonly source: UnicornSource }) {
@@ -147,6 +145,9 @@ export function UnicornPotential({
             {CONFIDENCE[score.confidence]}
             {" · "}
             {percent(score.coverage)} coverage
+            {score.overallScore === null ? null : (
+              <span className="block">{UNICORN_POTENTIAL_SHORT_CAVEAT}</span>
+            )}
           </span>
         </span>
         <span className="flex shrink-0 items-baseline gap-3">

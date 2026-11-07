@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 
+import {
+  UNICORN_CONFIDENCE_LABELS,
+  UNICORN_POTENTIAL_SHORT_CAVEAT,
+} from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 
 import { useT } from "@/features/i18n/language";
@@ -107,9 +111,10 @@ export function UnicornFigure({
       )}
       aria-label={
         words === null
-          ? t(`Unicorn Potential ${String(cell.score)}. Open the assessment`)
-          : t(`Unicorn Potential: ${words}. Open the assessment`)
+          ? `${t("Unicorn Potential")} ${String(cell.score)}. ${t(UNICORN_POTENTIAL_SHORT_CAVEAT)}. ${t("Open the assessment")}`
+          : `${t("Unicorn Potential")}: ${words}. ${t("Open the assessment")}`
       }
+      title={words === null ? t(UNICORN_POTENTIAL_SHORT_CAVEAT) : undefined}
       data-unicorn-link
     >
       {words ?? String(cell.score)}
@@ -117,10 +122,13 @@ export function UnicornFigure({
   );
   // How far the evidence has got, so an unscored company still says
   // something (owner 2026-10-19); the engine scores from 60%.
+  // A score always carries its confidence and coverage (metrics audit P0-6).
   const progress =
-    cell.score === null && cell.coverage !== undefined
-      ? t(`${String(Math.round(cell.coverage * 100))}% of evidence`)
-      : null;
+    cell.coverage === undefined
+      ? null
+      : cell.score === null
+        ? t(`${String(Math.round(cell.coverage * 100))}% of evidence`)
+        : `${cell.confidence === undefined ? "" : `${t(UNICORN_CONFIDENCE_LABELS[cell.confidence])} · `}${String(Math.round(cell.coverage * 100))}% ${t("coverage")}`;
   if (variant === "inline") {
     return (
       <span
