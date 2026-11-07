@@ -1,0 +1,252 @@
+{
+  "split": "heldout",
+  "turns": 283,
+  "summary": {
+    "overall": {
+      "turns": 283,
+      "passRate": 0.7879858657243817,
+      "decisionAccuracy": 0.823321554770318,
+      "moveTargetExact": 0.7522522522522522,
+      "wrongPageMoveRate": 0.038869257950530034,
+      "forbiddenMoves": 0
+    },
+    "bySplit": {
+      "dev": {
+        "turns": 0,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 1,
+        "forbiddenMoves": 0
+      },
+      "heldout": {
+        "turns": 283,
+        "passRate": 0.7879858657243817,
+        "decisionAccuracy": 0.823321554770318,
+        "moveTargetExact": 0.7522522522522522,
+        "wrongPageMoveRate": 0.038869257950530034,
+        "forbiddenMoves": 0
+      }
+    },
+    "byCategory": {
+      "COVERAGE": {
+        "turns": 145,
+        "passRate": 0.696551724137931,
+        "decisionAccuracy": 0.7379310344827587,
+        "moveTargetExact": 0.696551724137931,
+        "wrongPageMoveRate": 0.027586206896551724,
+        "forbiddenMoves": 0
+      },
+      "ACCESS": {
+        "turns": 20,
+        "passRate": 0.8,
+        "decisionAccuracy": 0.8,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0.1,
+        "forbiddenMoves": 0
+      },
+      "RECORD": {
+        "turns": 35,
+        "passRate": 0.8285714285714286,
+        "decisionAccuracy": 0.9428571428571428,
+        "moveTargetExact": 0.8285714285714286,
+        "wrongPageMoveRate": 0.11428571428571428,
+        "forbiddenMoves": 0
+      },
+      "THREAD": {
+        "turns": 2,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "STAY_IN_CHAT": {
+        "turns": 8,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_STAY": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_MOVE": {
+        "turns": 5,
+        "passRate": 0.6,
+        "decisionAccuracy": 0.6,
+        "moveTargetExact": 0.6,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FALSE_PAGE_WORD": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "TWO_ASKS": {
+        "turns": 3,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "TYPO": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "VOICE": {
+        "turns": 5,
+        "passRate": 0.8,
+        "decisionAccuracy": 0.8,
+        "moveTargetExact": 0.75,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NON_ENGLISH": {
+        "turns": 7,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "SARCASM": {
+        "turns": 3,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FOLLOW_UP": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "GO_BACK": {
+        "turns": 2,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NOT_THAT_ONE": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "STALE_CONTEXT": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "AMBIGUITY": {
+        "turns": 4,
+        "passRate": 0.5,
+        "decisionAccuracy": 0.5,
+        "moveTargetExact": 0,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "DIRTY_FORM": {
+        "turns": 2,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "BUSY_PANE": {
+        "turns": 2,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "COLLAPSED_PANE": {
+        "turns": 3,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NO_SUCH_PAGE": {
+        "turns": 3,
+        "passRate": 0.6666666666666666,
+        "decisionAccuracy": 0.6666666666666666,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0.3333333333333333,
+        "forbiddenMoves": 0
+      },
+      "DELETED_RECORD": {
+        "turns": 2,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ADVERSARIAL": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ALREADY_THERE": {
+        "turns": 3,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      }
+    },
+    "labsGate": false,
+    "onGate": false
+  },
+  "missesByCategory": {
+    "COVERAGE": 44,
+    "ACCESS": 4,
+    "RECORD": 6,
+    "LOOKALIKE_MOVE": 2,
+    "VOICE": 1,
+    "AMBIGUITY": 2,
+    "NO_SUCH_PAGE": 1
+  },
+  "calls": 283,
+  "tokens": {
+    "input": 2444816,
+    "cached": 2275574,
+    "output": 31547,
+    "cost": 1.1090688000000009
+  }
+}
