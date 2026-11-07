@@ -3,6 +3,7 @@ import type {
   DeckFact,
   DeckSection,
   DeckSectionCode,
+  FounderSectionAnswerDto,
   PitchClaimDto,
   PitchClaimKind,
   PitchSectionFactDto,
@@ -190,6 +191,12 @@ export type PitchProfileInput = {
    * (`sectionKey` is the section's factKey, else its key). Absent: none.
    */
   readonly pitchSections?: readonly PitchSectionFactDto[];
+  /**
+   * The founder's own answers for the profile's sections (their F9 steps),
+   * as the server sent them to this reader (`sectionKey` as above).
+   * Absent: none.
+   */
+  readonly founderSections?: readonly FounderSectionAnswerDto[];
   readonly answers: {
     readonly shortDescription: string | null;
     readonly sectorLabels: readonly string[];
@@ -205,6 +212,8 @@ export type PitchProfileInput = {
 };
 
 const ANSWER_SOURCE = "Founder's claim · Confirmed answer";
+/** A section in the founder's own words (their F9 answer): their claim. */
+export const FOUNDER_WORDS_SOURCE = "Founder's words";
 
 /** "$1.5m" and "$1.5M" are one figure; "$750K" and "$1.5m" are not. */
 function sameFigure(a: string | null, b: string): boolean {
@@ -378,7 +387,20 @@ export function pitchProfileSections(
       }
     }
 
-    // 3. The founder's confirmed answers, where neither said it.
+    // 3. The founder's own words for the section (their F9 answer), where
+    // neither the deck nor a pitch said anything for it (owner 2026-11-07:
+    // deck, then pitch video, then the founder's answer).
+    if (rows.length === 0 && summary === null) {
+      const theirs = (input.founderSections ?? []).find(
+        (answer) => answer.sectionKey === sectionKey,
+      );
+      if (theirs !== undefined) {
+        summary = theirs.text;
+        summarySource = FOUNDER_WORDS_SOURCE;
+      }
+    }
+
+    // 4. The founder's confirmed answers, where none of these said it.
     const answers = input.answers;
     for (const answer of sources.answers) {
       if (answer === "SUMMARY") {

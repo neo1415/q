@@ -719,6 +719,87 @@ describe("ADR 0041: the team on the profile", () => {
   });
 });
 
+describe("Owner 2026-11-07: the founder's F9 answers on the Overview", () => {
+  type SectionsBody = {
+    overview: {
+      founderSections?: { sectionKey: string; source: string }[];
+    } | null;
+  };
+  const ANSWERS = [
+    {
+      sectionKey: "problem",
+      text: "Clinics lose a fifth of what they are owed to late insurer payments.",
+      answeredAt: "2026-11-07T10:00:00.000Z",
+      truthClass: "USER_CLAIM" as const,
+      evidenceStatus: "SELF_REPORTED" as const,
+      source: "FOUNDER_ANSWER" as const,
+    },
+  ];
+
+  function withSections(options: {
+    readonly investor: boolean;
+    readonly findable: boolean;
+  }) {
+    const { profile, calls } = ports(options);
+    let asked = 0;
+    return {
+      calls,
+      asked: () => asked,
+      profile: {
+        ...profile,
+        founderSections: () => {
+          asked += 1;
+          return Promise.resolve(ANSWERS);
+        },
+      } satisfies CompanyProfilePorts,
+    };
+  }
+
+  it("an investor the pitch rule admits, and the owner, receive them as the founder's claim", async () => {
+    for (const { options, owned } of [
+      { options: { investor: true, findable: true }, owned: false },
+      { options: { investor: false, findable: false }, owned: true },
+    ]) {
+      const { profile, asked } = withSections(options);
+      const app = buildApp({
+        profile,
+        owned,
+        ...(owned
+          ? {
+              context: {
+                ...VIEWER,
+                tenantId: COMPANY_TENANT,
+                organisationId: COMPANY_ORG,
+              },
+            }
+          : {}),
+      });
+      const body = (
+        await app.inject({ method: "GET", url: PROFILE_URL })
+      ).json<SectionsBody>();
+      expect(body.overview?.founderSections).toEqual(ANSWERS);
+      expect(asked()).toBe(1);
+      await app.close();
+    }
+  });
+
+  it("an investor the pitch rule does not admit, and a founder, get none and nothing is read", async () => {
+    for (const options of [
+      { investor: true, findable: false },
+      { investor: false, findable: true },
+    ]) {
+      const { profile, asked } = withSections(options);
+      const app = buildApp({ profile });
+      const body = (
+        await app.inject({ method: "GET", url: PROFILE_URL })
+      ).json<SectionsBody>();
+      expect(body.overview?.founderSections ?? []).toEqual([]);
+      expect(asked()).toBe(0);
+      await app.close();
+    }
+  });
+});
+
 /**
  * What the pitches say (founder, 2026-10-08: Tensorgate's raise is said in
  * the video, the overview said "not shared"). The cues are Tensorgate's,

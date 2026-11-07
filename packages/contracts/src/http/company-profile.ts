@@ -177,6 +177,29 @@ export const PitchSectionFactDtoSchema = z
 export type PitchSectionFactDto = z.infer<typeof PitchSectionFactDtoSchema>;
 
 /**
+ * A profile section in the founder's own words: their answer to the
+ * onboarding step that holds it (founder definition v6+, phase F9). The
+ * Overview shows it only where neither the deck nor a pitch this reader may
+ * play says it (deck, then pitch video, then this). Served to the owner and
+ * to an investor the pitch rule admits (ADR 0041, as the team); never to
+ * anyone else. Always the company's own claim, never verified; "I don't
+ * know" and withdrawn answers are not sent: unknown stays unknown.
+ */
+export const FounderSectionAnswerDtoSchema = z
+  .object({
+    sectionKey: z.string().regex(/^[a-z][a-z0-9_]{0,47}$/u),
+    text: z.string().min(1).max(2000),
+    answeredAt: UtcTimestampSchema,
+    truthClass: z.literal("USER_CLAIM"),
+    evidenceStatus: z.literal("SELF_REPORTED"),
+    source: z.literal("FOUNDER_ANSWER"),
+  })
+  .strict();
+export type FounderSectionAnswerDto = z.infer<
+  typeof FounderSectionAnswerDtoSchema
+>;
+
+/**
  * The owner's view only: their pitch states a raise their profile does not
  * show as declared. The founder is told; nothing is decided for them.
  *
@@ -241,6 +264,12 @@ export const CompanyProfileOverviewSchema = z
      * sections (founder claims with their moments); absent from older servers.
      */
     pitchSections: z.array(PitchSectionFactDtoSchema).max(160).optional(),
+    /**
+     * The profile sections in the founder's own words (F9 answers), for
+     * the owner and an investor the pitch rule admits; absent from older
+     * servers.
+     */
+    founderSections: z.array(FounderSectionAnswerDtoSchema).max(24).optional(),
     /** OWNER only: the pitch and the declared raise disagree in what shows. */
     pitchRaiseNotice: PitchRaiseNoticeSchema.nullable().default(null),
     /**
