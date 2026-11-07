@@ -143,9 +143,12 @@ const SETTINGS_WORDS: Readonly<Record<string, readonly [string, string]>> = {
  */
 // An investor's "visibility settings" are plainly their privacy settings
 // to a human (a page of theirs), so not a founder-only access question.
+// To an investor, "my GateQ applications" are the ones they received:
+// their inbox, a page of theirs (r3 report), not a founder-only question.
 const NO_ACCESS_CASE: readonly string[] = [
   "DISCOVER:FOUNDER",
   "COMPANY_VISIBILITY:INVESTOR",
+  "GATEQ_APPLICATIONS:INVESTOR",
 ];
 
 function destinations(cases: CaseSet): void {

@@ -19,7 +19,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  NavigationDecisionResultV2Schema,
+  NavigationDecisionResultV3Schema,
   renderPrompt,
   type NavigationDecisionResult,
   type NavigationDecisionVariables,
@@ -123,6 +123,7 @@ export type QNavigationGuard =
   | "COLLAPSED_PANE"
   | "BELOW_GATE"
   | "UNSURE"
+  | "TWO_PLACES"
   | "NOTHING_BEFORE";
 
 // --- 0. The site map (W2) ---------------------------------------------
@@ -347,8 +348,9 @@ export function sitePlaceToTarget(
       tabId = tabId ?? owner.tab.id;
     }
   }
-  // A sub-route with no place of its own (/settings/team) is its parent
-  // page's section of the same name, when the parent lists one.
+  // A sub-route with no place of its own is its parent page's section of
+  // the same id (/settings/team) or the same title (/settings/plan is
+  // "Plan and billing", the parent's billing section), when it lists one.
   if (
     page !== undefined &&
     page.destinations.length === 0 &&
@@ -357,16 +359,27 @@ export function sitePlaceToTarget(
     place.sectionId === null &&
     place.tab === null
   ) {
-    const parentRoute = page.route.slice(0, page.route.lastIndexOf("/"));
-    const last = page.route.slice(page.route.lastIndexOf("/") + 1);
+    const sub = page;
+    const parentRoute = sub.route.slice(0, sub.route.lastIndexOf("/"));
+    const last = sub.route.slice(sub.route.lastIndexOf("/") + 1);
     const parent = pageByRoute(map, parentRoute);
-    if (
-      parent !== undefined &&
-      parent.destinations.length > 0 &&
-      parent.sections.some((s) => s.id === last && s.tab === undefined)
-    ) {
+    const sameTitle = (a: string, b: string) =>
+      a.trim().toLowerCase() === b.trim().toLowerCase();
+    const section =
+      parent === undefined || parent.destinations.length === 0
+        ? undefined
+        : (parent.sections.find((s) => s.tab === undefined && s.id === last) ??
+          parent.sections.find(
+            (s) => s.tab === undefined && sameTitle(s.title, sub.title),
+          ));
+    if (section !== undefined) {
       return sitePlaceToTarget(
-        { ...place, route: parentRoute, sectionId: last, position: "section" },
+        {
+          ...place,
+          route: parentRoute,
+          sectionId: section.id,
+          position: "section",
+        },
         ids,
         map,
       );
@@ -638,10 +651,10 @@ export function createQNavigationDecider(dependencies: {
             output: rendered.output,
             attribution,
           },
-          { schema: NavigationDecisionResultV2Schema },
+          { schema: NavigationDecisionResultV3Schema },
         );
         return result.output.kind === "STRUCTURED"
-          ? NavigationDecisionResultV2Schema.parse(result.output.value)
+          ? NavigationDecisionResultV3Schema.parse(result.output.value)
           : null;
       } catch (error: unknown) {
         // A failed decision costs the move, never the answer: STAY.
@@ -814,6 +827,28 @@ function placeTarget(
   return target === null ? { kind: "UNRESOLVED" } : { kind: "TARGET", target };
 }
 
+/**
+ * A document named by its title on a page that shows one document as its
+ * record (/documents) is that record: the title names it, as a record's
+ * name does. Elsewhere a document belongs to the record named with it.
+ */
+function documentAsRecord(
+  place: NonNullable<NavigationDecisionResult["place"]>,
+  map: QSiteMap,
+): NonNullable<NavigationDecisionResult["place"]> {
+  if (place.record !== null || place.document === null) return place;
+  const page = pageByRoute(map, place.route);
+  if (
+    !(page?.recordPages as readonly string[] | undefined)?.includes("DOCUMENT")
+  )
+    return place;
+  return {
+    ...place,
+    record: { kind: "THING", name: place.document },
+    document: null,
+  };
+}
+
 function askOf(
   place: NonNullable<NavigationDecisionResult["place"]>,
 ): QNavigationRecordAsk | null {
@@ -874,7 +909,8 @@ export function resolveNavigationPlace(
   map: QSiteMap = Q_SITE_MAP,
 ): QNavigationResolution {
   if (proposal.back) return backTo(input);
-  const place = proposal.place;
+  const place =
+    proposal.place === null ? null : documentAsRecord(proposal.place, map);
   if (place === null) return { kind: "UNRESOLVED" };
   const ask = askOf(place);
   return asOwnRecord(
@@ -895,7 +931,8 @@ export async function resolveNavigationPlaceWith(
   map: QSiteMap = Q_SITE_MAP,
 ): Promise<QNavigationResolution> {
   if (proposal.back) return backTo(input);
-  const place = proposal.place;
+  const place =
+    proposal.place === null ? null : documentAsRecord(proposal.place, map);
   if (place === null) return { kind: "UNRESOLVED" };
   const ask = askOf(place);
   let found: QNavigationRecordFound | null = null;
@@ -972,6 +1009,8 @@ export function applyNavigationPolicy(input: {
   readonly config: QNavigationPolicyConfig;
   /** Their records: where the pane is, read as their own record's place. */
   readonly records?: QNavigationRecords | undefined;
+  /** The model's second place, resolved (v5): a different one is an OFFER. */
+  readonly alternative?: QNavigationResolution | null | undefined;
 }): QNavigationOutcome {
   const { proposal, resolution } = input;
   const records = input.records;
@@ -991,7 +1030,8 @@ export function applyNavigationPolicy(input: {
     // Open the pane only for a page they asked to see; otherwise keep it.
     return proposal.decision === "MOVE" &&
       proposal.askedForPage &&
-      proposal.sure !== false
+      proposal.sure !== false &&
+      !secondPlace(target, input.alternative, input.canOpen, records)
       ? {
           decision: "MOVE",
           target,
@@ -1010,8 +1050,10 @@ export function applyNavigationPolicy(input: {
   });
   if (pane.dirty) return offer("UNSAVED_WORK");
   if (pane.busy !== null) return offer("BUSY_PANE");
-  // Not sure which place they mean: offer it, never move to a guess.
+  // Two places serve what they mean: offer it, never move to a guess.
   if (proposal.sure === false) return offer("UNSURE");
+  if (secondPlace(target, input.alternative, input.canOpen, records))
+    return offer("TWO_PLACES");
   if (proposal.decision === "OFFER") return offer(null);
   if (!input.config.movesAllowed) return offer("BELOW_GATE");
   return {
@@ -1021,6 +1063,40 @@ export function applyNavigationPolicy(input: {
     remembered: null,
     guard: null,
   };
+}
+
+/** A real second place: resolved, theirs to open, and not the same place. */
+function secondPlace(
+  target: QNavigateTarget,
+  alternative: QNavigationResolution | null | undefined,
+  canOpen: (page: string) => boolean,
+  records: QNavigationRecords | undefined,
+): boolean {
+  if (alternative?.kind !== "TARGET") return false;
+  const other =
+    records === undefined
+      ? alternative.target
+      : ownPlace(alternative.target, records);
+  const mine = records === undefined ? target : ownPlace(target, records);
+  return canOpen(other.page) && !samePlace(other, mine);
+}
+
+/** The model's alternative, resolved the same way as its place. */
+export async function resolveAlternative(
+  proposal: NavigationDecisionResult | null,
+  input: QNavigationInput,
+  resolver: QNavigationRecordResolver,
+  map: QSiteMap = Q_SITE_MAP,
+): Promise<QNavigationResolution | null> {
+  const alternative = proposal?.alternative ?? null;
+  if (proposal === null || alternative === null || proposal.decision === "STAY")
+    return null;
+  return resolveNavigationPlaceWith(
+    { ...proposal, place: alternative, back: false, alternative: null },
+    input,
+    resolver,
+    map,
+  );
 }
 
 /** The three steps together: decide, resolve, apply the policy. */
@@ -1036,14 +1112,14 @@ export async function decideNavigation(
   attribution: Parameters<QNavigationDecider["decide"]>[1],
 ): Promise<QNavigationOutcome> {
   const proposal = await dependencies.decider.decide(input, attribution);
-  const resolution =
+  const resolver = dependencies.resolver ?? listedRecordResolver(input.records);
+  const [resolution, alternative] =
     proposal === null || proposal.decision === "STAY"
-      ? null
-      : await resolveNavigationPlaceWith(
-          proposal,
-          input,
-          dependencies.resolver ?? listedRecordResolver(input.records),
-        );
+      ? [null, null]
+      : await Promise.all([
+          resolveNavigationPlaceWith(proposal, input, resolver),
+          resolveAlternative(proposal, input, resolver),
+        ]);
   return applyNavigationPolicy({
     proposal,
     resolution,
@@ -1051,6 +1127,7 @@ export async function decideNavigation(
     canOpen: dependencies.canOpen,
     config: dependencies.config,
     records: input.records,
+    alternative,
   });
 }
 

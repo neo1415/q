@@ -1931,3 +1931,34 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4932 passed (q-nav 15/15);
   - root tsc 0;
   - eslint and prettier clean.
+
+## 2026-11-07 — Decision 75: q-nav to the labs gate. Fresh sealed held-out set, v5, code gaps (`feat/q-navigation-policy`)
+
+- **Fresh held-out set:**
+  - written by a separate author (a subagent that never saw the dev phrasing) from each place's purpose, never its title;
+  - 264 turns, every category on both sides, every reachable page and side covered;
+  - 4 sentences that matched dev were reworded before sealing;
+  - sealed: `heldout-seal.ts` holds the SHA-256, and a test fails on any change;
+  - the old held-out set (`heldout.ts`) is retired.
+- **NAVIGATION_DECISION v5** (schema 3):
+  - a reasoning procedure: their goal, then the place whose PURPOSE serves it (no word matching, no synonym tables);
+  - `alternative` replaces `sure`: code offers (guard TWO_PLACES) only when it resolves to a different place they may open;
+  - a listed record goes in record;
+  - viewing is not interest.
+  - v1–v4 are unchanged; v4's `sure` is still honoured.
+- **Code gaps:**
+  - a document named by title on a page whose record is a DOCUMENT is that record;
+  - a sub-route is its parent's section of the same id or the same TITLE (/settings/plan → billing).
+- **Dev fixes, documented:**
+  - voice "led your line" expects STAY (two names);
+  - voice "ask me" became "last say to me";
+  - no investor ACCESS case for "my GateQ applications" (to them it is their inbox).
+- **Gaps for W3:**
+  - QRecordTab has no "deal", so a relationship's deal tab cannot be a target (the author found it);
+  - Usage vs Work Cost vs billing overlap in purpose.
+- **Gates:**
+  - package build 55/55;
+  - vitest packages: 4936 passed;
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.

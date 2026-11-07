@@ -122,6 +122,20 @@ export const NavigationDecisionResultV2Schema = z
     sure: z.boolean().optional().catch(undefined),
   })
   .strict();
+/**
+ * Schema version 3 (NAVIGATION_DECISION v5, owner decision 75):
+ * `alternative` is a second place, in the same shape as `place`, that
+ * would serve what they mean about as well. Code offers only when it
+ * resolves to a different place the person may open; otherwise the
+ * proposal stands. It replaces v4's `sure` (still read from v4 output).
+ */
+export const NAVIGATION_DECISION_SCHEMA_VERSION_3 = 3;
+export const NavigationDecisionResultV3Schema = z
+  .object({
+    ...NavigationDecisionResultV2Schema.shape,
+    alternative: NavigationPlaceSchema.nullable().optional().catch(undefined),
+  })
+  .strict();
 export type NavigationDecisionResult = z.infer<
-  typeof NavigationDecisionResultV2Schema
+  typeof NavigationDecisionResultV3Schema
 >;

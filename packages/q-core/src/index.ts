@@ -1779,6 +1779,7 @@ export { NAVIGATION_DECISION_V1 } from "./prompts/tasks/navigation-decision.v1.j
 export { NAVIGATION_DECISION_V2 } from "./prompts/tasks/navigation-decision.v2.js";
 export { NAVIGATION_DECISION_V3 } from "./prompts/tasks/navigation-decision.v3.js";
 export { NAVIGATION_DECISION_V4 } from "./prompts/tasks/navigation-decision.v4.js";
+export { NAVIGATION_DECISION_V5 } from "./prompts/tasks/navigation-decision.v5.js";
 export * from "./prompts/schemas/navigation-decision.js";
 export {
   WEB_DISCOVERY_READER_COMPANIES_MAX,

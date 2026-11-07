@@ -576,8 +576,12 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
     expect(
       at("/settings", { sectionId: "billing-history", position: "section" }),
     ).toBeNull();
-    // /settings/plan has no destination and shows no record.
-    expect(at("/settings/plan")).toBeNull();
+    // /settings/plan is the billing section of Settings (same title, v5).
+    expect(at("/settings/plan")).toEqual({
+      page: "SETTINGS",
+      sectionId: "billing",
+      position: "section",
+    });
     // A record on a page that shows none.
     expect(
       sitePlaceToTarget(
@@ -1046,5 +1050,72 @@ describe("q-nav round 3: unsure moves, sub-routes, their own data room", () => {
     expect(
       JSON.stringify(navigationVariables(input({ records }))),
     ).not.toContain(OWN);
+  });
+});
+
+describe("v5 (owner decision 75): a real second place, documents by title, sub-routes by title", () => {
+  it("offers only when the alternative resolves to a different place they may open", () => {
+    const target = { page: "WORK" } as const;
+    const policy = (
+      alternative: Parameters<typeof applyNavigationPolicy>[0]["alternative"],
+      canOpen: (page: string) => boolean = () => true,
+    ) =>
+      applyNavigationPolicy({
+        proposal: proposal({}),
+        resolution: { kind: "TARGET", target },
+        pane: pane(),
+        canOpen,
+        config: { movesAllowed: true },
+        alternative,
+      });
+    expect(policy({ kind: "TARGET", target: { page: "BOARD" } })).toMatchObject(
+      { decision: "OFFER", guard: "TWO_PLACES" },
+    );
+    // No rival, the same place, an unresolved or a closed one: it moves.
+    expect(policy(null).decision).toBe("MOVE");
+    expect(policy({ kind: "TARGET", target }).decision).toBe("MOVE");
+    expect(policy({ kind: "UNRESOLVED" }).decision).toBe("MOVE");
+    expect(
+      policy(
+        { kind: "TARGET", target: { page: "BOARD" } },
+        (p) => p !== "BOARD",
+      ).decision,
+    ).toBe("MOVE");
+  });
+
+  it("a document named by title on the documents page is that record", () => {
+    const records = {
+      ...input().records,
+      things: [{ id: CARD, title: "Diligence brief: Ledgerline" }],
+    };
+    expect(
+      resolveNavigationPlace(
+        proposal({
+          place: place({
+            route: "/documents",
+            document: "Diligence brief: Ledgerline",
+          }),
+        }),
+        input({ records }),
+      ),
+    ).toMatchObject({
+      kind: "TARGET",
+      target: { page: "DOCUMENT", recordId: CARD },
+    });
+  });
+
+  it("a sub-route is its parent's section of the same title", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/settings/plan",
+          tab: null,
+          sectionId: null,
+          slide: null,
+          position: null,
+        },
+        { recordId: null, documentId: null, itemId: null },
+      ),
+    ).toEqual({ page: "SETTINGS", sectionId: "billing", position: "section" });
   });
 });

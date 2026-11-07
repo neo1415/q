@@ -226,13 +226,16 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "INVESTOR",
       "who runs led your line",
-      team("co-ledgerline"),
-      "'Led your line' is Ledgerline.",
+      // Dataset fix (r3 report): it sounds as much like Ledgerfold as
+      // Ledgerline, so a person would ask which: a STAY.
+      null,
+      "Ledgerline or Ledgerfold: open between two names.",
     ],
     ["INVESTOR", "okay thanks q", null, "Small talk."],
     [
       "FOUNDER",
-      "what did savannah seed ask me",
+      // Not "ask me": diligence questions are asks too (as the text rows).
+      "what did savannah seed last say to me",
       threadWithInvestor("inv-savanna-seed"),
       "'Savannah Seed' is Savanna Seed.",
     ],

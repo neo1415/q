@@ -12190,6 +12190,7 @@ export {
   listedRecordResolver,
   resolveNavigationPlace,
   resolveNavigationPlaceWith,
+  resolveAlternative,
   NAVIGATION_DECISION_REASONING,
   NAVIGATION_DECISION_TASK_CLASS,
   navigateTargetFromPath,
