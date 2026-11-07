@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import {
   PermittedContextPlanSchema,
+  screenWithBoundEntities,
   sensitivityWithin,
   strongerSensitivity,
   type PermittedContextPlan,
@@ -174,70 +175,26 @@ function denialForDisclosure(
   }
 }
 
-/** The screen with only the entities some permitted scope is bound to. */
+/**
+ * The screen with only the entities some permitted scope is bound to. The
+ * contract's one rule (screenWithBoundEntities, owner live test 7 Nov, R1):
+ * an entity it names rides only when a permitted scope is bound to it;
+ * everything else is the person's own screen -- the route, the surface,
+ * attached ids, the page's manifest, the clock, an open artifact, the Q
+ * Workspace's panes -- each of which grants nothing (every ref in them is
+ * read again, as the asker, by its own tool) and rides as asked.
+ */
 export function screenWithin(
   screen: QScreenContext,
   permitted: readonly QAuthorisedKnowledgeScope[],
 ): QScreenContext {
-  const bound = (ref: QSubjectRef) =>
+  return screenWithBoundEntities(screen, (ref) =>
     permitted.some(
       (scope) =>
         scope.subject !== undefined &&
         JSON.stringify(scope.subject) === JSON.stringify(ref),
-    );
-  const {
-    companyId,
-    investorOrganisationId,
-    documentId,
-    documentPage,
-    timeZone,
-    artifactId,
-    artifactSlide,
-    artifactVersion,
-    manifest,
-    attachedDocumentIds,
-    surface,
-  } = screen;
-  return {
-    route: screen.route,
-    // Which of Q's surfaces they asked from: a closed kind, about no one.
-    ...(surface === undefined ? {} : { surface }),
-    // Lane 8: documents they attached in Q's composer, as ids only. It
-    // grants nothing: their words are read solely through
-    // read_attached_document, as the asker, through Evidence's own
-    // document.view check, and one that is not theirs reads as NONE.
-    ...(attachedDocumentIds === undefined ? {} : { attachedDocumentIds }),
-    // Q room R1: what the whole page shows, as ids and closed kinds only.
-    // It grants nothing: each ref is read through its own read tool under
-    // this plan, as the asker, and a refused one is dropped unread.
-    ...(manifest === undefined ? {} : { manifest }),
-    // The person's own clock, not data about anyone.
-    ...(timeZone === undefined ? {} : { timeZone }),
-    // voiceq-63: the document Q made for them that is open on this tab, as
-    // an id only. It grants nothing: its words are read solely through
-    // read_my_document, which reads it as the asker through the documents'
-    // own service and refuses one that is not theirs.
-    ...(artifactId === undefined
-      ? {}
-      : {
-          artifactId,
-          ...(artifactSlide === undefined ? {} : { artifactSlide }),
-          ...(artifactVersion === undefined ? {} : { artifactVersion }),
-        }),
-    ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
-      ? { companyId }
-      : {}),
-    ...(investorOrganisationId !== undefined &&
-    bound({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
-      ? { investorOrganisationId }
-      : {}),
-    ...(documentId !== undefined && bound({ kind: "DOCUMENT", documentId })
-      ? {
-          documentId,
-          ...(documentPage === undefined ? {} : { documentPage }),
-        }
-      : {}),
-  };
+    ),
+  );
 }
 
 function fingerprintOf(

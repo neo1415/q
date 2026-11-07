@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreateQRunRequestSchema,
+  QScreenContextSchema,
   QConversationIdSchema,
   type QScreenContext,
   type QSubjectRef,
@@ -373,5 +374,66 @@ describe("the company on screen is the run's first subject (run 5, 16 Oct)", () 
     const subjects = h.runs[0]?.subjects ?? [];
     expect(subjects[0]).toEqual(earlier);
     expect(subjects).not.toContainEqual(company);
+  });
+});
+
+describe("owner live test 7 Nov (R1): nothing the screen contract carries is silently lost", () => {
+  // One screen with every field the contract has. Each entity resolves, so
+  // the run must record it whole: a field the run's copy does not know is
+  // the defect that kept screen.workspace (and so Q's page moves) from
+  // ever reaching the answer path.
+  const everything: QScreenContext = QScreenContextSchema.parse({
+    route: "COMPANY",
+    companyId: COMPANY,
+    investorOrganisationId: INVESTOR,
+    documentId: DOCUMENT,
+    documentPage: 3,
+    artifactId: "f0000000-0000-4000-8000-000000000001",
+    artifactSlide: 2,
+    artifactVersion: 1,
+    timeZone: "Africa/Lagos",
+    manifest: { v: 2, seq: 1, inView: [], sections: [], dialogs: [] },
+    attachedDocumentIds: [DOCUMENT],
+    surface: "DOCK",
+    workspace: { qPane: "open", pagePane: "open", at: "/home" },
+  });
+
+  it("covers the whole contract: the sample names every field", () => {
+    expect(Object.keys(everything).sort()).toEqual(
+      Object.keys(QScreenContextSchema.shape).sort(),
+    );
+  });
+
+  it("keeps the Q Workspace hint and Q's surface: about the person's panes, never an entity", async () => {
+    const h = harness(() => true);
+    await h.ask({
+      route: "HOME",
+      surface: "DOCK",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    });
+    expect(h.runs[0]?.screen).toEqual({
+      route: "HOME",
+      surface: "DOCK",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    });
+  });
+
+  it("with every entity resolving, the run records the screen whole", async () => {
+    const h = harness(() => true);
+    await h.ask(everything);
+    expect(h.runs[0]?.screen).toEqual(everything);
+  });
+
+  it("with no entity resolving, only the entities go: every hint stays", async () => {
+    const h = harness(() => false);
+    await h.ask(everything);
+    const {
+      companyId: _c,
+      investorOrganisationId: _i,
+      documentId: _d,
+      documentPage: _p,
+      ...hints
+    } = everything;
+    expect(h.runs[0]?.screen).toEqual(hints);
   });
 });
