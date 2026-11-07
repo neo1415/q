@@ -154,3 +154,16 @@ describe("ScoreFigure: unknown is words, never 0", () => {
     expect(document.body.textContent).toMatch(/Suitability 70/u);
   });
 });
+
+describe("compact score lines are heard by screen readers (metrics audit P1-18)", () => {
+  for (const variant of ["compact", "minimal"] as const) {
+    it(`${variant}: the full sentence is real text, not an aria-label on a <p>`, () => {
+      render(<CompanyScores scores={scores} variant={variant} />);
+      const line = document.querySelector(`[data-company-scores="${variant}"]`);
+      expect(line?.getAttribute("aria-label")).toBeNull();
+      const spoken = line?.querySelector(".sr-only")?.textContent ?? "";
+      expect(spoken).toMatch(/Investability 58/u);
+      expect(spoken).toMatch(CAVEAT);
+    });
+  }
+});

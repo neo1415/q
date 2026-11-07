@@ -683,12 +683,18 @@ function CompareTable({
                   {card.name}
                 </span>
                 {card.fit === null ? null : (
-                  <div
-                    className="cscore"
-                    aria-label={fitWords(card) ?? undefined}
-                  >
-                    {card.fit.score.toFixed(1)}
-                    <small>{t("mandate fit, of 10")}</small>
+                  <div className="cscore">
+                    {/* Real text for screen readers: an aria-label on a
+                        roleless div is not read (metrics audit P1-18). */}
+                    <span
+                      aria-hidden={fitWords(card) === null ? undefined : true}
+                    >
+                      {card.fit.score.toFixed(1)}
+                      <small>{t("mandate fit, of 10")}</small>
+                    </span>
+                    {fitWords(card) === null ? null : (
+                      <span className="sr-only">{fitWords(card)}</span>
+                    )}
                   </div>
                 )}
                 {/* G-D17: how it was made, and a tie said as a tie. */}
