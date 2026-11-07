@@ -16,11 +16,12 @@ import {
 } from "./contracts.js";
 import { coverage } from "./coverage.js";
 import { devCurveballs } from "./curveballs.js";
-import { heldoutFresh } from "./heldout-fresh.js";
+import { heldoutThird } from "./heldout-third.js";
 import {
   destinationDef,
   Q_NAV_CONTRACT_PAGES,
   Q_NAV_DESTINATIONS,
+  foldedOf,
   Q_NAV_RECORD_PAGES,
   recordPageDef,
   sidesOf,
@@ -56,7 +57,7 @@ export function buildQNavCases(): QNavCase[] {
   // author, from each place's purpose; sealed (heldout-seal.ts). The
   // earlier held-out set was measured once and is retired.
   const heldout = new CaseSet("heldout");
-  heldoutFresh(heldout);
+  heldoutThird(heldout);
   return [...dev.out, ...heldout.out].map((c) => QNavCaseSchema.parse(c));
 }
 
@@ -187,6 +188,11 @@ export function lintQNavDataset(
       if (t.expect.decision === "MOVE" && t.expect.target !== null) {
         const set = moved.get(c.split) ?? new Set<string>();
         set.add(`${t.expect.target.page}:${c.side}`);
+        // A section also covers the destination folded into it.
+        if (t.expect.target.sectionId !== undefined)
+          set.add(
+            `${t.expect.target.page}#${t.expect.target.sectionId}:${c.side}`,
+          );
         moved.set(c.split, set);
       }
       if (
@@ -219,7 +225,13 @@ export function lintQNavDataset(
       ...Q_NAV_CONTRACT_PAGES.recordPages,
     ]) {
       const def = recordPageDef(page);
-      const canonical = def?.sameAs?.page ?? page;
+      const folded = foldedOf(page);
+      const canonical =
+        folded === undefined
+          ? (def?.sameAs?.page ?? page)
+          : folded.sectionId === null
+            ? folded.page
+            : `${folded.page}#${folded.sectionId}`;
       for (const side of sidesOf(page)) {
         if (!set.has(`${canonical}:${side}`))
           issues.push(`${split}: no MOVE to ${page} for ${side}`);

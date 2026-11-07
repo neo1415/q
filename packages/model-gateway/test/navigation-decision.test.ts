@@ -6,6 +6,7 @@ import type { NavigationDecisionResult } from "@capital-q/q-core";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import type { ModelGateway } from "../src/index.js";
+import { THINKING_MIN_OUTPUT_TOKENS } from "../src/providers/anthropic.js";
 import { Q_SITE_MAP, qSiteMapDigest } from "@capital-q/contracts";
 
 import {
@@ -13,6 +14,8 @@ import {
   createQNavigationDecider,
   createQPageMoves,
   decideNavigation,
+  NAVIGATION_VOTES,
+  voteNavigation,
   navigateTargetFromPath,
   navigationPaneFromWorkspace,
   navigationSiteMap,
@@ -125,7 +128,11 @@ describe("the decision call (W4.1)", () => {
     const request = requests[0] ?? {};
     // DECISIONS 73: the answer's class and model, never a smaller one.
     expect(request["taskClass"]).toBe("NORMAL_DIALOGUE");
-    expect(request["reasoning"]).toBe("LOW");
+    // Decision 78: MEDIUM, with room for thinking to actually run.
+    expect(request["reasoning"]).toBe("MEDIUM");
+    expect(
+      (request["budget"] as { maxOutputTokens: number }).maxOutputTokens,
+    ).toBeGreaterThanOrEqual(THINKING_MIN_OUTPUT_TOKENS);
     expect(request["reasoningKey"]).toBe("NAVIGATION_DECISION");
     const text = JSON.stringify(request["messages"]);
     expect(text).toContain("Silo Credit");
@@ -359,11 +366,11 @@ describe("resolution through the port (W2.3's resolve_page_target, called from c
     const { asked, resolver } = port({ status: "NONE" });
     expect(
       await resolveNavigationPlaceWith(
-        proposal({ place: place({ route: "/work", tab: "needs" }) }),
+        proposal({ place: place({ route: "/work", tab: "team" }) }),
         input(),
         resolver,
       ),
-    ).toEqual({ kind: "TARGET", target: { page: "WORK_NEEDS" } });
+    ).toEqual({ kind: "TARGET", target: { page: "WORK_TEAM" } });
     expect(asked).toEqual([]);
   });
 
@@ -531,7 +538,12 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
   });
 
   it("folds a tab with its own destination into it, and keeps a record page's tab", () => {
-    expect(at("/work", { tab: "needs" })).toEqual({ page: "WORK_NEEDS" });
+    expect(at("/work", { tab: "team" })).toEqual({ page: "WORK_TEAM" });
+    // Needs you is a section of the one Work scroll now (W2 d013eaa).
+    expect(at("/work", { sectionId: "progress" })).toEqual({
+      page: "WORK",
+      sectionId: "progress",
+    });
     expect(at("/relationships", { tab: "capital-raise" })).toEqual({
       page: "CAPITAL_RAISE",
     });
@@ -622,9 +634,9 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
   });
 
   it("says a target back in the site map's words", () => {
-    expect(targetToSitePlace({ page: "WORK_NEEDS" })).toMatchObject({
+    expect(targetToSitePlace({ page: "WORK_TEAM" })).toMatchObject({
       route: "/work",
-      tab: "needs",
+      tab: "team",
     });
     expect(
       targetToSitePlace({ page: "COMPANY", recordId: SILO, tab: "team" }),
@@ -647,7 +659,8 @@ describe("the page pane's place from the screen (W1's screen.workspace paths)", 
   it("reads W3's deep links back as targets", () => {
     const cases: readonly (readonly [string, QNavigateTarget])[] = [
       ["/home", { page: "HOME" }],
-      ["/work?view=needs", { page: "WORK_NEEDS" }],
+      // Needs, progress and done are one Work scroll (W2 d013eaa).
+      ["/work?view=needs", { page: "WORK" }],
       ["/relationships?view=capital&tab=raise", { page: "CAPITAL_RAISE" }],
       ["/relationships?view=capital", { page: "CAPITAL" }],
       [
@@ -959,7 +972,7 @@ describe("the site map's own place (q-nav round 2: resolution rules)", () => {
   it("a page-wide section with a tab is the page's; a record opens at its own tab, never a list's", () => {
     expect(
       at("/work", {
-        tab: "needs",
+        tab: "team",
         sectionId: "approvals",
         position: "section",
       }),
@@ -1271,5 +1284,128 @@ describe("decision 75 round 4: the leading section is the first one shown", () =
         { recordId: SILO, documentId: null, itemId: null },
       ),
     ).toEqual({ page: "COMPANY", recordId: SILO, tab: "overview" });
+  });
+});
+
+describe("decision 78: self-consistency, three samples in parallel", () => {
+  const attribution = { tenantId: "t", userId: "u", correlationId: "c" };
+  const deck = proposal({
+    place: place({ record: company("Silo Credit"), tab: "deck" }),
+  });
+  const team = proposal({
+    place: place({ record: company("Silo Credit"), tab: "team" }),
+  });
+  const stay = proposal({ decision: "STAY", askedForPage: false });
+  /** A decider that answers the samples in turn, and counts them in flight. */
+  function samples(...answers: (NavigationDecisionResult | null)[]) {
+    let next = 0;
+    let inFlight = 0;
+    const seen = { calls: 0, mostAtOnce: 0 };
+    const decider = {
+      decide: async () => {
+        const answer = answers[next % answers.length] ?? null;
+        next += 1;
+        seen.calls += 1;
+        inFlight += 1;
+        seen.mostAtOnce = Math.max(seen.mostAtOnce, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return answer;
+      },
+    };
+    return { decider, seen };
+  }
+  const decideWith = (
+    decider: ReturnType<typeof samples>["decider"],
+    over: Partial<QNavigationInput> = {},
+  ) =>
+    decideNavigation(
+      { decider, canOpen: () => true, config: { movesAllowed: true } },
+      input(over),
+      attribution,
+    );
+
+  it("asks three times at once (no added serial latency) and moves only when all three name the same place", async () => {
+    const { decider, seen } = samples(deck, deck, deck);
+    expect(await decideWith(decider)).toMatchObject({
+      decision: "MOVE",
+      target: { page: "COMPANY", recordId: SILO, tab: "deck" },
+      guard: null,
+    });
+    expect(seen.calls).toBe(NAVIGATION_VOTES);
+    expect(NAVIGATION_VOTES).toBe(3);
+    expect(seen.mostAtOnce).toBe(3);
+  });
+
+  it("two of three on one place: an OFFER of it, never a move", async () => {
+    for (const third of [stay, team, null]) {
+      const { decider } = samples(deck, third, deck);
+      expect(await decideWith(decider)).toMatchObject({
+        decision: "OFFER",
+        target: { page: "COMPANY", recordId: SILO, tab: "deck" },
+        guard: "SPLIT_VOTE",
+      });
+    }
+  });
+
+  it("no two agree on a place: STAY; two STAYs: STAY", async () => {
+    const other = proposal({ place: place({ route: "/work", tab: "team" }) });
+    expect(await decideWith(samples(deck, team, other).decider)).toMatchObject({
+      decision: "STAY",
+      target: null,
+      guard: "SPLIT_VOTE",
+    });
+    expect(await decideWith(samples(deck, stay, stay).decider)).toMatchObject({
+      decision: "STAY",
+      target: null,
+    });
+  });
+
+  it("all three on one place, one only offering it: the most careful of them", async () => {
+    const offerDeck = { ...deck, decision: "OFFER" as const };
+    expect(
+      await decideWith(samples(deck, offerDeck, deck).decider),
+    ).toMatchObject({ decision: "OFFER", target: { tab: "deck" } });
+  });
+
+  it("a collapsed pane: three asks to see it open it; two only remember it", async () => {
+    const collapsed = { pane: pane({ pane: "COLLAPSED" }) };
+    expect(
+      await decideWith(samples(deck, deck, deck).decider, collapsed),
+    ).toMatchObject({ decision: "MOVE", openPane: true });
+    expect(
+      await decideWith(samples(deck, stay, deck).decider, collapsed),
+    ).toMatchObject({
+      decision: "STAY",
+      openPane: false,
+      remembered: { page: "COMPANY", tab: "deck" },
+    });
+  });
+
+  it("votes are a setting: one sample is the plain pipeline", async () => {
+    const { decider, seen } = samples(deck);
+    const out = await decideNavigation(
+      {
+        decider,
+        canOpen: () => true,
+        config: { movesAllowed: true },
+        votes: 1,
+      },
+      input(),
+      attribution,
+    );
+    expect(out.decision).toBe("MOVE");
+    expect(seen.calls).toBe(1);
+  });
+
+  it("voteNavigation is pure: unanimous STAYs keep their guard", () => {
+    const already = {
+      decision: "STAY" as const,
+      target: null,
+      openPane: false,
+      remembered: null,
+      guard: "ALREADY_THERE" as const,
+    };
+    expect(voteNavigation([already, already, already])).toEqual(already);
   });
 });
