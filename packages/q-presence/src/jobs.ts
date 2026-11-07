@@ -88,7 +88,7 @@ export type PresenceResearchJob = z.infer<typeof PresenceResearchJobSchema>;
 /** One bounded message on the research queue: identifiers only. */
 export function presenceResearchJob(
   input: PresenceResearchJobData & {
-    readonly tenantId: string;
+    readonly tenantId?: string | undefined;
     readonly correlationId?: string | undefined;
   },
   clock: () => Date = () => new Date(),
@@ -97,7 +97,7 @@ export function presenceResearchJob(
     id: JobIdSchema.parse(randomUUID()),
     type: ResearchOnboardingPresenceJob.name,
     jobVersion: ResearchOnboardingPresenceJob.version,
-    tenantId: input.tenantId,
+    ...(input.tenantId === undefined ? {} : { tenantId: input.tenantId }),
     ...(input.correlationId === undefined
       ? {}
       : { correlationId: input.correlationId }),
