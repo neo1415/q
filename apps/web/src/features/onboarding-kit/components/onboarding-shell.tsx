@@ -43,6 +43,11 @@ export type OnboardingShellProps = {
   readonly secondaryAction?:
     { readonly label: string; readonly onClick: () => void } | undefined;
   readonly notice?: ReactNode | undefined;
+  /**
+   * Where "Continue later" leads: the journey's own place (an investor's
+   * Discover), the same as from its conversation. Default /home.
+   */
+  readonly continueLaterTo?: string | undefined;
 };
 
 export function OnboardingShell({
@@ -55,6 +60,7 @@ export function OnboardingShell({
   primaryAction,
   secondaryAction,
   notice,
+  continueLaterTo,
 }: OnboardingShellProps) {
   // While a save is in flight the primary keeps its colour and stays in the
   // tab order; a second press is simply not taken. It is announced as
@@ -97,7 +103,11 @@ export function OnboardingShell({
             />
           </IconButton>
           <span className="cq-label text-(--cq-text-primary)">Capital Q</span>
-          <ContinueLater />
+          <ContinueLater
+            {...(continueLaterTo === undefined
+              ? {}
+              : { destination: continueLaterTo })}
+          />
         </div>
         <div className="mx-auto w-full max-w-(--cq-layout-reading) px-4 pb-3">
           {progress}
