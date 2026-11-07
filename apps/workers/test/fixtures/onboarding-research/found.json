@@ -1,0 +1,64 @@
+{
+  "version": 2,
+  "providerCode": "tavily",
+  "recordedAt": "SYNTHETIC: hand-written for the onboarding research gate (DECISIONS 48), never recorded live. Tamarind Ledger is an invented company; tamarind.example is a reserved domain.",
+  "searches": [
+    {
+      "key": "tamarind ledger",
+      "query": "tamarind ledger",
+      "includeDomains": [],
+      "hits": [
+        {
+          "url": "https://tamarind.example/about",
+          "title": "About Tamarind Ledger",
+          "snippet": "Tamarind Ledger helps market traders in Lagos keep track of what they are owed and collect it by transfer.",
+          "publishedAt": null,
+          "relevance": 0.92
+        }
+      ],
+      "failure": null
+    },
+    {
+      "key": "tamarind ledger https tamarind.example",
+      "query": "tamarind ledger https tamarind.example",
+      "includeDomains": [],
+      "hits": [],
+      "failure": null
+    }
+  ],
+  "pages": [
+    {
+      "url": "https://tamarind.example/",
+      "title": "Tamarind Ledger",
+      "text": "Tamarind Ledger. Market traders keep their credit book in a notebook. Tamarind Ledger keeps it for them, sends WhatsApp reminders to customers who owe, and lets them pay by transfer. Based in Lagos, Nigeria."
+    },
+    {
+      "url": "https://tamarind.example/about",
+      "title": "About Tamarind Ledger",
+      "text": "About Tamarind Ledger. Tamarind Ledger helps market traders in Lagos keep track of what they are owed and collect it by transfer. A small team of nine."
+    }
+  ],
+  "failedUrls": [],
+  "extractFailures": [],
+  "extracts": [
+    {
+      "urls": ["https://tamarind.example/"],
+      "read": ["https://tamarind.example/"],
+      "failedUrls": [],
+      "failure": null
+    },
+    {
+      "urls": ["https://tamarind.example/about"],
+      "read": ["https://tamarind.example/about"],
+      "failedUrls": [],
+      "failure": null
+    },
+    {
+      "urls": ["https://tamarind.example/about"],
+      "read": ["https://tamarind.example/about"],
+      "failedUrls": [],
+      "failure": null
+    }
+  ],
+  "schedule": null
+}

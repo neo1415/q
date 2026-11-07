@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "providerCode": "tavily",
+  "recordedAt": "SYNTHETIC: hand-written for the onboarding research gate (DECISIONS 48), never recorded live. A company with no public presence yet: no hits, and its site does not answer.",
+  "searches": [
+    {
+      "key": "tamarind ledger",
+      "query": "tamarind ledger",
+      "includeDomains": [],
+      "hits": [],
+      "failure": null
+    },
+    {
+      "key": "tamarind ledger https tamarind.example",
+      "query": "tamarind ledger https tamarind.example",
+      "includeDomains": [],
+      "hits": [],
+      "failure": null
+    }
+  ],
+  "pages": [],
+  "failedUrls": ["https://tamarind.example/", "http://tamarind.example/"],
+  "extractFailures": [],
+  "extracts": [
+    {
+      "urls": ["https://tamarind.example/"],
+      "read": [],
+      "failedUrls": ["https://tamarind.example/"],
+      "failure": null
+    },
+    {
+      "urls": ["http://tamarind.example/"],
+      "read": [],
+      "failedUrls": ["http://tamarind.example/"],
+      "failure": null
+    }
+  ],
+  "schedule": null
+}

@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "providerCode": "tavily",
+  "recordedAt": "SYNTHETIC: hand-written for the onboarding research gate (DECISIONS 48), never recorded live. Every provider refuses the key, as on 30 Oct 2026.",
+  "searches": [
+    {
+      "key": "tamarind ledger",
+      "query": "tamarind ledger",
+      "includeDomains": [],
+      "hits": [],
+      "failure": { "failureClass": "AUTHENTICATION" }
+    },
+    {
+      "key": "tamarind ledger https tamarind.example",
+      "query": "tamarind ledger https tamarind.example",
+      "includeDomains": [],
+      "hits": [],
+      "failure": { "failureClass": "AUTHENTICATION" }
+    }
+  ],
+  "pages": [],
+  "failedUrls": [],
+  "extractFailures": [],
+  "extracts": [
+    {
+      "urls": ["https://tamarind.example/"],
+      "read": [],
+      "failedUrls": [],
+      "failure": { "failureClass": "AUTHENTICATION" }
+    }
+  ],
+  "schedule": null
+}
