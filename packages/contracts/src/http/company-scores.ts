@@ -111,6 +111,42 @@ export const INVESTABILITY_STATUSES = [
 export const InvestabilityStatusSchema = z.enum(INVESTABILITY_STATUSES);
 export type InvestabilityStatus = z.infer<typeof InvestabilityStatusSchema>;
 
+/** One part of Investability: a number only with enough graded evidence. */
+export const InvestabilityPartSchema = z
+  .object({
+    score: z.number().int().min(0).max(100).nullable(),
+    band: InvestabilityBandSchema.nullable(),
+    confidence: ScoreConfidenceSchema.nullable(),
+    /** Factors of this part on record, of those that apply. */
+    factors: z
+      .object({
+        onRecord: z.number().int().min(0).max(200),
+        applicable: z.number().int().min(0).max(200),
+      })
+      .strict(),
+  })
+  .strict();
+export type InvestabilityPart = z.infer<typeof InvestabilityPartSchema>;
+
+/**
+ * Plain names and one sentence each (owner decision 78): the same words on
+ * every screen and in Q's answers.
+ */
+export const INVESTABILITY_PARTS = [
+  {
+    key: "businessQuality",
+    name: "Business quality",
+    sentence:
+      "How strong the business looks: the team, the product and market, traction and finances.",
+  },
+  {
+    key: "readiness",
+    name: "Investment readiness",
+    sentence:
+      "How prepared it is for investors: governance, legal basics, the raise and diligence.",
+  },
+] as const;
+
 export const InvestabilityDtoSchema = z
   .object({
     status: InvestabilityStatusSchema,
@@ -148,6 +184,18 @@ export const InvestabilityDtoSchema = z
       .strict(),
     /** "Seed", or null when the stage is unknown. */
     stage: z.string().min(1).max(40).nullable(),
+    /**
+     * PADL #060-#062, owner decision 78 (audit P1-7): the two parts of the
+     * headline, each scored the same way over its own dimensions. Absent on
+     * assessments recorded before investability-inputs.v6.
+     */
+    parts: z
+      .object({
+        businessQuality: InvestabilityPartSchema,
+        readiness: InvestabilityPartSchema,
+      })
+      .strict()
+      .optional(),
     ...WhySchema,
     /** e.g. `investiq/v1+investability-inputs.v1`. */
     methodVersion: z.string().min(1).max(80),
@@ -167,7 +215,7 @@ export type InvestabilityDto = z.infer<typeof InvestabilityDtoSchema>;
  * readiness package's INVESTABILITY_METHOD_VERSION must equal it (tested).
  */
 export const INVESTABILITY_CURRENT_METHOD_VERSION =
-  "investiq/v3+investability-inputs.v5";
+  "investiq/v3+investability-inputs.v6";
 
 export function investabilityMethodLabel(methodVersion: string): string {
   const major = /^investiq\/v(\d+)/u.exec(methodVersion)?.[1];
@@ -263,6 +311,28 @@ export function investabilityLine(dto: InvestabilityDto): string {
       ? ""
       : ` · ${SCORE_CONFIDENCE_LABELS[dto.confidence]}`;
   return `Investability ${dto.score}${confidence} · ${factors}`;
+}
+
+/**
+ * "Business quality 68 · Developing · Low confidence", or "Business
+ * quality: not enough evidence yet". Null when the parts were not recorded.
+ */
+export function investabilityPartLines(dto: InvestabilityDto): string[] | null {
+  if (dto.parts === undefined) return null;
+  const parts = dto.parts;
+  return INVESTABILITY_PARTS.map(({ key, name }) => {
+    const part = parts[key];
+    if (part.score === null || part.band === null) {
+      return part.factors.onRecord === 0
+        ? `${name}: nothing shared yet`
+        : `${name}: ${String(part.factors.onRecord)} of ${String(part.factors.applicable)} factors on record, not enough to grade yet`;
+    }
+    const confidence =
+      part.confidence === null
+        ? ""
+        : ` · ${SCORE_CONFIDENCE_LABELS[part.confidence]}`;
+    return `${name} ${String(part.score)} · ${INVESTABILITY_BAND_LABELS[part.band]}${confidence}`;
+  });
 }
 
 /** "Suitability 80 · 6 of 7 known", or the honest words. */

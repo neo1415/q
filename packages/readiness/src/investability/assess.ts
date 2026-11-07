@@ -4,6 +4,7 @@ import {
   InvestabilityDtoSchema,
   type InvestabilityBand,
   type InvestabilityDto,
+  type InvestabilityPart,
   type ScoreFactor,
 } from "@capital-q/contracts";
 
@@ -17,6 +18,7 @@ import {
 import type { InvestIQObservation } from "../investiq/contracts.js";
 import {
   GRADED_DIMENSIONS,
+  OUTPUT_GROUPS,
   type GradedDimension,
   type ReadinessBand,
 } from "../investiq/method-v1.js";
@@ -520,6 +522,55 @@ function viewOf(
   const credibility = new Map(
     [...contentGraded].map((key) => [key, deciding.get(key) ?? 0] as const),
   );
+  // P1-7 (owner decision 78): the headline's two parts, each by the same
+  // equation over its own dimensions, with the same caps.
+  const partOf = (
+    group: "BUSINESS_QUALITY" | "INVESTMENT_READINESS",
+    provisional: boolean,
+  ): InvestabilityPart => {
+    const dims = new Set<string>(OUTPUT_GROUPS[group]);
+    const inGroup = new Set(
+      a.dimensions
+        .filter((d) => dims.has(d.dimension))
+        .flatMap((d) => d.criteria.map((c) => c.criterion)),
+    );
+    const point = pointEstimate(
+      a,
+      new Map([...credibility].filter(([key]) => inGroup.has(key))),
+      false,
+    );
+    const groupDims = a.dimensions.filter(
+      (d) => dims.has(d.dimension) && d.status !== "NOT_APPLICABLE",
+    );
+    const factors = {
+      onRecord: groupDims.reduce((n, d) => n + d.scoredCriteria, 0),
+      applicable: groupDims.reduce((n, d) => n + d.applicableGradedCriteria, 0),
+    };
+    // Facts merely on record grade nothing (P0-2): no number, the count.
+    if (point === null)
+      return { score: null, band: null, confidence: null, factors };
+    const summary =
+      group === "BUSINESS_QUALITY" ? a.businessQuality : a.investmentReadiness;
+    const confidence = provisional ? "LOW" : (summary.confidence ?? "LOW");
+    const raw = BAND_WORDS[bandOf(point)];
+    const { band } = cappedBand(
+      group === "BUSINESS_QUALITY" ? strongHeld(raw, a) : raw,
+      confidence,
+      provisional,
+    );
+    return {
+      score: Math.round(point * INVESTABILITY_SCALE),
+      band,
+      confidence,
+      factors,
+    };
+  };
+  const partsOf = (provisional: boolean) => ({
+    parts: {
+      businessQuality: partOf("BUSINESS_QUALITY", provisional),
+      readiness: partOf("INVESTMENT_READINESS", provisional),
+    },
+  });
   const range = evidenceRange(a, deciding);
   const rangeAround = (score: number) =>
     range === null
@@ -582,6 +633,7 @@ function viewOf(
       confidence,
       cappedByConfidence: capped,
       provisional: false,
+      ...partsOf(false),
     });
   }
   // ADR 0075: a number when something is content-graded; a thin basis is
@@ -603,6 +655,7 @@ function viewOf(
     confidence: "LOW",
     cappedByConfidence: capped,
     provisional: true,
+    ...partsOf(true),
   });
 }
 
