@@ -92,6 +92,11 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   // founder track's own step, opened by the tour.
   "/q-pitch/capital-q":
     "the founder track's Capital Q pitch page, opened by the tour",
+  // Q Workspace §8 A3/A4: Q opens it through the site map (W2, by route)
+  // and reads it with read_my "engagement"; a named ANALYTICS destination
+  // is requested from the contracts owner (W3).
+  "/analytics":
+    "opened through the site map by route, read with read_my engagement; its named destination is W3's to add",
   "/find": "old address, redirects to /search",
   "/gateway": "old address, redirects to /gateq",
   "/company":

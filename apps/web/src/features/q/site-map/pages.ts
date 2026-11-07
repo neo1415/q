@@ -262,6 +262,64 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       { id: "q-room-card", title: "Q's card", kind: "Q_ROOM_CARD" },
     ],
   },
+  "/analytics": {
+    title: "Analytics",
+    purpose:
+      "A founder's intent signals and investor viewing by week and slide; an investor's own visibility, views and founders' answers.",
+    audience: "ANY",
+    shows: ["COMPANY"],
+    sections: [
+      {
+        id: "intent",
+        title: "Intent",
+        kind: "INTEREST_LIST",
+        audience: "FOUNDER",
+      },
+      {
+        id: "deck-views",
+        title: "Deck views",
+        kind: "DECK",
+        audience: "FOUNDER",
+      },
+      {
+        id: "viewers",
+        title: "Who viewed",
+        kind: "OTHER",
+        audience: "FOUNDER",
+      },
+      { id: "trend", title: "By week", kind: "OTHER", audience: "FOUNDER" },
+      {
+        id: "breakdown",
+        title: "By investor type and geography",
+        kind: "OTHER",
+        audience: "FOUNDER",
+      },
+      {
+        id: "documents",
+        title: "Documents",
+        kind: "DOCUMENT_LIST",
+        audience: "FOUNDER",
+      },
+      {
+        id: "visibility",
+        title: "Your visibility",
+        kind: "VISIBILITY",
+        audience: "INVESTOR",
+      },
+      {
+        id: "my-activity",
+        title: "Companies you viewed",
+        kind: "COMPANY_LIST",
+        audience: "INVESTOR",
+      },
+      {
+        id: "responses",
+        title: "Founders' answers",
+        kind: "OTHER",
+        audience: "INVESTOR",
+      },
+    ],
+  },
   "/board": {
     title: "Board",
     purpose: "Your work board: what Q and you are working on.",

@@ -7,6 +7,8 @@ import {
   CompanyEngagementQuerySchema,
   createProblemDetails,
   ENGAGEMENT_EVENTS_PATH,
+  MY_ENGAGEMENT_PATH,
+  MyEngagementDtoSchema,
   PROBLEM_CONTENT_TYPE,
   RecordEngagementBatchRequestSchema,
   RecordEngagementBatchResponseSchema,
@@ -16,6 +18,7 @@ import {
 import type {
   CompanyEngagementReader,
   EngagementService,
+  MyEngagementReader,
 } from "@capital-q/engagement";
 
 import {
@@ -39,6 +42,7 @@ import {
 export type EngagementRoutesDependencies = ActorContextDependencies & {
   readonly engagement: EngagementService;
   readonly companyEngagement: CompanyEngagementReader;
+  readonly myEngagement: MyEngagementReader;
 };
 
 export function registerEngagementRoutes(
@@ -87,6 +91,24 @@ export function registerEngagementRoutes(
   // PUT VIEWING_PRIVACY_PATH is the declared app action
   // engagement.viewing_privacy.set (ADR 0040): one declaration for the
   // Settings control and Q's set_viewing_privacy.
+
+  /**
+   * A4: the person's own engagement: what they viewed, their visibility,
+   * and how founders answered what they asked. Their own records only.
+   */
+  app.get(
+    MY_ENGAGEMENT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const mine = await dependencies.myEngagement.read({
+        actorUserId: actor.userId,
+        organisationId: actor.organisationId ?? null,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return MyEngagementDtoSchema.parse(mine);
+    },
+  );
 
   /**
    * A3: the company's engagement, read by a member of its own

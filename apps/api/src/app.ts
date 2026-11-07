@@ -329,7 +329,10 @@ export type ApiModules = {
   // end ADMIN block
   // ANALYTICS block (Q Workspace §8)
   readonly engagement?:
-    | Pick<EngagementRoutesDependencies, "engagement" | "companyEngagement">
+    | Pick<
+        EngagementRoutesDependencies,
+        "engagement" | "companyEngagement" | "myEngagement"
+      >
     | undefined;
   // end ANALYTICS block
   /** Q.03/Q.04/Q.01: the founder's own readiness, plan and follow-ups. */

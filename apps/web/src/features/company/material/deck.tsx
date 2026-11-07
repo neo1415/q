@@ -33,6 +33,7 @@ import {
   openDeckAction,
   type OpenedFile,
 } from "./material-actions";
+import { useDeckEngagement } from "@/features/engagement/use-engagement";
 import { useT } from "@/features/i18n/language";
 import { DocumentFiguresReview } from "@/features/documents/document-figures-review";
 import {
@@ -96,6 +97,13 @@ function DeckViewer({
   }, [autoOpen, open]);
   const move = (by: number) =>
     setSlide((now) => Math.max(1, Math.min(total ?? now + by, now + by)));
+  // Q Workspace §8 A1: a reader's open and time per slide (never the owner).
+  useDeckEngagement({
+    enabled: !owner && file !== null,
+    companyId,
+    documentId: deck.documentId,
+    slide,
+  });
   return (
     <div className="flex flex-col gap-3" data-deck-viewer>
       <div

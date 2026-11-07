@@ -104,6 +104,8 @@ describe("MobileNavigation (option B, owner 2026-10-18)", () => {
     );
     expect(hrefs).toEqual([
       "/profile",
+      // Q Workspace §8: not a tab, so the phone reaches it here.
+      "/analytics",
       "/settings/usage",
       "/settings",
       "/admin",

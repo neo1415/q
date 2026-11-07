@@ -32,6 +32,12 @@ const day = (value: unknown): string => {
 };
 const num = z.coerce.number().int();
 const text = z.string();
+const nullableText = z.string().nullable();
+const timestamp = (value: unknown): string => {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") return new Date(value).toISOString();
+  throw new TypeError("expected a timestamp");
+};
 
 const nullableNum = z.coerce.number().int().nullable();
 const ViewerRow = z.object({
@@ -79,20 +85,33 @@ export function createPostgresCompanyEngagementReader(
       // Not a member, or no such company: the same answer.
       if (access?.allowed !== true) return null;
 
-      const [periods, funnel, videos, documents, viewers, detail, slices] =
-        await Promise.all([
-          sql`select * from analytics.company_engagement_periods(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-          sql`select * from analytics.company_deck_funnel(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-          sql`select * from analytics.company_video_completion(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-          sql`select * from analytics.company_document_views(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-          // Names only for ids the projection chose to show.
-          sql`select v.*, p.display_name as viewer_name, o.display_name as organisation_name
+      const [
+        periods,
+        funnel,
+        videos,
+        documents,
+        viewers,
+        detail,
+        slices,
+        intent,
+      ] = await Promise.all([
+        sql`select * from analytics.company_engagement_periods(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        sql`select * from analytics.company_deck_funnel(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        sql`select * from analytics.company_video_completion(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        sql`select * from analytics.company_document_views(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        // Names only for ids the projection chose to show.
+        sql`select v.*, p.display_name as viewer_name, o.display_name as organisation_name
               from analytics.company_engagement_viewers(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz) v
               left join identity.user_profiles p on p.id = v.viewer_user_id
               left join identity.organisations o on o.id = v.viewer_organisation_id`,
-          sql`select * from analytics.company_viewer_deck_detail(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-          sql`select * from analytics.company_engagement_slices(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
-        ]);
+        sql`select * from analytics.company_viewer_deck_detail(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        sql`select * from analytics.company_engagement_slices(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz)`,
+        // Names only for the ids the projection chose to show.
+        sql`select i.*, p.display_name as viewer_name, o.display_name as organisation_name
+                from analytics.company_intent_signals(${actorUserId}::uuid, ${companyId}::uuid, ${since}::timestamptz) i
+                left join identity.user_profiles p on p.id = i.viewer_user_id
+                left join identity.organisations o on o.id = i.viewer_organisation_id`,
+      ]);
 
       return CompanyEngagementDtoSchema.parse({
         companyId,
@@ -103,6 +122,27 @@ export function createPostgresCompanyEngagementReader(
         passiveBatch: access.batch,
         perViewer: access.per_viewer === true,
         entitled: access.entitled === true,
+        intent: intent.map((r) => {
+          const viewerUserId = nullableText.parse(r["viewer_user_id"]);
+          const viewerOrganisationId = nullableText.parse(
+            r["viewer_organisation_id"],
+          );
+          return {
+            type: text.parse(r["signal_type"]),
+            occurredAt: timestamp(r["occurred_at"]),
+            visibility: text.parse(r["visibility"]),
+            viewerUserId,
+            viewerName:
+              viewerUserId === null
+                ? null
+                : nullableText.parse(r["viewer_name"]),
+            viewerOrganisationId,
+            organisationName:
+              viewerOrganisationId === null
+                ? null
+                : nullableText.parse(r["organisation_name"]),
+          };
+        }),
         periods: periods.map((r) => ({
           periodStart: day(r["period_start"]),
           organisations: num.parse(r["organisations"]),

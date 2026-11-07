@@ -299,6 +299,66 @@ export const Q_SITE_MAP: QSiteMap = {
       sections: [],
     },
     {
+      route: "/analytics",
+      title: "Analytics",
+      purpose:
+        "A founder's intent signals and investor viewing by week and slide; an investor's own visibility, views and founders' answers.",
+      audience: "ANY",
+      params: [],
+      shows: ["COMPANY"],
+      destinations: [],
+      recordPages: [],
+      settingsSections: [],
+      tabs: [],
+      sections: [
+        {
+          id: "intent",
+          title: "Intent",
+          kind: "INTEREST_LIST",
+        },
+        {
+          id: "deck-views",
+          title: "Deck views",
+          kind: "DECK",
+        },
+        {
+          id: "viewers",
+          title: "Who viewed",
+          kind: "OTHER",
+        },
+        {
+          id: "trend",
+          title: "By week",
+          kind: "OTHER",
+        },
+        {
+          id: "breakdown",
+          title: "By investor type and geography",
+          kind: "OTHER",
+        },
+        {
+          id: "documents",
+          title: "Documents",
+          kind: "DOCUMENT_LIST",
+        },
+        {
+          id: "visibility",
+          title: "Your visibility",
+          kind: "VISIBILITY",
+        },
+        {
+          id: "my-activity",
+          title: "Companies you viewed",
+          kind: "COMPANY_LIST",
+        },
+        {
+          id: "responses",
+          title: "Founders' answers",
+          kind: "OTHER",
+        },
+      ],
+    },
+    {
       route: "/board",
       title: "Board",
       purpose: "Your work board: what Q and you are working on.",
