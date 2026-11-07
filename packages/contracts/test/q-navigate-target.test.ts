@@ -340,7 +340,7 @@ describe("Q Workspace screen context and set_layout (W1/W4 via W3)", () => {
   });
 });
 
-describe("W3 gaps for W4: sub, founders' Discover, Settings plan", () => {
+describe("W3 gaps for W4: sub, and the founders tab as a target", () => {
   it("a target names a part of its tab by key", () => {
     const intent = navigateTargetToIntent({
       page: "COMPANY",
@@ -386,12 +386,15 @@ describe("W3 gaps for W4: sub, founders' Discover, Settings plan", () => {
     ).toBe(false);
   });
 
-  it("the two new destinations are navigable, and old ones still parse", () => {
-    for (const destination of [
-      "DISCOVER_FOUNDERS",
-      "SETTINGS_PLAN",
-      "RESULTS",
-    ]) {
+  it("founders' Discover is DISCOVER at its founders tab; RESULTS still parses", () => {
+    expect(
+      navigateTargetToIntent({ page: "DISCOVER", tab: "founders" }),
+    ).toEqual({
+      kind: "NAVIGATE",
+      destination: "DISCOVER",
+      target: { tab: "founders" },
+    });
+    for (const destination of ["DISCOVER", "RESULTS"]) {
       expect(
         QNavigateIntentSchema.safeParse({ kind: "NAVIGATE", destination })
           .success,

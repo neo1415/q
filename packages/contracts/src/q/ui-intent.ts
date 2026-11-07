@@ -187,10 +187,6 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "BOARD",
   // Sweep 2026-10-29: the investor's mandate, by its own name.
   "MANDATE",
-  // Q Workspace W3 (W4's gaps): a founder's Discover tab of founders'
-  // videos, and Settings' plan page.
-  "DISCOVER_FOUNDERS",
-  "SETTINGS_PLAN",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

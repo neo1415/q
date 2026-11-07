@@ -331,10 +331,6 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // Sweep 2026-10-29: "take me to my mandate" went to Settings.
   MANDATE:
     "Opens an investor's mandate on their profile (what they invest in, cheque, stage, places), where they edit it.",
-  // Q Workspace W3 (W4's gaps).
-  DISCOVER_FOUNDERS:
-    "Opens a founder's Discover on its founders tab: other founders' videos opened to the network.",
-  SETTINGS_PLAN: "Opens Settings → Plan: their Capital Q plan.",
 };
 
 /** Screens that belong to a company's own people. */
@@ -344,8 +340,6 @@ const COMPANY_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
   "PITCH",
   "COMPANY_INTEREST",
   "NEW_PITCH",
-  // A founder's Discover tab (an investor's Discover has no founders tab).
-  "DISCOVER_FOUNDERS",
 ]);
 
 /**

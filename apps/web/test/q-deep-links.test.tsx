@@ -158,8 +158,7 @@ describe("W3.2 every deep link's path", () => {
       { page: "OWN_DECK", sub: "use_of_funds" },
       "/company/data-room?tab=deck&sub=use_of_funds",
     ],
-    [{ page: "DISCOVER_FOUNDERS" }, "/discover?tab=founders"],
-    [{ page: "SETTINGS_PLAN" }, "/settings/plan"],
+    [{ page: "DISCOVER", tab: "founders" }, "/discover?tab=founders"],
     [{ page: "RESULTS" }, "/relationships?view=overview"],
     [
       { page: "CAPITAL_ROUND", recordId: COMPANY },

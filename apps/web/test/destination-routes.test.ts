@@ -72,8 +72,6 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   // Sweep 2026-10-29: the bare address, resolved on the server to the
   // investor's mandate on their profile.
   MANDATE: "/mandate",
-  DISCOVER_FOUNDERS: "/discover?tab=founders",
-  SETTINGS_PLAN: "/settings/plan",
 };
 
 /**
@@ -100,6 +98,8 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
     "the bare company address, redirects to the founder's own /company/<id> (Q opens it by name)",
   "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",
   "/capital": "old address, redirects to the CRM's Capital tab (Q's CAPITAL)",
+  "/results":
+    "old address, redirects to the CRM's overview (Q's RESULTS goes there directly)",
   "/discover/yours": "old address, redirects to /discover?tab=yours",
   "/settings/reconnect/google": "a hand-off from Google, not a page to visit",
   "/join": "an invitation link",
