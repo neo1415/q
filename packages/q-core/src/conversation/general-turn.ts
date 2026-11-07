@@ -91,6 +91,15 @@ export function readingFromTurnReader(
   };
 }
 
+/** Turn kinds that ask Q for something (an answer turn never does). */
+const ASKS_SOMETHING: ReadonlySet<string> = new Set([
+  "QUESTION_TO_Q",
+  "RESEARCH_REQUEST",
+  "TOOL_REQUEST",
+  "CORRECTION",
+  "CLARIFICATION",
+]);
+
 export function researchDirectiveFor(
   state: ConversationState,
   reading: ConversationTurnReading,
@@ -98,8 +107,30 @@ export function researchDirectiveFor(
     readonly available: boolean;
     /** The reader's `aboutNamedOther`: a named company or person not theirs. */
     readonly aboutNamedOther?: boolean | undefined;
+    /**
+     * The reader's `asksForWeb` (v78, by meaning): they asked for the
+     * public web ("online", "on the web", "what's out there about us").
+     */
+    readonly asksForWeb?: boolean | undefined;
   },
 ): ResearchDirective {
+  // Owner replay batch 8 (#10): "what can you find about me online?" ran
+  // no search -- read as their own records it was ONLY_IF_EMPTY and the web
+  // call was held because their profile is always found; read as a plain
+  // question it was never offered. Asking for the web is explicit research.
+  if (
+    environment.asksForWeb === true &&
+    ASKS_SOMETHING.has(reading.kind) &&
+    !(
+      reading.kind === "QUESTION_TO_Q" &&
+      (reading.question?.kind === "FIT" ||
+        reading.question?.kind === "DISCOVER_COMPANIES")
+    )
+  ) {
+    return environment.available && !isExhausted(state.failures, "RESEARCH")
+      ? { mode: "EXPLICIT", announceSourceChange: false }
+      : NO_RESEARCH;
+  }
   // Which companies on Capital Q they could invest in is computed against
   // their mandate from Capital Q's own companies; the public web never
   // answers it (live 2026-10-09: read as ADVICE and researched, 23-30 s

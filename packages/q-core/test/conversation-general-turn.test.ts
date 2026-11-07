@@ -343,3 +343,49 @@ describe("a correction keeps the research tools in hand (R3)", () => {
     ).toBe("NEVER");
   });
 });
+
+/**
+ * Owner replay batch 8 (#10): "what can you find about me online?" ran no
+ * web search. Read as their own records it was ONLY_IF_EMPTY, and the web
+ * call was held because their own profile is always found; read as a
+ * plain question it was never offered. The reader's asksForWeb (by
+ * meaning: they asked for the public web) makes it explicit research.
+ */
+describe("asking for the web is explicit research (#10)", () => {
+  const directiveWeb = (
+    result: TurnReaderResult,
+    asksForWeb: boolean,
+    available = true,
+  ) =>
+    researchDirectiveFor(
+      INITIAL_CONVERSATION_STATE,
+      readingFromTurnReader(result),
+      { available, aboutNamedOther: result.aboutNamedOther, asksForWeb },
+    );
+  const own = read({
+    question: {
+      kind: "THEIR_OWN_RECORDS",
+      text: "what can you find about me online?",
+      about: [],
+      count: null,
+      discover: null,
+      subject: null,
+    },
+  });
+
+  it("about their own record, asked online: EXPLICIT, never held for their records", () => {
+    expect(directiveWeb(own, true).mode).toBe("EXPLICIT");
+    expect(directiveWeb(own, false).mode).toBe("ONLY_IF_EMPTY");
+  });
+
+  it("a plain question asked online: EXPLICIT; with research down: NEVER", () => {
+    expect(directiveWeb(read({}), true).mode).toBe("EXPLICIT");
+    expect(directiveWeb(read({}), true, false).mode).toBe("NEVER");
+  });
+
+  it("an answer turn is still never research, whatever it says", () => {
+    expect(
+      directiveWeb(read({ kind: "ANSWER", question: null }), true).mode,
+    ).toBe("NEVER");
+  });
+});

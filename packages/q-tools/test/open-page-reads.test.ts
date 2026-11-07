@@ -1,0 +1,132 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  QClientActionToolResultSchema,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
+
+import {
+  createOpenPageTool,
+  createQToolExecutor,
+  createQToolRegistry,
+  type RelationshipIntelligencePort,
+} from "../src/index.js";
+import {
+  COMPANY_B_NETWORK,
+  actorA,
+  contextFor,
+  fakePorts,
+  planFor,
+} from "./support.js";
+
+/**
+ * Owner replay batch 8 (production log): one fast navigation, "take me to
+ * harbourline cargos profile", took 3 s and 124 database round trips.
+ * open_page by name built the whole list of records the person can reach
+ * (relationships, feed decisions, feed page, network search) once to
+ * match the name and again, by the record's own name, to check the record
+ * is reachable -- though it had just been matched from that list. Now the
+ * list is built once, and its reads are sent together.
+ */
+
+const NAMED = "Beacon Analytics";
+
+/** Their own conversation, as the run's plan carries it. */
+function ownPlan(): PermittedContextPlan {
+  const plan = planFor(actorA, "GENERAL_QUESTION", [
+    { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+  ]);
+  return {
+    ...plan,
+    scopes: plan.scopes.map((scope) =>
+      scope.kind === "OWN_Q_CONVERSATION"
+        ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+        : scope,
+    ),
+  };
+}
+
+function counted() {
+  const reads = { own: 0, decisions: 0, feed: 0 };
+  let inFlight = 0;
+  let together = 0;
+  const track = <T>(value: T): Promise<T> => {
+    inFlight += 1;
+    together = Math.max(together, inFlight);
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        inFlight -= 1;
+        resolve(value);
+      }, 1),
+    );
+  };
+  const relationships: RelationshipIntelligencePort = {
+    ownRelationships: () => {
+      reads.own += 1;
+      return track({
+        side: "INVESTOR" as const,
+        items: [
+          {
+            relationshipId: "r1",
+            counterpart: {
+              kind: "COMPANY" as const,
+              id: COMPANY_B_NETWORK,
+              name: NAMED,
+            },
+            state: "CONNECTED" as const,
+            stateSince: "2026-09-20T10:00:00.000Z",
+            nextStep: "SCHEDULE_MEETING" as const,
+            milestones: [],
+          },
+        ],
+      });
+    },
+    withCompany: () => Promise.resolve(null),
+    withInvestor: () => Promise.resolve(null),
+    byRelationship: () => Promise.resolve(null),
+    incomingInterest: () => Promise.resolve([]),
+    mayExpressInterest: () => Promise.resolve(false),
+    mayAnswerInterest: () => Promise.resolve(false),
+    prepareForApproval: () => "PREPARED",
+  };
+  const investorFeed = {
+    decisions: () => {
+      reads.decisions += 1;
+      return track([]);
+    },
+    page: () => {
+      reads.feed += 1;
+      return track({ items: [], notes: [] });
+    },
+  };
+  return {
+    reads,
+    together: () => together,
+    ports: fakePorts({ relationships, investorFeed }),
+  };
+}
+
+describe("open_page by name reads the reachable records once (batch 8 speed)", () => {
+  it("a company in another tenant matched by a misheard name: one list build, its reads together", async () => {
+    const { reads, together, ports } = counted();
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(ports)]),
+    });
+    const outcome = await executor.execute(
+      {
+        id: "call-1",
+        name: "open_page",
+        arguments: { page: "COMPANY", name: "beacon analitics" },
+      } as never,
+      contextFor(actorA, ownPlan()),
+    );
+    const data = (outcome as { result: { ok: boolean; data?: unknown } })
+      .result;
+    expect(data).toMatchObject({ ok: true });
+    expect(QClientActionToolResultSchema.parse(data.data).clientAction).toEqual(
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY_B_NETWORK },
+    );
+    expect(reads).toEqual({ own: 1, decisions: 1, feed: 1 });
+    expect(together()).toBeGreaterThanOrEqual(3);
+  });
+});

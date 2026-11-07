@@ -1700,6 +1700,29 @@ describe("a general turn is read before it is answered", () => {
     expect(directives[0]?.mode).toBe("EXPLICIT");
   });
 
+  // Owner replay batch 8 (#10): "what can you find about me online?" was
+  // read as their own records (ONLY_IF_EMPTY) and the web never ran.
+  it("asking for the web about themselves is explicit research, not their records first", async () => {
+    const { answer, directives } = seam({
+      said: "what can you find about me online?",
+      reading: {
+        ...advice,
+        asksForWeb: true,
+        question: {
+          kind: "THEIR_OWN_RECORDS",
+          text: "what can you find about me online?",
+          about: [],
+          count: null,
+          discover: null,
+          subject: null,
+        },
+      } as TurnReaderResult,
+      outcomes: [],
+    });
+    await answer.answer(request());
+    expect(directives[0]?.mode).toBe("EXPLICIT");
+  });
+
   it("lets a request for a real example reach the web", async () => {
     const { answer, directives } = seam({
       said: "Give me a real investor like me",
