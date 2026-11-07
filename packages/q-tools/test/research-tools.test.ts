@@ -549,6 +549,45 @@ describe("public_web.search", () => {
     expect(provider.egressed()).not.toContain(INVESTOR_B);
   });
 
+  // Owner live test 7 Nov (R3; CQ-Q-RESEARCH-001 §9 amended, DECISIONS
+  // 77/78): "what can you find about me online" looks for them and their
+  // firm; their own name leaves only in a search about themselves.
+  const selfIdentity = {
+    displayName: () => Promise.resolve("Ama Mensah"),
+    investorOrganisation: () =>
+      Promise.resolve({ websiteUrl: "https://beacon.vc", hqCountry: "GH" }),
+  };
+
+  it("R3: about themselves, their own name and firm (with its country) are searched together", async () => {
+    const { port: p, provider } = harness({ selfIdentity });
+    const outcome = await search(
+      { query: "what can you find about me online", aboutThemselves: true },
+      speaking(
+        contextFor(actorB, investorPlan),
+        "what can you find about me online",
+      ),
+      p,
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    const sent = provider.egressed().toLowerCase();
+    expect(sent).toContain("ama mensah beacon ventures ghana");
+    expect(provider.egressed()).not.toContain(INVESTOR_MARKER);
+    expect(provider.egressed()).not.toContain(MARKERS.investor);
+  });
+
+  it("R3: about someone else, their own name never leaves", async () => {
+    const { port: p, provider } = harness({ selfIdentity });
+    await search(
+      { query: "Kobo360 logistics news" },
+      speaking(
+        contextFor(actorB, investorPlan),
+        "What's the news on Kobo360 logistics?",
+      ),
+      p,
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain("ama mensah");
+  });
+
   it("C: a company of another tenant that is not disclosed is not available, and nothing leaves", async () => {
     const { port: p, provider } = harness();
     const outcome = await search(

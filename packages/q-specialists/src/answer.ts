@@ -2583,9 +2583,24 @@ export function createSpecialistQAnswer(
   async function recordAnswer(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
-    written: string,
+    given: string,
     answerBlocks?: readonly QResultBlock[],
+    options?: {
+      /**
+       * Owner replay batch 7 (#3): a line saying a record could not be
+       * opened ("I can't open … from here right now") from code's narrower
+       * resolution. When the page pane's move is made this turn, the
+       * answer says what actually happened instead.
+       */
+      readonly yieldsToMove?: boolean | undefined;
+    },
   ): Promise<QAnswerOutcome> {
+    // W4: the page pane's move joins the answer, outside the transaction.
+    const blocks = await movedBlocks(request, answerBlocks);
+    const written =
+      options?.yieldsToMove === true && addsMove(answerBlocks, blocks)
+        ? MOVE_MADE_LINE
+        : given;
     const turn = turnOfRun.get(request.runId);
     const localise = dependencies.localiseWords;
     const content =
@@ -2602,8 +2617,6 @@ export function createSpecialistQAnswer(
               texts,
             ),
           );
-    // W4: the page pane's move joins the answer, outside the transaction.
-    const blocks = await movedBlocks(request, answerBlocks);
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         tenantId: request.tenantId,
@@ -6162,7 +6175,12 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, outcome: byName.log },
         "q opened a record by its name",
       );
-      return recordAnswer(request, conversationId, byName.said, byName.blocks);
+      // A record that code could not open, or found nothing by that name:
+      // the line yields to the page pane's move, when one is made.
+      return recordAnswer(request, conversationId, byName.said, byName.blocks, {
+        yieldsToMove:
+          byName.log === "PART_UNAVAILABLE" || byName.log === "NOT_FOUND",
+      });
     }
     const paged =
       continuesQ || movesWithQuestion.has(request.runId)
@@ -9213,4 +9231,23 @@ function recentTurnPairs(
     }
   }
   return pairs.slice(-4);
+}
+
+/** Owner replay batch 7 (#3): what is said when the pane's move was made. */
+const MOVE_MADE_LINE = "I've opened it for you.";
+
+/** Whether the settled blocks carry a move the answer's own blocks did not. */
+function addsMove(
+  before: readonly QResultBlock[] | undefined,
+  after: readonly QResultBlock[] | undefined,
+): boolean {
+  const moves = (blocks: readonly QResultBlock[] | undefined) =>
+    (blocks ?? []).filter(
+      (block) =>
+        block.kind === "UI_INTENT" &&
+        (block.intent.kind === "NAVIGATE" ||
+          block.intent.kind === "OPEN_RECORD_PAGE" ||
+          block.intent.kind === "OPEN_SETTINGS"),
+    ).length;
+  return moves(after) > moves(before);
 }

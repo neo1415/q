@@ -327,13 +327,13 @@ export async function performOnControl(
   if (governing === "APPROVAL") {
     // Never run from an act: prepared for the person's approval of its
     // exact payload, which alone runs it (approval-requests.ts).
-    noteHeld(
-      intent.actId,
-      entry.action !== undefined && requestApproval(entry.action)
-        ? "AWAITING_APPROVAL"
-        : "NOTHING_PREPARED",
-    );
-    return "NOT_APPLICABLE";
+    const prepared =
+      entry.action !== undefined && requestApproval(entry.action);
+    noteHeld(intent.actId, prepared ? "AWAITING_APPROVAL" : "NOTHING_PREPARED");
+    // Owner replay batch 7 (#9): reported as NOT_APPLICABLE, the next turn
+    // said the step "didn't go through". The receipt says what happened:
+    // prepared, waiting for their approval (W5 contract status).
+    return prepared ? "AWAITING_APPROVAL" : "NOT_APPLICABLE";
   }
   if (governing === "CONFIRM") {
     const confirmed = await askConfirm(

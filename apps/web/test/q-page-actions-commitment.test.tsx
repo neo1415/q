@@ -123,7 +123,8 @@ describe("Q and the relationship's commitment", () => {
     );
     const step = activate("button.commitment-confirm");
     const receipt = await performUiAct(step);
-    expect(receipt.status).toBe("NOT_APPLICABLE");
+    // Owner replay batch 7 (#9): prepared, waiting for approval.
+    expect(receipt.status).toBe("AWAITING_APPROVAL");
     expect(heldReason(step.actId)).toBe("AWAITING_APPROVAL");
     expect(confirmCommitmentAction).not.toHaveBeenCalled();
     expect(pending[0]?.payload).toEqual({

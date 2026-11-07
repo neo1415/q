@@ -252,7 +252,10 @@ describe("APPROVAL: prepared, approved on its exact payload, run once", () => {
     });
     const step = intent("ACTIVATE", "button.send-message");
     const receipt = await performUiAct(step);
-    expect(receipt.status).toBe("NOT_APPLICABLE");
+    // Owner replay batch 7 (#9): reported NOT_APPLICABLE, the next turn
+    // said "My last step on your screen didn't go through". It is
+    // prepared and waiting for their approval, and says so.
+    expect(receipt.status).toBe("AWAITING_APPROVAL");
     expect(execute).not.toHaveBeenCalled();
     expect(click).not.toHaveBeenCalled();
     expect(heldReason(step.actId)).toBe("AWAITING_APPROVAL");
