@@ -1,0 +1,68 @@
+{
+  "split": "dev",
+  "turns": 20,
+  "summary": {
+    "overall": {
+      "turns": 20,
+      "passRate": 1,
+      "decisionAccuracy": 1,
+      "moveTargetExact": 1,
+      "wrongPageMoveRate": 0,
+      "forbiddenMoves": 0
+    },
+    "bySplit": {
+      "dev": {
+        "turns": 20,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "heldout": {
+        "turns": 0,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 1,
+        "forbiddenMoves": 0
+      }
+    },
+    "byCategory": {
+      "COVERAGE": {
+        "turns": 14,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "TYPO": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      }
+    },
+    "labsGate": true,
+    "onGate": false
+  },
+  "missesByCategory": {},
+  "calls": 60,
+  "tokens": {
+    "input": 613284,
+    "cached": 397923,
+    "output": 6715,
+    "cost": 0.5774565999999999
+  },
+  "latency": {
+    "p50Ms": 1569,
+    "p95Ms": 4008,
+    "maxMs": 4157,
+    "votes": 3,
+    "concurrency": 4
+  },
+  "misses": []
+}
