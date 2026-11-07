@@ -156,6 +156,7 @@ import {
   MediaAssetIdSchema,
 } from "@capital-q/media";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
+import { INVESTABILITY_METHOD_VERSION } from "@capital-q/readiness";
 import {
   createPostgresChunkRepository,
   createQKnowledgeService,
@@ -694,6 +695,8 @@ const recommendations = createRecommendationPipeline({
   sql: database.sql,
   transactions: database.transactions,
   disclosure,
+  // Only the current Investability method orders Discover (metrics audit).
+  investabilityMethodVersion: INVESTABILITY_METHOD_VERSION,
   // discover-feed-eligibility.v1: the Discover video feed admits only
   // companies with a playable pitch, by the Media context's own rule.
   playablePitches: playablePitchPortFrom({

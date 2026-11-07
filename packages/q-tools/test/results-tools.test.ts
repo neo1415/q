@@ -86,6 +86,51 @@ describe("get_my_results", () => {
     );
     expect(summariseResults({ side: "NONE" }).figures).toEqual([]);
   });
+
+  it("an unknown count is Not recorded, never 0 (metrics audit P1-17)", () => {
+    const founder: ResultsDto = {
+      side: "FOUNDER",
+      organisationName: "Nixo",
+      window: WINDOW,
+      raise: null,
+      pipeline: { byState: [], rows: [] },
+      engagement: {
+        interestsReceived: 0,
+        connections: 0,
+        meetingsHeld: 0,
+        profileOpens: { value: null, belowFloor: false },
+        pitchWatches: { value: 0, belowFloor: false },
+      },
+      rehearsals: [],
+      documents: [],
+    };
+    expect(summariseResults(founder).figures).toContainEqual({
+      label: "Investor firms that opened the profile",
+      value: "Not recorded",
+    });
+    // Fewer seen than acted on: the views were not all recorded.
+    const investor: ResultsDto = {
+      side: "INVESTOR",
+      organisationName: "Ventures Platform",
+      window: WINDOW,
+      funnel: {
+        seen: 0,
+        saved: 4,
+        interest: 2,
+        connected: 0,
+        met: 0,
+        committed: 0,
+      },
+      meetings: { held: 0, upcoming: [] },
+      qWork: { runs: [], errands: 0, documents: 0 },
+      pipelineFit: [],
+      hasMandate: true,
+    };
+    expect(summariseResults(investor).figures).toContainEqual({
+      label: "Seen",
+      value: "Not recorded",
+    });
+  });
 });
 
 describe("get_my_results_report", () => {

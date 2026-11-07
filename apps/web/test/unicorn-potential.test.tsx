@@ -214,6 +214,7 @@ describe("Unicorn Potential progressive assessment", () => {
     expect(summary?.textContent).toContain("75/100");
     expect(summary?.textContent).toContain("Moderate confidence");
     expect(summary?.textContent).toContain("100% coverage");
+    // Owner decision 76: the caveat is on expansion only, once.
     expect(summary?.textContent).not.toContain("probability");
     expect(screen.getByText(UNICORN_POTENTIAL_CAVEAT).closest("details")).toBe(
       root,

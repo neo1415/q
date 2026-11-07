@@ -55,7 +55,7 @@ import {
  */
 
 /** v2 (ADR 0075): unconfirmed reads of open decks and investor-visible pitches. v4 (2026-10-28): figures keep their stated currency; annualised revenue is a year. */
-export const INVESTABILITY_INPUTS_VERSION = "investability-inputs.v4";
+export const INVESTABILITY_INPUTS_VERSION = "investability-inputs.v5";
 
 type Reading = InvestIQObservation["reading"];
 type SourceKind = InvestIQObservation["provenance"]["sourceKind"];

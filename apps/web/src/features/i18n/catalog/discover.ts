@@ -142,7 +142,7 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "No scored companies match these filters.":
     "لا توجد شركات ذات درجة تطابق عوامل التصفية هذه.",
   "Unicorn Potential needs sufficient current evidence before an overall score is available. This view excludes companies without a score; missing evidence is not a judgment of business quality.":
-    "تتطلب إمكانات النمو إلى شركة يونيكورن أدلة حالية كافية قبل إتاحة درجة إجمالية. يستبعد هذا العرض الشركات التي لا تتوفر لها درجة؛ ونقص الأدلة ليس حكماً على جودة الأعمال.",
+    "يتطلب مؤشر Unicorn Potential أدلة حالية كافية قبل إتاحة درجة إجمالية. يستبعد هذا العرض الشركات التي لا تتوفر لها درجة؛ ونقص الأدلة ليس حكماً على جودة الأعمال.",
   "No companies match these filters.": "لا توجد شركات تطابق عوامل التصفية هذه.",
   "No founder has shared a video with everyone yet.":
     "لم يشارك أي مؤسس مقطعاً مع الجميع بعد.",
@@ -270,9 +270,15 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Raise not shared": "الجولة غير مُشارَكة",
   "Suitability for you": "الملاءمة لك",
   "The other": "العوامل الأخرى",
+  "are unknown.": "غير معروفة.",
   "There is not enough shared evidence for a number yet.":
     "لا توجد أدلة مُشارَكة كافية لرقم بعد.",
-  "Unicorn potential": "إمكانية أن تصبح يونيكورن",
+  "Unicorn potential": "مؤشر Unicorn Potential",
+  coverage: "تغطية",
+  // UNICORN_POTENTIAL_CAVEAT (metrics audit P0-7): shown wherever the
+  // score is, in every language.
+  "Unicorn Potential is an evidence-based growth-characteristics indicator. It is not the probability of reaching a $1 billion valuation.":
+    "مؤشر Unicorn Potential مؤشر قائم على الأدلة لخصائص النمو. وهو ليس احتمال بلوغ تقييم بمليار دولار.",
   "Would raise confidence": "سيرفع الثقة",
   "factors have evidence": "عوامل لها أدلة",
   "factors.": "عاملًا.",

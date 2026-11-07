@@ -163,17 +163,21 @@ describe("CompanyScores", () => {
       "Investability: not enough shared evidence yet · based on 15 of 46 factors",
     );
     expect(line?.textContent).toContain("Suitability 80 · 6 of 7 known");
-    expect(line?.getAttribute("aria-label")).toBe(companyScoresLabel(thin));
+    expect(line?.querySelector(".sr-only")?.textContent).toBe(
+      companyScoresLabel(thin),
+    );
   });
 
   it("the minimal tile variant keeps the full sentence as its name", () => {
     render(<CompanyScores scores={scored} variant="minimal" />);
     const tile = document.querySelector('[data-company-scores="minimal"]');
-    expect(tile?.getAttribute("aria-label")).toContain(
-      "Investability 58 · based on 15 of 46 factors",
+    expect(tile?.querySelector(".sr-only")?.textContent).toContain(
+      "Investability 58 · Low confidence · based on 15 of 46 factors",
     );
     // One clean signal on the tile: the fit with this viewer.
-    expect(tile?.textContent).toBe("Suitability 80");
+    expect(tile?.querySelector('[aria-hidden="true"]')?.textContent).toBe(
+      "Suitability 80",
+    );
   });
 
   it("a tile drops an unscored Unicorn Potential from its visible line, never from its name", () => {
@@ -200,8 +204,12 @@ describe("CompanyScores", () => {
     };
     render(<CompanyScores scores={unscored} variant="minimal" />);
     const tile = document.querySelector('[data-company-scores="minimal"]');
-    expect(tile?.textContent).not.toContain("Unicorn");
-    expect(tile?.getAttribute("aria-label")).toBe(companyScoresLabel(unscored));
+    expect(
+      tile?.querySelector('[aria-hidden="true"]')?.textContent,
+    ).not.toContain("Unicorn");
+    expect(tile?.querySelector(".sr-only")?.textContent).toBe(
+      companyScoresLabel(unscored),
+    );
   });
 
   it("cards on one page share one batched read", async () => {

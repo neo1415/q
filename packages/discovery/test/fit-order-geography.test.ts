@@ -40,8 +40,8 @@ const base = (n: number) =>
   }));
 
 describe("discover order with a declared geography (fit-order.v3, v4)", () => {
-  it("is the current, versioned policy, with v2's weights", () => {
-    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v4");
+  it("is the current, versioned policy, with v3's declared tier", () => {
+    expect(FIT_ORDER_CURRENT.version).toBe("fit-order.v5");
     expect(FIT_ORDER_V3.geographyFirst).toEqual(["MUST", "STRONG"]);
     expect(Object.isFrozen(FIT_ORDER_V3)).toBe(true);
   });

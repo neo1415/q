@@ -83,6 +83,26 @@ describe("readiness rules v1", () => {
     );
   });
 
+  it("never tells a founder a missing item is not counted when it makes a Gap (metrics audit P0-9)", () => {
+    const result = assess(
+      {
+        ...EMPTY,
+        raise: {
+          target: "450000 USD",
+          useOfFunds: false,
+          instrument: true,
+          valuation: false,
+          targetCloseDate: false,
+        },
+      },
+      READINESS_RULES_V1,
+    );
+    expect(result.pillars.some((p) => p.status === "GAP")).toBe(true);
+    const text = result.uncertainty.join(" ");
+    expect(text).not.toMatch(/never counted against you/i);
+    expect(text).toMatch(/Gap/);
+  });
+
   it("stated revenue without a document is UNSUPPORTED, a document closes it", () => {
     const stated = {
       ...EMPTY,

@@ -1309,7 +1309,7 @@ function DossierActions({
 const NO_LABELS: ReadonlyMap<string, string> = new Map();
 
 /**
- * Discover is ordered by fit (fit-order.v1): a higher fit out of 10 is
+ * Discover is ordered by fit (fit-order.v5): a higher fit out of 10 is
  * never below a lower one, except where the exploration and diversity
  * policy placed a company. Those say so.
  */

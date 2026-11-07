@@ -4,9 +4,9 @@ import {
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
   INVESTABILITY_BAND_LABELS,
-  INVESTABILITY_METHOD_LABEL,
   SCORE_CONFIDENCE_LABELS,
   investabilityLine,
+  investabilityMethodLabel,
   suitabilityLine,
   type CompanyScoresDto,
   type InvestabilityDto,
@@ -202,10 +202,12 @@ export function CompanyScores({
     return (
       <p
         className={cx("cq-caption tabular-nums", className)}
-        aria-label={companyScoresLabel(scores)}
         title={companyScoresLabel(scores)}
         data-company-scores="minimal"
       >
+        {/* An aria-label on a <p> is not read (metrics audit P1-18): the
+            full sentence is real, visually hidden text. */}
+        <span className="sr-only">{companyScoresLabel(scores)}</span>
         {/* One clean signal on a small tile (QA F-42, live 23 Oct: three
             abbreviated scores ran off every tile): the fit with this viewer
             where there is one, else investability. The full sentence, all
@@ -226,9 +228,9 @@ export function CompanyScores({
           "cq-caption flex flex-wrap gap-x-3 gap-y-0.5 text-(--cq-text-secondary)",
           className,
         )}
-        aria-label={companyScoresLabel(scores)}
         data-company-scores="compact"
       >
+        <span className="sr-only">{companyScoresLabel(scores)}</span>
         <span aria-hidden="true" data-score="investability">
           {investabilityLine(inv)}
         </span>
@@ -262,7 +264,7 @@ export function CompanyScores({
       <ScoreCell
         data="investability"
         label="Investability"
-        caption={`${INVESTABILITY_METHOD_LABEL} · on shared evidence`}
+        caption={`${investabilityMethodLabel(inv.methodVersion)} · on shared evidence`}
         value={inv.score}
         words={investabilityWords(inv)}
         coverage={
