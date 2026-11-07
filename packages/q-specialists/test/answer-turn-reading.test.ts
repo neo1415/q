@@ -21,9 +21,11 @@ import {
 } from "../src/app-action-turn.js";
 import type { PendingDecisionPort } from "../src/pending-decision.js";
 import {
+  createQPageMoves,
   createQTurnReader,
   TURN_READER_ATTEMPT_TIMEOUT_MS,
   TURN_READER_SAME_MODEL_HEDGE_MS,
+  type QPageMovePort,
   type QTurnReader,
 } from "@capital-q/model-gateway/q";
 import { ModelGatewayError } from "@capital-q/model-gateway";
@@ -92,7 +94,7 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-function request(): QAnswerRequest {
+function request(screen?: Record<string, unknown>): QAnswerRequest {
   const runId = randomUUID();
   return {
     runId: runId as QAnswerRequest["runId"],
@@ -121,6 +123,7 @@ function request(): QAnswerRequest {
       evaluatedAt: new Date().toISOString(),
       revalidateAfter: new Date(Date.now() + 60_000).toISOString(),
       revalidateOnResume: true,
+      ...(screen === undefined ? {} : { screen }),
     }),
   };
 }
@@ -180,6 +183,7 @@ function seam(options: {
   readonly appActions?: QAppActionPort;
   /** Their relationships' counterpart names (lead 2026-10-03). */
   readonly counterpartNames?: readonly string[];
+  readonly pageMoves?: QPageMovePort;
   /** An investor's own data room requests, with their state (QO-15). */
   readonly diligenceSummary?: (
     request: QAnswerRequest,
@@ -450,6 +454,9 @@ function seam(options: {
     ...(options.diligenceSummary === undefined
       ? {}
       : { diligenceSummary: options.diligenceSummary }),
+    ...(options.pageMoves === undefined
+      ? {}
+      : { pageMoves: options.pageMoves }),
     ...(options.counterpartNames === undefined
       ? {}
       : {
@@ -870,6 +877,89 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       expect(run.stored[0]?.content).toMatch(/stay here/iu);
       expect(run.stored[0]?.blocks ?? []).toEqual([]);
     }
+  });
+
+  it("W4: with the workspace on screen, the page pane's move joins the stored answer; code's own move wins; off, nothing runs", async () => {
+    const decided: string[] = [];
+    const pageMoves = () =>
+      createQPageMoves({
+        decider: {
+          decide: (input) => {
+            decided.push(input.utterance);
+            return Promise.resolve({
+              decision: "MOVE",
+              place: {
+                route: "/work",
+                record: null,
+                tab: "needs",
+                document: null,
+                slide: null,
+                sectionId: null,
+                position: null,
+              },
+              back: false,
+              askedForPage: true,
+              reason: "",
+            });
+          },
+        },
+        config: { movesAllowed: true },
+      });
+    const WORKSPACE = {
+      route: "HOME",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    };
+    const earlier = [
+      { role: "USER" as const, content: "Show me my investor pipeline" },
+      {
+        role: "Q" as const,
+        content: `${SUMMARY} Your full pipeline is in Relationships. Would you like to open it?`,
+        blocks: [PIPELINE_OFFER],
+      },
+    ];
+    // "Stay here" is answered by code with no move: Q's decision adds one.
+    const on = seam({
+      said: "Stay here",
+      earlier,
+      reading: null,
+      outcomes: [],
+      pageMoves: pageMoves(),
+    });
+    expect((await on.answer.answer(request(WORKSPACE))).kind).toBe("ANSWERED");
+    expect(decided).toEqual(["Stay here"]);
+    expect(on.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "WORK_NEEDS" },
+      },
+    ]);
+    // "Yes, open it" is code's own move: one move per turn, code's.
+    const own = seam({
+      said: "Yes, open it.",
+      earlier,
+      reading: null,
+      outcomes: [],
+      pageMoves: pageMoves(),
+    });
+    await own.answer.answer(request(WORKSPACE));
+    expect(own.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      },
+    ]);
+    // Off (no screen.workspace): no decision, the answer unchanged.
+    decided.length = 0;
+    const off = seam({
+      said: "Stay here",
+      earlier,
+      reading: null,
+      outcomes: [],
+      pageMoves: pageMoves(),
+    });
+    await off.answer.answer(request());
+    expect(decided).toEqual([]);
+    expect(off.stored[0]?.blocks ?? []).toEqual([]);
   });
 
   it("a 'yes' with no offer before it is not read as one (N1)", async () => {

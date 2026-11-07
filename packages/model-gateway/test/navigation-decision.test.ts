@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { QNavigateTarget } from "@capital-q/contracts";
 import { createLogger } from "@capital-q/observability";
 import type { NavigationDecisionResult } from "@capital-q/q-core";
+import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import type { ModelGateway } from "../src/index.js";
 import { Q_SITE_MAP, qSiteMapDigest } from "@capital-q/contracts";
@@ -10,6 +11,7 @@ import { Q_SITE_MAP, qSiteMapDigest } from "@capital-q/contracts";
 import {
   applyNavigationPolicy,
   createQNavigationDecider,
+  createQPageMoves,
   decideNavigation,
   navigateTargetFromPath,
   navigationPaneFromWorkspace,
@@ -22,6 +24,7 @@ import {
   type QNavigationPane,
   type QNavigationRecordAsk,
   type QNavigationRecordFound,
+  type QWorkspaceScreen,
 } from "../src/q/index.js";
 
 /**
@@ -686,5 +689,172 @@ describe("the page pane's place from the screen (W1's screen.workspace paths)", 
         config: { movesAllowed: true },
       }).decision,
     ).toBe("MOVE");
+  });
+});
+
+describe("the answer path's page moves (createQPageMoves)", () => {
+  const RUN_ID = "77777777-7777-4777-8777-777777777777";
+  const answerRequest = (workspace: QWorkspaceScreen | undefined) =>
+    ({
+      runId: RUN_ID,
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        ...(workspace === undefined
+          ? { screen: { route: "HOME" } }
+          : { screen: { route: "HOME", workspace } }),
+      },
+    }) as unknown as QAnswerRequest;
+  const turn = {
+    utterance: "Show me Silo Credit's deck.",
+    recentTurns: [],
+    pageText: null,
+  };
+  const ON: QWorkspaceScreen = {
+    qPane: "open",
+    pagePane: "open",
+    at: "/home",
+  };
+  const proposing = (result: NavigationDecisionResult | null) => {
+    let calls = 0;
+    return {
+      calls: () => calls,
+      decider: {
+        decide: () => {
+          calls += 1;
+          return Promise.resolve(result);
+        },
+      },
+    };
+  };
+  const records = () => Promise.resolve(input().records);
+  const deck = proposal({
+    place: place({ record: company("Silo Credit"), tab: "deck" }),
+  });
+
+  it("does nothing without the workspace: no decision, the blocks unchanged", async () => {
+    const { calls, decider } = proposing(deck);
+    const moves = createQPageMoves({
+      decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    const request = answerRequest(undefined);
+    moves.start(request, turn);
+    expect(await moves.settle(request, undefined)).toBeUndefined();
+    expect(calls()).toBe(0);
+  });
+
+  it("with the workspace, adds the move with W3's target to the answer's blocks", async () => {
+    const moves = createQPageMoves({
+      decider: proposing(deck).decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    const request = answerRequest(ON);
+    moves.start(request, turn);
+    expect(await moves.settle(request, undefined)).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "OPEN_RECORD_PAGE",
+          page: "COMPANY",
+          id: SILO,
+          tab: "deck",
+        },
+      },
+    ]);
+    // Settled once: a second store in the same run adds nothing.
+    expect(await moves.settle(request, undefined)).toBeUndefined();
+  });
+
+  it("opens a collapsed page pane first, offers away from unsaved work, and leaves code's own move alone", async () => {
+    const collapsed = createQPageMoves({
+      decider: proposing(deck).decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    const r1 = answerRequest({ ...ON, pagePane: "collapsed" });
+    collapsed.start(r1, turn);
+    const opened = await collapsed.settle(r1, []);
+    expect(opened?.[0]).toEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "LAYOUT_SET", pagePane: "open" },
+    });
+    const dirty = createQPageMoves({
+      decider: proposing(deck).decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    const r2 = answerRequest({ ...ON, dirty: true });
+    dirty.start(r2, turn);
+    expect((await dirty.settle(r2, []))?.[0]).toMatchObject({
+      kind: "NAVIGATION_OFFER",
+      intent: { kind: "OPEN_RECORD_PAGE", id: SILO },
+    });
+    const own = createQPageMoves({
+      decider: proposing(deck).decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    const r3 = answerRequest(ON);
+    own.start(r3, turn);
+    const codes = [
+      {
+        kind: "UI_INTENT" as const,
+        intent: { kind: "NAVIGATE" as const, destination: "WORK" as const },
+      },
+    ];
+    expect(await own.settle(r3, codes)).toBe(codes);
+  });
+
+  it("a page the person may not open, or a decision too slow or failed, leaves the answer as it was", async () => {
+    const founderPage = createQPageMoves({
+      decider: proposing(
+        proposal({ place: place({ route: "/investors", record: null }) }),
+      ).decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    // No bound mandate: a founder, who may open /investors and may not
+    // open /discover/saved (investors' own).
+    const r1 = answerRequest(ON);
+    founderPage.start(r1, turn);
+    const investorsPage = await founderPage.settle(r1, []);
+    expect(investorsPage).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "INVESTORS" },
+      },
+    ]);
+    const closed = createQPageMoves({
+      decider: proposing(
+        proposal({ place: place({ route: "/discover/saved", record: null }) }),
+      ).decider,
+      config: { movesAllowed: true },
+      records,
+    });
+    const r2 = answerRequest(ON);
+    closed.start(r2, turn);
+    expect(await closed.settle(r2, [])).toEqual([]);
+    const slow = createQPageMoves({
+      decider: { decide: () => new Promise(() => undefined) },
+      config: { movesAllowed: true },
+      records,
+      settleWithinMs: 10,
+    });
+    const r3 = answerRequest(ON);
+    slow.start(r3, turn);
+    expect(await slow.settle(r3, [])).toEqual([]);
+    const failed = createQPageMoves({
+      decider: { decide: () => Promise.reject(new Error("down")) },
+      config: { movesAllowed: true },
+      records,
+    });
+    const r4 = answerRequest(ON);
+    failed.start(r4, turn);
+    expect(await failed.settle(r4, [])).toEqual([]);
   });
 });

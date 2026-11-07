@@ -1,11 +1,16 @@
 import {
+  navigateTargetToIntent,
+  Q_NAVIGATION_OFFER_LABEL_MAX,
   Q_SITE_MAP,
+  QNavigateDestinationSchema,
   QNavigateTargetSchema,
+  type QResultBlock,
   qSiteMapDigest,
   qSiteMapLandingFor,
   type QNavigateTarget,
   type QSiteMap,
   type QSiteMapPage,
+  type QWorkspaceScreen as QWorkspaceScreenContract,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -17,7 +22,10 @@ import {
   type NavigationDecisionVariables,
 } from "@capital-q/q-core";
 
+import type { QAnswerRequest } from "@capital-q/q-runtime";
+
 import type { ModelGateway } from "../gateway.js";
+import { ownInvestorOrganisationIn } from "./result-blocks.js";
 
 /**
  * Q Workspace W4 (DECISIONS 71 amends N1: Q may move the page pane on its
@@ -268,15 +276,8 @@ export function navigateTargetFromPath(
   return messageId === null ? target : { ...target, messageId };
 }
 
-/** W3's screen.workspace as W1 sends it (present: the workspace is on). */
-export type QWorkspaceScreen = {
-  readonly qPane: "open" | "collapsed";
-  readonly pagePane: "open" | "collapsed";
-  readonly at?: string | undefined;
-  readonly previous?: string | undefined;
-  readonly dirty?: true | undefined;
-  readonly busy?: true | undefined;
-};
+/** W3's screen.workspace (present: the workspace is on). */
+export type QWorkspaceScreen = QWorkspaceScreenContract;
 
 /** The policy's pane state from the screen (hints; nothing here grants). */
 export function navigationPaneFromWorkspace(
@@ -819,4 +820,195 @@ export async function decideNavigation(
     canOpen: dependencies.canOpen,
     config: dependencies.config,
   });
+}
+
+// --- 4. The answer path: one move per turn, beside the answer ------------
+
+/** The turn as the decision reads it (the answer path's own reads). */
+export type QPageMoveTurn = {
+  readonly utterance: string;
+  readonly recentTurns: QNavigationInput["recentTurns"];
+  readonly pageText: string | null;
+};
+
+/**
+ * W4 in the answer path. `start` runs the decision beside the answer's own
+ * reads when the screen carries the Q Workspace (`screen.workspace`
+ * present); `settle` is awaited just before the answer's message is
+ * stored -- never inside its transaction -- and adds the page pane's move
+ * to its blocks. Absent workspace: nothing starts and nothing changes
+ * (N1 and the legacy intents stand).
+ */
+export type QPageMovePort = {
+  readonly start: (request: QAnswerRequest, turn: QPageMoveTurn) => void;
+  readonly settle: (
+    request: QAnswerRequest,
+    blocks: readonly QResultBlock[] | undefined,
+  ) => Promise<readonly QResultBlock[] | undefined>;
+};
+
+const NO_RECORDS: QNavigationRecords = {
+  companies: [],
+  investors: [],
+  things: [],
+  deleted: [],
+};
+
+/** A move the answer already makes: code's own move wins (one per turn). */
+function movesAlready(blocks: readonly QResultBlock[]): boolean {
+  return blocks.some(
+    (block) =>
+      block.kind === "NAVIGATION_OFFER" ||
+      (block.kind === "UI_INTENT" &&
+        (block.intent.kind === "NAVIGATE" ||
+          block.intent.kind === "OPEN_RECORD_PAGE" ||
+          block.intent.kind === "OPEN_SETTINGS")),
+  );
+}
+
+export function sideOfRequest(request: QAnswerRequest): QNavigationSide {
+  return ownInvestorOrganisationIn(request.plan) === null
+    ? "FOUNDER"
+    : "INVESTOR";
+}
+
+/**
+ * Whether this person may open the page: the site map's audience for the
+ * side and, for a named destination, the run's own capability manifest
+ * (the server's list of what this run may open) when it carries one.
+ */
+export function canOpenFor(
+  request: QAnswerRequest,
+  map: QSiteMap = Q_SITE_MAP,
+): (page: string) => boolean {
+  const side = sideOfRequest(request);
+  const navigable = request.capabilities?.navigate;
+  return (page) => {
+    const landing = qSiteMapLandingFor(map, page);
+    if (landing === null || landing.page.redirectsTo !== undefined)
+      return false;
+    const audience = landing.page.audience;
+    if (audience !== "ANY" && audience !== side) return false;
+    const destination = QNavigateDestinationSchema.safeParse(page);
+    return (
+      !destination.success ||
+      navigable === undefined ||
+      navigable.includes(destination.data)
+    );
+  };
+}
+
+export function createQPageMoves(dependencies: {
+  readonly decider: QNavigationDecider;
+  readonly config: QNavigationPolicyConfig;
+  /** The names this person may open, for the prompt (their own reads). */
+  readonly records?:
+    ((request: QAnswerRequest) => Promise<QNavigationRecords>) | undefined;
+  /** W2.3's resolution as this person; absent: the listed records. */
+  readonly resolver?:
+    ((request: QAnswerRequest) => QNavigationRecordResolver) | undefined;
+  readonly map?: QSiteMap | undefined;
+  readonly logger?: Logger | undefined;
+  /** How long a settled answer waits for a decision still running. */
+  readonly settleWithinMs?: number | undefined;
+}): QPageMovePort {
+  const map = dependencies.map ?? Q_SITE_MAP;
+  const waitMs = dependencies.settleWithinMs ?? 2_500;
+  const pending = new Map<string, Promise<QNavigationOutcome | null>>();
+  return {
+    start: (request, turn) => {
+      const workspace = request.plan.screen?.workspace;
+      if (workspace === undefined || pending.has(request.runId)) return;
+      const side = sideOfRequest(request);
+      const decided = (async () => {
+        const records =
+          (await dependencies.records?.(request).catch(() => null)) ??
+          NO_RECORDS;
+        const input: QNavigationInput = {
+          utterance: turn.utterance,
+          recentTurns: turn.recentTurns,
+          side,
+          pane: navigationPaneFromWorkspace(workspace, map),
+          pageText: turn.pageText,
+          records,
+          siteMap: navigationSiteMap(side, map),
+        };
+        return decideNavigation(
+          {
+            decider: dependencies.decider,
+            canOpen: canOpenFor(request, map),
+            config: dependencies.config,
+            resolver:
+              dependencies.resolver?.(request) ?? listedRecordResolver(records),
+          },
+          input,
+          {
+            tenantId: request.tenantId,
+            userId: request.actorUserId,
+            correlationId: request.correlationId,
+          },
+        );
+      })().catch((error: unknown) => {
+        dependencies.logger?.warn(
+          { err: error instanceof Error ? error.name : typeof error },
+          "q page move not decided; the page pane stays",
+        );
+        return null;
+      });
+      pending.set(request.runId, decided);
+      // A run that never settles (a failed answer) does not keep it.
+      setTimeout(() => pending.delete(request.runId), 120_000).unref?.();
+    },
+    settle: async (request, blocks) => {
+      const decided = pending.get(request.runId);
+      if (decided === undefined) return blocks;
+      pending.delete(request.runId);
+      const current = blocks ?? [];
+      if (movesAlready(current)) return blocks;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const outcome = await Promise.race([
+        decided,
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), waitMs);
+        }),
+      ]).finally(() => clearTimeout(timer));
+      if (outcome === null || outcome.target === null) return blocks;
+      if (outcome.decision === "STAY") return blocks;
+      let intent: ReturnType<typeof navigateTargetToIntent>;
+      try {
+        intent = navigateTargetToIntent(outcome.target);
+      } catch {
+        return blocks;
+      }
+      if (outcome.decision === "OFFER") {
+        const title = (
+          qSiteMapLandingFor(map, outcome.target.page)?.page.title ?? "the page"
+        ).slice(0, Q_NAVIGATION_OFFER_LABEL_MAX - 5);
+        return [
+          ...current,
+          {
+            kind: "NAVIGATION_OFFER",
+            intent,
+            place: title,
+            openLabel: `Open ${title}`,
+          },
+        ];
+      }
+      return [
+        ...current,
+        ...(outcome.openPane
+          ? [
+              {
+                kind: "UI_INTENT" as const,
+                intent: {
+                  kind: "LAYOUT_SET" as const,
+                  pagePane: "open" as const,
+                },
+              },
+            ]
+          : []),
+        { kind: "UI_INTENT", intent },
+      ];
+    },
+  };
 }

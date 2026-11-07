@@ -133,6 +133,7 @@ import {
   withoutStatusTalk,
   TURN_READER_RECENT_TURNS_MAX,
   priorListings,
+  type QPageMovePort,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
@@ -1058,6 +1059,13 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly counterpartNames?:
     ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
+  /**
+   * Q Workspace W4 (DECISIONS 71): the page pane's move, decided beside
+   * the turn when the screen carries the workspace and added to the
+   * answer's blocks just before it is stored. The delegate (the
+   * conversational answer) settles it on the same port.
+   */
+  readonly pageMoves?: QPageMovePort | undefined;
   /**
    * Coordinator 23 Oct 2026: a move to their pipeline says what is in it
    * first (pipeline-summary.ts), from their own relationships as their side
@@ -2556,11 +2564,25 @@ export function createSpecialistQAnswer(
       if (oldest !== undefined) turnOfRun.delete(oldest);
     }
   };
+  /** W4: the answer's blocks with the page pane's move, if one was decided. */
+  async function movedBlocks(
+    request: QAnswerRequest,
+    blocks: readonly QResultBlock[] | undefined,
+  ): Promise<QResultBlock[] | undefined> {
+    const moved =
+      dependencies.pageMoves === undefined
+        ? blocks
+        : await dependencies.pageMoves
+            .settle(request, blocks)
+            .catch(() => blocks);
+    return moved === undefined ? undefined : [...moved];
+  }
+
   async function recordAnswer(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
     written: string,
-    blocks?: readonly QResultBlock[],
+    answerBlocks?: readonly QResultBlock[],
   ): Promise<QAnswerOutcome> {
     const turn = turnOfRun.get(request.runId);
     const localise = dependencies.localiseWords;
@@ -2578,6 +2600,8 @@ export function createSpecialistQAnswer(
               texts,
             ),
           );
+    // W4: the page pane's move joins the answer, outside the transaction.
+    const blocks = await movedBlocks(request, answerBlocks);
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         tenantId: request.tenantId,
@@ -5413,6 +5437,14 @@ export function createSpecialistQAnswer(
     const history = await historyOfRun(request.tenantId, request.runId);
     const conversationId = history[0]?.conversationId;
     const latest = [...history].reverse().find((m) => m.role === "USER");
+    // W4: the page pane's move is decided beside everything below (only
+    // with the workspace on screen; the port checks).
+    if (latest !== undefined)
+      dependencies.pageMoves?.start(request, {
+        utterance: latest.content,
+        recentTurns: recentTurnPairs(history, latest),
+        pageText: null,
+      });
     // RECOVERY B5 (audit B-05): "hi Q", "thanks", "how are you?" -- a turn
     // that is nothing but a pleasantry is answered by code: no reader, no
     // prefetch, no analyst. Spoken, only when it names Q or opens the
@@ -8685,7 +8717,7 @@ ${line}`;
       subjects: askedSubjects(request.subjects, request.plan),
     });
 
-    const blocks: QResultBlock[] | undefined =
+    const answerBlocks: QResultBlock[] | undefined =
       prepared === null
         ? analystBlocks === undefined
           ? undefined
@@ -8700,6 +8732,8 @@ ${line}`;
               title: prepared.title,
             },
           ];
+    // W4: the page pane's move joins the answer, outside the transaction.
+    const blocks = await movedBlocks(request, answerBlocks);
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         id: answerId,
@@ -9123,4 +9157,21 @@ function teamJobAudienceOf(request: QAnswerRequest): TeamJobAudience {
   return ownInvestorOrganisationIn(request.plan) !== null
     ? "INVESTOR"
     : "FOUNDER";
+}
+
+/** The turns before this one, theirs and Q's, as pairs (newest last). */
+function recentTurnPairs(
+  history: readonly QConversationMessage[],
+  latest: QConversationMessage,
+): { readonly user: string; readonly q: string }[] {
+  const pairs: { user: string; q: string }[] = [];
+  for (const message of history) {
+    if (message === latest) break;
+    if (message.role === "USER") pairs.push({ user: message.content, q: "" });
+    else if (message.role === "Q") {
+      const last = pairs.at(-1);
+      if (last !== undefined && last.q === "") last.q = message.content;
+    }
+  }
+  return pairs.slice(-4);
 }

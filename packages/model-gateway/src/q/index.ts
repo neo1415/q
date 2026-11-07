@@ -128,6 +128,7 @@ import {
   type TurnAnswerKind,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
+import type { QPageMovePort } from "./navigation-decision.js";
 import { createStageClock } from "./stage-clock.js";
 import {
   appendRunEvent,
@@ -2802,6 +2803,11 @@ export type ModelGatewayQAnswerDependencies = {
     | undefined;
   /** Narrows provider eligibility for this composition; never widens it. */
   readonly tenantPolicy?: TenantModelPolicy | undefined;
+  /**
+   * W4: the page pane's move for a turn on the Q Workspace, started by the
+   * answer's caller and settled here before the message is stored.
+   */
+  readonly pageMoves?: QPageMovePort | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -3030,6 +3036,20 @@ export function createModelGatewayQAnswer(
     dependencies;
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const context = dependencies.context ?? noAuthorisedContext;
+  // W4 (DECISIONS 71): the decision started beside the turn's reads; a
+  // failure keeps the answer's own blocks.
+  const movedBlocks = async (
+    request: QAnswerRequest,
+    blocks: readonly QResultBlock[] | undefined,
+  ): Promise<QResultBlock[] | undefined> => {
+    const moved =
+      dependencies.pageMoves === undefined
+        ? blocks
+        : await dependencies.pageMoves
+            .settle(request, blocks)
+            .catch(() => blocks);
+    return moved === undefined ? undefined : [...moved];
+  };
   const baseTools = dependencies.tools ?? createUnconfiguredQTools();
   // R0: the companies each run's tools returned, so an answer card can
   // carry the record its name means (never an id the model wrote).
@@ -5464,7 +5484,7 @@ export function createModelGatewayQAnswer(
       }),
       latest.content,
     );
-    const blocks = carried.length === 0 ? undefined : carried;
+    const answerBlocks = carried.length === 0 ? undefined : carried;
     const missed = screenActMissLine(
       missFacts(dependencies, request.actor, earlier),
       [...earlier].reverse().find((message) => message.role === "Q")?.content ??
@@ -5481,6 +5501,8 @@ export function createModelGatewayQAnswer(
     const messageId =
       request.leadLinesSaid?.answerMessageId ??
       QMessageIdSchema.parse(randomUUID());
+    // W4: the page pane's move joins the answer before it is stored.
+    const blocks = await movedBlocks(request, answerBlocks);
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
         id: messageId,
@@ -7727,7 +7749,7 @@ export function createModelGatewayQAnswer(
           // A map they asked to see is not replaced by a page they did not.
           latest.content,
         );
-        const blocks = carried.length === 0 ? undefined : carried;
+        const answerBlocks = carried.length === 0 ? undefined : carried;
         // A tie is said as a tie, with why (INC-1: three cards at 8.8 read
         // as a ranking).
         const ranked = carried.find(
@@ -7767,6 +7789,8 @@ export function createModelGatewayQAnswer(
         // The stages and live findings already queued are stored first, so
         // the completed message is the last word (lane 3 reconciles on it).
         await stages.queue;
+        // W4: the page pane's move joins the answer before it is stored.
+        const blocks = await movedBlocks(request, answerBlocks);
         return transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
@@ -12156,7 +12180,10 @@ export function appActionLineOf(data: unknown): string | null {
 // Q Workspace W4 (DECISIONS 71): the page pane's MOVE / OFFER / STAY.
 export {
   applyNavigationPolicy,
+  canOpenFor,
   createQNavigationDecider,
+  createQPageMoves,
+  sideOfRequest,
   decideNavigation,
   navigationVariables,
   findListedRecord,
@@ -12186,4 +12213,6 @@ export {
   type QNavigationResolution,
   type QNavigationSide,
   type QWorkspaceScreen,
+  type QPageMovePort,
+  type QPageMoveTurn,
 } from "./navigation-decision.js";
