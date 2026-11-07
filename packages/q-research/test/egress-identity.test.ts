@@ -115,3 +115,73 @@ describe("research service: whose name leads the query", () => {
     expect(provider.egressed()).toContain("Kobo360");
   });
 });
+
+/**
+ * Owner live test, 7 Nov 2026 (R3; DECISIONS 77/78, integration approval):
+ * "find me online" searched nothing about them. CQ-Q-RESEARCH-001 §9 is
+ * amended: when the research is about themselves, their own display name
+ * and their organisation's website and country are authorised identities,
+ * at their own request only; never for a search about anyone else.
+ */
+describe("research about themselves: their own name and firm (R3, §9 amended)", () => {
+  const ZINO = {
+    kind: "INVESTOR_ORGANISATION" as const,
+    investorOrganisationId: "d0000000-0000-4000-8000-000000000009",
+    name: "Zino Aviation",
+    websiteUrl: "https://zino.aero",
+    headquartersCountry: "NG",
+    identityAuthorised: true,
+  };
+  const ask = (
+    userText: string,
+    aboutThemselves: boolean,
+    subject: typeof ZINO | null = ZINO,
+  ) => {
+    const provider = createFakeResearchProvider({ pages: [PAGE] });
+    const service = createPublicWebResearchService({ provider });
+    return service
+      .research({
+        actor,
+        runId: "90000000-0000-4000-8000-000000000009",
+        correlationId: "cor_test",
+        requestedQuery: userText,
+        userText,
+        subject,
+        aboutThemselves,
+        self: { displayName: "Zino Ade" },
+        extractCount: 1,
+      })
+      .then((outcome) => ({ outcome, provider }));
+  };
+
+  it("about themselves: they and their firm are searched together, with its country", async () => {
+    const { outcome, provider } = await ask(
+      "what can you find about me online",
+      true,
+    );
+    expect(outcome.status).toBe("OK");
+    const sent = provider.egressed().toLowerCase();
+    expect(sent).toContain("zino ade");
+    expect(sent).toContain("zino aviation");
+    expect(sent).toContain("nigeria");
+  });
+
+  it("with no organisation, their own name still may, about themselves", async () => {
+    const { provider } = await ask(
+      "what can you find about me online",
+      true,
+      null,
+    );
+    expect(provider.egressed().toLowerCase()).toContain("zino ade");
+  });
+
+  it("about anyone else, their name never leaves", async () => {
+    const { provider } = await ask(
+      "What does the public web say about Kobo360?",
+      false,
+    );
+    const sent = provider.egressed().toLowerCase();
+    expect(sent).not.toContain("zino ade");
+    expect(sent).toContain("kobo360");
+  });
+});

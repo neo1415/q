@@ -623,6 +623,12 @@ export type QToolPorts = {
   readonly research?: PublicWebResearchService | undefined;
   /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
   readonly people?: PersonLookup | undefined;
+  /**
+   * Owner live test 7 Nov (R3): the person asking, read as them, for
+   * research about themselves only (CQ-Q-RESEARCH-001 §9 amended). Absent:
+   * a search about them carries their firm's name alone.
+   */
+  readonly selfIdentity?: SelfIdentityPort | undefined;
   /** D1: investors by meaning (known entities, then a bounded web search); absent means no such tool. */
   readonly counterparts?: CounterpartDiscoverer | undefined;
   /**
@@ -1470,4 +1476,21 @@ export type QBoardPort = {
     jobId: string,
     options: { readonly idempotencyKey: string },
   ) => Promise<QBoardOutcome>;
+};
+
+/**
+ * The asker's own identity for research about themselves (R3, §9 amended,
+ * DECISIONS 77/78): their display name, and their own investor
+ * organisation's site and country, each read as them. Never used for a
+ * search about anyone else.
+ */
+export type SelfIdentityPort = {
+  readonly displayName: (actor: ActorContext) => Promise<string | null>;
+  readonly investorOrganisation: (
+    actor: ActorContext,
+    investorOrganisationId: string,
+  ) => Promise<{
+    readonly websiteUrl: string | null;
+    readonly hqCountry: string | null;
+  } | null>;
 };

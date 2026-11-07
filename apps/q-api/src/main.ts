@@ -3516,6 +3516,22 @@ const qTools = createQTools({
       : { profiles: researchComposition.profiles }),
     // W2: find / brief a named person or organisation.
     people: researchComposition.people,
+    // R3 (owner live 7 Nov; CQ-Q-RESEARCH-001 §9 amended): the asker's own
+    // name and firm, read as them, for research about themselves only.
+    // Closures: both stores are composed further down and read per call.
+    selfIdentity: {
+      displayName: async (actor) =>
+        (await people.read(actor.userId))?.displayName ?? null,
+      investorOrganisation: async (actor, investorOrganisationId) => {
+        const firm = await investorService.getInvestorOrganisation({
+          actor,
+          investorOrganisationId: InvestorOrganisationIdSchema.parse(
+            investorOrganisationId,
+          ),
+        });
+        return { websiteUrl: firm.websiteUrl, hqCountry: firm.hqCountry };
+      },
+    },
     counterparts: researchComposition.counterparts,
     externalRehearsal: {
       canRehearse: async (actor, externalPersonId) =>

@@ -109,7 +109,7 @@ export const ResearchPublicWebInputSchema = z
       .boolean()
       .default(false)
       .describe(
-        "True only when they are asking about their own organisation ('what does the web say about us?'); false when the research is about someone else.",
+        "True only when they are asking about themselves or their own organisation ('what can you find about me online?', 'what does the web say about us?'): their own name and firm are then searched. False when the research is about someone else.",
       ),
     maxSources: z
       .number()
@@ -409,11 +409,24 @@ export function createResearchPublicWebTool(
           actor.tenantId === organisation.tenantId &&
           actor.organisationId === organisation.organisationId;
         if (organisation !== null && owner) {
+          // R3: their own firm's site and country, read as them, for a
+          // search about themselves (research uses them only then).
+          const site = input.aboutThemselves
+            ? await ports.selfIdentity
+                ?.investorOrganisation(actor, organisation.id)
+                .catch(() => null)
+            : null;
           return allow("PUBLIC", {
             subject: {
               kind: "INVESTOR_ORGANISATION",
               investorOrganisationId: organisation.id,
               name: organisation.displayName,
+              ...(site === null || site === undefined
+                ? {}
+                : {
+                    websiteUrl: site.websiteUrl,
+                    headquartersCountry: site.hqCountry,
+                  }),
               identityAuthorised: true,
             },
           });
@@ -423,6 +436,11 @@ export function createResearchPublicWebTool(
       return allow("PUBLIC", { subject: null });
     },
     execute: async (input, context, grant) => {
+      // R3 (CQ-Q-RESEARCH-001 §9 amended): their own name, only in a
+      // search about themselves, at their own request.
+      const ownName = input.aboutThemselves
+        ? await ports.selfIdentity?.displayName(context.actor).catch(() => null)
+        : null;
       const outcome = await ports.research.research({
         actor: context.actor,
         runId: context.runId,
@@ -437,6 +455,9 @@ export function createResearchPublicWebTool(
         freshness: input.freshness,
         freshRead: input.freshRead,
         aboutThemselves: input.aboutThemselves,
+        ...(ownName === null || ownName === undefined
+          ? {}
+          : { self: { displayName: ownName } }),
         extractCount: input.maxSources,
         includeDomains: input.includeDomains,
         categories: input.categories,

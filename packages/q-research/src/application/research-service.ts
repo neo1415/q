@@ -86,6 +86,13 @@ export type ResearchSubject =
       readonly kind: "INVESTOR_ORGANISATION";
       readonly investorOrganisationId: string;
       readonly name: string;
+      /**
+       * R3 (owner live 7 Nov): their own firm's site and country, so a
+       * search about themselves finds this firm, not another of the name.
+       * Absent: not read.
+       */
+      readonly websiteUrl?: string | null | undefined;
+      readonly headquartersCountry?: string | null | undefined;
       readonly identityAuthorised: boolean;
     };
 
@@ -134,6 +141,14 @@ export type ResearchCommand = {
    * false, an investor's own name never leads a search about someone else.
    */
   readonly aboutThemselves?: boolean | undefined;
+  /**
+   * The person asking, by their own display name, as the tool layer read it
+   * for them. CQ-Q-RESEARCH-001 §9 amended (owner live test 7 Nov 2026,
+   * DECISIONS 77/78): it is an authorised identity only when the research
+   * is about themselves (`aboutThemselves`), at their own request; it never
+   * leaves in a search about anyone else.
+   */
+  readonly self?: { readonly displayName: string } | undefined;
   readonly extractCount?: number | undefined;
   readonly includeDomains?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -389,18 +404,30 @@ function prependIdentityFor(
   return subject.kind === "COMPANY" ? true : aboutThemselves;
 }
 
-function identityTerms(subject: ResearchSubject | null): readonly string[] {
+function identityTerms(
+  subject: ResearchSubject | null,
+  self: ResearchCommand["self"],
+  aboutThemselves: boolean,
+): readonly string[] {
+  // §9 amended (R3): their own name, only in a search about themselves.
+  const own =
+    aboutThemselves && self !== undefined && self.displayName.trim().length > 1
+      ? [self.displayName.trim()]
+      : [];
   if (subject === null || !subject.identityAuthorised) {
-    return [];
+    return own;
   }
-  const terms = [subject.name];
-  if (subject.kind === "COMPANY") {
-    const domain = publicDomainOf(subject.websiteUrl);
+  const terms = [subject.name, ...own];
+  // A company always; their own firm when the search is about themselves.
+  const organisation =
+    subject.kind === "COMPANY" ? subject : aboutThemselves ? subject : null;
+  if (organisation !== null) {
+    const domain = publicDomainOf(organisation.websiteUrl ?? null);
     if (domain !== null) {
       terms.push(domain);
     }
     // Name + country tells one organisation from another of the same name.
-    const country = countryName(subject.headquartersCountry);
+    const country = countryName(organisation.headquartersCountry ?? null);
     if (country !== null) {
       terms.push(country);
     }
@@ -447,7 +474,11 @@ function namedEntityOf(command: ResearchCommand): NamedEntity | null {
             domain: publicDomainOf(subject.websiteUrl),
             country: subject.headquartersCountry,
           }
-        : { name: subject.name, domain: null, country: null }
+        : {
+            name: subject.name,
+            domain: publicDomainOf(subject.websiteUrl ?? null),
+            country: subject.headquartersCountry ?? null,
+          }
       : null;
   const named = command.entityName?.trim() ?? "";
   if (named.length < 2) return fromSubject;
@@ -812,7 +843,11 @@ export function createPublicWebResearchService(
 
     research: async (command) => {
       metrics.requested.add(1, { operation: "research" });
-      const identity = identityTerms(command.subject);
+      const identity = identityTerms(
+        command.subject,
+        command.self,
+        command.aboutThemselves === true,
+      );
       const entity = namedEntityOf(command);
       // Someone else named by the person: the conversation's own subject
       // is not put in front of a search about them.
@@ -883,6 +918,26 @@ export function createPublicWebResearchService(
       };
       const focused = command.focused === true;
       plan(command.requestedQuery, focused ? false : leadWithSubject);
+      // R3 (owner live 7 Nov, §9 amended): a search about themselves looks
+      // for them and their firm together ("find me online").
+      if (
+        !focused &&
+        command.aboutThemselves === true &&
+        command.self !== undefined &&
+        command.self.displayName.trim().length > 1
+      ) {
+        const subject = command.subject;
+        const country =
+          subject === null
+            ? null
+            : countryName(subject.headquartersCountry ?? null);
+        plan(
+          [command.self.displayName, subject?.name ?? "", country ?? ""].join(
+            " ",
+          ),
+          false,
+        );
+      }
       // Two slots (2026-10-25), filled by what the question most needs:
       // the name with its country when a name is what is being looked up,
       // then the model's other phrasings, then the same words without the
