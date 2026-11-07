@@ -1,6 +1,7 @@
 import {
   CreateQRunRequestSchema,
   Q_SUBJECTS_MAX,
+  screenWithBoundEntities,
   QConversationIdSchema,
   type CorrelationId,
   type CreateQRunRequest,
@@ -494,55 +495,15 @@ function screenWithManifest(
   screen: NonNullable<CreateQRunRequest["screen"]>,
   refs: readonly QSubjectRef[],
 ): NonNullable<CreateQRunRequest["screen"]> {
-  const has = (ref: QSubjectRef) =>
-    refs.some((known) => JSON.stringify(known) === JSON.stringify(ref));
-  const {
-    companyId,
-    investorOrganisationId,
-    documentId,
-    documentPage,
-    artifactId,
-    artifactSlide,
-    artifactVersion,
-    timeZone,
-    manifest,
-    attachedDocumentIds,
-  } = screen;
-  return {
-    route: screen.route,
-    // The person's own clock: not an entity, nothing to resolve.
-    ...(timeZone === undefined ? {} : { timeZone }),
-    // Lane 8: what they attached, as ids. Read only through
-    // read_attached_document, as the asker; one not theirs reads as NONE.
-    ...(attachedDocumentIds === undefined ? {} : { attachedDocumentIds }),
-    // Q room R1: the page's manifest, ids and closed kinds only. Kept as
-    // asked; every ref is read back as the asker before the model sees
-    // anything, and one that does not resolve is dropped there.
-    ...(manifest === undefined ? {} : { manifest }),
-    // An artifact is a viewer reference, not a document/entity subject.
-    // Its content and any edit still require the owning service's actor read.
-    // Keep it even when no conversation card exists (workforce documents).
-    ...(artifactId === undefined
-      ? {}
-      : {
-          artifactId,
-          ...(artifactSlide === undefined ? {} : { artifactSlide }),
-          ...(artifactVersion === undefined ? {} : { artifactVersion }),
-        }),
-    ...(companyId !== undefined && has({ kind: "COMPANY", companyId })
-      ? { companyId }
-      : {}),
-    ...(investorOrganisationId !== undefined &&
-    has({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
-      ? { investorOrganisationId }
-      : {}),
-    ...(documentId !== undefined && has({ kind: "DOCUMENT", documentId })
-      ? {
-          documentId,
-          ...(documentPage === undefined ? {} : { documentPage }),
-        }
-      : {}),
-  };
+  // Owner live test 7 Nov (R1): the run used to copy the screen field by
+  // field and silently lost every field it did not list (screen.workspace,
+  // so Q's page moves never ran; the surface). The contract's own rule:
+  // an entity rides only when it resolved for the asker (`refs`); every
+  // hint about their own screen -- the manifest, attached ids, the Q
+  // Workspace, the surface, the clock -- is kept as the schema accepted it.
+  return screenWithBoundEntities(screen, (ref) =>
+    refs.some((known) => JSON.stringify(known) === JSON.stringify(ref)),
+  );
 }
 
 /** The screen's entities as subjects, each resolved for the actor or dropped. */

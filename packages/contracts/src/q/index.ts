@@ -109,6 +109,8 @@ export {
   Q_SCREEN_ROUTES,
   QScreenContextSchema,
   QScreenRouteSchema,
+  Q_SCREEN_ENTITY_FIELDS,
+  screenWithBoundEntities,
   Q_ASK_SURFACES,
   QAskSurfaceSchema,
   type QAskSurface,

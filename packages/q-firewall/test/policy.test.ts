@@ -7,6 +7,7 @@ import {
   Q_SENSITIVITY_RANK,
   Q_TASK_CLASSES,
   QAuthorisedKnowledgeScopeSchema,
+  QScreenContextSchema,
   sensitivityWithin,
   strongerSensitivity,
   type QAuthorisedKnowledgeScope,
@@ -34,6 +35,32 @@ import { screenWithin } from "../src/firewall.js";
 
 const COMPANY = "11111111-1111-4111-8111-111111111111";
 const TENANT = "22222222-2222-4222-8222-222222222222";
+
+describe("owner live test 7 Nov (R1): the plan's screen loses no hint", () => {
+  it("keeps the Q Workspace hint and Q's surface (about the panes, never an entity)", () => {
+    const screen = QScreenContextSchema.parse({
+      route: "HOME",
+      surface: "DOCK",
+      timeZone: "Africa/Lagos",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    });
+    expect(screenWithin(screen, [])).toEqual(screen);
+  });
+
+  it("drops only what is bound to an entity no permitted scope covers", () => {
+    const hints = {
+      route: "COMPANY" as const,
+      surface: "DOCK" as const,
+      workspace: { qPane: "open" as const, pagePane: "open" as const },
+    };
+    expect(
+      screenWithin(
+        QScreenContextSchema.parse({ ...hints, companyId: COMPANY }),
+        [],
+      ),
+    ).toEqual(hints);
+  });
+});
 
 describe("viewer references within the permitted screen", () => {
   it("retains artifact positions without adding any scope", () => {

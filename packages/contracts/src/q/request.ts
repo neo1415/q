@@ -9,7 +9,7 @@ import {
 import { UuidSchema } from "../common/ids.js";
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
 import { QPageManifestSchema } from "./screen-manifest.js";
-import { QSubjectRefsSchema } from "./subject.js";
+import { QSubjectRefsSchema, type QSubjectRef } from "./subject.js";
 import { QWorkspacePaneStateSchema } from "./ui-intent.js";
 import { QContractVersionSchema } from "./version.js";
 
@@ -185,6 +185,70 @@ export const QScreenContextSchema = z
   })
   .strict();
 export type QScreenContext = z.infer<typeof QScreenContextSchema>;
+
+/**
+ * The screen with only the entities the caller has bound for this person
+ * (owner live test, 7 Nov 2026, R1). One rule for every place that narrows
+ * a screen -- the run as recorded, the Context Firewall's plan -- so a field
+ * added to the contract is never silently lost on the way to Q.
+ *
+ * Only the fields that NAME an entity are judged: a company, an investor
+ * organisation and a document (with its page) ride only when `bound` says
+ * so; an artifact's slide and version ride only with the artifact. Every
+ * other field is a hint about the person's own screen (route, surface, time
+ * zone, manifest, attached ids, the Q Workspace's panes) that grants nothing
+ * and is kept as the strict schema accepted it. A new entity-naming field
+ * must be added here, and the contract tests fail until it is.
+ */
+export function screenWithBoundEntities(
+  screen: QScreenContext,
+  bound: (ref: QSubjectRef) => boolean,
+): QScreenContext {
+  const {
+    companyId,
+    investorOrganisationId,
+    documentId,
+    documentPage,
+    artifactId,
+    artifactSlide,
+    artifactVersion,
+    ...hints
+  } = screen;
+  return {
+    ...hints,
+    ...(artifactId === undefined
+      ? {}
+      : {
+          artifactId,
+          ...(artifactSlide === undefined ? {} : { artifactSlide }),
+          ...(artifactVersion === undefined ? {} : { artifactVersion }),
+        }),
+    ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
+      ? { companyId }
+      : {}),
+    ...(investorOrganisationId !== undefined &&
+    bound({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
+      ? { investorOrganisationId }
+      : {}),
+    ...(documentId !== undefined && bound({ kind: "DOCUMENT", documentId })
+      ? {
+          documentId,
+          ...(documentPage === undefined ? {} : { documentPage }),
+        }
+      : {}),
+  };
+}
+
+/** The screen fields `screenWithBoundEntities` judges as naming an entity. */
+export const Q_SCREEN_ENTITY_FIELDS = [
+  "companyId",
+  "investorOrganisationId",
+  "documentId",
+  "documentPage",
+  "artifactId",
+  "artifactSlide",
+  "artifactVersion",
+] as const;
 
 /**
  * PUBLIC. The body a client sends to start a Q run (doc 22 §67).

@@ -134,3 +134,41 @@ describe("the tools a run is offered are bounded by relevance, not by the alphab
     expect(a).toEqual(b);
   });
 });
+
+describe("the Q Workspace: the page pane has one authority (owner decision, 7 Nov)", () => {
+  const PANE_MOVERS = ["open_page", "open_company_document"];
+  const withWorkspace = (context: ReturnType<typeof worstCase>) => ({
+    ...context,
+    plan: {
+      ...context.plan,
+      screen: {
+        route: "HOME" as const,
+        workspace: { qPane: "open" as const, pagePane: "open" as const },
+      },
+    },
+  });
+
+  it("offers no tool that moves the page pane when the workspace is on: Q's page-move decision is the one that does", () => {
+    for (const purpose of Q_TASK_CLASSES) {
+      const context = withWorkspace(worstCase(purpose));
+      for (const list of [
+        registry.eligible(context),
+        registry.available(context),
+      ]) {
+        const names = list.map((r) => r.definition.providerName);
+        for (const mover of PANE_MOVERS) expect(names).not.toContain(mover);
+      }
+      // A card in the Q room does not move the pane: it stays.
+      expect(
+        registry.eligible(context).map((r) => r.definition.providerName),
+      ).toContain("show");
+    }
+  });
+
+  it("outside the workspace, nothing changes", () => {
+    const names = registry
+      .available(worstCase("GENERAL_QUESTION"))
+      .map((r) => r.definition.providerName);
+    expect(names).toContain("open_page");
+  });
+});

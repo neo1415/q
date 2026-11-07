@@ -315,6 +315,18 @@ describe("wordsNamePage", () => {
     ["Ne me présente pas Capital Q", "Q_PITCH", false],
     ["I'm on Capital Q's profile", "Q_PITCH", false],
     ["How do I improve my pitch deck?", "Q_PITCH", false],
+    // F5 (owner live test 7 Nov): someone else's page word is never the
+    // person's own page. It is that subject's record, or Q's to decide.
+    ["okay take me tensorgates profile", "PROFILE", false],
+    ["take me to Tensorgate's profile", "PROFILE", false],
+    ["take me to Tensor Gates’ profile", "PROFILE", false],
+    ["can i see their profile", "PROFILE", false],
+    ["show me his profile", "PROFILE", false],
+    ["open my profile", "PROFILE", true],
+    ["take me to my profile", "PROFILE", true],
+    ["open the profile page", "PROFILE", true],
+    ["profile please", "PROFILE", true],
+    ["show me our pipeline", "CRM_PIPELINE", true],
   ] as const)("%s / %s -> %s", (text, destination, expected) => {
     expect(wordsNamePage(text, { kind: "DESTINATION", destination })).toBe(
       expected,
