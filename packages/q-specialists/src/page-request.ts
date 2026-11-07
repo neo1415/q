@@ -645,11 +645,48 @@ export function wordsNamePage(text: string, target: PageTarget): boolean {
     `\\b(?:${names.map(escaped).join("|")})(?:s|es|'s)?\\b`,
     "iu",
   );
+  const ownedBy = new RegExp(
+    `(\\S+)\\s+(?:${names.map(escaped).join("|")})(?:s|es|'s)?\\b`,
+    "iu",
+  );
   // A self-correction names only its last place: the model's move to the
   // one taken back ("Open Discover, no, actually Rehearsals") is not made.
   return selfCorrected(text)
     .split(/(?<=[.!?])\s+|\s*[,;]\s*(?:but|so|and)\s+/u)
-    .some((sentence) => named.test(sentence) && !NOT_A_MOVE.test(sentence));
+    .some(
+      (sentence) =>
+        named.test(sentence) &&
+        !NOT_A_MOVE.test(sentence) &&
+        !(target.kind === "DESTINATION" && pageOfAnother(sentence, ownedBy)),
+    );
+}
+
+/** "it's", "that's", "let's": a stem whose 's is a verb, not a possessor. */
+const CONTRACTED =
+  /^(?:it|that|what|let|here|there|where|who|how|he|she|this)['’]s$/iu;
+
+/**
+ * F5 (owner live test, 7 Nov 2026): "take me tensorgates profile" moved to
+ * the person's OWN profile, because the page word alone confirmed the
+ * reader's own-destination move. The word that owns the page name says
+ * whose page it is: a third person ("their", "his", "her", "its") or a
+ * possessive ("Tensorgate's", "Tensor Gates'", and the spoken "tensorgates")
+ * is someone else's page -- that subject's record, never the person's own
+ * destination. "my", "our", "the" or a verb before it is theirs.
+ */
+function pageOfAnother(sentence: string, ownedBy: RegExp): boolean {
+  const owner = ownedBy.exec(sentence)?.[1]?.toLowerCase();
+  if (owner === undefined) return false;
+  if (/^(?:their|his|her|its|theirs)$/u.test(owner)) return true;
+  if (/['’]s$|s['’]$/u.test(owner)) return !CONTRACTED.test(owner);
+  // Spoken or typed without the apostrophe: a name ending in s right
+  // before the page word ("tensorgates profile").
+  return (
+    owner.length >= 5 &&
+    owner.endsWith("s") &&
+    /^\p{L}+$/u.test(owner) &&
+    !/(?:ss|us|is)$/u.test(owner)
+  );
 }
 
 // Q Pitch v6 (live 2026-10-17: "Can you pitch Capital Q to me?" was read as

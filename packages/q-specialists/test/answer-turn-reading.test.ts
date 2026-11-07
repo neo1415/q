@@ -680,6 +680,52 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     ).not.toContainEqual(expect.objectContaining({ kind: "UI_INTENT" }));
   });
 
+  it("F5 (owner live test 7 Nov): someone else's page word never opens the person's own page", async () => {
+    for (const said of [
+      "okay take me tensorgates profile",
+      "take me to Tensorgate's profile",
+      // A counterpart named with the page word: that record's page, not theirs.
+      "take me to the profile for Tensorgate",
+    ]) {
+      const run = seam({
+        said,
+        reading: toolReading({
+          kind: "NAVIGATE",
+          destination: "PROFILE",
+          visibility: null,
+        }),
+        counterpartNames: ["Tensorgate", "Spheros"],
+        outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      });
+      await run.answer.answer(request());
+      expect(
+        run.stored.flatMap((message) => message.blocks ?? []),
+        said,
+      ).not.toContainEqual({
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "PROFILE" },
+      });
+    }
+    // Their own still opens at once.
+    const own = seam({
+      said: "take me to my profile",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "PROFILE",
+        visibility: null,
+      }),
+      counterpartNames: ["Tensorgate", "Spheros"],
+      outcomes: [],
+    });
+    await own.answer.answer(request());
+    expect(own.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "PROFILE" },
+      },
+    ]);
+  });
+
   it("a statement in English naming no page still never moves them", async () => {
     const run = seam({
       said: "I'm looking at Discover right now.",

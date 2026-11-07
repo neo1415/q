@@ -3996,6 +3996,18 @@ export function createSpecialistQAnswer(
         );
         return null;
       }
+      // F5 (owner live test 7 Nov): the reader names only the person's own
+      // destinations, so "the profile for Tensorgate" could only be read as
+      // their own profile. A sentence naming one of their own counterparts
+      // asks about that record's page: never moved to one of their own; the
+      // answer (and, in the Q Workspace, the page-move decision) takes it.
+      if (ownCounterpartWithin(words, await counterpartsOf(request)) !== null) {
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "q did not move: the words name one of their counterparts, not their own page",
+        );
+        return null;
+      }
       // U4/F8: a move with a question after it goes with the answer.
       if (questionAfterMove(askedIn(history))) {
         queueMoveWithAnswer(request.runId, {
