@@ -119,3 +119,11 @@ export {
   asksForMove,
   isDrawingObject,
 } from "./drawing-request.js";
+export {
+  checkTheirWords,
+  cleanedFromTheirLine,
+  isTokenSubsequence,
+  THEIR_WORDS_MIN_KEPT,
+  wordTokens,
+  type TheirWordsCheck,
+} from "./their-words.js";

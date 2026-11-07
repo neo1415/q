@@ -43,6 +43,7 @@ import {
   type OnboardingStepManifest,
   type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
+import { cleanedFromTheirLine } from "@capital-q/q-core";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
 import { countryOfNodeId } from "@capital-q/taxonomy/countries";
 import type { Logger } from "@capital-q/observability";
@@ -1029,12 +1030,14 @@ export function createOnboardingPort(input: {
    */
   readonly saidAt?: ((quote: string) => string | undefined) | undefined;
   /**
-   * The conversation-first path (owner 2026-10-17, re-agreed 2026-10-30):
-   * a narrative answer (what the company does, how it makes money) is
-   * saved only as Q's summary that Q said back in the conversation and
-   * they agreed to; never their raw words written straight in, however
-   * close the reading's cut of them is. Absent: their own words may be
-   * written directly (the guided interview, which reads back itself).
+   * The conversation-first path (owner 2026-10-17, re-agreed 2026-10-30;
+   * DECISIONS 77, P1-1): a narrative answer (what the company does, how it
+   * makes money) is saved as Q's summary that Q said back and they agreed
+   * to, or, when the reading judged it clear, as their own words with only
+   * filler removed (checked: deletions only, most of their line kept).
+   * Never their raw ramble written straight in. Absent: their own words
+   * may be written directly (the guided interview, which reads back
+   * itself).
    */
   readonly narrativeFromReadBackOnly?: boolean | undefined;
   /**
@@ -2958,19 +2961,26 @@ export function createOnboardingPort(input: {
     return qLine !== undefined && heardBack(text, qLine);
   };
   /**
-   * Their own words from a short line of theirs, a sentence or two
-   * ("Robotics for warehouse logistics.", "change our description to
-   * …"): nothing to say back. Words cut from a long line were told at
-   * length and are said back first (live 2026-10-30: a ramble minus "so
-   * basically, um" was saved as the description). Structure only: how
-   * long their line is and whether the words are in it, never what they
-   * mean.
+   * Their own words with only filler removed (onboarding P1-1, DECISIONS
+   * 77): the reader judged the answer clear, by meaning, whatever its
+   * length (ONBOARDING_TRANSCRIPT_READER v14, ownWords true), and code
+   * checks that claim by structure only: the text is the line of theirs
+   * the quote is from, with words deleted and none added, reworded or
+   * reordered, keeping most of it (cleanedFromTheirLine). Anything else,
+   * a ramble's summary included, is said back for their yes. This
+   * replaces a 30-word rule that summarised every clear long answer and
+   * kept a short ramble with its filler (live 2026-10-30: a ramble minus
+   * "so basically, um" was saved as the description; the coverage floor
+   * still refuses that).
    */
-  const shortWholeLine = (text: string): boolean =>
+  const cleanedTheirWords = (
+    text: string,
+    quote: string,
+    ownWords: boolean | undefined,
+  ): boolean =>
+    ownWords === true &&
     input.personTurns.some(
-      (said) =>
-        said.trim().split(/\s+/u).length <= SHORT_ANSWER_WORDS &&
-        textStatedIn(text, said),
+      (said) => quoteOccursIn(quote, said) && cleanedFromTheirLine(text, said),
     );
   /**
    * Whether free text is theirs: in their words (the quote, or the turn of
@@ -3081,7 +3091,11 @@ export function createOnboardingPort(input: {
   const unsupported = (
     step: OnboardingStepManifest,
     value: OnboardingResponseValue,
-    answer: { readonly quote: string; readonly basis?: string | undefined },
+    answer: {
+      readonly quote: string;
+      readonly basis?: string | undefined;
+      readonly ownWords?: boolean | undefined;
+    },
     readerStated = false,
   ): OnboardingRecordResult | null => {
     if (answer.basis === "DELEGATED") return null;
@@ -3151,10 +3165,16 @@ export function createOnboardingPort(input: {
     // step itself ("bridge dot com"), so it is not the words verbatim.
     // Text Q read back to them ("Nixo, right?") and they agreed to in
     // their latest words is theirs, as a read-back figure is.
+    // A long answer kept in their words with only filler removed (P1-1)
+    // is theirs too: deletions only from their line, most of it kept.
     if (
       value.type === "TEXT" &&
       !step.stepKey.endsWith(".website") &&
-      !textInTheirWords(value.text, answer.quote)
+      !textInTheirWords(value.text, answer.quote) &&
+      !(
+        PARAPHRASABLE.has(step.configuration.stepType) &&
+        cleanedTheirWords(value.text, answer.quote, answer.ownWords)
+      )
     ) {
       return refuse(
         "That text is not in their words, so nothing was recorded. Free text is recorded in the person's own words, and only for the question it answers.",
@@ -3662,7 +3682,7 @@ export function createOnboardingPort(input: {
       answer.value.trim().length > 0 &&
       !(input.narrativeFromReadBackOnly === true
         ? agreedReadBack(answer.value.trim(), answer.quote) ||
-          shortWholeLine(answer.value.trim())
+          cleanedTheirWords(answer.value.trim(), answer.quote, answer.ownWords)
         : textInTheirWords(answer.value.trim(), answer.quote))
     ) {
       // Their yes agreed to Q's one summary line, and the reading found it
@@ -5763,13 +5783,12 @@ const NOT_STATED_REASON =
   "Their latest words do not state this about themselves, so nothing was recorded. A question, advice or a mention is never their answer; ask them if you want to know.";
 
 const PARAPHRASABLE: ReadonlySet<string> = new Set(["long_text", "voice_text"]);
-/** The most words a line of theirs may have and still need no say-back. */
-const SHORT_ANSWER_WORDS = 30;
 
 /**
  * Whether a step's answer is told at length (what the company does, the
  * problem, how it makes money): saved as Q's summary they agreed to in
- * the conversation, never as their raw words.
+ * the conversation, or as their own words with only filler removed when
+ * the answer was clear (P1-1), never as a raw ramble.
  */
 export function isLongAnswerStep(
   journeyType: "investor" | "founder",
