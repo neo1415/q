@@ -1116,6 +1116,74 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     });
   });
 
+  it("batch-8 replay: a decision that lands after a fast code answer still moves the pane, as a short second message", async () => {
+    const pageMoves = createQPageMoves({
+      decider: {
+        decide: () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  decision: "MOVE",
+                  place: {
+                    route: "/work",
+                    record: null,
+                    tab: "team",
+                    document: null,
+                    slide: null,
+                    sectionId: null,
+                    position: null,
+                  },
+                  back: false,
+                  askedForPage: true,
+                  reason: "",
+                }),
+              60,
+            ),
+          ),
+      },
+      config: { movesAllowed: true },
+      // The answer does not wait for it.
+      settleWithinMs: 1,
+    });
+    const run = seam({
+      said: "Stay here",
+      earlier: [
+        { role: "USER" as const, content: "Show me my investor pipeline" },
+        {
+          role: "Q" as const,
+          content:
+            "Your full pipeline is in Relationships. Would you like to open it?",
+          blocks: [
+            {
+              kind: "NAVIGATION_OFFER",
+              intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+              place: "Relationships",
+              openLabel: "Open Relationships",
+            },
+          ],
+        },
+      ],
+      reading: null,
+      outcomes: [],
+      pageMoves,
+    });
+    await run.answer.answer(
+      request({
+        route: "HOME",
+        workspace: { qPane: "open", pagePane: "open", at: "/home" },
+      }),
+    );
+    expect(run.stored).toHaveLength(2);
+    expect(run.stored[1]?.content).toBe("I've opened Q's team.");
+    expect(run.stored[1]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
+      },
+    ]);
+  });
+
   it("a 'yes' with no offer before it is not read as one (N1)", async () => {
     const run = seam({
       said: "yes",

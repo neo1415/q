@@ -2575,7 +2575,8 @@ export function createSpecialistQAnswer(
       dependencies.pageMoves === undefined
         ? blocks
         : await dependencies.pageMoves
-            .settle(request, blocks)
+            // Code's answers: their moves are exact commands and stand.
+            .settle(request, blocks, { keepAnswerMoves: true })
             .catch(() => blocks);
     return moved === undefined ? undefined : [...moved];
   }
@@ -8878,11 +8879,49 @@ ${line}`;
       : { ...request, fetchedInConversation: kept };
   };
 
+  /**
+   * Batch-8 replay (owner via integration): a page-move decision that was
+   * still running when the answer was stored is never dropped. Its move
+   * follows the answer as a short second message, before the run
+   * completes, so the pane still goes where the conversation points.
+   */
+  async function followWithLateMove(
+    request: QAnswerRequest,
+    outcome: QAnswerOutcome,
+  ): Promise<void> {
+    if (outcome.kind !== "ANSWERED") return;
+    const late = await dependencies.pageMoves
+      ?.late?.(request)
+      .catch(() => null);
+    if (late == null) return;
+    const history = await historyOfRun(request.tenantId, request.runId).catch(
+      () => [] as readonly QConversationMessage[],
+    );
+    const conversationId = history[0]?.conversationId;
+    if (conversationId === undefined) return;
+    await recordAnswer(
+      request,
+      conversationId,
+      late.content,
+      late.blocks,
+    ).catch((error: unknown) => {
+      logger?.warn(
+        {
+          qRunId: request.runId,
+          err: error instanceof Error ? error.name : typeof error,
+        },
+        "q late page move not stored",
+      );
+    });
+  }
+
   return {
     lastResult: () => last,
     answer: async (request) => {
       try {
-        return await answerTurn(await withFetched(request));
+        const outcome = await answerTurn(await withFetched(request));
+        await followWithLateMove(request, outcome);
+        return outcome;
       } finally {
         // Step 11: the state's save ran beside the turn; a run ends only
         // once it has settled (it never fails the answer).
