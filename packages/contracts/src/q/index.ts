@@ -119,6 +119,9 @@ export {
   type QRequestEnvelope,
   type QUserMessageInput,
   type QViewingMoment,
+  Q_WORKSPACE_PATH_MAX,
+  QWorkspaceScreenSchema,
+  type QWorkspaceScreen,
 } from "./request.js";
 
 export {

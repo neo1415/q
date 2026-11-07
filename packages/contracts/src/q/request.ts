@@ -10,6 +10,7 @@ import { UuidSchema } from "../common/ids.js";
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
 import { QPageManifestSchema } from "./screen-manifest.js";
 import { QSubjectRefsSchema } from "./subject.js";
+import { QWorkspacePaneStateSchema } from "./ui-intent.js";
 import { QContractVersionSchema } from "./version.js";
 
 /**
@@ -90,6 +91,31 @@ export type QScreenRoute = z.infer<typeof QScreenRouteSchema>;
  * for the asker through its owning context exactly like a named subject,
  * and one that does not resolve is dropped silently, as if absent.
  */
+/**
+ * Q Workspace (DECISIONS 71): the workspace as this tab shows it, for the
+ * navigation decision (W4). Set by the web only when the Q Workspace shell
+ * is on for this tab; absent means off or an older web. A display hint for
+ * emitting workspace-only intents (LAYOUT_SET, navigate targets) and for
+ * the move policy's hard rules -- never authority: a page path here grants
+ * nothing, and every move is still validated and authorised as a click.
+ */
+export const Q_WORKSPACE_PATH_MAX = 512;
+export const QWorkspaceScreenSchema = z
+  .object({
+    pagePane: QWorkspacePaneStateSchema,
+    qPane: QWorkspacePaneStateSchema,
+    /** The current page in the page pane (its path). */
+    at: z.string().max(Q_WORKSPACE_PATH_MAX).optional(),
+    /** The page before Q's last move (its path). */
+    previous: z.string().max(Q_WORKSPACE_PATH_MAX).optional(),
+    /** Unsaved work on the page (the leave guard). */
+    dirty: z.boolean().optional(),
+    /** The person is typing or scrolling in the page pane. */
+    busy: z.boolean().optional(),
+  })
+  .strict();
+export type QWorkspaceScreen = z.infer<typeof QWorkspaceScreenSchema>;
+
 export const QScreenContextSchema = z
   .object({
     route: QScreenRouteSchema,
@@ -151,6 +177,11 @@ export const QScreenContextSchema = z
      * spoken turn is VOICE on the server whatever this says.
      */
     surface: QAskSurfaceSchema.optional(),
+    /**
+     * Q Workspace: present only when the workspace shell is on for this
+     * tab (QWorkspaceScreenSchema). A display hint, never authority.
+     */
+    workspace: QWorkspaceScreenSchema.optional(),
   })
   .strict();
 export type QScreenContext = z.infer<typeof QScreenContextSchema>;

@@ -10,6 +10,8 @@ import {
   QNavigateTargetSchema,
   QNavigationOfferBlockSchema,
   QClientActionIntentSchema,
+  Q_SCREEN_ROUTES,
+  QScreenContextSchema,
   Q_UI_INTENT_KINDS,
   QOpenRecordPageIntentSchema,
   QProfileSectionKeySchema,
@@ -283,5 +285,49 @@ describe("W1.5 LAYOUT_SET (contract owned by W3)", () => {
       expect(legacyParses(intent)).toBe(true);
     }
     expect(Q_UI_INTENT_KINDS).toContain("LAYOUT_SET");
+  });
+});
+
+describe("Q Workspace screen context and set_layout (W1/W4 via W3)", () => {
+  const route = Q_SCREEN_ROUTES[0];
+  const LegacyScreen = QScreenContextSchema.omit({ workspace: true }).strict();
+
+  it("a screen without the workspace parses in both the new and the old shape", () => {
+    const screen = { route };
+    expect(QScreenContextSchema.parse(screen)).toEqual(screen);
+    expect(LegacyScreen.parse(screen)).toEqual(screen);
+  });
+
+  it("a workspace screen parses in the new shape; the old one refuses it (sent only with the flag on)", () => {
+    const screen = {
+      route,
+      workspace: {
+        pagePane: "open",
+        qPane: "open",
+        at: "/relationships?view=capital",
+        previous: "/home",
+        dirty: false,
+        busy: true,
+      },
+    };
+    expect(QScreenContextSchema.parse(screen)).toEqual(screen);
+    expect(LegacyScreen.safeParse(screen).success).toBe(false);
+    expect(
+      QScreenContextSchema.safeParse({
+        route,
+        workspace: { pagePane: "collapsed", qPane: "open" },
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    [{ pagePane: "open" }],
+    [{ pagePane: "open", qPane: "hidden" }],
+    [{ pagePane: "open", qPane: "open", at: "x".repeat(513) }],
+    [{ pagePane: "open", qPane: "open", authority: "admin" }],
+  ])("refuses the workspace %o", (workspace) => {
+    expect(QScreenContextSchema.safeParse({ route, workspace }).success).toBe(
+      false,
+    );
   });
 });
