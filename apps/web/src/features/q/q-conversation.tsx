@@ -113,6 +113,7 @@ import {
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
+import { answerCardsDrawn, useSettledReveal } from "./settled-reveal";
 import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
@@ -636,6 +637,16 @@ export function QConversationPanel({
       : lines.filter(
           (line) => !(line.role === "person" && words(line.text) === liveWords),
         );
+
+  // CLS (batch 7, 0.55 at 390): restored history is drawn hidden until its
+  // rows, lazy cards and scroll have settled, then shown in place.
+  const conversationRef = useRef<HTMLDivElement>(null);
+  const settling = useSettledReveal(
+    conversationRef,
+    thread.length,
+    answerCardsDrawn,
+    workspace,
+  );
 
   // Documents still being made, asked for before the latest exchange: the
   // presence view keeps a line for each (pinned-work.tsx).
@@ -1415,6 +1426,10 @@ export function QConversationPanel({
           >
             {conversing ? (
               <div
+                ref={conversationRef}
+                // A restored conversation is shown once settled (CLS).
+                style={settling ? { visibility: "hidden" } : undefined}
+                data-q-settling={settling ? "" : undefined}
                 className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : room.filled && stageMode === "FULL" ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl"}`}
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >

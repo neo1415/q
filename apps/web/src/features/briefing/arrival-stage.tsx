@@ -68,6 +68,7 @@ import {
 } from "./stage-focus";
 import { useUiLanguage } from "@/features/i18n/language";
 import { useT } from "@/features/i18n/language";
+import { useQPaneWidth, wideEnough } from "@/features/workspace/q-pane-width";
 
 /**
  * The arrival as a layer of the Q stage (RECOVERY-2026-10 E1, audit
@@ -103,13 +104,15 @@ function subscribeWide(onChange: () => void): () => void {
   return () => query.removeEventListener("change", onChange);
 }
 function useWide(): boolean {
-  return useSyncExternalStore(
+  const viewportWide = useSyncExternalStore(
     subscribeWide,
     () =>
       typeof window.matchMedia === "function" &&
       window.matchMedia(WIDE_QUERY).matches,
     () => false,
   );
+  // R7: in the Q Workspace pane, the pane's own width decides.
+  return wideEnough(useQPaneWidth(), viewportWide, 1280);
 }
 
 function browserZone(): string | null {

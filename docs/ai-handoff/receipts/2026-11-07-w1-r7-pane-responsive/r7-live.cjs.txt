@@ -1,0 +1,30 @@
+const { chromium } = require("playwright");
+const OUT = process.argv[3];
+(async () => {
+  const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", ignoreDefaultArgs: ["--hide-scrollbars"] });
+  const cases = [
+    [1280, 800, 300, "open"], [1440, 900, 380, "open"], [1440, 900, 640, "open"],
+    [1920, 1080, 480, "open"], [1440, 900, 380, "collapsed"],
+  ];
+  for (const [vw, vh, qw, page] of cases) {
+    const ctx = await b.newContext({ storageState: process.argv[2], viewport: { width: vw, height: vh } });
+    const p = await ctx.newPage();
+    await p.addInitScript(([qw, page]) => {
+      try { sessionStorage.setItem("cq.splash.seen", "1"); localStorage.setItem("cq-workspace-layout", JSON.stringify({ qWidth: qw, qPane: "open", pagePane: page })); } catch {}
+    }, [qw, page]);
+    await p.goto(`http://127.0.0.1:3100${process.argv[4] ?? "/discover"}`, { waitUntil: "load", timeout: 180000 });
+    await p.waitForTimeout(9000);
+    const info = await p.evaluate(() => {
+      const pane = document.querySelector(".cq-ws-q");
+      const ta = pane?.querySelector("textarea");
+      const scrollers = [...(pane?.querySelectorAll("*") ?? [])].filter((n) => { const cs = getComputedStyle(n); return /(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1; }).map((n) => (n.getAttribute("data-q-workspace") !== null ? "workspace-section" : n.tagName.toLowerCase() + "." + String(n.className).split(" ").slice(0, 3).join(".")).slice(0, 80));
+      const marks = pane?.querySelectorAll("[data-q-scroll-mark], [data-scroll-marker], .cq-scroll-marks, [data-q-rail]").length ?? 0;
+      return { pane: Math.round(pane?.getBoundingClientRect().width ?? 0), textarea: ta ? Math.round(ta.getBoundingClientRect().height) : null, composerBox: ta ? Math.round(ta.closest("form, [data-q-composer]")?.getBoundingClientRect().height ?? 0) : null, scrollers, marks, cards: pane?.querySelectorAll(".cq-ac-card").length ?? 0, layout: pane?.querySelector(".cq-ac-cards")?.getAttribute("data-layout") ?? null };
+    });
+    const name = `${vw}-q${qw}-${page}`;
+    await p.screenshot({ path: `${OUT}/${name}.png` });
+    console.log(name, JSON.stringify(info));
+    await ctx.close();
+  }
+  await b.close();
+})();
