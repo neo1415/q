@@ -7530,6 +7530,12 @@ const onboardingConversation =
     ? undefined
     : createOnboardingConversation({
         apiBaseUrl: config.voice.apiBaseUrl,
+        // P1-2: a reply to Q's read-back is read by meaning.
+        wordsCheck: (actor, question, words) =>
+          wordsReaders.check(
+            { tenantId: actor.tenantId, userId: actor.userId },
+            { question, utterance: words },
+          ),
         reader: createOnboardingTranscriptReader({
           gateway: modelGateway,
           logger,
@@ -7565,6 +7571,12 @@ const typedOnboarding =
     ? undefined
     : createTypedOnboarding({
         conversation: onboardingConversation,
+        // P1-2: a reply to Q's read-back is read by meaning.
+        wordsCheck: (actor, question, words) =>
+          wordsReaders.check(
+            { tenantId: actor.tenantId, userId: actor.userId },
+            { question, utterance: words },
+          ),
         gateway: modelGateway,
         delegation: createQDelegationReader({
           gateway: modelGateway,

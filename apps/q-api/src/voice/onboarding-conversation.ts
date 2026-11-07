@@ -166,6 +166,18 @@ type Reading = {
 };
 
 export function createOnboardingConversation(dependencies: {
+  /**
+   * One closed question about their words, by meaning (P1-2): whether
+   * their reply agrees to what Q just read back. Absent: no reply counts
+   * as agreement (fail closed).
+   */
+  readonly wordsCheck?:
+    | ((
+        actor: ActorContext,
+        question: string,
+        words: string,
+      ) => Promise<"YES" | "NO" | "UNSURE" | null>)
+    | undefined;
   readonly apiBaseUrl: string;
   readonly reader: OnboardingTranscriptReader;
   readonly delegation?: QDelegationReader | undefined;
@@ -217,6 +229,13 @@ export function createOnboardingConversation(dependencies: {
       replaces,
       affirmed,
       logger,
+      ...(dependencies.wordsCheck === undefined
+        ? {}
+        : {
+            wordsCheck: (question: string, words: string) =>
+              dependencies.wordsCheck?.(line.actor, question, words) ??
+              Promise.resolve(null),
+          }),
       // Owner 2026-10-17, re-agreed 2026-10-30: a narrative answer is
       // saved as Q's summary they agreed to in the conversation, never
       // as their raw words; a summary not yet agreed is held for it.

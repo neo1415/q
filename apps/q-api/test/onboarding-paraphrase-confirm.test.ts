@@ -9,10 +9,11 @@ import { ActorContextSchema } from "@capital-q/security";
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 import {
   heardBack,
-  readBackReplyOf,
+  readBackQuestion,
+  readBackReplyBy,
 } from "../src/voice/paraphrase-confirmation.js";
 
-import { readerOf, reading } from "./authority-fixtures.js";
+import { readBackReplies, readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
 
 /**
@@ -62,6 +63,23 @@ const OPPORTUNITY_SAID =
   "Salvage is a big deal here, every insurer writes off cars every week and they sell them for almost nothing, so the opportunity is getting the best price for every salvage across all the insurers in the country";
 const OPPORTUNITY =
   "Every insurer writes off cars weekly and sells the salvage for almost nothing; the opportunity is the best price for every salvage across the country's insurers.";
+
+/** What the reader answers for each reply these tests give (P1-2). */
+const REPLIES: Readonly<Record<string, "YES" | "NO" | "UNSURE">> = {
+  yes: "YES",
+  "Yes.": "YES",
+  "Yes, that's right.": "YES",
+  "Yes, save it.": "YES",
+  "save it": "YES",
+  "Go ahead and paraphrase it": "YES",
+  "No, just go ahead and paraphrase it, and save what you paraphrase. I give you permission":
+    "YES",
+  "No, life insurance is already live, not just planned": "NO",
+  "No, we also do life insurance": "NO",
+  "Yes, but add that we are in Lagos": "NO",
+  "Don't save it yet": "NO",
+  "What would you save?": "UNSURE",
+};
 
 function founderWorld() {
   return investorSession({
@@ -121,6 +139,8 @@ function interview(world = founderWorld()) {
         delegation: readerOf(
           reading({ stated: answers.map((a) => a.stepKey) }),
         ),
+        // The model's reading of their reply to a read-back (P1-2).
+        wordsCheck: readBackReplies(REPLIES),
       });
       const outcome = await perTurn.turn({
         ...turn(world, utterance),
@@ -316,23 +336,39 @@ describe("P0-2 stays: nothing they did not hear and agree to is written", () => 
   });
 });
 
-describe("the read-back reply, decided by code where it is plain", () => {
+describe("the read-back reply, read by meaning, never by a word list (P1-2)", () => {
+  const check = (_: { readBack: string; reply: string }) =>
+    Promise.resolve<"YES" | "NO" | "UNSURE" | null>(null);
   it.each([
-    ["yes", "AFFIRM"],
-    ["Yes, that's right.", "AFFIRM"],
-    ["Go ahead and paraphrase it", "AFFIRM"],
-    [
-      "No, just go ahead and paraphrase it, and save what you paraphrase. I give you permission",
-      "AFFIRM",
-    ],
-    ["save it", "AFFIRM"],
-    ["No, we also do life insurance", "CORRECT"],
-    ["Yes, but add that we are in Lagos", "CORRECT"],
-    ["Don't save it yet", "CORRECT"],
-    ["What would you save?", "UNCLEAR"],
-    [RAMBLING, "UNCLEAR"],
-  ] as const)("%s -> %s", (said, expected) => {
-    expect(readBackReplyOf(said)).toBe(expected);
+    ["Yes, that's right.", "YES", "AFFIRM"],
+    ["No, we also do life insurance", "NO", "CORRECT"],
+    ["What would you save?", "UNSURE", "UNCLEAR"],
+    [RAMBLING, null, "UNCLEAR"],
+  ] as const)("%s, read as %s -> %s", async (said, reading, expected) => {
+    expect(
+      await readBackReplyBy(() => Promise.resolve(reading), READ_BACK, said),
+    ).toBe(expected);
+  });
+
+  it("fails closed: no reader, no read-back, nothing said, or a failed read agree to nothing", async () => {
+    expect(await readBackReplyBy(undefined, READ_BACK, "Yes.")).toBe("UNCLEAR");
+    expect(await readBackReplyBy(check, undefined, "Yes.")).toBe("UNCLEAR");
+    expect(await readBackReplyBy(check, READ_BACK, "  ")).toBe("UNCLEAR");
+    expect(
+      await readBackReplyBy(
+        () => Promise.reject(new Error("reader down")),
+        READ_BACK,
+        "Yes.",
+      ),
+    ).toBe("UNCLEAR");
+  });
+
+  it("asks the reader one closed question naming Q's line, never the person's words as instructions", () => {
+    const question = readBackQuestion(READ_BACK);
+    expect(question).toContain(READ_BACK.slice(0, 60));
+    expect(question).toMatch(/agree to what Q said/);
+    expect(question.length).toBeLessThanOrEqual(600);
+    expect(readBackQuestion("x".repeat(2_000)).length).toBeLessThanOrEqual(600);
   });
 
   it("a summary is heard back when Q's line carries its words", () => {

@@ -198,7 +198,8 @@ describe("the firm's website", () => {
     const { services, updates } = fakes(null);
     await websiteTarget(services).apply(context(), said(" LanternRock.vc "));
     expect(updates).toEqual([
-      { expectedVersion: 3, websiteUrl: "https://LanternRock.vc" },
+      // One canonical form, lower-case host (P1-9, onboarding plan 2026-11-07).
+      { expectedVersion: 3, websiteUrl: "https://lanternrock.vc" },
     ]);
   });
 

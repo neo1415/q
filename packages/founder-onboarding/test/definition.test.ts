@@ -260,9 +260,11 @@ describe("Founder canonical mappings", () => {
       "http://example.com/x",
     );
     // The scheme is kept (http stays http) but stored lower-case, which
-    // RFC 3986 makes the canonical form; the rest is kept as typed.
+    // RFC 3986 makes the canonical form. The host is lower-case too, so
+    // the form and the conversation store one website one way (P1-9,
+    // onboarding plan 2026-11-07); a path is kept as typed.
     expect(normaliseWebsite("  HTTPS://Example.com ")).toBe(
-      "https://Example.com",
+      "https://example.com",
     );
   });
 

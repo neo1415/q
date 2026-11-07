@@ -93,38 +93,40 @@ export function heardBack(text: string, qTurn: string | undefined): boolean {
 
 export type ReadBackReply = "AFFIRM" | "CORRECT" | "UNCLEAR";
 
-/** "Go ahead and paraphrase it", "save it", "I give you permission". */
-const PERMISSION =
-  /\b(?:go ahead|save (?:it|that|this|what you)|paraphrase (?:it|that)|(?:give|gave|giving) you (?:my )?permission|you have my permission|(?:use|keep) (?:that|it|yours|your (?:version|wording|summary))|put (?:it|that) down|write (?:it|that) down)\b/u;
-/** A permission taken back in the same breath. */
-const WITHHELD =
-  /\b(?:dont|do not|not yet|wait|hold on|hang on|before you|instead)\b/u;
-/** A plain yes, at the start of what they said. */
-const YES =
-  /^(?:(?:um+|uh+|oh|ah|well|so|and)\s+)*(?:yes|yeah|yea|yep|yup|ya|yah|sure|correct|right|exactly|perfect|absolutely|definitely|precisely|indeed|ok|okay|great|good|fine|spot on|sounds (?:good|right|great|fine)|thats (?:it|right|correct|perfect|good|fine|great|accurate)|that is (?:it|right|correct|accurate)|you got it|nailed it|please do|do it|go for it|uh huh|mm hmm)\b/u;
-/** Anything that changes, adds to or doubts what was read back. */
-const CHANGING =
-  /\b(?:no|nope|not|isnt|wasnt|arent|dont|doesnt|didnt|wrong|incorrect|actually|but|except|instead|rather|change|fix|missing|forgot|also|plus|though|however|wait)\b/u;
+/**
+ * One closed question about their reply, read by meaning (the gateway's
+ * UTTERANCE_CHECK reader): YES, NO or UNSURE; null when it could not be
+ * read. Composed in main.ts; absent only in tests of other properties.
+ */
+export type ReadBackCheck = (input: {
+  /** Q's line they are answering. Trusted: Capital Q's own words. */
+  readonly readBack: string;
+  /** What they said back. Untrusted. */
+  readonly reply: string;
+}) => Promise<"YES" | "NO" | "UNSURE" | null>;
+
+/** The closed question, Q's line bounded to fit the reader's question. */
+export function readBackQuestion(readBack: string): string {
+  const line = readBack.trim().replace(/\s+/gu, " ");
+  const quoted = line.length <= 420 ? line : `${line.slice(0, 417)}...`;
+  return `Q just said to them: "${quoted}". Does their reply agree to what Q said, as Q said it, without changing it, adding to it, doubting it or asking about it?`;
+}
 
 /**
- * Their reply to a read-back: a plain yes or a permission to save what Q
- * offered is AFFIRM; a no, a change or an addition is CORRECT; a question
- * or anything longer is UNCLEAR and left to the reader.
+ * Their reply to a read-back (P1-2, onboarding plan 2026-11-07; DECISIONS
+ * 40: read by meaning, never by a word list). YES is AFFIRM, NO is
+ * CORRECT; unsure, unread, or nothing to read is UNCLEAR, which agrees to
+ * nothing (fail closed).
  */
-export function readBackReplyOf(utterance: string): ReadBackReply {
-  const raw = utterance.trim();
-  if (raw.length === 0) return "UNCLEAR";
-  const said = raw
-    .toLocaleLowerCase()
-    .replace(/[’']/gu, "")
-    .replace(/[^\p{L}\p{N}?\s]+/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
-  if (PERMISSION.test(said) && !WITHHELD.test(said) && !said.includes("?")) {
-    return "AFFIRM";
+export async function readBackReplyBy(
+  check: ReadBackCheck | undefined,
+  readBack: string | undefined,
+  reply: string,
+): Promise<ReadBackReply> {
+  if (check === undefined || readBack === undefined) return "UNCLEAR";
+  if (reply.trim().length === 0 || readBack.trim().length === 0) {
+    return "UNCLEAR";
   }
-  if (CHANGING.test(said)) return "CORRECT";
-  if (said.includes("?")) return "UNCLEAR";
-  const words = said.split(" ").length;
-  return YES.test(said) && words <= 12 ? "AFFIRM" : "UNCLEAR";
+  const answer = await check({ readBack, reply }).catch(() => null);
+  return answer === "YES" ? "AFFIRM" : answer === "NO" ? "CORRECT" : "UNCLEAR";
 }

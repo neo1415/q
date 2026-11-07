@@ -47,3 +47,19 @@ export function readerOf(
     },
   };
 }
+
+/**
+ * The model's reading of a reply to Q's read-back (P1-2, DECISIONS 40), as
+ * a table: the words a test says, and what the reader would answer. Any
+ * other one-question check is unread (null), as if no reader answered.
+ */
+export function readBackReplies(
+  table: Readonly<Record<string, "YES" | "NO" | "UNSURE">>,
+) {
+  return (_actor: unknown, question: string, words: string) =>
+    Promise.resolve(
+      question.startsWith("Q just said to them")
+        ? (table[words.trim()] ?? "UNSURE")
+        : null,
+    );
+}

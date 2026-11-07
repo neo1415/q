@@ -155,3 +155,59 @@ Each fix has a test that fails before it and passes after.
 | P0-4 | FIXED     | The worker uses the detecting SERP provider. Test: `apps/workers/test/presence-research-vendor.test.ts`.                                                                                                                                                 |
 | P2-1 | FIXED     | The investor form's Continue later goes to `/discover`. Test: `apps/web/test/continue-later.test.tsx`.                                                                                                                                                   |
 | P1-6 | WITHDRAWN | Not a defect (see §3).                                                                                                                                                                                                                                   |
+
+## 7. Research design (P1-3/4/5)
+
+Written and implemented on `fix/onboarding-research` (from `e67014d79`). Built from what exists; no new provider, no new engine.
+
+**What exists.** Research already has a durable trigger.
+
+- `onboarding.response.committed` is written to the transactional outbox for every saved answer, typed, voice or form.
+- The worker's domain-event consumer hands it to the presence dispatch (`apps/workers/src/presence/dispatch.ts`). The dispatch builds through `presence.build`, whose DB build log is already the cross-process guard: a build RUNNING is not started twice, and one done inside the refresh window is not repeated.
+- Findings become pending ONBOARDING suggestions (`presenceCandidates`), which Q's checklist already reads as "not confirmed yet; Q found … (from a public page, not verified)" (`onboarding-port.ts` coverage proposals, source `PUBLIC_RESEARCH`). Nothing on that path depends on process memory.
+
+What was missing:
+
+- the read ran detached inside the consumer (`void`), so a deploy mid-read lost it;
+- it ran once, on the name only;
+- it never read the company's own site;
+- it cut pages to a turn's 3 s budget.
+
+**P1-4 Durable, idempotent job.**
+
+- The consumer now only **enqueues** `presence.onboarding.research` v1 (`packages/q-presence/src/jobs.ts`, identifiers only), for a company or firm name, or a founder's website. It returns at once, so no other domain event waits on a web read. A queue refusal retries the event.
+- A dedicated runner works the queue `presence-research` (`apps/workers/src/main.ts`):
+  - visibility timeout 120 s; a build is bounded at 45 s by an `AbortSignal`;
+  - 6 attempts with exponential backoff;
+  - a dead letter, `presence-research-dead`.
+- A deploy mid-read leaves the message to be delivered again, and the build log makes the redelivery idempotent.
+- Only `BUILD_IN_PROGRESS` is retried: the same subject's build is still running, and this job's identity (a website given since) must still be read. A failed read is never retried, because its searches are paid. It is logged, never said (DECISIONS 77).
+- **Migration `20261231430000_presence_research_queue.sql`:** the two pgmq queues, with browser roles locked out; pgTAP `430_presence_research_queue`. Additive. Not applied.
+
+**P1-3 A website given late re-triggers.**
+
+- `F1.website` is now a trigger step. Its job reads the company name from the current answers and builds with `force: true`.
+  - A new website is a new identity. The 14-day `PRESENCE_REFRESH_AFTER_MS` skip would otherwise have kept it unread after a name-only build.
+  - A build still running is never overtaken: the job retries until that build ends.
+- A website before the name waits for the name's own job, which reads it.
+- The q-api conversation trigger already re-runs on a new website, because its identity key includes the domain.
+
+**P1-5 The company's own site, within the budget.**
+
+- Both read ports, q-api `composition/presence.ts` and the worker's `createWorkerPresenceReadPort`, now read the website the person gave **directly**: `research.extract` with `personNamed`, bounded at `PLANNED_EXTRACT_BUDGET_MS` (8 s). This runs in parallel with the searches.
+- The searches run as planned jobs: the 8 s page budget instead of 3 s, and at most 2 searches each. Nobody waits on them.
+- Every non-OK status, for a search or a page read, is logged with its failure class.
+
+**Not moved: the q-api in-session fast path** (`voice/investor-research.ts`, an in-process Map with `void run`).
+
+- It reads more fields than the worker maps (website, description, country, stage, categories and team size, against the worker's description and role/mandate context). Retiring it would trade capability away (DECISIONS 73).
+- It stays as the fast path within a session. The worker job is the durable floor: if q-api restarts mid-read, the worker's suggestions still reach the checklist.
+- **Known cost:** both paths can read the same company, as they already did before this change.
+- **Size of unifying them:** move `founder-research.ts` / `validateFounderReading` into a package the worker can use, and map their findings through `presenceCandidates`. That is about a day's work. It is not done here.
+
+**Tests (failing first where behaviour changed):**
+
+- `apps/workers/test/presence-dispatch.test.ts`: website re-trigger, awaited and bounded, RETRY only on IN_PROGRESS, failures DONE.
+- `apps/workers/test/presence-research-job.test.ts`: enqueue only, a refused enqueue retries the event, and the job runner's outcomes.
+- `apps/workers/test/presence-read-port.test.ts` and `apps/q-api/test/presence-read-failures.test.ts`: own-site read, planned budget, failure logging.
+- `apps/workers/test/onboarding-research-replay.test.ts` (DECISIONS 48): synthetic recorded pages replayed through the real research service, read port, presence build and dispatch, in three cases: found, refused and nothing.

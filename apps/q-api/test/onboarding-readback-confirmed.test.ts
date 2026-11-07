@@ -9,7 +9,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 import { withoutUnbackedReadingClaims } from "../src/voice/onboarding-flow.js";
 
-import { readerOf, reading } from "./authority-fixtures.js";
+import { readBackReplies, readerOf, reading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
 
 /**
@@ -50,7 +50,7 @@ function firewall(): ContextFirewallPort {
 const READ = "Payroll and PAYE compliance for small businesses in Ghana";
 const CLAIM = "The deck points are confirmed. What stage is the company at?";
 
-async function turnAfter(lastQ: string) {
+async function turnAfter(lastQ: string, read = true) {
   const world = investorSession({
     journey: "founder",
     currentStepKey: "F1.description",
@@ -90,6 +90,14 @@ async function turnAfter(lastQ: string) {
     logger,
     recommendations,
     delegation: readerOf(reading({})),
+    // The model's reading of their reply to the read-back (P1-2).
+    ...(read
+      ? {
+          wordsCheck: readBackReplies({
+            "Yes, everything you read from the deck is right.": "YES",
+          }),
+        }
+      : {}),
   });
   const outcome = await agent.turn({
     ...turn(world, "Yes, everything you read from the deck is right."),
@@ -109,6 +117,15 @@ describe("a deck read-back is confirmed only in fact (QA F-134, 25 Oct)", () => 
       `From your deck: ${READ}. Is that right?`,
     );
     expect(pending).toHaveLength(0);
+  });
+
+  it("with no reader of their reply, a yes in words alone confirms nothing (P1-2, fail closed)", async () => {
+    // Before P1-2 a word list decided "yes" by itself (DECISIONS 40).
+    const { pending } = await turnAfter(
+      `From your deck: ${READ}. Is that right?`,
+      false,
+    );
+    expect(pending).toHaveLength(1);
   });
 
   it("readings Q never read back stay waiting, and the reply never calls them confirmed", async () => {

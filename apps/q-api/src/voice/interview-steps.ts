@@ -14,7 +14,10 @@ import {
   INVESTOR_INTERVIEW_CUES,
   INVESTOR_SOFT_EXCLUSION_STEPS,
 } from "@capital-q/investor-onboarding";
-import type { OnboardingStepManifest } from "@capital-q/onboarding";
+import {
+  normaliseWebsite,
+  type OnboardingStepManifest,
+} from "@capital-q/onboarding";
 import { type ModelGateway } from "@capital-q/model-gateway";
 import {
   type ConversationTurnReading,
@@ -912,16 +915,14 @@ function asNumberString(value: unknown): string | null {
  * com" was recorded as the company's website, letter for letter.
  */
 export function spokenUrl(text: string): string {
-  let host = text
-    .trim()
-    .toLowerCase()
-    .replace(/[.!?,;:]+$/g, "")
-    .replace(/\s*\b(?:dot|d0t)\b\s*/g, ".")
-    .replace(/\s+(?:slash)\s+/g, "/")
-    .replace(/^(?:https?:\/\/)?(?:www\.)?/, "")
-    .replace(/\s+/g, "");
-  host = host.replace(/\.{2,}/g, ".").replace(/^\.|\.$/g, "");
-  return host.length === 0 ? text.trim() : `https://${host}`;
+  // The one canonical form the form uses too (P1-9, onboarding plan
+  // 2026-11-07). Words that are no web address are kept as said: the
+  // write refuses them and Q says it did not go in.
+  try {
+    return normaliseWebsite(text);
+  } catch {
+    return text.trim();
+  }
 }
 
 /** Text cut to `max` characters at the last word boundary that fits. */

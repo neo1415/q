@@ -398,3 +398,80 @@ export function raiseFromObjective(
     ],
   };
 }
+
+/**
+ * The investor's mandate as it stands now, in display words: what Q's
+ * mandate change (or anything else) last wrote to the canonical mandate.
+ * Null fields are not stated there and leave the onboarding answer shown.
+ */
+export type DeclaredMandateLines = {
+  /** "Seed to Series A". */
+  readonly stages: string | null;
+  /** Each cheque figure with its currency ("USD 250,000"). */
+  readonly cheque: {
+    readonly min: string | null;
+    readonly typical: string | null;
+    readonly max: string | null;
+  };
+  /** The mandate in their own words. */
+  readonly thesis: string | null;
+};
+
+/**
+ * P1-8 (onboarding plan 2026-11-07): /profile's mandate shows the canonical
+ * mandate, not only the onboarding answers it began from. A change made
+ * through Q (change_my_mandate) writes the mandate and never the onboarding
+ * answers, so the page showed the old cheque after Q's approved change.
+ * The founder's raise is overlaid the same way from the capital objective.
+ */
+export function withDeclaredMandate(
+  groups: readonly AnswerGroup[],
+  mandate: DeclaredMandateLines,
+): readonly AnswerGroup[] {
+  const set = (
+    lines: readonly AnswerLine[],
+    stepKey: string,
+    title: string,
+    value: string | null,
+  ): readonly AnswerLine[] => {
+    if (value === null) return lines;
+    return lines.some((line) => line.stepKey === stepKey)
+      ? lines.map((line) =>
+          line.stepKey === stepKey ? { ...line, value, items: null } : line,
+        )
+      : [...lines, { stepKey, title, value, items: null }];
+  };
+  let next: readonly AnswerGroup[] = groups;
+  const patch = (
+    id: string,
+    label: string,
+    apply: (lines: readonly AnswerLine[]) => readonly AnswerLine[],
+  ): readonly AnswerGroup[] => {
+    const found = next.find((group) => group.id === id);
+    const lines = apply(found?.lines ?? []);
+    if (found === undefined) {
+      return lines.length === 0 ? next : [...next, { id, label, lines }];
+    }
+    return next.map((group) => (group.id === id ? { ...group, lines } : group));
+  };
+  next = patch("mandate", "Investment mandate", (lines) =>
+    set(lines, I.stages, "Stages", mandate.stages),
+  );
+  next = patch("cheque", "Cheque size", (lines) =>
+    set(
+      set(
+        set(lines, I.chequeMin, "Smallest", mandate.cheque.min),
+        I.chequeTypical,
+        "Typical",
+        mandate.cheque.typical,
+      ),
+      I.chequeMax,
+      "Largest",
+      mandate.cheque.max,
+    ),
+  );
+  next = patch("thesis", "In your words", (lines) =>
+    set(lines, I.additionalContext, "In your words", mandate.thesis),
+  );
+  return next;
+}

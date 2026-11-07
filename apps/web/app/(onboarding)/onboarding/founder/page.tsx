@@ -33,7 +33,6 @@ export default async function FounderOnboardingPage({
   // Arriving from Q (Home's welcome, or a spoken "let's finish my setup"):
   // Q has already welcomed them, and the screen does not do it twice.
   const greeted = startTalking || params["from"] === "home";
-  const openReview = params["review"] === "1";
   // Lane ov's Overview links a gap here ("?talk=1&section=<key>"): Q opens
   // on that section. A profile-sections key, checked by the API too.
   const rawSection = params["section"];
@@ -58,7 +57,6 @@ export default async function FounderOnboardingPage({
         seed={seed}
         startTalking={startTalking}
         greeted={greeted}
-        openReview={openReview}
         focusSection={focusSection}
       />
     </RegistrationDefaultsProvider>

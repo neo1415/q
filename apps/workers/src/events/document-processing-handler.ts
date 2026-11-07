@@ -16,6 +16,7 @@ import {
   type QueueMessage,
 } from "../queue/pgmq.js";
 import type { RunnerLogger } from "../outbox-runner.js";
+import type { PresenceResearchRequester } from "../presence/research-job.js";
 
 /**
  * The domain-event consumer. Two events matter to this worker.
@@ -151,15 +152,7 @@ export type DocumentProcessingHandlerOptions = {
    * also handled it. Absent means no research provider is configured and a
    * typed session behaves exactly as it did before this packet.
    */
-  readonly presenceResearch?:
-    | {
-        readonly onResponseCommitted: (event: {
-          readonly sessionId: string;
-          readonly stepKey: string;
-          readonly responseId: string;
-        }) => void;
-      }
-    | undefined;
+  readonly presenceResearch?: PresenceResearchRequester | undefined;
   /**
    * Persisted recommendation slates (CQ-REC-006): every domain event is
    * offered to the invalidation service, which decides whether it names a
@@ -339,15 +332,29 @@ export function createDomainEventHandler(
     }
     if (event.type === RESPONSE_COMMITTED_EVENT) {
       const committed = event.data as ResponseCommittedData;
-      // Fire-and-forget, deliberately not part of the try/catch below: a
-      // research run that fails, times out or finds nothing must never
-      // turn this message into a retry, and it never blocks the founder or
-      // mandate reading that follows it.
-      presenceResearch?.onResponseCommitted({
-        sessionId: committed.sessionId,
-        stepKey: committed.stepKey,
-        responseId: committed.responseId,
-      });
+      // Onboarding research (plan §7, P1-4): enqueued as its own durable
+      // job, worked by its own runner. Nothing here waits on a web read;
+      // a queue that refuses the job retries this event, so it is never
+      // lost. How the read itself went never retries this message.
+      if (presenceResearch !== undefined) {
+        try {
+          await presenceResearch.request({
+            tenantId: event.tenantId,
+            sessionId: committed.sessionId,
+            stepKey: committed.stepKey,
+            responseId: committed.responseId,
+            ...(event.correlationId === undefined
+              ? {}
+              : { correlationId: event.correlationId }),
+          });
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, msgId: message.msgId, eventId: event.id },
+            "presence research job not enqueued; retrying",
+          );
+          return { kind: "RETRY", errorCode: "PRESENCE_RESEARCH_ENQUEUE" };
+        }
+      }
       // Each journey's reading decides for itself whether the step is one
       // of its narrative steps; a session belongs to exactly one of them.
       const readers = [

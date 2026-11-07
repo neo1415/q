@@ -81,4 +81,15 @@ export {
 
 export { createPostgresPresenceBuildLog } from "./infrastructure/postgres-presence-build-log.js";
 
+export {
+  PRESENCE_RESEARCH_DEAD_LETTER_QUEUE,
+  PRESENCE_RESEARCH_JOB_DATA,
+  PRESENCE_RESEARCH_QUEUE,
+  PresenceResearchJobSchema,
+  ResearchOnboardingPresenceJob,
+  presenceResearchJob,
+  type PresenceResearchJob,
+  type PresenceResearchJobData,
+} from "./jobs.js";
+
 export const PACKAGE_NAME = "@capital-q/q-presence" as const;
