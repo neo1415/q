@@ -12226,6 +12226,7 @@ export {
   resolveAlternative,
   NAVIGATION_DECISION_REASONING,
   NAVIGATION_VOTES,
+  NAVIGATION_DECISION_DEADLINE_MS,
   voteNavigation,
   sampleForLog,
   type QNavigationSample,

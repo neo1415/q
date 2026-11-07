@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { QNavigateTarget } from "@capital-q/contracts";
 import { createLogger } from "@capital-q/observability";
@@ -1674,5 +1674,57 @@ describe("batch-8 replay: settle says why the decision's move was not used", () 
           "q page move not ready when the answer was stored; the pane stays",
       ),
     ).toBe(true);
+  });
+});
+
+describe("batch-8 replay: a fast answer waits for the decision's own deadline, counted from the turn's start", () => {
+  it("a decision ready 4 s into the turn joins an answer stored at 0.5 s (a fixed 2.5 s window after the answer dropped it)", async () => {
+    vi.useFakeTimers();
+    try {
+      const moves = createQPageMoves({
+        decider: {
+          decide: () =>
+            new Promise((resolve) =>
+              setTimeout(
+                () =>
+                  resolve(
+                    proposal({ place: place({ route: "/work", tab: "team" }) }),
+                  ),
+                4_000,
+              ),
+            ),
+        },
+        config: { movesAllowed: true },
+      });
+      const request = {
+        runId: "r3",
+        tenantId: "t",
+        actorUserId: "u",
+        correlationId: "c",
+        plan: {
+          scopes: [],
+          screen: {
+            route: "HOME",
+            workspace: { qPane: "open", pagePane: "open", at: "/home" },
+          },
+        },
+      } as unknown as QAnswerRequest;
+      moves.start(request, {
+        utterance: "who is on Q's team",
+        recentTurns: [],
+        pageText: null,
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      const settling = moves.settle(request, []);
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(await settling).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

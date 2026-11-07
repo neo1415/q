@@ -1287,6 +1287,12 @@ export async function resolveAlternative(
  */
 export const NAVIGATION_VOTES = 3;
 
+/**
+ * The decision's deadline from the turn's start: production's 2-4.5 s
+ * (batch-8 replay) with room. A stored answer never waits past it.
+ */
+export const NAVIGATION_DECISION_DEADLINE_MS = 6_000;
+
 /** How much a decision does on its own: the most careful one wins a tie. */
 const AUTHORITY: Readonly<Record<QNavigationOutcome["decision"], number>> = {
   STAY: 0,
@@ -1526,18 +1532,35 @@ export function createQPageMoves(dependencies: {
    */
   readonly situation?:
     ((request: QAnswerRequest) => Promise<string | null>) | undefined;
-  /** How long a settled answer waits for a decision still running. */
+  /**
+   * Tests: a fixed wait after the answer. Absent (production): until the
+   * decision's deadline from the turn's start (NAVIGATION_DECISION_DEADLINE_MS).
+   */
   readonly settleWithinMs?: number | undefined;
 }): QPageMovePort {
   const map = dependencies.map ?? Q_SITE_MAP;
-  const waitMs = dependencies.settleWithinMs ?? 2_500;
   const pending = new Map<string, Promise<QNavigationOutcome | null>>();
+  const startedAt = new Map<string, number>();
+  /**
+   * How long a stored answer waits for the decision. Batch-8 replay: a fixed
+   * 2.5 s after the answer dropped every move for a fast (code) answer,
+   * since the decision takes 2-4.5 s in production. It now waits until the
+   * decision's own deadline, counted from the turn's start: a long answer
+   * never waits, a fast one waits only as long as the decision needs.
+   */
+  const waitFor = (runId: string): number => {
+    if (dependencies.settleWithinMs !== undefined)
+      return dependencies.settleWithinMs;
+    const since = Date.now() - (startedAt.get(runId) ?? Date.now());
+    return Math.max(0, NAVIGATION_DECISION_DEADLINE_MS - since);
+  };
   return {
     start: (request, turn) => {
       const workspace = request.plan.screen?.workspace;
       if (workspace === undefined || pending.has(request.runId)) return;
       const side = sideOfRequest(request);
       let sampled: readonly QNavigationSample[] = [];
+      const began = Date.now();
       const decided = (async () => {
         const [listed, situation] = await Promise.all([
           dependencies.records?.(request).catch(() => null),
@@ -1587,6 +1610,7 @@ export function createQPageMoves(dependencies: {
               remembered: outcome.remembered?.page ?? null,
               guard: outcome.guard,
               samples: sampled.map(sampleForLog),
+              ms: Date.now() - began,
             },
             "q page move decided",
           );
@@ -1600,13 +1624,19 @@ export function createQPageMoves(dependencies: {
         return null;
       });
       pending.set(request.runId, decided);
+      startedAt.set(request.runId, Date.now());
       // A run that never settles (a failed answer) does not keep it.
-      setTimeout(() => pending.delete(request.runId), 120_000).unref?.();
+      setTimeout(() => {
+        pending.delete(request.runId);
+        startedAt.delete(request.runId);
+      }, 120_000).unref?.();
     },
     settle: async (request, blocks) => {
       const decided = pending.get(request.runId);
       if (decided === undefined) return blocks;
+      const waitMs = waitFor(request.runId);
       pending.delete(request.runId);
+      startedAt.delete(request.runId);
       const current = blocks ?? [];
       if (movesAlready(current)) {
         // Batch-8 replay: the answer's own move wins; say so, by kind only.
