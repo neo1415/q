@@ -139,3 +139,20 @@ export const NavigationDecisionResultV3Schema = z
 export type NavigationDecisionResult = z.infer<
   typeof NavigationDecisionResultV3Schema
 >;
+
+/**
+ * Schema version 4 (NAVIGATION_DECISION v7): v3 without `sure`, which the
+ * model still filled in now and then. `alternative` alone carries doubt.
+ * Parsed with the v3 schema in code (a superset), so nothing else changes.
+ */
+export const NAVIGATION_DECISION_SCHEMA_VERSION_4 = 4;
+export const NavigationDecisionResultV4Schema = z
+  .object({
+    decision: NavigationDecisionResultSchema.shape.decision,
+    place: NavigationDecisionResultSchema.shape.place,
+    back: NavigationDecisionResultSchema.shape.back,
+    askedForPage: NavigationDecisionResultSchema.shape.askedForPage,
+    reason: NavigationDecisionResultSchema.shape.reason,
+    alternative: NavigationDecisionResultV3Schema.shape.alternative,
+  })
+  .strict();

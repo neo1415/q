@@ -1134,8 +1134,9 @@ function secondPlace(
       ? alternative.target
       : ownPlace(alternative.target, records);
   const mine = records === undefined ? target : ownPlace(target, records);
-  // On the same page of the same record, both are on screen once it opens:
-  // no wrong page is possible, so it is not a second place.
+  // On the same tab of the same page and record, both are on screen once
+  // it opens: no wrong page is possible, so it is not a second place.
+  // Sibling tabs are separate places (a wrong tab is a wrong page).
   if (onSamePage(other, mine)) return false;
   return canOpen(other.page) && !samePlace(other, mine);
 }
@@ -1147,6 +1148,7 @@ function onSamePage(a: QNavigateTarget, b: QNavigateTarget): boolean {
     pa !== null &&
     pb !== null &&
     pa.route === pb.route &&
+    pa.tab === pb.tab &&
     (a.recordId ?? null) === (b.recordId ?? null)
   );
 }

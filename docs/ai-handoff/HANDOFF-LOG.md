@@ -2002,3 +2002,22 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - root tsc 0;
   - Q-IQ 6/6;
   - eslint and prettier clean.
+
+## 2026-11-07 — Decision 75 dev round 3 (`feat/q-navigation-policy`)
+
+- **D75 r2** (v6, 37e5fcb): 500 turns, 94.4% pass, move-target 93.8%, wrong-page 0.8%, forbidden 0, ACCESS 100%, $2.32. Receipt: `receipts/2026-11-07-qnav-d75-r2.json`.
+- **The 4 wrong-page moves:**
+  - "Which investors are in my round?" went to Raise, not Investors. My r2 same-route rule let a sibling tab win. Now only two sections of one TAB count as one place; sibling tabs are an OFFER.
+  - "Find me 5 companies that fit my mandate" went to Discover. v7: a list Q is asked to make is made in chat.
+  - The Yoruba "open Harbour Angels' page" went to the relationship page. v7: someone's own page is their profile, and the relationship is where things stand between you.
+  - "Open today's Daily" went to /daily, which W2 describes as "Today's Q Daily", so it is right. Dataset fix: the founder's edition case is a dated edition.
+- **Other misses:**
+  - most predate W2 a4e3c5d (data-room "missing", Interest vs Analytics intent, the GateQ inbox), now merged;
+  - stray OFFERs from `sure`: schema 4 drops it;
+  - a question across several parts of one page now goes to the page (v7).
+- **Merged** integration with W3's deal tab f8b83c1 and W2 a4e3c5d.
+- **Gates:**
+  - vitest packages: 4942 passed (the seal is intact);
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.

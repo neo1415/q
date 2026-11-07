@@ -1211,7 +1211,7 @@ describe("decision 75 round 2: the digest's notation, redundant tabs, records wi
     ).toEqual({ kind: "TARGET", target: { page: "CAPITAL_RAISE" } });
   });
 
-  it("two parts of one page are no second place: their shared tab or page is the place", () => {
+  it("two sections of one tab are no second place (their tab is the place); sibling tabs are", () => {
     const move = (target: QNavigateTarget, other: QNavigateTarget) =>
       applyNavigationPolicy({
         proposal: proposal({}),
@@ -1227,9 +1227,11 @@ describe("decision 75 round 2: the digest's notation, redundant tabs, records wi
         { page: "ANALYTICS", sectionId: "deck-views", position: "section" },
       ),
     ).toMatchObject({ decision: "MOVE", target: { page: "ANALYTICS" } });
+    // Sibling tabs are separate places (round 3): a wrong tab is a wrong
+    // page, so two tabs that both fit are an offer, never a guess.
     expect(move({ page: "CAPITAL" }, { page: "CAPITAL_RAISE" })).toMatchObject({
-      decision: "MOVE",
-      target: { page: "CAPITAL" },
+      decision: "OFFER",
+      guard: "TWO_PLACES",
     });
     // On another page it is a real second place: an offer.
     expect(move({ page: "BOARD" }, { page: "WORK" }).decision).toBe("OFFER");

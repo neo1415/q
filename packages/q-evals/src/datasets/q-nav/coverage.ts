@@ -541,10 +541,12 @@ function records(cases: CaseSet): void {
     ],
     [
       "FOUNDER",
-      "Open today's Daily.",
-      "What's in this morning's briefing?",
-      thing("DAILY_EDITION", "dailyToday"),
-      "One Daily edition.",
+      // Dataset fix (D75 r2): /daily is "Today's Q Daily", so today's
+      // edition is that page, not a record; one dated edition is.
+      "Pull up the Q Daily from 5 November.",
+      "What did the 5 November briefing say?",
+      thing("DAILY_EDITION", "dailyYesterday"),
+      "One dated Daily edition.",
     ],
     [
       "FOUNDER",
