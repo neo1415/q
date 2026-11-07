@@ -1146,6 +1146,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "set_notification_settings",
   "set_q_personality",
   "set_q_language",
+  // Analytics (DECISIONS 72/74): their own viewing visibility, reversible.
+  "set_viewing_privacy",
   // ADR 0050: their own speaking guide, versioned in Settings. (Removing it
   // deletes every version, so it is prepared for approval: RECOVERY-2026-10.)
   "set_my_speaking_guide",
