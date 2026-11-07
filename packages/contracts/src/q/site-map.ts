@@ -112,6 +112,8 @@ export const QSiteMapTabSchema = z
     destinations: z.array(QVoiceDestinationSchema).max(8),
     /** Parts of the tab reached by `sub=` (closed lists from the contracts). */
     subs: z.array(QSiteMapSubSchema).max(24),
+    /** Who sees this tab, when narrower than the page; absent: the page's. */
+    audience: QSiteMapAudienceSchema.optional(),
   })
   .strict();
 export type QSiteMapTab = z.infer<typeof QSiteMapTabSchema>;
@@ -128,6 +130,8 @@ export const QSiteMapSectionSchema = z
     kind: QManifestSectionKindSchema,
     /** The tab it is on; absent: on the page whatever the tab. */
     tab: QSiteMapTabIdSchema.optional(),
+    /** Who sees this section, when narrower than the page; absent: the page's. */
+    audience: QSiteMapAudienceSchema.optional(),
   })
   .strict();
 export type QSiteMapSection = z.infer<typeof QSiteMapSectionSchema>;
@@ -181,8 +185,53 @@ export const QSiteMapPageSchema = z
           page.tabs.some((tab) => tab.id === section.tab),
       ),
     { message: "a section's tab is one of the page's", path: ["sections"] },
+  )
+  .refine(
+    (page) =>
+      [...page.tabs, ...page.sections].every((part) =>
+        narrows(page.audience, part.audience),
+      ) &&
+      page.sections.every((section) =>
+        narrows(
+          audienceOf(
+            page,
+            page.tabs.find((tab) => tab.id === section.tab),
+          ),
+          section.audience,
+        ),
+      ),
+    {
+      message:
+        "a tab or section is only ever for (some of) its page's or tab's audience",
+      path: ["audience"],
+    },
   );
 export type QSiteMapPage = z.infer<typeof QSiteMapPageSchema>;
+
+/** Whether `inner` (absent: the same) is within `outer`. */
+function narrows(
+  outer: QSiteMapAudience,
+  inner: QSiteMapAudience | undefined,
+): boolean {
+  return inner === undefined || inner === outer || outer === "ANY";
+}
+
+/**
+ * Who sees a tab or section: its own audience, else its tab's, else the
+ * page's. W4 relies on this for access STAYs; the page still authorises.
+ */
+export function audienceOf(
+  page: { readonly audience: QSiteMapAudience },
+  ...parts: readonly (
+    { readonly audience?: QSiteMapAudience | undefined } | undefined
+  )[]
+): QSiteMapAudience {
+  let audience = page.audience;
+  for (const part of parts) {
+    if (part?.audience !== undefined) audience = part.audience;
+  }
+  return audience;
+}
 
 export const QSiteMapSchema = z
   .object({
@@ -259,28 +308,52 @@ export function qSiteMapDigest(
     lines.push(
       `${page.route}${params}${who} | ${page.title} | ${page.purpose}`,
     );
-    if (page.tabs.length > 0) {
+    const seen = (audience: QSiteMapAudience) =>
+      options.side === undefined ||
+      audience === "ANY" ||
+      audience === options.side;
+    const mark = (audience: QSiteMapAudience) =>
+      options.side === undefined &&
+      audience !== page.audience &&
+      audience !== "ANY"
+        ? `(${audience.toLowerCase()})`
+        : "";
+    const tabs = page.tabs.filter((tab) => seen(audienceOf(page, tab)));
+    if (tabs.length > 0) {
       lines.push(
-        ` tabs: ${page.tabs
+        ` tabs: ${tabs
           .map((tab) =>
             tab.subs.length === 0
-              ? `${tab.id}=${tab.title}`
-              : `${tab.id}=${tab.title}(sub: ${tab.subs.map((sub) => sub.id).join(",")})`,
+              ? `${tab.id}=${tab.title}${mark(audienceOf(page, tab))}`
+              : `${tab.id}=${tab.title}${mark(audienceOf(page, tab))}(sub: ${tab.subs.map((sub) => sub.id).join(",")})`,
           )
           .join("; ")}`,
       );
     }
     const sections = page.sections.filter(
-      // A one-section page's section is the page itself; not worth a line.
-      (section) => page.sections.length > 1 || section.tab !== undefined,
+      (section) =>
+        seen(
+          audienceOf(
+            page,
+            page.tabs.find((tab) => tab.id === section.tab),
+            section,
+          ),
+        ) &&
+        // A one-section page's section is the page itself; not worth a line.
+        (page.sections.length > 1 || section.tab !== undefined),
     );
     if (sections.length > 0) {
       lines.push(
         ` sections: ${sections
-          .map((section) =>
-            section.tab === undefined
-              ? `${section.id}=${section.title}`
-              : `${section.id}=${section.title}@${section.tab}`,
+          .map(
+            (section) =>
+              `${section.id}=${section.title}${mark(
+                audienceOf(
+                  page,
+                  page.tabs.find((tab) => tab.id === section.tab),
+                  section,
+                ),
+              )}${section.tab === undefined ? "" : `@${section.tab}`}`,
           )
           .join("; ")}`,
       );
