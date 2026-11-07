@@ -32,9 +32,10 @@ import {
   type PresenceService,
   type PresenceSource,
 } from "@capital-q/q-presence";
-import type {
-  PublicWebResearchService,
-  ResearchSubject,
+import {
+  PLANNED_EXTRACT_BUDGET_MS,
+  type PublicWebResearchService,
+  type ResearchSubject,
 } from "@capital-q/q-research";
 import type { PublicProfileLookupProvider } from "@capital-q/q-research";
 
@@ -115,9 +116,44 @@ export function createPresenceReadPort(dependencies: {
             userText: query,
             subject: researchSubject,
             extractCount: PRESENCE_BOUNDS.maxSourcesPerRead,
+            // P1-5 (onboarding plan §7): nobody waits on this read, so its
+            // pages get the background budget (8 s), not a turn's 3 s that
+            // cut them to search snippets.
+            planned: true,
+            maxSearches: 2,
             ...(signal === undefined ? {} : { signal }),
           }),
         );
+
+      // P1-5: the site they gave, read directly. A young company's site is
+      // often not indexed, and searching for it was the only way it was
+      // ever reached. It is their own link, read as a public page.
+      const website = identity.websiteUrl?.trim() ?? "";
+      const readingOwnSite =
+        website.length === 0
+          ? Promise.resolve(null)
+          : research
+              .extract({
+                actor,
+                runId,
+                correlationId,
+                urls: [website],
+                personNamed: [website],
+                signal:
+                  signal === undefined
+                    ? AbortSignal.timeout(PLANNED_EXTRACT_BUDGET_MS)
+                    : AbortSignal.any([
+                        signal,
+                        AbortSignal.timeout(PLANNED_EXTRACT_BUDGET_MS),
+                      ]),
+              })
+              .catch((error: unknown) => {
+                logger?.warn(
+                  { err: error, correlationId },
+                  "their own site could not be read",
+                );
+                return null;
+              });
 
       // A profile URL the person gave is read directly: it is their own
       // link, and searching for it would be a worse way to reach it.
@@ -131,7 +167,7 @@ export function createPresenceReadPort(dependencies: {
             )
           : null;
 
-      const [searches, profile] = await Promise.all([
+      const [searches, profile, ownSite] = await Promise.all([
         Promise.allSettled(searching),
         lookingUp === null
           ? Promise.resolve(null)
@@ -142,9 +178,34 @@ export function createPresenceReadPort(dependencies: {
               );
               return null;
             }),
+        readingOwnSite,
       ]);
 
       const found: PresenceSource[] = [];
+      if (ownSite !== null) {
+        if (ownSite.status === "OK") {
+          for (const source of ownSite.sources) {
+            found.push({
+              url: source.url,
+              title: source.title,
+              publishedAt: source.publishedAt,
+              excerpt: source.excerpt,
+              provider: "public_web",
+              retrievedAt: source.retrievedAt,
+            });
+          }
+        } else {
+          // Logged, never said (DECISIONS 77): their site could not be read.
+          logger?.warn(
+            {
+              correlationId,
+              status: ownSite.status,
+              failureClass: ownSite.failureClass,
+            },
+            "their own site had no provider to read it",
+          );
+        }
+      }
       for (const outcome of searches) {
         if (outcome.status !== "fulfilled") {
           logger?.warn(

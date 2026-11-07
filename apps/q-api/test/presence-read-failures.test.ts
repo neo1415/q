@@ -39,6 +39,8 @@ function researchReturning(
 ): PublicWebResearchService {
   return {
     research: () => Promise.resolve(outcome),
+    extract: () =>
+      Promise.resolve({ status: "OK", sources: [], rejectedUrls: [] }),
   } as unknown as PublicWebResearchService;
 }
 
@@ -91,5 +93,80 @@ describe("onboarding research: failures are logged, never mistaken for nothing f
       .map((call) => JSON.stringify(call))
       .join("\n");
     expect(all).toMatch(/NO_PUBLIC_IDENTITY/);
+  });
+});
+
+describe("onboarding research reads the company's own site, on the background budget (P1-5)", () => {
+  it("reads the website they gave directly, and searches as a planned job", async () => {
+    const searched: { planned?: boolean }[] = [];
+    const extracted: {
+      urls: readonly string[];
+      personNamed?: readonly string[];
+      signal?: AbortSignal;
+    }[] = [];
+    const research = {
+      research: (command: { planned?: boolean }) => {
+        searched.push(command);
+        return Promise.resolve({
+          status: "NO_PUBLIC_IDENTITY",
+          message: "Nothing indexed yet.",
+        });
+      },
+      extract: (command: {
+        urls: readonly string[];
+        personNamed?: readonly string[];
+        signal?: AbortSignal;
+      }) => {
+        extracted.push(command);
+        return Promise.resolve({
+          status: "OK",
+          sources: [
+            {
+              url: "https://tamarind.example/",
+              title: "Tamarind Ledger",
+              publishedAt: null,
+              excerpt:
+                "Tamarind Ledger helps market traders collect what they're owed.",
+              retrievedAt: "2026-11-07T10:00:00.000Z",
+            },
+          ],
+          rejectedUrls: [],
+        });
+      },
+    } as unknown as PublicWebResearchService;
+    const port = createPresenceReadPort({ research });
+
+    const found = await port.read(request);
+
+    // A young company's site is often not indexed: it is read directly.
+    expect(extracted).toHaveLength(1);
+    expect(extracted[0]?.urls).toEqual(["https://tamarind.example"]);
+    expect(extracted[0]?.personNamed).toEqual(["https://tamarind.example"]);
+    expect(extracted[0]?.signal).toBeInstanceOf(AbortSignal);
+    expect(found.map((page) => page.url)).toContain(
+      "https://tamarind.example/",
+    );
+    // Nobody waits on it: the 8 s page budget, not a turn's 3 s.
+    expect(searched.length).toBeGreaterThan(0);
+    expect(searched.every((command) => command.planned === true)).toBe(true);
+  });
+
+  it("logs a refused page read; the person hears nothing", async () => {
+    const { logger, warn } = spied();
+    const research = {
+      research: () =>
+        Promise.resolve({ status: "NO_PUBLIC_IDENTITY", message: "none" }),
+      extract: () =>
+        Promise.resolve({
+          status: "PROVIDER_UNAVAILABLE",
+          failureClass: "QUOTA",
+          message: "spent",
+        }),
+    } as unknown as PublicWebResearchService;
+    const port = createPresenceReadPort({ research, logger });
+    expect(await port.read(request)).toEqual([]);
+    expect(
+      warn.mock.calls.map((call) => JSON.stringify(call)).join("\n"),
+    ).toMatch(/QUOTA/);
   });
 });
