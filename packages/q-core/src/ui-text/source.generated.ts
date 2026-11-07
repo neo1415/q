@@ -5197,6 +5197,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Unicorn Potential 60+",
   "Unicorn Potential 80+",
   "Unicorn Potential first",
+  "Unicorn Potential is an evidence-based growth-characteristics indicator. It is not the probability of reaching a $1 billion valuation.",
   "Unicorn Potential needs sufficient current evidence before an overall score is available. This view excludes companies without a score; missing evidence is not a judgment of business quality.",
   "Unicorn Potential scored",
   "Unicorn Potential, highest first",
