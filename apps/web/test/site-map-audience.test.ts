@@ -234,15 +234,36 @@ describe("every place says what it is for, in everyday words (DECISIONS 75)", ()
     expect(page("/company/[companyId]").purpose).toMatch(/as others see it/u);
     expect(
       page("/discover").tabs.find((tab) => tab.id === "yours")?.purpose,
-    ).toMatch(/already follow/u);
+    ).toMatch(/companies you follow/u);
     expect(page("/settings/plan").purpose).toMatch(/billing/u);
     expect(page("/daily").purpose).toMatch(/today/iu);
     expect(
       page("/gateq").tabs.find((tab) => tab.id === "inbox")?.purpose,
-    ).toMatch(/founders sent you/u);
+    ).toMatch(/sent to you/u);
     expect(
       page("/gateq").tabs.find((tab) => tab.id === "applications")?.purpose,
     ).toMatch(/you sent/u);
     expect(sectionAudience("/analytics", "deck-views")).toBe("FOUNDER");
+  });
+});
+
+describe("overlapping places are told apart (W4 held-out, by category)", () => {
+  it("Usage, Work's Cost and Plan and billing each say what they are for", () => {
+    expect(page("/settings/usage").purpose).toMatch(/not a bill/u);
+    expect(
+      page("/work").tabs.find((tab) => tab.id === "cost")?.purpose,
+    ).toMatch(/day by day/u);
+    expect(page("/settings/plan").purpose).toMatch(/subscription/u);
+  });
+
+  it("a founder's Capital investors, the Investors page and the overview differ", () => {
+    const hub = page("/relationships");
+    expect(
+      hub.tabs.find((tab) => tab.id === "capital-investors")?.purpose,
+    ).toMatch(/already in touch/u);
+    expect(page("/investors").purpose).toMatch(/new investors/u);
+    expect(hub.tabs.find((tab) => tab.id === "overview")?.purpose).toMatch(
+      /all your relationships/u,
+    );
   });
 });
