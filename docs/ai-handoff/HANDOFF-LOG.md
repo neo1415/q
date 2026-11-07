@@ -1971,3 +1971,34 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Investor Analytics defaults visibility to "Only my organisation".
 - Owner decision 75, plus its amendment: q-nav understands people's own words with no keywords; 98% is the target, and if it plateaus the best result ships with wrong-page very low and forbidden at 0. W4 has the prompt (v5) and a fresh held-out set; W2 has the purposes.
 - Talent Q study, read-only: its navigation is keyword-first and about 50% correct on its own 20 navigate cases. Only its safety habits were passed to W4.
+
+## 2026-11-07 — Decision 75 dev round 2 (`feat/q-navigation-policy`)
+
+- **D75 r1** (v5, 00675884e): 500 turns, 86.0% pass, move-target 84.6%, wrong-page 1.0%, forbidden 0, $2.30. Receipt: `receipts/2026-11-07-qnav-d75-r1.json`.
+- **Root causes, by replaying every proposal:**
+  - Code:
+    - the model copies the digest's `id@tab` into sectionId, so the section fails (8);
+    - a thread route plus a redundant `messages` tab (3);
+    - a listed thing with no page of its own blocked the place (1).
+  - Prompt: `alternative` overused (about 30 OFFERs), often two parts of one page.
+  - Access: an other-side page swapped for a related own page (4). The model never saw the other side's places.
+- **Code fixes:**
+  - `id@tab` is read as the section on that tab;
+  - a tab the route already is gets dropped;
+  - a thing with `route: null` leaves the place it is listed on;
+  - an alternative on the same page and record is no second place, and two sections of one tab land on the tab;
+  - the site map variable ends with "ONLY THE OTHER SIDE HAS: titles". Titles their own side also has are excluded.
+- **NAVIGATION_DECISION v6:**
+  - an alternative only when both purposes leave it open, never parts of one page;
+  - a tab whose purpose serves the goal is named;
+  - the other side's places mean STAY;
+  - opensOn null.
+- **Dataset, documented:**
+  - W3's Analytics ask is side-neutral ("engagement"), since investors have no deck;
+  - the People search ask is "public web" (its purpose).
+- **Replaying r1's proposals:** code alone recovers 19 of 70.
+- **Gates:**
+  - vitest packages: 4940 passed;
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.

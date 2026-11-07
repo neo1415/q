@@ -74,7 +74,8 @@ export type QNavigationRecords = {
   readonly things: readonly {
     readonly id: string;
     readonly title: string;
-    readonly route?: string | undefined;
+    /** Null: known to have no page of its own (it lives on a list). */
+    readonly route?: string | null | undefined;
   }[];
   readonly deleted: readonly { readonly id: string; readonly name: string }[];
   /** Their own company or firm ("my company", "us"), by name. */
@@ -137,7 +138,38 @@ export function navigationSiteMap(
   side: QNavigationSide,
   map: QSiteMap = Q_SITE_MAP,
 ): string {
-  return qSiteMapDigest(map, { side });
+  const other = side === "INVESTOR" ? "FOUNDER" : "INVESTOR";
+  // What only the other side has, by title: so a request for one of them
+  // is known to be no place of theirs (a STAY), never swapped for a
+  // nearby page of theirs. Titles only; nothing here is theirs to open.
+  const theirs: string[] = [];
+  for (const page of map.pages) {
+    if (page.redirectsTo !== undefined || page.audience === "ADMIN") continue;
+    if (page.audience === other) {
+      theirs.push(page.title);
+      continue;
+    }
+    for (const tab of page.tabs)
+      if (audienceOf(page, tab) === other)
+        theirs.push(`${page.title}: ${tab.title}`);
+  }
+  // A title their own side also has (each side's own Messages, Calls) is
+  // theirs too: only what they have no place of is listed.
+  const own = new Set<string>();
+  for (const page of map.pages) {
+    if (page.redirectsTo !== undefined) continue;
+    if (page.audience === side || page.audience === "ANY") {
+      own.add(page.title);
+      for (const tab of page.tabs)
+        if (audienceOf(page, tab) !== other)
+          own.add(`${page.title}: ${tab.title}`);
+    }
+  }
+  const only = [...new Set(theirs)].filter((title) => !own.has(title));
+  const digest = qSiteMapDigest(map, { side });
+  return only.length === 0
+    ? digest
+    : `${digest}\nONLY THE OTHER SIDE HAS (never theirs to open): ${only.join("; ")}`;
 }
 
 /** A place in the site map's own words: a route, a tab, a section. */
@@ -334,8 +366,26 @@ export function sitePlaceToTarget(
   ids: QResolvedIds,
   map: QSiteMap = Q_SITE_MAP,
 ): QNavigateTarget | null {
+  // The digest writes a tab's section as "id@tab": the id is the section.
+  if (place.sectionId?.includes("@") === true) {
+    const [sectionId = "", tab = ""] = place.sectionId.split("@");
+    place = {
+      ...place,
+      sectionId: sectionId.length === 0 ? null : sectionId,
+      tab: place.tab ?? (tab.length === 0 ? null : tab),
+    };
+  }
   let page = pageByRoute(map, place.route);
   let tabId = place.tab;
+  // A route that is already a tab's own path names that tab: the same
+  // tab named again ("messages" on the messages route) adds nothing.
+  if (
+    page !== undefined &&
+    tabId !== null &&
+    !page.tabs.some((t) => t.id === tabId) &&
+    tabOwningRoute(map, page.route)?.tab.id === tabId
+  )
+    tabId = null;
   // A route that is a tab's own path on another page (a relationship's
   // calls, diligence or deal) is that page at that tab.
   if (
@@ -743,7 +793,9 @@ export type QNavigationRecordFound =
       readonly recordId: string;
       readonly documentId: string | null;
     }
-  | { readonly status: "NONE" | "WHICH_ONE" | "DELETED" };
+  | { readonly status: "NONE" | "WHICH_ONE" | "DELETED" }
+  /** A record with no page of its own: the place named stands without it. */
+  | { readonly status: "NO_PAGE" };
 
 /**
  * W4.3's resolution port. In the answer path it is W2.3's
@@ -773,6 +825,8 @@ export function findListedRecord(
         ? byName(records.things, (t) => t.title, ask.name)
         : null);
   if (found === null) return { status: "NONE" };
+  if (ask.kind === "THING" && "route" in found && found.route === null)
+    return { status: "NO_PAGE" };
   if (ask.document === null)
     return { status: "FOUND", recordId: found.id, documentId: null };
   const doc =
@@ -810,6 +864,8 @@ function placeTarget(
   map: QSiteMap,
 ): QNavigationResolution {
   if (found !== null && found.status === "DELETED") return { kind: "DELETED" };
+  if (found?.status === "NO_PAGE")
+    return placeTarget({ ...place, record: null, document: null }, null, map);
   if (found !== null && found.status !== "FOUND") return { kind: "UNRESOLVED" };
   // A document named without a record has nothing to belong to.
   if (found === null && place.document !== null) return { kind: "UNRESOLVED" };
@@ -1022,7 +1078,7 @@ export function applyNavigationPolicy(input: {
   if (resolution === null || resolution.kind !== "TARGET") {
     return STAY(resolution?.kind ?? "UNRESOLVED");
   }
-  const target = resolution.target;
+  const target = sharedPlace(resolution.target, input.alternative);
   if (!input.canOpen(target.page)) return STAY("NO_ACCESS");
   if (pane.at !== null && samePlace(target, pane.at))
     return STAY("ALREADY_THERE");
@@ -1078,7 +1134,47 @@ function secondPlace(
       ? alternative.target
       : ownPlace(alternative.target, records);
   const mine = records === undefined ? target : ownPlace(target, records);
+  // On the same page of the same record, both are on screen once it opens:
+  // no wrong page is possible, so it is not a second place.
+  if (onSamePage(other, mine)) return false;
   return canOpen(other.page) && !samePlace(other, mine);
+}
+
+function onSamePage(a: QNavigateTarget, b: QNavigateTarget): boolean {
+  const pa = targetToSitePlace(a);
+  const pb = targetToSitePlace(b);
+  return (
+    pa !== null &&
+    pb !== null &&
+    pa.route === pb.route &&
+    (a.recordId ?? null) === (b.recordId ?? null)
+  );
+}
+
+/**
+ * Two sections of one tab that serve what they mean about as well: the
+ * tab they share is the place (never a guess between its sections).
+ */
+function sharedPlace(
+  target: QNavigateTarget,
+  alternative: QNavigationResolution | null | undefined,
+): QNavigateTarget {
+  if (alternative?.kind !== "TARGET") return target;
+  const other = alternative.target;
+  if (
+    other.page !== target.page ||
+    (other.recordId ?? null) !== (target.recordId ?? null) ||
+    (other.tab ?? null) !== (target.tab ?? null) ||
+    (other.sectionId ?? null) === (target.sectionId ?? null) ||
+    target.sectionId === undefined
+  )
+    return target;
+  const { sectionId: _section, position, ...rest } = target;
+  const shared = QNavigateTargetSchema.safeParse({
+    ...rest,
+    ...(position === "latest" ? { position } : {}),
+  });
+  return shared.success ? shared.data : target;
 }
 
 /** The model's alternative, resolved the same way as its place. */

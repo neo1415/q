@@ -269,7 +269,9 @@ const BANKS: readonly {
     page: "PEOPLE_SEARCH",
     dev: bank(
       ["people search", "the people finder"],
-      ["Find me a person on Capital Q."],
+      // Not "on Capital Q": People search is the public web, not the
+      // network (W2's purposes; decision 75 round 2).
+      ["Look up someone on the public web for me."],
     ),
     heldout: bank(
       ["the directory of people"],
@@ -494,7 +496,9 @@ const BANKS: readonly {
     page: "ANALYTICS",
     dev: bank(
       ["my analytics", "the analytics page"],
-      ["Who looked at my deck this week?"],
+      // Side-neutral (round 2): an investor has no deck; both sides have
+      // engagement. The founder's deck-views asks are curveballs.
+      ["How is my engagement looking this week?"],
     ),
     heldout: bank(
       ["my engagement stats"],

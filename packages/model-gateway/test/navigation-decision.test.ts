@@ -515,9 +515,18 @@ describe("the site map in, W3.1 targets out (W2 + W3)", () => {
       none,
     );
 
-  it("gives the model W2's whole digest for the person's side", () => {
-    expect(navigationSiteMap("FOUNDER")).toBe(
-      qSiteMapDigest(Q_SITE_MAP, { side: "FOUNDER" }),
+  it("gives the model W2's whole digest for the person's side, then what only the other side has", () => {
+    const founder = navigationSiteMap("FOUNDER");
+    expect(
+      founder.startsWith(qSiteMapDigest(Q_SITE_MAP, { side: "FOUNDER" })),
+    ).toBe(true);
+    const others = founder.split("\n").at(-1) ?? "";
+    expect(others).toMatch(/^ONLY THE OTHER SIDE HAS/u);
+    expect(others).toContain("GateQ: Inbox");
+    // Each side has its own relationship pages: never listed as theirs only.
+    expect(others).not.toMatch(/\bMessages\b/u);
+    expect(navigationSiteMap("INVESTOR").split("\n").at(-1)).toContain(
+      "New pitch",
     );
   });
 
@@ -1117,5 +1126,97 @@ describe("v5 (owner decision 75): a real second place, documents by title, sub-r
         { recordId: null, documentId: null, itemId: null },
       ),
     ).toEqual({ page: "SETTINGS", sectionId: "billing", position: "section" });
+  });
+});
+
+describe("decision 75 round 2: the digest's notation, redundant tabs, records with no page, one page's parts", () => {
+  const at = (
+    route: string,
+    over: Partial<{
+      tab: string;
+      sectionId: string;
+      position: "section" | "latest";
+    }> = {},
+    recordId: string | null = null,
+  ) =>
+    sitePlaceToTarget(
+      {
+        route,
+        tab: over.tab ?? null,
+        sectionId: over.sectionId ?? null,
+        slide: null,
+        position: over.position ?? null,
+      },
+      { recordId, documentId: null, itemId: null },
+    );
+
+  it("reads the digest's id@tab as the section on that tab", () => {
+    expect(
+      at("/relationships", {
+        sectionId: "commitments@capital",
+        position: "section",
+      }),
+    ).toEqual({
+      page: "CAPITAL",
+      sectionId: "commitments",
+      position: "section",
+    });
+  });
+
+  it("drops a tab the route already is (the messages route)", () => {
+    expect(
+      at(
+        "/relationships/company/[companyId]/messages",
+        { tab: "messages", position: "latest" },
+        SILO,
+      ),
+    ).toEqual({
+      page: "RELATIONSHIP_COMPANY_MESSAGES",
+      recordId: SILO,
+      position: "latest",
+    });
+  });
+
+  it("a record with no page of its own leaves the place it is listed on", () => {
+    const records = {
+      ...input().records,
+      things: [{ id: CARD, title: "Our seed round", route: null }],
+    };
+    expect(
+      resolveNavigationPlace(
+        proposal({
+          place: place({
+            route: "/relationships",
+            record: { kind: "THING", name: "Our seed round" },
+            tab: "capital-raise",
+          }),
+        }),
+        input({ side: "FOUNDER", records }),
+      ),
+    ).toEqual({ kind: "TARGET", target: { page: "CAPITAL_RAISE" } });
+  });
+
+  it("two parts of one page are no second place: their shared tab or page is the place", () => {
+    const move = (target: QNavigateTarget, other: QNavigateTarget) =>
+      applyNavigationPolicy({
+        proposal: proposal({}),
+        resolution: { kind: "TARGET", target },
+        pane: pane(),
+        canOpen: () => true,
+        config: { movesAllowed: true },
+        alternative: { kind: "TARGET", target: other },
+      });
+    expect(
+      move(
+        { page: "ANALYTICS", sectionId: "viewers", position: "section" },
+        { page: "ANALYTICS", sectionId: "deck-views", position: "section" },
+      ),
+    ).toMatchObject({ decision: "MOVE", target: { page: "ANALYTICS" } });
+    expect(move({ page: "CAPITAL" }, { page: "CAPITAL_RAISE" })).toMatchObject({
+      decision: "MOVE",
+      target: { page: "CAPITAL" },
+    });
+    // On another page it is a real second place: an offer.
+    expect(move({ page: "BOARD" }, { page: "WORK" }).decision).toBe("OFFER");
   });
 });
