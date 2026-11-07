@@ -333,7 +333,7 @@ export type ApiModules = {
   readonly engagement?:
     | Pick<
         EngagementRoutesDependencies,
-        "engagement" | "companyEngagement" | "myEngagement"
+        "engagement" | "companyEngagement" | "myEngagement" | "investorViews"
       >
     | undefined;
   // end ANALYTICS block
