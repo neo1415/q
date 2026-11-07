@@ -39,6 +39,8 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/admin/safety/break-glass/[requestId]",
   "/admin/team",
   "/admin/verification",
+  // Q Workspace §8 A3/A4: a founder's or investor's own analytics.
+  "/analytics",
   "/capital",
   // D6: the bare address, resolved server-side to the person's own company.
   "/company",

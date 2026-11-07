@@ -121,6 +121,25 @@ describe("purposes are side-neutral where both sides use the page", () => {
   });
 });
 
+describe("the digest keeps easily confused places apart (W4 round 3)", () => {
+  it("people search and the network's Explore say which is which", () => {
+    expect(page("/search").purpose).toMatch(/public web/u);
+    expect(page("/explore").purpose).toMatch(/own network/u);
+    expect(page("/search").title).not.toBe(page("/explore").title);
+  });
+
+  it("Q's team on Work is not the person's colleagues; the company tabs say what each holds", () => {
+    const team = page("/work").tabs.find((tab) => tab.id === "team");
+    expect(team?.title).toBe("Q's team");
+    const company = page("/company/[companyId]");
+    for (const tab of company.tabs) {
+      expect(tab.purpose, tab.id).toBeDefined();
+    }
+    const digest = qSiteMapDigest(Q_SITE_MAP);
+    expect(digest).toContain("dataroom=Data room [the company's documents]");
+  });
+});
+
 describe("site-map audiences (pinned)", () => {
   it("Discover: the investor's feed and tabs, the founder's investors and videos", () => {
     expect(tabAudience("/discover", "for-you")).toBe("INVESTOR");

@@ -1,5 +1,6 @@
 "use client";
 
+import { useDirty } from "@/features/workspace/workspace-screen";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
@@ -354,6 +355,8 @@ function ScopeForm({
     snapshot(card.fieldScopes, card.indexable),
   );
   const dirty = snapshot(scopes, indexable) !== baseline;
+  // W5.4: unsaved Q Card settings hold Q's moves and ask before leaving.
+  useDirty(dirty);
   const newlyPublic = fields.filter(
     (field) =>
       scopes[field.key] === "public_external" &&

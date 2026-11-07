@@ -678,8 +678,12 @@ import {
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 import {
+  createAnalyticsSettingsReader,
+  createEngagementNotices,
+  noticeSaves,
   createEngagementService,
   createPostgresCompanyEngagementReader,
+  createPostgresMyEngagementReader,
   createPostgresEngagementRepository,
   ownEngagementItems,
 } from "@capital-q/engagement";
@@ -3109,11 +3113,22 @@ const companyEngagementReader = createPostgresCompanyEngagementReader(
 const engagementService = createEngagementService({
   repository: engagementRepository,
 });
+const myEngagementReader = createPostgresMyEngagementReader(
+  database.sql,
+  engagementRepository,
+);
+const analyticsSettings = createAnalyticsSettingsReader(database.sql);
 const appActionPorts: OwnReadPorts = {
   viewingPrivacy: engagementService,
   engagement: async (actor) =>
     ownEngagementItems(
-      { reader: companyEngagementReader, repository: engagementRepository },
+      {
+        reader: companyEngagementReader,
+        repository: engagementRepository,
+        mine: myEngagementReader,
+        usesPassiveSignals: async () =>
+          (await analyticsSettings.read()).qUsesPassiveSignals,
+      },
       actor,
       await runtimeDependencies.ownCompany(actor),
     ),
@@ -3185,13 +3200,23 @@ const appActionPorts: OwnReadPorts = {
         documentId: DocumentIdSchema.parse(command.documentId),
       }),
   },
-  interactions: createInteractionSignalService({
-    ports: slateRead.eligibilityPorts,
-    eligibility: slateRead.eligibility,
-    slates: slateRead.slates,
-    repository: createPostgresInteractionRepository({ sql: database.sql }),
-    logger,
-  }),
+  // Q Workspace §8 A6: a save Q makes for them tells the founders too.
+  interactions: (() => {
+    const service = createInteractionSignalService({
+      ports: slateRead.eligibilityPorts,
+      eligibility: slateRead.eligibility,
+      slates: slateRead.slates,
+      repository: createPostgresInteractionRepository({ sql: database.sql }),
+      logger,
+    });
+    return {
+      ...service,
+      decide: noticeSaves(
+        service.decide,
+        createEngagementNotices(database.sql),
+      ),
+    };
+  })(),
   ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
   ownInvestorOrganisationId: (actor) =>
     runtimeDependencies.ownInvestorOrganisation(actor),
@@ -3589,6 +3614,12 @@ const qTools = createQTools({
           companyId: company.companyId,
         });
       },
+    },
+    // W5.3: a recorded call's record, read as the actor through the meeting
+    // assistant, which answers only for the organiser or a participant.
+    // (Composed further down; read only when a turn calls the tool.)
+    meetings: {
+      read: (actor, meetingId) => meetingAssistant.read(actor, meetingId),
     },
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {

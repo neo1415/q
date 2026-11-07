@@ -2084,6 +2084,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "Q_PITCH",
           "BOARD",
           // An investor's own screen: no investor organisation in this plan.
+          // Q Workspace batch 2: Analytics, both sides.
+          "ANALYTICS",
         ],
         documents: [],
         visibilityChange: false,

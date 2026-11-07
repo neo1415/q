@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { HandleSchema } from "./public-identity.js";
 
 /**
  * Engagement analytics (Q Workspace §8 A1-A3; Product Specification
@@ -20,6 +21,8 @@ export const ENGAGEMENT_EVENTS_PATH = "/v1/engagement/events" as const;
 export const VIEWING_PRIVACY_PATH = "/v1/engagement/viewing-privacy" as const;
 export const COMPANY_ENGAGEMENT_PATH =
   "/v1/engagement/companies/:companyId" as const;
+/** An investor's own engagement: what they viewed and how founders answered. */
+export const MY_ENGAGEMENT_PATH = "/v1/engagement/me" as const;
 
 export const ENGAGEMENT_VERSION = "engagement.v1" as const;
 
@@ -70,7 +73,23 @@ const base = {
 
 export const EngagementEventInputSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("PROFILE_VIEW") }).strict(),
-  z.object({ ...base, type: z.literal("Q_CARD_VIEW") }).strict(),
+  // A Q Card is reached by its handle (the public card carries no subject
+  // id): the server resolves an ACTIVE company handle to the company.
+  z
+    .object({
+      clientEventId: base.clientEventId,
+      sessionId: base.sessionId,
+      occurredAt: base.occurredAt,
+      type: z.literal("Q_CARD_VIEW"),
+      companyId: UuidSchema.optional(),
+      handle: HandleSchema.optional(),
+    })
+    .strict()
+    .refine(
+      (event) =>
+        (event.companyId === undefined) !== (event.handle === undefined),
+      { message: "Name the company or its handle, not both." },
+    ),
   z
     .object({ ...base, type: z.literal("DECK_OPEN"), documentId: UuidSchema })
     .strict(),
@@ -238,6 +257,30 @@ export const DocumentViewsDtoSchema = z
   })
   .strict();
 
+export const INTENT_SIGNAL_TYPES = [
+  "SAVE",
+  "INTEREST",
+  "DATA_ROOM_REQUEST",
+] as const;
+
+/**
+ * An intent signal (§6.7.12), real time and with no floor. A save follows
+ * the investor's own level; a deliberate request always shows the firm (the
+ * relationship already does) and names the person only at Full identity.
+ */
+export const IntentSignalDtoSchema = z
+  .object({
+    type: z.enum(INTENT_SIGNAL_TYPES),
+    occurredAt: z.iso.datetime({ offset: true }),
+    visibility: ViewingVisibilitySchema,
+    viewerUserId: UuidSchema.nullable(),
+    viewerName: z.string().nullable(),
+    viewerOrganisationId: UuidSchema.nullable(),
+    organisationName: z.string().nullable(),
+  })
+  .strict();
+export type IntentSignalDto = z.infer<typeof IntentSignalDtoSchema>;
+
 export const CompanyEngagementDtoSchema = z
   .object({
     companyId: UuidSchema,
@@ -251,6 +294,8 @@ export const CompanyEngagementDtoSchema = z
     perViewer: z.boolean(),
     /** Whether this company's plan includes viewer identity. */
     entitled: z.boolean(),
+    /** Real time, every plan, no floor. */
+    intent: z.array(IntentSignalDtoSchema),
     periods: z.array(EngagementPeriodDtoSchema),
     slices: z.array(
       z
@@ -494,3 +539,39 @@ export const UpdateAnalyticsSettingsRequestSchema = z
 export type UpdateAnalyticsSettingsRequest = z.infer<
   typeof UpdateAnalyticsSettingsRequestSchema
 >;
+
+// ---------------------------------------------------------------------------
+// An investor's own engagement (A4): their own records only.
+// ---------------------------------------------------------------------------
+
+export const MyEngagementDtoSchema = z
+  .object({
+    privacy: ViewingPrivacyDtoSchema,
+    /** Companies they viewed, their own history (exact times are theirs). */
+    viewed: z.array(
+      z
+        .object({
+          companyId: UuidSchema,
+          companyName: z.string(),
+          views: z.number().int().min(0),
+          deckMinutes: z.number().int().min(0),
+          lastViewedAt: z.iso.datetime({ offset: true }),
+        })
+        .strict(),
+    ),
+    /** How founders answered what they asked. */
+    responses: z.array(
+      z
+        .object({
+          companyId: UuidSchema,
+          companyName: z.string(),
+          kind: z.enum(["INTEREST", "DATA_ROOM_REQUEST"]),
+          state: z.enum(["WAITING", "ACCEPTED", "DECLINED"]),
+          askedAt: z.iso.datetime({ offset: true }),
+          answeredAt: z.iso.datetime({ offset: true }).nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type MyEngagementDto = z.infer<typeof MyEngagementDtoSchema>;

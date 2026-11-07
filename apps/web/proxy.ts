@@ -39,6 +39,8 @@ export const config = {
     // AUTO (ADR 0030): Q's work.
     "/work/:path*",
     "/board/:path*",
+    // Q Workspace §8: a founder's or investor's own analytics.
+    "/analytics/:path*",
     // DAILY: The Q Daily reader.
     "/daily/:path*",
     "/gateway/:path*",

@@ -218,6 +218,8 @@ export function RelationshipPipeline({
       "button.pipeline-search": "[data-pipeline-search-button]",
       "button.pipeline-next": "[data-pipeline-next]",
     },
+    // W5.1: searching and paging change only what is shown.
+    approval: "NONE",
   });
   useQControl({
     id: "filter.pipeline-search",

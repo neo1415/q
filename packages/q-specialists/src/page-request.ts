@@ -297,6 +297,10 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   mandates: d("MANDATE"),
   "investment mandate": d("MANDATE"),
   "fund mandate": d("MANDATE"),
+  // Q Workspace batch 2: Analytics, both sides.
+  analytics: d("ANALYTICS"),
+  "my analytics": d("ANALYTICS"),
+  "engagement analytics": d("ANALYTICS"),
   "mandate settings": d("MANDATE"),
 };
 

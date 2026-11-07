@@ -72,6 +72,7 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   // Sweep 2026-10-29: the bare address, resolved on the server to the
   // investor's mandate on their profile.
   MANDATE: "/mandate",
+  ANALYTICS: "/analytics",
 };
 
 /**
@@ -92,6 +93,10 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   // founder track's own step, opened by the tour.
   "/q-pitch/capital-q":
     "the founder track's Capital Q pitch page, opened by the tour",
+  // Q Workspace §8 A3/A4 (integration owner 2026-11-07): no named
+  // destination, so the turn reader's prompt versions stay put.
+  "/analytics":
+    "reached by Q through the site map route; read with read_my engagement",
   "/find": "old address, redirects to /search",
   "/gateway": "old address, redirects to /gateq",
   "/company":

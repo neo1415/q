@@ -64,6 +64,7 @@ import {
   type OpenedFile,
 } from "./material-actions";
 import { RequestSheet, type RoomRequestTarget } from "./request-sheet";
+import { reportDataRoomView } from "@/features/engagement/use-engagement";
 import { QSection } from "@/features/q/q-section";
 import { setMaterialDocument } from "@/features/q/screen";
 import { useT } from "@/features/i18n/language";
@@ -619,6 +620,8 @@ function ConnectedDataRoom({
           file: result.value,
         });
         setReadNow((previous) => new Set([...previous, document.documentId]));
+        // Q Workspace §8 A1: the data room served it, so the view counts.
+        reportDataRoomView(companyId, document.documentId);
       } else {
         setOpened(null);
         setMessage(result.message);

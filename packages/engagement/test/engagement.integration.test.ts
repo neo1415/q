@@ -11,8 +11,10 @@ import {
 } from "@capital-q/database";
 
 import {
+  createEngagementNotices,
   createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
+  createPostgresMyEngagementReader,
   type EngagementViewer,
 } from "../src/index.js";
 
@@ -340,6 +342,132 @@ describe("@capital-q/engagement against local Postgres", () => {
       expect(
         await reader.read({ ...query, actorUserId: outsider.viewer.userId }),
       ).toBeNull();
+    });
+  });
+
+  it("an investor's own read: their views and visibility, never anyone else's", async () => {
+    await scenario(async (tx) => {
+      const repo = createPostgresEngagementRepository(tx.sql);
+      const mine = createPostgresMyEngagementReader(tx.sql, repo);
+      const company = await org(tx, "company");
+      const investor = await org(tx, "investment_firm");
+      const other = await org(tx, "investment_firm");
+      for (const viewer of [investor.viewer, investor.viewer, other.viewer]) {
+        await repo.append(viewer, {
+          type: "PROFILE_VIEW",
+          clientEventId: clientId(),
+          companyId: company.entityId,
+          occurredAt: at,
+        });
+      }
+      const read = await mine.read({
+        actorUserId: investor.viewer.userId,
+        organisationId: investor.viewer.organisationId,
+      });
+      expect(read.privacy.visibility).toBe("ORGANISATION_ONLY");
+      expect(read.viewed).toEqual([
+        expect.objectContaining({ companyId: company.entityId, views: 2 }),
+      ]);
+      expect(read.responses).toEqual([]);
+    });
+  });
+
+  it("save notices: worded at the saver's level, and silent when the admin turns them off", async () => {
+    await scenario(async (tx) => {
+      const repo = createPostgresEngagementRepository(tx.sql);
+      const notices = createEngagementNotices(tx.sql);
+      const company = await org(tx, "company");
+      const named = await org(tx, "investment_firm");
+      const quiet = await org(tx, "investment_firm");
+      await repo.setPrivacy(named.viewer.userId, "FULL_IDENTITY");
+      await repo.setPrivacy(quiet.viewer.userId, "ANONYMOUS");
+      const save = (saver: Org) =>
+        notices.companySaved({
+          saverUserId: saver.viewer.userId,
+          investorOrganisationId: saver.entityId,
+          companyId: company.entityId,
+        });
+      expect(await save(named)).toBe(1);
+      expect(await save(named)).toBe(0); // one per firm, company and day
+      expect(await save(quiet)).toBe(1);
+      const titles = await tx.sql<{ title: string; link_path: string }[]>`
+        select title, link_path from communication.notifications
+         where user_id = ${company.viewer.userId} and kind = 'COMPANY_SAVED'
+         order by created_at`;
+      expect(titles.map((row) => row.title)).toEqual([
+        expect.stringMatching(/^.+ from .+ saved your company$/),
+        "An investor saved your company",
+      ]);
+      expect(titles.every((row) => row.link_path === "/analytics")).toBe(true);
+      await tx.sql`update analytics.platform_settings set intent_signal_notifications = false`;
+      const third = await org(tx, "investment_firm");
+      expect(await save(third)).toBe(0);
+    });
+  });
+
+  it("the weekly digest: off by default; on, aggregate only and only above the floor", async () => {
+    await scenario(async (tx) => {
+      const repo = createPostgresEngagementRepository(tx.sql);
+      const notices = createEngagementNotices(tx.sql);
+      const company = await org(tx, "company");
+      const now = new Date("2026-10-27T12:00:00.000Z");
+      const viewers = [
+        await org(tx, "investment_firm"),
+        await org(tx, "investment_firm"),
+      ];
+      const viewOf = (viewer: EngagementViewer) =>
+        repo.append(viewer, {
+          type: "PROFILE_VIEW",
+          clientEventId: clientId(),
+          companyId: company.entityId,
+          occurredAt: at,
+        });
+      for (const viewer of viewers) await viewOf(viewer.viewer);
+      expect(await notices.weeklyDigest({ now })).toBe(0); // OFF by default
+      await tx.sql`update analytics.platform_settings set passive_view_notifications = true`;
+      expect(await notices.weeklyDigest({ now })).toBe(0); // two firms: below the floor
+      const third = await org(tx, "investment_firm");
+      await viewOf(third.viewer);
+      expect(await notices.weeklyDigest({ now })).toBe(1);
+      expect(await notices.weeklyDigest({ now })).toBe(0); // once per week
+      const [notice] = await tx.sql<{ title: string; body: string }[]>`
+        select title, body from communication.notifications
+         where user_id = ${company.viewer.userId} and kind = 'VIEWING_DIGEST'`;
+      expect(notice?.title).toBe(
+        "3 investor organisations viewed your company last week",
+      );
+      expect(notice?.body).toContain("not an invitation to get in touch");
+    });
+  });
+
+  it("a Q Card view by handle resolves only an active company handle", async () => {
+    await scenario(async (tx) => {
+      const repo = createPostgresEngagementRepository(tx.sql);
+      const company = await org(tx, "company");
+      const investor = await org(tx, "investment_firm");
+      const handle = `card-${company.entityId.slice(0, 8)}`;
+      await tx.sql`insert into core.handles (handle, tenant_id, organisation_id, subject_type, subject_id)
+        values (${handle}, ${company.viewer.tenantId}, ${company.viewer.organisationId}, 'COMPANY', ${company.entityId})`;
+      expect(
+        await repo.append(investor.viewer, {
+          type: "Q_CARD_VIEW",
+          clientEventId: clientId(),
+          handle,
+          occurredAt: at,
+        }),
+      ).toBe("ACCEPTED");
+      expect(
+        await repo.append(investor.viewer, {
+          type: "Q_CARD_VIEW",
+          clientEventId: clientId(),
+          handle: "no-such-card",
+          occurredAt: at,
+        }),
+      ).toBe("DROPPED");
+      const [row] = await tx.sql<{ company_id: string }[]>`
+        select company_id from analytics.engagement_events
+         where viewer_user_id = ${investor.viewer.userId} and engagement_type = 'Q_CARD_VIEW'`;
+      expect(row?.company_id).toBe(company.entityId);
     });
   });
 });

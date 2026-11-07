@@ -415,6 +415,8 @@ describe("a voice line that also routes the words to Q (duplex)", () => {
       id: "button.readiness",
       kind: "BUTTON",
       element: () => element,
+      // W5.1: a button Q may press declares its class; this one opens a view.
+      approval: "NONE",
     });
     expect(actedHere("press Readiness")).toBe(true);
     performClientAction({

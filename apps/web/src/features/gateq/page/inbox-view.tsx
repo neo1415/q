@@ -1476,6 +1476,7 @@ function Dossier({
               </div>
             ))}
             <form
+              data-q-editing
               className="flex gap-2"
               onSubmit={(event) => {
                 event.preventDefault();

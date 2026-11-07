@@ -331,6 +331,9 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // Sweep 2026-10-29: "take me to my mandate" went to Settings.
   MANDATE:
     "Opens an investor's mandate on their profile (what they invest in, cheque, stage, places), where they edit it.",
+  // Q Workspace batch 2.
+  ANALYTICS:
+    "Opens Analytics: who engaged with what (views, deck and video engagement, Q Card views), within each viewer's visibility choice.",
 };
 
 /** Screens that belong to a company's own people. */

@@ -714,6 +714,7 @@ export function PlanCard({ block }: { readonly block: PlanCardBlock }) {
 
       {changing && view !== null ? (
         <form
+          data-q-editing
           id={noteId}
           className="flex flex-col gap-2"
           onSubmit={(event) => {

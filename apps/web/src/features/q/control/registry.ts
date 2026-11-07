@@ -1,3 +1,4 @@
+import type { ApprovalAction, ApprovalClass } from "./approval";
 import type {
   QControlKind,
   QManifestControl,
@@ -72,6 +73,16 @@ export type ControlEntry = {
   readonly exclusive?: boolean | undefined;
   /** LIST: how many items it holds, when the page knows better than the DOM. */
   readonly count?: (() => number | undefined) | undefined;
+  /**
+   * W5.1: the approval class of what this control does (approval.ts).
+   * Required in practice for a clickable kind: without it Q's act is
+   * refused. View-only kinds are NONE whatever is declared here.
+   */
+  readonly approval?: ApprovalClass | undefined;
+  /** CONFIRM: what the person is asked to confirm ("Save Brightwell"). */
+  readonly confirmSummary?: (() => string) | undefined;
+  /** APPROVAL: the action Q prepares for the person's approval. */
+  readonly action?: ApprovalAction | undefined;
 };
 
 type Registered = ControlEntry & { readonly order: number };

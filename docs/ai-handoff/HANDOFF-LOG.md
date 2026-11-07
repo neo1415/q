@@ -1881,6 +1881,14 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - per-tab purposes on the company profile (overview = headline figures);
   - /work Team tab title ("Q's team").
 
+## 2026-11-07 05:40 UTC — batch 1 deployed (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- W3's 0354889 fixed the q-nav CI failure: RESULTS and CAPITAL_ROUND are alias redirects again. Locally: full vitest 1934 files / 20,491 passed; root, web and q-api tsc 0; eslint and prettier clean on 194 files.
+- CI 42339444390 on f3b0d9847: all jobs green, including pgTAP and integration. Fast-forwarded recovery/2026-09-12 d09aec914 → f3b0d9847; Railway reports SUCCESS for all four services at 05:21.
+- Live (fictional investor, Playwright 1440/390): the core pages return 200 with no errors; with the flag off, nothing changes visibly; one Q turn was correct with a source in 8.1 s.
+- q-nav held-out ran once ($1.11): 78.8% / move-target 75.2% / wrong-page 3.9% / forbidden 0, so moves stay OFFER-only. The receipt is 2026-11-07-qnav-heldout.json.
+- Batch 2 is assembled locally (see the board); it gets one CI run, then migrations 400000/410000, then the deploy.
+
 ## 2026-11-07 — q-nav fix for the batch-1 deploy (CI 42329939198)
 
 - **Cause:** W3 cd46eae points RESULTS at its real landing (/relationships, overview tab) and makes CAPITAL_ROUND a record page on Relationships (both sides). The q-nav lint and the pipeline proof still expected RESULTS as its own place and had no CAPITAL_ROUND cases.

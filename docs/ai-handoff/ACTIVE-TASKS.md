@@ -1,5 +1,25 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 7 November 2026, 05:40 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: **batch 1 `f3b0d9847`** on all four services (05:21, CI 42339444390 green). Rollback `d09aec914`. Hosted migrations 283. `CQ_WORKSPACE_MODE` unset (off); `CQ_Q_NAV_MOVES_ALLOWED` unset (Q offers, never moves).
+Live check (fictional investor, 1440 and 390): /home, /discover, /relationships, /explore and /settings return 200 with no page errors or 5xx; flag off looks as before (Chat default, no split). /analytics returns 404 until batch 2. One Q turn: "What are my hard exclusions?" answered correctly with a source in 8.1 s.
+
+**q-nav held-out (once, e85a6f3 = integration code, Anthropic $1.11):** pass 78.8%, move-target 75.2%, wrong-page 3.9%, forbidden 0. Dev r3 was 91.2%, so the tuning overfit dev. Gates not met; moves stay OFFER-only. W4's notes: QNAV-R3-ROOT-CAUSES.md and QNAV-HELDOUT-NOTE.md (b33a59e). **Owner decision:** v5 `alternative` plus everyday-words page purposes, then a FRESH held-out set.
+
+**Batch 2** is assembled locally and its gates are running: W1 Analytics link 49caa25, W5 bd59128 (arrival line, outward actions as APPROVAL), W2 7d12e17 (digest clarity), analytics M2+M3 7c62f4c, W3 8bbd707 (ANALYTICS destination), W4 b33a59e (docs). Migrations 20261231400000 and 20261231410000 (410000 drops and re-adds the notification kind CHECK with --founder-approved) go on after pgTAP and before the code.
+
+| Lane                      | Session                          | State                                                                                                       |
+| ------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| W1 shell                  | session_01Wncmn4AftvVnCCbs7qHobz | Batch 2: Analytics sidebar link (49caa25)                                                                   |
+| W2 site map               | session_01Wncmn4SKUdLWXcpXd7KKVm | Batch 2: digest clarity (7d12e17). Next, if the owner agrees: page purposes in everyday words               |
+| W3 deep links + contracts | session_01Wncmn6yZzXx1xtFxaXwp9b | Batch 2: AWAITING_APPROVAL (b633f23) is live; ANALYTICS destination 8bbd707                                 |
+| W4 navigation             | session_01Wncmn4BQnwUu8PoUpcMjfu | Waiting for the owner on v5. Dataset fix (deck-views STAY → MOVE ANALYTICS) after batch 2 is on integration |
+| W5 page actions           | session_01Wncmn7LanmxRBs1Eoe8por | Batch 2 (bd59128). Open: per-row revoke and dismiss (needs W2.3), deal terms                                |
+| Analytics                 | session_01Wncmn6n2wuJcJPM1ZeWXX3 | M3 done (7c62f4c); in batch 2                                                                               |
+
+Anthropic test spend: about $15.0 of $50 (q-nav r3 $2.03, held-out $1.11).
+
 ## Live board — 7 November 2026, 02:55 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: `d09aec914` until the batch-1 deploy. Hosted migrations **283**: the analytics migrations 370000 and 380000 were applied 02:50 after pgTAP passed. **Batch 1 `7fe7f5f0c` is in CI**: W1 shell, W2 site map, W3 deep links, W4 navigation (OFFER-only; `CQ_Q_NAV_MOVES_ALLOWED` unset), analytics M1, the claim check. The workspace flag `CQ_WORKSPACE_MODE` is unset (off).

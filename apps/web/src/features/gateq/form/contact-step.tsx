@@ -227,6 +227,7 @@ export function ContactStep({
           </div>
         ) : null}
         <form
+          data-q-editing
           className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
@@ -314,6 +315,7 @@ export function ContactStep({
         </div>
       )}
       <form
+        data-q-editing
         className="flex flex-col gap-3"
         noValidate
         onSubmit={(event) => {

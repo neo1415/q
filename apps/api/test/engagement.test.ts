@@ -88,6 +88,19 @@ function build(authenticated = true) {
     {
       engagement: {
         engagement: createEngagementService({ repository }),
+        myEngagement: {
+          read: () =>
+            Promise.resolve({
+              privacy: {
+                visibility: "ORGANISATION_ONLY",
+                chosen: false,
+                defaultVisibility: "ORGANISATION_ONLY",
+                allowedVisibilities: ["ORGANISATION_ONLY", "ANONYMOUS"],
+              },
+              viewed: [],
+              responses: [],
+            }),
+        },
         companyEngagement: {
           read: (query) => {
             reads.push(query);

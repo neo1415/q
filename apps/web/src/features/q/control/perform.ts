@@ -14,6 +14,8 @@ import {
   type ControlStatus,
 } from "./registry";
 import { currentRoute, routeEpoch, routeOfHref } from "./route-state";
+import { askConfirm, classOfAct } from "./approval";
+import { noteHeld, requestApproval } from "./approval-requests";
 
 /**
  * RECOVERY-2026-10 (C1/C2): one UI act on one registered control, through
@@ -310,6 +312,37 @@ export async function performOnControl(
     isDisabled(stateElement(entry.kind, element))
   ) {
     return "NOT_APPLICABLE";
+  }
+  // W5.1: the class the page gave this control decides, in code. The
+  // model's act carries no class and cannot change it.
+  const governing = classOfAct(entry.kind, entry.approval, intent.act);
+  if (governing === null) {
+    noteHeld(intent.actId, "UNCLASSIFIED");
+    return "NOT_APPLICABLE";
+  }
+  if (governing === "NEVER") {
+    noteHeld(intent.actId, "NEVER");
+    return "NOT_APPLICABLE";
+  }
+  if (governing === "APPROVAL") {
+    // Never run from an act: prepared for the person's approval of its
+    // exact payload, which alone runs it (approval-requests.ts).
+    noteHeld(
+      intent.actId,
+      entry.action !== undefined && requestApproval(entry.action)
+        ? "AWAITING_APPROVAL"
+        : "NOTHING_PREPARED",
+    );
+    return "NOT_APPLICABLE";
+  }
+  if (governing === "CONFIRM") {
+    const confirmed = await askConfirm(
+      entry.confirmSummary?.() ?? "Q would like to do this on the page.",
+    );
+    if (!confirmed) {
+      noteHeld(intent.actId, "DECLINED");
+      return "NOT_APPLICABLE";
+    }
   }
   if (entry.onAct !== undefined) {
     const own = await entry.onAct(intent);

@@ -7,6 +7,7 @@ import { Textarea } from "@capital-q/ui/input";
 
 import { readChatDraft, reviseChatDraftAction } from "./integration-actions";
 import { useT } from "@/features/i18n/language";
+import { useDirty } from "@/features/workspace/workspace-screen";
 
 /**
  * Edit the chat message Q drafted, on its approval card (live 2026-10-28:
@@ -24,6 +25,8 @@ export function ChatDraftEditor({
 }) {
   const t = useT();
   const [draft, setDraft] = useState<{ body: string } | null>(null);
+  // W5.4: an open draft is work the person may lose.
+  useDirty(draft !== null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 

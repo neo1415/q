@@ -40,6 +40,9 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   // Sweep 2026-10-29: "take me to my mandate" is opened by code
   // (page-request.ts); no reader version names it.
   "MANDATE",
+  // Q Workspace batch 2: "open analytics" is opened by code
+  // (page-request.ts); no reader version names it.
+  "ANALYTICS",
 ]);
 
 export const READER_DESTINATIONS = Q_NAVIGATE_DESTINATIONS.filter(

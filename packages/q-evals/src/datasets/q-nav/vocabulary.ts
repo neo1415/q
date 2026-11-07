@@ -489,6 +489,18 @@ const BANKS: readonly {
       ["What did I say I invest in?"],
     ),
   },
+  // Q Workspace batch 2 (W3): Analytics, both sides.
+  {
+    page: "ANALYTICS",
+    dev: bank(
+      ["my analytics", "the analytics page"],
+      ["Who looked at my deck this week?"],
+    ),
+    heldout: bank(
+      ["my engagement stats"],
+      ["How many people watched my video?"],
+    ),
+  },
 ];
 
 /**

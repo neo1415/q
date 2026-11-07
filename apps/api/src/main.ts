@@ -119,9 +119,11 @@ import {
 import { createBoardService } from "@capital-q/board";
 import { createResultsReader } from "@capital-q/results";
 import {
+  createEngagementNotices,
   createEngagementService,
   createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
+  createPostgresMyEngagementReader,
 } from "@capital-q/engagement";
 import {
   createPostgresUnicornPotentialStore,
@@ -1766,11 +1768,14 @@ const outcomes = createRelationshipOutcomeService({
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
 });
 // ANALYTICS block (Q Workspace §8): engagement ingest and viewing privacy.
+const engagementRepository = createPostgresEngagementRepository(database.sql);
 const engagement = {
-  engagement: createEngagementService({
-    repository: createPostgresEngagementRepository(database.sql),
-  }),
+  engagement: createEngagementService({ repository: engagementRepository }),
   companyEngagement: createPostgresCompanyEngagementReader(database.sql),
+  myEngagement: createPostgresMyEngagementReader(
+    database.sql,
+    engagementRepository,
+  ),
 };
 // end ANALYTICS block
 // ADMIN block (spec §5): a person's own results. The raise is the same
@@ -3083,6 +3088,7 @@ const { app, logger } = createApp(config, security, {
   }),
   results,
   engagement,
+  engagementNotices: createEngagementNotices(database.sql),
   readiness,
   adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
   adminVerificationDecider: createDecideByOperator({

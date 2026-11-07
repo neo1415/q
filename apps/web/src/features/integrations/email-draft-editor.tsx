@@ -7,6 +7,7 @@ import { Input, Textarea } from "@capital-q/ui/input";
 
 import { readEmailDraft, reviseEmailDraftAction } from "./integration-actions";
 import { useT } from "@/features/i18n/language";
+import { useDirty } from "@/features/workspace/workspace-screen";
 
 /**
  * Edit the email Q drafted (BIZ-007), on its approval card. Saving is not
@@ -24,6 +25,8 @@ export function EmailDraftEditor({
   const [draft, setDraft] = useState<{ subject: string; body: string } | null>(
     null,
   );
+  // W5.4: an open draft is work the person may lose.
+  useDirty(draft !== null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 

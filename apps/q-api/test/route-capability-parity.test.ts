@@ -665,6 +665,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/engagement.ts GET VIEWING_PRIVACY_PATH": cap("tool.read_my"),
   "api/http/engagement.ts GET COMPANY_ENGAGEMENT_PATH": cap("tool.read_my"),
+  "api/http/engagement.ts GET MY_ENGAGEMENT_PATH": cap("tool.read_my"),
   "api/http/recommendation-interactions.ts POST DISCOVERY_INTERACTIONS_PATH":
     exempt(
       "observations the feed reports (impressions, watch milestones); never an action a person asks for",
@@ -1154,6 +1155,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/work": cap("navigate.WORK"),
   // The work board (owner 2026-10-23): a Work tab; Q reads it with my_board.
   "/board": cap("tool.my_board"),
+  // Q Workspace §8 A3/A4: the same records as read_my "engagement".
+  "/analytics": cap("tool.read_my"),
   "/work/[delegationId]": cap("tool.list_q_work"),
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,
   // DOCS: their documents and brand kit.

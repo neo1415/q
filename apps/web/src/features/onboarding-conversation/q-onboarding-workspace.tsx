@@ -3159,6 +3159,7 @@ function GapItem({
         ) : null}
         {control.kind === "figure" || control.kind === "text" ? (
           <form
+            data-q-editing
             className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
             onSubmit={(event) => {
               event.preventDefault();

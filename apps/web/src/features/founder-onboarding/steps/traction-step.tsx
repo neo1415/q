@@ -87,6 +87,7 @@ export function TractionStep({
 
   return (
     <form
+      data-q-editing
       id={formId}
       onSubmit={handleSubmit}
       className="flex flex-col gap-7"
