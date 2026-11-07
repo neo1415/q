@@ -10,7 +10,9 @@ import {
   getMyProfile,
   getProfileFindings,
   getProfileImages,
+  getInvestorMandate,
   getTaxonomyNode,
+  listInvestorMandates,
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -21,8 +23,12 @@ import type {
   ProfileFindingSubjectType,
   ProfileImagesDto,
   ProfileImageSubjectType,
+  InvestorMandateDto,
   OnboardingResponseValue,
 } from "@capital-q/contracts";
+import { formatAmountForDisplay } from "@capital-q/ui/money-input";
+
+import { stageLine } from "@/features/capital/mandate-summary";
 
 import { getSessionAccessToken } from "@/auth/session";
 import type { OwnContext } from "@/features/q/context";
@@ -31,7 +37,9 @@ import {
   answerGroups,
   raiseFromObjective,
   taxonomyIdsIn,
+  withDeclaredMandate,
   type AnswerGroup,
+  type DeclaredMandateLines,
   type ProfileJourney,
 } from "./profile-answers";
 import type { FindingsState, VerificationState } from "./profile-enrichment";
@@ -140,7 +148,7 @@ export async function loadProfileAnswers(
   const journey: ProfileJourney =
     context.kind === "FOUNDER" ? "founder" : "investor";
 
-  const [view, objective] = await Promise.all([
+  const [view, objective, mandate] = await Promise.all([
     within(async () => {
       try {
         return await getCurrentOnboardingSession(session, journey);
@@ -158,6 +166,11 @@ export async function loadProfileAnswers(
             throw error;
           }
         })
+      : Promise.resolve(null),
+    context.kind === "INVESTOR"
+      ? within(() =>
+          activeMandateOf(session, context.investorOrganisationId),
+        )
       : Promise.resolve(null),
   ]);
 
@@ -177,7 +190,13 @@ export async function loadProfileAnswers(
     if (node !== undefined) labels[node.id] = node.displayName;
   }
 
-  const groups = answerGroups(journey, view, labels);
+  const answered = answerGroups(journey, view, labels);
+  // P1-8: what the canonical mandate holds now, over the answers it began
+  // from (a change made through Q writes only the mandate).
+  const groups =
+    mandate === null || mandate === undefined
+      ? answered
+      : withDeclaredMandate(answered, declaredMandateLines(mandate));
   const recorded = {
     responses: Object.fromEntries(
       view.responses.map((response) => [response.stepKey, response.value]),
@@ -247,4 +266,39 @@ export async function loadProfileImages(
     (await within(() => getProfileImages(session, subjectType, subjectId))) ??
     null
   );
+}
+
+async function activeMandateOf(
+  session: ApiSession,
+  investorOrganisationId: string,
+): Promise<InvestorMandateDto | null> {
+  const page = await listInvestorMandates(session, investorOrganisationId, {
+    status: "ACTIVE",
+    limit: 1,
+  });
+  const first = page.items[0];
+  if (first === undefined) return null;
+  return getInvestorMandate(session, investorOrganisationId, first.id);
+}
+
+/** The mandate in the profile's display words; unstated stays null. */
+export function declaredMandateLines(
+  mandate: InvestorMandateDto,
+): DeclaredMandateLines {
+  const range = mandate.chequeRange ?? null;
+  const money = (amount: string | undefined) =>
+    range === null || amount === undefined
+      ? null
+      : `${range.currency} ${formatAmountForDisplay(amount)}`;
+  const stages = stageLine(mandate);
+  const thesis = mandate.rawMandateText?.trim() ?? "";
+  return {
+    stages: stages === "Not stated" ? null : stages,
+    cheque: {
+      min: money(range?.min),
+      typical: money(range?.typical),
+      max: money(range?.max),
+    },
+    thesis: thesis.length === 0 ? null : thesis,
+  };
 }

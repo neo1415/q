@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
@@ -86,7 +86,6 @@ export function FounderOnboardingScreen({
   seed,
   startTalking = false,
   greeted: arrivedGreeted = false,
-  openReview = false,
   focusSection,
 }: {
   /** The profile section to talk about first (lane ov's Overview link). */
@@ -95,8 +94,6 @@ export function FounderOnboardingScreen({
   readonly startTalking?: boolean | undefined;
   /** Q welcomed them on the way here; the screen does not welcome again. */
   readonly greeted?: boolean | undefined;
-  /** Open the review of a finished setup, to change what the profile says. */
-  readonly openReview?: boolean | undefined;
   readonly adapter: FounderOnboardingAdapter;
   readonly seed?: string | undefined;
 }) {
@@ -146,22 +143,11 @@ export function FounderOnboardingScreen({
   if (mode === "form" && !greeted) {
     setGreeted(true);
   }
-  // A finished setup asked to be reviewed opens its review step once.
-  const reviewOpened = useRef(false);
-  const sessionStatus = state.session?.status;
-  const sessionStep = state.session?.step;
-  const openStep = actions.openStep;
-  useEffect(() => {
-    if (
-      openReview === true &&
-      !reviewOpened.current &&
-      sessionStatus === "complete" &&
-      sessionStep === undefined
-    ) {
-      reviewOpened.current = true;
-      void openStep("review");
-    }
-  }, [openReview, sessionStatus, sessionStep, openStep]);
+  // A finished setup is never stepped back into (P1-7, onboarding plan
+  // 2026-11-07): the review step belongs to an active session and the
+  // server refuses to move a finished one, so "?review=1" asking it to
+  // only showed an error. A finished setup shows what Q holds and how to
+  // change it with Q (below).
 
   if (state.phase === "unavailable") {
     return (
