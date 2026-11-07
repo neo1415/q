@@ -1,5 +1,32 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 7 November 2026, 23:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: **batch 8 `1a669b58c`** (rollback `1f467bf39`); hosted migrations **291**; workspace LABS on, moves allowed. Today shipped batches 5–8.
+
+- Batch 6: onboarding D78/D79 (mandatory set), metrics P1-7, investability parts.
+- Batch 7:
+  - R1 fix (navigation decision now runs), one-authority, F5;
+  - FOCUS/self (W3), page actions (R4), pane responsiveness (R7), CLS;
+  - investor "who viewed you", onboarding-3.
+- Batch 8: q-nav v11 with the INEXACT_NAME guard; W3 contradiction, viewer and narration fixes plus self-research; approval card in the pane; onboarding-4 (reasons, single voice line); F9 on the Overview.
+
+Evidence:
+
+- Owner replay on batch 8 (receipts/2026-11-07-owner-replay-batch8): who-viewed OK, firm location OK, page action OK; tab and topic moves still miss on production.
+- Root causes found: settle window (fixed in W4 batch 9), answer UI_ACT pre-empting (W4), two openers (W3 4989b39), owned-first held web (W3), luna vs the Sonnet evals (OWNER DECISION pending).
+- Onboarding e2e run 4: founder ALL PASS; investor lists asked one by one (W5 fixing).
+
+| Lane                                       | State                                                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| W4 session_01Wncmn4BQnwUu8PoUpcMjfu        | fix/q-nav-batch9 50e23dbc (decision logs, 6 s deadline); answer UI_ACT yielding in progress. Owner Q: Claude for the decision? |
+| W3 session_01Wncmn6yZzXx1xtFxaXwp9b        | feat/q-deep-links 4d5947ae (one opener, explicit web for "find me online", ~half the DB trips)                                 |
+| W5 session_01Wncmn7LanmxRBs1Eoe8por        | fix/onboarding-5 in progress (3 themed list questions; untouched lists stay open, not None)                                    |
+| W1 session_01Wncmn4AftvVnCCbs7qHobz        | idle (a357eee shipped)                                                                                                         |
+| Analytics session_01Wncmn6n2wuJcJPM1ZeWXX3 | idle (investor viewers shipped)                                                                                                |
+
+Anthropic test spend: about $42.5 of $50. Serper credit is spent (402); Brave and Tavily work.
+
 ## Live board — 7 November 2026, 17:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: batch 5 `041e754f0` (rollback `2262fed36`). Workspace LABS is on (web and q-api CQ_WORKSPACE_MODE=labs; q-api CQ_Q_NAV_MOVES_ALLOWED=1). Batch 6 `6ef854dc8` is in CI: onboarding D78/D79 (migrations 440000/450000), metrics P1-7, W1 hydration and place card.
