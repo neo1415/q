@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@capital-q/ui/button";
 
 import { useT } from "@/features/i18n/language";
+import { useActSlot } from "@/features/workspace/act-slot";
 
 import { subscribeConfirms, type ConfirmRequest } from "./approval";
 import {
@@ -32,14 +34,21 @@ export function QActPrompts() {
   useEffect(() => subscribeConfirms(setConfirms), []);
   useEffect(() => subscribeApprovals(setApprovals), []);
   const [failed, setFailed] = useState<string | null>(null);
+  // Q Workspace (batch 8): in the Q pane's own slot, in its flow and at its
+  // width; floating over the screen only where there is no pane.
+  const slot = useActSlot();
 
   if (confirms.length === 0 && approvals.length === 0 && failed === null) {
     return null;
   }
-  return (
+  const prompts = (
     <div
-      className="fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto flex w-full max-w-[min(32rem,calc(100vw-2rem))] flex-col gap-2"
-      data-q-act-prompts
+      className={
+        slot === null
+          ? "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto flex w-full max-w-[min(32rem,calc(100vw-2rem))] flex-col gap-2"
+          : "flex max-h-[45vh] w-full flex-col gap-2 overflow-y-auto"
+      }
+      data-q-act-prompts={slot === null ? "floating" : "in-pane"}
     >
       {confirms.map((request) => (
         <div
@@ -140,4 +149,5 @@ export function QActPrompts() {
       )}
     </div>
   );
+  return slot === null ? prompts : createPortal(prompts, slot);
 }

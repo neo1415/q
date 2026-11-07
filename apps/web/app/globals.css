@@ -5987,6 +5987,11 @@
     inset-inline-start: 6px;
   }
 
+  /* Batch 8: Q's prompts in the pane's flow; with nothing below them
+     (the empty home), clear of the pane's foot control. */
+  .cq-q-pane [data-q-act-slot]:not(:empty):last-child {
+    padding-bottom: 52px;
+  }
   /* Q collapsed: a thin edge with Q's mark, one tap from open. */
   :root[data-cq-ws-q="collapsed"] .cq-ws-q {
     width: 46px;

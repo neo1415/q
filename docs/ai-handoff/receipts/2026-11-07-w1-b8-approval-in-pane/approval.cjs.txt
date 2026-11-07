@@ -1,0 +1,26 @@
+const { chromium } = require("playwright");
+(async () => {
+  const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+  const cases = [["on", 1440, 900, 300], ["on", 1440, 900, 380], ["on", 1440, 900, 640], ["on", 390, 844, 380], ["off", 1440, 900, 380]];
+  for (const [ws, vw, vh, qw] of cases) {
+    const p = await b.newPage({ viewport: { width: vw, height: vh } });
+    await p.addInitScript((qw) => { try { sessionStorage.setItem("cq.splash.seen", "1"); localStorage.setItem("cq-workspace-layout", JSON.stringify({ qWidth: qw, qPane: "open", pagePane: "open" })); } catch {} }, qw);
+    await p.goto(`http://127.0.0.1:3100/dev/workspace?ws=${ws}&approval=1`, { waitUntil: "load", timeout: 240000 });
+    await p.waitForTimeout(3500);
+    const r = await p.evaluate(() => {
+      const card = document.querySelector("[data-q-approval]");
+      if (!card) return { card: false };
+      const c = card.getBoundingClientRect();
+      const pane = document.querySelector(".cq-ws-q")?.getBoundingClientRect();
+      const page = document.querySelector(".cq-ws-page")?.getBoundingClientRect();
+      const host = card.closest("[data-q-act-prompts]")?.getAttribute("data-q-act-prompts");
+      const thread = document.querySelector(".cq-ws-q .cq-stage-scroll")?.getBoundingClientRect();
+      return { host, card: [Math.round(c.x), Math.round(c.y), Math.round(c.width), Math.round(c.height)], pane: pane ? [Math.round(pane.x), Math.round(pane.width)] : null, insidePane: pane ? c.x >= pane.x - 1 && c.right <= pane.right + 1 : null, overlapsPage: page && page.width > 0 ? c.right > page.x + 1 : null, overlapsThread: thread ? c.y < thread.bottom - 1 && c.bottom > thread.y : null };
+    });
+    const name = `approval-${ws}-${vw}-q${qw}`;
+    await p.screenshot({ path: `${process.argv[2]}/${name}.png` });
+    console.log(name, JSON.stringify(r));
+    await p.close();
+  }
+  await b.close();
+})();

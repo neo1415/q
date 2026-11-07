@@ -114,6 +114,7 @@ import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
 import { answerCardsDrawn, useSettledReveal } from "./settled-reveal";
+import { registerActSlot } from "@/features/workspace/act-slot";
 import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
@@ -1967,6 +1968,16 @@ export function QConversationPanel({
             <div ref={threadEnd} aria-hidden="true" />
           </div>
 
+          {/* Q Workspace (batch 8): Q's confirm and approval prompts sit
+              here, in the pane's flow above its controls, never over the
+              conversation (act-slot.ts). Empty, it takes no room. */}
+          {workspace ? (
+            <div
+              ref={registerActSlot}
+              className="flex flex-none flex-col gap-2 px-3 pt-2 empty:hidden sm:px-8"
+              data-q-act-slot
+            />
+          ) : null}
           {/* The controls: always on screen, and compact -- one line that
               grows with what is typed, clear of the home indicator. The
               microphone is in the field; before the first word it is also

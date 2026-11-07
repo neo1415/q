@@ -6,6 +6,8 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { LanguageProvider } from "@/features/i18n/language";
 import { QConversationPanel } from "@/features/q/q-conversation";
 
+import { SampleApproval } from "./sample-approval";
+
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -31,7 +33,9 @@ export default async function WorkspaceHarnessPage({
   ) {
     notFound();
   }
-  const enabled = (await searchParams)["ws"] === "on";
+  const params = await searchParams;
+  const enabled = params["ws"] === "on";
+  const approval = params["approval"] === "1";
   return (
     <LanguageProvider language="en">
       <AppShell
@@ -81,6 +85,7 @@ export default async function WorkspaceHarnessPage({
             ))}
           </ul>
         </PageContainer>
+        {approval ? <SampleApproval /> : null}
       </AppShell>
     </LanguageProvider>
   );
