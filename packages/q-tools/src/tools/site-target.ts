@@ -12,8 +12,9 @@ import {
 import { actorWideScope } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
 import {
-  findRecordByName,
   matchCounterpart,
+  nameableRecords,
+  findRecordByName,
   ownDocumentId,
 } from "./client-actions.js";
 import { matchDocument, words } from "./company-documents.js";
@@ -45,6 +46,12 @@ export const Q_PAGE_TARGET_KINDS = [
   "DECK",
   "DATA_ROOM_DOCUMENT",
   "OWN_DOCUMENT",
+  /** A company's profile (one they may already reach by hand, or their own). */
+  "COMPANY",
+  /** An investor organisation's page (one they may already reach by hand). */
+  "INVESTOR",
+  /** One item on their own work board. */
+  "BOARD_ITEM",
 ] as const;
 
 export const ResolvePageTargetInputSchema = z
@@ -52,7 +59,7 @@ export const ResolvePageTargetInputSchema = z
     target: z
       .enum(Q_PAGE_TARGET_KINDS)
       .describe(
-        "RELATIONSHIP_THREAD (the message thread with a company or investor they have a relationship with), DECK (a company's pitch deck), DATA_ROOM_DOCUMENT (one document in a company's data room), OWN_DOCUMENT (a document Q made for them).",
+        "RELATIONSHIP_THREAD (the message thread with a company or investor they have a relationship with), DECK (a company's pitch deck), DATA_ROOM_DOCUMENT (one document in a company's data room), OWN_DOCUMENT (a document Q made for them), COMPANY (a company's profile page), INVESTOR (an investor organisation's page), BOARD_ITEM (one item on their own work board: give its title in document).",
       ),
     counterpart: z
       .string()
@@ -73,7 +80,7 @@ export const ResolvePageTargetInputSchema = z
       .max(200)
       .optional()
       .describe(
-        "DATA_ROOM_DOCUMENT or OWN_DOCUMENT: what they called it ('the cap table', 'the incorporation certificate', 'the IC memo').",
+        "DATA_ROOM_DOCUMENT, OWN_DOCUMENT or BOARD_ITEM: what they called it ('the cap table', 'the incorporation certificate', 'the IC memo', 'the follow-up with Brightwell').",
       ),
     documentId: UuidSchema.optional().describe(
       "Instead of document: its id, exactly as this tool returned it (after they picked one).",
@@ -99,6 +106,8 @@ const FoundSchema = z
     documentId: UuidSchema.optional(),
     versionNumber: z.number().int().min(1).optional(),
     artifactId: UuidSchema.optional(),
+    /** BOARD_ITEM: the item, as the navigation target's `itemId`. */
+    itemId: UuidSchema.optional(),
   })
   .strict();
 
@@ -129,6 +138,7 @@ type Ports = Pick<
   | "discovery"
   | "investorFeed"
   | "documents"
+  | "board"
 >;
 
 const NONE_LINE =
@@ -366,6 +376,106 @@ async function ownDocument(
   };
 }
 
+type Candidate = { readonly id: string; readonly name: string };
+
+/**
+ * One record of a kind by id, by name, or the one this conversation is
+ * about -- only among the records this person may already reach by hand
+ * (nameableRecords: their relationships, Saves and Passes, what the network
+ * and Discover show them) and, for a company, their own. An id that is not
+ * among them is NONE, never "it exists".
+ */
+async function profile(
+  ports: Ports,
+  material: ProfileMaterialPort | undefined,
+  input: ResolvePageTargetInput,
+  context: QToolExecutionContext,
+): Promise<ResolvePageTargetOutput> {
+  const target = input.target;
+  const kind = target === "COMPANY" ? "COMPANY" : "INVESTOR_ORGANISATION";
+  const candidates: Candidate[] = [
+    ...(await nameableRecords(
+      ports,
+      context.actor,
+      kind,
+      input.counterpart ?? null,
+    ).catch(() => [])),
+  ];
+  if (kind === "COMPANY" && material !== undefined) {
+    const own = await material.ownCompanyId(context.actor).catch(() => null);
+    if (own !== null) candidates.push({ id: own, name: "Your company" });
+  }
+  const byId = new Map(candidates.map((one) => [id(one.id), one]));
+  let chosen: Candidate | undefined;
+  if (input.counterpartId !== undefined) {
+    chosen = byId.get(id(input.counterpartId));
+  } else if (input.counterpart !== undefined) {
+    const match = matchCounterpart(input.counterpart, [...byId.values()]);
+    chosen = match === null ? undefined : byId.get(id(match));
+  } else {
+    const subjects = context.plan.subjects.flatMap((subject) =>
+      kind === "COMPANY" && subject.kind === "COMPANY"
+        ? [id(subject.companyId)]
+        : kind === "INVESTOR_ORGANISATION" &&
+            subject.kind === "INVESTOR_ORGANISATION"
+          ? [id(subject.investorOrganisationId)]
+          : [],
+    );
+    const only = subjects.length === 1 ? subjects[0] : undefined;
+    chosen = only === undefined ? undefined : byId.get(only);
+  }
+  if (chosen === undefined) return none(target);
+  const recordId = id(chosen.id);
+  return target === "COMPANY"
+    ? {
+        status: "FOUND",
+        target,
+        route: "/company/[companyId]",
+        path: `/company/${seg(recordId)}`,
+        title: chosen.name.slice(0, 200),
+        companyId: recordId,
+      }
+    : {
+        status: "FOUND",
+        target,
+        route: "/investors/[investorOrganisationId]",
+        path: `/investors/${seg(recordId)}`,
+        title: chosen.name.slice(0, 200),
+        investorOrganisationId: recordId,
+      };
+}
+
+/** One item on their own board (the board service lists only theirs). */
+async function boardItem(
+  ports: Ports,
+  input: ResolvePageTargetInput,
+  context: QToolExecutionContext,
+): Promise<ResolvePageTargetOutput | null> {
+  if (ports.board === undefined) return null;
+  const list = await ports.board.list(context.actor).catch(() => null);
+  if (list === null) return null;
+  const items = list.items.map((item) => ({ id: item.id, name: item.title }));
+  const wanted =
+    input.documentId !== undefined
+      ? id(input.documentId)
+      : input.document !== undefined
+        ? matchCounterpart(input.document, items)
+        : null;
+  const item =
+    wanted === null
+      ? undefined
+      : items.find((one) => id(one.id) === id(wanted));
+  if (item === undefined) return none("BOARD_ITEM");
+  return {
+    status: "FOUND",
+    target: "BOARD_ITEM",
+    route: "/board",
+    path: "/board",
+    title: item.name.slice(0, 200),
+    itemId: id(item.id),
+  };
+}
+
 export function createResolvePageTargetTool(
   ports: Ports,
   material: ProfileMaterialPort | undefined,
@@ -380,7 +490,7 @@ export function createResolvePageTargetTool(
     status: "ACTIVE",
     providerName: "resolve_page_target",
     description:
-      "Finds the one record behind a place in the app, for this person, before moving there or naming it: the thread with a company or investor (relationship id and its messages page), a company's pitch deck (document id and version), one document in a company's data room (document id), or one of their own documents (artifact id). Returns ids and the page path only; it opens and reads nothing. WHICH_ONE: ask which. NONE: say nothing they can see matches and stay.",
+      "Finds the one record behind a place in the app, for this person, before moving there or naming it: the thread with a company or investor (relationship id and its messages page), a company's pitch deck (document id and version), one document in a company's data room (document id), one of their own documents (artifact id), a company's or investor's page (its id), or an item on their own board (item id). Returns ids and the page path only; it opens and reads nothing. WHICH_ONE: ask which. NONE: say nothing they can see matches and stay.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
@@ -396,16 +506,25 @@ export function createResolvePageTargetTool(
     output: ResolvePageTargetOutputSchema,
     authorize: async (input, context) => {
       if (context.actor.actorType !== "HUMAN") return deny("NOT_AVAILABLE");
+      if (input.target === "COMPANY" || input.target === "INVESTOR") {
+        return allow(
+          "CONFIDENTIAL",
+          await profile(ports, material, input, context),
+        );
+      }
       if (
         input.target === "RELATIONSHIP_THREAD" ||
-        input.target === "OWN_DOCUMENT"
+        input.target === "OWN_DOCUMENT" ||
+        input.target === "BOARD_ITEM"
       ) {
         // Their own records only, in their own conversation.
         if (!ownConversation(context)) return deny("NOT_AVAILABLE");
         const output =
           input.target === "OWN_DOCUMENT"
             ? await ownDocument(ports, input, context)
-            : await thread(ports, input, context);
+            : input.target === "BOARD_ITEM"
+              ? await boardItem(ports, input, context)
+              : await thread(ports, input, context);
         return output === null
           ? deny("NOT_AVAILABLE")
           : allow("CONFIDENTIAL", output);
