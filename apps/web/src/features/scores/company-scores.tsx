@@ -4,9 +4,9 @@ import {
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
   INVESTABILITY_BAND_LABELS,
-  INVESTABILITY_METHOD_LABEL,
   SCORE_CONFIDENCE_LABELS,
   investabilityLine,
+  investabilityMethodLabel,
   suitabilityLine,
   type CompanyScoresDto,
   type InvestabilityDto,
@@ -264,7 +264,7 @@ export function CompanyScores({
       <ScoreCell
         data="investability"
         label="Investability"
-        caption={`${INVESTABILITY_METHOD_LABEL} · on shared evidence`}
+        caption={`${investabilityMethodLabel(inv.methodVersion)} · on shared evidence`}
         value={inv.score}
         words={investabilityWords(inv)}
         coverage={

@@ -13,8 +13,11 @@ import { INVESTIQ_SHADOW_METHOD_V0 } from "./method-v0.js";
  * The owner (2026-10-15) named InvestIQ FDN's proprietary methodology and
  * delegated the weights, rules and bands to the lead "after deep research".
  * Every number below is traced in docs/product-sources/investiq/RESEARCH.md
- * (R1..R12) and is a CALIBRATION HYPOTHESIS, to be tested against 3-5 real
- * FDN companies (CALIBRATION.md) before anything consumes it. Shadow only.
+ * (R1..R12) and is a CALIBRATION HYPOTHESIS, still to be tested against
+ * 3-5 real FDN companies (CALIBRATION.md). No longer shadow-only: since
+ * ADR 0074 it is shown to investors as Investability (investiq/v2
+ * arithmetic) and breaks ties among equal fits in Discover (fit-order.v5),
+ * which is why its band is capped by confidence.
  *
  * Locked rules kept (not overridden by the owner):
  *   - Investor Fit is a canonical FDN dimension but carries no weight and no

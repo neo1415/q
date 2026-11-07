@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   FIT_PARAMETERS,
   fitScoreOutOf10,
+  investabilityMethodLabel,
   suitabilityFromFit,
   type FitProfileDto,
 } from "../src/index.js";
@@ -81,5 +82,17 @@ describe("suitability", () => {
     const s = suitabilityFromFit(profile({}));
     expect(s.status).toBe("NOT_ENOUGH_INFORMATION");
     expect(s.score).toBeNull();
+  });
+});
+
+describe("investabilityMethodLabel (metrics audit P1-6)", () => {
+  it("names the method version that produced the score", () => {
+    expect(
+      investabilityMethodLabel("investiq/v2+investability-inputs.v5"),
+    ).toBe("FDN InvestIQ v2");
+    expect(
+      investabilityMethodLabel("investiq/v1+investability-inputs.v1"),
+    ).toBe("FDN InvestIQ v1");
+    expect(investabilityMethodLabel("unknown")).toBe("FDN InvestIQ");
   });
 });
