@@ -191,7 +191,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/capital": {
     title: "Capital",
     purpose: "Old address of Capital.",
-    audience: "FOUNDER",
+    audience: "ANY",
     redirectsTo: "/relationships",
   },
   "/crm": {
@@ -585,7 +585,8 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   // --- relationships ---
   "/relationships": {
     title: "Relationships",
-    purpose: "Your relationships: overview, pipeline, and a founder's Capital.",
+    purpose:
+      "Your relationships: overview, pipeline, and Capital (a founder's raise and plan; an investor's mandate and commitments).",
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
     tabs: [
@@ -728,7 +729,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/gateq": {
     title: "GateQ",
     purpose:
-      "An investor's front door: inbox of applications, the gate, find and claim.",
+      "GateQ: an investor's inbox of applications, gate and find; a founder's applications and company claim.",
     audience: "ANY",
     shows: ["GATEQ_APPLICATION"],
     tabs: [
@@ -862,7 +863,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/profile": {
     title: "Your profile",
     purpose:
-      "You and your company or firm, edited in place; an investor's mandate and thesis.",
+      "You, edited in place: a founder's company and traction; an investor's firm, mandate and thesis.",
     audience: "ANY",
     sections: [
       { id: "about", title: "In your words", kind: "OTHER" },
