@@ -30,6 +30,8 @@ export type SiteMapTabEntry = {
   readonly subs?: readonly QSiteMapSub[] | undefined;
   /** Narrower than the page: who the code renders this tab for. */
   readonly audience?: QSiteMapAudience | undefined;
+  /** What the tab is for, when its title alone could be mistaken. */
+  readonly purpose?: string | undefined;
 };
 
 export type SiteMapSectionEntry = {
@@ -291,7 +293,12 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       { id: "needs", title: "Needs you", href: "/work?view=needs" },
       { id: "progress", title: "In progress", href: "/work?view=progress" },
       { id: "done", title: "Done", href: "/work?view=done" },
-      { id: "team", title: "Team", href: "/work?view=team" },
+      {
+        id: "team",
+        title: "Q's team",
+        href: "/work?view=team",
+        purpose: "the specialists Q runs for your work; not your colleagues",
+      },
       { id: "cost", title: "Cost", href: "/work?view=cost" },
     ],
     sections: [
@@ -377,15 +384,17 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     ],
   },
   "/explore": {
-    title: "Explore",
-    purpose: "Search the network and browse pitches.",
+    title: "Explore the network",
+    purpose:
+      "Search Capital Q's own network of companies and browse pitches; not people on the public web.",
     audience: "ANY",
     shows: ["COMPANY", "PITCH_VIDEO"],
     sections: [{ id: "explore", title: "Explore", kind: "EXPLORE" }],
   },
   "/search": {
-    title: "People search",
-    purpose: "Find people, organisations and agencies in public.",
+    title: "People search (public web)",
+    purpose:
+      "Find people, organisations and agencies on the public web; not Capital Q's own network.",
     audience: "ANY",
     shows: ["EXTERNAL_PERSON"],
     sections: [
@@ -426,22 +435,40 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         id: "overview",
         title: "Overview",
         href: `${COMPANY}?tab=overview`,
+        purpose: "headline figures, the story and the raise, by section",
         subs: OVERVIEW_SUBS,
       },
-      { id: "diligence", title: "Diligence", href: `${COMPANY}?tab=diligence` },
+      {
+        id: "diligence",
+        title: "Diligence",
+        href: `${COMPANY}?tab=diligence`,
+        purpose: "questions, evidence and risks",
+      },
       {
         id: "elevator",
         title: "Elevator pitch",
         href: `${COMPANY}?tab=elevator`,
+        purpose: "the short pitch",
       },
-      { id: "dataroom", title: "Data room", href: `${COMPANY}?tab=dataroom` },
+      {
+        id: "dataroom",
+        title: "Data room",
+        href: `${COMPANY}?tab=dataroom`,
+        purpose: "the company's documents",
+      },
       {
         id: "deck",
         title: "Pitch deck",
         href: `${COMPANY}?tab=deck`,
+        purpose: "the deck and Q's reading of it, by section",
         subs: DECK_SUBS,
       },
-      { id: "team", title: "Team", href: `${COMPANY}?tab=team` },
+      {
+        id: "team",
+        title: "Team",
+        href: `${COMPANY}?tab=team`,
+        purpose: "the founders and team",
+      },
     ],
     sections: [
       { id: "profile", title: "Profile", kind: "COMPANY_PROFILE" },
