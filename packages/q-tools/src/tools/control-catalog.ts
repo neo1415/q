@@ -21,16 +21,21 @@ export type QControlCatalogEntry = {
 };
 
 export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
+  { id: "button.chat-send", kind: "BUTTON" },
   { id: "button.commitment-adopt", kind: "BUTTON" },
   { id: "button.commitment-confirm", kind: "BUTTON" },
   { id: "button.commitment-open", kind: "BUTTON" },
   { id: "button.commitment-record", kind: "BUTTON" },
   { id: "button.commitment-withdraw", kind: "BUTTON" },
+  { id: "button.dataroom-share", kind: "BUTTON" },
   { id: "button.documents-by-q", kind: "BUTTON" },
   { id: "button.feed-save", kind: "BUTTON" },
   { id: "button.hub-gateq", kind: "BUTTON" },
+  { id: "button.interest-accept", kind: "BUTTON" },
+  { id: "button.interest-decline", kind: "BUTTON" },
   { id: "button.pipeline-next", kind: "BUTTON" },
   { id: "button.pipeline-search", kind: "BUTTON" },
+  { id: "button.team-invite", kind: "BUTTON" },
   { id: "carousel.feed", kind: "CAROUSEL" },
   { id: "dialog.book-call", kind: "DIALOG" },
   { id: "dialog.join-call", kind: "DIALOG" },

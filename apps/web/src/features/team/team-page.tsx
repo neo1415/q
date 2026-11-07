@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -50,6 +51,8 @@ import {
   RadioList,
 } from "@/features/settings/account-kit";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 import { useCapabilities } from "@/features/organisation/capabilities";
 import { CAP } from "@/features/organisation/role-words";
 
@@ -850,6 +853,31 @@ function InviteCard({
   const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
   const emails = splitEmailInput(raw);
   const looksRight = emails.length > 0 && emails.every((e) => e.includes("@"));
+  // W5.1b: an invitation is outward (an email goes out), so Q may send it
+  // only on the person's approval of exactly whom and with what role.
+  const sendRef = useRef<HTMLSpanElement>(null);
+  useQControl({
+    id: "button.team-invite",
+    kind: "BUTTON",
+    ref: sendRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.team-invite",
+      summary: (payload) =>
+        `Invite ${String(payload["emails"])} to your team as ${String(payload["role"])}`,
+      prepare: (): ApprovalPayload | null =>
+        !looksRight || phase !== "idle" || pending
+          ? null
+          : { emails: emails.join(", "), role: ROLE_WORD[role] },
+      execute: async () => {
+        setPhase("pending");
+        const sent = await onSend(emails, role);
+        setPhase("idle");
+        if (sent) setRaw("");
+        return sent ? "DONE" : "FAILED";
+      },
+    },
+  });
   return (
     <form
       data-q-editing
@@ -911,24 +939,26 @@ function InviteCard({
             />
           </span>
         </Field>
-        <button
-          type="submit"
-          disabled={pending || phase !== "idle" || !looksRight}
-          aria-busy={phase === "pending"}
-          className={accountButton(phase === "done" ? "done" : "primary")}
-          data-team-invite-send
-        >
-          {phase === "pending" ? (
-            <Pending>{t("Sending…")}</Pending>
-          ) : phase === "done" ? (
-            <>
-              <Check size={14} aria-hidden="true" />
-              {t("Sent")}
-            </>
-          ) : (
-            t("Send invitation")
-          )}
-        </button>
+        <span ref={sendRef} className="contents">
+          <button
+            type="submit"
+            disabled={pending || phase !== "idle" || !looksRight}
+            aria-busy={phase === "pending"}
+            className={accountButton(phase === "done" ? "done" : "primary")}
+            data-team-invite-send
+          >
+            {phase === "pending" ? (
+              <Pending>{t("Sending…")}</Pending>
+            ) : phase === "done" ? (
+              <>
+                <Check size={14} aria-hidden="true" />
+                {t("Sent")}
+              </>
+            ) : (
+              t("Send invitation")
+            )}
+          </button>
+        </span>
       </div>
       <span className="text-xs text-(--cq-text-tertiary)" data-team-role-says>
         {t(

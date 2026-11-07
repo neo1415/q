@@ -19,6 +19,8 @@ import { formatDay } from "@/components/date-format";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { STATE_WORDS } from "@/features/relationships/relationship-words";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 
 /**
  * The founder's inbox of investor interest (CQ-NET-011; doc 17 §83-§86).
@@ -72,9 +74,12 @@ function Row({
   answer,
   onAnswered,
   currentState,
+  qTarget = false,
 }: {
   readonly item: IncomingInterestDto;
   readonly answer: AnswerPort;
+  /** W5.1b: the one row Q's accept/decline acts on (the top unanswered). */
+  readonly qTarget?: boolean | undefined;
   readonly onAnswered?: (() => void) | undefined;
   /** Where the relationship stands now, when known. */
   readonly currentState?: RelationshipStateV2 | undefined;
@@ -121,6 +126,8 @@ function Row({
   );
 
   const name = current.investorName;
+  const acceptRef = useRef<HTMLSpanElement>(null);
+  const declineRef = useRef<HTMLSpanElement>(null);
 
   // Where it stands after the accept (QA run 8a1d57b9: the line read
   // "Connected... Now: interest expressed" -- the state loaded with the
@@ -204,23 +211,27 @@ function Row({
             </Button>
           ) : (
             <>
-              <Button
-                variant="primary"
-                onClick={() =>
-                  setPhase({ kind: "CONFIRMING", decision: "ACCEPTED" })
-                }
-              >
-                {t("Accept")}
-              </Button>
+              <span ref={acceptRef} className="contents">
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    setPhase({ kind: "CONFIRMING", decision: "ACCEPTED" })
+                  }
+                >
+                  {t("Accept")}
+                </Button>
+              </span>
               {/* Declining is neutral: quiet, never danger, never red. */}
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  setPhase({ kind: "CONFIRMING", decision: "DECLINED" })
-                }
-              >
-                {t("Decline")}
-              </Button>
+              <span ref={declineRef} className="contents">
+                <Button
+                  variant="quiet"
+                  onClick={() =>
+                    setPhase({ kind: "CONFIRMING", decision: "DECLINED" })
+                  }
+                >
+                  {t("Decline")}
+                </Button>
+              </span>
             </>
           )}
         </div>
@@ -257,6 +268,22 @@ function Row({
         </div>
       </div>
       {outcome}
+      {qTarget &&
+      current.response !== "ACCEPTED" &&
+      current.response !== "DECLINED" ? (
+        <InterestQActions
+          name={name}
+          interestId={current.interestId}
+          acceptRef={acceptRef}
+          declineRef={declineRef}
+          answer={answer}
+          onDone={(interest) => {
+            setCurrent(interest);
+            setPhase({ kind: "IDLE" });
+            onAnswered?.();
+          }}
+        />
+      ) : null}
     </li>
   );
 }
@@ -275,6 +302,10 @@ export function IncomingInterest({
   readonly onAnswered?: (() => void) | undefined;
 }) {
   const t = useT();
+  const qTargetId =
+    items.find(
+      (item) => item.response !== "ACCEPTED" && item.response !== "DECLINED",
+    )?.interestId ?? null;
   if (items.length === 0) {
     return (
       <EmptyState
@@ -297,8 +328,74 @@ export function IncomingInterest({
           answer={answer}
           onAnswered={onAnswered}
           currentState={currentStates?.get(item.investorOrganisationId)}
+          qTarget={item.interestId === qTargetId}
         />
       ))}
     </ul>
   );
+}
+
+/**
+ * W5.1b: accepting or declining is outward (the investor sees it), so Q
+ * may do it only as APPROVAL: on the person's approval of exactly which
+ * investor and which answer, once, under the approval's key.
+ */
+function InterestQActions({
+  name,
+  interestId,
+  acceptRef,
+  declineRef,
+  answer,
+  onDone,
+}: {
+  readonly name: string;
+  readonly interestId: string;
+  readonly acceptRef: React.RefObject<HTMLSpanElement | null>;
+  readonly declineRef: React.RefObject<HTMLSpanElement | null>;
+  readonly answer: AnswerPort;
+  readonly onDone: (interest: IncomingInterestDto) => void;
+}) {
+  const run =
+    (decision: "ACCEPTED" | "DECLINED") =>
+    async (_payload: ApprovalPayload, key: string) => {
+      try {
+        const result = await answer({
+          interestId,
+          decision,
+          idempotencyKey: `answer:${key}`,
+        });
+        if (!result.ok) return "FAILED" as const;
+        onDone(result.value.interest);
+        return "DONE" as const;
+      } catch {
+        return "FAILED" as const;
+      }
+    };
+  useQControl({
+    id: "button.interest-accept",
+    kind: "BUTTON",
+    ref: acceptRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.interest-accept",
+      summary: () =>
+        `Accept ${name}'s interest: both sides will have agreed to connect. It is not an investment.`,
+      prepare: () => ({ investor: name, answer: "Accept" }),
+      execute: run("ACCEPTED"),
+    },
+  });
+  useQControl({
+    id: "button.interest-decline",
+    kind: "BUTTON",
+    ref: declineRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.interest-decline",
+      summary: () =>
+        `Decline ${name}'s interest: they will see it was not taken forward. No reason is shared.`,
+      prepare: () => ({ investor: name, answer: "Decline" }),
+      execute: run("DECLINED"),
+    },
+  });
+  return null;
 }
