@@ -134,6 +134,11 @@ export const QSiteMapSectionSchema = z
     tab: QSiteMapTabIdSchema.optional(),
     /** Who sees this section, when narrower than the page; absent: the page's. */
     audience: QSiteMapAudienceSchema.optional(),
+    /**
+     * DECISIONS 75: what the section is for, in a person's everyday words
+     * (what they go there to do or see); never a keyword list.
+     */
+    purpose: z.string().trim().min(1).max(90).optional(),
   })
   .strict();
 export type QSiteMapSection = z.infer<typeof QSiteMapSectionSchema>;
@@ -295,20 +300,37 @@ export function qSiteMapDigest(
   options: QSiteMapDigestOptions = {},
 ): string {
   const lines: string[] = [
-    `Capital Q site map v${String(map.version)}. route | title | purpose. tabs: id=title. sections: id=title. [param]=what it names.`,
+    `Capital Q site map v${String(map.version)}: route | Title: what it is for. tabs: id "Title": for (parts). sections: id@tab: for. (founder)/(investor): that side only.`,
   ];
+  let previousSections = "";
+  // Pages that are another page's tab (a record's Messages, Calls...): the
+  // tab already says what they are for, so they point to it.
+  const tabPages = new Map<string, string>();
+  const parentSections = new Map<string, ReadonlySet<string>>();
+  for (const page of map.pages) {
+    for (const tab of page.tabs) {
+      const path = tab.href.split(/[?#]/u)[0] ?? "";
+      if (path !== page.route) {
+        tabPages.set(path, tab.id);
+        parentSections.set(
+          path,
+          new Set(page.sections.map((section) => section.id)),
+        );
+      }
+    }
+  }
   for (const page of map.pages) {
     if (!admits(page, options.side)) continue;
-    const params =
-      page.params.length === 0
-        ? ""
-        : ` [${page.params.map((param) => `${param.name}=${param.instance}`).join(",")}]`;
+    // A route's [param] names say what they name; the map keeps the kinds.
     const who =
       options.side === undefined && page.audience !== "ANY"
         ? ` (${page.audience.toLowerCase()})`
         : "";
+    const tabOf = tabPages.get(page.route);
     lines.push(
-      `${page.route}${params}${who} | ${page.title} | ${page.purpose}`,
+      tabOf === undefined
+        ? `${page.route}${who} | ${page.title}: ${page.purpose}`
+        : `${page.route}${who} | ${page.title}: its "${tabOf}" tab above`,
     );
     const seen = (audience: QSiteMapAudience) =>
       options.side === undefined ||
@@ -326,7 +348,7 @@ export function qSiteMapDigest(
         ` tabs: ${tabs
           .map(
             (tab) =>
-              `${tab.id}=${tab.title}${mark(audienceOf(page, tab))}${tab.purpose === undefined ? "" : ` [${tab.purpose}]`}${tab.subs.length === 0 ? "" : `(sub: ${tab.subs.map((sub) => sub.id).join(",")})`}`,
+              `${tab.id} "${tab.title}"${mark(audienceOf(page, tab))}${tab.purpose === undefined ? "" : `: ${tab.purpose}`}${tab.subs.length === 0 ? "" : ` (parts: ${tab.subs.map((sub) => sub.id).join(",")})`}`,
           )
           .join("; ")}`,
       );
@@ -340,24 +362,42 @@ export function qSiteMapDigest(
             section,
           ),
         ) &&
-        // A one-section page's section is the page itself; not worth a line.
-        (page.sections.length > 1 || section.tab !== undefined),
+        // A one-section page's section is the page itself, and a section
+        // that is its whole tab is the tab: neither is worth an entry.
+        (page.sections.length > 1 || section.tab !== undefined) &&
+        section.id !== section.tab &&
+        // The page's own section (its last route word) is the page.
+        section.id !== page.route.split("/").pop() &&
+        // A tab page lists only what its record page does not.
+        parentSections.get(page.route)?.has(section.id) !== true,
     );
     if (sections.length > 0) {
+      const block = sections
+        .map((section) => {
+          const audience = audienceOf(
+            page,
+            page.tabs.find((tab) => tab.id === section.tab),
+            section,
+          );
+          const tab = page.tabs.find((one) => one.id === section.tab);
+          // A side already said by its tab is not said again.
+          const side =
+            tab !== undefined && audienceOf(page, tab) === audience
+              ? ""
+              : mark(audience);
+          return `${section.id}${side}${section.tab === undefined ? "" : `@${section.tab}`}: ${section.purpose ?? section.title}`;
+        })
+        .join("; ");
+      // Sibling pages that show the same parts (one record's tabs) say so
+      // once; the ids stay exact on the first.
       lines.push(
-        ` sections: ${sections
-          .map(
-            (section) =>
-              `${section.id}=${section.title}${mark(
-                audienceOf(
-                  page,
-                  page.tabs.find((tab) => tab.id === section.tab),
-                  section,
-                ),
-              )}${section.tab === undefined ? "" : `@${section.tab}`}`,
-          )
-          .join("; ")}`,
+        block === previousSections
+          ? " sections: as the page above"
+          : ` sections: ${block}`,
       );
+      previousSections = block;
+    } else {
+      previousSections = "";
     }
   }
   return lines.join("\n");

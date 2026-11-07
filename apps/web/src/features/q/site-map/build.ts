@@ -15,7 +15,12 @@ import { APP_ROUTE_PATTERNS } from "@/features/q/control/app-routes";
 import { recordPagePath, settingsPath } from "@/features/q/client-actions";
 import { destinationPath } from "@/features/voice/destinations";
 
-import { SITE_MAP_AUDIENCES, SITE_MAP_PAGES, SITE_MAP_PARAMS } from "./pages";
+import {
+  SITE_MAP_AUDIENCES,
+  SITE_MAP_PAGES,
+  SITE_MAP_PARAMS,
+  SITE_MAP_PURPOSES,
+} from "./pages";
 
 /**
  * Q Workspace W2.1: the site map, built deterministically from
@@ -153,6 +158,7 @@ export function buildSiteMap(): QSiteMap {
       throw new Error(`site map: no registry entry for ${route}`);
     }
     const audiences = SITE_MAP_AUDIENCES[route] ?? {};
+    const purposes = SITE_MAP_PURPOSES[route] ?? {};
     return {
       route,
       title: entry.title,
@@ -181,19 +187,25 @@ export function buildSiteMap(): QSiteMap {
         href: tab.href,
         destinations: destinations.get(`${route} ${tab.id}`) ?? [],
         subs: [...(tab.subs ?? [])],
-        ...(tab.purpose === undefined ? {} : { purpose: tab.purpose }),
-        ...(audiences.tabs?.[tab.id] === undefined
+        ...((purposes.tabs?.[tab.id] ?? tab.purpose) === undefined
           ? {}
-          : { audience: audiences.tabs[tab.id] }),
+          : { purpose: purposes.tabs?.[tab.id] ?? tab.purpose }),
+        ...((audiences.tabs?.[tab.id] ?? tab.audience) === undefined
+          ? {}
+          : { audience: audiences.tabs?.[tab.id] ?? tab.audience }),
       })),
       sections: (entry.sections ?? []).map((section) => ({
         id: section.id,
         title: section.title,
         kind: section.kind,
         ...(section.tab === undefined ? {} : { tab: section.tab }),
-        ...(audiences.sections?.[section.id] === undefined
+        // The audit table, else the entry's own (an inline audience counts).
+        ...((audiences.sections?.[section.id] ?? section.audience) === undefined
           ? {}
-          : { audience: audiences.sections[section.id] }),
+          : { audience: audiences.sections?.[section.id] ?? section.audience }),
+        ...((purposes.sections?.[section.id] ?? section.purpose) === undefined
+          ? {}
+          : { purpose: purposes.sections?.[section.id] ?? section.purpose }),
       })),
     };
   });
@@ -210,6 +222,19 @@ export function buildSiteMap(): QSiteMap {
         throw new Error(
           `site map: audience for unknown section ${route} ${id}`,
         );
+      }
+    }
+  }
+  for (const [route, words] of Object.entries(SITE_MAP_PURPOSES)) {
+    const page = pages.find((one) => one.route === route);
+    for (const id of Object.keys(words.tabs ?? {})) {
+      if (page?.tabs.some((tab) => tab.id === id) !== true) {
+        throw new Error(`site map: purpose for unknown tab ${route} ${id}`);
+      }
+    }
+    for (const id of Object.keys(words.sections ?? {})) {
+      if (page?.sections.some((section) => section.id === id) !== true) {
+        throw new Error(`site map: purpose for unknown section ${route} ${id}`);
       }
     }
   }

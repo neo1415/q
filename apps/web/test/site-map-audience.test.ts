@@ -136,7 +136,7 @@ describe("the digest keeps easily confused places apart (W4 round 3)", () => {
       expect(tab.purpose, tab.id).toBeDefined();
     }
     const digest = qSiteMapDigest(Q_SITE_MAP);
-    expect(digest).toContain("dataroom=Data room [the company's documents]");
+    expect(digest).toContain('dataroom "Data room": the company\'s documents');
   });
 });
 
@@ -163,14 +163,86 @@ describe("site-map audiences (pinned)", () => {
   it("a side's digest leaves out the other side's tabs and sections", () => {
     const founder = qSiteMapDigest(Q_SITE_MAP, { side: "FOUNDER" });
     const investor = qSiteMapDigest(Q_SITE_MAP, { side: "INVESTOR" });
-    expect(investor).not.toContain("capital-raise=");
-    expect(investor).not.toContain("claim=");
-    expect(investor).toContain("commitments=");
-    expect(founder).toContain("capital-raise=");
-    expect(founder).not.toContain("commitments=");
-    expect(founder).not.toContain("inbox=Inbox");
-    expect(founder).toContain("claim=");
+    expect(investor).not.toContain('capital-raise "');
+    expect(investor).not.toContain('claim "');
+    expect(investor).toMatch(/\bcommitments@capital:/u);
+    expect(founder).toContain('capital-raise "');
+    expect(founder).not.toMatch(/\bcommitments[(@:]/u);
+    expect(founder).not.toContain('inbox "Inbox"');
+    expect(founder).toContain('claim "Claim"');
     // Both sides together mark who each narrower part is for.
-    expect(qSiteMapDigest(Q_SITE_MAP)).toContain("claim=Claim(founder)");
+    expect(qSiteMapDigest(Q_SITE_MAP)).toContain('claim "Claim"(founder)');
+  });
+});
+
+describe("every place says what it is for, in everyday words (DECISIONS 75)", () => {
+  const places = Q_SITE_MAP.pages.filter(
+    (one) => one.audience !== "ADMIN" && one.redirectsTo === undefined,
+  );
+
+  it("every page, tab and section Q can move to has a purpose", () => {
+    const missing: string[] = [];
+    for (const one of places) {
+      if (one.purpose.trim().length < 12) missing.push(one.route);
+      for (const tab of one.tabs) {
+        if (tab.purpose === undefined)
+          missing.push(`${one.route} tab ${tab.id}`);
+      }
+      for (const section of one.sections) {
+        if (section.purpose === undefined) {
+          missing.push(`${one.route} section ${section.id}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("a purpose is a plain phrase, never a keyword or synonym list", () => {
+    const listy: string[] = [];
+    const check = (where: string, text: string) => {
+      // Slashes, "aka", "e.g." and quoted alternatives are how keyword
+      // lists creep in; a purpose says what the place is for instead.
+      if (/\/|\baka\b|\be\.g\.|"|\bor\b.*\bor\b.*\bor\b/iu.test(text)) {
+        listy.push(`${where}: ${text}`);
+      }
+    };
+    for (const one of places) {
+      for (const tab of one.tabs)
+        check(`${one.route} ${tab.id}`, tab.purpose ?? "");
+      for (const section of one.sections) {
+        check(`${one.route} ${section.id}`, section.purpose ?? "");
+      }
+    }
+    expect(listy).toEqual([]);
+  });
+
+  it("the digest keeps every place within the budget", () => {
+    for (const side of [undefined, "FOUNDER", "INVESTOR"] as const) {
+      expect(qSiteMapDigest(Q_SITE_MAP, { side }).length).toBeLessThanOrEqual(
+        12_000,
+      );
+    }
+  });
+
+  it("W4's confusable places are told apart by purpose", () => {
+    const work = page("/work");
+    expect(work.tabs.find((tab) => tab.id === "needs")?.purpose).toMatch(
+      /decide or do/u,
+    );
+    expect(page("/company/data-room").purpose).toMatch(/missing/u);
+    expect(page("/profile").purpose).toMatch(/Not how others see you/u);
+    expect(page("/company/[companyId]").purpose).toMatch(/as others see it/u);
+    expect(
+      page("/discover").tabs.find((tab) => tab.id === "yours")?.purpose,
+    ).toMatch(/already follow/u);
+    expect(page("/settings/plan").purpose).toMatch(/billing/u);
+    expect(page("/daily").purpose).toMatch(/today/iu);
+    expect(
+      page("/gateq").tabs.find((tab) => tab.id === "inbox")?.purpose,
+    ).toMatch(/founders sent you/u);
+    expect(
+      page("/gateq").tabs.find((tab) => tab.id === "applications")?.purpose,
+    ).toMatch(/you sent/u);
+    expect(sectionAudience("/analytics", "deck-views")).toBe("FOUNDER");
   });
 });
