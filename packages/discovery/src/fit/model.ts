@@ -184,6 +184,9 @@ export function assessFit(
     topReasons,
     mainMismatch,
     hardRule: inputs.hardRule,
+    ...(config.score === undefined
+      ? {}
+      : { scoreOutOf10: weightedScore(config, results, value, coverage) }),
     computedAt,
   });
   return { profile, value, coverage, confidenceScore };
@@ -254,4 +257,32 @@ export function compareAssessmentMerit(
   const ca = CONFIDENCE_ORDER[a.profile.confidence];
   const cb = CONFIDENCE_ORDER[b.profile.confidence];
   return cb - ca;
+}
+
+/**
+ * ranking-config.v8 (FitConfig.score): 10 × the weighted value of the known
+ * parameters, one decimal, shown only when enough is known; otherwise null.
+ * The value is the band's own value, so the number and the words agree.
+ */
+function weightedScore(
+  config: FitConfig,
+  results: readonly FitParameterResultDto[],
+  value: number | null,
+  coverage: number,
+): string | null {
+  const rule = config.score;
+  if (rule === undefined || value === null) return null;
+  const known = results.filter((r) => r.applicable && r.outcome !== "UNKNOWN");
+  const constraints = known.filter((r) =>
+    rule.constraints.includes(r.parameter),
+  ).length;
+  if (
+    known.length < rule.minKnown ||
+    coverage < rule.minCoverage ||
+    constraints < rule.minConstraintsKnown
+  ) {
+    return null;
+  }
+  const outOf10 = Math.round(value * 100) / 10;
+  return outOf10.toFixed(1).replace(/\.0$/u, "");
 }

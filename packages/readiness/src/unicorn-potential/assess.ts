@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { UnicornPotentialDto } from "@capital-q/contracts";
 import type { InvestabilityInputs } from "../investability/inputs.js";
 import {
+  UNICORN_GATES,
   UNICORN_PILLARS,
   UNICORN_POTENTIAL_METHOD_VERSION,
   UNICORN_POTENTIAL_INPUT_RULES_VERSION,
@@ -71,7 +72,11 @@ export function assessUnicornPotential(
                       ? "Plausible or mixed limited evidence"
                       : grade === 4
                         ? "Sustained documented or corroborated execution"
-                        : "Demonstrated stage-appropriate execution",
+                        : // P1-13: a founder's own word is stated, not demonstrated.
+                          Math.max(0, ...current.map((o) => o.reliability)) <=
+                            0.5
+                          ? "Stage-appropriate execution, as the company states it"
+                          : "Demonstrated stage-appropriate execution",
             sources: all.slice(0, 12).map((o) => ({
               ...o.source,
               label: o.source.label.slice(0, 200),
@@ -119,11 +124,17 @@ export function assessUnicornPotential(
       confidenceIndex += ((p.weight ?? 1) * 0.5 * rel) / total;
     }
   }
+  // v1.1.0 gates (UNICORN_GATES): founder, market and problem graded;
+  // traction from seed on (pre-seed: traction or distribution); 8 of 12.
+  const has = (id: string) => scored.some((p) => p.id === id);
   const required =
-    ["P1", "P2", "P3"].every((id) => scored.some((p) => p.id === id)) &&
-    scored.some((p) => p.id === "P4" || p.id === "P7");
+    UNICORN_GATES.required.every(has) &&
+    (stage === "PRE_SEED" ? has("P4") || has("P7") : has("P4"));
   const eligible =
-    stage !== null && coverage >= 0.6 && scored.length >= 6 && required;
+    stage !== null &&
+    coverage >= UNICORN_GATES.minCoverage &&
+    scored.length >= UNICORN_GATES.minPillars &&
+    required;
   const raw =
     scoredWeight === 0
       ? null

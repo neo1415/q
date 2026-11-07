@@ -277,8 +277,8 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   coverage: "تغطية",
   // UNICORN_POTENTIAL_CAVEAT (metrics audit P0-7): shown wherever the
   // score is, in every language.
-  "Unicorn Potential is an evidence-based growth-characteristics indicator. It is not the probability of reaching a $1 billion valuation.":
-    "مؤشر Unicorn Potential مؤشر قائم على الأدلة لخصائص النمو. وهو ليس احتمال بلوغ تقييم بمليار دولار.",
+  "Unicorn Potential is a growth-characteristics indicator based on published research on startup outcomes. It is not the probability of reaching a $1 billion valuation.":
+    "مؤشر Unicorn Potential مؤشر لخصائص النمو قائم على الأبحاث المنشورة حول نتائج الشركات الناشئة. وهو ليس احتمال بلوغ تقييم بمليار دولار.",
   "Would raise confidence": "سيرفع الثقة",
   "factors have evidence": "عوامل لها أدلة",
   "factors.": "عاملًا.",

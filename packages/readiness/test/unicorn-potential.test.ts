@@ -4,6 +4,8 @@ import type { InvestabilityInputs } from "../src/investability/inputs.js";
 import { assessUnicornPotential } from "../src/unicorn-potential/assess.js";
 import {
   UNICORN_PILLARS,
+  UNICORN_POTENTIAL_METHOD_VERSION,
+  UNICORN_WEIGHTS_V1_0,
   unicornStageOf,
 } from "../src/unicorn-potential/method-v1.js";
 const NOW = "2026-10-17T12:00:00.000Z";
@@ -105,9 +107,13 @@ describe("provisional Unicorn Potential pure engine", () => {
   it("requires60percentweightedcoverageanddoesnotimputemissingcriteria", () => {
     const x = inputs(statements.filter((_, i) => i % 2 === 0));
     const v = assessUnicornPotential(x, NOW).view;
-    expect(v.coverage).toBe(0.5);
+    // v1.1.0 weights: half of every pillar is 47% of the stage weight
+    // (P8's runway criterion only ever counts distress).
+    expect(v.coverage).toBeLessThan(0.6);
     expect(v.overallScore).toBeNull();
-    expect(v.pillars.every((p) => p.coverage === 0.5)).toBe(true);
+    expect(v.pillars.every((p) => p.coverage === 0.5 || p.coverage === 0)).toBe(
+      true,
+    );
   });
   it("affirmative adverse evidence grades zero while mere absence remains unknown", () => {
     const v = assessUnicornPotential(
@@ -131,17 +137,20 @@ describe("provisional Unicorn Potential pure engine", () => {
         expect(c.positive).toBeInstanceOf(RegExp);
       }
   });
-  it("reproduces the owner's266/100 arithmetic with one final round", () => {
+  it("reproduces the v1.1.0 arithmetic with one final round", () => {
     const { view } = assessUnicornPotential(inputs(), NOW);
     expect(view.pillars.map((p) => p.grade)).toEqual([
       3, 3, 3, 2, 2, 3, 2, 2, 3, 3, 2, 2,
     ]);
-    expect(view.overallScore).toBe(67);
-    expect(view.coverage).toBe(1);
-    expect(view.confidence).toBe("MODERATE");
+    // Pre-seed v1.1.0 weights [18,15,14,8,4,9,4,6,10,4,6,2] (sum 100):
+    // Σ w·g = 270, × 25 / 100 = 67.5, rounded once = 68.
+    expect(view.overallScore).toBe(68);
+    expect(view.coverage).toBeCloseTo(0.97, 2);
+    // All self-reported, and P8's runway criterion no longer counts: Low.
+    expect(view.confidence).toBe("LOW");
     expect(
       view.pillars.reduce((s, p) => s + (p.contribution ?? 0), 0),
-    ).toBeCloseTo(66.5);
+    ).toBeCloseTo(67.5);
   });
   it("does not equate missing evidence with zero", () => {
     const { view } = assessUnicornPotential(inputs([]), NOW);
@@ -218,7 +227,9 @@ describe("provisional Unicorn Potential pure engine", () => {
       ).view;
       expect(v.overallScore).toBeNull();
       expect(
-        v.pillars.every((p) => p.criteria.every((c) => c.state === "STALE")),
+        v.pillars.every((p) =>
+          p.criteria.every((c) => c.state === "STALE" || c.state === "UNKNOWN"),
+        ),
       ).toBe(true);
     }
   });
@@ -260,5 +271,57 @@ describe("provisional Unicorn Potential pure engine", () => {
       NOW,
     ).view;
     expect(v.coverage).toBe(0);
+  });
+});
+
+describe("Unicorn Potential v1.1.0 (metrics methods)", () => {
+  it("is the current method; v1.0.0's weights stay on record", () => {
+    expect(UNICORN_POTENTIAL_METHOD_VERSION).toBe("unicorn-potential.v1.1.0");
+    expect(UNICORN_WEIGHTS_V1_0.P1).toEqual([15, 12, 8]);
+    expect(UNICORN_PILLARS[0]?.weights).toEqual([18, 14, 9]);
+  });
+
+  it("runway never raises potential; only distress lowers it", () => {
+    const long = assessUnicornPotential(
+      inputs(["Current runway 30 months"]),
+      NOW,
+    ).view;
+    expect(long.pillars[7]?.criteria[0]?.grade).toBeNull();
+    const distress = assessUnicornPotential(
+      inputs(["The company is insolvent"]),
+      NOW,
+    ).view;
+    expect(distress.pillars[7]?.criteria[0]?.grade).toBe(0);
+  });
+
+  it("needs 8 of 12 pillars graded", () => {
+    // Founder, market, problem, traction and three more: 7 pillars.
+    const seven = statements.filter((_, i) => i < 14);
+    expect(
+      assessUnicornPotential(inputs(seven), NOW).view.overallScore,
+    ).toBeNull();
+  });
+
+  it("needs traction from seed on", () => {
+    const noTraction = statements.filter((_, i) => i !== 6 && i !== 7);
+    const seed = assessUnicornPotential(
+      { ...inputs(noTraction), stageCode: "SEED" },
+      NOW,
+    ).view;
+    expect(seed.pillars[3]?.grade).toBeNull();
+    expect(seed.overallScore).toBeNull();
+  });
+
+  it("calls a self-reported grade 3 stated, not demonstrated (P1-13)", () => {
+    const v = assessUnicornPotential(inputs(), NOW).view;
+    const anchors = v.pillars.flatMap((p) =>
+      p.criteria.filter((c) => c.grade === 3).map((c) => c.anchor),
+    );
+    expect(anchors.length).toBeGreaterThan(0);
+    for (const anchor of anchors) {
+      expect(anchor).toBe(
+        "Stage-appropriate execution, as the company states it",
+      );
+    }
   });
 });

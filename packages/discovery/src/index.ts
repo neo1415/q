@@ -780,6 +780,7 @@ export {
   FIT_CONFIG_V4,
   FIT_CONFIG_V6,
   FIT_CONFIG_V7,
+  FIT_CONFIG_V8,
   FIT_CONFIGS,
   FitConfigSchema,
   fitConfigByVersion,

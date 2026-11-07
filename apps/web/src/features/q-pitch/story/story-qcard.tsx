@@ -2,6 +2,8 @@
 
 import {
   INVESTABILITY_BAND_LABELS,
+  INVESTABILITY_CURRENT_METHOD_VERSION,
+  investabilityMethodLabel,
   PublicCardDtoSchema,
   type PublicCardDto,
 } from "@capital-q/contracts";
@@ -157,7 +159,9 @@ export function storyQCard(origin: string): PublicCardDto {
           strengths: [],
           areasScored: 4,
           areasTotal: 8,
-          method: "FDN InvestIQ v1",
+          method: investabilityMethodLabel(
+            INVESTABILITY_CURRENT_METHOD_VERSION,
+          ),
           assessedAt: null,
         },
       },

@@ -453,9 +453,12 @@ describe("fit tools", () => {
     ).comparison;
     if (comparison === null || comparison.entries[0] === undefined)
       throw new Error("expected a candidate");
-    // The bound under test is the reasons' duplication; scores are added
-    // and, if still too large, dropped from the typed entries by the tool.
-    const { scores: _scores, ...first } = comparison.entries[0];
+    // The bound under test is the reasons' duplication; scores (and the
+    // v8 score out of 10) are added and, if still too large, dropped from
+    // the typed entries by the tool.
+    const { scores: _scores, ...withProfile } = comparison.entries[0];
+    const { scoreOutOf10: _outOf10, ...profileOnly } = withProfile.profile;
+    const first = { ...withProfile, profile: profileOnly };
     const rich = {
       ...comparison,
       considered: 10,
@@ -570,6 +573,43 @@ describe("fit tools", () => {
     );
     expect(refused.result.ok).toBe(false);
     expect(refused.failureCode).toBe("RESULT_TOO_LARGE");
+
+    // ranking-config.v8 profiles carry their score out of 10: when ten
+    // rich profiles no longer fit, the typed copy goes and the text keeps
+    // each score, once per company.
+    const withScores = {
+      ...rich,
+      entries: rich.entries.map((entry) => ({
+        ...entry,
+        profile: { ...entry.profile, scoreOutOf10: "7.5" },
+      })),
+    };
+    const scoredPort = createQToolExecutor({
+      registry: createQToolRegistry([
+        createFitTopCandidatesTool(
+          fakePorts({
+            fit: {
+              profiles: () => Promise.resolve({ kind: "NO_MANDATE" }),
+              compare: () => Promise.resolve({ kind: "NO_MANDATE" }),
+              top: () =>
+                Promise.resolve({ kind: "OK", comparison: withScores }),
+            },
+          }),
+        ),
+      ]),
+    });
+    const scored = await scoredPort.execute(
+      call("fit_top_candidates", { limit: 10 }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!scored.result.ok)
+      throw new Error(scored.failureCode ?? "expected comparison");
+    const scoredData = FitTopCandidatesOutputSchema.parse(scored.result.data);
+    expect(scoredData.comparison?.entries).toHaveLength(10);
+    for (const entry of withScores.entries) {
+      if (fitScoreOutOf10(entry.profile) !== null)
+        expect(scoredData.text).toContain(`${entry.name}: 7.5/10`);
+    }
   });
 
   it("one company's fit, and a company the reader may not see is not found", async () => {

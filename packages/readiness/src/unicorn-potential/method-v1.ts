@@ -1,8 +1,15 @@
 import { stageBandOf } from "../investiq/method-v1.js";
-/** Owner-approved provisional heuristics, not fitted probability coefficients. */
-export const UNICORN_POTENTIAL_METHOD_VERSION = "unicorn-potential.v1.0.0";
+/**
+ * Provisional heuristics, not fitted probability coefficients.
+ * v1.1.0 (metrics methods 2026-11-07, owner decision 76): pillar weights
+ * re-set from published research on startup outcomes (sources in
+ * docs/specs/metrics/METRICS-METHODS.md); runway is an adverse flag only;
+ * stricter gates. v1.0.0's weights are kept below (UNICORN_WEIGHTS_V1_0)
+ * so its snapshots stay explainable.
+ */
+export const UNICORN_POTENTIAL_METHOD_VERSION = "unicorn-potential.v1.1.0";
 export const UNICORN_POTENTIAL_INPUT_RULES_VERSION =
-  "unicorn-potential-inputs.v4";
+  "unicorn-potential-inputs.v5";
 export type UnicornStage = "PRE_SEED" | "SEED" | "SERIES_A_GROWTH";
 export type PillarId = `P${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
 export type CriterionRule = {
@@ -13,6 +20,8 @@ export type CriterionRule = {
   readonly positive: RegExp;
   readonly freshnessDays: number;
 };
+/** A rule that matches no text (v1.1.0 P8: runway never raises potential). */
+const NEVER = /(?!)/u;
 const criterion = (
   label: string,
   gap: string,
@@ -30,7 +39,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P1",
     label: "Founder quality & founder–market fit",
-    weights: [15, 12, 8],
+    weights: [18, 14, 9],
     criteria: [
       criterion(
         "Relevant founder expertise",
@@ -52,7 +61,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P2",
     label: "Market opportunity & expansion",
-    weights: [15, 14, 11],
+    weights: [15, 13, 11],
     criteria: [
       criterion(
         "Accessible market demand",
@@ -73,7 +82,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P3",
     label: "Problem intensity & product–market fit",
-    weights: [15, 14, 10],
+    weights: [14, 13, 9],
     criteria: [
       criterion(
         "Problem severity and willingness to pay",
@@ -95,7 +104,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P4",
     label: "Traction & growth velocity",
-    weights: [8, 12, 16],
+    weights: [8, 13, 18],
     criteria: [
       criterion(
         "Dated growth velocity",
@@ -118,7 +127,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P5",
     label: "Business model & unit economics",
-    weights: [6, 8, 12],
+    weights: [4, 7, 11],
     criteria: [
       criterion(
         "Contribution economics and pricing",
@@ -141,7 +150,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P6",
     label: "Defensibility & competitive moat",
-    weights: [8, 9, 9],
+    weights: [9, 9, 8],
     criteria: [
       criterion(
         "Differentiated assets",
@@ -163,7 +172,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P7",
     label: "Distribution & organic influence",
-    weights: [5, 7, 8],
+    weights: [4, 5, 6],
     criteria: [
       criterion(
         "Repeatable acquisition channels",
@@ -186,14 +195,17 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P8",
     label: "Capital strength & investor support",
-    weights: [5, 6, 6],
+    weights: [6, 8, 9],
     criteria: [
+      // v1.1.0: runway is readiness, not potential (no published evidence
+      // that months of runway predict large outcomes). Only distress lowers
+      // the pillar; runway never raises it (NEVER matches nothing).
       criterion(
-        "Runway and capital access",
-        "Dated current cash runway or completed financing, excluding planned raises",
+        "Runway distress",
+        "Only distress counts here: insolvency or an inability to meet payroll",
         /\b(runway exhausted|insolvent|unable to meet payroll)\b/iu,
-        /\bcurrent runway.{0,25}\b(?:[1-9]|1[0-1]) months\b/iu,
-        /\bcurrent runway.{0,25}\b(?:1[2-9]|[2-9]\d) months\b/iu,
+        NEVER,
+        NEVER,
         90,
       ),
       criterion(
@@ -208,7 +220,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P9",
     label: "Team & execution",
-    weights: [8, 7, 6],
+    weights: [10, 8, 6],
     criteria: [
       criterion(
         "Critical function coverage",
@@ -230,7 +242,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P10",
     label: "Timing & structural tailwinds",
-    weights: [5, 4, 3],
+    weights: [4, 3, 2],
     criteria: [
       criterion(
         "Structural demand or technology shift",
@@ -274,7 +286,7 @@ export const UNICORN_PILLARS: readonly {
   {
     id: "P12",
     label: "Ecosystem position & strategic optionality",
-    weights: [4, 2, 2],
+    weights: [2, 2, 2],
     criteria: [
       criterion(
         "Ecosystem access and partnerships",
@@ -362,3 +374,33 @@ export const UNICORN_WEAKNESS_RULES: Readonly<
     /\bstrategic (?:option|opportunity).{0,50}\brejected by customer\b/iu,
   ],
 };
+
+/** v1.0.0's stage weights [pre-seed, seed, Series A/growth], for its snapshots. */
+export const UNICORN_WEIGHTS_V1_0: Readonly<
+  Record<PillarId, readonly [number, number, number]>
+> = {
+  P1: [15, 12, 8],
+  P2: [15, 14, 11],
+  P3: [15, 14, 10],
+  P4: [8, 12, 16],
+  P5: [6, 8, 12],
+  P6: [8, 9, 9],
+  P7: [5, 7, 8],
+  P8: [5, 6, 6],
+  P9: [8, 7, 6],
+  P10: [5, 4, 3],
+  P11: [6, 5, 9],
+  P12: [4, 2, 2],
+};
+
+/**
+ * v1.1.0 gates (JUDGMENT from the research note): a score needs a known
+ * stage, at least 60% of the stage weight evidenced, at least 8 of the 12
+ * pillars graded, founder, market and problem graded, and traction graded
+ * from seed on (at pre-seed, traction or distribution).
+ */
+export const UNICORN_GATES = Object.freeze({
+  minCoverage: 0.6,
+  minPillars: 8,
+  required: Object.freeze(["P1", "P2", "P3"] as const),
+});

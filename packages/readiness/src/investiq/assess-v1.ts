@@ -33,6 +33,7 @@ import {
   type ReadinessBand,
   type StageBand,
 } from "./method-v1.js";
+import { STAGE_WEIGHTS_V3 } from "./method-v3.js";
 
 /**
  * FDN InvestIQ v1 (shadow). Pure: (input) -> assessment. No clock, model,
@@ -107,7 +108,7 @@ export const InvestIQV1AssessmentSchema = z
   .object({
     method: z
       .object({
-        version: z.enum(["investiq/v1", "investiq/v2"]),
+        version: z.enum(["investiq/v1", "investiq/v2", "investiq/v3"]),
         status: z.literal("OWNER_DELEGATED_PENDING_CALIBRATION"),
       })
       .strict(),
@@ -231,6 +232,7 @@ function weightedBand(
   members: readonly GradedDimension[],
   stage: StageBand | null,
   required: readonly GradedDimension[],
+  stageWeights: StageWeightTable = STAGE_WEIGHTS,
 ): InvestIQV1Band {
   const reasons: string[] = [];
   if (stage === null) {
@@ -244,7 +246,7 @@ function weightedBand(
       reasons: ["STAGE_UNKNOWN"],
     };
   }
-  const weights = STAGE_WEIGHTS[stage];
+  const weights = stageWeights[stage];
   const inScope = dims.filter((d) => members.includes(d.dimension));
   const total = inScope.reduce((s, d) => s + weights[d.dimension], 0);
   const scored = inScope.filter((d) => d.score !== null);
@@ -316,10 +318,16 @@ function weightedBand(
  * weight drives confidence (and the evidence range) only. v1 stays
  * published and reproducible.
  */
+export type StageWeightTable = Readonly<
+  Record<StageBand, Readonly<Record<GradedDimension, number>>>
+>;
+
 export type InvestIQArithmetic = {
-  readonly version: "investiq/v1" | "investiq/v2";
-  /** v1: 2 + (anchor - 2) × w. v2: the anchor itself. */
+  readonly version: "investiq/v1" | "investiq/v2" | "investiq/v3";
+  /** v1: 2 + (anchor - 2) × w. v2 and later: the anchor itself. */
   readonly shrinkToBaseline: boolean;
+  /** The stage weights; absent: method-v1's STAGE_WEIGHTS (v1, v2). */
+  readonly stageWeights?: StageWeightTable | undefined;
 };
 export const INVESTIQ_V1_ARITHMETIC: InvestIQArithmetic = Object.freeze({
   version: "investiq/v1",
@@ -328,6 +336,15 @@ export const INVESTIQ_V1_ARITHMETIC: InvestIQArithmetic = Object.freeze({
 export const INVESTIQ_V2_ARITHMETIC: InvestIQArithmetic = Object.freeze({
   version: "investiq/v2",
   shrinkToBaseline: false,
+});
+/**
+ * investiq/v3 (metrics methods 2026-11-07, owner decision 76): v2's
+ * arithmetic with the research-based stage weights of method-v3.ts.
+ */
+export const INVESTIQ_V3_ARITHMETIC: InvestIQArithmetic = Object.freeze({
+  version: "investiq/v3",
+  shrinkToBaseline: false,
+  stageWeights: STAGE_WEIGHTS_V3,
 });
 
 export function assessInvestIQV1(
@@ -527,18 +544,21 @@ export function assessInvestIQV1(
     GRADED_DIMENSIONS,
     stage,
     COVERAGE_RULES.requiredForOverall,
+    arithmetic.stageWeights,
   );
   const businessQuality = weightedBand(
     forBand,
     OUTPUT_GROUPS.BUSINESS_QUALITY,
     stage,
     [],
+    arithmetic.stageWeights,
   );
   const investmentReadiness = weightedBand(
     forBand,
     OUTPUT_GROUPS.INVESTMENT_READINESS,
     stage,
     [],
+    arithmetic.stageWeights,
   );
   step(
     "overall",
@@ -572,7 +592,10 @@ export function assessInvestIQV1(
     asOf: input.asOf,
     inputHash: investiqInputHash(arithmetic.version, input),
     stageBand: stage,
-    weights: stage === null ? null : { ...STAGE_WEIGHTS[stage] },
+    weights:
+      stage === null
+        ? null
+        : { ...(arithmetic.stageWeights ?? STAGE_WEIGHTS)[stage] },
     dimensions: dimensionResults.map((d) => d.result),
     investorFit: { status: "ROUTED_TO_DISCOVERY_FIT", weight: 0 },
     overall,
