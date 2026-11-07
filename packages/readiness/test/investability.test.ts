@@ -202,29 +202,29 @@ describe("ADR 0075: unconfirmed investor-visible material", () => {
   });
 });
 
-describe("content grading (investability-grading.v1, investiq/v2)", () => {
-  const traction = (value: string, stage: string) =>
-    assessInvestability(
-      inputs(
-        {
-          stageCode: stage,
-          businessModelCodes: [],
-          profile: {
-            listed: true,
-            description: false,
-            website: false,
-            updatedAt: null,
-          },
+const traction = (value: string, stage: string) =>
+  assessInvestability(
+    inputs(
+      {
+        stageCode: stage,
+        businessModelCodes: [],
+        profile: {
+          listed: true,
+          description: false,
+          website: false,
+          updatedAt: null,
         },
-        DECK_SECTIONS.map((code) =>
-          code === "TRACTION"
-            ? section("TRACTION", [fact("Monthly revenue", value)])
-            : section(code, [], { status: "NOT_IN_DECK", summary: null }),
-        ),
+      },
+      DECK_SECTIONS.map((code) =>
+        code === "TRACTION"
+          ? section("TRACTION", [fact("Monthly revenue", value)])
+          : section(code, [], { status: "NOT_IN_DECK", summary: null }),
       ),
-      AS_OF,
-    );
+    ),
+    AS_OF,
+  );
 
+describe("content grading (investability-grading.v1, investiq/v2)", () => {
   it("a seed founder claiming $41k MRR scores clearly above a pre-revenue peer", () => {
     const revenue = traction("USD 41,000", "seed");
     const none = traction("None reported yet", "seed");
@@ -263,7 +263,47 @@ describe("content grading (investability-grading.v1, investiq/v2)", () => {
       ),
       AS_OF,
     );
-    expect(only.view.score).toBe(50);
+    // P0-2 (metrics audit): material merely on record grades nothing, so
+    // there is no number; never the stage norm ("Investable" at 50).
+    expect(only.view.status).toBe("INSUFFICIENT_EVIDENCE");
+    expect(only.view.score).toBeNull();
+    expect(only.view.band).toBeNull();
+  });
+});
+
+describe("P0-1 (metrics audit): the band is capped by confidence", () => {
+  const strongAtPreSeed = () =>
+    assessInvestability(
+      inputs(
+        { stageCode: "pre_seed" },
+        fullDeck({
+          TRACTION: section("TRACTION", [
+            fact("Monthly revenue", "USD 400,000"),
+            fact("Paying customers", "900 customers"),
+          ]),
+        }),
+      ),
+      AS_OF,
+    );
+
+  it("never shows Investable or Strong at Low confidence", () => {
+    const { view } = strongAtPreSeed();
+    expect(view.status).toBe("SCORED");
+    expect(view.confidence).toBe("LOW");
+    expect(view.score ?? 0).toBeGreaterThanOrEqual(50);
+    expect(["EARLY", "DEVELOPING"]).toContain(view.band);
+    expect(view.cappedByConfidence).toBe(true);
+  });
+
+  it("a provisional (early read) score is held at Developing at most", () => {
+    const { view } = traction("USD 400,000", "pre_seed");
+    expect(view.provisional).toBe(true);
+    expect(["EARLY", "DEVELOPING"]).toContain(view.band);
+  });
+
+  it("never caps a score that is already Developing or below", () => {
+    const { view } = traction("None reported yet", "series_a");
+    if (view.status === "SCORED") expect(view.cappedByConfidence).toBe(false);
   });
 });
 
@@ -302,8 +342,9 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     );
     // Self-reported deck evidence: low confidence, band held at Developing.
     expect(view.confidence).toBe("LOW");
-    // Score and confidence are separate: the band follows the score.
-    expect(view.cappedByConfidence).toBe(false);
+    // The number follows the evidence; the band is held at Developing at
+    // Low confidence (metrics audit P0-1, ADR 0074), never Investable.
+    expect(["EARLY", "DEVELOPING"]).toContain(view.band);
     expect(view.range).toBeDefined();
     expect(view.up.length).toBeGreaterThan(0);
     expect(view.missing.length).toBeGreaterThan(0);
