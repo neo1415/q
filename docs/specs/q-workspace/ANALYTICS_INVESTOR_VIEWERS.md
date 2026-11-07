@@ -1,8 +1,9 @@
 # Analytics: who viewed an investor (root cause and design)
 
-**Source:** owner live test, 7 Nov 2026 (`docs/ai-handoff/LIVE-FINDINGS-2026-11-07-OWNER.md`). An investor asked Q "who has viewed my profile?". Q answered with what *they* had viewed ("You viewed Spheros once today…").
+**Source:** owner live test, 7 Nov 2026 (`docs/ai-handoff/LIVE-FINDINGS-2026-11-07-OWNER.md`). An investor asked Q "who has viewed my profile?". Q answered with what _they_ had viewed ("You viewed Spheros once today…").
 
 **Governing rules:**
+
 - Product Specification §6.7.12–6.7.14;
 - DECISIONS 72 and 74 (organisation-level identity by default, the same floors, the viewer's own visibility choice, investors never pay);
 - [ANALYTICS_OWNER_NOTES.md](ANALYTICS_OWNER_NOTES.md).
@@ -38,6 +39,7 @@
 ### What the investor sees ("Who viewed you", Analytics)
 
 It follows the founder-side free plan, the specification default:
+
 - **Weekly, completed weeks only.** No view times, no real-time passive alerts.
 - **Floors.** Headline totals need at least 3 distinct founder organisations in the week (`analytics.engagement_floor()`, admin-raisable, never below 3). Below that: "Fewer than 3 founder organisations viewed your profile this week".
 - **Breakdowns** by the viewing company's stage and country, each slice needing at least 5 organisations (`analytics.slice_floor()`), with complementary suppression. Hidden slices become one "Other" row with no count.

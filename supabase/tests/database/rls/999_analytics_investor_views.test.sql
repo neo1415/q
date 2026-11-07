@@ -124,7 +124,8 @@ select ok((select bool_and(period_start < date_trunc('week', now())::date)
   'the current week is not shown (weekly batches)');
 select is((select array_agg(slice || ':' || coalesce(organisations::text, '-') order by slice)
              from analytics.my_investor_viewing_slices(pg_temp.rls_id('investor_a')) where dimension = 'STAGE'),
-  array['OTHER:-', 'seed:5'], 'a stage slice at the floor is shown; the one below it is hidden');
+  array['OTHER:-'],
+  'pre-seed (2) is hidden, and seed (5) with it: one hidden slice could be read off the total (complementary suppression)');
 select is((select array_agg(slice || ':' || coalesce(organisations::text, '-') order by slice)
              from analytics.my_investor_viewing_slices(pg_temp.rls_id('investor_a')) where dimension = 'GEOGRAPHY'),
   array['OTHER:-'], 'NG 4 and KE 3 are both below 5: one Other row, no count');
@@ -134,17 +135,21 @@ select throws_ok($$ select * from analytics.investor_viewing_periods(pg_temp.rls
   '42501', null, 'the actor-parameter projection is server-only');
 select throws_ok($$ select pg_temp.f_view(5, 'ivw-5-0099') $$, '42501', null, 'a browser cannot write views');
 
--- ---------------------------------------------------------------- complementary suppression
+-- ---------------------------------------------------------------- every slice above the floor
+-- Four more founders: seed 6 (NG 5, KE 1) and pre-seed 5 (KE 5).
 select pg_temp.reset_test_identity();
 select pg_temp.founder(8, 'seed', 'NG', null);
-select pg_temp.f_view(8, 'ivw-8-0001');
+select pg_temp.founder(9, 'pre_seed', 'KE', null);
+select pg_temp.founder(10, 'pre_seed', 'KE', null);
+select pg_temp.founder(11, 'pre_seed', 'KE', null);
+select pg_temp.f_view(n, 'ivw-' || n || '-0001') from generate_series(8, 11) n;
 select pg_temp.act_as_user_a();
 select is((select array_agg(slice || ':' || coalesce(organisations::text, '-') order by slice)
-             from analytics.my_investor_viewing_slices(pg_temp.rls_id('investor_a')) where dimension = 'GEOGRAPHY'),
-  array['NG:5', 'OTHER:-'], 'NG reaches 5 and is shown; KE stays hidden');
-select is((select array_agg(slice || ':' || coalesce(organisations::text, '-') order by slice)
              from analytics.my_investor_viewing_slices(pg_temp.rls_id('investor_a')) where dimension = 'STAGE'),
-  array['OTHER:-', 'seed:6'], 'pre-seed (2) is hidden, alone in its dimension');
+  array['pre_seed:5', 'seed:6'], 'with no slice below 5, every slice is shown with its count');
+select is((select array_agg(slice || ':' || coalesce(organisations::text, '-') order by slice)
+             from analytics.my_investor_viewing_slices(pg_temp.rls_id('investor_a')) where dimension = 'GEOGRAPHY'),
+  array['KE:6', 'NG:5'], 'and by country');
 
 -- ---------------------------------------------------------------- other principals
 select pg_temp.act_as_user_b();
