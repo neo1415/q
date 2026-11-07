@@ -2021,3 +2021,25 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - root tsc 0;
   - Q-IQ 6/6;
   - eslint and prettier clean.
+
+## 2026-11-07 — Decision 75 dev round 4, the last (`feat/q-navigation-policy`)
+
+- **D75 r3** (v7, 9d9207f): 500 turns, 93.0% pass, move-target 91.8%, wrong-page 0.4% (meets ≤0.5%), forbidden 0, $2.33. Receipt: `receipts/2026-11-07-qnav-d75-r3.json`.
+- **Over-corrections in r3:**
+  - the sibling-tab OFFER rule (Overview/Pipeline, Raise/Investors): kept for safety;
+  - the list rule: "Find startups that pass my gate" stayed although GateQ Find exists for exactly that. v8 refines it: a list composed to their spec is made in chat; a place made to show or find those things serves seeing them;
+  - `alternative` still given for places that share a topic. v8: only when their words leave two goals open.
+- **Code bug:** the leading-section rule took a tab's first section before the page's own, so the data room's `missing` was dropped (4 misses). Now the leading section is the first section shown there, or the section bearing the tab's id.
+- **Wrong-page, both r3 moves:**
+  - "Open what Q is doing" went to /work, not In progress;
+  - "What needs my attention" went to /work#approvals.
+  - Work's needs, progress and done are ONE decision scroll in the app (pageViewOf), so WORK ≡ WORK_NEEDS ≡ WORK_PROGRESS ≡ WORK_DONE as the same place (documented with the code cite; Team and Cost stay separate). For W2/W3: the site map lists them as tabs.
+- **Dataset, documented:**
+  - "who looked at my deck" (EN, FR) expects Analytics#viewers (W2's sections define it);
+  - the Analytics bank ask is page-level.
+- **Replay:** r3's proposals now pass 6 of 35 on code and data alone.
+- **Gates:**
+  - vitest packages: 4944 passed (the seal is intact);
+  - root tsc 0;
+  - Q-IQ 6/6;
+  - eslint and prettier clean.

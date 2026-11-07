@@ -469,8 +469,7 @@ export function sitePlaceToTarget(
       tab = opening;
   }
   // The leading section of what is shown is that place itself.
-  const leading =
-    section !== undefined && leadingSection(page, tab)?.id === section.id;
+  const leading = section !== undefined && isLeadingSection(page, tab, section);
   const sectionId = section === undefined || leading ? null : section.id;
   const position =
     place.position === "section" && sectionId === null ? null : place.position;
@@ -552,17 +551,21 @@ function tabOwningRoute(
   return null;
 }
 
-/** The first section shown at a place: the tab's own first, else the page's. */
-function leadingSection(
+/**
+ * Whether a section is the place itself: the first section shown there
+ * (the page's and this tab's, in the order the page lists them), or the
+ * section that bears the tab's own id (the tab's body).
+ */
+function isLeadingSection(
   page: QSiteMapPage,
   tab: QSiteMapPage["tabs"][number] | undefined,
-): QSiteMapPage["sections"][number] | undefined {
-  return (
-    (tab === undefined
-      ? undefined
-      : page.sections.find((s) => s.tab === tab.id)) ??
-    page.sections.find((s) => s.tab === undefined)
+  section: QSiteMapPage["sections"][number],
+): boolean {
+  if (tab !== undefined && section.id === tab.id) return true;
+  const shown = page.sections.filter(
+    (s) => s.tab === undefined || s.tab === tab?.id,
   );
+  return shown[0]?.id === section.id;
 }
 
 // --- 1. Decide -------------------------------------------------------------

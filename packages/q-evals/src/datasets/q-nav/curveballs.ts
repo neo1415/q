@@ -725,13 +725,20 @@ export function devCurveballs(cases: CaseSet): void {
   cases.add("COVERAGE", "FOUNDER", [
     turn(
       "Who's looked at my deck this week?",
-      F.move(dest("ANALYTICS"), "Deck views live on Analytics."),
+      // W2's sections (D75): "viewers: who viewed you" is that place.
+      F.move(
+        section("ANALYTICS", "viewers"),
+        "Who viewed them: Analytics, viewers.",
+      ),
     ),
   ]);
   cases.add("NON_ENGLISH", "FOUNDER", [
     turn(
       "Qui a regardé mon deck cette semaine ?",
-      F.move(dest("ANALYTICS"), "Deck views live on Analytics, in French."),
+      F.move(
+        section("ANALYTICS", "viewers"),
+        "Who viewed them, in French: Analytics, viewers.",
+      ),
     ),
   ]);
   // Pages Capital Q does not have (replacing the two above).

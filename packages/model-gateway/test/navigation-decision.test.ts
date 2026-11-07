@@ -1237,3 +1237,39 @@ describe("decision 75 round 2: the digest's notation, redundant tabs, records wi
     expect(move({ page: "BOARD" }, { page: "WORK" }).decision).toBe("OFFER");
   });
 });
+
+describe("decision 75 round 4: the leading section is the first one shown", () => {
+  it("keeps a tab's later section when the page's own section leads (data room: missing)", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/company/data-room",
+          tab: "dataroom",
+          sectionId: "missing",
+          slide: null,
+          position: "section",
+        },
+        { recordId: null, documentId: null, itemId: null },
+      ),
+    ).toEqual({
+      page: "OWN_DATA_ROOM",
+      sectionId: "missing",
+      position: "section",
+    });
+  });
+
+  it("a section bearing its tab's id is the tab itself", () => {
+    expect(
+      sitePlaceToTarget(
+        {
+          route: "/company/[companyId]",
+          tab: "overview",
+          sectionId: "overview",
+          slide: null,
+          position: "section",
+        },
+        { recordId: SILO, documentId: null, itemId: null },
+      ),
+    ).toEqual({ page: "COMPANY", recordId: SILO, tab: "overview" });
+  });
+});

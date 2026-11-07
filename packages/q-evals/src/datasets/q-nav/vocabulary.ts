@@ -498,7 +498,9 @@ const BANKS: readonly {
       ["my analytics", "the analytics page"],
       // Side-neutral (round 2): an investor has no deck; both sides have
       // engagement. The founder's deck-views asks are curveballs.
-      ["How is my engagement looking this week?"],
+      // Page-level (D75 r4): a week's trend is the trend section, so the
+      // page's own ask is about engagement as a whole.
+      ["Give me the overall picture of who has engaged with me."],
     ),
     heldout: bank(
       ["my engagement stats"],
@@ -616,17 +618,21 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] =
 /**
  * Same-route and same-place names, graded as equal: destinations.ts sends
  * SEARCH and EXPLORE to /explore; /gateq opens each side's own GateQ tab;
- * /mandate redirects to the profile's mandate section.
+ * /mandate redirects to the profile's mandate section; Work's needs,
+ * progress and done are one decision scroll (apps/web/app/(app)/work/
+ * page.tsx pageViewOf: a deep link to any of them lands on that page).
  */
 export const Q_NAV_SAME_PLACE: Readonly<
   Record<QNavSide, readonly (readonly string[])[]>
 > = {
   INVESTOR: [
     ["SEARCH", "EXPLORE"],
+    ["WORK", "WORK_NEEDS", "WORK_PROGRESS", "WORK_DONE"],
     ["GATEWAY", "GATEQ_INBOX"],
   ],
   FOUNDER: [
     ["SEARCH", "EXPLORE"],
+    ["WORK", "WORK_NEEDS", "WORK_PROGRESS", "WORK_DONE"],
     ["GATEWAY", "GATEQ_APPLICATIONS"],
   ],
 };
