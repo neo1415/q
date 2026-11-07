@@ -182,6 +182,21 @@ describe("voice onboarding as a conversation (owner 2026-10-27)", () => {
     );
   });
 
+  it("a needed topic they won't answer is asked again with the reason, never dropped (DECISIONS 77, P0-2)", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: { "I0.investor_type": "accelerator" },
+    });
+    const brief = briefOf(await stateOf(world));
+    // The reason they hear: it's needed to verify the profile, and they
+    // can come back to it.
+    expect(brief).toMatch(/Needed topics are required/);
+    expect(brief).toMatch(/verif/i);
+    expect(brief).toMatch(/later/);
+    // Optional ones still just go.
+    expect(brief).toMatch(/Optional/);
+  });
+
   it("keeps the call in the thread and saves it from the whole transcript, latest word winning (live 2026-10-27)", async () => {
     const world = investorSession({ currentStepKey: "I0.investor_type" });
     const { thread, fetch } = withThread(world);
