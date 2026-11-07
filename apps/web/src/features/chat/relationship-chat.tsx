@@ -701,6 +701,7 @@ export function RelationshipChat({
         // until the person sends it; a section Q can name.
         <QSection id="draft" kind="CHAT" label={t("Reply")}>
           <form
+            data-q-editing
             ref={composer}
             onSubmit={(event) => void submit(event)}
             className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-canvas) px-3 pt-2.5 pb-1"

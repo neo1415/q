@@ -143,6 +143,7 @@ export function ChatComposer({
 
   return (
     <form
+      data-q-editing
       className="flex items-end gap-2"
       onSubmit={(event) => {
         event.preventDefault();
@@ -718,6 +719,7 @@ export function ApplyExperience({
   const composer = (
     <div className="flex flex-col gap-1">
       <form
+        data-q-editing
         className="flex items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
@@ -935,6 +937,7 @@ export function ApplyExperience({
 
   const contactPanel = (
     <form
+      data-q-editing
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();

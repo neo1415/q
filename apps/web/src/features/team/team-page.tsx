@@ -852,6 +852,7 @@ function InviteCard({
   const looksRight = emails.length > 0 && emails.every((e) => e.includes("@"));
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-[18px]"
       data-team-invite
       onSubmit={(event) => {

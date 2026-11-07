@@ -16,6 +16,8 @@ import {
 import { startReceiptReporter } from "./receipt-reporter";
 import { heldReason } from "./approval-requests";
 import { QActPrompts } from "./q-act-prompts";
+import { watchDirtyForms } from "@/features/workspace/dirty-forms";
+import { pagesHoldDirtyWork } from "@/features/workspace/workspace-screen";
 
 /**
  * RECOVERY-2026-10 (C2/C3): the shell's part of Q's control of the app,
@@ -59,6 +61,13 @@ export function QControlRuntime({
   }, [pathname, query]);
 
   useEffect(() => startReceiptReporter(currentManifest), []);
+
+  // W5.4: unsaved work on editing pages -- Q's moves offer instead, and
+  // the person's own leaving asks first (dirty-forms.ts).
+  useEffect(
+    () => watchDirtyForms(document, { alsoDirty: pagesHoldDirtyWork }),
+    [],
+  );
 
   // The fast path prefetches the page a partial transcript points at, so
   // the move when the sentence ends costs nothing.

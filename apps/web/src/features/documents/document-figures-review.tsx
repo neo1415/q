@@ -192,6 +192,7 @@ export function DocumentFiguresReview({
                     </span>
                     {editing === offer.suggestion.id ? (
                       <form
+                        data-q-editing
                         className="flex gap-1"
                         onSubmit={(event) => {
                           event.preventDefault();

@@ -15,6 +15,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 
 import { deletePitchMediaAction, setPitchDetailsAction } from "./pitch-actions";
 import { useT } from "@/features/i18n/language";
+import { useDirty } from "@/features/workspace/workspace-screen";
 
 /**
  * One video's name and who may watch it (ADR 0021/0022), and deleting it.
@@ -92,6 +93,7 @@ export function PitchDetails({
   const trimmed = title.trim();
   const changed =
     trimmed !== (record.title ?? "") || sharing !== sharingOf(record);
+  useDirty(changed);
 
   const save = async () => {
     setSaving(true);

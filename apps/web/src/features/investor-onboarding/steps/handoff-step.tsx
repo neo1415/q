@@ -28,7 +28,12 @@ export function HandoffStep({
   const active = handoff?.mandate.status === "ACTIVE";
 
   return (
-    <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <form
+      data-q-editing
+      id={formId}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-6"
+    >
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       <dl className="flex flex-col gap-3" data-handoff>
         <div className="flex flex-col gap-1">

@@ -7,6 +7,7 @@ import {
   type QWorkspaceScreen,
 } from "@capital-q/contracts";
 
+import { dirtyFormsNow } from "./dirty-forms";
 import { getWorkspaceLayout } from "./layout-store";
 
 /**
@@ -76,7 +77,8 @@ export function useDirty(dirty: boolean): void {
 }
 
 export function hasDirtyWork(): boolean {
-  return dirtyPages.size > 0;
+  // W5.4: editing forms the person has typed into count too (dirty-forms.ts).
+  return dirtyPages.size > 0 || dirtyFormsNow();
 }
 
 // --- Busy: the person's own input in the page pane ------------------------
@@ -124,6 +126,11 @@ export function workspaceScreen(
     ...(hasDirtyWork() ? { dirty: true } : {}),
     ...(now - lastPageActivity < BUSY_WINDOW_MS ? { busy: true } : {}),
   };
+}
+
+/** Pages' own registrations only (dirty-forms.ts reads it for the leave guard). */
+export function pagesHoldDirtyWork(): boolean {
+  return dirtyPages.size > 0;
 }
 
 /** Tests only. */

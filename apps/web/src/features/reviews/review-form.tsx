@@ -64,6 +64,7 @@ export function ReviewForm({
   const ready = reason.trim().length >= 10;
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();

@@ -21,6 +21,11 @@ export type QControlCatalogEntry = {
 };
 
 export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
+  { id: "button.commitment-adopt", kind: "BUTTON" },
+  { id: "button.commitment-confirm", kind: "BUTTON" },
+  { id: "button.commitment-open", kind: "BUTTON" },
+  { id: "button.commitment-record", kind: "BUTTON" },
+  { id: "button.commitment-withdraw", kind: "BUTTON" },
   { id: "button.documents-by-q", kind: "BUTTON" },
   { id: "button.feed-save", kind: "BUTTON" },
   { id: "button.hub-gateq", kind: "BUTTON" },

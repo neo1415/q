@@ -46,6 +46,7 @@ export function FounderBackground({
 
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-3"
       aria-label={t("Your background")}
       data-founder-background

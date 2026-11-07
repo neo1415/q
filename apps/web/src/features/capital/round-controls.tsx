@@ -229,6 +229,7 @@ function StepForm({
 
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-4 overflow-y-auto pb-2"
       onSubmit={(event) => {
         event.preventDefault();
@@ -365,6 +366,7 @@ function EditForm({
 
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-4 overflow-y-auto pb-2"
       onSubmit={(event) => {
         event.preventDefault();

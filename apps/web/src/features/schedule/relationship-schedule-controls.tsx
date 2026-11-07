@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
+import { useDirty } from "@/features/workspace/workspace-screen";
+
 import type {
   MeetingDto,
   MeetingSlot,
@@ -112,6 +114,8 @@ export function RelationshipScheduleControls({
   const [reminderTitle, setReminderTitle] = useState("");
   const [reminderAt, setReminderAt] = useState("");
   const [byEmail, setByEmail] = useState(true);
+  // W5.4: a reminder being written is unsaved work.
+  useDirty(reminderTitle.trim() !== "");
   const [reminderKey, setReminderKey] = useState(newKey);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);

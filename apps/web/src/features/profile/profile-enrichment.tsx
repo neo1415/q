@@ -444,7 +444,7 @@ export function SignalsAndVerification({
             standing.status === "NOT_REQUESTED" ||
             standing.status === "EXPIRED",
         ) ? (
-          <form action={requestVerificationFromProfileAction}>
+          <form data-q-editing action={requestVerificationFromProfileAction}>
             <input
               type="hidden"
               name="companyId"

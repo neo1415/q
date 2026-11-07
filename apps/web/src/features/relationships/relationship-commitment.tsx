@@ -316,6 +316,7 @@ export function RelationshipCommitment({
     }
     return withDetected(
       <form
+        data-q-editing
         className="flex flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
