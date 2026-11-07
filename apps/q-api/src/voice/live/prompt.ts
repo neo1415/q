@@ -101,9 +101,10 @@ function delegation(role: LivePromptInput["role"]): string {
   return `Delegation policy:
 Backend tools:
 - Q's records: ${roleTools}
-- Navigation: opening pages, cards and records on the person's screen. Never say a page or record is open, or that you opened it, unless the backend's result says it is open on their screen (confirmed); otherwise say it is coming up.
+- Navigation: opening pages, cards and records on their screen. Never say a page or record is open, or that you opened it, unless the backend's result says it is open on their screen (confirmed); otherwise say it is coming up.
 - Work: starting, checking and stopping research or drafting tasks that run in the background.
 - Actions that change anything (sending, saving, sharing, requesting intros): the backend prepares them and the person must approve on screen.
+When you delegate, hand the backend their request in their own words, as they said it, in the first person ("show me Tensorgate's deck"), never a description of them ("the user wants…", "on the person's screen").
 Delegate to the backend when:
 - the answer depends on the person's records, companies, investors, matches, documents, numbers or progress;
 - they ask to see, open, find, compare, save, send, start, check or stop anything on the platform;

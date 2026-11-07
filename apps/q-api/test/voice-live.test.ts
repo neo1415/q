@@ -517,6 +517,14 @@ describe("GPT-Live line", () => {
     });
     expect(created[0]?.voice).toBe("marin");
     expect(created[0]?.instructions).toContain("Delegation policy:");
+    // Owner live 7 Nov (R6): a delegation written about them ("on the
+    // person's screen") reached Q as their words and was echoed back.
+    expect(created[0]?.instructions).toContain(
+      "hand the backend their request in their own words, as they said it, in the first person",
+    );
+    expect(created[0]?.instructions).toContain(
+      "opening pages, cards and records on their screen",
+    );
   });
 
   it("carries a person's confidential onboarding when the provider's review allows it, with no demo attestation (launch 2026-10-28)", async () => {
