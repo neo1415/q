@@ -422,6 +422,15 @@ function InvestorFeed({
     id: "button.feed-save",
     kind: "BUTTON",
     ref: stageRef,
+    // W5.1 (plan §7): a reversible write to their own list -- Q saves it
+    // after one tap of theirs.
+    approval: "CONFIRM",
+    confirmSummary: () => {
+      const current = latestFeed.current.card;
+      return current === null
+        ? "Save this company to your list"
+        : `Save ${current.canonicalName} to your list`;
+    },
     onAct: async (intent) => {
       if (intent.act !== "ACTIVATE") return "NOT_APPLICABLE";
       const current = latestFeed.current.card;

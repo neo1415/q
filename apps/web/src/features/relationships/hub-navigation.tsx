@@ -155,6 +155,8 @@ export function HubNavigation({
       "button.hub-gateq":
         '[data-hub-view="gateq"], [data-hub-view="applications"]',
     },
+    // W5.1: it opens a view, nothing more.
+    approval: "NONE",
   });
 
   const chosen = useChosenTab(view);
@@ -205,6 +207,8 @@ export function HubRelated({ side }: { readonly side: HubSide }) {
     ids: {
       "button.hub-gateq": '[data-hub-link="gateq"]',
     },
+    // W5.1: a link to another view.
+    approval: "NONE",
   });
   const destinations = hubDestinations(side);
   if (destinations.length === 0) return null;

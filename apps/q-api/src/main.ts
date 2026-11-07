@@ -3603,6 +3603,12 @@ const qTools = createQTools({
         });
       },
     },
+    // W5.3: a recorded call's record, read as the actor through the meeting
+    // assistant, which answers only for the organiser or a participant.
+    // (Composed further down; read only when a turn calls the tool.)
+    meetings: {
+      read: (actor, meetingId) => meetingAssistant.read(actor, meetingId),
+    },
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
       momentAround: async (actor, query) => {

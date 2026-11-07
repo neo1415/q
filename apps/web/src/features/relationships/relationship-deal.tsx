@@ -48,6 +48,7 @@ import {
 import { QLine } from "./record-parts";
 import type { RelationshipSide } from "./relationship-words";
 import { useT } from "@/features/i18n/language";
+import { QControl } from "@/features/q/control/q-control";
 
 /**
  * The deal on the ONE relationship (founder, 2026-10-08), as the CRM
@@ -1049,68 +1050,74 @@ export function RelationshipDeal({
                   </option>
                 ))}
               </select>
-              <Confirm
-                label={t("Record as signed")}
-                title={t(
-                  `Record terms v${String(view.terms.version)} as signed?`,
-                )}
-                description={t(
-                  "Both sides see the terms marked signed with the signed copy attached. It applies to exactly this version: if the terms change first, nothing is recorded.",
-                )}
-                confirmLabel={t("Approve and record")}
-                primary
-                disabled={pending || signedDoc === ""}
-                onConfirm={(key) =>
-                  view.terms === null
-                    ? Promise.resolve(false)
-                    : apply(
-                        markSignedAction(
-                          relationshipId,
-                          view.terms.termsId,
-                          signedDoc,
-                          key,
-                        ),
-                      )
-                }
-              >
-                <p className="cq-body text-(--cq-text-primary)">
-                  {termsLine(view.terms, t)}
-                </p>
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  {signedDoc === "" ? "" : t(shortDoc(signedDoc))}
-                </p>
-              </Confirm>
+              <QControl id="button.deal-signed" kind="BUTTON" approval="NEVER">
+                {/* W5.1: Signing is the person's own act; Q never does it (NEVER). */}
+                <Confirm
+                  label={t("Record as signed")}
+                  title={t(
+                    `Record terms v${String(view.terms.version)} as signed?`,
+                  )}
+                  description={t(
+                    "Both sides see the terms marked signed with the signed copy attached. It applies to exactly this version: if the terms change first, nothing is recorded.",
+                  )}
+                  confirmLabel={t("Approve and record")}
+                  primary
+                  disabled={pending || signedDoc === ""}
+                  onConfirm={(key) =>
+                    view.terms === null
+                      ? Promise.resolve(false)
+                      : apply(
+                          markSignedAction(
+                            relationshipId,
+                            view.terms.termsId,
+                            signedDoc,
+                            key,
+                          ),
+                        )
+                  }
+                >
+                  <p className="cq-body text-(--cq-text-primary)">
+                    {termsLine(view.terms, t)}
+                  </p>
+                  <p className="cq-body-sm text-(--cq-text-secondary)">
+                    {signedDoc === "" ? "" : t(shortDoc(signedDoc))}
+                  </p>
+                </Confirm>
+              </QControl>
             </div>
           ) : null}
           {steps.includes("CLOSE") ? (
-            <Confirm
-              label={t("Close the investment")}
-              title={t(`Close the investment with ${counterpart}?`)}
-              description={t(
-                "Signed terms and received money: both sides see it closed, a closing report is filed, and this becomes the relationship's final state.",
-              )}
-              confirmLabel={t("Approve and close")}
-              primary
-              disabled={pending}
-              onConfirm={(key) =>
-                apply(closeDealAction(relationshipId, closeNote, key))
-              }
-            >
-              <label
-                className="cq-body-sm text-(--cq-text-secondary)"
-                htmlFor={`${noteId}-close`}
+            <QControl id="button.deal-close" kind="BUTTON" approval="NEVER">
+              {/* W5.1: Closing says the money moved: only the person can say that; Q never does it (NEVER). */}
+              <Confirm
+                label={t("Close the investment")}
+                title={t(`Close the investment with ${counterpart}?`)}
+                description={t(
+                  "Signed terms and received money: both sides see it closed, a closing report is filed, and this becomes the relationship's final state.",
+                )}
+                confirmLabel={t("Approve and close")}
+                primary
+                disabled={pending}
+                onConfirm={(key) =>
+                  apply(closeDealAction(relationshipId, closeNote, key))
+                }
               >
-                {t("A closing note both sides see (optional)")}
-              </label>
-              <textarea
-                id={`${noteId}-close`}
-                rows={2}
-                maxLength={1000}
-                className={INPUT}
-                value={closeNote}
-                onChange={(e) => setCloseNote(e.target.value)}
-              />
-            </Confirm>
+                <label
+                  className="cq-body-sm text-(--cq-text-secondary)"
+                  htmlFor={`${noteId}-close`}
+                >
+                  {t("A closing note both sides see (optional)")}
+                </label>
+                <textarea
+                  id={`${noteId}-close`}
+                  rows={2}
+                  maxLength={1000}
+                  className={INPUT}
+                  value={closeNote}
+                  onChange={(e) => setCloseNote(e.target.value)}
+                />
+              </Confirm>
+            </QControl>
           ) : null}
         </div>
       )}

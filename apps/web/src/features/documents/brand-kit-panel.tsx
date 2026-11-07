@@ -208,6 +208,7 @@ function BrandForm({
 
   return (
     <form
+      data-q-editing
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();

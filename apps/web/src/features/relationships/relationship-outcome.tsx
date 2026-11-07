@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   draftPassNote,
@@ -23,6 +23,8 @@ import {
 import type { RelationshipSide } from "./relationship-words";
 import type { CallToRecord } from "./call-to-record";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { QControl, useQControl } from "@/features/q/control/q-control";
 
 /**
  * Where a match goes after a meeting (2026-10-02). The investor's side
@@ -153,12 +155,18 @@ function SideOutcome({
             "only comes back to your Discover with something new: a new pitch, a new raise, or a change to your mandate.",
           )}
         </p>
-        <OutcomeButton
-          label={t("Reconsider")}
-          busyLabel={t("Reopening…")}
-          primary
-          run={() => resumeAction(relationshipId)}
-        />
+        <QControl
+          id="button.relationship-reconsider"
+          kind="BUTTON"
+          approval="CONFIRM"
+        >
+          <OutcomeButton
+            label={t("Reconsider")}
+            busyLabel={t("Reopening…")}
+            primary
+            run={() => resumeAction(relationshipId)}
+          />
+        </QControl>
       </div>
     );
   }
@@ -166,18 +174,30 @@ function SideOutcome({
   return (
     <div className="flex flex-col items-stretch gap-2">
       {state === "PAUSED" ? (
-        <OutcomeButton
-          label={t("Resume")}
-          busyLabel={t("Resuming…")}
-          primary
-          run={() => resumeAction(relationshipId)}
-        />
+        <QControl
+          id="button.relationship-resume"
+          kind="BUTTON"
+          approval="CONFIRM"
+        >
+          <OutcomeButton
+            label={t("Resume")}
+            busyLabel={t("Resuming…")}
+            primary
+            run={() => resumeAction(relationshipId)}
+          />
+        </QControl>
       ) : (
-        <OutcomeButton
-          label={t("Pause for now")}
-          busyLabel={t("Pausing…")}
-          run={() => pauseAction(relationshipId)}
-        />
+        <QControl
+          id="button.relationship-pause"
+          kind="BUTTON"
+          approval="CONFIRM"
+        >
+          <OutcomeButton
+            label={t("Pause for now")}
+            busyLabel={t("Pausing…")}
+            run={() => pauseAction(relationshipId)}
+          />
+        </QControl>
       )}
       <PassDialog relationshipId={relationshipId} counterpart={counterpart} />
     </div>
@@ -261,6 +281,64 @@ function PassDialog({
   const trimmed = note.trim();
   const canShare = reason !== null || trimmed.length > 0;
 
+  const pass = async (
+    input: {
+      readonly reasonCode: string | null;
+      readonly note: string | null;
+      readonly shareWithFounder: boolean;
+    },
+    idempotencyKey: string,
+  ): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    const result = await passAction(relationshipId, input, idempotencyKey);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.message);
+      return false;
+    }
+    setOpen(false);
+    router.refresh();
+    return true;
+  };
+
+  // W5.1b: the other side is told, so Q may record "not proceeding" only
+  // on the person's approval of exactly the reason, note and sharing.
+  const passRef = useRef<HTMLSpanElement>(null);
+  useQControl({
+    id: "button.relationship-pass",
+    kind: "BUTTON",
+    ref: passRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.relationship-pass",
+      summary: () => `Tell ${counterpart} you are not proceeding for now`,
+      prepare: (): ApprovalPayload | null =>
+        !open
+          ? null
+          : {
+              with: counterpart,
+              reason:
+                reasons.find((one) => one.code === reason)?.label ??
+                reason ??
+                "",
+              note: trimmed,
+              shareReasonWithThem: share && canShare,
+            },
+      execute: async (payload, approvedKey) =>
+        (await pass(
+          {
+            reasonCode: reason,
+            note: payload["note"] === "" ? null : String(payload["note"]),
+            shareWithFounder: payload["shareReasonWithThem"] === true,
+          },
+          approvedKey,
+        ))
+          ? "DONE"
+          : "FAILED",
+    },
+  });
+
   return (
     <DialogRoot
       open={open}
@@ -292,34 +370,25 @@ function PassDialog({
               >
                 {t("Cancel")}
               </Button>
-              <Button
-                variant="primary"
-                className="min-h-11"
-                disabled={busy}
-                onClick={() => {
-                  setBusy(true);
-                  setError(null);
-                  void passAction(
-                    relationshipId,
-                    {
-                      reasonCode: reason,
-                      note: trimmed.length === 0 ? null : trimmed,
-                      shareWithFounder: share && canShare,
-                    },
-                    key,
-                  ).then((result) => {
-                    setBusy(false);
-                    if (result.ok) {
-                      setOpen(false);
-                      router.refresh();
-                    } else {
-                      setError(result.message);
-                    }
-                  });
-                }}
-              >
-                {busy ? "Saving…" : "Confirm"}
-              </Button>
+              <span ref={passRef} className="contents">
+                <Button
+                  variant="primary"
+                  className="min-h-11"
+                  disabled={busy}
+                  onClick={() =>
+                    void pass(
+                      {
+                        reasonCode: reason,
+                        note: trimmed.length === 0 ? null : trimmed,
+                        shareWithFounder: share && canShare,
+                      },
+                      key,
+                    )
+                  }
+                >
+                  {busy ? "Saving…" : "Confirm"}
+                </Button>
+              </span>
             </>
           }
         >

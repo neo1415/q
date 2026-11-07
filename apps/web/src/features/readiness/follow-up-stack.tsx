@@ -204,6 +204,7 @@ export function FollowUpStack({
               )}
               {current.typed === "NONE" ? null : (
                 <form
+                  data-q-editing
                   className="flex gap-2"
                   onSubmit={(event) => {
                     event.preventDefault();

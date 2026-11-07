@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ArrivalFacts } from "@/features/q/arrival-news-line";
+import { relationshipArrivalFacts } from "@/features/q/arrival-page-facts";
+
 import {
   isMatchedRelationshipState,
   type ChatThreadDto,
@@ -217,6 +220,13 @@ export function RelationshipDetail({
 
   return (
     <PageContainer className="cq-charcoal flex flex-col gap-5">
+      {/* W5.2: what is new here since the person last looked. */}
+      {relationship === null ? null : (
+        <ArrivalFacts
+          page={`relationship:${relationship.relationshipId}`}
+          facts={relationshipArrivalFacts(brief, relationship, counterpart)}
+        />
+      )}
       <RelationshipHero
         counterpart={counterpart}
         relationship={relationship}

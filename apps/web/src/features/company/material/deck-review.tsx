@@ -256,6 +256,7 @@ export function DeckReadingReview({
               )}
               {editing === section.section ? (
                 <form
+                  data-q-editing
                   className="flex flex-col gap-2"
                   onSubmit={(event) => {
                     event.preventDefault();

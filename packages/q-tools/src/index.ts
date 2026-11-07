@@ -296,6 +296,17 @@ export {
   type ProposeEmailOutput,
 } from "./tools/email.js";
 export {
+  READ_MEETING_RECORD,
+  MEETING_TRANSCRIPT_CHARS_MAX,
+  ReadMeetingRecordInputSchema,
+  ReadMeetingRecordOutputSchema,
+  boundedTranscript,
+  createReadMeetingRecordTool,
+  meetingProposals,
+  type MeetingRecordPort,
+  type ReadMeetingRecordOutput,
+} from "./tools/meeting-record.js";
+export {
   GET_PITCH_MOMENT,
   GetPitchMomentInputSchema,
   GetPitchMomentOutputSchema,

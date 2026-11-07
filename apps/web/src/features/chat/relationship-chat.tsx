@@ -47,6 +47,8 @@ import {
 } from "./reply-draft-actions";
 import { VoiceRecorder } from "./voice-recorder";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 
 /**
  * The 1:1 chat on one relationship (R34; ADR 0019).
@@ -244,8 +246,9 @@ export function RelationshipChat({
       | { kind: "TEXT"; body: string }
       | { kind: "ATTACHMENT"; documentId: string; body?: string }
       | { kind: "VOICE_NOTE"; documentId: string; durationMs: number },
+    approvedKey?: string,
   ): Promise<boolean> => {
-    const key = newKey();
+    const key = approvedKey ?? newKey();
     for (let attempt = 0; attempt <= CHECK_RETRIES; attempt += 1) {
       const result = await sendChatMessageAction(relationshipId, message, key);
       if (result.ok) {
@@ -291,6 +294,37 @@ export function RelationshipChat({
     }
     setBusy(false);
   };
+
+  // W5.1b: Q may send the reply only on the person's approval of the
+  // exact words (APPROVAL); an edit after approving needs approving again.
+  const sendRef = useRef<HTMLSpanElement>(null);
+  useQControl({
+    id: "button.chat-send",
+    kind: "BUTTON",
+    ref: sendRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.chat-send",
+      summary: () => `Send this message to ${counterpart}`,
+      prepare: (): ApprovalPayload | null => {
+        const text = draft.trim();
+        // "@Q …" is a question to Q, never a message to send.
+        if (text.length === 0 || Q_PREFIX.test(text)) return null;
+        return { to: counterpart, message: text };
+      },
+      execute: async (payload, key) => {
+        const body = String(payload["message"]);
+        setBusy(true);
+        const sent = await deliver({ kind: "TEXT", body }, key);
+        if (sent) {
+          setDraft("");
+          setQDrafted(false);
+        }
+        setBusy(false);
+        return sent ? "DONE" : "FAILED";
+      },
+    },
+  });
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (
@@ -701,6 +735,7 @@ export function RelationshipChat({
         // until the person sends it; a section Q can name.
         <QSection id="draft" kind="CHAT" label={t("Reply")}>
           <form
+            data-q-editing
             ref={composer}
             onSubmit={(event) => void submit(event)}
             className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-canvas) px-3 pt-2.5 pb-1"
@@ -809,15 +844,17 @@ export function RelationshipChat({
                   onError={setNotice}
                 />
               )}
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={busy || !hasDraft}
-                aria-label={t("Send")}
-              >
-                <Send size={ICON_SIZE.compact} aria-hidden="true" />
-                {t("Send")}
-              </Button>
+              <span ref={sendRef} className="contents">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={busy || !hasDraft}
+                  aria-label={t("Send")}
+                >
+                  <Send size={ICON_SIZE.compact} aria-hidden="true" />
+                  {t("Send")}
+                </Button>
+              </span>
               <input
                 ref={fileInput}
                 type="file"

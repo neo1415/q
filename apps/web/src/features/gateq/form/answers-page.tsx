@@ -259,6 +259,7 @@ export function AnswersPage({
       <GateHero gateway={gateway} questions={questions} />
       <div className={`gqp-form${compact ? " gqp-compact" : ""}`}>
         <form
+          data-q-editing
           className="gqp-card"
           aria-label={t(`Apply to ${fund}`)}
           onSubmit={(event) => {

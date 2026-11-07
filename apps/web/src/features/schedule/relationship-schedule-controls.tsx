@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
+import { useDirty } from "@/features/workspace/workspace-screen";
+
 import type {
   MeetingDto,
   MeetingSlot,
@@ -21,6 +23,8 @@ import { JOINED_MESSAGE, JoinCallForm } from "./join-call-form";
 import { MeetingQ } from "./meeting-q";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 import { useT } from "@/features/i18n/language";
+import type { ApprovalPayload } from "@/features/q/control/approval";
+import { useQControl } from "@/features/q/control/q-control";
 
 /**
  * The relationship page's calls and reminders (BIZ-008). The same things Q
@@ -112,6 +116,8 @@ export function RelationshipScheduleControls({
   const [reminderTitle, setReminderTitle] = useState("");
   const [reminderAt, setReminderAt] = useState("");
   const [byEmail, setByEmail] = useState(true);
+  // W5.4: a reminder being written is unsaved work.
+  useDirty(reminderTitle.trim() !== "");
   const [reminderKey, setReminderKey] = useState(newKey);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
@@ -157,49 +163,145 @@ export function RelationshipScheduleControls({
     findTimesRef.current();
   }, [focus, connected]);
 
+  const bookSlot = async (
+    slot: MeetingSlot,
+    topic: string,
+    key: string,
+  ): Promise<boolean> => {
+    const booked = await bookMeetingAction({
+      relationshipId,
+      purpose: topic,
+      startsAt: slot.startsAt,
+      durationMinutes: Math.round(
+        (Date.parse(slot.endsAt) - Date.parse(slot.startsAt)) / 60_000,
+      ),
+      timeZone: localZone(),
+      idempotencyKey: key,
+    });
+    if (!booked.ok) {
+      setMessage(booked.message);
+      return false;
+    }
+    setMeetings((current) => [
+      booked.value,
+      ...current.filter((meeting) => meeting.id !== booked.value.id),
+    ]);
+    setSlots(null);
+    setChosen(null);
+    setBookKey(newKey());
+    setMessage(`Invite sent to ${counterpart}.`);
+    return true;
+  };
   const book = () =>
     startTransition(async () => {
       if (chosen === null) return;
-      const booked = await bookMeetingAction({
-        relationshipId,
-        purpose,
-        startsAt: chosen.startsAt,
-        durationMinutes: Math.round(
-          (Date.parse(chosen.endsAt) - Date.parse(chosen.startsAt)) / 60_000,
-        ),
-        timeZone: localZone(),
-        idempotencyKey: bookKey,
-      });
-      if (!booked.ok) {
-        setMessage(booked.message);
-        return;
-      }
-      setMeetings((current) => [
-        booked.value,
-        ...current.filter((meeting) => meeting.id !== booked.value.id),
-      ]);
-      setSlots(null);
-      setChosen(null);
-      setBookKey(newKey());
-      setMessage(`Invite sent to ${counterpart}.`);
+      await bookSlot(chosen, purpose, bookKey);
     });
 
+  const cancelCall = async (meetingId: string): Promise<boolean> => {
+    const cancelled = await cancelMeetingAction(meetingId);
+    if (!cancelled.ok) {
+      setMessage(cancelled.message);
+      return false;
+    }
+    setMeetings((current) =>
+      current.map((meeting) =>
+        meeting.id === meetingId
+          ? { ...meeting, status: "CANCELLED" }
+          : meeting,
+      ),
+    );
+    setMessage("Cancelled. Everyone invited has been told.");
+    return true;
+  };
   const cancel = (meetingId: string) =>
     startTransition(async () => {
-      const cancelled = await cancelMeetingAction(meetingId);
-      if (!cancelled.ok) {
-        setMessage(cancelled.message);
-        return;
-      }
-      setMeetings((current) =>
-        current.map((meeting) =>
-          meeting.id === meetingId
-            ? { ...meeting, status: "CANCELLED" }
-            : meeting,
-        ),
-      );
-      setMessage("Cancelled. Everyone invited has been told.");
+      await cancelCall(meetingId);
     });
+
+  // W5.1b (plan §5): scheduling, as Q may operate it. Finding free times
+  // only reads the person's own calendar (NONE). Sending an invite or
+  // cancelling a call reaches the other side (APPROVAL, on the exact time
+  // and topic). A reminder is the person's own, reversible (CONFIRM).
+  const findRef = useRef<HTMLSpanElement>(null);
+  const bookRef = useRef<HTMLSpanElement>(null);
+  const cancelRef = useRef<HTMLSpanElement>(null);
+  const remindRef = useRef<HTMLSpanElement>(null);
+  // The slot Q would book: the person's choice, else the first free one
+  // (shown in full for their approval, so the time is theirs to accept).
+  const slotForQ = chosen ?? slots?.[0] ?? null;
+  // The call Q would cancel: the next one the person organised, not over.
+  const cancellable =
+    upcoming.find(
+      (meeting) =>
+        meeting.organisedByYou && Date.parse(meeting.endsAt) >= openedAt,
+    ) ?? null;
+  useQControl({
+    id: "button.schedule-find",
+    kind: "BUTTON",
+    ref: findRef,
+    approval: "NONE",
+  });
+  useQControl({
+    id: "button.meeting-book",
+    kind: "BUTTON",
+    ref: bookRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.meeting-book",
+      summary: (payload) =>
+        `Send ${counterpart} an invite for ${String(payload["when"])}`,
+      prepare: (): ApprovalPayload | null =>
+        slotForQ === null || purpose.trim() === ""
+          ? null
+          : {
+              with: counterpart,
+              when: when(slotForQ.startsAt),
+              startsAt: slotForQ.startsAt,
+              topic: purpose.trim(),
+            },
+      execute: async (payload, key) =>
+        slotForQ !== null &&
+        slotForQ.startsAt === payload["startsAt"] &&
+        (await bookSlot(slotForQ, String(payload["topic"]), key))
+          ? "DONE"
+          : "FAILED",
+    },
+  });
+  useQControl({
+    id: "button.meeting-cancel",
+    kind: "BUTTON",
+    ref: cancelRef,
+    approval: "APPROVAL",
+    action: {
+      id: "button.meeting-cancel",
+      summary: (payload) =>
+        `Cancel the call with ${counterpart} on ${String(payload["when"])}: everyone invited is told`,
+      prepare: (): ApprovalPayload | null =>
+        cancellable === null
+          ? null
+          : {
+              with: counterpart,
+              when: when(cancellable.startsAt),
+              call: cancellable.purpose,
+              meeting: cancellable.id,
+            },
+      execute: async (payload) =>
+        cancellable !== null &&
+        cancellable.id === payload["meeting"] &&
+        (await cancelCall(cancellable.id))
+          ? "DONE"
+          : "FAILED",
+    },
+  });
+  useQControl({
+    id: "button.reminder-set",
+    kind: "BUTTON",
+    ref: remindRef,
+    approval: "CONFIRM",
+    confirmSummary: () =>
+      `Set a reminder: ${reminderTitle.trim() === "" ? `Follow up with ${counterpart}` : reminderTitle.trim()}`,
+  });
 
   const remind = () =>
     startTransition(async () => {
@@ -287,14 +389,21 @@ export function RelationshipScheduleControls({
                     )}
                     {meeting.organisedByYou &&
                     Date.parse(meeting.endsAt) >= openedAt ? (
-                      <Button
-                        variant="quiet"
-                        size="compact"
-                        disabled={pending}
-                        onClick={() => cancel(meeting.id)}
+                      <span
+                        ref={
+                          meeting.id === cancellable?.id ? cancelRef : undefined
+                        }
+                        className="contents"
                       >
-                        {t("Cancel call")}
-                      </Button>
+                        <Button
+                          variant="quiet"
+                          size="compact"
+                          disabled={pending}
+                          onClick={() => cancel(meeting.id)}
+                        >
+                          {t("Cancel call")}
+                        </Button>
+                      </span>
                     ) : null}
                   </div>
                   {meeting.meetLink !== null ? (
@@ -346,65 +455,71 @@ export function RelationshipScheduleControls({
                 </span>
               </div>
             ) : (
-              <Button
-                variant="secondary"
-                disabled={pending}
-                onClick={findTimes}
-                className="self-start"
-              >
-                {t("Find a time")}
-              </Button>
+              <span ref={findRef} className="contents">
+                <Button
+                  variant="secondary"
+                  disabled={pending}
+                  onClick={findTimes}
+                  className="self-start"
+                >
+                  {t("Find a time")}
+                </Button>
+              </span>
             )
           ) : (
-            <fieldset className="flex flex-col gap-3" data-slots>
-              <legend className="cq-label text-(--cq-text-secondary)">
-                Free in your calendar (30 minutes)
-              </legend>
-              <div className="flex flex-wrap gap-2">
-                {slots.map((slot) => (
-                  <Button
-                    key={slot.startsAt}
-                    variant={
-                      chosen?.startsAt === slot.startsAt
-                        ? "primary"
-                        : "secondary"
-                    }
-                    size="compact"
-                    aria-pressed={chosen?.startsAt === slot.startsAt}
-                    onClick={() => setChosen(slot)}
-                  >
-                    <span suppressHydrationWarning>{when(slot.startsAt)}</span>
-                  </Button>
-                ))}
-              </div>
-              {chosen === null ? null : (
-                <div className="flex flex-col items-start gap-2">
-                  <Button
-                    variant="primary"
-                    disabled={pending || purpose.trim() === ""}
-                    onClick={book}
-                  >
-                    <span suppressHydrationWarning>
-                      Send invite · {when(chosen.startsAt)}
-                    </span>
-                  </Button>
-                  <details className="cq-caption text-(--cq-text-secondary)">
-                    <summary className="cursor-pointer">
-                      Topic: {purpose}
-                    </summary>
-                    <div className="pt-2">
-                      <Input
-                        id="meeting-purpose"
-                        label={t("What the call is for")}
-                        value={purpose}
-                        maxLength={500}
-                        onChange={(event) => setPurpose(event.target.value)}
-                      />
-                    </div>
-                  </details>
+            <span ref={bookRef} className="contents">
+              <fieldset className="flex flex-col gap-3" data-slots>
+                <legend className="cq-label text-(--cq-text-secondary)">
+                  Free in your calendar (30 minutes)
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {slots.map((slot) => (
+                    <Button
+                      key={slot.startsAt}
+                      variant={
+                        chosen?.startsAt === slot.startsAt
+                          ? "primary"
+                          : "secondary"
+                      }
+                      size="compact"
+                      aria-pressed={chosen?.startsAt === slot.startsAt}
+                      onClick={() => setChosen(slot)}
+                    >
+                      <span suppressHydrationWarning>
+                        {when(slot.startsAt)}
+                      </span>
+                    </Button>
+                  ))}
                 </div>
-              )}
-            </fieldset>
+                {chosen === null ? null : (
+                  <div className="flex flex-col items-start gap-2">
+                    <Button
+                      variant="primary"
+                      disabled={pending || purpose.trim() === ""}
+                      onClick={book}
+                    >
+                      <span suppressHydrationWarning>
+                        Send invite · {when(chosen.startsAt)}
+                      </span>
+                    </Button>
+                    <details className="cq-caption text-(--cq-text-secondary)">
+                      <summary className="cursor-pointer">
+                        Topic: {purpose}
+                      </summary>
+                      <div className="pt-2">
+                        <Input
+                          id="meeting-purpose"
+                          label={t("What the call is for")}
+                          value={purpose}
+                          maxLength={500}
+                          onChange={(event) => setPurpose(event.target.value)}
+                        />
+                      </div>
+                    </details>
+                  </div>
+                )}
+              </fieldset>
+            </span>
           )}
         </div>
       )}
@@ -482,14 +597,16 @@ export function RelationshipScheduleControls({
               />
               {t("Email me too")}
             </label>
-            <Button
-              variant="secondary"
-              disabled={pending}
-              onClick={remind}
-              className="self-start"
-            >
-              {t("Set reminder")}
-            </Button>
+            <span ref={remindRef} className="contents">
+              <Button
+                variant="secondary"
+                disabled={pending}
+                onClick={remind}
+                className="self-start"
+              >
+                {t("Set reminder")}
+              </Button>
+            </span>
           </div>
         </div>
       )}
