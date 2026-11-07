@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { HandleSchema } from "./public-identity.js";
 
 /**
  * Engagement analytics (Q Workspace §8 A1-A3; Product Specification
@@ -72,7 +73,23 @@ const base = {
 
 export const EngagementEventInputSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("PROFILE_VIEW") }).strict(),
-  z.object({ ...base, type: z.literal("Q_CARD_VIEW") }).strict(),
+  // A Q Card is reached by its handle (the public card carries no subject
+  // id): the server resolves an ACTIVE company handle to the company.
+  z
+    .object({
+      clientEventId: base.clientEventId,
+      sessionId: base.sessionId,
+      occurredAt: base.occurredAt,
+      type: z.literal("Q_CARD_VIEW"),
+      companyId: UuidSchema.optional(),
+      handle: HandleSchema.optional(),
+    })
+    .strict()
+    .refine(
+      (event) =>
+        (event.companyId === undefined) !== (event.handle === undefined),
+      { message: "Name the company or its handle, not both." },
+    ),
   z
     .object({ ...base, type: z.literal("DECK_OPEN"), documentId: UuidSchema })
     .strict(),

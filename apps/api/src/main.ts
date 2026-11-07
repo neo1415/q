@@ -119,6 +119,7 @@ import {
 import { createBoardService } from "@capital-q/board";
 import { createResultsReader } from "@capital-q/results";
 import {
+  createEngagementNotices,
   createEngagementService,
   createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
@@ -3087,6 +3088,7 @@ const { app, logger } = createApp(config, security, {
   }),
   results,
   engagement,
+  engagementNotices: createEngagementNotices(database.sql),
   readiness,
   adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
   adminVerificationDecider: createDecideByOperator({

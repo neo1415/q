@@ -33,4 +33,5 @@ export const ANALYTICS_AR: Readonly<Record<string, string>> = {
   "No requests yet.": "لا طلبات حتى الآن.",
   "connection request": "طلب تواصل",
   "data-room request": "طلب غرفة البيانات",
+  "See analytics": "عرض التحليلات",
 };

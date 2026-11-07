@@ -59,11 +59,20 @@ Billing feature `analytics.identity_reveal` (ACCESS, a subscription, not credits
 - **Collection:** deck open and slide dwell, pitch watch time, data-room views.
 - **Q:** `read_my` "engagement" puts intent first, and gives passive context only while "Q uses viewing" is on.
 
+## Milestone 3 (built)
+
+- **Save notices (`COMPANY_SAVED`):**
+  - Worded at the saver's level: name, firm, or "An investor".
+  - Gated by `intent_signal_notifications` (ON). One per firm, company and day; links to `/analytics`.
+  - The text says saving is not interest yet.
+- **Weekly viewing digest (`VIEWING_DIGEST`):**
+  - A worker checks hourly. Gated by `passive_view_notifications` (OFF).
+  - Aggregate only, above the floor, once per company and week.
+- **Migration `20261231410000`:** widens the notification kinds by drop and re-add, keeping all 25 values. Apply it with `--founder-approved`.
+- **Q Card views:** ingested by handle, resolved server-side to an ACTIVE company handle. Only a signed-in participant's view of a company card counts.
+
 ## Open
 
-- **Q Card view collection:** public cards carry no subject id. The proposal is to ingest by handle, resolved on the server.
-- **Save notifications:** they need a new `communication.notifications` kind. That is a DROP CONSTRAINT migration, which needs founder approval. Interest, connection and data-room requests already notify founders in real time.
-- **Passive digest:** the setting exists (OFF by default); the sender is not built.
-- **Q destination:** a named `ANALYTICS` navigate destination is requested from W3. Q reaches the page through the site map meanwhile.
+- **Q destination:** Q reaches `/analytics` through the site map route; there is no named destination, per the integration owner.
 - **Navigation link:** a sidebar link to `/analytics` belongs to W1.
 - **Breakdowns:** stage and sector need the mandate context.

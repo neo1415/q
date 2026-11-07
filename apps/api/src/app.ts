@@ -40,6 +40,7 @@ import {
   type ResultsRoutesDependencies,
 } from "./http/results.js";
 // ANALYTICS block (Q Workspace §8)
+import { noticeSaves, type EngagementNotices } from "@capital-q/engagement";
 import {
   registerEngagementRoutes,
   type EngagementRoutesDependencies,
@@ -328,6 +329,7 @@ export type ApiModules = {
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
   // ANALYTICS block (Q Workspace §8)
+  readonly engagementNotices?: EngagementNotices | undefined;
   readonly engagement?:
     | Pick<
         EngagementRoutesDependencies,
@@ -700,7 +702,18 @@ export function createApp(
         : { viewingPrivacy: modules.engagement.engagement }),
       ...(modules.discovery?.interactions === undefined
         ? {}
-        : { interactions: modules.discovery.interactions }),
+        : {
+            // Q Workspace §8 A6: a new save tells the company's founders.
+            interactions:
+              modules.engagementNotices === undefined
+                ? modules.discovery.interactions
+                : {
+                    decide: noticeSaves(
+                      modules.discovery.interactions.decide,
+                      modules.engagementNotices,
+                    ),
+                  },
+          }),
       ...(modules.capital === undefined ? {} : { capital: modules.capital }),
       ...(modules.visibility === undefined
         ? {}

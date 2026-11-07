@@ -26,3 +26,8 @@ export {
   createPostgresMyEngagementReader,
   type MyEngagementReader,
 } from "./postgres-my-engagement-reader.js";
+export {
+  createEngagementNotices,
+  noticeSaves,
+  type EngagementNotices,
+} from "./notices.js";

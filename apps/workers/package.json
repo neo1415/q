@@ -21,6 +21,7 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/discovery": "workspace:*",
+    "@capital-q/engagement": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/evidence": "workspace:*",
     "@capital-q/founder-onboarding": "workspace:*",
