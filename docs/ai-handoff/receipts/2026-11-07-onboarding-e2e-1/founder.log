@@ -1,0 +1,26 @@
+account e2e-fou-202611071326-cxwg@fictional.capitalq.local
+FAIL J1 one introduction on opening — 0 "I'm Q" lines
+FAIL J1 one dense line answers several topics
+NOTE J1 Q's next question (judge: conversational, not a label) — 
+FAIL J2 a ramble is said back for a yes
+PASS J2 nothing saved before the yes
+FAIL J2 saved after the yes
+NOTE J2 Q after a clear typed answer — 
+FAIL J2 a clear typed answer is saved in their words, not read back
+NOTE J3 Q's reply to an optional skip and a required refusal — 
+FAIL J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What does the founding team cover between you: product, engineering, sales, operations?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Are you raising right now? 
+FAIL J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — 
+PASS J5 no new introduction on return
+FAIL J5 the same open question is picked up
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — What do you already have? / What do you already have?
+FAIL J6 finish lands on verification — /onboarding/founder
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+9 FAIL; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/onb-e2e/founder-1440

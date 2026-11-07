@@ -1,0 +1,151 @@
+{
+  "email": "e2e-fou-202611071326-cxwg@fictional.capitalq.local",
+  "journey": "founder",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": false,
+      "detail": "0 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "a ramble is said back for a yes",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "nothing saved before the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "saved after the yes",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "Q after a clear typed answer",
+      "ok": null,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "a clear typed answer is saved in their words, not read back",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": ""
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": false,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. What does the founding team cover between you: product, engineering, sales, operations?"
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Are you raising right now? "
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "What do you already have? / What do you already have?"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": false,
+      "detail": "/onboarding/founder"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
