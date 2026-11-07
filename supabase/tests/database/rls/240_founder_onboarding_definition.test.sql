@@ -24,7 +24,7 @@ select is(
 -- already running it keep their own journey (CQ-Q-021 §82).
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  8, 'founder definition points new sessions at version 8 (20261231190000: country from the geography taxonomy)');
+  9, 'founder definition points new sessions at version 9 (20261231440000: the mandatory set; 20261231190000: country from the geography taxonomy)');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v
