@@ -10,7 +10,12 @@ import {
   pendingQApprovalsAction,
   readQApprovalAction,
 } from "@/features/q/actions";
-import { listWorkAction } from "@/features/work/work-actions";
+import {
+  listShellNoticesAction,
+  listWorkAction,
+} from "@/features/work/work-actions";
+import { NoticeSnapshot } from "@/features/work/notice-snapshot";
+import type { NoticeState } from "@/features/work/notice-store";
 import {
   listDoneAction,
   listSuggestionsAction,
@@ -65,13 +70,27 @@ async function WorkLists({
 }) {
   const t = await serverT();
 
-  const [suggestions, approvals, work, done, workforce] = await Promise.all([
-    listSuggestionsAction().catch(() => null),
-    pendingQApprovalsAction().catch(() => null),
-    listWorkAction().catch(() => null),
-    listDoneAction().catch(() => null),
-    loadWorkforceAction().catch(() => null),
-  ]);
+  const [suggestions, approvals, work, done, workforce, shellNotices] =
+    await Promise.all([
+      listSuggestionsAction().catch(() => null),
+      pendingQApprovalsAction().catch(() => null),
+      listWorkAction().catch(() => null),
+      listDoneAction().catch(() => null),
+      loadWorkforceAction().catch(() => null),
+      // CLS (batch 7): what waits on them is on the first paint, not after
+      // this tab's own notice read lands (NoticeSnapshot / useNotices).
+      listShellNoticesAction().catch(() => null),
+    ]);
+  const noticeSnapshot: NoticeState | null =
+    shellNotices?.ok === true
+      ? {
+          items: shellNotices.value.items,
+          unread: shellNotices.value.unread,
+          failed: false,
+          nextBefore: shellNotices.value.nextBefore ?? null,
+          waitingApprovals: shellNotices.value.waitingApprovals,
+        }
+      : null;
   const items = work?.ok === true ? work.value : [];
   const waiting = approvals?.ok === true ? approvals.value : null;
   // Work around decisions (2026-10-08): the first cards are read in full
@@ -113,16 +132,18 @@ async function WorkLists({
           label={t("what needs you")}
         />
       )}
-      <WorkPage
-        key={view ?? "default"}
-        initialView={pageViewOf(view)}
-        suggestions={suggestions?.ok === true ? suggestions.value : null}
-        approvals={approvals?.ok === true ? approvals.value : null}
-        views={views}
-        work={work?.ok === true ? work.value : null}
-        done={done?.ok === true ? done.value : null}
-        workforce={workforce}
-      />
+      <NoticeSnapshot value={noticeSnapshot}>
+        <WorkPage
+          key={view ?? "default"}
+          initialView={pageViewOf(view)}
+          suggestions={suggestions?.ok === true ? suggestions.value : null}
+          approvals={approvals?.ok === true ? approvals.value : null}
+          views={views}
+          work={work?.ok === true ? work.value : null}
+          done={done?.ok === true ? done.value : null}
+          workforce={workforce}
+        />
+      </NoticeSnapshot>
     </>
   );
 }
