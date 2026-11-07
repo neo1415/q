@@ -210,11 +210,12 @@ export const relationshipWithCompany = (
 });
 export const relationshipWithInvestor = (
   key: string,
-  tab: string,
+  // No tab: the relationship page as it opens (5719942's D-FUP-004 label).
+  tab?: string,
 ): QNavTarget => ({
   page: "RELATIONSHIP_INVESTOR",
   recordId: investor(key).id,
-  tab,
+  ...(tab === undefined ? {} : { tab }),
 });
 export const investorProfile = (key: string): QNavTarget => ({
   page: "INVESTOR",
