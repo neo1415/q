@@ -17,7 +17,11 @@ import type {
   KybService,
 } from "@capital-q/verification";
 import type { CompanyService } from "@capital-q/companies";
-import type { PitchSummaryDto } from "@capital-q/contracts";
+import type {
+  PitchSummaryDto,
+  ViewingPrivacyDto,
+  ViewingVisibility,
+} from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type { EvidenceService } from "@capital-q/evidence";
 import type { InvestorService } from "@capital-q/investors";
@@ -97,6 +101,15 @@ export type AppActionPorts = {
       >
     | undefined;
   readonly interactions?: Pick<InteractionSignalService, "decide"> | undefined;
+  /** Q Workspace §8: the person's own viewing visibility. */
+  readonly viewingPrivacy?:
+    | {
+        readonly setPrivacy: (
+          actor: ActorContext,
+          visibility: ViewingVisibility,
+        ) => Promise<ViewingPrivacyDto | "NOT_ALLOWED">;
+      }
+    | undefined;
   /** Profile and records (ADR 0040 checklist): the owning services. */
   readonly companies?:
     | Pick<
