@@ -286,3 +286,23 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **Passive analytics refresh weekly,** with no per-view timestamps or real-time passive alerts. Intent signals are real-time and always shown, named per the viewer's visibility.
     - **Per-slide time tied to a named viewer** is off by default.
 75. **Q navigation must understand people's words, not keywords** (owner, 7 Nov 2026 ~06:40 UTC). Go ahead with the q-nav work and keep pushing until the benchmark is met (labs gate: ≥98% exact move target, ≤0.5% wrong page, 0 forbidden). No keyword lists or phrase matching: Q must understand which page a person means from the words they use. That is the point of Q's intelligence. Use Talent Q's approach as a reference (read-only). Accuracy is the priority. **Amendment (owner, ~07:00 UTC):** 98% is the target, not a blocker. Go as far as it will go. If it plateaus, ship the best result, provided wrong-page moves stay very low and forbidden moves stay at 0. Talent Q turned out keyword-first, with about 50% correct on its own 20 navigate cases, so it is a reference for safety habits only. **COR-054:** keep the current default. **Workspace switch:** set it after this work.
+76. **Metrics: real methods, not caveats; navigation target; onboarding next** (owner, 7 Nov 2026 ~08:15 UTC).
+    - **No caveat spam.** This is a pre-launch MVP. Remove repeated "not strong evidence" text across screens. Honesty fixes stay; they are not caveats: no "Strong" band on low confidence, unknown ≠ 0, a score only from enough inputs. Confidence is shown once, compactly, never as paragraphs on every surface.
+    - **Investability, Suitability, Unicorn Potential:** do deep research (academic and practitioner literature, published VC success studies, base rates) and turn it into explicit equations, then deterministic, versioned code. Improve the current methods where the research says so. Deliver documentation of every metric: the equation, its inputs, weights and their sources, worked examples, and how unknowns are handled. The name "Unicorn Potential" is kept for now.
+      - **Flag:** PADL #046 (locked) bars predictive positioning until statistically validated. A literature-grounded method cites external evidence but is not validated on Capital Q data. The owner directs building it. The PADL conflict is recorded here for an amendment decision; it is not silently overridden.
+    - **Navigation:** 98% stays the aim (100% would be ideal). 95–97% exact move target is acceptable for the MVP if 98% stalls; keep improving after.
+    - **Next after navigation:** test onboarding end to end:
+      - the interview by chat and by voice;
+      - switching between them with the same context;
+      - the form, and continue later;
+      - Q editing profile fields on request (mandate, description, geography and the rest).
+      Then report the premium-product gaps.
+77. **Onboarding is a real conversation** (owner, 7 Nov 2026 ~08:30 UTC). Onboarding has been troubled for months; treat it carefully.
+    - **Conversation, not a questionnaire.** Q asks things like "what do you do?" and "how do you make money?" and draws what it needs from the person's answers.
+    - **Long answers.** Q judges when to summarise. A long, rambling spoken answer is summarised professionally and played back ("Is that right?"), and the person confirms, edits or types their own version. A clear or typed answer is kept whole, with filler removed. Q does not summarise every time.
+    - **Required vs optional.**
+      - Optional questions can be skipped.
+      - Required questions are asked again, with the reason given: they are needed for verification. The person may leave and come back later.
+      - Onboarding cannot be completed without the required answers.
+    - **Background research in parallel.** Once Q has the person's name, the company name and the website (normalised so it can be searched), it researches them online in parallel while the conversation continues. What it finds is presented for confirmation; it is never silently made authoritative. If nothing is found (not a public figure), carry on without it, and don't mention a failure.
+    - **Testing.** Fictional accounts can't exercise real research. The research path is tested on fixtures, and a live probe needs a stated reason and a small size, because paid search providers are the founder's credits.

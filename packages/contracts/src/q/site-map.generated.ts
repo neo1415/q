@@ -936,7 +936,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/discover/saved",
       title: "Saved",
-      purpose: "Companies you saved to look at again.",
+      purpose: "Companies you saved.",
       audience: "INVESTOR",
       params: [],
       shows: ["COMPANY"],
@@ -1532,7 +1532,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/q-pitch",
       title: "Capital Q tour",
-      purpose: "A guided tour of Capital Q, presented by Q.",
+      purpose: "Q plays a guided story of how Capital Q works.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1552,7 +1552,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/q-pitch/capital-q",
       title: "Capital Q pitch",
-      purpose: "Capital Q's own investor pitch.",
+      purpose: "Read Capital Q's own investor pitch.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1719,7 +1719,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/rehearsals/r/[rehearsalId]",
       title: "Rehearsal",
-      purpose: "One finished practice session, with Q's feedback.",
+      purpose: "A finished practice, with Q's feedback.",
       audience: "ANY",
       params: [
         {
@@ -1784,7 +1784,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_RAISE"],
           subs: [],
           audience: "FOUNDER",
-          purpose: "your current round and who is in it",
+          purpose: "the round itself: size, terms, money committed",
         },
         {
           id: "capital-readiness",
@@ -1820,7 +1820,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_INVESTORS"],
           subs: [],
           audience: "FOUNDER",
-          purpose: "investors already in touch about this raise",
+          purpose: "the people: investors in touch about it",
         },
       ],
       sections: [

@@ -1,0 +1,982 @@
+{
+  "split": "dev",
+  "turns": 500,
+  "summary": {
+    "overall": {
+      "turns": 500,
+      "passRate": 0.944,
+      "decisionAccuracy": 0.966,
+      "moveTargetExact": 0.9375,
+      "wrongPageMoveRate": 0.008,
+      "forbiddenMoves": 0
+    },
+    "bySplit": {
+      "dev": {
+        "turns": 500,
+        "passRate": 0.944,
+        "decisionAccuracy": 0.966,
+        "moveTargetExact": 0.9375,
+        "wrongPageMoveRate": 0.008,
+        "forbiddenMoves": 0
+      },
+      "heldout": {
+        "turns": 0,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 1,
+        "forbiddenMoves": 0
+      }
+    },
+    "byCategory": {
+      "COVERAGE": {
+        "turns": 225,
+        "passRate": 0.9466666666666667,
+        "decisionAccuracy": 0.9733333333333334,
+        "moveTargetExact": 0.9466666666666667,
+        "wrongPageMoveRate": 0.0044444444444444444,
+        "forbiddenMoves": 0
+      },
+      "TYPO": {
+        "turns": 74,
+        "passRate": 0.9594594594594594,
+        "decisionAccuracy": 0.9594594594594594,
+        "moveTargetExact": 0.9594594594594594,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ACCESS": {
+        "turns": 19,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "RECORD": {
+        "turns": 57,
+        "passRate": 0.9473684210526315,
+        "decisionAccuracy": 0.9649122807017544,
+        "moveTargetExact": 0.9473684210526315,
+        "wrongPageMoveRate": 0.017543859649122806,
+        "forbiddenMoves": 0
+      },
+      "THREAD": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "STAY_IN_CHAT": {
+        "turns": 12,
+        "passRate": 0.9166666666666666,
+        "decisionAccuracy": 0.9166666666666666,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0.08333333333333333,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_STAY": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_MOVE": {
+        "turns": 5,
+        "passRate": 0.6,
+        "decisionAccuracy": 0.6,
+        "moveTargetExact": 0.6,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FALSE_PAGE_WORD": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "TWO_ASKS": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "VOICE": {
+        "turns": 8,
+        "passRate": 0.875,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 0.8333333333333334,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NON_ENGLISH": {
+        "turns": 8,
+        "passRate": 0.375,
+        "decisionAccuracy": 0.625,
+        "moveTargetExact": 0.2857142857142857,
+        "wrongPageMoveRate": 0.125,
+        "forbiddenMoves": 0
+      },
+      "SARCASM": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FOLLOW_UP": {
+        "turns": 13,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "GO_BACK": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NOT_THAT_ONE": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "STALE_CONTEXT": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "AMBIGUITY": {
+        "turns": 7,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "DIRTY_FORM": {
+        "turns": 5,
+        "passRate": 0.8,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "BUSY_PANE": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "COLLAPSED_PANE": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NO_SUCH_PAGE": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "DELETED_RECORD": {
+        "turns": 3,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ADVERSARIAL": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ALREADY_THERE": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      }
+    },
+    "labsGate": false,
+    "onGate": false
+  },
+  "missesByCategory": {
+    "TYPO": 3,
+    "COVERAGE": 12,
+    "RECORD": 3,
+    "STAY_IN_CHAT": 1,
+    "LOOKALIKE_MOVE": 2,
+    "VOICE": 1,
+    "NON_ENGLISH": 5,
+    "DIRTY_FORM": 1
+  },
+  "calls": 500,
+  "tokens": {
+    "input": 4969092,
+    "cached": 4585868,
+    "output": 63500,
+    "cost": 2.318621600000001
+  },
+  "misses": [
+    {
+      "id": "QNAV-D-TYP-006#0",
+      "category": "TYPO",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/relationships",
+          "record": null,
+          "tab": "capital",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They ask to see Capital, a founder's raise, which the Capital tab on Relationships is for.",
+        "sure": false,
+        "alternative": {
+          "route": "/q-pitch/capital-q",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-TYP-008#0",
+      "category": "TYPO",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/visibility",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to open their visibility settings, meaning who can see which parts of their company; the Visibility page serves that.",
+        "sure": true,
+        "alternative": {
+          "route": "/settings",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "privacy",
+          "position": "section"
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-COV-048#0",
+      "category": "COVERAGE",
+      "reasons": ["decided STAY (want MOVE)", "no target"],
+      "proposed": {
+        "decision": "STAY",
+        "place": null,
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know which investors could fund them, a question that Q answers with analysis in chat; it is not a single page, and /investors and /discover serve different purposes, so no one place clearly fits.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-COV-079#0",
+      "category": "COVERAGE",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/documents",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to see their documents; /documents holds the memos, reports and spreadsheets Q wrote for them.",
+        "sure": false,
+        "alternative": {
+          "route": "/company/data-room",
+          "record": null,
+          "tab": "dataroom",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-COV-146#0",
+      "category": "COVERAGE",
+      "reasons": [
+        "sectionId gateq-inbox (want -)",
+        "position section (want -)"
+      ],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/gateq",
+          "record": null,
+          "tab": "inbox",
+          "document": null,
+          "slide": null,
+          "sectionId": "gateq-inbox",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know whether new applications have come in to their fund; GateQ's Inbox lists the applications sent to them to decide.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-COV-181#0",
+      "category": "COVERAGE",
+      "reasons": [
+        "page CAPITAL_RAISE (want CAPITAL_INVESTORS)",
+        "moved to the wrong page"
+      ],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/relationships",
+          "record": null,
+          "tab": "capital-raise",
+          "document": null,
+          "slide": null,
+          "sectionId": "rounds",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know who is in their current round; the Capital: Raise tab shows their round and who is in it.",
+        "alternative": {
+          "route": "/relationships",
+          "record": null,
+          "tab": "capital-investors",
+          "document": null,
+          "slide": null,
+          "sectionId": "investors",
+          "position": "section"
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-COV-188#0",
+      "category": "COVERAGE",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/q-pitch",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to see Q Pitch; the Capital Q tour page presented by Q serves that, with the Capital Q pitch as a nearby alternative.",
+        "sure": false,
+        "alternative": {
+          "route": "/q-pitch/capital-q",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-TYP-069#0",
+      "category": "TYPO",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/q-pitch",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to open Q Pitch; the Capital Q tour page at /q-pitch is the page whose purpose is Q presenting Capital Q.",
+        "sure": false,
+        "alternative": {
+          "route": "/q-pitch/capital-q",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-COV-198#0",
+      "category": "COVERAGE",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/board",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to see their board of tasks that they and Q are working on; /board is that to-do board.",
+        "sure": true,
+        "alternative": {
+          "route": "/work",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-COV-205#0",
+      "category": "COVERAGE",
+      "reasons": ["sectionId trend (want -)", "position section (want -)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "trend",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know how investor engagement is moving this week; the Analytics page's trend section shows attention week by week.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-COV-209#0",
+      "category": "COVERAGE",
+      "reasons": [
+        "decided OFFER (want MOVE)",
+        "page ANALYTICS (want COMPANY_INTEREST)"
+      ],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "intent",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know which investors have signalled interest this week; the Analytics intent section shows who saved, asked to connect or asked for documents.",
+        "sure": false,
+        "alternative": {
+          "route": "/company/interest",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-COV-210#0",
+      "category": "COVERAGE",
+      "reasons": ["sectionId - (want missing)", "position - (want section)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/data-room",
+          "record": null,
+          "tab": "dataroom",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know whether their own data room is diligence-ready; their data room page shows their documents and what is still missing.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-COV-211#0",
+      "category": "COVERAGE",
+      "reasons": ["sectionId - (want missing)", "position - (want section)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/data-room",
+          "record": null,
+          "tab": "dataroom",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know which expected documents are absent from their own data room; the Data room tab of their data room page shows their documents and what is still missing.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-COV-221#0",
+      "category": "COVERAGE",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/settings",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "connections",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to see their connections, meaning the linked Google calendar and mail accounts, which live in the connections section of Settings.",
+        "sure": false,
+        "alternative": {
+          "route": "/relationships",
+          "record": null,
+          "tab": "overview",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-REC-014#0",
+      "category": "RECORD",
+      "reasons": ["decided STAY (want MOVE)", "no target"],
+      "proposed": {
+        "decision": "STAY",
+        "place": null,
+        "back": false,
+        "askedForPage": false,
+        "reason": "They ask a factual question about Silo Credit's ARR, which Q answers in chat; they did not ask to see a page, so the pane stays.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-REC-043#0",
+      "category": "RECORD",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/daily/[editionId]",
+          "record": {
+            "kind": "THING",
+            "name": "Q Daily, 5 November"
+          },
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to read yesterday's Q Daily edition; the latest listed edition is 6 November, so yesterday's is 5 November, which opens on the edition page.",
+        "sure": false,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-REC-050#0",
+      "category": "RECORD",
+      "reasons": [
+        "page DAILY (want DAILY_EDITION)",
+        "recordId - (want 6c05f7bc-2a7a-4900-952c-c40b4cfec05c)",
+        "moved to the wrong page"
+      ],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/daily",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They want to read today's Q Daily briefing; the Q Daily page shows today's edition and past ones.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-STY-001#0",
+      "category": "STAY_IN_CHAT",
+      "reasons": [
+        "decided MOVE (want STAY)",
+        "a target on a STAY turn",
+        "moved to the wrong page"
+      ],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/discover",
+          "record": null,
+          "tab": "for-you",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want companies matched to their mandate; Discover's 'For you' tab holds exactly those matches.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-LKM-004#0",
+      "category": "LOOKALIKE_MOVE",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/interest",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know whether investors are warming to their company; the Interest page lists investors interested in them and their replies.",
+        "sure": false,
+        "alternative": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "intent",
+          "position": "section"
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-LKM-005#0",
+      "category": "LOOKALIKE_MOVE",
+      "reasons": ["decided STAY (want MOVE)", "no target"],
+      "proposed": {
+        "decision": "STAY",
+        "place": null,
+        "back": false,
+        "askedForPage": false,
+        "reason": "They voice a worry about diligence readiness and ask to see nothing; the answer is analysis and advice given in chat, so the pane stays.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-VOC-007#0",
+      "category": "VOICE",
+      "reasons": ["sectionId - (want missing)", "position - (want section)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/data-room",
+          "record": null,
+          "tab": "dataroom",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know whether their own data room is ready; the Your data room page, data room tab, shows their documents and what is still missing.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-LNG-002#0",
+      "category": "NON_ENGLISH",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/relationships/company/[companyId]/messages",
+          "record": {
+            "kind": "COMPANY",
+            "name": "Tamarind Pay"
+          },
+          "tab": "messages",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": "latest"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know whether Tamarind Pay has replied; the answer lives in that relationship's conversation, at its latest message.",
+        "sure": false,
+        "alternative": {
+          "route": "/analytics",
+          "record": {
+            "kind": "COMPANY",
+            "name": "Tamarind Pay"
+          },
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "responses",
+          "position": "section"
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-LNG-005#0",
+      "category": "NON_ENGLISH",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/interest",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know which investors are interested in their company this week; the Interest page lists investors interested in their company.",
+        "sure": true,
+        "alternative": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "intent",
+          "position": "section"
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-LNG-006#0",
+      "category": "NON_ENGLISH",
+      "reasons": ["decided OFFER (want MOVE)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/visibility",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know who can see their company; the Visibility page is where access to their company's parts is set and shown.",
+        "sure": true,
+        "alternative": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "viewers",
+          "position": "section"
+        }
+      }
+    },
+    {
+      "id": "QNAV-D-LNG-007#0",
+      "category": "NON_ENGLISH",
+      "reasons": [
+        "page RELATIONSHIP_INVESTOR (want INVESTOR)",
+        "moved to the wrong page"
+      ],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/relationships/investor/[investorOrganisationId]",
+          "record": {
+            "kind": "INVESTOR",
+            "name": "Harbour Angels"
+          },
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": true,
+        "reason": "They asked (in Yoruba) to open the Harbour Angels page; the investor relationship page serves that, since Harbour Angels is one of their investor records.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-DRT-004#0",
+      "category": "DIRTY_FORM",
+      "reasons": ["sectionId - (want missing)", "position - (want section)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/company/data-room",
+          "record": null,
+          "tab": "dataroom",
+          "document": null,
+          "slide": null,
+          "sectionId": null,
+          "position": null
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know if their own data room is complete; their data room page shows their documents and what is still missing.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-COV-225#0",
+      "category": "COVERAGE",
+      "reasons": ["sectionId viewers (want -)", "position section (want -)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "viewers",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know which investors have viewed their deck; Analytics lists who viewed them, as each allows.",
+        "sure": true,
+        "alternative": null
+      }
+    },
+    {
+      "id": "QNAV-D-LNG-008#0",
+      "category": "NON_ENGLISH",
+      "reasons": ["sectionId deck-views (want -)", "position section (want -)"],
+      "proposed": {
+        "decision": "MOVE",
+        "place": {
+          "route": "/analytics",
+          "record": null,
+          "tab": null,
+          "document": null,
+          "slide": null,
+          "sectionId": "deck-views",
+          "position": "section"
+        },
+        "back": false,
+        "askedForPage": false,
+        "reason": "They want to know which investors viewed their deck this week; Analytics is where deck views and viewers are counted.",
+        "sure": true,
+        "alternative": null
+      }
+    }
+  ]
+}

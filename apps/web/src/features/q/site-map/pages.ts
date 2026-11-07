@@ -415,7 +415,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/discover/saved": {
     title: "Saved",
-    purpose: "Companies you saved to look at again.",
+    purpose: "Companies you saved.",
     audience: "INVESTOR",
     shows: ["COMPANY"],
     sections: [
@@ -834,13 +834,13 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/q-pitch": {
     title: "Capital Q tour",
-    purpose: "A guided tour of Capital Q, presented by Q.",
+    purpose: "Q plays a guided story of how Capital Q works.",
     audience: "ANY",
     sections: [{ id: "q-pitch", title: "The Capital Q tour", kind: "PITCH" }],
   },
   "/q-pitch/capital-q": {
     title: "Capital Q pitch",
-    purpose: "Capital Q's own investor pitch.",
+    purpose: "Read Capital Q's own investor pitch.",
     audience: "ANY",
     sections: [
       { id: "capital-q-pitch", title: "The Capital Q pitch", kind: "PITCH" },
@@ -883,7 +883,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/rehearsals/r/[rehearsalId]": {
     title: "Rehearsal",
-    purpose: "One finished practice session, with Q's feedback.",
+    purpose: "A finished practice, with Q's feedback.",
     audience: "ANY",
     sections: REHEARSAL,
   },
@@ -1264,11 +1264,11 @@ export const SITE_MAP_PURPOSES: Readonly<
       overview: "all your relationships at a glance, whatever the stage",
       pipeline: "relationships by stage",
       capital: "a founder's raise; an investor's mandate and book",
-      "capital-raise": "your current round and who is in it",
+      "capital-raise": "the round itself: size, terms, money committed",
       "capital-readiness": "how ready your company looks to investors",
       "capital-action-plan": "the steps to get investor-ready",
       "capital-plan": "your 3, 6 and 12-month plan",
-      "capital-investors": "investors already in touch about this raise",
+      "capital-investors": "the people: investors in touch about it",
     },
     sections: {
       "hub-overview": "the overview",
