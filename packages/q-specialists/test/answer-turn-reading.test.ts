@@ -1009,6 +1009,62 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(off.stored[0]?.blocks ?? []).toEqual([]);
   });
 
+  it("the Q Workspace has one authority for the page pane: the reader's own move steps aside, and only the decision's move is stored", async () => {
+    const decided: string[] = [];
+    const pageMoves = createQPageMoves({
+      decider: {
+        decide: (input) => {
+          decided.push(input.utterance);
+          return Promise.resolve({
+            decision: "MOVE",
+            place: {
+              route: "/work",
+              record: null,
+              tab: "team",
+              document: null,
+              slide: null,
+              sectionId: null,
+              position: null,
+            },
+            back: false,
+            askedForPage: true,
+            reason: "",
+          });
+        },
+      },
+      config: { movesAllowed: true },
+    });
+    const WORKSPACE = {
+      route: "HOME",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    };
+    const run = seam({
+      // Not a page by its exact name (code's instant reader leaves it), but
+      // the reader reads NAVIGATE PROFILE and its words gate would pass:
+      // outside the workspace this opened their own profile.
+      said: "can you just take me to my profile?",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "PROFILE",
+        visibility: null,
+      }),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      pageMoves,
+    });
+    await run.answer.answer(request(WORKSPACE));
+    // The reader stepped aside: the turn went to the answer, which settles
+    // the decision's move into what it stores (model-gateway's
+    // workspace-answer-move.test.ts), and the decision ran.
+    expect(run.delegated()).toBe(1);
+    expect(decided.length).toBeGreaterThan(0);
+    expect(
+      run.stored.flatMap((message) => message.blocks ?? []),
+    ).not.toContainEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "PROFILE" },
+    });
+  });
+
   it("a 'yes' with no offer before it is not read as one (N1)", async () => {
     const run = seam({
       said: "yes",

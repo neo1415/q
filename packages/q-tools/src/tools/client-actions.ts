@@ -742,6 +742,7 @@ export function createOpenPageTool(
     ...COMMON,
     id: OPEN_PAGE,
     providerName: "open_page",
+    movesPagePane: true,
     description:
       "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open the deck' or 'open the questions for Priya' is DOCUMENT with that title; 'open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR; 'rehearse / practise my meeting with X' is INVESTOR_REHEARSAL when X is an investor (they are a founder) and COMPANY_REHEARSAL when X is a company (they are an investor). Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
     input: OpenPageInputSchema,

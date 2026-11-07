@@ -3960,6 +3960,18 @@ export function createSpecialistQAnswer(
     }
     if (tool.kind === "NAVIGATE" && tool.destination !== null) {
       const destination = tool.destination;
+      // The Q Workspace (owner, 7 Nov 2026): the page pane has one
+      // authority, Q's page-move decision, which reads the same words with
+      // the whole site map, their records and the pane. The reader names
+      // only their own destinations, so it never moves the pane here: the
+      // turn is answered and the decision places the page.
+      if (request.plan.screen?.workspace !== undefined) {
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "q workspace: the page-move decision places the page, not the reader",
+        );
+        return null;
+      }
       if (destination === "COMPANY_VISIBILITY" && company === undefined) {
         return null;
       }

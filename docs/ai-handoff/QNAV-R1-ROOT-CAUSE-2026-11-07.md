@@ -68,3 +68,21 @@ Two caveats:
 - Several of the owner's turns are follow-ups about the company in the conversation ("their elevator"). The decision reads RECENT TURNS for that, but the answer path passes it only Q's and the person's text, not which company the conversation is about. That is R2's conversation-focus question; the decision should consume the same focus once R2 defines it.
 
 No live model calls were made for this note.
+
+## Implemented after approval (integration, 7 Nov)
+
+When the plan's screen carries `workspace`, the D78 decision is now the only thing that moves the page pane:
+
+- **The turn reader steps aside.** `actOnTool` NAVIGATE (`answer.ts`) emits no move in workspace mode. The turn goes to the answer, which settles the decision's move into the message it stores.
+- **No pane-moving tools for the answer model.** `open_page` and `open_company_document` carry `movesPagePane: true`, and the tool registry (`registry.ts`, `relevant`) doesn't offer them, or list them for the reader, while the workspace is on. They still execute when code calls them, because the decision resolves records through open_page's own authorize step. `show` (a Q-room card) stays.
+- **Fast navigation is unchanged.** Pages named exactly and records named in full still move at once, verified by code.
+- **F5, inside or outside the workspace.** Someone else's page word never opens the person's own page:
+  - `wordsNamePage` reads the page word's possessor;
+  - a sentence naming one of their counterparts doesn't follow the reader's own-destination move.
+- **Tests:**
+  - written failing first:
+    - `q-tools/test/tool-offer-bound.test.ts` (nothing that moves the pane is offered in workspace mode);
+    - `q-specialists/test/answer-turn-reading.test.ts` (the reader's move steps aside, the decision runs, and no own-page move is stored; plus F5);
+    - `fast-navigation.test.ts` (F5 wordsNamePage);
+  - a new coverage test of behaviour that already existed and was untested: `model-gateway/test/workspace-answer-move.test.ts` (a model-composed answer stores the decision's move).
+- **Next:** take W3's FOCUS block as an input to the decision once its contract exists.
