@@ -1892,3 +1892,17 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - vitest q-evals/q-core/q-specialists/model-gateway/contracts: 4928 passed;
   - root tsc 0;
   - eslint and prettier clean.
+
+## 2026-11-07 — W4 synced to integration 2131178 for batch 2
+
+- **Merged** integration 2131178. W3's 0354889 restored RESULTS → /results and CAPITAL_ROUND → /capital?round= as alias redirects.
+- **Reverted 771fe40's q-evals changes:**
+  - the RESULTS ≡ RELATIONSHIPS alias;
+  - the CAPITAL_ROUND rows.
+  - Both are redirect-only pages again, so the vocabulary marks them unreachable, and the seed round is the raise tab again.
+- **Gates:**
+  - package build 55/55;
+  - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4930 passed (q-nav 15/15);
+  - root tsc 0;
+  - eslint and prettier clean.
+- **Next:** held-out runs once on this SHA. The v5 `alternative` proposal and the dataset items in QNAV-R3-ROOT-CAUSES.md wait for the owner.

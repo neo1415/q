@@ -129,8 +129,7 @@ export const Q_NAV_THINGS = {
     title: "Chase legal on the SHA",
   },
   roundSeed: {
-    // W3 cd46eae: a round lands on Relationships' Capital (both sides).
-    page: "CAPITAL_ROUND",
+    page: null,
     id: navId("round:ledgerfold-seed"),
     title: "Ledgerfold seed round",
   },
@@ -209,11 +208,15 @@ export const Q_NAV_RECORDS: QNavRecords = {
   })),
   investors: Q_NAV_INVESTORS.map((i) => ({ id: i.id, name: i.name })),
   things: Object.values(Q_NAV_THINGS).map((t) => {
-    const place = targetToSitePlace(
-      t.page === "BOARD"
-        ? { page: "BOARD", itemId: t.id }
-        : QNavigateTargetSchema.parse({ page: t.page, recordId: t.id }),
-    );
+    // A round has no page of its own to name (/capital only redirects).
+    const place =
+      t.page === null
+        ? null
+        : targetToSitePlace(
+            t.page === "BOARD"
+              ? { page: "BOARD", itemId: t.id }
+              : QNavigateTargetSchema.parse({ page: t.page, recordId: t.id }),
+          );
     return {
       id: t.id,
       title: t.title,
