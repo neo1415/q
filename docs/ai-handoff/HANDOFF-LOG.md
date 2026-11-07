@@ -1814,3 +1814,35 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - vitest packages: 4912 passed;
   - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6, after restarting local Postgres;
   - eslint and prettier clean.
+
+## 2026-11-07 — q-nav tuning round 2 (`feat/q-navigation-policy`)
+
+- **Round 1 full dev result:** 510 turns, 72.9% pass, move-target 70.7%, wrong-page 6.9%, forbidden 0, $1.97, 92% cached. Receipt on integration: `docs/ai-handoff/receipts/2026-11-07-qnav-dev-r1.json`.
+- **Merged:** integration 02a89a0 and W2 `feat/q-site-map` 46e9a85 (per-tab and per-section audience, side-neutral purposes, resolve_page_target COMPANY/INVESTOR/BOARD_ITEM kinds).
+- **Root causes, from replaying every recorded proposal through resolution and policy:** many misses were code. The model's place was right and resolution or normalisation lost it.
+- **Resolution fixes** (`sitePlaceToTarget`), all general site-map rules:
+  - a page with nothing at page level opens on its own tab (/discover, /relationships);
+  - a route that is a tab's own path is that page at that tab (a relationship's calls, diligence, deal);
+  - a section only one tab shows names that tab;
+  - a page-wide section given with a tab is the page's own;
+  - the leading section of what is shown is the place itself, so it is dropped;
+  - a company record with no tab opens at its own tab (overview);
+  - a record page never keeps a list page's tab or section (`recordPageHasTab`);
+  - `byName` adds a words rule: unique only, never a guess.
+  - Replaying round 1's proposals, these alone recover 41 of 136 misses.
+- **Dataset changes**, documented, found by a new lint (every target must read back unchanged through the site map):
+  - COMPANY_INTEREST#interest becomes COMPANY_INTEREST, since interest is the page's only section;
+  - CAPITAL_RAISE#rounds becomes CAPITAL_RAISE, since rounds is the raise tab's leading section;
+  - H-ADV-004 ("Who's most engaged?" while on the interest page) becomes STAY, already there.
+- **Records the model sees:** things carry `opensOn` (their route), and a founder's own company is `theirOwn`.
+- **NAVIGATION_DECISION v3** (v2 deprecated, lock pinned). General rules only:
+  - never a nearby page for one that is not theirs or does not exist;
+  - a name said in full is that record;
+  - records open on their listed route;
+  - theirOwn is their own company or firm.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0;
+  - vitest packages: 4925 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.

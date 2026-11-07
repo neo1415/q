@@ -81,7 +81,7 @@ const SECTION_ASKS: readonly {
   {
     // Deck views are not built (W2): asking for them is a STAY
     // (curveballs); investor interest is the interest section.
-    target: section("COMPANY_INTEREST", "interest"),
+    target: dest("COMPANY_INTEREST"),
     side: "FOUNDER",
     dev: [
       "Which investors have shown interest in us?",
@@ -111,7 +111,7 @@ const SECTION_ASKS: readonly {
     heldout: ["Is anything blocked on my yes?"],
   },
   {
-    target: section("CAPITAL_RAISE", "rounds"),
+    target: dest("CAPITAL_RAISE"),
     side: "FOUNDER",
     dev: ["Show me all my rounds."],
     heldout: ["List every round we've done, on screen."],
@@ -576,7 +576,7 @@ function records(cases: CaseSet): void {
       "Bring up the seed round page.",
       // /capital only redirects, so the round has no page of its own to
       // name: it is a row of the raise tab's rounds (reported to W3).
-      section("CAPITAL_RAISE", "rounds"),
+      dest("CAPITAL_RAISE"),
       "Their round is listed on the raise tab's rounds.",
     ],
     [

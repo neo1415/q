@@ -17,7 +17,12 @@ import type {
   QNavTarget,
 } from "../datasets/q-nav/contracts.js";
 import { sidesOf } from "../datasets/q-nav/vocabulary.js";
-import { Q_NAV_RECORDS, type QNavRecords } from "../datasets/q-nav/world.js";
+import {
+  company,
+  Q_NAV_FOUNDER_COMPANY_KEY,
+  Q_NAV_RECORDS,
+  type QNavRecords,
+} from "../datasets/q-nav/world.js";
 import {
   gradeQNavTurn,
   summariseQNav,
@@ -70,7 +75,17 @@ export async function runQNav(
         modality: turn.modality,
         language: turn.language,
         context: turn.context,
-        records: Q_NAV_RECORDS,
+        // A founder's own company is theirs ("my company", "us").
+        records:
+          evalCase.side === "FOUNDER"
+            ? {
+                ...Q_NAV_RECORDS,
+                own: {
+                  kind: "COMPANY" as const,
+                  name: company(Q_NAV_FOUNDER_COMPANY_KEY).name,
+                },
+              }
+            : Q_NAV_RECORDS,
       });
       grades.push(gradeQNavTurn(evalCase, index, reply));
     }

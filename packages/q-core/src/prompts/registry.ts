@@ -249,6 +249,7 @@ import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { WEB_DISCOVERY_READER_V1 } from "./tasks/web-discovery-reader.v1.js";
 import { NAVIGATION_DECISION_V1 } from "./tasks/navigation-decision.v1.js";
 import { NAVIGATION_DECISION_V2 } from "./tasks/navigation-decision.v2.js";
+import { NAVIGATION_DECISION_V3 } from "./tasks/navigation-decision.v3.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -899,7 +900,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PERSON_BRIEF_READER_V1,
     WEB_DISCOVERY_READER_V1,
     { ...NAVIGATION_DECISION_V1, status: "DEPRECATED" },
-    NAVIGATION_DECISION_V2,
+    { ...NAVIGATION_DECISION_V2, status: "DEPRECATED" },
+    NAVIGATION_DECISION_V3,
     BRIEFING_COMMAND_V1,
     GATEQ_DOSSIER_SYNTHESIS_V1,
   ];

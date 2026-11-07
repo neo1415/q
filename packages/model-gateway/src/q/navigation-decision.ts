@@ -4,6 +4,8 @@ import {
   Q_SITE_MAP,
   QNavigateDestinationSchema,
   QNavigateTargetSchema,
+  QRecordTabSchema,
+  recordPageHasTab,
   type QResultBlock,
   qSiteMapDigest,
   qSiteMapLandingFor,
@@ -67,8 +69,17 @@ export type QNavigationRecords = {
       readonly { readonly title: string; readonly id: string }[] | undefined;
   }[];
   readonly investors: readonly { readonly id: string; readonly name: string }[];
-  readonly things: readonly { readonly id: string; readonly title: string }[];
+  /** Other records (a document, a Daily, a rehearsal), each with the route it opens on when known. */
+  readonly things: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly route?: string | undefined;
+  }[];
   readonly deleted: readonly { readonly id: string; readonly name: string }[];
+  /** Their own company or firm ("my company", "us"), by name. */
+  readonly own?:
+    | { readonly kind: "COMPANY" | "INVESTOR"; readonly name: string }
+    | undefined;
 };
 
 export type QNavigationInput = {
@@ -315,45 +326,102 @@ export function sitePlaceToTarget(
   ids: QResolvedIds,
   map: QSiteMap = Q_SITE_MAP,
 ): QNavigateTarget | null {
-  const page = pageByRoute(map, place.route);
-  if (page === undefined) return null;
-  const tab =
-    place.tab === null ? undefined : page.tabs.find((t) => t.id === place.tab);
-  if (place.tab !== null && tab === undefined) return null;
-  if (place.sectionId !== null) {
-    const section = page.sections.find((s) => s.id === place.sectionId);
-    if (section === undefined) return null;
-    if (
-      section.tab !== undefined &&
-      tab !== undefined &&
-      section.tab !== tab.id
-    )
-      return null;
+  let page = pageByRoute(map, place.route);
+  let tabId = place.tab;
+  // A route that is a tab's own path on another page (a relationship's
+  // calls, diligence or deal) is that page at that tab.
+  if (
+    page === undefined ||
+    (page.destinations.length === 0 && page.recordPages.length === 0)
+  ) {
+    const owner = tabOwningRoute(map, place.route);
+    if (owner !== null) {
+      page = owner.page;
+      tabId = tabId ?? owner.tab.id;
+    }
   }
+  if (page === undefined) return null;
+  let tab = tabId === null ? undefined : page.tabs.find((t) => t.id === tabId);
+  if (tabId !== null && tab === undefined) return null;
+  const section =
+    place.sectionId === null
+      ? undefined
+      : page.sections.find((s) => s.id === place.sectionId);
+  if (place.sectionId !== null && section === undefined) return null;
+  if (section?.tab !== undefined && tab !== undefined && section.tab !== tab.id)
+    return null;
+  const recordId =
+    ids.itemId !== null && page.route === "/board" ? null : ids.recordId;
+  // A section on the page whatever the tab is the page's own place.
+  if (
+    section !== undefined &&
+    section.tab === undefined &&
+    tab !== undefined &&
+    page.destinations.length > 0 &&
+    recordId === null
+  )
+    tab = undefined;
+  // A section only one tab shows names that tab.
+  if (section?.tab !== undefined && tab === undefined)
+    tab = page.tabs.find((t) => t.id === section.tab);
+  // Nothing at page level: the tab the page opens on.
+  if (tab === undefined && recordId === null && page.destinations.length === 0)
+    tab = openingTab(page);
+  // A record whose tabs are its own page's (a company): the tab it opens on.
+  if (tab === undefined && recordId !== null) {
+    const opening = openingTab(page);
+    if (opening !== undefined && hrefPath(opening.href) === page.route)
+      tab = opening;
+  }
+  // The leading section of what is shown is that place itself.
+  const leading =
+    section !== undefined && leadingSection(page, tab)?.id === section.id;
+  const sectionId = section === undefined || leading ? null : section.id;
+  const position =
+    place.position === "section" && sectionId === null ? null : place.position;
   const detail = {
     ...(ids.documentId === null ? {} : { documentId: ids.documentId }),
     ...(place.slide === null ? {} : { slide: place.slide }),
-    ...(place.sectionId === null ? {} : { sectionId: place.sectionId }),
-    ...(place.position === null ? {} : { position: place.position }),
+    ...(sectionId === null ? {} : { sectionId }),
+    ...(position === null ? {} : { position }),
   };
   let candidate: Record<string, unknown>;
   const [tabDestination] = tab?.destinations ?? [];
-  if (tabDestination !== undefined && ids.recordId === null) {
+  if (
+    tabDestination !== undefined &&
+    recordId === null &&
+    ids.itemId === null
+  ) {
     candidate = { page: tabDestination, ...detail };
   } else if (ids.itemId !== null && page.route === "/board") {
     candidate = { page: "BOARD", itemId: ids.itemId, ...detail };
-  } else if (ids.recordId !== null) {
+  } else if (recordId !== null) {
     const [recordPage] = page.recordPages;
     if (recordPage === undefined) return null;
     const thread =
       tab?.id === "messages" &&
       (recordPage === "RELATIONSHIP_COMPANY" ||
         recordPage === "RELATIONSHIP_INVESTOR");
+    // A record page opens the record itself: a list page's tab, and a
+    // section on it, are not the record's own.
+    const recordTab =
+      tab === undefined || thread ? null : QRecordTabSchema.safeParse(tab.id);
+    const ownTab =
+      recordTab?.success === true &&
+      recordPageHasTab(recordPage, recordTab.data)
+        ? recordTab.data
+        : null;
+    const listTab = tab !== undefined && !thread && ownTab === null;
     candidate = {
       page: thread ? `${recordPage}_MESSAGES` : recordPage,
-      recordId: ids.recordId,
-      ...(tab === undefined || thread ? {} : { tab: tab.id }),
-      ...detail,
+      recordId,
+      ...(ownTab === null ? {} : { tab: ownTab }),
+      ...(listTab && section?.tab !== undefined
+        ? {
+            ...(ids.documentId === null ? {} : { documentId: ids.documentId }),
+            ...(place.slide === null ? {} : { slide: place.slide }),
+          }
+        : detail),
     };
   } else {
     const [destination] = page.destinations;
@@ -362,6 +430,44 @@ export function sitePlaceToTarget(
   }
   const parsed = QNavigateTargetSchema.safeParse(candidate);
   return parsed.success ? parsed.data : null;
+}
+
+const hrefPath = (href: string): string => href.split(/[?#]/u)[0] ?? href;
+
+/** The tab a page opens on: its own path with no query, else the first on its path. */
+function openingTab(
+  page: QSiteMapPage,
+): QSiteMapPage["tabs"][number] | undefined {
+  return (
+    page.tabs.find((t) => t.href === page.route) ??
+    page.tabs.find((t) => hrefPath(t.href) === page.route)
+  );
+}
+
+/** The page and tab whose tab lives at this route (its own path). */
+function tabOwningRoute(
+  map: QSiteMap,
+  route: string,
+): { page: QSiteMapPage; tab: QSiteMapPage["tabs"][number] } | null {
+  for (const page of map.pages) {
+    if (page.route === route) continue;
+    const tab = page.tabs.find((t) => hrefPath(t.href) === route);
+    if (tab !== undefined) return { page, tab };
+  }
+  return null;
+}
+
+/** The first section shown at a place: the tab's own first, else the page's. */
+function leadingSection(
+  page: QSiteMapPage,
+  tab: QSiteMapPage["tabs"][number] | undefined,
+): QSiteMapPage["sections"][number] | undefined {
+  return (
+    (tab === undefined
+      ? undefined
+      : page.sections.find((s) => s.tab === tab.id)) ??
+    page.sections.find((s) => s.tab === undefined)
+  );
 }
 
 // --- 1. Decide -------------------------------------------------------------
@@ -413,8 +519,11 @@ export function navigationVariables(
         : { documents: c.documents.map((d) => d.title) }),
     })),
     investors: input.records.investors.map((i) => i.name),
-    things: input.records.things.map((t) => t.title),
+    things: input.records.things.map((t) =>
+      t.route === undefined ? t.title : { title: t.title, opensOn: t.route },
+    ),
     deleted: input.records.deleted.map((d) => d.name),
+    ...(input.records.own === undefined ? {} : { theirOwn: input.records.own }),
   };
   return {
     utterance: input.utterance,
@@ -511,7 +620,28 @@ export function createQNavigationDecider(dependencies: {
 const norm = (text: string): string =>
   text.toLowerCase().replace(/[’']/gu, "'").replace(/\s+/gu, " ").trim();
 
-/** One record by its name: exact, else the one name that contains it. */
+const NAME_STOP = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "our",
+  "my",
+  "your",
+  "of",
+]);
+const nameWords = (text: string): string[] =>
+  norm(text)
+    .replace(/'s\b/gu, "")
+    .replace(/[^\p{L}\p{N} ]+/gu, " ")
+    .split(" ")
+    .filter((word) => word.length >= 3 && !NAME_STOP.has(word));
+
+/**
+ * One record by its name: exact; else the one name that contains what was
+ * said; else the one whose every word was said (or that holds every word
+ * said). Two that fit, or none, is no record: never a guess.
+ */
 function byName<T>(
   list: readonly T[],
   nameOf: (item: T) => string,
@@ -520,8 +650,21 @@ function byName<T>(
   const wanted = norm(said);
   const exact = list.filter((item) => norm(nameOf(item)) === wanted);
   if (exact.length === 1) return exact[0] ?? null;
+  if (exact.length > 1) return null;
   const partial = list.filter((item) => norm(nameOf(item)).includes(wanted));
-  return partial.length === 1 ? (partial[0] ?? null) : null;
+  if (partial.length === 1) return partial[0] ?? null;
+  if (partial.length > 1) return null;
+  const saidWords = new Set(nameWords(said));
+  if (saidWords.size === 0) return null;
+  const byWords = list.filter((item) => {
+    const words = nameWords(nameOf(item));
+    return (
+      words.length > 0 &&
+      (words.every((w) => saidWords.has(w)) ||
+        [...saidWords].every((w) => words.includes(w)))
+    );
+  });
+  return byWords.length === 1 ? (byWords[0] ?? null) : null;
 }
 
 export type QNavigationResolution =

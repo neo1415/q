@@ -1777,6 +1777,7 @@ export { WEB_DISCOVERY_READER_V1 } from "./prompts/tasks/web-discovery-reader.v1
 // Q Workspace W4.1: the page pane's MOVE / OFFER / STAY.
 export { NAVIGATION_DECISION_V1 } from "./prompts/tasks/navigation-decision.v1.js";
 export { NAVIGATION_DECISION_V2 } from "./prompts/tasks/navigation-decision.v2.js";
+export { NAVIGATION_DECISION_V3 } from "./prompts/tasks/navigation-decision.v3.js";
 export * from "./prompts/schemas/navigation-decision.js";
 export {
   WEB_DISCOVERY_READER_COMPANIES_MAX,

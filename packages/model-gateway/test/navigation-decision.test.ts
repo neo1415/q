@@ -622,7 +622,8 @@ describe("the page pane's place from the screen (W1's screen.workspace paths)", 
         "/relationships?view=capital#section-commitments",
         { page: "CAPITAL", sectionId: "commitments", position: "section" },
       ],
-      [`/company/${id}`, { page: "COMPANY", recordId: id }],
+      // A company opens on its overview tab.
+      [`/company/${id}`, { page: "COMPANY", recordId: id, tab: "overview" }],
       [
         `/company/${id}?tab=deck&slide=4&open=1`,
         { page: "COMPANY", recordId: id, tab: "deck", slide: 4 },
@@ -856,5 +857,115 @@ describe("the answer path's page moves (createQPageMoves)", () => {
     const r4 = answerRequest(ON);
     failed.start(r4, turn);
     expect(await failed.settle(r4, [])).toEqual([]);
+  });
+});
+
+describe("the site map's own place (q-nav round 2: resolution rules)", () => {
+  const at = (
+    route: string,
+    over: Partial<{
+      tab: string;
+      sectionId: string;
+      position: "section" | "latest";
+    }> = {},
+    ids: Partial<{ recordId: string; itemId: string; documentId: string }> = {},
+  ) =>
+    sitePlaceToTarget(
+      {
+        route,
+        tab: over.tab ?? null,
+        sectionId: over.sectionId ?? null,
+        slide: null,
+        position: over.position ?? null,
+      },
+      {
+        recordId: ids.recordId ?? null,
+        documentId: ids.documentId ?? null,
+        itemId: ids.itemId ?? null,
+      },
+    );
+
+  it("a page with nothing at page level opens on its own tab", () => {
+    expect(at("/discover")).toEqual({ page: "DISCOVER" });
+    expect(at("/relationships")).toEqual({ page: "RELATIONSHIPS" });
+  });
+
+  it("a route that is a tab's own path is that page at that tab", () => {
+    expect(
+      at("/relationships/company/[companyId]/calls", {}, { recordId: SILO }),
+    ).toEqual({ page: "RELATIONSHIP_COMPANY", recordId: SILO, tab: "calls" });
+  });
+
+  it("the leading section of what is shown is the place itself; a later one is kept", () => {
+    expect(
+      at("/relationships", {
+        tab: "pipeline",
+        sectionId: "pipeline",
+        position: "section",
+      }),
+    ).toEqual({ page: "CRM_PIPELINE" });
+    expect(
+      at("/relationships", {
+        tab: "capital",
+        sectionId: "commitments",
+        position: "section",
+      }),
+    ).toEqual({
+      page: "CAPITAL",
+      sectionId: "commitments",
+      position: "section",
+    });
+    expect(
+      at(
+        "/company/[companyId]",
+        { tab: "team", sectionId: "team", position: "section" },
+        { recordId: SILO },
+      ),
+    ).toEqual({ page: "COMPANY", recordId: SILO, tab: "team" });
+  });
+
+  it("a page-wide section with a tab is the page's; a record opens at its own tab, never a list's", () => {
+    expect(
+      at("/work", {
+        tab: "needs",
+        sectionId: "approvals",
+        position: "section",
+      }),
+    ).toEqual({ page: "WORK", sectionId: "approvals", position: "section" });
+    expect(at("/company/[companyId]", {}, { recordId: SILO })).toEqual({
+      page: "COMPANY",
+      recordId: SILO,
+      tab: "overview",
+    });
+    expect(
+      at(
+        "/gateq",
+        { tab: "inbox", sectionId: "gateq-application", position: "section" },
+        { recordId: CARD },
+      ),
+    ).toEqual({ page: "GATEQ_APPLICATION", recordId: CARD });
+  });
+
+  it("finds a record whose every word was said, and never one of two", () => {
+    const pick = (said: string) =>
+      resolveNavigationPlace(
+        proposal({
+          place: place({
+            route: "/board",
+            record: { kind: "THING", name: said },
+          }),
+        }),
+        input(),
+      );
+    expect(pick("the call tunde about the term sheet card")).toEqual({
+      kind: "TARGET",
+      target: { page: "BOARD", itemId: CARD },
+    });
+    expect(
+      resolveNavigationPlace(
+        proposal({ place: place({ record: company("Silo") }) }),
+        input(),
+      ),
+    ).toEqual({ kind: "UNRESOLVED" });
   });
 });
