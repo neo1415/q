@@ -37,7 +37,10 @@ export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
     "How open are you to founders reaching out to you: only well-matched ones, anyone, or nobody for now?",
   "F0.intent":
     "What brings you to Capital Q: are you raising for a company now, getting ready to raise, or just exploring?",
-  "F1.country": "Where is the company based?",
+  "F1.country": "Where is the company based: which city and country?",
+  "F1.city": "Which city is the company based in?",
+  "F1.founded_year": "What year was the company founded?",
+  "F1.one_line": "How would you put the company in one line, for investors?",
   "F1.stage": "What stage is the company at: pre-seed, seed, Series A?",
   "F1.description": "In a sentence or two, what does the company do?",
   "F1.categories":
@@ -69,6 +72,8 @@ export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
   "I0.business_title": "What's your role there?",
   "I0.website": "What's your firm's website?",
   "I0.hq_country": "Which country is your firm based in?",
+  "I11.public_description":
+    "How would you describe your firm to a founder, in a few sentences?",
   "I1.mandate_context":
     "Are we setting up your main investment strategy, or a different one?",
   "I2.currency": "Which currency do you write cheques in?",

@@ -69,6 +69,7 @@ import {
 import { localFigureOf } from "../local-figures/provenance.js";
 import { founderCountryOf } from "../definition/country.js";
 import { FOUNDER_FINANCIAL_WRITE_TARGET } from "../definition/founder-v4.js";
+import { FOUNDER_V10_STEPS } from "../definition/founder-v10.js";
 import {
   createFounderDomainServices,
   type FounderDomainDependencies,
@@ -415,6 +416,26 @@ function companyBasicsChanges(
     }
     case FOUNDER_STEPS.description:
       return { primaryDescription: text(values, stepKey) };
+    // v10 (batch 7): the profile's city, founding year and one-line
+    // summary. "I don't know" leaves each unknown (text() reads none).
+    case FOUNDER_V10_STEPS.city:
+      return { headquartersCity: text(values, stepKey) };
+    case FOUNDER_V10_STEPS.oneLine:
+      return { shortDescription: text(values, stepKey) };
+    case FOUNDER_V10_STEPS.foundedYear: {
+      const year = integer(values, stepKey);
+      if (year === null) return { foundedDate: null };
+      if (year > new Date().getUTCFullYear()) {
+        invalid(
+          "value.value",
+          "founded_in_future",
+          "That year hasn't happened yet.",
+        );
+      }
+      // The year is what they told us: kept as its first day, and shown
+      // as the year only.
+      return { foundedDate: `${String(year).padStart(4, "0")}-01-01` };
+    }
     default:
       return invalid(
         "stepKey",

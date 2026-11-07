@@ -2,6 +2,7 @@ import {
   INVESTOR_DEFINITION_CURRENT,
   INVESTOR_STEPS,
   INVESTOR_HQ_COUNTRY_STEP,
+  INVESTOR_PUBLIC_DESCRIPTION_STEP,
   INVESTOR_WEBSITE_STEP,
   type InvestorHandoffContext,
   type InvestorMandatesContext,
@@ -28,6 +29,7 @@ import {
   type SyntheticNode,
 } from "../../onboarding-kit/fixture-runtime";
 import type { RuntimePort } from "../../onboarding-kit/runtime-port";
+import { NONE_ANSWER_TEXT } from "@capital-q/onboarding/response-values";
 
 /**
  * Development fixture for the investor journey: the kit's in-memory runtime
@@ -428,16 +430,27 @@ function seedState(seed: FixtureSeed): FixtureState {
         [S.discoveryMode, single_("balanced")],
         [S.inboundPreference, single_("qualified")],
       );
-      skipped.push(
-        S.sectorsAvoid,
-        S.customerTypes,
-        S.regulatoryAppetite,
-        S.revenueState,
-        S.founderPreferences,
-        S.greenFlagStrength,
-        S.customCriteria,
-        S.portfolio,
-        S.additionalContext,
+      // v5 (batch 7): every list is mandatory; "None" answers what has
+      // nothing for them, and the firm describes itself.
+      answered.push(
+        [S.greenFlagStrength, single_("strong")],
+        [
+          INVESTOR_PUBLIC_DESCRIPTION_STEP,
+          text_("Northbank backs early fintech in West Africa."),
+        ],
+        ...[
+          S.sectorsAvoid,
+          S.customerTypes,
+          S.regulatoryAppetite,
+          S.revenueState,
+          S.founderPreferences,
+          S.customCriteria,
+          S.portfolio,
+          S.additionalContext,
+        ].map((key): [string, ReturnType<typeof text_>] => [
+          key,
+          text_(NONE_ANSWER_TEXT),
+        ]),
       );
       break;
   }

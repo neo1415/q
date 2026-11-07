@@ -28,11 +28,11 @@ const required = (key: string): boolean | undefined =>
   FOUNDER_DEFINITION_V9.steps.find((s) => s.stepKey === key)?.required;
 
 describe("founder definition v9", () => {
-  it("is valid and current", () => {
+  it("is valid, and superseded by v10 for new sessions", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V9),
     ).not.toThrow();
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(9);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(10);
   });
 
   it("makes the profile's, matching's and verification's fields mandatory", () => {

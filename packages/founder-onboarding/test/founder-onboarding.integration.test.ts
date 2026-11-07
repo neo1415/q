@@ -54,6 +54,7 @@ import {
   FOUNDER_FINANCIAL_STEPS,
   FOUNDER_PROFILE_STEPS,
   FOUNDER_STEPS,
+  FOUNDER_V10_STEPS,
   founderCountryAnswer,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
@@ -415,11 +416,15 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         headquarters_country: string | null;
         current_stage_code: string | null;
         primary_description: string | null;
+        headquarters_city: string | null;
+        founded_date: string | null;
+        short_description: string | null;
         organisation_id: string;
         tenant_id: string;
         version: number;
       }[]
     >`select canonical_name, website_url, headquarters_country, current_stage_code, primary_description,
+             headquarters_city, founded_date::text as founded_date, short_description,
              organisation_id, tenant_id, version
         from core.companies where id = ${companyId}`;
     return row;
@@ -448,11 +453,11 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      // v9 is the published journey (20261231440000, the mandatory set,
-      // DECISIONS 79): v4's optional financials, v6's company-profile
-      // sections, v7's customers at seed, v8's country from the geography
-      // taxonomy.
-      expect(journey.view().session.definitionVersion).toBe(9);
+      // v10 is the published journey (20261231460000, batch 7: city,
+      // founding year, one line; v9 the mandatory set): v4's optional
+      // financials, v6's company-profile sections, v7's customers at seed,
+      // v8's country from the geography taxonomy.
+      expect(journey.view().session.definitionVersion).toBe(10);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(
@@ -517,15 +522,25 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         "DK",
       );
       await journey.submit(FOUNDER_STEPS.country, founderCountryAnswer("NG"));
+      // v10 (batch 7): the city and founding year, asked with the country.
+      await journey.submit(FOUNDER_V10_STEPS.city, text("Lagos"));
+      await journey.submit(FOUNDER_V10_STEPS.foundedYear, range("2021"));
       await journey.submit(FOUNDER_STEPS.stage, single("seed"));
       await journey.submit(
         FOUNDER_STEPS.description,
         text(`Claims automation for insurers. ${DESCRIPTION_MARKER}`),
       );
+      await journey.submit(
+        FOUNDER_V10_STEPS.oneLine,
+        text("Claims automation for mid-sized insurers."),
+      );
       const afterBasics = await companyRow(tx, companyId);
       expect(afterBasics).toMatchObject({
         website_url: "https://nexarail.example",
         headquarters_country: "NG",
+        headquarters_city: "Lagos",
+        founded_date: "2021-01-01",
+        short_description: "Claims automation for mid-sized insurers.",
         current_stage_code: "seed",
       });
       expect(afterBasics?.primary_description).toContain(DESCRIPTION_MARKER);
@@ -876,8 +891,11 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       );
       await journey.pass(FOUNDER_STEPS.website);
       await journey.pass(FOUNDER_STEPS.country);
+      await journey.pass(FOUNDER_V10_STEPS.city);
+      await journey.pass(FOUNDER_V10_STEPS.foundedYear);
       await journey.submit(FOUNDER_STEPS.stage, single("series_a"));
       await journey.pass(FOUNDER_STEPS.description);
+      await journey.pass(FOUNDER_V10_STEPS.oneLine);
       const [stage] = await tx.sql<
         { id: string }[]
       >`select n.id from taxonomy.nodes n join taxonomy.vocabularies v on v.id = n.vocabulary_id

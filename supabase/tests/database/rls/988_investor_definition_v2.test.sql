@@ -9,7 +9,7 @@ select plan(5);
 
 select is(
   (select current_version from onboarding.definitions where journey_type = 'investor'),
-  4, 'new investor sessions pin to v4, a later version than v2 (997 covers v3, 998 v4)');
+  5, 'new investor sessions pin to v5, a later version than v2 (997 covers v3, 998 v4 and v5)');
 
 select ok(
   exists (select 1 from onboarding.definition_versions v

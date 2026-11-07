@@ -52,7 +52,8 @@ describe("Investor Definition v4", () => {
     expect(() =>
       validateOnboardingManifest(INVESTOR_DEFINITION_V4),
     ).not.toThrow();
-    expect(INVESTOR_DEFINITION_CURRENT).toBe(INVESTOR_DEFINITION_V4);
+    // v5 (batch 7) supersedes it for new sessions.
+    expect(INVESTOR_DEFINITION_CURRENT.version).toBe(5);
     expect(INVESTOR_DEFINITION_V4.version).toBe(4);
   });
 

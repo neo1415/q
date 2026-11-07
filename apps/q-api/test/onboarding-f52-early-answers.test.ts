@@ -8,6 +8,10 @@ import type {
   PendingWriteRepository,
 } from "@capital-q/onboarding";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
+import {
+  INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V1,
+} from "@capital-q/investor-onboarding";
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createHeldWritesStore } from "../src/voice/held-writes.js";
@@ -15,6 +19,37 @@ import { createInterviewAgent } from "../src/voice/interview-agent.js";
 import { createOnboardingPort } from "../src/voice/onboarding-port.js";
 
 import { investorSession, turn } from "./interviewer-fixtures.js";
+
+/** Investor v5's lists, answered as the test world (v1 steps) holds them. */
+const V5_LISTS: Readonly<Record<string, string>> = Object.fromEntries(
+  INVESTOR_DEFINITION_V1.steps
+    .filter(
+      (step) =>
+        INVESTOR_DEFINITION_CURRENT.steps.find(
+          (now) => now.stepKey === step.stepKey,
+        )?.required === true &&
+        step.configuration.stepType !== "confirmation" &&
+        !step.stepKey.startsWith("I0.") &&
+        !step.stepKey.startsWith("I1.") &&
+        !step.stepKey.startsWith("I2.") &&
+        step.stepKey !== "I3.geography" &&
+        step.stepKey !== "I3.sectors" &&
+        step.stepKey !== "I10.inbound_preference",
+    )
+    .map((step) => {
+      const c = step.configuration;
+      return [
+        step.stepKey,
+        c.stepType === "single_select" || c.stepType === "multi_select"
+          ? (c.options[0]?.optionKey ?? "x")
+          : c.stepType === "range"
+            ? c.min
+            : c.stepType === "reference_select"
+              ? "c1000000-0000-4000-8000-000000000003"
+              : "value",
+      ] as const;
+    }),
+);
 
 /**
  * F-52 (production QA 2026-10-23): a new investor's first answer named the
@@ -640,6 +675,9 @@ describe("QO-29: once the essentials are in, making the mandate live is asked ne
         "I3.sectors": "c1000000-0000-4000-8000-000000000003",
         "I9.discovery_mode": "focused",
         "I10.inbound_preference": "open",
+        // Mandatory from investor v5 (batch 7): every list, and how firm
+        // each focus is.
+        ...V5_LISTS,
       },
     });
     const port = createOnboardingPort({

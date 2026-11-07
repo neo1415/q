@@ -10,7 +10,7 @@ select plan(6);
 
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  9, 'new founder sessions pin to v9, a later version than v5 (979 covers v6, 992 v7, 996 v8, 998 v9)');
+  10, 'new founder sessions pin to v10, a later version than v5 (996 covers v8, 998 v9, 999 v10)');
 
 select ok(
   exists (select 1 from onboarding.definition_versions v

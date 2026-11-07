@@ -389,6 +389,11 @@ export function OwnProfileView({
                   fields: omit(COMPANY_FIELDS, [
                     "shortDescription",
                     "primaryDescription",
+                    // The legal name belongs to verification (KYB), never
+                    // onboarding: an empty row is not shown (batch 7).
+                    ...(company.legalName === null
+                      ? (["legalName"] as const)
+                      : []),
                   ]),
                   values: fieldValues(COMPANY_FIELDS, company),
                   version: company.version,

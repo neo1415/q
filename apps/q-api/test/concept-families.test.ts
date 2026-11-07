@@ -103,7 +103,7 @@ function firewall(): ContextFirewallPort {
 }
 
 describe("the loop never offers a covered step as its question", () => {
-  it("the state says it is covered, and the screen is not given it to ask", async () => {
+  it("a mandatory member of the family is not covered by another: it is asked (batch 7, investor v5)", async () => {
     const world = investorSession({
       currentStepKey: "I7.sector_exclusions",
       recorded: {
@@ -136,15 +136,14 @@ describe("the loop never offers a covered step as its question", () => {
       recommendations: world.recommendations,
     }).turn({ ...turn(world, "Seed stage only."), actor });
 
-    expect(seen[0]).toContain('"coveredBy":"I7.hard_exclusions"');
-    // Never the covered step; since 2026-10-29 the turn asks what is
-    // really open instead of ending with no question.
-    expect(outcome.asking?.stepKey).not.toBe("I7.sector_exclusions");
-    expect(outcome.askingAbout).not.toContain("I7.sector_exclusions");
-    expect(outcome.reply).not.toContain("Any sectors to exclude");
+    // Every list is mandatory from investor v5, and "None" answers it: a
+    // family member answered no longer covers the rest, which Q asks
+    // together (the checklist groups them).
+    expect(seen[0]).not.toContain('"coveredBy":"I7.hard_exclusions"');
+    expect(outcome.degraded).toBe(false);
   });
 
-  it("the write that settles a concept leaves the rest of its family out of what is still open", async () => {
+  it("the write that settles one member leaves the rest of the family open while it is mandatory (batch 7)", async () => {
     const world = investorSession({
       currentStepKey: "I7.hard_exclusions",
       recorded: {
@@ -202,8 +201,9 @@ describe("the loop never offers a covered step as its question", () => {
     const after = seen[1] ?? "";
     const stillOpen = after.slice(after.indexOf('"stillOpen"'));
     expect(after).toContain('"outcome":"COMMITTED"');
+    expect(stillOpen.includes('"stepKey":"I7.hard_exclusions"')).toBe(false);
     for (const key of FAMILY.filter((k) => k !== "I7.hard_exclusions")) {
-      expect(stillOpen.includes(`"stepKey":"${key}"`), key).toBe(false);
+      expect(stillOpen.includes(`"stepKey":"${key}"`), key).toBe(true);
     }
   });
 });

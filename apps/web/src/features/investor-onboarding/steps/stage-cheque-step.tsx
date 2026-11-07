@@ -119,7 +119,7 @@ export function StageChequeStep({
       <MoneyInput
         id="cheque-min"
         label={t("Minimum cheque")}
-        description={t("Optional. Exact figures in one currency.")}
+        description={t("Exact figures in one currency.")}
         value={min}
         currencies={step.currencies}
         disabled={busy}
@@ -132,7 +132,6 @@ export function StageChequeStep({
       <MoneyInput
         id="cheque-typical"
         label={t("Typical cheque")}
-        description={t("Optional.")}
         value={typical}
         currencies={step.currencies}
         disabled={busy}
@@ -145,7 +144,6 @@ export function StageChequeStep({
       <MoneyInput
         id="cheque-max"
         label={t("Maximum cheque")}
-        description={t("Optional.")}
         value={max}
         currencies={step.currencies}
         disabled={busy}
@@ -160,7 +158,7 @@ export function StageChequeStep({
         id="mandate-roles"
         name="roles"
         legend="How do you usually take part?"
-        description={t("Optional. Choose any that apply.")}
+        description={t("Choose any that apply.")}
         options={step.roleOptions}
         values={roles}
         disabled={busy}

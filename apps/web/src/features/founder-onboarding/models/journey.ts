@@ -15,6 +15,7 @@ import {
   FOUNDER_PROFILE_SECTION_STEPS,
   FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
+  FOUNDER_V10_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
@@ -121,7 +122,14 @@ export const GROUPS: readonly Group[] = [
     kind: "company_basics",
     section: "company",
     title: "Your company",
-    stepKeys: [S.companyName, S.website, S.country],
+    // v10 (batch 7): the city and founding year, asked with the country.
+    stepKeys: [
+      S.companyName,
+      S.website,
+      S.country,
+      FOUNDER_V10_STEPS.city,
+      FOUNDER_V10_STEPS.foundedYear,
+    ],
   },
   {
     id: "stage",
@@ -269,6 +277,22 @@ function config(stepKey: string) {
 }
 
 /** A step this build does not know: its question and a text field. */
+/** Whether the session's own journey has the step (v10 added the city). */
+function hasStep(
+  view:
+    | {
+        readonly progress: {
+          readonly eligibleSteps: readonly { readonly stepKey: string }[];
+        };
+      }
+    | undefined,
+  key: string,
+) {
+  return (
+    view?.progress.eligibleSteps.some((step) => step.stepKey === key) ?? false
+  );
+}
+
 function fallbackGroup(stepKey: string): Group {
   return {
     id: `step:${stepKey}`,
@@ -667,9 +691,13 @@ function buildStep(
       const name = text(state, S.companyName);
       const website = text(state, S.website);
       const country = founderCountryOf(state.responses.get(S.country))?.iso;
+      const city = text(state, FOUNDER_V10_STEPS.city);
+      const year = state.responses.get(FOUNDER_V10_STEPS.foundedYear);
+      const foundedYear = year?.type === "RANGE" ? year.value : undefined;
       return {
         ...base(group, "company_basics", state),
         countries: countryChoices(state.view.session.definitionVersion),
+        asksCityAndYear: hasStep(state.view, FOUNDER_V10_STEPS.city),
         ...(website === undefined
           ? suggestedWebsiteOf(extras.suggestions ?? [])
           : {}),
@@ -681,6 +709,8 @@ function buildStep(
                 name,
                 ...(website === undefined ? {} : { website }),
                 ...(country === undefined ? {} : { countryCode: country }),
+                ...(city === undefined ? {} : { city }),
+                ...(foundedYear === undefined ? {} : { foundedYear }),
               },
       };
     }
@@ -1189,6 +1219,18 @@ export function planSubmissions(
           response.countryCode,
           view?.session?.definitionVersion ?? FOUNDER_DEFINITION_V8_VERSION,
         ),
+        // Only a journey that has them (v10 onward) is sent them.
+        ...(hasStep(view, FOUNDER_V10_STEPS.city)
+          ? [
+              textOrSkip(FOUNDER_V10_STEPS.city, response.city),
+              response.foundedYear === undefined
+                ? skip(FOUNDER_V10_STEPS.foundedYear)
+                : submit(FOUNDER_V10_STEPS.foundedYear, {
+                    type: "RANGE",
+                    value: response.foundedYear,
+                  }),
+            ]
+          : []),
       ];
     case "taxonomy_select":
       return [

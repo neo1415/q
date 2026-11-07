@@ -1,5 +1,6 @@
 import type { OnboardingResponseValue } from "@capital-q/contracts";
 
+import { holdsNoValue } from "../application/response-values.js";
 import {
   BRANCH_MAX_DEPTH,
   type BranchExpression,
@@ -71,7 +72,12 @@ export function evaluateBranch(
   }
   switch (expression.op) {
     case "EXISTS":
-      return snapshot.has(expression.stepKey);
+      // "I don't know" or "None" holds nothing for a follow-up to be about
+      // (no "how firm is that?" after "None").
+      return (
+        snapshot.has(expression.stepKey) &&
+        !holdsNoValue(snapshot.get(expression.stepKey))
+      );
     case "EQUALS": {
       const value = snapshot.get(expression.stepKey);
       return value === undefined

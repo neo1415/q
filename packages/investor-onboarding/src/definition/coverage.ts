@@ -263,9 +263,10 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 30,
     },
     [INVESTOR_STEPS.discoveryMode]: {
+      // Optional from investor v4 (DECISIONS 79): nothing ranks on it.
       rank: 8,
       concept: "discovery.mode",
-      priority: "ESSENTIAL",
+      priority: "OPTIONAL",
       label: "Discovery",
       seconds: 10,
     },
