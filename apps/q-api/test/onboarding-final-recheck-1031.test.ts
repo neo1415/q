@@ -257,6 +257,8 @@ describe("2. every step the turn's words answer is written, even one their answe
       fetch: world.fetch,
       logger,
       readAfterMs: 5,
+      // As production wires it: a held figure waits there (D-OWN-3).
+      recommendations: world.recommendations,
       reader: {
         // As a reader does: it can give only the steps it is shown.
         read: (input) => {
@@ -318,10 +320,13 @@ describe("2. every step the turn's words answer is written, even one their answe
       type: "SINGLE_SELECT",
       optionKey: "active",
     });
-    expect(world.recordedValue("F6.target_amount")).toEqual({
-      type: "RANGE",
-      value: "1500000",
-    });
+    // D-OWN-3 (DECISIONS 78): a number is held for its read-back, never saved
+    // before their yes; the value held is exactly the figure they gave.
+    expect(world.recordedValue("F6.target_amount")).toBeUndefined();
+    expect(
+      world.heldSuggestions().find((s) => s.stepKey === "F6.target_amount")
+        ?.value,
+    ).toEqual({ type: "RANGE", value: "1500000" });
     expect(world.recordedValue("F6.currency")).toEqual({
       type: "SINGLE_SELECT",
       optionKey: "eur",

@@ -112,9 +112,9 @@ describe("ONBOARDING_TRANSCRIPT_READER v15 and ONBOARDING_TYPED_REPLY v8 (P1-1)"
   const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
   const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
 
-  it("are active", () => {
-    expect(reader.version).toBe(15);
-    expect(reply.version).toBe(8);
+  it("carry into the active versions (reader v16, reply v9: DECISIONS 79)", () => {
+    expect(reader.version).toBe(16);
+    expect(reply.version).toBe(9);
   });
 
   it("the reader judges a LONG_TEXT answer clear (their words, filler removed) or rambling (a summary)", () => {
@@ -188,5 +188,30 @@ describe("a spoken answer's own words meet a stricter bar (P1-1 live run 1)", ()
     expect(check.deletionsOnly).toBe(true);
     expect(check.kept).toBeLessThan(SPOKEN_MIN_KEPT);
     expect(cleanedFromTheirLine(cut, said, { spoken: true })).toBe(false);
+  });
+});
+
+describe("DECISIONS 79: Q stops advertising optionality", () => {
+  const registry = createDefaultPromptRegistry();
+  const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
+  const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
+
+  it("the typed reply never offers a skip, and still accepts one they offer", () => {
+    expect(reply.template).not.toMatch(/saying they can skip/iu);
+    expect(reply.template).toMatch(
+      /Never say a question is optional or can be skipped/u,
+    );
+    expect(reply.template).toMatch(
+      /If they ask to skip something, or say they don't know, move on/u,
+    );
+  });
+
+  it("the reader holds a required step they do not have as not known", () => {
+    expect(reader.template).toMatch(
+      /a required step under notKnown with those words/u,
+    );
+    expect(reader.template).toMatch(
+      /an optional step goes under declined with those words/u,
+    );
   });
 });

@@ -721,7 +721,7 @@ export function spokenAcknowledgement(
         : `I do need this one to finish setting things up: ${understood.why}`;
     case "WHY":
       return understood.why === null
-        ? "It helps me describe you accurately to the right people. You can skip it if you'd rather."
+        ? "It helps me describe you accurately to the right people."
         : understood.why;
     case "UPLOAD":
       return "Go ahead and add the document on screen whenever you're ready. Whatever it covers, I won't ask again.";

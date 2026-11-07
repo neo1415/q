@@ -8,6 +8,7 @@ import {
   type ValidationIssue,
 } from "@capital-q/contracts";
 
+import { isNotKnownAnswer } from "../application/response-values.js";
 import type {
   OnboardingStepDefinition,
   ValidatedOnboardingResponse,
@@ -131,10 +132,13 @@ export function validateOnboardingResponse(
   // "Tidevand": a rambling sentence was saved as the sector and read back
   // as "Sector: basically fishing boats…"). Words no category holds are
   // never its value; they may sit beside the categories as a note.
+  // "I don't know" is the one exception (DECISIONS 79): it settles the
+  // step and holds no category (isNotKnownAnswer; no write target reads it).
   if (
     value.type === "TEXT" &&
     step.configuration.stepType === "reference_select" &&
-    step.configuration.resourceType === "TAXONOMY_NODE"
+    step.configuration.resourceType === "TAXONOMY_NODE" &&
+    !isNotKnownAnswer(value)
   ) {
     throw new ContractValidationError("The onboarding response is not valid.", [
       issue(

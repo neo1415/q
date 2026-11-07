@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V1,
+} from "@capital-q/investor-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type {
   OnboardingTranscriptReader,
@@ -28,6 +31,12 @@ import {
 
 import { reading as authorityReading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
+
+const requiredNow: ReadonlySet<string> = new Set(
+  INVESTOR_DEFINITION_CURRENT.steps
+    .filter((step) => step.required)
+    .map((step) => step.stepKey),
+);
 
 /**
  * Live check 2026-10-31 on production d6f606053 (fictional founder
@@ -75,7 +84,11 @@ const sleep = (ms: number) =>
 function essentials(except: readonly string[] = []): Record<string, string> {
   const recorded: Record<string, string> = {};
   for (const s of INVESTOR_DEFINITION_V1.steps) {
-    if (!s.required || except.includes(s.stepKey)) continue;
+    if (
+      (!s.required && !requiredNow.has(s.stepKey)) ||
+      except.includes(s.stepKey)
+    )
+      continue;
     const c = s.configuration;
     if (c.stepType === "confirmation") continue;
     recorded[s.stepKey] =
@@ -108,7 +121,8 @@ describe("2-3. a held suggestion is put to them for its yes, and that yes never 
     const optional = INVESTOR_DEFINITION_V1.steps
       .filter(
         (s) =>
-          !s.required &&
+          // Optional as the current definition says (DECISIONS 79).
+          !requiredNow.has(s.stepKey) &&
           s.configuration.stepType !== "confirmation" &&
           w.recordedValue(s.stepKey) === undefined,
       )
@@ -235,6 +249,31 @@ describe("2-3. a held suggestion is put to them for its yes, and that yes never 
     );
   });
 
+  it("an off-target reply to a needed question is asked again, never taken as 'come back to it' (e2e run 2)", async () => {
+    // Production e2e run 2: Q asked "Which currency are you raising in?",
+    // the person said "Yes, actively raising." (not an answer), and Q said
+    // "That's fine, we can come back to that one" and moved on.
+    const { say } = world([
+      () => authorityReading({ finishing: true }),
+      () => authorityReading({}),
+    ]);
+    const first = await say("That's all for now.");
+    expect(first.outcome.asking?.stepKey ?? first.outcome.asking).toBeTruthy();
+    const offTarget = await say("Yes, actively raising.");
+    expect(offTarget.outcome.reply).not.toMatch(/come back to that/u);
+    expect(offTarget.outcome.reply).not.toMatch(/^That's fine/u);
+  });
+
+  it("a needed question they said they would rather not answer is let go for now, as before", async () => {
+    const { say } = world([
+      () => authorityReading({ finishing: true }),
+      () => authorityReading({ declined: [INBOUND] }),
+    ]);
+    await say("That's all for now.");
+    const declined = await say("I'd rather not say for now.");
+    expect(declined.outcome.reply).toMatch(/^That's fine/u);
+  });
+
   it("a reply that does not approve it accepts nothing", async () => {
     const { w, say } = world([
       () => authorityReading({ finishing: true }),
@@ -316,7 +355,8 @@ describe("3. a reading's model call never waits behind the set-asides of the rea
     const optional = INVESTOR_DEFINITION_V1.steps
       .filter(
         (s) =>
-          !s.required &&
+          // Optional as the current definition says (DECISIONS 79).
+          !requiredNow.has(s.stepKey) &&
           s.configuration.stepType !== "confirmation" &&
           w.recordedValue(s.stepKey) === undefined &&
           s.stepKey !== "I2.investment_role",

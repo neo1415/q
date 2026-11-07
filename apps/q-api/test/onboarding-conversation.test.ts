@@ -1,5 +1,6 @@
 import type { OnboardingTranscriptReader } from "@capital-q/model-gateway/q";
 import {
+  INVESTOR_DEFINITION_CURRENT,
   INVESTOR_DEFINITION_V1,
   INVESTOR_STEPS,
   stageChequePatch,
@@ -21,10 +22,19 @@ import { reading } from "./authority-fixtures.js";
 import { investorSession, type InvestorWorld } from "./interviewer-fixtures.js";
 
 /** Every required spoken answer, valid for its step; reviews left open. */
+// Required as the current definition says (v4, DECISIONS 79), over the v1
+// steps the test world runs.
+const REQUIRED_NOW = new Set(
+  INVESTOR_DEFINITION_CURRENT.steps
+    .filter((step) => step.required)
+    .map((step) => step.stepKey),
+);
 const SPOKEN_REQUIRED: Readonly<Record<string, string>> = Object.fromEntries(
   INVESTOR_DEFINITION_V1.steps
     .filter(
-      (step) => step.required && step.configuration.stepType !== "confirmation",
+      (step) =>
+        (step.required || REQUIRED_NOW.has(step.stepKey)) &&
+        step.configuration.stepType !== "confirmation",
     )
     .map((step) => {
       const c = step.configuration;
@@ -508,7 +518,11 @@ const TIARA_SO_FAR: Readonly<Record<string, string>> = Object.fromEntries([
   ...Object.entries(SPOKEN_REQUIRED).filter(
     ([key]) =>
       key !== INVESTOR_STEPS.discoveryMode &&
-      key !== INVESTOR_STEPS.inboundPreference,
+      key !== INVESTOR_STEPS.inboundPreference &&
+      // Tiara had not said how she takes part yet (mandatory from v4).
+      key !== INVESTOR_STEPS.investmentRole &&
+      key !== INVESTOR_STEPS.geography &&
+      key !== INVESTOR_STEPS.sectors,
   ),
   [INVESTOR_STEPS.businessTitle, "Partner"],
   [INVESTOR_STEPS.chequeMin, "1000000"],
@@ -635,8 +649,10 @@ describe("voice onboarding, owner live run 2026-10-28 (Tiara)", () => {
       recorded: TIARA_SO_FAR,
     });
     const brief = briefOf(await stateOf(world));
-    expect(brief).toContain("Optional topics, grouped");
-    expect(brief).toMatch(/- Group 1: .*lead rounds/);
+    expect(brief).toContain("Other topics, grouped");
+    // DECISIONS 79: Q never advertises optionality.
+    expect(brief).not.toMatch(/they can skip|they may skip/u);
+    expect(brief).toMatch(/- Group 1: /);
     expect(brief).toMatch(/- Group 2: /);
     expect(brief).toContain(
       "Finish only when every topic has been asked or they declined it, or they ask to finish.",

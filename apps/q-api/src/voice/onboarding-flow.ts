@@ -13,7 +13,7 @@ import {
  * Q speaks first, warmly, by first name, with what it already knows, and
  * every turn ends in the single most valuable next question from the
  * coverage model's "next" ordering, never "how can I help". When the
- * essentials are in, Q says so, names what is optional and offers to
+ * essentials are in, Q says so, names what else they could add and offers to
  * finish or go on. Founders get company questions; investors get mandate
  * questions, because coverage is per journey.
  *
@@ -160,11 +160,8 @@ export function onboardingFlowFor(input: {
         ? `Then ask them to confirm, in one grouped question, the values on offer (${quoted(next.question)} first).`
         : `Then ask exactly one question, the most valuable one still open after your writes. Before this turn that was ${quoted(next.question)}; if you have just recorded it, ask the next one the tool results list as still open instead, never one already answered.`,
     );
-    if (next.optional) {
-      lines.push(
-        'It is optional: offer to skip it ("we can come back to this").',
-      );
-    }
+    // DECISIONS 79: Q no longer advertises optionality; it just asks. A
+    // skip or "I don't know" they offer is still accepted.
     lines.push(
       "Never ask how you can help, never end without that question, and do not interrogate: warm, concise, plain English.",
     );
@@ -173,14 +170,18 @@ export function onboardingFlowFor(input: {
       `Every essential is covered: say so in one line${
         optionalLeft.length === 0
           ? ""
-          : `, sum up in one line what is optional (${optionalLeft.map(quoted).join(", ")})`
+          : `, name in one line what else they could add (${optionalLeft.map(quoted).join(", ")})`
       }, and ask whether they would like to finish now or keep going.`,
     );
   }
   return { note: lines.join(" "), next, essentialsDone, optionalLeft };
 }
 
-/** The offer to skip an optional question, as code says it. */
+/**
+ * The offer to skip an optional question, as code once said it. No longer
+ * added (DECISIONS 79: Q stops advertising optionality); still recognised so
+ * a reply carrying it from an older turn is cleaned the same way.
+ */
 const OPTIONAL_TAIL = "We can come back to this if you'd rather skip it.";
 
 /** Whether a reply already puts a question to the person. */
@@ -203,10 +204,10 @@ export function withNextQuestion(
     const ask = flow.next.question.endsWith("?")
       ? flow.next.question
       : `${flow.next.question}?`;
-    return `${trimmed} ${ask}${flow.next.optional ? ` ${OPTIONAL_TAIL}` : ""}`.trim();
+    return `${trimmed} ${ask}`.trim();
   }
   if (flow.essentialsDone) {
-    return `${trimmed} Would you like to finish now, or keep going with the optional details?`.trim();
+    return `${trimmed} Would you like to finish now, or keep going?`.trim();
   }
   return reply;
 }

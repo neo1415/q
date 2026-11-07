@@ -22,6 +22,7 @@ import {
 import {
   INVESTOR_CONCEPT_FAMILIES,
   INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_HQ_COUNTRY_STEP,
   INVESTOR_STEPS,
   INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
@@ -30,7 +31,9 @@ import {
 import {
   deriveOnboardingCoverage,
   isLocalFigureProposal,
+  isNotKnownAnswer,
   isTransientOnboardingFailure,
+  NOT_KNOWN_ANSWER_TEXT,
   waitsForContext,
   clausesOf,
   negatedMention,
@@ -299,11 +302,13 @@ const WHOLE_LIST_PARTS_MAX = 5;
 
 /**
  * Steps whose answer is one country, chosen from the geography taxonomy
- * (founder v8 F1.country): a region is never offered or saved for them,
- * and the canonical country list says which nodes are countries.
+ * (founder v8 F1.country, investor v4 I0.hq_country): a region is never
+ * offered or saved for them, and the canonical country list says which
+ * nodes are countries.
  */
 const COUNTRY_ONLY_STEPS: ReadonlySet<string> = new Set([
   FOUNDER_STEPS.country,
+  INVESTOR_HQ_COUNTRY_STEP,
 ]);
 
 /** A lookup's candidates that are countries; a region dropped is no exact match. */
@@ -821,7 +826,7 @@ export type BoundOnboardingPort = OnboardingToolPort &
  * ("Discovery style · I don't know"), so the read-back says it plainly and
  * a later answer replaces it.
  */
-export const NOT_KNOWN_TEXT = "I don't know";
+export const NOT_KNOWN_TEXT = NOT_KNOWN_ANSWER_TEXT;
 
 /** Text compared for "already says this": case, quotes and spacing aside. */
 function normalisedText(text: string): string {
@@ -5659,8 +5664,7 @@ export function createOnboardingPort(input: {
           );
           const recorded = notSure?.label ?? NOT_KNOWN_TEXT;
           if (
-            (onRecord?.value.type === "TEXT" &&
-              onRecord.value.text === NOT_KNOWN_TEXT) ||
+            isNotKnownAnswer(onRecord?.value) ||
             (onRecord?.value.type === "SINGLE_SELECT" &&
               onRecord.value.optionKey === NOT_SURE_OPTION_KEY)
           ) {

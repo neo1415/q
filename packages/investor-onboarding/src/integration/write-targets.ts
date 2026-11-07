@@ -77,6 +77,11 @@ import {
 } from "../definition/investor-v2.js";
 import { NOT_SURE_OPTION_KEY } from "../definition/investor-v3.js";
 import {
+  INVESTOR_HQ_COUNTRY_STEP,
+  INVESTOR_HQ_COUNTRY_WRITE_TARGET,
+  investorHqCountryOf,
+} from "../definition/investor-v4.js";
+import {
   createInvestorDomainServices,
   type InvestorDomainDependencies,
   type InvestorDomainServices,
@@ -1046,6 +1051,40 @@ export function createInvestorWriteTargets(
           UpdateInvestorOrganisationRequestSchema,
           { expectedVersion: investor.version, websiteUrl },
           "That isn't a web address.",
+        ),
+        correlationId: context.correlationId,
+      });
+    },
+
+    // The firm's headquarters country (v4, DECISIONS 79): one country, read
+    // against the canonical list. "I don't know" (or words naming no
+    // country) leaves it unknown, never a guess; a region is refused.
+    [INVESTOR_HQ_COUNTRY_WRITE_TARGET]: async (services, context, values) => {
+      const bound = await boundOrBootstrapped(services, context, values);
+      const given = values.get(INVESTOR_HQ_COUNTRY_STEP);
+      const hqCountry = investorHqCountryOf(given)?.iso ?? null;
+      // A region chosen is not a country: refused, as the founder's is.
+      if (hqCountry === null && given?.type === "RESOURCE_REFERENCE") {
+        invalid(
+          "value.resourceIds",
+          "not_a_country",
+          "Choose the country your firm is based in.",
+        );
+      }
+      const investor = await services.investors.getInvestorOrganisation({
+        actor: bound.context,
+        investorOrganisationId: bound.investorOrganisationId,
+      });
+      if (investor.hqCountry === hqCountry) {
+        return;
+      }
+      await services.investors.updateInvestorOrganisation({
+        actor: bound.context,
+        investorOrganisationId: bound.investorOrganisationId,
+        input: parseContract(
+          UpdateInvestorOrganisationRequestSchema,
+          { expectedVersion: investor.version, hqCountry },
+          "That isn't a country.",
         ),
         correlationId: context.correlationId,
       });

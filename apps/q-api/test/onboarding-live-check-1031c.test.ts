@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { OnboardingState } from "@capital-q/q-tools";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V1,
+} from "@capital-q/investor-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type {
   OnboardingTranscriptReader,
@@ -26,6 +29,12 @@ import {
 
 import { reading as authorityReading } from "./authority-fixtures.js";
 import { investorSession, turn } from "./interviewer-fixtures.js";
+
+const requiredNow: ReadonlySet<string> = new Set(
+  INVESTOR_DEFINITION_CURRENT.steps
+    .filter((step) => step.required)
+    .map((step) => step.stepKey),
+);
 
 /**
  * Live check 2026-10-31 (production 84d8ede07, fictional founder
@@ -386,7 +395,7 @@ describe("5. wrap-up turns never wait on setting aside or on a yes that adds not
   function everyEssential(): Record<string, string> {
     const recorded: Record<string, string> = {};
     for (const s of INVESTOR_DEFINITION_V1.steps) {
-      if (!s.required) continue;
+      if (!s.required && !requiredNow.has(s.stepKey)) continue;
       const c = s.configuration;
       if (c.stepType === "confirmation") continue;
       recorded[s.stepKey] =
@@ -410,7 +419,8 @@ describe("5. wrap-up turns never wait on setting aside or on a yes that adds not
     const optional = INVESTOR_DEFINITION_V1.steps
       .filter(
         (s) =>
-          !s.required &&
+          // Optional as the current definition says (DECISIONS 79).
+          !requiredNow.has(s.stepKey) &&
           s.configuration.stepType !== "confirmation" &&
           world.recordedValue(s.stepKey) === undefined,
       )

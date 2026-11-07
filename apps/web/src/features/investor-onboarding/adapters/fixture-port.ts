@@ -1,6 +1,7 @@
 import {
   INVESTOR_DEFINITION_CURRENT,
   INVESTOR_STEPS,
+  INVESTOR_HQ_COUNTRY_STEP,
   INVESTOR_WEBSITE_STEP,
   type InvestorHandoffContext,
   type InvestorMandatesContext,
@@ -393,6 +394,7 @@ function seedState(seed: FixtureSeed): FixtureState {
       [S.investorType, single_("vc")],
       [S.organisationName, text_("Northbank Capital")],
       [INVESTOR_WEBSITE_STEP, text_("northbank.example")],
+      [INVESTOR_HQ_COUNTRY_STEP, refs_("TAXONOMY_NODE", [NIGERIA])],
       [S.businessTitle, text_("Partner")],
       [S.deploymentStatus, single_("actively_investing")],
       [S.mandateContext, refs_("INVESTOR_MANDATE", [DRAFT_MANDATE_ID])],

@@ -368,6 +368,8 @@ describe("4. a reread for the steps a save opened reads only those steps", () =>
       fetch: world.fetch,
       logger,
       readAfterMs: 5,
+      // As production wires it: a held figure waits there (D-OWN-3).
+      recommendations: world.recommendations,
       reader: {
         read: (input) => {
           const keys = input.steps.map((s) => s.stepKey);
@@ -424,7 +426,11 @@ describe("4. a reread for the steps a save opened reads only those steps", () =>
     expect([...(seen[1] ?? [])].sort()).toEqual(
       ["F6.currency", "F6.target_amount"].sort(),
     );
-    expect(world.recordedValue("F6.target_amount")).toBeDefined();
+    // D-OWN-3 (DECISIONS 78): the amount is held for its read-back, not saved.
+    expect(world.recordedValue("F6.target_amount")).toBeUndefined();
+    expect(
+      world.heldSuggestions().find((s) => s.stepKey === "F6.target_amount"),
+    ).toBeDefined();
     expect(world.recordedValue("F6.currency")).toEqual({
       type: "SINGLE_SELECT",
       optionKey: "eur",

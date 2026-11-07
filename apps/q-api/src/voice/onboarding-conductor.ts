@@ -777,6 +777,14 @@ export type ConductorPortFactory = (input: {
       ) => Promise<
         readonly { readonly stepKey: string; readonly outcome: string }[]
       >)
+    | undefined; /**
+   * What waits for their yes, in display words: put back to them on a
+   * resume rather than asked from scratch. Absent: nothing is put back.
+   */
+  readonly pendingRecommendations?:
+    | (() => Promise<
+        readonly { readonly stepKey: string; readonly value: string }[]
+      >)
     | undefined;
 };
 
@@ -820,6 +828,9 @@ export type OnboardingConductorDependencies = {
 
 /** One line the conductor says; a step's question carries its step. */
 type Line = { readonly text: string; readonly stepKey?: string | undefined };
+
+const lowerFirst = (text: string): string =>
+  text.length === 0 ? text : text[0]?.toLowerCase() + text.slice(1);
 
 export type OnboardingConductor = InterviewAgent & {
   /** Findings that landed between turns, for the next natural gap. */
@@ -991,6 +1002,7 @@ export function createOnboardingConductor(
     const actor = input.actor;
     let view: OnboardingSessionView | null = null;
     let coverageNext: string | undefined = undefined;
+    let heldNow: ((stepKey: string) => Promise<string | null>) | null = null;
     if (actor !== undefined) {
       const port = dependencies.portFor({
         actor,
@@ -1000,6 +1012,18 @@ export function createOnboardingConductor(
       });
       await settleKnownAnswers(port, input.journeyType);
       view = port.view();
+      // What they said that waits for their yes (an unasked judgement, a
+      // figure to read back): put back to them on resume, never asked from
+      // scratch (e2e run 2, 7 Nov: "actively deploying" was held from their
+      // first line, and the reopened voice line asked "Are you actively
+      // writing cheques at the moment?" as if never said).
+      const pendingOf = port.pendingRecommendations;
+      heldNow = async (stepKey) =>
+        pendingOf === undefined
+          ? null
+          : ((
+              await pendingOf().catch(reported("held suggestions read", []))
+            ).find((item) => item.stepKey === stepKey)?.value ?? null);
       // Live 2026-10-29: after "continue later" (a line that asks nothing),
       // the reopening took the journey's order and read back the company
       // details (F3.review) instead of the founders' full-time question
@@ -1069,13 +1093,28 @@ export function createOnboardingConductor(
     const names = await categoryNames(input.session, view).catch(
       () => new Map<string, string>(),
     );
+    // The step this reopening puts to them: the open question, else the
+    // next one. When what they said for it waits for their yes, that is
+    // put back to them instead of the question (e2e run 2).
+    const target = ask ?? next;
+    const held =
+      target === null || heldNow === null
+        ? null
+        : await heldNow(target.stepKey);
     let lines: readonly Line[] =
-      ask === null
-        ? resumeLines(view, input.journeyType, names)
-        : [
+      target !== null && held !== null && held.trim().length > 0
+        ? [
             ...(spoken || focused !== null ? [{ text: PICKING_UP }] : []),
-            ...askLines(view, input.journeyType, ask, names),
-          ];
+            {
+              text: `From what you said earlier, ${lowerFirst(plainStepLabel(target.stepKey))}: ${held.trim().replace(/[.;\s]+$/u, "")}. Shall I keep that? Say yes, or tell me what it should be.`,
+            },
+          ]
+        : ask === null
+          ? resumeLines(view, input.journeyType, names)
+          : [
+              ...(spoken || focused !== null ? [{ text: PICKING_UP }] : []),
+              ...askLines(view, input.journeyType, ask, names),
+            ];
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);
     // What research found while they were away is the first thing said.

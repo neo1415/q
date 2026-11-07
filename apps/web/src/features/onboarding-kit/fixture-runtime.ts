@@ -10,6 +10,7 @@ import {
   type OnboardingStepProgressStatus,
 } from "@capital-q/contracts";
 import type { FOUNDER_DEFINITION_V1 } from "@capital-q/founder-onboarding/definition";
+import { isNotKnownAnswer } from "@capital-q/onboarding/response-values";
 
 import { OnboardingClientError, type TaxonomyCandidateView } from "./client";
 import type { RuntimePort } from "./runtime-port";
@@ -610,6 +611,25 @@ export function createFixtureRuntime(
         );
       }
       const step = eligibleStep(stepKey);
+      // "I don't know" answers any question but a confirmation, as on the
+      // server (DECISIONS 79): it holds no value.
+      if (
+        isNotKnownAnswer(value) &&
+        step.configuration.stepType !== "confirmation"
+      ) {
+        persist(
+          moveOn(
+            {
+              ...state,
+              sessionVersion: state.sessionVersion + 1,
+              responses: { ...state.responses, [stepKey]: value },
+              states: { ...state.states, [stepKey]: "COMPLETED" },
+            },
+            stepKey,
+          ),
+        );
+        return view();
+      }
       if (value.type !== expectedType(step)) {
         throw reject("That answer doesn't fit the question.");
       }

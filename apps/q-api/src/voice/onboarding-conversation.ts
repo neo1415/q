@@ -690,11 +690,25 @@ export function createOnboardingConversation(dependencies: {
         "onboarding conversation reading held an unasked judgement",
       );
     }
+    // D-OWN-3 (DECISIONS 78): a number is read back for their yes, always,
+    // typed or spoken. A figure they stated is held like an inferred value
+    // (Q says it back; their yes saves it); only their agreement to Q's own
+    // read-back of it (affirms) goes straight to the record.
+    const figureToReadBack = (answer: {
+      readonly value: unknown;
+      readonly affirms?: boolean | undefined;
+    }): boolean => typeof answer.value === "number" && answer.affirms !== true;
     const stated = answers.filter(
-      (answer) => answer.source !== "INFERRED" && fromQuestion(answer),
+      (answer) =>
+        answer.source !== "INFERRED" &&
+        fromQuestion(answer) &&
+        !figureToReadBack(answer),
     );
     const inferred = answers.filter(
-      (answer) => answer.source === "INFERRED" || !fromQuestion(answer),
+      (answer) =>
+        answer.source === "INFERRED" ||
+        !fromQuestion(answer) ||
+        figureToReadBack(answer),
     );
     if (
       answers.length === 0 &&
@@ -1471,7 +1485,7 @@ export function briefOf(
       step.status === "OPEN" && isLongAnswerStep(state.journey, step.stepKey)
         ? " (say back)"
         : "";
-    return `- ${step.required ? "Needed" : "Optional"}: ${topic}${
+    return `- ${step.required ? "Needed" : "Other"}: ${topic}${
       choices.length === 0 ? "" : ` (choices: ${choices})`
     }${sayBack} [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
   });
@@ -1495,7 +1509,7 @@ export function briefOf(
     ...lines,
     ...(neededOpen
       ? [
-          "Needed topics are required: Capital Q needs them to verify the profile, and setup can't finish without them. If they'd rather not answer one, don't drop it and don't press: say briefly why it's needed (to verify their profile), that they can answer it later, then move on and come back to it. Optional topics they skip are simply left.",
+          "Needed topics are required: Capital Q needs them for their profile, their matching and verification, and setup can't finish without an answer. \"I don't know\" is an answer: it is recorded as not known and they carry on. If they'd rather not answer one, don't drop it and don't press: say briefly why it's needed (what it is used for, in plain words), that they can answer it later, then move on and come back to it. Optional topics they skip are simply left.",
         ]
       : []),
     // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long
@@ -1514,12 +1528,13 @@ export function briefOf(
     ...(groups.length === 0
       ? []
       : [
-          "Optional topics, grouped (every one is asked; they may skip any):",
+          // DECISIONS 79: Q stops advertising optionality; it just asks.
+          "Other topics, grouped (ask every one as naturally as the rest; never say one is optional or can be skipped):",
           ...groups.map(
             (group, index) =>
               `- Group ${String(index + 1)}: ${group.join("; ")}`,
           ),
-          "After the needed topics, offer these a group at a time, in plain words, saying they can skip. Finish only when every topic has been asked or they declined it, or they ask to finish.",
+          "After the needed topics, ask these a group at a time, in plain words, as naturally as the rest. Finish only when every topic has been asked or they declined it, or they ask to finish.",
         ]),
     ...(documents
       ? [
@@ -1663,9 +1678,9 @@ export function readBack(state: OnboardingState): string {
       ? ""
       : `Found in their documents or public sources, not confirmed yet (put these to them in one go and ask if they're right): ${found.join("; ")}.`,
     needed.length > 0
-      ? "Carry on naturally with what is still needed. Then offer the optional topics a group at a time, saying they can skip any."
+      ? "Carry on naturally with what is still needed. Then ask the other topics a group at a time, as naturally as the rest, never saying one is optional or can be skipped."
       : optionalLeft > 0
-        ? "Do not wrap up yet: offer the next optional group now, in plain words, one group at a time, saying they can skip it. If they'd rather finish now, that is their choice: pass their words on."
+        ? "Do not wrap up yet: ask the next group now, in plain words, one group at a time, never saying it is optional or can be skipped. If they'd rather finish now, that is their choice: pass their words on."
         : "Read back the essentials in a few plain sentences (never the list word for word), ask if anything is wrong or missing, and whether they'd like to finish. If they want to finish, pass their words on.",
   ]
     .filter((line) => line.length > 0)

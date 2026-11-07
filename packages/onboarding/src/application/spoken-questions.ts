@@ -68,6 +68,7 @@ export const SPOKEN_QUESTIONS: Readonly<Record<string, string>> = {
   "F6.min_cheque": "What's the smallest cheque you'd take?",
   "I0.business_title": "What's your role there?",
   "I0.website": "What's your firm's website?",
+  "I0.hq_country": "Which country is your firm based in?",
   "I1.mandate_context":
     "Are we setting up your main investment strategy, or a different one?",
   "I2.currency": "Which currency do you write cheques in?",

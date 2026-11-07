@@ -42,8 +42,35 @@ export function multiSelect(
   return value?.type === "MULTI_SELECT" ? value.optionKeys : null;
 }
 
+/**
+ * The answer "I don't know" to a step (D-OWN-1, DECISIONS 78): it settles
+ * the step, needed or optional, and holds no value. Every step type takes
+ * it as words, a taxonomy step included (DECISIONS 79: an unknown answer on
+ * every mandatory step), and no accessor ever reads it as a value: unknown
+ * stays unknown, never a website, a description or a category.
+ */
+export const NOT_KNOWN_ANSWER_TEXT = "I don't know";
+
+/** Whether an answer is "I don't know" (case, quotes and spacing aside). */
+export function isNotKnownAnswer(
+  value: OnboardingResponseValue | null | undefined,
+): boolean {
+  return (
+    value?.type === "TEXT" &&
+    value.text
+      .normalize("NFKC")
+      .replace(/[\u2018\u2019]/gu, "'")
+      .replace(/\s+/gu, " ")
+      .trim()
+      .replace(/\.$/u, "")
+      .toLocaleLowerCase() === NOT_KNOWN_ANSWER_TEXT.toLocaleLowerCase()
+  );
+}
+
+/** Their words for a step; null when unanswered or "I don't know". */
 export function text(values: ResponseValues, stepKey: string): string | null {
   const value = values.get(stepKey);
+  if (isNotKnownAnswer(value)) return null;
   return value?.type === "TEXT" ? value.text.trim() : null;
 }
 

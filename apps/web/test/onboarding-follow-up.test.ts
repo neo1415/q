@@ -66,6 +66,8 @@ describe("investor onboarding v3 on the web", () => {
       >[0];
     expect(isSupportedVersion(view(1))).toBe(true);
     expect(isSupportedVersion(view(3))).toBe(true);
-    expect(isSupportedVersion(view(4))).toBe(false);
+    // v4 (DECISIONS 79): the mandatory set and the firm's country.
+    expect(isSupportedVersion(view(4))).toBe(true);
+    expect(isSupportedVersion(view(5))).toBe(false);
   });
 });

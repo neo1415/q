@@ -86,8 +86,8 @@ describe("investor journey over the runtime contract", () => {
     });
     const view = await port.start("00000000-0000-4000-8000-000000000001");
     expect(() => OnboardingSessionViewSchema.parse(view)).not.toThrow();
-    // v3 (live final re-check 2026-10-31): "Not sure yet" on deploying.
-    expect(view.session.definitionVersion).toBe(3);
+    // v4 (DECISIONS 79): the mandatory set and the firm's country.
+    expect(view.session.definitionVersion).toBe(4);
     expect(view.session.currentStepKey).toBe(INVESTOR_STEPS.investorType);
     const presented = toPresentation(view, SOURCE);
     expect(presented.sections.map((s) => s.id)).toEqual([
@@ -99,6 +99,7 @@ describe("investor journey over the runtime contract", () => {
     expect(presented.currentStepId).toBe("role");
     expect(presented.steps.map((s) => s.id)).toEqual([
       "role",
+      "hq_country",
       "deployment",
       "mandate",
       "stage_cheque",
@@ -133,6 +134,16 @@ describe("investor journey over the runtime contract", () => {
         investorType: "vc",
         organisationName: "Northbank Capital",
         businessTitle: "Partner",
+      },
+    });
+    // v4: where the firm is based, one country, before deploying.
+    expect(session.currentStepId).toBe("hq_country");
+    const home = await investor.findTaxonomyCandidates({ text: "nigeria" });
+    session = await investor.saveResponse({
+      stepId: "hq_country",
+      response: {
+        kind: "taxonomy_focus",
+        nodeIds: home.slice(0, 1).map((c) => c.nodeId),
       },
     });
     expect(session.currentStepId).toBe("deployment");
@@ -361,6 +372,12 @@ describe("investor journey over the runtime contract", () => {
       "actively_investing",
     );
     session = await investor.goBack({ stepId: "deployment" });
+    // v4: where the firm is based sits between the role and deploying.
+    expect(session.currentStepId).toBe("hq_country");
+    expect(
+      expectKind(session.step, "taxonomy_focus").response?.nodeIds,
+    ).toHaveLength(1);
+    session = await investor.goBack({ stepId: "hq_country" });
     expect(expectKind(session.step, "investor_role").response).toEqual({
       kind: "investor_role",
       investorType: "vc",
@@ -383,7 +400,7 @@ describe("investor journey over the runtime contract", () => {
       flaky.saveResponse({ stepId: "role", response: role }),
     ).rejects.toMatchObject({ kind: "NETWORK", retryable: true });
     const after = await flaky.saveResponse({ stepId: "role", response: role });
-    expect(after.currentStepId).toBe("deployment");
+    expect(after.currentStepId).toBe("hq_country");
 
     const storage = memoryStorage();
     const first = client(storage, "mandate");
@@ -592,7 +609,7 @@ describe("investor journey over the runtime contract", () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 4 } };
+          : { ...view, session: { ...view.session, definitionVersion: 5 } };
       },
     };
     await expect(

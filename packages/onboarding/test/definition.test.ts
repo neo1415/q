@@ -25,6 +25,11 @@ import {
   validateOnboardingResponse,
 } from "../src/runtime/validate-response.js";
 import { validateOnboardingManifest } from "../src/definitions/validate.js";
+import {
+  isNotKnownAnswer,
+  NOT_KNOWN_ANSWER_TEXT,
+  text,
+} from "../src/application/response-values.js";
 import { OnboardingDefinitionInvalidError } from "../src/domain/errors.js";
 import {
   hashOnboardingIdempotencyKey,
@@ -602,6 +607,52 @@ describe("response validation per step type (§40, §96-99, §210)", () => {
         note: "cold-chain monitoring",
       }).responseType,
     ).toBe("RESOURCE_REFERENCE");
+  });
+
+  it('a taxonomy step takes "I don\'t know", which holds no category (DECISIONS 79)', () => {
+    const docs = defStep("docs");
+    const sectors: OnboardingStepDefinition = {
+      ...docs,
+      stepKey: "categories",
+      stepType: "reference_select",
+      required: true,
+      configuration: {
+        stepType: "reference_select",
+        prompt: "Which sector are you in?",
+        resourceType: "TAXONOMY_NODE",
+        vocabularyCodes: ["industry"],
+        minItems: 1,
+        maxItems: 5,
+      },
+    };
+    for (const said of [
+      "I don't know",
+      "i don\u2019t know.",
+      " I don't  know ",
+    ]) {
+      expect(
+        validateOnboardingResponse(sectors, {
+          value: { type: "TEXT", text: said },
+        }).responseType,
+      ).toBe("TEXT");
+    }
+    // Anything more than that is still words, never the step's value.
+    expect(() =>
+      validateOnboardingResponse(sectors, {
+        value: { type: "TEXT", text: "I don't know, fintech maybe" },
+      }),
+    ).toThrow(ContractValidationError);
+  });
+
+  it('no accessor reads "I don\'t know" as a value', () => {
+    const values = new Map([
+      ["website", { type: "TEXT" as const, text: "I don't know" }],
+      ["name", { type: "TEXT" as const, text: "Tamarind" }],
+    ]);
+    expect(text(values, "website")).toBeNull();
+    expect(text(values, "name")).toBe("Tamarind");
+    expect(isNotKnownAnswer(values.get("website"))).toBe(true);
+    expect(NOT_KNOWN_ANSWER_TEXT).toBe("I don't know");
   });
 
   it("document references and confirmations", () => {

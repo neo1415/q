@@ -474,12 +474,18 @@ export function createTypedOnboarding(dependencies: {
             ? "Finishing your setup"
             : "Checking what I have saved for you",
         );
+        // Said once, on the turn they ask to finish or agree to the
+        // read-back; never again on the answers that follow while open
+        // essentials are asked (e2e run 2, 7 Nov: every later turn began
+        // "I'll check what I have saved and read it back to you", and no
+        // read-back came). It promises nothing it may not do.
+        const askedNow = authority?.finishing === true || agreedToReadBack;
         const firstLine =
-          input.onSentence === undefined
+          input.onSentence === undefined || !askedNow
             ? null
             : agreedToReadBack
               ? "Thank you, finishing your setup now."
-              : "Understood. I'll check what I have saved and read it back to you.";
+              : "Understood. Let me check what I have.";
         if (firstLine !== null) {
           try {
             input.onSentence?.(firstLine);
@@ -539,11 +545,19 @@ export function createTypedOnboarding(dependencies: {
                 ...shown,
                 pending: waitingOnYes(now, suggestions, labelOf),
               };
-        // Already finishing, Q's last line asked a needed step, and their
-        // answer left it open: it is not put again word for word.
-        const unsettled = stillFinishing
+        // Already finishing, Q's last line asked a needed step, and they
+        // said they would rather not answer it: it is let go for now, not
+        // put again word for word. A reply that only missed the question
+        // (e2e run 2: "Yes, actively raising." to "Which currency…") is not
+        // a decline, so the question is asked again.
+        const lastAskedKey = stillFinishing
           ? lastAsked.get(input.onboardingSessionId)
           : undefined;
+        const unsettled =
+          lastAskedKey !== undefined &&
+          authority?.declined.has(lastAskedKey) === true
+            ? lastAskedKey
+            : undefined;
         const said = finishingLine(input.journeyType, finished, {
           labelOf,
           questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,

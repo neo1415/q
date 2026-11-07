@@ -283,14 +283,15 @@ describe("onboarding never drops what the person said", () => {
   });
 
   it("does not press an optional question again after a restart forgot it was asked", async () => {
-    // The kept thread: Q asked for the website twice and they moved on
-    // both times, which makes it passed over: never asked again.
+    // The kept thread: Q asked which functions the team covers twice and
+    // they moved on both times, which makes it passed over: never asked
+    // again. (The website is mandatory from founder v9, DECISIONS 79.)
     const { world } = worldWithThread([
       {
         role: "Q",
-        text: "Do you have a website I can look at?",
+        text: "Which of product, engineering, sales and the rest does the founding team cover?",
         channel: "TEXT",
-        stepKey: "F1.website",
+        stepKey: "F4.functions",
         createdAt: "2026-10-20T09:00:00.000Z",
       },
       {
@@ -301,9 +302,9 @@ describe("onboarding never drops what the person said", () => {
       },
       {
         role: "Q",
-        text: "Is there a site or a page about the company?",
+        text: "And which functions does the founding team cover?",
         channel: "TEXT",
-        stepKey: "F1.website",
+        stepKey: "F4.functions",
         createdAt: "2026-10-20T09:01:00.000Z",
       },
       {
@@ -333,13 +334,13 @@ describe("onboarding never drops what the person said", () => {
     const rendered = prompts.join("\n");
     // Held across the restart: asked twice, so passed over ...
     expect(rendered).toMatch(
-      /Passed over, never ask again in this conversation: [^\n]*F1\.website/,
+      /Passed over, never ask again in this conversation: [^\n]*F4\.functions/,
     );
     // ... and never offered as a question still to ask.
     for (const line of rendered
       .split("\n")
       .filter((l) => l.includes("Still unasked"))) {
-      expect(line).not.toContain("F1.website");
+      expect(line).not.toContain("F4.functions");
     }
   });
 });

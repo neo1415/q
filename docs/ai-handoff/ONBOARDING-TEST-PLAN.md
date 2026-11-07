@@ -211,3 +211,112 @@ What was missing:
 - `apps/workers/test/presence-research-job.test.ts`: enqueue only, a refused enqueue retries the event, and the job runner's outcomes.
 - `apps/workers/test/presence-read-port.test.ts` and `apps/q-api/test/presence-read-failures.test.ts`: own-site read, planned budget, failure logging.
 - `apps/workers/test/onboarding-research-replay.test.ts` (DECISIONS 48): synthetic recorded pages replayed through the real research service, read port, presence build and dispatch, in three cases: found, refused and nothing.
+
+## 8. Proposed mandatory set (D-OWN-2, DECISIONS 78), for the owner's approval
+
+**Status: approved by the owner (DECISIONS 79, 2026-11-07) and implemented on `fix/onboarding-2` as founder v9 and investor v4. See §9 for what was built and what still needs the owner's call.**
+
+**The rule:** mandatory = what the profile needs, plus what creating the investor's mandate needs, plus what founder matching and verification need. Everything else is optional and kept as context for Q. "I don't know" to a mandatory question is recorded as unknown and counts as answered (D-OWN-1).
+
+Two facts shape the list:
+
+1. Activating a mandate needs no content: it checks only the status and version (`packages/investors/src/application/mandate-use-cases.ts:795-806`). So matching decides most of the investor's list.
+2. The profile minimum already exists in code: name, description, stage and country (`packages/companies/src/domain/marketplace-readiness.ts:143-151`).
+
+Short names used below:
+
+- SPEC = `docs/product-sources/text/Real_CAPITAL_Q_PRODUCT_SPECIFICATION.txt`
+- D17 = `docs/architecture/17_*.md`
+- D19 = `docs/architecture/19_*.md`
+
+### Founder (definition v8): proposed mandatory
+
+| Step                                                     | Why / feature (code)                                                                                                                                                                                                                        | Spec                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| F1.company_name                                          | Profile: creates the company (`founder-onboarding/src/integration/write-targets.ts:622`), readiness name. Verification: KYB name (`verification/src/application/auto-request.ts:246,276`).                                                  | SPEC:514; D17:729            |
+| F1.website **(optional today)**                          | Verification: email-domain match (`auto-request.ts:248,258-277`). DECISIONS 77 research needs it.                                                                                                                                           | SPEC:518 (D17:730: optional) |
+| F1.country **(optional today)**                          | Profile: readiness (`marketplace-readiness.ts:149`). Matching: geography exclusion and fit (`discovery/src/eligibility/policy.ts:535-537`, `discovery/src/features/policy.ts:434-480`). Verification: jurisdiction (`auto-request.ts:250`). | SPEC:516; D17:731; D19 §13   |
+| F1.stage                                                 | Profile: readiness. Matching: stage exclusion, stage fit and candidate search (`eligibility/policy.ts:526-528`, `features/policy.ts:400-430`, `candidates/service.ts:159-195`). "Not sure" exists.                                          | SPEC:517; D17:732; D19 §23   |
+| F1.description **(optional today)**                      | Profile: readiness description (`marketplace-readiness.ts:146-147`).                                                                                                                                                                        | SPEC:519; D17:733            |
+| F1.categories **(optional today)**                       | Matching: taxonomy fit, candidates and sector exclusion (`features/policy.ts:550`, `candidates/service.ts:211,260`, `eligibility/policy.ts:523`).                                                                                           | SPEC:515; D19 §23            |
+| F4.founder_role                                          | Verification: membership and the founder identity claim (`write-targets.ts:680-700`, `auto-request.ts:118-126`).                                                                                                                            | SPEC:527                     |
+| F6.raising                                               | Matching: gates the raise questions (`founder-v1.ts:322-326`).                                                                                                                                                                              | D19 §13                      |
+| F6.currency, F6.target_amount, F6.confirm (when raising) | Matching: the capital objective gives the round target for cheque fit (`write-targets.ts:502-525,759`; `features/policy.ts:635-651`).                                                                                                       | D19 §13, §23                 |
+| F8.snapshot                                              | Verification: a completed session triggers the automatic KYB request (`auto-request.ts:108-110`).                                                                                                                                           | DECISIONS 77                 |
+
+- **Becomes optional:**
+  - F0.intent: writes nothing; F6.raising carries the fact.
+  - F3.review: proposed to be asked only when materials exist.
+  - F4.founder_count, F4.full_time and F4.team_size: they feed the readiness score, not the profile minimum, matching or verification. This is a judgement call, because the profile's Team section shows them.
+  - F5.signal and F5.revenue_status: they write nothing; they are context only.
+- **Becomes mandatory:** F1.website, F1.country, F1.description and F1.categories.
+
+### Investor (definition v3): proposed mandatory
+
+| Step                                                                                            | Why / feature (code)                                                                                                                                            | Spec                              |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| I0.investor_type, I0.organisation_name                                                          | Profile and mandate: the firm is created once both are known (`investor-onboarding/src/integration/write-targets.ts:759-769,1007`). Verification: KYB name.     | SPEC:4929-4930; D17:1031-1032     |
+| I0.website **(optional today)**                                                                 | Verification: email-domain match (`auto-request.ts:248,258`). Founder-side "profile complete" ranking (`discovery/src/domain/fit.ts:170-178`).                  | Final System Review:419           |
+| I1.deployment_status                                                                            | Mandate: creates the first draft (`investor-v1.ts:455-460`; `write-targets.ts:1092`). Founder-side ranking (`domain/fit.ts:160-168`).                           | D17:1040-1052                     |
+| I1.mandate_context                                                                              | Mandate: chooses the draft every later write goes to (`write-targets.ts:195-238`). It can be answered automatically when there is one.                          | D17:1040                          |
+| I2.stages                                                                                       | Mandate and matching: stage range and a MUST constraint; candidate search and stage fit (`write-targets.ts:371-386`; `candidates/service.ts:159-195`).          | SPEC:4932; D17:1055-1066          |
+| I2.currency + I2.cheque_min or I2.cheque_max **(the amounts are optional today; at least one)** | Matching: with neither end, cheque fit is always NO_RANGE (`discovery/src/features/cheque.ts:77`).                                                              | SPEC:4935; D17:1068-1074; D19 §13 |
+| I3.geography **(optional today)**                                                               | Matching: taxonomy preference, candidates and geography fit (`write-targets.ts:411-416`; `candidates/service.ts:216-232`).                                      | SPEC:4934; D17:1080-1091          |
+| I3.sectors **(optional today)**                                                                 | Matching: taxonomy fit, candidates and fit (`write-targets.ts:417-421`; `features/policy.ts:550`).                                                              | SPEC:4933; D19 §23                |
+| I10.inbound_preference                                                                          | Profile: saved on the firm at confirmation; "not stated is never consent" (`write-targets.ts:1290-1316`). GateQ (`gateq/src/application/investor-gates.ts:88`). | SPEC:4938                         |
+| I11.review                                                                                      | Mandate: the only step that activates it; matching ignores mandates that are not ACTIVE (`write-targets.ts:1319-1333`; `eligibility/policy.ts:500-512`).        | Final System Review:419           |
+
+- **Becomes optional:**
+  - I9.discovery_mode: written to the mandate, but no ranking, eligibility or candidate code reads it. See conflict 4.
+  - I12.handoff: a closing screen that writes nothing.
+- **Becomes mandatory:** I0.website, at least one cheque end, I3.geography and I3.sectors.
+
+### For the owner to decide
+
+1. **Pitch deck.** The spec makes it mandatory at Stage 2 (SPEC:525-526). The rule makes it optional, and so do code and docs: `marketplace-readiness.ts:164-167` ("V1 mandates no document"), D17:757, Final System Review:413.
+2. **"Founder information" (SPEC:527).** Is the role enough, or do the team counts stay mandatory?
+3. **Website mandatory** for pre-launch companies and for firms, with "no website yet" accepted as unknown?
+4. **Discovery mode.** PADL #60 (`Real_PADL_…txt:1955`) says it is established during onboarding, but ranking doesn't read it. Keep it mandatory, or make it optional with a default?
+5. **Industry** is Stage 1 in the spec and optional in code. The rule agrees with the spec. Suggested categories still need explicit confirmation (`write-targets.ts:428`).
+6. **Gap: the investor's HQ country.** KYB jurisdiction and founder-side ranking read it (`auto-request.ts:250`, `domain/fit.ts:155,174`), but no investor step collects it. Adding one needs definition v4.
+7. **Gap: semantic matching** reads only `short_description` (`discovery/src/semantic/service.ts:224-229`), so F1.description fills the profile minimum but not semantic matching.
+8. **Gap: discovery visibility (the F10 choice)** is required by readiness but is not an onboarding step.
+9. **D-OWN-1 needs an "unknown" answer on every mandatory step.** Steps without "Not sure" today: F1.country, F1.categories, F1.website, I3.geography, I3.sectors and the cheque amounts.
+10. **The reason Q gives.** On a re-asked mandatory question, it should name the real use (the profile, matching, verification), not always "verification".
+
+## 9. DECISIONS 79 as built, and the profile audit
+
+### What was built (`fix/onboarding-2`)
+
+- **Founder v9** (migration `20261231440000`):
+  - Now required: F1.website, F1.country, F1.description and F1.categories. On their own paths: F5.pilots, F5.customers, F5.growth, F6.instrument, F6.timeframe and F6.use_of_funds.
+  - Now optional: F0.intent, and the team counts F4.founder_count, F4.full_time and F4.team_size (owner: the founder's role is enough; `/profile` renders no team-count rows).
+  - Unchanged: the deck (F2.materials) stays optional; the founder's role stays required.
+- **Investor v4** (migration `20261231450000`):
+  - New, required: I0.hq_country (one geography country, after the role). It writes `core.investor_organisations.hq_country`.
+  - Now required: I0.website, I0.business_title, I2.cheque_min, I2.cheque_typical, I2.cheque_max, I2.investment_role, I3.geography and I3.sectors.
+  - Now optional: I9.discovery_mode.
+- **Unknown on every mandatory step:**
+  - "I don't know" (`NOT_KNOWN_ANSWER_TEXT`, `isNotKnownAnswer` in `@capital-q/onboarding`) settles any step, taxonomy steps included.
+  - No write target reads it as a value. `text()` returns null for it, so a website or description is never saved as "I don't know".
+  - On the form, Skip on a required step sends it.
+  - Reader v16: "no website yet" on a required step is not known.
+- **Q stops advertising optionality:**
+  - Typed reply v9.
+  - The checklist and live-call prompt never say a topic is optional or can be skipped.
+  - The code no longer appends "We can come back to this if you'd rather skip it."
+  - "Anything you're not sure of can wait" stays, once, in the opening.
+
+### Profile audit: fields on the profile that onboarding does not make mandatory
+
+These are reported to the owner rather than made mandatory.
+
+| Profile field (where)                                                                                                                                                                                                    | Onboarding step                                               | Why not mandatory now                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Founder "In one line" / header tagline (`short_description`)                                                                                                                                                             | none                                                          | No step writes it, and semantic matching reads it (§8 gap 7). It needs a new step, or the description to write it: owner's call.                                                                                                               |
+| Founder city, founded year, legal name (`/profile`)                                                                                                                                                                      | none                                                          | No step. City can go in the country note. Legal name and founding year are KYB facts. Owner's call.                                                                                                                                            |
+| Investor description "In your words" (`publicDescription`)                                                                                                                                                               | none                                                          | No step.                                                                                                                                                                                                                                       |
+| Investor geography / sector strength, sectors to avoid, business models, customer types, capital intensity, regulated markets, revenue, founder fit, green flags, exclusions, portfolio, thesis (`/profile`, `/capital`) | I3 strengths, I3.sectors_avoid, I4-I8, I11.additional_context | "None" or "no preference" is the honest answer for most people. A required step cannot be declined, so making these mandatory would re-ask them until the person says "I don't know". This needs a "none" option per step first. Owner's call. |
+| Founder F6.min_cheque                                                                                                                                                                                                    | F6.min_cheque (optional)                                      | Rendering on the profile is unverified (deck-derived "Minimum cheque").                                                                                                                                                                        |
+| Founder F9 pitch sections (problem, solution, …)                                                                                                                                                                         | F9.* (optional)                                               | The overview reads the deck, the pitch video and four answers, not F9 answers. It looks unrendered (unverified on the API side).                                                                                                               |
+| Logo, cover, verification, Q findings, Q card, team list, deck and data room, derived numbers, "Your book"                                                                                                               | none                                                          | Uploads, verification state or derived: not onboarding questions.                                                                                                                                                                              |
