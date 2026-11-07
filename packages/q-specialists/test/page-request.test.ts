@@ -58,6 +58,9 @@ const TABLE: readonly (readonly [string, string])[] = [
   ["Take me to my mandate", "MANDATE"],
   ["open my investment mandate", "MANDATE"],
   ["show me my mandate", "MANDATE"],
+  // Q Workspace batch 2: Analytics, both sides.
+  ["open analytics", "ANALYTICS"],
+  ["take me to my analytics", "ANALYTICS"],
   // Lane ov 2026-10-16: the CRM by its name and its tabs.
   ["open the CRM", "RELATIONSHIPS"],
   ["take me to the crm overview", "RELATIONSHIPS"],

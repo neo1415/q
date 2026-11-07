@@ -69,6 +69,9 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   // Sweep 2026-10-29: the bare /mandate is resolved on the server (their
   // profile's mandate, or the setup that creates one).
   MANDATE: "/mandate",
+  // Q Workspace batch 2: who engaged with what, within the visibility
+  // each viewer chose (plan §8); both sides.
+  ANALYTICS: "/analytics",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

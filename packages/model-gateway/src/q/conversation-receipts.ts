@@ -201,6 +201,7 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   Q_PITCH: "Q Pitch",
   BOARD: "Work (Board)",
   MANDATE: "your mandate",
+  ANALYTICS: "your analytics",
 };
 
 /** Where the person is, in their terms (R21). */
