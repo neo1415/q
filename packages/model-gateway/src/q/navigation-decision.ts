@@ -1356,6 +1356,34 @@ export function voteNavigation(
   return STAY("SPLIT_VOTE");
 }
 
+/** One sample of the decision: what the model proposed, and what code made of it. */
+export type QNavigationSample = {
+  readonly proposal: NavigationDecisionResult | null;
+  readonly resolution: QNavigationResolution | null;
+  readonly outcome: QNavigationOutcome;
+};
+
+/**
+ * A sample as a log line may carry it (batch-8 replay: production must say
+ * what the decision did): decisions, place shapes and guards only -- never
+ * a record's name, the person's words, or an id.
+ */
+export function sampleForLog(one: QNavigationSample): Record<string, unknown> {
+  const place = one.proposal?.place ?? null;
+  return {
+    proposed: one.proposal?.decision ?? "FAILED",
+    route: place?.route ?? null,
+    tab: place?.tab ?? null,
+    sectionId: place?.sectionId ?? null,
+    askedForPage: one.proposal?.askedForPage ?? null,
+    record: place?.record != null,
+    alternative: one.proposal?.alternative != null,
+    resolved: one.resolution?.kind ?? null,
+    outcome: one.outcome.decision,
+    guard: one.outcome.guard,
+  };
+}
+
 /**
  * The three steps together -- decide, resolve, apply the policy -- for each
  * of NAVIGATION_VOTES samples at once, then the vote.
@@ -1369,12 +1397,15 @@ export async function decideNavigation(
     readonly resolver?: QNavigationRecordResolver | undefined;
     /** Samples to vote over (decision 78); 1 is the plain pipeline. */
     readonly votes?: number | undefined;
+    /** Observability: each sample's proposal, resolution and outcome. */
+    readonly onSamples?:
+      ((samples: readonly QNavigationSample[]) => void) | undefined;
   },
   input: QNavigationInput,
   attribution: Parameters<QNavigationDecider["decide"]>[1],
 ): Promise<QNavigationOutcome> {
   const resolver = dependencies.resolver ?? listedRecordResolver(input.records);
-  const sample = async (): Promise<QNavigationOutcome> => {
+  const sample = async (): Promise<QNavigationSample> => {
     const proposal = await dependencies.decider.decide(input, attribution);
     const [resolution, alternative] =
       proposal === null || proposal.decision === "STAY"
@@ -1383,7 +1414,7 @@ export async function decideNavigation(
             resolveNavigationPlaceWith(proposal, input, resolver),
             resolveAlternative(proposal, input, resolver),
           ]);
-    return applyNavigationPolicy({
+    const outcome = applyNavigationPolicy({
       proposal,
       resolution,
       pane: input.pane,
@@ -1392,11 +1423,13 @@ export async function decideNavigation(
       records: input.records,
       alternative,
     });
+    return { proposal, resolution, outcome };
   };
   const votes = Math.max(1, dependencies.votes ?? NAVIGATION_VOTES);
   // In parallel: the vote costs no serial latency over one decision.
-  const outcomes = await Promise.all(Array.from({ length: votes }, sample));
-  return voteNavigation(outcomes);
+  const samples = await Promise.all(Array.from({ length: votes }, sample));
+  dependencies.onSamples?.(samples);
+  return voteNavigation(samples.map((one) => one.outcome));
 }
 
 // --- 4. The answer path: one move per turn, beside the answer ------------
@@ -1504,6 +1537,7 @@ export function createQPageMoves(dependencies: {
       const workspace = request.plan.screen?.workspace;
       if (workspace === undefined || pending.has(request.runId)) return;
       const side = sideOfRequest(request);
+      let sampled: readonly QNavigationSample[] = [];
       const decided = (async () => {
         const [listed, situation] = await Promise.all([
           dependencies.records?.(request).catch(() => null),
@@ -1527,6 +1561,9 @@ export function createQPageMoves(dependencies: {
             config: dependencies.config,
             resolver:
               dependencies.resolver?.(request) ?? listedRecordResolver(records),
+            onSamples: (samples) => {
+              sampled = samples;
+            },
           },
           input,
           {
@@ -1534,7 +1571,27 @@ export function createQPageMoves(dependencies: {
             userId: request.actorUserId,
             correlationId: request.correlationId,
           },
-        );
+        ).then((outcome) => {
+          // Batch-8 replay: what the decision did, every run (no names,
+          // no words, no ids).
+          const target =
+            outcome.target === null ? null : targetToSitePlace(outcome.target);
+          dependencies.logger?.info(
+            {
+              qRunId: request.runId,
+              decision: outcome.decision,
+              page: outcome.target?.page ?? null,
+              tab: outcome.target?.tab ?? null,
+              route: target?.route ?? null,
+              openPane: outcome.openPane,
+              remembered: outcome.remembered?.page ?? null,
+              guard: outcome.guard,
+              samples: sampled.map(sampleForLog),
+            },
+            "q page move decided",
+          );
+          return outcome;
+        });
       })().catch((error: unknown) => {
         dependencies.logger?.warn(
           { err: error instanceof Error ? error.name : typeof error },
@@ -1551,14 +1608,37 @@ export function createQPageMoves(dependencies: {
       if (decided === undefined) return blocks;
       pending.delete(request.runId);
       const current = blocks ?? [];
-      if (movesAlready(current)) return blocks;
+      if (movesAlready(current)) {
+        // Batch-8 replay: the answer's own move wins; say so, by kind only.
+        dependencies.logger?.info(
+          {
+            qRunId: request.runId,
+            answerMoves: current
+              .filter((block) => movesAlready([block]))
+              .map((block) =>
+                block.kind === "UI_INTENT"
+                  ? `UI_INTENT:${block.intent.kind}`
+                  : block.kind,
+              ),
+          },
+          "q page move skipped: the answer already moves the pane",
+        );
+        return blocks;
+      }
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const outcome = await Promise.race([
+      const late = Symbol("late");
+      const settled = await Promise.race([
         decided,
-        new Promise<null>((resolve) => {
-          timer = setTimeout(() => resolve(null), waitMs);
+        new Promise<typeof late>((resolve) => {
+          timer = setTimeout(() => resolve(late), waitMs);
         }),
       ]).finally(() => clearTimeout(timer));
+      if (settled === late)
+        dependencies.logger?.info(
+          { qRunId: request.runId, waitedMs: waitMs },
+          "q page move not ready when the answer was stored; the pane stays",
+        );
+      const outcome = settled === late ? null : settled;
       if (outcome === null || outcome.target === null) return blocks;
       if (outcome.decision === "STAY") return blocks;
       let intent: ReturnType<typeof navigateTargetToIntent>;

@@ -12227,6 +12227,8 @@ export {
   NAVIGATION_DECISION_REASONING,
   NAVIGATION_VOTES,
   voteNavigation,
+  sampleForLog,
+  type QNavigationSample,
   NAVIGATION_DECISION_TASK_CLASS,
   navigateTargetFromPath,
   navigationPaneFromWorkspace,

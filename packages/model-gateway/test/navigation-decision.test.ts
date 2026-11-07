@@ -1528,3 +1528,151 @@ describe("heldout4 follow-up: a record found only by part of its name is offered
     expect(out.remembered).toMatchObject({ recordId: SILO });
   });
 });
+
+describe("batch-8 replay: each run's decision is logged, with no names and no text", () => {
+  it("logs the outcome, its guard, and each sample's decision, place shape and resolution", async () => {
+    const lines: { obj: Record<string, unknown>; msg: string }[] = [];
+    const recordingLogger = {
+      info: (obj: Record<string, unknown>, msg: string) =>
+        lines.push({ obj, msg }),
+      warn: () => undefined,
+      error: () => undefined,
+      debug: () => undefined,
+      child: () => recordingLogger,
+    } as unknown as Parameters<typeof createQPageMoves>[0]["logger"];
+    const moves = createQPageMoves({
+      decider: {
+        decide: () =>
+          Promise.resolve(
+            proposal({
+              place: place({ record: company("Silo Credit"), tab: "deck" }),
+              askedForPage: false,
+            }),
+          ),
+      },
+      config: { movesAllowed: true },
+      records: () =>
+        Promise.resolve({
+          companies: [{ id: SILO, name: "Silo Credit" }],
+          investors: [],
+          things: [],
+          deleted: [],
+        }),
+      logger: recordingLogger,
+      settleWithinMs: 1_000,
+    });
+    const request = {
+      runId: "r1",
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "HOME",
+          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+        },
+      },
+    } as unknown as QAnswerRequest;
+    moves.start(request, {
+      utterance: "show me silo credit's deck",
+      recentTurns: [],
+      pageText: null,
+    });
+    await moves.settle(request, []);
+    const decided = lines.find((l) => l.msg === "q page move decided");
+    expect(decided?.obj).toMatchObject({
+      qRunId: "r1",
+      decision: "MOVE",
+      page: "COMPANY",
+      tab: "deck",
+      guard: null,
+    });
+    const samples = decided?.obj["samples"] as Record<string, unknown>[];
+    expect(samples).toHaveLength(3);
+    expect(samples[0]).toEqual({
+      proposed: "MOVE",
+      route: "/company/[companyId]",
+      tab: "deck",
+      sectionId: null,
+      askedForPage: false,
+      record: true,
+      alternative: false,
+      resolved: "TARGET",
+      outcome: "MOVE",
+      guard: null,
+    });
+    // No names, no words, no ids of records.
+    const logged = JSON.stringify(decided);
+    expect(logged).not.toContain("Silo");
+    expect(logged).not.toContain(SILO);
+    expect(logged).not.toContain('deck"s');
+  });
+});
+
+describe("batch-8 replay: settle says why the decision's move was not used", () => {
+  const request = {
+    runId: "r2",
+    tenantId: "t",
+    actorUserId: "u",
+    correlationId: "c",
+    plan: {
+      scopes: [],
+      screen: {
+        route: "HOME",
+        workspace: { qPane: "open", pagePane: "open", at: "/home" },
+      },
+    },
+  } as unknown as QAnswerRequest;
+  function logged() {
+    const lines: { obj: Record<string, unknown>; msg: string }[] = [];
+    const logger = {
+      info: (obj: Record<string, unknown>, msg: string) =>
+        lines.push({ obj, msg }),
+      warn: () => undefined,
+      error: () => undefined,
+      debug: () => undefined,
+      child: () => logger,
+    } as unknown as Parameters<typeof createQPageMoves>[0]["logger"];
+    return { lines, logger };
+  }
+  const turn = { utterance: "open my work", recentTurns: [], pageText: null };
+
+  it("the answer already moves the pane: logged with the moving block's kind", async () => {
+    const { lines, logger } = logged();
+    const moves = createQPageMoves({
+      decider: { decide: () => Promise.resolve(null) },
+      config: { movesAllowed: true },
+      logger,
+    });
+    moves.start(request, turn);
+    await moves.settle(request, [
+      { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination: "WORK" } },
+    ]);
+    expect(
+      lines.find(
+        (l) =>
+          l.msg === "q page move skipped: the answer already moves the pane",
+      )?.obj,
+    ).toEqual({ qRunId: "r2", answerMoves: ["UI_INTENT:NAVIGATE"] });
+  });
+
+  it("the decision is still running when the answer is stored: logged", async () => {
+    const { lines, logger } = logged();
+    const moves = createQPageMoves({
+      decider: { decide: () => new Promise(() => undefined) },
+      config: { movesAllowed: true },
+      logger,
+      settleWithinMs: 5,
+    });
+    moves.start(request, turn);
+    await moves.settle(request, []);
+    expect(
+      lines.some(
+        (l) =>
+          l.msg ===
+          "q page move not ready when the answer was stored; the pane stays",
+      ),
+    ).toBe(true);
+  });
+});
