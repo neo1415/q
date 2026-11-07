@@ -9,6 +9,7 @@ import {
   investorProfile,
   ownMissing,
   profile,
+  relationshipWithInvestor,
   section,
   team,
   threadWithCompany,
@@ -133,14 +134,22 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "I'm curious whether any investors are warming to us.",
-      dest("COMPANY_INTEREST"),
-      "Investor interest: the interest section.",
+      // Dataset correction (after the v10/v11 A/B, 7 Nov): "warming to us"
+      // is the signals (saves, asks for more), Analytics' intent section;
+      // /company/interest is where requests to connect are answered. The
+      // intent section leads Analytics, so its place is the page.
+      dest("ANALYTICS"),
+      "Investors warming to them: Analytics (its intent section leads).",
     ],
     [
       "FOUNDER",
       "Not sure we're ready for diligence, honestly.",
-      ownMissing(),
-      "What's missing in their data room.",
+      // Dataset correction (after the v10/v11 A/B, 7 Nov; flagged in the r3
+      // note): readiness for investors is Capital: Readiness ("how ready
+      // your company looks to investors"); the data room's missing list is
+      // one part of it.
+      dest("CAPITAL_READINESS"),
+      "How ready they look to investors: Capital, Readiness.",
     ],
   ];
   for (const [s, user, target, why] of lookMove)
@@ -968,9 +977,11 @@ function devConversation(cases: CaseSet): void {
     ),
     turn(
       "have we talked to them before?",
+      // Dataset correction (after the v10/v11 A/B, 7 Nov): "talked" is
+      // calls as well as messages; the relationship page holds both.
       F.move(
-        threadWithInvestor("inv-baobab-ridge"),
-        "'Them': the investor talked about; the conversation with them.",
+        relationshipWithInvestor("inv-baobab-ridge"),
+        "'Them': the investor talked about; where things stand with them.",
       ),
       { context: context({ at: investorProfile("inv-baobab-ridge") }) },
     ),
