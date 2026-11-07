@@ -36,6 +36,7 @@ import {
 } from "@capital-q/q-presence";
 import {
   createPublicWebResearchService,
+  PLANNED_EXTRACT_BUDGET_MS,
   type PublicProfileLookupProvider,
   type PublicWebResearchProvider,
   type PublicWebResearchService,
@@ -128,9 +129,42 @@ export function createWorkerPresenceReadPort(dependencies: {
             userText: query,
             subject: researchSubject,
             extractCount: PRESENCE_BOUNDS.maxSourcesPerRead,
+            // P1-5 (onboarding plan §7): a background job's pages get the
+            // planned budget (8 s), not a turn's 3 s.
+            planned: true,
+            maxSearches: 2,
             ...(signal === undefined ? {} : { signal }),
           }),
         );
+
+      // P1-5: the site they gave, read directly (a young company's site is
+      // often not indexed). Their own link, read as a public page.
+      const website = identity.websiteUrl?.trim() ?? "";
+      const readingOwnSite =
+        website.length === 0
+          ? Promise.resolve(null)
+          : research
+              .extract({
+                actor,
+                runId,
+                correlationId,
+                urls: [website],
+                personNamed: [website],
+                signal:
+                  signal === undefined
+                    ? AbortSignal.timeout(PLANNED_EXTRACT_BUDGET_MS)
+                    : AbortSignal.any([
+                        signal,
+                        AbortSignal.timeout(PLANNED_EXTRACT_BUDGET_MS),
+                      ]),
+              })
+              .catch((error: unknown) => {
+                logger?.warn(
+                  { err: error, correlationId },
+                  "their own site could not be read",
+                );
+                return null;
+              });
 
       const lookingUp =
         profiles !== undefined &&
@@ -142,7 +176,7 @@ export function createWorkerPresenceReadPort(dependencies: {
             )
           : null;
 
-      const [searches, profile] = await Promise.all([
+      const [searches, profile, ownSite] = await Promise.all([
         Promise.allSettled(searching),
         lookingUp === null
           ? Promise.resolve(null)
@@ -153,9 +187,34 @@ export function createWorkerPresenceReadPort(dependencies: {
               );
               return null;
             }),
+        readingOwnSite,
       ]);
 
       const found: PresenceSource[] = [];
+      if (ownSite !== null) {
+        if (ownSite.status === "OK") {
+          for (const source of ownSite.sources) {
+            found.push({
+              url: source.url,
+              title: source.title,
+              publishedAt: source.publishedAt,
+              excerpt: source.excerpt,
+              provider: "public_web",
+              retrievedAt: source.retrievedAt,
+            });
+          }
+        } else {
+          // Logged, never said (DECISIONS 77).
+          logger?.warn(
+            {
+              correlationId,
+              status: ownSite.status,
+              failureClass: ownSite.failureClass,
+            },
+            "their own site had no provider to read it",
+          );
+        }
+      }
       for (const outcome of searches) {
         if (outcome.status !== "fulfilled") {
           logger?.warn(
@@ -164,7 +223,27 @@ export function createWorkerPresenceReadPort(dependencies: {
           );
           continue;
         }
-        if (outcome.value.status !== "OK") continue;
+        if (outcome.value.status !== "OK") {
+          // P0-3: a refused or spent provider is not "nothing found". The
+          // person hears nothing (DECISIONS 77); the logs say which.
+          const status = outcome.value.status;
+          if (status === "PROVIDER_UNAVAILABLE") {
+            logger?.warn(
+              {
+                correlationId,
+                status,
+                failureClass: outcome.value.failureClass,
+              },
+              "a public presence search had no provider to answer",
+            );
+          } else {
+            logger?.info(
+              { correlationId, status },
+              "a public presence search found no public identity",
+            );
+          }
+          continue;
+        }
         for (const source of outcome.value.sources) {
           found.push({
             url: source.url,

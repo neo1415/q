@@ -77,6 +77,11 @@ import {
 } from "@capital-q/discovery";
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
+  PRESENCE_RESEARCH_DEAD_LETTER_QUEUE,
+  PRESENCE_RESEARCH_QUEUE,
+  ResearchOnboardingPresenceJob,
+} from "@capital-q/q-presence";
+import {
   createDocumentProcessingService,
   createPostgresDocumentPageTextReader,
   createPostgresEvidenceRepositories,
@@ -225,6 +230,10 @@ import {
   unavailableAppEmailSender,
 } from "@capital-q/integrations";
 import { createPresenceResearchDispatch } from "./presence/dispatch.js";
+import {
+  createPresenceResearchJobHandler,
+  createPresenceResearchRequester,
+} from "./presence/research-job.js";
 import { createPostgresBuildPrincipalResolver } from "./recommendations/build-principal.js";
 import { createRecommendationRefreshHandler } from "./recommendations/refresh-handler.js";
 import { EXTRACTION_PARSER_LIMITS } from "./parser/limits.js";
@@ -622,6 +631,42 @@ logger.info(
   },
   "public presence research composed",
 );
+// Onboarding research as a durable job (onboarding plan §7, P1-4): the
+// domain-event consumer enqueues, this runner reads. One at a time per
+// process: each is a bounded web read and one model reading.
+const presenceResearchRequester =
+  presenceResearch === undefined
+    ? undefined
+    : createPresenceResearchRequester({ queue: queues });
+const presenceResearchJobs =
+  presenceResearch === undefined
+    ? undefined
+    : createQueueRunner({
+        queue: PRESENCE_RESEARCH_QUEUE,
+        deadLetterQueue: PRESENCE_RESEARCH_DEAD_LETTER_QUEUE,
+        client: queues,
+        handle: createPresenceResearchJobHandler({
+          dispatch: presenceResearch,
+          logger,
+        }),
+        batchSize: 1,
+        pollIntervalMs: 2_000,
+        idle: idleBackoff(2_000),
+        visibilityTimeoutSeconds:
+          ResearchOnboardingPresenceJob.retryPolicy.visibilityTimeoutSeconds,
+        maxAttempts: ResearchOnboardingPresenceJob.retryPolicy.maxAttempts,
+        backoff: {
+          initialDelaySeconds:
+            ResearchOnboardingPresenceJob.retryPolicy.backoff
+              .initialDelaySeconds,
+          maxDelaySeconds:
+            ResearchOnboardingPresenceJob.retryPolicy.backoff.maxDelaySeconds ??
+            600,
+          jitter:
+            ResearchOnboardingPresenceJob.retryPolicy.backoff.jitter ?? true,
+        },
+        logger,
+      });
 
 /**
  * Persisted recommendation slates (CQ-REC-006). The same pipeline
@@ -1034,9 +1079,11 @@ const documentEvents = createQueueRunner({
                           ...(mandateReview === undefined
                             ? {}
                             : { mandateReview }),
-                          ...(presenceResearch === undefined
+                          ...(presenceResearchRequester === undefined
                             ? {}
-                            : { presenceResearch }),
+                            : {
+                                presenceResearch: presenceResearchRequester,
+                              }),
                           recommendations: {
                             onEvent: async (event) => {
                               const applied = await slateInvalidation.apply(
@@ -1680,6 +1727,9 @@ await Promise.all([
   runner.run(shutdownController.signal),
   documentEvents.run(shutdownController.signal),
   recommendationRefresh.run(shutdownController.signal),
+  ...(presenceResearchJobs === undefined
+    ? []
+    : [presenceResearchJobs.run(shutdownController.signal)]),
   ...(documents === undefined
     ? []
     : [documents.run(shutdownController.signal)]),
