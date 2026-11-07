@@ -9,6 +9,7 @@ import {
 } from "@capital-q/contracts";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
+import { InvestabilityParts } from "@/features/scores/company-scores";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -122,6 +123,7 @@ export function QRead({
               ? `${t("The other")} ${String(unknown)} ${t("are unknown.")}`
               : ""}
           </p>
+          <InvestabilityParts investability={inv} />
         </div>
       </Row>
       {suit === null ? null : (

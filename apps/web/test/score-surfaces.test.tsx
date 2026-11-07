@@ -170,3 +170,52 @@ describe("compact score lines are heard by screen readers (metrics audit P1-18)"
     });
   }
 });
+
+describe("Investability's parts under the headline (audit P1-7)", () => {
+  const withParts: CompanyScoresDto = CompanyScoresDtoSchema.parse({
+    ...scores,
+    investability: {
+      ...scores.investability,
+      parts: {
+        businessQuality: {
+          score: 64,
+          band: "DEVELOPING",
+          confidence: "LOW",
+          factors: { onRecord: 9, applicable: 25 },
+        },
+        readiness: {
+          score: null,
+          band: null,
+          confidence: null,
+          factors: { onRecord: 3, applicable: 23 },
+        },
+      },
+    },
+  });
+
+  it("shows both parts with plain names, one sentence each, under the number", () => {
+    render(<CompanyScores scores={withParts} variant="full" />);
+    const parts = document.querySelector("[data-investability-parts]");
+    expect(parts).not.toBeNull();
+    const quality = parts?.querySelector('[data-part="businessQuality"]');
+    expect(quality?.textContent).toMatch(/Business quality/u);
+    expect(quality?.textContent).toMatch(/64/u);
+    expect(quality?.textContent).toMatch(/Developing · Low confidence/u);
+    expect(quality?.textContent).toMatch(/team, the product and market/u);
+    const readiness = parts?.querySelector('[data-part="readiness"]');
+    expect(readiness?.textContent).toMatch(/Investment readiness/u);
+    // No number from facts merely on record: never 0.
+    expect(readiness?.textContent).toMatch(
+      /3 of 23 factors on record, not enough to grade yet/u,
+    );
+    expect(readiness?.textContent).not.toMatch(/\b0\b/u);
+  });
+
+  it("shows them in Q's read too, and nothing when an older assessment has none", () => {
+    render(<QRead scores={withParts} companyName="Acme" />);
+    expect(document.querySelector("[data-investability-parts]")).not.toBeNull();
+    cleanup();
+    render(<CompanyScores scores={scores} variant="full" />);
+    expect(document.querySelector("[data-investability-parts]")).toBeNull();
+  });
+});

@@ -10,6 +10,7 @@ import {
   FitComparisonDtoSchema,
   INVESTABILITY_BAND_LABELS,
   investabilityLine,
+  investabilityPartLines,
   notAssessedInvestability,
   SCORE_CONFIDENCE_LABELS,
   suitabilityFromFit,
@@ -695,6 +696,10 @@ export function companyScoresText(scores: CompanyScoresDto): string {
     inv.status === "SCORED" && inv.band !== null && inv.confidence !== null
       ? `${investabilityLine(inv)} (${INVESTABILITY_BAND_LABELS[inv.band]}, ${SCORE_CONFIDENCE_LABELS[inv.confidence].toLowerCase()})`
       : investabilityLine(inv);
+  // Its two parts, in the screen's own words (audit P1-7).
+  const parts = investabilityPartLines(inv);
+  const invWithParts =
+    parts === null ? invWords : `${invWords}; its parts: ${parts.join("; ")}`;
   const suit =
     scores.suitability === null ? null : suitabilityLine(scores.suitability);
   const potential = scores.unicornPotential;
@@ -703,7 +708,8 @@ export function companyScoresText(scores: CompanyScoresDto): string {
       ? null
       : `Unicorn Potential: ${potential.overallScore === null ? "insufficient evidence, no score" : `${potential.overallScore}/100`}; evidence coverage ${Math.round(potential.coverage * 100)}%; ${potential.confidence.toLowerCase()} confidence; method ${potential.methodVersion}. ${UNICORN_POTENTIAL_CAVEAT}`;
   return (
-    [invWords, suit, unicorn].filter((part) => part !== null).join(". ") + "."
+    [invWithParts, suit, unicorn].filter((part) => part !== null).join(". ") +
+    "."
   );
 }
 

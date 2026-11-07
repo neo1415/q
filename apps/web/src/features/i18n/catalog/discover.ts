@@ -270,6 +270,17 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Raise not shared": "الجولة غير مُشارَكة",
   "Suitability for you": "الملاءمة لك",
   "The other": "العوامل الأخرى",
+  // Investability's parts (audit P1-7, owner decision 78).
+  "Business quality": "جودة الأعمال",
+  "Investment readiness": "الجاهزية للاستثمار",
+  "How strong the business looks: the team, the product and market, traction and finances.":
+    "مدى قوة الأعمال: الفريق، والمنتج والسوق، والزخم التجاري، والوضع المالي.",
+  "How prepared it is for investors: governance, legal basics, the raise and diligence.":
+    "مدى استعدادها للمستثمرين: الحوكمة، والأساسيات القانونية، وجولة التمويل، والفحص النافي للجهالة.",
+  "No number yet": "لا رقم بعد",
+  "Nothing shared yet": "لم يُشارَك شيء بعد",
+  "factors on record, not enough to grade yet":
+    "عوامل مسجلة، غير كافية للتقييم بعد",
   "are unknown.": "غير معروفة.",
   "There is not enough shared evidence for a number yet.":
     "لا توجد أدلة مُشارَكة كافية لرقم بعد.",
