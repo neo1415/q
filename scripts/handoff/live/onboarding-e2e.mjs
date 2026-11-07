@@ -347,26 +347,45 @@ if (STEPS.has("J2") && JOURNEY === "founder") {
   // saved without a read-back.
   const CLEAR =
     "The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkward to send, and there is no simple way for a customer to pay a debt by transfer.";
-  const before = new Set(await answered());
+  // Run 3: the say-back above already saved F9.problem, so this answer
+  // UPDATES it. Judge the problem's stored text, not newly answered keys
+  // (which an update never adds).
+  const problemText = async () => {
+    const value = ((await view())?.responses ?? []).find(
+      (r) => r.stepKey === "F9.problem",
+    )?.value;
+    return value?.type === "TEXT" ? value.text : "";
+  };
+  const problemBefore = await problemText();
   await say(CLEAR);
   const reply = await lastQ();
-  const gained = (await answered()).filter((key) => !before.has(key));
+  await new Promise((resolve) => setTimeout(resolve, 6000));
+  const problemAfter = await problemText();
   note("J2", "Q after a clear typed answer", reply.slice(0, 200));
+  note(
+    "J2",
+    "F9.problem before → after",
+    `${problemBefore.slice(0, 80)} → ${problemAfter.slice(0, 120)}`,
+  );
   check(
     "J2",
     "a clear typed answer is saved in their words, not read back",
-    gained.some((key) => key.startsWith("F9.")) &&
+    /a fifth of what they are owed/i.test(problemAfter) &&
       !/is that right|did I get that|shall I save/i.test(reply),
-    gained.join(", "),
+    problemAfter.slice(0, 120),
   );
 }
 
 // ---- J3 required vs optional ---------------------------------------------------------
 if (STEPS.has("J3")) {
+  // Founder v9 / investor v4 (DECISIONS 79): the founder's website and
+  // the investor's geography and inbound are REQUIRED; team size is
+  // optional. So: an optional skip (team size; for the investor the
+  // discovery style), and a required refusal (website; inbound).
   await say(
     JOURNEY === "founder"
-      ? "Skip the website for now, and I'd rather not say how many people work here."
-      : "Skip geography for now, and I'd rather not say how we handle inbound.",
+      ? "Skip the team size for now, and I'd rather not give the website."
+      : "Skip the discovery style for now, and I'd rather not say how we handle inbound.",
   );
   const reply = await lastQ();
   note(
@@ -378,7 +397,7 @@ if (STEPS.has("J3")) {
   // stating it earlier (J1): a decline of an answered required step is
   // refused, so their earlier answer should still stand.
   const requiredStep =
-    JOURNEY === "founder" ? "F4.team_size" : "I10.inbound_preference";
+    JOURNEY === "founder" ? "F1.website" : "I10.inbound_preference";
   const stored = ((await view())?.responses ?? []).find(
     (r) => r.stepKey === requiredStep,
   );
@@ -390,7 +409,9 @@ if (STEPS.has("J3")) {
   check(
     "J3",
     "a required refusal is re-asked with the reason",
-    /verif|need(ed)? (it|this)|because|so (that|we|I) can/i.test(reply),
+    /verif|need(ed)? (it|this)|because|so (that|we|I) can|matching|your profile|investors (can|see)/i.test(
+      reply,
+    ),
     "expected a reason (P0-2)",
   );
   await shot("j3-required");
@@ -595,28 +616,92 @@ if (STEPS.has("J6")) {
     /shall i keep|keep that|is that right|right\?|correct\?|confirm|look right|shall i save/i,
     "Yes, that's right.",
   ];
+  // Run 3: the founder v9/v10 and investor v4/v5 required steps too, so J6
+  // can finish (website, founders, team, city, year, one line; the
+  // investor's website, country, role, lists and description). Most
+  // specific first; matched on Q's question sentence only.
   const FACTS =
     JOURNEY === "founder"
       ? [
           READ_BACK,
+          [/website|site\b|web address/i, "tamarindledger.example"],
+          [
+            /one line|in a line|one sentence|tagline/i,
+            "Tamarind Ledger helps market traders track and collect what they're owed.",
+          ],
+          [/which city|what city|\bcity\b/i, "Lagos."],
+          [/what year|which year|founded|start(ed)? the company/i, "2021."],
+          [
+            /how many founders|number of founders|founders are there/i,
+            "Two founders.",
+          ],
+          [/full[- ]time/i, "Both of us are full-time."],
+          [
+            /how many people|team size|people work|employees|headcount/i,
+            "Nine people.",
+          ],
+          [/your role|role at|what do you do at/i, "I'm the CEO."],
+          [/cover|functions|between you/i, "Product, engineering and sales."],
+          [/which country|what country|based|where is/i, "Lagos, Nigeria."],
           [/currency/i, "US dollars."],
           [
             /how much|amount|target|size of the round/i,
             "One and a half million dollars.",
           ],
+          [/instrument|safe|equity|convertible|structure/i, "A SAFE."],
+          [/when .*close|timeframe|timeline|by when/i, "Within six months."],
+          [/use of funds|money .*go|spend|go towards/i, "Product and hiring."],
+          [/growth|growing/i, "Growing about ten percent a month."],
+          [/pilots|design partners/i, "Three pilots."],
           [/stage/i, "Seed."],
           [/problem/i, "Market traders lose track of what they're owed."],
+          [
+            /sector|industry|categor|space you're in/i,
+            "Fintech for small merchants.",
+          ],
+          [/deck|material|document|upload/i, "I don't have a deck yet."],
           [
             /signal|traction|customers/i,
             "Paying customers, about forty shops.",
           ],
           [/revenue/i, "Recurring and growing."],
           [/raising|raise|fundrais/i, "Yes, actively raising."],
+          [/anything else|anything more|missed/i, "No, that's everything."],
         ]
       : [
           READ_BACK,
+          [/website|site\b|web address/i, "wadden.example"],
+          [/which country|what country|based|headquarter/i, "The Netherlands."],
+          [/your role|role there|title/i, "Partner."],
+          [
+            /describe your firm|firm to a founder|about your firm/i,
+            "We back early fintech and climate companies in West Africa.",
+          ],
           [/currency/i, "US dollars."],
+          [/minimum|smallest/i, "$250,000."],
+          [/typical/i, "$500,000."],
+          [/maximum|largest/i, "$1,000,000."],
           [/cheque|ticket|how much/i, "Between $250,000 and $1,000,000."],
+          [/lead|co-?invest|follow/i, "We lead and co-invest."],
+          [
+            /how firm|must match|strong preference|nice to have/i,
+            "A strong preference.",
+          ],
+          [/where do you invest|geograph|region/i, "West Africa."],
+          [
+            /rather not see|avoid|never (want|show)|exclude|exclusion/i,
+            "None.",
+          ],
+          [/sector|industr|product area/i, "Fintech and climate."],
+          [
+            /business model|customer type|capital[- ]intens|regulat|revenue/i,
+            "No preference.",
+          ],
+          [
+            /founder|founding team|green flag|signal|look for/i,
+            "Repeat founders and capital efficiency.",
+          ],
+          [/portfolio/i, "None yet."],
           [
             /inbound|approach|reach (you|out)/i,
             "Founders can reach out directly.",
@@ -626,16 +711,17 @@ if (STEPS.has("J6")) {
           [/type of investor|what kind of investor|type/i, "A VC fund."],
           [/discover|how.*see|mode/i, "Show me everything that fits."],
           [
-            /mandate|in your own words|describe/i,
+            /mandate|thesis|in your own words|describe/i,
             "Early fintech and climate in West Africa.",
           ],
+          [/anything else|anything more|missed/i, "No, that's everything."],
         ];
   const questionOf = (line) => {
     const asks = line.match(/[^.?!]*\?/gu);
     return asks === null ? line : asks[asks.length - 1];
   };
   const answers = [];
-  for (let turn = 0; turn < Number(process.env.TURNS ?? 12); turn += 1) {
+  for (let turn = 0; turn < Number(process.env.TURNS ?? 30); turn += 1) {
     if (!new URL(page.url()).pathname.startsWith("/onboarding")) break;
     const q = questionOf(await lastQ());
     const hit = FACTS.find(([re]) => re.test(q));
