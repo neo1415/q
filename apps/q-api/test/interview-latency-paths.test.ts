@@ -998,6 +998,9 @@ describe("the receipt is said once in a voice turn (e2e run 3, production 57e728
       onSentence: (sentence) => sentences.push(sentence),
     });
     expect(outcome.reply.match(/I've saved/gu) ?? []).toHaveLength(1);
+    // What the voice speaks: the stream, not only the stored reply
+    // (production 2026-11-07: stored once, streamed twice).
+    expect(sentences.join(" ").match(/I've saved/gu) ?? []).toHaveLength(1);
     expect(outcome.reply.match(/Paying customers/gu) ?? []).toHaveLength(1);
   });
 });
@@ -1056,6 +1059,9 @@ describe("a model reply that restates the receipt in its own words (e2e run 3)",
     });
     expect(sentences[0]).toMatch(/I've saved/u);
     expect(outcome.reply.match(/I've saved/gu) ?? []).toHaveLength(1);
+    // What the voice speaks: the stream, not only the stored reply
+    // (production 2026-11-07: stored once, streamed twice).
+    expect(sentences.join(" ").match(/I've saved/gu) ?? []).toHaveLength(1);
     expect(outcome.reply).toMatch(/How many founders are there\?$/u);
   });
 });
@@ -1138,5 +1144,8 @@ describe("the production echo, word for word (e2e run 3, J4)", () => {
       onSentence: (sentence) => sentences.push(sentence),
     });
     expect(outcome.reply.match(/I've saved/gu) ?? []).toHaveLength(1);
+    // What the voice speaks: the stream, not only the stored reply
+    // (production 2026-11-07: stored once, streamed twice).
+    expect(sentences.join(" ").match(/I've saved/gu) ?? []).toHaveLength(1);
   });
 });

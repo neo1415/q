@@ -12,11 +12,26 @@
  * said then; if the settled reply is not the text already streamed (a
  * round whose text was refused and answered again), nothing more is sent,
  * and `diverged` says so, so the caller can decide what to do.
+ *
+ * `lead` is a sentence code said before the model wrote anything (the save
+ * receipt). It goes out through this stream, so the stream knows it was
+ * said: the settled reply opens with it, and `finish` sends only what
+ * follows it. Production 2026-11-07: the receipt was said beside the
+ * stream, `finish` saw nothing streamed and sent the whole reply, and the
+ * voice said "I've saved…" twice while the stored turn held it once.
+ * A model sentence that only restates the lead (`restates`) is not sent
+ * either: once spoken it cannot be taken back.
  */
 export type ReplySentenceStream = {
   readonly push: (delta: string) => void;
+  readonly lead: (
+    sentence: string,
+    restates?: (sentence: string) => boolean,
+  ) => void;
   readonly finish: (reply: string) => { readonly diverged: boolean };
 };
+
+const collapsed = (text: string) => text.replace(/\s+/g, " ").trim();
 
 const FIELD = '"reply"';
 /** Where a sentence ends: terminal punctuation, a closing mark, then space. */
@@ -34,10 +49,22 @@ export function createReplySentenceStream(
   let escape = false;
   let emitted = "";
   let pending = "";
+  /** The sentence code said first, if any; never counted in `emitted`. */
+  let leadSaid: string | null = null;
+  let restatesLead: ((sentence: string) => boolean) | null = null;
 
   const emit = (sentence: string) => {
     const trimmed = sentence.trim();
     if (trimmed.length === 0) return;
+    if (
+      leadSaid !== null &&
+      (collapsed(trimmed) === collapsed(leadSaid) ||
+        restatesLead?.(trimmed) === true)
+    ) {
+      // Already said, in code's words: dropped, and not counted as said,
+      // because the settled reply drops it too.
+      return;
+    }
     emitted += sentence;
     onSentence(trimmed);
   };
@@ -99,10 +126,23 @@ export function createReplySentenceStream(
       }
       decode(cursor);
     },
-    finish: (reply) => {
+    lead: (sentence, restates) => {
+      const trimmed = sentence.trim();
+      if (closed || leadSaid !== null || trimmed.length === 0) return;
+      leadSaid = trimmed;
+      restatesLead = restates ?? null;
+      onSentence(trimmed);
+    },
+    finish: (settled) => {
       closed = true;
-      if (!reply.startsWith(emitted)) return { diverged: true };
-      let rest = reply.slice(emitted.length);
+      // The lead was said: what is left to say follows it.
+      const reply =
+        leadSaid !== null && settled.startsWith(leadSaid)
+          ? settled.slice(leadSaid.length).trimStart()
+          : settled;
+      const said = emitted.trimStart();
+      if (!reply.startsWith(said)) return { diverged: true };
+      let rest = reply.slice(said.length);
       for (;;) {
         const match = SENTENCE_END.exec(rest);
         if (match === null) break;
