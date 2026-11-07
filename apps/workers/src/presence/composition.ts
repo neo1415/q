@@ -48,7 +48,7 @@ import {
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { withCircuitBreaker } from "@capital-q/q-research/providers/breaker";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
-import { createSerpApiResearchProvider } from "@capital-q/q-research/providers/serpapi";
+import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
 
 /**
@@ -434,10 +434,13 @@ export function composeWorkerResearchProvider(
     ...(secrets.tavily === undefined
       ? []
       : [createTavilyResearchProvider({ apiKey: secrets.tavily.reveal() })]),
+    // SERP_API_KEY holds a Serper.dev key under a SerpApi name (production
+    // 2026-10-10): the detecting provider settles the vendor, as in q-api
+    // (P0-4, onboarding plan 2026-11-07). SerpApi alone failed every call.
     ...(secrets.serpApi === undefined
       ? []
       : [
-          createSerpApiResearchProvider({
+          createDetectingSerpProvider({
             apiKey: secrets.serpApi.reveal(),
           }),
         ]),

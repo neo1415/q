@@ -372,6 +372,7 @@ export function InvestorOnboardingScreen({
   return (
     <OnboardingShell
       stepKey={step.id}
+      continueLaterTo={continueLaterDestination("investor")}
       progress={
         <div className="flex flex-col gap-2">
           <OnboardingProgress session={session} />

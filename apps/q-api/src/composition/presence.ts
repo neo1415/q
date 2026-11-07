@@ -153,7 +153,29 @@ export function createPresenceReadPort(dependencies: {
           );
           continue;
         }
-        if (outcome.value.status !== "OK") continue;
+        if (outcome.value.status !== "OK") {
+          // P0-3 (onboarding plan 2026-11-07): a refused or spent provider
+          // is not "nothing found". The person still hears nothing
+          // (DECISIONS 77); the logs say which, so a failing search can be
+          // told apart from a subject with no public presence.
+          const status = outcome.value.status;
+          if (status === "PROVIDER_UNAVAILABLE") {
+            logger?.warn(
+              {
+                correlationId,
+                status,
+                failureClass: outcome.value.failureClass,
+              },
+              "a public presence search had no provider to answer",
+            );
+          } else {
+            logger?.info(
+              { correlationId, status },
+              "a public presence search found no public identity",
+            );
+          }
+          continue;
+        }
         for (const source of outcome.value.sources) {
           found.push({
             url: source.url,

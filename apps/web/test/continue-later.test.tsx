@@ -144,3 +144,49 @@ describe("a typed turn's navigate (coordinator 2026-10-28)", () => {
     expect(pausingDestination("HOME", undefined)).toBe("/home");
   });
 });
+
+describe("Continue later in the form goes where the conversation goes (P2-1)", () => {
+  it("the form's frame takes the destination it is given", async () => {
+    vi.useFakeTimers();
+    const { OnboardingShell } =
+      await import("../src/features/onboarding-kit/components/onboarding-shell");
+    render(
+      <OnboardingShell
+        progress={null}
+        onBack={undefined}
+        busy={false}
+        saveStatus="idle"
+        primaryAction={{ label: "Continue" }}
+        continueLaterTo="/discover"
+      >
+        <p>step</p>
+      </OnboardingShell>,
+    );
+    act(() => {
+      screen.getByRole("button", { name: "Continue later" }).click();
+    });
+    act(() => {
+      vi.advanceTimersByTime(CONTINUE_LATER_PAUSE_MS);
+    });
+    expect(push).toHaveBeenCalledWith("/discover");
+  });
+
+  it("the investor form gives it the investor's destination, as its conversation does", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const root = process.cwd().endsWith("apps/web")
+      ? process.cwd()
+      : path.join(process.cwd(), "apps/web");
+    const source = fs.readFileSync(
+      path.join(
+        root,
+        "src/features/investor-onboarding/investor-onboarding-screen.tsx",
+      ),
+      "utf8",
+    );
+    const shell = source.slice(source.indexOf("<OnboardingShell"));
+    expect(shell.slice(0, 400)).toMatch(
+      /continueLaterTo=\{continueLaterDestination\("investor"\)\}/,
+    );
+  });
+});

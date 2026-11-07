@@ -1453,9 +1453,20 @@ export function briefOf(
   const documents = state.steps.some((step) => step.kind === "DOCUMENT");
   const minutes = state.minutesLeft ?? null;
   const groups = optionalGroups(state);
+  // DECISIONS 77: a required answer they'd rather not give is not dropped;
+  // they hear why it's needed, and that it can wait. (A required step they
+  // say they don't know is a separate case, recorded as unknown.)
+  const neededOpen = state.steps.some(
+    (step) => isConversational(step) && step.required && step.status === "OPEN",
+  );
   return [
     `What this setup needs (${state.journey}), in the setup's order. These are topics, not a script: ask in your own plain words, one thing at a time, and group things that belong together.`,
     ...lines,
+    ...(neededOpen
+      ? [
+          "Needed topics are required: Capital Q needs them to verify the profile, and setup can't finish without them. If they'd rather not answer one, don't drop it and don't press: say briefly why it's needed (to verify their profile), that they can answer it later, then move on and come back to it. Optional topics they skip are simply left.",
+        ]
+      : []),
     // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long
     // answer is said back in Q's words at once and saved as what they
     // agree to; a summary card beside the conversation raced it.

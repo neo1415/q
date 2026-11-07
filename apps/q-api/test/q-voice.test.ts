@@ -128,6 +128,8 @@ function buildApp(options: {
   readonly interviewAgent?: InterviewAgent | undefined;
   readonly trialBroker?: LiveBroker | undefined;
   readonly rehearsals?: QVoiceRehearsals | undefined;
+  readonly onboardingConversation?:
+    QVoiceRoutesDependencies["onboardingConversation"] | undefined;
 }): FastifyInstance {
   const security: QApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -159,6 +161,9 @@ function buildApp(options: {
         ...(options.rehearsals === undefined
           ? {}
           : { rehearsals: options.rehearsals }),
+        ...(options.onboardingConversation === undefined
+          ? {}
+          : { onboardingConversation: options.onboardingConversation }),
         ...(options.interviewAgent === undefined
           ? {}
           : {
@@ -491,6 +496,70 @@ describe("POST /v1/q/voice/sessions", () => {
     const line = resumed.json<{ firstMessage?: string }>().firstMessage;
     expect(line).toContain("typical cheque");
     expect(line).not.toMatch(/welcome/i);
+    await app.close();
+  });
+
+  it("switching chat → voice mid-interview never greets again, as production wires it (P0-1)", async () => {
+    // Production wires the onboarding conversation (main.ts) as well as
+    // the conductor. Its opening says "Welcome back, <name>" whenever the
+    // thread has an answer, and "Hi <name>, I'm Q" before one: it must
+    // never open a line the person is switching to mid-interview.
+    const introductions: string[] = [];
+    const onboardingConversation = {
+      opening: () => {
+        introductions.push("opening");
+        return Promise.resolve(
+          "Welcome back, Ada. I've kept everything from last time, so let's pick up where we left off. What's a typical cheque for you?",
+        );
+      },
+    } as unknown as NonNullable<
+      QVoiceRoutesDependencies["onboardingConversation"]
+    >;
+    const conducted: string[] = [];
+    const interviewAgent = {
+      turn: (input: { readonly utterance: string }) => {
+        conducted.push(input.utterance);
+        return Promise.resolve({
+          reply:
+            "Picking up where we left off. What's a typical cheque for you?",
+          resumed: true,
+        });
+      },
+      researchEnded: () => undefined,
+    } as unknown as InterviewAgent;
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      provider: fakeProvider(),
+      bindings: createVoiceSessionBindings(),
+      interviewAgent,
+      onboardingConversation,
+    });
+    const onboarding = {
+      sessionId: "f0000000-0000-4000-8000-000000000012",
+      journeyType: "investor",
+    };
+    for (const payload of [
+      { onboarding, resume: true },
+      // The client sends no resume when its on-screen line isn't Q's
+      // question: the conductor still resumes on the kept thread.
+      { onboarding },
+    ]) {
+      const opened = await app.inject({
+        method: "POST",
+        url: "/v1/q/voice/sessions",
+        headers: AUTH,
+        payload,
+      });
+      expect(opened.statusCode).toBe(201);
+      const line = opened.json<{ firstMessage?: string }>().firstMessage ?? "";
+      expect(line).toContain("typical cheque");
+      expect(line).not.toMatch(/welcome|I'm Q/i);
+    }
+    // The conductor decides, from the kept thread, whether this is a
+    // first opening (it introduces Q itself) or a resume.
+    expect(introductions).toEqual([]);
+    expect(conducted).toEqual(["", ""]);
     await app.close();
   });
 
