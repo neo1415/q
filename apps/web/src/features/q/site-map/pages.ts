@@ -527,7 +527,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   // --- relationships ---
   "/relationships": {
     title: "Relationships",
-    purpose: "Your relationships: overview, pipeline, and a founder's Capital.",
+    purpose: "Your relationships: overview, pipeline, and Capital (a founder's raise and plan; an investor's mandate and commitments).",
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
     tabs: [
