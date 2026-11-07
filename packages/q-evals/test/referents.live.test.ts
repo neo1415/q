@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  createFakeModelProvider,
   createInMemoryModelUsageRepository,
   createModelGateway,
   createModelProviderRegistry,
@@ -94,7 +95,7 @@ const catalog: ModelCatalogSnapshot = {
   routingPolicies: (["PUBLIC", "INTERNAL", "CONFIDENTIAL"] as const).map(
     (sensitivityClass, index) => ({
       id: `a4000000-0000-4000-8000-00000000004${String(index)}`,
-      code: `fast_classification.referents.${sensitivityClass.toLowerCase()}`,
+      code: `fast_classification_referents_${sensitivityClass.toLowerCase()}.v1`,
       taskClass: "FAST_CLASSIFICATION" as const,
       sensitivityClass,
       qualityFloor: "STANDARD" as const,
@@ -275,68 +276,115 @@ const CASES: readonly Case[] = [
   },
 ];
 
+// Runs without a key: the catalog itself is valid, so a live run never
+// fails before its first call (integration's run on a42b26b did).
+describe("the referents check's catalog", () => {
+  it("is a valid static catalog", () => {
+    expect(() => createStaticModelCatalog(catalog)).not.toThrow();
+  });
+
+  it("runs every case end to end on a scripted model ($0): nothing fails before the first call", async () => {
+    const { results, usage } = await runCases(
+      createFakeModelProvider({
+        code: "anthropic",
+        script: [
+          {
+            kind: "JSON",
+            value: {
+              kind: "QUESTION_TO_Q",
+              confidence: "HIGH",
+              transcript: "CLEAR",
+              question: null,
+              aboutNamedOther: false,
+              tool: null,
+            },
+          },
+        ],
+      }),
+    );
+    expect(results).toHaveLength(CASES.length);
+    expect(results.filter((r) => r.reading === null).map((r) => r.id)).toEqual(
+      [],
+    );
+    expect(usage.entries.length).toBeGreaterThanOrEqual(CASES.length);
+  });
+});
+
+type CaseResult = {
+  id: string;
+  pass: boolean;
+  why: string | null;
+  reading: QTurnReading | null;
+};
+
+/** Every case through the real reader on the given provider, within the cap. */
+async function runCases(
+  provider: Parameters<typeof createModelProviderRegistry>[0][number],
+): Promise<{
+  readonly results: CaseResult[];
+  readonly usage: ReturnType<typeof createInMemoryModelUsageRepository>;
+}> {
+  const usage = createInMemoryModelUsageRepository();
+  const reader = createQTurnReader({
+    gateway: createModelGateway({
+      catalog: createStaticModelCatalog(catalog),
+      registry: createModelProviderRegistry([provider]),
+      usage,
+    }),
+    logger: createLogger(
+      { serviceName: "q-evals-live", environment: "test" },
+      { level: "silent" },
+    ),
+  });
+  const spentUsd = () =>
+    usage.entries.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
+  const results: CaseResult[] = [];
+  for (const one of CASES) {
+    if (spentUsd() >= CAP_USD) break;
+    const situation = situationHeader({
+      now: new Date(NOW),
+      asker: {
+        ...INVESTOR,
+        onScreen:
+          one.onScreen === null
+            ? null
+            : { kind: "COMPANY", name: one.onScreen },
+      },
+      surface: "CHAT",
+      page: one.onScreen === null ? "HOME" : "COMPANY",
+    });
+    const reading = await reader
+      .read({
+        utterance: one.said,
+        recentTurns: one.recent,
+        modality: "TEXT",
+        situation,
+        conversationState: STATE,
+        attribution: {
+          tenantId: "c0000000-0000-4000-8000-000000000001",
+          userId: "b0000000-0000-4000-8000-000000000001",
+          correlationId: "cor_referents_live",
+        },
+      })
+      .catch(() => null);
+    const grade = one.grade(reading);
+    results.push({
+      id: one.id,
+      pass: grade === true,
+      why: grade === true ? null : grade,
+      reading,
+    });
+  }
+  return { results, usage };
+}
+
 describe.skipIf(!LIVE || KEY === undefined)(
   "live: who and what a turn means (R2/R3), on the real reader",
   () => {
     it("reads the owner's 6 sentences and 4 curveballs within $1.50", async () => {
-      const usage = createInMemoryModelUsageRepository();
-      const reader = createQTurnReader({
-        gateway: createModelGateway({
-          catalog: createStaticModelCatalog(catalog),
-          registry: createModelProviderRegistry([
-            createAnthropicModelProvider({ apiKey: KEY ?? "" }),
-          ]),
-          usage,
-        }),
-        logger: createLogger(
-          { serviceName: "q-evals-live", environment: "test" },
-          { level: "silent" },
-        ),
-      });
-      const spentUsd = () =>
-        usage.entries.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
-      const results: {
-        id: string;
-        pass: boolean;
-        why: string | null;
-        reading: QTurnReading | null;
-      }[] = [];
-      for (const one of CASES) {
-        if (spentUsd() >= CAP_USD) break;
-        const situation = situationHeader({
-          now: new Date(NOW),
-          asker: {
-            ...INVESTOR,
-            onScreen:
-              one.onScreen === null
-                ? null
-                : { kind: "COMPANY", name: one.onScreen },
-          },
-          surface: "CHAT",
-          page: one.onScreen === null ? "HOME" : "COMPANY",
-        });
-        const reading = await reader
-          .read({
-            utterance: one.said,
-            recentTurns: one.recent,
-            modality: "TEXT",
-            situation,
-            conversationState: STATE,
-            attribution: {
-              tenantId: "c0000000-0000-4000-8000-000000000001",
-              userId: "b0000000-0000-4000-8000-000000000001",
-              correlationId: "cor_referents_live",
-            },
-          })
-          .catch(() => null);
-        const grade = one.grade(reading);
-        results.push({
-          id: one.id,
-          pass: grade === true,
-          why: grade === true ? null : grade,
-          reading,
-        });
-      }
+      const { results, usage } = await runCases(
+        createAnthropicModelProvider({ apiKey: KEY ?? "" }),
+      );
       const spent = usage.entries.reduce(
         (sum, r) => ({
           input: sum.input + r.inputTokens,
