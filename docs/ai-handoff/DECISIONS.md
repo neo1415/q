@@ -297,3 +297,12 @@ Core Seven remains the governing assessment framework. The new directive authori
       - the form, and continue later;
       - Q editing profile fields on request (mandate, description, geography and the rest).
       Then report the premium-product gaps.
+77. **Onboarding is a real conversation** (owner, 7 Nov 2026 ~08:30 UTC). Onboarding has been troubled for months; treat it carefully.
+    - **Conversation, not a questionnaire.** Q asks things like "what do you do?" and "how do you make money?" and draws what it needs from the person's answers.
+    - **Long answers.** Q judges when to summarise. A long, rambling spoken answer is summarised professionally and played back ("Is that right?"), and the person confirms, edits or types their own version. A clear or typed answer is kept whole, with filler removed. Q does not summarise every time.
+    - **Required vs optional.**
+      - Optional questions can be skipped.
+      - Required questions are asked again, with the reason given: they are needed for verification. The person may leave and come back later.
+      - Onboarding cannot be completed without the required answers.
+    - **Background research in parallel.** Once Q has the person's name, the company name and the website (normalised so it can be searched), it researches them online in parallel while the conversation continues. What it finds is presented for confirmation; it is never silently made authoritative. If nothing is found (not a public figure), carry on without it, and don't mention a failure.
+    - **Testing.** Fictional accounts can't exercise real research. The research path is tested on fixtures, and a live probe needs a stated reason and a small size, because paid search providers are the founder's credits.
