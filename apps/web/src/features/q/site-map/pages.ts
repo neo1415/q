@@ -259,8 +259,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   // --- Q and the day ---
   "/home": {
     title: "Q",
-    purpose:
-      "Talk to Q: ask anything and see the answers, cards and documents.",
+    purpose: "Talk to Q: ask anything; see answers, cards and documents.",
     audience: "ANY",
     sections: [
       // Workspace off: Home is Q itself. On: Q is the layout pane and
@@ -582,11 +581,22 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       { id: "dataroom", title: "Data room", href: "/company/data-room" },
       { id: "deck", title: "Pitch deck", href: "/company/data-room?tab=deck" },
     ],
-    sections: [{ id: "data-room", title: "Data room", kind: "DATA_ROOM" }],
+    // A founder is sent on to their company's page at this tab, so its
+    // data-room sections are the founder's here too (the coverage test
+    // reads them there: OPENS_AS).
+    sections: [
+      { id: "data-room", title: "Data room", kind: "DATA_ROOM" },
+      {
+        id: "missing",
+        title: "Still to add",
+        kind: "DATA_ROOM",
+        tab: "dataroom",
+      },
+    ],
   },
   "/company/interest": {
     title: "Interest",
-    purpose: "Investors interested in your company, and your replies.",
+    purpose: "Answer investors' interest: accept to connect, or decline.",
     audience: "FOUNDER",
     shows: ["INVESTOR_ORGANISATION"],
     sections: [{ id: "interest", title: "Interest", kind: "INTEREST_LIST" }],
@@ -867,7 +877,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/rehearsals/meeting/[meetingId]": {
     title: "Rehearse a meeting",
-    purpose: "Prepare for one meeting already booked in your calendar.",
+    purpose: "Prepare for one booked meeting.",
     audience: "ANY",
     sections: REHEARSAL,
   },
@@ -1087,7 +1097,8 @@ export const SITE_MAP_PURPOSES: Readonly<
 > = {
   "/analytics": {
     sections: {
-      intent: "who saved you, asked to connect or asked for documents",
+      intent:
+        "investors saving you or asking for more, as it happens; nothing to answer here",
       "deck-views": "how far investors read your deck",
       viewers: "who viewed you, as each allows",
       trend: "attention week by week",
@@ -1127,10 +1138,13 @@ export const SITE_MAP_PURPOSES: Readonly<
       dataroom: "your documents, and what is still missing",
       deck: "your pitch deck",
     },
-    sections: { "data-room": "your documents to share with investors" },
+    sections: {
+      "data-room": "your documents to share with investors",
+      missing: "documents investors expect, still missing",
+    },
   },
   "/company/interest": {
-    sections: { interest: "each investor's interest and your answer" },
+    sections: { interest: "interest awaiting your answer" },
   },
   "/company/visibility": {
     sections: { visibility: "who sees what of your company" },
@@ -1183,8 +1197,8 @@ export const SITE_MAP_PURPOSES: Readonly<
       applications: "applications you sent, and their status",
     },
     sections: {
-      inbox: "the inbox",
-      "gateq-inbox": "applications received",
+      inbox: "every application you received",
+      "gateq-inbox": "those left after your search or folder",
       "gateq-application": "one application",
       "gateq-selection": "your picks",
       "gateq-comparison": "your picks side by side",
