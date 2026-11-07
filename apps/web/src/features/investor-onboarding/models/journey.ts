@@ -10,8 +10,9 @@ import {
   GEOGRAPHY_VOCABULARIES,
   INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DEFINITION_CURRENT,
-  INVESTOR_DEFINITION_V3_VERSION,
+  INVESTOR_DEFINITION_V4_VERSION,
   INVESTOR_DEFINITION_VERSION,
+  INVESTOR_HQ_COUNTRY_STEP,
   INVESTOR_WEBSITE_STEP,
   INVESTOR_STEPS,
   InvestorHandoffContextSchema,
@@ -52,6 +53,7 @@ import type {
 
 export type GroupId =
   | "role"
+  | "hq_country"
   | "deployment"
   | "mandate"
   | "stage_cheque"
@@ -96,6 +98,15 @@ export const GROUPS: readonly Group[] = [
       INVESTOR_WEBSITE_STEP,
       S.businessTitle,
     ],
+  },
+  {
+    // v4 (DECISIONS 79): where the firm is based, one country. A session
+    // pinned to v1-v3 has no such step, so the screen is passed over.
+    id: "hq_country",
+    kind: "taxonomy_focus",
+    section: "context",
+    title: "Where is your firm based?",
+    stepKeys: [INVESTOR_HQ_COUNTRY_STEP],
   },
   {
     id: "deployment",
@@ -276,14 +287,15 @@ function runtimeState(view: OnboardingSessionView): RuntimeState {
 }
 
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  // v1, v2 (the firm's website on the role screen) and v3 ("Not sure yet"
-  // on the deployment status, an option the step's own list carries). A
-  // later version may add a step this build has no screen for, so it is
-  // refused honestly.
+  // v1, v2 (the firm's website on the role screen), v3 ("Not sure yet"
+  // on the deployment status, an option the step's own list carries) and
+  // v4 (the mandatory set and the firm's country, its own screen). A later
+  // version may add a step this build has no screen for, so it is refused
+  // honestly.
   const version = view.session.definitionVersion;
   return (
     version >= INVESTOR_DEFINITION_VERSION &&
-    version <= INVESTOR_DEFINITION_V3_VERSION
+    version <= INVESTOR_DEFINITION_V4_VERSION
   );
 }
 
@@ -397,6 +409,9 @@ async function enrichGroup(
       ids.length === 0 ? [] : await port.describeNodes(ids);
   };
   switch (group.id) {
+    case "hq_country":
+      await describe(INVESTOR_HQ_COUNTRY_STEP);
+      return { selectedTaxonomy };
     case "geography":
       await describe(S.geography);
       return { selectedTaxonomy };
@@ -680,6 +695,26 @@ function buildStep(
                 ...(max === undefined ? {} : { max }),
                 roles: multi(state, S.investmentRole) ?? [],
               },
+      };
+    }
+    case "hq_country": {
+      const nodeIds = refs(state, INVESTOR_HQ_COUNTRY_STEP);
+      return {
+        ...base(group, "taxonomy_focus", state),
+        vocabularies: [...GEOGRAPHY_VOCABULARIES],
+        // One country, no strength: it is a fact about the firm.
+        strengthOptions: [],
+        allowAvoid: false,
+        maxItems: 1,
+        searchLabel: "Search countries",
+        searchPlaceholder: "Search countries…",
+        emptyHint: "The country of your firm's headquarters.",
+        selected: selected(INVESTOR_HQ_COUNTRY_STEP),
+        avoidSelected: [],
+        response:
+          nodeIds === undefined
+            ? undefined
+            : { kind: "taxonomy_focus", nodeIds },
       };
     }
     case "geography": {
@@ -1014,6 +1049,9 @@ export function planSubmissions(
         multiOrSkip(S.investmentRole, response.roles),
       ];
     case "taxonomy_focus":
+      if (group.id === "hq_country") {
+        return [nodesOrSkip(INVESTOR_HQ_COUNTRY_STEP, response.nodeIds)];
+      }
       return group.id === "geography"
         ? [
             nodesOrSkip(S.geography, response.nodeIds),

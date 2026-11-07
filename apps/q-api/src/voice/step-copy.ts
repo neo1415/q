@@ -22,6 +22,7 @@ export const STEP_NOUNS: Readonly<Record<string, string>> = {
   "I0.organisation_name": "firm name",
   "I0.business_title": "role",
   "I0.website": "firm's website",
+  "I0.hq_country": "firm's country",
   "I1.deployment_status": "deployment status",
   "I1.mandate_context": "mandate",
   "I2.stages": "stages",

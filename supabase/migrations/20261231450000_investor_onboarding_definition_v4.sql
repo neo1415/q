@@ -1,7 +1,7 @@
 -- Owner 2026-11-07 (DECISIONS 79) · Investor onboarding v4: the mandatory
 -- set and the firm's headquarters country.
 --
--- New, required: I0.hq_country, after the website: one geography node that
+-- New, required: I0.hq_country, after their role: one geography node that
 -- is a country (like founder F1.country v8). It writes only
 -- core.investor_organisations.hq_country, which KYB jurisdiction and
 -- founder-side ranking already read; no step asked it before.
@@ -29,7 +29,7 @@ on conflict (journey_type) do nothing;
 insert into onboarding.definition_versions (id, definition_id, version, schema, manifest_hash)
 select '1e6324de-26ea-53f7-8cb3-ed3e418d34e3', d.id, 4,
        $cq${"schemaVersion":1,"phases":[{"phaseKey":"I0","label":"Role"},{"phaseKey":"I1","label":"Deployment"},{"phaseKey":"I2","label":"Stage and cheque"},{"phaseKey":"I3","label":"Geography and sectors"},{"phaseKey":"I4","label":"Business attributes"},{"phaseKey":"I5","label":"Founding team"},{"phaseKey":"I6","label":"Green flags"},{"phaseKey":"I7","label":"Red flags"},{"phaseKey":"I8","label":"Portfolio"},{"phaseKey":"I9","label":"Discovery style"},{"phaseKey":"I10","label":"Inbound"},{"phaseKey":"I11","label":"Review"},{"phaseKey":"I12","label":"Handoff"}],"runtime":{"subjectType":"INVESTOR_ORGANISATION","allowUnboundStart":true}}$cq$::jsonb,
-       '04f350819e45929aa67d5f0955a84c090694b2c04074608ca552dcd998eee688'
+       '602ab111a8a289851fb4129dddde89243b5ecd9f25e6083bfc753541c5a90a90'
   from onboarding.definitions d
  where d.journey_type = $cq$investor$cq$;
 
@@ -48,14 +48,14 @@ values
    $cq${"prompt":"Your firm's website","supportingText":"Founders can see who you are before they reply. No website yet? Say so; that's an answer.","phaseKey":"I0","minLength":1,"maxLength":200,"placeholder":"example.com"}$cq$::jsonb,
    null,
    $cq$[{"targetKey":"investor.website"}]$cq$::jsonb),
-  ('8c796ee6-1ba7-52b0-8a59-d4155b496a52', '1e6324de-26ea-53f7-8cb3-ed3e418d34e3', $cq$I0.hq_country$cq$, 3, $cq$reference_select$cq$, true,
-   $cq${"prompt":"Where is your firm based?","supportingText":"The country of its headquarters.","phaseKey":"I0","resourceType":"TAXONOMY_NODE","vocabularyCodes":["geography"],"minItems":1,"maxItems":1}$cq$::jsonb,
-   null,
-   $cq$[{"targetKey":"investor.hq_country"}]$cq$::jsonb),
-  ('49dd336c-3751-543a-9f05-ddd76c7de6e4', '1e6324de-26ea-53f7-8cb3-ed3e418d34e3', $cq$I0.business_title$cq$, 4, $cq$short_text$cq$, true,
+  ('49dd336c-3751-543a-9f05-ddd76c7de6e4', '1e6324de-26ea-53f7-8cb3-ed3e418d34e3', $cq$I0.business_title$cq$, 3, $cq$short_text$cq$, true,
    $cq${"prompt":"Your role there","supportingText":"A title is descriptive only; it grants no permissions.","phaseKey":"I0","minLength":1,"maxLength":120,"placeholder":"Partner, Principal, Angel"}$cq$::jsonb,
    null,
    $cq$[{"targetKey":"investor.representative"}]$cq$::jsonb),
+  ('8c796ee6-1ba7-52b0-8a59-d4155b496a52', '1e6324de-26ea-53f7-8cb3-ed3e418d34e3', $cq$I0.hq_country$cq$, 4, $cq$reference_select$cq$, true,
+   $cq${"prompt":"Where is your firm based?","supportingText":"The country of its headquarters.","phaseKey":"I0","resourceType":"TAXONOMY_NODE","vocabularyCodes":["geography"],"minItems":1,"maxItems":1}$cq$::jsonb,
+   null,
+   $cq$[{"targetKey":"investor.hq_country"}]$cq$::jsonb),
   ('c324bb22-a894-5160-b68a-d7a6195503f3', '1e6324de-26ea-53f7-8cb3-ed3e418d34e3', $cq$I1.deployment_status$cq$, 5, $cq$single_select$cq$, true,
    $cq${"prompt":"Are you deploying capital right now?","supportingText":"An operating state you can change any time.","phaseKey":"I1","options":[{"optionKey":"actively_investing","label":"Actively investing","description":"Deploying now."},{"optionKey":"selective","label":"Selective","description":"Open, but only for a strong fit."},{"optionKey":"paused","label":"Paused","description":"Not deploying at the moment."},{"optionKey":"exploring_only","label":"Exploring only","description":"Looking, not yet investing."},{"optionKey":"not_sure","label":"Not sure yet","description":"Not decided; change it any time."}]}$cq$::jsonb,
    null,

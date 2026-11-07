@@ -29,7 +29,8 @@ import { INVESTOR_DEFINITION_V3 } from "./investor-v3.js";
  * verification need. "I don't know" is an answer to every one of them and
  * is recorded as unknown (D-OWN-1; `isNotKnownAnswer`).
  *
- * - New, mandatory: I0.hq_country, after the website. KYB jurisdiction and
+ * - New, mandatory: I0.hq_country, after their role (the form asks the
+ *   website and the role on one screen). KYB jurisdiction and
  *   founder-side ranking read the firm's country, and no step asked it
  *   (§8, gap 6). One geography node that is a country, like the founder's
  *   F1.country (v8); it writes the organisation's hq_country only.
@@ -116,7 +117,10 @@ function v4Steps(
   const out: Omit<OnboardingStepManifest, "sequenceOrder">[] = [];
   for (const step of steps) {
     out.push(withMandatorySet(step));
-    if (step.stepKey === INVESTOR_WEBSITE_STEP) out.push(HQ_COUNTRY_STEP);
+    // After the role: the form asks the website and the role on one screen.
+    if (step.stepKey === INVESTOR_STEPS.businessTitle) {
+      out.push(HQ_COUNTRY_STEP);
+    }
   }
   return out.map((step, sequenceOrder) => ({ ...step, sequenceOrder }));
 }

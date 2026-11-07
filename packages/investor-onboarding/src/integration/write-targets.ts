@@ -1057,12 +1057,20 @@ export function createInvestorWriteTargets(
     },
 
     // The firm's headquarters country (v4, DECISIONS 79): one country, read
-    // against the canonical list. "I don't know" (or a region, or words
-    // naming no country) leaves it unknown, never a guess.
+    // against the canonical list. "I don't know" (or words naming no
+    // country) leaves it unknown, never a guess; a region is refused.
     [INVESTOR_HQ_COUNTRY_WRITE_TARGET]: async (services, context, values) => {
       const bound = await boundOrBootstrapped(services, context, values);
-      const hqCountry =
-        investorHqCountryOf(values.get(INVESTOR_HQ_COUNTRY_STEP))?.iso ?? null;
+      const given = values.get(INVESTOR_HQ_COUNTRY_STEP);
+      const hqCountry = investorHqCountryOf(given)?.iso ?? null;
+      // A region chosen is not a country: refused, as the founder's is.
+      if (hqCountry === null && given?.type === "RESOURCE_REFERENCE") {
+        invalid(
+          "value.resourceIds",
+          "not_a_country",
+          "Choose the country your firm is based in.",
+        );
+      }
       const investor = await services.investors.getInvestorOrganisation({
         actor: bound.context,
         investorOrganisationId: bound.investorOrganisationId,

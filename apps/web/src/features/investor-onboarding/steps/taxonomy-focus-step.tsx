@@ -229,7 +229,7 @@ export function TaxonomyFocusStep({
           </ul>
         )}
       </fieldset>
-      {focus.length > 0 ? (
+      {focus.length > 0 && step.strengthOptions.length > 0 ? (
         <ChoiceList
           id={`${step.id}-strength`}
           name="strength"

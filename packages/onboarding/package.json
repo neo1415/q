@@ -24,6 +24,10 @@
     "./spoken-questions": {
       "types": "./dist/application/spoken-questions.d.ts",
       "default": "./dist/application/spoken-questions.js"
+    },
+    "./response-values": {
+      "types": "./dist/application/response-values.d.ts",
+      "default": "./dist/application/response-values.js"
     }
   },
   "main": "./dist/index.js",

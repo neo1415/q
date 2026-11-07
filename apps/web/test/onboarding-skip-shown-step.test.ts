@@ -124,4 +124,32 @@ describe("Skip sets aside the question shown, not the pointer's screen", () => {
         ?.status,
     ).toBe("SKIPPED");
   });
+
+  it('Skip on a required question is their "I don\'t know": an answer, recorded as unknown (DECISIONS 79)', async () => {
+    // Every field the profile shows is required now; the runtime refuses to
+    // skip a required step, so Skip there was a dead end.
+    const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
+    const client = createRuntimeFounderClient(port, SOURCE);
+    const session = await client.getSession();
+    const view = rawOf(session);
+    const open = view.progress.eligibleSteps.find(
+      (step) =>
+        step.required &&
+        step.stepKey === view.currentStep?.stepKey &&
+        view.currentStep.stepType !== "confirmation",
+    );
+    expect(open).toBeDefined();
+    const key = open?.stepKey ?? "";
+    const after = await client.skipStep({
+      stepId: session.currentStepId ?? "",
+      stepKey: key,
+    });
+    expect(
+      rawOf(after).progress.eligibleSteps.find((s) => s.stepKey === key)
+        ?.status,
+    ).toBe("COMPLETED");
+    expect(
+      rawOf(after).responses.find((r) => r.stepKey === key)?.value,
+    ).toEqual({ type: "TEXT", text: "I don't know" });
+  });
 });

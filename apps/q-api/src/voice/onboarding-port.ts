@@ -22,6 +22,7 @@ import {
 import {
   INVESTOR_CONCEPT_FAMILIES,
   INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_HQ_COUNTRY_STEP,
   INVESTOR_STEPS,
   INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
@@ -301,11 +302,13 @@ const WHOLE_LIST_PARTS_MAX = 5;
 
 /**
  * Steps whose answer is one country, chosen from the geography taxonomy
- * (founder v8 F1.country): a region is never offered or saved for them,
- * and the canonical country list says which nodes are countries.
+ * (founder v8 F1.country, investor v4 I0.hq_country): a region is never
+ * offered or saved for them, and the canonical country list says which
+ * nodes are countries.
  */
 const COUNTRY_ONLY_STEPS: ReadonlySet<string> = new Set([
   FOUNDER_STEPS.country,
+  INVESTOR_HQ_COUNTRY_STEP,
 ]);
 
 /** A lookup's candidates that are countries; a region dropped is no exact match. */

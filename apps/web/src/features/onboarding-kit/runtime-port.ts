@@ -4,6 +4,7 @@ import type {
   OnboardingSessionView,
   SayOnboardingResponse,
 } from "@capital-q/contracts";
+import { NOT_KNOWN_ANSWER_TEXT } from "@capital-q/onboarding/response-values";
 
 import {
   OnboardingClientError,
@@ -349,6 +350,25 @@ export function createRuntimeClient<
     return { ...presentation, raw: view };
   };
 
+  /**
+   * Setting a step aside. A required step cannot be skipped (the runtime
+   * refuses STEP_REQUIRED), and under DECISIONS 79 every field the profile
+   * shows is required: Skip on one is their "I don't know", an answer that
+   * is recorded as unknown and settles the step (D-OWN-1), never a value.
+   */
+  const setAside = (
+    view: OnboardingSessionView,
+    input: Parameters<RuntimePort["skip"]>[0],
+  ): Promise<OnboardingSessionView> =>
+    view.progress.eligibleSteps.find((s) => s.stepKey === input.stepKey)
+      ?.required === true
+      ? port.submit({
+          ...input,
+          value: { type: "TEXT", text: NOT_KNOWN_ANSWER_TEXT },
+          channel: "FORM",
+        })
+      : port.skip(input);
+
   const eligibleStatus = (view: OnboardingSessionView, stepKey: string) =>
     view.progress.eligibleSteps.find((s) => s.stepKey === stepKey)?.status;
 
@@ -421,7 +441,7 @@ export function createRuntimeClient<
       );
     }
     return remember(
-      await port.skip({
+      await setAside(view, {
         sessionId: view.session.id,
         stepKey: last,
         expectedSessionVersion: view.session.version,
@@ -720,7 +740,7 @@ export function createRuntimeClient<
             // sure": the runtime refuses that skip (STEP_NOT_ELIGIBLE,
             // sweep D3 "That step isn't open yet"), and the answer stays.
             view = remember(
-              await port.skip({
+              await setAside(view, {
                 sessionId: view.session.id,
                 stepKey: submission.stepKey,
                 expectedSessionVersion: view.session.version,
@@ -756,7 +776,7 @@ export function createRuntimeClient<
                   "That question isn't open any more.",
                 );
               }
-              return port.skip({
+              return setAside(view, {
                 sessionId: view.session.id,
                 stepKey: shown,
                 expectedSessionVersion: view.session.version,
@@ -783,7 +803,7 @@ export function createRuntimeClient<
             continue;
           }
           view = remember(
-            await port.skip({
+            await setAside(view, {
               sessionId: view.session.id,
               stepKey,
               expectedSessionVersion: view.session.version,

@@ -56,10 +56,10 @@ describe("Investor Definition v4", () => {
     expect(INVESTOR_DEFINITION_V4.version).toBe(4);
   });
 
-  it("asks where the firm is based, right after its website, as one country", () => {
+  it("asks where the firm is based, right after their role, as one country", () => {
     const keys = INVESTOR_DEFINITION_V4.steps.map((s) => s.stepKey);
     expect(keys.indexOf(INVESTOR_HQ_COUNTRY_STEP)).toBe(
-      keys.indexOf(INVESTOR_WEBSITE_STEP) + 1,
+      keys.indexOf(INVESTOR_STEPS.businessTitle) + 1,
     );
     expect(stepOf(INVESTOR_HQ_COUNTRY_STEP)).toMatchObject({
       required: true,
@@ -267,5 +267,15 @@ describe("the firm's headquarters country", () => {
     expect(investorHqCountryOf({ type: "TEXT", text: "West Africa" })).toBe(
       null,
     );
+  });
+
+  it("refuses a region chosen as the firm's country", async () => {
+    await expect(
+      write(null, {
+        type: "RESOURCE_REFERENCE",
+        resourceType: "TAXONOMY_NODE",
+        resourceIds: ["00000000-0000-4000-8000-000000000001"],
+      }),
+    ).rejects.toThrow();
   });
 });
