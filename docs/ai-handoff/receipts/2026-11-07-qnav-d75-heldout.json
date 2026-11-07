@@ -1,0 +1,258 @@
+{
+  "split": "heldout",
+  "turns": 264,
+  "summary": {
+    "overall": {
+      "turns": 264,
+      "passRate": 0.8863636363636364,
+      "decisionAccuracy": 0.9545454545454546,
+      "moveTargetExact": 0.8693467336683417,
+      "wrongPageMoveRate": 0.011363636363636364,
+      "forbiddenMoves": 0
+    },
+    "bySplit": {
+      "dev": {
+        "turns": 0,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 1,
+        "forbiddenMoves": 0
+      },
+      "heldout": {
+        "turns": 264,
+        "passRate": 0.8863636363636364,
+        "decisionAccuracy": 0.9545454545454546,
+        "moveTargetExact": 0.8693467336683417,
+        "wrongPageMoveRate": 0.011363636363636364,
+        "forbiddenMoves": 0
+      }
+    },
+    "byCategory": {
+      "COVERAGE": {
+        "turns": 86,
+        "passRate": 0.8372093023255814,
+        "decisionAccuracy": 0.9651162790697675,
+        "moveTargetExact": 0.8372093023255814,
+        "wrongPageMoveRate": 0.011627906976744186,
+        "forbiddenMoves": 0
+      },
+      "RECORD": {
+        "turns": 39,
+        "passRate": 0.9743589743589743,
+        "decisionAccuracy": 0.9743589743589743,
+        "moveTargetExact": 0.9743589743589743,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "THREAD": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "STAY_IN_CHAT": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_STAY": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "LOOKALIKE_MOVE": {
+        "turns": 5,
+        "passRate": 0.8,
+        "decisionAccuracy": 0.8,
+        "moveTargetExact": 0.8,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FALSE_PAGE_WORD": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "TWO_ASKS": {
+        "turns": 5,
+        "passRate": 0.8,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 0.8,
+        "wrongPageMoveRate": 0.2,
+        "forbiddenMoves": 0
+      },
+      "TYPO": {
+        "turns": 6,
+        "passRate": 0.8333333333333334,
+        "decisionAccuracy": 0.8333333333333334,
+        "moveTargetExact": 0.8333333333333334,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "VOICE": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NON_ENGLISH": {
+        "turns": 6,
+        "passRate": 0.8333333333333334,
+        "decisionAccuracy": 0.8333333333333334,
+        "moveTargetExact": 0.8333333333333334,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "SARCASM": {
+        "turns": 6,
+        "passRate": 0.8333333333333334,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 0.5,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "FOLLOW_UP": {
+        "turns": 11,
+        "passRate": 0.9090909090909091,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 0.9090909090909091,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "GO_BACK": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NOT_THAT_ONE": {
+        "turns": 10,
+        "passRate": 0.7,
+        "decisionAccuracy": 0.8,
+        "moveTargetExact": 0.7,
+        "wrongPageMoveRate": 0.1,
+        "forbiddenMoves": 0
+      },
+      "STALE_CONTEXT": {
+        "turns": 8,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "AMBIGUITY": {
+        "turns": 7,
+        "passRate": 0.7142857142857143,
+        "decisionAccuracy": 0.7142857142857143,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "DIRTY_FORM": {
+        "turns": 6,
+        "passRate": 0.8333333333333334,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "BUSY_PANE": {
+        "turns": 5,
+        "passRate": 0.8,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "COLLAPSED_PANE": {
+        "turns": 5,
+        "passRate": 0.6,
+        "decisionAccuracy": 0.8,
+        "moveTargetExact": 0.3333333333333333,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ACCESS": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "NO_SUCH_PAGE": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "DELETED_RECORD": {
+        "turns": 4,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ADVERSARIAL": {
+        "turns": 5,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      },
+      "ALREADY_THERE": {
+        "turns": 6,
+        "passRate": 1,
+        "decisionAccuracy": 1,
+        "moveTargetExact": 1,
+        "wrongPageMoveRate": 0,
+        "forbiddenMoves": 0
+      }
+    },
+    "labsGate": false,
+    "onGate": false
+  },
+  "missesByCategory": {
+    "COVERAGE": 14,
+    "RECORD": 1,
+    "LOOKALIKE_MOVE": 1,
+    "TWO_ASKS": 1,
+    "TYPO": 1,
+    "NON_ENGLISH": 1,
+    "SARCASM": 1,
+    "FOLLOW_UP": 1,
+    "NOT_THAT_ONE": 3,
+    "AMBIGUITY": 2,
+    "DIRTY_FORM": 1,
+    "BUSY_PANE": 1,
+    "COLLAPSED_PANE": 2
+  },
+  "calls": 264,
+  "tokens": {
+    "input": 2667343,
+    "cached": 2431204,
+    "output": 34653,
+    "cost": 1.305048800000001
+  }
+}
