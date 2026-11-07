@@ -65,12 +65,18 @@ function essentials(): Record<string, string> {
   return recorded;
 }
 
-function world(authority: () => QTurnAuthority) {
+function world(
+  authority: () => QTurnAuthority,
+  /** Needed steps left open, so finishing still has things to ask. */
+  open: readonly string[] = [],
+) {
+  const recorded = essentials();
+  for (const stepKey of open) delete recorded[stepKey];
   const w = investorSession({
     currentStepKey: "I2.investment_role",
     subject: FIRM,
     servesTurnSteps: true,
-    recorded: essentials(),
+    recorded,
   });
   const conversation = createOnboardingConversation({
     apiBaseUrl: "http://api.test",
@@ -151,10 +157,31 @@ describe("onboarding wrap-up: the reply comes first (live 2026-10-31)", () => {
     expect(skip.ms).toBeLessThan(REPLY_MS);
     expect(stopped()).toBe(1);
     // The streamed line stays part of the whole reply, read-back after it.
-    expect(skip.sentences[0]).toMatch(/I'll check what I have saved/u);
-    expect(skip.outcome.reply).toMatch(
-      /^Understood\. I'll check what I have saved and read it back to you\. \S/u,
+    expect(skip.sentences[0]).toMatch(
+      /^Understood\. Let me check what I have\./u,
     );
+    expect(skip.outcome.reply).toMatch(
+      /^Understood\. Let me check what I have\. \S/u,
+    );
+  });
+
+  it("the 'checking' line is said once, on the turn they ask to finish, never again on the answers that follow (e2e run 2, 7 Nov)", async () => {
+    // Production e2e run 2: after "That's all for now", every later turn
+    // began "Understood. I'll check what I have saved and read it back to
+    // you." while Q went on asking the open essentials, and nothing was
+    // ever read back.
+    let reads = 0;
+    const { say } = world(() => {
+      reads += 1;
+      return authorityReading(reads === 1 ? { finishing: true } : {});
+    }, ["I2.stages"]);
+    const first = await say("That's all for now.");
+    expect(first.outcome.reply).toMatch(/^Understood\./u);
+    const next = await say("We lead or co-lead.");
+    expect(next.sentences.join(" ")).not.toMatch(/check what I have/u);
+    expect(next.outcome.reply).not.toMatch(/check what I have/u);
+    // Never a promise of a read-back that does not come.
+    expect(first.outcome.reply).not.toMatch(/read it back to you/u);
   });
 
   it("an ordinary turn still waits for, and uses, Q's reply", async () => {

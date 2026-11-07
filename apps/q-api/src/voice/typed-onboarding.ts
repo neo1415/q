@@ -474,12 +474,18 @@ export function createTypedOnboarding(dependencies: {
             ? "Finishing your setup"
             : "Checking what I have saved for you",
         );
+        // Said once, on the turn they ask to finish or agree to the
+        // read-back; never again on the answers that follow while open
+        // essentials are asked (e2e run 2, 7 Nov: every later turn began
+        // "I'll check what I have saved and read it back to you", and no
+        // read-back came). It promises nothing it may not do.
+        const askedNow = authority?.finishing === true || agreedToReadBack;
         const firstLine =
-          input.onSentence === undefined
+          input.onSentence === undefined || !askedNow
             ? null
             : agreedToReadBack
               ? "Thank you, finishing your setup now."
-              : "Understood. I'll check what I have saved and read it back to you.";
+              : "Understood. Let me check what I have.";
         if (firstLine !== null) {
           try {
             input.onSentence?.(firstLine);
