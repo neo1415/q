@@ -188,7 +188,7 @@ describe("presence research dispatch", () => {
       dependencies({ presence: presence.service, createSuggestion }),
     );
 
-    dispatch.onResponseCommitted({
+    await dispatch.onResponseCommitted({
       sessionId: randomUUID(),
       stepKey: "F1.stage",
       responseId: randomUUID(),
@@ -247,7 +247,7 @@ describe("presence research dispatch", () => {
       }),
     );
 
-    dispatch.onResponseCommitted({
+    await dispatch.onResponseCommitted({
       sessionId: session.id,
       stepKey: "F1.company_name",
       responseId,
@@ -299,7 +299,7 @@ describe("presence research dispatch", () => {
       }),
     );
 
-    dispatch.onResponseCommitted({
+    await dispatch.onResponseCommitted({
       sessionId: session.id,
       stepKey: "F1.company_name",
       responseId,
@@ -336,7 +336,7 @@ describe("presence research dispatch", () => {
       }),
     );
 
-    dispatch.onResponseCommitted({
+    await dispatch.onResponseCommitted({
       sessionId: session.id,
       stepKey: "F1.company_name",
       responseId,
@@ -397,7 +397,7 @@ describe("presence research dispatch", () => {
       }),
     );
 
-    dispatch.onResponseCommitted({
+    await dispatch.onResponseCommitted({
       sessionId: session.id,
       stepKey: "I0.organisation_name",
       responseId,
@@ -536,7 +536,7 @@ describe("presence research dispatch", () => {
       text: "Tamarind Ledger",
     });
     let release: (outcome: PresenceOutcome) => void = () => undefined;
-    const builds: { signal?: AbortSignal }[] = [];
+    const builds: { signal?: AbortSignal | undefined }[] = [];
     const presence: PresenceService = {
       build: (command) => {
         builds.push(command);

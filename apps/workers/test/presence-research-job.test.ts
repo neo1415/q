@@ -10,7 +10,6 @@ import {
 } from "@capital-q/q-presence";
 
 import { createDomainEventHandler } from "../src/events/document-processing-handler.js";
-import type { PresenceResearchDispatch } from "../src/presence/dispatch.js";
 import {
   createPresenceResearchJobHandler,
   createPresenceResearchRequester,
@@ -141,7 +140,7 @@ describe("the research job runner", () => {
   it("works the job and is done", async () => {
     const onResponseCommitted = vi.fn(() => Promise.resolve("DONE" as const));
     const handle = createPresenceResearchJobHandler({
-      dispatch: { onResponseCommitted } as PresenceResearchDispatch,
+      dispatch: { onResponseCommitted },
       logger: createRecordingLogger(),
     });
     expect(await handle(job())).toEqual({ kind: "DONE" });
