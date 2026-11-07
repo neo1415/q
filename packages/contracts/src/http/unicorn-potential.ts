@@ -16,7 +16,7 @@ const ScoreFactorSchema = z
   .strict();
 
 export const UNICORN_POTENTIAL_CAVEAT =
-  "Unicorn Potential is an evidence-based growth-characteristics indicator. It is not the probability of reaching a $1 billion valuation.";
+  "Unicorn Potential is a growth-characteristics indicator based on published research on startup outcomes. It is not the probability of reaching a $1 billion valuation.";
 /**
  * "Low confidence" etc.: with the coverage, the one compact indicator a
  * Unicorn Potential number carries on every surface (metrics audit P0-6 as
