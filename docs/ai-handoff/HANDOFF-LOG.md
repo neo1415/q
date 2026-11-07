@@ -1931,3 +1931,13 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - vitest q-evals/model-gateway/q-core/q-specialists/contracts: 4932 passed (q-nav 15/15);
   - root tsc 0;
   - eslint and prettier clean.
+
+## 2026-11-07 07:10 UTC — batch 2 deployed (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- CI 42344043063 on 64d51b965 was green, pgTAP included. The live notifications_kind_check was read first: 25 kinds, a strict subset of the new 27, and every stored kind is still allowed. Applied 20261231400000 then 20261231410000; hosted is now at 285.
+- Fast-forwarded recovery/2026-09-12 from f3b0d9847 to 64d51b965. Railway shows SUCCESS for all four services. Rollback: f3b0d9847.
+- Live (Playwright 1440/390), for both the fictional investor savanna-seed and the founder maji-loop: /home, /analytics, /relationships, /discover and /settings return 200, with no page errors and no 5xx; flag off.
+  - Founder Analytics shows intent at organisation level ("Someone from The Vaultlyne asked to connect", "Someone from Ventures Platform saved your company"). Deck views, Who viewed, By week and Type/geo show "Fewer than 3 investor organisations viewed this week" (the floor holds).
+  - Investor Analytics defaults visibility to "Only my organisation".
+- Owner decision 75, plus its amendment: q-nav understands people's own words with no keywords; 98% is the target, and if it plateaus the best result ships with wrong-page very low and forbidden at 0. W4 has the prompt (v5) and a fresh held-out set; W2 has the purposes.
+- Talent Q study, read-only: its navigation is keyword-first and about 50% correct on its own 20 navigate cases. Only its safety habits were passed to W4.

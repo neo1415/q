@@ -2,7 +2,7 @@
 
 ## Live board — 7 November 2026, 05:40 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
-Production: **batch 1 `f3b0d9847`** on all four services (05:21, CI 42339444390 green). Rollback `d09aec914`. Hosted migrations 283. `CQ_WORKSPACE_MODE` unset (off); `CQ_Q_NAV_MOVES_ALLOWED` unset (Q offers, never moves).
+Production: **batch 2 `64d51b965`** on all four services (06:23, CI 42344043063 green; live-checked as investor and founder at 07:05, /analytics live). Rollback `f3b0d9847`. Hosted migrations **285** (400000, 410000). Batch 1 `f3b0d9847` went live at 05:21. **DECISIONS 75:** q-nav pushes on (W4: v5 and a fresh held-out set; W2: purposes); batch 3 = the W4 dataset fix 6b19ffdc6 plus that work. `CQ_WORKSPACE_MODE` unset (off); `CQ_Q_NAV_MOVES_ALLOWED` unset (Q offers, never moves).
 Live check (fictional investor, 1440 and 390): /home, /discover, /relationships, /explore and /settings return 200 with no page errors or 5xx; flag off looks as before (Chat default, no split). /analytics returns 404 until batch 2. One Q turn: "What are my hard exclusions?" answered correctly with a source in 8.1 s.
 
 **q-nav held-out (once, e85a6f3 = integration code, Anthropic $1.11):** pass 78.8%, move-target 75.2%, wrong-page 3.9%, forbidden 0. Dev r3 was 91.2%, so the tuning overfit dev. Gates not met; moves stay OFFER-only. W4's notes: QNAV-R3-ROOT-CAUSES.md and QNAV-HELDOUT-NOTE.md (b33a59e). **Owner decision:** v5 `alternative` plus everyday-words page purposes, then a FRESH held-out set.
