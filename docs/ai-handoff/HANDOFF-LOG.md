@@ -2044,3 +2044,20 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - root tsc 0;
   - Q-IQ 6/6;
   - eslint and prettier clean.
+
+## 2026-11-07 10:40 UTC — batch 3 deployed (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Local gates on b87961156:
+  - package build 55/55;
+  - root, web, q-api, api and workers tsc 0;
+  - full vitest 1948 files / 20,626 passed;
+  - eslint and prettier clean on 97 files.
+- CI 42361008037 green. No migrations in this batch.
+- Fast-forwarded recovery/2026-09-12 from 64d51b965 to b87961156 (rollback 64d51b965). Railway shows SUCCESS for all four.
+- Contents:
+  - q-nav D75 v8, OFFER-only. Held-out on 44a79ef: move-target 86.9%, wrong-page 1.1%, forbidden 0.
+  - W2 purposes; W3 deal tab.
+  - Metrics P0 Days 1–2: band cap, presence-only means not enough evidence, Suitability minimums, fit-first order v5, one compact confidence line (DECISIONS 76), unknown is "Not recorded".
+  - Onboarding P0: no chat→voice re-greet, required re-asked with the reason, research failures logged, the worker uses the right SERP provider.
+- Live (fictional investor and founder, 1440/390): /home, /discover, /analytics, /relationships and /work return 200 with no errors. Discover shows "Investability: Not enough evidence" until the v5 sweep, Suitability "6 of 7 mandate…", and Unicorn as a compact coverage line. No caveat paragraphs. Q turn correct with a source in 10.0 s.
+- Batch 4 is on integration: onboarding P1 dbb138008 (migration 20261231430000), metrics methods 06d9e96 (METRICS-METHODS.md and SOURCES.md), plus P1-1 once its live eval passes. Long-answer live 1: decision dev 22/30, held-out 10/15, 1 unsafe save, so W5 is fixing it.
