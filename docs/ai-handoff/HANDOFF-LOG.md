@@ -1770,3 +1770,27 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Open:**
   - The answer.ts wiring waits on W3's screen.workspace schema SHA.
   - resolve_page_target has no plain COMPANY/INVESTOR profile kind and no Board-item kind (W2.3 gap). The adapter will use it for threads, decks and documents, and the existing authorised `findRecordByName` for profiles.
+
+## 2026-11-07 — W4 milestone 5: the page pane's move in the answer path (`feat/q-navigation-policy` d276719 and after)
+
+- **Merged** integration 36b5763 (W3 `QWorkspaceScreenSchema` on `screen.workspace`).
+- **`createQPageMoves`** (model-gateway):
+  - `start` runs NAVIGATION_DECISION beside the turn, only when `screen.workspace` is present.
+  - `settle` is awaited just before the answer's message is stored, outside the transaction.
+  - Code's own move wins, one move per turn.
+  - A collapsed pane gets LAYOUT_SET pagePane open first.
+  - An OFFER becomes a NAVIGATION_OFFER.
+  - A slow decision (over 2.5 s) or a failed one leaves the answer unchanged.
+- **Wired** into the specialist (start, plus settle at recordAnswer and the analyst store) and the conversational answer (settle at both stores). Both get the same port, composed in q-api.
+- **Resolution as the person:** open_page by name covers COMPANY, INVESTOR, relationships and threads, own DOCUMENT and rehearsals. The prompt lists the person's counterpart names; ids never reach the model.
+  - Unresolved, so STAY: data-room documents by title and Board items, until resolve_page_target is callable from code. W2 is to add proper kinds.
+- **Flag:** `CQ_Q_NAV_MOVES_ALLOWED=1` turns on autonomous moves. Off by default: every MOVE is an OFFER (plan §6 gate).
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0, web tsc 0, q-api tsc 0;
+  - vitest packages: 4912 passed;
+  - apps/q-api: 3131 passed, 3 failed. The failures are route-capability-parity on integration's analytics and engagement routes. Their inputs are identical to integration's, so they are pre-existing there.
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+- **Owner:** the Anthropic test budget is $50 (about $7.7 used). Smoke run first, then dev, then held-out once.
+- **Prompt note for tuning:** NAVIGATION_DECISION v1 still names "who viewed their deck" as a page. Deck views are not built (W2), so v2 should drop it.
