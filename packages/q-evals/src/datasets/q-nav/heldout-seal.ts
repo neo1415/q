@@ -21,7 +21,7 @@ export const Q_NAV_HELDOUT_SEAL = {
  * Sealed before it is run; measured once.
  */
 export const Q_NAV_HELDOUT4_SEAL = {
-  sha256: "unsealed",
-  turns: 0,
+  sha256: "882fffbfefc2dc3ad75de1179ceca504c189804aa9584e13e2425a6a6e6c407f",
+  turns: 120,
   sealedAt: "2026-11-07",
 } as const;
