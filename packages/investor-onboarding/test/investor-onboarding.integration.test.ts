@@ -32,6 +32,7 @@ import { createLogger } from "@capital-q/observability";
 import {
   createInvestorOrganisationOnboardingSubjectResolver,
   createOnboardingService,
+  NONE_ANSWER_TEXT,
   NOT_KNOWN_ANSWER_TEXT,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
@@ -56,6 +57,7 @@ import {
   createInvestorDomainServices,
   createInvestorOnboardingIntegration,
   INVESTOR_HQ_COUNTRY_STEP,
+  INVESTOR_PUBLIC_DESCRIPTION_STEP,
   INVESTOR_REVISABLE_STEPS,
   INVESTOR_STEPS,
   INVESTOR_WEBSITE_STEP,
@@ -692,26 +694,22 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
           value_jsonb: { kind: "codes", values: ["gambling"] },
         },
       ]);
-      // CQ-QX-008: an answer taken back leaves the mandate as if it was
-      // never given, and its history stays; a required step cannot be
-      // emptied; a new answer after a withdrawal is a new current row.
-      await journey.withdraw(INVESTOR_STEPS.avoid);
-      const afterWithdrawal = (await constraints(tx, mandateId)).filter(
+      // CQ-QX-008: a required step cannot be emptied (investor v5, batch 7:
+      // every list is mandatory). "None" is how a list is left with nothing
+      // in it: the mandate is as if it was never given, history stays.
+      await expect(journey.withdraw(INVESTOR_STEPS.avoid)).rejects.toThrow();
+      await journey.submit(INVESTOR_STEPS.avoid, {
+        type: "TEXT",
+        text: NONE_ANSWER_TEXT,
+      });
+      const afterNone = (await constraints(tx, mandateId)).filter(
         (c) => c.dimension === "red_flag",
       );
-      expect(afterWithdrawal.map((c) => c.importance)).toEqual([
-        "HARD_EXCLUSION",
-      ]);
+      expect(afterNone.map((c) => c.importance)).toEqual(["HARD_EXCLUSION"]);
       expect(
-        journey
-          .view()
-          .responses.some((r) => r.stepKey === INVESTOR_STEPS.avoid),
-      ).toBe(false);
-      const history = await tx.sql<{ withdrawn: boolean }[]>`
-        select withdrawn_at is not null as withdrawn from onboarding.responses
-         where session_id = ${journey.view().session.id} and step_key = ${INVESTOR_STEPS.avoid}`;
-      expect(history).toEqual([{ withdrawn: true }]);
-      await expect(journey.withdraw(INVESTOR_STEPS.avoid)).rejects.toThrow();
+        journey.view().responses.find((r) => r.stepKey === INVESTOR_STEPS.avoid)
+          ?.value,
+      ).toEqual({ type: "TEXT", text: NONE_ANSWER_TEXT });
       await expect(journey.withdraw(INVESTOR_STEPS.stages)).rejects.toThrow();
       // The move that motivated it: the only red flag on the softer list
       // can now go to never-show.
@@ -779,6 +777,18 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       expect(
         (await constraints(tx, mandateId)).filter((c) => c.is_hard_exclusion),
       ).toHaveLength(1);
+
+      // I11: the firm's description (v5, batch 7), on the firm itself.
+      await journey.submit(
+        INVESTOR_PUBLIC_DESCRIPTION_STEP,
+        text("Northbank backs early fintech in West Africa."),
+      );
+      const [firm] = await tx.sql<{ public_description: string | null }[]>`
+        select public_description from core.investor_organisations
+         where id = ${investorIdOf(journey.view())}`;
+      expect(firm?.public_description).toBe(
+        "Northbank backs early fintech in West Africa.",
+      );
 
       // I11: deterministic review, then activation through the Investor domain.
       await journey.submit(
