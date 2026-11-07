@@ -680,17 +680,11 @@ if (STEPS.has("J6")) {
             "Minimum $250,000, typical $500,000, maximum $1,000,000.",
           ],
           // Making the mandate live is a yes, not the discovery style.
-          [
-            /mandate live|make .* live|go live|activate/i,
-            "Yes, make it live.",
-          ],
+          [/mandate live|make .* live|go live|activate/i, "Yes, make it live."],
           READ_BACK,
           // The themed "what makes you lean in" question (batch 9) and a
           // green-flags question name "anything else" and "revenue" too.
-          [
-            /lean in|green flag/i,
-            "Repeat founders and capital efficiency.",
-          ],
+          [/lean in|green flag/i, "Repeat founders and capital efficiency."],
           // Before "founder" and "look for": what else, and inbound, are
           // their own questions (run 4: both got the founder answer).
           [
