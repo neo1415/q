@@ -1,0 +1,24 @@
+-- at /discover
+#2 "i want to see harbourline cargo's pitch deck" → /discover moveMs=-1 totalMs=9516
+    Q:  Q: "Harbourline Cargo" has no deck I can open for you. Ask Q Q
+#3 "okay take me to harbourline cargos profile" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=3347 totalMs=7424
+    Q:  Q: I can't open "Harbourline Cargo" from here right now. Ask Q Q
+#4 "i'm curious about their team" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=-1 totalMs=13531
+    Q:  Q: Harbourline Cargo’s team is listed as 42 full-time people. The named team is Babatunde Oyelaran, Founder & CEO, with prior clearing and freight-forwarding operations experience; Chiamaka Eze, COO, with ten years in haulage operations and fleet management; and Ifeanyi Okoro, Head of Engineering, who built dispatch software for a ride-hailing start-up. The profile page itself lists three people, so the relationship
+#5 "can i see it?" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=-1 totalMs=11996
+    Q:  Q: Yes — you’re on Harbourline Cargo’s profile now. The page shows an Overview tab, with the company’s data room and pitch-deck section available further down. I also have the deck content: it describes the port-to-warehouse trucking service, reports 3,900 monthly container moves and 410 active importers as of September 2026, and states a USD 9 million priced-equity raise with a USD 250,000 minimum cheque. Those are
+#6 "tell me about clinicrest" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=-1 totalMs=17611
+    Q: nics often run out of essential medicines and resort to open markets where counterfeit or expired stock is common. Its profile reports 340 active clinics and pharmacies, while its latest management accounts list 212 paying accounts; Clinicrest attributes the gap to free trials, but the split has not been shown. Monthly revenue is reported at around USD 95,000. Clinicrest is raising USD 1.8 million in a priced seed ro
+#7 "can i see their elevator" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=elevator moveMs=7931 totalMs=10990
+    Q:  Q: It’s the company’s short overview alongside the port-to-warehouse trucking profile. Sources Companies · 2 Ask Q Q
+#8 "send those questions to them" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=elevator moveMs=-1 totalMs=61187
+    Q: igure come from? Q: Send Harbourline Cargo these 3 questions: "1. What is your monthly burn, and your runway after this round? What is Market size today, and where does the figure come from? What is Pricing today, and where does the figure come from?". Ready to send: approve on the card, or tell me what to change. Waiting for your approval Done: Understanding your request Done: Pulling it together Now Needs you Send 
+#9 "who has viewed my profile?" → /analytics moveMs=9986 totalMs=13043
+    Q:  Q: Fewer than three founder organisations viewed your profile in a completed week, so their names aren’t shown. Viewing isn’t the same as interest or a request to connect; your recorded intent signals are the relevant ones, including accepted connections with Harbourline Cargo, Brightkloof Energy, Nsuo Labs, Tarmacly, Clinicrest, Tallyloom and Maji Loop, plus pending connection requests from Kivu Traceworks and Sahe
+#10 "what can you find about me online?" → /analytics moveMs=-1 totalMs=9227
+    Q:  Q: I don’t have a public-web search result about you in this conversation. What I do have is your Capital Q profile: you’re Amara Diallo-Benson, a Partner at Savanna Seed Partners, actively investing at seed stage in African fintech, B2B software and logistics, generally writing USD 250,000–1 million cheques, typically around USD 600,000. Your setup is largely complete, though some mandate details remain open, inclu
+#11 "where is my firm located?" → /analytics moveMs=-1 totalMs=9248
+    Q:  Q: Your firm, Savanna Seed Partners, is based in Lagos, Nigeria. Sources Company · 1 Ask Q Q
+errors []
+
+[exited with code 0]
