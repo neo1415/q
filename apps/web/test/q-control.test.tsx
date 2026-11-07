@@ -781,5 +781,12 @@ describe("receipts reach the Q API and the person (C2)", () => {
         receipt: { actId: intent.actId, status: "TARGET_MISSING" },
       }),
     ).toMatch(/couldn't find/);
+    // W5: prepared for their approval is not a failure; the card speaks.
+    expect(
+      noticeOf({
+        intent,
+        receipt: { actId: intent.actId, status: "AWAITING_APPROVAL" },
+      }),
+    ).toBeNull();
   });
 });

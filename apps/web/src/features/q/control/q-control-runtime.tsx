@@ -131,5 +131,9 @@ export function noticeOf(report: UiActReport): string | null {
         : "Q can't do that with this part of the page.";
     case "FAILED":
       return "That didn't work on this page. Try it yourself, or ask Q again.";
+    // W5: prepared and waiting for their approval; the approval card is
+    // what they read, not a failure notice.
+    case "AWAITING_APPROVAL":
+      return null;
   }
 }
