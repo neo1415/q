@@ -59,8 +59,8 @@ Results (category level only; no rows read):
   - a record only mentioned inside a wider question is answered in chat;
   - a tab only when the part asked about is what that tab holds, otherwise the page as it opens;
   - a pointing word that fits both the conversation's record and the screen's gives the other as `alternative` (an offer, not a guess).
-- **Dev:** 15 conversation-placement turns written for dev (FOLLOW_UP, TYPO, STAY_IN_CHAT, LOOKALIKE_STAY). None is a held-out sentence, which the "holds out" test checks.
+- **Dev:** 12 conversation-placement turns written for dev (FOLLOW_UP, TYPO, STAY_IN_CHAT, LOOKALIKE_STAY). None is a held-out sentence, which the "holds out" test checks.
 - **Measurement:** an A/B on the same focused dev subset, v10 against v11:
   - `CQ_QNAV_PROMPT_VERSION=10|11`;
   - `CQ_QNAV_CATEGORIES=FOLLOW_UP,LOOKALIKE_MOVE,LOOKALIKE_STAY,TYPO,NOT_THAT_ONE,STALE_CONTEXT,COLLAPSED_PANE,DIRTY_FORM,STAY_IN_CHAT`.
-    That is about 146 turns, roughly $3.2 per version. Ship v11 only if dev wrong-page falls with move-target held. There is no fresh held-out set for v11; a fifth set would be needed for that claim.
+    That is about 143 turns, roughly $3.1 per version. Ship v11 only if dev wrong-page falls with move-target held. There is no fresh held-out set for v11; a fifth set would be needed for that claim.
