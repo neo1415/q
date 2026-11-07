@@ -129,3 +129,18 @@ export {
   type QIqSubject,
 } from "./runner/q-iq.js";
 export { createQIqWorldSubject } from "./runner/q-iq-world.js";
+// Onboarding P1-1 (DECISIONS 77): Q judges when to summarise a long answer.
+export * from "./datasets/onboarding-long-answer/index.js";
+export {
+  gradeLongAnswerCase,
+  summariseLongAnswer,
+  type LongAnswerStepGrade,
+  type LongAnswerSummary,
+} from "./graders/onboarding-long-answer.js";
+export {
+  readerLongAnswerSubject,
+  runLongAnswer,
+  scriptedLongAnswerSubject,
+  type LongAnswerRun,
+  type LongAnswerSubject,
+} from "./runner/onboarding-long-answer.js";
