@@ -1,6 +1,7 @@
 import type { ActorContext } from "@capital-q/security";
 
 import type { CompanyEngagementReader } from "./postgres-engagement-reader.js";
+import type { MyEngagementReader } from "./postgres-my-engagement-reader.js";
 import type { EngagementRepository } from "./postgres-engagement-repository.js";
 
 /**
@@ -35,6 +36,13 @@ export async function ownEngagementItems(
   deps: {
     readonly reader: CompanyEngagementReader;
     readonly repository: Pick<EngagementRepository, "privacyFor">;
+    /** The investor's own views and founders' answers (A4). */
+    readonly mine?: MyEngagementReader | undefined;
+    /**
+     * The admin setting q_uses_passive_signals: off, Q reads intent only.
+     * Absent: on (the specification default).
+     */
+    readonly usesPassiveSignals?: (() => Promise<boolean>) | undefined;
   },
   actor: ActorContext,
   companyId: string | null,
@@ -53,7 +61,37 @@ export async function ownEngagementItems(
       canChoose: privacy.allowedVisibilities.join(", "),
     },
   });
-  if (companyId === null) return items;
+  if (companyId === null) {
+    if (deps.mine === undefined) return items;
+    const mine = await deps.mine.read({
+      actorUserId: actor.userId,
+      organisationId: actor.organisationId ?? null,
+    });
+    for (const response of mine.responses.slice(0, 10)) {
+      items.push({
+        id: `response-${response.companyId}-${response.kind}-${response.askedAt}`,
+        title: `${response.companyName}: ${response.kind === "INTEREST" ? "connection request" : "data-room request"}`,
+        status:
+          response.state === "WAITING"
+            ? "waiting for the founder"
+            : response.state === "ACCEPTED"
+              ? "accepted"
+              : "declined",
+        at: response.answeredAt ?? response.askedAt,
+        facts: { kind: response.kind, state: response.state },
+      });
+    }
+    for (const company of mine.viewed.slice(0, 15)) {
+      items.push({
+        id: `viewed-${company.companyId}`,
+        title: company.companyName,
+        status: `you viewed it ${String(company.views)} times`,
+        at: company.lastViewedAt,
+        facts: { views: company.views, deckMinutes: company.deckMinutes },
+      });
+    }
+    return items.slice(0, 30);
+  }
 
   const engagement = await deps.reader.read({
     actorUserId: actor.userId,
@@ -61,6 +99,30 @@ export async function ownEngagementItems(
     since: null,
   });
   if (engagement === null) return items;
+
+  // Intent first (§6.7.12): real time, every plan, no floor.
+  for (const signal of engagement.intent.slice(0, 10)) {
+    const who =
+      signal.viewerName !== null && signal.organisationName !== null
+        ? `${signal.viewerName} (${signal.organisationName})`
+        : signal.organisationName !== null
+          ? `Someone from ${signal.organisationName}`
+          : "An investor";
+    items.push({
+      id: `intent-${signal.type}-${signal.occurredAt}`,
+      title: who,
+      status:
+        signal.type === "SAVE"
+          ? "saved your company"
+          : signal.type === "INTEREST"
+            ? "asked to connect"
+            : "asked for data-room access",
+      at: signal.occurredAt,
+      facts: { signal: signal.type, shownAs: signal.visibility },
+    });
+  }
+  const passive = (await deps.usesPassiveSignals?.()) ?? true;
+  if (!passive) return items.slice(0, 30);
 
   const period = engagement.passiveBatch === "WEEKLY" ? "week" : "day";
   const latest = engagement.periods.at(-1);

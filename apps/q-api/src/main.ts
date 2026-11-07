@@ -678,8 +678,10 @@ import {
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 import {
+  createAnalyticsSettingsReader,
   createEngagementService,
   createPostgresCompanyEngagementReader,
+  createPostgresMyEngagementReader,
   createPostgresEngagementRepository,
   ownEngagementItems,
 } from "@capital-q/engagement";
@@ -3109,11 +3111,22 @@ const companyEngagementReader = createPostgresCompanyEngagementReader(
 const engagementService = createEngagementService({
   repository: engagementRepository,
 });
+const myEngagementReader = createPostgresMyEngagementReader(
+  database.sql,
+  engagementRepository,
+);
+const analyticsSettings = createAnalyticsSettingsReader(database.sql);
 const appActionPorts: OwnReadPorts = {
   viewingPrivacy: engagementService,
   engagement: async (actor) =>
     ownEngagementItems(
-      { reader: companyEngagementReader, repository: engagementRepository },
+      {
+        reader: companyEngagementReader,
+        repository: engagementRepository,
+        mine: myEngagementReader,
+        usesPassiveSignals: async () =>
+          (await analyticsSettings.read()).qUsesPassiveSignals,
+      },
       actor,
       await runtimeDependencies.ownCompany(actor),
     ),

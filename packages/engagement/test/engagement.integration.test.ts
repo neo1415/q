@@ -13,6 +13,7 @@ import {
 import {
   createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
+  createPostgresMyEngagementReader,
   type EngagementViewer,
 } from "../src/index.js";
 
@@ -340,6 +341,33 @@ describe("@capital-q/engagement against local Postgres", () => {
       expect(
         await reader.read({ ...query, actorUserId: outsider.viewer.userId }),
       ).toBeNull();
+    });
+  });
+
+  it("an investor's own read: their views and visibility, never anyone else's", async () => {
+    await scenario(async (tx) => {
+      const repo = createPostgresEngagementRepository(tx.sql);
+      const mine = createPostgresMyEngagementReader(tx.sql, repo);
+      const company = await org(tx, "company");
+      const investor = await org(tx, "investment_firm");
+      const other = await org(tx, "investment_firm");
+      for (const viewer of [investor.viewer, investor.viewer, other.viewer]) {
+        await repo.append(viewer, {
+          type: "PROFILE_VIEW",
+          clientEventId: clientId(),
+          companyId: company.entityId,
+          occurredAt: at,
+        });
+      }
+      const read = await mine.read({
+        actorUserId: investor.viewer.userId,
+        organisationId: investor.viewer.organisationId,
+      });
+      expect(read.privacy.visibility).toBe("ORGANISATION_ONLY");
+      expect(read.viewed).toEqual([
+        expect.objectContaining({ companyId: company.entityId, views: 2 }),
+      ]);
+      expect(read.responses).toEqual([]);
     });
   });
 });

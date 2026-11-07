@@ -7,6 +7,7 @@ import { languageInfo, listSeparator } from "@capital-q/q-core/language";
 import { ANSWERS_AR } from "./catalog/answers";
 import { BOARD_AR } from "./catalog/board";
 import { ADMIN_AR } from "./catalog/admin";
+import { ANALYTICS_AR } from "./catalog/analytics";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
 import { ACCOUNT_AR } from "./catalog/account";
@@ -83,6 +84,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...WORK_AR,
   ...DAILY_AR,
   ...ADMIN_AR,
+  ...ANALYTICS_AR,
   ...Q_AR,
   ...DISCOVER_AR,
   ...COMPANY_AR,

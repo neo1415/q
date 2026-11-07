@@ -299,6 +299,66 @@ export const Q_SITE_MAP: QSiteMap = {
       sections: [],
     },
     {
+      route: "/analytics",
+      title: "Analytics",
+      purpose:
+        "Intent and investor viewing of your company (deck by slide, who viewed, by week); an investor's own visibility and answers.",
+      audience: "ANY",
+      params: [],
+      shows: ["COMPANY"],
+      destinations: [],
+      recordPages: [],
+      settingsSections: [],
+      tabs: [],
+      sections: [
+        {
+          id: "intent",
+          title: "Intent",
+          kind: "INTEREST_LIST",
+        },
+        {
+          id: "deck-views",
+          title: "Deck views",
+          kind: "DECK",
+        },
+        {
+          id: "viewers",
+          title: "Who viewed",
+          kind: "OTHER",
+        },
+        {
+          id: "trend",
+          title: "By week",
+          kind: "OTHER",
+        },
+        {
+          id: "breakdown",
+          title: "By investor type and geography",
+          kind: "OTHER",
+        },
+        {
+          id: "documents",
+          title: "Documents",
+          kind: "DOCUMENT_LIST",
+        },
+        {
+          id: "visibility",
+          title: "Your visibility",
+          kind: "VISIBILITY",
+        },
+        {
+          id: "my-activity",
+          title: "Companies you viewed",
+          kind: "COMPANY_LIST",
+        },
+        {
+          id: "responses",
+          title: "Founders' answers",
+          kind: "OTHER",
+        },
+      ],
+    },
+    {
       route: "/board",
       title: "Board",
       purpose: "Your work board: what Q and you are working on.",
@@ -326,7 +386,7 @@ export const Q_SITE_MAP: QSiteMap = {
       params: [],
       shows: [],
       destinations: [],
-      recordPages: ["CAPITAL_ROUND"],
+      recordPages: [],
       settingsSections: [],
       tabs: [],
       sections: [],
@@ -1576,14 +1636,14 @@ export const Q_SITE_MAP: QSiteMap = {
       params: [],
       shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
       destinations: [],
-      recordPages: [],
+      recordPages: ["CAPITAL_ROUND"],
       settingsSections: [],
       tabs: [
         {
           id: "overview",
           title: "Overview",
           href: "/relationships?view=overview",
-          destinations: ["RELATIONSHIPS"],
+          destinations: ["RELATIONSHIPS", "RESULTS"],
           subs: [],
         },
         {
@@ -2094,7 +2154,7 @@ export const Q_SITE_MAP: QSiteMap = {
       redirectsTo: "/relationships",
       params: [],
       shows: [],
-      destinations: ["RESULTS"],
+      destinations: [],
       recordPages: [],
       settingsSections: [],
       tabs: [],

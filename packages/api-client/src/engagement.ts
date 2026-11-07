@@ -1,6 +1,10 @@
 import {
   ANALYTICS_SETTINGS_PATH,
   AnalyticsSettingsDtoSchema,
+  COMPANY_ENGAGEMENT_PATH,
+  CompanyEngagementDtoSchema,
+  MY_ENGAGEMENT_PATH,
+  MyEngagementDtoSchema,
   ENGAGEMENT_EVENTS_PATH,
   RecordEngagementBatchResponseSchema,
   VIEWING_PRIVACY_PATH,
@@ -61,4 +65,22 @@ export function updateAdminAnalyticsSettings(
     AnalyticsSettingsDtoSchema,
     { body },
   );
+}
+
+/** A founder's company engagement, as the analytics projection shows it. */
+export function getCompanyEngagement(session: ApiSession, companyId: string) {
+  return call(
+    session,
+    "GET",
+    COMPANY_ENGAGEMENT_PATH.replace(
+      ":companyId",
+      encodeURIComponent(companyId),
+    ),
+    CompanyEngagementDtoSchema,
+  );
+}
+
+/** The person's own engagement: what they viewed and founders' answers. */
+export function getMyEngagement(session: ApiSession) {
+  return call(session, "GET", MY_ENGAGEMENT_PATH, MyEngagementDtoSchema);
 }
