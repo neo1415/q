@@ -14,22 +14,41 @@ const with_ = (patch: Partial<AnalyticsSettings>) =>
   }).success;
 
 describe("analytics settings (Q Workspace §8)", () => {
-  it("defaults to the product specification §6.7", () => {
+  it("defaults to §6.7 except the owner's Founder Pro viewer identity, which says so", () => {
     expect(AnalyticsSettingsSchema.parse(ANALYTICS_SETTINGS_DEFAULTS)).toEqual(
       ANALYTICS_SETTINGS_DEFAULTS,
     );
-    for (const [key, text] of Object.entries(ANALYTICS_SETTING_DESCRIPTIONS)) {
-      expect(
+    const beyond = Object.entries(ANALYTICS_SETTING_DESCRIPTIONS)
+      .filter(([key, text]) =>
         text.beyondSpec(
           ANALYTICS_SETTINGS_DEFAULTS[key as keyof AnalyticsSettings],
         ),
-        key,
-      ).toBe(false);
-    }
+      )
+      .map(([key]) => key);
+    expect(beyond).toEqual(["paidIdentityReveal"]);
+    expect(ANALYTICS_SETTINGS_DEFAULTS).toMatchObject({
+      paidRevealOverridesAnonymous: false,
+      perPersonPassiveAnalytics: false,
+      passiveViewNotifications: false,
+      headlineFloor: 3,
+      sliceFloor: 5,
+      passiveBatch: "WEEKLY",
+    });
+    expect(
+      ANALYTICS_SETTING_DESCRIPTIONS.paidRevealOverridesAnonymous.locked,
+    ).toBe(true);
+  });
+
+  it("never lets a floor go below 3 for totals or 5 for breakdowns", () => {
+    expect(with_({ headlineFloor: 2 })).toBe(false);
+    expect(with_({ sliceFloor: 4 })).toBe(false);
+    expect(with_({ headlineFloor: 10, sliceFloor: 12 })).toBe(true);
   });
 
   it("never lets the Anonymous override exist without paid reveal", () => {
-    expect(with_({ paidRevealOverridesAnonymous: true })).toBe(false);
+    expect(
+      with_({ paidIdentityReveal: false, paidRevealOverridesAnonymous: true }),
+    ).toBe(false);
     expect(
       with_({ paidIdentityReveal: true, paidRevealOverridesAnonymous: true }),
     ).toBe(true);

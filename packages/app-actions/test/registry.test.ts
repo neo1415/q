@@ -76,6 +76,7 @@ describe("the action registry", () => {
       ["discovery.company.unsave", "unsave_company", "INSTANT"],
       ["discovery.company.pass", "pass_company", "INSTANT"],
       ["discovery.company.unpass", "unpass_company", "INSTANT"],
+      ["engagement.viewing_privacy.set", "set_viewing_privacy", "INSTANT"],
       ["person.profile.update", "update_my_profile", "CONSEQUENTIAL"],
       ["company.profile.update", "update_company_profile", "CONSEQUENTIAL"],
       ["company.team.me.upsert", "set_my_company_role", "CONSEQUENTIAL"],

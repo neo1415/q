@@ -403,6 +403,8 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
   "Settings couldn't load": "تعذّر تحميل الإعدادات",
   "Beyond the product specification §6.7": "يتجاوز مواصفات المنتج §6.7",
   "(always allowed)": "(مسموح دائمًا)",
+  "I understand this breaks the anonymity promise made to investors and can end their trust in Capital Q.":
+    "أفهم أن هذا يخلّ بوعد إخفاء الهوية المقدَّم للمستثمرين وقد يُفقدهم ثقتهم في Capital Q.",
   "Save analytics settings?": "حفظ إعدادات التحليلات؟",
   Discard: "تجاهل",
   Changes: "التغييرات",

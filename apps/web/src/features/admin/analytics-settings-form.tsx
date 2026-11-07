@@ -31,8 +31,8 @@ const rank = (v: ViewingVisibility) =>
   v === "FULL_IDENTITY" ? 0 : v === "ORGANISATION_ONLY" ? 1 : 2;
 
 const BOOLEAN_KEYS = [
-  "namedPassiveViewers",
   "paidIdentityReveal",
+  "namedPassiveViewers",
   "paidRevealOverridesAnonymous",
   "perPersonPassiveAnalytics",
   "passiveViewNotifications",
@@ -62,7 +62,14 @@ export function AnalyticsSettingsForm({
   const t = useT();
   const [settings, setSettings] = useState<AnalyticsSettings>(initial);
   const defaultId = useId();
+  const batchId = useId();
+  const [acknowledged, setAcknowledged] = useState(false);
   const changed = JSON.stringify(settings) !== JSON.stringify(initial);
+  // The Anonymous override is locked: turning it on needs its own
+  // acknowledgement of the investor-trust risk, on top of the reason.
+  const unlocking =
+    settings.paidRevealOverridesAnonymous &&
+    !initial.paidRevealOverridesAnonymous;
 
   const setDefault = (level: ViewingVisibility) => {
     // The default and everything more private are always allowed.
@@ -184,9 +191,83 @@ export function AnalyticsSettingsForm({
                 {t(text.description)}
               </span>
               <BeyondSpec on={text.beyondSpec(settings[key])} />
+              {key === "paidRevealOverridesAnonymous" && unlocking ? (
+                <label className="flex min-h-11 items-center gap-3 cq-body text-(--cq-text-primary)">
+                  <input
+                    type="checkbox"
+                    className="size-5"
+                    checked={acknowledged}
+                    onChange={(event) => setAcknowledged(event.target.checked)}
+                  />
+                  {t(
+                    "I understand this breaks the anonymity promise made to investors and can end their trust in Capital Q.",
+                  )}
+                </label>
+              ) : null}
             </li>
           );
         })}
+        {(["headlineFloor", "sliceFloor"] as const).map((key) => {
+          const text = describe[key];
+          const minimum = key === "headlineFloor" ? 3 : 5;
+          return (
+            <li key={key} className="flex flex-col gap-2 py-4">
+              <label className="flex min-h-11 items-center gap-3 cq-body font-medium text-(--cq-text-primary)">
+                {t(text.title)}
+                <input
+                  type="number"
+                  min={minimum}
+                  max={100}
+                  className="cq-body min-h-11 w-24 rounded-(--cq-radius-md) border border-(--cq-border-strong) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)"
+                  value={settings[key]}
+                  disabled={!canWrite}
+                  onChange={(event) => {
+                    const value = Number.parseInt(event.target.value, 10);
+                    if (Number.isFinite(value)) {
+                      setSettings({
+                        ...settings,
+                        [key]: Math.min(100, Math.max(minimum, value)),
+                      });
+                    }
+                  }}
+                />
+              </label>
+              <span className="cq-caption text-(--cq-text-secondary)">
+                {t(text.description)}
+              </span>
+            </li>
+          );
+        })}
+        <li className="flex flex-col gap-2 py-4">
+          <label
+            htmlFor={batchId}
+            className="cq-body font-medium text-(--cq-text-primary)"
+          >
+            {t(describe.passiveBatch.title)}
+          </label>
+          <span className="cq-caption text-(--cq-text-secondary)">
+            {t(describe.passiveBatch.description)}
+          </span>
+          <select
+            id={batchId}
+            className="cq-body min-h-11 max-w-md rounded-(--cq-radius-md) border border-(--cq-border-strong) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)"
+            value={settings.passiveBatch}
+            disabled={!canWrite}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                passiveBatch:
+                  event.target.value === "DAILY" ? "DAILY" : "WEEKLY",
+              })
+            }
+          >
+            <option value="WEEKLY">{t("Weekly")}</option>
+            <option value="DAILY">{t("Daily")}</option>
+          </select>
+          <BeyondSpec
+            on={describe.passiveBatch.beyondSpec(settings.passiveBatch)}
+          />
+        </li>
       </ul>
       {canWrite ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -198,12 +279,15 @@ export function AnalyticsSettingsForm({
             )}
             confirm="Save"
             variant="primary"
-            disabled={!changed}
+            disabled={!changed || (unlocking && !acknowledged)}
             run={(reason) =>
               updateAnalyticsSettingsAction({
                 settings,
                 expectedVersion: version,
                 reason,
+                ...(unlocking && acknowledged
+                  ? { acknowledgeInvestorTrustRisk: true }
+                  : {}),
               })
             }
           />
@@ -211,7 +295,10 @@ export function AnalyticsSettingsForm({
             <button
               type="button"
               className="cq-body min-h-11 px-3 text-(--cq-text-secondary) underline"
-              onClick={() => setSettings(initial)}
+              onClick={() => {
+                setSettings(initial);
+                setAcknowledged(false);
+              }}
             >
               {t("Discard")}
             </button>

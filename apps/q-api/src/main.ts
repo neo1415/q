@@ -677,6 +677,12 @@ import {
   playablePitchPortFrom,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
+import {
+  createEngagementService,
+  createPostgresCompanyEngagementReader,
+  createPostgresEngagementRepository,
+  ownEngagementItems,
+} from "@capital-q/engagement";
 
 import {
   composePresence,
@@ -3093,7 +3099,24 @@ const investorSectorFocusPort = createInvestorSectorFocusPort({
   projection: ownCompanyProjection,
   cards: publicIdentity,
 });
+// Q Workspace §8 A2/A5: viewing privacy (set) and engagement (read), both
+// through the analytics projection; Q never sees an identity the founder
+// page would not show.
+const engagementRepository = createPostgresEngagementRepository(database.sql);
+const companyEngagementReader = createPostgresCompanyEngagementReader(
+  database.sql,
+);
+const engagementService = createEngagementService({
+  repository: engagementRepository,
+});
 const appActionPorts: OwnReadPorts = {
+  viewingPrivacy: engagementService,
+  engagement: async (actor) =>
+    ownEngagementItems(
+      { reader: companyEngagementReader, repository: engagementRepository },
+      actor,
+      await runtimeDependencies.ownCompany(actor),
+    ),
   // D (2026-10-11): meeting time proposals, booked through the schedule
   // service as the accepting person once an acceptance is recorded.
   proposals: createMeetingProposalPort({

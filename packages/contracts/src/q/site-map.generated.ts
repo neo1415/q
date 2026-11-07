@@ -550,9 +550,10 @@ export const Q_SITE_MAP: QSiteMap = {
         },
         {
           id: "missing",
-          title: "Still to add (owner)",
+          title: "Still to add",
           kind: "DATA_ROOM",
           tab: "dataroom",
+          audience: "FOUNDER",
         },
         {
           id: "deck",
@@ -740,24 +741,27 @@ export const Q_SITE_MAP: QSiteMap = {
       tabs: [
         {
           id: "for-you",
-          title: "For you (investor)",
+          title: "For you",
           href: "/discover",
           destinations: ["DISCOVER"],
           subs: [],
+          audience: "INVESTOR",
         },
         {
           id: "yours",
-          title: "Your companies (investor)",
+          title: "Your companies",
           href: "/discover?tab=yours",
           destinations: ["YOUR_COMPANIES"],
           subs: [],
+          audience: "INVESTOR",
         },
         {
           id: "founders",
-          title: "Founders' videos (founder)",
+          title: "Founders' videos",
           href: "/discover?tab=founders",
           destinations: [],
           subs: [],
+          audience: "FOUNDER",
         },
       ],
       sections: [
@@ -765,11 +769,13 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "feed",
           title: "Your feed",
           kind: "COMPANY_FEED",
+          audience: "INVESTOR",
         },
         {
           id: "investors",
           title: "Investors",
           kind: "INVESTOR_LIST",
+          audience: "FOUNDER",
         },
         {
           id: "q-room-card",
@@ -962,6 +968,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/gateq?tab=inbox",
           destinations: ["GATEQ_INBOX"],
           subs: [],
+          audience: "INVESTOR",
         },
         {
           id: "gate",
@@ -969,6 +976,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/gateq?tab=gate",
           destinations: [],
           subs: [],
+          audience: "INVESTOR",
         },
         {
           id: "find",
@@ -976,6 +984,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/gateq?tab=find",
           destinations: ["GATEQ_FIND"],
           subs: [],
+          audience: "INVESTOR",
         },
         {
           id: "claim",
@@ -983,13 +992,15 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/gateq?tab=claim",
           destinations: ["GATEQ_CLAIM"],
           subs: [],
+          audience: "FOUNDER",
         },
         {
           id: "applications",
-          title: "Applications (founder)",
+          title: "Your applications",
           href: "/gateq?tab=applications",
           destinations: ["GATEQ_APPLICATIONS"],
           subs: [],
+          audience: "FOUNDER",
         },
       ],
       sections: [
@@ -1291,11 +1302,13 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "company",
           title: "Company",
           kind: "OTHER",
+          audience: "FOUNDER",
         },
         {
           id: "traction",
           title: "Traction",
           kind: "OTHER",
+          audience: "FOUNDER",
         },
         {
           id: "team",
@@ -1306,16 +1319,19 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "mandate",
           title: "Mandate",
           kind: "OTHER",
+          audience: "INVESTOR",
         },
         {
           id: "thesis",
           title: "How Q reads your thesis",
           kind: "OTHER",
+          audience: "INVESTOR",
         },
         {
           id: "firm",
           title: "Firm",
           kind: "OTHER",
+          audience: "INVESTOR",
         },
         {
           id: "organisation",
@@ -1590,6 +1606,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=capital&tab=raise",
           destinations: ["CAPITAL_RAISE"],
           subs: [],
+          audience: "FOUNDER",
         },
         {
           id: "capital-readiness",
@@ -1597,6 +1614,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=capital&tab=readiness",
           destinations: ["CAPITAL_READINESS"],
           subs: [],
+          audience: "FOUNDER",
         },
         {
           id: "capital-action-plan",
@@ -1604,6 +1622,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=capital&tab=action-plan",
           destinations: ["CAPITAL_ACTION_PLAN"],
           subs: [],
+          audience: "FOUNDER",
         },
         {
           id: "capital-plan",
@@ -1611,6 +1630,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=capital&tab=plan",
           destinations: ["CAPITAL_PLAN"],
           subs: [],
+          audience: "FOUNDER",
         },
         {
           id: "capital-investors",
@@ -1618,6 +1638,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=capital&tab=investors",
           destinations: ["CAPITAL_INVESTORS"],
           subs: [],
+          audience: "FOUNDER",
         },
       ],
       sections: [
@@ -1643,18 +1664,21 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Your mandate",
           kind: "OTHER",
           tab: "capital",
+          audience: "INVESTOR",
         },
         {
           id: "commitments",
           title: "Your book (commitments)",
           kind: "CAPITAL_ROUNDS",
           tab: "capital",
+          audience: "INVESTOR",
         },
         {
           id: "capital-overview",
           title: "Capital overview",
           kind: "CAPITAL_ROUNDS",
           tab: "capital",
+          audience: "FOUNDER",
         },
         {
           id: "rounds",

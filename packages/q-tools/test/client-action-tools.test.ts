@@ -339,6 +339,26 @@ describe("set_layout (Q Workspace W1.5)", () => {
     }
   });
 
+  it("by default, emits only when the run's screen carries workspace", async () => {
+    const onScreen: PermittedContextPlan = {
+      ...ownPlan(),
+      screen: {
+        route: "DISCOVER",
+        workspace: { qPane: "open", pagePane: "open" },
+      },
+    };
+    const allowedRun = await layoutExecutor(undefined).execute(
+      call("set_layout", { pagePane: "collapsed" }),
+      contextFor(actorA, onScreen),
+    );
+    expect(allowedRun.status).toBe("SUCCEEDED");
+    const offScreen = await layoutExecutor(undefined).execute(
+      call("set_layout", { pagePane: "collapsed" }),
+      contextFor(actorA, { ...onScreen, screen: { route: "DISCOVER" } }),
+    );
+    expect(offScreen.status).not.toBe("SUCCEEDED");
+  });
+
   it("is refused outside the person's own conversation", async () => {
     const outcome = await layoutExecutor(true).execute(
       call("set_layout", { qPane: "open" }),

@@ -28,6 +28,8 @@ export type SiteMapTabEntry = {
   readonly title: string;
   readonly href: string;
   readonly subs?: readonly QSiteMapSub[] | undefined;
+  /** Narrower than the page: who the code renders this tab for. */
+  readonly audience?: QSiteMapAudience | undefined;
 };
 
 export type SiteMapSectionEntry = {
@@ -35,6 +37,8 @@ export type SiteMapSectionEntry = {
   readonly title: string;
   readonly kind: QManifestSectionKind;
   readonly tab?: string | undefined;
+  /** Narrower than the page or tab: who the code renders it for. */
+  readonly audience?: QSiteMapAudience | undefined;
 };
 
 export type SiteMapPageEntry = {
@@ -321,15 +325,15 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "PITCH_VIDEO"],
     tabs: [
-      { id: "for-you", title: "For you (investor)", href: "/discover" },
+      { id: "for-you", title: "For you", href: "/discover" },
       {
         id: "yours",
-        title: "Your companies (investor)",
+        title: "Your companies",
         href: "/discover?tab=yours",
       },
       {
         id: "founders",
-        title: "Founders' videos (founder)",
+        title: "Founders' videos",
         href: "/discover?tab=founders",
       },
     ],
@@ -467,7 +471,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       },
       {
         id: "missing",
-        title: "Still to add (owner)",
+        title: "Still to add",
         kind: "DATA_ROOM",
         tab: "dataroom",
       },
@@ -676,7 +680,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       { id: "claim", title: "Claim", href: "/gateq?tab=claim" },
       {
         id: "applications",
-        title: "Applications (founder)",
+        title: "Your applications",
         href: "/gateq?tab=applications",
       },
     ],
@@ -910,5 +914,66 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     title: "Reconnect Google",
     purpose: "Reconnect your Google calendar and mail.",
     audience: "ANY",
+  },
+};
+
+/**
+ * W4 access STAYs (integration 2026-11-07): who the code renders each tab
+ * and section for, where narrower than its page. Audited against the code
+ * that renders it; `site-map-audience.test.ts` re-derives what it can from
+ * that code. Absent: the page's (or the tab's) audience.
+ */
+export const SITE_MAP_AUDIENCES: Readonly<
+  Record<
+    string,
+    {
+      readonly tabs?: Readonly<Record<string, QSiteMapAudience>>;
+      readonly sections?: Readonly<Record<string, QSiteMapAudience>>;
+    }
+  >
+> = {
+  // discover/page.tsx: the investor's two tabs; a founder's videos tab.
+  "/discover": {
+    tabs: { "for-you": "INVESTOR", yours: "INVESTOR", founders: "FOUNDER" },
+    sections: { feed: "INVESTOR", investors: "FOUNDER" },
+  },
+  // capital-screen.tsx: both sides have Capital (the investor's mandate and
+  // book; the founder's overview); its own tabs are FounderTab's, founder-only.
+  "/relationships": {
+    tabs: {
+      "capital-raise": "FOUNDER",
+      "capital-readiness": "FOUNDER",
+      "capital-action-plan": "FOUNDER",
+      "capital-plan": "FOUNDER",
+      "capital-investors": "FOUNDER",
+    },
+    sections: {
+      mandate: "INVESTOR",
+      commitments: "INVESTOR",
+      "capital-overview": "FOUNDER",
+    },
+  },
+  // gateq/page.tsx: an investor has inbox, gate and find; anyone else the
+  // founder's claim and applications.
+  "/gateq": {
+    tabs: {
+      inbox: "INVESTOR",
+      gate: "INVESTOR",
+      find: "INVESTOR",
+      claim: "FOUNDER",
+      applications: "FOUNDER",
+    },
+  },
+  // data-room.tsx: the stage checklist is the owner's (their own company).
+  [COMPANY]: { sections: { missing: "FOUNDER" } },
+  // own-profile-view.tsx: company branch, investor branch.
+  "/profile": {
+    sections: {
+      company: "FOUNDER",
+      traction: "FOUNDER",
+      mandate: "INVESTOR",
+      firm: "INVESTOR",
+      thesis: "INVESTOR",
+    },
   },
 };

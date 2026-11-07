@@ -222,6 +222,9 @@ importers:
       '@capital-q/email':
         specifier: workspace:*
         version: link:../../packages/email
+      '@capital-q/engagement':
+        specifier: workspace:*
+        version: link:../../packages/engagement
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
