@@ -1084,6 +1084,8 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "control_document",
   // RECOVERY-2026-10: any registered control on the page (ui-act.ts).
   "operate_screen",
+  // Q Workspace W1.5: the workspace's panes (LAYOUT_SET).
+  "set_layout",
 ] as const;
 
 /**

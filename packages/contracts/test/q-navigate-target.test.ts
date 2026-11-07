@@ -10,6 +10,7 @@ import {
   QNavigateTargetSchema,
   QNavigationOfferBlockSchema,
   QClientActionIntentSchema,
+  Q_CLIENT_ACTION_TOOLS,
   Q_SCREEN_ROUTES,
   QScreenContextSchema,
   Q_UI_INTENT_KINDS,
@@ -328,6 +329,13 @@ describe("Q Workspace screen context and set_layout (W1/W4 via W3)", () => {
   ])("refuses the workspace %o", (workspace) => {
     expect(QScreenContextSchema.safeParse({ route, workspace }).success).toBe(
       false,
+    );
+  });
+
+  it("set_layout is a client-action tool, right after operate_screen", () => {
+    const tools: readonly string[] = Q_CLIENT_ACTION_TOOLS;
+    expect(tools.indexOf("set_layout")).toBe(
+      tools.indexOf("operate_screen") + 1,
     );
   });
 });
