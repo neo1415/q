@@ -397,6 +397,15 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
   People: "الأشخاص",
   Activity: "النشاط",
   "Live errors": "الأخطاء المباشرة",
+  // Analytics privacy (Q Workspace §8)
+  "Analytics privacy": "خصوصية التحليلات",
+  "Analytics privacy · Admin": "خصوصية التحليلات · الإدارة",
+  "Settings couldn't load": "تعذّر تحميل الإعدادات",
+  "Beyond the product specification §6.7": "يتجاوز مواصفات المنتج §6.7",
+  "(always allowed)": "(مسموح دائمًا)",
+  "Save analytics settings?": "حفظ إعدادات التحليلات؟",
+  Discard: "تجاهل",
+  Changes: "التغييرات",
   // Kill switches
   "Kill switches": "مفاتيح الإيقاف",
   "Kill switches · Admin": "مفاتيح الإيقاف · الإدارة",

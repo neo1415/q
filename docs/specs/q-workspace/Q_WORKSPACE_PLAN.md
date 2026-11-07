@@ -29,7 +29,7 @@ Bar for (1): "no error, no room for mistakes, the exact page every single time".
 
   §8 is designed **inside** these rules and lists exactly what would need an owner amendment. Nothing in §8 overrides them silently.
 
-- **ADR 0017** (founder design amendments: Q Dock F1, Stage + Board F3, glow on Q only) needs an amendment for the permanent Q pane: ADR 0031 (W1).
+- **ADR 0017** (founder design amendments: Q Dock F1, Stage + Board F3, glow on Q only) needs an amendment for the permanent Q pane: ADR 0077 (W1).
 
 ## 2. Target experience (what "done" looks like)
 
@@ -115,7 +115,7 @@ Each is a lane: a cloud session on its own branch from `fix/resume-asking-cv9ru3
   - `/home` with the flag on renders the page pane's home content, or nothing with Q full width when the page pane is collapsed.
   - The panel must work at 300–640 px.
   - The Stage presence scales (existing aperture sizes 200/64/44).
-  - The Board moves to the page pane as a page (`/board`), or a collapsible drawer of the Q pane. Pick by the design rules; note the choice in ADR 0031.
+  - The Board moves to the page pane as a page (`/board`), or a collapsible drawer of the Q pane. Pick by the design rules; note the choice in ADR 0077.
 - **W1.3 Split.**
   - A CSS grid: nav | Q pane | page pane.
   - A resizable separator (role=separator, pointer drag, ←/→ by 24 px, Home/End, double-click → 380 px).
@@ -131,7 +131,7 @@ Each is a lane: a cloud session on its own branch from `fix/resume-asking-cv9ru3
   - Model tool `set_layout` (no approval). Works by voice.
 - **W1.6 Phone.** Q full screen; a peek bar after a move; the page as a bottom sheet with "Back to Q"; the sheet follows moves while open; one active voice line.
 - **W1.7 Dock and sheet** are not mounted when the flag is on (the Q pane replaces them). `WakeWord` stays single-instance in `global-q.tsx`.
-- **W1.8 ADR 0031** "Q Workspace shell", amending ADR 0017 F1/F3 (Dock, Stage + Board) for flag-on users.
+- **W1.8 ADR 0077** "Q Workspace shell", amending ADR 0017 F1/F3 (Dock, Stage + Board) for flag-on users.
 - **Tests:**
   - The layout persists across navigation: the Q pane is not remounted (test by a render counter or a stable DOM node identity).
   - Voice is not interrupted by navigation.
@@ -299,7 +299,7 @@ The **single contracts owner** for `ui-intent.ts` and `result-block.ts` during t
 
 | Lane            | Session                                                              | Branch                     | Owns (exclusive while active)                                                                                                 |
 | --------------- | -------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| W1 shell        | new                                                                  | `feat/q-workspace-shell`   | `components/app-shell/*`, `features/q/global-q.tsx`, the layout pane, ADR 0031, the flag (and its migration if one is needed) |
+| W1 shell        | new                                                                  | `feat/q-workspace-shell`   | `components/app-shell/*`, `features/q/global-q.tsx`, the layout pane, ADR 0077, the flag (and its migration if one is needed) |
 | W2 site map     | new                                                                  | `feat/q-site-map`          | `contracts/src/q/site-map.ts` (new), the site-map build, the coverage test                                                    |
 | W3 deep links   | new                                                                  | `feat/q-deep-links`        | `contracts/src/q/ui-intent.ts`, `result-block.ts` (single contracts owner), route params, arrival                             |
 | W4 policy       | gaps lane (session_01Wncmn4BQnwUu8PoUpcMjfu) after its current slice | `feat/q-navigation-policy` | the NAVIGATION_DECISION prompt and task, `page-request.ts` policy, the `q-nav` eval                                           |

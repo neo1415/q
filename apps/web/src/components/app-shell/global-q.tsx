@@ -39,6 +39,11 @@ import {
 import { QSounds } from "@/features/q-sound/q-sounds";
 import { WakeWord } from "@/features/wake/wake-word";
 import { useT } from "@/features/i18n/language";
+import { setPane } from "@/features/workspace/layout-store";
+import {
+  focusQPaneComposer,
+  requestQPaneDraft,
+} from "@/features/workspace/q-pane-requests";
 import { opensQ } from "./q-shortcut";
 
 /**
@@ -127,6 +132,7 @@ export function GlobalQProvider({
   connected,
   children,
   dock,
+  workspace = false,
 }: {
   /** The person's own subject, resolved on the server. */
   readonly subject: QSubject;
@@ -135,6 +141,12 @@ export function GlobalQProvider({
   readonly children: ReactNode;
   /** The floating presence, rendered inside the store. */
   readonly dock?: ReactNode | undefined;
+  /**
+   * Q Workspace (W1.7, ADR 0077): Q is the pane beside every page, so
+   * there is no side sheet, dock, answer chip or arrival dock; opening Q
+   * opens the pane. The one store and the one "Hey Q" are unchanged.
+   */
+  readonly workspace?: boolean | undefined;
 }) {
   const pathname = usePathname();
   const onQPage = pathname === Q_PAGE;
@@ -153,13 +165,22 @@ export function GlobalQProvider({
     // R21: the same source answers every turn's screen, not just opening.
     setScreenFocusSource(source);
   }, []);
-  const openWith = useCallback((explicitSeed: string | null) => {
-    const read = momentSource.current?.() ?? null;
-    const at = read?.kind === "PITCH_MOMENT" ? read : null;
-    setMoment(at);
-    setSeed(explicitSeed ?? (at === null ? null : momentDraft(at)));
-    setRequested(true);
-  }, []);
+  const openWith = useCallback(
+    (explicitSeed: string | null) => {
+      if (workspace) {
+        setPane("qPane", "open");
+        if (explicitSeed === null) focusQPaneComposer();
+        else requestQPaneDraft(explicitSeed);
+        return;
+      }
+      const read = momentSource.current?.() ?? null;
+      const at = read?.kind === "PITCH_MOMENT" ? read : null;
+      setMoment(at);
+      setSeed(explicitSeed ?? (at === null ? null : momentDraft(at)));
+      setRequested(true);
+    },
+    [workspace],
+  );
   // A draft and a moment belong to the opening that asked for them;
   // closing drops both so the next plain "Ask Q" starts empty.
   const setOpen = useCallback(
@@ -196,12 +217,13 @@ export function GlobalQProvider({
       const text = question.trim();
       if (text.length === 0) return;
       // Off the Q page the panel opens on the answer as it comes.
-      if (!onQPage) openWith(null);
+      if (workspace) setPane("qPane", "open");
+      else if (!onQPage) openWith(null);
       setRun((current) => ({ id: (current?.id ?? 0) + 1, text }));
     },
-    [onQPage, openWith],
+    [onQPage, openWith, workspace],
   );
-  const open = requested && !onQPage;
+  const open = requested && !onQPage && !workspace;
   const [closedFor, setClosedFor] = useState(pathname);
   if (closedFor !== pathname) {
     setClosedFor(pathname);
@@ -218,6 +240,10 @@ export function GlobalQProvider({
     const onKey = (event: KeyboardEvent) => {
       if (!opensQ(event)) return;
       event.preventDefault();
+      if (workspace) {
+        openWith(null);
+        return;
+      }
       if (window.location.pathname === Q_PAGE) {
         document.getElementById("home-q")?.focus();
         return;
@@ -226,12 +252,12 @@ export function GlobalQProvider({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openWith]);
+  }, [openWith, workspace]);
 
   // P9: off the Q page, fetch the panel's code once the page has settled,
   // so a later open is immediate even on a slow line. Never on Save-Data.
   useEffect(() => {
-    if (onQPage) return;
+    if (onQPage || workspace) return;
     const connection = (
       navigator as Navigator & { connection?: { saveData?: boolean } }
     ).connection;
@@ -244,7 +270,7 @@ export function GlobalQProvider({
       }
     }, 4000);
     return () => window.clearTimeout(timer);
-  }, [onQPage]);
+  }, [onQPage, workspace]);
 
   const value = useMemo<GlobalQValue>(
     () => ({
@@ -275,17 +301,17 @@ export function GlobalQProvider({
       <QSessionProvider connected={connected}>
         <GlobalQContext.Provider value={value}>
           {children}
-          <GlobalQSheet />
+          {workspace ? null : <GlobalQSheet />}
           <GlobalQRunner />
-          <AnswerChip />
+          {workspace ? null : <AnswerChip />}
           {/* The arrival briefing beside the dock on every other page. */}
-          <ArrivalDock />
+          {workspace ? null : <ArrivalDock />}
           <QSounds />
           {/* No particles around the page edge (UX-06, owner 2026-11-04):
               Q's own presence and its state label say Q is working. */}
           {/* D1: "Hey Q"; off by default, and nothing loads while off. */}
           <WakeWord openQ={openQ} />
-          {dock}
+          {workspace ? null : dock}
         </GlobalQContext.Provider>
       </QSessionProvider>
     </QSubjectProvider>

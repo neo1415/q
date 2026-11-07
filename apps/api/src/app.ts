@@ -39,6 +39,12 @@ import {
   registerResultsRoutes,
   type ResultsRoutesDependencies,
 } from "./http/results.js";
+// ANALYTICS block (Q Workspace §8)
+import {
+  registerEngagementRoutes,
+  type EngagementRoutesDependencies,
+} from "./http/engagement.js";
+// end ANALYTICS block
 import { registerReadinessRoutes } from "./http/readiness.js";
 import type { ReadinessService } from "@capital-q/readiness";
 import {
@@ -321,6 +327,11 @@ export type ApiModules = {
   // end ADMIN-3 block
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
+  // ANALYTICS block (Q Workspace §8)
+  readonly engagement?:
+    | Pick<EngagementRoutesDependencies, "engagement" | "companyEngagement">
+    | undefined;
+  // end ANALYTICS block
   /** Q.03/Q.04/Q.01: the founder's own readiness, plan and follow-ups. */
   readonly readiness?: ReadinessService | undefined;
   /** Diligence (2026-10-02). Absent: those routes do not register. */
@@ -883,6 +894,16 @@ export function createApp(
     });
   }
   // end ADMIN block
+
+  // ANALYTICS block (Q Workspace §8)
+  if (modules.engagement !== undefined) {
+    registerEngagementRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.engagement,
+    });
+  }
+  // end ANALYTICS block
 
   if (modules.readiness !== undefined) {
     registerReadinessRoutes(app, {

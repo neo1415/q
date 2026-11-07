@@ -21,6 +21,16 @@ import { GlobalQProvider } from "./global-q";
 import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
 import { Words } from "@/features/i18n/language";
+import { WORKSPACE_BOOT_SCRIPT } from "@/features/workspace/layout-rules";
+import {
+  WORKSPACE_OFF,
+  type WorkspaceMode,
+} from "@capital-q/config/workspace-mode";
+import { WorkspaceProvider } from "@/features/workspace/workspace-context";
+import {
+  WorkspacePagePane,
+  WorkspaceQPane,
+} from "@/features/workspace/workspace-panes";
 
 /**
  * The workspace cue the shell shows: which organisation context this person
@@ -59,6 +69,8 @@ export function AppShell({
   qConnected = false,
   onboarding = null,
   verifyNudge = null,
+  workspace = WORKSPACE_OFF,
+  qPane = null,
 }: {
   readonly children: ReactNode;
   readonly context?: ShellContext | undefined;
@@ -73,6 +85,10 @@ export function AppShell({
   readonly onboarding?: string | null | undefined;
   /** ADMIN-4: "Verify you and <organisation>" while either claim is unverified. */
   readonly verifyNudge?: VerifyNudge | null | undefined;
+  /** Q Workspace (W1.1), decided on the server for this request. */
+  readonly workspace?: WorkspaceMode | undefined;
+  /** The Q pane's conversation, rendered once by the layout (W1.2). */
+  readonly qPane?: ReactNode | undefined;
 }) {
   if (onboarding !== null) {
     return (
@@ -95,42 +111,89 @@ export function AppShell({
       </GlobalQProvider>
     );
   }
+  if (workspace.enabled) {
+    return (
+      <WorkspaceProvider mode={workspace}>
+        <GlobalQProvider subject={subject} connected={qConnected} workspace>
+          {/* The pane sizes, applied before the first paint (no shift). */}
+          <script dangerouslySetInnerHTML={{ __html: WORKSPACE_BOOT_SCRIPT }} />
+          <div className="cq-shell" data-workspace>
+            <a
+              href="#main"
+              className="sr-only z-(--cq-z-toast) bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:start-3"
+            >
+              <Words>Skip to content</Words>
+            </a>
+            <DesktopSidebar context={context} />
+            <WorkspaceQPane>{qPane}</WorkspaceQPane>
+            <WorkspacePagePane>
+              <AppHeader context={context} verifyNudge={verifyNudge} />
+              <NetworkStatus />
+              {verifyNudge === null ? null : (
+                <div className="cq-verify-nudge-desktop justify-end px-6 pt-3">
+                  <VerifyNudgeLink nudge={verifyNudge} />
+                </div>
+              )}
+              <main id="main" className="cq-shell-main">
+                <ShellPhoneLeadProvider
+                  context={context}
+                  verifyNudge={verifyNudge}
+                >
+                  {children}
+                </ShellPhoneLeadProvider>
+                <FictionalNames />
+              </main>
+              <MobileNavigation />
+            </WorkspacePagePane>
+          </div>
+          <DocumentReadyCenter connected={qConnected} />
+          <WakeIndicator />
+        </GlobalQProvider>
+      </WorkspaceProvider>
+    );
+  }
+  // Flag off: today's shell, unchanged (the provider adds no markup).
   return (
-    <GlobalQProvider
-      subject={subject}
-      connected={qConnected}
-      dock={<QDockOffQPage />}
-    >
-      <div className="cq-shell">
-        <a
-          href="#main"
-          className="sr-only z-(--cq-z-toast) bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:start-3"
-        >
-          <Words>Skip to content</Words>
-        </a>
-        <DesktopSidebar context={context} />
-        <div className="cq-shell-body">
-          <AppHeader context={context} verifyNudge={verifyNudge} />
-          <NetworkStatus />
-          {verifyNudge === null ? null : (
-            <div className="cq-verify-nudge-desktop justify-end px-6 pt-3">
-              <VerifyNudgeLink nudge={verifyNudge} />
-            </div>
-          )}
-          <main id="main" className="cq-shell-main">
-            <ShellPhoneLeadProvider context={context} verifyNudge={verifyNudge}>
-              {children}
-            </ShellPhoneLeadProvider>
-            <FictionalNames />
-          </main>
-          {/* Discover only (owner 2026-10-29); null on every other page. */}
-          <MobileNavigation />
+    <WorkspaceProvider mode={workspace}>
+      <GlobalQProvider
+        subject={subject}
+        connected={qConnected}
+        dock={<QDockOffQPage />}
+      >
+        <div className="cq-shell">
+          <a
+            href="#main"
+            className="sr-only z-(--cq-z-toast) bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:start-3"
+          >
+            <Words>Skip to content</Words>
+          </a>
+          <DesktopSidebar context={context} />
+          <div className="cq-shell-body">
+            <AppHeader context={context} verifyNudge={verifyNudge} />
+            <NetworkStatus />
+            {verifyNudge === null ? null : (
+              <div className="cq-verify-nudge-desktop justify-end px-6 pt-3">
+                <VerifyNudgeLink nudge={verifyNudge} />
+              </div>
+            )}
+            <main id="main" className="cq-shell-main">
+              <ShellPhoneLeadProvider
+                context={context}
+                verifyNudge={verifyNudge}
+              >
+                {children}
+              </ShellPhoneLeadProvider>
+              <FictionalNames />
+            </main>
+            {/* Discover only (owner 2026-10-29); null on every other page. */}
+            <MobileNavigation />
+          </div>
         </div>
-      </div>
-      {/* DOCS: the one owner of document-ready cards, on every page. */}
-      <DocumentReadyCenter connected={qConnected} />
-      {/* D2: a small corner button while "Hey Q" has the microphone. */}
-      <WakeIndicator />
-    </GlobalQProvider>
+        {/* DOCS: the one owner of document-ready cards, on every page. */}
+        <DocumentReadyCenter connected={qConnected} />
+        {/* D2: a small corner button while "Hey Q" has the microphone. */}
+        <WakeIndicator />
+      </GlobalQProvider>
+    </WorkspaceProvider>
   );
 }

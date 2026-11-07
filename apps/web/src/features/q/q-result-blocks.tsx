@@ -12,7 +12,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { CompanyAvatar } from "../company/company-avatar";
-import { destinationPath } from "../voice/destinations";
+import { navigateIntentPath } from "./control/deep-link";
 import { ArtifactCard } from "./artifact-card";
 import { CalendarConnectCard } from "./calendar-connect-card";
 import { HideableCard } from "./cards/hideable-card";
@@ -98,6 +98,7 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_COMPANY"
       | "FOCUS_SECTION"
       | "OPEN_SETTINGS"
+      | "LAYOUT_SET"
       | "SHOW_IN_Q_ROOM"
       | "SHOW_CALENDAR_CONNECT"
       | "DOCUMENT_ACT"
@@ -126,7 +127,7 @@ const COMPANY_SECTION_TABS: Readonly<Record<QUiCompanySection, string | null>> =
 export function intentHref(intent: QUiIntent): string | null {
   // A named surface, through the same route map spoken navigation uses.
   if (intent.kind === "NAVIGATE") {
-    return destinationPath(intent.destination);
+    return navigateIntentPath(intent);
   }
   // Client actions happen as the answer arrives (client-actions.ts); a
   // website also gets its own link card below, never an in-app route.
@@ -144,7 +145,9 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "SHOW_CALENDAR_CONNECT" ||
     intent.kind === "DOCUMENT_ACT" ||
     intent.kind === "CARDS" ||
-    intent.kind === "UI_ACT"
+    intent.kind === "UI_ACT" ||
+    // Q Workspace W1.5: the panes change where the person is; no link.
+    intent.kind === "LAYOUT_SET"
   ) {
     return null;
   }
@@ -245,6 +248,8 @@ function intentLabel(intent: QUiIntent): string {
                     "Open the relationship");
     case "SCREEN_ACT":
       return "On this page";
+    case "LAYOUT_SET":
+      return "Workspace";
     case "OPEN_SETUP":
       return intent.journey === "investor"
         ? "Continue your mandate"

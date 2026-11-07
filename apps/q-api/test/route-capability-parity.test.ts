@@ -999,6 +999,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/dev/q-presence": exempt("development-only page"),
   "/dev/ui": exempt("development-only page"),
+  // Q Workspace W1 (ADR 0077): the shell harness for screenshots.
+  "/dev/workspace": exempt("development-only page"),
   "/dev/daily": exempt("development-only page"),
   "/dev/profile": exempt(
     "development-only page (design review, fictional data)",
@@ -1039,6 +1041,12 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/dev/voice-preview": exempt("development-only page (local env + flag)"),
   "/dev/q-nav/work": exempt("development-only page"),
+  // Q Workspace W3: the deep-links harness (e2e/deep-links.spec.ts).
+  "/dev/deep-links": exempt("development-only page (deep-links harness)"),
+  "/dev/deep-links/board": exempt("development-only page"),
+  "/dev/deep-links/thread": exempt("development-only page"),
+  "/dev/deep-links/sections": exempt("development-only page"),
+  "/dev/deep-links/dataroom": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
   "/dev/deal-close": exempt("development-only page"),
   "/dev/gateq-v2": exempt("development-only page"),

@@ -17,12 +17,16 @@ import {
   revokeAdminRole,
   setAdminAccountSuspension,
   setAdminFlag,
+  updateAdminAnalyticsSettings,
   setAdminOrganisationSuspension,
   type ApiSession,
   decideAdminCompanyClaim,
   publishCompanyAsAdmin,
 } from "@capital-q/api-client";
-import type { AdminQErrorsDto } from "@capital-q/contracts";
+import {
+  UpdateAnalyticsSettingsRequestSchema,
+  type AdminQErrorsDto,
+} from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { createServerSupabaseClient } from "@/auth/supabase-server";
@@ -515,4 +519,26 @@ export async function publishCompanyAction(input: {
           ? "Public: anyone with the link can see its profile."
           : "Back to the network: only people on Capital Q see it.",
   };
+}
+
+/**
+ * Analytics privacy settings (Q Workspace §8). The whole set is sent with
+ * the version the admin was looking at; the API refuses a stale one, and
+ * re-checks every rule the database also enforces.
+ */
+export async function updateAnalyticsSettingsAction(
+  input: unknown,
+): Promise<ConsoleResult> {
+  const parsed = UpdateAnalyticsSettingsRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Check the settings and try again.",
+    };
+  }
+  return run(
+    (session) => updateAdminAnalyticsSettings(session, parsed.data),
+    "Analytics settings saved.",
+  );
 }

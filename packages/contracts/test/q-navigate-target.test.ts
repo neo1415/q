@@ -9,6 +9,8 @@ import {
   QNavigateIntentSchema,
   QNavigateTargetSchema,
   QNavigationOfferBlockSchema,
+  QClientActionIntentSchema,
+  Q_UI_INTENT_KINDS,
   QOpenRecordPageIntentSchema,
   QProfileSectionKeySchema,
   QRecordPageSchema,
@@ -238,5 +240,48 @@ describe("W3.1 navigate target: target ⇄ intent", () => {
         tab: "messages",
       }),
     ).toThrow();
+  });
+});
+
+describe("W1.5 LAYOUT_SET (contract owned by W3)", () => {
+  const LegacyClientAction = QClientActionIntentSchema.options.filter(
+    (option) => option.shape.kind.value !== "LAYOUT_SET",
+  );
+  const legacyParses = (value: unknown) =>
+    LegacyClientAction.some((option) => option.safeParse(value).success);
+
+  it.each([
+    [{ kind: "LAYOUT_SET", pagePane: "collapsed" }],
+    [{ kind: "LAYOUT_SET", qPane: "open" }],
+    [{ kind: "LAYOUT_SET", qPane: "collapsed", pagePane: "open" }],
+  ])("parses %o as a UI intent, a client action and a block", (intent) => {
+    expect(QUiIntentSchema.parse(intent)).toEqual(intent);
+    expect(QClientActionIntentSchema.parse(intent)).toEqual(intent);
+    expect(
+      QResultBlockSchema.safeParse({ kind: "UI_INTENT", intent }).success,
+    ).toBe(true);
+    // A pre-W1.5 browser does not know it (why it is flag-gated).
+    expect(legacyParses(intent)).toBe(false);
+  });
+
+  it.each([
+    [{ kind: "LAYOUT_SET" }],
+    [{ kind: "LAYOUT_SET", qPane: "hidden" }],
+    [{ kind: "LAYOUT_SET", pagePane: "open", width: 400 }],
+  ])("refuses %o", (intent) => {
+    expect(QUiIntentSchema.safeParse(intent).success).toBe(false);
+    expect(QClientActionIntentSchema.safeParse(intent).success).toBe(false);
+  });
+
+  it("every client action from before W1.5 still parses", () => {
+    for (const intent of [
+      { kind: "SET_THEME", theme: "dark" },
+      { kind: "RELOAD_PAGE" },
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY },
+    ]) {
+      expect(QClientActionIntentSchema.safeParse(intent).success).toBe(true);
+      expect(legacyParses(intent)).toBe(true);
+    }
+    expect(Q_UI_INTENT_KINDS).toContain("LAYOUT_SET");
   });
 });

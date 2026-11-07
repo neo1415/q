@@ -515,6 +515,7 @@ describe("QUiIntent", () => {
     },
     DOCUMENT_ACT: { kind: "DOCUMENT_ACT", act: "GO_TO_PAGE", page: 3 },
     CARDS: { kind: "CARDS", action: "HIDE_CATEGORY", category: "CONNECTION" },
+    LAYOUT_SET: { kind: "LAYOUT_SET", pagePane: "collapsed" },
   };
 
   it("parses every supported intent", () => {

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   CorrelationIdSchema,
   QClientActionIntentSchema,
+  QNavigateTargetDetailSchema,
   QRunIdSchema,
   QVoiceDestinationSchema,
   sensitivityWithin,
@@ -109,6 +110,7 @@ export function leadTurns(
  */
 export function liveMoveOf(board: {
   readonly navigate: unknown;
+  readonly navigateTarget?: unknown;
   readonly clientAction?: unknown;
   readonly clientActions?: readonly unknown[] | undefined;
 }): LiveMove | null {
@@ -134,7 +136,14 @@ export function liveMoveOf(board: {
   }
   const destination = QVoiceDestinationSchema.safeParse(board.navigate);
   const navigate = destination.success ? destination.data : null;
-  return navigate === null && action === null ? null : { navigate, action };
+  if (navigate === null && action === null) return null;
+  const target =
+    navigate === null
+      ? undefined
+      : QNavigateTargetDetailSchema.safeParse(board.navigateTarget);
+  return target?.success === true
+    ? { navigate, navigateTarget: target.data, action }
+    : { navigate, action };
 }
 
 /**

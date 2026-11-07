@@ -1464,6 +1464,10 @@ export function createVoiceTurnHandler(
                 ...dependencies.board.read(binding.voiceSessionId),
                 asking: null,
                 navigate: follow.navigate,
+                // W3: the exact place on that page, with its move only.
+                ...(follow.navigateTarget === undefined
+                  ? {}
+                  : { navigateTarget: follow.navigateTarget }),
                 clientAction: follow.clientAction,
                 // C2: the whole chain, in order, for the screen.
                 clientActions: follow.clientActions.slice(0, 12),

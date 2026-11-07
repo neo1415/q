@@ -13,6 +13,7 @@ import {
   resolveOwnContext,
   resolveQStanding,
 } from "@/features/q/context";
+import { QArrival } from "@/features/q/control/q-arrival";
 import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
@@ -32,6 +33,11 @@ import { LanguageProvider } from "@/features/i18n/language";
 import { machineUiText } from "@/features/i18n/machine";
 import { uiLanguageOf } from "@/features/i18n/messages";
 import { deviceLanguages } from "@/features/i18n/server";
+import { workspaceMode } from "@/features/workspace/mode";
+import {
+  WorkspaceQConversation,
+  WorkspaceQPending,
+} from "@/features/workspace/workspace-q-pane";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -71,6 +77,8 @@ export default async function ApplicationLayout({
   // What they may do in their active organisation, read once per request
   // and handed to client controls (presentation only; the API decides).
   const capabilitiesRead = loadMyCapabilities();
+  // Q Workspace (W1.1): off unless CQ_WORKSPACE_MODE allows it.
+  const workspaceRead = workspaceMode();
   const context = await resolveOwnContext();
   const qPitch = qPitchEnabled();
   const shell: ShellContext =
@@ -120,17 +128,24 @@ export default async function ApplicationLayout({
   // WORK-58: the Admin group shows only to a platform admin, decided by
   // the API (the console's own route refuses anyone else regardless).
   // P5: the brand colour, read alongside so it paints with the first frame.
-  const [verifyNudgeState, admin, brandCss, organisations, capabilities] =
-    await Promise.all([
-      unfinished === null && context.kind !== "NONE"
-        ? verifyRead
-        : Promise.resolve(null),
-      adminRead,
-      brandRead,
-      // G2: the switcher's list (shown only for two or more).
-      loadMyOrganisations(),
-      capabilitiesRead,
-    ]);
+  const [
+    verifyNudgeState,
+    admin,
+    brandCss,
+    organisations,
+    capabilities,
+    workspace,
+  ] = await Promise.all([
+    unfinished === null && context.kind !== "NONE"
+      ? verifyRead
+      : Promise.resolve(null),
+    adminRead,
+    brandRead,
+    // G2: the switcher's list (shown only for two or more).
+    loadMyOrganisations(),
+    capabilitiesRead,
+    workspaceRead,
+  ]);
   // Any language: the interface follows the language they chose; Q's
   // machine translations fill what no hand catalogue covers.
   const language = uiLanguageOf(standing?.language, await deviceLanguages());
@@ -144,6 +159,14 @@ export default async function ApplicationLayout({
           qConnected={qConnected}
           onboarding={gate}
           verifyNudge={verifyNudgeState}
+          workspace={workspace}
+          qPane={
+            workspace.enabled ? (
+              <Suspense fallback={<WorkspaceQPending />}>
+                <WorkspaceQConversation />
+              </Suspense>
+            ) : null
+          }
         >
           <BrandStyle css={brandCss} />
           {/* UX-04: lets Back use the real history after in-app moves. */}
@@ -188,6 +211,11 @@ export default async function ApplicationLayout({
                 admin,
               }}
             />
+          </Suspense>
+          {/* Q Workspace W3: a move's arrival (scroll, mark, focus) and
+          the history mark on Q's moves, from the navigation lifecycle. */}
+          <Suspense fallback={null}>
+            <QArrival />
           </Suspense>
         </AppShell>
       </CapabilitiesProvider>

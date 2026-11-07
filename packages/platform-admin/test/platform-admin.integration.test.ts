@@ -369,6 +369,60 @@ describe("@capital-q/platform-admin against local Postgres", () => {
     });
   });
 
+  it("changes analytics privacy settings with a reason, audited and versioned", async () => {
+    await scenario(async (admin, w, tx) => {
+      await tx.sql`insert into identity.platform_admins (user_id, role) values (${w.member}, 'operator')`;
+      // The fixture's analyst may read the settings, never change them.
+      expect(
+        (await admin.authorize(w.analyst, "analytics_settings.write")).kind,
+      ).toBe("NOT_FOUND");
+      await stepUp(admin, tx, w.member);
+      const grant = await granted(admin, w.member, "analytics_settings.write");
+      const before = await admin.readAnalyticsSettings(grant);
+      expect(before.settings).toMatchObject({
+        defaultVisibility: "ORGANISATION_ONLY",
+        namedPassiveViewers: false,
+        paidIdentityReveal: false,
+        paidRevealOverridesAnonymous: false,
+      });
+      const next = { ...before.settings, namedPassiveViewers: true };
+      expect(
+        await admin.updateAnalyticsSettings(grant, {
+          settings: next,
+          expectedVersion: before.version,
+          reason: "Owner trial of who viewed you",
+        }),
+      ).toBe("CHANGED");
+      const after = await admin.readAnalyticsSettings(grant);
+      expect(after.version).toBe(before.version + 1);
+      expect(after.settings.namedPassiveViewers).toBe(true);
+      expect(after.history[0]).toMatchObject({
+        reason: "Owner trial of who viewed you",
+        changed: ["namedPassiveViewers"],
+      });
+      // A second admin working from the old version is refused.
+      expect(
+        await admin.updateAnalyticsSettings(grant, {
+          settings: before.settings,
+          expectedVersion: before.version,
+          reason: "Stale form",
+        }),
+      ).toBe("STALE");
+      const [audit] = await tx.sql<{ action_type: string }[]>`
+        select action_type from platform_ops.admin_actions
+         where actor_user_id = ${w.member} order by occurred_at desc, id desc limit 1`;
+      expect(audit?.action_type).toBe("analytics_settings.changed");
+      // The database refuses what the contract refuses, too.
+      await expect(
+        tx.sql`savepoint s1`.then(
+          () =>
+            tx.sql`update analytics.platform_settings set paid_reveal_overrides_anonymous = true`,
+        ),
+      ).rejects.toThrow();
+      await tx.sql`rollback to savepoint s1`;
+    });
+  });
+
   it("runs every console read against the real schema", async () => {
     await scenario(async (admin, w) => {
       const grant = await granted(admin, w.owner, "overview.read");
