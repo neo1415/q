@@ -820,6 +820,18 @@ export type BoundOnboardingPort = OnboardingToolPort &
     readonly recordNotKnown: (
       items: readonly { readonly stepKey: string; readonly quote: string }[],
     ) => Promise<readonly OnboardingRecordResult[]>;
+    /**
+     * Investor lists their explicit answer settles (e2e run 4): a plain
+     * "none" to a themed question is "None" (NONE_ANSWER_TEXT); a plain
+     * skip of its follow-up is not known (NOT_KNOWN_TEXT). Code decides
+     * which (`listsSettledByAnswer`); this only writes, and only a required
+     * list "None" answers (INVESTOR_NONE_STEPS) that holds no answer yet,
+     * quoting their latest words. Never overwrites anything.
+     */
+    readonly recordNone: (
+      items: readonly { readonly stepKey: string; readonly quote: string }[],
+      as?: "NONE" | "NOT_KNOWN",
+    ) => Promise<readonly OnboardingRecordResult[]>;
   };
 
 /**
@@ -5637,6 +5649,58 @@ export function createOnboardingPort(input: {
           });
         } catch (error: unknown) {
           results.push(refused(answer.stepKey, error));
+        }
+      }
+      return results;
+    },
+    recordNone: async (items, as = "NONE") => {
+      const text = as === "NONE" ? NONE_ANSWER_TEXT : NOT_KNOWN_TEXT;
+      const results: OnboardingRecordResult[] = [];
+      for (const item of items) {
+        const step = steps.get(item.stepKey);
+        if (
+          step === undefined ||
+          !step.required ||
+          !INVESTOR_NONE_STEPS.has(step.stepKey)
+        ) {
+          results.push({
+            stepKey: item.stepKey.slice(0, 80),
+            outcome: "REJECTED",
+            reason: "Only a needed preference list is settled as None.",
+          });
+          continue;
+        }
+        const question = (
+          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+        ).slice(0, 400);
+        if (!said(item.quote)) {
+          results.push(unsaid(step.stepKey));
+          continue;
+        }
+        try {
+          const onRecord = (await current()).responses.find(
+            (r) => r.stepKey === step.stepKey,
+          );
+          // What they answered stays theirs: None fills only an open list.
+          if (onRecord !== undefined) {
+            results.push({
+              stepKey: step.stepKey,
+              outcome: "REJECTED",
+              question,
+              reason: "It already holds their answer.",
+            });
+            continue;
+          }
+          await submit(step.stepKey, { type: "TEXT", text });
+          written.push(step.stepKey);
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "COMMITTED",
+            question,
+            recorded: text,
+          });
+        } catch (error: unknown) {
+          results.push(refused(step.stepKey, error));
         }
       }
       return results;

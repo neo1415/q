@@ -217,3 +217,22 @@ describe("answerGroups (founder)", () => {
     ]);
   });
 });
+
+describe("a website they don't know (e2e run 4, 2026-11-07)", () => {
+  it("never shows 'I don't know' as a website on the profile", () => {
+    const answers = { type: "TEXT", text: "I don't know" } as const;
+    for (const [journey, stepKey] of [
+      ["founder", "F1.website"],
+      ["investor", "I0.website"],
+    ] as const) {
+      const lines = answerGroups(
+        journey,
+        view(journey, [stepKey], { [stepKey]: answers }),
+      ).flatMap((group) => group.lines);
+      // The website is the record's declared field (null for unknown),
+      // never the onboarding answer's words.
+      expect(lines.some((line) => line.stepKey === stepKey)).toBe(false);
+      expect(lines.some((line) => line.value === "I don't know")).toBe(false);
+    }
+  });
+});

@@ -1,5 +1,7 @@
+import { investorListThemeOf } from "@capital-q/investor-onboarding";
 import type { OnboardingState } from "@capital-q/q-tools";
 
+import { themeFollowUp } from "./list-settle.js";
 import {
   EVIDENCE_QUESTION_FALLBACK,
   EVIDENCE_QUESTIONS,
@@ -32,6 +34,15 @@ export type FlowNext = {
    * Not the step's own question, so its controls do not go with it.
    */
   readonly evidence: boolean;
+  /**
+   * The investor's lists asked together (e2e run 4, owner: "as few natural
+   * questions as possible"): the theme the next list belongs to, and its
+   * lists still open. Absent: one step is asked, as before.
+   */
+  readonly theme?: {
+    readonly key: string;
+    readonly stepKeys: readonly string[];
+  };
 };
 
 export type OnboardingFlow = {
@@ -114,6 +125,16 @@ export function onboardingFlowFor(input: {
     .map((s) => s.question)
     .slice(0, 4);
 
+  // An investor list whose theme still has two or more lists open is asked
+  // as the theme's one question (owner, e2e run 4). Plain asking only: a
+  // proposal to confirm or a document for evidence stays its own question.
+  const theme =
+    input.journey !== "investor" ||
+    top === undefined ||
+    top.reason === "CONFIRM_PROPOSAL" ||
+    top.reason === "EVIDENCE_NEEDED"
+      ? undefined
+      : themeOpen(investorListThemeOf(top.stepKey), byKey);
   const next: FlowNext | null =
     top === undefined ||
     topStep === undefined ||
@@ -121,13 +142,18 @@ export function onboardingFlowFor(input: {
       ? null
       : {
           stepKey: top.stepKey,
-          question: (top.reason === "EVIDENCE_NEEDED"
-            ? (EVIDENCE_QUESTIONS[top.stepKey] ?? EVIDENCE_QUESTION_FALLBACK)
-            : (SPOKEN_QUESTIONS[top.stepKey] ?? topStep.question)
+          question: (theme !== undefined
+            ? theme.question
+            : top.reason === "EVIDENCE_NEEDED"
+              ? (EVIDENCE_QUESTIONS[top.stepKey] ?? EVIDENCE_QUESTION_FALLBACK)
+              : (SPOKEN_QUESTIONS[top.stepKey] ?? topStep.question)
           ).slice(0, 300),
           optional: !topStep.required && topStep.priority !== "ESSENTIAL",
           confirming: top.reason === "CONFIRM_PROPOSAL",
           evidence: top.reason === "EVIDENCE_NEEDED",
+          ...(theme === undefined
+            ? {}
+            : { theme: { key: theme.key, stepKeys: theme.stepKeys } }),
         };
 
   const minutes = Math.max(1, state.minutesLeft ?? 10);
@@ -154,7 +180,12 @@ export function onboardingFlowFor(input: {
       "They came here to fill this part of their company profile: ask about it now, before anything else.",
     );
   }
-  if (next !== null) {
+  if (next?.theme !== undefined) {
+    lines.push(
+      `Then ask exactly one question, in these words: ${quoted(next.question)} It asks several of their lists at once (${next.theme.stepKeys.join(", ")}): never ask them one by one. Their one answer may fill several of them: record each list it speaks to, and only those; a list their answer does not speak to stays open (never record none for it). A plain "none" to the whole question is settled by code.`,
+      "Never ask how you can help, never end without that question, and do not interrogate: warm, concise, plain English.",
+    );
+  } else if (next !== null) {
     lines.push(
       next.confirming
         ? `Then ask them to confirm, in one grouped question, the values on offer (${quoted(next.question)} first).`
@@ -175,6 +206,44 @@ export function onboardingFlowFor(input: {
     );
   }
   return { note: lines.join(" "), next, essentialsDone, optionalLeft };
+}
+
+/**
+ * What to ask of a theme (e2e run 4): its own question while two or more of
+ * its lists are open and none is answered; once some are answered, one
+ * short follow-up naming just the lists still open (never "none" assumed
+ * for them: unknown stays unknown). Open: OPEN, not held by a family
+ * sibling, not saving. Undefined: ask the step on its own.
+ */
+function themeOpen(
+  theme: ReturnType<typeof investorListThemeOf>,
+  byKey: ReadonlyMap<string, OnboardingState["steps"][number]>,
+):
+  | {
+      readonly key: string;
+      readonly question: string;
+      readonly stepKeys: readonly string[];
+    }
+  | undefined {
+  if (theme === undefined) return undefined;
+  const open = theme.stepKeys.filter((stepKey) => {
+    const step = byKey.get(stepKey);
+    return (
+      step !== undefined &&
+      step.status === "OPEN" &&
+      step.savePending !== true &&
+      step.coveredBy === undefined
+    );
+  });
+  const answered = theme.stepKeys.some(
+    (stepKey) => byKey.get(stepKey)?.status === "ANSWERED",
+  );
+  if (answered && open.length > 0) {
+    return { key: theme.key, question: themeFollowUp(open), stepKeys: open };
+  }
+  return open.length >= 2
+    ? { key: theme.key, question: theme.question, stepKeys: open }
+    : undefined;
 }
 
 /**
