@@ -312,6 +312,7 @@ const TAB_LABELS: Readonly<Record<QManifestTab, string>> = {
   yours: "Your companies",
   saved: "Saved",
   passed: "Passed",
+  deal: "Deal and close",
 };
 
 function lines(

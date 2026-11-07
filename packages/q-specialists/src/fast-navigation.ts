@@ -61,6 +61,7 @@ const FACET_OF_TAB: Readonly<Record<TabAsk["tab"], NamedRecordFacet>> = {
   messages: "CHAT",
   calls: "RELATIONSHIP",
   diligence: "RELATIONSHIP",
+  deal: "RELATIONSHIP",
 };
 
 /**

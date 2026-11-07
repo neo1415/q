@@ -133,6 +133,14 @@ describe("W3.2 every deep link's path", () => {
     ],
     [{ page: "BOARD", itemId: ITEM }, `/board?item=${ITEM}`],
     [
+      { page: "RELATIONSHIP_INVESTOR", recordId: COMPANY, tab: "deal" },
+      `/relationships/investor/${COMPANY}/deal`,
+    ],
+    [
+      { page: "RELATIONSHIP_COMPANY", recordId: COMPANY, tab: "deal" },
+      `/relationships/company/${COMPANY}/deal`,
+    ],
+    [
       { page: "CAPITAL", sectionId: "rounds", position: "section" },
       "/relationships?view=capital#section-rounds",
     ],

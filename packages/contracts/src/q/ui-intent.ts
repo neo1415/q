@@ -460,6 +460,8 @@ export const Q_RELATIONSHIP_TABS = [
   "messages",
   "calls",
   "diligence",
+  // Q Workspace batch 3: the Deal tab (/relationships/.../deal).
+  "deal",
 ] as const satisfies readonly QManifestTab[];
 /** Both lists, each tab once ("diligence" is on both pages). */
 export const Q_RECORD_TABS = [
@@ -471,6 +473,7 @@ export const Q_RECORD_TABS = [
   "team",
   "messages",
   "calls",
+  "deal",
 ] as const satisfies readonly (
   (typeof Q_COMPANY_PROFILE_TABS)[number] | (typeof Q_RELATIONSHIP_TABS)[number]
 )[];

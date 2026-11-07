@@ -117,6 +117,9 @@ export const Q_MANIFEST_TABS = [
   "yours",
   "saved",
   "passed",
+  // Q Workspace batch 3: a relationship's Deal tab (terms, commitments,
+  // closing).
+  "deal",
 ] as const;
 export const QManifestTabSchema = z.enum(Q_MANIFEST_TABS);
 export type QManifestTab = z.infer<typeof QManifestTabSchema>;

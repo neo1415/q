@@ -180,6 +180,8 @@ const RELATIONSHIP_TAB_NAMES: readonly string[] = [
   "messages",
   "calls",
   "diligence",
+  // Q Workspace batch 3.
+  "deal",
 ];
 
 /**

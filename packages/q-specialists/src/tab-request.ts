@@ -348,7 +348,8 @@ export function screenTabTarget(
   if (
     ask.tab === "calls" ||
     ask.tab === "diligence" ||
-    ask.tab === "messages"
+    ask.tab === "messages" ||
+    ask.tab === "deal"
   ) {
     if (companyRoute && screen.companyId !== undefined) {
       return {
@@ -396,6 +397,8 @@ export function tabPlace(ask: TabAsk): string {
       return "the calls tab";
     case "diligence":
       return "diligence";
+    case "deal":
+      return "the deal tab";
   }
 }
 
