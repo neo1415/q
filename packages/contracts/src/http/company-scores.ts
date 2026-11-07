@@ -156,7 +156,15 @@ export const InvestabilityDtoSchema = z
   .strict();
 export type InvestabilityDto = z.infer<typeof InvestabilityDtoSchema>;
 
-export const INVESTABILITY_METHOD_LABEL = "FDN InvestIQ v1";
+/**
+ * The method's public name from the version that produced the score
+ * (metrics audit P1-6: the label said v1 over v2 arithmetic), e.g.
+ * `investiq/v2+investability-inputs.v5` -> "FDN InvestIQ v2".
+ */
+export function investabilityMethodLabel(methodVersion: string): string {
+  const major = /^investiq\/v(\d+)/u.exec(methodVersion)?.[1];
+  return major === undefined ? "FDN InvestIQ" : `FDN InvestIQ v${major}`;
+}
 
 export function notAssessedInvestability(
   methodVersion: string,
@@ -241,7 +249,12 @@ export function investabilityLine(dto: InvestabilityDto): string {
   if (dto.status === "INSUFFICIENT_EVIDENCE" || dto.score === null) {
     return `Investability: not enough shared evidence yet · ${factors}`;
   }
-  return `Investability ${dto.score} · ${factors}`;
+  // One compact indicator per score (owner decision 76; audit P2-4).
+  const confidence =
+    dto.confidence === null
+      ? ""
+      : ` · ${SCORE_CONFIDENCE_LABELS[dto.confidence]}`;
+  return `Investability ${dto.score}${confidence} · ${factors}`;
 }
 
 /** "Suitability 80 · 6 of 7 known", or the honest words. */

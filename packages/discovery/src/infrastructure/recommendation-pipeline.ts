@@ -157,6 +157,11 @@ export type RecommendationPipelineDependencies = {
    * Absent while the policy requires a pitch: the feed admits nobody.
    */
   readonly playablePitches?: PlayablePitchPort | undefined;
+  /**
+   * The current Investability method version (the readiness package's).
+   * Absent: Investability is unknown to the order, which is fit alone.
+   */
+  readonly investabilityMethodVersion?: string | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -474,8 +479,14 @@ export function createRecommendationPipeline(
   const suppression = createProactiveSuppression({ signals });
   const fitOrdering = createFitOrdering({
     clock,
-    // fit-order.v2: Investability after explicit fit; Suitability recorded.
-    investability: createPostgresInvestabilityScores({ sql }),
+    // fit-order.v5: Investability only among equal fits; Suitability recorded.
+    investability:
+      dependencies.investabilityMethodVersion === undefined
+        ? () => Promise.resolve(new Map<string, number>())
+        : createPostgresInvestabilityScores({
+            sql,
+            methodVersion: dependencies.investabilityMethodVersion,
+          }),
     recordSuitability: createPostgresSuitabilityRecorder({ sql }),
     inputs: createFitInputSource({
       sql,

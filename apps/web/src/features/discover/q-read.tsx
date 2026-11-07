@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 
 import {
   SCORE_CONFIDENCE_LABELS,
+  UNICORN_CONFIDENCE_LABELS,
   type CompanyScoresDto,
 } from "@capital-q/contracts";
 
@@ -82,7 +83,6 @@ function Row({
 
 export function QRead({
   scores,
-  companyName,
 }: {
   readonly scores: CompanyScoresDto;
   readonly companyName: string;
@@ -119,7 +119,7 @@ export function QRead({
               ? `${t("There is not enough shared evidence for a number yet.")} `
               : `${String(inv.score)} ${t("is read from")} ${String(scored)} ${t("of")} ${String(applicable)} ${t("factors.")} `}
             {unknown > 0
-              ? `${t("The other")} ${String(unknown)} ${t("have no evidence yet. They count as unknown, never against")} ${companyName}.`
+              ? `${t("The other")} ${String(unknown)} ${t("are unknown.")}`
               : ""}
           </p>
         </div>
@@ -156,8 +156,12 @@ export function QRead({
                 )
               : String(unicorn.overallScore)
           }
-          share={null}
-          coverage=""
+          share={unicorn.coverage}
+          coverage={
+            unicorn.overallScore === null
+              ? `${String(Math.round(unicorn.coverage * 100))}% ${t("coverage")}`
+              : `${t(UNICORN_CONFIDENCE_LABELS[unicorn.confidence])} · ${String(Math.round(unicorn.coverage * 100))}% ${t("coverage")}`
+          }
         />
       )}
     </section>

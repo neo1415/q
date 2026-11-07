@@ -3,14 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   FIT_PARAMETERS,
   fitScoreOutOf10,
+  investabilityMethodLabel,
   suitabilityFromFit,
   type FitProfileDto,
 } from "../src/index.js";
 
 /**
- * ADR 0075: Suitability is a number whenever any mandate parameter is
- * known, labelled with its coverage; it equals the fit's x/10 × 10 where
- * the fit shows one; unknown is never a low number.
+ * Suitability is the fit's own x/10 × 10, shown exactly where the fit
+ * shows its number (3+ known parameters, a band other than Not enough
+ * information); otherwise no number. Unknown is never a low number.
  */
 
 function profile(
@@ -40,12 +41,27 @@ function profile(
 }
 
 describe("suitability", () => {
-  it("shows a number with coverage when only one parameter is known", () => {
-    const s = suitabilityFromFit(profile({ STAGE: "STRONG" }));
-    expect(s.status).toBe("SCORED");
-    expect(s.score).toBe(100);
-    expect(s.coverage).toEqual({ known: 1, applicable: 9 });
-    expect(s.missing.length).toBeGreaterThan(0);
+  it("no number from one or two known parameters (metrics audit P0-4)", () => {
+    for (const known of [
+      { STAGE: "STRONG" as const },
+      { STAGE: "STRONG" as const, SECTOR: "STRONG" as const },
+    ]) {
+      const s = suitabilityFromFit(profile(known));
+      expect(s.status).toBe("NOT_ENOUGH_INFORMATION");
+      expect(s.score).toBeNull();
+      expect(s.coverage.known).toBe(Object.keys(known).length);
+      expect(s.missing.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never shows a number beside a fit of Not enough information", () => {
+    const p = profile({
+      STAGE: "STRONG",
+      SECTOR: "STRONG",
+      GEOGRAPHY: "STRONG",
+    });
+    expect(p.band).toBe("NOT_ENOUGH_INFORMATION");
+    expect(suitabilityFromFit(p).score).toBeNull();
   });
 
   it("equals the fit's own score where the fit shows one", () => {
@@ -66,5 +82,17 @@ describe("suitability", () => {
     const s = suitabilityFromFit(profile({}));
     expect(s.status).toBe("NOT_ENOUGH_INFORMATION");
     expect(s.score).toBeNull();
+  });
+});
+
+describe("investabilityMethodLabel (metrics audit P1-6)", () => {
+  it("names the method version that produced the score", () => {
+    expect(
+      investabilityMethodLabel("investiq/v2+investability-inputs.v5"),
+    ).toBe("FDN InvestIQ v2");
+    expect(
+      investabilityMethodLabel("investiq/v1+investability-inputs.v1"),
+    ).toBe("FDN InvestIQ v1");
+    expect(investabilityMethodLabel("unknown")).toBe("FDN InvestIQ");
   });
 });

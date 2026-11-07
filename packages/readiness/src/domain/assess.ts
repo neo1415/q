@@ -282,7 +282,7 @@ export function assess(
     );
   }
   uncertainty.push(
-    "Statuses come from what you've shared on Capital Q. Not shared yet is never counted against you.",
+    "Statuses come from what you've shared on Capital Q. A pillar marked Not shared yet is never read as a weakness; an item investors expect at your stage that is still missing shows as a Gap, with what would close it.",
   );
 
   return {

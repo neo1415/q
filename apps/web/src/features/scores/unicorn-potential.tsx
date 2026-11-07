@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  UNICORN_CONFIDENCE_LABELS,
   UNICORN_POTENTIAL_CAVEAT,
   type UnicornPotentialDto,
   type UnicornSource,
@@ -17,11 +18,7 @@ const BANDS = {
   STRONG_SIGNALS: "Strong signals",
   EXCEPTIONAL_SIGNALS: "Exceptional signals",
 } as const;
-const CONFIDENCE = {
-  HIGH: "High confidence",
-  MODERATE: "Moderate confidence",
-  LOW: "Low confidence",
-} as const;
+const CONFIDENCE = UNICORN_CONFIDENCE_LABELS;
 const STAGES = {
   PRE_SEED: "Pre-seed",
   SEED: "Seed",
@@ -53,7 +50,7 @@ function decimal(value: number): string {
 export function unicornPotentialLine(score: UnicornPotentialDto): string {
   return score.overallScore === null
     ? `Unicorn Potential: ${score.status === "NOT_ASSESSED" ? "not assessed yet" : "insufficient evidence"}`
-    : `Unicorn Potential ${String(score.overallScore)}/100`;
+    : `Unicorn Potential ${String(score.overallScore)}/100 · ${CONFIDENCE[score.confidence]} · ${percent(score.coverage)} coverage`;
 }
 
 function Source({ source }: { readonly source: UnicornSource }) {

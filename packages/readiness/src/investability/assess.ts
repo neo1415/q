@@ -25,6 +25,7 @@ import {
   INVESTOR_ELIGIBLE_SCOPES,
   type InvestabilityInputs,
 } from "./inputs.js";
+import { INVESTABILITY_GRADING_VERSION } from "./grade.js";
 import {
   INVESTABILITY_INPUTS_VERSION,
   observeInvestability,
@@ -51,8 +52,34 @@ import {
  * company is never re-recorded.
  */
 
-/** investiq/v2 arithmetic (no shrinkage; evidence drives confidence and range). */
+/**
+ * investiq/v2 arithmetic + the input rules. A new inputs version is also
+ * the revision for a change in how the view is derived: inputs.v5 (metrics
+ * audit 2026-11-07) caps the band by confidence and gives no number when
+ * nothing is content-graded. The grading rules (benchmarks, FX) are in the
+ * basis hash, so a calibration change records new history.
+ */
 export const INVESTABILITY_METHOD_VERSION = `${INVESTIQ_V2_ARITHMETIC.version}+${INVESTABILITY_INPUTS_VERSION}`;
+
+/**
+ * PADL #017/#068, ADR 0074: a band above Developing needs at least
+ * Moderate confidence. A Low-confidence or early-read score keeps its
+ * number but its band is held at Developing.
+ */
+const CAPPED_BANDS: ReadonlySet<InvestabilityBand> = new Set([
+  "INVESTABLE",
+  "STRONG",
+]);
+
+function cappedBand(
+  band: InvestabilityBand,
+  confidence: string,
+  provisional: boolean,
+): { readonly band: InvestabilityBand; readonly capped: boolean } {
+  const capped =
+    (provisional || confidence === "LOW") && CAPPED_BANDS.has(band);
+  return { band: capped ? "DEVELOPING" : band, capped };
+}
 
 export const INVESTABILITY_SCALE = 25;
 
@@ -146,6 +173,8 @@ export function assessInvestability(
   const basisHash = createHash("sha256")
     .update(INVESTABILITY_METHOD_VERSION)
     .update("\n")
+    .update(INVESTABILITY_GRADING_VERSION)
+    .update("\n")
     .update(
       stable({
         context,
@@ -224,7 +253,8 @@ function pointEstimate(
       ),
     ),
   ).length;
-  if (n === 0) return raw;
+  // Nothing content-graded: unknown, never the stage norm (metrics audit P0-2).
+  if (n === 0) return null;
   const z = Math.min(1, n / FULL_CREDIBILITY_FACTORS);
   return 2 + (raw - 2) * z;
 }
@@ -420,16 +450,9 @@ function viewOf(
       `${DIMENSION_LABELS[d.dimension]}: ${DIMENSION_ASKS[d.dimension]}`,
     );
   }
+  // Owner decision 76: confidence is shown once, compactly, beside the
+  // score; no generic "stronger evidence would help" line on every card.
   const overall = a.overall;
-  if (
-    overall.status === "BANDED" &&
-    overall.confidence !== "HIGH" &&
-    missing.length < 4
-  ) {
-    missing.push(
-      "Document-supported or verified evidence would raise confidence",
-    );
-  }
 
   const coverage = {
     areasScored: scoredAreas.length,
@@ -472,32 +495,13 @@ function viewOf(
       provisional: false,
     });
   }
-  if (
-    overall.status === "BANDED" &&
-    overall.score !== null &&
-    overall.band !== null
-  ) {
-    // Score and confidence are separate (lead 2026-10-16): the band says
-    // where the score is; confidence says how far to trust it.
-    const point = pointEstimate(a, contentGraded, true) ?? overall.score;
-    const score = Math.round(point * INVESTABILITY_SCALE);
-    return parse({
+  const insufficient = () =>
+    parse({
       ...common,
-      status: "SCORED",
-      score,
-      ...rangeAround(score),
-      band: BAND_WORDS[bandOf(point)],
-      confidence: overall.confidence,
-      cappedByConfidence: false,
-      provisional: false,
-    });
-  }
-  // ADR 0075: always a number when there is material; a thin basis is
-  // Low confidence and the band is held at Developing at most.
-  const provisional = pointEstimate(a, contentGraded, false);
-  if (provisional === null) {
-    return parse({
-      ...common,
+      missing: [
+        "Figures to grade: what is shared is on record, but none of it can yet be compared with the stage",
+        ...common.missing,
+      ].slice(0, 4),
       status: "INSUFFICIENT_EVIDENCE",
       score: null,
       band: null,
@@ -505,16 +509,51 @@ function viewOf(
       cappedByConfidence: false,
       provisional: false,
     });
+  if (
+    overall.status === "BANDED" &&
+    overall.score !== null &&
+    overall.band !== null
+  ) {
+    // Score and confidence are separate (lead 2026-10-16): the band says
+    // where the score is; confidence says how far to trust it, and caps it.
+    const point = pointEstimate(a, contentGraded, true);
+    if (point === null) return insufficient();
+    const score = Math.round(point * INVESTABILITY_SCALE);
+    const confidence = overall.confidence ?? "LOW";
+    const { band, capped } = cappedBand(
+      BAND_WORDS[bandOf(point)],
+      confidence,
+      false,
+    );
+    return parse({
+      ...common,
+      status: "SCORED",
+      score,
+      ...rangeAround(score),
+      band,
+      confidence,
+      cappedByConfidence: capped,
+      provisional: false,
+    });
   }
+  // ADR 0075: a number when something is content-graded; a thin basis is
+  // Low confidence and the band is held at Developing at most.
+  const provisional = pointEstimate(a, contentGraded, false);
+  if (provisional === null) return insufficient();
   const score = Math.round(provisional * INVESTABILITY_SCALE);
+  const { band, capped } = cappedBand(
+    BAND_WORDS[bandOf(provisional)],
+    "LOW",
+    true,
+  );
   return parse({
     ...common,
     status: "SCORED",
     score,
     ...rangeAround(score),
-    band: BAND_WORDS[bandOf(provisional)],
+    band,
     confidence: "LOW",
-    cappedByConfidence: false,
+    cappedByConfidence: capped,
     provisional: true,
   });
 }

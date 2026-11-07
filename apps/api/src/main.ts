@@ -61,7 +61,7 @@ import {
   NO_RAISE_VIEW,
   PolicyExtractionDtoSchema,
   INVESTABILITY_BAND_LABELS,
-  INVESTABILITY_METHOD_LABEL,
+  investabilityMethodLabel,
   SCORE_CONFIDENCE_LABELS,
 } from "@capital-q/contracts";
 import {
@@ -2373,7 +2373,7 @@ const cardSubjects = createSubjectDirectory({
               strengths: iq.up.map((factor) => factor.label),
               areasScored: iq.coverage.areasScored,
               areasTotal: iq.coverage.areasTotal,
-              method: INVESTABILITY_METHOD_LABEL,
+              method: investabilityMethodLabel(iq.methodVersion),
               assessedAt: iq.assessedAt,
             },
       pipeline,

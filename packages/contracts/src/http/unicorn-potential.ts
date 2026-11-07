@@ -17,6 +17,16 @@ const ScoreFactorSchema = z
 
 export const UNICORN_POTENTIAL_CAVEAT =
   "Unicorn Potential is an evidence-based growth-characteristics indicator. It is not the probability of reaching a $1 billion valuation.";
+/**
+ * "Low confidence" etc.: with the coverage, the one compact indicator a
+ * Unicorn Potential number carries on every surface (metrics audit P0-6 as
+ * amended by owner decision 76: no caveat sentences on every surface).
+ */
+export const UNICORN_CONFIDENCE_LABELS = {
+  HIGH: "High confidence",
+  MODERATE: "Moderate confidence",
+  LOW: "Low confidence",
+} as const;
 export const UNICORN_PILLAR_IDS = [
   "P1",
   "P2",

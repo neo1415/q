@@ -164,14 +164,19 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
     missing: [],
   };
 
-  it("carries only the persisted status and score, and nothing without premium", () => {
+  it("carries the persisted status, score, confidence and coverage, and nothing without premium", () => {
     expect(pipelineScoresOf(base)).toEqual({
       suitability: 80,
       investability: 64,
     });
     expect(
       pipelineScoresOf({ ...base, unicornPotential: scoredUnicorn }).unicorn,
-    ).toEqual({ status: "SCORED", score: 67 });
+    ).toEqual({
+      status: "SCORED",
+      score: 67,
+      confidence: "LOW",
+      coverage: 0.7,
+    });
     expect(
       pipelineScoresOf({
         ...base,
