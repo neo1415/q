@@ -30,7 +30,9 @@ import {
 import {
   deriveOnboardingCoverage,
   isLocalFigureProposal,
+  isNotKnownAnswer,
   isTransientOnboardingFailure,
+  NOT_KNOWN_ANSWER_TEXT,
   waitsForContext,
   clausesOf,
   negatedMention,
@@ -821,7 +823,7 @@ export type BoundOnboardingPort = OnboardingToolPort &
  * ("Discovery style · I don't know"), so the read-back says it plainly and
  * a later answer replaces it.
  */
-export const NOT_KNOWN_TEXT = "I don't know";
+export const NOT_KNOWN_TEXT = NOT_KNOWN_ANSWER_TEXT;
 
 /** Text compared for "already says this": case, quotes and spacing aside. */
 function normalisedText(text: string): string {
@@ -5659,8 +5661,7 @@ export function createOnboardingPort(input: {
           );
           const recorded = notSure?.label ?? NOT_KNOWN_TEXT;
           if (
-            (onRecord?.value.type === "TEXT" &&
-              onRecord.value.text === NOT_KNOWN_TEXT) ||
+            isNotKnownAnswer(onRecord?.value) ||
             (onRecord?.value.type === "SINGLE_SELECT" &&
               onRecord.value.optionKey === NOT_SURE_OPTION_KEY)
           ) {

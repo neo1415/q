@@ -34,11 +34,16 @@ const countryStep = FOUNDER_DEFINITION_V8.steps.find(
 );
 
 describe("founder definition v8", () => {
-  it("is valid and current", () => {
+  it("is valid, and current sessions read its country step the same way", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V8),
     ).not.toThrow();
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(8);
+    // v9 (DECISIONS 79) changes only required flags and copy.
+    expect(
+      FOUNDER_DEFINITION_CURRENT.steps.find(
+        (s) => s.stepKey === FOUNDER_STEPS.country,
+      )?.configuration.stepType,
+    ).toBe("reference_select");
   });
 
   it("chooses one geography node for the country, with no option list", () => {

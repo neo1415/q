@@ -79,9 +79,20 @@ export {
 export {
   FOUNDER_COUNTRY_VOCABULARIES,
   FOUNDER_DEFINITION_V8,
-  FOUNDER_DEFINITION_V8 as FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V8_VERSION,
 } from "./founder-v8.js";
+/**
+ * The version new founder sessions pin to (v9: the owner's mandatory set,
+ * DECISIONS 79). v9 changes only which steps are required and two lines of
+ * copy, so everything said of v8 above holds.
+ */
+export {
+  FOUNDER_DEFINITION_V9,
+  FOUNDER_DEFINITION_V9 as FOUNDER_DEFINITION_CURRENT,
+  FOUNDER_DEFINITION_V9_VERSION,
+  FOUNDER_V9_NOW_OPTIONAL,
+  FOUNDER_V9_NOW_REQUIRED,
+} from "./founder-v9.js";
 export { founderCountryAnswer, founderCountryOf } from "./country.js";
 export {
   FOUNDER_DEFINITION_V6,
