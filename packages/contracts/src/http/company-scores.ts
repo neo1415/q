@@ -317,7 +317,9 @@ export function investabilityLine(dto: InvestabilityDto): string {
  * "Business quality 68 · Developing · Low confidence", or "Business
  * quality: not enough evidence yet". Null when the parts were not recorded.
  */
-export function investabilityPartLines(dto: InvestabilityDto): string[] | null {
+export function investabilityPartLines(
+  dto: Pick<InvestabilityDto, "parts">,
+): string[] | null {
   if (dto.parts === undefined) return null;
   const parts = dto.parts;
   return INVESTABILITY_PARTS.map(({ key, name }) => {
