@@ -47,14 +47,23 @@ Billing feature `analytics.identity_reveal` (ACCESS, a subscription, not credits
   - Intent signals stay real time.
 - **Own team:** never counted.
 
-## Still to build (milestone 2)
+## Milestone 2 (built)
 
-- **Intent signals:** shown in full and real time, named per the viewer's visibility, with no floor.
-- **Founder and investor pages:** the founder page shows the floor message "Fewer than 3 investor organisations viewed this week".
-- **Q:** Safe Read tools.
-- **Notifications.**
-- **Stage and sector slices:** they need the investor's mandate, which is a separate context. Investor type and geography are built.
+- **`/analytics` for founders:**
+  - Intent: saves, connection and data-room requests; real time, every plan, no floor.
+    - Saves follow the investor's level.
+    - Requests always show the firm; they name the person only at Full identity (owner-approved).
+  - Deck views by slide (QSection `deck-views`), who viewed, by week, breakdowns, documents.
+  - Below the floor: "Fewer than 3 investor organisations viewed this week".
+- **`/analytics` for investors:** their visibility (the `set_viewing_privacy` action), companies they viewed, and founders' answers.
+- **Collection:** deck open and slide dwell, pitch watch time, data-room views.
+- **Q:** `read_my` "engagement" puts intent first, and gives passive context only while "Q uses viewing" is on.
 
-## Backlog
+## Open
 
-- The investor-side "Your activity as founders see it" preview. It is cheap once the pages exist; I'll build it with A4 if time allows.
+- **Q Card view collection:** public cards carry no subject id. The proposal is to ingest by handle, resolved on the server.
+- **Save notifications:** they need a new `communication.notifications` kind. That is a DROP CONSTRAINT migration, which needs founder approval. Interest, connection and data-room requests already notify founders in real time.
+- **Passive digest:** the setting exists (OFF by default); the sender is not built.
+- **Q destination:** a named `ANALYTICS` navigate destination is requested from W3. Q reaches the page through the site map meanwhile.
+- **Navigation link:** a sidebar link to `/analytics` belongs to W1.
+- **Breakdowns:** stage and sector need the mandate context.
