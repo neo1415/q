@@ -587,40 +587,63 @@ if (STEPS.has("J6")) {
     await backToQ.click();
     await settle(6000);
   }
-  // Answer what Q asks from the fact table, a few turns at most.
+  // Answer what Q asks from the fact table, a few turns at most. Matched
+  // on the question Q actually put (its last sentence ending "?"), most
+  // specific first: run 2 answered "Which currency are you raising in?"
+  // with the raising line because /raising/ came before /currency/.
+  const READ_BACK = [
+    /shall i keep|keep that|is that right|right\?|correct\?|confirm|look right|shall i save/i,
+    "Yes, that's right.",
+  ];
   const FACTS =
     JOURNEY === "founder"
       ? [
+          READ_BACK,
+          [/currency/i, "US dollars."],
+          [
+            /how much|amount|target|size of the round/i,
+            "One and a half million dollars.",
+          ],
           [/stage/i, "Seed."],
+          [/problem/i, "Market traders lose track of what they're owed."],
           [
             /signal|traction|customers/i,
             "Paying customers, about forty shops.",
           ],
           [/revenue/i, "Recurring and growing."],
-          [/raising|raise/i, "Yes, actively raising."],
-          [/currency/i, "US dollars."],
-          [/how much|amount|target/i, "One and a half million dollars."],
-          [/right\?|correct|confirm|look right|save/i, "Yes, that's right."],
+          [/raising|raise|fundrais/i, "Yes, actively raising."],
         ]
       : [
-          [/type/i, "A VC fund."],
+          READ_BACK,
+          [/currency/i, "US dollars."],
+          [/cheque|ticket|how much/i, "Between $250,000 and $1,000,000."],
+          [
+            /inbound|approach|reach (you|out)/i,
+            "Founders can reach out directly.",
+          ],
           [/deploy/i, "Actively deploying."],
           [/stage/i, "Pre-seed and seed."],
-          [/currency/i, "US dollars."],
+          [/type of investor|what kind of investor|type/i, "A VC fund."],
           [/discover|how.*see|mode/i, "Show me everything that fits."],
-          [/inbound|approach/i, "Founders can reach out directly."],
           [
             /mandate|in your own words|describe/i,
             "Early fintech and climate in West Africa.",
           ],
-          [/right\?|correct|confirm|look right|save/i, "Yes, that's right."],
         ];
-  for (let turn = 0; turn < Number(process.env.TURNS ?? 10); turn += 1) {
+  const questionOf = (line) => {
+    const asks = line.match(/[^.?!]*\?/gu);
+    return asks === null ? line : asks[asks.length - 1];
+  };
+  const answers = [];
+  for (let turn = 0; turn < Number(process.env.TURNS ?? 12); turn += 1) {
     if (!new URL(page.url()).pathname.startsWith("/onboarding")) break;
-    const q = await lastQ();
+    const q = questionOf(await lastQ());
     const hit = FACTS.find(([re]) => re.test(q));
-    await say(hit ? hit[1] : "Yes, that's right. That's all for now.");
+    const answer = hit ? hit[1] : "Yes, that's right. That's all for now.";
+    answers.push({ q: q.trim().slice(0, 120), answer });
+    await say(answer);
   }
+  note("J6", "questions answered from the fact table", JSON.stringify(answers));
   await settle(8000);
   const at = new URL(page.url()).pathname;
   check(
