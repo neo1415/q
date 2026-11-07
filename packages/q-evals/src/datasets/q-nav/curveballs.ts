@@ -132,7 +132,7 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       "I'm curious whether any investors are warming to us.",
-      section("COMPANY_INTEREST", "interest"),
+      dest("COMPANY_INTEREST"),
       "Investor interest: the interest section.",
     ],
     [
@@ -281,7 +281,7 @@ export function devCurveballs(cases: CaseSet): void {
       "FOUNDER",
       "fr",
       "Quels investisseurs s'intéressent à nous cette semaine ?",
-      section("COMPANY_INTEREST", "interest"),
+      dest("COMPANY_INTEREST"),
     ],
     [
       "FOUNDER",
@@ -597,7 +597,7 @@ export function devCurveballs(cases: CaseSet): void {
     [
       "FOUNDER",
       dest("CAPITAL_PLAN"),
-      "What did Savanna Seed ask me?",
+      "What did Savanna Seed last write to me?",
       threadWithInvestor("inv-savanna-seed"),
     ],
   ];
@@ -645,7 +645,7 @@ export function devCurveballs(cases: CaseSet): void {
       "SCROLLING",
       dest("OWN_DATA_ROOM"),
       "Who's shown interest in us?",
-      section("COMPANY_INTEREST", "interest"),
+      dest("COMPANY_INTEREST"),
     ],
   ];
   for (const [s, what, at, user, target] of busy)
@@ -836,7 +836,7 @@ export function devCurveballs(cases: CaseSet): void {
     ["FOUNDER", "Open my data room.", dest("OWN_DATA_ROOM")],
     [
       "FOUNDER",
-      "What did Savanna Seed ask me?",
+      "What did Savanna Seed last write to me?",
       threadWithInvestor("inv-savanna-seed"),
     ],
   ];

@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 
+import { QNavigateTargetSchema } from "@capital-q/contracts";
+import { targetToSitePlace } from "@capital-q/model-gateway/q";
+
 import { Q_IQ_COMPANIES } from "../q-iq/world.js";
 
 /**
@@ -86,51 +89,67 @@ export const Q_NAV_FOUNDER_COMPANY_KEY = "co-ledgerfold";
 /** Q's documents, Daily editions, work items and Board items. */
 export const Q_NAV_THINGS = {
   memoSilo: {
+    page: "DOCUMENT",
     id: navId("doc:memo-silo-credit"),
     title: "Investment memo: Silo Credit",
   },
   briefLedgerline: {
+    page: "DOCUMENT",
     id: navId("doc:brief-ledgerline"),
     title: "Diligence brief: Ledgerline",
   },
-  dailyToday: { id: navId("daily:2026-11-06"), title: "Q Daily, 6 November" },
+  dailyToday: {
+    page: "DAILY_EDITION",
+    id: navId("daily:2026-11-06"),
+    title: "Q Daily, 6 November",
+  },
   dailyYesterday: {
+    page: "DAILY_EDITION",
     id: navId("daily:2026-11-05"),
     title: "Q Daily, 5 November",
   },
   workDiligence: {
+    page: "WORK_ITEM",
     id: navId("work:diligence-ledgerline"),
     title: "Ledgerline diligence",
   },
   workOutreach: {
+    page: "WORK_ITEM",
     id: navId("work:outreach-seed"),
     title: "Seed investor outreach",
   },
   boardCallTunde: {
+    page: "BOARD",
     id: navId("board:call-tunde"),
     title: "Call Tunde about the term sheet",
   },
   boardChaseLegal: {
+    page: "BOARD",
     id: navId("board:chase-legal"),
     title: "Chase legal on the SHA",
   },
   roundSeed: {
+    page: null,
     id: navId("round:ledgerfold-seed"),
     title: "Ledgerfold seed round",
   },
   pitchBrightwell: {
+    page: "COMPANY_PITCH",
     id: navId("pitch:brightwell"),
     title: "Brightwell Energy pitch video",
   },
   rehearsalExternal: {
+    page: "EXTERNAL_REHEARSAL",
     id: navId("person:dr-okoye"),
     title: "Rehearsal with Dr Ifeoma Okoye (external)",
   },
   applicationTamarind: {
+    page: "GATEQ_APPLICATION",
     id: navId("gateq:tamarind"),
     title: "Tamarind Pay's GateQ application",
   },
   applicationOwn: {
+    page: "GATEQ_APPLICATION",
     id: navId("gateq:ledgerfold-kestrel"),
     title: "Ledgerfold's application to Kestrel Lane's gate",
   },
@@ -164,7 +183,18 @@ export type QNavRecords = {
     }[];
   }[];
   readonly investors: readonly { readonly id: string; readonly name: string }[];
-  readonly things: readonly { readonly id: string; readonly title: string }[];
+  /** Each opens on its route (the site map's), when it has a page. */
+  readonly things: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly route?: string;
+  }[];
+  /** Their own company or firm, by name. */
+  readonly own?: {
+    readonly kind: "COMPANY" | "INVESTOR";
+    readonly name: string;
+    readonly id?: string;
+  };
   /** Records that were deleted: never a target. */
   readonly deleted: readonly { readonly id: string; readonly name: string }[];
 };
@@ -177,9 +207,21 @@ export const Q_NAV_RECORDS: QNavRecords = {
     documents: c.documents.map((d) => ({ title: d.title, id: d.id })),
   })),
   investors: Q_NAV_INVESTORS.map((i) => ({ id: i.id, name: i.name })),
-  things: Object.values(Q_NAV_THINGS).map((t) => ({
-    id: t.id,
-    title: t.title,
-  })),
+  things: Object.values(Q_NAV_THINGS).map((t) => {
+    // A round has no page of its own to name (/capital only redirects).
+    const place =
+      t.page === null
+        ? null
+        : targetToSitePlace(
+            t.page === "BOARD"
+              ? { page: "BOARD", itemId: t.id }
+              : QNavigateTargetSchema.parse({ page: t.page, recordId: t.id }),
+          );
+    return {
+      id: t.id,
+      title: t.title,
+      ...(place === null ? {} : { route: place.route }),
+    };
+  }),
   deleted: [{ id: Q_NAV_DELETED_COMPANY.id, name: Q_NAV_DELETED_COMPANY.name }],
 };

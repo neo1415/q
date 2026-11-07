@@ -93,6 +93,34 @@ describe("site-map audiences are the code's (derived)", () => {
   });
 });
 
+describe("purposes are side-neutral where both sides use the page", () => {
+  it("a page for both sides never describes it as one side's alone", () => {
+    const biased: string[] = [];
+    for (const one of Q_SITE_MAP.pages) {
+      if (one.audience !== "ANY") continue;
+      const text = `${one.title} ${one.purpose}`.toLowerCase();
+      const founder = /\bfounder/u.test(text);
+      const investor = /\binvestor/u.test(text);
+      // Naming one side only, on a page both sides have, told the model the
+      // page was not the other's (W4 live: "Open Capital" from an investor).
+      if (
+        founder !== investor &&
+        /\b(?:a|an|the)\s+(?:founder|investor)'s\b/u.test(text)
+      ) {
+        biased.push(`${one.route}: ${one.purpose}`);
+      }
+    }
+    expect(biased).toEqual([]);
+  });
+
+  it("Capital is described for both sides", () => {
+    const hub = page("/relationships");
+    expect(hub.purpose).toMatch(/founder/u);
+    expect(hub.purpose).toMatch(/investor/u);
+    expect(page("/capital").audience).toBe("ANY");
+  });
+});
+
 describe("site-map audiences (pinned)", () => {
   it("Discover: the investor's feed and tabs, the founder's investors and videos", () => {
     expect(tabAudience("/discover", "for-you")).toBe("INVESTOR");

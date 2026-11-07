@@ -1,5 +1,10 @@
-import { sameNavigationPlace } from "@capital-q/model-gateway/q";
+import {
+  sameNavigationPlace,
+  sitePlaceToTarget,
+  targetToSitePlace,
+} from "@capital-q/model-gateway/q";
 
+import { canonicalTarget } from "../../graders/q-nav.js";
 import { CaseSet } from "./build.js";
 import {
   Q_NAV_CATEGORIES,
@@ -113,6 +118,29 @@ export function targetProblems(target: QNavTarget, side: QNavSide): string[] {
   }
   if (target.position === "top")
     problems.push("top is the default: leave position out");
+  // The site map's own place: said in its words and read back, the same
+  // (no leading section, no list tab on a record, a company at its tab).
+  if (problems.length === 0) {
+    const place = targetToSitePlace(target);
+    const back =
+      place === null
+        ? null
+        : sitePlaceToTarget(place, {
+            recordId:
+              target.page === "BOARD" ? null : (target.recordId ?? null),
+            documentId: target.documentId ?? null,
+            itemId: target.itemId ?? null,
+          });
+    // Same-place names (SEARCH and EXPLORE) count as one, as graded.
+    if (
+      back === null ||
+      JSON.stringify(canonicalTarget(back, side)) !==
+        JSON.stringify(canonicalTarget(target, side))
+    )
+      problems.push(
+        `not the site map's own place: it reads back as ${JSON.stringify(back)}`,
+      );
+  }
   return problems;
 }
 

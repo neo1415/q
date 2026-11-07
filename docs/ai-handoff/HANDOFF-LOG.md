@@ -1794,3 +1794,89 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - eslint and prettier clean.
 - **Owner:** the Anthropic test budget is $50 (about $7.7 used). Smoke run first, then dev, then held-out once.
 - **Prompt note for tuning:** NAVIGATION_DECISION v1 still names "who viewed their deck" as a page. Deck views are not built (W2), so v2 should drop it.
+
+## 2026-11-07 — q-nav tuning round 1 (`feat/q-navigation-policy`)
+
+- **Paid smoke on 3239110** (owner, Anthropic): 20 dev turns, 17 exact, $0.1986, 51% of input cached.
+- **Misses and root causes:**
+  - D-COV-007: the model added sectionId `about` to a page-level ask. The grader is right (the target has no section), so the model over-specified.
+  - D-COV-011 and D-TYP-005 ("Open Capital." from an investor): STAY. W2's /relationships purpose line says "...and a founder's Capital", although the investor digest lists the capital tab and its commitments section. Reported to W2: fix the purpose text and the founder-only audience of the capital-raise, readiness, action-plan, plan and investors tabs.
+- **NAVIGATION_DECISION v2** (v1 deprecated, lock pinned). All changes are general rules; no dev sentence is quoted:
+  - no deck-views example (not built);
+  - a section only when they ask about that part of a page, so a page-level ask is the page;
+  - SITE MAP lists only what their side may open, whatever a purpose line says.
+- **Live harness:**
+  - one synthetic user per side, as in production, so each side's prompt cache holds its own site map (51% cached came from sides alternating under one key);
+  - dev misses now carry the model's own proposal (decision, place, reason).
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0;
+  - vitest packages: 4912 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6, after restarting local Postgres;
+  - eslint and prettier clean.
+
+## 2026-11-07 — q-nav tuning round 2 (`feat/q-navigation-policy`)
+
+- **Round 1 full dev result:** 510 turns, 72.9% pass, move-target 70.7%, wrong-page 6.9%, forbidden 0, $1.97, 92% cached. Receipt on integration: `docs/ai-handoff/receipts/2026-11-07-qnav-dev-r1.json`.
+- **Merged:** integration 02a89a0 and W2 `feat/q-site-map` 46e9a85 (per-tab and per-section audience, side-neutral purposes, resolve_page_target COMPANY/INVESTOR/BOARD_ITEM kinds).
+- **Root causes, from replaying every recorded proposal through resolution and policy:** many misses were code. The model's place was right and resolution or normalisation lost it.
+- **Resolution fixes** (`sitePlaceToTarget`), all general site-map rules:
+  - a page with nothing at page level opens on its own tab (/discover, /relationships);
+  - a route that is a tab's own path is that page at that tab (a relationship's calls, diligence, deal);
+  - a section only one tab shows names that tab;
+  - a page-wide section given with a tab is the page's own;
+  - the leading section of what is shown is the place itself, so it is dropped;
+  - a company record with no tab opens at its own tab (overview);
+  - a record page never keeps a list page's tab or section (`recordPageHasTab`);
+  - `byName` adds a words rule: unique only, never a guess.
+  - Replaying round 1's proposals, these alone recover 41 of 136 misses.
+- **Dataset changes**, documented, found by a new lint (every target must read back unchanged through the site map):
+  - COMPANY_INTEREST#interest becomes COMPANY_INTEREST, since interest is the page's only section;
+  - CAPITAL_RAISE#rounds becomes CAPITAL_RAISE, since rounds is the raise tab's leading section;
+  - H-ADV-004 ("Who's most engaged?" while on the interest page) becomes STAY, already there.
+- **Records the model sees:** things carry `opensOn` (their route), and a founder's own company is `theirOwn`.
+- **NAVIGATION_DECISION v3** (v2 deprecated, lock pinned). General rules only:
+  - never a nearby page for one that is not theirs or does not exist;
+  - a name said in full is that record;
+  - records open on their listed route;
+  - theirOwn is their own company or firm.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0;
+  - vitest packages: 4925 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+
+## 2026-11-07 — q-nav tuning round 3, the last before held-out (`feat/q-navigation-policy`)
+
+- **Dev round 2** (live, c2d3d11): 502 turns, 89.8% pass (r1 72.9), move-target 89.5%, wrong-page 5.98%, forbidden 0, $2.02. Receipt: `docs/ai-handoff/receipts/2026-11-07-qnav-dev-r2.json`.
+- **Wrong-page and STAY misses by cause:**
+  - **Stale vocabulary:** W2's per-tab and per-section audiences replaced the "(investor)"/"(founder)" tab titles the vocabulary parsed, so the dataset asked founders for YOUR_COMPANIES and investors for GATEQ_APPLICATIONS. Sides now come from `audienceOf`, and the hand overrides are gone. The gateway's `canOpenFor` also uses tab audience.
+  - **Code:**
+    - a sub-route with no place of its own is its parent's section (/settings/team → SETTINGS#team, /settings/security);
+    - a founder's /company/data-room and deck are their own company's tabs (the page sends them there). `ownPlace` applies to resolution, Back and "already there", and the id never reaches the model. The grader gives founders the same-place alias, like SEARCH ≡ EXPLORE.
+  - **Ambiguous to a human, so documented dataset changes:**
+    - "search" (/search is People search) became "search the network";
+    - "my to-dos" (Board items too) became "what Q needs from me";
+    - "Who am I talking to" became "Which of my relationships are active right now?";
+    - "What did X ask me?" (diligence questions too) became "last write to me";
+    - "evidence behind X's numbers" (overview or data room) became headline figures;
+    - an investor's "visibility settings" (their privacy settings) gets no ACCESS case.
+  - **Wrong in the dataset**, fixed in both splits:
+    - WORK_TEAM is Q's team map, not their colleagues (/settings/activity);
+    - REVIEWS are reviews they asked for, not what waits for their review (Work approvals).
+- **NAVIGATION_DECISION v4** (schema version 2; v3 deprecated; v1–v3 hashes unchanged):
+  - `sure: false` when another page could equally be meant, and code then OFFERs (guard UNSURE) and never moves to a guess;
+  - two asks go to the one they ask to see, else the last;
+  - a tab whose title is asked for is named.
+- **Note:** the dataset regenerated (new sides, ids shifted), so r2 replays no longer align.
+- **Gates:**
+  - package build 55/55;
+  - root tsc 0, q-api tsc 0;
+  - vitest packages: 4928 passed;
+  - Q-IQ `CQ_Q_IQ_ALL=1`: 6/6;
+  - eslint and prettier clean.
+- **For W2 (digest clarity):**
+  - /search vs /explore titles;
+  - per-tab purposes on the company profile (overview = headline figures);
+  - /work Team tab title ("Q's team").

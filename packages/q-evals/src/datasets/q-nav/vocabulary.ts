@@ -1,6 +1,7 @@
 import {
   Q_NAVIGATE_DESTINATIONS,
   Q_RECORD_PAGES,
+  audienceOf,
   Q_SITE_MAP,
   QNavigateTargetSchema,
   type QNavigateDestination,
@@ -14,6 +15,7 @@ import type { QNavSide } from "./contracts.js";
 
 /**
  * Every place Q may move the page pane to, derived from W2's site map
+ * (sides from each page's, tab's and section's own audience, 46e9a85)
  * (`Q_SITE_MAP`, feat/q-site-map a4027887) and W3's contract: each
  * QNavigateDestination and QRecordPage, the site-map page it lands on, who
  * may open it (the page's audience; a tab's own when it says so), its tabs
@@ -106,7 +108,7 @@ const BANKS: readonly {
     page: "RELATIONSHIPS",
     dev: bank(
       ["my relationships", "Relationships"],
-      ["Who am I talking to at the moment?"],
+      ["Which of my relationships are active right now?"],
     ),
     heldout: bank(["the CRM"], ["Which conversations do I have open?"]),
   },
@@ -166,7 +168,8 @@ const BANKS: readonly {
   },
   {
     page: "SEARCH",
-    dev: bank(["search"], []),
+    // Not bare "search": /search is People search, so it is open to a human.
+    dev: bank(["search the network"], []),
     heldout: bank(["the search box page"], []),
   },
   {
@@ -276,7 +279,8 @@ const BANKS: readonly {
   {
     page: "WORK_NEEDS",
     dev: bank(
-      ["what needs me", "my to-dos"],
+      // Not "my to-dos": Board items are to-dos too (open to a human).
+      ["what needs me", "what Q needs from me"],
       ["What needs my attention today?"],
     ),
     heldout: bank(["the needs-you list"], ["What's waiting on me?"]),
@@ -300,12 +304,14 @@ const BANKS: readonly {
   {
     page: "WORK_TEAM",
     dev: bank(
-      ["my team's work", "the team tab in Work"],
-      ["What is my team working on?"],
+      // Work's Team tab is Q's team map (its specialists), not their
+      // colleagues (that is /settings/activity): the asks were wrong.
+      ["Q's team map", "the team tab in Work"],
+      ["Which of Q's specialists are on my work?"],
     ),
     heldout: bank(
-      ["the team board of work"],
-      ["What are my colleagues busy with?"],
+      ["the map of Q's team"],
+      ["Who on Q's side is handling my jobs?"],
     ),
   },
   {
@@ -389,10 +395,15 @@ const BANKS: readonly {
   },
   {
     page: "REVIEWS",
-    dev: bank(["reviews", "my reviews"], ["What's waiting for my review?"]),
+    // Reviews are human reviews they asked for, and the answers; what
+    // waits for their own review is Work's approvals (the asks were wrong).
+    dev: bank(
+      ["reviews", "my reviews"],
+      ["What did the reviewers I asked come back with?"],
+    ),
     heldout: bank(
-      ["things to check"],
-      ["Is anything waiting for me to look over?"],
+      ["the reviews I requested"],
+      ["Has the expert I asked replied yet?"],
     ),
   },
   {
@@ -491,26 +502,6 @@ const PLANNED_SECTIONS: readonly (readonly [
   QNavSide | undefined,
 ])[] = [["COMPANY_INTEREST", "deck-views", "FOUNDER"]];
 
-/**
- * Sides the page's code decides where W2's tab titles say otherwise or
- * nothing (reported to W2): GateQ's investor inbox and find and its
- * founder claim (apps/web/app/(app)/gateq/page.tsx); Capital, which gives
- * the investor its own screen (mandate, commitments), and its raise,
- * readiness, plan and investors tabs, which only a founder's screen has
- * (apps/web/src/features/capital/capital-screen.tsx).
- */
-const TAB_SIDES: Readonly<Record<string, readonly QNavSide[]>> = {
-  GATEQ_INBOX: ["INVESTOR"],
-  GATEQ_FIND: ["INVESTOR"],
-  GATEQ_CLAIM: ["FOUNDER"],
-  CAPITAL: ["INVESTOR", "FOUNDER"],
-  CAPITAL_RAISE: ["FOUNDER"],
-  CAPITAL_READINESS: ["FOUNDER"],
-  CAPITAL_ACTION_PLAN: ["FOUNDER"],
-  CAPITAL_PLAN: ["FOUNDER"],
-  CAPITAL_INVESTORS: ["FOUNDER"],
-};
-
 const BOTH: readonly QNavSide[] = ["INVESTOR", "FOUNDER"];
 const sidesOfAudience = (audience: string): readonly QNavSide[] =>
   audience === "FOUNDER"
@@ -531,7 +522,24 @@ function sectionsOf(
 ): readonly QNavSectionDef[] {
   const existing: QNavSectionDef[] = (site?.sections ?? [])
     .filter((s) => s.tab === undefined || tab === null || s.tab === tab)
-    .map((s) => ({ id: s.id, status: "EXISTS" as const }));
+    .map((s) => {
+      // Who sees it: its own audience, else its tab's, else the page's.
+      const audience =
+        site === undefined
+          ? "ANY"
+          : audienceOf(
+              site,
+              site.tabs.find((t) => t.id === s.tab),
+              s,
+            );
+      return {
+        id: s.id,
+        status: "EXISTS" as const,
+        ...(audience === "INVESTOR" || audience === "FOUNDER"
+          ? { side: audience }
+          : {}),
+      };
+    });
   for (const [onPage, id, side] of PLANNED_SECTIONS) {
     if (onPage === page && !existing.some((s) => s.id === id))
       existing.push({
@@ -565,15 +573,14 @@ export const Q_NAV_DESTINATIONS: readonly QNavDestinationDef[] =
   Q_NAVIGATE_DESTINATIONS.map((page) => {
     const words = BANKS.find((b) => b.page === page);
     const { site, route, tab } = placeOf(page);
-    const tabTitle =
-      site?.tabs.find((t) => t.id === tab)?.title.toLowerCase() ?? "";
-    const tabSide: readonly QNavSide[] | null = tabTitle.endsWith("(investor)")
-      ? ["INVESTOR"]
-      : tabTitle.endsWith("(founder)")
-        ? ["FOUNDER"]
-        : null;
-    const sides =
-      TAB_SIDES[page] ?? tabSide ?? sidesOfAudience(site?.audience ?? "");
+    const sides = sidesOfAudience(
+      site === undefined
+        ? ""
+        : audienceOf(
+            site,
+            site.tabs.find((t) => t.id === tab),
+          ),
+    );
     const unreachable =
       site === undefined
         ? "not in the site map"
