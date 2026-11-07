@@ -190,7 +190,7 @@ describe("presence research dispatch", () => {
 
     dispatch.onResponseCommitted({
       sessionId: randomUUID(),
-      stepKey: "F1.website",
+      stepKey: "F1.stage",
       responseId: randomUUID(),
     });
     await flush();
@@ -450,5 +450,179 @@ describe("presence research dispatch", () => {
     await flush();
 
     expect(createSuggestion).not.toHaveBeenCalled();
+  });
+
+  // P1-3/P1-4 (onboarding plan 2026-11-07, research design §7).
+  const COMPLETED_EMPTY: PresenceOutcome = {
+    status: "COMPLETED",
+    buildId: "b",
+    sourceCount: 0,
+    understandingCount: 0,
+    understandings: [],
+    domains: [],
+  };
+
+  it("a website given after the company name researches again, with the website, past the refresh window", async () => {
+    const companyId = randomUUID();
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: companyId },
+    });
+    const name = textResponse({
+      stepKey: "F1.company_name",
+      text: "Tamarind Ledger",
+    });
+    const website = textResponse({
+      stepKey: "F1.website",
+      text: "https://tamarind.example",
+    });
+    const presence = fakePresence(COMPLETED_EMPTY);
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence: presence.service,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([name, website]),
+      }),
+    );
+
+    const outcome = await dispatch.onResponseCommitted({
+      sessionId: session.id,
+      stepKey: "F1.website",
+      responseId: website.id,
+    });
+
+    expect(outcome).toBe("DONE");
+    expect(presence.builds).toHaveLength(1);
+    expect(presence.builds[0]).toMatchObject({
+      identity: {
+        name: "Tamarind Ledger",
+        websiteUrl: "https://tamarind.example",
+      },
+      // A new website is a new identity: the 14-day "recent" skip must
+      // not keep it unread.
+      force: true,
+    });
+  });
+
+  it("a website with no company name yet waits for the name", async () => {
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: randomUUID() },
+    });
+    const website = textResponse({
+      stepKey: "F1.website",
+      text: "https://tamarind.example",
+    });
+    const presence = fakePresence(COMPLETED_EMPTY);
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence: presence.service,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([website]),
+      }),
+    );
+    await dispatch.onResponseCommitted({
+      sessionId: session.id,
+      stepKey: "F1.website",
+      responseId: website.id,
+    });
+    expect(presence.builds).toHaveLength(0);
+  });
+
+  it("is awaited and bounded: the consumer holds the message until the build ends", async () => {
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: randomUUID() },
+    });
+    const name = textResponse({
+      stepKey: "F1.company_name",
+      text: "Tamarind Ledger",
+    });
+    let release: (outcome: PresenceOutcome) => void = () => undefined;
+    const builds: { signal?: AbortSignal }[] = [];
+    const presence: PresenceService = {
+      build: (command) => {
+        builds.push(command);
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      },
+      isDue: () => Promise.resolve(true),
+    };
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([name]),
+      }),
+    );
+    let settled = false;
+    const running = dispatch
+      .onResponseCommitted({
+        sessionId: session.id,
+        stepKey: "F1.company_name",
+        responseId: name.id,
+      })
+      .then((outcome) => {
+        settled = true;
+        return outcome;
+      });
+    await flush();
+    expect(builds).toHaveLength(1);
+    // A deploy now leaves the message unarchived, so it is delivered again.
+    expect(settled).toBe(false);
+    expect(builds[0]?.signal).toBeInstanceOf(AbortSignal);
+    release(COMPLETED_EMPTY);
+    expect(await running).toBe("DONE");
+  });
+
+  it("a build already running for the subject is retried later, not dropped", async () => {
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: randomUUID() },
+    });
+    const name = textResponse({
+      stepKey: "F1.company_name",
+      text: "Tamarind Ledger",
+    });
+    const presence = fakePresence({ status: "SKIPPED", reason: "IN_PROGRESS" });
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence: presence.service,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([name]),
+      }),
+    );
+    expect(
+      await dispatch.onResponseCommitted({
+        sessionId: session.id,
+        stepKey: "F1.company_name",
+        responseId: name.id,
+      }),
+    ).toBe("RETRY");
+  });
+
+  it("a failed build is never retried (paid searches) and never thrown", async () => {
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: randomUUID() },
+    });
+    const name = textResponse({
+      stepKey: "F1.company_name",
+      text: "Tamarind Ledger",
+    });
+    const presence: PresenceService = {
+      build: () => Promise.reject(new Error("provider down")),
+      isDue: () => Promise.resolve(true),
+    };
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([name]),
+      }),
+    );
+    expect(
+      await dispatch.onResponseCommitted({
+        sessionId: session.id,
+        stepKey: "F1.company_name",
+        responseId: name.id,
+      }),
+    ).toBe("DONE");
   });
 });

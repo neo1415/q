@@ -110,17 +110,33 @@ export type PresenceResearchDispatchDependencies = {
   readonly logger?: Logger | undefined;
 };
 
+/**
+ * DONE: nothing more to do for this event (researched, skipped, or failed:
+ * a failed build is never retried, its searches are paid). RETRY: another
+ * build of the same subject is running; deliver the event again later so
+ * this one's identity (a website given since) is still read.
+ */
+export type PresenceResearchResult = "DONE" | "RETRY";
+
+/**
+ * How long one research build may hold the event (onboarding plan §7,
+ * P1-4): under the document queue's 60 s visibility timeout, so a build
+ * that finishes keeps its message, and one cut off by a deploy leaves the
+ * message to be delivered again.
+ */
+export const PRESENCE_RESEARCH_BOUND_MS = 45_000;
+
 export type PresenceResearchDispatch = {
   /**
-   * Fire-and-forget: returns before the research has even started. Call it
-   * from the domain-event handler exactly like a log line, not like a step
-   * whose outcome the caller waits on.
+   * Awaited by the outbox consumer (P1-4): the message is archived only
+   * once the build has ended, so research survives a deploy or a crash.
+   * Never throws.
    */
   readonly onResponseCommitted: (event: {
     readonly sessionId: string;
     readonly stepKey: string;
     readonly responseId: string;
-  }) => void;
+  }) => Promise<PresenceResearchResult>;
 };
 
 /**
@@ -161,139 +177,153 @@ export function createPresenceResearchDispatch(
   } = dependencies;
 
   return {
-    onResponseCommitted: (event) => {
-      const naming = NAMING_STEPS.get(event.stepKey);
-      if (naming === undefined) return;
+    onResponseCommitted: async (event) => {
+      // A naming step, or (P1-3) a founder's website given after the name:
+      // a new website is a new identity to read.
+      const websiteGiven = event.stepKey === FOUNDER_STEPS.website;
+      const naming = websiteGiven
+        ? NAMING_STEPS.get(FOUNDER_STEPS.companyName)
+        : NAMING_STEPS.get(event.stepKey);
+      if (naming === undefined) return "DONE";
 
-      // Detached: nothing below this line is awaited by the event handler,
-      // and nothing it throws leaves this function.
-      void (async () => {
-        try {
-          const session = await sessions.findById(
-            sql,
-            event.sessionId as never,
-          );
-          if (
-            session === null ||
-            session.status !== "ACTIVE" ||
-            session.tenantId === null ||
-            session.journeyType !== naming.journeyType ||
-            session.subject === null ||
-            session.subject.subjectType !== naming.subjectType
-          ) {
-            return;
-          }
+      try {
+        const session = await sessions.findById(sql, event.sessionId as never);
+        if (
+          session === null ||
+          session.status !== "ACTIVE" ||
+          session.tenantId === null ||
+          session.journeyType !== naming.journeyType ||
+          session.subject === null ||
+          session.subject.subjectType !== naming.subjectType
+        ) {
+          return "DONE";
+        }
 
-          const current = await responses.listCurrent(sql, session.id);
-          const committed = current.find(
-            (response) =>
-              response.stepKey === event.stepKey &&
-              response.id === event.responseId,
-          );
-          const name =
-            committed !== undefined && committed.value.type === "TEXT"
-              ? committed.value.text.trim()
-              : "";
-          if (name.length < 2) return;
-          // An invented subject has no public presence to find.
-          if (
-            isFictionalAccount !== undefined &&
-            (await isFictionalAccount(session.userId))
-          ) {
-            logger?.info(
-              { sessionId: session.id, subjectType: naming.subjectType },
-              "presence research skipped: fictional synthetic account",
-            );
-            return;
-          }
-
-          // Only a founder's company has a separate website step to offer
-          // alongside its name; an investor organisation's name is asked
-          // alone (CQ-Q-PRESENCE-001's own trigger draws the same line).
-          const website =
-            naming.subjectType === "COMPANY"
-              ? textOf(current, FOUNDER_STEPS.website)
-              : null;
-
-          const outcome = await presence.build({
-            actor: {
-              userId: session.userId,
-              tenantId: session.tenantId,
-              actorType: "HUMAN",
-              ...(session.organisationId === null
-                ? {}
-                : { organisationId: session.organisationId }),
-            },
-            subject: {
-              subjectType: naming.subjectType,
-              subjectId: session.subject.subjectId,
-            },
-            identity: {
-              name,
-              websiteUrl: website,
-              profileUrl: null,
-              qualifier: null,
-            },
-            correlationId: createCorrelationId(),
-          });
-
+        const current = await responses.listCurrent(sql, session.id);
+        const committed = current.find(
+          (response) =>
+            response.stepKey === event.stepKey &&
+            response.id === event.responseId,
+        );
+        // A revision since superseded is not this event's to act on: the
+        // newer one has its own event.
+        if (committed === undefined) return "DONE";
+        const name = websiteGiven
+          ? (textOf(current, FOUNDER_STEPS.companyName) ?? "")
+          : committed.value.type === "TEXT"
+            ? committed.value.text.trim()
+            : "";
+        // A website before the name waits: the name's own event reads it.
+        if (name.length < 2) return "DONE";
+        // An invented subject has no public presence to find.
+        if (
+          isFictionalAccount !== undefined &&
+          (await isFictionalAccount(session.userId))
+        ) {
           logger?.info(
-            {
-              sessionId: session.id,
-              subjectType: naming.subjectType,
-              status: outcome.status,
-            },
-            "presence research for a typed onboarding turn finished",
+            { sessionId: session.id, subjectType: naming.subjectType },
+            "presence research skipped: fictional synthetic account",
           );
+          return "DONE";
+        }
 
-          if (
-            outcome.status !== "COMPLETED" ||
-            outcome.understandings.length === 0
-          ) {
-            return;
-          }
+        // Only a founder's company has a separate website step to offer
+        // alongside its name; an investor organisation's name is asked
+        // alone (CQ-Q-PRESENCE-001's own trigger draws the same line).
+        const website =
+          naming.subjectType === "COMPANY"
+            ? textOf(current, FOUNDER_STEPS.website)
+            : null;
 
-          const pending = await suggestions.listPending(sql, session.id);
-          const reading = presenceCandidates({
-            journeyType: naming.journeyType,
+        const outcome = await presence.build({
+          actor: {
+            userId: session.userId,
+            tenantId: session.tenantId,
+            actorType: "HUMAN",
+            ...(session.organisationId === null
+              ? {}
+              : { organisationId: session.organisationId }),
+          },
+          subject: {
             subjectType: naming.subjectType,
-            findings: outcome.understandings,
-            answeredStepKeys: new Set(
-              current.map((response) => response.stepKey),
-            ),
-            pendingStepKeys: new Set(
-              pending.map((suggestion) => suggestion.stepKey),
-            ),
-          });
+            subjectId: session.subject.subjectId,
+          },
+          identity: {
+            name,
+            websiteUrl: website,
+            profileUrl: null,
+            qualifier: null,
+          },
+          correlationId: createCorrelationId(),
+          // A website given after the name is read past the refresh window
+          // (a build with the name alone just finished, or one a fortnight
+          // ago found nothing). A build still running is never overtaken.
+          ...(websiteGiven ? { force: true } : {}),
+          signal: AbortSignal.timeout(PRESENCE_RESEARCH_BOUND_MS),
+        });
 
-          for (const candidate of reading.candidates) {
-            try {
-              await createSuggestion({
+        logger?.info(
+          {
+            sessionId: session.id,
+            subjectType: naming.subjectType,
+            status: outcome.status,
+            ...(outcome.status === "SKIPPED" ? { reason: outcome.reason } : {}),
+          },
+          "presence research for an onboarding answer finished",
+        );
+
+        if (outcome.status === "SKIPPED" && outcome.reason === "IN_PROGRESS") {
+          return "RETRY";
+        }
+        if (
+          outcome.status !== "COMPLETED" ||
+          outcome.understandings.length === 0
+        ) {
+          return "DONE";
+        }
+
+        const pending = await suggestions.listPending(sql, session.id);
+        const reading = presenceCandidates({
+          journeyType: naming.journeyType,
+          subjectType: naming.subjectType,
+          findings: outcome.understandings,
+          answeredStepKeys: new Set(
+            current.map((response) => response.stepKey),
+          ),
+          pendingStepKeys: new Set(
+            pending.map((suggestion) => suggestion.stepKey),
+          ),
+        });
+
+        for (const candidate of reading.candidates) {
+          try {
+            await createSuggestion({
+              sessionId: session.id,
+              stepKey: candidate.stepKey,
+              targetField: candidate.targetField,
+              suggestedValue: candidate.suggestedValue,
+              sourceRefs: candidate.sourceRefs,
+              confidence: candidate.confidence,
+            });
+          } catch (error: unknown) {
+            logger?.warn(
+              {
+                err: error,
                 sessionId: session.id,
                 stepKey: candidate.stepKey,
-                targetField: candidate.targetField,
-                suggestedValue: candidate.suggestedValue,
-                sourceRefs: candidate.sourceRefs,
-                confidence: candidate.confidence,
-              });
-            } catch (error: unknown) {
-              logger?.warn(
-                {
-                  err: error,
-                  sessionId: session.id,
-                  stepKey: candidate.stepKey,
-                },
-                "a presence candidate was refused by the onboarding runtime",
-              );
-            }
+              },
+              "a presence candidate was refused by the onboarding runtime",
+            );
           }
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error, sessionId: event.sessionId },
-            "presence research for a typed onboarding turn failed",
-          );
         }
-      })();
+        return "DONE";
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, sessionId: event.sessionId },
+          "presence research for an onboarding answer failed",
+        );
+        return "DONE";
+      }
     },
   };
 }
