@@ -151,9 +151,14 @@ export async function resolveNamedRecord(input: {
     !leadingWordsOf(asked.name, match.name) &&
     plausibleName(asked.name);
   for (const page of pagesFor(asked.facet, input.side)) {
-    const intent = await input.open(page, name).catch(() => null);
+    // Speed (batch 8): the guess and the name as said are opened together.
+    const [intent, said] = await Promise.all([
+      input.open(page, name).catch(() => null),
+      guessed
+        ? input.open(page, asked.name).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     if (guessed) {
-      const said = await input.open(page, asked.name).catch(() => null);
       if (said !== null && said.id !== intent?.id) {
         return {
           kind: "OPEN",

@@ -606,47 +606,66 @@ export async function nameableRecords(
   kind: "COMPANY" | "INVESTOR_ORGANISATION",
   name: string | null,
 ): Promise<{ readonly id: string; readonly name: string }[]> {
+  // Speed (batch 8): the sources are independent reads, so they are sent
+  // together; the list keeps the same order as when they were read one by
+  // one, so a tie between equally close names resolves as before.
+  const ownRead = Promise.resolve(
+    ports.relationships?.ownRelationships?.(actor),
+  ).catch(() => null);
   const found: { id: string; name: string }[] = [];
-  const own = await ports.relationships
-    ?.ownRelationships?.(actor)
-    .catch(() => null);
-  for (const item of own?.items ?? []) {
-    if (item.counterpart.kind === kind) found.push(item.counterpart);
-  }
+  const ownOf = (own: Awaited<typeof ownRead>): void => {
+    for (const item of own?.items ?? []) {
+      if (item.counterpart.kind === kind) found.push(item.counterpart);
+    }
+  };
   if (kind === "COMPANY") {
-    const decisions = await ports.investorFeed
-      ?.decisions(actor, 100)
-      .catch(() => []);
+    // A spoken name's spacing is not the record's (live 2026-10-09:
+    // "Tensor Gate" for Tensorgate): the run-together form is searched
+    // too. The match itself ignores spacing (nameKey).
+    const joined = name?.replace(/[\s.-]+/gu, "") ?? null;
+    const texts =
+      name === null || joined === null
+        ? []
+        : joined === name.trim()
+          ? [name]
+          : [name, joined];
+    const [own, decisions, feed, ...networks] = await Promise.all([
+      ownRead,
+      Promise.resolve(ports.investorFeed?.decisions(actor, 100)).catch(
+        () => [],
+      ),
+      // The companies in their own feed right now (parity eval 2026-10-02:
+      // "Save Ajopot" met "not in your record" while Ajopot led their feed
+      // but was not network-searchable by that name).
+      Promise.resolve(ports.investorFeed?.page(actor, 30)).catch(() => null),
+      ...texts.map((text) =>
+        networkVisibleCompanies(ports, actor, { text, limit: 10 }).catch(
+          () => null,
+        ),
+      ),
+    ]);
+    ownOf(own);
     for (const entry of decisions ?? []) {
       found.push({ id: entry.companyId, name: entry.name });
     }
-    // The companies in their own feed right now (parity eval 2026-10-02:
-    // "Save Ajopot" met "not in your record" while Ajopot led their feed
-    // but was not network-searchable by that name).
-    const feed = await ports.investorFeed?.page(actor, 30).catch(() => null);
     for (const item of feed?.items ?? []) {
       found.push({ id: item.companyId, name: item.name });
     }
-    if (name !== null) {
-      // A spoken name's spacing is not the record's (live 2026-10-09:
-      // "Tensor Gate" for Tensorgate): the run-together form is searched
-      // too. The match itself ignores spacing (nameKey).
-      const joined = name.replace(/[\s.-]+/gu, "");
-      const texts = joined === name.trim() ? [name] : [name, joined];
-      for (const text of texts) {
-        const network = await networkVisibleCompanies(ports, actor, {
-          text,
-          limit: 10,
-        }).catch(() => null);
-        for (const item of network?.items ?? []) {
-          found.push({ id: item.id, name: item.canonicalName });
-        }
+    for (const network of networks) {
+      for (const item of network?.items ?? []) {
+        found.push({ id: item.id, name: item.canonicalName });
       }
     }
-  } else if (ports.discovery !== undefined) {
-    const slate = await ports.discovery
-      .discoverInvestors({ actor, limit: 50 })
-      .catch(() => null);
+  } else {
+    const [own, slate] = await Promise.all([
+      ownRead,
+      ports.discovery === undefined
+        ? Promise.resolve(null)
+        : ports.discovery
+            .discoverInvestors({ actor, limit: 50 })
+            .catch(() => null),
+    ]);
+    ownOf(own);
     for (const item of slate?.items ?? []) {
       found.push({ id: item.investorOrganisationId, name: item.displayName });
     }
@@ -810,6 +829,10 @@ export function createOpenPageTool(
         input.page === "RELATIONSHIP_COMPANY_MESSAGES";
       const kind = companySide ? "COMPANY" : "INVESTOR_ORGANISATION";
       let recordId = input.id?.toLowerCase() ?? null;
+      // Speed (batch 8: one fast navigation, 124 round trips): an id matched
+      // from `candidates` is already one they can reach by hand, so the
+      // reach check below does not build the whole list a second time.
+      let matched = false;
       // A screen of Capital Q's own is never a record's name (QA F-36, live
       // 2026-10-23: "open Discover" became open_page COMPANY "Discover",
       // and the misheard-name match opened Umoja Cover). Not found here;
@@ -822,10 +845,10 @@ export function createOpenPageTool(
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       if (recordId === null && input.name !== undefined) {
-        recordId = matchCounterpart(
-          input.name,
-          await candidates(actor, kind, input.name),
-        );
+        const named = await candidates(actor, kind, input.name);
+        recordId = matchCounterpart(input.name, named);
+        // Matched from the records they can already reach: reachable.
+        matched = recordId !== null;
       }
       if (recordId === null) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
@@ -847,6 +870,7 @@ export function createOpenPageTool(
         openable =
           profile !== null &&
           (profile.tenantId === actor.tenantId ||
+            matched ||
             (await candidates(actor, kind, profile.canonicalName)).some(
               (candidate) => candidate.id.toLowerCase() === wanted,
             ));
@@ -857,6 +881,7 @@ export function createOpenPageTool(
         const id = recordId;
         openable =
           actor.organisationId === id ||
+          matched ||
           (await candidates(actor, kind, null)).some(
             (candidate) => candidate.id.toLowerCase() === id,
           );
