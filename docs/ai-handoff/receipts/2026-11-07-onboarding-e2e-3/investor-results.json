@@ -1,0 +1,133 @@
+{
+  "email": "e2e-inv-202611071830-6ybj@fictional.capitalq.local",
+  "journey": "investor",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": true,
+      "detail": "1 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": true,
+      "detail": "I0.investor_type, I0.organisation_name, I1.mandate_context, I2.stages, I2.currency"
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": "Thanks — I have Kestrel Bay Capital as an actively deploying VC fund, investing $100,000–$500,000 in US dollars at pre-seed and seed. What’s the firm’s website?"
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": "Understood — we’ll leave geography and founder outreach aside for now. What’s Kestrel Bay Capital’s website?"
+    },
+    {
+      "journey": "J3",
+      "name": "stored for I10.inbound_preference",
+      "ok": null,
+      "detail": "null"
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": false,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. What's your firm's website?"
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Noted, I've saved West Africa (geography) and Fintech, Clean Energy (sectors). Noted, I've saved West Africa and Fintech, Clean Energy for Kestrel Bay Capital. "
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/discover"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": "Noted, I've saved West Africa (geography) and Fintech, Clean Energy (sectors). Shall I make that mandate live so Discover can match companies to it now?"
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": true,
+      "detail": "before: eography) and Fintech, Clean Energy (sectors). Shall I make that mandate live so Discover can match companies to it now? | after: Noted, I've saved West Africa (geography) and Fintech, Clean Energy (sectors). Shall I make that mandate live so Discover can match companies to it now?"
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/discover"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "How do you invest? / How do you invest?"
+    },
+    {
+      "journey": "J6",
+      "name": "questions answered from the fact table",
+      "ok": null,
+      "detail": "[{\"q\":\"Shall I make that mandate live so Discover can match companies to it now?\",\"answer\":\"Show me everything that fits.\"},{\"q\":\"What’s Kestrel Bay Capital’s website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your firm's website?\",\"answer\":\"Yes, that's right. That's all for now.\"}]"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": false,
+      "detail": "/onboarding/investor"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": false,
+      "detail": ""
+    }
+  ]
+}

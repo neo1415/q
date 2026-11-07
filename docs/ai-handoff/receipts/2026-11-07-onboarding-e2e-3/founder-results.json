@@ -1,0 +1,163 @@
+{
+  "email": "e2e-fou-202611071823-q9vz@fictional.capitalq.local",
+  "journey": "founder",
+  "width": 1440,
+  "results": [
+    {
+      "journey": "J1",
+      "name": "one introduction on opening",
+      "ok": true,
+      "detail": "1 \"I'm Q\" lines"
+    },
+    {
+      "journey": "J1",
+      "name": "one dense line answers several topics",
+      "ok": true,
+      "detail": "F1.country, F1.stage, F1.categories, F4.founder_role, F4.full_time"
+    },
+    {
+      "journey": "J1",
+      "name": "Q's next question (judge: conversational, not a label)",
+      "ok": null,
+      "detail": "That gives me the company, stage, Lagos base, your CEO role, two full-time founders, and a nine-person team. What’s Tamarind Ledger’s website?"
+    },
+    {
+      "journey": "J2",
+      "name": "a ramble is said back for a yes",
+      "ok": true,
+      "detail": "The company: Tamarind Ledger helps small shops and market traders in Lagos and Ibadan manage informal credit and collect payments. The problem: Many small merchants still track who owes them in notebo"
+    },
+    {
+      "journey": "J2",
+      "name": "nothing saved before the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "saved after the yes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J2",
+      "name": "Q after a clear typed answer",
+      "ok": null,
+      "detail": "That adds useful detail on the scale of the problem. What’s Tamarind Ledger’s website?"
+    },
+    {
+      "journey": "J2",
+      "name": "a clear typed answer is saved in their words, not read back",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "journey": "J3",
+      "name": "Q's reply to an optional skip and a required refusal",
+      "ok": null,
+      "detail": "Understood—we’ll leave the website and team size aside for now. You mentioned there are two founders; should I keep that, and what areas does the founding team cover between you—such as product, engineering, sales, partnerships or operations?"
+    },
+    {
+      "journey": "J3",
+      "name": "stored for F4.team_size",
+      "ok": null,
+      "detail": "null"
+    },
+    {
+      "journey": "J3",
+      "name": "a required refusal is re-asked with the reason",
+      "ok": false,
+      "detail": "expected a reason (P0-2)"
+    },
+    {
+      "journey": "J4",
+      "name": "chat → voice: no re-greeting",
+      "ok": true,
+      "detail": "Picking up where we left off. From what you said earlier, founders: 2. Shall I keep that? Say yes, or tell me what it should be."
+    },
+    {
+      "journey": "J4",
+      "name": "Q answers by voice",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "the voice turn greets nobody again",
+      "ok": true,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying cu"
+    },
+    {
+      "journey": "J4",
+      "name": "voice turns kept in the thread",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J4",
+      "name": "no greeting after the first answer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "continue later leaves to the app",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "Q on return",
+      "ok": null,
+      "detail": "Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger (fictional) has nine people, based on what you said earlier. Is that right? And"
+    },
+    {
+      "journey": "J5",
+      "name": "no new introduction on return",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J5",
+      "name": "the same open question is picked up",
+      "ok": true,
+      "detail": "before: rind Ledger (fictional) has nine people, based on what you said earlier. Is that right? And how many founders are there? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger (fictional) has nine people, based on w"
+    },
+    {
+      "journey": "J5",
+      "name": "form continue later matches the conversation's destination (P2-1)",
+      "ok": true,
+      "detail": "/home"
+    },
+    {
+      "journey": "J5",
+      "name": "the form reopens on the same step",
+      "ok": true,
+      "detail": "Your company / Your company"
+    },
+    {
+      "journey": "J6",
+      "name": "questions answered from the fact table",
+      "ok": null,
+      "detail": "[{\"q\":\"And how many founders are there?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"What's your website?\",\"answer\":\"Yes, that's right. That's all for now.\"},{\"q\":\"Are you raising right now?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"Which currency are you raising in?\",\"answer\":\"US dollars.\"},{\"q\":\"How much are you raising?\",\"answer\":\"One and a half million dollars.\"},{\"q\":\"5 million Shall I keep that?\",\"answer\":\"Yes, that's right.\"},{\"q\":\"What instrument are you raising on?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"What instrument are you raising on?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"What instrument are you raising on?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"What instrument are you raising on?\",\"answer\":\"Yes, actively raising.\"},{\"q\":\"What instrument are you raising on?\",\"answer\":\"Yes, actively raising.\"}]"
+    },
+    {
+      "journey": "J6",
+      "name": "finish lands on verification",
+      "ok": false,
+      "detail": "/onboarding/founder"
+    },
+    {
+      "journey": "J7",
+      "name": "the edit waits for approval",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "journey": "J7",
+      "name": "the change shows on the page",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
