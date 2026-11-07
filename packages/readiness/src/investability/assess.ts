@@ -59,7 +59,7 @@ import {
  */
 
 /**
- * investiq/v2 arithmetic + the input rules. A new inputs version is also
+ * investiq/v3 (research weights, credibility) + the input rules. A new inputs version is also
  * the revision for a change in how the view is derived: inputs.v5 (metrics
  * audit 2026-11-07) caps the band by confidence and gives no number when
  * nothing is content-graded. The grading rules (benchmarks, FX) are in the
