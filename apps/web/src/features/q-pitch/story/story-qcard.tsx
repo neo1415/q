@@ -145,16 +145,18 @@ export function storyQCard(origin: string): PublicCardDto {
       },
       {
         // Q's reading of the seeded company with its data room (S6 #324,
-        // #325; deck confirmed), as the deterministic scorer gives it on the
-        // seeded data: STRONG, Low confidence, 4 of 8 areas. Words only, no
-        // number, in the product's own band label.
+        // #325; deck confirmed): Low confidence, 4 of 8 areas. The product
+        // holds any band at Developing while confidence is Low (metrics
+        // audit P0-1, ADR 0074), and the story follows its own score rules
+        // (owner decision 78), so it reads Developing, never Strong. Words
+        // only, no number, in the product's own band label.
         key: "investabilitySummary",
-        value: INVESTABILITY_BAND_LABELS.STRONG,
+        value: INVESTABILITY_BAND_LABELS.DEVELOPING,
         scope: qCard.investabilitySummary,
         detail: {
           kind: "INTELLIGENCE",
           status: "ASSESSED",
-          band: INVESTABILITY_BAND_LABELS.STRONG,
+          band: INVESTABILITY_BAND_LABELS.DEVELOPING,
           confidence: "Low confidence",
           strengths: [],
           areasScored: 4,

@@ -297,6 +297,19 @@ describe("Q Story Q Card (#48-49)", () => {
       true,
     );
   });
+
+  it("follows the product's band cap: never Investable or Strong at Low confidence (owner decision 78)", async () => {
+    const { storyQCard } = await import("@/features/q-pitch/story/story-qcard");
+    const field = storyQCard("https://example.test").fields.find(
+      (f) => f.key === "investabilitySummary",
+    );
+    const detail = field?.detail;
+    if (detail?.kind !== "INTELLIGENCE") throw new Error("no investability");
+    expect(detail.confidence).toBe("Low confidence");
+    expect(["Not yet investable", "Developing"]).toContain(detail.band);
+    expect(field?.value).toBe(detail.band);
+    expect(detail.method).toBe("FDN InvestIQ v3");
+  });
 });
 
 describe("Q Story audio bank (budgeted preload)", () => {
