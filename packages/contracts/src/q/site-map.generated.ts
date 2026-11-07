@@ -306,7 +306,7 @@ export const Q_SITE_MAP: QSiteMap = {
       audience: "ANY",
       params: [],
       shows: ["COMPANY"],
-      destinations: [],
+      destinations: ["ANALYTICS"],
       recordPages: [],
       settingsSections: [],
       tabs: [],
