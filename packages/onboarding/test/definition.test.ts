@@ -26,7 +26,9 @@ import {
 } from "../src/runtime/validate-response.js";
 import { validateOnboardingManifest } from "../src/definitions/validate.js";
 import {
+  isNoneAnswer,
   isNotKnownAnswer,
+  NONE_ANSWER_TEXT,
   NOT_KNOWN_ANSWER_TEXT,
   text,
 } from "../src/application/response-values.js";
@@ -642,6 +644,52 @@ describe("response validation per step type (§40, §96-99, §210)", () => {
         value: { type: "TEXT", text: "I don't know, fintech maybe" },
       }),
     ).toThrow(ContractValidationError);
+  });
+
+  it('"None" settles a list step and holds no value; no follow-up is about it (batch 7)', () => {
+    const docs = defStep("docs");
+    const lists: OnboardingStepDefinition = {
+      ...docs,
+      stepKey: "avoid_sectors",
+      stepType: "reference_select",
+      required: true,
+      configuration: {
+        stepType: "reference_select",
+        prompt: "Sectors you'd rather not see?",
+        resourceType: "TAXONOMY_NODE",
+        vocabularyCodes: ["industry"],
+        minItems: 1,
+        maxItems: 5,
+      },
+    };
+    expect(
+      validateOnboardingResponse(lists, {
+        value: { type: "TEXT", text: "none." },
+      }).responseType,
+    ).toBe("TEXT");
+    const values = new Map([
+      ["criteria", { type: "TEXT" as const, text: "None" }],
+    ]);
+    expect(text(values, "criteria")).toBeNull();
+    expect(isNoneAnswer(values.get("criteria"))).toBe(true);
+    expect(NONE_ANSWER_TEXT).toBe("None");
+    for (const said of ["None", "I don't know"]) {
+      expect(
+        evaluateBranch(
+          { op: "EXISTS", stepKey: "flags" },
+          new Map([["flags", { type: "TEXT" as const, text: said }]]),
+        ),
+        said,
+      ).toBe(false);
+    }
+    expect(
+      evaluateBranch(
+        { op: "EXISTS", stepKey: "flags" },
+        new Map([
+          ["flags", { type: "TEXT" as const, text: "Repeat founders" }],
+        ]),
+      ),
+    ).toBe(true);
   });
 
   it('no accessor reads "I don\'t know" as a value', () => {

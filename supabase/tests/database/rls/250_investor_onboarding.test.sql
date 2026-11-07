@@ -79,7 +79,7 @@ select pg_temp.act_as_privileged();
 -- Investor Definition v1 -----------------------------------------------------------
 select is(
   (select current_version from onboarding.definitions where journey_type = 'investor'),
-  4, 'investor definition points new sessions at version 4 (20261231450000: the mandatory set and the firm''s HQ country; 20261231210000: "Not sure yet" on deploying; 20261231090000 added the firm''s website); v1 stays published for sessions pinned to it');
+  5, 'investor definition points new sessions at version 5 (20261231470000: every profile field mandatory; 20261231450000: the mandatory set and the firm''s HQ country; 20261231210000: "Not sure yet" on deploying; 20261231090000 added the firm''s website); v1 stays published for sessions pinned to it');
 select is(
   (select count(*)::int
      from onboarding.definition_versions v

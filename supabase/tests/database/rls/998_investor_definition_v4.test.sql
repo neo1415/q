@@ -7,9 +7,11 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(5);
 
-select is(
-  (select current_version from onboarding.definitions where journey_type = 'investor'),
-  4, 'new investor sessions pin to v4');
+select ok(
+  exists (select 1 from onboarding.definition_versions v
+            join onboarding.definitions d on d.id = v.definition_id
+           where d.journey_type = 'investor' and v.version = 4 and v.published_at is not null),
+  'v4 stays published (v5, 20261231470000, is current)');
 
 select is(
   (select s.step_type || ' ' || s.required::text || ' ' || (s.configuration ->> 'maxItems') || ' ' || s.writes_to::text
