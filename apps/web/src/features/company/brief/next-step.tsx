@@ -56,13 +56,11 @@ export function questionsPayload(
   to: string,
   questions: readonly string[],
 ): ApprovalPayload {
-  return Object.fromEntries([
-    ["To", to],
-    ...questions.map((question, index) => [
-      `Question ${String(index + 1)}`,
-      question,
-    ]),
-  ]);
+  const fields: Record<string, string> = { To: to };
+  questions.forEach((question, index) => {
+    fields[`Question ${String(index + 1)}`] = question;
+  });
+  return fields;
 }
 
 export function questionsOf(payload: ApprovalPayload): string[] {
