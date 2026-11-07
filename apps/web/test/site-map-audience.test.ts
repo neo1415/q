@@ -267,3 +267,26 @@ describe("overlapping places are told apart (W4 held-out, by category)", () => {
     );
   });
 });
+
+describe("W4 r1: data room, interest vs analytics, GateQ inbox", () => {
+  it("a founder's own data room names its missing section", () => {
+    const room = page("/company/data-room");
+    expect(room.sections.map((section) => section.id)).toContain("missing");
+    expect(sectionAudience("/company/data-room", "missing")).toBe("FOUNDER");
+  });
+
+  it("Interest is for answering; Analytics intent is for seeing the signals", () => {
+    expect(page("/company/interest").purpose).toMatch(/accept to connect/u);
+    const intent = page("/analytics").sections.find((s) => s.id === "intent");
+    expect(intent?.purpose).toMatch(/nothing to answer here/u);
+  });
+
+  it("GateQ's two inbox sections say different things", () => {
+    const gateq = page("/gateq");
+    const inbox = gateq.sections.find((s) => s.id === "inbox")?.purpose;
+    const view = gateq.sections.find((s) => s.id === "gateq-inbox")?.purpose;
+    expect(inbox).toBeDefined();
+    expect(view).toMatch(/search or folder/u);
+    expect(inbox).not.toBe(view);
+  });
+});

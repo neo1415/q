@@ -316,7 +316,8 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Intent",
           kind: "INTEREST_LIST",
           audience: "FOUNDER",
-          purpose: "who saved you, asked to connect or asked for documents",
+          purpose:
+            "investors saving you or asking for more, as it happens; nothing to answer here",
         },
         {
           id: "deck-views",
@@ -728,12 +729,19 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "DATA_ROOM",
           purpose: "your documents to share with investors",
         },
+        {
+          id: "missing",
+          title: "Still to add",
+          kind: "DATA_ROOM",
+          tab: "dataroom",
+          purpose: "documents investors expect, still missing",
+        },
       ],
     },
     {
       route: "/company/interest",
       title: "Interest",
-      purpose: "Investors interested in your company, and your replies.",
+      purpose: "Answer investors' interest: accept to connect, or decline.",
       audience: "FOUNDER",
       params: [],
       shows: ["INVESTOR_ORGANISATION"],
@@ -746,7 +754,7 @@ export const Q_SITE_MAP: QSiteMap = {
           id: "interest",
           title: "Interest",
           kind: "INTEREST_LIST",
-          purpose: "each investor's interest and your answer",
+          purpose: "interest awaiting your answer",
         },
       ],
     },
@@ -1136,14 +1144,14 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Inbox",
           kind: "GATEQ_INBOX",
           tab: "inbox",
-          purpose: "the inbox",
+          purpose: "every application you received",
         },
         {
           id: "gateq-inbox",
           title: "Applications",
           kind: "GATEQ_INBOX",
           tab: "inbox",
-          purpose: "applications received",
+          purpose: "those left after your search or folder",
         },
         {
           id: "gateq-application",
@@ -1185,8 +1193,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/home",
       title: "Q",
-      purpose:
-        "Talk to Q: ask anything and see the answers, cards and documents.",
+      purpose: "Talk to Q: ask anything; see answers, cards and documents.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1662,7 +1669,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/rehearsals/meeting/[meetingId]",
       title: "Rehearse a meeting",
-      purpose: "Prepare for one meeting already booked in your calendar.",
+      purpose: "Prepare for one booked meeting.",
       audience: "ANY",
       params: [
         {
