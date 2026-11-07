@@ -585,6 +585,41 @@ describe("Q leads", () => {
     expect(outcome.reply).not.toBe(before.reply);
   });
 
+  it("a voice turn that asks a step whose answer waits for their yes puts it back, never from scratch (e2e run 3)", async () => {
+    // Production e2e run 3 (J4): "two full-time founders" was held for its
+    // read-back (a figure, D-OWN-3), and the voice turn ended "And how many
+    // founders are there?".
+    const ports = fakePorts();
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() =>
+        Promise.resolve(
+          outcomeOf("Great, noted. And how many founders are there?", {
+            asking: {
+              stepKey: "F4.founder_count",
+              kind: "NUMBER",
+              options: [],
+              maxChoices: undefined,
+            },
+          }),
+        ),
+      ),
+      portFor: (args) => ({
+        ...ports.portFor(args),
+        pendingRecommendations: () =>
+          Promise.resolve([{ stepKey: "F4.founder_count", value: "2" }]),
+      }),
+      logger,
+    });
+    const outcome = await conductor.turn(
+      input(api({}).fetch, "We have paying customers.", { channel: "voice" }),
+    );
+    expect(outcome.reply).not.toMatch(/how many founders are there\?/iu);
+    expect(outcome.reply).toMatch(
+      /From what you said earlier, [^:]*: 2\. Shall I keep that\?/u,
+    );
+    expect(outcome.reply).toMatch(/^Great, noted\./u);
+  });
+
   it("a reopening whose resume line is already last keeps it once, not again (live AG: twice per load)", async () => {
     const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
     const line = resumeLine(stuckView(), "founder");

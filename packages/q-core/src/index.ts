@@ -181,6 +181,7 @@ export { ONBOARDING_TYPED_REPLY_V6 } from "./prompts/tasks/onboarding-typed-repl
 export { ONBOARDING_TYPED_REPLY_V7 } from "./prompts/tasks/onboarding-typed-reply.v7.js";
 export { ONBOARDING_TYPED_REPLY_V8 } from "./prompts/tasks/onboarding-typed-reply.v8.js";
 export { ONBOARDING_TYPED_REPLY_V9 } from "./prompts/tasks/onboarding-typed-reply.v9.js";
+export { ONBOARDING_TYPED_REPLY_V10 } from "./prompts/tasks/onboarding-typed-reply.v10.js";
 export {
   ONBOARDING_TYPED_REPLY_SCHEMA_NAME,
   OnboardingTypedReplyResultSchema,
