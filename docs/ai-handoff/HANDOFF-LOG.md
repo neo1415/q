@@ -2061,3 +2061,19 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Onboarding P0: no chat→voice re-greet, required re-asked with the reason, research failures logged, the worker uses the right SERP provider.
 - Live (fictional investor and founder, 1440/390): /home, /discover, /analytics, /relationships and /work return 200 with no errors. Discover shows "Investability: Not enough evidence" until the v5 sweep, Suitability "6 of 7 mandate…", and Unicorn as a compact coverage line. No caveat paragraphs. Q turn correct with a source in 10.0 s.
 - Batch 4 is on integration: onboarding P1 dbb138008 (migration 20261231430000), metrics methods 06d9e96 (METRICS-METHODS.md and SOURCES.md), plus P1-1 once its live eval passes. Long-answer live 1: decision dev 22/30, held-out 10/15, 1 unsafe save, so W5 is fixing it.
+
+## 2026-11-07 12:25 UTC — batch 4 deployed (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Local gates on 2262fed36:
+  - package build 55/55;
+  - root, web, q-api, api and workers tsc 0;
+  - full vitest 1957 files / 20,701 passed;
+  - eslint and prettier clean on 87 files.
+- CI 42368232859 green, pgTAP included. Applied 20261231430000 (presence-research queues; additive; pgmq lockdown); hosted is at 286. The pgmq tables are confirmed present.
+- Fast-forwarded recovery/2026-09-12 from b87961156 to 2262fed36 (rollback b87961156). Railway shows SUCCESS for all four.
+- Contents:
+  - onboarding P1: the mandate shows in /profile, one website form, model-read read-back agreement, durable research jobs, research re-triggered when a website arrives late, the own site fetched, the voice opening kept;
+  - P1-1, reader v15 plus the spoken bar. Live: dev decision 27/30, held-out 15/15, unsafe 0, $0.36 total;
+  - metrics methods: Investability v3, Suitability ranking-config v8, Unicorn v1.1.0, with METRICS-METHODS.md and SOURCES.md.
+- Live (investor and founder, 1440/390): /home, /discover, /profile, /analytics and /work return 200 with no errors. The investor /profile shows the canonical mandate. Q turn correct in 11.4 s.
+- BLOCKED: the onboarding e2e on fresh fictional accounts needs SB_KEY (Supabase admin) for account creation. Fetching it through the management API was refused by the session's permission policy. It needs the owner, either by setting SB_KEY in the environment or by allowing the fetch.
