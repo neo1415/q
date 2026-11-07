@@ -121,6 +121,7 @@ import { createResultsReader } from "@capital-q/results";
 import {
   createEngagementNotices,
   createEngagementService,
+  createInvestorViews,
   createPostgresCompanyEngagementReader,
   createPostgresEngagementRepository,
   createPostgresMyEngagementReader,
@@ -1776,6 +1777,13 @@ const engagement = {
     database.sql,
     engagementRepository,
   ),
+  // Who viewed an investor: a view counts only when the founder's own
+  // authorised investor read (ADR 0023) says they may see the investor.
+  investorViews: createInvestorViews({
+    sql: database.sql,
+    mayViewInvestor: async (actor, investorOrganisationId) =>
+      (await discovery.findInvestor(actor, investorOrganisationId)) !== null,
+  }),
 };
 // end ANALYTICS block
 // ADMIN block (spec §5): a person's own results. The raise is the same

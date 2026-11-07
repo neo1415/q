@@ -666,6 +666,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/engagement.ts GET VIEWING_PRIVACY_PATH": cap("tool.read_my"),
   "api/http/engagement.ts GET COMPANY_ENGAGEMENT_PATH": cap("tool.read_my"),
   "api/http/engagement.ts GET MY_ENGAGEMENT_PATH": cap("tool.read_my"),
+  // Who viewed an investor: the investor's aggregate is read_my
+  // "engagement"; the view itself is an observation like the ingest above.
+  "api/http/engagement.ts GET MY_INVESTOR_VIEWING_PATH": cap("tool.read_my"),
+  "api/http/engagement.ts POST INVESTOR_VIEWS_PATH": exempt(
+    "Analytics observation: a founder's view of an investor's profile, reported by the page itself. Q never reports a view on anyone's behalf.",
+  ),
   "api/http/recommendation-interactions.ts POST DISCOVERY_INTERACTIONS_PATH":
     exempt(
       "observations the feed reports (impressions, watch milestones); never an action a person asks for",
@@ -1352,6 +1358,7 @@ const Q_STANDING_SETTINGS: ReadonlySet<string> = new Set([
  */
 const ANALYTICS_OBSERVATIONS: ReadonlySet<string> = new Set([
   "api/http/engagement.ts POST ENGAGEMENT_EVENTS_PATH",
+  "api/http/engagement.ts POST INVESTOR_VIEWS_PATH",
 ]);
 
 const DRAFT_WORD_EDITS: ReadonlySet<string> = new Set([

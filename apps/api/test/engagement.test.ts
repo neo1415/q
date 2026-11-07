@@ -32,6 +32,12 @@ function build(authenticated = true) {
     [];
   let stored: ViewingVisibility | null = null;
   const reads: { actorUserId: string; companyId: string }[] = [];
+  const investorRecords: { userId: string; investorOrganisationId: string }[] =
+    [];
+  const investorReads: {
+    actorUserId: string;
+    organisationId: string | null;
+  }[] = [];
   const repository: EngagementRepository = {
     append: (viewer, event) => {
       appended.push({ viewer, event });
@@ -107,10 +113,26 @@ function build(authenticated = true) {
             return Promise.resolve(null);
           },
         },
+        investorViews: {
+          record: (actor, view) => {
+            investorRecords.push({
+              userId: actor.userId,
+              investorOrganisationId: view.investorOrganisationId,
+            });
+            return Promise.resolve("DROPPED");
+          },
+          mine: (query) => {
+            investorReads.push({
+              actorUserId: query.actorUserId,
+              organisationId: query.organisationId,
+            });
+            return Promise.resolve(null);
+          },
+        },
       },
     },
   ).app;
-  return { app, appended, reads };
+  return { app, appended, reads, investorRecords, investorReads };
 }
 
 const view = (clientEventId: string) => ({
@@ -252,5 +274,62 @@ describe("GET /v1/engagement/companies/:companyId", () => {
     expect(reads).toEqual([
       { actorUserId: USER, companyId: COMPANY, since: null },
     ]);
+  });
+});
+
+describe("who viewed an investor", () => {
+  const INVESTOR = "f0000000-0000-4000-8000-0000000000aa";
+
+  it("records as the resolved actor and answers 202 even when the view is dropped", async () => {
+    const { app, investorRecords } = build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/engagement/investor-views",
+      payload: {
+        clientEventId: "inv-view-0001",
+        investorOrganisationId: INVESTOR,
+        occurredAt: "2026-11-06T10:00:00.000Z",
+      },
+    });
+    // Dropped (not visible, own firm or duplicate) looks the same: 202.
+    expect(response.statusCode).toBe(202);
+    expect(investorRecords).toEqual([
+      { userId: USER, investorOrganisationId: INVESTOR },
+    ]);
+  });
+
+  it("refuses a viewer or visibility in the body", async () => {
+    const { app, investorRecords } = build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/engagement/investor-views",
+      payload: {
+        clientEventId: "inv-view-0002",
+        investorOrganisationId: INVESTOR,
+        occurredAt: "2026-11-06T10:00:00.000Z",
+        viewerUserId: USER,
+      },
+    });
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(investorRecords).toEqual([]);
+  });
+
+  it("is 401 without a session", async () => {
+    const { app } = build(false);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/engagement/investor-viewing",
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("reads the actor's own firm, never a named one, and 404s a non-member", async () => {
+    const { app, investorReads } = build();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/engagement/investor-viewing",
+    });
+    expect(response.statusCode).toBe(404);
+    expect(investorReads).toEqual([{ actorUserId: USER, organisationId: ORG }]);
   });
 });

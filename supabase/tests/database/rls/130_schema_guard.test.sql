@@ -220,6 +220,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- Q Workspace §8 A1/A2: the viewer reads their own events and setting; founders
   -- read only through the redacting projection functions. Suite 999_analytics_engagement.
   ('analytics', 'engagement_events',        'RLS_REQUIRED', '{SELECT}'),
+  ('analytics', 'investor_profile_views',   'RLS_REQUIRED', '{SELECT}'),
   ('analytics', 'viewing_privacy_settings', 'RLS_REQUIRED', '{SELECT}'),
   -- Admin-controlled analytics settings and their audited history: server only.
   ('analytics', 'platform_settings',        'INTERNAL_SERVER_ONLY', '{}'),

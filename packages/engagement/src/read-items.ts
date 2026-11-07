@@ -1,5 +1,7 @@
 import type { ActorContext } from "@capital-q/security";
 
+import type { InvestorViews } from "./investor-views.js";
+
 import type { CompanyEngagementReader } from "./postgres-engagement-reader.js";
 import type { MyEngagementReader } from "./postgres-my-engagement-reader.js";
 import type { EngagementRepository } from "./postgres-engagement-repository.js";
@@ -43,6 +45,11 @@ export async function ownEngagementItems(
      * Absent: on (the specification default).
      */
     readonly usesPassiveSignals?: (() => Promise<boolean>) | undefined;
+    /**
+     * Who viewed an investor's firm (owner live test 7 Nov 2026):
+     * aggregates only. Absent: not read.
+     */
+    readonly investorViewing?: Pick<InvestorViews, "mine"> | undefined;
   },
   actor: ActorContext,
   companyId: string | null,
@@ -62,6 +69,44 @@ export async function ownEngagementItems(
     },
   });
   if (companyId === null) {
+    // "Who viewed me?" for an investor: who viewed THEM, never what they
+    // viewed. Aggregates as the projection decided them.
+    const passive = (await deps.usesPassiveSignals?.()) ?? true;
+    const viewing =
+      deps.investorViewing === undefined || !passive
+        ? null
+        : await deps.investorViewing
+            .mine({
+              actorUserId: actor.userId,
+              organisationId: actor.organisationId ?? null,
+              since: null,
+            })
+            .catch(() => null);
+    if (viewing !== null) {
+      const latest = viewing.periods.at(-1);
+      items.push({
+        id: "who-viewed-you",
+        title: "Founders viewing your profile",
+        status:
+          latest === undefined
+            ? `Fewer than ${String(viewing.floor)} founder organisations viewed your profile in a completed week`
+            : `${String(latest.organisations)} founder organisations viewed your profile in the week of ${latest.periodStart} (${String(latest.profileViews)} views)`,
+        at: latest?.periodStart ?? null,
+        facts: {
+          completedPeriodsOnly: true,
+          shownTogetherNeverByName: true,
+          weeksShown: viewing.periods.length,
+          slices: viewing.slices
+            .map((slice) =>
+              slice.suppressed
+                ? `${slice.dimension}: others (too few to show)`
+                : `${slice.dimension}: ${slice.slice} ${String(slice.organisations ?? 0)}`,
+            )
+            .join("; "),
+          rule: RULE,
+        },
+      });
+    }
     if (deps.mine === undefined) return items;
     const mine = await deps.mine.read({
       actorUserId: actor.userId,
@@ -84,8 +129,9 @@ export async function ownEngagementItems(
     for (const company of mine.viewed.slice(0, 15)) {
       items.push({
         id: `viewed-${company.companyId}`,
-        title: company.companyName,
-        status: `you viewed it ${String(company.views)} times`,
+        // Their own viewing, labelled so it cannot answer "who viewed me".
+        title: `You viewed ${company.companyName}`,
+        status: `your own viewing: ${String(company.views)} ${company.views === 1 ? "view" : "views"}, not who viewed you`,
         at: company.lastViewedAt,
         facts: { views: company.views, deckMinutes: company.deckMinutes },
       });

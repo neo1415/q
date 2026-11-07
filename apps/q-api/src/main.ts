@@ -687,6 +687,7 @@ import {
   createEngagementService,
   createPostgresCompanyEngagementReader,
   createPostgresMyEngagementReader,
+  createInvestorViews,
   createPostgresEngagementRepository,
   ownEngagementItems,
 } from "@capital-q/engagement";
@@ -3129,6 +3130,12 @@ const appActionPorts: OwnReadPorts = {
         reader: companyEngagementReader,
         repository: engagementRepository,
         mine: myEngagementReader,
+        // Who viewed an investor's firm: read only here; Q never records
+        // a view, so no visibility check is ever asked for.
+        investorViewing: createInvestorViews({
+          sql: database.sql,
+          mayViewInvestor: () => Promise.resolve(false),
+        }),
         usesPassiveSignals: async () =>
           (await analyticsSettings.read()).qUsesPassiveSignals,
       },

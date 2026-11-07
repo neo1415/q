@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { CompanyEngagementDto } from "@capital-q/contracts";
+import type {
+  CompanyEngagementDto,
+  InvestorViewingDto,
+} from "@capital-q/contracts";
 import {
   MembershipIdSchema,
   OrganisationIdSchema,
@@ -186,5 +189,99 @@ describe("Q's read of engagement (A5)", () => {
       "viewing-privacy",
       "intent-INTEREST-2026-11-06T10:00:00.000Z",
     ]);
+  });
+});
+
+describe("an investor asking who viewed them (owner live test 7 Nov 2026)", () => {
+  const viewing = (patch: Partial<InvestorViewingDto> = {}) => ({
+    mine: () =>
+      Promise.resolve<InvestorViewingDto>({
+        investorOrganisationId: "f0000000-0000-4000-8000-0000000000aa",
+        since: null,
+        floorMet: false,
+        floor: 3,
+        sliceFloor: 5,
+        passiveBatch: "WEEKLY",
+        periods: [],
+        slices: [],
+        ...patch,
+      }),
+  });
+  const mine = {
+    read: () =>
+      Promise.resolve({
+        privacy: {
+          visibility: "ORGANISATION_ONLY" as const,
+          chosen: false,
+          defaultVisibility: "ORGANISATION_ONLY" as const,
+          allowedVisibilities: ["ORGANISATION_ONLY" as const],
+        },
+        viewed: [
+          {
+            companyId: COMPANY,
+            companyName: "Spheros",
+            views: 1,
+            deckMinutes: 0,
+            lastViewedAt: "2026-11-07T10:00:00.000Z",
+          },
+        ],
+        responses: [],
+      }),
+  };
+  const reader = { read: () => Promise.resolve(null) };
+
+  it("answers who viewed the investor, below the floor in words", async () => {
+    const items = await ownEngagementItems(
+      { reader, repository, mine, investorViewing: viewing() },
+      actor,
+      null,
+    );
+    const who = items.find((item) => item.id === "who-viewed-you");
+    expect(who?.title).toBe("Founders viewing your profile");
+    expect(who?.status).toBe(
+      "Fewer than 3 founder organisations viewed your profile in a completed week",
+    );
+  });
+
+  it("gives the latest completed week once the floor is met, never a name", async () => {
+    const items = await ownEngagementItems(
+      {
+        reader,
+        repository,
+        mine,
+        investorViewing: viewing({
+          floorMet: true,
+          periods: [
+            {
+              periodStart: "2026-10-26",
+              organisations: 7,
+              viewers: 7,
+              profileViews: 8,
+            },
+          ],
+        }),
+      },
+      actor,
+      null,
+    );
+    const who = items.find((item) => item.id === "who-viewed-you");
+    expect(who?.status).toBe(
+      "7 founder organisations viewed your profile in the week of 2026-10-26 (8 views)",
+    );
+    expect(JSON.stringify(who)).not.toMatch(
+      /contact them|reach out|message them/iu,
+    );
+    expect(String(who?.facts["rule"])).toMatch(/not permission to contact/u);
+  });
+
+  it("labels the investor's own viewing so it cannot answer 'who viewed me'", async () => {
+    const items = await ownEngagementItems(
+      { reader, repository, mine, investorViewing: viewing() },
+      actor,
+      null,
+    );
+    const own = items.find((item) => item.id === `viewed-${COMPANY}`);
+    expect(own?.title).toBe("You viewed Spheros");
+    expect(own?.status).toBe("your own viewing: 1 view, not who viewed you");
   });
 });

@@ -270,6 +270,23 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Raise not shared": "الجولة غير مُشارَكة",
   "Suitability for you": "الملاءمة لك",
   "The other": "العوامل الأخرى",
+  // Who viewed an investor (owner live test 7 Nov 2026).
+  "Who viewed you": "من شاهد ملفك",
+  "Founders who opened your firm's profile, by completed week. Shown together, never by name; viewing is not interest.":
+    "المؤسسون الذين فتحوا ملف شركتك، حسب الأسبوع المكتمل. يُعرضون مجتمعين، ولا تُذكر الأسماء أبداً؛ والمشاهدة ليست اهتماماً.",
+  "Fewer than": "أقل من",
+  "founder organisations viewed your profile in a completed week.":
+    "مؤسسات مؤسسين شاهدت ملفك في أسبوع مكتمل.",
+  "founder organisations": "مؤسسات مؤسسين",
+  "profile views": "مشاهدات للملف",
+  "By stage and country": "حسب المرحلة والبلد",
+  "Groups under": "المجموعات التي تقل عن",
+  "organisations are combined so no one can be singled out.":
+    "مؤسسات تُدمج حتى لا يمكن تمييز أحد.",
+  organisations: "مؤسسات",
+  "Not stated": "غير مذكور",
+  "Not a company": "ليست شركة",
+  "who viewed your profile": "من شاهد ملفك",
   // Investability's parts (audit P1-7, owner decision 78).
   "Business quality": "جودة الأعمال",
   "Investment readiness": "الجاهزية للاستثمار",
