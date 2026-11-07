@@ -112,8 +112,8 @@ describe("ONBOARDING_TRANSCRIPT_READER v15 and ONBOARDING_TYPED_REPLY v8 (P1-1)"
   const reader = registry.getActive("ONBOARDING_TRANSCRIPT_READER").definition;
   const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
 
-  it("carry into the active versions (reader v16, reply v9: DECISIONS 79)", () => {
-    expect(reader.version).toBe(16);
+  it("carry into the active versions (reader v17, reply v9: DECISIONS 79)", () => {
+    expect(reader.version).toBe(17);
     expect(reply.version).toBe(9);
   });
 
@@ -212,6 +212,29 @@ describe("DECISIONS 79: Q stops advertising optionality", () => {
     );
     expect(reader.template).toMatch(
       /an optional step goes under declined with those words/u,
+    );
+  });
+});
+
+describe("batch 7: None answers a required list; drafts for the one line and the firm", () => {
+  const reader = createDefaultPromptRegistry().getActive(
+    "ONBOARDING_TRANSCRIPT_READER",
+  ).definition;
+
+  it('a required list marked "(none is an answer)" with nothing for them is declined', () => {
+    expect(reader.version).toBe(17);
+    expect(reader.template).toMatch(
+      /a required step whose question ends "\(none is an answer\)"[^\n]*goes under declined/u,
+    );
+    // Every other required step is still never declined.
+    expect(reader.template).toContain(
+      "A required step is never declined: leave it out.",
+    );
+  });
+
+  it("drafts the one line and the firm description as INFERRED, for their yes", () => {
+    expect(reader.template).toMatch(
+      /company in one line, or for a description of the firm[^\n]*source INFERRED/u,
     );
   });
 });

@@ -12,6 +12,7 @@ import type {
   QDelegationReader,
   TaxonomyChooser,
 } from "@capital-q/model-gateway/q";
+import { INVESTOR_NONE_STEPS } from "@capital-q/investor-onboarding";
 import type { Logger } from "@capital-q/observability";
 import type { OnboardingState, OnboardingStepState } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -1430,7 +1431,13 @@ function readableSteps(
   const topics = topicsOf(state.steps);
   return state.steps.filter(isConversational).map((step) => ({
     stepKey: step.stepKey,
-    question: topics.get(step.stepKey) ?? step.question,
+    // A mandatory list "None" answers (investor v5): marked so the reader
+    // takes "no preference" as its answer, never as a skip to ask again.
+    question: `${topics.get(step.stepKey) ?? step.question}${
+      step.required && INVESTOR_NONE_STEPS.has(step.stepKey)
+        ? " (none is an answer)"
+        : ""
+    }`,
     // A step told at length is saved only as Q's summary they agreed to
     // (ONBOARDING_TRANSCRIPT_READER v7 reads LONG_TEXT so).
     kind: isLongAnswerStep(state.journey, step.stepKey)
@@ -1485,9 +1492,13 @@ export function briefOf(
       step.status === "OPEN" && isLongAnswerStep(state.journey, step.stepKey)
         ? " (say back)"
         : "";
+    const noneMark =
+      step.required && INVESTOR_NONE_STEPS.has(step.stepKey)
+        ? " (none is an answer)"
+        : "";
     return `- ${step.required ? "Needed" : "Other"}: ${topic}${
       choices.length === 0 ? "" : ` (choices: ${choices})`
-    }${sayBack} [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
+    }${noneMark}${sayBack} [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
   });
   const sayingBack = state.steps.some(
     (step) =>
@@ -1510,6 +1521,19 @@ export function briefOf(
     ...(neededOpen
       ? [
           "Needed topics are required: Capital Q needs them for their profile, their matching and verification, and setup can't finish without an answer. \"I don't know\" is an answer: it is recorded as not known and they carry on. If they'd rather not answer one, don't drop it and don't press: say briefly why it's needed (what it is used for, in plain words), that they can answer it later, then move on and come back to it. Optional topics they skip are simply left.",
+        ]
+      : []),
+    // Batch 7 (DECISIONS 79): the investor's preference lists are
+    // mandatory now; asked one by one they would be a ten-question form.
+    ...(state.steps.some(
+      (step) =>
+        isConversational(step) &&
+        step.required &&
+        step.status === "OPEN" &&
+        INVESTOR_NONE_STEPS.has(step.stepKey),
+    )
+      ? [
+          'Topics marked (none is an answer) are lists: ask them in as few natural questions as you can, by theme (what they look for in a company; the founders and signals they value; what they\'d rather not see or never want shown; their portfolio and thesis). One answer often fills several. "None" or "no preference" from them answers a list: take it and move on.',
         ]
       : []),
     // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long

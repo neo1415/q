@@ -373,6 +373,7 @@ import { ONBOARDING_TRANSCRIPT_READER_V13 } from "./tasks/onboarding-transcript-
 import { ONBOARDING_TRANSCRIPT_READER_V14 } from "./tasks/onboarding-transcript-reader.v14.js";
 import { ONBOARDING_TRANSCRIPT_READER_V15 } from "./tasks/onboarding-transcript-reader.v15.js";
 import { ONBOARDING_TRANSCRIPT_READER_V16 } from "./tasks/onboarding-transcript-reader.v16.js";
+import { ONBOARDING_TRANSCRIPT_READER_V17 } from "./tasks/onboarding-transcript-reader.v17.js";
 import { TAXONOMY_CHOICE_V1 } from "./tasks/taxonomy-choice.v1.js";
 import { TAXONOMY_CHOICE_V2 } from "./tasks/taxonomy-choice.v2.js";
 import { TAXONOMY_CHOICE_V3 } from "./tasks/taxonomy-choice.v3.js";
@@ -589,7 +590,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // short rambles and long spoken answers summarised.
     { ...ONBOARDING_TRANSCRIPT_READER_V15, status: "DEPRECATED" },
     // DECISIONS 79: a required step they do not have is not known.
-    ONBOARDING_TRANSCRIPT_READER_V16,
+    { ...ONBOARDING_TRANSCRIPT_READER_V16, status: "DEPRECATED" },
+    // Batch 7: "None" answers a required list; drafts for the one line and
+    // the firm description, for their yes.
+    ONBOARDING_TRANSCRIPT_READER_V17,
     // Production re-test 2026-10-28: an ambiguous category word, by meaning.
     { ...TAXONOMY_CHOICE_V1, status: "DEPRECATED" },
     // Onboarding sweep 2026-10-29: a region read as its listed members.
