@@ -30,6 +30,7 @@ import { createLogger } from "@capital-q/observability";
 import {
   createCompanyOnboardingSubjectResolver,
   createOnboardingService,
+  NOT_KNOWN_ANSWER_TEXT,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
   type OnboardingActor,
@@ -277,6 +278,13 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       value: OnboardingResponseValue,
     ) => Promise<OnboardingSessionView>;
     readonly skip: (stepKey: string) => Promise<OnboardingSessionView>;
+    /**
+     * Moves past a step the test has no value for: an optional one is
+     * skipped; a required one (founder v9, DECISIONS 79) is answered "I
+     * don't know", the answer that holds no value. The required rule is
+     * never weakened: a required step is answered, not skipped.
+     */
+    readonly pass: (stepKey: string) => Promise<OnboardingSessionView>;
     readonly back: (targetStepKey?: string) => Promise<OnboardingSessionView>;
     readonly refresh: () => Promise<OnboardingSessionView>;
   };
@@ -323,6 +331,34 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
             correlationId: CORRELATION(),
           }),
         ),
+      pass: async (stepKey) => {
+        const sessionId = OnboardingSessionIdSchema.parse(current.session.id);
+        const required =
+          current.progress.eligibleSteps.find((s) => s.stepKey === stepKey)
+            ?.required === true;
+        return remember(
+          required
+            ? await runtime.submitResponse({
+                actor,
+                sessionId,
+                stepKey,
+                response: {
+                  value: { type: "TEXT", text: NOT_KNOWN_ANSWER_TEXT },
+                },
+                expectedSessionVersion: current.session.version,
+                idempotencyKey: randomUUID(),
+                correlationId: CORRELATION(),
+              })
+            : await runtime.skipStep({
+                actor,
+                sessionId,
+                stepKey,
+                expectedSessionVersion: current.session.version,
+                idempotencyKey: randomUUID(),
+                correlationId: CORRELATION(),
+              }),
+        );
+      },
       back: async (targetStepKey) =>
         remember(
           await runtime.goBack({
@@ -412,10 +448,11 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      // v8 is the published journey (20261231190000): v4's optional
-      // financials, v6's company-profile sections, v7's customers at seed,
-      // and v8's country from the geography taxonomy.
-      expect(journey.view().session.definitionVersion).toBe(8);
+      // v9 is the published journey (20261231440000, the mandatory set,
+      // DECISIONS 79): v4's optional financials, v6's company-profile
+      // sections, v7's customers at seed, v8's country from the geography
+      // taxonomy.
+      expect(journey.view().session.definitionVersion).toBe(9);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(
@@ -515,7 +552,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       // F2 gathers real documents through the Evidence API (CQ-Q-021). This
       // test builds no Evidence rows, so it takes the skip path — which is a
       // first-class route, not a penalty.
-      await journey.skip(FOUNDER_STEPS.materials);
+      await journey.pass(FOUNDER_STEPS.materials);
 
       // F3 -- deterministic review of what exists now.
       const review = journey.view();
@@ -543,7 +580,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       await journey.submit(FOUNDER_STEPS.founderCount, range("2"));
       await journey.submit(FOUNDER_STEPS.fullTime, single("all"));
       await journey.submit(FOUNDER_STEPS.teamSize, range("6"));
-      await journey.skip(FOUNDER_STEPS.functions);
+      await journey.pass(FOUNDER_STEPS.functions);
       const [title] = await tx.sql<
         { business_title: string | null }[]
       >`select business_title from core.company_members where company_id = ${companyId} and user_id = ${newcomer.userId}`;
@@ -579,7 +616,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       await journey.submit(FOUNDER_STEPS.currency, single("usd"));
       await journey.submit(FOUNDER_STEPS.targetAmount, range("500000"));
       await journey.submit(FOUNDER_STEPS.instrument, single("safe"));
-      await journey.skip(FOUNDER_STEPS.timeframe);
+      await journey.pass(FOUNDER_STEPS.timeframe);
       await journey.submit(FOUNDER_STEPS.useOfFunds, multi(["product", "gtm"]));
       await skipFinancials(journey);
       const raiseStep = journey.view();
@@ -837,10 +874,10 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         FOUNDER_STEPS.companyName,
         text("Taxo Ltd"),
       );
-      await journey.skip(FOUNDER_STEPS.website);
-      await journey.skip(FOUNDER_STEPS.country);
+      await journey.pass(FOUNDER_STEPS.website);
+      await journey.pass(FOUNDER_STEPS.country);
       await journey.submit(FOUNDER_STEPS.stage, single("series_a"));
-      await journey.skip(FOUNDER_STEPS.description);
+      await journey.pass(FOUNDER_STEPS.description);
       const [stage] = await tx.sql<
         { id: string }[]
       >`select n.id from taxonomy.nodes n join taxonomy.vocabularies v on v.id = n.vocabulary_id
@@ -867,8 +904,8 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       expect(count).toBe(0);
 
       // Series A takes the revenue branch, and the review works with skips.
-      await journey.skip(FOUNDER_STEPS.categories);
-      await journey.skip(FOUNDER_STEPS.materials);
+      await journey.pass(FOUNDER_STEPS.categories);
+      await journey.pass(FOUNDER_STEPS.materials);
       const review = FounderReviewContextSchema.parse(
         journey.view().currentStep?.context,
       );
@@ -880,7 +917,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       await journey.submit(FOUNDER_STEPS.founderCount, range("3"));
       await journey.submit(FOUNDER_STEPS.fullTime, single("some"));
       await journey.submit(FOUNDER_STEPS.teamSize, range("40"));
-      await journey.skip(FOUNDER_STEPS.functions);
+      await journey.pass(FOUNDER_STEPS.functions);
       const [facts] = await tx.sql<
         {
           founder_count: number | null;
@@ -901,13 +938,13 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       expect(eligible).not.toContain(FOUNDER_STEPS.signal);
       await journey.submit(FOUNDER_STEPS.revenueStatus, single("recurring"));
       await journey.submit(FOUNDER_STEPS.customers, range("31"));
-      await journey.skip(FOUNDER_STEPS.growth);
+      await journey.pass(FOUNDER_STEPS.growth);
       // Not raising: the raise steps are not on the path and nothing is created.
       await journey.submit(FOUNDER_STEPS.raising, single("not_now"));
       expect(
         journey.view().progress.eligibleSteps.map((s) => s.stepKey),
       ).not.toContain(FOUNDER_STEPS.raiseConfirm);
-      await journey.skip(FOUNDER_STEPS.followUp);
+      await journey.pass(FOUNDER_STEPS.followUp);
       await skipFinancials(journey);
       const snapshot = FounderSnapshotContextSchema.parse(
         journey.view().currentStep?.context,
