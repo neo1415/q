@@ -44,7 +44,9 @@ function researchReturning(
 
 const request = {
   actor,
-  correlationId: CorrelationIdSchema.parse("cor_e0000000-0000-4000-8000-000000000001"),
+  correlationId: CorrelationIdSchema.parse(
+    "cor_e0000000-0000-4000-8000-000000000001",
+  ),
   subject: {
     subjectType: "COMPANY" as const,
     subjectId: "d0000000-0000-4000-8000-000000000001",

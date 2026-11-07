@@ -172,13 +172,13 @@ describe("Continue later in the form goes where the conversation goes (P2-1)", (
   });
 
   it("the investor form gives it the investor's destination, as its conversation does", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
+    const fs = await import("node:fs");
+    const path = await import("node:path");
     const root = process.cwd().endsWith("apps/web")
       ? process.cwd()
-      : join(process.cwd(), "apps/web");
-    const source = readFileSync(
-      join(
+      : path.join(process.cwd(), "apps/web");
+    const source = fs.readFileSync(
+      path.join(
         root,
         "src/features/investor-onboarding/investor-onboarding-screen.tsx",
       ),
