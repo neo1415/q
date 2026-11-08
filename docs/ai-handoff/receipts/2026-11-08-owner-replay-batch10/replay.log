@@ -1,0 +1,22 @@
+-- at /discover
+#2 "i want to see harbourline cargo's pitch deck" → /discover moveMs=-1 totalMs=16122
+    Q:  Q: Opening Harbourline Cargo's pitch deck… Where this lives Open the document Ask Q Q
+#3 "okay take me to harbourline cargos profile" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=1572 totalMs=16122
+    Q:  Q: Opened Harbourline Cargo. Ask Q Q
+#4 "i'm curious about their team" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=team moveMs=9973 totalMs=22197
+    Q: m Q: Harbourline Cargo’s team is listed as three people on its company profile: Babatunde Oyelaran, Founder & CEO; Chiamaka Eze, COO; and Ifeanyi Okoro, Head of Engineering. The team document adds that Chiamaka has ten years in haulage operations and fleet management, while Ifeanyi built dispatch software for a ride-hailing start-up. The deck separately states a headcount of 42 full-time, so the profile’s three named
+#5 "can i see it?" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=team moveMs=-1 totalMs=23249
+    Q:  Q: It shows the team evidence we just discussed, including the three named leaders, their relevant operating backgrounds, and the separate 42-person headcount claim that still needs reconciling. Want me to show the team document itself? Sources Companies · 2 Ask Q Q
+#6 "tell me about clinicrest" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=overview moveMs=11538 totalMs=23771
+    Q: gement accounts list 212 paying accounts. It attributes the difference to free trials, but hasn’t shown the split. Management accounts also report monthly revenue of around USD 95,000. Clinicrest is raising USD 1.8 million in a priced seed round to open depots in Abeokuta and Osogbo and extend credit terms to clinics. The main diligence points are gross margin by product category, working-capital needs, regulatory li
+#7 "can i see their elevator" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=elevator moveMs=7432 totalMs=19680
+    Q:  Q: It gives the company’s concise overview, alongside its profile information. Sources Company · 1 Ask Q Q
+#8 "send those questions to them" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=elevator moveMs=-1 totalMs=61224
+    Q: d Clinicrest these 3 questions: "1. What is Revenue growth today, and where does the figure come from? What is Financial history today, and where does the figure come from? What is Financial plan today, and where does the figure come from?". Ready to send: approve on the card, or tell me what to change. Waiting for your approval Done: Understanding your request Done: Pulling it together Now Needs you Send Clinicrest 
+#9 "who has viewed my profile?" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=elevator moveMs=-1 totalMs=17625
+    Q:  Q: I don’t have a record of who has viewed your profile. What I can see is your relationship activity—such as interest or connection signals—not profile-viewer names. Would you like me to check your incoming interest and connection requests instead? Where this lives Analytics Open Analytics Stay here Sources Companies · 2 Ask Q Q
+#10 "what can you find about me online?" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=elevator moveMs=-1 totalMs=21257
+    Q:  Q: I found no reliable public result that identifies you, Amara Diallo-Benson, or Savanna Seed Partners. The pages returned were general articles about searching or removing personal information online, not profiles about you, so they don’t establish anything about your public footprint. What I do have from your own Capital Q profile is that you’re a Partner at Savanna Seed Partners, actively investing at seed stage
+#11 "where is my firm located?" → /profile moveMs=4936 totalMs=17180
+    Q:  Q: Your firm, Savanna Seed Partners, is based in Lagos, Nigeria. You’re currently on Clinicrest’s company page. Sources Companies · 2 Ask Q Q
+errors []
