@@ -124,6 +124,12 @@ export function createTypedOnboarding(dependencies: {
    */
   const lastAsked = new Map<string, string>();
   /**
+   * How many times the finishing line has asked each step that is still
+   * open, by session (e2e run 6: one strength question asked 13 times
+   * word for word). Bounded like the others.
+   */
+  const finishRepeats = new Map<string, Map<string, number>>();
+  /**
    * Turns taken, per session: a follow-up to a reply is written only while
    * that reply is still Q's last line (nothing said since).
    */
@@ -424,8 +430,13 @@ export function createTypedOnboarding(dependencies: {
       // 5: every reply to the cheque read-back restated the range, and none
       // counted). Code decides, from the figures and words themselves.
       const restated = new Set(restatedHeld(heldOffer, utterance));
+      // A plain yes to code's own read-back ("… Shall I keep these?") is a
+      // yes to exactly what that line read back (e2e run 6: "Yes." left the
+      // cheque held). Code decides; the values were said in that line.
+      const yesToReadBack = isPlainYes(utterance) && isReadBackLine(lastQ);
       const approvedOffer = heldOffer.filter(
         (item) =>
+          yesToReadBack ||
           authority?.approved.has(item.stepKey) === true ||
           restated.has(item.stepKey),
       );
@@ -568,14 +579,37 @@ export function createTypedOnboarding(dependencies: {
           authority?.declined.has(lastAskedKey) === true
             ? lastAskedKey
             : undefined;
+        // Counts only while finishing: a fresh finish starts afresh.
+        if (!stillFinishing) finishRepeats.delete(input.onboardingSessionId);
+        const asks =
+          finishRepeats.get(input.onboardingSessionId) ??
+          new Map<string, number>();
         const said = finishingLine(input.journeyType, finished, {
           labelOf,
           questionOf: (stepKey) => SPOKEN_QUESTIONS[stepKey] ?? null,
+          repeats: (stepKey) => asks.get(stepKey) ?? 0,
+          choicesOf: (stepKey) => {
+            const step = definitionFor(input.journeyType).steps.find(
+              (candidate) => candidate.stepKey === stepKey,
+            );
+            return step === undefined
+              ? []
+              : optionsOf(step).map((option) => option.label);
+          },
           heldFor: (stepKey) =>
             suggestions.find((item) => item.stepKey === stepKey)?.value ?? null,
           ...(review === undefined ? {} : { review }),
           ...(unsettled === undefined ? {} : { unsettled }),
         });
+        if (said?.asking !== null && said?.asking !== undefined) {
+          asks.set(said.asking, (asks.get(said.asking) ?? 0) + 1);
+          finishRepeats.delete(input.onboardingSessionId);
+          finishRepeats.set(input.onboardingSessionId, asks);
+          if (finishRepeats.size > 2_000) {
+            const oldest = finishRepeats.keys().next().value;
+            if (oldest !== undefined) finishRepeats.delete(oldest);
+          }
+        }
         if (review !== undefined && said !== null) {
           readBackShown.add(input.onboardingSessionId);
           if (review.pending.length > 0) {
@@ -888,6 +922,54 @@ export function restatedHeld(
       return value.length >= 3 && words.includes(value);
     })
     .map((item) => item.stepKey);
+}
+
+/** A reply that is a plain yes and nothing else. */
+const PLAIN_YES = new Set([
+  "yes",
+  "yes please",
+  "yep",
+  "yeah",
+  "yes that's right",
+  "yes that is right",
+  "that's right",
+  "that is right",
+  "correct",
+  "yes correct",
+  "right",
+  "sure",
+  "ok",
+  "okay",
+  "go ahead",
+  "sounds good",
+  "perfect",
+  "keep them",
+  "keep these",
+  "keep that",
+  "keep it",
+  "yes keep them",
+  "yes keep these",
+  "yes keep that",
+  "yes keep it",
+]);
+
+export function isPlainYes(utterance: string): boolean {
+  return PLAIN_YES.has(
+    utterance
+      .toLowerCase()
+      .replace(/[’]/gu, "'")
+      .replace(/[^\p{L}\p{N}' ]+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim(),
+  );
+}
+
+/** Code's read-back of held values for their yes (finishingLine). */
+export function isReadBackLine(line: string): boolean {
+  return (
+    /\bFrom what you said:/u.test(line) &&
+    /\bShall I keep (these|that)\?/u.test(line)
+  );
 }
 
 const plainWords = (text: string) =>
