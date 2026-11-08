@@ -46,6 +46,7 @@ import {
 import { askQ } from "./ask-route";
 import { noteLiveRun, noteTypedRun } from "./follow-navigation";
 import { loadWire } from "./wire";
+import { announcePageDataChanged } from "./page-data-changed";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -308,6 +309,8 @@ export function useQConversation(
   /** The conversation id last taken from the caller, so a URL the hook itself wrote is not reopened. */
   const opened = useRef<string | null | undefined>(undefined);
   const openRun = useRef<string | null>(null);
+  /** Batch 13: the run resumed after the person approved its proposal. */
+  const approvedRun = useRef<string | null>(null);
   /** Whether the open run has reached a terminal event. True when none is open. */
   const finished = useRef(true);
   const abort = useRef<AbortController | null>(null);
@@ -384,6 +387,15 @@ export function useQConversation(
               // A finished run may have named the conversation for the
               // first time; the list is read again either way.
               announceConversationsChanged();
+              // Batch 13: a run resumed after the person's yes has executed
+              // the approved action; the page beside Q reads again.
+              if (
+                approvedRun.current === run &&
+                event.type === "q.run.completed"
+              ) {
+                approvedRun.current = null;
+                announcePageDataChanged();
+              }
             }
           },
         }),
@@ -1026,7 +1038,10 @@ export function useQConversation(
         // thread again).
         for (const wait of [3_000, 10_000]) {
           setTimeout(() => {
-            void refresh();
+            void refresh().then(() => {
+              // Batch 13: what the engine ran is read back; so is the page.
+              if (decision === "APPROVE") announcePageDataChanged();
+            });
           }, wait);
         }
         return;
@@ -1048,6 +1063,7 @@ export function useQConversation(
       setRunState((current) => ({ ...current, approval: null }));
       if (decision === "APPROVE") {
         finished.current = false;
+        approvedRun.current = open;
         follow(open);
       }
     },

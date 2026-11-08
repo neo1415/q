@@ -21,6 +21,7 @@ import { GlobalQProvider } from "./global-q";
 import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
 import { Words } from "@/features/i18n/language";
+import { PageDataRefresher } from "@/features/q/page-data-changed";
 import { WORKSPACE_BOOT_SCRIPT } from "@/features/workspace/layout-rules";
 import {
   WORKSPACE_OFF,
@@ -148,6 +149,8 @@ export function AppShell({
           </div>
           <DocumentReadyCenter connected={qConnected} />
           <WakeIndicator />
+          {/* Batch 13: the page reads again when Q has changed its data. */}
+          <PageDataRefresher />
         </GlobalQProvider>
       </WorkspaceProvider>
     );
@@ -193,6 +196,8 @@ export function AppShell({
         <DocumentReadyCenter connected={qConnected} />
         {/* D2: a small corner button while "Hey Q" has the microphone. */}
         <WakeIndicator />
+        {/* Batch 13: the page reads again when Q has changed its data. */}
+        <PageDataRefresher />
       </GlobalQProvider>
     </WorkspaceProvider>
   );
