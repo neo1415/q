@@ -1,5 +1,27 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 8 November 2026, 09:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7; owner away, D82)
+
+Production: **batch 12 `329e0ccb1`** (rollback `4a89f2277`). Batch 13 is assembling on integration (16478e739 + W1 pending):
+
+- W4 latency 5e3b2f314: the move is published as its own message when decided.
+- W4 batch13 a167b309b: side from the actor's organisation (`askerSideOf`); 2 of 3 → MOVE. Also the warm-up 9cc90a5d9.
+- W3 90c5e5e70: the public-web tools are eligible for RELATIONSHIP_QUESTION. That was the owner's "web search never runs"; confirmed, 18 of 37 owner plans.
+- W5 22f1f5ebe: finish after "all set"; the per-step no-repeat rule.
+- W5 a1e71599f: D81 conversational depth, folded in to save a cycle.
+- Runner 848041879.
+- Waiting: W1 (pane-width responsiveness via container queries; page refresh after Q acts).
+- Full vitest on integration is running.
+
+The owner's 07:11–07:29 session root causes are in receipts/2026-11-08-onboarding-e2e-8/README.md and the 08:00 handoff log. Decisions 81 (conversational depth, professional register) and 82 (owner delegates) are recorded.
+
+| Lane       | State                             |
+| ---------- | --------------------------------- |
+| W1         | building responsiveness + refresh |
+| W3, W4, W5 | idle (batch 13 delivered)         |
+
+Anthropic test spend: about $42.5 of $50 (no paid runs today).
+
 ## Live board — 8 November 2026, 05:35 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: **batch 11 `4a89f2277`** (rollback `47df02df9`); CI 1887 green; all four services SUCCESS; hosted migrations 291; workspace LABS on, moves allowed.
