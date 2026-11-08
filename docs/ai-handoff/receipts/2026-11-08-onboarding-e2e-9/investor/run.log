@@ -1,0 +1,24 @@
+(node:13931) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+account e2e-inv-202611081153-9ezz@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+FAIL J1 one dense line answers several topics
+NOTE J1 Q's next question (judge: conversational, not a label) — Understood — you invest through a venture capital fund, are actively deploying, and focus on pre-seed and seed with US-dollar cheques of roughly $100,000 to $500,000. What is the full name of the fund
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood — we’ll leave the discovery approach aside for now. Your inbound preference is needed for matching and profile setup; you can answer it later or say “I don’t know.” What’s the fund’s website?
+NOTE J3 stored for I10.inbound_preference — null
+PASS J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What's your firm's website?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — I’ve got fintech, climate, and West Africa; those will be saved once Kestrel Bay Capital and your fund type are in. Kestrel Bay Capital is the firm name I have from your sign-up, so please correct me 
+file:///home/user/q/scripts/handoff/live/onboarding-e2e.mjs:168
+    throw new Error(`read ${path.split("?")[0]}: HTTP ${response.status}`);
+          ^
+
+Error: read /v1/onboarding/sessions/current: HTTP 400
+    at apiGet (file:///home/user/q/scripts/handoff/live/onboarding-e2e.mjs:168:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async view (file:///home/user/q/scripts/handoff/live/onboarding-e2e.mjs:175:12)
+    at async turns (file:///home/user/q/scripts/handoff/live/onboarding-e2e.mjs:185:19)
+    at async file:///home/user/q/scripts/handoff/live/onboarding-e2e.mjs:505:15
+
+Node.js v22.23.4

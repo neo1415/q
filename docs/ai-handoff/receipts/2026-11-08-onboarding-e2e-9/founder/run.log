@@ -1,0 +1,31 @@
+(node:14366) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+account e2e-fou-202611081155-iqms@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+FAIL J1 one dense line answers several topics
+NOTE J1 Q's next question (judge: conversational, not a label) — Thanks, Ada — Tamarind Ledger is based in Lagos, Nigeria; you’re the CEO, there are two founders, both full-time, and the team has nine people. What’s the company website?
+PASS J2 a ramble is said back for a yes — The company: Tamarind Ledger helps small shops and market traders in Lagos and Ibadan manage informal customer credit. The problem: Many small businesses still track who owes them in notebooks, making
+PASS J2 nothing saved before the yes
+FAIL J2 saved after the yes
+NOTE J2 Q after a clear typed answer — That adds useful context on the scale of the loss and the payment friction. No problem: website matters because investors look for it on your profile, but let's leave it for now; you can add it here o
+NOTE J2 F9.problem before → after —  → Many small businesses still track who owes them in notebooks, making collections difficult.
+FAIL J2 a clear typed answer is saved in their words, not read back — Many small businesses still track who owes them in notebooks, making collections difficult.
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood. What stage is the company at: pre-seed, seed, Series A?
+NOTE J3 stored for F1.website — null
+FAIL J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. From what you said earlier, stage: Seed. Shall I keep that? Say yes, or tell me what it should be.
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved We already have paying customers, about forty shops, and revenue is recurring (opportunity and economics), paying customers kept in your notes, revenue kept in your notes and early s
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — Great, I've saved We already have paying customers, about forty shops, and revenue is recurring (opportunity and economics), paying customers kept in your notes, revenue kept in your notes and early s
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before: portunity and economics. What stage is the company at, and where is it based: seed in Lagos, Nigeria, or something else? | after: Great, I've saved We already have paying customers, about forty shops, and revenue is recurring (opportunity and economics), paying customers kept in your notes
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — Your company / Your company
+NOTE J6 questions answered from the fact table — [{"q":"What stage is the company at, and where is it based: seed in Lagos, Nigeria, or something else?","answer":"Lagos, Nigeria."},{"q":"What stage is the company at: pre-seed, seed, Series A?","answer":"Seed."},{"q":"What year was Tamarind Ledger founded?","answer":"2021."},{"q":"What year was Tamarind Ledger founded?","answer":"2021."},{"q":"Is that right?","answer":"Yes, that's right."},{"q":"What does the founding team cover between you—for example, product, engineering, sales or partnerships, operations, fina","answer":"Product, engineering and sales."},{"q":"Is that right?","answer":"Yes, that's right."},{"q":"Is that right?","answer":"Yes, that's right."},{"q":"Which currency do you use for your company’s financial figures—Nigerian naira, US dollars, or another currency?","answer":"US dollars."},{"q":"Roughly how much do you spend beyond revenue each month?","answer":"Gross margin about 60%, burn about $25k a month beyond revenue, $300k in the bank, about 12 months of runway."},{"q":"Is that right?","answer":"Yes, that's right."},{"q":"Is that right?","answer":"Yes, that's right."},{"q":"Roughly how many paying shops do you have today?","answer":"Yes, that's right. That's all for now."},{"q":"Are you raising right now?","answer":"Yes, actively raising."},{"q":"From what you said: Raising now: Yes, actively Shall I keep that?","answer":"Yes, that's right."},{"q":"Which currency are you raising in?","answer":"US dollars."},{"q":"From what you said: Raise currency: US dollar Shall I keep that?","answer":"Yes, that's right."},{"q":"How much are you raising?","answer":"One and a half million dollars."},{"q":"5 million Shall I keep that?","answer":"Yes, that's right."},{"q":"What instrument are you raising on?","answer":"A SAFE."},{"q":"From what you said: Instrument: SAFE Shall I keep that?","answer":"Yes, that's right."},{"q":"When are you hoping to close the round?","answer":"Within six months."},{"q":"From what you said: Close timing: 3–6 months Shall I keep that?","answer":"Yes, that's right."},{"q":"What will the money mainly go towards?","answer":"Product and hiring."},{"q":"From what you said: Use of funds: Product and engineering, Key hires Shall I keep that?","answer":"Yes, that's right."},{"q":"5 million Instrument: SAFE Close timing: 3–6 months Use of funds: Product and engineering, Key hires Company profile Opp","answer":"Yes, that's right."}]
+PASS J6 finish lands on verification — /verification
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+4 FAIL; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/e2e9/fdr
