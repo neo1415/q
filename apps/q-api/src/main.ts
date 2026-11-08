@@ -733,6 +733,7 @@ import {
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
 import { createFastNavigation } from "./composition/fast-navigation.js";
+import { warmAfterListen } from "./composition/boot-warmup.js";
 import {
   createQPitchQaMatcher,
   loadQPitchQaVectors,
@@ -928,7 +929,8 @@ await telemetry.start();
 // One pool per process, request-class access: never the privileged or
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and the runtime's ownership checks.
-const database = createRequestDatabaseClient(loadDatabaseConfig());
+const databaseConfig = loadDatabaseConfig();
+const database = createRequestDatabaseClient(databaseConfig);
 // QA F-85: every public link q-api writes (a Q Card's address) is built
 // from this origin, checked once here: an https URL, or q-api does not start.
 const webOrigin = webOriginFrom(process.env["CQ_WEB_ORIGIN"]);
@@ -8195,6 +8197,14 @@ const accessTokens =
         sessions: createPostgresSessionLiveness({ sql: database.sql }),
         fallback: createSupabaseAccessTokenAuthenticator(supabaseAuth),
       });
+// RECOVERY-2026-10 (C, "stupid fast"): where a finished sentence goes,
+// by code alone, before Q has answered. Built here so boot can warm it.
+const fastNavigation = createFastNavigation({
+  firewall: baseFirewall,
+  tools: qTools.port,
+  ownRelationships: errandRelationships.ownRelationships,
+  logger,
+});
 const { app, logger: appLogger } = createApp(
   config,
   {
@@ -8366,12 +8376,7 @@ const { app, logger: appLogger } = createApp(
     // RECOVERY-2026-10 (C, "stupid fast"): where a finished sentence goes,
     // by code alone, before Q has answered. No run, so no run's recorded
     // firewall decision: the same firewall, unrecorded.
-    fastNavigation: createFastNavigation({
-      firewall: baseFirewall,
-      tools: qTools.port,
-      ownRelationships: errandRelationships.ownRelationships,
-      logger,
-    }),
+    fastNavigation,
     // Q Story ending: a spoken question to the Q&A bank. Tier 2 (meaning)
     // embeds through the reviewed OpenAI adapter, with the key this service
     // already holds; without it, or without current vectors, tier 1 alone.
@@ -8560,6 +8565,15 @@ app.addHook("onClose", async () => {
 await app.listen({
   port: config.network.port,
   host: config.network.host,
+});
+
+// Batch 13: open the pool and run the fast-navigation path once, now,
+// so the first person after a deploy does not pay for it. Never awaited.
+void warmAfterListen({
+  ping: () => database.sql`select 1`,
+  poolMax: databaseConfig.poolMax,
+  fastNavigation,
+  logger: appLogger,
 });
 
 if (deepgramProvider !== undefined) {
