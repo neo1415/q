@@ -626,6 +626,13 @@ if (STEPS.has("J6")) {
     JOURNEY === "founder"
       ? [
           READ_BACK,
+          // Run 8: the finances, fictional and plausible, all together;
+          // before "spend" (use of funds), "growth" and "revenue", which the same questions name.
+          [
+            /gross margin|burn|monthly spend|spend beyond|cash in the bank|cash on hand|runway|financial details/i,
+            "Gross margin about 60%, burn about $25k a month beyond revenue, $300k in the bank, about 12 months of runway.",
+          ],
+
           [/website|site\b|web address/i, "tamarindledger.example"],
           [
             /one line|in a line|one sentence|tagline/i,
@@ -754,7 +761,18 @@ if (STEPS.has("J6")) {
     // Run 7: Q left a step for now and asked nothing; the runner replied
     // "That's all for now." eight times. A line that asks nothing is not
     // answered: the journey stops sending.
-    if (answers.length > 0 && !/[?؟]/u.test(line)) {
+    // Run 8: "…I still need the remaining financial details: …" asks with
+    // no "?". Only a line that closes ("for now", "whenever you're
+    // ready", "all set") and asks for nothing stops it.
+    const closes =
+      !/[?؟]/u.test(line) &&
+      /\b(for now|whenever you're ready|all set|everything else (is )?done|that's everything I need)\b/iu.test(
+        line,
+      ) &&
+      !/\b(I (still )?need|could you|can you|please (share|tell|add)|what (is|are)|which)\b/iu.test(
+        line,
+      );
+    if (answers.length > 0 && closes) {
       answers.push({
         q: line.trim().slice(0, 120),
         answer: "(stopped: Q asked nothing)",
