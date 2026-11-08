@@ -1839,9 +1839,13 @@ export function createQPageMoves(dependencies: {
         }),
       ]).finally(() => clearTimeout(timer));
       if (settled === notYet) {
-        if (answerMoves.length > 0) {
+        // Batch-11 replay: only an answer that itself moved the pane keeps
+        // the late move away; an offer or a document opened in its viewer
+        // never moved it, and used to drop a 3/3 decision for a Deck tab.
+        const movedItself = current.filter(movesPaneItself);
+        if (movedItself.length > 0) {
           dependencies.logger?.info(
-            { qRunId: request.runId, answerMoves: answerMoves.map(blockKind) },
+            { qRunId: request.runId, answerMoves: movedItself.map(blockKind) },
             "q page move skipped: the answer already moves the pane",
           );
           return blocks;

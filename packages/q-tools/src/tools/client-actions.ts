@@ -936,7 +936,12 @@ export function createOpenPageTool(
       // The deck tab's own read decides whether this reader may see it
       // (null otherwise), and the viewer's signed read decides Download
       // from the founder's download audience. No deck: the tab, as before.
-      if (openable && onDeck && COMPANY_TABS.has(input.page)) {
+      // The Q Workspace (batch-11 owner replay: "it should have still taken
+      // me to the pitchdeck page of the company"): the page pane beside
+      // them is where they are, so the deck opens on the company's Deck tab
+      // there, never in the viewer over the conversation.
+      const inWorkspace = plan.screen?.workspace !== undefined;
+      if (!inWorkspace && openable && onDeck && COMPANY_TABS.has(input.page)) {
         const view = await ports.profileMaterial
           ?.deck(actor, recordId)
           .catch(() => null);

@@ -1923,3 +1923,87 @@ describe("batch-10 replay: an offer or a document open is not a move; sections n
     expect(voteNavigation([at("viewers"), at("trend"), at()])).toEqual(at());
   });
 });
+
+describe("batch-11 replay: a viewer open never stops a late decision from following the answer", () => {
+  it("a code answer that opened the deck in its viewer, then a decision for the Deck tab landing late: the move follows", async () => {
+    vi.useFakeTimers();
+    try {
+      const moves = createQPageMoves({
+        decider: {
+          decide: () =>
+            new Promise((resolve) =>
+              setTimeout(
+                () =>
+                  resolve(
+                    proposal({
+                      place: place({
+                        record: company("Silo Credit"),
+                        tab: "deck",
+                      }),
+                    }),
+                  ),
+                4_000,
+              ),
+            ),
+        },
+        config: { movesAllowed: true },
+        records: () =>
+          Promise.resolve({
+            companies: [{ id: SILO, name: "Silo Credit" }],
+            investors: [],
+            things: [],
+            deleted: [],
+          }),
+      });
+      const r = {
+        runId: "viewer-late",
+        tenantId: "t",
+        actorUserId: "u",
+        correlationId: "c",
+        plan: {
+          scopes: [],
+          screen: {
+            route: "DISCOVER",
+            workspace: { qPane: "open", pagePane: "open", at: "/discover" },
+          },
+        },
+      } as unknown as QAnswerRequest;
+      moves.start(r, {
+        utterance: "i want to see silo credit's pitch deck",
+        recentTurns: [],
+        pageText: null,
+      });
+      const viewerOpen = {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "OPEN_RECORD_PAGE",
+          page: "DATA_ROOM_DOCUMENT",
+          id: CAP,
+          companyId: SILO,
+        },
+      };
+      const settling = moves.settle(r, [viewerOpen] as never, {
+        keepAnswerMoves: true,
+      });
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(await settling).toEqual([viewerOpen]);
+      const late = moves.late?.(r);
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(await late).toMatchObject({
+        blocks: [
+          {
+            kind: "UI_INTENT",
+            intent: {
+              kind: "OPEN_RECORD_PAGE",
+              page: "COMPANY",
+              id: SILO,
+              tab: "deck",
+            },
+          },
+        ],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
