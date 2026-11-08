@@ -2596,12 +2596,37 @@ export function createSpecialistQAnswer(
       readonly yieldsToMove?: boolean | undefined;
     },
   ): Promise<QAnswerOutcome> {
+    // Batch-12 latency: the move is its own message. A line that would say
+    // the record could not be opened gives way to it: the move's message
+    // is the answer, and the false line is never stored.
+    if (options?.yieldsToMove === true) {
+      const moved = await dependencies.pageMoves
+        ?.awaitPublished?.(request)
+        .catch(() => null);
+      if (moved != null)
+        return {
+          kind: "ANSWERED",
+          messageId: moved,
+          modelPolicyVersion: "none",
+          promptBundleVersion: "none",
+        };
+    }
     // W4: the page pane's move joins the answer, outside the transaction.
     const blocks = await movedBlocks(request, answerBlocks);
     const written =
       options?.yieldsToMove === true && addsMove(answerBlocks, blocks)
         ? MOVE_MADE_LINE
         : given;
+    return storeQMessage(request, conversationId, written, blocks);
+  }
+
+  /** One Q message and its durable completion event, committed together. */
+  async function storeQMessage(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    written: string,
+    blocks: readonly QResultBlock[] | undefined,
+  ): Promise<QAnswerOutcome> {
     const turn = turnOfRun.get(request.runId);
     const localise = dependencies.localiseWords;
     const content =
@@ -5502,6 +5527,23 @@ export function createSpecialistQAnswer(
         utterance: latest.content,
         recentTurns: recentTurnPairs(history, latest),
         pageText: null,
+        // Batch-12 latency: the move is its own message the moment the
+        // decision lands, while the answer may still be writing.
+        ...(conversationId === undefined
+          ? {}
+          : {
+              publish: async (move) => {
+                const stored = await storeQMessage(
+                  request,
+                  conversationId,
+                  move.content,
+                  move.blocks,
+                );
+                return stored.kind === "ANSWERED" && stored.messageId !== null
+                  ? { messageId: stored.messageId }
+                  : undefined;
+              },
+            }),
       });
     // RECOVERY B5 (audit B-05): "hi Q", "thanks", "how are you?" -- a turn
     // that is nothing but a pleasantry is answered by code: no reader, no

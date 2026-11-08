@@ -2007,3 +2007,149 @@ describe("batch-11 replay: a viewer open never stops a late decision from follow
     }
   });
 });
+
+describe("batch-12 latency: the decision's move is its own message the moment it lands, not after the answer", () => {
+  const request = (runId: string) =>
+    ({
+      runId,
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "HOME",
+          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+        },
+      },
+    }) as unknown as QAnswerRequest;
+  const team = proposal({ place: place({ route: "/work", tab: "team" }) });
+  const TEAM_MOVE = {
+    kind: "UI_INTENT",
+    intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
+  };
+  const landsAt = (ms: number) => ({
+    decide: () =>
+      new Promise<NavigationDecisionResult>((resolve) =>
+        setTimeout(() => resolve(team), ms),
+      ),
+  });
+
+  it("a decision at 2 s is published at 2 s while a 10 s answer is still writing; the answer later carries no second move", async () => {
+    vi.useFakeTimers();
+    try {
+      const published: { at: number; content: string; blocks: unknown }[] = [];
+      const t0 = Date.now();
+      const moves = createQPageMoves({
+        decider: landsAt(2_000),
+        config: { movesAllowed: true },
+      });
+      const r = request("early-1");
+      moves.start(r, {
+        utterance: "who is on Q's team",
+        recentTurns: [],
+        pageText: null,
+        publish: (move) => {
+          published.push({ at: Date.now() - t0, ...move });
+          return Promise.resolve({ messageId: "m-move" });
+        },
+      });
+      await vi.advanceTimersByTimeAsync(2_100);
+      expect(published).toEqual([
+        { at: 2_000, content: "I've opened Q's team.", blocks: [TEAM_MOVE] },
+      ]);
+      await vi.advanceTimersByTimeAsync(8_000);
+      // The answer model's own place move would be a second, contrary move.
+      const own = {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "PROFILE" },
+      };
+      const words = {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "UI_ACT",
+          actId: "uia_press00001",
+          act: "ACTIVATE",
+          target: "button.send",
+        },
+      };
+      expect(await moves.settle(r, [own, words] as never)).toEqual([words]);
+      expect(await moves.late?.(r)).toBeNull();
+      expect(published).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a fast code answer is not held at all; the decision is published when it lands, and late() waits for it so the run cannot end first", async () => {
+    vi.useFakeTimers();
+    try {
+      const published: number[] = [];
+      const t0 = Date.now();
+      const moves = createQPageMoves({
+        decider: landsAt(3_000),
+        config: { movesAllowed: true },
+      });
+      const r = request("early-2");
+      moves.start(r, {
+        utterance: "who is on Q's team",
+        recentTurns: [],
+        pageText: null,
+        publish: () => {
+          published.push(Date.now() - t0);
+          return Promise.resolve({ messageId: "m-move" });
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      const settled = moves.settle(r, [], { keepAnswerMoves: true });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await settled).toEqual([]);
+      let lateDone = false;
+      const late = moves.late?.(r).then((v) => {
+        lateDone = true;
+        return v;
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(lateDone).toBe(false);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(await late).toBeNull();
+      expect(published).toEqual([3_000]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("code's exact command in a fast answer keeps the decision from publishing a second move", async () => {
+    vi.useFakeTimers();
+    try {
+      const published: unknown[] = [];
+      const moves = createQPageMoves({
+        decider: landsAt(3_000),
+        config: { movesAllowed: true },
+      });
+      const r = request("early-3");
+      moves.start(r, {
+        utterance: "open work",
+        recentTurns: [],
+        pageText: null,
+        publish: (move) => {
+          published.push(move);
+          return Promise.resolve({ messageId: "m-move" });
+        },
+      });
+      const command = [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "WORK" },
+        },
+      ];
+      expect(
+        await moves.settle(r, command as never, { keepAnswerMoves: true }),
+      ).toEqual(command);
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(published).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

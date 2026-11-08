@@ -965,6 +965,9 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
         workspace: { qPane: "open", pagePane: "open", at: "/discover" },
       }),
     );
+    // Batch-12 latency: the move is its own message, and it is the answer:
+    // the can't-open line is never stored.
+    expect(run.stored).toHaveLength(1);
     const stored = run.stored[0];
     expect(stored?.blocks ?? []).toContainEqual({
       kind: "UI_INTENT",
@@ -973,17 +976,19 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(stored?.content ?? "").not.toMatch(
       /can't open|isn't one of yours|don't see/iu,
     );
-    expect(stored?.content ?? "").toMatch(/I've opened it/u);
+    expect(stored?.content ?? "").toMatch(/I've opened Work/u);
   });
 
-  it("W4: with the workspace on screen, the page pane's move joins the stored answer; code's own move wins; off, nothing runs", async () => {
+  it("W4: with the workspace on screen, the page pane's move is its own message; code's own move wins; off, nothing runs", async () => {
     const decided: string[] = [];
     const pageMoves = () =>
       createQPageMoves({
         decider: {
-          decide: (input) => {
+          decide: async (input) => {
             decided.push(input.utterance);
-            return Promise.resolve({
+            // As in production, the decision lands after a code answer.
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            return {
               decision: "MOVE",
               place: {
                 route: "/work",
@@ -997,7 +1002,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
               back: false,
               askedForPage: true,
               reason: "",
-            });
+            } as const;
           },
         },
         config: { movesAllowed: true },
@@ -1025,7 +1030,12 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect((await on.answer.answer(request(WORKSPACE))).kind).toBe("ANSWERED");
     // Decision 78: the decision is sampled three times, in parallel.
     expect(decided).toEqual(["Stay here", "Stay here", "Stay here"]);
-    expect(on.stored[0]?.blocks).toEqual([
+    // Batch-12 latency: the answer goes at once; the move follows as its
+    // own message the moment the decision lands.
+    expect(on.stored).toHaveLength(2);
+    expect(on.stored[0]?.blocks ?? []).toEqual([]);
+    expect(on.stored[1]?.content).toBe("I've opened Q's team.");
+    expect(on.stored[1]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
         intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
@@ -1040,6 +1050,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       pageMoves: pageMoves(),
     });
     await own.answer.answer(request(WORKSPACE));
+    expect(own.stored).toHaveLength(1);
     expect(own.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
