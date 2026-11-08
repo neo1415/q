@@ -11,6 +11,7 @@ import {
   NAVIGATION_LINE,
   HERE_LINE,
   screenLines,
+  WORKSPACE_PANE_LINE,
   collectReceipts,
   PLAIN_KNOWING_LINE,
   POINTING_LINE,
@@ -413,5 +414,16 @@ describe("'what are you doing?' opens Work with the cards (founder 2026-10-06)",
     "Take me to Discover",
   ])("leaves %s alone", (text) => {
     expect(asksAboutQWork(text)).toBe(false);
+  });
+});
+
+describe("batch 14: in the Q Workspace the answer never offers a page move of its own", () => {
+  it("the screen lines say Capital Q moves the page pane, only when the workspace is on", () => {
+    const on = screenLines({
+      route: "HOME",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    });
+    expect(on).toContain(WORKSPACE_PANE_LINE);
+    expect(screenLines({ route: "HOME" })).not.toContain(WORKSPACE_PANE_LINE);
   });
 });
