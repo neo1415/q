@@ -1158,6 +1158,8 @@ export function createInterviewAgent(
         kept.items.filter((t) => t.role === "Q").map((t) => t.stepKey ?? null),
       );
     }
+    /** The step Q's last line asked, before this turn changes it. */
+    const askedBeforeTurn = lastAsked.get(input.onboardingSessionId) ?? null;
     const standing = await standingRead;
     const personality = standing?.personality ?? "AUTO";
     // Multilingual Q: the language they chose for Q (Settings or by telling
@@ -2922,6 +2924,7 @@ export function createInterviewAgent(
         );
         const settled = listsSettledByAnswer({
           lastQTurn,
+          askedStep: askedBeforeTurn,
           utterance,
           recordedThisTurn: port.recorded(),
           open,

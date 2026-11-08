@@ -12,11 +12,20 @@ import type {
   QDelegationReader,
   TaxonomyChooser,
 } from "@capital-q/model-gateway/q";
-import { INVESTOR_NONE_STEPS } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_LIST_THEMES,
+  INVESTOR_NONE_STEPS,
+} from "@capital-q/investor-onboarding";
 import type { Logger } from "@capital-q/observability";
 import type { OnboardingState, OnboardingStepState } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import {
+  isWholeNone,
+  isWholeSkip,
+  listsSettledByAnswer,
+  themeAskedIn,
+} from "./list-settle.js";
 import type { HeldWritesStore } from "./held-writes.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { definitionFor, toResponseValue } from "./interview-steps.js";
@@ -435,6 +444,71 @@ export function createOnboardingConversation(dependencies: {
     );
     let state = await portFor(line, personTurns).state();
     if (state.completed) return;
+    // e2e run 5 (production batch 9): "Are there sectors you'd rather not
+    // see?" answered "None." seven times and never saved -- the reading
+    // left it to a decline the port's own check did not share. A plain
+    // "none" to what Q's last line asked (one list, a themed question or
+    // its follow-up) is settled by code before the reading, for exactly
+    // the lists that line asked; never a list it did not ask.
+    const latest = thread.items.findLastIndex((turn) => turn.role === "PERSON");
+    const latestWords = thread.items[latest]?.text ?? "";
+    const askedBy = thread.items
+      .slice(0, Math.max(0, latest))
+      .findLast((turn) => turn.role === "Q");
+    /** The steps Q's line before their latest words asked about. */
+    const askedSteps = new Set<string>([
+      ...(askedBy?.stepKey === undefined ? [] : [askedBy.stepKey]),
+      ...(themeAskedIn(askedBy?.text)?.stepKeys ?? []),
+    ]);
+    if (only === undefined && line.onboarding.journeyType === "investor") {
+      const settled = listsSettledByAnswer({
+        lastQTurn: askedBy?.text,
+        askedStep: askedBy?.stepKey,
+        utterance: latestWords,
+        recordedThisTurn: [],
+        open: new Set(
+          state.steps
+            .filter(
+              (step) => step.status === "OPEN" || step.status === "SET_ASIDE",
+            )
+            .map((step) => step.stepKey),
+        ),
+        answers: new Map(),
+      });
+      const port = portFor(line, personTurns);
+      let settledNow = 0;
+      for (const [keys, as] of [
+        [settled.none, "NONE"],
+        [settled.notKnown, "NOT_KNOWN"],
+      ] as const) {
+        if (keys.length === 0) continue;
+        const results = await port
+          .recordNone(
+            keys.map((stepKey) => ({ stepKey, quote: latestWords })),
+            as,
+          )
+          .catch((error: unknown) => {
+            logger.warn(
+              { err: error, onboardingSessionId: line.onboarding.sessionId },
+              "a plain none was not settled",
+            );
+            return [];
+          });
+        settledNow += results.filter((r) => r.outcome === "COMMITTED").length;
+      }
+      if (settledNow > 0) {
+        logger.info(
+          {
+            onboardingSessionId: line.onboarding.sessionId,
+            none: settled.none,
+            notKnown: settled.notKnown,
+          },
+          "a plain none settled the lists Q asked",
+        );
+        state = await port.state();
+        if (state.completed) return;
+      }
+    }
     const optionIds = optionIdsOf(state);
     const steps = readableSteps(state, optionIds).filter(
       (step) => only === undefined || only.has(step.stepKey),
@@ -460,10 +534,45 @@ export function createOnboardingConversation(dependencies: {
       state = await portFor(line, personTurns).state();
       if (state.completed) return;
     }
+    // e2e run 5 (production 01:03:37): the reader filed a bare "None." to
+    // "sectors you'd rather not see" as their additional context. A bare
+    // none or skip answers only what Q's line asked: read from that line
+    // for any other step (an answer, a decline or a "do not know"), it is
+    // dropped. Words with any content are the reading's, as before.
+    // Only when what Q asked is known: otherwise the reading decides alone.
+    const bare =
+      askedSteps.size > 0 &&
+      (isWholeNone(latestWords) || isWholeSkip(latestWords));
+    const fromBareLine = (item: {
+      readonly stepKey: string;
+      readonly quote: string;
+    }) =>
+      bare &&
+      !askedSteps.has(item.stepKey) &&
+      quotedFrom(item.quote, [latestWords]);
+    const kept = read.answers.filter((answer) => !fromBareLine(answer));
+    const bareDropped = [
+      ...read.answers,
+      ...read.declined,
+      ...(read.notKnown ?? []),
+    ].filter((item) => fromBareLine(item));
+    if (bareDropped.length > 0) {
+      logger.info(
+        {
+          onboardingSessionId: line.onboarding.sessionId,
+          dropped: bareDropped.map((item) => item.stepKey),
+        },
+        "a bare none was not filed under a step Q did not ask",
+      );
+    }
     // The reader named options by their ids; back to the journey's keys.
     const reading = {
       ...read,
-      answers: read.answers.map((answer) => ({
+      declined: read.declined.filter((item) => !fromBareLine(item)),
+      ...(read.notKnown === undefined
+        ? {}
+        : { notKnown: read.notKnown.filter((item) => !fromBareLine(item)) }),
+      answers: kept.map((answer) => ({
         ...answer,
         value: keysFromIds(answer.value, optionIds.get(answer.stepKey)),
       })),
@@ -1533,7 +1642,7 @@ export function briefOf(
         INVESTOR_NONE_STEPS.has(step.stepKey),
     )
       ? [
-          'Topics marked (none is an answer) are lists: ask them in as few natural questions as you can, by theme (what they look for in a company; the founders and signals they value; what they\'d rather not see or never want shown; their portfolio and thesis). One answer often fills several. "None" or "no preference" from them answers a list: take it and move on.',
+          `Topics marked (none is an answer) are lists: ask them in as few natural questions as you can, by theme, never list by list. Ask each theme with exactly these words: ${INVESTOR_LIST_THEMES.map((theme) => JSON.stringify(theme.question)).join("; ")}; the portfolio and their thesis on their own. One answer often fills several. "None" or "no preference" from them answers a list, or a whole question: take it and move on. When an answer covers only some of a question's lists, ask once, briefly, about just the rest together ("Anything on revenue expectations or regulated markets, or no preference?"); never take a list they did not address as none.`,
         ]
       : []),
     // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long

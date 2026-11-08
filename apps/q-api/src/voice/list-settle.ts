@@ -19,7 +19,11 @@ import { plainStepLabel } from "./step-copy.js";
  *
  * 1. A plain whole "none" to a themed question Q asked (the theme's own
  *    words, or its follow-up's) is "None" for every list it asked that is
- *    still open: they answered all of them at once.
+ *    still open: they answered all of them at once. A plain "none" to a
+ *    question about one list (the step Q's line asked, e2e run 5: "Are
+ *    there sectors you'd rather not see?" answered "None." seven times and
+ *    never saved) is "None" for that list, and, when it is one of a
+ *    concept family, for the family's open lists too.
  * 2. A plain skip ("not sure", "skip") to the follow-up is "I don't know"
  *    for the lists it named: asked twice, and they would rather not say.
  * 3. "None" recorded this turn for one list of a concept family (what they
@@ -153,6 +157,8 @@ export type SettledLists = {
 
 export function listsSettledByAnswer(input: {
   readonly lastQTurn: string | null | undefined;
+  /** The step Q's last line asked, when known. */
+  readonly askedStep?: string | null | undefined;
   readonly utterance: string;
   /** Steps written this turn. */
   readonly recordedThisTurn: readonly string[];
@@ -169,11 +175,20 @@ export function listsSettledByAnswer(input: {
   } else if (asked?.followUp === true && isWholeSkip(input.utterance)) {
     for (const key of asked.stepKeys) notKnown.add(key);
   }
+  const askedStep = input.askedStep ?? undefined;
+  if (
+    askedStep !== undefined &&
+    INVESTOR_NONE_STEPS.has(askedStep) &&
+    isWholeNone(input.utterance)
+  ) {
+    none.add(askedStep);
+  }
   for (const family of INVESTOR_CONCEPT_FAMILIES) {
     const saidNone = family.stepKeys.some(
       (key) =>
-        input.recordedThisTurn.includes(key) &&
-        isNoneAnswer(input.answers.get(key)),
+        (input.recordedThisTurn.includes(key) &&
+          isNoneAnswer(input.answers.get(key))) ||
+        (key === askedStep && none.has(key)),
     );
     if (saidNone) for (const key of family.stepKeys) none.add(key);
   }
