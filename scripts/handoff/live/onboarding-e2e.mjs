@@ -671,6 +671,10 @@ if (STEPS.has("J6")) {
           [/anything else|anything more|missed/i, "No, that's everything."],
         ]
       : [
+          // Run 5: a read-back of what they said ("From what you said: …
+          // Shall I keep that/these?") is a plain yes, before the cheque
+          // rule: the figures read back are the ones they gave.
+          [/shall i keep (that|these|them)/i, "Yes."],
           // Run 4: one answer for every cheque question, all three figures,
           // before the read-back: a proposal of other figures is corrected,
           // never agreed to, and never answered one figure at a time (the
