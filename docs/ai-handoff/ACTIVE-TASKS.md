@@ -1,5 +1,32 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 8 November 2026, 03:25 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: **batch 10 `47df02df9`** (rollback `c3e563daa`); CI run 1885 green (run 1884 failed only on my unformatted receipt JSON); all four services SUCCESS; hosted migrations 291; workspace LABS on, moves allowed.
+
+Batch 10:
+
+- W4 b6904e51b: open_page executes for code in workspace mode (`invokedBy: "CODE"`); the model's offer stays narrowed.
+- W5 85d3ffb03 and f3e9cce71: a plain none settles exactly the lists asked, a bare none is never filed as free text, the held set is read back once, and a restated set counts as yes.
+
+Evidence:
+
+- Owner replay (receipts/2026-11-08-owner-replay-batch10):
+  - team tab, Clinicrest (topic move), Clinicrest's elevator (right referent) and /profile now MOVE;
+  - page action 8.6 s on the server.
+  - Left for W4 batch 11: (1) the deck: an "Open the document" offer suppresses a unanimous MOVE to the Deck tab; (2) who viewed: 3/3 MOVE /analytics decided as SPLIT_VOTE.
+- Onboarding e2e run 6 (receipts/2026-11-08-onboarding-e2e-6):
+  - founder ALL PASS; the investor's none loop is fixed.
+  - Left for W5 batch 11: the read-back shares a line with a new question, and a strength question is repeated verbatim after a non-answer.
+
+| Lane                                | State                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| W4 session_01Wncmn4BQnwUu8PoUpcMjfu | batch 11: offer must not suppress a decided move; vote on place, not section      |
+| W5 session_01Wncmn7LanmxRBs1Eoe8por | batch 11: read-back alone on its line; no verbatim re-ask; runner strength answer |
+| W1, W3, Analytics                   | idle                                                                              |
+
+Anthropic test spend: about $42.5 of $50 (none used since). Serper credit is spent; Brave and Tavily work.
+
 ## Live board — 8 November 2026, 01:05 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: **batch 9 `c3e563daa`** (rollback `1a669b58c`); CI run 1882 green; all four Railway services SUCCESS; hosted migrations 291; workspace LABS on, moves allowed.

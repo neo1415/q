@@ -2146,3 +2146,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - The resolver's `open_page` was DENIED TOOL_NOT_ELIGIBLE because the q-tools registry's workspace one-authority filter also gates execution.
   - Assigned to W4 (batch 10).
 - Onboarding e2e run 5 is running on batch 9.
+
+## 2026-11-08 03:25 UTC — batch 10 live (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- `47df02df9` = W4 b6904e51b (resolver executes open_page for code) + W5 f3e9cce71 (none settle, no free-text filing, held set read back once) + runner bfda6b817.
+  - CI 1884 failed only on format, because of my unformatted receipts results.json. Fixed; CI 1885 green.
+  - Deployed; rollback c3e563daa.
+- Owner replay: team, Clinicrest, their elevator and profile moves now work. Deck offer and split vote go to W4 (batch 11).
+- Onboarding e2e run 6: founder ALL PASS; investor none loop fixed. Read-back sharing a line and the verbatim strength re-ask go to W5 (batch 11).
