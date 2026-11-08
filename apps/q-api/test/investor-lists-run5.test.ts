@@ -169,3 +169,27 @@ describe("the finishing line asks missing lists by theme (e2e run 5)", () => {
     expect(said?.reply).toContain(`Question ${I.portfolio}?`);
   });
 });
+
+describe("the natural nones (e2e run 7)", () => {
+  it("are plain nones; not sure and skip are not", async () => {
+    const { isWholeNone, isWholeSkip } =
+      await import("../src/voice/list-settle.js");
+    for (const said of [
+      "No, that's everything.",
+      "Nothing else.",
+      "That's all.",
+      "None yet.",
+      "Not yet.",
+      "No portfolio yet.",
+      "Nothing to add.",
+    ]) {
+      expect(isWholeNone(said)).toBe(true);
+    }
+    for (const said of ["Not sure.", "Skip.", "I don't know."]) {
+      expect(isWholeNone(said)).toBe(false);
+      expect(isWholeSkip(said)).toBe(true);
+    }
+    // Still a finishing word, never a none, when it carries more.
+    expect(isWholeNone("Yes, that's right. That's all for now.")).toBe(false);
+  });
+});

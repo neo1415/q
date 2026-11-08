@@ -601,8 +601,9 @@ export function createTypedOnboarding(dependencies: {
           ...(review === undefined ? {} : { review }),
           ...(unsettled === undefined ? {} : { unsettled }),
         });
-        if (said?.asking !== null && said?.asking !== undefined) {
-          asks.set(said.asking, (asks.get(said.asking) ?? 0) + 1);
+        const counted = said?.asking ?? said?.leaving ?? null;
+        if (counted !== null) {
+          asks.set(counted, (asks.get(counted) ?? 0) + 1);
           finishRepeats.delete(input.onboardingSessionId);
           finishRepeats.set(input.onboardingSessionId, asks);
           if (finishRepeats.size > 2_000) {
@@ -621,7 +622,12 @@ export function createTypedOnboarding(dependencies: {
         }
         // Still open essentials: their next answer goes on toward the
         // finish. Finished, or read back for their yes: that yes decides.
-        if (!finished.completed && finished.missing.length > 0) {
+        // After the one short close for a step left for now, finishing
+        // stops here: their next words are the conversation again, never
+        // the same close once more (e2e run 7).
+        const closed =
+          said?.leaving !== undefined && (asks.get(said.leaving) ?? 0) > 3;
+        if (!finished.completed && finished.missing.length > 0 && !closed) {
           finishAsked.add(input.onboardingSessionId);
         } else {
           finishAsked.delete(input.onboardingSessionId);
@@ -630,7 +636,12 @@ export function createTypedOnboarding(dependencies: {
           said?.reply ??
           "Before I can finish, a few things are still open. Shall we go through them?";
         // The streamed first line stays part of the whole reply.
-        text = firstLine === null ? rest : `${firstLine} ${rest}`;
+        // "Let me check what I have." leads a check, never a close that
+        // leaves a step for now (e2e run 7).
+        text =
+          firstLine === null || said?.leaving !== undefined
+            ? rest
+            : `${firstLine} ${rest}`;
         asking = said?.asking ?? null;
         if (finished.completed) navigate = destination(true);
         path = finished.completed ? "FINISHED" : "FINISHING";

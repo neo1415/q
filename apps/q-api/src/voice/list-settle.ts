@@ -57,6 +57,31 @@ const WHOLE_NONE = new Set([
   "no restrictions",
   "nothing comes to mind",
   "no thanks",
+  // e2e run 7: the natural nones for the own-words lists (anything else
+  // they look for, their portfolio) -- explicit answers, not refusals:
+  // "No, that's everything." five times and "None yet." twice, unsaved.
+  "that's everything",
+  "no that's everything",
+  "that's it",
+  "no that's it",
+  "that's all",
+  "no that's all",
+  "nothing else",
+  "no nothing else",
+  "nothing more",
+  "no nothing more",
+  "nothing to add",
+  "no nothing to add",
+  "nothing further",
+  "none yet",
+  "no none yet",
+  "not yet",
+  "no not yet",
+  "nothing yet",
+  "no portfolio yet",
+  "no portfolio companies yet",
+  "no investments yet",
+  "no companies yet",
   NONE_ANSWER_TEXT.toLowerCase(),
 ]);
 

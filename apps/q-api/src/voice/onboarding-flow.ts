@@ -718,7 +718,12 @@ export function finishingLine(
     /** A choice step's choices, in the journey's plain words. */
     readonly choicesOf?: ((stepKey: string) => readonly string[]) | undefined;
   },
-): { readonly reply: string; readonly asking: string | null } | null {
+): {
+  readonly reply: string;
+  readonly asking: string | null;
+  /** The needed step this line leaves open for now, asking nothing. */
+  readonly leaving?: string;
+} | null {
   if (
     !finished.completed &&
     finished.reason === REVIEW_NOT_SHOWN_REASON &&
@@ -845,10 +850,19 @@ export function finishingLine(
   }
   if (timesAsked(first.stepKey) >= 2) {
     // Asked twice, the second time with why and its choices, and still no
-    // answer: left open for now, asked nothing, never looped.
+    // answer: left open for now, asked nothing, never looped. Said once;
+    // after it, one short close (e2e run 7: the same "let's leave …" line
+    // came back on eight messages in a row).
+    const label = lowerFirst(
+      copy.labelOf(first.stepKey) ?? plainStepLabel(first.stepKey),
+    );
     return {
-      reply: `That's fine, let's leave ${lowerFirst(copy.labelOf(first.stepKey) ?? plainStepLabel(first.stepKey))} for now: everything else you told me is kept. It's the one thing your setup still needs, and you can answer it here or on your profile whenever you like.`,
+      reply:
+        timesAsked(first.stepKey) === 2
+          ? `That's fine, let's leave ${label} for now: everything else you told me is kept. It's the one thing your setup still needs, and you can answer it here or on your profile whenever you like.`
+          : `That's everything else done; ${label} is the one thing left, whenever you're ready.`,
       asking: null,
+      leaving: first.stepKey,
     };
   }
   // A decline has its own words below ("That's fine…"); this is for a

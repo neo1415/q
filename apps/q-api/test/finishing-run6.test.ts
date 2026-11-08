@@ -130,3 +130,17 @@ describe("a plain yes to code's read-back is a yes to exactly what it read back"
     ).toEqual([I.chequeMin, I.chequeTypical, I.chequeMax]);
   });
 });
+
+describe("left for now, then one short close (e2e run 7)", () => {
+  it("the leave line once, then a short close; neither asks anything", () => {
+    const left = ask([STRENGTH], { [STRENGTH]: 2 });
+    const close = ask([STRENGTH], { [STRENGTH]: 3 });
+    expect(left?.leaving).toBe(STRENGTH);
+    expect(close?.leaving).toBe(STRENGTH);
+    expect(close?.reply).toBe(
+      "That's everything else done; green-flag firmness is the one thing left, whenever you're ready.",
+    );
+    expect(close?.reply).not.toBe(left?.reply);
+    expect(close?.asking).toBeNull();
+  });
+});

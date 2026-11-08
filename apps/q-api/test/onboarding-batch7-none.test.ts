@@ -309,3 +309,67 @@ describe("a bare none is never filed under a step Q did not ask (run 5)", () => 
     expect(w.recordedValue(INVESTOR_STEPS.additionalContext)).toBeDefined();
   });
 });
+
+/**
+ * e2e run 7 (production batch 11): "Anything else you look for that we
+ * haven't covered?" was answered "No, that's everything." five times and
+ * "Could you name a few representative portfolio companies?" "None yet."
+ * twice; neither was saved, and setup could not finish. These are explicit
+ * nones, not refusals: each is None for exactly the list asked.
+ */
+describe("the natural nones of the own-words lists (e2e run 7)", () => {
+  const quiet: OnboardingTranscriptReader = {
+    read: () => Promise.resolve({ answers: [], declined: [] }),
+  };
+  const talk = async (q: string, asked: string, said: string) => {
+    const w = investorSession({
+      steps: INVESTOR_DEFINITION_CURRENT.steps,
+      servesTurnSteps: true,
+      currentStepKey: asked,
+      subject: FIRM,
+      recorded: { "I0.investor_type": "vc" },
+    });
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: w.fetch,
+      logger,
+      readAfterMs: 5,
+      reader: quiet,
+      recommendations: w.recommendations,
+    });
+    await conversation.said?.(line, "Q", q, asked);
+    await conversation.said?.(line, "PERSON", said);
+    await conversation.flush?.(line);
+    return w;
+  };
+  const NONE = { type: "TEXT", text: "None" };
+
+  it("'No, that's everything.' to anything else they look for is None for it", async () => {
+    const w = await talk(
+      "Anything else you look for that we haven't covered?",
+      INVESTOR_STEPS.additionalContext,
+      "No, that's everything.",
+    );
+    expect(w.recordedValue(INVESTOR_STEPS.additionalContext)).toEqual(NONE);
+    expect(w.recordedValue(INVESTOR_STEPS.portfolio)).toBeUndefined();
+  });
+
+  it("'None yet.' to their portfolio is None for it", async () => {
+    const w = await talk(
+      "Could you name a few representative portfolio companies?",
+      INVESTOR_STEPS.portfolio,
+      "None yet.",
+    );
+    expect(w.recordedValue(INVESTOR_STEPS.portfolio)).toEqual(NONE);
+    expect(w.recordedValue(INVESTOR_STEPS.additionalContext)).toBeUndefined();
+  });
+
+  it("'Not sure.' is never None", async () => {
+    const w = await talk(
+      "Could you name a few representative portfolio companies?",
+      INVESTOR_STEPS.portfolio,
+      "Not sure.",
+    );
+    expect(w.recordedValue(INVESTOR_STEPS.portfolio)).not.toEqual(NONE);
+  });
+});
