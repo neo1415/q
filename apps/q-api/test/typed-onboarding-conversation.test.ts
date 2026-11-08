@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
+import {
+  INVESTOR_DEFINITION_CURRENT,
+  INVESTOR_DEFINITION_V1,
+} from "@capital-q/investor-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type {
   OnboardingTranscriptReader,
@@ -458,5 +461,82 @@ describe("a needed question is never looped word for word (e2e run 6)", () => {
     // Then it is left for now: another needed one is asked instead.
     expect(third.asking?.stepKey).not.toBe(asked);
     expect(new Set([first.reply, second.reply, third.reply]).size).toBe(3);
+  });
+});
+
+/**
+ * e2e run 8 (production batch 12): every needed answer was in, Q wrote
+ * "That's all set …" and asked nothing, and nothing finished. A reply that
+ * asks nothing, once nothing needed is open, goes on to the finish: the
+ * read-back for their yes.
+ */
+describe("all answered: a reply that asks nothing goes on to the finish (e2e run 8)", () => {
+  it("Q's line leads the read-back for their yes", async () => {
+    const steps = INVESTOR_DEFINITION_CURRENT.steps.filter((step) =>
+      ["I0.organisation_name", "I11.review"].includes(step.stepKey),
+    );
+    const world = investorSession({
+      steps,
+      currentStepKey: "I11.review",
+      subject: FIRM,
+      recorded: { "I0.organisation_name": "Harmattan Angels" },
+    });
+    const { say } = typedWorld({
+      world,
+      script: [{ reply: "That's all set.", asking: null }],
+    });
+    const outcome = await say("No, that's everything.");
+    expect(outcome.reply).toMatch(/^That's all set\./u);
+    expect(outcome.reply).toMatch(/Here's what I have saved/u);
+    expect(outcome.reply).toMatch(/Is that all right\?/u);
+  });
+});
+
+/**
+ * e2e run 8 (founder): "What are your approximate gross margin, monthly
+ * spend…?" asked seven times, reworded each time, to an unrelated answer.
+ * DECISIONS 77, whoever words it: the third time, its reason once, then it
+ * is left for now and the next one is asked.
+ */
+describe("a needed step Q's own replies keep asking is left for now (e2e run 8)", () => {
+  it("twice as written, then its reason once and the next question; never a fourth", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      subject: FIRM,
+      recorded: {
+        "I0.investor_type": "angel",
+        "I0.organisation_name": "Harmattan Angels",
+      },
+    });
+    const { say } = typedWorld({
+      world,
+      script: [
+        {
+          reply: "Got it. Which stages do you invest in?",
+          asking: "I2.stages",
+        },
+        {
+          reply: "Thanks. And which stages do you back?",
+          asking: "I2.stages",
+        },
+        {
+          reply: "Understood. What stages are you investing at?",
+          asking: "I2.stages",
+        },
+        { reply: "Sure. Which stages, again?", asking: "I2.stages" },
+      ],
+    });
+    const first = await say("Product and hiring.");
+    const second = await say("Product and hiring.");
+    const third = await say("Product and hiring.");
+    const fourth = await say("Product and hiring.");
+    expect(first.asking?.stepKey).toBe("I2.stages");
+    expect(second.asking?.stepKey).toBe("I2.stages");
+    expect(third.reply).toMatch(/let's leave it for now/u);
+    expect(third.reply).not.toMatch(/What stages are you investing at\?/u);
+    expect(third.asking?.stepKey).not.toBe("I2.stages");
+    // Asked again anyway: the next one is asked instead.
+    expect(fourth.asking?.stepKey).not.toBe("I2.stages");
+    expect(fourth.reply).not.toMatch(/Which stages, again\?/u);
   });
 });
