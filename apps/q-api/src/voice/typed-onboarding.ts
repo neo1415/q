@@ -121,6 +121,10 @@ export function createTypedOnboarding(dependencies: {
   const whyWaiting = new Map<string, Map<string, string>>();
   /** D81 #4: replays of a topic's playback after a correction, by session. */
   const replays = new Map<string, Map<string, number>>();
+  /** D82: topics already played back, by session (once each). */
+  const playedTopics = new Map<string, Set<string>>();
+  /** D82 #5: the step Q's last reply asked, for asks counted running. */
+  const lastReplyAsk = new Map<string, string | null>();
   const bounded = <V>(map: Map<string, V>, key: string, value: V) => {
     map.delete(key);
     map.set(key, value);
@@ -178,6 +182,11 @@ export function createTypedOnboarding(dependencies: {
       if (oldest !== undefined) replyAsks.delete(oldest);
     }
     const asked = input.asking;
+    // D82 #5: counted running -- the same step asked again on the very
+    // next reply, with no answer taken between; a reply asking anything
+    // else (a playback included) starts the count again.
+    const previous = lastReplyAsk.get(input.sessionId) ?? null;
+    bounded(lastReplyAsk, input.sessionId, asked);
     const step =
       asked === null
         ? undefined
@@ -185,7 +194,7 @@ export function createTypedOnboarding(dependencies: {
     if (asked === null || step === undefined || !neededOpen(step)) {
       return { text: input.text, asking: input.asking };
     }
-    const times = asks.get(asked) ?? 0;
+    const times = previous === asked ? (asks.get(asked) ?? 0) : 0;
     asks.set(asked, times + 1);
     if (times < 2) return { text: input.text, asking: input.asking };
     // The next needed one, never one left for now.
@@ -843,6 +852,8 @@ export function createTypedOnboarding(dependencies: {
         if (played !== null) {
           text = played.text;
           asking = played.asking;
+          // A playback is no ask of a step (D82 #5).
+          bounded(lastReplyAsk, input.onboardingSessionId, null);
         }
         // DECISIONS 77, whoever words the question: a needed step asked
         // twice with no answer it could take is, the third time, given its
@@ -963,7 +974,19 @@ export function createTypedOnboarding(dependencies: {
             heldFromTheirWords(item.rationale) &&
             topicOf(input.journeyType, item.stepKey) === topic,
         );
-        if (items.length === 0) return null;
+        // D82: once per topic, all of it together; a topic with one value
+        // waiting joins the next playback or the final read-back.
+        const played =
+          playedTopics.get(input.onboardingSessionId) ?? new Set<string>();
+        bounded(playedTopics, input.onboardingSessionId, played);
+        if (!replay && (items.length < 2 || played.has(topic))) return null;
+        if (
+          items.some((item) => item.value.trim().length === 0) ||
+          items.length === 0
+        ) {
+          return null;
+        }
+        played.add(topic);
         const counts =
           replays.get(input.onboardingSessionId) ?? new Map<string, number>();
         bounded(replays, input.onboardingSessionId, counts);
