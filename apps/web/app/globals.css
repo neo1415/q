@@ -6167,6 +6167,13 @@
     .cq-ws-page :is(.cq-brief-dock, .gq-pbar) {
       padding-inline-start: 60px;
     }
+    /* The phone feed's caption runs to the pane's foot: its last line
+       sits above the toggle, not under it (batch 14). */
+    @container cq-page (width < 1024px) {
+      .cq-ws-page .cq-feed-overlay {
+        padding-bottom: 60px;
+      }
+    }
   }
   /* A zero-height strip that sticks to the bottom of the viewport. */
   .cq-ws-page-foot {

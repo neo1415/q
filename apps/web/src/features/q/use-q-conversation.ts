@@ -387,14 +387,17 @@ export function useQConversation(
               // A finished run may have named the conversation for the
               // first time; the list is read again either way.
               announceConversationsChanged();
-              // Batch 13: a run resumed after the person's yes has executed
-              // the approved action; the page beside Q reads again.
-              if (
-                approvedRun.current === run &&
-                event.type === "q.run.completed"
-              ) {
-                approvedRun.current = null;
-                announcePageDataChanged();
+              // The page beside Q reads again, once, when the run changed
+              // data: a tool in it wrote (batch 14, the server's
+              // dataChanged: a Save, a Pass, a note), or it resumed after
+              // the person's yes and executed the approved action (batch
+              // 13; also said by a server older than dataChanged).
+              if (event.type === "q.run.completed") {
+                const approved = approvedRun.current === run;
+                if (approved) approvedRun.current = null;
+                if (approved || event.data.dataChanged === true) {
+                  announcePageDataChanged();
+                }
               }
             }
           },

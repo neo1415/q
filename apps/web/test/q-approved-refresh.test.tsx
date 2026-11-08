@@ -90,7 +90,7 @@ function Home() {
   return <p data-testid="working">{String(q.working)}</p>;
 }
 
-describe("the page reads again after Q executes an approved action", () => {
+describe("the page reads again after Q changes data", () => {
   it("announces once, when the run resumed after the yes completes", async () => {
     const changed = vi.fn();
     window.addEventListener(PAGE_DATA_CHANGED_EVENT, changed);
@@ -162,6 +162,87 @@ describe("the page reads again after Q executes an approved action", () => {
         );
       });
       expect(changed).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(PAGE_DATA_CHANGED_EVENT, changed);
+    }
+  });
+
+  // Batch 14 (W3's contract): a run whose tool wrote without an approval
+  // (Save, Pass, a note) completes with data.dataChanged; the page reads
+  // again once. An approved run that also carries it reads once, not twice.
+  it("announces once when a run completes with dataChanged", async () => {
+    const changed = vi.fn();
+    window.addEventListener(PAGE_DATA_CHANGED_EVENT, changed);
+    try {
+      emit = null;
+      render(<Home />);
+      await act(async () => {
+        await handle.ask?.("Save Harbourline Cargo");
+      });
+      await waitFor(() => {
+        expect(emit).not.toBeNull();
+      });
+      act(() => {
+        emit?.(
+          event("q.run.started", { capability: "ANSWER", status: "RECEIVED" }),
+        );
+        emit?.(
+          event("q.run.completed", {
+            status: "COMPLETED",
+            completedAt: "2026-09-27T10:00:05.000Z",
+            dataChanged: true,
+          }),
+        );
+      });
+      expect(changed).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(PAGE_DATA_CHANGED_EVENT, changed);
+    }
+  });
+
+  it("an approved run that says dataChanged announces once, not twice", async () => {
+    const changed = vi.fn();
+    window.addEventListener(PAGE_DATA_CHANGED_EVENT, changed);
+    try {
+      emit = null;
+      render(<Home />);
+      await act(async () => {
+        await handle.ask?.("Express interest in Harbourline Cargo");
+      });
+      await waitFor(() => {
+        expect(emit).not.toBeNull();
+      });
+      act(() => {
+        emit?.(
+          event("q.run.started", {
+            capability: "PREPARE_ACTION",
+            status: "RECEIVED",
+          }),
+        );
+        emit?.(
+          event("q.approval.required", {
+            proposalId: "123e4567-e89b-12d3-a456-426614174000",
+            approvalId: "123e4567-e89b-12d3-a456-426614174001",
+          }),
+        );
+      });
+      emit = null;
+      await act(async () => {
+        await handle.approve?.();
+      });
+      await waitFor(() => {
+        expect(emit).not.toBeNull();
+      });
+      act(() => {
+        emit?.(
+          event("q.run.completed", {
+            status: "COMPLETED",
+            completedAt: "2026-09-27T10:00:05.000Z",
+            dataChanged: true,
+          }),
+        );
+      });
+      expect(changed).toHaveBeenCalledTimes(1);
     } finally {
       window.removeEventListener(PAGE_DATA_CHANGED_EVENT, changed);
     }
