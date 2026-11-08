@@ -94,6 +94,10 @@ export function createExtractPublicWebTool(
       "INVESTOR_QUESTION",
       "COMPARISON",
       "GENERAL_QUESTION",
+      // Owner live 8 Nov (batch 13): a conversation carrying one of their
+      // relationships never reached the web. Public sources are not bound
+      // to the question's subject; the actor-wide public scope decides.
+      "RELATIONSHIP_QUESTION",
     ],
     requiredScopeKinds: ["PUBLIC_EXTERNAL_DATA"],
     approval: "NONE",
