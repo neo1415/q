@@ -66,10 +66,10 @@ export const IDENTITY_STEPS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Phases one topic spans, as the profile shows them: an investor's
- * deployment goes with their cheques.
+ * Phases one topic spans. None today: e2e run 10's playback mixed whether
+ * they are deploying with their cheque, two things to confirm apart.
  */
-const MERGED_PHASES: Readonly<Record<string, string>> = { I1: "I2" };
+const MERGED_PHASES: Readonly<Record<string, string>> = {};
 
 /**
  * The topic a step belongs to: its investor list theme, else its phase.
@@ -129,5 +129,7 @@ export function isPlaybackLine(line: string): boolean {
 
 /** A step whose choices are put to them to react to (D81 #3). */
 export function offersChoices(stepKey: string): boolean {
-  return /_strength$/u.test(stepKey) || stepKey === "I10.inbound_preference";
+  // The inbound question names its choices in words already (e2e run 10:
+  // "…or nobody for now: Closed, Qualified or Open?").
+  return /_strength$/u.test(stepKey);
 }

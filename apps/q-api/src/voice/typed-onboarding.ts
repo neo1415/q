@@ -123,8 +123,7 @@ export function createTypedOnboarding(dependencies: {
   const replays = new Map<string, Map<string, number>>();
   /** D82: topics already played back, by session (once each). */
   const playedTopics = new Map<string, Set<string>>();
-  /** D82 #5: the step Q's last reply asked, for asks counted running. */
-  const lastReplyAsk = new Map<string, string | null>();
+
   const bounded = <V>(map: Map<string, V>, key: string, value: V) => {
     map.delete(key);
     map.set(key, value);
@@ -182,11 +181,6 @@ export function createTypedOnboarding(dependencies: {
       if (oldest !== undefined) replyAsks.delete(oldest);
     }
     const asked = input.asking;
-    // D82 #5: counted running -- the same step asked again on the very
-    // next reply, with no answer taken between; a reply asking anything
-    // else (a playback included) starts the count again.
-    const previous = lastReplyAsk.get(input.sessionId) ?? null;
-    bounded(lastReplyAsk, input.sessionId, asked);
     const step =
       asked === null
         ? undefined
@@ -194,9 +188,31 @@ export function createTypedOnboarding(dependencies: {
     if (asked === null || step === undefined || !neededOpen(step)) {
       return { text: input.text, asking: input.asking };
     }
-    const times = previous === asked ? (asks.get(asked) ?? 0) : 0;
+    // e2e run 10 (integration): every ask of a still-open needed step
+    // counts, interleaved or not (the deployment question came back four
+    // times with others between); a playback is no ask. The third time:
+    // its reason and its choices, once; the fourth: left for now.
+    const times = asks.get(asked) ?? 0;
     asks.set(asked, times + 1);
     if (times < 2) return { text: input.text, asking: input.asking };
+    if (times === 2) {
+      const choices = (step.options ?? []).map((option) => option.label);
+      const question = (SPOKEN_QUESTIONS[asked] ?? step.question)
+        .trim()
+        .replace(/\?$/u, "");
+      const why =
+        input.journey === "investor"
+          ? "Just so I can match you well"
+          : "Just so investors see your company right";
+      return {
+        text: `${withoutLastQuestion(input.text)} ${why}, I need this one: ${question}${
+          choices.length >= 2
+            ? `: ${choices.slice(0, -1).join(", ")} or ${choices.at(-1) ?? ""}?`
+            : "?"
+        }`.trim(),
+        asking: asked,
+      };
+    }
     // The next needed one, never one left for now.
     const next =
       [
@@ -216,7 +232,7 @@ export function createTypedOnboarding(dependencies: {
         ? ""
         : ` ${(SPOKEN_QUESTIONS[next.stepKey] ?? next.question).trim()}`;
     const before = withoutLastQuestion(input.text);
-    if (times > 2) {
+    if (times > 3) {
       // Left already: asked again anyway, the next one is asked instead.
       return {
         text: `${before}${nextQuestion}`.trim(),
@@ -852,8 +868,6 @@ export function createTypedOnboarding(dependencies: {
         if (played !== null) {
           text = played.text;
           asking = played.asking;
-          // A playback is no ask of a step (D82 #5).
-          bounded(lastReplyAsk, input.onboardingSessionId, null);
         }
         // DECISIONS 77, whoever words the question: a needed step asked
         // twice with no answer it could take is, the third time, given its
@@ -974,12 +988,25 @@ export function createTypedOnboarding(dependencies: {
             heldFromTheirWords(item.rationale) &&
             topicOf(input.journeyType, item.stepKey) === topic,
         );
-        // D82: once per topic, all of it together; a topic with one value
-        // waiting joins the next playback or the final read-back.
+        // e2e run 10: the topic's full set, what is saved beside what
+        // waits (the cheque's minimum and typical saved, its maximum
+        // waiting, are one picture). D82: once per topic, never one value
+        // alone.
+        const saved = now.steps.filter(
+          (step) =>
+            step.status === "ANSWERED" &&
+            step.value !== null &&
+            step.value.trim().length > 0 &&
+            step.value.trim().toLowerCase() !== "none" &&
+            topicOf(input.journeyType, step.stepKey) === topic &&
+            !items.some((item) => item.stepKey === step.stepKey),
+        );
         const played =
           playedTopics.get(input.onboardingSessionId) ?? new Set<string>();
         bounded(playedTopics, input.onboardingSessionId, played);
-        if (!replay && (items.length < 2 || played.has(topic))) return null;
+        if (!replay && (items.length + saved.length < 2 || played.has(topic))) {
+          return null;
+        }
         if (
           items.some((item) => item.value.trim().length === 0) ||
           items.length === 0
@@ -1004,8 +1031,22 @@ export function createTypedOnboarding(dependencies: {
                 topicOf(input.journeyType, step.stepKey) === topic,
             )
           : [];
+        // In the journey's order, so the set reads as one picture.
+        const order = (stepKey: string) =>
+          now.steps.findIndex((step) => step.stepKey === stepKey);
         const lines = [
-          ...items.map((item) => `${labelled(item.stepKey)}: ${item.value}`),
+          ...[
+            ...items.map((item) => ({
+              stepKey: item.stepKey,
+              value: item.value,
+            })),
+            ...saved.map((step) => ({
+              stepKey: step.stepKey,
+              value: step.value ?? "",
+            })),
+          ]
+            .sort((a, b) => order(a.stepKey) - order(b.stepKey))
+            .map((one) => `${labelled(one.stepKey)}: ${one.value}`),
           ...nones.map((step) => `${labelled(step.stepKey)}: none`),
         ];
         const lead = replay ? "" : withoutLastQuestion(at.text);

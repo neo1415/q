@@ -499,7 +499,7 @@ describe("all answered: a reply that asks nothing goes on to the finish (e2e run
  * is left for now and the next one is asked.
  */
 describe("a needed step Q's own replies keep asking is left for now (e2e run 8)", () => {
-  it("twice as written, then its reason once and the next question; never a fourth", async () => {
+  it("twice as written, then its reason and choices, then left for now; never a fifth", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
       subject: FIRM,
@@ -532,10 +532,14 @@ describe("a needed step Q's own replies keep asking is left for now (e2e run 8)"
     const fourth = await say("Product and hiring.");
     expect(first.asking?.stepKey).toBe("I2.stages");
     expect(second.asking?.stepKey).toBe("I2.stages");
-    expect(third.reply).toMatch(/let's leave it for now/u);
+    // Run 10: the third ask gives its reason and choices once.
+    expect(third.reply).toMatch(
+      /Just so I can match you well, I need this one/u,
+    );
     expect(third.reply).not.toMatch(/What stages are you investing at\?/u);
-    expect(third.asking?.stepKey).not.toBe("I2.stages");
-    // Asked again anyway: the next one is asked instead.
+    expect(third.asking?.stepKey).toBe("I2.stages");
+    // The fourth: left for now, and another is asked.
+    expect(fourth.reply).toMatch(/let's leave it for now/u);
     expect(fourth.asking?.stepKey).not.toBe("I2.stages");
     expect(fourth.reply).not.toMatch(/Which stages, again\?/u);
   });

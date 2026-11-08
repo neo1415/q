@@ -618,7 +618,7 @@ describe("5. the kept words for a field are that field's part only", () => {
 });
 
 describe("6. their own words beside a list are said apart from it", () => {
-  it('"Also said: consumer apps", never "; consumer apps (in their words)" inside the exclusions', async () => {
+  it('"(you also said “consumer apps”)", never "; consumer apps (in their words)" inside the exclusions', async () => {
     const SAID = "Consumer apps, gambling or crypto are a firm no for our LPs.";
     const w = investorSession({
       currentStepKey: "I7.hard_exclusions",
@@ -651,13 +651,13 @@ describe("6. their own words beside a list are said apart from it", () => {
     const state = await port.state();
     const row = state.steps.find((s) => s.stepKey === "I7.hard_exclusions");
     expect(row?.value).toMatch(
-      /^Gambling, Speculative crypto\. Also said: consumer apps$/u,
+      /^Gambling, Speculative crypto \(you also said “consumer apps”\)$/u,
     );
     const labelOf = (key: string) =>
       coverageProfileFor("investor").fields[key]?.label;
     const readBack = groupedSaved(state, "investor", labelOf).join("\n");
     expect(readBack).toMatch(
-      /: Gambling, Speculative crypto\. Also said: consumer apps/u,
+      /: Gambling, Speculative crypto \(you also said “consumer apps”\)/u,
     );
     expect(readBack).not.toMatch(/in their words/u);
   });

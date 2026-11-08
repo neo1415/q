@@ -140,7 +140,7 @@ describe("1. a sector phrase no category holds, given as its own item, is kept b
     expect(w.recordedNote(SECTORS)).toBe("industrial automation");
     const state = await port.state();
     const row = state.steps.find((s) => s.stepKey === SECTORS);
-    expect(row?.value).toMatch(/Also said: industrial automation/u);
+    expect(row?.value).toMatch(/you also said “industrial automation/u);
   });
 
   it("the conversation path, with the reader's separate items, keeps it too", async () => {
@@ -326,11 +326,11 @@ describe("3. their words beyond the option they were read as are kept and read b
     });
     expect(w.recordedNote("F5.signal")).toBe("40 lockers live in 12 towns");
     expect(result?.recorded).toMatch(
-      /Paying customers\. Also said: 40 lockers live in 12 towns/u,
+      /Paying customers \(you also said “40 lockers live in 12 towns/u,
     );
     const state = await port.state();
     expect(state.steps.find((s) => s.stepKey === "F5.signal")?.value).toMatch(
-      /Paying customers\. Also said: 40 lockers live in 12 towns/u,
+      /Paying customers \(you also said “40 lockers live in 12 towns/u,
     );
   });
 

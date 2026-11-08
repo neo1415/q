@@ -234,7 +234,7 @@ describe("2a. their words beyond an option named by its label are kept", () => {
     expect(w.recordedNote("F5.signal")).toBe("40 lockers in 12 towns");
     const state = await port.state();
     expect(state.steps.find((s) => s.stepKey === "F5.signal")?.value).toMatch(
-      /Also said: 40 lockers in 12 towns/u,
+      /you also said “40 lockers in 12 towns/u,
     );
   });
 

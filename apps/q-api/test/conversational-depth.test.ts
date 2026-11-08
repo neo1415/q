@@ -418,10 +418,77 @@ describe("the playback line itself", () => {
     expect(isPlaybackLine("Is that right?")).toBe(false);
   });
 
-  it("topics follow the profile: deployment goes with the cheque", () => {
-    expect(topicOf("investor", "I1.deployment_status")).toBe(
+  it("topics follow the profile: deployment is its own topic, apart from the cheque", () => {
+    expect(topicOf("investor", "I1.deployment_status")).not.toBe(
       topicOf("investor", "I2.cheque_min"),
     );
     expect(topicOf("investor", "I3.sectors_avoid")).toBe("theme:off_the_table");
+  });
+});
+
+/**
+ * e2e run 10 (production batch 15): "Are you actively writing cheques at
+ * the moment…?" asked four times with other steps between; the playback
+ * mixed "Deploying now" with the cheque and left out the saved minimum.
+ */
+describe("run 10 (a): every ask counts, interleaved or not", () => {
+  it("the third ask gives its reason and choices once; the fourth leaves it for now", async () => {
+    const DEPLOY = "I1.deployment_status";
+    const { say } = depthWorld({
+      readings: [NOTHING],
+      script: [
+        { reply: "Are you actively investing right now?", asking: DEPLOY },
+        { reply: "Which stages do you invest in?", asking: "I2.stages" },
+        { reply: "Are you writing cheques at the moment?", asking: DEPLOY },
+        { reply: "Where do you invest?", asking: "I3.geography" },
+        { reply: "And are you deploying now?", asking: DEPLOY },
+        { reply: "Thanks. Which sectors?", asking: "I3.sectors" },
+        { reply: "Are you actively investing?", asking: DEPLOY },
+      ],
+    });
+    const replies: string[] = [];
+    for (const words of [
+      "Hello.",
+      "Seed.",
+      "Pre-seed and seed.",
+      "West Africa.",
+      "Fintech.",
+      "Climate too.",
+      "Yes.",
+    ]) {
+      replies.push((await say(words)).reply);
+    }
+    // Third ask (fifth reply): its reason and its choices, once.
+    expect(replies[4]).toMatch(
+      /^Just so I can match you well, I need this one: /u,
+    );
+    expect(replies[4]).toMatch(/ or [^?]+\?$/u);
+    // Fourth ask (seventh reply): left for now, never asked a fifth way.
+    expect(replies[6]).toMatch(/let's leave it for now/u);
+  });
+});
+
+describe("run 10 (b): a playback is one topic, its full set", () => {
+  it("the cheque's saved minimum beside its waiting maximum, without deployment", async () => {
+    const { world, say } = depthWorld({
+      readings: [
+        NOTHING,
+        SAID([
+          [MAX, 1000000, "up to a million"],
+          ["I1.deployment_status", "actively_investing", "actively investing"],
+        ]),
+      ],
+      script: [
+        { reply: "What's your largest cheque?", asking: MAX },
+        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
+      ],
+    });
+    world.record(MIN, { type: "RANGE", value: "250000" });
+    await say("Hello.");
+    const moved = await say("Up to a million, and we're actively investing.");
+    expect(moved.reply).toMatch(/Let me get this right: /u);
+    expect(moved.reply).toMatch(/250/u);
+    expect(moved.reply).toMatch(/1,?000,?000|1 million/u);
+    expect(moved.reply).not.toMatch(/Deploying|deploying|Actively investing/u);
   });
 });

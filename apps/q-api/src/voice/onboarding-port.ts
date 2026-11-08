@@ -280,7 +280,12 @@ function theirWordsBesideList(
 }
 
 /** How their own words kept beside a list are shown with it. */
-export const ALSO_SAID_NOTE = "Also said:";
+export const ALSO_SAID_NOTE = "you also said";
+
+/** Their words beside a choice, as one clause: you also said “…”. */
+export function alsoSaid(note: string): string {
+  return `${ALSO_SAID_NOTE} “${note.trim().replace(/[.\s]+$/u, "")}”`;
+}
 
 /** How a note of options also named on a one-choice step begins. */
 export const ALSO_NAMED_NOTE = "Also named:";
@@ -1512,7 +1517,9 @@ export function createOnboardingPort(input: {
       }
     }
     if (theirWordsBesideList(value, note) && value.type === "SINGLE_SELECT") {
-      return `${await spoken(step, value, view)}. ${ALSO_SAID_NOTE} ${note}`;
+      // One clause, never a sentence of its own (e2e run 10: "… Actively
+      // investing. Also said: Minimum …" read as a fragment).
+      return `${await spoken(step, value, view)} (${alsoSaid(note)})`;
     }
     return `${note} (in their words)`;
   };
@@ -1624,7 +1631,7 @@ export function createOnboardingPort(input: {
                           // show: Gambling, Speculative crypto; consumer apps
                           // (in their words)" read as a listed exclusion).
                           theirWordsBesideList(stored.value, stored.note)
-                          ? `${await spoken(step, stored.value, view)}. ${ALSO_SAID_NOTE} ${stored.note ?? ""}`
+                          ? `${await spoken(step, stored.value, view)} (${alsoSaid(stored.note ?? "")})`
                           : await spoken(step, stored.value, view),
                     600,
                   ) || null,

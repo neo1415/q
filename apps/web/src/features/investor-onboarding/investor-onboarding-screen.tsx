@@ -286,6 +286,12 @@ export function InvestorOnboardingScreen({
             void actions.openStep(editorId);
           }}
           onFinish={() => void finishFromQ()}
+          onFinished={() =>
+            // Finished in the conversation (e2e run 10: it followed Q's own
+            // destination, /discover): the same way on as the form's
+            // finish, verification first, then Discover (ADMIN-4).
+            router.push("/verification?from=setup&next=discover")
+          }
           qSubject={
             investorOrganisationId === undefined
               ? undefined

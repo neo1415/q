@@ -74,12 +74,17 @@ describe("D4: where finishing goes", () => {
     );
   });
 
-  it("the investor screen passes no override, so Q's Discover destination stands", () => {
-    expect(
-      read(
-        "../src/features/investor-onboarding/investor-onboarding-screen.tsx",
-      ),
-    ).not.toContain("onFinished=");
+  it("an investor finished in the conversation goes to verification, then Discover, as the form does (e2e run 10)", () => {
+    // Was: no override, so Q's own Discover destination stood, and run 10
+    // finished on /discover. Integration (8 Nov): the conversation's
+    // finish goes the form's way (ADMIN-4).
+    const screen = read(
+      "../src/features/investor-onboarding/investor-onboarding-screen.tsx",
+    );
+    const finished = screen.slice(screen.indexOf("onFinished={"));
+    expect(finished).toContain(
+      'router.push("/verification?from=setup&next=discover")',
+    );
   });
 
   it("the form's last button says where it goes", () => {
