@@ -2134,3 +2134,15 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - **Tests, failing first:** run creation, the firewall plan, and an end-to-end q-api test (gate → run → firewall → `createQPageMoves`).
 - **Keyword-like moves:** they came from the turn reader's NAVIGATE (own destinations only, confirmed by a word match: "Opening your profile.", `answer.ts:1772`) and from the answer model's `open_page` / `open_company_document`. The note proposes making the decision the only page-pane authority in workspace mode; that needs a go-ahead.
 - **Pre-existing failures on integration `d57b87e06`, not this change:** 4 onboarding "I don't know" tests (`onboarding-{granary,acceptance}-1030`, `onboarding-{final-recheck,recheck}-1031`).
+
+## 2026-11-08 01:05 UTC — batch 9 live; navigation root cause found (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- **Batch 9 `c3e563daa`:** W4 76e39514f (logs, late moves, the decision outranks the answer's place moves), W3 4d5947ae4, W5 8d7ef1522 (themed investor lists; untouched lists stay open), runner 6314ae44b.
+  - Local gates: build 55/55, all typechecks 0, vitest 1981 files / 20916 passed, eslint and prettier clean on changed files.
+  - CI run 1882 green. Deployed to recovery/2026-09-12 (rollback 1a669b58c); all four services SUCCESS.
+- **Owner replay on production:** receipts/2026-11-08-owner-replay-batch9.
+  - Contradiction gone; page action 22 s; web research for "find me online" runs.
+  - Record-bearing moves still STAY. The logs prove luna proposed the right place each time.
+  - The resolver's `open_page` was DENIED TOOL_NOT_ELIGIBLE because the q-tools registry's workspace one-authority filter also gates execution.
+  - Assigned to W4 (batch 10).
+- Onboarding e2e run 5 is running on batch 9.

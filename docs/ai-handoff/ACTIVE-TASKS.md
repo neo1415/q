@@ -1,5 +1,31 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 8 November 2026, 01:05 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: **batch 9 `c3e563daa`** (rollback `1a669b58c`); CI run 1882 green; all four Railway services SUCCESS; hosted migrations 291; workspace LABS on, moves allowed.
+
+Batch 9:
+
+- W4: decision logs, late moves arrive as a second message, and the decision outranks the answer model's own place moves.
+- W3: one opener, explicit web research for "find me online", about half the DB trips.
+- W5: the investor's lists are asked by theme; untouched lists stay open; the same rule applies in realtime voice.
+- The onboarding e2e runner was updated to match.
+
+Evidence: owner replay on batch 9 (receipts/2026-11-08-owner-replay-batch9).
+
+- Fixed: the "I can't open" contradiction is gone, the page action takes 22 s (61 s before), "find me online" runs web research, who-viewed and firm location are OK.
+- **Root cause of every remaining navigation miss:** luna proposes the RIGHT place (deck, team, elevator), but the resolver's `open_page` call is DENIED TOOL_NOT_ELIGIBLE in workspace mode (q-tools registry `relevant()` applies the one-authority offer filter to execution too). So every record-bearing move is UNRESOLVED and STAYs.
+- The model is not the problem. The Claude-vs-luna owner question can wait.
+
+| Lane                                       | State                                                                                                             |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| W4 session_01Wncmn4BQnwUu8PoUpcMjfu        | batch 10: open_page executable for code in workspace mode, model offer still narrowed (failing-first, real registry) |
+| W3 session_01Wncmn6yZzXx1xtFxaXwp9b        | idle (4d5947ae shipped)                                                                                           |
+| W5 session_01Wncmn7LanmxRBs1Eoe8por        | idle (8d7ef152 shipped)                                                                                           |
+| Integration                                | onboarding e2e run 5 (investor + founder) running on batch 9                                                      |
+
+Anthropic test spend: about $42.5 of $50. Serper credit is spent (402); Brave and Tavily work.
+
 ## Live board — 7 November 2026, 23:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: **batch 8 `1a669b58c`** (rollback `1f467bf39`); hosted migrations **291**; workspace LABS on, moves allowed. Today shipped batches 5–8.

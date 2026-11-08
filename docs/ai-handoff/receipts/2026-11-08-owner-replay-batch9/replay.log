@@ -1,0 +1,22 @@
+-- at /discover
+#2 "i want to see harbourline cargo's pitch deck" → /discover moveMs=-1 totalMs=16077
+    Q:  Q: Opening Harbourline Cargo's pitch deck… Where this lives Open the document Ask Q Q
+#3 "okay take me to harbourline cargos profile" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=1054 totalMs=14779
+    Q:  Q: Opened Harbourline Cargo. Ask Q Q
+#4 "i'm curious about their team" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=-1 totalMs=22167
+    Q:  Q: Harbourline Cargo’s team is listed as three people on its company profile: Babatunde Oyelaran, Founder & CEO; Chiamaka Eze, COO; and Ifeanyi Okoro, Head of Engineering. The team document adds that Chiamaka has ten years in haulage operations and fleet management, Ifeanyi built dispatch software for a ride-hailing start-up, and the company reports 42 full-time employees. The profile and documents conflict on team 
+#5 "can i see it?" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=-1 totalMs=21653
+    Q:  Q: It lists Babatunde Oyelaran as Founder & CEO, Chiamaka Eze as COO, and Ifeanyi Okoro as Head of Engineering. The team document adds Chiamaka’s ten years in haulage operations, Ifeanyi’s dispatch-software experience, and 42 full-time employees; the profile and document still differ on team size. Sources Companies · 2 Q couldn't find that on this page. Ask Q Q
+#6 "tell me about clinicrest" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407 moveMs=-1 totalMs=28023
+    Q: nd resort to open markets where counterfeit or expired stock is common. It reports 340 active clinics and pharmacies, while its latest management accounts list 212 paying accounts; Clinicrest attributes the difference to free trials, but has not shown the split. Monthly revenue is reported at around USD 95,000. Clinicrest is raising USD 1.8 million in a priced seed round to open depots in Abeokuta and Osogbo and exte
+#7 "can i see their elevator" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=elevator moveMs=7427 totalMs=19642
+    Q:  Q: It’s the company’s short overview: port-to-warehouse container trucking for Lagos importers, with booking, tracking and paperwork in one place. Harbourline says containers can sit at Apapa for days because importers struggle to find reliable trucks and incur demurrage; its service books vetted trucks and tracks each move to the warehouse. Sources Company · 1 Ask Q Q
+#8 "send those questions to them" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=elevator moveMs=-1 totalMs=21933
+    Q:  Q: The three questions for Harbourline Cargo are prepared for your approval: monthly burn and runway after the round; current market size and its source; and current pricing and its source. Sources Companies · 2 Q prepared this for your approval Send 3 questions to Babatunde Oyelaran To Babatunde Oyelaran Question 1 What is your monthly burn, and your runway after this round? Question 2 What is Market size today, an
+#9 "who has viewed my profile?" → /analytics moveMs=8196 totalMs=20137
+    Q: wn. Viewing isn’t an indication of investment interest; your recorded intent signals are the connection requests and interests you’ve received, including accepted connections with Harbourline Cargo, Brightkloof Energy, Nsuo Labs, Tarmacly, Clinicrest, Tallyloom and Maji Loop, plus pending responses from Kivu Traceworks and Sahel Pumps. Sources Companies · 2 Q prepared this for your approval Send 3 questions to Babatu
+#10 "what can you find about me online?" → /analytics moveMs=-1 totalMs=24714
+    Q: mpanies or clarified some preference fields. Public sources also say: a site called Ledgerline describes US company incorporation, accounting, tax and compliance services for founders, and says it serves more than 100 clients. Those pages are undated and unverified; they do not establish that the business is connected to you. Sources · 2 sources Company · 1 Q prepared this for your approval Send 3 questions to Babatu
+#11 "where is my firm located?" → /analytics moveMs=-1 totalMs=16345
+    Q:  Q: Savanna Seed Partners is based in Lagos, Nigeria. Where this lives Your profile Open Your profile Stay here Sources Company · 1 Q prepared this for your approval Send 3 questions to Babatunde Oyelaran To Babatunde Oyelaran Question 1 What is your monthly burn, and your runway after this round? Question 2 What is Market size today, and where does the figure come from? Question 3 What is Pricing today, and where do
+errors []
