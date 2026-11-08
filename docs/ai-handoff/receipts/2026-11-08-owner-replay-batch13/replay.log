@@ -1,0 +1,18 @@
+-- at /home
+#2 "whats happening with my capital?" → /relationships?view=capital moveMs=1084 totalMs=29343
+    Q: own Not known Not known Not known Stage Series B Seed Not known Not known Not known Not known Not known Not known Based in Lagos, NG Johannesburg, ZA Not known Not known Not known Not known Not known Not known Founded 2019 2022 Not known Not known Not known Not known Not known Not known Website https://tallyloom.example https://joburg-fleet.example Not known Not known Not known Not known Not known Not known Your capi
+#3 "who has viewed me so far?" → /analytics moveMs=5644 totalMs=23960
+    Q:  Q: I've opened Analytics. Q: Fewer than three founder organisations viewed your profile in a completed week. Capital Q doesn’t show their names, and there are no completed weeks with a named viewer to report. Viewing is separate from interest: your recorded intent signals are the connection requests and accepted connections shown in your relationships. Sources Investor · 1 Ask Q Q
+-- at /work
+#5 "tell me about clinicrest" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=overview moveMs=4630 totalMs=27315
+    Q: end clinic credit terms. The main diligence issues are gross margin by product category, the split between paying and trial accounts, working capital tied up in inventory, regulatory licensing and distribution margins. For your seed mandate, Clinicrest matches the stage, African healthcare/regulated operating context and preference for early revenue, but the evidence does not establish whether the raise size, margins
+#6 "take me to their chat" → /relationships/company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe/messages moveMs=315 totalMs=12538
+    Q: end clinic credit terms. The main diligence issues are gross margin by product category, the split between paying and trial accounts, working capital tied up in inventory, regulatory licensing and distribution margins. For your seed mandate, Clinicrest matches the stage, African healthcare/regulated operating context and preference for early revenue, but the evidence does not establish whether the raise size, margins
+#7 "what do i have in my pipeline?" → /relationships?view=pipeline moveMs=4119 totalMs=23259
+    Q: ourline Cargo, Brightkloof Energy, Nsuo Labs, Tarmacly, Maji Loop, Clinicrest, Tallyloom and Ledgerfold — connected; the next recorded step for most is scheduling a meeting. Clinicrest has also asked about your typical cheque size and whether you lead, so that reply is waiting on you. Kivu Traceworks, Sahel Pumps and Kazikit — interest expressed; you’re waiting for each company to accept. These are not connections or
+-- at /discover
+#9 "find paystack for me online now" → /discover moveMs=-1 totalMs=28113
+    Q:  Q: I searched the public web, but the pages I could read didn't name specific companies I could stand behind, so I won't guess. I can search again with a different angle (a city, a sub-sector or a recent accelerator batch) if you'd like. Ask Q Q
+#10 "what can you find online about me?" → /discover moveMs=-1 totalMs=23805
+    Q: Seed Partners. The search returned several plausible but unconfirmed profiles for people named Amara Benson or Amara Diallo, none tied clearly to your name and firm, so I won’t attribute them to you. Your Capital Q profile identifies you as a Partner at Savanna Seed Partners, actively investing at seed in African fintech, B2B software and logistics, typically writing USD 600,000 cheques within a USD 250,000–1 million
+errors []
