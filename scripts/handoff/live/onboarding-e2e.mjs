@@ -622,9 +622,39 @@ if (STEPS.has("J6")) {
   // can finish (website, founders, team, city, year, one line; the
   // investor's website, country, role, lists and description). Most
   // specific first; matched on Q's question sentence only.
+  // Batch 14 (D81): Q's topic playback ("Let me get this right: … Is that
+  // right?", a replay "Thanks. So: … Is that right?") ends on "Is that
+  // right?", which READ_BACK answers "Yes, that's right." A "why" Q asks
+  // about a stated preference gets a short plausible reason, never the
+  // preference again; first, before any topic rule its words also name.
+  const WHY = [
+    [
+      /\bwhy\b[^?]*\bfounders?\b|\bfounders?\b[^?]*\bwhy\b/i,
+      "Mostly speed: they move faster.",
+    ],
+    [
+      /\bwhy\b[^?]*\b(capital efficien|efficien)/i,
+      "It keeps them alive longer between rounds.",
+    ],
+    [
+      /what puts you off|why (avoid|exclude|not|pass)|\bwhy\b[^?]*\b(gambling|crypto|tobacco|weapons|exclu)/i,
+      "Regulation: our LPs won't touch it.",
+    ],
+    [
+      /\bwhy\b[^?]*\b(west africa|region|geograph|fintech|clean energy|sector)/i,
+      "That's where our network and our LPs are.",
+    ],
+    [
+      /^\s*why\b|\bwhy (is|does|do|that)\b|what are you (trying|hoping) to achieve|what draws you/i,
+      JOURNEY === "founder"
+        ? "Our customers asked for it directly."
+        : "It's where we've done best.",
+    ],
+  ];
   const FACTS =
     JOURNEY === "founder"
       ? [
+          ...WHY,
           READ_BACK,
           // Run 8: the finances, fictional and plausible, all together;
           // before "spend" (use of funds), "growth" and "revenue", which the same questions name.
@@ -678,6 +708,7 @@ if (STEPS.has("J6")) {
           [/anything else|anything more|missed/i, "No, that's everything."],
         ]
       : [
+          ...WHY,
           // Run 5: a read-back of what they said ("From what you said: …
           // Shall I keep that/these?") is a plain yes, before the cheque
           // rule: the figures read back are the ones they gave.
@@ -755,7 +786,7 @@ if (STEPS.has("J6")) {
     return asks === null ? line : asks[asks.length - 1];
   };
   const answers = [];
-  for (let turn = 0; turn < Number(process.env.TURNS ?? 30); turn += 1) {
+  for (let turn = 0; turn < Number(process.env.TURNS ?? 45); turn += 1) {
     if (!new URL(page.url()).pathname.startsWith("/onboarding")) break;
     const line = await lastQ();
     // Run 7: Q left a step for now and asked nothing; the runner replied
