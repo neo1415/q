@@ -46,6 +46,7 @@ import { QControl } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { CrmSheet, QRing, useCrmToast } from "@/features/relationships/crm-kit";
 import { useT } from "@/features/i18n/language";
+import { usePageAtLeast } from "@/features/workspace/page-pane-width";
 
 import { dismissHeld } from "./decision-queue";
 import {
@@ -321,6 +322,8 @@ export function WorkInbox({
     prepared === undefined ? null : `s:${prepared.key}`,
   );
   const [sheet, setSheet] = useState<string | null>(null);
+  // A phone, or a narrow Q Workspace page pane (batch 13).
+  const desktop = usePageAtLeast(1024, true);
   // The open decision: the one picked while it is still here, else the
   // first that needs a yes (approving one opens the next).
   const selected =
@@ -335,13 +338,7 @@ export function WorkInbox({
   const pick = (key: string) => {
     setPicked(key);
     // On a phone the decision opens over the queue.
-    if (
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      !window.matchMedia("(min-width: 1024px)").matches
-    ) {
-      setSheet(key);
-    }
+    if (!desktop) setSheet(key);
   };
   const finished = (key: string) => {
     setSheet(null);

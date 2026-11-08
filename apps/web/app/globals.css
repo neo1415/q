@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@capital-q/ui/styles.css";
+@import "./page-width.css";
 
 /* Component classes live in the design-system package's source. */
 @source "../../../packages/ui/src";
@@ -22,6 +23,135 @@
   --radius-2xl: 20px;
   --radius-3xl: 24px;
   --radius-4xl: 32px;
+}
+
+/*
+ * Batch 13 (Q Workspace): the page answers to the width it is given.
+ * Inside the workspace page pane (`.cq-ws-page`, the `cq-page` container)
+ * Tailwind's breakpoints read the pane's width, so a 560 px pane lays out
+ * like a phone; everywhere else they stay the viewport media queries they
+ * always were, to the pixel (`:where` adds no specificity). Tailwind's
+ * values. Page stylesheets use the page-* variants (page-width.css).
+ */
+@custom-variant sm {
+  @media (width >= 40rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width >= 40rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant md {
+  @media (width >= 48rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width >= 48rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant lg {
+  @media (width >= 64rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width >= 64rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant xl {
+  @media (width >= 80rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width >= 80rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant 2xl {
+  @media (width >= 96rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width >= 96rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant max-2xl {
+  @media (width < 96rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width < 96rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant max-xl {
+  @media (width < 80rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width < 80rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant max-lg {
+  @media (width < 64rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width < 64rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant max-md {
+  @media (width < 48rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width < 48rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
+}
+@custom-variant max-sm {
+  @media (width < 40rem) {
+    &:where(:not(.cq-ws-page *)) {
+      @slot;
+    }
+  }
+  @container cq-page (width < 40rem) {
+    &:where(.cq-ws-page *) {
+      @slot;
+    }
+  }
 }
 @layer base {
   /*
@@ -1236,7 +1366,7 @@
   body:has([data-feed-immersive]) [data-q-dock] {
     display: none;
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-shell:has([data-feed-immersive]) .cq-shell-header {
       display: none;
     }
@@ -1785,7 +1915,7 @@
   }
   /* On a phone the toast sits under the tabs, clear of the company's
      words and the rail at the foot of the pitch. */
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-feed-toast-layer {
       top: calc(56px + var(--cq-safe-top));
       bottom: auto;
@@ -2340,7 +2470,7 @@
      Discover tabs, never in their row, and "Tap for sound" sits beside the
      sound button it explains rather than stacked under the captions
      toggle over the picture. */
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-feed-player-controls {
       top: calc(56px + var(--cq-safe-top));
     }
@@ -2354,7 +2484,7 @@
      single-tap equivalent (WCAG 2.2 SC 2.5.7): shown and tappable, top
      right under the filter (live 2026-10-29: clipped to nothing, so a tap
      at their centre reached the video). */
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-feed-nav {
       top: calc(56px + var(--cq-safe-top));
       transform: none;
@@ -2788,7 +2918,7 @@
     pointer-events: none;
   }
 
-  @media (min-width: 1024px) {
+  @variant page-min-1024 {
     .cq-yours-feed {
       height: 100dvh;
     }
@@ -2807,12 +2937,6 @@
           (100cqw - var(--cq-yours-panel) - var(--cq-yours-reserve)) * 16 / 9
         )
       );
-    }
-    @media (min-width: 1280px) {
-      .cq-yours-card {
-        --cq-yours-panel: 440px;
-        --cq-yours-reserve: 232px;
-      }
     }
     .cq-yours-card::before {
       display: none;
@@ -2871,8 +2995,22 @@
       color: var(--cq-app-text-primary);
     }
   }
+  @variant page-min-1280 {
+    .cq-yours-card {
+      --cq-yours-panel: 440px;
+      --cq-yours-reserve: 232px;
+    }
+  }
 
-  @media (min-width: 1024px) {
+  /* Used by the desktop dossier below; a keyframes rule cannot sit inside
+     the page-width variant. */
+  @keyframes cq-feed-row-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @variant page-min-1024 {
     .cq-feed {
       height: 100dvh;
     }
@@ -2900,11 +3038,6 @@
         calc((100cqw - var(--cq-foryou-dossier) - 48px) * 16 / 9)
       );
       --cq-feed-video-w: calc(var(--cq-feed-video-h) * 9 / 16);
-    }
-    @media (min-width: 1280px) {
-      .cq-feed-stage {
-        --cq-foryou-dossier: 560px;
-      }
     }
     .cq-feed-stage::before {
       display: none;
@@ -3129,12 +3262,6 @@
     .cq-feed-overlay .cq-feed-more-body > :nth-child(n + 5) {
       animation-delay: 120ms;
     }
-    @keyframes cq-feed-row-in {
-      from {
-        opacity: 0;
-        transform: translateY(6px);
-      }
-    }
     /* The end of the slate sits where the pitch was; the dossier column
        is left quiet (Discover A). */
     /* Ask Q fills the dossier's height, its composer at the foot. */
@@ -3327,17 +3454,8 @@
       );
       transform: none;
     }
-    /* From 1280px the dossier keeps 560px (.cq-feed-stage): 560 + 48. */
-    @media (min-width: 1280px) {
-      .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
-        .cq-discover-tabs,
-      .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
-        .cq-discover-tabs {
-        inset-inline-start: calc(
-          48px + min(100dvh - 48px, (100% - 608px) * 16 / 9) * 9 / 16 + 14px
-        );
-      }
-    }
+    /* From 1280px the dossier keeps 560px (.cq-feed-stage): 560 + 48,
+       below this block (a page-width variant cannot nest in another). */
     /* Your companies has its own grid (.cq-yours-card: the stage, then a
        440px panel), so the For you offset above lands on its video (live
        2026-11-04, 1440). Here the tabs sit at the top of that panel, in
@@ -3348,14 +3466,6 @@
       )
       .cq-discover-tabs {
       inset-inline-start: calc(100% - 320px + 18px);
-    }
-    @media (min-width: 1280px) {
-      .cq-discover[data-discover-tab="YOURS"]:has(
-          > div[data-feed-immersive]:not([hidden])
-        )
-        .cq-discover-tabs {
-        inset-inline-start: calc(100% - 440px + 18px);
-      }
     }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
       .cq-discover-tab,
@@ -3369,6 +3479,29 @@
     .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
       .cq-discover-tab[aria-pressed="true"] {
       color: var(--cq-app-text-primary);
+    }
+  }
+  @variant page-min-1280 {
+    .cq-feed-stage {
+      --cq-foryou-dossier: 560px;
+    }
+  }
+  @variant page-min-1280 {
+    .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
+      .cq-discover-tabs,
+    .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
+      .cq-discover-tabs {
+      inset-inline-start: calc(
+        48px + min(100dvh - 48px, (100% - 608px) * 16 / 9) * 9 / 16 + 14px
+      );
+    }
+  }
+  @variant page-min-1280 {
+    .cq-discover[data-discover-tab="YOURS"]:has(
+        > div[data-feed-immersive]:not([hidden])
+      )
+      .cq-discover-tabs {
+      inset-inline-start: calc(100% - 440px + 18px);
     }
   }
 
@@ -4807,7 +4940,7 @@
   /* On a phone the mosaic runs edge to edge, as Instagram's does: it
      steps out of the page's 16px gutter exactly, so nothing scrolls
      sideways. */
-  @media (max-width: 639.98px) {
+  @variant page-below-640 {
     .cq-explore-mosaic-host {
       width: calc(100% + 32px);
       margin-inline: -16px;
@@ -5133,7 +5266,7 @@
   .cq-explore-updown {
     display: none;
   }
-  @media (min-width: 1024px) {
+  @variant page-min-1024 {
     .cq-explore-feed {
       inset-inline-start: var(--cq-sidebar-width);
     }
@@ -5971,8 +6104,69 @@
     outline: 2px solid var(--cq-focus-ring);
     outline-offset: 2px;
   }
+  /* Batch 13: the page pane is the page's width (globals' sm..2xl and the
+     page-* variants, page-width.css), so a narrow pane reads as a phone. */
   .cq-ws-page {
     min-width: 0;
+    container: cq-page / inline-size;
+  }
+  /* The design tokens sized by the viewport (tokens.css: the page gutter
+     and the type scale), read again from the pane's width; the values
+     are tokens.css's own. */
+  .cq-ws-page > * {
+    --cq-page-gutter: 16px;
+  }
+  /* From 1024 px the shell hides the bottom navigation (a viewport rule,
+     the shell's), so a phone layout in the pane reserves no room for it. */
+  @media (min-width: 1024px) {
+    .cq-ws-page > * {
+      --cq-bottom-nav-height: 0px;
+    }
+  }
+  @container cq-page (width >= 640px) {
+    .cq-ws-page > * {
+      --cq-page-gutter: 24px;
+    }
+  }
+  @container cq-page (width >= 1024px) {
+    .cq-ws-page > * {
+      --cq-page-gutter: 32px;
+    }
+  }
+  @container cq-page (width < 768px) {
+    .cq-ws-page .cq-display {
+      font-size: 34px;
+    }
+    .cq-ws-page .cq-title-xl {
+      font-size: 28px;
+    }
+    .cq-ws-page .cq-title-lg {
+      font-size: 24px;
+    }
+    .cq-ws-page .cq-title-md {
+      font-size: 20px;
+    }
+    .cq-ws-page .cq-title-sm {
+      font-size: 17px;
+    }
+    .cq-ws-page .cq-body {
+      font-size: 16px;
+    }
+  }
+  /* A page's own fixed bars (the company brief's next-step dock and its
+     toast, GateQ's phone bar and detail) span the page pane, not the
+     screen under Q (batch 13): the pane's edges, measured by the pane. */
+  .cq-ws-page :is(.cq-brief-dock, .cq-brief-toast, .gq-pbar, .gq-phonedetail) {
+    inset-inline: auto;
+    left: var(--cq-ws-page-left, 0px);
+    width: var(--cq-ws-page-width, 100%);
+  }
+  /* Clear of the pane's own collapse toggle at its foot (desktop only;
+     the phone sheet has no foot). */
+  @media (min-width: 861px) {
+    .cq-ws-page :is(.cq-brief-dock, .gq-pbar) {
+      padding-inline-start: 60px;
+    }
   }
   /* A zero-height strip that sticks to the bottom of the viewport. */
   .cq-ws-page-foot {
@@ -6193,8 +6387,9 @@
  * utilities; scoped to `.cq-q-pane`, so the flag-off app is untouched.
  */
 @layer components {
+  /* Also a `cq-page`: a page part Q shows lays out by Q's width. */
   .cq-q-pane {
-    container: q-pane / inline-size;
+    container: q-pane cq-page / inline-size;
   }
 }
 /*

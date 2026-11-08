@@ -6,6 +6,8 @@
  * --cq-move from the page's option scope (.cq-gold, .cq-ink), else the
  * accent; dark tiles read --cq-tile. Meaning always has a word beside it.
  */
+
+@reference "../../../app/page-width.css";
 @layer components {
   .cq-wk {
     --wk-move: var(--cq-move, var(--cq-accent));
@@ -80,7 +82,7 @@
     border-color: var(--wk-move);
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--wk-move) 18%, transparent);
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-track {
       flex-wrap: nowrap;
       gap: 4px;
@@ -246,7 +248,7 @@
     gap: 20px;
     align-items: start;
   }
-  @media (min-width: 1024px) {
+  @variant page-min-1024 {
     .cq-wk-inbox {
       grid-template-columns: 360px minmax(0, 1fr);
     }
@@ -301,7 +303,7 @@
       inset 3px 0 0 var(--wk-move);
   }
   /* On a phone the decision opens in a sheet: no row stays marked. */
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-inbox .cq-wk-qi[aria-current="true"] {
       background: transparent;
       box-shadow: none;
@@ -353,7 +355,7 @@
     letter-spacing: -0.015em;
     line-height: 1.25;
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-dt {
       font-size: 19px;
     }
@@ -367,7 +369,7 @@
     padding-top: 14px;
     border-top: 1px solid var(--cq-border-subtle);
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-dacts > [data-primary] {
       flex: 1 1 100%;
     }
@@ -383,7 +385,7 @@
     gap: 0;
     align-items: start;
   }
-  @media (min-width: 1024px) {
+  @variant page-min-1024 {
     .cq-wk-tplan {
       grid-template-columns: 300px minmax(0, 1fr);
       gap: 22px;
@@ -402,7 +404,7 @@
     border-radius: var(--cq-radius-lg);
     background: var(--cq-surface-raised);
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-plan-card {
       padding: 18px 16px;
     }
@@ -416,7 +418,7 @@
     letter-spacing: -0.015em;
     line-height: 1.3;
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-pg {
       font-size: 19px;
     }
@@ -488,7 +490,7 @@
     font-weight: 400;
     letter-spacing: 0;
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-big {
       font-size: 28px;
     }
@@ -563,7 +565,7 @@
     font-size: 11px;
     font-variant-numeric: tabular-nums;
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-days {
       height: 190px;
       gap: 1px;
@@ -608,7 +610,7 @@
     border-radius: var(--cq-radius-full);
     background: color-mix(in oklab, var(--cq-accent) 55%, var(--cq-surface));
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-br {
       grid-template-columns: minmax(0, 1fr) 56px;
     }
@@ -662,7 +664,7 @@
     border-radius: var(--cq-radius-circle);
     background: var(--cq-surface-raised);
   }
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-wk-audit > li {
       grid-template-columns: 46px 12px minmax(0, 1fr);
       gap: 10px;

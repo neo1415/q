@@ -5,6 +5,8 @@
  * hatched warning = not known yet. Every colour is a token; meaning always
  * has a word beside it.
  */
+
+@reference "../../../../app/page-width.css";
 @layer components {
   .cq-brief {
     --cq-brief-line: color-mix(
@@ -147,7 +149,7 @@
      past the screen's edge (re-test #3, 390 px: "Pitch deck" and "Team"
      sat beyond the right edge, behind a fade). The sliding ink cannot
      follow a second row, so the current tab carries its own underline. */
-  @media (max-width: 640px) {
+  @variant page-max-640 {
     .cq-brief-tabs {
       flex-wrap: wrap;
       gap: 0 20px;
@@ -1331,7 +1333,7 @@
     }
   }
 
-  @media (max-width: 1023px) {
+  @variant page-max-1023 {
     .cq-brief-grid {
       display: flex;
       flex-direction: column;
@@ -1363,7 +1365,7 @@
       display: flex;
     }
   }
-  @media (min-width: 1024px) and (max-width: 1279px) {
+  @variant page-1024-1279 {
     /* No gutter wide enough outside the card: the arrows overlap its edge. */
     .cq-brief-arrow[data-side="prev"] {
       inset-inline-start: -22px;
@@ -1372,7 +1374,7 @@
       inset-inline-end: -22px;
     }
   }
-  @media (max-width: 639px) {
+  @variant page-max-639 {
     .cq-brief-head {
       gap: 12px;
     }
