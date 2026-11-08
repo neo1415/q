@@ -773,7 +773,21 @@ export function finishingLine(
     finished.missing.length === 1
       ? "one more answer from you"
       : `${String(finished.missing.length)} more answers from you, starting with this one`;
-  const question = (copy.questionOf(first.stepKey) ?? first.question).trim();
+  // e2e run 5: the investor's lists still missing are asked together, by
+  // theme (its question while none of it is answered, else the short
+  // follow-up naming just those), never one bare list label at a time.
+  const theme =
+    journey === "investor" ? investorListThemeOf(first.stepKey) : undefined;
+  const missingKeys = new Set(finished.missing.map((item) => item.stepKey));
+  const themeMissing =
+    theme?.stepKeys.filter((stepKey) => missingKeys.has(stepKey)) ?? [];
+  const question = (
+    theme !== undefined && themeMissing.length >= 2
+      ? themeMissing.length === theme.stepKeys.length
+        ? theme.question
+        : themeFollowUp(themeMissing)
+      : (copy.questionOf(first.stepKey) ?? first.question)
+  ).trim();
   const asked = question.endsWith("?") ? question : `${question}?`;
   const held =
     first.stepKey === copy.unsettled
@@ -781,13 +795,28 @@ export function finishingLine(
       : (copy.heldFor?.(first.stepKey)?.trim() ?? null);
   if (held !== null && held.length > 0) {
     // What they said is put back to them for their yes, never asked again.
-    const label = copy.labelOf(first.stepKey) ?? question.replace(/\?$/u, "");
+    // Every other missing step with a value held for their yes goes in the
+    // same read-back (e2e run 5: the cheque from one sentence was read
+    // back as three questions; DECISIONS 78), one yes for the set.
+    const lineOf = (stepKey: string, value: string) =>
+      `${copy.labelOf(stepKey) ?? (copy.questionOf(stepKey) ?? stepKey).replace(/\?$/u, "")}: ${value.replace(/[.;\s]+$/u, "")}`;
+    const lines = [
+      lineOf(first.stepKey, held),
+      ...ordered.slice(1).flatMap((item) => {
+        if (item.stepKey === copy.unsettled) return [];
+        const value = copy.heldFor?.(item.stepKey)?.trim() ?? "";
+        return value.length === 0 ? [] : [lineOf(item.stepKey, value)];
+      }),
+    ].slice(0, 4);
+    const several = lines.length > 1;
     const which =
-      finished.missing.length === 1
-        ? "I need your yes on one thing"
-        : `I still need ${String(finished.missing.length)} more answers from you, starting with your yes on this one`;
+      finished.missing.length === lines.length
+        ? several
+          ? "I need your yes on these"
+          : "I need your yes on one thing"
+        : `I still need ${String(finished.missing.length)} more answers from you, starting with your yes on ${several ? "these" : "this one"}`;
     return {
-      reply: `Before I can finish, ${which}. From what you said:\n\n${label}: ${held.replace(/[.;\s]+$/u, "")}\n\nShall I keep that? Say yes, or tell me what it should be.`,
+      reply: `Before I can finish, ${which}. From what you said:\n\n${lines.join("\n")}\n\n${several ? "Shall I keep these? Say yes, or tell me what to change." : "Shall I keep that? Say yes, or tell me what it should be."}`,
       asking: first.stepKey,
     };
   }
