@@ -1,5 +1,20 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 8 November 2026, 16:40 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7; owner away, D82)
+
+Production: **batch 16 `a9be2ffc6`** (web and q-api; api and workers unchanged on 74944dc22); rollback `74944dc22`; CI 1896 green.
+
+- **Onboarding e2e run 11: founder ALL PASS and investor ALL PASS**, both finishing on /verification (receipts/2026-11-08-onboarding-e2e-11).
+- The owner's 8 Nov navigation, web and pane issues are verified fixed on production (receipts/2026-11-08-owner-replay-batch15).
+- Known small item: the reader can file a restated cheque range as a note on the deployment answer (cosmetic, W5 flagged).
+- **Next:** the owner's own live test. No new lanes until then.
+
+| Lane                      | State |
+| ------------------------- | ----- |
+| W1, W3, W4, W5, Analytics | idle  |
+
+Anthropic test spend: about $42.5 of $50 (no paid runs today).
+
 ## Live board — 8 November 2026, 14:20 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7; owner away, D82)
 
 Production: **batch 15 `74944dc22`** (rollback `06be34c81`); CI 1894 green; all four services SUCCESS. Batch 13 shipped at 11:46 after a GitHub releases outage blocked Railway builds from 10:22.

@@ -677,6 +677,12 @@ if (STEPS.has("J6")) {
           CONFIRM,
           ...WHY,
           READ_BACK,
+          // Run 11: the use-of-funds question lists "runway and operations"
+          // as a choice, so it must come before the finance rule below.
+          [
+            /use (of )?(the )?fund|money .*go|go towards|use the funding/i,
+            "Product and hiring.",
+          ],
           // Run 8: the finances, fictional and plausible, all together;
           // before "spend" (use of funds), "growth" and "revenue", which the same questions name.
           [

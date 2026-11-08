@@ -2179,3 +2179,14 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - W5: the D82 playback fix.
   - CI 1894 green; deployed first time.
   - Replay all OK. Onboarding run 10: founder ALL PASS; investor J6 only.
+
+## 2026-11-08 16:40 UTC — batch 16 live; onboarding both journeys ALL PASS (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Batch 16 `a9be2ffc6` = W5 a82748525 + runner d530e543:
+  - the investor finish goes to /verification;
+  - asks are counted across the session;
+  - one topic per playback;
+  - the note wording is fixed.
+- CI 1896 green; deployed (web and q-api built; api and workers unchanged).
+- e2e run 11: investor ALL PASS; founder ALL PASS after a runner rule-order fix (use of funds before finance; committed here).
+- Waiting for the owner's live test.
