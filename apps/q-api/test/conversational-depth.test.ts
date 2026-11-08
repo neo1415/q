@@ -122,31 +122,143 @@ const ROLE_SAID = (value: string[], quote: string): Reading => ({
 });
 const NOTHING: Reading = { answers: [], declined: [] };
 
-describe("D81 #4: a topic is played back before it is saved", () => {
-  it("held while the topic is open, played back on moving on, saved on their yes", async () => {
+const SAID = (
+  items: readonly (readonly [string, string | number | string[], string])[],
+): Reading => ({
+  answers: items.map(([stepKey, value, quote]) => ({
+    stepKey,
+    value,
+    quote,
+    ownWords: false,
+  })),
+  declined: [],
+});
+const MIN = "I2.cheque_min";
+const MAX = "I2.cheque_max";
+
+describe("D82: a clear typed answer saves at once (D77)", () => {
+  it("their clear answer is saved, with no playback", async () => {
     const { world, say } = depthWorld({
-      readings: [NOTHING, ROLE_SAID(["lead"], "We lead rounds"), NOTHING],
+      readings: [NOTHING, ROLE_SAID(["lead"], "We lead rounds")],
       script: [
-        {
-          reply: "Do you usually lead rounds, or invest alongside a lead?",
-          asking: ROLE,
-        },
+        { reply: "Do you usually lead rounds?", asking: ROLE },
         { reply: "Clear. Where do you invest?", asking: "I3.geography" },
-        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
       ],
     });
     await say("Hello.");
     const moved = await say("We lead rounds.");
-    // Not saved yet: held for their yes.
-    expect(world.recordedValue(ROLE)).toBeUndefined();
-    expect(moved.reply).toMatch(/^Clear\. Let me get this right: /u);
-    expect(moved.reply).toMatch(/Lead rounds\. Is that right\?$/u);
-    expect(moved.asking?.stepKey).toBe(ROLE);
-    // Their yes saves exactly what was played back.
-    await say("Yes.");
+    expect(moved.reply).toBe("Clear. Where do you invest?");
     expect(world.recordedValue(ROLE)).toEqual({
       type: "MULTI_SELECT",
       optionKeys: ["lead"],
+    });
+  });
+
+  it("run 9 J1: a dense line with the firm's name saves the name and what needs it", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.organisation_name",
+      setUpBy: ["I0.organisation_name"],
+      subject: FIRM,
+      recorded: { "I0.investor_type": "angel" },
+    });
+    const reader: OnboardingTranscriptReader = {
+      read: () =>
+        Promise.resolve(
+          SAID([
+            [
+              "I0.organisation_name",
+              "Kestrel Bay Capital",
+              "Kestrel Bay Capital",
+            ],
+            ["I2.stages", ["seed"], "seed"],
+          ]),
+        ),
+    };
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: world.fetch,
+      logger,
+      readAfterMs: 5,
+      reader,
+      recommendations: world.recommendations,
+      depth: CONVERSATIONAL_DEPTH,
+    });
+    const line = {
+      voiceSessionId: "typed:11111111-1111-4111-8111-111111111111",
+      actor,
+      accessToken: "eyPRIVATE.NEVER-EMITTED.bearer",
+      onboarding: {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        journeyType: "investor" as const,
+      },
+    };
+    await conversation.said?.(
+      line,
+      "Q",
+      "What's your firm called?",
+      "I0.organisation_name",
+    );
+    await conversation.said?.(
+      line,
+      "PERSON",
+      "We're Kestrel Bay Capital, we back seed companies.",
+    );
+    await conversation.flush?.(line);
+    expect(world.recordedValue("I0.organisation_name")).toEqual({
+      type: "TEXT",
+      text: "Kestrel Bay Capital",
+    });
+    expect(world.recordedValue("I2.stages")).toBeDefined();
+  });
+});
+
+describe("D82: what waits for their yes is played back once a topic, together", () => {
+  it("one value waiting gets no playback of its own", async () => {
+    const { say } = depthWorld({
+      readings: [NOTHING, SAID([[MIN, 250000, "from 250k"]])],
+      script: [
+        { reply: "What's your smallest cheque?", asking: MIN },
+        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
+      ],
+    });
+    await say("Hello.");
+    const moved = await say("From 250k.");
+    expect(moved.reply).toBe("Thanks. Where do you invest?");
+  });
+
+  it("two values waiting: one playback that carries both, one sentence, saved on their yes", async () => {
+    const { world, say } = depthWorld({
+      readings: [
+        NOTHING,
+        SAID([
+          [MIN, 250000, "from 250k"],
+          [MAX, 1000000, "up to a million"],
+        ]),
+        NOTHING,
+      ],
+      script: [
+        { reply: "What cheque range do you write?", asking: MIN },
+        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
+        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
+      ],
+    });
+    await say("Hello.");
+    const moved = await say("From 250k up to a million.");
+    expect(moved.reply).toMatch(/^Thanks\. Let me get this right: /u);
+    expect(moved.reply).toMatch(/250/u);
+    expect(moved.reply).toMatch(/1,?000,?000|1 million/u);
+    expect(moved.reply).toMatch(/, is that right\?$/u);
+    // Never a bare "Is that right?" sentence.
+    expect(moved.reply).not.toMatch(/\. Is that right\?/u);
+    expect(world.recordedValue(MIN)).toBeUndefined();
+    await say("Yes.");
+    expect(world.recordedValue(MIN)).toEqual({
+      type: "RANGE",
+      value: "250000",
+    });
+    expect(world.recordedValue(MAX)).toEqual({
+      type: "RANGE",
+      value: "1000000",
     });
   });
 
@@ -154,23 +266,51 @@ describe("D81 #4: a topic is played back before it is saved", () => {
     const { world, say } = depthWorld({
       readings: [
         NOTHING,
-        ROLE_SAID(["lead"], "We lead rounds"),
-        ROLE_SAID(["follow"], "we follow in later rounds"),
+        SAID([
+          [MIN, 250000, "from 250k"],
+          [MAX, 1000000, "up to a million"],
+        ]),
+        SAID([[MIN, 300000, "300k"]]),
       ],
       script: [
-        { reply: "Do you usually lead rounds?", asking: ROLE },
-        { reply: "Clear. Where do you invest?", asking: "I3.geography" },
+        { reply: "What cheque range do you write?", asking: MIN },
+        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
         { reply: "Got it. Where do you invest?", asking: "I3.geography" },
       ],
     });
     await say("Hello.");
-    await say("We lead rounds.");
-    const replay = await say("Actually no, we follow in later rounds.");
+    await say("From 250k up to a million.");
+    const replay = await say("The minimum is 300k, not 250k.");
     expect(replay.reply).toMatch(/^Thanks\. So: /u);
-    expect(replay.reply).toMatch(/Follow in later rounds/u);
-    expect(replay.reply).not.toMatch(/Lead rounds/u);
-    expect(replay.reply).toMatch(/Is that right\?$/u);
-    expect(world.recordedValue(ROLE)).toBeUndefined();
+    expect(replay.reply).toMatch(/300/u);
+    expect(replay.reply).not.toMatch(/250/u);
+    expect(replay.reply).toMatch(/, is that right\?$/u);
+    expect(world.recordedValue(MIN)).toBeUndefined();
+  });
+});
+
+describe("D82 #5: asks are counted running, never across other turns", () => {
+  it("run 9 J3: a needed step asked again later is asked, not left for now", async () => {
+    // The fixture's v1 journey has no website step; the stages stand in.
+    const WEBSITE = "I3.geography";
+    const { say } = depthWorld({
+      readings: [NOTHING],
+      script: [
+        { reply: "Where do you invest?", asking: WEBSITE },
+        { reply: "Which stages do you invest in?", asking: "I2.stages" },
+        { reply: "And where do you invest?", asking: WEBSITE },
+        {
+          reply: "Capital Q matches you by it. Where do you invest?",
+          asking: WEBSITE,
+        },
+      ],
+    });
+    await say("Hello.");
+    await say("We're a seed fund.");
+    await say("Pre-seed and seed.");
+    const fourth = await say("I'd rather not give it.");
+    expect(fourth.reply).not.toMatch(/let's leave it for now/u);
+    expect(fourth.asking?.stepKey).toBe(WEBSITE);
   });
 });
 
@@ -198,18 +338,18 @@ describe("D81 #2: why once a topic, never a loop", () => {
     expect(second.asking?.stepKey).not.toBe(ROLE);
   });
 
-  it("their why is kept as the topic's private note once its answer is saved", async () => {
+  it("their why is kept as the topic's private note", async () => {
     const { world, say } = depthWorld({
       readings: [ROLE_SAID(["lead"], "We lead rounds"), NOTHING],
       script: [
         { reply: "Why lead rather than follow?", asking: ROLE, probing: ROLE },
         { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
-        { reply: "Thanks. Where do you invest?", asking: "I3.geography" },
       ],
     });
     await say("We lead rounds.");
     await say("Speed: we can move first.");
-    await say("Yes.");
+    // Kept once the answer is on the record: by the next turn at the latest.
+    await say("West Africa.");
     expect(world.recordedValue(ROLE)).toBeDefined();
     expect(world.recordedNote(ROLE)).toBe("Speed: we can move first.");
   });
@@ -270,7 +410,7 @@ describe("the playback line itself", () => {
   it("is labels and values, one question, and code recognises it", () => {
     const first = playbackLine(["Role in a round: Lead rounds"], false);
     expect(first).toBe(
-      "Let me get this right: Role in a round: Lead rounds. Is that right?",
+      "Let me get this right: Role in a round: Lead rounds, is that right?",
     );
     expect(first.match(/\?/gu) ?? []).toHaveLength(1);
     expect(isPlaybackLine(first)).toBe(true);

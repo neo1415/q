@@ -14,15 +14,22 @@ import { definitionFor } from "./interview-steps.js";
  */
 export type ConversationalDepth = {
   /**
-   * #4: what their words state is held, not saved, while its topic is
-   * open, and played back for their yes when Q moves on ("Let me get this
-   * right: … Is that right?"). Typed conversations: the voice line plays
-   * back in its own words (its prompt) and saves as before.
+   * #4, as D82 settles it (e2e run 9): what waits for their yes -- what Q
+   * inferred or restated, a figure to read back -- is played back once per
+   * topic, all of it together, when Q moves on ("Let me get this right:
+   * … , is that right?"). A clear answer they typed saves at once in their
+   * words (D77); never one value per question; a topic with one value
+   * waiting joins the next playback or the final read-back. Typed
+   * conversations: the voice line plays back in its own words.
    */
   readonly playbackBeforeSave: boolean;
   /** Owner Q1: code's explicit nones are saved at once and named in the playback. */
   readonly nonesImmediate: boolean;
-  /** Owner Q2: identity facts (website, role, country) are played back with their topic. */
+  /**
+   * Owner Q2, flipped by D82: identity facts held for the playback. Off:
+   * they save at once (the firm's name comes first, and every other save
+   * waits on it).
+   */
   readonly identityPlayedBack: boolean;
   /** Owner Q3: their answer to Q's "why" is kept as that topic's private note. */
   readonly whyAsNote: boolean;
@@ -31,7 +38,9 @@ export type ConversationalDepth = {
 export const CONVERSATIONAL_DEPTH: ConversationalDepth = {
   playbackBeforeSave: true,
   nonesImmediate: true,
-  identityPlayedBack: true,
+  // D82 (e2e run 9): the firm's name held for a playback left every save
+  // that needs the firm refused; identity facts save at once.
+  identityPlayedBack: false,
   whyAsNote: true,
 };
 
@@ -103,16 +112,18 @@ export function playbackLine(
     .map((line) => line.trim().replace(/[.;\s]+$/u, ""))
     .filter((line) => line.length > 0)
     .join("; ");
+  // One sentence that carries the values to the question (D82: never a
+  // bare "Is that right?").
   return replay
-    ? `Thanks. So: ${said}. Is that right?`
-    : `Let me get this right: ${said}. Is that right?`;
+    ? `Thanks. So: ${said}, is that right?`
+    : `Let me get this right: ${said}, is that right?`;
 }
 
 /** Code's own playback line (first or replay). */
 export function isPlaybackLine(line: string): boolean {
   return (
     /\b(Let me get this right:|Thanks\. So:)/u.test(line) &&
-    /\bIs that right\?/u.test(line)
+    /\bis that right\?/iu.test(line)
   );
 }
 

@@ -836,20 +836,19 @@ export function createOnboardingConversation(dependencies: {
       readonly value: unknown;
       readonly affirms?: boolean | undefined;
     }): boolean => typeof answer.value === "number" && answer.affirms !== true;
-    // DECISIONS 81 #4: in a typed conversation what their words state is
-    // held, not saved, while its topic is open; Q plays the topic back for
-    // their yes when it moves on, and their yes saves it. Their agreement
-    // to Q's own read-back (affirms) saves at once, as before; a long
-    // answer keeps its own say-back; identity follows its switch.
+    // D82 (e2e run 9): a clear answer they typed saves at once in their
+    // words (D77); only what waits for their yes already (an inference, a
+    // restatement, a figure to read back) is played back with its topic.
+    // Identity facts are held only when their switch says so (off).
     const forPlayback = (answer: {
       readonly stepKey: string;
       readonly affirms?: boolean | undefined;
     }): boolean =>
       depth.playbackBeforeSave &&
+      depth.identityPlayedBack &&
       line.voiceSessionId.startsWith("typed:") &&
       answer.affirms !== true &&
-      !isLongAnswerStep(line.onboarding.journeyType, answer.stepKey) &&
-      (depth.identityPlayedBack || !IDENTITY_STEPS.has(answer.stepKey)) &&
+      IDENTITY_STEPS.has(answer.stepKey) &&
       topicOf(line.onboarding.journeyType, answer.stepKey) !== null;
     const stated = answers.filter(
       (answer) =>
