@@ -226,6 +226,15 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * is never derived from a checkpoint alone or from a client field.
    */
   readonly actor: ActorContext;
+  /**
+   * Batch 13 (owner live 8 Nov): which side of Capital Q the actor's own
+   * organisation is on, from their membership on the server at the answer
+   * seam -- never from the client, and never from which context scopes this
+   * turn's plan happens to carry (an investor's plan holds no mandate scope
+   * on a relationship turn). Read through `askerSideOf`. Absent: not
+   * composed (tests), and the plan's mandate scope is the fallback.
+   */
+  readonly askerSide?: "FOUNDER" | "INVESTOR" | undefined;
   readonly correlationId: CorrelationId;
   readonly retrieval: QRetrievalOutcome;
   readonly plan: PermittedContextPlan;

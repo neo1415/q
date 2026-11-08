@@ -4986,6 +4986,24 @@ const arrivalSnapshots = createArrivalSnapshots({
   // P4: their own latest Q Daily edition, for the quiet-day welcome.
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
+/**
+ * Batch 13 (owner live 8 Nov: an investor's relationship turns were read
+ * as a founder's): which side the actor's own organisation is on, from
+ * their membership on the server -- never from the client, never from the
+ * context scopes a turn's plan happens to carry. Null: neither (the plan
+ * then decides, as before).
+ */
+const askerSideOfActor = async (
+  actor: ActorContext,
+): Promise<"FOUNDER" | "INVESTOR" | null> => {
+  if (actor.organisationId === undefined) return null;
+  const [firm, company] = await Promise.all([
+    runtimeDependencies.ownInvestorOrganisation(actor),
+    runtimeDependencies.ownCompany(actor),
+  ]);
+  if (firm !== null) return "INVESTOR";
+  return company !== null ? "FOUNDER" : null;
+};
 // Q intelligence step 1: who is asking, for the situation header every Q
 // model step is told. The role is the side of the organisation their actor
 // context's membership grants (the rehearsal's own viewer read), never
@@ -5076,6 +5094,8 @@ async function onScreenOf(
   return null;
 }
 const qIntelligence = composeQIntelligence({
+  // Batch 13: the side their membership puts them on, for every answer.
+  askerSide: askerSideOfActor,
   readCache: qReadCache,
   // Situation-first planning (S5, S6): the reader's planAsk starts the plan
   // job at once (the reply carries its card); directsWork files their
@@ -8201,6 +8221,7 @@ const accessTokens =
 // by code alone, before Q has answered. Built here so boot can warm it.
 const fastNavigation = createFastNavigation({
   firewall: baseFirewall,
+  askerSide: askerSideOfActor,
   tools: qTools.port,
   ownRelationships: errandRelationships.ownRelationships,
   logger,

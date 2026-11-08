@@ -3,6 +3,7 @@ import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import { createPostgresCompanyKnowledge } from "@capital-q/discovery";
+import type { ActorContext } from "@capital-q/security";
 import { createPostgresContextEpochReader } from "@capital-q/security/postgres";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { ReadCache } from "@capital-q/model-gateway/q";
@@ -329,6 +330,14 @@ export type QIntelligenceDependencies = {
   readonly pictures?: ModelGatewayQAnswerDependencies["pictures"];
   /** Pictures of who a turn names, from public pages; absent, none. */
   readonly publicPictures?: ModelGatewayQAnswerDependencies["publicPictures"];
+  /**
+   * Batch 13: the side of the actor's own organisation, from their
+   * membership on the server, stamped on every answer request (see
+   * QAnswerRequest.askerSide). Absent: the plan's mandate scope decides.
+   */
+  readonly askerSide?:
+    | ((actor: ActorContext) => Promise<"FOUNDER" | "INVESTOR" | null>)
+    | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -854,12 +863,59 @@ export function composeQIntelligence(
   return {
     companyIntelligence: specialist,
     retrieval: evidence.port,
-    answer,
+    answer: withAskerSide(answer, dependencies.askerSide),
     capabilities: {
       authorisedRetrieval: true,
       knowledgeQuery: true,
       companyIntelligence: true,
       semanticRetrieval: embeddings !== undefined,
     },
+  };
+}
+
+/**
+ * Batch 13 (owner live 8 Nov): every answer request carries the side the
+ * actor's membership puts them on, read once per run here, so no reader
+ * downstream infers it from whichever context scopes this turn's plan
+ * holds. The early warm-up gets the same stamp (it prepares the turn the
+ * answer reuses). A failed read leaves it unset (the plan's mandate scope
+ * then decides), never a failed answer.
+ */
+export function withAskerSide(
+  answer: QAnswerPort,
+  askerSide:
+    | ((actor: ActorContext) => Promise<"FOUNDER" | "INVESTOR" | null>)
+    | undefined,
+): QAnswerPort {
+  if (askerSide === undefined) return answer;
+  const RUNS_MAX = 256;
+  const sides = new Map<string, Promise<"FOUNDER" | "INVESTOR" | null>>();
+  const sideOf = (request: QAnswerRequest) => {
+    const known = sides.get(request.runId);
+    if (known !== undefined) return known;
+    const read = askerSide(request.actor).catch(() => null);
+    sides.set(request.runId, read);
+    while (sides.size > RUNS_MAX) {
+      const oldest = sides.keys().next().value;
+      if (oldest === undefined) break;
+      sides.delete(oldest);
+    }
+    return read;
+  };
+  const stamped = async (request: QAnswerRequest): Promise<QAnswerRequest> => {
+    const side = await sideOf(request);
+    return side === null ? request : { ...request, askerSide: side };
+  };
+  const warm = answer.warm;
+  return {
+    ...answer,
+    answer: async (request) => answer.answer(await stamped(request)),
+    ...(warm === undefined
+      ? {}
+      : {
+          warm: (request: QAnswerRequest) => {
+            void stamped(request).then(warm, () => undefined);
+          },
+        }),
   };
 }
