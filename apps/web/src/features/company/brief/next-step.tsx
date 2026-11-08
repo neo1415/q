@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import type {
   DataRoomView,
@@ -15,6 +15,7 @@ import type { ApprovalPayload } from "@/features/q/control/approval";
 import { useQControl } from "@/features/q/control/q-control";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 import { useT } from "@/features/i18n/language";
+import { usePageNarrowerThan } from "@/features/workspace/page-pane-width";
 
 import { ProfilePass } from "../company-profile-parts";
 import type { ProfileTab } from "../profile-tab";
@@ -31,22 +32,6 @@ import { QMark } from "./parts";
  * the relationship record. Before the founders accept, the step is the
  * server-confirmed Express interest (Pass stays beside it, neutral).
  */
-
-const PHONE = "(max-width: 1023px)";
-function subscribePhone(listener: () => void): () => void {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function")
-    return () => undefined;
-  const query = window.matchMedia(PHONE);
-  query.addEventListener("change", listener);
-  return () => query.removeEventListener("change", listener);
-}
-function isPhone(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia(PHONE).matches
-  );
-}
 
 /**
  * R4: the page's questions as an approval payload (flat fields, shown in
@@ -104,7 +89,8 @@ export function NextStepRibbon({
   const tab = useProfileTab() ?? serverTab;
   // One of the two at a time, so the step's controls (Express interest
   // keeps its own state) exist once: the ribbon, or on a phone the dock.
-  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
+  // A phone, or a narrow Q Workspace page pane (batch 13).
+  const phone = usePageNarrowerThan(1024, false);
   const requested = brief?.requested ?? new Set<string>();
   const roomDocs =
     dataRoom !== null && dataRoom.viewer === "INVESTOR"

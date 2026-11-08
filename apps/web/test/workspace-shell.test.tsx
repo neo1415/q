@@ -8,7 +8,10 @@ import { describe, expect, it, vi } from "vitest";
  * the dock handed to the one Q provider, no workspace markup); with it on,
  * nav | Q pane | page pane, the same one provider, and no dock.
  */
-vi.mock("next/navigation", () => ({ usePathname: () => "/discover" }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/discover",
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+}));
 const providerProps: Array<Record<string, unknown>> = [];
 vi.mock("../src/components/app-shell/global-q", () => ({
   GlobalQProvider: (props: {

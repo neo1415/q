@@ -54,6 +54,7 @@ import { PitchPlayer } from "./player/pitch-player";
 import { useT } from "@/features/i18n/language";
 import { useCompanyScores } from "@/features/scores";
 import { QRead } from "./q-read";
+import { usePageAtLeast } from "@/features/workspace/page-pane-width";
 
 /** A swipe down this far on the details sheet closes it. */
 const SHEET_DISMISS_PX = 64;
@@ -287,22 +288,12 @@ function Reasons({
 
 const subscribeNothing = () => () => undefined;
 
-const DESKTOP = "(min-width: 1024px)";
-function subscribeDesktop(onChange: () => void): () => void {
-  if (typeof window.matchMedia !== "function") return () => undefined;
-  const query = window.matchMedia(DESKTOP);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-/** The intelligence panel's width: a desktop shows the fit beside the pitch. */
+/**
+ * The intelligence panel's width: a desktop shows the fit beside the
+ * pitch. In the Q Workspace it is the page pane's width (batch 13).
+ */
 function useDesktopPanel(): boolean {
-  return useSyncExternalStore(
-    subscribeDesktop,
-    () =>
-      typeof window.matchMedia === "function" &&
-      window.matchMedia(DESKTOP).matches,
-    () => false,
-  );
+  return usePageAtLeast(1024, false);
 }
 
 /** The few words a statement's axes earn on a card (ADR-001). */

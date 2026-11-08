@@ -3,6 +3,8 @@
  * raw colour. Scoped under .gq-* so nothing leaks into the rest of the app.
  */
 
+@reference "../../../app/page-width.css";
+
 .gq-fg {
   flex: none;
 }
@@ -267,7 +269,7 @@ textarea.gq-input {
   display: grid;
   gap: 24px;
 }
-@media (min-width: 1024px) {
+@variant page-min-1024 {
   .gq-form:not(.gq-compact) {
     grid-template-columns: 300px minmax(0, 1fr);
     gap: 48px;
@@ -280,7 +282,7 @@ textarea.gq-input {
   gap: 14px;
   padding: 18px;
 }
-@media (min-width: 1024px) {
+@variant page-min-1024 {
   .gq-form:not(.gq-compact) .gq-gatecard {
     position: sticky;
     top: 28px;
@@ -386,7 +388,7 @@ textarea.gq-input {
   align-items: center;
   padding-top: 8px;
 }
-@media (max-width: 767px) {
+@variant page-max-767 {
   .gq-in-app .gq-formbar {
     position: sticky;
     bottom: calc(var(--cq-bottom-nav-height) + 8px);
@@ -433,7 +435,7 @@ textarea.gq-input {
   grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid var(--cq-border-subtle);
 }
-@media (max-width: 1023px) {
+@variant page-max-1023 {
   .gq-listhead .gq-hide-s {
     display: none;
   }
@@ -445,7 +447,7 @@ textarea.gq-input {
     text-align: end;
   }
 }
-@media (min-width: 1024px) {
+@variant page-min-1024 {
   .gq-ibx {
     grid-template-columns: 440px minmax(0, 1fr);
     height: calc(100dvh - 210px);
@@ -466,7 +468,7 @@ textarea.gq-input {
 .gq-ibx .gq-detail {
   display: none;
 }
-@media (min-width: 1024px) {
+@variant page-min-1024 {
   .gq-ibx .gq-detail {
     display: block;
   }

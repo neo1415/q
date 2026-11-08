@@ -26,6 +26,7 @@ import { QAperture } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { useT } from "@/features/i18n/language";
 
+import { PagePaneWidthContext } from "./page-pane-width";
 import { QPaneWidthContext } from "./q-pane-width";
 
 import {
@@ -311,6 +312,32 @@ export function WorkspacePagePane({
     const pane = paneRef.current;
     return pane === null ? undefined : watchPageActivity(pane);
   }, []);
+  // Batch 13: the pane's width for pages' layout decisions made in code
+  // (the CSS reads the same width as the `cq-page` container), and its
+  // edges for a page's fixed bars (--cq-ws-page-left/-width, globals.css).
+  // Measured before paint; a hidden pane keeps the last width it had.
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const pane = paneRef.current;
+    if (pane === null || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement.style;
+    const read = () => {
+      const box = pane.getBoundingClientRect();
+      const next = Math.round(box.width);
+      if (next <= 0) return;
+      setWidth(next);
+      root.setProperty("--cq-ws-page-left", `${Math.round(box.left)}px`);
+      root.setProperty("--cq-ws-page-width", `${next}px`);
+    };
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(pane);
+    return () => {
+      observer.disconnect();
+      root.removeProperty("--cq-ws-page-left");
+      root.removeProperty("--cq-ws-page-width");
+    };
+  }, []);
 
   const openSheet = useCallback(() => {
     setPeek(null);
@@ -364,7 +391,9 @@ export function WorkspacePagePane({
             {t("Back to Q")}
           </button>
         </div>
-        {children}
+        <PagePaneWidthContext.Provider value={width}>
+          {children}
+        </PagePaneWidthContext.Provider>
         <div className="cq-ws-page-foot">
           <button
             type="button"

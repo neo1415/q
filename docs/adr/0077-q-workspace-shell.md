@@ -67,6 +67,12 @@ The owner directed a split: nav | Q pane | page pane. Q is beside every page, an
 
 - **Flag off:** today's DOM, which a landmark test checks (`test/workspace-shell.test.tsx`).
 - **Old paths:** `/home`'s full-screen stage, Dock and sheet stay until `on` has been the default for a week with no regressions (plan §4.3).
-- **Narrow pane:** inside the pane the panel runs narrower than the viewport, and some viewport-based `lg:` classes inside it still see the viewport width. Those are visual follow-ups, found with the 1440/390 screenshots. Container queries are the long-term fix.
+- **Narrow pane (batch 13, resolved):** a page in the pane lays out by the pane's width.
+  - The page pane is the `cq-page` CSS container. In globals.css, Tailwind's `sm`…`2xl` and `max-*` variants read that container inside the pane and keep their exact viewport media query everywhere else.
+  - Page stylesheets write `@variant page-max-1023 { … }` (from `app/page-width.css`) in place of `@media (max-width: 1023px)`. Tailwind expands this into the same media query outside the workspace and a container query inside it.
+  - Layout decisions made in code use `usePageAtLeast` / `usePageNarrowerThan`.
+  - The viewport-sized tokens (page gutter, type scale, bottom-navigation height) are re-read from the pane. A page's fixed bars span the pane.
+  - Flag off is unchanged: element boxes were compared before and after on 7 pages at 6 viewports, including 1032 px with a classic scrollbar.
+  - Two rules for new code: a `@keyframes` rule cannot sit inside a page variant, and one page variant cannot nest inside another.
 - **Phone scrolling:** on a phone the page sheet is its own scroll container. A page that listens to window scroll for infinite loading must also accept its nearest scroll container; this is verified live per page in W6.
 - **Glow:** ADR 0017's glow-on-Q-only rule still holds. The collapsed edge shows only Q's aperture.

@@ -1,0 +1,105 @@
+/*
+ * The page's width (Q Workspace batch 13). A page's own stylesheet writes
+ * `@variant page-max-1023 { ... }` where it used to write
+ * `@media (max-width: 1023px) { ... }`. Tailwind expands it into both:
+ *
+ * - outside the workspace (flag off), the same viewport media query as
+ *   before, to the pixel;
+ * - inside the workspace, the same condition on the `cq-page` container:
+ *   the page pane, or the Q pane for a page part Q shows. A 560 px pane
+ *   lays out like a phone.
+ *
+ * The `:where()` adds no specificity. A page stylesheet takes these with
+ * `@reference` (nothing is emitted twice); globals.css imports them.
+ * Tailwind's own sm..2xl are pane-aware in globals.css.
+ */
+@custom-variant page-max-479 {
+  @media (max-width: 479px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (max-width: 479px) {
+    @slot;
+  }
+}
+@custom-variant page-max-639 {
+  @media (max-width: 639px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (max-width: 639px) {
+    @slot;
+  }
+}
+@custom-variant page-below-640 {
+  @media (max-width: 639.98px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (max-width: 639.98px) {
+    @slot;
+  }
+}
+@custom-variant page-max-640 {
+  @media (max-width: 640px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (max-width: 640px) {
+    @slot;
+  }
+}
+@custom-variant page-max-767 {
+  @media (max-width: 767px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (max-width: 767px) {
+    @slot;
+  }
+}
+@custom-variant page-max-1023 {
+  @media (max-width: 1023px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (max-width: 1023px) {
+    @slot;
+  }
+}
+@custom-variant page-min-1024 {
+  @media (min-width: 1024px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (min-width: 1024px) {
+    @slot;
+  }
+}
+@custom-variant page-1024-1279 {
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (min-width: 1024px) and (max-width: 1279px) {
+    @slot;
+  }
+}
+@custom-variant page-min-1280 {
+  @media (min-width: 1280px) {
+    :where(html:not(:has(.cq-ws-page))) {
+      @slot;
+    }
+  }
+  @container cq-page (min-width: 1280px) {
+    @slot;
+  }
+}

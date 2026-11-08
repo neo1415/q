@@ -96,6 +96,7 @@ import {
   type PaneView,
 } from "./inbox-model";
 import { useT } from "@/features/i18n/language";
+import { usePageAtLeast } from "@/features/workspace/page-pane-width";
 
 /**
  * The investor's GateQ inbox (F4; design a/gateq.html "Investor: GateQ
@@ -165,16 +166,9 @@ function key(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+/** A desktop, or a wide enough Q Workspace page pane (batch 13). */
 function useIsDesktop(): boolean {
-  const [desktop, setDesktop] = useState(true);
-  useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
-    const update = () => setDesktop(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return desktop;
+  return usePageAtLeast(1024, true);
 }
 
 const SHORTCUTS_KEY = "cq.gateq.shortcuts.v1";
