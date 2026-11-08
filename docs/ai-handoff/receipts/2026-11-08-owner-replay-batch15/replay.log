@@ -1,0 +1,18 @@
+-- at /home
+#2 "whats happening with my capital?" → /relationships?view=capital moveMs=1124 totalMs=23344
+    Q:  Q: I've opened Capital. Q: Your capital activity shows two recorded items: you have invested in USD, and Ledgerfold has a USD 250,000 investment confirmed by both sides, marked as not sent. I don’t have a current total of capital deployed or a fuller breakdown in what’s visible here. Sources Investor · 1 Ask Q Q
+#3 "who has viewed me so far?" → /analytics moveMs=4122 totalMs=21417
+    Q:  Q: I've opened Analytics. Q: Fewer than three founder organisations viewed your profile in a completed week. Capital Q doesn’t show their names, and there are no completed weekly periods to identify yet. Viewing isn’t an expression of interest; your recorded interest signals are separate, including accepted connections with Harbourline Cargo, Brightkloof Energy, Nsuo Labs, Tarmacly, Clinicrest, Tallyloom and Maji Lo
+-- at /work
+#5 "tell me about clinicrest" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=overview moveMs=4646 totalMs=32970
+    Q: macies with verified essential medicines. The company reports 212 paying accounts and about $95,000 in monthly revenue as of February 2026. Its pitch deck also says 340 active clinics and pharmacies; Clinicrest attributes the difference to free-trial accounts, but it hasn’t shown the split, so that customer measure remains unresolved. Clinicrest says it is raising $1.8 million in a priced seed round to open depots in
+#6 "take me to their chat" → /relationships/company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe/messages moveMs=312 totalMs=12527
+    Q: macies with verified essential medicines. The company reports 212 paying accounts and about $95,000 in monthly revenue as of February 2026. Its pitch deck also says 340 active clinics and pharmacies; Clinicrest attributes the difference to free-trial accounts, but it hasn’t shown the split, so that customer measure remains unresolved. Clinicrest says it is raising $1.8 million in a priced seed round to open depots in
+#7 "what do i have in my pipeline?" → /relationships?view=pipeline moveMs=4111 totalMs=23470
+    Q: ross three stages: In diligence: Ajopot. Connected: Harbourline Cargo, Brightkloof Energy, Nsuo Labs, Tarmacly, Maji Loop, Clinicrest, Tallyloom and Ledgerfold. These are mutual connections, not investments or commitments. Clinicrest is currently waiting for your reply about your typical cheque size and whether you lead. Interest expressed, awaiting the companies’ answers: Kivu Traceworks, Sahel Pumps and Kazikit. Se
+-- at /discover
+#9 "find paystack for me online now" → /discover moveMs=-1 totalMs=22748
+    Q:  Q: Paystack is an African payments company that helps businesses accept online and offline payments. Its official website is paystack.com. Public sources also say: Paystack’s LinkedIn page, retrieved 8 November 2026, describes more than 200,000 businesses using Paystack and identifies Stripe as its parent company; those details are public, unverified and may be stale. Picture From paystack.com · Public image, not a 
+#10 "what can you find online about me?" → /discover moveMs=-1 totalMs=26361
+    Q: prefer some revenue, lead or co-invest, and look for a path to Series A within 24 months. Your setup is substantially complete, though some mandate details remain open, including how firm certain preferences are, outright sector exclusions and representative portfolio companies. Public sources also say: I found one undated page on Ledgerline’s website describing Ledgerline as offering US company setup, accounting, ta
+errors []
