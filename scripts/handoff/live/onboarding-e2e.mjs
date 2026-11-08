@@ -750,7 +750,18 @@ if (STEPS.has("J6")) {
   const answers = [];
   for (let turn = 0; turn < Number(process.env.TURNS ?? 30); turn += 1) {
     if (!new URL(page.url()).pathname.startsWith("/onboarding")) break;
-    const q = questionOf(await lastQ());
+    const line = await lastQ();
+    // Run 7: Q left a step for now and asked nothing; the runner replied
+    // "That's all for now." eight times. A line that asks nothing is not
+    // answered: the journey stops sending.
+    if (answers.length > 0 && !/[?؟]/u.test(line)) {
+      answers.push({
+        q: line.trim().slice(0, 120),
+        answer: "(stopped: Q asked nothing)",
+      });
+      break;
+    }
+    const q = questionOf(line);
     const hit = FACTS.find(([re]) => re.test(q));
     const answer = hit ? hit[1] : "Yes, that's right. That's all for now.";
     answers.push({ q: q.trim().slice(0, 120), answer });
