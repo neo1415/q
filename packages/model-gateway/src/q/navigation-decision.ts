@@ -1500,6 +1500,19 @@ export type QPageMoveTurn = {
   readonly utterance: string;
   readonly recentTurns: QNavigationInput["recentTurns"];
   readonly pageText: string | null;
+  /**
+   * Batch-12 latency: stores the decision's move as its own Q message the
+   * moment the decision lands, while the answer may still be writing, so
+   * the page pane moves within the decision's own time (the browser
+   * follows a stored message at once). Absent: the move joins the answer
+   * (settle) or follows it (late).
+   */
+  readonly publish?:
+    | ((move: {
+        readonly content: string;
+        readonly blocks: readonly QResultBlock[];
+      }) => Promise<{ readonly messageId: string } | undefined>)
+    | undefined;
 };
 
 /**
@@ -1530,6 +1543,14 @@ export type QPageMovePort = {
    * line, for the answer path to store before the run completes. Null when
    * there is none.
    */
+  /**
+   * The message the decision's move was published as, waiting for the
+   * decision until its deadline; null when it moves nothing. For a code
+   * answer that would otherwise say a record could not be opened while the
+   * pane moved there (batch 7 #3): the move's message is the answer.
+   */
+  readonly awaitPublished?:
+    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
   readonly late?:
     | ((request: QAnswerRequest) => Promise<{
         readonly content: string;
@@ -1666,6 +1687,15 @@ export function createQPageMoves(dependencies: {
    * decision's own deadline, counted from the turn's start: a long answer
    * never waits, a fast one waits only as long as the decision needs.
    */
+  // Batch-12 latency: runs whose move is published the moment it lands
+  // (the stored message's id, or null when nothing was published).
+  const publications = new Map<string, Promise<string | null>>();
+  const published = new Set<string>();
+  const consumed = new Set<string>();
+  const lineFor = (outcome: QNavigationOutcome, title: string): string =>
+    outcome.decision === "OFFER"
+      ? `${title} is ready to open.`
+      : `I've opened ${title}.`;
   const lateRuns = new Map<
     string,
     {
@@ -1802,16 +1832,94 @@ export function createQPageMoves(dependencies: {
       });
       pending.set(request.runId, decided);
       startedAt.set(request.runId, Date.now());
+      const publish = turn.publish;
+      if (publish !== undefined) {
+        const runId = request.runId;
+        publications.set(
+          runId,
+          decided
+            .then(async (outcome): Promise<string | null> => {
+              if (outcome === null || consumed.has(runId)) return null;
+              const moved = blocksOf(outcome);
+              if (moved === null || outcome.target === null) return null;
+              consumed.add(runId);
+              published.add(runId);
+              const stored = await publish({
+                content: lineFor(outcome, placeTitle(outcome.target)),
+                blocks: moved,
+              });
+              dependencies.logger?.info(
+                {
+                  qRunId: runId,
+                  decision: outcome.decision,
+                  page: outcome.target.page,
+                  ms: Date.now() - began,
+                },
+                "q page move published as it landed",
+              );
+              return stored?.messageId ?? null;
+            })
+            .catch((error: unknown) => {
+              dependencies.logger?.warn(
+                {
+                  qRunId: runId,
+                  err: error instanceof Error ? error.name : typeof error,
+                },
+                "q page move not published",
+              );
+              return null;
+            }),
+        );
+      }
       // A run that never settles (a failed answer) does not keep it.
       setTimeout(() => {
         pending.delete(request.runId);
         startedAt.delete(request.runId);
         lateRuns.delete(request.runId);
+        publications.delete(request.runId);
+        published.delete(request.runId);
+        consumed.delete(request.runId);
       }, 120_000).unref?.();
     },
     settle: async (request, blocks, options) => {
       const decided = pending.get(request.runId);
       if (decided === undefined) return blocks;
+      if (publications.has(request.runId)) {
+        // Batch-12 latency: the decision is its own message; the answer
+        // never waits for it and never carries it.
+        pending.delete(request.runId);
+        const current = blocks ?? [];
+        if (published.has(request.runId)) {
+          // One authority: the answer model's own place moves would be a
+          // second, contrary move after the pane already moved.
+          if (options?.keepAnswerMoves === true) return blocks;
+          const stripped = current.filter((block) => !changesPlace(block));
+          if (stripped.length !== current.length)
+            dependencies.logger?.info(
+              {
+                qRunId: request.runId,
+                answerMoves: current.filter(changesPlace).map(blockKind),
+              },
+              "q page move replaced the answer's own move",
+            );
+          return stripped;
+        }
+        if (
+          options?.keepAnswerMoves === true &&
+          current.some(movesPaneItself)
+        ) {
+          // Code's exact command moved the pane: the decision adds nothing.
+          consumed.add(request.runId);
+          dependencies.logger?.info(
+            {
+              qRunId: request.runId,
+              answerMoves: current.filter(movesPaneItself).map(blockKind),
+            },
+            "q page move skipped: the answer already moves the pane",
+          );
+        }
+        return blocks;
+      }
       const began = startedAt.get(request.runId) ?? Date.now();
       const waitMs = waitFor(request.runId);
       pending.delete(request.runId);
@@ -1870,7 +1978,43 @@ export function createQPageMoves(dependencies: {
         );
       return [...current.filter((block) => !changesPlace(block)), ...moved];
     },
+    awaitPublished: async (request) => {
+      const publication = publications.get(request.runId);
+      if (publication === undefined) return null;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const began = startedAt.get(request.runId) ?? Date.now();
+      return Promise.race([
+        publication,
+        new Promise<null>((resolve) => {
+          timer = setTimeout(
+            () => resolve(null),
+            Math.max(0, began + NAVIGATION_DECISION_DEADLINE_MS - Date.now()),
+          );
+        }),
+      ]).finally(() => clearTimeout(timer));
+    },
     late: async (request) => {
+      const publication = publications.get(request.runId);
+      if (publication !== undefined) {
+        // The run must not end before the move is stored: wait for it
+        // (bounded), then nothing is left to add.
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const began = startedAt.get(request.runId) ?? Date.now();
+        await Promise.race([
+          publication,
+          new Promise<void>((resolve) => {
+            timer = setTimeout(
+              resolve,
+              Math.max(0, began + NAVIGATION_LATE_LIMIT_MS - Date.now()),
+            );
+          }),
+        ]).finally(() => clearTimeout(timer));
+        publications.delete(request.runId);
+        published.delete(request.runId);
+        consumed.delete(request.runId);
+        startedAt.delete(request.runId);
+        return null;
+      }
       const waiting = lateRuns.get(request.runId);
       if (waiting === undefined) return null;
       lateRuns.delete(request.runId);
