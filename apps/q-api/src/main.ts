@@ -734,6 +734,7 @@ import {
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
 import { createFastNavigation } from "./composition/fast-navigation.js";
+import { warmAfterListen } from "./composition/boot-warmup.js";
 import {
   createQPitchQaMatcher,
   loadQPitchQaVectors,
@@ -929,7 +930,8 @@ await telemetry.start();
 // One pool per process, request-class access: never the privileged or
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and the runtime's ownership checks.
-const database = createRequestDatabaseClient(loadDatabaseConfig());
+const databaseConfig = loadDatabaseConfig();
+const database = createRequestDatabaseClient(databaseConfig);
 // QA F-85: every public link q-api writes (a Q Card's address) is built
 // from this origin, checked once here: an https URL, or q-api does not start.
 const webOrigin = webOriginFrom(process.env["CQ_WEB_ORIGIN"]);
@@ -4985,6 +4987,24 @@ const arrivalSnapshots = createArrivalSnapshots({
   // P4: their own latest Q Daily edition, for the quiet-day welcome.
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
+/**
+ * Batch 13 (owner live 8 Nov: an investor's relationship turns were read
+ * as a founder's): which side the actor's own organisation is on, from
+ * their membership on the server -- never from the client, never from the
+ * context scopes a turn's plan happens to carry. Null: neither (the plan
+ * then decides, as before).
+ */
+const askerSideOfActor = async (
+  actor: ActorContext,
+): Promise<"FOUNDER" | "INVESTOR" | null> => {
+  if (actor.organisationId === undefined) return null;
+  const [firm, company] = await Promise.all([
+    runtimeDependencies.ownInvestorOrganisation(actor),
+    runtimeDependencies.ownCompany(actor),
+  ]);
+  if (firm !== null) return "INVESTOR";
+  return company !== null ? "FOUNDER" : null;
+};
 // Q intelligence step 1: who is asking, for the situation header every Q
 // model step is told. The role is the side of the organisation their actor
 // context's membership grants (the rehearsal's own viewer read), never
@@ -5075,6 +5095,8 @@ async function onScreenOf(
   return null;
 }
 const qIntelligence = composeQIntelligence({
+  // Batch 13: the side their membership puts them on, for every answer.
+  askerSide: askerSideOfActor,
   readCache: qReadCache,
   // Situation-first planning (S5, S6): the reader's planAsk starts the plan
   // job at once (the reply carries its card); directsWork files their
@@ -8200,6 +8222,15 @@ const accessTokens =
         sessions: createPostgresSessionLiveness({ sql: database.sql }),
         fallback: createSupabaseAccessTokenAuthenticator(supabaseAuth),
       });
+// RECOVERY-2026-10 (C, "stupid fast"): where a finished sentence goes,
+// by code alone, before Q has answered. Built here so boot can warm it.
+const fastNavigation = createFastNavigation({
+  firewall: baseFirewall,
+  askerSide: askerSideOfActor,
+  tools: qTools.port,
+  ownRelationships: errandRelationships.ownRelationships,
+  logger,
+});
 const { app, logger: appLogger } = createApp(
   config,
   {
@@ -8371,12 +8402,7 @@ const { app, logger: appLogger } = createApp(
     // RECOVERY-2026-10 (C, "stupid fast"): where a finished sentence goes,
     // by code alone, before Q has answered. No run, so no run's recorded
     // firewall decision: the same firewall, unrecorded.
-    fastNavigation: createFastNavigation({
-      firewall: baseFirewall,
-      tools: qTools.port,
-      ownRelationships: errandRelationships.ownRelationships,
-      logger,
-    }),
+    fastNavigation,
     // Q Story ending: a spoken question to the Q&A bank. Tier 2 (meaning)
     // embeds through the reviewed OpenAI adapter, with the key this service
     // already holds; without it, or without current vectors, tier 1 alone.
@@ -8565,6 +8591,15 @@ app.addHook("onClose", async () => {
 await app.listen({
   port: config.network.port,
   host: config.network.host,
+});
+
+// Batch 13: open the pool and run the fast-navigation path once, now,
+// so the first person after a deploy does not pay for it. Never awaited.
+void warmAfterListen({
+  ping: () => database.sql`select 1`,
+  poolMax: databaseConfig.poolMax,
+  fastNavigation,
+  logger: appLogger,
 });
 
 if (deepgramProvider !== undefined) {

@@ -544,6 +544,7 @@ import {
   COMPANIES_TABLE_TITLE,
   findingBlockOf,
   namesReadByRun,
+  askerSideOf,
   ownInvestorOrganisationIn,
   PICTURE_WAIT_MS,
   pictureBlock,
@@ -559,6 +560,7 @@ export { companyNameCandidates } from "./named-company-fact.js";
 export {
   analystResultBlocks,
   askedSubjects,
+  askerSideOf,
   ownInvestorOrganisationIn,
   provenanceLine,
   withoutContradictedGaps,
@@ -5509,7 +5511,7 @@ export function createModelGatewayQAnswer(
         asked: latest.content,
         previous: previousCardCompanyIds(earlier),
         // QA U2: a mandate fit is an investor's; none for anyone else.
-        mandate: ownInvestorOrganisationIn(request.plan) !== null,
+        mandate: askerSideOf(request) === "INVESTOR",
       }),
       latest.content,
     );
@@ -6578,7 +6580,7 @@ export function createModelGatewayQAnswer(
         // Lead 2026-10-16: a company's marketplace readiness, never an
         // investor's (live: ~600 ms spent before every investor's
         // own-records answer on a read that has nothing for them).
-        !(ownInvestorOrganisationIn(plan) !== null && ownCompanyId === null)
+        !(askerSideOf(request) === "INVESTOR" && ownCompanyId === null)
       ) {
         const outcome = await callTool(
           {
@@ -6622,7 +6624,7 @@ export function createModelGatewayQAnswer(
       if (
         prefetchable.has("read_my_record") &&
         ASKS_ABOUT_OWN_TEAM.test(latest.content) &&
-        !(ownInvestorOrganisationIn(plan) !== null && ownCompanyId === null)
+        !(askerSideOf(request) === "INVESTOR" && ownCompanyId === null)
       ) {
         const outcome = await callTool(
           {
@@ -7776,7 +7778,7 @@ export function createModelGatewayQAnswer(
               // answer says it is the mandate's ranking instead (below).
               previous: rankedPastShown ? [] : previousCardCompanyIds(earlier),
               // QA U2: a mandate fit is an investor's; none for anyone else.
-              mandate: ownInvestorOrganisationIn(request.plan) !== null,
+              mandate: askerSideOf(request) === "INVESTOR",
             },
           ),
           // A map they asked to see is not replaced by a page they did not.
@@ -8483,7 +8485,7 @@ export function createModelGatewayQAnswer(
         (request.fitQuestion !== undefined &&
         // How they fit one named investor is not a list of investors.
         request.aboutNamedOther !== true &&
-        ownInvestorOrganisationIn(request.plan) === null
+        askerSideOf(request) === "FOUNDER"
           ? {
               text: request.fitQuestion.text,
               count: request.fitQuestion.count,
@@ -10702,7 +10704,7 @@ export function createModelGatewayQAnswer(
             name: Q_CARD_READ_TOOL,
             arguments: {
               subject:
-                ownInvestorOrganisationIn(plan) === null
+                askerSideOf(request) === "FOUNDER"
                   ? "COMPANY"
                   : "INVESTOR_ORGANISATION",
             },

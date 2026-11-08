@@ -97,6 +97,7 @@ function reader(options: {
   denied?: boolean;
   names?: readonly string[];
   clock?: () => number;
+  askerSide?: "FOUNDER" | "INVESTOR";
 }) {
   const calls = { plans: 0, opens: [] as unknown[], lists: 0 };
   const firewall: ContextFirewallPort = {
@@ -146,6 +147,9 @@ function reader(options: {
       });
     },
     clock: options.clock,
+    ...(options.askerSide === undefined
+      ? {}
+      : { askerSide: () => Promise.resolve(options.askerSide ?? null) }),
   });
   return { resolve, calls };
 }
@@ -449,6 +453,24 @@ describe("Lane 7: a document by its name, opened only through the document tools
     });
     expect(await resolve(ACTOR, "open the financial model")).toMatchObject({
       kind: "LEAVE_TO_Q",
+    });
+  });
+});
+
+describe("batch 13 (owner live 8 Nov): the side is the membership's, not the plan's scopes", () => {
+  it("an investor whose plan holds no mandate scope opens the company's chat first", async () => {
+    const { resolve, calls } = reader({ askerSide: "INVESTOR" });
+    await resolve(ACTOR, "take me to Shiftwell chat");
+    expect(calls.opens[0]).toMatchObject({
+      page: "RELATIONSHIP_COMPANY_MESSAGES",
+    });
+  });
+
+  it("without a resolved side, the plan decides as before (no mandate scope: founder)", async () => {
+    const { resolve, calls } = reader({});
+    await resolve(ACTOR, "take me to Shiftwell chat");
+    expect(calls.opens[0]).toMatchObject({
+      page: "RELATIONSHIP_INVESTOR_MESSAGES",
     });
   });
 });

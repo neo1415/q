@@ -13,7 +13,7 @@ import {
   createRoundTripCounter,
   withRoundTripCounter,
 } from "@capital-q/database";
-import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
+import { askerSideOf } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import type { ContextFirewallPort, QToolPort } from "@capital-q/q-runtime";
 import {
@@ -79,6 +79,13 @@ export function createFastNavigation(dependencies: {
   readonly tools: QToolPort;
   readonly ownRelationships:
     ((actor: ActorContext) => Promise<OwnRelationships>) | undefined;
+  /**
+   * Batch 13: the side their membership puts them on (server-side). The
+   * plan's mandate scope stands in only where this is absent or null.
+   */
+  readonly askerSide?:
+    | ((actor: ActorContext) => Promise<"FOUNDER" | "INVESTOR" | null>)
+    | undefined;
   readonly logger?: Logger | undefined;
   readonly now?: (() => number) | undefined;
   /** Wall clock for the prepared context's freshness (tests). */
@@ -225,12 +232,12 @@ export function createFastNavigation(dependencies: {
       const reused = known !== undefined && fresh(known);
       const context = asksForRecord ? preparedFor(actor) : null;
       const side =
-        context !== null &&
-        ownInvestorOrganisationIn(
-          (await planNow(context)) ?? { scopes: [] },
-        ) !== null
-          ? "INVESTOR"
-          : "FOUNDER";
+        context === null
+          ? "FOUNDER"
+          : ((await (
+              dependencies.askerSide?.(actor) ?? Promise.resolve(null)
+            ).catch(() => null)) ??
+            askerSideOf({ plan: (await planNow(context)) ?? { scopes: [] } }));
       const decided = await resolveFastNavigation({
         text,
         side,

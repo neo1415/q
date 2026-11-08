@@ -126,7 +126,7 @@ import {
 import {
   asksForOwnMandate,
   conversationContextOf,
-  ownInvestorOrganisationIn,
+  askerSideOf,
   reRenderAskOf,
   reshownBlocks,
   shownTurnOf,
@@ -4024,7 +4024,7 @@ export function createSpecialistQAnswer(
       // in this run's plan (the registry's INVESTOR_SCREENS eligibility).
       if (
         INVESTOR_SCREENS.has(destination) &&
-        ownInvestorOrganisationIn(request.plan) === null
+        askerSideOf(request) === "FOUNDER"
       ) {
         const other = notTheirSideMove(destination, navigable);
         logger?.info(
@@ -4173,7 +4173,7 @@ export function createSpecialistQAnswer(
       surface: "HOME_Q",
       offeredTools: new Set(offeredTools),
       company: request.subjects.some((subject) => subject.kind === "COMPANY"),
-      ownInvestorOrganisation: ownInvestorOrganisationIn(request.plan) !== null,
+      ownInvestorOrganisation: askerSideOf(request) === "INVESTOR",
       artifacts: artifacts !== undefined,
       ownMandate: dependencies.ownMandate !== undefined,
       visibility: dependencies.visibility !== undefined,
@@ -4231,7 +4231,7 @@ export function createSpecialistQAnswer(
     readonly blocks: readonly QResultBlock[];
     readonly requests: boolean;
   } => {
-    if (ownInvestorOrganisationIn(request.plan) === null) {
+    if (askerSideOf(request) === "FOUNDER") {
       return { said, blocks, requests: false };
     }
     const moved = blocks.find(
@@ -4579,10 +4579,7 @@ export function createSpecialistQAnswer(
     // target; the screen dedupes the second move.
     const resolved = await resolveNamedRecord({
       text,
-      side:
-        ownInvestorOrganisationIn(request.plan) !== null
-          ? "INVESTOR"
-          : "FOUNDER",
+      side: askerSideOf(request),
       counterpartNames: () =>
         dependencies.counterpartNames?.(request) ?? Promise.resolve([]),
       open: (page, name) => port.open(request, { page, name }),
@@ -4959,7 +4956,7 @@ export function createSpecialistQAnswer(
   };
   /** An investor's run on a company: across a relationship by its plan. */
   const companyAcrossRelationship = (request: QAnswerRequest): boolean =>
-    ownInvestorOrganisationIn(request.plan) !== null &&
+    askerSideOf(request) === "INVESTOR" &&
     request.subjects.some((subject) => subject.kind === "COMPANY");
 
   const aboutCounterparty = async (
@@ -5381,8 +5378,7 @@ export function createSpecialistQAnswer(
   ): Promise<QAnswerOutcome | null> => {
     const port = dependencies.openRecord;
     if (port === undefined) return null;
-    const side =
-      ownInvestorOrganisationIn(request.plan) !== null ? "INVESTOR" : "FOUNDER";
+    const side = askerSideOf(request);
     const target = openTarget(reference, shown, side);
     if (target === null) return null;
     for (const page of target.pages) {
@@ -9299,9 +9295,7 @@ export function researchedMemoAsked(read: {
 }
 
 function teamJobAudienceOf(request: QAnswerRequest): TeamJobAudience {
-  return ownInvestorOrganisationIn(request.plan) !== null
-    ? "INVESTOR"
-    : "FOUNDER";
+  return askerSideOf(request);
 }
 
 /** The turns before this one, theirs and Q's, as pairs (newest last). */

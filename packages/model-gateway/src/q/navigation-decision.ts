@@ -28,7 +28,7 @@ import {
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import type { ModelGateway } from "../gateway.js";
-import { ownInvestorOrganisationIn } from "./result-blocks.js";
+import { askerSideOf } from "./result-blocks.js";
 
 /**
  * Q Workspace W4 (DECISIONS 71 amends N1: Q may move the page pane on its
@@ -1367,12 +1367,17 @@ const leastAuthority = (
   );
 
 /**
- * The samples' outcomes, voted (decision 78):
+ * The samples' outcomes, voted (decision 78; batch 13, owner: "the whole
+ * point was for Q to open pages by itself"):
  * - all name one place: the most careful of them (a MOVE only if all move);
- * - a strict majority names one place: never a move -- an OFFER of it, or,
- *   with the pane collapsed, it is remembered for when it opens;
- * - a strict majority names no place: their STAY;
- * - otherwise: STAY (SPLIT_VOTE).
+ * - a strict majority (2 of 3) names one place: the most careful of that
+ *   majority -- a MOVE when they all move there. A safety guard on any of
+ *   them (an inexact name, unsaved work, ...) still makes it an offer.
+ *   A sample whose place did not resolve votes for no place;
+ * - no place has a majority, and only one place was named at all (one
+ *   MOVE beside STAYs): an OFFER of it, or, with the pane collapsed, it
+ *   is remembered for when it opens;
+ * - otherwise (two places, one vote each): STAY (SPLIT_VOTE).
  */
 export function voteNavigation(
   outcomes: readonly QNavigationOutcome[],
@@ -1401,7 +1406,14 @@ export function voteNavigation(
     return sectionVoted(largest, leastAuthority(largest));
   if (largest !== undefined && majority(largest.length)) {
     const careful = sectionVoted(largest, leastAuthority(largest));
-    if (careful.decision !== "MOVE") return { ...careful, guard: "SPLIT_VOTE" };
+    return careful.decision === "MOVE"
+      ? careful
+      : { ...careful, guard: careful.guard ?? "SPLIT_VOTE" };
+  }
+  const [only] = groups;
+  if (groups.length === 1 && only !== undefined) {
+    const careful = sectionVoted(only, leastAuthority(only));
+    if (careful.decision === "STAY") return { ...careful, guard: "SPLIT_VOTE" };
     const at = votedPlace(careful);
     return careful.openPane
       ? STAY("SPLIT_VOTE", at)
@@ -1622,9 +1634,7 @@ function movesAlready(blocks: readonly QResultBlock[]): boolean {
 }
 
 export function sideOfRequest(request: QAnswerRequest): QNavigationSide {
-  return ownInvestorOrganisationIn(request.plan) === null
-    ? "FOUNDER"
-    : "INVESTOR";
+  return askerSideOf(request);
 }
 
 /**

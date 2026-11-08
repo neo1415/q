@@ -5,7 +5,7 @@ import type {
   QAnswerRequest,
   QToolPort,
 } from "@capital-q/q-runtime";
-import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
+import { askerSideOf } from "@capital-q/model-gateway/q";
 import { closestByName } from "@capital-q/q-tools";
 
 /**
@@ -356,7 +356,7 @@ export async function actOnHandOver(
     return {
       kind: "ASK",
       line:
-        ownInvestorOrganisationIn(request.plan) === null
+        askerSideOf(request) === "FOUNDER"
           ? `None of your relationships is ${name}, so there's no call with them to book yet: calls open once you're connected.`
           : `None of your relationships is ${name}, so there's no call with them to book yet: calls open once they accept your interest. Want me to prepare Express Interest in ${name} with a note asking for a call, for your approval?`,
     };

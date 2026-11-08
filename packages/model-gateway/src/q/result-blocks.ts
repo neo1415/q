@@ -323,6 +323,24 @@ export function ownInvestorOrganisationIn(
 }
 
 /**
+ * Batch 13 (owner live 8 Nov: an investor's relationship turns were read
+ * as a founder's): the ONE test of which side the person is on. The
+ * server-resolved `askerSide` (their membership's organisation) decides;
+ * a bound mandate scope only stands in where no side was resolved. Never
+ * test the side with `ownInvestorOrganisationIn` directly: a plan carries
+ * the mandate scope only on some turns.
+ */
+export function askerSideOf(request: {
+  readonly plan: Pick<PermittedContextPlan, "scopes">;
+  readonly askerSide?: "FOUNDER" | "INVESTOR" | undefined;
+}): "FOUNDER" | "INVESTOR" {
+  if (request.askerSide !== undefined) return request.askerSide;
+  return ownInvestorOrganisationIn(request.plan) === null
+    ? "FOUNDER"
+    : "INVESTOR";
+}
+
+/**
  * What the question is about, without the person's own organisation
  * carried along as context. "Is this company worth my time?" is about the
  * company; the investor's own firm is why the answer can be specific, not

@@ -11,6 +11,9 @@ import { Q_SITE_MAP, qSiteMapDigest } from "@capital-q/contracts";
 
 import {
   applyNavigationPolicy,
+  askerSideOf,
+  canOpenFor,
+  sideOfRequest,
   createQNavigationDecider,
   createQPageMoves,
   decideNavigation,
@@ -1353,18 +1356,18 @@ describe("decision 78: self-consistency, three samples in parallel", () => {
     expect(seen.mostAtOnce).toBe(3);
   });
 
-  it("two of three on one place: an OFFER of it, never a move", async () => {
+  it("two of three on one place: a MOVE there (batch 13 replaced 'an OFFER of it')", async () => {
     for (const third of [stay, team, null]) {
       const { decider } = samples(deck, third, deck);
       expect(await decideWith(decider)).toMatchObject({
-        decision: "OFFER",
+        decision: "MOVE",
         target: { page: "COMPANY", recordId: SILO, tab: "deck" },
-        guard: "SPLIT_VOTE",
+        guard: null,
       });
     }
   });
 
-  it("no two agree on a place: STAY; two STAYs: STAY", async () => {
+  it("no two agree on a place: STAY; one move beside two STAYs: an OFFER of it (batch 13)", async () => {
     const other = proposal({ place: place({ route: "/work", tab: "team" }) });
     expect(await decideWith(samples(deck, team, other).decider)).toMatchObject({
       decision: "STAY",
@@ -1372,8 +1375,9 @@ describe("decision 78: self-consistency, three samples in parallel", () => {
       guard: "SPLIT_VOTE",
     });
     expect(await decideWith(samples(deck, stay, stay).decider)).toMatchObject({
-      decision: "STAY",
-      target: null,
+      decision: "OFFER",
+      target: { page: "COMPANY", recordId: SILO, tab: "deck" },
+      guard: "SPLIT_VOTE",
     });
   });
 
@@ -1384,13 +1388,16 @@ describe("decision 78: self-consistency, three samples in parallel", () => {
     ).toMatchObject({ decision: "OFFER", target: { tab: "deck" } });
   });
 
-  it("a collapsed pane: three asks to see it open it; two only remember it", async () => {
+  it("a collapsed pane: two or three asks to see it open it; one only remembers it (batch 13)", async () => {
     const collapsed = { pane: pane({ pane: "COLLAPSED" }) };
     expect(
       await decideWith(samples(deck, deck, deck).decider, collapsed),
     ).toMatchObject({ decision: "MOVE", openPane: true });
     expect(
       await decideWith(samples(deck, stay, deck).decider, collapsed),
+    ).toMatchObject({ decision: "MOVE", openPane: true });
+    expect(
+      await decideWith(samples(deck, stay, stay).decider, collapsed),
     ).toMatchObject({
       decision: "STAY",
       openPane: false,
@@ -2151,5 +2158,184 @@ describe("batch-12 latency: the decision's move is its own message the moment it
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("batch-13 replay: an investor is an investor on every turn, mandate scope or not", () => {
+  const RUN_ID = "88888888-8888-4888-8888-888888888888";
+  const SPHEROS = "99999999-9999-4999-8999-999999999999";
+  const ON: QWorkspaceScreen = { qPane: "open", pagePane: "open", at: "/work" };
+  // Owner live 8 Nov: an investor's plan on HOME / WORK / a relationship
+  // carries no INVESTOR_MANDATE scope; only the server-resolved side says
+  // which side they are on.
+  const investorOnWork = {
+    runId: RUN_ID,
+    tenantId: "t",
+    actorUserId: "u",
+    correlationId: "c",
+    askerSide: "INVESTOR",
+    plan: { scopes: [], screen: { route: "WORK", workspace: ON } },
+  } as unknown as QAnswerRequest;
+
+  it("askerSideOf: the membership's side decides; the mandate scope only stands in", () => {
+    expect(askerSideOf({ askerSide: "INVESTOR", plan: { scopes: [] } })).toBe(
+      "INVESTOR",
+    );
+    expect(askerSideOf({ plan: { scopes: [] } })).toBe("FOUNDER");
+    expect(sideOfRequest(investorOnWork)).toBe("INVESTOR");
+    expect(canOpenFor(investorOnWork)("RELATIONSHIP_COMPANY_MESSAGES")).toBe(
+      true,
+    );
+    expect(canOpenFor(investorOnWork)("RELATIONSHIP_INVESTOR_MESSAGES")).toBe(
+      false,
+    );
+  });
+
+  it("\"take me to spheros chat\" from Work: the investor's site map, and the company's chat opens", async () => {
+    const seen: QNavigationInput[] = [];
+    const moves = createQPageMoves({
+      decider: {
+        decide: (given) => {
+          seen.push(given);
+          return Promise.resolve(
+            proposal({
+              place: place({
+                route: "/relationships/company/[companyId]/messages",
+                record: company("Spheros"),
+              }),
+            }),
+          );
+        },
+      },
+      config: { movesAllowed: true },
+      records: () =>
+        Promise.resolve({
+          companies: [{ id: SPHEROS, name: "Spheros" }],
+          investors: [],
+          things: [],
+          deleted: [],
+        }),
+    });
+    moves.start(investorOnWork, {
+      utterance: "take me to spheros chat",
+      recentTurns: [],
+      pageText: null,
+    });
+    const blocks = await moves.settle(investorOnWork, []);
+    expect(seen[0]?.side).toBe("INVESTOR");
+    expect(seen[0]?.siteMap).toEqual(navigationSiteMap("INVESTOR"));
+    expect(blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "OPEN_RECORD_PAGE",
+          page: "RELATIONSHIP_COMPANY_MESSAGES",
+          id: SPHEROS,
+        },
+      },
+    ]);
+  });
+});
+
+describe("batch-13 replay (owner 8 Nov: 'it's just giving me buttons'): two of three on one place move", () => {
+  const attribution = { tenantId: "t", userId: "u", correlationId: "c" };
+  const stay = proposal({ decision: "STAY", askedForPage: false });
+  const capital = proposal({
+    place: place({ route: "/relationships", tab: "capital" }),
+  });
+  const analytics = proposal({ place: place({ route: "/analytics" }) });
+  const profile = proposal({ place: place({ route: "/profile" }) });
+  const silo = proposal({ place: place({ record: company("Silo Credit") }) });
+  // The side bug's shape: a company proposed on an investor's page, which
+  // no investor of that name resolves.
+  const siloAsInvestor = proposal({
+    place: place({
+      route: "/investors/[investorOrganisationId]",
+      record: { kind: "INVESTOR" as const, name: "Silo Credit" },
+    }),
+  });
+  const decideWith = (...answers: NavigationDecisionResult[]) => {
+    let next = 0;
+    return decideNavigation(
+      {
+        decider: {
+          decide: () =>
+            Promise.resolve(answers[next++ % answers.length] ?? null),
+        },
+        canOpen: () => true,
+        config: { movesAllowed: true },
+      },
+      input({ siteMap: navigationSiteMap("INVESTOR") }),
+      attribution,
+    );
+  };
+
+  it('07:11:58 "whats happening with my capital?": MOVE, MOVE, STAY moves to Relationships, capital', async () => {
+    expect(await decideWith(capital, capital, stay)).toMatchObject({
+      decision: "MOVE",
+      target: { page: "CAPITAL" },
+      guard: null,
+    });
+  });
+
+  it('07:25:41 "who has viewed me so far?": MOVE, STAY, MOVE moves to Analytics', async () => {
+    expect(await decideWith(analytics, stay, analytics)).toMatchObject({
+      decision: "MOVE",
+      target: { page: "ANALYTICS" },
+      guard: null,
+    });
+  });
+
+  it('07:18:17 "take me to the page now, come on": /profile, /company, /company moves to the company', async () => {
+    expect(await decideWith(profile, silo, silo)).toMatchObject({
+      decision: "MOVE",
+      target: { page: "COMPANY", recordId: SILO },
+      guard: null,
+    });
+  });
+
+  it('07:28:47 "can i see their profile?": an unresolved sample votes for nothing; the two /company samples move', async () => {
+    expect(await decideWith(siloAsInvestor, silo, silo)).toMatchObject({
+      decision: "MOVE",
+      target: { page: "COMPANY", recordId: SILO },
+      guard: null,
+    });
+  });
+
+  it("no place with two votes: one MOVE beside two STAYs offers it; two places and a STAY stay", async () => {
+    expect(await decideWith(analytics, stay, stay)).toMatchObject({
+      decision: "OFFER",
+      target: { page: "ANALYTICS" },
+      guard: "SPLIT_VOTE",
+    });
+    expect(await decideWith(analytics, capital, stay)).toMatchObject({
+      decision: "STAY",
+      guard: "SPLIT_VOTE",
+    });
+  });
+
+  it("a safety guard on either of the two still holds: an inexact name is offered, never moved to", () => {
+    const move = {
+      decision: "MOVE" as const,
+      target: { page: "COMPANY" as const, recordId: SILO },
+      openPane: false,
+      remembered: null,
+      guard: null,
+    };
+    const inexact = {
+      ...move,
+      decision: "OFFER" as const,
+      guard: "INEXACT_NAME" as const,
+    };
+    const stayed = {
+      ...move,
+      decision: "STAY" as const,
+      target: null,
+      guard: null,
+    };
+    expect(voteNavigation([move, inexact, stayed])).toMatchObject({
+      decision: "OFFER",
+      guard: "INEXACT_NAME",
+    });
   });
 });
