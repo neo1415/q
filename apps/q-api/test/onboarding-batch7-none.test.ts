@@ -215,3 +215,97 @@ describe("the checklist gives the themes in their own words (e2e run 5)", () => 
     expect(brief).toMatch(/never take a list they did not address as none/u);
   });
 });
+
+/**
+ * Production 01:03:37 (run 5): the reader filed a bare "None." to "sectors
+ * you'd rather not see" as their additional context, and nothing landed
+ * on the exclusion lists. A bare none answers only what Q asked.
+ */
+describe("a bare none is never filed under a step Q did not ask (run 5)", () => {
+  it("the reader's additional_context=None. is dropped; the asked list is settled", async () => {
+    const w = investorSession({
+      steps: INVESTOR_DEFINITION_CURRENT.steps,
+      servesTurnSteps: true,
+      currentStepKey: INVESTOR_STEPS.sectorsAvoid,
+      subject: FIRM,
+      recorded: { "I0.investor_type": "vc" },
+    });
+    const misfiling: OnboardingTranscriptReader = {
+      read: () =>
+        Promise.resolve({
+          answers: [
+            {
+              stepKey: INVESTOR_STEPS.additionalContext,
+              value: "None.",
+              quote: "None.",
+              ownWords: true,
+            },
+          ],
+          declined: [],
+        }),
+    };
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: w.fetch,
+      logger,
+      readAfterMs: 5,
+      reader: misfiling,
+      recommendations: w.recommendations,
+    });
+    await conversation.said?.(
+      line,
+      "Q",
+      "Are there any sectors you'd rather not see, or is there no particular sector to avoid?",
+      INVESTOR_STEPS.sectorsAvoid,
+    );
+    await conversation.said?.(line, "PERSON", "None.");
+    await conversation.flush?.(line);
+    expect(w.recordedValue(INVESTOR_STEPS.additionalContext)).toBeUndefined();
+    expect(w.recordedValue(INVESTOR_STEPS.sectorsAvoid)).toEqual({
+      type: "TEXT",
+      text: "None",
+    });
+  });
+
+  it("words with content are still the reader's, whatever step it files them under", async () => {
+    const w = investorSession({
+      steps: INVESTOR_DEFINITION_CURRENT.steps,
+      servesTurnSteps: true,
+      currentStepKey: INVESTOR_STEPS.sectorsAvoid,
+      subject: FIRM,
+      recorded: { "I0.investor_type": "vc" },
+    });
+    const said = "None, but we love climate founders who sell to utilities.";
+    const reader: OnboardingTranscriptReader = {
+      read: () =>
+        Promise.resolve({
+          answers: [
+            {
+              stepKey: INVESTOR_STEPS.additionalContext,
+              value: "We love climate founders who sell to utilities.",
+              quote: "we love climate founders who sell to utilities",
+              ownWords: true,
+            },
+          ],
+          declined: [],
+        }),
+    };
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: w.fetch,
+      logger,
+      readAfterMs: 5,
+      reader,
+      recommendations: w.recommendations,
+    });
+    await conversation.said?.(
+      line,
+      "Q",
+      "Are there sectors you'd rather not see?",
+      INVESTOR_STEPS.sectorsAvoid,
+    );
+    await conversation.said?.(line, "PERSON", said);
+    await conversation.flush?.(line);
+    expect(w.recordedValue(INVESTOR_STEPS.additionalContext)).toBeDefined();
+  });
+});

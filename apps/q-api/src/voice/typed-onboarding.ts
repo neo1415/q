@@ -358,8 +358,12 @@ export function createTypedOnboarding(dependencies: {
                 return [];
               })
             )
-              .filter((item) => item.stepKey === heldAsked)
-              .slice(0, 1);
+              // The held step asked, and every other held value Q's line
+              // read back with it (e2e run 5: the cheque is read back as
+              // one set, so one yes accepts the set).
+              .filter((item, _index, all) =>
+                heldOfferedIn(all, heldAsked, lastQ).includes(item),
+              );
       // The reply and the reading of whether they pause or finish run side
       // by side: the person waits for one model, not two in a row. A turn
       // that pauses or finishes never uses the reply, so it is not waited
@@ -416,8 +420,14 @@ export function createTypedOnboarding(dependencies: {
       // as it was put to them (the port checks it is still pending and
       // was said), so nothing waits on a reading of "yes" for it.
       const acceptedNow = new Set<string>();
+      // Restating the very values Q read back is a yes to them too (e2e run
+      // 5: every reply to the cheque read-back restated the range, and none
+      // counted). Code decides, from the figures and words themselves.
+      const restated = new Set(restatedHeld(heldOffer, utterance));
       const approvedOffer = heldOffer.filter(
-        (item) => authority?.approved.has(item.stepKey) === true,
+        (item) =>
+          authority?.approved.has(item.stepKey) === true ||
+          restated.has(item.stepKey),
       );
       if (approvedOffer.length > 0) {
         const accepted = await portOf(
@@ -832,6 +842,61 @@ export function createTypedOnboarding(dependencies: {
  * of Q's held for their yes (an open step with one pending): their reply
  * may approve it. Null otherwise.
  */
+/**
+ * The held suggestions Q's last line put to them: the one for the step it
+ * asked, then every other one whose value that line read back with it (the
+ * finishing line reads a set back in one go), at most four.
+ */
+export function heldOfferedIn<
+  T extends { readonly stepKey: string; readonly value: string },
+>(pending: readonly T[], asked: string, lastQ: string): T[] {
+  const said = plainWords(lastQ);
+  const first = pending.filter((item) => item.stepKey === asked).slice(0, 1);
+  const withIt = pending.filter((item) => {
+    if (item.stepKey === asked) return false;
+    const value = plainWords(item.value);
+    return value.length >= 2 && said.includes(value);
+  });
+  return first.length === 0 ? [] : [...first, ...withIt].slice(0, 4);
+}
+
+/**
+ * Which held suggestions their reply restates: a reply that says the very
+ * values Q read back agrees to them. With figures, every figure of each
+ * held value is in their words and they name no other figure (so a
+ * different range is never taken as a yes); without figures, their words
+ * contain the held words. Never a reading of meaning.
+ */
+export function restatedHeld(
+  held: readonly { readonly stepKey: string; readonly value: string }[],
+  utterance: string,
+): string[] {
+  const said = figuresOf(utterance);
+  const words = plainWords(utterance);
+  const withFigures = held.filter((item) => figuresOf(item.value).size > 0);
+  const named = new Set(
+    withFigures.flatMap((item) => [...figuresOf(item.value)]),
+  );
+  const figuresAgree =
+    said.size > 0 &&
+    [...said].every((figure) => named.has(figure)) &&
+    [...named].every((figure) => said.has(figure));
+  return held
+    .filter((item) => {
+      if (figuresOf(item.value).size > 0) return figuresAgree;
+      const value = plainWords(item.value);
+      return value.length >= 3 && words.includes(value);
+    })
+    .map((item) => item.stepKey);
+}
+
+const plainWords = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}$€£]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+
 export function heldAskedOf(
   state: OnboardingState,
   asked: string | undefined,
