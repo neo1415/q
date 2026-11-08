@@ -1,0 +1,31 @@
+(node:1452) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+account e2e-fou-202611081400-fca5@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+PASS J1 one dense line answers several topics — F1.country, F1.city, F1.stage, F1.categories, F4.founder_role, F4.full_time
+NOTE J1 Q's next question (judge: conversational, not a label) — Thanks, Ada — I have Tamarind Ledger as a seed-stage fintech based in Lagos, Nigeria, with you as CEO, two full-time founders and a nine-person team. What’s the company website?
+PASS J2 a ramble is said back for a yes — The company: Tamarind Ledger helps small shops and market traders in Lagos and Ibadan track customer debts digitally instead of relying on notebooks. The problem: Small businesses often struggle to ma
+PASS J2 nothing saved before the yes
+PASS J2 saved after the yes
+NOTE J2 Q after a clear typed answer — That clarifies the problem well. What’s Tamarind Ledger’s website?
+NOTE J2 F9.problem before → after — Small businesses often struggle to manage informal credit and collect what custo → small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkwa
+PASS J2 a clear typed answer is saved in their words, not read back — small traders lose about a fifth of what they are owed because credit is tracked in paper notebooks, reminders are awkwa
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood — the website is needed for your profile, matching and verification, but you can provide it later. I’ll leave the team size as already described and move on: what year was Tamarind Ledger founded?
+NOTE J3 stored for F1.website — {"type":"TEXT","text":"I don't know"}
+PASS J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What year was the company founded?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier, I have two full-time founders and a nine-person team. Is that right
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier, I have two full-time founders and a nine-person team. Is that right
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before:  40 (paying customers). From what you said earlier, I have two full-time founders and a nine-person team. Is that right? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier, I have two full-time founde
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — Your company / Your company
+NOTE J6 questions answered from the fact table — [{"q":"Is that right?","answer":"Yes, that's right."},{"q":"What year was Tamarind Ledger founded?","answer":"2021."},{"q":"Let me get this right: One-line summary: Tamarind Ledger helps small shops and market traders track debts, sends payment","answer":"Yes, that's right."},{"q":"Between the founders and the wider team, which areas do you cover today—product, engineering, sales and partnerships, op","answer":"Product, engineering and sales."},{"q":"Which currency do you use for reporting your numbers—Nigerian naira, US dollars, or another currency?","answer":"US dollars."},{"q":"Roughly how much did you bill last month?","answer":"One and a half million dollars."},{"q":"Has your monthly revenue been growing month on month, roughly flat, declining, or lumpy from month to month?","answer":"Growing about ten percent a month."},{"q":"What’s your gross margin, approximately, as a percentage?","answer":"Gross margin about 60%, burn about $25k a month beyond revenue, $300k in the bank, about 12 months of runway."},{"q":"5 million; Gross margin: 60%; Monthly burn: $25,000; Cash: $300,000, is that right?","answer":"Yes, that's right."},{"q":"Are you raising now, preparing to raise, or not raising at the moment?","answer":"Yes, actively raising."},{"q":"To start the broader picture, how large do you believe the opportunity is, and what do the economics look like as you gr","answer":"Yes, that's right. That's all for now."},{"q":"Which currency are you raising in?","answer":"US dollars."},{"q":"How much are you raising?","answer":"One and a half million dollars."},{"q":"5 million Shall I keep that?","answer":"Yes, that's right."},{"q":"What instrument are you raising on?","answer":"A SAFE."},{"q":"When are you hoping to close the round?","answer":"Within six months."},{"q":"What will the money mainly go towards?","answer":"Product and hiring."},{"q":"5 million Instrument: SAFE Close timing: 3–6 months Use of funds: Key hires, Product and engineering Company profile The","answer":"Yes, that's right."},{"q":"Thank you, finishing your setup now. That's everything I need. Your company profile is saved, and investors who fit will","answer":"Yes, that's right. That's all for now."}]
+PASS J6 finish lands on verification — /verification
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+ALL PASS; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/e2e10/fdr

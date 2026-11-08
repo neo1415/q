@@ -2161,3 +2161,21 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Replay: 8 of 9 places right; the deck is still blocked (W4).
 - Onboarding e2e run 7: founder ALL PASS. Investor stuck on own-words explicit nones (W5).
 - Decision: a step left for now is not recorded as "not known" for the person.
+
+## 2026-11-08 14:20 UTC — batches 13 and 15 live (integration owner session_01Wncmn73d4XJWmh1N9ECao7, owner away under D82)
+
+- **Batch 13 `06be34c81`:**
+  - W4: the side from the actor's organisation; 2 of 3 → MOVE; instant move publish; boot warm-up.
+  - W3: public web for RELATIONSHIP_QUESTION.
+  - W1: pane-width container queries; refresh after an approved action.
+  - W5: finish after "all set"; D81 conversational depth.
+  - CI 1891: the integration job failed on "port 54322 in use" (infra); the rerun passed. Railway builds failed 7× on GitHub releases 503/504 (mise download) from 10:22 to 11:46 UTC; the services were redeployed as builds succeeded.
+- **Owner-session replay on batch 13:** every move works (side fix confirmed); web research runs (Brave and Tavily).
+- **Onboarding run 9 regressed** (D81 held identity facts, so organisation context was missing). Decisions under D82: identity and clear answers save at once; playback once per topic.
+- **Batch 15 `74944dc22`:**
+  - batch 14 (W3 dataChanged contract; W1 refresh on dataChanged; toggle fix);
+  - W4: stale same-place offer dropped plus a pane prompt line;
+  - W3: a named entity isn't handed to discovery (Paystack);
+  - W5: the D82 playback fix.
+  - CI 1894 green; deployed first time.
+  - Replay all OK. Onboarding run 10: founder ALL PASS; investor J6 only.

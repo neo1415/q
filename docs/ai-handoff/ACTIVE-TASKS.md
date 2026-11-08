@@ -1,5 +1,25 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 8 November 2026, 14:20 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7; owner away, D82)
+
+Production: **batch 15 `74944dc22`** (rollback `06be34c81`); CI 1894 green; all four services SUCCESS. Batch 13 shipped at 11:46 after a GitHub releases outage blocked Railway builds from 10:22.
+
+Replay of the owner's 8 Nov session (receipts/2026-11-08-owner-replay-batch15):
+
+- capital, analytics, Clinicrest, the chat and the pipeline all move in 0.3–4.6 s;
+- Paystack is summarised from the web;
+- self-search is honest;
+- no stale offer.
+
+Onboarding e2e run 10: founder ALL PASS; investor J6 finish only (mostly runner gaps; W5).
+
+| Lane                  | State                                                                       |
+| --------------------- | --------------------------------------------------------------------------- |
+| W5                    | batch 16: runner read-back-first, interleaved-repeat cap, playback by topic |
+| W1, W3, W4, Analytics | idle                                                                        |
+
+Anthropic test spend: about $42.5 of $50 (no paid runs today).
+
 ## Live board — 8 November 2026, 09:00 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7; owner away, D82)
 
 Production: **batch 12 `329e0ccb1`** (rollback `4a89f2277`). Batch 13 is assembling on integration (16478e739 + W1 pending):
