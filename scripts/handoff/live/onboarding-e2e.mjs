@@ -663,9 +663,18 @@ if (STEPS.has("J6")) {
         : "It's where we've done best.",
     ],
   ];
+  // Run 10: a confirmation Q asks ("…, is that right?", "Is that right?",
+  // "Shall I keep…?", "…correct?") is a yes before every topic rule: Q8's
+  // playback named cheques and the final "Also said…" read-backs named
+  // topics, so topic rules answered them.
+  const CONFIRM = [
+    /(\bis that right|\bshall i keep\b[^?]*|\bcorrect)\?\s*$/i,
+    "Yes, that's right.",
+  ];
   const FACTS =
     JOURNEY === "founder"
       ? [
+          CONFIRM,
           ...WHY,
           READ_BACK,
           // Run 8: the finances, fictional and plausible, all together;
@@ -720,11 +729,18 @@ if (STEPS.has("J6")) {
           [/anything else|anything more|missed/i, "No, that's everything."],
         ]
       : [
+          CONFIRM,
           ...WHY,
           // Run 5: a read-back of what they said ("From what you said: …
           // Shall I keep that/these?") is a plain yes, before the cheque
           // rule: the figures read back are the ones they gave.
           [/shall i keep (that|these|them)/i, "Yes."],
+          // Run 10: whether they are deploying now is its own question,
+          // before the cheque rule ("writing cheques" names cheques).
+          [
+            /\bactively\b[^?]*\b(at the moment|right now|currently|now)\b|writing cheques|\bdeploying\b/i,
+            "Actively investing.",
+          ],
           // Run 4: one answer for every cheque question, all three figures,
           // before the read-back: a proposal of other figures is corrected,
           // never agreed to, and never answered one figure at a time (the
