@@ -1,6 +1,7 @@
 import { investorListThemeOf } from "@capital-q/investor-onboarding";
 import type { OnboardingState } from "@capital-q/q-tools";
 
+import { offersChoices } from "./conversational-depth.js";
 import { themeFollowUp } from "./list-settle.js";
 import {
   EVIDENCE_QUESTION_FALLBACK,
@@ -813,7 +814,17 @@ export function finishingLine(
         : themeFollowUp(themeMissing)
       : (copy.questionOf(first.stepKey) ?? first.question)
   ).trim();
-  const asked = question.endsWith("?") ? question : `${question}?`;
+  // D81 #3: a strength or preference step offers its choices to react
+  // to from the first ask.
+  const firstChoices =
+    offersChoices(first.stepKey) && theme === undefined
+      ? (copy.choicesOf?.(first.stepKey) ?? [])
+      : [];
+  const plainAsked = question.endsWith("?") ? question : `${question}?`;
+  const asked =
+    firstChoices.length < 2
+      ? plainAsked
+      : `${plainAsked.replace(/\?$/u, "")}: ${firstChoices.slice(0, -1).join(", ")} or ${firstChoices.at(-1) ?? ""}?`;
   const held =
     first.stepKey === copy.unsettled
       ? null
@@ -876,8 +887,8 @@ export function finishingLine(
         : "Just so investors see your company right";
     const offered =
       choices.length === 0
-        ? asked
-        : `${asked.replace(/\?$/u, "")}: ${choices.length === 1 ? (choices[0] ?? "") : `${choices.slice(0, -1).join(", ")} or ${choices.at(-1) ?? ""}`}?`;
+        ? plainAsked
+        : `${plainAsked.replace(/\?$/u, "")}: ${choices.length === 1 ? (choices[0] ?? "") : `${choices.slice(0, -1).join(", ")} or ${choices.at(-1) ?? ""}`}?`;
     return {
       reply: `${why}, I need this one before I can finish. ${offered}`,
       asking: first.stepKey,

@@ -46,6 +46,14 @@ import {
 } from "./onboarding-port.js";
 import { writeSession } from "./session-writes.js";
 import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
+import {
+  heldFromTheirWords,
+  isPlaybackLine,
+  NO_DEPTH,
+  playbackLine,
+  topicOf,
+  type ConversationalDepth,
+} from "./conversational-depth.js";
 
 /**
  * Typed onboarding as the voice line's conversation (owner 2026-10-28,
@@ -99,9 +107,28 @@ export function createTypedOnboarding(dependencies: {
   readonly recommendations?: RecommendationStore | undefined;
   readonly registry?: PromptRegistry | undefined;
   readonly dataPosture?: "REAL_CUSTOMER" | "SYNTHETIC_DEMO" | undefined;
+  /** DECISIONS 81's switches; absent: NO_DEPTH (before D81). */
+  readonly depth?: ConversationalDepth | undefined;
   readonly logger: Logger;
 }): TypedOnboarding {
   const { conversation, gateway, logger } = dependencies;
+  const depth = dependencies.depth ?? NO_DEPTH;
+  /** D81 #2: the topics whose why Q asked, by session (one each). */
+  const probed = new Map<string, Set<string>>();
+  /** D81 #2, owner Q3: the topic whose why Q's last line asked, by session. */
+  const probing = new Map<string, string>();
+  /** Their why for a topic still held for their yes: kept once it is saved. */
+  const whyWaiting = new Map<string, Map<string, string>>();
+  /** D81 #4: replays of a topic's playback after a correction, by session. */
+  const replays = new Map<string, Map<string, number>>();
+  const bounded = <V>(map: Map<string, V>, key: string, value: V) => {
+    map.delete(key);
+    map.set(key, value);
+    if (map.size > 2_000) {
+      const oldest = map.keys().next().value;
+      if (oldest !== undefined) map.delete(oldest);
+    }
+  };
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   /** Sessions whose whole record code read back for their yes. */
   const readBackShown = new Set<string>();
@@ -362,10 +389,20 @@ export function createTypedOnboarding(dependencies: {
       const port = portOf(false);
       // Their words go in the thread first, so leaving now loses nothing;
       // the background reading is scheduled from them.
-      const [state] = await Promise.all([
+      const [state, heldBefore] = await Promise.all([
         port.state(),
+        // D81 #4: what their own words gave that waits for the topic's
+        // playback; the checklist marks it, so Q never asks it again.
+        depth.playbackBeforeSave
+          ? port.pendingRecommendations().catch(() => [])
+          : Promise.resolve([]),
         conversation.said(line, "PERSON", utterance),
       ]);
+      const playedBack = new Set(
+        heldBefore
+          .filter((item) => heldFromTheirWords(item.rationale))
+          .map((item) => item.stepKey),
+      );
       // Read now, beside the reply. Only finishing waits for it (what is
       // missing is decided from the record); Q's ordinary reply never does
       // (live final re-check 2026-10-31: waiting made typed turns 12 s at
@@ -447,7 +484,7 @@ export function createTypedOnboarding(dependencies: {
       const stopReply = () => replyStop.abort();
       if (input.signal?.aborted === true) stopReply();
       input.signal?.addEventListener("abort", stopReply, { once: true });
-      const replying = reply(input, state, turns, replyStop.signal)
+      const replying = reply(input, state, turns, replyStop.signal, playedBack)
         .catch((error: unknown) => {
           if (!replyStop.signal.aborted)
             logger.warn({ err: error }, "typed onboarding reply unavailable");
@@ -501,7 +538,9 @@ export function createTypedOnboarding(dependencies: {
       // A plain yes to code's own read-back ("… Shall I keep these?") is a
       // yes to exactly what that line read back (e2e run 6: "Yes." left the
       // cheque held). Code decides; the values were said in that line.
-      const yesToReadBack = isPlainYes(utterance) && isReadBackLine(lastQ);
+      const yesToReadBack =
+        isPlainYes(utterance) &&
+        (isReadBackLine(lastQ) || isPlaybackLine(lastQ));
       const approvedOffer = heldOffer.filter(
         (item) =>
           yesToReadBack ||
@@ -525,6 +564,13 @@ export function createTypedOnboarding(dependencies: {
         for (const result of accepted) {
           if (result.outcome === "COMMITTED") acceptedNow.add(result.stepKey);
         }
+      }
+      // D81 #2, owner Q3: their answer to Q's why is kept as that topic's
+      // private note, once its answer is on the record.
+      if (depth.whyAsNote) {
+        await keepWhy(utterance).catch((error: unknown) => {
+          logger.warn({ err: error }, "their why was not kept");
+        });
       }
       const agreedToReadBack =
         readBackReview !== null &&
@@ -760,20 +806,61 @@ export function createTypedOnboarding(dependencies: {
           utterance,
         ).trim();
         asking = written.asking;
+        // D81 #2: one why per topic. A second probe of the same topic is
+        // taken out and the next needed question asked instead.
+        if (written.probing !== null) {
+          const seen = probed.get(input.onboardingSessionId) ?? new Set();
+          bounded(probed, input.onboardingSessionId, seen);
+          if (seen.has(written.probing)) {
+            const next = state.steps.find(
+              (one) => one.stepKey !== written.probing && neededOpen(one),
+            );
+            text = `${withoutLastQuestion(text)}${
+              next === undefined
+                ? ""
+                : ` ${(SPOKEN_QUESTIONS[next.stepKey] ?? next.question).trim()}`
+            }`.trim();
+            asking = next?.stepKey ?? null;
+            logger.info(
+              { probing: written.probing },
+              "a second why for one topic was taken out",
+            );
+          } else {
+            seen.add(written.probing);
+            bounded(probing, input.onboardingSessionId, written.probing);
+          }
+        }
+        // D81 #4: moving on from a topic, or after their correction of its
+        // playback, code plays the topic back for their yes.
+        const played = depth.playbackBeforeSave
+          ? await topicPlayback({
+              text,
+              asking,
+              lastQ,
+              acceptedNow,
+            })
+          : null;
+        if (played !== null) {
+          text = played.text;
+          asking = played.asking;
+        }
         // DECISIONS 77, whoever words the question: a needed step asked
         // twice with no answer it could take is, the third time, given its
         // reason once and left for now; Q moves to the next one.
-        const parked = parkRepeated({
-          sessionId: input.onboardingSessionId,
-          journey: input.journeyType,
-          state,
-          text,
-          asking,
-          labelOf,
-        });
+        const parked =
+          played === null
+            ? parkRepeated({
+                sessionId: input.onboardingSessionId,
+                journey: input.journeyType,
+                state,
+                text,
+                asking,
+                labelOf,
+              })
+            : { text, asking };
         text = parked.text;
         asking = parked.asking;
-        path = "REPLY";
+        path = played === null ? "REPLY" : "PLAYBACK";
       } else {
         const next = state.next?.[0]?.stepKey ?? null;
         text = `Sorry, I lost my thread for a second; I have what you wrote.${
@@ -843,6 +930,87 @@ export function createTypedOnboarding(dependencies: {
           });
       }
       return outcome;
+
+      /**
+       * D81 #4: the topic's playback, when Q's reply moves on from a topic
+       * whose answers wait for their yes, or replays it after their
+       * correction (until they confirm; at most three replays, after which
+       * the finish's read-back has it). Null: nothing to play back.
+       */
+      async function topicPlayback(at: {
+        readonly text: string;
+        readonly asking: string | null;
+        readonly lastQ: string;
+        readonly acceptedNow: ReadonlySet<string>;
+      }): Promise<{ text: string; asking: string | null } | null> {
+        const before = lastAsked.get(input.onboardingSessionId);
+        const topic = topicOf(input.journeyType, before);
+        if (topic === null) return null;
+        const replay = isPlaybackLine(at.lastQ) && at.acceptedNow.size === 0;
+        const moving = topicOf(input.journeyType, at.asking) !== topic;
+        if (!replay && !moving) return null;
+        // What this very line said is in the playback too.
+        await (conversation.answered === undefined
+          ? reading
+          : conversation.answered(line, "LATEST"));
+        const after = portOf(false);
+        const [held, now] = await Promise.all([
+          after.pendingRecommendations().catch(() => []),
+          after.state(),
+        ]);
+        const items = held.filter(
+          (item) =>
+            heldFromTheirWords(item.rationale) &&
+            topicOf(input.journeyType, item.stepKey) === topic,
+        );
+        if (items.length === 0) return null;
+        const counts =
+          replays.get(input.onboardingSessionId) ?? new Map<string, number>();
+        bounded(replays, input.onboardingSessionId, counts);
+        const times = counts.get(topic) ?? 0;
+        if (replay && times >= 3) return null;
+        counts.set(topic, replay ? times + 1 : 0);
+        const labelled = (stepKey: string) =>
+          labelOf(stepKey) ?? plainStepLabel(stepKey);
+        // Owner Q1: an explicit none saved at once is named with its topic.
+        const nones = depth.nonesImmediate
+          ? now.steps.filter(
+              (step) =>
+                step.status === "ANSWERED" &&
+                step.value?.trim().toLowerCase() === "none" &&
+                topicOf(input.journeyType, step.stepKey) === topic,
+            )
+          : [];
+        const lines = [
+          ...items.map((item) => `${labelled(item.stepKey)}: ${item.value}`),
+          ...nones.map((step) => `${labelled(step.stepKey)}: none`),
+        ];
+        const lead = replay ? "" : withoutLastQuestion(at.text);
+        return {
+          text: `${lead} ${playbackLine(lines, replay)}`.trim(),
+          asking: items[0]?.stepKey ?? null,
+        };
+      }
+
+      /** Owner Q3: their why, kept as the asked topic's private note. */
+      async function keepWhy(words: string): Promise<void> {
+        const waiting =
+          whyWaiting.get(input.onboardingSessionId) ??
+          new Map<string, string>();
+        const asked = probing.get(input.onboardingSessionId);
+        probing.delete(input.onboardingSessionId);
+        if (asked !== undefined && words.trim().length > 0) {
+          waiting.set(asked, words.trim().slice(0, 500));
+        }
+        if (waiting.size === 0) return;
+        bounded(whyWaiting, input.onboardingSessionId, waiting);
+        const notes = portOf(false);
+        for (const [stepKey, why] of [...waiting]) {
+          // Kept once the topic's answer is on the record (after their yes
+          // to its playback); until then it waits here.
+          if (await notes.annotate(stepKey, why)) waiting.delete(stepKey);
+        }
+      }
 
       /** Q's line kept with the step it asks, and the screen's outcome. */
       async function outcomeOf(said: {
@@ -937,6 +1105,8 @@ export function createTypedOnboarding(dependencies: {
     turns: readonly { readonly role: string; readonly text: string }[],
     /** The turn's own signal, and stopped when the turn ends without it. */
     signal: AbortSignal,
+    /** Held from their words for the topic's playback (D81 #4). */
+    playedBack: ReadonlySet<string> = new Set(),
   ): Promise<OnboardingTypedReplyResult | null> {
     const transcript = turns
       .map((turn) => `${turn.role}: ${turn.text.replace(/\s+/g, " ").trim()}`)
@@ -951,7 +1121,10 @@ export function createTypedOnboarding(dependencies: {
         "You write Q's next message in an onboarding chat; Capital Q saves what the person says from the conversation, never from your message.",
       variables: {
         journey: input.journeyType,
-        checklist: briefOf(state, { withIds: true }).slice(0, 12_000),
+        checklist: briefOf(state, { withIds: true, playedBack }).slice(
+          0,
+          12_000,
+        ),
         transcript,
       },
     });

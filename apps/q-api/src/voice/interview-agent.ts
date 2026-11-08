@@ -836,6 +836,11 @@ export function turnNotesFor(input: {
   // QA QO-30 (23 Oct): "Your exclusions are set aside, and the handoff
   // still needs an explicit yes": the state's own words, said to them.
   notes.push(PLAIN_WORDS_NOTE);
+  // DECISIONS 81, last: a note that does not fit is left out whole, so
+  // this never displaces what the turn itself needs.
+  notes.push(
+    "Ask one concrete, easy question; ask why once when they state a preference; offer choices where it helps.",
+  );
   // Fitted to the prompt's budget in order: a note that does not fit is
   // left out whole rather than cut mid-sentence, the first one excepted.
   let fitted = "";

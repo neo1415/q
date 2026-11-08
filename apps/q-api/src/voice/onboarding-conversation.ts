@@ -20,6 +20,15 @@ import type { Logger } from "@capital-q/observability";
 import type { OnboardingState, OnboardingStepState } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import { NONE_ANSWER_TEXT } from "@capital-q/onboarding";
+
+import {
+  IDENTITY_STEPS,
+  NO_DEPTH,
+  offersChoices,
+  topicOf,
+  type ConversationalDepth,
+} from "./conversational-depth.js";
 import {
   isWholeNone,
   isWholeSkip,
@@ -190,6 +199,8 @@ export function createOnboardingConversation(dependencies: {
     | undefined;
   readonly apiBaseUrl: string;
   readonly reader: OnboardingTranscriptReader;
+  /** DECISIONS 81's switches; absent: NO_DEPTH (before D81). */
+  readonly depth?: ConversationalDepth | undefined;
   readonly delegation?: QDelegationReader | undefined;
   /** An ambiguous category word, chosen among the lookup's candidates by meaning. */
   readonly categories?: TaxonomyChooser | undefined;
@@ -211,6 +222,7 @@ export function createOnboardingConversation(dependencies: {
   readonly fetch?: typeof fetch | undefined;
 }): OnboardingConversation {
   const { logger } = dependencies;
+  const depth = dependencies.depth ?? NO_DEPTH;
   const readAfterMs = dependencies.readAfterMs ?? READ_AFTER_MS;
   const buffers = new Map<string, Buffer>();
   /** Thread writes per line, in order: an utterance never overtakes another. */
@@ -482,18 +494,34 @@ export function createOnboardingConversation(dependencies: {
         [settled.notKnown, "NOT_KNOWN"],
       ] as const) {
         if (keys.length === 0) continue;
-        const results = await port
-          .recordNone(
-            keys.map((stepKey) => ({ stepKey, quote: latestWords })),
-            as,
-          )
-          .catch((error: unknown) => {
-            logger.warn(
-              { err: error, onboardingSessionId: line.onboarding.sessionId },
-              "a plain none was not settled",
-            );
-            return [];
-          });
+        // Owner Q1 (D81): an explicit none is saved at once and named in
+        // the topic's playback; with the switch off it waits for their yes
+        // like every other answer of a typed conversation.
+        const holdNone =
+          as === "NONE" &&
+          !depth.nonesImmediate &&
+          depth.playbackBeforeSave &&
+          line.voiceSessionId.startsWith("typed:");
+        const results = await (
+          holdNone
+            ? port.holdInferred(
+                keys.map((stepKey) => ({
+                  stepKey,
+                  value: NONE_ANSWER_TEXT,
+                  quote: latestWords,
+                })),
+              )
+            : port.recordNone(
+                keys.map((stepKey) => ({ stepKey, quote: latestWords })),
+                as,
+              )
+        ).catch((error: unknown) => {
+          logger.warn(
+            { err: error, onboardingSessionId: line.onboarding.sessionId },
+            "a plain none was not settled",
+          );
+          return [];
+        });
         settledNow += results.filter((r) => r.outcome === "COMMITTED").length;
       }
       if (settledNow > 0) {
@@ -808,17 +836,34 @@ export function createOnboardingConversation(dependencies: {
       readonly value: unknown;
       readonly affirms?: boolean | undefined;
     }): boolean => typeof answer.value === "number" && answer.affirms !== true;
+    // DECISIONS 81 #4: in a typed conversation what their words state is
+    // held, not saved, while its topic is open; Q plays the topic back for
+    // their yes when it moves on, and their yes saves it. Their agreement
+    // to Q's own read-back (affirms) saves at once, as before; a long
+    // answer keeps its own say-back; identity follows its switch.
+    const forPlayback = (answer: {
+      readonly stepKey: string;
+      readonly affirms?: boolean | undefined;
+    }): boolean =>
+      depth.playbackBeforeSave &&
+      line.voiceSessionId.startsWith("typed:") &&
+      answer.affirms !== true &&
+      !isLongAnswerStep(line.onboarding.journeyType, answer.stepKey) &&
+      (depth.identityPlayedBack || !IDENTITY_STEPS.has(answer.stepKey)) &&
+      topicOf(line.onboarding.journeyType, answer.stepKey) !== null;
     const stated = answers.filter(
       (answer) =>
         answer.source !== "INFERRED" &&
         fromQuestion(answer) &&
-        !figureToReadBack(answer),
+        !figureToReadBack(answer) &&
+        !forPlayback(answer),
     );
     const inferred = answers.filter(
       (answer) =>
         answer.source === "INFERRED" ||
         !fromQuestion(answer) ||
-        figureToReadBack(answer),
+        figureToReadBack(answer) ||
+        forPlayback(answer),
     );
     if (
       answers.length === 0 &&
@@ -1576,9 +1621,26 @@ function readableSteps(
  * typed reply said asking=null, and a reopened setup asked the wrong
  * question). Voice speaks its lines, so it never sees ids.
  */
+/** D81 #1: a founder's finances, one figure a question. */
+const FOUNDER_FINANCE_STEPS: ReadonlySet<string> = new Set([
+  "F5.monthly_revenue",
+  "F5.revenue_trend",
+  "F5.gross_margin",
+  "F5.monthly_burn",
+  "F5.cash",
+  "F5.runway_months",
+]);
+
 export function briefOf(
   state: OnboardingState,
-  options: { readonly withIds?: boolean } = {},
+  options: {
+    readonly withIds?: boolean;
+    /**
+     * D81 #4: steps their words answered that wait for the topic's
+     * playback: never asked again, never said back by the model.
+     */
+    readonly playedBack?: ReadonlySet<string> | undefined;
+  } = {},
 ): string {
   const topics = topicsOf(state.steps);
   const lines = state.steps.filter(isConversational).map((step) => {
@@ -1587,16 +1649,18 @@ export function briefOf(
     const status =
       step.status === "ANSWERED"
         ? `already saved: ${step.value ?? "answered"}`
-        : step.status === "SET_ASIDE"
-          ? "they chose to skip this"
-          : // Production re-test 2026-10-28: "Are those US dollars?" after
-            // "dollars" was typed, and "currency unspecified" while USD was
-            // being saved: an answer still saving is theirs already.
-            step.savePending === true
-            ? "they already told you this and it is being saved: never ask it again or call it unknown"
-            : (step.pendingRecommendation ?? step.offered) !== undefined
-              ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
-              : "not covered yet";
+        : options.playedBack?.has(step.stepKey) === true
+          ? `they told you this (${(step.pendingRecommendation ?? "").slice(0, 120)}); Capital Q plays it back with its topic: being played back, never ask it`
+          : step.status === "SET_ASIDE"
+            ? "they chose to skip this"
+            : // Production re-test 2026-10-28: "Are those US dollars?" after
+              // "dollars" was typed, and "currency unspecified" while USD was
+              // being saved: an answer still saving is theirs already.
+              step.savePending === true
+              ? "they already told you this and it is being saved: never ask it again or call it unknown"
+              : (step.pendingRecommendation ?? step.offered) !== undefined
+                ? `not confirmed yet; Q found: ${step.pendingRecommendation ?? step.offered ?? ""}`
+                : "not covered yet";
     const sayBack =
       step.status === "OPEN" && isLongAnswerStep(state.journey, step.stepKey)
         ? " (say back)"
@@ -1605,9 +1669,14 @@ export function briefOf(
       step.required && INVESTOR_NONE_STEPS.has(step.stepKey)
         ? " (none is an answer)"
         : "";
+    // D81 #3: choices to react to, a mix accepted.
+    const offerMark =
+      offersChoices(step.stepKey) && choices.length > 0
+        ? " (offer these choices to react to; a mix is an answer)"
+        : "";
     return `- ${step.required ? "Needed" : "Other"}: ${topic}${
       choices.length === 0 ? "" : ` (choices: ${choices})`
-    }${noneMark}${sayBack} [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
+    }${noneMark}${offerMark}${sayBack} [${status}]${options.withIds === true ? ` (id: ${step.stepKey})` : ""}`;
   });
   const sayingBack = state.steps.some(
     (step) =>
@@ -1643,6 +1712,20 @@ export function briefOf(
     )
       ? [
           `Topics marked (none is an answer) are lists: ask them in as few natural questions as you can, by theme, never list by list. Ask each theme with exactly these words: ${INVESTOR_LIST_THEMES.map((theme) => JSON.stringify(theme.question)).join("; ")}; the portfolio and their thesis on their own. One answer often fills several. "None" or "no preference" from them answers a list, or a whole question: take it and move on. When an answer covers only some of a question's lists, ask once, briefly, about just the rest together ("Anything on revenue expectations or regulated markets, or no preference?"); never take a list they did not address as none.`,
+        ]
+      : []),
+    // DECISIONS 81 #1 (e2e run 8: "the financial picture", four figures
+    // in one question, asked seven times): a founder's finances are asked
+    // one concrete figure at a time.
+    ...(state.journey === "founder" &&
+    state.steps.some(
+      (step) =>
+        isConversational(step) &&
+        step.status === "OPEN" &&
+        FOUNDER_FINANCE_STEPS.has(step.stepKey),
+    )
+      ? [
+          'Their finances (last month\'s revenue, how it is moving, gross margin, monthly burn, cash in the bank, runway) are asked one figure at a time, each as a concrete, easy question ("Roughly what did you bill last month?", "About how much cash is in the bank today?"), never several in one question.',
         ]
       : []),
     // Owner 2026-10-17, re-agreed 2026-10-30 (live, Granary): a long

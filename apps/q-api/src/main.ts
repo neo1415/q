@@ -717,6 +717,7 @@ import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
 import { createHeldWritesStore } from "./voice/held-writes.js";
 import { createOnboardingConversation } from "./voice/onboarding-conversation.js";
+import { CONVERSATIONAL_DEPTH } from "./voice/conversational-depth.js";
 import { createTypedOnboarding } from "./voice/typed-onboarding.js";
 import { createOnboardingTranscriptPort } from "./composition/onboarding-transcript.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
@@ -7627,6 +7628,8 @@ const onboardingConversation =
   process.env.CQ_ONBOARDING_VOICE_CONVERSATION === "off"
     ? undefined
     : createOnboardingConversation({
+        // DECISIONS 81: Q converses like a skilled interviewer.
+        depth: CONVERSATIONAL_DEPTH,
         apiBaseUrl: config.voice.apiBaseUrl,
         // P1-2: a reply to Q's read-back is read by meaning.
         wordsCheck: (actor, question, words) =>
@@ -7668,6 +7671,8 @@ const typedOnboarding =
   onboardingConversation === undefined
     ? undefined
     : createTypedOnboarding({
+        // DECISIONS 81: Q converses like a skilled interviewer.
+        depth: CONVERSATIONAL_DEPTH,
         conversation: onboardingConversation,
         // P1-2: a reply to Q's read-back is read by meaning.
         wordsCheck: (actor, question, words) =>

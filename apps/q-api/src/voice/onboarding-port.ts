@@ -828,6 +828,13 @@ export type BoundOnboardingPort = OnboardingToolPort &
      * list "None" answers (INVESTOR_NONE_STEPS) that holds no answer yet,
      * quoting their latest words. Never overwrites anything.
      */
+    /**
+     * DECISIONS 81 (owner Q3): their answer to Q's "why" kept as the
+     * private note of a step's answer on the record -- a new version of
+     * the same value with the note, history kept. False: nothing on the
+     * record for it yet (it still waits for their yes).
+     */
+    readonly annotate: (stepKey: string, note: string) => Promise<boolean>;
     readonly recordNone: (
       items: readonly { readonly stepKey: string; readonly quote: string }[],
       as?: "NONE" | "NOT_KNOWN",
@@ -5652,6 +5659,18 @@ export function createOnboardingPort(input: {
         }
       }
       return results;
+    },
+    annotate: async (stepKey, note) => {
+      const step = steps.get(stepKey);
+      const kept = note.trim().slice(0, 500);
+      if (step === undefined || kept.length === 0) return false;
+      const onRecord = (await current()).responses.find(
+        (r) => r.stepKey === stepKey,
+      );
+      if (onRecord === undefined) return false;
+      if (onRecord.note === kept) return true;
+      await submit(stepKey, onRecord.value, kept);
+      return true;
     },
     recordNone: async (items, as = "NONE") => {
       const text = as === "NONE" ? NONE_ANSWER_TEXT : NOT_KNOWN_TEXT;

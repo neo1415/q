@@ -37,6 +37,11 @@ export const OnboardingTypedReplyResultSchema = z
     asking: z.string().max(80).nullable().default(null),
     /** They asked what Q has so far: code reads it back from the record. */
     readBack: z.boolean().default(false),
+    /**
+     * DECISIONS 81: the topic whose "why" this message asks (a stated
+     * preference or dislike), or null. Code allows one per topic.
+     */
+    probing: z.string().max(80).nullable().default(null),
   })
   .strict();
 export type OnboardingTypedReplyResult = z.infer<
