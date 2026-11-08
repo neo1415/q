@@ -2159,6 +2159,47 @@ describe("batch-12 latency: the decision's move is its own message the moment it
       vi.useRealTimers();
     }
   });
+  it("batch 14: once the move is published, the answer's offer of the same place is dropped, even beside code's own commands", async () => {
+    vi.useFakeTimers();
+    try {
+      const offer = (destination: string) => ({
+        kind: "NAVIGATION_OFFER",
+        intent: { kind: "NAVIGATE", destination },
+        place: "Team",
+        openLabel: "Open Team",
+      });
+      const command = {
+        kind: "UI_INTENT",
+        intent: { kind: "OPEN_SETTINGS", section: "NOTIFICATIONS" },
+      };
+      for (const keepAnswerMoves of [false, true]) {
+        const moves = createQPageMoves({
+          decider: landsAt(2_000),
+          config: { movesAllowed: true },
+        });
+        const r = request(`offer-${String(keepAnswerMoves)}`);
+        moves.start(r, {
+          utterance: "who is on Q's team",
+          recentTurns: [],
+          pageText: null,
+          publish: () => Promise.resolve({ messageId: "m-move" }),
+        });
+        await vi.advanceTimersByTimeAsync(2_100);
+        const settled = await moves.settle(
+          r,
+          (keepAnswerMoves
+            ? [command, offer("WORK_TEAM"), offer("SETTINGS")]
+            : [offer("WORK_TEAM")]) as never,
+          { keepAnswerMoves },
+        );
+        expect(settled).toEqual(
+          keepAnswerMoves ? [command, offer("SETTINGS")] : [],
+        );
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("batch-13 replay: an investor is an investor on every turn, mandate scope or not", () => {

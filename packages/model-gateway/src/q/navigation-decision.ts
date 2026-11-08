@@ -1597,6 +1597,34 @@ function changesPlace(block: QResultBlock): boolean {
   );
 }
 
+/** A place an intent names: everything but its section and scroll position. */
+const intentPlace = (intent: object): string => {
+  const {
+    sectionId: _section,
+    position: _position,
+    ...rest
+  } = intent as Record<string, unknown>;
+  return JSON.stringify(
+    Object.entries(rest).sort(([a], [b]) => a.localeCompare(b)),
+  );
+};
+
+/**
+ * Batch 14 (owner live 8 Nov: "I've opened Clinicrest." then "Want me to
+ * open Clinicrest's profile…?"): an offer of a place a published move has
+ * already taken the pane to.
+ */
+function offersPlaceMoved(
+  block: QResultBlock,
+  moved: readonly QResultBlock[],
+): boolean {
+  if (block.kind !== "NAVIGATION_OFFER") return false;
+  const offered = intentPlace(block.intent);
+  return moved.some(
+    (one) => one.kind === "UI_INTENT" && intentPlace(one.intent) === offered,
+  );
+}
+
 /** Record pages that open a document in its viewer, not a page of the pane. */
 const VIEWER_PAGES: ReadonlySet<string> = new Set([
   "DOCUMENT",
@@ -1700,7 +1728,9 @@ export function createQPageMoves(dependencies: {
   // Batch-12 latency: runs whose move is published the moment it lands
   // (the stored message's id, or null when nothing was published).
   const publications = new Map<string, Promise<string | null>>();
-  const published = new Set<string>();
+  // The blocks each run's published move carried (batch 14: an offer of
+  // the same place in the answer is stale once the pane is there).
+  const published = new Map<string, readonly QResultBlock[]>();
   const consumed = new Set<string>();
   const lineFor = (outcome: QNavigationOutcome, title: string): string =>
     outcome.decision === "OFFER"
@@ -1853,7 +1883,7 @@ export function createQPageMoves(dependencies: {
               const moved = blocksOf(outcome);
               if (moved === null || outcome.target === null) return null;
               consumed.add(runId);
-              published.add(runId);
+              published.set(runId, moved);
               const stored = await publish({
                 content: lineFor(outcome, placeTitle(outcome.target)),
                 blocks: moved,
@@ -1899,10 +1929,23 @@ export function createQPageMoves(dependencies: {
         // never waits for it and never carries it.
         pending.delete(request.runId);
         const current = blocks ?? [];
-        if (published.has(request.runId)) {
+        const movedTo = published.get(request.runId);
+        if (movedTo !== undefined) {
           // One authority: the answer model's own place moves would be a
           // second, contrary move after the pane already moved.
-          if (options?.keepAnswerMoves === true) return blocks;
+          if (options?.keepAnswerMoves === true) {
+            // Code's exact commands stand; an offer of the place the pane
+            // is already showing never does (batch 14).
+            const fresh = current.filter(
+              (block) => !offersPlaceMoved(block, movedTo),
+            );
+            if (fresh.length === current.length) return blocks;
+            dependencies.logger?.info(
+              { qRunId: request.runId },
+              "q page move dropped the answer's offer of the same place",
+            );
+            return fresh;
+          }
           const stripped = current.filter((block) => !changesPlace(block));
           if (stripped.length !== current.length)
             dependencies.logger?.info(

@@ -313,6 +313,7 @@ export function screenLines(
           'Everything on the page they are on, including below the fold and any open window, is under ON THEIR SCREEN in the facts: answer "what\'s on my screen", "in this window" or "further down" from it, and never say you can only see part of the page.',
         ]),
     ...(name === null ? [] : [HERE_LINE]),
+    ...(screen.workspace === undefined ? [] : [WORKSPACE_PANE_LINE]),
     ...(screen.route === "DAILY" ? [DAILY_HERE_LINE] : []),
     ...localTimeLines(screen.timeZone, now),
   ];
@@ -366,6 +367,15 @@ const DOCUMENT_NAMES: Readonly<Record<string, string>> = {
 export const CAPABILITY_NOTE_MAX_CHARS = 7_000;
 
 /** Said whenever navigation or page control is offered (always: core). */
+/**
+ * Batch 14 (owner live 8 Nov: "I've opened Clinicrest." and then the answer
+ * "Want me to open Clinicrest's profile…?"): in the Q Workspace the page
+ * pane is moved by Capital Q's own decision, often while the answer is
+ * still being written, so the answer never offers a move of its own.
+ */
+export const WORKSPACE_PANE_LINE =
+  "THE PAGE PANE (Q Workspace): Capital Q moves the page beside this conversation itself, from what they say; when they want to see a place, it is opened for them while you answer, and Capital Q tells them so. Never offer to open, show or take them to a page, tab or record, and never end by asking whether to open one: answer what they asked.";
+
 export const NAVIGATION_LINE =
   "- You CAN navigate and work the page: open_page takes them to any Capital Q screen and control_screen scrolls, goes back, shows a section or works the page they are on. Never say you cannot navigate, open pages or scroll; call the tool.";
 
