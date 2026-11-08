@@ -423,3 +423,40 @@ describe("typed onboarding is the conversation (owner 2026-10-28)", () => {
     expect(outcome.view.session.status).toBe("ACTIVE");
   });
 });
+
+/**
+ * e2e run 6 (production batch 10): "Are those musts, or more of a
+ * preference?" was asked 13 times, word for word, to "Yes, that's right.
+ * That's all for now." DECISIONS 77: a needed question is asked once more
+ * with why and its choices, then left for now; never looped.
+ */
+describe("a needed question is never looped word for word (e2e run 6)", () => {
+  it("plain, then with why and its choices, then another one -- never the same line twice", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      subject: FIRM,
+      recorded: {
+        "I0.investor_type": "angel",
+        "I0.organisation_name": "Harmattan Angels",
+      },
+    });
+    const { say } = typedWorld({
+      world,
+      script: [{ reply: "Sure.", asking: "I2.stages" }],
+      authority: reading({ finishing: true }),
+    });
+    const nonAnswer = "Yes, that's right. That's all for now.";
+    const first = await say(nonAnswer);
+    const second = await say(nonAnswer);
+    const third = await say(nonAnswer);
+    expect(first.asking?.stepKey).toBeDefined();
+    const asked = first.asking?.stepKey;
+    // Once more for the same step: why, and its choices, never verbatim.
+    expect(second.asking?.stepKey).toBe(asked);
+    expect(second.reply).not.toBe(first.reply);
+    expect(second.reply).toMatch(/^Just so I can match you well/u);
+    // Then it is left for now: another needed one is asked instead.
+    expect(third.asking?.stepKey).not.toBe(asked);
+    expect(new Set([first.reply, second.reply, third.reply]).size).toBe(3);
+  });
+});

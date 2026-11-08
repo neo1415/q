@@ -660,6 +660,9 @@ export const REVIEW_NOT_SHOWN_REASON =
  * Null when the port could not say what is missing: the model's reply
  * stands. No "we'll pause here", and nothing about leaving.
  */
+const lowerFirst = (text: string) =>
+  text.length === 0 ? text : `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+
 export function finishingLine(
   journey: "founder" | "investor",
   finished: {
@@ -704,6 +707,16 @@ export function finishingLine(
      * question from scratch): that step is put to them as the suggestion.
      */
     readonly heldFor?: ((stepKey: string) => string | null) | undefined;
+    /**
+     * How many times in a row this finishing line has already asked the
+     * step and it is still unanswered (e2e run 6: "Are those musts, or
+     * more of a preference?" asked 13 times, word for word). Once more it
+     * is asked with why and its choices in plain words; after that it is
+     * left for now, never asked again here (DECISIONS 77).
+     */
+    readonly repeats?: ((stepKey: string) => number) | undefined;
+    /** A choice step's choices, in the journey's plain words. */
+    readonly choicesOf?: ((stepKey: string) => readonly string[]) | undefined;
   },
 ): { readonly reply: string; readonly asking: string | null } | null {
   if (
@@ -764,7 +777,14 @@ export function finishingLine(
   const ordered = again
     ? [...finished.missing.slice(1), ...finished.missing.slice(0, 1)]
     : finished.missing;
-  const [first] = ordered;
+  // A step asked twice already with no answer is left for now: another
+  // needed one goes first (DECISIONS 77: never loop).
+  const timesAsked = (stepKey: string) => copy.repeats?.(stepKey) ?? 0;
+  const queue = [
+    ...ordered.filter((item) => timesAsked(item.stepKey) < 2),
+    ...ordered.filter((item) => timesAsked(item.stepKey) >= 2),
+  ];
+  const [first] = queue;
   if (first === undefined) return null;
   // The setup's own spoken question, never its internal field labels
   // (production re-test 2026-10-28: "I still need 2 things: discovery and
@@ -798,11 +818,14 @@ export function finishingLine(
     // Every other missing step with a value held for their yes goes in the
     // same read-back (e2e run 5: the cheque from one sentence was read
     // back as three questions; DECISIONS 78), one yes for the set.
+    // Labelled, never by a question (e2e run 6: the firm description was
+    // read back as "How would you describe …: …", a second question in the
+    // line their yes answers).
     const lineOf = (stepKey: string, value: string) =>
-      `${copy.labelOf(stepKey) ?? (copy.questionOf(stepKey) ?? stepKey).replace(/\?$/u, "")}: ${value.replace(/[.;\s]+$/u, "")}`;
+      `${copy.labelOf(stepKey) ?? plainStepLabel(stepKey)}: ${value.replace(/[.;\s]+$/u, "")}`;
     const lines = [
       lineOf(first.stepKey, held),
-      ...ordered.slice(1).flatMap((item) => {
+      ...queue.slice(1).flatMap((item) => {
         if (item.stepKey === copy.unsettled) return [];
         const value = copy.heldFor?.(item.stepKey)?.trim() ?? "";
         return value.length === 0 ? [] : [lineOf(item.stepKey, value)];
@@ -817,6 +840,32 @@ export function finishingLine(
         : `I still need ${String(finished.missing.length)} more answers from you, starting with your yes on ${several ? "these" : "this one"}`;
     return {
       reply: `Before I can finish, ${which}. From what you said:\n\n${lines.join("\n")}\n\n${several ? "Shall I keep these? Say yes, or tell me what to change." : "Shall I keep that? Say yes, or tell me what it should be."}`,
+      asking: first.stepKey,
+    };
+  }
+  if (timesAsked(first.stepKey) >= 2) {
+    // Asked twice, the second time with why and its choices, and still no
+    // answer: left open for now, asked nothing, never looped.
+    return {
+      reply: `That's fine, let's leave ${lowerFirst(copy.labelOf(first.stepKey) ?? plainStepLabel(first.stepKey))} for now: everything else you told me is kept. It's the one thing your setup still needs, and you can answer it here or on your profile whenever you like.`,
+      asking: null,
+    };
+  }
+  // A decline has its own words below ("That's fine…"); this is for a
+  // reply that did not answer it at all.
+  if (timesAsked(first.stepKey) === 1 && first.stepKey !== copy.unsettled) {
+    // Once more, never word for word: why it is needed, and its choices.
+    const choices = copy.choicesOf?.(first.stepKey) ?? [];
+    const why =
+      journey === "investor"
+        ? "Just so I can match you well"
+        : "Just so investors see your company right";
+    const offered =
+      choices.length === 0
+        ? asked
+        : `${asked.replace(/\?$/u, "")}: ${choices.length === 1 ? (choices[0] ?? "") : `${choices.slice(0, -1).join(", ")} or ${choices.at(-1) ?? ""}`}?`;
+    return {
+      reply: `${why}, I need this one before I can finish. ${offered}`,
       asking: first.stepKey,
     };
   }
