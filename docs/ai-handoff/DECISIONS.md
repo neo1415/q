@@ -335,3 +335,5 @@ Core Seven remains the governing assessment framework. The new directive authori
     - **Play it back before acting.** At the end of a topic, and before anything is saved or done, Q summarises in their words ("Let me get this right: … Is that right?"). It takes corrections ("not the saxophone, a flute") and plays the corrected version back until they confirm.
     - Not in a rush. Depth and understanding come before speed of completion. Required information is still gathered (D77/D79), but through conversation, not a checklist.
     - Applies to typed and voice onboarding, and to Q's conversations generally.
+    - **Owner clarification (8 Nov, ~07:55 UTC):** Capital Q's register is professional, not casual like the music example. It is still conversational, and the purpose is unchanged: know exactly what to ask to get the most accurate answer. Q never loses sight of what the conversation must collect (the mandatory set, D77/D79). Depth serves accuracy, not small talk.
+    - **Navigation (same message):** a majority of the decision's votes (2 of 3) for the same place moves the page; a single vote shows the button.
