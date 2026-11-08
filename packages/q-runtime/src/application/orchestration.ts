@@ -710,6 +710,16 @@ export type QToolExecutionContext = {
   readonly plan: PermittedContextPlan;
   readonly signal?: AbortSignal | undefined;
   /**
+   * "CODE": code calls this tool itself (Q's page-move decision resolving a
+   * record it named through open_page's own authorize step). Set only by a
+   * code port that builds its own call; a model's proposal never carries
+   * it. It does not widen authority: the tool's authorize step still
+   * decides. Batch-9 replay: the Q Workspace hides the page-moving tools
+   * from the model, and without this the same filter refused code's own
+   * lookups, so no record the decision named could resolve.
+   */
+  readonly invokedBy?: "CODE" | undefined;
+  /**
    * The person's latest message in this run, verbatim (CQ-Q-RESEARCH-001
    * §9). A tool that sends anything outside Capital Q composes its request
    * from these words and from authorised public identity — never from a

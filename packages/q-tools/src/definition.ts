@@ -147,8 +147,10 @@ export type QToolDefinition<I, O, G> = {
    * Workspace the page pane has one authority, Q's page-move decision
    * (owner, 7 Nov 2026: one authority for where to go), so such a tool is
    * not offered to the answer while the plan's screen carries the
-   * workspace. It still executes when code calls it (the decision resolves
-   * records through open_page's own authorize step). Absent: false.
+   * workspace, and a model's proposal for it is refused. It still executes
+   * when code calls it itself (`invokedBy: "CODE"` on the context: the
+   * decision resolves records through open_page's own authorize step).
+   * Absent: false.
    */
   readonly movesPagePane?: boolean | undefined;
   /** Offered only when the plan holds at least one of these scope kinds; empty = always. */
