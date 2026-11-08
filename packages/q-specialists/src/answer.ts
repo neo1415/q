@@ -8272,8 +8272,21 @@ export function createSpecialistQAnswer(
       // DISCOVER_COMPANIES or FIT question), or when Q already listed a
       // discovery in this conversation (code's own record, not words).
       // Investors asked for never do.
+      // Batch 14 replay (run b19e26ed): "find paystack for me online now",
+      // after a discovery list, was handed over and answered that the
+      // pages "didn't name specific companies". A turn about one named
+      // company or person (namedOther) asks for that one on the web, not
+      // for companies to be found -- unless it asks for companies (like
+      // it, or that fit): DISCOVER_COMPANIES or FIT.
       ...(read !== null &&
       read.discoverWhom !== "INVESTORS" &&
+      !(
+        read.aboutNamedOther === true &&
+        read.namedOther !== undefined &&
+        read.namedOther !== null &&
+        read.question?.kind !== "DISCOVER_COMPANIES" &&
+        read.question?.kind !== "FIT"
+      ) &&
       (read.kind === "RESEARCH_REQUEST" ||
         (read.kind === "QUESTION_TO_Q" && read.asksForWeb === true)) &&
       (read.discoverWhom === "COMPANIES" ||

@@ -211,4 +211,51 @@ describe("web discovery is handed over whenever the reading asks for companies o
     await s.answer.answer(request());
     expect(s.delegated.at(-1)?.webDiscovery).toBeUndefined();
   });
+
+  // Batch 14 replay (run b19e26ed, savanna-seed on /discover): "find
+  // paystack for me online now", after a discovery list, was read
+  // RESEARCH_REQUEST, PUBLIC_FACTS, aboutNamedOther, research EXPLICIT --
+  // and handed to discovery, which said the pages "didn't name specific
+  // companies". One company named is that company, looked up on the web.
+  const PAYSTACK = {
+    aboutNamedOther: true,
+    namedOther: { name: "Paystack", kind: "COMPANY" },
+  };
+
+  it("run b19e26ed: one named company asked for online, after a discovery list -> that company, not a discovery", async () => {
+    const s = seam(
+      "find paystack for me online now",
+      read("RESEARCH_REQUEST", "PUBLIC_FACTS", PAYSTACK),
+      EARLIER_LIST,
+    );
+    await s.answer.answer(request());
+    expect(s.delegated.at(-1)?.webDiscovery).toBeUndefined();
+    expect(s.delegated.at(-1)?.aboutNamedOther).toBe(true);
+  });
+
+  it("the same with the reading's discoverWhom COMPANIES -> still that company", async () => {
+    const s = seam(
+      "find paystack for me online now",
+      read("RESEARCH_REQUEST", "PUBLIC_FACTS", {
+        ...PAYSTACK,
+        discoverWhom: "COMPANIES",
+      }),
+      null,
+    );
+    await s.answer.answer(request());
+    expect(s.delegated.at(-1)?.webDiscovery).toBeUndefined();
+  });
+
+  it("companies LIKE a named one are still a discovery", async () => {
+    const s = seam(
+      "find me companies like paystack online",
+      read("RESEARCH_REQUEST", "DISCOVER_COMPANIES", {
+        ...PAYSTACK,
+        discoverWhom: "COMPANIES",
+      }),
+      null,
+    );
+    await s.answer.answer(request());
+    expect(s.delegated.at(-1)?.webDiscovery).toBeDefined();
+  });
 });
