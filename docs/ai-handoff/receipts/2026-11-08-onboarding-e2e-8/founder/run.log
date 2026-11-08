@@ -1,0 +1,31 @@
+(node:1612) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+account e2e-fou-202611080656-dkgf@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+PASS J1 one dense line answers several topics — F1.country, F1.city, F1.stage, F1.categories, F4.founder_role, F4.full_time
+NOTE J1 Q's next question (judge: conversational, not a label) — Thanks — Tamarind Ledger is a seed-stage fintech in Lagos, Nigeria, with two full-time founders and a nine-person team; you’re the CEO. What’s the company website?
+PASS J2 a ramble is said back for a yes — The company: Tamarind Ledger helps small shops and market traders, mainly in Lagos and also in Ibadan, manage customer debts digitally. The problem: Many traders still track credit sales in notebooks,
+PASS J2 nothing saved before the yes
+PASS J2 saved after the yes
+NOTE J2 Q after a clear typed answer — That sharpens the problem: paper-based credit tracking leads to lost collections, awkward reminders and no easy transfer payment. What’s Tamarind Ledger’s website?
+NOTE J2 F9.problem before → after — Many traders still track credit sales in notebooks, making it difficult to know  → The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebook
+PASS J2 a clear typed answer is saved in their words, not read back — The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebook
+NOTE J3 Q's reply to an optional skip and a required refusal — Understood — the website is needed for your company profile, matching and verification, but you can provide it later; we’ll return to it before setup is complete. What year was Tamarind Ledger founded?
+NOTE J3 stored for F1.website — null
+PASS J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What year was the company founded?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier, I found two founders and a nine-person team; is that right? And how
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier, I found two founders and a nine-person team; is that right? And how
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before: From what you said earlier, I found two founders and a nine-person team; is that right? And how many founders are there? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). From what you said earlier, I found two founders and a 
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — Your company / Your company
+NOTE J6 questions answered from the fact table — [{"q":"And how many founders are there?","answer":"Two founders."},{"q":"Between the two of you, which areas do you cover today: product, engineering, sales and partnerships, operations, financ","answer":"Product, engineering and sales."},{"q":"What year was Tamarind Ledger founded?","answer":"2021."},{"q":"Are you raising now, preparing to raise, or not raising at the moment?","answer":"Yes, actively raising."},{"q":"Let’s cover the financial picture: which currency do you use, roughly how much did you bill last month, and has revenue ","answer":"Product, engineering and sales."},{"q":"For the financial picture, what currency do you report in, roughly what did you bill last month, and is revenue growing,","answer":"US dollars."},{"q":"Roughly how much did you bill last month, and has revenue been growing, flat, declining or lumpy?","answer":"One and a half million dollars."},{"q":"How has revenue been moving recently—growing, roughly flat, declining or lumpy—and, if you know them, what are your appr","answer":"Product and hiring."},{"q":"How has revenue been moving recently—growing, roughly flat, declining or lumpy—and, if you know them, what are your appr","answer":"Product and hiring."},{"q":"For the remaining financial picture, is revenue growing, roughly flat, declining or lumpy—and, if you know them, what ar","answer":"Product and hiring."},{"q":"For the financial picture, is revenue growing, roughly flat, declining or lumpy?","answer":"Growing about ten percent a month."},{"q":"What are your approximate gross margin, monthly spend beyond revenue, cash in the bank, and runway?","answer":"Product and hiring."},{"q":"For the remaining financial picture, what are your approximate gross margin, monthly spend beyond revenue, cash in the b","answer":"Product and hiring."},{"q":"What are your approximate gross margin, monthly spend beyond revenue, cash in the bank, and runway?","answer":"Product and hiring."},{"q":"For the financial picture, what are your approximate gross margin, monthly spend beyond revenue, cash in the bank, and r","answer":"Product and hiring."},{"q":"For the remaining financial details, what’s your approximate gross margin, monthly spend beyond revenue, cash in the ban","answer":"Product and hiring."},{"q":"For the remaining financial details, what’s your approximate gross margin, monthly spend beyond revenue, cash in the ban","answer":"Product and hiring."},{"q":"What are your approximate gross margin, monthly spend beyond revenue, cash in the bank, and runway?","answer":"Product and hiring."},{"q":"Product and hiring are covered. I still need the remaining financial details: approximate gross margin, monthly spend be","answer":"(stopped: Q asked nothing)"}]
+FAIL J6 finish lands on verification — /onboarding/founder
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+1 FAIL; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/e2e8/fdr
