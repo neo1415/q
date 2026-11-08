@@ -165,7 +165,19 @@ const apiGet = async (path) => {
     headers: { authorization: `Bearer ${await token()}` },
   });
   if (!response.ok) {
-    throw new Error(`read ${path.split("?")[0]}: HTTP ${response.status}`);
+    // Run 9: a 400 on sessions/current with no cause in the logs. The
+    // problem's title, detail and code (RFC 9457; no tokens, no request).
+    const problem = await response.json().catch(() => null);
+    const said =
+      problem === null
+        ? ""
+        : ` ${[problem.code, problem.title, problem.detail]
+            .filter((part) => typeof part === "string")
+            .join(" | ")
+            .slice(0, 300)}`;
+    throw new Error(
+      `read ${path.split("?")[0]}: HTTP ${response.status}${said}`,
+    );
   }
   return response.json();
 };
