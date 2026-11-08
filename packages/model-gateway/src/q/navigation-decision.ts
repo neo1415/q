@@ -1308,6 +1308,57 @@ const AUTHORITY: Readonly<Record<QNavigationOutcome["decision"], number>> = {
 const votedPlace = (outcome: QNavigationOutcome): QNavigateTarget | null =>
   outcome.target ?? outcome.remembered;
 
+/**
+ * The place a vote is about: everything but the section (and its scroll
+ * position). Batch-10 replay: three samples on Analytics, one naming the
+ * who-viewed section, split a unanimous move into an OFFER.
+ */
+const withoutSection = (target: QNavigateTarget): QNavigateTarget => {
+  const { sectionId: _section, position, ...rest } = target;
+  const parsed = QNavigateTargetSchema.safeParse({
+    ...rest,
+    ...(position === "section" || position === undefined ? {} : { position }),
+  });
+  return parsed.success ? parsed.data : target;
+};
+const samePlaceAnySection = (a: QNavigateTarget, b: QNavigateTarget) =>
+  samePlace(withoutSection(a), withoutSection(b));
+
+/**
+ * The group's section: the one a strict majority of it names, else none
+ * (the place itself, never a guess between its parts).
+ */
+function sectionVoted(
+  group: readonly QNavigationOutcome[],
+  chosen: QNavigationOutcome,
+): QNavigationOutcome {
+  const counts = new Map<string, number>();
+  for (const one of group) {
+    const section = votedPlace(one)?.sectionId ?? "";
+    counts.set(section, (counts.get(section) ?? 0) + 1);
+  }
+  const [top] = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const winner =
+    top !== undefined && top[1] * 2 > group.length && top[0] !== ""
+      ? top[0]
+      : null;
+  const place = (target: QNavigateTarget | null): QNavigateTarget | null => {
+    if (target === null) return null;
+    if (winner === null) return withoutSection(target);
+    const parsed = QNavigateTargetSchema.safeParse({
+      ...withoutSection(target),
+      sectionId: winner,
+      position: "section",
+    });
+    return parsed.success ? parsed.data : target;
+  };
+  return {
+    ...chosen,
+    target: place(chosen.target),
+    remembered: place(chosen.remembered),
+  };
+}
+
 const leastAuthority = (
   outcomes: readonly QNavigationOutcome[],
 ): QNavigationOutcome =>
@@ -1339,7 +1390,7 @@ export function voteNavigation(
     }
     const group = groups.find((g) => {
       const there = g[0] === undefined ? null : votedPlace(g[0]);
-      return there !== null && samePlace(there, at);
+      return there !== null && samePlaceAnySection(there, at);
     });
     if (group === undefined) groups.push([outcome]);
     else group.push(outcome);
@@ -1347,9 +1398,9 @@ export function voteNavigation(
   const majority = (n: number) => n * 2 > outcomes.length;
   const [largest] = [...groups].sort((a, b) => b.length - a.length);
   if (largest !== undefined && largest.length === outcomes.length)
-    return leastAuthority(largest);
+    return sectionVoted(largest, leastAuthority(largest));
   if (largest !== undefined && majority(largest.length)) {
-    const careful = leastAuthority(largest);
+    const careful = sectionVoted(largest, leastAuthority(largest));
     if (careful.decision !== "MOVE") return { ...careful, guard: "SPLIT_VOTE" };
     const at = votedPlace(careful);
     return careful.openPane
@@ -1511,6 +1562,24 @@ function changesPlace(block: QResultBlock): boolean {
       block.intent.kind === "UI_ACT" &&
       PLACE_ACTS.has(block.intent.act))
   );
+}
+
+/** Record pages that open a document in its viewer, not a page of the pane. */
+const VIEWER_PAGES: ReadonlySet<string> = new Set([
+  "DOCUMENT",
+  "DATA_ROOM_DOCUMENT",
+]);
+
+/**
+ * A block that itself takes the page pane to another place: a page, a
+ * settings part, a record's page, a tab or history act. Not an offer (the
+ * person has not moved), and not a document opened in its viewer.
+ */
+function movesPaneItself(block: QResultBlock): boolean {
+  if (block.kind !== "UI_INTENT") return false;
+  const intent = block.intent;
+  if (intent.kind === "OPEN_RECORD_PAGE") return !VIEWER_PAGES.has(intent.page);
+  return changesPlace(block);
 }
 
 const blockKind = (block: QResultBlock): string =>
@@ -1749,9 +1818,14 @@ export function createQPageMoves(dependencies: {
       startedAt.delete(request.runId);
       const current = blocks ?? [];
       const answerMoves = current.filter(changesPlace);
-      if (options?.keepAnswerMoves === true && answerMoves.length > 0) {
+      // Code's exact commands stand. Batch-10 replay: an offer, or a
+      // document opened in its viewer, is not one -- it never moved the
+      // pane, and it used to discard a unanimous decision for the
+      // company's own Deck tab.
+      const commanded = current.filter(movesPaneItself);
+      if (options?.keepAnswerMoves === true && commanded.length > 0) {
         dependencies.logger?.info(
-          { qRunId: request.runId, answerMoves: answerMoves.map(blockKind) },
+          { qRunId: request.runId, answerMoves: commanded.map(blockKind) },
           "q page move skipped: the answer already moves the pane",
         );
         return blocks;
