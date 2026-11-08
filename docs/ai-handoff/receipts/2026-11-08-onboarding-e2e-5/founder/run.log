@@ -1,0 +1,31 @@
+(node:2849) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+account e2e-fou-202611080110-629q@fictional.capitalq.local
+PASS J1 one introduction on opening — 1 "I'm Q" lines
+PASS J1 one dense line answers several topics — F1.country, F1.city, F1.stage, F1.categories, F4.founder_role, F4.full_time
+NOTE J1 Q's next question (judge: conversational, not a label) — Thanks, Ada — I have Tamarind Ledger as a seed-stage fintech in Lagos, Nigeria, with two full-time founders, nine people, and you as CEO. What’s the company website?
+PASS J2 a ramble is said back for a yes — The company: Tamarind Ledger helps small shops and market traders track customer debts digitally. The problem: Many small businesses still rely on notebooks to manage money owed to them. The solution:
+PASS J2 nothing saved before the yes
+PASS J2 saved after the yes
+NOTE J2 Q after a clear typed answer — That adds useful detail to the problem, particularly the collection gap and the lack of easy transfer payments. What’s Tamarind Ledger’s website?
+NOTE J2 F9.problem before → after — Many small businesses still rely on notebooks to manage money owed to them. → The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebook
+PASS J2 a clear typed answer is saved in their words, not read back — The problem we solve: small traders lose about a fifth of what they are owed because credit is tracked in paper notebook
+NOTE J3 Q's reply to an optional skip and a required refusal — That’s fine—you can provide the website later or say “I don’t know”; Capital Q needs it for your profile, matching and verification. What year was Tamarind Ledger founded?
+NOTE J3 stored for F1.website — null
+PASS J3 a required refusal is re-asked with the reason — expected a reason (P0-2)
+PASS J4 chat → voice: no re-greeting — Picking up where we left off. What year was the company founded?
+PASS J4 Q answers by voice
+PASS J4 the voice turn greets nobody again — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger has about forty paying shops and recurring revenue. From what you said earlier,
+PASS J4 voice turns kept in the thread
+PASS J4 no greeting after the first answer
+PASS J5 continue later leaves to the app — /home
+NOTE J5 Q on return — Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger has about forty paying shops and recurring revenue. From what you said earlier,
+PASS J5 no new introduction on return
+PASS J5 the same open question is picked up — before: From what you said earlier, I have two full-time founders and nine people; is that right? And are you raising right now? | after: Great, I've saved Paying customers (early signal), revenue kept in your notes and 40 (paying customers). Tamarind Ledger has about forty paying shops and recurr
+PASS J5 form continue later matches the conversation's destination (P2-1) — /home
+PASS J5 the form reopens on the same step — Your company / Your company
+NOTE J6 questions answered from the fact table — [{"q":"And are you raising right now?","answer":"Yes, actively raising."},{"q":"What year was Tamarind Ledger founded?","answer":"2021."},{"q":"What currency are you raising in, how much are you looking to raise, and are you using equity, a SAFE, or a convertible ","answer":"US dollars."},{"q":"How much are you looking to raise, and will it be a priced equity round, a SAFE, a convertible note, or are you not sure","answer":"One and a half million dollars."},{"q":"What instrument are you using: a priced equity round, a SAFE, a convertible note, or are you not sure yet?","answer":"A SAFE."},{"q":"When are you hoping to close the round: within three months, three to six months, six to twelve months, or are you not s","answer":"Within six months."},{"q":"What will you mainly use the funding for: product and engineering, key hires, sales and go-to-market, operations, or ent","answer":"Yes, that's right. That's all for now."},{"q":"From what you said: What year was the company founded: 2,021 Shall I keep that?","answer":"Yes, that's right."},{"q":"From what you said: What year was the company founded: 2,021 Shall I keep that?","answer":"Yes, that's right."},{"q":"From what you said: How would you put the company in one line, for investors: Tamarind Ledger helps small shops and mark","answer":"Yes, that's right."},{"q":"5 million Shall I keep that?","answer":"Yes, that's right."},{"q":"5 million Instrument: SAFE Close timing: 3–6 months Use of funds: Product and engineering, Key hires, Sales and go-to-ma","answer":"Yes, that's right."},{"q":"Thank you, finishing your setup now. That's everything I need. Your company profile is saved, and investors who fit will","answer":"Yes, that's right. That's all for now."}]
+PASS J6 finish lands on verification — /verification
+PASS J7 the edit waits for approval
+PASS J7 the change shows on the page
+ALL PASS; screenshots and results in /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/e2e5/fdr

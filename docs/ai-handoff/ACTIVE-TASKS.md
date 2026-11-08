@@ -17,12 +17,12 @@ Evidence: owner replay on batch 9 (receipts/2026-11-08-owner-replay-batch9).
 - **Root cause of every remaining navigation miss:** luna proposes the RIGHT place (deck, team, elevator), but the resolver's `open_page` call is DENIED TOOL_NOT_ELIGIBLE in workspace mode (q-tools registry `relevant()` applies the one-authority offer filter to execution too). So every record-bearing move is UNRESOLVED and STAYs.
 - The model is not the problem. The Claude-vs-luna owner question can wait.
 
-| Lane                                       | State                                                                                                             |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| W4 session_01Wncmn4BQnwUu8PoUpcMjfu        | batch 10: open_page executable for code in workspace mode, model offer still narrowed (failing-first, real registry) |
-| W3 session_01Wncmn6yZzXx1xtFxaXwp9b        | idle (4d5947ae shipped)                                                                                           |
-| W5 session_01Wncmn7LanmxRBs1Eoe8por        | idle (8d7ef152 shipped)                                                                                           |
-| Integration                                | onboarding e2e run 5 (investor + founder) running on batch 9                                                      |
+| Lane                                | State                                                                                                                |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| W4 session_01Wncmn4BQnwUu8PoUpcMjfu | batch 10: open_page executable for code in workspace mode, model offer still narrowed (failing-first, real registry) |
+| W3 session_01Wncmn6yZzXx1xtFxaXwp9b | idle (4d5947ae shipped)                                                                                              |
+| W5 session_01Wncmn7LanmxRBs1Eoe8por | batch 10: single-list none not recorded (loop), cheque read-back once                                                |
+| Integration                         | e2e run 5: founder ALL PASS; investor loops on single-list "None" (W5 batch 10)                                      |
 
 Anthropic test spend: about $42.5 of $50. Serper credit is spent (402); Brave and Tavily work.
 
