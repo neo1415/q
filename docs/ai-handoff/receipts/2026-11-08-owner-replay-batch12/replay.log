@@ -1,0 +1,22 @@
+-- at /discover
+#2 "i want to see harbourline cargo's pitch deck" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=deck&open=1 moveMs=19700 totalMs=32179
+    Q: m cheque of USD 250,000. Proceeds are allocated to truck finance partnerships, the tracking platform, expansion to Onne and Tin Can, and the team; runway and committed investors are not stated. Founders: Babatunde Oyelaran is Founder and CEO, with prior experience as a clearing agent at Apapa and operations lead for a freight forwarder. Chiamaka Eze is COO and Ifeanyi Okoro is Head of Engineering, but their relevant 
+#3 "okay take me to harbourline cargos profile" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=deck&open=1 moveMs=-1 totalMs=14540
+    Q:  Q: Opened Harbourline Cargo. Ask Q Q
+#4 "i'm curious about their team" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=team moveMs=17093 totalMs=29313
+    Q: he previously worked as a clearing agent at Apapa and ran freight-forwarding operations. Chiamaka Eze is COO, with ten years in haulage operations and fleet management, and Ifeanyi Okoro is Head of Engineering, having built dispatch software for a ride-hailing start-up. The company states it has 42 full-time employees. The relevant operating backgrounds are a clear fit for a port-to-warehouse trucking business. What 
+#5 "can i see it?" → /company/ceb6ec2d-4a4a-41a2-9b71-377d72c26407?tab=team moveMs=-1 totalMs=22191
+    Q:  Q: Want me to open the team document for the page-cited detail? Sources Companies · 2 Ask Q Q
+#6 "tell me about clinicrest" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=overview moveMs=13040 totalMs=25270
+    Q: ts; Clinicrest attributes the difference to free trials, but has not shown the split. Management accounts report monthly revenue of around USD 95,000. It is raising USD 1.8 million in priced seed equity to open depots in Abeokuta and Osogbo and extend credit terms to clinics. The main diligence gaps are the paying-versus-trial customer split, gross margin by product category, working-capital needs, regulatory licensi
+#7 "can i see their elevator" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=elevator moveMs=2337 totalMs=14571
+    Q:  Q: Opening the elevator tab. Ask Q Q
+#8 "send those questions to them" → /company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe?tab=elevator moveMs=-1 totalMs=21720
+    Q:  Q: Three questions for Clinicrest are prepared for your approval: Revenue growth today and its source; Financial history today and its source; Financial plan today and its source. Sources Q prepared this for your approval Send 3 questions to Dr. Folake Adebayo-Hart To Dr. Folake Adebayo-Hart Question 1 What is Revenue growth today, and where does the figure come from? Question 2 What is Financial history today, and 
+#9 "who has viewed my profile?" → /analytics moveMs=8726 totalMs=20947
+    Q: is separate from investment interest or a connection request; your recorded intent signals include accepted connections with Clinicrest, Harbourline Cargo, Brightkloof Energy, Nsuo Labs, Tarmacly, Tallyloom and Maji Loop, plus pending requests from Kivu Traceworks and Sahel Pumps. Sources Companies · 2 Q: I've opened Analytics. Q prepared this for your approval Send 3 questions to Dr. Folake Adebayo-Hart To Dr. Folak
+#10 "what can you find about me online?" → /analytics moveMs=-1 totalMs=23244
+    Q: Savanna Seed Partners, actively investing at seed stage in African fintech, B2B software and logistics, usually writing USD 250,000–1,000,000 cheques and often leading or co-investing. Your public presence and whether your firm has a public website or investment announcements remain unestablished. Sources · 2 sources Company · 1 Q prepared this for your approval Send 3 questions to Dr. Folake Adebayo-Hart To Dr. Fola
+#11 "where is my firm located?" → /analytics moveMs=-1 totalMs=18374
+    Q:  Q: Savanna Seed Partners is located in Lagos, Nigeria. That’s the location you previously gave for your firm. Sources Company · 1 Q prepared this for your approval Send 3 questions to Dr. Folake Adebayo-Hart To Dr. Folake Adebayo-Hart Question 1 What is Revenue growth today, and where does the figure come from? Question 2 What is Financial history today, and where does the figure come from? Question 3 What is Financ
+errors []
