@@ -1833,3 +1833,93 @@ describe("batch-8 replay: late decisions still move the pane; the decision outra
     expect(await moves.settle(r, [own] as never)).toEqual([own]);
   });
 });
+
+describe("batch-10 replay: an offer or a document open is not a move; sections never split a place", () => {
+  const request = (runId: string) =>
+    ({
+      runId,
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "DISCOVER",
+          workspace: { qPane: "open", pagePane: "open", at: "/discover" },
+        },
+      },
+    }) as unknown as QAnswerRequest;
+  const deckOf = proposal({
+    place: place({ record: company("Silo Credit"), tab: "deck" }),
+  });
+  const records = () =>
+    Promise.resolve({
+      companies: [{ id: SILO, name: "Silo Credit" }],
+      investors: [],
+      things: [],
+      deleted: [],
+    });
+  const turn = {
+    utterance: "i want to see silo credit's pitch deck",
+    recentTurns: [],
+    pageText: null,
+  };
+  const DECK_MOVE = {
+    kind: "UI_INTENT",
+    intent: {
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY",
+      id: SILO,
+      tab: "deck",
+    },
+  };
+
+  it("a code answer's NAVIGATION_OFFER or document-viewer open yields to a decided record tab", async () => {
+    const offer = {
+      kind: "NAVIGATION_OFFER",
+      intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: SILO },
+      place: "Company profile",
+      openLabel: "Open Company profile",
+    };
+    const documentOpen = {
+      kind: "UI_INTENT",
+      intent: {
+        kind: "OPEN_RECORD_PAGE",
+        page: "DATA_ROOM_DOCUMENT",
+        id: CAP,
+        companyId: SILO,
+      },
+    };
+    for (const [n, answer] of [offer, documentOpen].entries()) {
+      const moves = createQPageMoves({
+        decider: { decide: () => Promise.resolve(deckOf) },
+        config: { movesAllowed: true },
+        records,
+      });
+      const r = request(`deck-${String(n)}`);
+      moves.start(r, turn);
+      expect(
+        await moves.settle(r, [answer] as never, { keepAnswerMoves: true }),
+      ).toEqual([DECK_MOVE]);
+    }
+  });
+
+  it("three samples on one page that differ only in section are one place: MOVE, with the majority's section or none", () => {
+    const at = (sectionId?: string) => ({
+      decision: "MOVE" as const,
+      target: {
+        page: "ANALYTICS",
+        ...(sectionId === undefined
+          ? {}
+          : { sectionId, position: "section" as const }),
+      } as QNavigateTarget,
+      openPane: false,
+      remembered: null,
+      guard: null,
+    });
+    expect(voteNavigation([at("viewers"), at(), at("viewers")])).toEqual(
+      at("viewers"),
+    );
+    expect(voteNavigation([at("viewers"), at("trend"), at()])).toEqual(at());
+  });
+});
