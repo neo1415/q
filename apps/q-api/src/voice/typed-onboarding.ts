@@ -45,7 +45,7 @@ import {
   type RecommendationStore,
 } from "./onboarding-port.js";
 import { writeSession } from "./session-writes.js";
-import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
 
 /**
  * Typed onboarding as the voice line's conversation (owner 2026-10-28,
@@ -129,6 +129,74 @@ export function createTypedOnboarding(dependencies: {
    * word for word). Bounded like the others.
    */
   const finishRepeats = new Map<string, Map<string, number>>();
+  /**
+   * How many times Q's own replies asked each needed step that is still
+   * open, by session, whatever the wording (e2e run 8: the founder's
+   * finances asked seven times, reworded each time). Bounded.
+   */
+  const replyAsks = new Map<string, Map<string, number>>();
+  const parkRepeated = (input: {
+    readonly sessionId: string;
+    readonly journey: "founder" | "investor";
+    readonly state: OnboardingState;
+    readonly text: string;
+    readonly asking: string | null;
+    readonly labelOf: (stepKey: string) => string | undefined;
+  }): { readonly text: string; readonly asking: string | null } => {
+    const asks = replyAsks.get(input.sessionId) ?? new Map<string, number>();
+    replyAsks.delete(input.sessionId);
+    replyAsks.set(input.sessionId, asks);
+    if (replyAsks.size > 2_000) {
+      const oldest = replyAsks.keys().next().value;
+      if (oldest !== undefined) replyAsks.delete(oldest);
+    }
+    const asked = input.asking;
+    const step =
+      asked === null
+        ? undefined
+        : input.state.steps.find((one) => one.stepKey === asked);
+    if (asked === null || step === undefined || !neededOpen(step)) {
+      return { text: input.text, asking: input.asking };
+    }
+    const times = asks.get(asked) ?? 0;
+    asks.set(asked, times + 1);
+    if (times < 2) return { text: input.text, asking: input.asking };
+    // The next needed one, never one left for now.
+    const next =
+      [
+        ...(input.state.next ?? []).map((item) => item.stepKey),
+        ...input.state.steps.map((one) => one.stepKey),
+      ]
+        .map((key) => input.state.steps.find((one) => one.stepKey === key))
+        .find(
+          (one) =>
+            one !== undefined &&
+            one.stepKey !== asked &&
+            neededOpen(one) &&
+            (asks.get(one.stepKey) ?? 0) < 3,
+        ) ?? null;
+    const nextQuestion =
+      next === null
+        ? ""
+        : ` ${(SPOKEN_QUESTIONS[next.stepKey] ?? next.question).trim()}`;
+    const before = withoutLastQuestion(input.text);
+    if (times > 2) {
+      // Left already: asked again anyway, the next one is asked instead.
+      return {
+        text: `${before}${nextQuestion}`.trim(),
+        asking: next?.stepKey ?? null,
+      };
+    }
+    const label = (input.labelOf(asked) ?? plainStepLabel(asked)).toLowerCase();
+    const why =
+      input.journey === "investor"
+        ? "it helps me match you well"
+        : "investors look for it on your profile";
+    return {
+      text: `${before} No problem: ${label} matters because ${why}, but let's leave it for now; you can add it here or on your profile any time.${nextQuestion}`.trim(),
+      asking: next?.stepKey ?? null,
+    };
+  };
   /**
    * Turns taken, per session: a follow-up to a reply is written only while
    * that reply is still Q's last line (nothing said since).
@@ -463,6 +531,29 @@ export function createTypedOnboarding(dependencies: {
         authority?.stated.has(readBackReview) === true;
       const stillFinishing = finishAsked.has(input.onboardingSessionId);
 
+      // e2e run 8: the investor's last answer was taken, Q wrote "That's
+      // all set …" and asked nothing, and nothing finished. A reply that
+      // asks nothing, once what they said is in, goes on to the finish when
+      // nothing needed is open: the read-back for their yes, or done.
+      const asksNothing =
+        written !== null &&
+        written.readBack !== true &&
+        written.asking === null &&
+        !/[?؟]/u.test(written.reply) &&
+        authority?.pausing !== true;
+      let allAnswered = false;
+      if (asksNothing && authority?.finishing !== true && !stillFinishing) {
+        await (conversation.answered === undefined
+          ? reading
+          : conversation.answered(line, "LATEST"));
+        allAnswered = !(await portOf(false).state()).steps.some(neededOpen);
+      }
+      const finishingNow =
+        authority?.finishing === true ||
+        agreedToReadBack ||
+        stillFinishing ||
+        allAnswered;
+
       let text: string;
       let asking: string | null = null;
       let navigate: InterviewTurnOutcome["navigate"] = null;
@@ -480,11 +571,7 @@ export function createTypedOnboarding(dependencies: {
         navigate = destination(false);
         pausing = true;
         path = "PAUSING";
-      } else if (
-        authority?.finishing === true ||
-        agreedToReadBack ||
-        stillFinishing
-      ) {
+      } else if (finishingNow) {
         // Said at once (live check 2026-10-31: "skip the rest" and the
         // final yes left the person looking at nothing for 12-23 s): the
         // stage, and on a streamed turn Q's first line, go out the moment
@@ -638,10 +725,15 @@ export function createTypedOnboarding(dependencies: {
         // The streamed first line stays part of the whole reply.
         // "Let me check what I have." leads a check, never a close that
         // leaves a step for now (e2e run 7).
+        // Reached because everything is answered: Q's own line leads it.
+        const lead =
+          allAnswered && written !== null ? written.reply.trim() : null;
         text =
-          firstLine === null || said?.leaving !== undefined
-            ? rest
-            : `${firstLine} ${rest}`;
+          lead !== null && lead.length > 0
+            ? `${lead} ${rest}`
+            : firstLine === null || said?.leaving !== undefined
+              ? rest
+              : `${firstLine} ${rest}`;
         asking = said?.asking ?? null;
         if (finished.completed) navigate = destination(true);
         path = finished.completed ? "FINISHED" : "FINISHING";
@@ -668,6 +760,19 @@ export function createTypedOnboarding(dependencies: {
           utterance,
         ).trim();
         asking = written.asking;
+        // DECISIONS 77, whoever words the question: a needed step asked
+        // twice with no answer it could take is, the third time, given its
+        // reason once and left for now; Q moves to the next one.
+        const parked = parkRepeated({
+          sessionId: input.onboardingSessionId,
+          journey: input.journeyType,
+          state,
+          text,
+          asking,
+          labelOf,
+        });
+        text = parked.text;
+        asking = parked.asking;
         path = "REPLY";
       } else {
         const next = state.next?.[0]?.stepKey ?? null;
@@ -686,8 +791,7 @@ export function createTypedOnboarding(dependencies: {
         navigate,
         pausing,
         path,
-        finishing:
-          authority?.finishing === true || agreedToReadBack || stillFinishing,
+        finishing: finishingNow,
         readBack: showedReadBack,
       });
       // The step the reply asked, as written: when the reading landed
@@ -933,6 +1037,31 @@ export function restatedHeld(
       return value.length >= 3 && words.includes(value);
     })
     .map((item) => item.stepKey);
+}
+
+/** A needed step still open for an answer in conversation. */
+function neededOpen(step: OnboardingState["steps"][number]): boolean {
+  return (
+    step.required &&
+    step.status === "OPEN" &&
+    step.savePending !== true &&
+    step.kind !== "DOCUMENT" &&
+    step.kind !== "YES_NO" &&
+    step.kind !== "CHOICE_OF_RECORD" &&
+    step.coverage !== "INAPPLICABLE"
+  );
+}
+
+/** The text without its last question sentence (what it asked). */
+export function withoutLastQuestion(text: string): string {
+  const sentences = text.match(/[^.?!؟]+[.?!؟]*/gu) ?? [text];
+  const last = sentences.findLastIndex((sentence) => /[?؟]/u.test(sentence));
+  if (last < 0) return text.trim();
+  return sentences
+    .filter((_, index) => index !== last)
+    .join("")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
 }
 
 /** A reply that is a plain yes and nothing else. */
