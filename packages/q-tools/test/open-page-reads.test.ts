@@ -181,3 +181,62 @@ describe("batch-9 replay: the Q Workspace hides open_page from the model, never 
     });
   });
 });
+
+describe("batch-11 replay: in the Q Workspace a company's deck opens on its Deck tab, not in the viewer", () => {
+  const DECK_DOCUMENT = "d0000000-0000-4000-8000-0000000000aa";
+  const withDeck = () => {
+    const { ports } = counted();
+    return {
+      ...ports,
+      profileMaterial: {
+        deck: () =>
+          Promise.resolve({
+            deck: { documentId: DECK_DOCUMENT, title: "Seed deck" },
+          }),
+      },
+    } as unknown as typeof ports;
+  };
+  const ask = {
+    id: "call-deck",
+    name: "open_page",
+    arguments: { page: "COMPANY_DECK", name: "Beacon Analytics" },
+  } as never;
+  const clientAction = (outcome: unknown) =>
+    QClientActionToolResultSchema.parse(
+      (outcome as { result: { data?: unknown } }).result.data,
+    ).clientAction;
+
+  it("outside the workspace: the deck opens in the material viewer where they are (as before)", async () => {
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(withDeck())]),
+    });
+    expect(
+      clientAction(await executor.execute(ask, contextFor(actorA, ownPlan()))),
+    ).toMatchObject({ page: "DATA_ROOM_DOCUMENT", id: DECK_DOCUMENT });
+  });
+
+  it("in the workspace: the page pane beside them is where they are, so the deck opens on the company's Deck tab", async () => {
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(withDeck())]),
+    });
+    const plan: PermittedContextPlan = {
+      ...ownPlan(),
+      screen: {
+        route: "DISCOVER",
+        workspace: { qPane: "open", pagePane: "open", at: "/discover" },
+      },
+    };
+    expect(
+      clientAction(
+        await executor.execute(ask, {
+          ...contextFor(actorA, plan),
+          invokedBy: "CODE",
+        }),
+      ),
+    ).toMatchObject({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY_DECK",
+      id: COMPANY_B_NETWORK,
+    });
+  });
+});
