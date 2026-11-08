@@ -265,7 +265,12 @@ export function createQToolRegistry(
     // capability lists has no area to judge it by, so it is kept.
     const readsOnly = focus?.readsOnly === true;
     // The Q Workspace: the page pane moves only on Q's page-move decision.
-    const workspace = context.plan.screen?.workspace !== undefined;
+    // So the model is neither offered nor allowed a tool that moves it; code
+    // calling one itself (the decision resolving a record it named) is not
+    // the model, and goes through the tool's own authorize step.
+    const workspace =
+      context.plan.screen?.workspace !== undefined &&
+      context.invokedBy !== "CODE";
     const relevant = (record: QToolRecord): boolean => {
       const name = record.definition.providerName;
       if (workspace && record.definition.movesPagePane === true) return false;

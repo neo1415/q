@@ -130,3 +130,54 @@ describe("open_page by name reads the reachable records once (batch 8 speed)", (
     expect(together()).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("batch-9 replay: the Q Workspace hides open_page from the model, never from code's own lookups", () => {
+  const withWorkspace = (plan: PermittedContextPlan): PermittedContextPlan => ({
+    ...plan,
+    screen: {
+      route: "HOME",
+      workspace: { qPane: "open", pagePane: "open", at: "/home" },
+    },
+  });
+  const ask = {
+    id: "call-ws",
+    name: "open_page",
+    arguments: { page: "COMPANY", name: "Beacon Analytics" },
+  } as never;
+
+  it("not offered to the model, and a model's proposal for it is refused", async () => {
+    const { ports } = counted();
+    const registry = createQToolRegistry([createOpenPageTool(ports)]);
+    const executor = createQToolExecutor({ registry });
+    const context = contextFor(actorA, withWorkspace(ownPlan()));
+    expect(
+      (await executor.offer(context)).map((tool) => tool.definition.name),
+    ).not.toContain("open_page");
+    const outcome = await executor.execute(ask, context);
+    expect(outcome).toMatchObject({
+      status: "DENIED",
+      failureCode: "TOOL_NOT_ELIGIBLE",
+    });
+  });
+
+  it("code's own call (the page-move decision's record lookup) executes through open_page's authorize step", async () => {
+    const { ports } = counted();
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(ports)]),
+    });
+    const outcome = await executor.execute(ask, {
+      ...contextFor(actorA, withWorkspace(ownPlan())),
+      invokedBy: "CODE",
+    });
+    const result = (outcome as { result: { ok: boolean; data?: unknown } })
+      .result;
+    expect(result).toMatchObject({ ok: true });
+    expect(
+      QClientActionToolResultSchema.parse(result.data).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY",
+      id: COMPANY_B_NETWORK,
+    });
+  });
+});

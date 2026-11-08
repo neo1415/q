@@ -7,7 +7,16 @@ import {
   createOpenRecordNavigationResolver,
   recordPageForRoute,
 } from "../src/page-moves.js";
-import type { QOpenRecordPort } from "../src/references.js";
+import {
+  createOpenPageTool,
+  createQToolExecutor,
+  createQToolRegistry,
+} from "@capital-q/q-tools";
+
+import {
+  createToolOpenRecordPort,
+  type QOpenRecordPort,
+} from "../src/references.js";
 
 /**
  * Q Workspace W4.3 in the answer path: names the decision gives are found
@@ -119,5 +128,90 @@ describe("the names the prompt lists", () => {
     ).toEqual(["Silo Credit", "Kora Farms"]);
     expect((await records(founderRequest)).investors).toHaveLength(2);
     expect((await records(founderRequest)).companies).toEqual([]);
+  });
+});
+
+describe("batch-9 replay: in the Q Workspace a record the decision names resolves through the real registry", () => {
+  it("'Harbourline Cargo' on its team tab resolves to the record (open_page hidden from the model, not from code)", async () => {
+    const actor = {
+      userId: "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+      tenantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      actorType: "HUMAN",
+    };
+    const HARBOURLINE = "33333333-3333-4333-8333-333333333333";
+    const ports = {
+      clientActions: true,
+      // The network search finds nothing more: the name is their own
+      // relationship's.
+      companies: {
+        searchCompanies: () => Promise.resolve({ items: [], nextCursor: null }),
+        // Another tenant's company, reachable through their relationship.
+        findCanonicalCompanyProfile: () =>
+          Promise.resolve({
+            tenantId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            canonicalName: "Harbourline Cargo",
+          }),
+      },
+      relationships: {
+        ownRelationships: () =>
+          Promise.resolve({
+            side: "INVESTOR",
+            items: [
+              {
+                relationshipId: "r1",
+                counterpart: {
+                  kind: "COMPANY",
+                  id: HARBOURLINE,
+                  name: "Harbourline Cargo",
+                },
+              },
+            ],
+          }),
+      },
+      investorFeed: {
+        decisions: () => Promise.resolve([]),
+        page: () => Promise.resolve({ items: [], notes: [] }),
+      },
+    } as unknown as Parameters<typeof createOpenPageTool>[0];
+    const tools = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(ports)]),
+    });
+    const request = {
+      runId: "44444444-4444-4444-8444-444444444444",
+      tenantId: actor.tenantId,
+      actorUserId: actor.userId,
+      correlationId: "cor_ws",
+      capability: "ANSWER",
+      actor,
+      plan: {
+        runId: "44444444-4444-4444-8444-444444444444",
+        tenantId: actor.tenantId,
+        actor: { userId: actor.userId, tenantId: actor.tenantId },
+        purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+        maxSensitivity: "HIGHLY_CONFIDENTIAL",
+        scopes: [
+          {
+            kind: "OWN_Q_CONVERSATION",
+            filter: { tenantId: actor.tenantId, userId: actor.userId },
+          },
+        ],
+        screen: {
+          route: "COMPANY",
+          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+        },
+      },
+    } as unknown as QAnswerRequest;
+    const resolve = createOpenRecordNavigationResolver(
+      createToolOpenRecordPort({ tools }),
+    )(request);
+    expect(
+      await resolve({
+        kind: "COMPANY",
+        name: "Harbourline Cargo",
+        document: null,
+        route: "/company/[companyId]",
+        tab: "team",
+      }),
+    ).toEqual({ status: "FOUND", recordId: HARBOURLINE, documentId: null });
   });
 });

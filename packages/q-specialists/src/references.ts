@@ -398,6 +398,9 @@ export function createToolOpenRecordPort(dependencies: {
         capability: request.capability,
         plan,
         focus: { areas: [], tools: ["open_page"] },
+        // Code's own lookup (not the model's): in the Q Workspace, open_page
+        // is hidden from the model but still resolves what code asks for.
+        invokedBy: "CODE",
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       },
     );
