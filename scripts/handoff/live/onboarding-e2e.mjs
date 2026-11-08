@@ -713,7 +713,9 @@ if (STEPS.has("J6")) {
           [/currency/i, "US dollars."],
           [/lead|co-?invest|follow/i, "We lead and co-invest."],
           [
-            /how firm|must match|strong preference|nice to have/i,
+            // Run 6: "Are those musts, or more of a preference?" went to the
+            // default 13 times.
+            /how firm|must match|strong preference|nice to have|\bmusts?\b|must-haves?|more of a preference|firmness/i,
             "A strong preference.",
           ],
           [/where do you invest|geograph|region/i, "West Africa."],
