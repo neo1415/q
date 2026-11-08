@@ -275,6 +275,15 @@ export const QInputRequiredEventSchema = event("q.input.required", {
 export const QRunCompletedEventSchema = event("q.run.completed", {
   status: z.literal("COMPLETED"),
   completedAt: UtcTimestampSchema,
+  /**
+   * Batch 14 (W1, instant writes): a tool in this run committed a change
+   * to Capital Q's data (a Save, a Pass, a note, a proposal prepared, an
+   * approved action executed), so a page showing that data reads it again.
+   * Set by the server from the tool executor's classification; absent when
+   * the run only read. Additive: an older client reading `.strict()` sees
+   * an unreadable terminal frame, ends the stream and re-reads the run.
+   */
+  dataChanged: z.literal(true).optional(),
 });
 
 /**

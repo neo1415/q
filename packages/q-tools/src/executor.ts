@@ -21,6 +21,7 @@ import {
   type QToolRegistry,
   Q_TURN_TOOLS_MAX,
 } from "./registry.js";
+import type { QRunWriteLedger } from "./run-writes.js";
 
 /**
  * The tool execution pipeline (doc 12 §29; doc 15 §50-52):
@@ -42,6 +43,8 @@ export type QToolExecutorDependencies = {
   readonly registry: QToolRegistry;
   readonly logger?: Logger | undefined;
   readonly clock?: (() => number) | undefined;
+  /** Batch 14: notes the runs whose tools committed a write. */
+  readonly writes?: QRunWriteLedger | undefined;
 };
 
 function failed(
@@ -190,6 +193,7 @@ export function createQToolExecutor(
       failure_code: outcome.failureCode ?? "none",
     };
     metrics.calls.add(1, labels);
+    dependencies.writes?.note(context.runId, outcome);
     metrics.latencyMs.record(outcome.latencyMs, labels);
     logger?.info(
       {

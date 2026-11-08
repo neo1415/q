@@ -3,6 +3,7 @@ import type { QToolPort } from "@capital-q/q-runtime";
 
 import type { AnyQToolDefinition } from "./definition.js";
 import { createQToolExecutor } from "./executor.js";
+import { createRunWriteLedger, type QRunWriteLedger } from "./run-writes.js";
 import type { QToolPorts } from "./ports.js";
 import { createQToolRegistry, type QToolRegistry } from "./registry.js";
 import { createGetCapitalObjectiveTool } from "./tools/get-capital-objective.js";
@@ -354,6 +355,11 @@ export type QToolsComposition = {
    * one source.
    */
   readonly attention: AttentionReader;
+  /**
+   * Batch 14: the runs whose tools committed a write, for the run's
+   * completed event (`dataChanged`).
+   */
+  readonly writes: QRunWriteLedger;
 };
 
 /** Registry plus executor over the default catalogue; what apps compose. */
@@ -365,9 +371,11 @@ export function createQTools(options: {
   const registry = createQToolRegistry(
     options.definitions ?? createDefaultQTools(options.ports),
   );
+  const writes = createRunWriteLedger();
   return {
     registry,
-    port: createQToolExecutor({ registry, logger: options.logger }),
+    port: createQToolExecutor({ registry, logger: options.logger, writes }),
     attention: createAttentionReader(options.ports),
+    writes,
   };
 }

@@ -5536,6 +5536,8 @@ const orchestrator = withLearning(
     actions: qActionPort,
     pausePolicy: neverPause,
     logger,
+    // Batch 14 (W1): the completed event says when a tool wrote.
+    dataChanged: (runId) => qTools.writes.take(runId),
   }),
   memoryLearner,
 );

@@ -125,6 +125,11 @@ export type QOrchestrationRuntime = {
        * request.
        */
       readonly answered?: boolean | undefined;
+      /**
+       * Batch 14: a tool in this run committed a change to Capital Q's
+       * data; the completed event says so (`dataChanged`).
+       */
+      readonly dataChanged?: boolean | undefined;
     },
   ) => Promise<QLifecycleOutcome>;
   readonly fail: (
@@ -434,6 +439,7 @@ export function createQOrchestrationRuntime(
           data: {
             status: "COMPLETED",
             completedAt: run.completedAt ?? new Date().toISOString(),
+            ...(metadata.dataChanged === true ? { dataChanged: true } : {}),
           },
         }),
       }),

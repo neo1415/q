@@ -74,6 +74,12 @@ export type LangGraphQOrchestratorOptions = {
   readonly actions?: QActionPort | undefined;
   readonly pausePolicy: QPausePolicy;
   readonly logger?: Logger | undefined;
+  /**
+   * Batch 14 (W1, instant writes): whether a tool in the run committed a
+   * write (q-tools `QRunWriteLedger.take`), so the completed event carries
+   * `dataChanged`. Absent: never said.
+   */
+  readonly dataChanged?: ((runId: string) => boolean) | undefined;
 };
 
 const tracer = getTracer("q-orchestrator", Q_ORCHESTRATION_VERSION);
@@ -284,6 +290,7 @@ export function createLangGraphQOrchestrator(
                 modelPolicyVersion: state.modelPolicyVersion ?? undefined,
                 promptBundleVersion: state.promptBundleVersion ?? undefined,
                 answered: true,
+                dataChanged: options.dataChanged?.(ref.runId) === true,
               });
               outcome = "completed";
             } else if (state.answer === "FAILED") {
@@ -366,9 +373,13 @@ export function createLangGraphQOrchestrator(
     switch (state.action) {
       case "EXECUTED":
       case "ALREADY_EXECUTED":
+        // An approved action that executed changed their data, whichever
+        // run it was first executed by.
+        options.dataChanged?.(ref.runId);
         await runtime.complete(ref, {
           modelPolicyVersion: state.modelPolicyVersion ?? undefined,
           promptBundleVersion: state.promptBundleVersion ?? undefined,
+          dataChanged: true,
         });
         return "action_executed";
       case "IN_PROGRESS":
@@ -387,6 +398,7 @@ export function createLangGraphQOrchestrator(
         await runtime.complete(ref, {
           modelPolicyVersion: state.modelPolicyVersion ?? undefined,
           promptBundleVersion: state.promptBundleVersion ?? undefined,
+          dataChanged: options.dataChanged?.(ref.runId) === true,
         });
         return "action_not_approved";
       case "BLOCKED":
