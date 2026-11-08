@@ -2154,3 +2154,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Deployed; rollback c3e563daa.
 - Owner replay: team, Clinicrest, their elevator and profile moves now work. Deck offer and split vote go to W4 (batch 11).
 - Onboarding e2e run 6: founder ALL PASS; investor none loop fixed. Read-back sharing a line and the verbatim strength re-ask go to W5 (batch 11).
+
+## 2026-11-08 05:35 UTC — batch 11 live (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- `4a89f2277` = W4 6af22ba4c (an offer or viewer open yields to the decided place; vote by place) + W5 597d32938 (read-back labels, no verbatim re-ask, plain yes to a read-back) + runner d4a906843. CI 1887 green; deployed; rollback 47df02df9.
+- Replay: 8 of 9 places right; the deck is still blocked (W4).
+- Onboarding e2e run 7: founder ALL PASS. Investor stuck on own-words explicit nones (W5).
+- Decision: a step left for now is not recorded as "not known" for the person.

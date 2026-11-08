@@ -1,5 +1,21 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 8 November 2026, 05:35 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+Production: **batch 11 `4a89f2277`** (rollback `47df02df9`); CI 1887 green; all four services SUCCESS; hosted migrations 291; workspace LABS on, moves allowed.
+
+- Owner replay (receipts/2026-11-08-owner-replay-batch11): 8 of 9 places are right, including who viewed → Analytics (fixed by the vote by place). Still a miss: the pitch deck. The fast route's OPEN_RECORD_PAGE still blocks the 3/3 Deck-tab decision, and the pane never moves (W4, batch 12).
+- Onboarding e2e run 7 (receipts/2026-11-08-onboarding-e2e-7): founder ALL PASS. Investor: "No, that's everything" and "None yet" aren't taken as None for other criteria and portfolio, so setup can't finish, and the "left for now" close repeats (W5, batch 12).
+- Owner-level decision taken by the integration owner: a required step that is left for now is NOT recorded as "not known" on the person's behalf (every profile field mandatory; never put words in their mouth).
+
+| Lane                                | State                                                        |
+| ----------------------------------- | ------------------------------------------------------------ |
+| W4 session_01Wncmn4BQnwUu8PoUpcMjfu | batch 12: the deck via the fast route's open                 |
+| W5 session_01Wncmn7LanmxRBs1Eoe8por | batch 12: explicit nones for own-words lists; one close only |
+| W1, W3, Analytics                   | idle                                                         |
+
+Anthropic test spend: about $42.5 of $50.
+
 ## Live board — 8 November 2026, 03:25 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 Production: **batch 10 `47df02df9`** (rollback `c3e563daa`); CI run 1885 green (run 1884 failed only on my unformatted receipt JSON); all four services SUCCESS; hosted migrations 291; workspace LABS on, moves allowed.
