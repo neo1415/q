@@ -85,7 +85,7 @@ describe("countryNamedIn (owner, live duplex voice 9 Nov)", () => {
 
   it.each([
     "send it to us",
-    "San Francisco",
+    "Springfield",
     "Atlanta, Georgia",
     "Nigeria and Ghana",
     "",
@@ -95,5 +95,40 @@ describe("countryNamedIn (owner, live duplex voice 9 Nov)", () => {
 
   it("returns the words that name it, as said", () => {
     expect(countryNamedIn("in the USA")?.words).toBe("the USA");
+  });
+});
+
+describe("countryNamedIn: a major investor city names its country (owner, 9 Nov)", () => {
+  it.each([
+    ["San Francisco", "US"],
+    ["San Francisco, California", "US"],
+    ["New York City", "US"],
+    ["Boston", "US"],
+    ["Lagos", "NG"],
+    ["Doha", "QA"],
+    ["We're in Doha right now", "QA"],
+    ["Dubai", "AE"],
+    ["Abu Dhabi", "AE"],
+    ["Riyadh", "SA"],
+    ["Nairobi", "KE"],
+    ["Cape Town", "ZA"],
+    ["London", "GB"],
+    ["Paris", "FR"],
+    ["Berlin", "DE"],
+    ["Singapore", "SG"],
+    ["Hong Kong", "HK"],
+    ["Toronto", "CA"],
+    ["São Paulo", "BR"],
+    ["Sao Paulo", "BR"],
+    ["Mumbai", "IN"],
+    ["Bangalore", "IN"],
+    ["Bengaluru", "IN"],
+    ["Lagos, Nigeria", "NG"],
+  ])("%s → %s", (words, iso) => {
+    expect(countryNamedIn(words)?.country.iso).toBe(iso);
+  });
+
+  it("a city and a different country together name none", () => {
+    expect(countryNamedIn("London and Lagos")).toBeNull();
   });
 });

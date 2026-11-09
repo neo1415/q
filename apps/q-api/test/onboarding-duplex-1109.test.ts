@@ -311,6 +311,9 @@ describe("7. a city they name is saved as its country, typed and spoken", () => 
     ["Nigeria", "Lagos", "NG", TYPED],
     ["United States", "San Francisco", "US", TYPED],
     ["United Kingdom", "London, England", "GB", DUPLEX],
+    // The reader gave the city itself: the hub table saves the country.
+    ["Doha", "Doha", "QA", DUPLEX],
+    ["Lagos", "We're in Lagos", "NG", TYPED],
   ] as const)('%s from "%s"', async (value, quote, iso, line) => {
     const { world, readings, conversation } = duplexWorld("I0.hq_country");
     readings.push({
