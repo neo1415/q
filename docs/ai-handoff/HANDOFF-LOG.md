@@ -2190,3 +2190,21 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - CI 1896 green; deployed (web and q-api built; api and workers unchanged).
 - e2e run 11: investor ALL PASS; founder ALL PASS after a runner rule-order fix (use of funds before finance; committed here).
 - Waiting for the owner's live test.
+
+## 2026-11-09 11:35 UTC — batches 17 and 18 live (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- **Batch 17 `3466339cb`** (CI 1898 green, including the Postgres firewall tests):
+  - W4 own-organisation subject: the owner's "edit my profile" refusal is fixed and verified live (an "Update your mandate" card, no raw refusal).
+  - W5 rehearsal: the review loop, the double room, and the false "Voice isn't available".
+- **Batch 18 `c92789167`** (CI 1900 green):
+  - W1: the Attach picker, pointer cursors, the Draft-a-reply body;
+  - D83: chat attachments share without a scan hold; production has no scanner (2163 versions, all NOT_SCANNED); BLOCKED and ERROR are still refused.
+  - Workers rebuilt once after a GitHub 5xx.
+- **On integration, next batch:**
+  - W4 705ac9061 (the card states before → after; no subject card on own edits) and b0fee090a (own-organisation actions need the person's own organisation; no change_my_raise for investors);
+  - CI split into 3 test shards (4c6b51d98);
+  - W1 light-mode polish in progress.
+- **Owner items:**
+  - The client in Doha sees the app's offline fallback: his network can't reach *.up.railway.app. Recommended a custom domain; CQ_WEB_ORIGIN is the only code setting.
+  - The "Bawo" greeting stays (the persona is Q's read of the person).
+  - "Priya" is the owner's founder test account's own name.
