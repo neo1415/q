@@ -129,9 +129,16 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
   test:
-    name: test
+    # Three shards in parallel: the unit suite was ~30 min on one runner and
+    # set the whole run's length (owner, 9 Nov: release cycles too slow).
+    # The quality gate still needs every shard green.
+    name: test (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout
@@ -176,7 +183,7 @@ jobs:
       - name: Test
         # Preserve every assertion; expose test and unhandled-error failures
         # through native check annotations when log downloads are unavailable.
-        run: pnpm test --reporter=default --reporter=github-actions
+        run: pnpm test --shard=${{ matrix.shard }}/3 --reporter=default --reporter=github-actions
   build:
     name: build
     runs-on: ubuntu-latest
