@@ -1,5 +1,15 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 9 November 2026, 15:20 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+See `HANDOFF-2026-11-09.md` §4 for the exact next actions per lane.
+
+- Production: batch 19 `25ebc4c60`.
+- Batch 20 `3250e2014` in CI: the PWA pane fix, plus voice country, cities, yes and cut-off fixes.
+- Batch 21 on integration: W5's D86 voice steering.
+- **W3 URGENT:** chat/voice document attachments (not tied to the turn; DOCX extracts 0 pages but is marked COMPLETED).
+- W1 and W4 are idle.
+
 ## Live board — 8 November 2026, 16:40 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7; owner away, D82)
 
 Production: **batch 16 `a9be2ffc6`** (web and q-api; api and workers unchanged on 74944dc22); rollback `74944dc22`; CI 1896 green.

@@ -2,6 +2,15 @@
 
 > **DEPLOYED 2026-11-04 09:49 UTC:** web on `d25c0843c` (CI green); q-api on `c53a08055`; api and workers on `b10cd6c87`. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing. Live-checked as a fictional investor: switch on a fresh page, no opening lists. **Newest audit: `Q_MULTIMODAL_DEMO_AUDIT_2026-11-04.md`, including a P0: text typed in the ~3.5 s before hydration is destroyed.**
 
+## DEPLOYED 25ebc4c60 — 9 November 2026, 13:08 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- All four Railway services are on `25ebc4c60` (batch 19); rollback `c92789167`.
+- Batch 20 `3250e2014` is in CI. Hosted migrations are in sync.
+- Workspace LABS is on (web and q-api `CQ_WORKSPACE_MODE=labs`, q-api `CQ_Q_NAV_MOVES_ALLOWED=1`; per-user opt-in).
+- Supabase Auth `mailer_autoconfirm=true` (D84).
+- CI: 3 test shards, about 11 min.
+- Full picture: `HANDOFF-2026-11-09.md`.
+
 ## DEPLOYED c53a08055 — 2 November 2026, 20:42 UTC (Claude, local session)
 
 - **web + q-api SUCCESS on `c53a08055`** (CI run 41518159421 green: build, lint, typecheck, test, pgTAP). **api + workers unchanged on `b10cd6c87`.** No migrations (still 268/268). Also pushed to `build/int-rc`.
