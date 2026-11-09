@@ -52,6 +52,13 @@ import {
   type RecommendationStore,
 } from "./onboarding-port.js";
 import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
+import {
+  sharesTopic,
+  spokenQuestion,
+  voiceSteer,
+  type SteerSaves,
+  type VoiceSteer,
+} from "./voice-steer.js";
 
 /**
  * Voice onboarding as a conversation first (owner 2026-10-27).
@@ -84,6 +91,14 @@ export type HeardSegment = {
 };
 
 export type OnboardingConversation = {
+  /**
+   * D86: the latest steer for this person's onboarding session on a live
+   * line (what is saved, refused, waiting and next), or null.
+   */
+  readonly steerFor?: (
+    userId: string,
+    onboardingSessionId: string,
+  ) => VoiceSteer | null;
   /** Transcript segments as the line reports them, in order. */
   readonly heard: (
     line: ConversationLine,
@@ -351,6 +366,25 @@ export function createOnboardingConversation(dependencies: {
   ) => {
     const words = text.replace(/\s+/g, " ").trim();
     if (words.length === 0) return;
+    // D86: a spoken line names no step (the live model asks in its own
+    // words). A question of Q's on the topic it was steered to ask is that
+    // step's: the screen shows its choices (the session's asked step), and
+    // an answer to it is an answer to that question.
+    if (
+      role === "Q" &&
+      stepKey === null &&
+      !line.voiceSessionId.startsWith("typed:")
+    ) {
+      const steered = steers.get(line.onboarding.sessionId);
+      if (
+        steered !== undefined &&
+        steered.steer.askedStepKey !== null &&
+        /\?/u.test(words) &&
+        sharesTopic(words, steered.askedWords)
+      ) {
+        stepKey = steered.steer.askedStepKey;
+      }
+    }
     const before = writes.get(line.voiceSessionId) ?? Promise.resolve();
     // One ref for the line: made again once after a failure, it is the
     // same line (unique per session, ref and role), never a second one.
@@ -403,6 +437,37 @@ export function createOnboardingConversation(dependencies: {
     if (buffer.role === "PERSON") schedule(line);
   };
 
+  /**
+   * D86: the latest steer for each onboarding session's live line, with
+   * whose it is (only that person reads it).
+   */
+  const steers = new Map<
+    string,
+    {
+      readonly userId: string;
+      readonly steer: VoiceSteer;
+      /** The next step's spoken question and label, to know Q asked it. */
+      readonly askedWords: string;
+    }
+  >();
+  const steerAfter = async (
+    line: ConversationLine,
+    saves: SteerSaves,
+    state?: OnboardingState,
+  ): Promise<void> => {
+    const now = state ?? (await portFor(line, []).state());
+    const steer = voiceSteer(now, saves);
+    const next = now.steps.find((step) => step.stepKey === steer.askedStepKey);
+    steers.set(line.onboarding.sessionId, {
+      userId: line.actor.userId,
+      steer,
+      askedWords:
+        next === undefined
+          ? ""
+          : `${spokenQuestion(next)} ${plainStepLabel(next.stepKey)}`,
+    });
+  };
+
   /** Held values Q's last spoken line read back, accepted on their yes. */
   const acceptSpokenYes = async (
     line: ConversationLine,
@@ -410,23 +475,23 @@ export function createOnboardingConversation(dependencies: {
       readonly role: "PERSON" | "Q";
       readonly text: string;
     }[],
-  ): Promise<void> => {
+  ): Promise<readonly string[]> => {
     const personAt = items.findLastIndex((item) => item.role === "PERSON");
-    if (personAt < 0) return;
+    if (personAt < 0) return [];
     const person = items[personAt]?.text ?? "";
     const lastQ = items
       .slice(0, personAt)
       .findLast((item) => item.role === "Q")?.text;
-    if (lastQ === undefined) return;
+    if (lastQ === undefined) return [];
     const port = portFor(line, [person]);
     const pending = await port.pendingRecommendations();
-    if (pending.length === 0) return;
+    if (pending.length === 0) return [];
     const offered = pending.filter((item) => readBackIn(item.value, lastQ));
-    if (offered.length === 0) return;
+    if (offered.length === 0) return [];
     const approved = isPlainYes(person)
       ? offered.map((item) => item.stepKey)
       : restatedHeld(offered, person);
-    if (approved.length === 0) return;
+    if (approved.length === 0) return [];
     const keys = new Set(approved);
     const accepted = await portFor(
       line,
@@ -454,6 +519,9 @@ export function createOnboardingConversation(dependencies: {
       },
       "onboarding conversation accepted their yes",
     );
+    return accepted
+      .filter((result) => result.outcome === "COMMITTED")
+      .map((result) => result.stepKey);
   };
 
   const readAndSave = async (
@@ -722,14 +790,16 @@ export function createOnboardingConversation(dependencies: {
     // said again, to Q's line that named them (their figures, or their
     // words). Code decides; the reading is not asked what "yes" meant.
     // Typed lines accept in the typed engine itself.
-    if (!line.voiceSessionId.startsWith("typed:")) {
-      await acceptSpokenYes(line, thread.items).catch((error: unknown) => {
-        logger.warn(
-          { err: error, qVoiceSessionId: line.voiceSessionId },
-          "onboarding conversation yes not accepted",
-        );
-      });
-    }
+    const spoken = !line.voiceSessionId.startsWith("typed:");
+    const yesSaved = spoken
+      ? await acceptSpokenYes(line, thread.items).catch((error: unknown) => {
+          logger.warn(
+            { err: error, qVoiceSessionId: line.voiceSessionId },
+            "onboarding conversation yes not accepted",
+          );
+          return [] as readonly string[];
+        })
+      : [];
     // Live 2026-10-30 (Hydrolume): they skipped "team strengths"; a later
     // reading of the whole conversation took their "Yes, that looks right"
     // (to a different question) as agreeing to the examples Q's question
@@ -959,6 +1029,9 @@ export function createOnboardingConversation(dependencies: {
       declined.length === 0 &&
       notKnownNeeded.length === 0
     ) {
+      if (spoken) {
+        await steerAfter(line, { saved: yesSaved, refused: [], held: [] });
+      }
       return;
     }
     // A list they add to keeps what is on record, unless the reading found
@@ -1085,7 +1158,46 @@ export function createOnboardingConversation(dependencies: {
       },
       "onboarding conversation read and saved",
     );
+    // D86: a refused save is never silent. Logged as an error with its
+    // step and reason, and the live line is told in the same update.
+    const refused = [...recorded, ...held]
+      .filter((r) => REFUSED_OUTCOMES.has(r.outcome))
+      .map((r) => ({
+        stepKey: r.stepKey,
+        reason: (r.reason ?? r.outcome).slice(0, 400),
+      }));
+    for (const one of refused) {
+      logger.error(
+        {
+          qVoiceSessionId: line.voiceSessionId,
+          onboardingSessionId: line.onboarding.sessionId,
+          stepKey: one.stepKey,
+          reason: one.reason,
+        },
+        "onboarding conversation save refused",
+      );
+    }
     const after = setAside.length === 0 ? answeredState : await port.state();
+    if (spoken) {
+      await steerAfter(
+        line,
+        {
+          saved: [
+            ...yesSaved,
+            ...recorded
+              .filter(
+                (r) => r.outcome === "COMMITTED" && r.alreadyRecorded !== true,
+              )
+              .map((r) => r.stepKey),
+          ],
+          refused,
+          held: held
+            .filter((r) => !REFUSED_OUTCOMES.has(r.outcome))
+            .map((r) => r.stepKey),
+        },
+        after,
+      );
+    }
     considerResearch(line, identityOf(after));
     if (rereading) {
       await readAndSave(line, rereads + 1, answeredNow, undefined, openedSteps);
@@ -1292,6 +1404,11 @@ export function createOnboardingConversation(dependencies: {
       ) {
         readings.delete(line.onboarding.sessionId);
       }
+    },
+
+    steerFor: (userId, onboardingSessionId) => {
+      const kept = steers.get(onboardingSessionId);
+      return kept !== undefined && kept.userId === userId ? kept.steer : null;
     },
 
     brief: async (line) => {
@@ -2033,3 +2150,11 @@ export function readBackIn(value: string, qLine: string): boolean {
   const words = plainWords(value);
   return words.length >= 3 && plainWords(qLine).includes(words);
 }
+
+/** A save that did not take (D86: never silent). */
+const REFUSED_OUTCOMES: ReadonlySet<string> = new Set([
+  "REJECTED",
+  "AMBIGUOUS",
+  "UNMATCHED",
+  "NEEDS_FIRST",
+]);

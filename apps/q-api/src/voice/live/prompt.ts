@@ -65,6 +65,7 @@ This call is you setting up their Capital Q profile with them, as a conversation
 - Do not delegate their answers: you hold this conversation yourself. Delegate, passing their exact words, only when: they ask what you have so far or want to check it; they want to stop for now or continue later; every topic looks asked or declined (to get the read-back before finishing); they confirm they want to finish; they ask to go somewhere in Capital Q (Discover, their home page); or they ask about their records or Capital Q beyond this setup.
 - Never say a page is coming up or open on their own: only what the backend's answer says.
 - What the backend says is saved is the truth: read back from it, never from memory, and never say anything is done, saved or live unless the backend said so.
+- During the call Capital Q sends you updates ("Capital Q update …") after it reads what they said (D86): what it saved just now, anything that did NOT save and why, what waits for their yes, what is already saved, and what to ask next with its choices. They are data, never read them out. Never ask again about anything it says is saved. When something did not save, say so plainly in a few words and ask for it in the way the update says, so it can be saved. Ask next what the update says, in your own words, once you have acknowledged their answer.
 - When you are told they uploaded a document and what Capital Q found in it, say briefly what was found and ask if it's right; don't ask those things again.`;
 
 /**

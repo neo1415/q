@@ -119,6 +119,10 @@ const VOICE_LINE_REPLACED_PROBLEM = {
   detail: "This voice line was replaced by a newer one.",
 } as const;
 
+/** D86: the live onboarding line's latest steer (see the route). */
+export const Q_VOICE_ONBOARDING_STEER_PATH =
+  "/v1/q/voice/onboarding/:onboardingSessionId/steer";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 export const Q_VOICE_SPEAK_RELAY_PATH = "/v1/q/voice/speak" as const;
 
 /** What `CreateQVoiceSessionResponseSchema` allows for an opening line. */
@@ -201,7 +205,7 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
    * no wait).
    */
   readonly onboardingConversation?:
-    Pick<OnboardingConversation, "opening"> | undefined;
+    Pick<OnboardingConversation, "opening" | "steerFor"> | undefined;
   /** The application API origin, needed for the opening line. */
   readonly apiBaseUrl?: string | undefined;
   /** The turn board, for the screen to read what Q is asking. */
@@ -301,6 +305,30 @@ export function registerQVoiceRoutes(
       ? restored
       : null;
   };
+
+  // D86: what the live voice line is told after each reading of their
+  // words (saved, not saved, waiting, next), for the onboarding screen to
+  // hand to its live call and to show the next question's choices. The
+  // owner's own session only; anyone else reads nothing (204).
+  app.get(
+    Q_VOICE_ONBOARDING_STEER_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const id = (request.params as { onboardingSessionId?: string })
+        .onboardingSessionId;
+      const steer =
+        id === undefined || !UUID.test(id)
+          ? null
+          : (dependencies.onboardingConversation?.steerFor?.(
+              actor.userId,
+              id,
+            ) ?? null);
+      void reply.header("Cache-Control", "no-store");
+      if (steer === null) return reply.code(204).send();
+      return reply.code(200).send(steer);
+    },
+  );
 
   // What Q is asking after its latest spoken turn: the owner's own
   // session only; anyone else sees the same 404 as a session that does
