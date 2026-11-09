@@ -4,6 +4,7 @@ import type { OnboardingTranscriptReader } from "@capital-q/model-gateway/q";
 import { INVESTOR_DEFINITION_V5 } from "@capital-q/investor-onboarding";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
+import { createDefaultPromptRegistry } from "@capital-q/q-core";
 import { countryOfIso } from "@capital-q/taxonomy";
 
 import {
@@ -12,6 +13,7 @@ import {
 } from "../src/voice/onboarding-conversation.js";
 
 import { livePrompt } from "../src/voice/live/prompt.js";
+import { isPlainYes } from "../src/voice/typed-onboarding.js";
 
 import { investorSession } from "./interviewer-fixtures.js";
 
@@ -184,5 +186,167 @@ describe("4. the live interview asks one thing at most twice (D77)", () => {
     });
     expect(prompt).toContain("Never ask the same thing more than twice");
     expect(prompt).toContain("leave it for now");
+  });
+});
+
+describe("5. a confirmation is more than 'yes' (owner, 9 Nov)", () => {
+  it.each([
+    "Yep",
+    "Yes",
+    "That's very correct.",
+    "Correct",
+    "Exactly",
+    "That's right",
+    "Mm-hm",
+    "Mhm.",
+    "Sure",
+    "Right",
+    "Go ahead",
+    "Yes, exactly right",
+    "Absolutely",
+    "Yeah, that's correct",
+    "Uh-huh",
+    "Spot on",
+  ])("%s accepts", (said) => {
+    expect(isPlainYes(said)).toBe(true);
+  });
+
+  it.each([
+    "No",
+    "Not quite",
+    "Right, but the minimum is 250k",
+    "Yes, but make it 400k",
+    "That's not right",
+    "Correct me if I'm wrong, it's 3 million",
+    "",
+  ])("%s does not", (said) => {
+    expect(isPlainYes(said)).toBe(false);
+  });
+});
+
+describe("6. session 12a0275a replayed: what they said is saved", () => {
+  it("country, the yes to deployment, and both cheques via a spoken read-back", async () => {
+    const { world, readings, conversation } = duplexWorld("I0.hq_country");
+    const say = async (q: string, person: string, reading: Reading) => {
+      readings.push(reading);
+      await conversation.said?.(DUPLEX, "Q", q);
+      await conversation.said?.(DUPLEX, "PERSON", person);
+      await conversation.flush?.(DUPLEX);
+    };
+    const one = (
+      stepKey: string,
+      value: string | number,
+      quote: string,
+    ): Reading => ({
+      answers: [
+        {
+          stepKey,
+          value,
+          quote,
+          ownWords: false,
+          aboutStep: true,
+          source: "STATED",
+        },
+      ],
+      declined: [],
+      notKnown: [],
+    });
+    await say(
+      "And the firm is based where?",
+      "It's based in um, San Francisco, California, in the USA",
+      one(
+        "I0.hq_country",
+        "San Francisco, California, in the USA",
+        "It's based in um, San Francisco, California, in the USA",
+      ),
+    );
+    await say(
+      "Are you actively investing right now?",
+      "Yes, I am",
+      one("I1.deployment_status", "actively_investing", "Yes, I am"),
+    );
+    await say(
+      "And on cheque sizes, what's the smallest you'd write?",
+      "500 thousand",
+      one("I2.cheque_min", 500_000, "500 thousand"),
+    );
+    await say(
+      "And your typical cheque?",
+      "My typical check size is about 3 million",
+      one(
+        "I2.cheque_typical",
+        3_000_000,
+        "My typical check size is about 3 million",
+      ),
+    );
+    // Held for their yes (D-OWN-3): figures are read back.
+    expect(world.recordedValue("I2.cheque_min")).toBeUndefined();
+    await say(
+      "So your smallest cheque is 500 thousand and your typical about 3 million, is that right?",
+      "Yep, that's very correct.",
+      EMPTY,
+    );
+    expect(world.recordedValue("I0.hq_country")).toEqual({
+      type: "RESOURCE_REFERENCE",
+      resourceType: "TAXONOMY_NODE",
+      resourceIds: [US?.nodeId],
+    });
+    expect(world.recordedValue("I1.deployment_status")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "actively_investing",
+    });
+    expect(world.recordedValue("I2.cheque_min")).toBeDefined();
+    expect(world.recordedValue("I2.cheque_typical")).toBeDefined();
+  });
+});
+
+describe("7. a city they name is saved as its country, typed and spoken", () => {
+  const TYPED: ConversationLine = {
+    ...DUPLEX,
+    voiceSessionId: `typed:${SESSION}`,
+  };
+  it.each([
+    ["Qatar", "We're in Doha right now", "QA", DUPLEX],
+    ["United Arab Emirates", "Our office is in Dubai", "AE", DUPLEX],
+    ["Nigeria", "Lagos", "NG", TYPED],
+    ["United States", "San Francisco", "US", TYPED],
+    ["United Kingdom", "London, England", "GB", DUPLEX],
+  ] as const)('%s from "%s"', async (value, quote, iso, line) => {
+    const { world, readings, conversation } = duplexWorld("I0.hq_country");
+    readings.push({
+      answers: [
+        {
+          stepKey: "I0.hq_country",
+          value,
+          quote,
+          ownWords: false,
+          aboutStep: true,
+          source: "STATED",
+        },
+      ],
+      declined: [],
+      notKnown: [],
+    });
+    await conversation.said?.(
+      line,
+      "Q",
+      "Where is your firm based?",
+      line === TYPED ? "I0.hq_country" : undefined,
+    );
+    await conversation.said?.(line, "PERSON", quote);
+    await conversation.flush?.(line);
+    expect(world.recordedValue("I0.hq_country")).toEqual({
+      type: "RESOURCE_REFERENCE",
+      resourceType: "TAXONOMY_NODE",
+      resourceIds: [countryOfIso(iso)?.nodeId],
+    });
+  });
+
+  it("the reader is told to give the country for a city", () => {
+    const reader = createDefaultPromptRegistry().getActive(
+      "ONBOARDING_TRANSCRIPT_READER",
+    ).definition.template;
+    expect(reader).toContain("Doha");
+    expect(reader).toContain("give the country");
   });
 });
