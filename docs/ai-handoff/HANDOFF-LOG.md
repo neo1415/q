@@ -2221,3 +2221,9 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 
 - Owner report: voice onboarding repeated the cheque (and the country) questions. The logs showed the answers were heard and held for a yes, but `acceptSpokenYes` never took one: `readBackIn` -> `figuresOf` could not read spoken numbers. Fixed at the matcher, for every held value type (numbers, lists, websites, currencies). Live retry by the owner pending.
 - Open idea, not done: the owner's original design (a parallel reader saving from the transcript) was not revisited; the owner said there is no time for it now.
+
+## 2026-11-09 21:45 UTC — q-api 811202101 live; typed + form e2e ALL PASS
+
+- q-api `811202101`: a spoken yes is taken as soon as the words are kept (owner saw an ~11 s delay and re-asks on d9dc487e3). Rollback `d9dc487e3`.
+- Live typed + form e2e, investor (fictional `e2e-inv-202611092134-1aq8`): **ALL PASS** — one introduction, a dense line answers 5 topics, a required refusal is re-asked with its reason, chat→voice with no re-greeting, continue-later to /discover, **the form reopens on the same step**, finish lands on /verification.
+- Demo fallback: the form. The voice yes fix is not yet re-checked live by voice (the cloud sandbox has no UDP for WebRTC).
