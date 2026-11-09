@@ -90,6 +90,43 @@ try {
   console.error(`${ESPEAK} not found: apt-get install -y espeak-ng`);
   process.exit(2);
 }
+// Run 1 (9 Nov, 8ad54a2b): the live line ended "connect_failed" 6 s after
+// it opened: the WebRTC data channel never opened, because this runner
+// (a cloud sandbox) reaches the outside only through an HTTPS proxy, with
+// no UDP. WebRTC media needs UDP. Checked first, free, before any account
+// or paid minute: a STUN binding request must come back.
+const udpReachable = () =>
+  new Promise((resolve) => {
+    import("node:dgram").then(({ createSocket }) => {
+      const socket = createSocket("udp4");
+      const request = Buffer.alloc(20);
+      request.writeUInt16BE(0x0001, 0);
+      request.writeUInt32BE(0x2112a442, 4);
+      for (let i = 8; i < 20; i += 1)
+        request[i] = Math.floor(Math.random() * 256);
+      const done = (ok) => {
+        clearTimeout(timer);
+        try {
+          socket.close();
+        } catch {
+          // Already closed.
+        }
+        resolve(ok);
+      };
+      const timer = setTimeout(() => done(false), 6000);
+      socket.on("message", () => done(true));
+      socket.on("error", () => done(false));
+      socket.send(request, 19302, "stun.l.google.com", (error) => {
+        if (error) done(false);
+      });
+    });
+  });
+if (process.env.CQ_SKIP_UDP_CHECK !== "1" && !(await udpReachable())) {
+  console.error(
+    "No UDP to the internet from here (STUN got no reply): a WebRTC voice line cannot connect, so nothing was spent. Run this on a machine with normal network (a laptop, or a CI runner with UDP egress).",
+  );
+  process.exit(3);
+}
 mkdirSync(OUT, { recursive: true });
 
 const results = [];
@@ -289,11 +326,35 @@ const speak = async (words) => {
   await page.waitForTimeout(Math.round(seconds * 1000) + 1500);
 };
 
+/** Whether the page shows a live voice line that has dropped (typing fallback). */
+const lineDropped = () =>
+  page
+    .getByText(
+      /voice line dropped|Voice isn't available|didn't start|couldn't connect/i,
+    )
+    .count()
+    .then((n) => n > 0)
+    .catch(() => false);
+
 const said = [];
 let cardsSeen = 0;
 const ends = Date.now() + MAX_MINUTES * 60_000;
 let lastAnswered = "";
+const started = Date.now();
 while (Date.now() < ends) {
+  // A line that never connected is not waited out (run 1 waited 6 min).
+  if (await lineDropped()) {
+    check(
+      "the live line stayed up",
+      false,
+      "the page says the voice line dropped",
+    );
+    break;
+  }
+  if (said.length === 0 && Date.now() - started > 90_000) {
+    check("Q asked something within 90 s of voice on", false);
+    break;
+  }
   const line = await lastQOnScreen();
   await page.waitForTimeout(1500);
   const still = await lastQOnScreen();
