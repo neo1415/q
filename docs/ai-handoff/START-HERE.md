@@ -43,7 +43,7 @@ Locked PADL → Product Specification → Final System Review → MVP/V1 Release
 
 ## Release lane (how code reaches production)
 
-1. Work in your own worktree and branch from `origin/build/int-rc`. One owner per branch.
+1. Work in your own worktree and branch from the integration branch. **Since 7 Nov 2026 that is `origin/fix/resume-asking-cv9ru3`** (mirror `claude/confident-keller-v0ug6h`); `build/int-rc` is stale (see `HANDOFF-2026-11-09.md` §2). One owner per branch.
 2. Gates before merging:
    - `pnpm exec turbo run build --filter=./packages/*`, so package `dist` folders are current. Stale `dist` causes false type errors.
    - Targeted `vitest` runs.
@@ -51,7 +51,7 @@ Locked PADL → Product Specification → Final System Review → MVP/V1 Release
    - `tsc` for each app touched.
    - eslint and prettier on changed files.
    - `pnpm check` runs everything; it's slow.
-3. Merge to `build/int-rc`. Push the same commit to `recovery/2026-09-12-8y2j4w` to run CI; CI does **not** trigger on `build/*`. That gives the quality job plus pgTAP.
+3. Merge to the integration branch. Push the same commit to `recovery/2026-09-12-8y2j4w` to run CI; CI does **not** trigger on `build/*`. That gives the quality job plus pgTAP.
 4. For a migration:
    1. Wait for the pgTAP job to pass.
    2. Apply with `node scripts/handoff/hosted-migrate-https.mjs --apply <version>`. It refuses DROP and RLS-loosening; `--founder-approved <version>` exists only for a reviewed exception.
