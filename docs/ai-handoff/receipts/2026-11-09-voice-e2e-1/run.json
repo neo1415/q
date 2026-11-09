@@ -1,0 +1,63 @@
+{
+  "email": "e2e-voice-202611091540-3jcr@fictional.capitalq.local",
+  "minutes": 6,
+  "said": [
+    {
+      "q": "How do you invest: as an angel, through a fund, a family office, an accelerator, or something else?",
+      "answer": "We're a venture capital fund."
+    }
+  ],
+  "qLines": 1,
+  "results": [
+    {
+      "name": "country saved from a city (Doha → Qatar)",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "deployment saved",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "I2.cheque_min saved",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "I2.cheque_typical saved",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "I2.cheque_max saved",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "no Q line cut mid-sentence",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "country asked at most twice",
+      "ok": true,
+      "detail": "asked 0"
+    },
+    {
+      "name": "deployment asked at most twice",
+      "ok": true,
+      "detail": "asked 0"
+    },
+    {
+      "name": "cheques asked at most twice",
+      "ok": true,
+      "detail": "asked 0"
+    },
+    {
+      "name": "answer cards shown during voice",
+      "ok": false,
+      "detail": "0 of 1 questions"
+    }
+  ]
+}
