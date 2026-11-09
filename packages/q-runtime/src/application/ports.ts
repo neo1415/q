@@ -328,6 +328,17 @@ export type QConversationMessageRepository = {
     userId: UserId,
     query: QPastTurnSearch,
   ) => Promise<readonly QPastTurn[]>;
+  /**
+   * D82: the documents earlier turns of this conversation already carried,
+   * so a turn records only what was attached with it (the composer sends
+   * every file of the conversation on every turn). Optional: without it,
+   * no turn records attachments.
+   */
+  readonly attachedDocumentIds?: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+  ) => Promise<readonly string[]>;
   /** The most recent messages of a conversation, oldest first, bounded. Tenant-scoped; the caller has checked ownership. */
   readonly listRecentForConversation: (
     executor: DatabaseExecutor,

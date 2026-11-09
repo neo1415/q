@@ -306,6 +306,8 @@ type Line = {
   readonly id: string;
   readonly role: "person" | "q";
   readonly text: string;
+  /** D82: the files a person's stored turn carried. */
+  readonly files?: readonly string[] | undefined;
   /** G-R3: the voice turn a spoken line belongs to. */
   readonly turnId?: string | undefined;
   /** The Q turn behind it, when it is a stored answer. */
@@ -589,7 +591,12 @@ export function QConversationPanel({
 
   const stored: Line[] = turns.map((turn) =>
     turn.kind === "PERSON"
-      ? { id: turn.id, role: "person", text: turn.text }
+      ? {
+          id: turn.id,
+          role: "person",
+          text: turn.text,
+          ...(turn.files === undefined ? {} : { files: turn.files }),
+        }
       : { id: turn.id, role: "q", text: turn.text, turn },
   );
   const lines: readonly Line[] = threadInOrder(
@@ -1646,22 +1653,25 @@ export function QConversationPanel({
                             {line.text}
                           </p>
                           {/* Owner live 9 Nov: the files this turn carried. */}
-                          {(turnFiles[turnKey(line.text)]?.length ?? 0) > 0 ? (
+                          {((line.files ?? turnFiles[turnKey(line.text)])
+                            ?.length ?? 0) > 0 ? (
                             <ul
                               aria-label={t("Attached")}
                               className="mt-1 flex flex-wrap justify-end gap-2 self-end"
                               data-q-turn-attachments
                             >
-                              {(turnFiles[turnKey(line.text)] ?? []).map(
-                                (name) => (
-                                  <li
-                                    key={name}
-                                    className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
-                                  >
-                                    {name}
-                                  </li>
-                                ),
-                              )}
+                              {(
+                                line.files ??
+                                turnFiles[turnKey(line.text)] ??
+                                []
+                              ).map((name) => (
+                                <li
+                                  key={name}
+                                  className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+                                >
+                                  {name}
+                                </li>
+                              ))}
                             </ul>
                           ) : null}
                           <HideFromQ

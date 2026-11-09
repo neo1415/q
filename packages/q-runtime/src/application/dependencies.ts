@@ -1,7 +1,7 @@
 import type { SecurityEventWriter } from "@capital-q/audit";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
-import type { QViewingMoment } from "@capital-q/contracts";
+import type { QMessageAttachment, QViewingMoment } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import type { QSubjectResolverRegistry } from "../domain/subjects.js";
@@ -20,6 +20,19 @@ import type { QRuntimeRepositories } from "./ports.js";
  * be composed in a test without either; production supplies both.
  */
 export type QRuntimeDependencies = {
+  /**
+   * D82: the documents named as the actor sees them, by Evidence: only
+   * documents this actor may read come back, each with its title. Absent:
+   * no turn records attachments.
+   */
+  readonly attachedDocuments?:
+    | {
+        readonly titled: (
+          actor: ActorContext,
+          documentIds: readonly string[],
+        ) => Promise<readonly QMessageAttachment[]>;
+      }
+    | undefined;
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
   readonly subjects: QSubjectResolverRegistry;

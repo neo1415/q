@@ -401,8 +401,11 @@ export {
 } from "./silence-ladder.js";
 
 export {
+  Q_MESSAGE_ATTACHMENTS_MAX,
   Q_MESSAGE_ROLES,
   Q_RESPONSE_TEXT_MAX_LENGTH,
+  QMessageAttachmentSchema,
+  type QMessageAttachment,
   QMessageRoleSchema,
   QMessageSchema,
   QResponseMessageSchema,

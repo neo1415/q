@@ -126,3 +126,27 @@ describe("Q attachments", () => {
     expect(long.length).toBeLessThan(4_000);
   });
 });
+
+describe("a stored turn's files (D82)", () => {
+  it("the person's turn keeps the files it carried after a reload", async () => {
+    const { turnsFrom } = await import("../src/features/q/conversation");
+    const { createQStreamState } = await import("@capital-q/api-client");
+    const { QMessageSchema } = await import("@capital-q/contracts");
+    const message = QMessageSchema.parse({
+      messageId: "11111111-0000-4000-8000-000000000001",
+      runId: "22222222-0000-4000-8000-000000000001",
+      role: "USER",
+      text: "Whats this about?",
+      attachments: [{ documentId: DOC, title: "TERMS AND CONDITIONS" }],
+      createdAt: "2026-11-09T14:59:34.000Z",
+    });
+    const turns = turnsFrom(
+      { ...createQStreamState(), messages: [message] },
+      [],
+    );
+    expect(turns[0]).toMatchObject({
+      kind: "PERSON",
+      files: ["TERMS AND CONDITIONS"],
+    });
+  });
+});

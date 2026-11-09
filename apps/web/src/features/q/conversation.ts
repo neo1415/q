@@ -34,6 +34,8 @@ export type QTurn =
       readonly text: string;
       /** True while the server has not yet confirmed this turn. */
       readonly unconfirmed: boolean;
+      /** D82: the titles of the documents this turn carried, as stored. */
+      readonly files?: readonly string[] | undefined;
     }
   | {
       readonly kind: "Q";
@@ -417,6 +419,9 @@ export function turnsFrom(
           id: message.messageId,
           text,
           unconfirmed: false,
+          ...(message.attachments === undefined
+            ? {}
+            : { files: message.attachments.map((file) => file.title) }),
         },
       });
       continue;

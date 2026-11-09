@@ -1110,6 +1110,30 @@ const repositories = withRunReadCache(
 );
 const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
 const runtimeDependencies = {
+  // D82: the documents a turn carried, titled by Evidence AS THE ACTOR: one
+  // they may not read is refused there and dropped here. Read at request
+  // time (Evidence is composed further down).
+  attachedDocuments: {
+    titled: async (actor: ActorContext, documentIds: readonly string[]) => {
+      const named = await Promise.all(
+        documentIds.slice(0, 5).map(async (documentId) => {
+          const held = await researchComposition.evidence
+            .getDocumentWithVersion({
+              actor,
+              documentId: DocumentIdSchema.parse(documentId),
+            })
+            .catch(() => null);
+          const title = held?.document.title.trim().slice(0, 300) ?? "";
+          return held === null ||
+            held.document.status !== "ACTIVE" ||
+            title.length === 0
+            ? []
+            : [{ documentId: held.document.id.toLowerCase(), title }];
+        }),
+      );
+      return named.flat();
+    },
+  },
   sql: database.sql,
   transactions: database.transactions,
   subjects,
