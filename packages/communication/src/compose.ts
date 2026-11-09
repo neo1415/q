@@ -63,14 +63,28 @@ export type OwnDocumentLookup = (
   readonly malwareScanStatus: string;
 } | null>;
 
-/** Only a document that has cleared the malware gate may be shared. */
+/**
+ * The scan states a chat attachment may carry. DECISIONS 83 (owner,
+ * 9 Nov 2026): uploads are not held for a virus scan, and production runs
+ * no scanner (every version is NOT_SCANNED), so a CLEAN-only gate made
+ * every attachment unsendable. A file a scanner found BLOCKED, or failed
+ * to scan (ERROR), is still never shared.
+ */
+const SHAREABLE_SCAN_STATES: ReadonlySet<string> = new Set([
+  "CLEAN",
+  "NOT_SCANNED",
+  "PENDING",
+]);
+
+/** The sender's own document, unless a scan flagged it. */
 export function createChatDocuments(
   lookup: OwnDocumentLookup,
 ): ChatDocumentPort {
   return async (actor, documentId) => {
     const document = await lookup(actor, documentId).catch(() => null);
     if (document === null) return { outcome: "NOT_FOUND" };
-    if (document.malwareScanStatus !== "CLEAN") return { outcome: "NOT_READY" };
+    if (!SHAREABLE_SCAN_STATES.has(document.malwareScanStatus))
+      return { outcome: "NOT_READY" };
     return {
       outcome: "READY",
       snapshot: {

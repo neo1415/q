@@ -2537,6 +2537,9 @@ const chat = composeChat({
       : createSharedDocumentDownloads({
           sql: database.sql,
           storage,
+          // DECISIONS 83: a shared chat file opens without a scan hold
+          // (never a BLOCKED one; the download port refuses those).
+          serveUnscanned: true,
         }).authorizeSharedVersion,
   newCorrelationId: createCorrelationId,
   // QA run 8a1d57b9: each new message is announced (the other side is
