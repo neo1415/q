@@ -179,17 +179,47 @@ function correlationOf(value: string): CorrelationId {
 }
 
 /** The fields a value did not fit, in plain words (never the value itself). */
-function misfit(error: z.ZodError): string {
-  return error.issues
-    .slice(0, 4)
-    .map((issue) => {
-      const field = issue.path
+/** A field's name as words ("websiteUrl" -> "website url"), for the person. */
+const fieldWords = (field: string): string =>
+  field
+    .replace(/([a-z0-9])([A-Z])/gu, "$1 $2")
+    .replace(/[._]+/gu, " ")
+    .toLowerCase();
+
+/** The fields a value did not fit, in words; null when no field was at fault. */
+function misfit(error: z.ZodError): string | null {
+  const parts = error.issues
+    .map((issue) => ({
+      field: issue.path
         .filter((part): part is string => typeof part === "string")
         .filter((part) => part !== "input")
-        .join(".");
-      return field.length === 0 ? issue.message : `${field} ${issue.message}`;
-    })
-    .join("; ");
+        .join("."),
+      message: issue.message,
+    }))
+    .filter((issue) => issue.field.length > 0)
+    .slice(0, 4)
+    .map((issue) => `${fieldWords(issue.field)} ${issue.message}`);
+  return parts.length === 0 ? null : parts.join("; ");
+}
+
+/**
+ * Batch 17 (owner live 9 Nov: "That doesn't fit: expected at least one
+ * field to update." was shown to an investor asking to edit their cheque
+ * range): a refusal of the form as a whole -- nothing they asked for is a
+ * field this action changes -- is guidance for Q, never the reply. Q is
+ * told what this action does change, so it uses the tool that holds what
+ * they asked about, or says plainly what it cannot change here.
+ */
+function notThisActionsFields(toolName: string, input: z.ZodType): string {
+  const fields =
+    input instanceof z.ZodObject
+      ? Object.keys(input.shape as Record<string, unknown>)
+          .filter((field) => field !== "reason")
+          .map(fieldWords)
+      : [];
+  return `Nothing they asked for is something ${toolName} changes${
+    fields.length === 0 ? "" : ` (it changes only: ${fields.join(", ")})`
+  }. Use the tool that holds what they asked about (their firm's profile, their mandate, their company), loading it with use_capability if it is not offered; if none does, tell them plainly, in your own words, what you can't change here. Never repeat this note to them.`;
 }
 
 /** Same run, same action, same words: the same key, so a retry does nothing twice. */
@@ -484,12 +514,15 @@ function toolFor(
       }
       const parsed = action.input.safeParse(canonical);
       if (!parsed.success) {
-        // The declaration's own contract refused a value: say which, so Q
-        // can ask for a value that fits instead of going quiet.
-        return deny(
-          "NOT_AVAILABLE",
-          `That doesn't fit: ${misfit(parsed.error)}.`,
-        );
+        // The declaration's own contract refused a value: say which, in
+        // words, so Q can ask for a value that fits instead of going quiet.
+        const fields = misfit(parsed.error);
+        return fields === null
+          ? deny(
+              "NOT_THIS_ACTION",
+              notThisActionsFields(declared.name, declared.input),
+            )
+          : deny("NOT_AVAILABLE", `That doesn't fit: ${fields}.`);
       }
       const refused = await declared
         .refuse?.(parsed.data, own, context)

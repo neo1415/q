@@ -49,3 +49,30 @@ export function planScopeKinds(
 ): ReadonlySet<QKnowledgeScopeKind> {
   return new Set(plan.scopes.map((scope) => scope.kind));
 }
+
+/**
+ * Batch 17 (owner live 9 Nov): the task classes of the actor's OWN
+ * organisation whose scopes this plan holds, beside whatever the turn is
+ * about. Their own company: a COMPANY_PROFILE under its owner label
+ * (organisation_private; a disclosed one never carries it). Their own
+ * investor organisation: an INVESTOR_MANDATE, which the firewall admits to
+ * its owner alone. Read from the plan, never from the request.
+ */
+export function ownOrganisationPurposes(
+  plan: Pick<PermittedContextPlan, "scopes">,
+): readonly ("OWN_COMPANY_QUESTION" | "INVESTOR_QUESTION")[] {
+  const out: ("OWN_COMPANY_QUESTION" | "INVESTOR_QUESTION")[] = [];
+  if (
+    plan.scopes.some(
+      (scope) =>
+        scope.kind === "COMPANY_PROFILE" &&
+        scope.contextLabel === "organisation_private",
+    )
+  ) {
+    out.push("OWN_COMPANY_QUESTION");
+  }
+  if (plan.scopes.some((scope) => scope.kind === "INVESTOR_MANDATE")) {
+    out.push("INVESTOR_QUESTION");
+  }
+  return out;
+}

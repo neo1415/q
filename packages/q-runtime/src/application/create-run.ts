@@ -108,9 +108,16 @@ export type CreateQRunResult = {
  * resolves in their tenant as belonging to their own organisation. What
  * either may contribute is still decided per run by the Context Firewall.
  *
- * Their company is added when the turn is about no company (a question
- * about somebody else's keeps that one alone); their investor
- * organisation whenever the turn names no investor or relationship.
+ * Batch 17 (owner live 9 Nov, an investor: "edit my profile" after a
+ * conversation had touched a relationship was refused, because the run
+ * carried no INVESTOR_MANDATE or INVESTOR_PROFILE): their own company and
+ * their own investor organisation are added on EVERY turn, beside whatever
+ * the turn names (a relationship, a counterparty, another firm). Their own
+ * scopes are their own data and widen nothing about anyone else: each
+ * subject is still judged on its own by the Context Firewall, the task
+ * class still follows what the turn names (an own organisation carried as
+ * context never changes it), and combination rules apply only to what the
+ * actor does not own.
  */
 async function withOwnContext(
   dependencies: QRuntimeDependencies,
@@ -128,24 +135,17 @@ async function withOwnContext(
       ? ref
       : null;
   };
-  if (
-    dependencies.ownCompany !== undefined &&
-    out.length < Q_SUBJECTS_MAX &&
-    !out.some((ref) => ref.kind === "COMPANY") &&
-    !out.some((ref) => ref.kind === "RELATIONSHIP")
-  ) {
+  const held = (ref: QSubjectRef) =>
+    out.some((one) => JSON.stringify(one) === JSON.stringify(ref));
+  if (dependencies.ownCompany !== undefined && out.length < Q_SUBJECTS_MAX) {
     const companyId = await dependencies.ownCompany(actor);
     const ref =
       companyId === null ? null : await own({ kind: "COMPANY", companyId });
-    if (ref !== null) out = [...out, ref];
+    if (ref !== null && !held(ref)) out = [...out, ref];
   }
   if (
     dependencies.ownInvestorOrganisation !== undefined &&
-    out.length < Q_SUBJECTS_MAX &&
-    !out.some(
-      (ref) =>
-        ref.kind === "INVESTOR_ORGANISATION" || ref.kind === "RELATIONSHIP",
-    )
+    out.length < Q_SUBJECTS_MAX
   ) {
     const investorOrganisationId =
       await dependencies.ownInvestorOrganisation(actor);
@@ -156,7 +156,7 @@ async function withOwnContext(
             kind: "INVESTOR_ORGANISATION",
             investorOrganisationId,
           });
-    if (ref !== null) out = [...out, ref];
+    if (ref !== null && !held(ref)) out = [...out, ref];
   }
   return out;
 }

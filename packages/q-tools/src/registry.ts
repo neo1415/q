@@ -14,7 +14,7 @@ import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 
 import { capabilityArea, Q_CAPABILITIES } from "./capabilities.js";
 import type { AnyQToolDefinition } from "./definition.js";
-import { planScopeKinds } from "./plan.js";
+import { ownOrganisationPurposes, planScopeKinds } from "./plan.js";
 import {
   BIND_CATALOGUE,
   type CapabilityCatalogue,
@@ -167,6 +167,22 @@ const DECLARED_PROPOSERS: ReadonlySet<string> = new Set(
   appActionToolNames(APP_ACTIONS).filter((name) => name.startsWith("propose_")),
 );
 
+/**
+ * Batch 17: a declared action that serves the person's own organisation
+ * (its purposes name their own company's or firm's turn) and never a
+ * counterparty's or a relationship's.
+ */
+function ownOrganisationAction(record: QToolRecord): boolean {
+  const purposes = record.definition.supportedPurposes;
+  return (
+    declaredAction(record) &&
+    (purposes.includes("OWN_COMPANY_QUESTION") ||
+      purposes.includes("INVESTOR_QUESTION")) &&
+    !purposes.includes("RELATIONSHIP_QUESTION") &&
+    !purposes.includes("COUNTERPARTY_COMPANY_QUESTION")
+  );
+}
+
 /** A declared app action's tool: offered when named, on any purpose its scopes allow. */
 function declaredAction(record: QToolRecord): boolean {
   return (
@@ -246,12 +262,38 @@ export function createQToolRegistry(
    * specific to this one; then id. Deterministic for the same catalogue
    * and plan, so the same run always offers the same tools.
    */
+  /**
+   * Batch 17: the reader read the turn as about their own records, or it
+   * named one of their own organisation's declared actions.
+   */
+  const ownTurn = (context: QToolExecutionContext): boolean => {
+    const focus = context.focus;
+    if (focus === undefined) return false;
+    if (focus.ownRecords === true) return true;
+    return focus.tools.some((name) => {
+      const record = activeByProviderName.get(name);
+      return record !== undefined && ownOrganisationAction(record);
+    });
+  };
+
   const ranked = (context: QToolExecutionContext): readonly QToolRecord[] => {
     if (context.actor.actorType !== "HUMAN") {
       return [];
     }
     const kinds = planScopeKinds(context.plan);
     const purpose = context.plan.purpose.taskClass;
+    // Batch 17 (owner live 9 Nov: "edit my profile" after a conversation
+    // touched a relationship found no mandate or profile edit): on a turn
+    // the reader read as about their own records, a declared app action for
+    // the person's OWN organisation (an approval card; its authorize checks
+    // it is theirs) is offered wherever the plan holds their own scopes,
+    // not only on their own organisation's turn. The run's class, and so
+    // every counterparty rule, is unchanged.
+    const ownPurposes = ownTurn(context)
+      ? ownOrganisationPurposes(context.plan)
+      : [];
+    const directly = (record: QToolRecord) =>
+      record.definition.supportedPurposes.includes(purpose);
     const core = (record: QToolRecord) => record.definition.core === true;
     const readOnly = (record: QToolRecord) =>
       record.definition.classification === "READ_ONLY";
@@ -285,8 +327,13 @@ export function createQToolRegistry(
           named.has(name)
         );
       }
-      const forPurpose = record.definition.supportedPurposes.includes(purpose);
       const app = declaredAction(record);
+      const forOwn =
+        ownOrganisationAction(record) &&
+        ownPurposes.some((own) =>
+          record.definition.supportedPurposes.includes(own),
+        );
+      const forPurpose = directly(record) || forOwn;
       // A named tool off this purpose is offered only when it is a declared
       // app action: what is offered is what may execute. (Unfocused, no
       // tool is named, so this is the focused rule only.)
@@ -298,6 +345,8 @@ export function createQToolRegistry(
       // loads one the moment the answer needs it.
       if (readsOnly && !readOnly(record)) return false;
       if (!focused) return forPurpose;
+      // Their own records, read as such: kept whatever the turn's areas.
+      if (forOwn) return true;
       const area = TOOL_AREAS.get(name);
       const inArea = area !== undefined && areas.has(area);
       // A declared app action is offered whenever its area is in the
@@ -329,6 +378,9 @@ export function createQToolRegistry(
           // A tool marked to come last never displaces a purpose's own.
           Number(a.definition.offerLast === true) -
             Number(b.definition.offerLast === true) ||
+          // The turn's own purpose before the person's own-organisation
+          // actions carried beside it (batch 17), so they never displace it.
+          Number(directly(b)) - Number(directly(a)) ||
           a.definition.supportedPurposes.length -
             b.definition.supportedPurposes.length ||
           a.definition.id.localeCompare(b.definition.id),
@@ -415,6 +467,15 @@ export function createQToolRegistry(
       inFocusArea(context, providerName)
         ? nameable(context).find(
             (record) => record.definition.providerName === providerName,
+          )
+        : undefined) ??
+      // Batch 17: their own organisation's declared action, on a turn
+      // about their own records, executes exactly as it is offered.
+      (ownTurn(context)
+        ? ranked(context).find(
+            (record) =>
+              ownOrganisationAction(record) &&
+              record.definition.providerName === providerName,
           )
         : undefined) ??
       // A tool offered only when named, named by this turn.

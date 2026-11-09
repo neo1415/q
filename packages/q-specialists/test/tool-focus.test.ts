@@ -29,6 +29,19 @@ describe("toolFocusOf", () => {
     previous: { areas: string[]; tools: string[] } | null = null,
   ) => toolFocusOf({ reading: read, subjectKinds, areaOf, previous });
 
+  it("batch 17: a turn the reader read as about their own records says so; any other does not", () => {
+    expect(
+      focus(reading({ kind: "TOOL_REQUEST", ownRecords: true }), [
+        "RELATIONSHIP",
+        "INVESTOR_ORGANISATION",
+      ])?.ownRecords,
+    ).toBe(true);
+    expect(
+      focus(reading({ kind: "TOOL_REQUEST" }), ["RELATIONSHIP"])?.ownRecords,
+    ).toBeUndefined();
+    expect(focus(null)).toBeNull();
+  });
+
   it("a named action is its tool and its area, plus the subjects' areas", () => {
     expect(
       focus(

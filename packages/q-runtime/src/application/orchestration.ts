@@ -782,6 +782,13 @@ export type QToolFocus = {
    * without the focus, exactly as before.
    */
   readonly readsOnly?: boolean | undefined;
+  /**
+   * Batch 17 (owner live 9 Nov): the turn reader read this turn as about
+   * the person's own records (THEIR_OWN_RECORDS, or saving to their own
+   * profile). Their own organisation's declared actions are then offered
+   * beside the run's purpose, wherever the plan holds their own scopes.
+   */
+  readonly ownRecords?: boolean | undefined;
 };
 
 /**

@@ -652,6 +652,76 @@ describe("@capital-q/q-firewall against local PostgreSQL", () => {
     });
   });
 
+  it("batch 17: an investor's relationship turn with their own firm alongside gets their own mandate and profile, and nothing more of the founder's", async () => {
+    await withWorld(async (world) => {
+      const decision = await world.firewall.plan(
+        ask(world.apexAdmin, "ANSWER", [
+          relationship(world.relationshipApex),
+          investor(world.investorApex),
+        ]),
+      );
+      expect(decision.outcome).toBe("AUTHORISED");
+      if (decision.outcome !== "AUTHORISED") return;
+      // Their own firm is context; the turn stays a relationship question.
+      expect(decision.plan.purpose.taskClass).toBe("RELATIONSHIP_QUESTION");
+      for (const kind of ["INVESTOR_MANDATE", "INVESTOR_PROFILE"] as const) {
+        expect(
+          decision.plan.scopes.find((s) => s.kind === kind)?.subject,
+        ).toEqual(investor(world.investorApex));
+      }
+      // Counterparty-negative: the relationship is still read from the
+      // investor's side only, and nothing of the company is bound.
+      const shared = decision.plan.scopes.find(
+        (s) => s.kind === "RELATIONSHIP_CONTEXT",
+      );
+      expect(shared?.filter.contextLabels).not.toContain("founder_private");
+      const kinds = decision.plan.scopes.map((s) => s.kind);
+      expect(kinds).not.toContain("COMPANY_PRIVATE_FINANCIALS");
+      expect(kinds).not.toContain("EVIDENCE_DOCUMENTS");
+      expect(kinds).not.toContain("COMPANY_PROFILE");
+      assertNoMarkers(JSON.stringify(decision));
+      assertNoMarkers(world.logLines.join("\n"));
+    });
+  });
+
+  it("batch 17: a founder's relationship turn with their own company alongside gets their own company, and never the investor's mandate or private context", async () => {
+    await withWorld(async (world) => {
+      const decision = await world.firewall.plan(
+        ask(world.founderAlpha, "ANSWER", [
+          relationship(world.relationshipApex),
+          company(world.companyAlpha),
+        ]),
+      );
+      expect(decision.outcome).toBe("AUTHORISED");
+      if (decision.outcome !== "AUTHORISED") return;
+      expect(decision.plan.purpose.taskClass).toBe("RELATIONSHIP_QUESTION");
+      expect(
+        decision.plan.scopes.find((s) => s.kind === "COMPANY_PROFILE")?.subject,
+      ).toEqual(company(world.companyAlpha));
+      const kinds = decision.plan.scopes.map((s) => s.kind);
+      expect(kinds).not.toContain("INVESTOR_MANDATE");
+      expect(kinds).not.toContain("INVESTOR_PROFILE");
+      const shared = decision.plan.scopes.find(
+        (s) => s.kind === "RELATIONSHIP_CONTEXT",
+      );
+      expect(shared?.filter.contextLabels).not.toContain("investor_private");
+      assertNoMarkers(JSON.stringify(decision));
+    });
+  });
+
+  it("batch 17, cross-tenant negative: another investor's firm declared beside a relationship it is no party to is refused outright", async () => {
+    await withWorld(async (world) => {
+      const decision = await world.firewall.plan(
+        ask(world.horizonAdmin, "ANSWER", [
+          relationship(world.relationshipApex),
+          investor(world.investorApex),
+        ]),
+      );
+      expect(decision.outcome).toBe("DENIED");
+      assertNoMarkers(JSON.stringify(decision));
+    });
+  });
+
   it("GOLDEN own public presence: the owner may read it and a counterparty never can", async () => {
     await withWorld(async (world) => {
       await makeNetworkVisible(world);

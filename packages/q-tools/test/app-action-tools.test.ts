@@ -656,6 +656,51 @@ describe("profile and records, generated from the registry (ADR 0040 step 2)", (
     expect(writes).toEqual([]);
   });
 
+  it("batch 17: a founder on a relationship turn whose plan holds their own company edits it; a counterparty's company profile on their plan never makes the edit eligible", async () => {
+    const withLabel = (
+      taskClass: "RELATIONSHIP_QUESTION" | "COUNTERPARTY_COMPANY_QUESTION",
+      label: "organisation_private" | "network_visible",
+    ): PermittedContextPlan => {
+      const plan = founderPlan();
+      return {
+        ...plan,
+        purpose: { ...plan.purpose, taskClass },
+        scopes: plan.scopes.map((scope) =>
+          scope.kind === "COMPANY_PROFILE"
+            ? { ...scope, contextLabel: label }
+            : scope,
+        ),
+      };
+    };
+    const website = call("update_company_profile", {
+      websiteUrl: "kivu-freight.example",
+    });
+    const ownTurn = (plan: PermittedContextPlan) => ({
+      ...contextFor(actorA, plan),
+      focus: { areas: ["Relationships"], tools: [], ownRecords: true },
+    });
+    const own = records();
+    const outcome = await own.executor.execute(
+      website,
+      ownTurn(withLabel("RELATIONSHIP_QUESTION", "organisation_private")),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(own.prepared.map((one) => one.actionType)).toEqual([
+      "app.company.profile.update",
+    ]);
+    // Counterparty-negative: a company bound by disclosure (not theirs).
+    const other = records();
+    const refused = await other.executor.execute(
+      website,
+      ownTurn(withLabel("COUNTERPARTY_COMPANY_QUESTION", "network_visible")),
+    );
+    expect(refused.result.ok).toBe(false);
+    expect(other.prepared).toEqual([]);
+  });
+
   it("a role change keeps what they did not mention, as their membership holds it", async () => {
     const { executor, prepared } = records();
     await executor.execute(
@@ -728,9 +773,25 @@ describe("profile and records, generated from the registry (ADR 0040 step 2)", (
       contextFor(actorA, founderPlan()),
     );
     expect(JSON.stringify(misfit.result)).toContain(
-      "timeZone needs to be a time zone such as Africa/Lagos",
+      "time zone needs to be a time zone such as Africa/Lagos",
     );
     expect(prepared).toHaveLength(1);
+  });
+
+  it("batch 17: an edit with nothing this action changes is guidance for Q (NOT_THIS_ACTION), never a schema string for the person", async () => {
+    const { executor, prepared } = records();
+    const outcome = await executor.execute(
+      call("update_my_profile", {}),
+      contextFor(actorA, founderPlan()),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: false,
+      error: { code: "NOT_THIS_ACTION" },
+    });
+    const said = JSON.stringify(outcome.result);
+    expect(said).not.toContain("expected at least one field");
+    expect(said).toContain("display name");
+    expect(prepared).toEqual([]);
   });
 
   it("an investor organisation's tools are not offered on a founder's own-company turn", async () => {
@@ -927,10 +988,9 @@ describe("the mandate form, one generated tool for its four declarations", () =>
         },
       },
     });
-    const executor = createQToolExecutor({
-      registry: createQToolRegistry(createDefaultQTools(ports)),
-    });
-    return { executor, prepared };
+    const registry = createQToolRegistry(createDefaultQTools(ports));
+    const executor = createQToolExecutor({ registry });
+    return { executor, prepared, registry };
   }
 
   it("a mandate id the model made up is input, never proof: their active mandate is the one changed", async () => {
@@ -956,6 +1016,86 @@ describe("the mandate form, one generated tool for its four declarations", () =>
           },
         },
       },
+    ]);
+  });
+
+  it("batch 17: on a relationship turn whose plan holds their own firm, 'change my cheque range to 50k-3m' is offered and prepares the card; without their own scopes, nothing", async () => {
+    const relationshipTurn = (own: boolean): PermittedContextPlan => {
+      const plan = planFor(actorA, "RELATIONSHIP_QUESTION", [
+        { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+        { kind: "RELATIONSHIP_CONTEXT", sensitivity: "CONFIDENTIAL" },
+        ...(own
+          ? ([
+              {
+                kind: "INVESTOR_PROFILE",
+                sensitivity: "INTERNAL",
+                investorOrganisationId: ORG_INVESTOR,
+              },
+              {
+                kind: "INVESTOR_MANDATE",
+                sensitivity: "CONFIDENTIAL",
+                investorOrganisationId: ORG_INVESTOR,
+              },
+            ] as const)
+          : []),
+      ]);
+      return {
+        ...plan,
+        scopes: plan.scopes.map((scope) =>
+          scope.kind === "OWN_Q_CONVERSATION"
+            ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+            : scope,
+        ),
+      };
+    };
+    const { executor, prepared, registry } = mandates();
+    // The reader read the turn as about their own records (batch 17).
+    const ownTurn = (plan: PermittedContextPlan) => ({
+      ...contextFor(actorA, plan),
+      focus: { areas: ["Relationships"], tools: [], ownRecords: true },
+    });
+    const offered = (context: Parameters<typeof registry.eligible>[0]) =>
+      registry
+        .eligible(context)
+        .map(({ definition }) => definition.providerName);
+    expect(offered(ownTurn(relationshipTurn(true)))).toContain(
+      "change_my_mandate",
+    );
+    expect(offered(ownTurn(relationshipTurn(true)))).toContain(
+      "update_investor_profile",
+    );
+    // Without their own scopes, or on a turn not about their own records,
+    // the relationship turn offers neither.
+    expect(offered(ownTurn(relationshipTurn(false)))).not.toContain(
+      "change_my_mandate",
+    );
+    expect(
+      offered({
+        ...ownTurn(relationshipTurn(true)),
+        focus: { areas: ["Relationships"], tools: [] },
+      }),
+    ).not.toContain("change_my_mandate");
+
+    const cheque = {
+      operation: "UPDATE",
+      chequeRange: { currency: "USD", min: "50000", max: "3000000" },
+    };
+    const refused = await executor.execute(
+      call("change_my_mandate", cheque),
+      ownTurn(relationshipTurn(false)),
+    );
+    expect(refused.result.ok).toBe(false);
+    expect(prepared).toEqual([]);
+    const outcome = await executor.execute(
+      call("change_my_mandate", cheque),
+      ownTurn(relationshipTurn(true)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(prepared.map((one) => one.actionType)).toEqual([
+      "app.investor.mandate.change",
     ]);
   });
 

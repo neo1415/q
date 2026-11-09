@@ -135,7 +135,7 @@ const TURNS: readonly (readonly QSubjectRef[])[] = [
   [otherCompany, otherFirm],
 ];
 
-describe("the actor's own context joins every turn that does not name it otherwise", () => {
+describe("the actor's own context joins every turn (batch 17: also beside a relationship or a counterparty)", () => {
   it("follows the rule for every turn, organisation and verification", async () => {
     for (const turn of TURNS) {
       for (const company of [OWN_COMPANY, null]) {
@@ -144,21 +144,12 @@ describe("the actor's own context joins every turn that does not name it otherwi
             const h = harness({ company, firm, verified });
             await h.ask(turn);
             const got = h.runs[0]?.subjects ?? [];
-            const names = (kind: string) => turn.some((r) => r.kind === kind);
+            // Batch 17: on EVERY turn, beside a relationship, another
+            // company or another firm (their own data, judged per subject).
             const expected = [
               ...turn,
-              ...(company !== null &&
-              verified &&
-              !names("COMPANY") &&
-              !names("RELATIONSHIP")
-                ? [ownCompany]
-                : []),
-              ...(firm !== null &&
-              verified &&
-              !names("INVESTOR_ORGANISATION") &&
-              !names("RELATIONSHIP")
-                ? [ownFirm]
-                : []),
+              ...(company !== null && verified ? [ownCompany] : []),
+              ...(firm !== null && verified ? [ownFirm] : []),
             ];
             expect(
               got,

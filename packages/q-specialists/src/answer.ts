@@ -8166,6 +8166,9 @@ export function createSpecialistQAnswer(
               handOver: (read.handOver ?? null) !== null,
               research: (await research).mode,
               text: latest.content,
+              ownRecords:
+                read.question?.kind === "THEIR_OWN_RECORDS" ||
+                read.saveToOwnProfile === true,
             },
       subjectKinds: request.subjects.map((subject) => subject.kind),
       counterparty: await aboutCounterparty(request, latest.content, read),

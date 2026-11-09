@@ -36,6 +36,11 @@ export type FocusReading = {
   readonly research?: string | null | undefined;
   /** The person's words this turn, for a URL or a domain they named. */
   readonly text?: string | undefined;
+  /**
+   * Batch 17: the reader read the turn as about their own records (a
+   * THEIR_OWN_RECORDS question, or saving to their own profile).
+   */
+  readonly ownRecords?: boolean | undefined;
 };
 
 /**
@@ -164,6 +169,13 @@ export function toolFocusOf(input: {
    */
   readonly onboarding?: boolean | undefined;
 }): QToolFocus | null {
+  const focus = focusFor(input);
+  return focus !== null && input.reading?.ownRecords === true
+    ? { ...focus, ownRecords: true }
+    : focus;
+}
+
+function focusFor(input: Parameters<typeof toolFocusOf>[0]): QToolFocus | null {
   const focus = focusOf(input);
   if (
     input.onboarding !== true ||
