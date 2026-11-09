@@ -4638,7 +4638,8 @@
       flex: none;
       flex-direction: column;
       border-inline-end: 1px solid var(--cq-border-subtle);
-      background-color: var(--cq-surface);
+      /* The panel step (owner 9 Nov): off the page, as Q's pane is. */
+      background-color: var(--cq-panel-surface);
       padding-top: var(--cq-safe-top);
       padding-left: var(--cq-safe-left);
       overflow-x: hidden;

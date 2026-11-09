@@ -34,6 +34,7 @@ export const PRESET_TOKENS = [
   "surface-subtle",
   "surface-strong",
   "surface-sunken",
+  "panel-surface",
   "text-primary",
   "text-secondary",
   "text-tertiary",
@@ -113,21 +114,25 @@ export const BLACK_GOLD: BrandPreset = {
     light: {
       // Clean neutral white (client feedback UX-03, boss 2026-11-04):
       // no cream or ivory in the surfaces; gold stays the accent and Q's
-      // light only. Text and borders keep AA on every light surface,
-      // including the #f4f4f4 sunken well (brand-presets.test.ts).
-      canvas: "#ffffff",
+      // light only. Layered like the dark theme (owner 9 Nov: light was
+      // flat, everything on one white): the page a step below white,
+      // cards and dialogs on white, the sidebar and Q's pane on a panel
+      // step between, wells a step below the page. Neutral greys only.
+      // Text and borders keep AA on every one (brand-presets.test.ts).
+      canvas: "#f2f2f2",
       surface: "#ffffff",
       "surface-raised": "#ffffff",
-      "surface-subtle": "#f9f9f9",
-      "surface-strong": "#ececec",
-      "surface-sunken": "#f4f4f4",
+      "surface-subtle": "#ececec",
+      "surface-strong": "#e2e2e2",
+      "surface-sunken": "#e9e9e9",
+      "panel-surface": "#fcfcfc",
       "text-primary": INK,
       "text-secondary": "#4d4d4d",
       "text-tertiary": "#666666",
       "text-inverse": "#ffffff",
-      "border-subtle": "#ececec",
-      border: "#e0e0e0",
-      "border-strong": "#8f8f8f",
+      "border-subtle": "#dfdfdf",
+      border: "#d4d4d4",
+      "border-strong": "#8a8a8a",
       accent: BRONZE,
       "accent-hover": DEEP_BRONZE,
       "accent-soft": "#f3ead2",
@@ -150,6 +155,9 @@ export const BLACK_GOLD: BrandPreset = {
       "surface-subtle": "#2a2a2a",
       "surface-strong": "#383838",
       "surface-sunken": "#171717",
+      // The menu bar and the Q stage carry their own dark values (chrome,
+      // stage); the panel step is the page's, so nothing in dark changes.
+      "panel-surface": "#212121",
       "text-primary": PAPER_TEXT,
       "text-secondary": "#c4c4c4",
       "text-tertiary": "#a3a3a3",
@@ -284,9 +292,11 @@ export function presetStyleSheet(preset: BrandPreset): string {
 
 /** Ink alpha steps on the paper stage (hex alpha suffixes). */
 const PAPER_INK = {
-  surface: "0b", // ~4.5%
-  "surface-strong": "16", // ~8.5%
-  border: "29", // ~16%
+  // Owner 9 Nov: the person's bubble, the composer and Q's cards read as
+  // a faint fill on the pane, a notch above the 4.5% that vanished on white.
+  surface: "10", // ~6.3%
+  "surface-strong": "1c", // ~11%
+  border: "30", // ~19%
   star: "33", // ~20%
   "star-faint": "1a", // ~10%
 } as const;
@@ -302,7 +312,8 @@ export function presetPaperStage(
 ): Readonly<Record<string, string>> {
   const ink = light["text-primary"].slice(0, 7);
   return {
-    canvas: light.canvas,
+    // Q's pane sits on the panel step, as the sidebar does (owner 9 Nov).
+    canvas: light["panel-surface"],
     surface: `${ink}${PAPER_INK.surface}`,
     "surface-strong": `${ink}${PAPER_INK["surface-strong"]}`,
     border: `${ink}${PAPER_INK.border}`,
@@ -311,7 +322,7 @@ export function presetPaperStage(
     accent: light.accent,
     star: `${ink}${PAPER_INK.star}`,
     "star-faint": `${ink}${PAPER_INK["star-faint"]}`,
-    veil: `${light.canvas.slice(0, 7)}e0`,
+    veil: `${light["panel-surface"].slice(0, 7)}e0`,
     "q-light": light["q-light"],
     "q-sweep": light["q-light"],
     "q-ember": light["q-ember"],
@@ -355,6 +366,34 @@ export function contrastPairs(
       mode["surface-subtle"],
     ),
     pair("Quiet text on cards", mode["text-tertiary"], mode.surface),
+    pair("Quiet text on the page", mode["text-tertiary"], mode.canvas),
+    pair(
+      "Secondary text in a sunken well",
+      mode["text-secondary"],
+      mode["surface-sunken"],
+    ),
+    pair(
+      "Quiet text in a sunken well",
+      mode["text-tertiary"],
+      mode["surface-sunken"],
+    ),
+    pair(
+      "Body text on the sidebar and Q's pane",
+      mode["text-primary"],
+      mode["panel-surface"],
+    ),
+    pair(
+      "Secondary text on the sidebar and Q's pane",
+      mode["text-secondary"],
+      mode["panel-surface"],
+    ),
+    pair(
+      "Field and control borders against the page",
+      mode["border-strong"],
+      mode.canvas,
+      3,
+    ),
+    pair("Focus ring in a sunken well", mode.accent, mode["surface-sunken"], 3),
     pair("Accent links on cards", mode.accent, mode["surface-raised"]),
     pair("Accent links on the page", mode.accent, mode.canvas),
     pair("Button label on the accent", mode["text-inverse"], mode.accent),

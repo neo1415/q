@@ -27,27 +27,32 @@
 
   /* Surfaces: canvas → section → surface → raised overlay. */
   /* Clean neutral white (client feedback UX-03, boss 2026-11-04): no
-     cream or warm tint in any surface; greys carry no chroma. */
-  --cq-canvas: oklch(1 0 0);
+     cream or warm tint in any surface; greys carry no chroma. Layered as
+     the dark theme is (owner 9 Nov: light read flat, one white): the page
+     a step below white, cards on white, the sidebar and Q's pane on the
+     panel step between, wells below the page. */
+  --cq-canvas: oklch(0.962 0 0);
   --cq-surface: oklch(1 0 0);
   --cq-surface-raised: oklch(1 0 0);
-  --cq-surface-subtle: oklch(0.982 0 0);
+  --cq-surface-subtle: oklch(0.95 0 0);
+  --cq-panel-surface: oklch(0.992 0 0);
   /* The tile behind a company logo: light in both themes, because logos
      are made for a light ground (acceptance 2026-11-04: a dark mark with
      clear pixels vanished on the dark stage). */
   --cq-logo-tile: oklch(0.985 0 0);
-  --cq-surface-strong: oklch(0.94 0 0);
+  --cq-surface-strong: oklch(0.925 0 0);
   /* Below the canvas: a person's own message, a well an answer sits in. */
-  --cq-surface-sunken: oklch(0.968 0 0);
+  --cq-surface-sunken: oklch(0.948 0 0);
 
   --cq-text-primary: oklch(0.19 0.012 258);
   --cq-text-secondary: oklch(0.43 0.012 258);
   --cq-text-tertiary: oklch(0.53 0.01 258);
   --cq-text-inverse: oklch(0.98 0.004 92);
 
-  --cq-border-subtle: oklch(0.91 0.006 258);
-  --cq-border: oklch(0.86 0.008 258);
-  --cq-border-strong: oklch(0.71 0.012 258);
+  --cq-border-subtle: oklch(0.895 0.006 258);
+  --cq-border: oklch(0.845 0.008 258);
+  /* A field's edge: 3:1 against the page and cards (WCAG 1.4.11). */
+  --cq-border-strong: oklch(0.62 0.012 258);
 
   /* One accent: primary action, active navigation, selection, Q. */
   --cq-accent: oklch(0.53 0.18 258);
@@ -178,7 +183,7 @@
    * (globals.css), which pins the stage tokens to the night in both themes,
    * so a video on a light page sits in its own dark frame.
    */
-  --cq-stage-canvas: oklch(1 0 0);
+  --cq-stage-canvas: oklch(0.992 0 0);
   /* The Q Card (founder design 2026-09-28): a card with a thin lit edge
      and one soft arc of light. Light theme: paper card, blue edge. */
   --cq-qcard-surface: oklch(0.985 0.006 258);
@@ -296,6 +301,7 @@
     --cq-logo-tile: oklch(0.94 0 0);
     --cq-surface-strong: oklch(0.34 0 0);
     --cq-surface-sunken: oklch(0.205 0 0);
+    --cq-panel-surface: oklch(0.268 0 0);
     --cq-text-primary: oklch(0.95 0.005 92);
     --cq-text-secondary: oklch(0.8 0 0);
     --cq-text-tertiary: oklch(0.7 0 0);
@@ -382,6 +388,7 @@
   --cq-logo-tile: oklch(0.94 0 0);
   --cq-surface-strong: oklch(0.34 0 0);
   --cq-surface-sunken: oklch(0.205 0 0);
+  --cq-panel-surface: oklch(0.268 0 0);
   --cq-text-primary: oklch(0.95 0.005 92);
   --cq-text-secondary: oklch(0.8 0 0);
   --cq-text-tertiary: oklch(0.7 0 0);
