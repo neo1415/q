@@ -2,6 +2,14 @@
 
 > **DEPLOYED 2026-11-04 09:49 UTC:** web on `d25c0843c` (CI green); q-api on `c53a08055`; api and workers on `b10cd6c87`. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing. Live-checked as a fictional investor: switch on a fresh page, no opening lists. **Newest audit: `Q_MULTIMODAL_DEMO_AUDIT_2026-11-04.md`, including a P0: text typed in the ~3.5 s before hydration is destroyed.**
 
+## DEPLOYED e107d7040 — 9 November 2026, 18:13 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- All four Railway services are on `e107d7040` (batch 23); rollback `06334c09b` (batch 22, live 17:11 UTC).
+- Batch 22 (W3): Word documents read section by section (the owner's TERMS docx: 0 → 10 pages, 34,624 characters); "what's this about" right after an upload means that file; "reading it now" while a file processes; real failure reasons.
+- Batch 23 (W3): migration `20261231490000` (`q_runtime.conversation_messages.attachments`, applied on hosted before the deploy; hosted 292/292 in sync). A turn keeps the files it carried; workers `pg_notify q_document_ready_wake` → q-api posts the follow-up answer once a file finishes reading.
+- CI run 42669835503 green (the first run, 42667454783, failed pgTAP: a separate CHECK called `jsonb_array_length` on a non-array → 22023; fixed with a CASE in e107d7040 before the migration was ever applied).
+- **Live-verified 18:25 UTC** (fictional investor.savanna-seed): uploaded a fictional .txt memo in Q's composer, asked "What is this document about?". Q answered from the file with a page cite; the USER row stores `[{title:"memo", documentId}]`; the chip shows before and after a reload.
+
 ## DEPLOYED 25ebc4c60 — 9 November 2026, 13:08 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 - All four Railway services are on `25ebc4c60` (batch 19); rollback `c92789167`.

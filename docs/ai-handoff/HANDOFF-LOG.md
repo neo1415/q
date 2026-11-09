@@ -2208,3 +2208,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - The client in Doha sees the app's offline fallback: his network can't reach *.up.railway.app. Recommended a custom domain; CQ_WEB_ORIGIN is the only code setting.
   - The "Bawo" greeting stays (the persona is Q's read of the person).
   - "Priya" is the owner's founder test account's own name.
+
+## 2026-11-09 18:30 UTC — batches 22 and 23 live (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Batch 22 `06334c09b` live 17:11 (docx sections as pages; attachedOnThisTurn; READING/FAILED honesty). Owner's TERMS docx re-read: 10 pages, 34,624 chars.
+- Batch 23 `e107d7040` live 18:13: the attachments column (migration 20261231490000, applied first) and the doc-ready follow-up. The pgTAP fix (CASE guard) went in before the hosted apply.
+- Live check: the attachment chip survives a reload; Q answers about the uploaded file with a page cite. The auto follow-up (a file still READING when asked) is test-covered only, not live-exercised: the .txt finished before the question.
+- Gate script now refuses to push to CI when any vitest test fails.
+- Next: the paid voice e2e (D85) needs a UDP-capable runner (cloud sandbox has no UDP for WebRTC); the owner's own voice test is the fastest check. Owner items unchanged (HANDOFF-2026-11-09.md §5).
