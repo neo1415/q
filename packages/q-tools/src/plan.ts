@@ -56,8 +56,16 @@ export function planScopeKinds(
  * about. Their own company: a COMPANY_PROFILE under its owner label
  * (organisation_private; a disclosed one never carries it). Their own
  * investor organisation: an INVESTOR_MANDATE, which the firewall admits to
- * its owner alone. Read from the plan, never from the request.
+ * its owner alone, or (batch 19, a plan preparing an action holds no
+ * mandate) an INVESTOR_PROFILE under an owner's label. Read from the plan,
+ * never from the request.
  */
+/** The labels the firewall gives a scope only on its owner's side. */
+const OWNER_LABELS: ReadonlySet<string> = new Set([
+  "organisation_private",
+  "investor_private",
+]);
+
 export function ownOrganisationPurposes(
   plan: Pick<PermittedContextPlan, "scopes">,
 ): readonly ("OWN_COMPANY_QUESTION" | "INVESTOR_QUESTION")[] {
@@ -71,7 +79,14 @@ export function ownOrganisationPurposes(
   ) {
     out.push("OWN_COMPANY_QUESTION");
   }
-  if (plan.scopes.some((scope) => scope.kind === "INVESTOR_MANDATE")) {
+  if (
+    plan.scopes.some(
+      (scope) =>
+        scope.kind === "INVESTOR_MANDATE" ||
+        (scope.kind === "INVESTOR_PROFILE" &&
+          OWNER_LABELS.has(scope.contextLabel)),
+    )
+  ) {
     out.push("INVESTOR_QUESTION");
   }
   return out;

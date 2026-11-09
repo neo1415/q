@@ -1130,6 +1130,68 @@ describe("the mandate form, one generated tool for its four declarations", () =>
     expect(says).toContain("nothing changes until you approve it");
   });
 
+  it("batch 19 (run 9d1edc9a): an investor on a turn about a company is offered their mandate change, never a founder's raise change, and it comes first on their own-record turn", () => {
+    const CLINICREST = "0c000000-0000-4000-8000-0000000000c1";
+    const base = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
+      { kind: "OWN_Q_CONVERSATION", sensitivity: "CONFIDENTIAL" },
+      {
+        kind: "COMPANY_PROFILE",
+        sensitivity: "NETWORK_VISIBLE",
+        companyId: CLINICREST,
+      },
+      {
+        kind: "INVESTOR_PROFILE",
+        sensitivity: "INTERNAL",
+        investorOrganisationId: ORG_INVESTOR,
+      },
+      {
+        kind: "INVESTOR_MANDATE",
+        sensitivity: "CONFIDENTIAL",
+        investorOrganisationId: ORG_INVESTOR,
+      },
+    ]);
+    const plan: PermittedContextPlan = {
+      ...base,
+      scopes: base.scopes.map((scope) =>
+        scope.kind === "OWN_Q_CONVERSATION"
+          ? { ...scope, filter: { ...scope.filter, userId: actorA.userId } }
+          : scope.kind === "COMPANY_PROFILE"
+            ? { ...scope, contextLabel: "network_visible" }
+            : { ...scope, contextLabel: "investor_private" },
+      ),
+    };
+    const { registry } = mandates();
+    // What the turn reader is told it can do (registry.available).
+    const available = (
+      registry.available?.(contextFor(actorA, plan)) ?? []
+    ).map(({ definition }) => definition.providerName);
+    expect(available).toContain("change_my_mandate");
+    expect(available).not.toContain("change_my_raise");
+    // The reader named their own mandate change: offered in round one.
+    const offered = registry
+      .eligible({
+        ...contextFor(actorA, plan),
+        focus: { areas: ["Records"], tools: ["change_my_mandate"] },
+      })
+      .map(({ definition }) => definition.providerName);
+    expect(offered).toContain("change_my_mandate");
+    expect(offered).not.toContain("change_my_raise");
+    // Read as about their own records with nothing named: within the
+    // bound, whatever the purpose's list (no use_capability round).
+    const ownTurn = registry
+      .eligible({
+        ...contextFor(actorA, plan),
+        focus: {
+          areas: ["Records", "Relationships", "Research", "Documents"],
+          tools: [],
+          widen: true,
+          ownRecords: true,
+        },
+      })
+      .map(({ definition }) => definition.providerName);
+    expect(ownTurn).toContain("change_my_mandate");
+  });
+
   it("closing their mandate prepares the close itself, with nothing else to change", async () => {
     const { executor, prepared } = mandates();
     await executor.execute(
