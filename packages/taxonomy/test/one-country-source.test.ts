@@ -48,6 +48,8 @@ const ALLOWED: Readonly<Record<string, string>> = {
   // The canonical source.
   "packages/taxonomy/src/reference-data/geography.ts":
     "the canonical source: the geography vocabulary's ISO 3166-1 nodes",
+  "packages/taxonomy/src/countries/index.ts":
+    "the canonical source's own reader: everyday names for its countries (USA, UK) and the names that clash with a place (Georgia, New Mexico), keyed to its ISO codes",
   // Published definitions are immutable: v1-v7 keep the option list their
   // sessions answered; v8 replaced it with the geography taxonomy.
   "packages/founder-onboarding/src/definition/founder-v1.ts":

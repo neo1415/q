@@ -133,6 +133,7 @@ export {
   countryOfCanonicalCode,
   countryOfIso,
   countryOfName,
+  countryNamedIn,
   countryOfNodeId,
   isIsoCountryCode,
   type IsoCountry,

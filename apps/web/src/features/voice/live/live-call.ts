@@ -18,7 +18,7 @@ import { interceptHeard } from "../heard-intercept";
 import { watchSpokenMove } from "../use-follow-turn";
 import { idleEnds } from "./line-hold";
 import { noteForMove, receiptListener, type MoveOutcome } from "./move";
-import { createReplyLine } from "./reply-line";
+import { createReplyLine, interruptsReply } from "./reply-line";
 import {
   boundedContent,
   createLiveBridge,
@@ -804,8 +804,12 @@ export async function startLiveCall(
         heardWords(ms);
         lastInputAt = ms;
         lastSpeechAt = performance.now();
-        // Interrupted mid-sentence: what it had said is still kept.
-        reply.interrupted();
+        // Interrupted mid-sentence: what it had said is still kept. Only a
+        // real interruption ends Q's reply: a "mm" or Q's own voice heard
+        // back cut Q's lines mid-sentence (owner, live onboarding 9 Nov).
+        if (interruptsReply((utterance?.text ?? "") + delta, reply.saying())) {
+          reply.interrupted();
+        }
         if (utterance === null) {
           // A new turn of theirs: whatever the voice answers is its own
           // until it hands this one to Q.

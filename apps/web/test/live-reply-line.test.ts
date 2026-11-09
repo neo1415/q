@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
   createReplyLine,
+  interruptsReply,
   type ReplyTranscript,
 } from "../src/features/voice/live/reply-line";
 
@@ -105,5 +109,58 @@ describe("Q's reply on the live line", () => {
     line.end();
     expect(kept).toEqual(["I was saying", "Another"]);
     expect(line.open()).toBe(false);
+  });
+});
+
+/**
+ * Owner, live voice onboarding 9 Nov (production c92789167): Q's lines
+ * were kept cut mid-sentence ("And on cheque sizes,", "even pre-re"). The
+ * live call ended Q's reply on the first word heard from the person, so a
+ * "mm", a "yes" or Q's own voice heard back split Q's sentence; the rest
+ * became another line, and the read-back of their cheques was never one
+ * line their "yes" could agree to.
+ */
+describe("a reply ends on a real interruption only", () => {
+  it.each(["mm", "Mm-hmm.", "yeah", "Okay, right.", "yes", "uh huh"])(
+    "%s is a backchannel, not an interruption",
+    (heard) => {
+      expect(interruptsReply(heard, "And on cheque sizes, what's your")).toBe(
+        false,
+      );
+    },
+  );
+
+  it("Q's own words heard back are not an interruption", () => {
+    expect(
+      interruptsReply(
+        "on cheque sizes",
+        "And on cheque sizes, what's your smallest?",
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    "What did you say?",
+    "Wait, sorry",
+    "Yes, I am",
+    "No, it's 3 million",
+  ])("%s interrupts", (heard) => {
+    expect(interruptsReply(heard, "And on cheque sizes, what's your")).toBe(
+      true,
+    );
+  });
+
+  it("the live call asks before it ends Q's reply", () => {
+    const call = readFileSync(
+      resolve(import.meta.dirname, "../src/features/voice/live/live-call.ts"),
+      "utf8",
+    );
+    const calls = [...call.matchAll(/reply\.interrupted\(\)/gu)];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const found of calls) {
+      expect(call.slice(Math.max(0, found.index - 120), found.index)).toContain(
+        "if (interruptsReply(",
+      );
+    }
   });
 });

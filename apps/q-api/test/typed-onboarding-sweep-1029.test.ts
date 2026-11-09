@@ -9,11 +9,7 @@ import type {
 } from "@capital-q/model-gateway/q";
 import { createLogger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
-import {
-  ISO_COUNTRIES,
-  countryOfIso,
-  countryOfNodeId,
-} from "@capital-q/taxonomy/countries";
+import { countryOfIso } from "@capital-q/taxonomy/countries";
 import { REFERENCE_TAXONOMY } from "@capital-q/taxonomy/reference-data";
 
 import { createOnboardingConversation } from "../src/voice/onboarding-conversation.js";
@@ -433,9 +429,10 @@ describe("sweep D2: a country named with more detail", () => {
         resourceType: "TAXONOMY_NODE",
         resourceIds: [nodeId],
       });
-      // Offered every country and no region: one country is the answer.
-      expect(new Set(offered).size).toBe(ISO_COUNTRIES.length);
-      expect(offered.every((id) => countryOfNodeId(id) !== null)).toBe(true);
+      // Owner, live duplex voice 9 Nov: a country their words name is read
+      // by code against the one country list (countryNamedIn), so no model
+      // chooser is needed; it was "offered every country" before.
+      expect(offered).toEqual([]);
     });
   }
 });
