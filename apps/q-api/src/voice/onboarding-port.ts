@@ -51,7 +51,7 @@ import {
 } from "@capital-q/onboarding";
 import { cleanedFromTheirLine } from "@capital-q/q-core";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
-import { countryOfNodeId } from "@capital-q/taxonomy/countries";
+import { countryNamedIn, countryOfNodeId } from "@capital-q/taxonomy/countries";
 import type { Logger } from "@capital-q/observability";
 import { turnIsEnglish } from "./reply-language.js";
 
@@ -2083,6 +2083,21 @@ export function createOnboardingPort(input: {
       /** Categories the lookup named exactly, with the phrase it named. */
       const exactPhrase = new Map<string, string>();
       for (const phrase of phrases) {
+        // A country step: the country their words name, read by code
+        // against the one country list first (owner, live duplex voice
+        // 9 Nov: "San Francisco, California, in the USA" matched nothing
+        // in the lookup, was refused on every reading, and Q asked again
+        // four times). Their phrase, else their own words for it.
+        const named = countryOnly
+          ? (countryNamedIn(phrase) ?? countryNamedIn(answer.quote))
+          : null;
+        if (named !== null) {
+          const id = named.country.nodeId;
+          if (!ids.includes(id)) ids.push(id);
+          nodeNames.set(id, named.country.name);
+          exactPhrase.set(id, named.words);
+          continue;
+        }
         const looked: TaxonomyCandidateResponse = await findTaxonomyCandidates(
           input.session,
           {

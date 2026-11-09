@@ -6,6 +6,7 @@ import {
   countryOfCanonicalCode,
   countryOfIso,
   countryOfName,
+  countryNamedIn,
   countryOfNodeId,
   isIsoCountryCode,
 } from "../src/countries/index.js";
@@ -60,5 +61,39 @@ describe("the canonical country list", () => {
     expect(countryOfName("Copenhagen, Denmark")).toBeNull();
     expect(countryOfName("somewhere nice")).toBeNull();
     expect(countryOfName("")).toBeNull();
+  });
+});
+
+describe("countryNamedIn (owner, live duplex voice 9 Nov)", () => {
+  it.each([
+    ["USA", "US"],
+    ["U.S.A.", "US"],
+    ["the US", "US"],
+    ["Yes, I'm in the US", "US"],
+    ["It's based in um, San Francisco, California, in the USA", "US"],
+    ["United States of America", "US"],
+    ["United States", "US"],
+    ["America", "US"],
+    ["Santa Fe, New Mexico", "US"],
+    ["London, UK", "GB"],
+    ["Amsterdam, the Netherlands", "NL"],
+    ["Lagos, Nigeria", "NG"],
+    ["Côte d'Ivoire", "CI"],
+  ])("%s → %s", (words, iso) => {
+    expect(countryNamedIn(words)?.country.iso).toBe(iso);
+  });
+
+  it.each([
+    "send it to us",
+    "San Francisco",
+    "Atlanta, Georgia",
+    "Nigeria and Ghana",
+    "",
+  ])("%s → none", (words) => {
+    expect(countryNamedIn(words)).toBeNull();
+  });
+
+  it("returns the words that name it, as said", () => {
+    expect(countryNamedIn("in the USA")?.words).toBe("the USA");
   });
 });

@@ -42,6 +42,8 @@ export type ReplyLine = {
   /** The call ended: what was said is kept. */
   readonly end: () => void;
   readonly open: () => boolean;
+  /** What Q has said so far in this reply ("" when none is open). */
+  readonly saying: () => string;
 };
 
 export function createReplyLine(deps: ReplyLineDependencies): ReplyLine {
@@ -103,5 +105,56 @@ export function createReplyLine(deps: ReplyLineDependencies): ReplyLine {
     interrupted: drop,
     end: drop,
     open: () => reply !== null,
+    saying: () => reply?.text ?? "",
   };
+}
+
+/** Words that only keep the speaker going: never a turn of their own. */
+const BACKCHANNEL = new Set([
+  "mm",
+  "mmm",
+  "hmm",
+  "mhm",
+  "mm-hmm",
+  "uh-huh",
+  "uh",
+  "huh",
+  "um",
+  "ah",
+  "oh",
+  "yeah",
+  "yes",
+  "yep",
+  "ok",
+  "okay",
+  "right",
+  "sure",
+  "got",
+  "it",
+  "i",
+  "see",
+]);
+
+const wordsOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .replace(/[’']/gu, "'")
+    .match(/[a-z0-9'-]+/gu) ?? [];
+
+/**
+ * Whether what the person has said so far over Q's reply ends it (owner,
+ * live voice onboarding 9 Nov: Q's lines were kept cut mid-sentence on a
+ * "mm"). A backchannel ("mm", "yeah", "okay, right") keeps the reply
+ * going, as does Q's own voice heard back (its words are in what Q is
+ * saying). Anything else is the person taking the turn.
+ */
+export function interruptsReply(heard: string, qSaying: string): boolean {
+  const words = wordsOf(heard);
+  if (words.length === 0) return false;
+  if (words.every((word) => BACKCHANNEL.has(word))) return false;
+  const saying = ` ${wordsOf(qSaying).join(" ")} `;
+  if (words.length >= 2 && saying.includes(` ${words.join(" ")} `)) {
+    return false;
+  }
+  return true;
 }

@@ -805,15 +805,27 @@ export function createOnboardingConversation(dependencies: {
     // it); from anything else it is held for their yes, whatever the
     // reading calls its source. Code decides; the label is not the guard.
     const askOnly = coverageProfileFor(line.onboarding.journeyType).fields;
+    // Owner, live duplex voice 9 Nov: a spoken line keeps Q's words with
+    // no step (the realtime model asks in its own words), so "Yes, I am"
+    // to "Are you actively investing right now?" was held as unasked on
+    // every reading to the end. Where Q's line before their words names no
+    // step, the reading's own attribution counts, as it does for a skip:
+    // their words answered a question about this step (aboutStep), or
+    // agreed to Q's own read-back of it (affirms).
     const fromQuestion = (answer: {
       readonly stepKey: string;
       readonly quote: string;
+      readonly aboutStep?: boolean | undefined;
+      readonly affirms?: boolean | undefined;
     }): boolean =>
       askOnly[answer.stepKey]?.askOnly !== true ||
       personSaid.some(
         (turn) =>
-          turn.asked === answer.stepKey &&
-          quotedFrom(answer.quote, [turn.text]),
+          quotedFrom(answer.quote, [turn.text]) &&
+          (turn.asked === answer.stepKey ||
+            (turn.asked === undefined &&
+              turn.askedAt >= 0 &&
+              (answer.aboutStep === true || answer.affirms === true))),
       );
     const unasked = answers.filter(
       (answer) => answer.source !== "INFERRED" && !fromQuestion(answer),

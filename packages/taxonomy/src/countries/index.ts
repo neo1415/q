@@ -177,3 +177,97 @@ export function countryOfName(
   const iso = byName().get(fold(words));
   return iso === undefined ? null : countryOfIso(iso);
 }
+
+/**
+ * Everyday names for a country that are not its reference or ICU name
+ * (owner, live duplex voice 9 Nov: "in the USA" was never saved, and Q
+ * asked for the country four times). Lowercase, punctuation already
+ * dropped ("U.S.A." is "usa").
+ */
+const EVERYDAY_NAMES: Readonly<Record<string, string>> = {
+  usa: "US",
+  "united states of america": "US",
+  "the united states": "US",
+  "the states": "US",
+  "the us": "US",
+  "the usa": "US",
+  america: "US",
+  "new mexico": "US",
+  uk: "GB",
+  "the uk": "GB",
+  britain: "GB",
+  "great britain": "GB",
+  england: "GB",
+  scotland: "GB",
+  wales: "GB",
+  "northern ireland": "GB",
+  uae: "AE",
+  "the uae": "AE",
+  emirates: "AE",
+  "the emirates": "AE",
+  holland: "NL",
+  "the netherlands": "NL",
+  "south korea": "KR",
+  korea: "KR",
+  "ivory coast": "CI",
+  drc: "CD",
+};
+
+/**
+ * Names that are also somewhere else, so never a country by themselves in
+ * a sentence: Georgia (the US state).
+ */
+const CLASHING_NAMES: ReadonlySet<string> = new Set(["georgia"]);
+
+/**
+ * The one country a short answer names, and the words that name it: the
+ * answer as a country's name, or a country named inside it ("San Francisco,
+ * California, in the USA" names the US). Null when it names none, or more
+ * than one (that is for the person, or the chooser, to settle). A
+ * lowercase "us" is the pronoun, never the country, unless "the us".
+ */
+export function countryNamedIn(
+  words: string | null | undefined,
+): { readonly country: IsoCountry; readonly words: string } | null {
+  if (words === null || words === undefined) return null;
+  const exact = countryOfName(words);
+  if (exact !== null) return { country: exact, words: words.trim() };
+  // Tokens with their surface form: "U.S.A." is one token, "usa".
+  const tokens = [...words.matchAll(/[\p{L}\p{N}][\p{L}\p{N}.'’-]*/gu)].map(
+    (match) => {
+      const surface = match[0].replace(/\.+$/u, "");
+      return {
+        surface,
+        key: fold(surface.replace(/\./gu, "")),
+      };
+    },
+  );
+  const found = new Map<string, string>();
+  const names = byName();
+  // Longest first, so "new mexico" is read before "mexico".
+  const taken = new Set<number>();
+  for (let size = 4; size >= 1; size -= 1) {
+    for (let at = 0; at + size <= tokens.length; at += 1) {
+      const span = tokens.slice(at, at + size);
+      if (span.some((_, i) => taken.has(at + i))) continue;
+      const key = span.map((token) => token.key).join(" ");
+      const surface = span.map((token) => token.surface).join(" ");
+      if (CLASHING_NAMES.has(key)) continue;
+      // "us" alone counts only as written "US" or "U.S."
+      if (key === "us" && !/^U\.?S$/u.test(surface)) continue;
+      const iso =
+        EVERYDAY_NAMES[key] ??
+        (key === "us" ? "US" : undefined) ??
+        names.get(key);
+      if (iso === undefined) continue;
+      for (let i = 0; i < size; i += 1) taken.add(at + i);
+      if (!found.has(iso)) found.set(iso, surface);
+    }
+  }
+  if (found.size !== 1) return null;
+  const [iso, surface] = [...found][0] ?? [];
+  const country = countryOfIso(iso);
+  return country === null || surface === undefined
+    ? null
+    : { country, words: surface };
+}
