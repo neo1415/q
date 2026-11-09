@@ -340,3 +340,10 @@ Core Seven remains the governing assessment framework. The new directive authori
 82. **Owner away; the integration owner decides** (owner, 8 Nov 2026 ~08:00 UTC: "take over for now for everything including decisions"). Until the owner returns, the integration owner (session_01Wncmn73d4XJWmh1N9ECao7) makes product and engineering decisions within the locked PADL, the CLAUDE.md invariants and DECISIONS 68–81. Each decision taken is recorded here, marked "integration owner under D82", for the owner to review. The binding rules are unchanged: fictional accounts only; no weakening of RLS, the Context Firewall or approval binding; CI before every deploy with a rollback kept; no paid OpenAI evals; test spend under $50.
     - First decisions under D82: the three D81 questions take W5's proposals (explicit nones saved at once and included in the playback; identity facts played back with their topic; "why" answers kept as a private note).
 83. **Uploads are not held for a virus scan** (owner, 9 Nov 2026 ~09:00 UTC: "please forget the virus scanner"). A file a person uploads appears in its place (messages, documents, data room) as soon as the upload completes. No scan gates its visibility. File type and size limits, storage authorization and signed access stay as they are.
+84. **No email confirmation at sign-up, for now** (owner, 9 Nov 2026 ~12:20 UTC: "the verification emails are not being sent, can we just remove those for now… i need to be able to register and login asap").
+    - Supabase Auth `mailer_autoconfirm` set to true on the hosted project, through the management API.
+    - Sign-up now returns a session at once; the web already redirects into the app when a session comes back (signUpWithPasswordAction).
+    - Verified with a fictional sign-up: a session and a confirmed address at once.
+    - The 4 older unconfirmed accounts (none from the last 7 days) are left untouched.
+    - Turn it back on (mailer_autoconfirm false) once email delivery works.
+    - Separate from Capital Q's identity and organisation verification (verification_claims), which is unchanged.
