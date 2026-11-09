@@ -113,7 +113,7 @@ describe("ONBOARDING_TRANSCRIPT_READER v15 and ONBOARDING_TYPED_REPLY v8 (P1-1)"
   const reply = registry.getActive("ONBOARDING_TYPED_REPLY").definition;
 
   it("carry into the active versions (reader v17, reply v9: DECISIONS 79)", () => {
-    expect(reader.version).toBe(17);
+    expect(reader.version).toBe(18);
     expect(reply.version).toBe(11);
   });
 
@@ -226,7 +226,7 @@ describe("batch 7: None answers a required list; drafts for the one line and the
   ).definition;
 
   it('a required list marked "(none is an answer)" with nothing for them is declined', () => {
-    expect(reader.version).toBe(17);
+    expect(reader.version).toBe(18);
     expect(reader.template).toMatch(
       /a required step whose question ends "\(none is an answer\)"[^\n]*goes under declined/u,
     );
