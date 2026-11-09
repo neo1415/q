@@ -307,7 +307,7 @@ export function QSheetConversation({
                         const text = attachmentQuestion(typed);
                         if (text.length === 0 || interceptTyped(text)) return;
                         voice.client.sendText(text);
-                        markAttachmentsSent();
+                        markAttachmentsSent(text);
                       }
                     : async (typed: string) => {
                         // Lane 8: Send on an attached document alone asks
@@ -323,7 +323,7 @@ export function QSheetConversation({
                             ? undefined
                             : { viewing: viewingOf(moment) },
                         );
-                        markAttachmentsSent();
+                        markAttachmentsSent(text);
                       },
                 // Lane 8: a document attached here goes to their own
                 // organisation's documents (never the company on screen,

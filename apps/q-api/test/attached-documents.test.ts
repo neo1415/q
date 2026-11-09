@@ -217,6 +217,48 @@ describe("attached document reads", () => {
     expect(slept).toBe(0);
   });
 
+  // Owner live 9 Nov: a .docx with no text read as "it may be a scan". The
+  // reason Q gives is the true one for what happened to that file.
+  it.each([
+    [
+      "a Word file with no text",
+      {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        textExtractionStatus: "FAILED",
+      },
+      /found no text/u,
+    ],
+    ["a PDF with no text layer", { textExtractionStatus: "FAILED" }, /scan/u],
+    [
+      "a format with no reader yet",
+      {
+        mimeType: "application/rtf",
+        processingStatus: "FAILED",
+        textExtractionStatus: "UNSUPPORTED",
+      },
+      /can't read this kind of file yet/u,
+    ],
+    [
+      "a file that could not be opened",
+      { processingStatus: "FAILED", textExtractionStatus: "FAILED" },
+      /damaged or password-protected/u,
+    ],
+  ] as const)("%s: says so, never a guess", async (_name, state, reason) => {
+    const reads = createAttachedDocumentReads({
+      sql: fakeSql([]).sql,
+      get: evidenceOf([version(state)]),
+      list: () => Promise.resolve([]),
+    });
+    const out = await reads.read(actorA, { documentId: DOC });
+    expect(out?.document).toMatchObject({ state: "UNREADABLE" });
+    const said = (out?.document as { reason?: string } | null)?.reason ?? "";
+    expect(said).toMatch(reason);
+    if ("mimeType" in state && state.mimeType.includes("word")) {
+      expect(said).not.toMatch(/scan/u);
+    }
+  });
+
   it("a long document: its opening and the pages that answer the question", async () => {
     const long = "x".repeat(3_000);
     const rows = Array.from({ length: 10 }, (_, index) => ({

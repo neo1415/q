@@ -42,12 +42,28 @@ function named(titles: readonly string[]): string {
   return quoted.length === 0 ? "the document they attached" : quoted.join(", ");
 }
 
+/**
+ * What became of a document attached on this turn: read, still being read,
+ * or one that cannot be read.
+ */
+export type AttachedDocumentState = "READ" | "READING" | "UNREADABLE";
+
 /** The trusted turn note for a turn with an attached document read. */
 export function attachedDocumentNote(
   titles: readonly string[],
   intent: AttachedDocumentIntent,
+  state: AttachedDocumentState = "READ",
 ): string {
   const which = named(titles);
+  // Owner live 9 Nov: "whats this one about?" right after an upload was
+  // answered about the page on screen, because the file was still being
+  // read and only a read file had a note. The file is what they mean.
+  if (state === "READING") {
+    return `THEY JUST ATTACHED ${which}, AND "THIS" / "IT" MEANS THAT FILE, never the page on screen. It is still being read. Say in one short line that you are reading it now and will answer as soon as it is read; say nothing about the page or anything else, and do not guess what it says.`;
+  }
+  if (state === "UNREADABLE") {
+    return `THEY JUST ATTACHED ${which}, AND "THIS" / "IT" MEANS THAT FILE, never the page on screen. It can't be read: say why in one line, in the words of its reason, and what would work instead. Say nothing about the page and do not guess what it says.`;
+  }
   switch (intent) {
     case "SUMMARY":
       return `THEY ATTACHED ${which} AND WANT TO KNOW WHAT IT IS AND SAYS. Open with what it is in one sentence, then its key points and numbers as written, each cited (p. N). Put those points in findings as FACT or OBSERVATION. This turn has no RISK or GAP findings and at most one missingEvidence item; do not open with what is missing, weak or unverified, and do not grade it. End with one short line offering your critical read (for example "Want my read on what's weak?"). What it says is their document's claim, so say "it says", never that it is verified.`;
@@ -56,4 +72,44 @@ export function attachedDocumentNote(
     case "QUESTION":
       return `THEY ARE ASKING ABOUT ${which}. Answer exactly what they asked from its text, cited (p. N), first. Add no critique they did not ask for; if the answer is not in it, say so plainly.`;
   }
+}
+
+/**
+ * The documents attached on this turn -- uploaded after their previous
+ * message (or with none before) -- and what became of them, from the
+ * read_attached_document results. Read wins over still-being-read, which
+ * wins over unreadable: the note is about what can be said now. Null when
+ * nothing was attached on this turn.
+ */
+export function attachedOnThisTurn(
+  results: readonly unknown[],
+  previousTurnAt: string | null,
+): {
+  readonly titles: readonly string[];
+  readonly state: AttachedDocumentState;
+} | null {
+  const since = previousTurnAt === null ? null : Date.parse(previousTurnAt);
+  const byState = new Map<AttachedDocumentState, string[]>();
+  for (const data of results) {
+    if (typeof data !== "object" || data === null) continue;
+    const status: unknown = Reflect.get(data, "status");
+    const title: unknown = Reflect.get(data, "title");
+    const uploadedAt: unknown = Reflect.get(data, "uploadedAt");
+    if (
+      (status !== "READ" && status !== "READING" && status !== "UNREADABLE") ||
+      typeof title !== "string"
+    ) {
+      continue;
+    }
+    const at = typeof uploadedAt === "string" ? Date.parse(uploadedAt) : NaN;
+    // An upload time we cannot read is not taken as new.
+    if (since !== null && !(Number.isFinite(at) && at > since)) continue;
+    if (since === null && !Number.isFinite(at)) continue;
+    byState.set(status, [...(byState.get(status) ?? []), title]);
+  }
+  for (const state of ["READ", "READING", "UNREADABLE"] as const) {
+    const titles = byState.get(state);
+    if (titles !== undefined && titles.length > 0) return { titles, state };
+  }
+  return null;
 }

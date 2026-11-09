@@ -172,7 +172,10 @@ export function createPostgresDocumentExtractionRepository(): DocumentExtraction
     listWithoutPages: async (executor, limit) => {
       const rows = await executor`
         ${selectExtractions(executor)}
-         where (coalesce(e.page_count, 0) > 0 or coalesce(e.slide_count, 0) > 0)
+         where (coalesce(e.page_count, 0) > 0 or coalesce(e.slide_count, 0) > 0
+                -- Owner live 9 Nov: an unpaged document (Word, text) is
+                -- read in sections; those extracted before have none yet.
+                or coalesce(e.block_count, 0) > 0)
            and not exists (
              select 1 from evidence.document_pages p where p.extraction_id = e.id)
          order by e.created_at, e.id

@@ -76,11 +76,26 @@ export function unreadableReason(version: Version): string | null {
   if (mime.startsWith("audio/")) {
     return "It is a recording; Q reads documents, not audio, here.";
   }
+  // Owner live 9 Nov: Q said "it may be a scan" of a Word file. The reason
+  // is the true one: a format with no reader yet, a file with no text in
+  // it (a scan only when it is a PDF), or a file that could not be opened.
+  if (version.textExtractionStatus === "UNSUPPORTED") {
+    return "Q can't read this kind of file yet. A PDF, Word (.docx), PowerPoint (.pptx), spreadsheet or text file works.";
+  }
+  const pdf = mime === "application/pdf";
+  if (
+    version.textExtractionStatus === "FAILED" &&
+    version.processingStatus === "COMPLETED"
+  ) {
+    return pdf
+      ? "It has no text layer: it looks like a scan or pictures of pages, and Q couldn't read them."
+      : "Q found no text in it: it looks empty, or its words are in pictures.";
+  }
   if (
     version.processingStatus === "FAILED" ||
     version.textExtractionStatus === "FAILED"
   ) {
-    return "The file couldn't be read: it may be damaged, password-protected or a scan with no text layer.";
+    return "The file couldn't be opened: it may be damaged or password-protected.";
   }
   return null;
 }
@@ -307,7 +322,9 @@ export function createAttachedDocumentReads(
             ...identity,
             state: "UNREADABLE",
             reason:
-              "It has no text Q can read: it may be a scan or made of pictures.",
+              version.mimeType.toLowerCase() === "application/pdf"
+                ? "It has no text Q can read: it looks like a scan or pictures of pages."
+                : "Its text isn't ready to read yet. Ask again in a moment.",
           },
           others,
         };

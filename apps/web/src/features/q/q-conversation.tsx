@@ -74,7 +74,9 @@ import {
   attachmentQuestion,
   markAttachmentsSent,
   Q_ATTACH_ACCEPT,
+  turnKey,
   useQAttachments,
+  useTurnAttachments,
   writtenAnswerNote,
 } from "./q-attachments";
 import { WorkingLine } from "@/components/working/working-line";
@@ -393,6 +395,7 @@ export function QConversationPanel({
    * organisation's own documents.
    */
   const attached = useQAttachments();
+  const turnFiles = useTurnAttachments();
   const attach = useCallback(
     (file: File) => attachToQ(file, context.companyId),
     [context.companyId],
@@ -958,7 +961,7 @@ export function QConversationPanel({
       if (text !== typed.trim()) {
         if (lineOpen) lineNote.current = { question: text, after: turnCount };
         await qAsk(text);
-        markAttachmentsSent();
+        markAttachmentsSent(text);
         return;
       }
       if (interceptTyped(text)) return;
@@ -983,7 +986,7 @@ export function QConversationPanel({
         endForTyping();
       }
       await qAsk(text);
-      markAttachmentsSent();
+      markAttachmentsSent(text);
     },
     [lineOpen, endForTyping, qAsk, turnCount, approvalWaiting],
   );
@@ -1642,6 +1645,25 @@ export function QConversationPanel({
                             <span className="sr-only">{t("You:")} </span>
                             {line.text}
                           </p>
+                          {/* Owner live 9 Nov: the files this turn carried. */}
+                          {(turnFiles[turnKey(line.text)]?.length ?? 0) > 0 ? (
+                            <ul
+                              aria-label={t("Attached")}
+                              className="mt-1 flex flex-wrap justify-end gap-2 self-end"
+                              data-q-turn-attachments
+                            >
+                              {(turnFiles[turnKey(line.text)] ?? []).map(
+                                (name) => (
+                                  <li
+                                    key={name}
+                                    className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+                                  >
+                                    {name}
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          ) : null}
                           <HideFromQ
                             conversationId={q.conversationId}
                             messageId={line.id}

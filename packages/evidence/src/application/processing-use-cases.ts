@@ -274,6 +274,13 @@ export const CompleteDocumentProcessingInputSchema = z
      * recorded NOT_SCANNED. Ignored when scannedClean is true.
      */
     notScanned: z.boolean().optional(),
+    /**
+     * Owner live 9 Nov: the parser ran and found no text at all (a Word
+     * file whose words never reached its extraction, a scan with no text
+     * layer nobody transcribed). The run completes, but its text is not
+     * "COMPLETED": it is FAILED, so every reader says why, never "done".
+     */
+    textless: z.boolean().optional(),
     provenance: z
       .object({
         extractorVersion: z.string().min(1).max(64).optional(),
@@ -341,7 +348,8 @@ export function createCompleteDocumentProcessing(
           versionId: parsed.documentVersionId,
           changes: {
             processingStatus: "COMPLETED",
-            textExtractionStatus: "COMPLETED",
+            textExtractionStatus:
+              parsed.textless === true ? "FAILED" : "COMPLETED",
             // Only a scanner's verdict may write CLEAN; an unscanned
             // document keeps the state it already had.
             ...(parsed.scannedClean

@@ -502,6 +502,8 @@ import {
 import {
   attachedDocumentIntent,
   attachedDocumentNote,
+  attachedOnThisTurn,
+  type AttachedDocumentState,
   type AttachedDocumentIntent,
 } from "./attached-document-intent.js";
 import { reRenderAskOf } from "./re-render.js";
@@ -791,6 +793,12 @@ export type QAuthorisedContextPort = {
      */
     readonly institutionalNotes?: string | undefined;
   }>;
+};
+
+/** A document attached on this turn, and what became of it (9 Nov). */
+type AttachedNow = {
+  readonly titles: readonly string[];
+  readonly state: AttachedDocumentState;
 };
 
 /** The tools that reach the public web; a re-render ask is offered none. */
@@ -2214,6 +2222,7 @@ export function environmentNoteParts(
       | {
           readonly titles: readonly string[];
           readonly intent: AttachedDocumentIntent;
+          readonly state?: AttachedDocumentState | undefined;
         }
       | undefined;
   } = {},
@@ -2294,6 +2303,7 @@ export function environmentNoteParts(
           attachedDocumentNote(
             options.attachedDocument.titles,
             options.attachedDocument.intent,
+            options.attachedDocument.state,
           ),
         ]),
     ...(options.spoken === true && options.writingDocument !== true
@@ -3731,6 +3741,9 @@ export function createModelGatewayQAnswer(
       request.discoverInvestors === undefined &&
       request.writingDocument !== true &&
       request.askedAction === undefined &&
+      // Owner live 9 Nov: a turn that carries their attached files is
+      // never answered by the arrival code, which skipped reading them.
+      (plan.screen?.attachedDocumentIds?.length ?? 0) === 0 &&
       (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
     /**
      * Speed lane C (production 2026-10-12): only a follow-up that code
@@ -3934,6 +3947,13 @@ export function createModelGatewayQAnswer(
     let attachedDocuments: readonly AuthorisedFact[] = [];
     /** The titles of those read this turn, for the turn note (23 Oct). */
     let attachedTitles: readonly string[] = [];
+    /**
+     * Owner live 9 Nov: the file attached on THIS turn (uploaded after
+     * their previous message; the composer sends every file of the
+     * conversation on every turn), whatever became of it, so "what's this
+     * about?" means the file even while it is still being read.
+     */
+    const attachedThisTurn: { now: AttachedNow | null } = { now: null };
     const attachmentRead = (async (): Promise<void> => {
       const ids = plan.screen?.attachedDocumentIds;
       if (ids === undefined || ids.length === 0) return;
@@ -3969,6 +3989,13 @@ export function createModelGatewayQAnswer(
         const title: unknown = Reflect.get(data, "title");
         return status === "READ" && typeof title === "string" ? [title] : [];
       });
+      attachedThisTurn.now = attachedOnThisTurn(
+        reads.map((outcome) =>
+          outcome?.result.ok === true ? outcome.result.data : null,
+        ),
+        earlier.filter((message) => message.role === "USER").at(-1)
+          ?.createdAt ?? null,
+      );
       attachedDocuments = attachedDocumentsWithin(
         reads.map((outcome) =>
           outcome?.result.ok === true
@@ -5406,6 +5433,7 @@ export function createModelGatewayQAnswer(
       onScreenDocument,
       attachedDocuments,
       attachedTitles,
+      attachedNow: (): AttachedNow | null => attachedThisTurn.now,
       compareFacts,
       compareIds,
       dataRoomFacts,
@@ -5801,6 +5829,7 @@ export function createModelGatewayQAnswer(
         onScreenDocument,
         attachedDocuments,
         attachedTitles,
+        attachedNow,
         compareFacts: preparedCompareFacts,
         compareIds: preparedCompareIds,
         dataRoomFacts,
@@ -6751,14 +6780,22 @@ export function createModelGatewayQAnswer(
           ...(asker === null ? {} : { asker }),
           // Lane 8 (owner, 23 Oct): a summary first unless they asked
           // for a critique; read from their words by code.
-          ...(attachedTitles.length === 0
-            ? {}
-            : {
+          ...(attachedNow() !== null
+            ? {
                 attachedDocument: {
-                  titles: attachedTitles,
+                  titles: attachedNow()?.titles ?? [],
                   intent: attachedDocumentIntent(latest.content),
+                  state: attachedNow()?.state,
                 },
-              }),
+              }
+            : attachedTitles.length === 0
+              ? {}
+              : {
+                  attachedDocument: {
+                    titles: attachedTitles,
+                    intent: attachedDocumentIntent(latest.content),
+                  },
+                }),
         });
         // S3a (live 2026-10-15, #107): the named company read ahead of the
         // model was looked up again (company.search, company.get: two

@@ -257,6 +257,7 @@ export {
   DOCUMENT_PAGE_MAX_CHARS,
   documentTextFromBlocks,
   pagesFromBlocks,
+  UNPAGED_SECTION_CHARS,
   type DocumentPageText,
 } from "./domain/document-pages.js";
 export {

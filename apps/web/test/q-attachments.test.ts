@@ -23,6 +23,7 @@ vi.mock("../src/features/onboarding-kit/material-actions", () => ({
 const {
   attachToQ,
   attachmentQuestion,
+  attachmentsOfTurn,
   bindAttachmentsTo,
   markAttachmentsSent,
   mimeOf,
@@ -65,6 +66,35 @@ describe("Q attachments", () => {
     // Sent: no chip to ask about any more, still read for the follow-up.
     expect(attachmentQuestion("")).toBe("");
     expect(currentScreen("/home").attachedDocumentIds).toEqual([DOC]);
+  });
+
+  // Owner live 9 Nov: "it's not even in the chat" -- the turn that carried
+  // the file showed no sign of it.
+  it("the turn that carried a file shows it, and the file's id goes with that turn", async () => {
+    await attachToQ(new File(["hi"], "TERMS AND CONDITIONS.docx"));
+    expect(currentScreen("/home").attachedDocumentIds).toEqual([DOC]);
+    markAttachmentsSent(" Whats this about? ");
+    expect(attachmentsOfTurn("Whats this about?")).toEqual([
+      "TERMS AND CONDITIONS.docx",
+    ]);
+    // A later turn with nothing new attached shows nothing.
+    markAttachmentsSent("and the payment terms?");
+    expect(attachmentsOfTurn("and the payment terms?")).toEqual([]);
+    resetAttachments();
+    expect(attachmentsOfTurn("Whats this about?")).toEqual([]);
+  });
+
+  it("an open voice line is told at once that a file is attached, not on its next poll", async () => {
+    const told = vi.fn();
+    const line = new EventTarget();
+    line.addEventListener("cq:voice-turn-now", told);
+    vi.stubGlobal("window", line);
+    try {
+      await attachToQ(new File(["hi"], "deck.pdf"));
+      expect(told).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("a new conversation starts with nothing attached", async () => {
