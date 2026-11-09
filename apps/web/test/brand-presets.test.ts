@@ -116,7 +116,12 @@ describe("brand presets", () => {
 
   it("writes black and gold's whole look, and nothing for classic blue", () => {
     const css = presetStyleSheet(BLACK_GOLD);
-    expect(css).toContain("--cq-canvas:#ffffff");
+    // Light is layered (owner 9 Nov): page below white, cards on white,
+    // the sidebar and Q's pane on the panel step.
+    expect(css).toContain("--cq-canvas:#f2f2f2");
+    expect(css).toContain("--cq-surface:#ffffff");
+    expect(css).toContain("--cq-panel-surface:#fcfcfc");
+    expect(css).toContain("--cq-stage-canvas:#fcfcfc");
     expect(css).toContain("--cq-accent:#8a6a12");
     expect(css).toContain(':root[data-theme="dark"]');
     expect(css).toContain("prefers-color-scheme: dark");
@@ -129,7 +134,6 @@ describe("brand presets", () => {
     // light theme's stage is the preset's own paper, Q drawn in bronze ink.
     expect(css).toContain("--cq-night-q-light:#e2b858");
     expect(css).toContain("--cq-night-canvas:#212121");
-    expect(css).toContain("--cq-stage-canvas:#ffffff");
     expect(css).toContain("--cq-stage-q-light:#8a6a12");
     expect(css).toContain("--cq-stage-text:#0d0d0d");
     expect(css).not.toMatch(/<\/style|<script/iu);
