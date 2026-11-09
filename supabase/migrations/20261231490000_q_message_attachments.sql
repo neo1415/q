@@ -20,9 +20,15 @@ alter table q_runtime.conversation_messages
     check (attachments is null or jsonb_typeof(attachments) = 'array'),
   add constraint conversation_messages_attachments_bounded
     check (
-      attachments is null
-      or (jsonb_array_length(attachments) between 1 and 5
-          and length(attachments::text) <= 4000)
+      -- CASE, not AND: Postgres does not promise to evaluate the other
+      -- constraint first, and jsonb_array_length raises (22023) on a
+      -- non-array instead of failing the check (23514).
+      case
+        when attachments is null then true
+        when jsonb_typeof(attachments) <> 'array' then false
+        else jsonb_array_length(attachments) between 1 and 5
+          and length(attachments::text) <= 4000
+      end
     ),
   -- Only a person's turn carries what they attached.
   add constraint conversation_messages_attachments_role
