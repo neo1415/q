@@ -973,11 +973,16 @@ export function createPostgresQRuntimeRepositories(
           await executor`
           ${selectMessage(executor)}
            where m.tenant_id = ${tenantId}
-             and m.conversation_id = (
-               select c.conversation_id
-                 from q_runtime.conversation_messages c
-                where c.run_id = ${runId} and c.tenant_id = ${tenantId}
-                limit 1)
+             and m.conversation_id = coalesce(
+               (select c.conversation_id
+                  from q_runtime.conversation_messages c
+                 where c.run_id = ${runId} and c.tenant_id = ${tenantId}
+                 limit 1),
+               -- D82: a quiet run Q opened has no message of its own; it
+               -- answers in its own conversation all the same.
+               (select r.conversation_id
+                  from q_runtime.runs r
+                 where r.id = ${runId} and r.tenant_id = ${tenantId}))
              -- A marked line is not read back (20261110030000): speech
              -- meant for someone else, or a line the person hid. This
              -- run's own message is read before any mark exists for it.

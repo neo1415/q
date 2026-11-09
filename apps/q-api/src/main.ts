@@ -311,6 +311,7 @@ import {
 import { createInstructionMaterialReader } from "./composition/instructions/material.js";
 import { createIntroducedReader } from "./composition/instructions/introduced.js";
 import { MANDATE_LABELS } from "./composition/mandate-labels.js";
+import { createDocumentReadyFollowUp } from "./composition/document-ready-follow-up.js";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -445,6 +446,7 @@ import {
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  Q_DOCUMENT_READY_WAKE_CHANNEL,
   Q_PLAN_WAKE_CHANNEL,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_THINK_PATH,
@@ -7608,6 +7610,50 @@ const voiceTurnBoard = createVoiceTurnBoard();
 // voice-cards: the person's Q room feed, beside the turn board (same
 // process, same lifetime): every run's answer, whichever path made it.
 const qRoom = createQRoomFeed({ qStream, logger });
+// D82 (owner live 2026-11-09): a turn answered "I'm reading it now" is
+// answered once its file is read -- as its person, through the firewall,
+// once per (turn, document). The workers announce the document id.
+const documentReadyFollowUp = createDocumentReadyFollowUp({
+  sql: database.sql,
+  actorFor: planOwnerActor,
+  createRun: (command) => qRuntime.createRun(command),
+  start: ({ actor, runId, conversationId, correlationId }) => {
+    if (Q_ORCHESTRATION_AUTOSTART) {
+      void orchestrator
+        .start({ actor, runId: QRunIdSchema.parse(runId), correlationId })
+        .catch((error: unknown) => {
+          logger.error(
+            { err: error, qRunId: runId, correlationId },
+            "q orchestration ended with an error",
+          );
+        });
+    }
+    qRoom.watchRun({
+      actor,
+      runId: QRunIdSchema.parse(runId),
+      conversationId,
+      correlationId,
+    });
+  },
+  logger,
+});
+void createWorkWakeListener({
+  listen: (channel, onNotify, onListen) =>
+    database.listen(channel, onNotify, onListen),
+  channel: Q_DOCUMENT_READY_WAKE_CHANNEL,
+  targets: [
+    {
+      name: "document-ready",
+      wake: (documentId) => documentReadyFollowUp.onDocumentReady(documentId),
+    },
+  ],
+  logger,
+})
+  .start()
+  .then(() => logger.info({}, "document-ready wake listener started"))
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "document-ready wake listener not started");
+  });
 const uiActReceipts = createUiActReceiptLedger();
 const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
