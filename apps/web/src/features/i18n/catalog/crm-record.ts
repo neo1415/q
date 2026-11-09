@@ -151,6 +151,9 @@ export const CRM_RECORD_AR: Readonly<Record<string, string>> = {
   "Q is drafting…": "Q يصوغ…",
   "Attach a shared document": "إرفاق مستند مُشارك",
   "Upload a file": "رفع ملف",
+  "Attach one of your documents": "أرفق أحد مستنداتك",
+  "Reading your documents…": "جارٍ قراءة مستنداتك…",
+  "You have no documents to share yet.": "ليس لديك مستندات لمشاركتها بعد.",
   "Draft by Q from your conversation. Edit it before sending.":
     "مسودة من Q من محادثتك. عدّلها قبل الإرسال.",
   "Write to {name}": "اكتب إلى {name}",

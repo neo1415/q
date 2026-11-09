@@ -6410,6 +6410,23 @@
   body {
     container-type: inline-size;
   }
+  /*
+   * Owner report (9 Nov): a control that acts looks like it (Tailwind 4's
+   * preflight leaves buttons at the default arrow), and one that cannot
+   * act says so. Base layer: any component's own cursor still wins.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
 @layer utilities {
   @container q-pane (width < 1280px) {

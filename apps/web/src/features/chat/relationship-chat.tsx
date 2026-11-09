@@ -176,8 +176,9 @@ export function RelationshipChat({
     readonly messageId: string;
     readonly url: string;
   } | null>(null);
+  // The document picker: closed (null), reading the list, or the list.
   const [documents, setDocuments] = useState<
-    readonly { id: string; name: string; ready: boolean }[] | null
+    readonly { id: string; name: string; ready: boolean }[] | "loading" | null
   >(null);
   const cursor = useRef<string | null>(initial?.cursor ?? null);
   const readUpTo = useRef<string | null>(null);
@@ -429,9 +430,16 @@ export function RelationshipChat({
       setDocuments(null);
       return;
     }
+    // Owner report (9 Nov): the press looked like nothing happened. The
+    // picker opens at once and says what it is doing.
+    setDocuments("loading");
     const result = await shareableDocumentsAction();
-    if (result.ok) setDocuments(result.value);
-    else setNotice(result.message);
+    if (result.ok) {
+      setDocuments(result.value);
+    } else {
+      setDocuments(null);
+      setNotice(result.message);
+    }
   };
 
   const share = async (documentId: string) => {
@@ -472,7 +480,7 @@ export function RelationshipChat({
         return;
       }
       for (let attempt = 0; attempt < DRAFT_POLLS; attempt += 1) {
-        await wait(1500);
+        await wait(attempt === 0 ? 700 : 1500);
         const read = await readReplyDraftAction(started.value.runId);
         if (!read.ok) {
           setNotice(read.message);
@@ -740,35 +748,81 @@ export function RelationshipChat({
             onSubmit={(event) => void submit(event)}
             className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-canvas) px-3 pt-2.5 pb-1"
           >
-            {documents === null ? null : documents.length === 0 ? (
-              <p className="cq-body-sm px-2 text-(--cq-text-secondary)">
-                {t("No documents yet.")}
-              </p>
-            ) : (
-              <ul
-                className="flex max-h-48 flex-col gap-1 overflow-y-auto"
-                aria-label={t("Your documents")}
+            {documents === null ? null : (
+              <div
+                className="flex flex-col gap-1 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-2"
+                data-chat-documents
               >
-                {documents.map((document) => (
-                  <li key={document.id}>
+                <div className="flex items-center justify-between gap-2 ps-2">
+                  <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
+                    {t("Attach one of your documents")}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    onClick={() => setDocuments(null)}
+                  >
+                    {t("Close")}
+                  </Button>
+                </div>
+                {documents === "loading" ? (
+                  <p
+                    role="status"
+                    className="cq-body-sm px-2 py-1.5 text-(--cq-text-secondary)"
+                  >
+                    {t("Reading your documents…")}
+                  </p>
+                ) : documents.length === 0 ? (
+                  <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
+                    <p
+                      role="status"
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                    >
+                      {t("You have no documents to share yet.")}
+                    </p>
                     <Button
                       type="button"
-                      variant="quiet"
-                      className="w-full justify-start"
-                      disabled={!document.ready || busy}
-                      onClick={() => void share(document.id)}
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setDocuments(null);
+                        fileInput.current?.click();
+                      }}
                     >
-                      <FileText size={ICON_SIZE.regular} aria-hidden="true" />
-                      <span className="truncate">{document.name}</span>
-                      {document.ready ? null : (
-                        <span className="cq-caption text-(--cq-text-tertiary)">
-                          {t("Still being checked")}
-                        </span>
-                      )}
+                      <Upload size={ICON_SIZE.compact} aria-hidden="true" />
+                      {t("Upload a file")}
                     </Button>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                ) : (
+                  <ul
+                    className="flex max-h-48 flex-col gap-1 overflow-y-auto"
+                    aria-label={t("Your documents")}
+                  >
+                    {documents.map((document) => (
+                      <li key={document.id}>
+                        <Button
+                          type="button"
+                          variant="quiet"
+                          className="w-full justify-start"
+                          disabled={!document.ready || busy}
+                          onClick={() => void share(document.id)}
+                        >
+                          <FileText
+                            size={ICON_SIZE.regular}
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{document.name}</span>
+                          {document.ready ? null : (
+                            <span className="cq-caption text-(--cq-text-tertiary)">
+                              {t("Still being checked")}
+                            </span>
+                          )}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             <div
               className="flex gap-2 overflow-x-auto [scrollbar-width:none]"
@@ -790,7 +844,7 @@ export function RelationshipChat({
                 disabled={busy}
                 onClick={() => void openDocuments()}
                 aria-expanded={documents !== null}
-                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
+                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary) disabled:opacity-60"
               >
                 <FileText size={ICON_SIZE.compact} aria-hidden="true" />
                 {t("Attach a shared document")}
@@ -799,12 +853,22 @@ export function RelationshipChat({
                 type="button"
                 disabled={busy}
                 onClick={() => fileInput.current?.click()}
-                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
+                className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary) disabled:opacity-60"
               >
                 <Upload size={ICON_SIZE.compact} aria-hidden="true" />
                 {t("Upload a file")}
               </button>
             </div>
+            {drafting ? (
+              <span
+                role="status"
+                className="cq-caption cq-swap flex items-center gap-1.5 text-(--cq-text-secondary)"
+                data-q-drafting
+              >
+                <QCircle className="size-4 text-[9px]" />
+                {t(`Q is writing a reply to ${counterpart}. It fills in here.`)}
+              </span>
+            ) : null}
             {qDrafted && hasDraft ? (
               <span
                 className="cq-caption cq-swap flex items-center gap-1.5 text-(--cq-accent)"

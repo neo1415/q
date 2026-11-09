@@ -44,13 +44,14 @@ vi.mock("../src/features/chat/chat-actions", () => ({
   ),
   markChatReadAction: vi.fn(() => Promise.resolve({ ok: true, value: null })),
   sendChatMessageAction: (...args: unknown[]) => send(...args),
-  shareableDocumentsAction: vi.fn(),
+  shareableDocumentsAction: () => shareable(),
   unsendChatMessageAction: vi.fn(),
   blockChatAction: (...args: unknown[]) => block(...args),
   unblockChatAction: vi.fn(),
   reportChatAction: (...args: unknown[]) => report(...args),
 }));
 
+const shareable = vi.fn<() => Promise<unknown>>();
 const startDraft = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const readDraft = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock("../src/features/chat/reply-draft-actions", () => ({
@@ -128,6 +129,66 @@ describe("Draft a reply (inbox split, 2026-10-20)", () => {
     expect(screen.getByText(/Draft by Q from your conversation/u)).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+});
+
+describe("Messages tab controls (owner report, 9 Nov)", () => {
+  it("says at once that Q is writing the draft", async () => {
+    startDraft.mockResolvedValue({
+      ok: true,
+      value: { runId: "00000000-0000-4000-8000-00000000e001" },
+    });
+    readDraft.mockResolvedValue({
+      ok: true,
+      value: { done: false, text: null },
+    });
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={thread("OPEN")}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Draft a reply" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByText(/Q is writing a reply to Apex/u)).toBeTruthy();
+  });
+
+  it("opens the document picker visibly, and offers an upload when there is nothing to attach", async () => {
+    let resolve: (value: unknown) => void = () => undefined;
+    shareable.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={thread("OPEN")}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Attach a shared document" }),
+      );
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Reading your documents…")).toBeTruthy();
+    await act(async () => {
+      resolve({ ok: true, value: [] });
+      await Promise.resolve();
+    });
+    expect(
+      screen.getByText("You have no documents to share yet."),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("button", { name: "Upload a file" })
+        .some((button) => button.closest("[data-chat-documents]") !== null),
+    ).toBe(true);
   });
 });
 
