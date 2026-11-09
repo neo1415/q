@@ -2095,7 +2095,21 @@ export function createOnboardingPort(input: {
           const id = named.country.nodeId;
           if (!ids.includes(id)) ids.push(id);
           nodeNames.set(id, named.country.name);
-          exactPhrase.set(id, named.words);
+          // Their own words name it, or name a place in it ("Doha": the
+          // reader gives the country of a city, ONBOARDING_TRANSCRIPT_READER
+          // v18). Where a firm is based is a fact of the place they named,
+          // not Q's reading of a preference: it is theirs (owner, 9 Nov:
+          // "a US city must save United States").
+          const quote = answer.quote ?? "";
+          const inQuote = countryNamedIn(quote);
+          exactPhrase.set(
+            id,
+            inQuote?.country.iso === named.country.iso
+              ? inQuote.words
+              : inQuote === null && quote.trim().length > 0
+                ? quote
+                : named.words,
+          );
           continue;
         }
         const looked: TaxonomyCandidateResponse = await findTaxonomyCandidates(

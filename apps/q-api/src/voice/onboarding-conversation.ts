@@ -23,6 +23,12 @@ import type { ActorContext } from "@capital-q/security";
 import { NONE_ANSWER_TEXT } from "@capital-q/onboarding";
 
 import {
+  figuresOf,
+  isPlainYes,
+  plainWords,
+  restatedHeld,
+} from "./held-accept.js";
+import {
   IDENTITY_STEPS,
   NO_DEPTH,
   offersChoices,
@@ -246,9 +252,15 @@ export function createOnboardingConversation(dependencies: {
     affirmed: ReadonlySet<string> = new Set(),
     replaces: ReadonlySet<string> = new Set(),
     spokenTurns: ReadonlySet<string> = new Set(),
+    /** Held values their reply approved, and Q's line it answered. */
+    yes: {
+      readonly approved?: ReadonlySet<string>;
+      readonly lastQTurn?: string;
+    } = {},
   ) =>
     createOnboardingPort({
       spokenTurns,
+      ...(yes.lastQTurn === undefined ? {} : { lastQTurn: yes.lastQTurn }),
       addsTo,
       replaces,
       affirmed,
@@ -291,7 +303,7 @@ export function createOnboardingConversation(dependencies: {
           stated,
           declined,
           handed: new Set<string>(),
-          approved: new Set<string>(),
+          approved: yes.approved ?? new Set<string>(),
           finishing,
           lookup: null,
         }),
@@ -389,6 +401,59 @@ export function createOnboardingConversation(dependencies: {
     buffers.delete(line.voiceSessionId);
     keep(line, buffer.role, buffer.parts.join(" "));
     if (buffer.role === "PERSON") schedule(line);
+  };
+
+  /** Held values Q's last spoken line read back, accepted on their yes. */
+  const acceptSpokenYes = async (
+    line: ConversationLine,
+    items: readonly {
+      readonly role: "PERSON" | "Q";
+      readonly text: string;
+    }[],
+  ): Promise<void> => {
+    const personAt = items.findLastIndex((item) => item.role === "PERSON");
+    if (personAt < 0) return;
+    const person = items[personAt]?.text ?? "";
+    const lastQ = items
+      .slice(0, personAt)
+      .findLast((item) => item.role === "Q")?.text;
+    if (lastQ === undefined) return;
+    const port = portFor(line, [person]);
+    const pending = await port.pendingRecommendations();
+    if (pending.length === 0) return;
+    const offered = pending.filter((item) => readBackIn(item.value, lastQ));
+    if (offered.length === 0) return;
+    const approved = isPlainYes(person)
+      ? offered.map((item) => item.stepKey)
+      : restatedHeld(offered, person);
+    if (approved.length === 0) return;
+    const keys = new Set(approved);
+    const accepted = await portFor(
+      line,
+      [person],
+      undefined,
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { approved: keys, lastQTurn: lastQ },
+    ).accept([...keys]);
+    logger.info(
+      {
+        qVoiceSessionId: line.voiceSessionId,
+        onboardingSessionId: line.onboarding.sessionId,
+        accepted: accepted
+          .filter((result) => result.outcome === "COMMITTED")
+          .map((result) => result.stepKey),
+        notAccepted: accepted
+          .filter((result) => result.outcome !== "COMMITTED")
+          .map((result) => `${result.stepKey}:${result.outcome}`),
+      },
+      "onboarding conversation accepted their yes",
+    );
   };
 
   const readAndSave = async (
@@ -652,6 +717,19 @@ export function createOnboardingConversation(dependencies: {
         },
       ];
     });
+    // Owner, 9 Nov: a spoken line accepts what Q read back the same way a
+    // typed one does (held-accept): "Yes", "yep", "exactly" or the values
+    // said again, to Q's line that named them (their figures, or their
+    // words). Code decides; the reading is not asked what "yes" meant.
+    // Typed lines accept in the typed engine itself.
+    if (!line.voiceSessionId.startsWith("typed:")) {
+      await acceptSpokenYes(line, thread.items).catch((error: unknown) => {
+        logger.warn(
+          { err: error, qVoiceSessionId: line.voiceSessionId },
+          "onboarding conversation yes not accepted",
+        );
+      });
+    }
     // Live 2026-10-30 (Hydrolume): they skipped "team strengths"; a later
     // reading of the whole conversation took their "Yes, that looks right"
     // (to a different question) as agreeing to the examples Q's question
@@ -1940,4 +2018,18 @@ function completedNote(
   return journey === "investor"
     ? "Their mandate is saved and live: Capital Q now matches companies to it. Tell them warmly, in one or two sentences, that it's done and that you're taking them to Discover now, where they'll see companies matched to it. Then stop talking: the call ends after your goodbye."
     : "Their company profile is saved. Tell them warmly, in one or two sentences, that it's done, that investors who fit will now be matched to it, and that you're taking them to their home page now. Then stop talking: the call ends after your goodbye.";
+}
+
+/**
+ * Whether Q's spoken line read this held value back: every figure of it
+ * (said as Q says it: "500 thousand", "3 million"), or its words.
+ */
+export function readBackIn(value: string, qLine: string): boolean {
+  const figures = figuresOf(value);
+  if (figures.size > 0) {
+    const said = figuresOf(qLine);
+    return [...figures].every((figure) => said.has(figure));
+  }
+  const words = plainWords(value);
+  return words.length >= 3 && plainWords(qLine).includes(words);
 }
