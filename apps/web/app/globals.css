@@ -6314,7 +6314,11 @@
         transform var(--cq-motion-base) var(--cq-ease-exit),
         visibility 0s linear var(--cq-motion-base);
     }
-    .cq-ws-page[data-ws-sheet="open"] {
+    /* Also when the desktop layout stored "page collapsed" (owner report,
+       installed app on a phone): that rule's selector outranked the open
+       sheet, which then opened invisible over Q's home. */
+    .cq-ws-page[data-ws-sheet="open"],
+    :root[data-cq-ws-page="collapsed"] .cq-ws-page[data-ws-sheet="open"] {
       transform: none;
       visibility: visible;
       transition:

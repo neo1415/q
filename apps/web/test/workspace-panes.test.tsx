@@ -181,3 +181,43 @@ describe("the phone's way to the pages", () => {
     expect(pane?.getAttribute("data-ws-sheet")).toBe("open");
   });
 });
+
+/**
+ * Owner-reported, production 25ebc4c60 (installed app): every nav item
+ * left the screen on Q's Home while the page's audio played. The page
+ * pane had been collapsed in that app's own storage (an installed app
+ * keeps its own), and a page was then opened into the hidden pane. A page
+ * anyone moves to is shown: a collapsed page pane opens for any page but
+ * Q's own home.
+ */
+describe("a collapsed page pane", () => {
+  function collapsedPage(): void {
+    window.localStorage.setItem(
+      "cq-workspace-layout",
+      JSON.stringify({ qWidth: 380, qPane: "open", pagePane: "collapsed" }),
+    );
+    resetWorkspaceLayoutForTests();
+    root.setAttribute("data-cq-ws-page", "collapsed");
+  }
+
+  it("opens when the person moves to a page", () => {
+    collapsedPage();
+    pathname = "/home";
+    const view = render(<Shell page={<h1>Home</h1>} />);
+    // On Q's home the person's choice stands.
+    expect(root.getAttribute("data-cq-ws-page")).toBe("collapsed");
+    pathname = "/discover";
+    view.rerender(<Shell page={<h1>Discover</h1>} />);
+    expect(root.hasAttribute("data-cq-ws-page")).toBe(false);
+    expect(
+      JSON.parse(window.localStorage.getItem("cq-workspace-layout") ?? "{}"),
+    ).toMatchObject({ pagePane: "open" });
+  });
+
+  it("is open on a page loaded directly", () => {
+    collapsedPage();
+    pathname = "/relationships";
+    render(<Shell page={<h1>CRM</h1>} />);
+    expect(root.hasAttribute("data-cq-ws-page")).toBe(false);
+  });
+});

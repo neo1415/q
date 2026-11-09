@@ -171,8 +171,13 @@ export default async function ApplicationLayout({
           <BrandStyle css={brandCss} />
           {/* UX-04: lets Back use the real history after in-app moves. */}
           <InAppNavigationMark />
+          {/* In the Q Workspace the page pane's flow starts with the page,
+            and Q lives in its own pane, so the install offer goes first:
+            after the content it sat a long page down and was never seen
+            (owner report: the install prompt no longer appears). */}
+          {workspace.enabled ? <InstallPrompt /> : null}
           {children}
-          <InstallPrompt />
+          {workspace.enabled ? null : <InstallPrompt />}
           {/* Search as a palette (app prototype "search", option 2): / from
             any page opens it over what the person is doing. */}
           <SearchPalette viewer={user.authUserId} />

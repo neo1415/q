@@ -131,3 +131,26 @@ describe("Q's LAYOUT_SET", () => {
     shell.remove();
   });
 });
+
+describe("the boot script and a collapsed page pane (owner report, PWA)", () => {
+  const stored = JSON.stringify({
+    qWidth: 380,
+    qPane: "open",
+    pagePane: "collapsed",
+  });
+
+  it("keeps the page collapsed on Q's home", () => {
+    window.history.replaceState(null, "", "/home");
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, stored);
+    runBootScript();
+    expect(root.getAttribute("data-cq-ws-page")).toBe("collapsed");
+  });
+
+  it("never hides a page loaded directly", () => {
+    window.history.replaceState(null, "", "/discover");
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, stored);
+    runBootScript();
+    expect(root.hasAttribute("data-cq-ws-page")).toBe(false);
+    window.history.replaceState(null, "", "/");
+  });
+});

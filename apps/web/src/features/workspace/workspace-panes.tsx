@@ -307,6 +307,17 @@ export function WorkspacePagePane({
     notePageMove(shownPath.current, ownMoveJustNow());
     shownPath.current = pathname;
   }, [pathname]);
+  // A page anyone moves to is shown (owner report, production 25ebc4c60,
+  // installed app: with the page pane collapsed in that app's own storage
+  // every nav item opened its page into the hidden pane -- the pitch's
+  // audio played over Q's home). A collapsed page pane stays collapsed
+  // only on Q's own home; before paint, so the page never flashes hidden.
+  useLayoutEffect(() => {
+    if (pathname !== Q_HOME && getWorkspaceLayout().pagePane === "collapsed") {
+      setPane("pagePane", "open");
+    }
+  }, [pathname]);
+
   const paneRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const pane = paneRef.current;

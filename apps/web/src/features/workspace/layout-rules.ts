@@ -92,10 +92,14 @@ export function applyLayoutSet(
 }
 
 /**
+ * A collapsed page pane is kept only on Q's own home (`/home`): on any
+ * other page the page is what the person came for, so it shows (owner
+ * report, installed app: every page opened into a hidden pane).
+ *
  * Applied to `<html>` before the first paint (and by the store after), so
  * the panes are the right size in the very first frame: no layout shift.
  * Attributes rather than React state, because they exist before hydration.
  */
 export const WORKSPACE_BOOT_SCRIPT = `try{var d=document.documentElement,r=localStorage.getItem(${JSON.stringify(
   LAYOUT_STORAGE_KEY,
-)}),v=r?JSON.parse(r):{},w=typeof v.qWidth==="number"&&isFinite(v.qWidth)?Math.min(${Q_PANE_MAX},Math.max(${Q_PANE_MIN},Math.round(v.qWidth))):${Q_PANE_DEFAULT},q=v.qPane==="collapsed",p=v.pagePane==="collapsed";if(q&&p){q=false}d.style.setProperty("--cq-ws-q-width",w+"px");if(q)d.setAttribute("data-cq-ws-q","collapsed");if(p)d.setAttribute("data-cq-ws-page","collapsed")}catch(e){}`;
+)}),v=r?JSON.parse(r):{},w=typeof v.qWidth==="number"&&isFinite(v.qWidth)?Math.min(${Q_PANE_MAX},Math.max(${Q_PANE_MIN},Math.round(v.qWidth))):${Q_PANE_DEFAULT},q=v.qPane==="collapsed",p=v.pagePane==="collapsed"&&location.pathname==="/home";if(q&&p){q=false}d.style.setProperty("--cq-ws-q-width",w+"px");if(q)d.setAttribute("data-cq-ws-q","collapsed");if(p)d.setAttribute("data-cq-ws-page","collapsed")}catch(e){}`;
