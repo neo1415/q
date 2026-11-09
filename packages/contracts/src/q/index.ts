@@ -401,8 +401,11 @@ export {
 } from "./silence-ladder.js";
 
 export {
+  Q_MESSAGE_ATTACHMENTS_MAX,
   Q_MESSAGE_ROLES,
   Q_RESPONSE_TEXT_MAX_LENGTH,
+  QMessageAttachmentSchema,
+  type QMessageAttachment,
   QMessageRoleSchema,
   QMessageSchema,
   QResponseMessageSchema,
@@ -1175,6 +1178,7 @@ export {
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
+  Q_DOCUMENT_READY_WAKE_CHANNEL,
   Q_PLAN_WAKE_CHANNEL,
   Q_WORK_LANE_ANSWER_PATH,
   Q_WORK_LANE_PATH,

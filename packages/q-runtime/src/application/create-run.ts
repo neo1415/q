@@ -236,6 +236,37 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
      * a subject therefore grants nothing — authority is decided per run,
      * by the firewall, after this.
      */
+    // D82: the documents this turn carried -- those on the screen that no
+    // earlier turn of the conversation carried -- titled by Evidence as the
+    // actor (one they may not read is dropped). Read before the
+    // transaction; a failure records none and never fails the turn.
+    const attachments = await (async () => {
+      const ids = input.screen?.attachedDocumentIds ?? [];
+      const titled = dependencies.attachedDocuments?.titled;
+      if (
+        ids.length === 0 ||
+        titled === undefined ||
+        command.openedBy === "Q"
+      ) {
+        return [];
+      }
+      try {
+        const earlier =
+          existing === null
+            ? []
+            : ((await repositories.messages.attachedDocumentIds?.(
+                dependencies.sql,
+                actor.tenantId,
+                existing.id,
+              )) ?? []);
+        const seen = new Set(earlier.map((id) => id.toLowerCase()));
+        const fresh = ids.filter((id) => !seen.has(id.toLowerCase()));
+        return fresh.length === 0 ? [] : await titled(actor, fresh);
+      } catch {
+        return [];
+      }
+    })();
+
     let refs: readonly QSubjectRef[] = requested;
     if (requested.length === 0 && existing !== null) {
       const carried: QSubjectRef[] = [];
@@ -383,6 +414,9 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
             ...(command.utteranceRef === undefined
               ? {}
               : { utteranceRef: command.utteranceRef }),
+            ...(attachments.length === 0 || command.openedBy === "Q"
+              ? {}
+              : { attachments }),
           });
 
       await appendRunEvent(repositories, tx, run, {

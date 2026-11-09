@@ -70,6 +70,14 @@ export const Q_INSTRUCTION_NEW_COMPANY_CHANNEL =
  */
 export const Q_PLAN_WAKE_CHANNEL = "q_plan_wake" as const;
 
+/**
+ * D82 (owner live 2026-11-09): a document finished reading. The Q API
+ * answers a turn about it that was answered "I'm reading it" (as that
+ * turn's person, through the firewall). The payload is the document id
+ * only; the Q API re-reads everything under the person's own access.
+ */
+export const Q_DOCUMENT_READY_WAKE_CHANNEL = "q_document_ready_wake" as const;
+
 export const Q_WORK_KINDS = [
   "INVESTOR_OUTREACH",
   "FOUNDER_STAND_IN",

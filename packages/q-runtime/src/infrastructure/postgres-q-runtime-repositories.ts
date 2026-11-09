@@ -6,6 +6,8 @@ import {
   QConsequenceClassSchema,
   QConversationIdSchema,
   QFailureDiagnosticCodeSchema,
+  Q_MESSAGE_ATTACHMENTS_MAX,
+  QMessageAttachmentSchema,
   QMessageIdSchema,
   QMessageRoleSchema,
   QRunIdSchema,
@@ -247,6 +249,21 @@ const MessageRow = z.object({
       value === null ? undefined : parseQResultBlocks(value).blocks,
     ),
   provider_message_ref: z.string().nullable(),
+  /**
+   * D82: re-validated on read like the blocks; a value the public contract
+   * refuses is served as no attachments, never as something else.
+   */
+  attachments: z
+    .unknown()
+    .optional()
+    .transform((value) => {
+      const parsed = z
+        .array(QMessageAttachmentSchema)
+        .min(1)
+        .max(Q_MESSAGE_ATTACHMENTS_MAX)
+        .safeParse(value);
+      return parsed.success ? parsed.data : undefined;
+    }),
   created_at: Timestamp,
 });
 
@@ -264,6 +281,7 @@ function toMessage(row: unknown): QConversationMessage {
     ...(r.provider_message_ref === null
       ? {}
       : { utteranceRef: r.provider_message_ref }),
+    ...(r.attachments === undefined ? {} : { attachments: r.attachments }),
     createdAt: r.created_at,
   };
 }
@@ -319,7 +337,7 @@ function selectMessage(executor: DatabaseExecutor) {
   return executor`
     select m.id, m.tenant_id, m.conversation_id, m.run_id, m.role, m.content,
            m.content_type, m.result_blocks, m.provider_message_ref,
-           m.created_at
+           m.attachments, m.created_at
       from q_runtime.conversation_messages m`;
 }
 
@@ -748,6 +766,16 @@ export function createPostgresQRuntimeRepositories(
           UTTERANCE_REF_PATTERN.test(input.utteranceRef)
             ? input.utteranceRef
             : null;
+        // D82: a person's turn only, and only what the contract allows.
+        const attachments =
+          input.role !== "USER" ||
+          input.attachments === undefined ||
+          input.attachments.length === 0
+            ? null
+            : z
+                .array(QMessageAttachmentSchema)
+                .max(Q_MESSAGE_ATTACHMENTS_MAX)
+                .parse(input.attachments.slice(0, Q_MESSAGE_ATTACHMENTS_MAX));
         const blocks =
           input.blocks === undefined || input.blocks.length === 0
             ? null
@@ -763,14 +791,16 @@ export function createPostgresQRuntimeRepositories(
           with inserted as (
             insert into q_runtime.conversation_messages
               (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
-               provider_message_ref)
+               provider_message_ref, attachments)
             values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
                     ${input.tenantId}, ${input.conversationId}, ${input.runId},
                     ${input.role}, ${input.content},
                     ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
-                    ${utteranceRef})
+                    ${utteranceRef},
+                    ${attachments === null ? null : JSON.stringify(attachments)}::text::jsonb)
             returning id, tenant_id, conversation_id, run_id, role, content,
-                      content_type, result_blocks, provider_message_ref, created_at
+                      content_type, result_blocks, provider_message_ref,
+                      attachments, created_at
           ),
           clocked as (
             update q_runtime.conversations c
@@ -914,6 +944,20 @@ export function createPostgresQRuntimeRepositories(
                   and a.conversation_id = ${conversationId})`;
         return rows.map((row) => RunIdRow.parse(row).run_id);
       },
+      attachedDocumentIds: async (executor, tenantId, conversationId) => {
+        const rows = await executor`
+          select distinct a ->> 'documentId' as document_id
+            from q_runtime.conversation_messages m,
+                 jsonb_array_elements(m.attachments) a
+           where m.tenant_id = ${tenantId}
+             and m.conversation_id = ${conversationId}
+             and m.role = 'USER'
+             and m.attachments is not null`;
+        return rows.flatMap((row) => {
+          const id: unknown = Reflect.get(row, "document_id");
+          return typeof id === "string" ? [id] : [];
+        });
+      },
       listRecentForConversationOfRun: async (
         executor,
         tenantId,
@@ -929,11 +973,16 @@ export function createPostgresQRuntimeRepositories(
           await executor`
           ${selectMessage(executor)}
            where m.tenant_id = ${tenantId}
-             and m.conversation_id = (
-               select c.conversation_id
-                 from q_runtime.conversation_messages c
-                where c.run_id = ${runId} and c.tenant_id = ${tenantId}
-                limit 1)
+             and m.conversation_id = coalesce(
+               (select c.conversation_id
+                  from q_runtime.conversation_messages c
+                 where c.run_id = ${runId} and c.tenant_id = ${tenantId}
+                 limit 1),
+               -- D82: a quiet run Q opened has no message of its own; it
+               -- answers in its own conversation all the same.
+               (select r.conversation_id
+                  from q_runtime.runs r
+                 where r.id = ${runId} and r.tenant_id = ${tenantId}))
              -- A marked line is not read back (20261110030000): speech
              -- meant for someone else, or a line the person hid. This
              -- run's own message is read before any mark exists for it.

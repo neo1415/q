@@ -26,7 +26,11 @@ import {
   type UtcTimestamp,
   type QResultBlock,
 } from "@capital-q/contracts";
-import type { QScreenContext, QViewingMoment } from "@capital-q/contracts";
+import type {
+  QMessageAttachment,
+  QScreenContext,
+  QViewingMoment,
+} from "@capital-q/contracts";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
 /**
@@ -167,6 +171,8 @@ export type QConversationMessage = {
    * to a client.
    */
   readonly utteranceRef?: string | undefined;
+  /** D82: the documents a person's turn carried (USER only). */
+  readonly attachments?: readonly QMessageAttachment[] | undefined;
   readonly createdAt: UtcTimestamp;
 };
 
@@ -186,6 +192,8 @@ export type NewQConversationMessage = {
   readonly blocks?: readonly QResultBlock[] | undefined;
   /** A person's spoken turn only: the utterance it is a form of. */
   readonly utteranceRef?: string | undefined;
+  /** D82: a person's turn only: the documents it carried, titled by Evidence. */
+  readonly attachments?: readonly QMessageAttachment[] | undefined;
 };
 
 export type QRunEventRecord = {
@@ -316,6 +324,10 @@ export function toQMessage(message: QConversationMessage): QMessage {
           runId: message.runId,
           role: "USER",
           text: message.content,
+          ...(message.attachments === undefined ||
+          message.attachments.length === 0
+            ? {}
+            : { attachments: message.attachments }),
           createdAt: message.createdAt,
         }
       : {

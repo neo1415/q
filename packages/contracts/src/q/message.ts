@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QMessageIdSchema, QRunIdSchema } from "./ids.js";
 import { Q_MESSAGE_TEXT_MAX_LENGTH } from "./request.js";
@@ -32,12 +33,34 @@ export const QMessageRoleSchema = z.enum(Q_MESSAGE_ROLES);
  */
 export const Q_RESPONSE_TEXT_MAX_LENGTH = 32_000;
 
+/** At most this many documents ride one turn (the screen's own bound). */
+export const Q_MESSAGE_ATTACHMENTS_MAX = 5;
+
+/**
+ * D82 (owner live 2026-11-09): a document a person's turn carried, by its
+ * id and its title as Evidence named it to them. A reference, never a
+ * grant: reading the document re-checks access as the reader.
+ */
+export const QMessageAttachmentSchema = z
+  .object({
+    documentId: UuidSchema,
+    title: z.string().trim().min(1).max(300),
+  })
+  .strict();
+export type QMessageAttachment = z.infer<typeof QMessageAttachmentSchema>;
+
 export const QUserMessageSchema = z
   .object({
     messageId: QMessageIdSchema,
     runId: QRunIdSchema,
     role: z.literal("USER"),
     text: z.string().trim().min(1).max(Q_MESSAGE_TEXT_MAX_LENGTH),
+    /** D82: the documents this turn carried; absent when none. Additive. */
+    attachments: z
+      .array(QMessageAttachmentSchema)
+      .min(1)
+      .max(Q_MESSAGE_ATTACHMENTS_MAX)
+      .optional(),
     createdAt: UtcTimestampSchema,
   })
   .strict();
