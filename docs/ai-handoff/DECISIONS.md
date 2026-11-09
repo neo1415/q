@@ -352,3 +352,7 @@ Core Seven remains the governing assessment framework. The new directive authori
     - Every answer a person gives must be saved. A country such as "USA" or "San Francisco" always saves; "can't be saved, move on" is not acceptable.
     - Answer option cards show in voice as in typed.
     - The owner approved one short scripted live duplex-voice onboarding call on the provider credits after the fix (a few cents), cost reported.
+86. **Voice onboarding: the engine steers live voice without blocking it** (integration owner under D82, 9 Nov 2026 ~13:40 UTC; refines D85).
+    - Routing every spoken turn through the typed engine before Q speaks would add about 2–4 s of silence per turn (W5's estimate: 6–10 h of work). Rejected for voice quality.
+    - Instead, the engine's decisions (save, confirm, repeat count, held playback, finishing, the next step and its options) run in the background after each reading. They are pushed into the live call as context, so the model's wording follows the engine's state. Code owns saving, confirming and repeats; the model owns only the phrasing.
+    - Countries and major investor cities map to a country deterministically (taxonomy aliases); the model is the fallback for others.
