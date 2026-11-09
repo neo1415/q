@@ -11,7 +11,7 @@ export const plainWords = (text: string) =>
     .replace(/\s+/gu, " ")
     .trim();
 
-const NUMBER_WORDS: Readonly<Record<string, number>> = {
+const UNITS: Readonly<Record<string, number>> = {
   zero: 0,
   one: 1,
   two: 2,
@@ -22,6 +22,8 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   seven: 7,
   eight: 8,
   nine: 9,
+};
+const TEENS: Readonly<Record<string, number>> = {
   ten: 10,
   eleven: 11,
   twelve: 12,
@@ -32,40 +34,224 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   seventeen: 17,
   eighteen: 18,
   nineteen: 19,
+};
+const TENS: Readonly<Record<string, number>> = {
   twenty: 20,
   thirty: 30,
   forty: 40,
   fifty: 50,
-  hundred: 100,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
 };
-
-const SCALE: Readonly<Record<string, number>> = {
-  k: 1e3,
+const FRACTIONS: Readonly<Record<string, number>> = {
+  half: 0.5,
+  quarter: 0.25,
+};
+/** Scales a word may carry; the short ones only straight after digits. */
+const WORD_SCALES: Readonly<Record<string, number>> = {
   thousand: 1e3,
-  m: 1e6,
-  mn: 1e6,
   million: 1e6,
-  bn: 1e9,
   billion: 1e9,
 };
+const DIGIT_SCALES: Readonly<Record<string, number>> = {
+  k: 1e3,
+  m: 1e6,
+  mn: 1e6,
+  bn: 1e9,
+};
+/** Words that join the parts of one spoken number ("two and a half million"). */
+const JOINERS = new Set(["and", "a", "an"]);
 
-/** The figures a text gives, as numbers: digits with a scale, or number words. */
+type Part =
+  | "unit"
+  | "teen"
+  | "ten"
+  | "hundred"
+  | "scale"
+  | "digit"
+  | "fraction"
+  | "point";
+
+/**
+ * The figures a text gives, as numbers: digits with a scale ("500k",
+ * "3.5 million"), or a number said in words, read whole.
+ *
+ * Owner, live duplex voice 9 Nov: Q read cheques back as it speaks them
+ * ("five hundred thousand", "three million"), and this read each word on
+ * its own (5, 100, 3), so no read-back ever matched the held 500000 and
+ * every yes fell through: the same question, again and again. A spoken
+ * number is one figure; its words are composed, never read apart.
+ */
 export function figuresOf(text: string): ReadonlySet<number> {
   const found = new Set<number>();
-  const lower = text.toLowerCase();
-  for (const match of lower.matchAll(
-    /(\d[\d,]*(?:\.\d+)?)\s*(k|mn|m|bn|thousand|million|billion)?\b/gu,
-  )) {
-    const base = Number((match[1] ?? "").replace(/,/gu, ""));
-    if (!Number.isFinite(base)) continue;
-    const scale = match[2] === undefined ? 1 : (SCALE[match[2]] ?? 1);
-    found.add(Math.round(base * scale));
+  const tokens =
+    text.toLowerCase().match(/\d[\d,]*(?:\.\d+)?(?:k|mn|m|bn)?\b|[a-z]+/gu) ??
+    [];
+  let total = 0;
+  let group = 0;
+  let fraction = 0;
+  let decimals = 0;
+  let lastScale = Infinity;
+  let last: Part | null = null;
+  // A figure given in digits is whole: words after it are a new figure
+  // ("300k and twelve towns"), only a scale word extends it.
+  let digitMade = false;
+  const flush = () => {
+    if (last !== null) {
+      const value = Math.round(total + group + fraction);
+      found.add(value);
+    }
+    total = 0;
+    group = 0;
+    fraction = 0;
+    decimals = 0;
+    lastScale = Infinity;
+    last = null;
+    digitMade = false;
+  };
+  for (const token of tokens) {
+    if (/^\d/u.test(token)) {
+      flush();
+      const digits = /^([\d,]*\d(?:\.\d+)?)(k|mn|m|bn)?$/u.exec(token);
+      const base = Number((digits?.[1] ?? "").replace(/,/gu, ""));
+      if (!Number.isFinite(base)) continue;
+      const scale =
+        digits?.[2] === undefined ? 1 : (DIGIT_SCALES[digits[2]] ?? 1);
+      digitMade = true;
+      if (scale > 1) {
+        total = base * scale;
+        lastScale = scale;
+        last = "scale";
+      } else {
+        group = base;
+        last = "digit";
+      }
+      continue;
+    }
+    const unit = UNITS[token];
+    const teen = TEENS[token];
+    const ten = TENS[token];
+    if (
+      digitMade &&
+      (unit !== undefined || teen !== undefined || ten !== undefined)
+    )
+      flush();
+    if (last === "point" && unit !== undefined) {
+      decimals += 1;
+      group += unit / 10 ** decimals;
+      continue;
+    }
+    if (unit !== undefined) {
+      // "three seven" or "five, six" are two figures, "twenty five" one.
+      if (
+        last !== null &&
+        last !== "ten" &&
+        last !== "hundred" &&
+        last !== "scale"
+      )
+        flush();
+      group += unit;
+      last = "unit";
+      continue;
+    }
+    if (teen !== undefined || ten !== undefined) {
+      if (last !== null && last !== "hundred" && last !== "scale") flush();
+      group += teen ?? ten ?? 0;
+      last = teen !== undefined ? "teen" : "ten";
+      continue;
+    }
+    if (token === "hundred") {
+      group = (group === 0 ? 1 : group) * 100;
+      last = "hundred";
+      continue;
+    }
+    const fractionOf = FRACTIONS[token];
+    if (fractionOf !== undefined) {
+      fraction += fractionOf;
+      last = last ?? "fraction";
+      continue;
+    }
+    if (token === "point" && last !== null && last !== "point") {
+      last = "point";
+      continue;
+    }
+    const scale = WORD_SCALES[token];
+    if (scale !== undefined) {
+      // A digit straight before a scale word is its count ("500 thousand").
+      // A scale as large as one already used starts a new figure
+      // ("five hundred thousand and three million").
+      if (scale >= lastScale && total > 0) {
+        const carried = group + fraction;
+        const kept = last;
+        group = 0;
+        fraction = 0;
+        flush();
+        group = carried;
+        last = kept;
+      }
+      const count = group + fraction;
+      total += (count === 0 ? 1 : count) * scale;
+      group = 0;
+      fraction = 0;
+      decimals = 0;
+      lastScale = scale;
+      last = "scale";
+      continue;
+    }
+    if (JOINERS.has(token)) continue;
+    flush();
   }
-  for (const word of lower.split(/[^a-z]+/u)) {
-    const value = NUMBER_WORDS[word];
-    if (value !== undefined) found.add(value);
-  }
+  flush();
   return found;
+}
+
+const DISAGREES =
+  /\b(no|not|nope|never|wrong|incorrect|but|except|instead|remove|drop)\b|n't\b/iu;
+
+/** Words that carry no part of a held value ("Nigeria, Kenya and France"). */
+const LINKING = new Set([
+  "and",
+  "or",
+  "the",
+  "a",
+  "an",
+  "of",
+  "in",
+  "with",
+  "plus",
+  "dot",
+  "www",
+  "https",
+  "http",
+]);
+
+/** A word as said or written: lower case, a plural "s" off ("dollars"). */
+const stem = (word: string) =>
+  word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
+    ? word.slice(0, -1)
+    : word;
+
+const contentWords = (text: string): string[] =>
+  plainWords(text.replace(/\./gu, " "))
+    .split(" ")
+    .filter((word) => word.length > 0 && !LINKING.has(word))
+    .map(stem);
+
+/**
+ * Whether a line names a held value given in words: every word that
+ * carries the value is in the line, in any order (owner, 9 Nov: how Q
+ * says a value back is never character for character the stored text,
+ * "Nigeria, Kenya, France" is said "Nigeria, Kenya and France",
+ * "acme.com" is "acme dot com", "US dollar" is "US dollars"). Code
+ * decides, never a reading of meaning.
+ */
+export function namesValue(value: string, line: string): boolean {
+  const wanted = contentWords(value);
+  if (wanted.join("").length < 3) return false;
+  const said = new Set(contentWords(line));
+  return wanted.every((word) => said.has(word));
 }
 
 /**
@@ -76,12 +262,15 @@ export function figuresOf(text: string): ReadonlySet<number> {
 export function heldOfferedIn<
   T extends { readonly stepKey: string; readonly value: string },
 >(pending: readonly T[], asked: string, lastQ: string): T[] {
-  const said = plainWords(lastQ);
   const first = pending.filter((item) => item.stepKey === asked).slice(0, 1);
   const withIt = pending.filter((item) => {
     if (item.stepKey === asked) return false;
-    const value = plainWords(item.value);
-    return value.length >= 2 && said.includes(value);
+    const figures = figuresOf(item.value);
+    if (figures.size > 0) {
+      const said = figuresOf(lastQ);
+      return [...figures].every((figure) => said.has(figure));
+    }
+    return namesValue(item.value, lastQ);
   });
   return first.length === 0 ? [] : [...first, ...withIt].slice(0, 4);
 }
@@ -98,7 +287,6 @@ export function restatedHeld(
   utterance: string,
 ): string[] {
   const said = figuresOf(utterance);
-  const words = plainWords(utterance);
   const withFigures = held.filter((item) => figuresOf(item.value).size > 0);
   const named = new Set(
     withFigures.flatMap((item) => [...figuresOf(item.value)]),
@@ -110,8 +298,8 @@ export function restatedHeld(
   return held
     .filter((item) => {
       if (figuresOf(item.value).size > 0) return figuresAgree;
-      const value = plainWords(item.value);
-      return value.length >= 3 && words.includes(value);
+      // "No, not Nigeria" names the held word too: never a yes.
+      return !DISAGREES.test(utterance) && namesValue(item.value, utterance);
     })
     .map((item) => item.stepKey);
 }

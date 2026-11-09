@@ -24,8 +24,8 @@ import { NONE_ANSWER_TEXT } from "@capital-q/onboarding";
 
 import {
   figuresOf,
+  namesValue,
   isPlainYes,
-  plainWords,
   restatedHeld,
 } from "./held-accept.js";
 import {
@@ -2147,8 +2147,7 @@ export function readBackIn(value: string, qLine: string): boolean {
     const said = figuresOf(qLine);
     return [...figures].every((figure) => said.has(figure));
   }
-  const words = plainWords(value);
-  return words.length >= 3 && plainWords(qLine).includes(words);
+  return namesValue(value, qLine);
 }
 
 /** A save that did not take (D86: never silent). */
