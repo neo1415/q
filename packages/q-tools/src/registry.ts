@@ -183,6 +183,29 @@ function ownOrganisationAction(record: QToolRecord): boolean {
   );
 }
 
+/** Scopes that bind an organisation (theirs, or a counterparty's). */
+const ORGANISATION_SCOPES: ReadonlySet<string> = new Set([
+  "COMPANY_PROFILE",
+  "INVESTOR_PROFILE",
+  "INVESTOR_MANDATE",
+]);
+
+/**
+ * Batch 19 (owner live 9 Nov, run 9d1edc9a: an investor's "change my
+ * cheque range" was read as change_my_raise): an action on the person's
+ * own company or firm needs that organisation in the plan, not merely a
+ * scope of the same kind -- a counterparty's COMPANY_PROFILE made a
+ * founder's raise change available to an investor.
+ */
+function needsOwnOrganisation(record: QToolRecord): boolean {
+  return (
+    ownOrganisationAction(record) &&
+    record.definition.requiredScopeKinds.some((kind) =>
+      ORGANISATION_SCOPES.has(kind),
+    )
+  );
+}
+
 /** A declared app action's tool: offered when named, on any purpose its scopes allow. */
 function declaredAction(record: QToolRecord): boolean {
   return (
@@ -289,9 +312,10 @@ export function createQToolRegistry(
     // it is theirs) is offered wherever the plan holds their own scopes,
     // not only on their own organisation's turn. The run's class, and so
     // every counterparty rule, is unchanged.
-    const ownPurposes = ownTurn(context)
-      ? ownOrganisationPurposes(context.plan)
-      : [];
+    const ownHeld = ownOrganisationPurposes(context.plan);
+    const ownPurposes = ownTurn(context) ? ownHeld : [];
+    const ownHeldFor = (record: QToolRecord) =>
+      ownHeld.some((own) => record.definition.supportedPurposes.includes(own));
     const directly = (record: QToolRecord) =>
       record.definition.supportedPurposes.includes(purpose);
     const core = (record: QToolRecord) => record.definition.core === true;
@@ -366,12 +390,24 @@ export function createQToolRegistry(
           definition.requiredScopeKinds.length === 0 ||
           definition.requiredScopeKinds.some((kind) => kinds.has(kind)),
       )
+      .filter((record) => !needsOwnOrganisation(record) || ownHeldFor(record))
       .sort(
         (a, b) =>
           Number(core(b)) - Number(core(a)) ||
           // What the turn named leads, so no bound can cut it.
           Number(named.has(b.definition.providerName)) -
             Number(named.has(a.definition.providerName)) ||
+          // Batch 19: on a turn about their own records, their own
+          // organisation's actions come next, so a long purpose list never
+          // cuts them (run 9d1edc9a loaded change_my_mandate on demand).
+          Number(
+            ownPurposes.length > 0 && ownHeldFor(b) && ownOrganisationAction(b),
+          ) -
+            Number(
+              ownPurposes.length > 0 &&
+                ownHeldFor(a) &&
+                ownOrganisationAction(a),
+            ) ||
           // Then what is in the turn's areas, so a widened offer keeps
           // what the turn is about within the bound.
           Number(focusArea(b)) - Number(focusArea(a)) ||
