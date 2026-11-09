@@ -9118,6 +9118,10 @@ export function createModelGatewayQAnswer(
        * 2026-10-03: one status per card per answer).
        */
       let preparedByTool = false;
+      // Batch 19: each prepared change's own line (what it will change, in
+      // the card's words), and whether every change acted on was their own.
+      const preparedLines: string[] = [];
+      let ownRecordsOnly: boolean | null = null;
       /**
        * A card is waiting for their approval from this turn (any tool's,
        * the email's Capital Q message instead, or a first contact): the
@@ -10354,6 +10358,15 @@ export function createModelGatewayQAnswer(
               ) {
                 preparedByTool = true;
                 if (asksForMessage(call.name)) messagePrepared = true;
+                const line = preparedLineOf(outcome.result.data);
+                if (line !== null && !preparedLines.includes(line)) {
+                  preparedLines.push(line);
+                }
+              }
+              if (outcome.result.ok) {
+                const own = ownRecordOf(outcome.result.data);
+                if (own !== null)
+                  ownRecordsOnly = (ownRecordsOnly ?? true) && own;
               }
               if (acted !== null && !actedLines.includes(acted)) {
                 actedLines.push(acted);
@@ -11365,7 +11378,11 @@ export function createModelGatewayQAnswer(
             { qRunId: request.runId },
             "an answer emptied by the status guards kept its prepared change",
           );
-          content = PREPARED_FOR_APPROVAL_LINE;
+          // Batch 19: what the change will change, before approval.
+          content =
+            preparedLines.length > 0
+              ? preparedLines.join("\n\n")
+              : PREPARED_FOR_APPROVAL_LINE;
         }
         if (content.length === 0 && spoken.removed === 0) {
           logger?.warn(
@@ -11467,12 +11484,18 @@ export function createModelGatewayQAnswer(
           // company. Its reference must come from an exact name and a
           // successful authorised profile read, never a model-written id.
           // Ordinary screen questions retain the run's allowed subjects.
+          // Batch 19 (owner live 9 Nov: "Company · 1" on a mandate change):
+          // a turn whose only act was on their own records carries no
+          // other subject's card -- the conversation's company was not
+          // what it was about.
           subjects:
-            request.aboutNamedOther === true
-              ? namedSubjects.length > 0
-                ? namedSubjects
-                : selectedCompanySubjects
-              : askedSubjects(request.subjects, plan),
+            ownRecordsOnly === true
+              ? []
+              : request.aboutNamedOther === true
+                ? namedSubjects.length > 0
+                  ? namedSubjects
+                  : selectedCompanySubjects
+                : askedSubjects(request.subjects, plan),
           // RECOVERY E4: investors and places this run's tools returned,
           // so investor cards and maps name only what was read.
           read: companiesRead,
@@ -12197,6 +12220,31 @@ export function atMostOneOffer(text: string): string {
     .filter((sentence, at) => !/[?？؟]\s*$/u.test(sentence) || at === last)
     .join("")
     .trim();
+}
+
+/** Batch 19: a prepared app action's own line (what it will change). */
+export function preparedLineOf(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const record = data as { readonly status?: unknown; readonly says?: unknown };
+  return record.status === "PREPARED" &&
+    typeof record.says === "string" &&
+    record.says.trim().length > 0
+    ? record.says.trim()
+    : null;
+}
+
+/**
+ * Batch 19: whether an app action acted on the person's own records (true),
+ * on anything else (false), or is no app action at all (null).
+ */
+export function ownRecordOf(data: unknown): boolean | null {
+  if (typeof data !== "object" || data === null) return null;
+  const record = data as {
+    readonly status?: unknown;
+    readonly ownRecord?: unknown;
+  };
+  if (record.status !== "PREPARED" && record.status !== "DONE") return null;
+  return record.ownRecord === true;
 }
 
 export function appActionLineOf(data: unknown): string | null {

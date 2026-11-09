@@ -4666,3 +4666,74 @@ describe("step 11: retrieval refined by the reading after a warmed prepare", () 
     }
   });
 });
+
+/**
+ * Batch 19 (owner live 9 Nov, savanna-seed: "tell me about clinicrest",
+ * then "change my cheque range to 50k to 3m"): Q said "The card shows the
+ * details once it's saved" and a "Company · 1" chip showed Clinicrest.
+ */
+describe("batch 19: a prepared change to their own mandate says what it changes, with no other subject's card", () => {
+  const CLINICREST = "0c000000-0000-4000-8000-0000000000c1";
+  const SAYS =
+    "Update your mandate: Cheque: USD from 250,000, up to 1,000,000 → USD from 50,000, up to 3,000,000. It's on the card for your approval; nothing changes until you approve it.";
+  const CHANGE: QOfferedTool = {
+    toolName: "app.investor.mandate.change",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "change_my_mandate",
+      description: "Prepares a change to their own mandate.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+
+  it("the emptied answer is the change's own line, and the conversation's company gets no card", async () => {
+    const tools = toolPort([CHANGE], (p) => ({
+      ...succeeded(p, {
+        status: "PREPARED",
+        summary: "Update your mandate",
+        says: SAYS,
+        ownRecord: true,
+      }),
+      toolName: "app.investor.mandate.change",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      said: "change my cheque range to 50k to 3m",
+      investor: true,
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "m",
+              name: "change_my_mandate",
+              arguments: {
+                chequeRange: { currency: "USD", min: "50000", max: "3000000" },
+              },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "I've proposed that for your approval; it's waiting for your approval.",
+          ),
+        },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      turnKind: "TOOL_REQUEST",
+      subjects: [{ kind: "COMPANY", companyId: CLINICREST }],
+    });
+    const said = JSON.stringify(completed);
+    expect(said).not.toContain("once it's saved");
+    expect(said).toContain(
+      "USD from 250,000, up to 1,000,000 → USD from 50,000",
+    );
+    expect(said).not.toContain("COMPANY_REFERENCE");
+  });
+});

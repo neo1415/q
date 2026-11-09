@@ -104,6 +104,11 @@ export const AppToolOutputSchema = z
      * after the turn, so a caller can leave it to that one line.
      */
     summary: z.string().max(600).optional(),
+    /**
+     * Batch 19: the action was on their own company or firm, so the turn
+     * is about their own records (no other subject's card goes with it).
+     */
+    ownRecord: z.literal(true).optional(),
   })
   .strict();
 export type AppToolOutput = z.infer<typeof AppToolOutputSchema>;
@@ -179,6 +184,45 @@ function correlationOf(value: string): CorrelationId {
 }
 
 /** The fields a value did not fit, in plain words (never the value itself). */
+/**
+ * Batch 19 (owner live 9 Nov: "The card shows the details once it's
+ * saved" for a cheque-range change): what a prepared change will change,
+ * in the card's own words, before anyone approves it -- its summary and
+ * its preview ("Cheque: USD from 250,000, up to 1,000,000 → USD from
+ * 50,000, up to 3,000,000"), never a promise of details later.
+ */
+export function preparedLine(
+  card: { readonly summary: string; readonly preview: string },
+  closest?: string,
+): string {
+  const changes = card.preview
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && line !== "Nothing else changes.")
+    .join("; ");
+  const what =
+    changes.length === 0 ? card.summary : `${card.summary}: ${changes}`;
+  const said = `${closest === undefined ? "" : `${closest} `}${what}. It's on the card for your approval; nothing changes until you approve it.`;
+  return said.length <= 600 ? said : `${said.slice(0, 597).trimEnd()}…`;
+}
+
+/**
+ * Batch 19: an action on the person's own company or firm (its purposes
+ * name their own organisation's turn, never a counterparty's or a
+ * relationship's): what such a turn changes is theirs alone.
+ */
+function ownOrganisationTool(declared: {
+  readonly purposes?: readonly string[] | undefined;
+}): boolean {
+  const purposes = declared.purposes ?? [];
+  return (
+    (purposes.includes("OWN_COMPANY_QUESTION") ||
+      purposes.includes("INVESTOR_QUESTION")) &&
+    !purposes.includes("RELATIONSHIP_QUESTION") &&
+    !purposes.includes("COUNTERPARTY_COMPANY_QUESTION")
+  );
+}
+
 /** A field's name as words ("websiteUrl" -> "website url"), for the person. */
 const fieldWords = (field: string): string =>
   field
@@ -558,18 +602,16 @@ function toolFor(
           payload: grant.canonical,
           reason: reasonOf(_input),
         });
+        const card =
+          status === "PREPARED" ? action.card(grant.canonical) : null;
         return {
           status,
-          ...(status === "PREPARED"
-            ? { summary: action.card(grant.canonical).summary }
-            : {}),
+          ...(card === null ? {} : { summary: card.summary }),
+          ...(ownOrganisationTool(declared) ? { ownRecord: true } : {}),
           says:
-            status === "PREPARED"
-              ? `${grant.closest === undefined ? "" : `${grant.closest} `}${action.card(grant.canonical).summary}: it's on the card for your approval; nothing changes until you approve it.`.slice(
-                  0,
-                  600,
-                )
-              : "Another change is already waiting for your approval in this answer; approve or decline it first.",
+            card === null
+              ? "Another change is already waiting for your approval in this answer; approve or decline it first."
+              : preparedLine(card, grant.closest),
         };
       }
       const out = await action.run(own, grant.context, grant.canonical);

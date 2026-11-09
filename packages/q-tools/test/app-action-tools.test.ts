@@ -948,7 +948,7 @@ describe("the mandate form, one generated tool for its four declarations", () =>
       ),
     };
   }
-  function mandates() {
+  function mandates(full?: Record<string, unknown>) {
     const prepared: { actionType: string; payload: unknown }[] = [];
     const never = () =>
       Promise.reject(new Error("Q prepares; it never writes"));
@@ -960,7 +960,8 @@ describe("the mandate form, one generated tool for its four declarations", () =>
           setInvestorVisibility: never,
           updateInvestorOrganisation: never,
           upsertMyInvestorRepresentative: never,
-          getInvestorMandate: never,
+          getInvestorMandate:
+            full === undefined ? never : () => Promise.resolve(full as never),
           listInvestorMandates: () =>
             Promise.resolve({
               items: [
@@ -1097,6 +1098,36 @@ describe("the mandate form, one generated tool for its four declarations", () =>
     expect(prepared.map((one) => one.actionType)).toEqual([
       "app.investor.mandate.change",
     ]);
+  });
+
+  it("batch 19: the prepared change says what it changes, before and after, and marks it as their own record", async () => {
+    const { executor } = mandates({
+      name: "Core",
+      discoveryMode: "BROAD",
+      minCheque: "250000",
+      maxCheque: "1000000",
+      currencyCode: "USD",
+      constraints: [],
+      minStageCode: null,
+      maxStageCode: null,
+      rawMandateText: null,
+    });
+    const outcome = await executor.execute(
+      call("change_my_mandate", {
+        operation: "UPDATE",
+        chequeRange: { currency: "USD", min: "50000", max: "3000000" },
+      }),
+      contextFor(actorA, investorPlan()),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED", ownRecord: true },
+    });
+    const says = (outcome.result as { data: { says: string } }).data.says;
+    expect(says).toContain(
+      "Cheque: USD from 250,000, up to 1,000,000 → USD from 50,000, up to 3,000,000",
+    );
+    expect(says).toContain("nothing changes until you approve it");
   });
 
   it("closing their mandate prepares the close itself, with nothing else to change", async () => {
