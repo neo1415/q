@@ -195,6 +195,39 @@ describe("document processing pipeline", () => {
     expect(JSON.stringify(logger.lines)).not.toContain(PRIVACY_MARKER);
   });
 
+  // Owner live 9 Nov: a file whose extraction found no text was marked
+  // COMPLETED, and Q guessed "it may be a scan".
+  it("an extraction with no text at all completes the run as textless, never COMPLETED text", async () => {
+    const run = async (blocks: readonly unknown[]) => {
+      const version = makeVersion();
+      const evidence = createFakeEvidence({
+        version,
+        pipelineVersion: PIPELINE_VERSION,
+        instructionRiskSignals: 0,
+      });
+      const { handle } = build({
+        evidence: evidence.service,
+        storage: storageStub(version.sizeBytes).provider,
+        sandbox: sandboxStub({
+          ...successfulParse,
+          output: { ...successfulParse.output, blocks },
+        } as ParserResult),
+      });
+      await handle(jobMessage({ documentVersionId: version.id }));
+      return evidence.calls.find(
+        (call) => call.name === "completeDocumentProcessing",
+      );
+    };
+    const empty = await run([
+      { kind: "paragraph", text: "   ", locator: { index: 0 } },
+    ]);
+    expect(JSON.stringify(empty)).toContain('"textless":true');
+    const texted = await run([
+      { kind: "paragraph", text: "Clause 1.", locator: { index: 0 } },
+    ]);
+    expect(JSON.stringify(texted)).not.toContain("textless");
+  });
+
   it("refuses a job whose tenant claim does not match the document", async () => {
     const version = makeVersion({ tenantId: TENANT_A });
     const evidence = createFakeEvidence({

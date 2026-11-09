@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DOCUMENT_PAGE_MAX_CHARS,
   pagesFromBlocks,
+  UNPAGED_SECTION_CHARS,
   type ExtractedBlock,
 } from "../src/index.js";
 
@@ -65,12 +66,36 @@ describe("pagesFromBlocks (Q room W3)", () => {
     ]);
   });
 
-  it("invents no pages for an unpaged document", () => {
+  // Owner live 9 Nov: a .docx attached in Q's chat was extracted, wrote no
+  // pages, and Q said "it may be a scan". An unpaged document is read in
+  // sections of whole blocks, numbered as its pages.
+  it("an unpaged document (a Word file) is read in sections of whole blocks", () => {
+    const paragraph = (n: number, text: string) => ({
+      kind: "paragraph" as const,
+      text,
+      locator: at(n),
+    });
     expect(
       pagesFromBlocks([
-        { kind: "paragraph", text: "Plain text", locator: at(0) },
-      ]),
-    ).toEqual([]);
+        {
+          kind: "heading",
+          level: 1,
+          text: "TERMS AND CONDITIONS",
+          locator: at(0),
+        },
+        paragraph(1, "These terms apply to every order."),
+      ]).map((page) => [page.pageNumber, page.text]),
+    ).toEqual([[1, "TERMS AND CONDITIONS\nThese terms apply to every order."]]);
+    const third = "y".repeat(Math.floor(UNPAGED_SECTION_CHARS / 2) + 1);
+    const pages = pagesFromBlocks([
+      paragraph(0, third),
+      paragraph(1, third),
+      paragraph(2, third),
+    ]);
+    // A block is never split: each over half a section, so one per section.
+    expect(pages.map((page) => page.pageNumber)).toEqual([1, 2, 3]);
+    expect(pages.every((page) => page.text === third)).toBe(true);
+    expect(pagesFromBlocks([paragraph(0, "   ")])).toEqual([]);
   });
 
   it("keeps an empty page as a page and bounds a long one", () => {

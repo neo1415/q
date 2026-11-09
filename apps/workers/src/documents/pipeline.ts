@@ -6,10 +6,11 @@ import {
   createJobSchema,
   DocumentTypeSchema,
 } from "@capital-q/contracts";
-import type {
-  DocumentProcessingService,
-  ExtractedBlock,
-  PrivateDocumentStorageProvider,
+import {
+  documentTextFromBlocks,
+  type DocumentProcessingService,
+  type ExtractedBlock,
+  type PrivateDocumentStorageProvider,
 } from "@capital-q/evidence";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import type {
@@ -664,6 +665,10 @@ export function createDocumentProcessingPipeline(
       causationId: CausationIdSchema.parse(`cau_${job.id}`),
       scannedClean: decision.scanned,
       ...(decision.recordNotScanned === true ? { notScanned: true } : {}),
+      // Owner live 9 Nov: no text at all is never "COMPLETED" text.
+      ...(documentTextFromBlocks(output.blocks, 1).length === 0
+        ? { textless: true }
+        : {}),
       provenance: {
         extractorVersion: output.metadata.parserVersion,
         ...(chunking?.chunkingVersion === undefined

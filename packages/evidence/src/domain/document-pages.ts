@@ -56,15 +56,50 @@ function textOf(block: ExtractedBlock): string {
 const codePoints = (text: string) => Array.from(text);
 
 /**
- * The pages of a paged document. A document whose blocks carry no page or
- * slide (plain text, a workbook, a Word file) has none: its text is not
- * cut into pages that do not exist.
+ * An unpaged document's reading section: whole blocks, in order, up to
+ * this many characters (one block longer than this is its own section).
+ */
+export const UNPAGED_SECTION_CHARS = 4_000;
+
+/**
+ * Owner live 9 Nov: a Word file attached in Q's chat had its text
+ * extracted, yet Q said "it may be a scan" -- it had no pages, and every
+ * reader (the attached-file read, the Q room, read aloud) reads pages. A
+ * document whose blocks carry no page or slide at all (Word, plain text,
+ * Markdown, a workbook) is read in sections of whole blocks, numbered as
+ * its pages; a block is never split between two.
+ */
+function sectionOf(blocks: readonly ExtractedBlock[]): Map<number, string[]> {
+  const byPage = new Map<number, string[]>();
+  let page = 1;
+  let size = 0;
+  for (const block of blocks) {
+    const text = textOf(block).trim();
+    if (text.length === 0) continue;
+    const length = codePoints(text).length;
+    if (size > 0 && size + length > UNPAGED_SECTION_CHARS) {
+      page += 1;
+      size = 0;
+    }
+    const parts = byPage.get(page) ?? [];
+    parts.push(text);
+    byPage.set(page, parts);
+    size += length;
+  }
+  return byPage;
+}
+
+/**
+ * The pages of a document: a paged one's (PDF, slides) as its parser
+ * located them; an unpaged one's (Word, text, a workbook) as reading
+ * sections of whole blocks.
  */
 export function pagesFromBlocks(
   blocks: readonly ExtractedBlock[],
 ): readonly DocumentPageText[] {
-  const byPage = new Map<number, string[]>();
-  for (const block of blocks) {
+  const paged = blocks.some((block) => pageOf(block) !== null);
+  const byPage = paged ? new Map<number, string[]>() : sectionOf(blocks);
+  for (const block of paged ? blocks : []) {
     const page = pageOf(block);
     if (page === null) continue;
     const text = textOf(block).trim();

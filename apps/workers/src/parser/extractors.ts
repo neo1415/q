@@ -137,7 +137,11 @@ export function createTextExtractor(): ContentExtractor {
     id: "text",
     version: TEXT_EXTRACTOR_VERSION,
     // CSV has its own row-preserving extractor (CQ-RAG-001).
-    supports: (descriptor) => descriptor.mimeType === "text/plain",
+    // Markdown is text (owner live 9 Nov: attachments in any text format).
+    supports: (descriptor) =>
+      descriptor.mimeType === "text/plain" ||
+      descriptor.mimeType === "text/markdown" ||
+      descriptor.mimeType === "text/x-markdown",
     extract: (input, context) => {
       const builder = new BlockBuilder(context.limits);
       // Decoded leniently: a document with a bad byte is still a document,
@@ -227,6 +231,30 @@ function paragraphText(paragraph: XmlNode): string {
   );
 }
 
+/**
+ * The body's paragraphs and tables, in order, through the wrappers Word
+ * puts around them: a content control (`w:sdt` → `w:sdtContent`) or custom
+ * XML (`w:customXml`). Owner live 9 Nov: a terms-and-conditions template
+ * keeps its whole text inside content controls, which the direct children
+ * of the body never reached.
+ */
+function bodyBlocks(node: XmlNode | undefined, depth = 0): XmlNode[] {
+  const out: XmlNode[] = [];
+  for (const child of node?.children ?? []) {
+    const name = localName(child);
+    if (name === "p" || name === "tbl") {
+      out.push(child);
+    } else if (depth < 8 && (name === "sdt" || name === "customXml")) {
+      const inner =
+        name === "sdt"
+          ? child.children.find((c) => localName(c) === "sdtContent")
+          : child;
+      out.push(...bodyBlocks(inner, depth + 1));
+    }
+  }
+  return out;
+}
+
 export function createDocxExtractor(): ContentExtractor {
   return {
     id: "ooxml_docx",
@@ -266,7 +294,7 @@ export function createDocxExtractor(): ContentExtractor {
         );
       };
 
-      for (const node of body?.children ?? []) {
+      for (const node of bodyBlocks(body)) {
         const name = localName(node);
         if (name === "p") {
           section += 1;
