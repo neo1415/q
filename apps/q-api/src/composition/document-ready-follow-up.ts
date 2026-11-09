@@ -26,6 +26,11 @@ import type { ActorContext } from "@capital-q/security";
  *   question it answers is the person's own last turn.
  * - Once: the run's idempotency key is (turn, document), so a redelivered
  *   or repeated wake starts nothing new.
+ *
+ * Known limit (accepted by integration, 2026-11-09): a wake that lands
+ * while the READING turn's run is still finishing (not yet COMPLETED)
+ * finds no waiting turn, and that turn gets no follow-up. There is no
+ * sweep (no polling, by decision); the person can ask again.
  */
 
 /** How long after a turn its file finishing still answers it. */
