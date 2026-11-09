@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { OnboardingTranscriptReader } from "@capital-q/model-gateway/q";
 import { INVESTOR_DEFINITION_V5 } from "@capital-q/investor-onboarding";
@@ -351,5 +351,138 @@ describe("7. a city they name is saved as its country, typed and spoken", () => 
     ).definition.template;
     expect(reader).toContain("Doha");
     expect(reader).toContain("give the country");
+  });
+});
+
+describe("8. D86: the live line is told what was saved, refused and is next", () => {
+  it("a save: the steer names it, never asks it again, and asks the next needed step with its choices", async () => {
+    const { readings, conversation } = duplexWorld("I0.hq_country");
+    readings.push({
+      answers: [
+        {
+          stepKey: "I0.hq_country",
+          value: "Doha",
+          quote: "We're based in Doha",
+          ownWords: false,
+          aboutStep: true,
+          source: "STATED",
+        },
+      ],
+      declined: [],
+      notKnown: [],
+    });
+    await conversation.said?.(DUPLEX, "Q", "Where is the firm based?");
+    await conversation.said?.(DUPLEX, "PERSON", "We're based in Doha");
+    await conversation.flush?.(DUPLEX);
+    const steer = conversation.steerFor?.(actor.userId, SESSION) ?? null;
+    expect(steer?.text).toMatch(/Saved just now: [^\n]*Qatar/u);
+    expect(steer?.text).toMatch(/Ask next: /u);
+    expect(steer?.askedStepKey).not.toBe("I0.hq_country");
+    expect(steer?.askedStepKey).not.toBeNull();
+    // Only the person whose session it is reads it.
+    expect(
+      conversation.steerFor?.("b0000000-0000-4000-8000-000000000099", SESSION),
+    ).toBeNull();
+  });
+
+  it("a refused save is never silent: an error log, and the steer says it did not take", async () => {
+    const { readings, conversation } = duplexWorld("I0.hq_country");
+    const errors = vi.spyOn(logger, "error");
+    readings.push({
+      answers: [
+        {
+          stepKey: "I0.hq_country",
+          value: "Atlantis",
+          quote: "Atlantis",
+          ownWords: false,
+          aboutStep: true,
+          source: "STATED",
+        },
+      ],
+      declined: [],
+      notKnown: [],
+    });
+    await conversation.said?.(DUPLEX, "Q", "Where is the firm based?");
+    await conversation.said?.(DUPLEX, "PERSON", "Atlantis");
+    await conversation.flush?.(DUPLEX);
+    expect(errors).toHaveBeenCalledWith(
+      expect.objectContaining({ stepKey: "I0.hq_country" }),
+      "onboarding conversation save refused",
+    );
+    const steer = conversation.steerFor?.(actor.userId, SESSION) ?? null;
+    expect(steer?.text).toMatch(/NOT saved: [^\n]*(country|based)/iu);
+    errors.mockRestore();
+  });
+
+  it("a figure waiting for their yes is named for a read-back", async () => {
+    const { readings, conversation } = duplexWorld("I2.cheque_min");
+    readings.push({
+      answers: [
+        {
+          stepKey: "I2.cheque_min",
+          value: 500_000,
+          quote: "500 thousand",
+          ownWords: false,
+          aboutStep: true,
+          source: "STATED",
+        },
+      ],
+      declined: [],
+      notKnown: [],
+    });
+    await conversation.said?.(
+      DUPLEX,
+      "Q",
+      "What's the smallest cheque you write?",
+    );
+    await conversation.said?.(DUPLEX, "PERSON", "500 thousand");
+    await conversation.flush?.(DUPLEX);
+    const steer = conversation.steerFor?.(actor.userId, SESSION) ?? null;
+    expect(steer?.text).toMatch(/Waiting for their yes[^\n]*500/u);
+  });
+});
+
+describe("9. D86: Q's spoken question on the steered topic is that step's (its choices show)", () => {
+  it("kept with the steered step, so the session's asked step carries its options", async () => {
+    const { world, readings, conversation } = duplexWorld("I0.hq_country");
+    readings.push({
+      answers: [
+        {
+          stepKey: "I0.hq_country",
+          value: "Doha",
+          quote: "We're based in Doha",
+          ownWords: false,
+          aboutStep: true,
+          source: "STATED",
+        },
+      ],
+      declined: [],
+      notKnown: [],
+    });
+    await conversation.said?.(DUPLEX, "Q", "Where is the firm based?");
+    await conversation.said?.(DUPLEX, "PERSON", "We're based in Doha");
+    await conversation.flush?.(DUPLEX);
+    const steer = conversation.steerFor?.(actor.userId, SESSION) ?? null;
+    const next = steer?.askedStepKey ?? "";
+    const question = /Ask next: ([^(\n]+)/u.exec(steer?.text ?? "")?.[1] ?? "";
+    expect(question.length).toBeGreaterThan(5);
+    // The live model asks it in its own words; then something off-topic.
+    await conversation.said?.(DUPLEX, "Q", `Got it. ${question.trim()}`);
+    await conversation.said?.(DUPLEX, "Q", "By the way, how's your day going?");
+    await conversation.flush?.(DUPLEX);
+    const kept = world.keptSteps();
+    expect(kept.at(-2)).toBe(next);
+    expect(kept.at(-1)).toBeNull();
+  });
+});
+
+describe("10. D86: the live interview follows Capital Q's updates", () => {
+  it("never asks again what is saved; a refused save is said plainly", () => {
+    const prompt = livePrompt({
+      interview: "- Needed: Where is your firm based?",
+    });
+    expect(prompt).toContain("Capital Q update");
+    expect(prompt).toContain("Never ask again about anything it says is saved");
+    expect(prompt).toContain("did not save, say so plainly");
   });
 });

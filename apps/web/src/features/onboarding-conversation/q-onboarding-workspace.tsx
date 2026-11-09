@@ -144,6 +144,7 @@ import {
   type StillNeeded,
 } from "./conversation";
 import { useHeldReply } from "./held-reply";
+import { voiceSteerAction } from "./voice-steer-action";
 import { useT } from "@/features/i18n/language";
 import { LocalFigureNote, localFigureProvenance } from "./local-figure-note";
 import { WorkingLine } from "@/components/working/working-line";
@@ -319,6 +320,9 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
   return b.every((item) => seen.has(item));
 }
 
+/** D86: how often a live call looks for Capital Q's latest steer. */
+const VOICE_STEER_POLL_MS = 2_500;
+
 export function QOnboardingWorkspace({
   session,
   vocabulary,
@@ -483,11 +487,18 @@ export function QOnboardingWorkspace({
   const voiceConnected = voice.client.connected;
   const voiceSendText = voice.client.sendText;
 
+  // D86: in a live call the choices follow the question the session says
+  // Q is asking (its spoken line kept with that step), not the form's
+  // cursor or the last typed turn.
+  const voiceAsked = voiceActive ? (view?.askedStep ?? null) : null;
+  const askedNow = voiceAsked ?? qAskedStep;
+  const chipsAsking = voiceAsked === null ? qAsking : [voiceAsked.stepKey];
+
   const prompt: QPrompt | null = useMemo(() => {
     if (view === undefined) return null;
-    const step = promptStepOf(view, qAskedStep);
+    const step = promptStepOf(view, askedNow);
     return step === null ? null : promptFor(step, vocabulary);
-  }, [view, vocabulary, qAskedStep]);
+  }, [view, vocabulary, askedNow]);
   /**
    * Q's last sentence, waiting for the session to settle on the step it
    * was about. `say` resolves once the view has been re-read, so the
@@ -1905,6 +1916,33 @@ export function QOnboardingWorkspace({
       for (const item of fresh) notedFindings.current.add(item.id);
     }
   }, [view, voiceActive, vocabulary, labels]);
+  // D86 (owner, 9 Nov): during a live call, what Capital Q saved, could not
+  // save, waits on and asks next is handed to the call as a quiet note once
+  // each time it changes; the call keeps speaking at once in its own words.
+  // The session is read again with it, so what was saved shows and the
+  // question Q asks next shows its choices (the session's asked step).
+  const steeredId = useRef<string | null>(null);
+  const steerSessionId = view?.session.id;
+  useEffect(() => {
+    if (!voiceActive || steerSessionId === undefined) return;
+    let stopped = false;
+    const look = async () => {
+      const steer = await voiceSteerAction(steerSessionId).catch(() => null);
+      if (stopped || steer === null || steer.id === steeredId.current) return;
+      if (briefCall.current?.(steer.text) === true) {
+        steeredId.current = steer.id;
+        void refreshRef.current();
+      }
+    };
+    const timer = setInterval(() => {
+      void look();
+    }, VOICE_STEER_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [voiceActive, steerSessionId]);
+
   /** What Q picked up from one document, read from the latest session. */
   const findingsOf = useRef<(documentId: string) => readonly DocumentFinding[]>(
     () => [],
@@ -2300,7 +2338,7 @@ export function QOnboardingWorkspace({
   // (production re-test 2026-10-28: the investor-type chips stayed under
   // three later questions about currency, until the answer was saved).
   const visibleChips =
-    prompt === null || !chipsBelongTo(prompt.stepKey, qAsking)
+    prompt === null || !chipsBelongTo(prompt.stepKey, chipsAsking)
       ? []
       : prompt.chips.filter(
           (chip) =>
@@ -2308,7 +2346,7 @@ export function QOnboardingWorkspace({
             chip.optionKey === undefined ||
             narrowedTo.includes(chip.optionKey),
         );
-  const composerPlaceholder = composerHint(prompt, qAsking);
+  const composerPlaceholder = composerHint(prompt, chipsAsking);
 
   return (
     <div

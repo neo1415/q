@@ -962,6 +962,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/recommendation-explanations.ts GET DISCOVERY_EXPLANATION_PATH":
     cap("tool.recommendation_explanation"),
   "q-api/voice/interview-route.ts POST dependencies.path": Q_TRANSPORT,
+  "q-api/voice/routes.ts GET Q_VOICE_ONBOARDING_STEER_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts GET Q_VOICE_TURN_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SCREEN_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SPEECH_PATH": Q_TRANSPORT,
