@@ -2,6 +2,12 @@
 
 > **DEPLOYED 2026-11-04 09:49 UTC:** web on `d25c0843c` (CI green); q-api on `c53a08055`; api and workers on `b10cd6c87`. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing. Live-checked as a fictional investor: switch on a fresh page, no opening lists. **Newest audit: `Q_MULTIMODAL_DEMO_AUDIT_2026-11-04.md`, including a P0: text typed in the ~3.5 s before hydration is destroyed.**
 
+## DEPLOYED d9dc487e3 (q-api) — 9 November 2026, 20:03 UTC
+
+- q-api on `d9dc487e3` (CI run 42686267918 green); web, api and workers unchanged on `e107d7040`. Rollback for q-api: `e107d7040`.
+- Fix: a spoken yes to a held read-back was never taken when Q said the value in words. `figuresOf` read "five hundred thousand" as 5 and 100, so `readBackIn` never matched the held 500000 and Q asked the cheque again and again (owner session 73253301: yes said nine times). Spoken numbers are now composed whole; values in words (lists, websites, currencies) match by their words in any order; a reply with no/not/but is never a yes. Typed and voice share `held-accept.ts`. Test: `apps/q-api/test/spoken-figures-1109.test.ts`.
+- Owner's held cheques (500000 / 3000000 / 7000000, PENDING in `onboarding.suggestions`) are taken on the next read-back and yes. Not yet re-checked live by the owner.
+
 ## DEPLOYED e107d7040 — 9 November 2026, 18:13 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 - All four Railway services are on `e107d7040` (batch 23); rollback `06334c09b` (batch 22, live 17:11 UTC).

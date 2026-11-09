@@ -2216,3 +2216,8 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Live check: the attachment chip survives a reload; Q answers about the uploaded file with a page cite. The auto follow-up (a file still READING when asked) is test-covered only, not live-exercised: the .txt finished before the question.
 - Gate script now refuses to push to CI when any vitest test fails.
 - Next: the paid voice e2e (D85) needs a UDP-capable runner (cloud sandbox has no UDP for WebRTC); the owner's own voice test is the fastest check. Owner items unchanged (HANDOFF-2026-11-09.md §5).
+
+## 2026-11-09 20:05 UTC — voice yes fix live (q-api d9dc487e3)
+
+- Owner report: voice onboarding repeated the cheque (and the country) questions. The logs showed the answers were heard and held for a yes, but `acceptSpokenYes` never took one: `readBackIn` -> `figuresOf` could not read spoken numbers. Fixed at the matcher, for every held value type (numbers, lists, websites, currencies). Live retry by the owner pending.
+- Open idea, not done: the owner's original design (a parallel reader saving from the transcript) was not revisited; the owner said there is no time for it now.
