@@ -347,3 +347,8 @@ Core Seven remains the governing assessment framework. The new directive authori
     - The 4 older unconfirmed accounts (none from the last 7 days) are left untouched.
     - Turn it back on (mailer_autoconfirm false) once email delivery works.
     - Separate from Capital Q's identity and organisation verification (verification_claims), which is unchanged.
+85. **Live voice onboarding runs through the typed engine; one paid voice check approved** (owner, 9 Nov 2026 ~13:00 UTC).
+    - Duplex voice onboarding uses the same engine as typed: saving, accepting confirmations (not only a literal "yes"), the repeat cap, playback, the next question and its options. Voice keeps only audio in and out, so the two can't diverge.
+    - Every answer a person gives must be saved. A country such as "USA" or "San Francisco" always saves; "can't be saved, move on" is not acceptable.
+    - Answer option cards show in voice as in typed.
+    - The owner approved one short scripted live duplex-voice onboarding call on the provider credits after the fix (a few cents), cost reported.
