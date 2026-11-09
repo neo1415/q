@@ -434,7 +434,43 @@ export function createOnboardingConversation(dependencies: {
     if (buffer === undefined) return;
     buffers.delete(line.voiceSessionId);
     keep(line, buffer.role, buffer.parts.join(" "));
-    if (buffer.role === "PERSON") schedule(line);
+    if (buffer.role === "PERSON") {
+      quickYes(line);
+      schedule(line);
+    }
+  };
+
+  /**
+   * A yes taken as soon as their words are kept, without waiting out the
+   * reading's pause for more words (code only: Q's line read the held
+   * value back, and their reply agrees). One at a time per conversation;
+   * a reading's own pass waits for it, so a yes is never taken twice.
+   */
+  const yesInFlight = new Map<string, Promise<unknown>>();
+  const quickYes = (line: ConversationLine) => {
+    if (line.voiceSessionId.startsWith("typed:")) return;
+    const key = line.onboarding.sessionId;
+    const before = yesInFlight.get(key) ?? Promise.resolve();
+    const next = before
+      .then(async () => {
+        await (writes.get(line.voiceSessionId) ?? Promise.resolve());
+        const thread = await listOnboardingInterviewTurns(
+          sessionOf(line),
+          line.onboarding.sessionId,
+          THREAD_LIMIT,
+        );
+        const saved = await acceptSpokenYes(line, thread.items);
+        if (saved.length > 0) {
+          await steerAfter(line, { saved, refused: [], held: [] });
+        }
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { err: error, qVoiceSessionId: line.voiceSessionId },
+          "onboarding conversation yes not accepted",
+        );
+      });
+    yesInFlight.set(key, next);
   };
 
   /**
@@ -589,6 +625,30 @@ export function createOnboardingConversation(dependencies: {
     );
     let state = await portFor(line, personTurns).state();
     if (state.completed) return;
+    // Owner, live duplex voice 9 Nov 21:01: "Yes" to "Seven million. Is
+    // that right?" was taken 11 s later, after the model reading below and
+    // the reading before it; Q, steered all that time to put the held
+    // figure to them, asked it twice more. A yes to Q's read-back is code
+    // (held-accept), not a reading: it is taken here, before the model
+    // call, and Q is steered at once. Anything a still-running earlier
+    // reading holds meanwhile is taken by the second pass further down.
+    const spoken = !line.voiceSessionId.startsWith("typed:");
+    const takeYes = () =>
+      acceptSpokenYes(line, thread.items).catch((error: unknown) => {
+        logger.warn(
+          { err: error, qVoiceSessionId: line.voiceSessionId },
+          "onboarding conversation yes not accepted",
+        );
+        return [] as readonly string[];
+      });
+    await (yesInFlight.get(line.onboarding.sessionId) ?? Promise.resolve());
+    const yesAtOnce =
+      spoken && only === undefined ? await takeYes() : ([] as const);
+    if (yesAtOnce.length > 0) {
+      await steerAfter(line, { saved: yesAtOnce, refused: [], held: [] });
+      state = await portFor(line, personTurns).state();
+      if (state.completed) return;
+    }
     // e2e run 5 (production batch 9): "Are there sectors you'd rather not
     // see?" answered "None." seven times and never saved -- the reading
     // left it to a decline the port's own check did not share. A plain
@@ -790,16 +850,7 @@ export function createOnboardingConversation(dependencies: {
     // said again, to Q's line that named them (their figures, or their
     // words). Code decides; the reading is not asked what "yes" meant.
     // Typed lines accept in the typed engine itself.
-    const spoken = !line.voiceSessionId.startsWith("typed:");
-    const yesSaved = spoken
-      ? await acceptSpokenYes(line, thread.items).catch((error: unknown) => {
-          logger.warn(
-            { err: error, qVoiceSessionId: line.voiceSessionId },
-            "onboarding conversation yes not accepted",
-          );
-          return [] as readonly string[];
-        })
-      : [];
+    const yesSaved = [...yesAtOnce, ...(spoken ? await takeYes() : [])];
     // Live 2026-10-30 (Hydrolume): they skipped "team strengths"; a later
     // reading of the whole conversation took their "Yes, that looks right"
     // (to a different question) as agreeing to the examples Q's question
