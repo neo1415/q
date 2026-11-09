@@ -207,10 +207,13 @@ describe("video lobby admission and durable navigation", () => {
     }
   });
 
-  it("preserves the same canonical id in a durable voice URL after confirmed video fallback", async () => {
-    vi.spyOn(window.history, "replaceState").mockImplementation(
-      () => undefined,
-    );
+  // Owner rehearsal 9 Nov: the lobby shows the room it started and only
+  // rewrites the URL. Navigating as well mounted a second room (two voice
+  // lines, two stages); a refresh still lands on the same rehearsal.
+  it("preserves the same canonical id in a durable voice URL after confirmed video fallback, without a second room", async () => {
+    const history = vi
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => undefined);
     actions.start.mockResolvedValue({ ok: true, value: { id: ID } });
     actions.video.mockResolvedValue({
       ok: true,
@@ -223,15 +226,18 @@ describe("video lobby admission and durable navigation", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Join now/u }));
     await waitFor(() =>
-      expect(navigation.replace).toHaveBeenCalledWith(
+      expect(history).toHaveBeenCalledWith(
+        null,
+        "",
         `/rehearsals/live/${ID}?video=0`,
       ),
     );
+    expect(navigation.replace).not.toHaveBeenCalled();
     expect(actions.start).toHaveBeenCalledTimes(1);
     expect(actions.video).toHaveBeenCalledTimes(1);
   });
 
-  it("persists the canonical room id before provider allocation and uses the same stable route on success", async () => {
+  it("persists the canonical room id before provider allocation and keeps that route on success, without a second room", async () => {
     const history = vi
       .spyOn(window.history, "replaceState")
       .mockImplementation(() => undefined);
@@ -254,11 +260,14 @@ describe("video lobby admission and durable navigation", () => {
     fireEvent.click(screen.getByRole("radio", { name: /Video, up to/u }));
     fireEvent.click(screen.getByRole("button", { name: /Join now/u }));
     await waitFor(() =>
-      expect(navigation.replace).toHaveBeenCalledWith(
-        `/rehearsals/live/${ID}?video=1`,
-      ),
+      expect(actions.video).toHaveBeenCalledWith(ID, "q-selected"),
     );
+    expect(history).toHaveBeenCalledWith(
+      null,
+      "",
+      `/rehearsals/live/${ID}?video=1`,
+    );
+    expect(navigation.replace).not.toHaveBeenCalled();
     expect(actions.start).toHaveBeenCalledTimes(1);
-    expect(actions.video).toHaveBeenCalledWith(ID, "q-selected");
   });
 });

@@ -65,6 +65,7 @@ import {
   waitingForAnswer,
 } from "./meet";
 import {
+  finishRehearsalAction,
   raiseHandAction,
   readRehearsalAction,
   sayInRehearsalAction,
@@ -369,6 +370,14 @@ export function RehearsalRoom({
   const typedMode =
     voiceLive === "TYPED" || (voiceLive === "LIVE" && !lineLive);
 
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   // The person leaving hears the leave sound; when the other side ended
   // the meeting, their leaving sound plays instead.
   const leave = useCallback(
@@ -382,6 +391,24 @@ export function RehearsalRoom({
       sound(cue);
       if (sounds.current) {
         await new Promise((done) => window.setTimeout(done, meetSoundMs(cue)));
+      }
+      // Finished here, before the review: the review page never finishes
+      // an open rehearsal and sends one back to this room (1ca6b9346), so
+      // going there first looped review → room → review (owner, 9 Nov).
+      // Q writes the review now, which can take a few seconds.
+      setNotice("Q is writing your review…");
+      const finished = await finishRehearsalAction(initial.id).catch(
+        () => null,
+      );
+      if (!mounted.current) return;
+      if (finished?.ok !== true) {
+        // Stay in the room: Leave again tries again.
+        left.current = false;
+        setNotice(
+          finished?.message ??
+            "Q couldn't write your review just now. Leave again to try again.",
+        );
+        return;
       }
       router.push(`/rehearsals/r/${encodeURIComponent(initial.id)}`);
     },
@@ -404,6 +431,10 @@ export function RehearsalRoom({
         ...deviceLocale(),
         ...(resume ? { resume: true } : {}),
       });
+      // Gone while the server answered (a room replaced by another):
+      // never open a line nobody sees, which would take the person's
+      // voice from the room they are in.
+      if (!mounted.current) return false;
       if (!started.ok) {
         // A silent retry says nothing; the caller decides when to tell.
         if (options.quiet === true) return false;
@@ -442,10 +473,13 @@ export function RehearsalRoom({
   }, [connect]);
   const opened = useRef(false);
   useEffect(() => {
+    // Already over (a reload after they left): no line to open, the room
+    // only finishes it and goes to the review.
+    if (initial.endedAt !== null || initial.status === "FINISHED") return;
     if (opened.current) return;
     opened.current = true;
     void connect(false);
-  }, [connect]);
+  }, [connect, initial.endedAt, initial.status]);
 
   // Silence: when nobody has spoken for a while, the played person reacts
   // once (asks if they are there, rephrases) -- a cue, never their words.
@@ -940,7 +974,13 @@ export function RehearsalRoom({
           )}
 
           {(captionsOn && caption !== null) || waiting ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-2 px-4">
+            <div
+              className={`pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-2 px-4${
+                // Below md the transcript is a sheet over the stage, and it
+                // already holds these words: no caption over it.
+                panel ? " max-md:hidden" : ""
+              }`}
+            >
               {waiting ? (
                 <p
                   role="status"

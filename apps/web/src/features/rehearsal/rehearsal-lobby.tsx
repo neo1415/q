@@ -2,7 +2,6 @@
 
 import { primeMeetSounds } from "./meet-sounds";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import {
@@ -102,7 +101,6 @@ export function RehearsalLobby({
   readonly initialDifficulty?: RehearsalDifficulty;
 }) {
   const t = useT();
-  const router = useRouter();
   const [persona, setPersona] = useState<QRehearsalPersonaDto | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -223,18 +221,21 @@ export function RehearsalLobby({
           interviewerId,
         );
         if (opened.ok && opened.value.mode === "VIDEO") {
+          // The canonical id survives refresh (the URL above). This lobby
+          // shows the room; never navigate as well, which mounts a second
+          // one (owner rehearsal 9 Nov: two voice lines, two stages).
           setVideo({ rehearsal: result.value, session: opened.value.session });
-          // The canonical id survives refresh. The destination reads this
-          // existing room only; it cannot create another paid conversation.
-          router.replace(livePath);
           return;
         }
         // A confirmed fallback preserves the same canonical rehearsal URL.
         // If allocation remains uncertain, recovery still sees its open
         // row and fails closed rather than blindly entering another room.
         const voicePath = `/rehearsals/live/${encodeURIComponent(result.value.id)}?video=0`;
+        // The URL only: this lobby shows the voice room below. Navigating
+        // too mounted a second room (owner rehearsal 9 Nov: two voice
+        // sessions 2 s apart; the second took the line, and the first said
+        // "Voice isn't available right now").
         window.history.replaceState(null, "", voicePath);
-        router.replace(voicePath);
         setVoiceNote(
           opened.ok &&
             opened.value.mode === "VOICE_FALLBACK" &&
