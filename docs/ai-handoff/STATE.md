@@ -2,6 +2,13 @@
 
 > **DEPLOYED 2026-11-04 09:49 UTC:** web on `d25c0843c` (CI green); q-api on `c53a08055`; api and workers on `b10cd6c87`. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing. Live-checked as a fictional investor: switch on a fresh page, no opening lists. **Newest audit: `Q_MULTIMODAL_DEMO_AUDIT_2026-11-04.md`, including a P0: text typed in the ~3.5 s before hydration is destroyed.**
 
+## DEPLOYED 811202101 (q-api) — 9 November 2026, 21:28 UTC — demo 10 Nov
+
+- q-api on `811202101` (CI run 42700415100 green); web, api, workers on `e107d7040`. **q-api rollback: `d9dc487e3`** (yes taken, but ~11 s late) then `e107d7040`.
+- Fix: a spoken yes to Q's read-back is taken as soon as the person's words are kept (code only, no model), and Q is steered at once. Before, it waited for the 2.5 s pause plus the model reading (~11 s), so Q re-asked "Seven million, is that right?" (owner, 21:01).
+- Owner live check at 21:00 on d9dc487e3: all three cheques (500k / 3m / 7m), sectors and France saved; the re-asking was the delay above.
+- **Demo fallback (owner, 9 Nov): the form must always work.** Voice changes touch only spoken lines (`typed:` lines skip them); the form and typed paths are untouched. If voice misbehaves during the demo, use "Use the form" on the onboarding page.
+
 ## DEPLOYED d9dc487e3 (q-api) — 9 November 2026, 20:03 UTC
 
 - q-api on `d9dc487e3` (CI run 42686267918 green); web, api and workers unchanged on `e107d7040`. Rollback for q-api: `e107d7040`.
