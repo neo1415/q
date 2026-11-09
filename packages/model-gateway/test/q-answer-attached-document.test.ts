@@ -53,13 +53,29 @@ const OFFERED: QOfferedTool = {
 };
 
 /** Their term sheet, as Evidence and the pipeline's pages would give it. */
-const port: AttachedDocumentsPort & { asked: unknown[] } = {
+const port: AttachedDocumentsPort & {
+  asked: unknown[];
+  reading: boolean;
+} = {
   asked: [],
+  reading: false,
   read(actor, request) {
     port.asked.push({ userId: actor.userId, ...request });
     const found =
       request.documentId === DOC ||
       (request.name?.toLowerCase().includes("term") ?? false);
+    if (found && port.reading) {
+      return Promise.resolve({
+        document: {
+          documentId: DOC,
+          title: "Term sheet",
+          filename: "term-sheet.pdf",
+          uploadedAt: new Date().toISOString(),
+          state: "READING",
+        },
+        others: [],
+      });
+    }
     return Promise.resolve({
       document: found
         ? {
@@ -285,6 +301,27 @@ describe("Q answers from a document the person attached", () => {
     expect(sentTo(alpha)).toContain("[p. 2] 1x non-participating");
     // A specific question is answered from it, with no unasked critique.
     expect(sentTo(alpha)).toContain("Add no critique they did not ask for");
+  });
+
+  // Owner live 9 Nov (run 3a7721d0): "whats this one about?" right after
+  // an upload still being read was answered about the page on screen.
+  it("asked about a file still being read: the turn is about the file, and says it is reading it", async () => {
+    port.asked = [];
+    port.reading = true;
+    try {
+      const { seam, request, alpha } = build({
+        said: "whats this one about?",
+        attached: [DOC],
+        script: [analyst("I'm reading Term sheet now.")],
+      });
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      const sent = sentTo(alpha);
+      expect(sent).toContain('THEY JUST ATTACHED "Term sheet"');
+      expect(sent).toContain("never the page on screen");
+      expect(sent).toContain("It is still being read");
+    } finally {
+      port.reading = false;
+    }
   });
 
   it("a later conversation finds it again by its name", async () => {
