@@ -2227,3 +2227,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - q-api `811202101`: a spoken yes is taken as soon as the words are kept (owner saw an ~11 s delay and re-asks on d9dc487e3). Rollback `d9dc487e3`.
 - Live typed + form e2e, investor (fictional `e2e-inv-202611092134-1aq8`): **ALL PASS** — one introduction, a dense line answers 5 topics, a required refusal is re-asked with its reason, chat→voice with no re-greeting, continue-later to /discover, **the form reopens on the same step**, finish lands on /verification.
 - Demo fallback: the form. The voice yes fix is not yet re-checked live by voice (the cloud sandbox has no UDP for WebRTC).
+
+## 2026-11-10 06:14 Lagos (05:14 UTC) — 74d33a828 live on all four services (owner's 06:30 Lagos demo)
+
+- Deployed before CI finished, on the owner's 06:30 deadline; every local gate passed (web 4332 tests, q-pitch 213, root tsc, eslint, prettier). CI run 42759740579 still to confirm; **rollback `811202101`** if it fails.
+- Live-verified: the Q Pitch page Start plays the story ("let me tell you a story"); typed "Thank you. Pitch yourself to investors" opens the investor cut.
+- Also live: Q's pointer is one gold arrow; Q's thinking figure is a turning DNA helix. Not reproduced: the story not covering the screen.
+- Times: the owner is in Lagos (WAT, UTC+1); give times in Lagos time.
