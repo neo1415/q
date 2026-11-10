@@ -2230,7 +2230,7 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 
 ## 2026-11-10 06:14 Lagos (05:14 UTC) — 74d33a828 live on all four services (owner's 06:30 Lagos demo)
 
-- Deployed before CI finished, on the owner's 06:30 deadline; every local gate passed (web 4332 tests, q-pitch 213, root tsc, eslint, prettier). CI run 42759740579 still to confirm; **rollback `811202101`** if it fails.
+- Deployed before CI finished, on the owner's 06:30 deadline; every local gate passed (web 4332 tests, q-pitch 213, root tsc, eslint, prettier). CI run 42759740579 **green** (06:15 Lagos), after the deploy. Rollback `811202101` if ever needed.
 - Live-verified: the Q Pitch page Start plays the story ("let me tell you a story"); typed "Thank you. Pitch yourself to investors" opens the investor cut.
 - Also live: Q's pointer is one gold arrow; Q's thinking figure is a turning DNA helix. Not reproduced: the story not covering the screen.
 - Times: the owner is in Lagos (WAT, UTC+1); give times in Lagos time.
