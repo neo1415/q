@@ -708,13 +708,29 @@ export function QConversationPanel({
   // every microphone track (duplex-line.ts, live-call.ts) -- and Q stops
   // mid-sentence. A line that comes up while Chat shows is ended too, so
   // nothing reconnects here; the voice view is the one place it lives.
+  //
+  // Owner live 10 Nov: "it does what I ask, opens the page, then just
+  // dies". Q opening a page draws this conversation again (the Q pane
+  // comes back beside the page); mounting on Chat with the line open ended
+  // it, though the person never chose Chat. Only their own switch to Chat
+  // while this is on screen ends the line; arriving with a line open shows
+  // the voice view instead, so the call carries on across the move.
   const shownBefore = useRef<QStageView | null>(null);
+  const voiceBefore = useRef<boolean | null>(null);
   useEffect(() => {
-    const arrived = view === "chat" && shownBefore.current !== "chat";
+    const mounting = shownBefore.current === null;
+    const switchedToChat =
+      !mounting && view === "chat" && shownBefore.current !== "chat";
+    const lineCameUp = voiceBefore.current === false && voiceOn;
     shownBefore.current = view;
+    voiceBefore.current = voiceOn;
     if (view !== "chat") return;
-    if (arrived) stopSpeech();
-    if (voiceOn) end();
+    if (mounting && voiceOn) {
+      writeStageView("presence");
+      return;
+    }
+    if (mounting || switchedToChat) stopSpeech();
+    if (voiceOn && (switchedToChat || lineCameUp)) end();
   }, [view, voiceOn, end, stopSpeech]);
   // Q intelligence step 1: questions asked here say the Q page and its
   // view; once it unmounts, Q is the dock again.

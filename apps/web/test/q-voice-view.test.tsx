@@ -327,11 +327,16 @@ describe("Chat is voice off (owner 2026-11-06)", () => {
     expect(speechStop).toHaveBeenCalled();
   });
 
-  it("arriving on Chat with a line still open (stored choice, navigation) ends it", async () => {
+  // Owner live 10 Nov: Q opening a page draws the conversation again; the
+  // call ended there though the person never chose Chat. Arriving with a
+  // line open keeps it and shows the voice view; only their own switch to
+  // Chat (above) ends it.
+  it("arriving on Chat with a line still open (Q opened a page) keeps the call", async () => {
     localStorage.setItem("cq.q.view", "chat");
     state.voiceActive = true;
     await renderHome();
-    expect(voiceEnd).toHaveBeenCalledWith("user");
+    expect(voiceEnd).not.toHaveBeenCalled();
+    expect(localStorage.getItem("cq.q.view")).toBe("presence");
   });
 
   it("never re-arms on Chat: a line that comes up there is ended, and talk() is not called", async () => {
