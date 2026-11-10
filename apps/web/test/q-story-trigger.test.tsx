@@ -56,6 +56,27 @@ describe("the story trigger", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("takes an ask split across two transcripts (owner live 10 Nov)", () => {
+    render(<Trigger active />);
+    expect(interceptHeard("Hey Q, pitch yourself to")).toBe(false);
+    expect(interceptHeard("investors")).toBe(true);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(String(push.mock.calls[0]?.[0])).toMatch(/&edition=investor&/u);
+  });
+
+  it("does not join words heard long after", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Trigger active />);
+      expect(interceptHeard("Hey Q, pitch yourself to")).toBe(false);
+      vi.advanceTimersByTime(20_000);
+      expect(interceptHeard("investors")).toBe(false);
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("takes a spoken ask from a voice line's final transcript (23 Oct)", () => {
     render(<Trigger active />);
     expect(interceptHeard("Hey, cue. Pitch yourself to investors.")).toBe(true);

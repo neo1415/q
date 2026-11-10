@@ -52,6 +52,9 @@ export function storyAskedHref(edition: StoryEditionId = "FULL"): string {
  * story, by code (classifyStoryTrigger), no model call and no turn. Held
  * only while no tour runs; a running story takes words itself.
  */
+/** How long after one transcript the next may finish its ask. */
+const SPLIT_ASK_MS = 8_000;
+
 export function useStoryTrigger(active: boolean): void {
   const router = useRouter();
   const session = useQSessionOptional();
@@ -79,7 +82,31 @@ export function useStoryTrigger(active: boolean): void {
     const releaseTyped = setTypedInterceptor((text) => start(text, "TYPED"));
     // Said on a voice line: the final transcript, before the line's model
     // may answer it.
-    const releaseHeard = setHeardInterceptor((said) => start(said, "HEARD"));
+    //
+    // Owner live 10 Nov 06:06: "Hey Q, pitch yourself to" and "investors"
+    // came as two transcripts; neither was the ask alone, so the line's
+    // model gave its own pitch. Words heard within a few seconds of the
+    // last are read with it too, so an ask split by a pause still starts
+    // the story (and its cut).
+    let lastHeard: { readonly text: string; readonly at: number } | null = null;
+    const releaseHeard = setHeardInterceptor((said) => {
+      const now = Date.now();
+      const before =
+        lastHeard !== null && now - lastHeard.at <= SPLIT_ASK_MS
+          ? lastHeard.text
+          : null;
+      lastHeard = { text: said, at: now };
+      if (start(said, "HEARD")) {
+        // An ask taken is spent: never joined to what comes next.
+        lastHeard = null;
+        return true;
+      }
+      if (before !== null && start(`${before} ${said}`, "HEARD")) {
+        lastHeard = null;
+        return true;
+      }
+      return false;
+    });
     return () => {
       releaseTyped();
       releaseHeard();
