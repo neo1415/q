@@ -2234,3 +2234,8 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Live-verified: the Q Pitch page Start plays the story ("let me tell you a story"); typed "Thank you. Pitch yourself to investors" opens the investor cut.
 - Also live: Q's pointer is one gold arrow; Q's thinking figure is a turning DNA helix. Not reproduced: the story not covering the screen.
 - Times: the owner is in Lagos (WAT, UTC+1); give times in Lagos time.
+
+## 2026-11-10 06:57 Lagos — web 600cca432: voice survives Q opening a page
+
+- Owner: "it does what I ask, opens the page, then just dies". Line ad831b91 ended (reason "user") the second "my pipeline" was heard. Cause: `q-conversation.tsx` ended any open line whenever Chat showed, including when the Q pane mounted on Chat after Q's move. Now only the person's own switch to Chat (or a line coming up on Chat) ends it; arriving with a line open shows the voice view.
+- CI run 42763378115 green before the deploy. Web on 600cca432; api, q-api and workers on 74d33a828. Web rollback: 74d33a828. Not voice-tested live (the sandbox has no UDP).
