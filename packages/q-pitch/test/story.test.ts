@@ -453,7 +453,11 @@ describe("Q Story trigger", () => {
       expect(classifyStoryTrigger(said)).toEqual({ kind: "STORY", edition });
     }
     expect(classifyStoryTrigger("pitch")).toBeNull();
-    expect(classifyStoryTrigger("Hey Q, pitch please")).toBeNull();
+    // Owner, live voice 10 Nov: "Hey Q, pitch" is the ask (was null).
+    expect(classifyStoryTrigger("Hey Q, pitch please")).toEqual({
+      kind: "STORY",
+      edition: "FULL",
+    });
   });
 
   it("answers 'What is Capital Q?' in two sentences and offers the story", () => {

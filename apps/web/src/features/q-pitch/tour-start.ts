@@ -9,5 +9,6 @@
  * the tab's conversation (the ask that started the tour).
  */
 export function tourStartFor(): string {
-  return "/home?qpitch=story&new=1";
+  // Reached because they asked for it: it starts on arrival (`&start=`).
+  return `/home?qpitch=story&new=1&start=${Date.now().toString(36)}`;
 }

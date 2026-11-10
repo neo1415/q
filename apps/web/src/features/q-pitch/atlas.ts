@@ -66,6 +66,12 @@ export const STORY_LENGTHS: Readonly<Record<StoryEditionId, string>> = {
   FOUNDER: "About 4½ minutes",
 };
 
+/** Each page view's own start token, so a later Start plays again. */
+function startToken(now: string): string {
+  const at = Date.parse(now);
+  return (Number.isFinite(at) ? at : 0).toString(36);
+}
+
 export function tourOptions(now: string): readonly TourOption[] {
   return (["FULL", "INVESTOR", "FOUNDER"] as const).map((edition) => ({
     key:
@@ -76,10 +82,12 @@ export function tourOptions(now: string): readonly TourOption[] {
           : "story-founder",
     title: STORY_EDITIONS[edition].label,
     length: STORY_LENGTHS[edition],
-    href:
-      edition === "FULL"
-        ? "/home?qpitch=story&new=1"
-        : `/home?qpitch=story&new=1&edition=${edition.toLowerCase()}`,
+    // A press of Start is the ask: the story starts on arrival (`&start=`,
+    // as "pitch yourself" does). Owner live 10 Nov: without it, Start
+    // landed on Home in the workspace and nothing played.
+    href: `/home?qpitch=story&new=1${
+      edition === "FULL" ? "" : `&edition=${edition.toLowerCase()}`
+    }&start=${startToken(now)}`,
     ...storyStanding(now, edition),
   }));
 }

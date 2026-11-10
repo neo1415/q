@@ -21,7 +21,6 @@ import { pointTargetFor, type PointCandidate } from "./point-target";
 const FLY_MS = 900;
 const CIRCLE_MS = 2_600;
 const RETURN_MS = 900;
-const PARTICLES = 150;
 const TAU = Math.PI * 2;
 
 type Flight = {
@@ -59,23 +58,6 @@ function presenceOrigin(): { x: number; y: number } {
   return { x: window.innerWidth - 48, y: window.innerHeight - 48 };
 }
 
-/** A point on the rounded outline of `rect`, `u` in 0..1 around it. */
-function outline(rect: DOMRect, u: number, pad: number) {
-  const w = rect.width + pad * 2;
-  const h = rect.height + pad * 2;
-  const perimeter = 2 * (w + h);
-  let d = (((u % 1) + 1) % 1) * perimeter;
-  const left = rect.left - pad;
-  const top = rect.top - pad;
-  if (d < w) return { x: left + d, y: top };
-  d -= w;
-  if (d < h) return { x: left + w, y: top + d };
-  d -= h;
-  if (d < w) return { x: left + w - d, y: top + h };
-  d -= w;
-  return { x: left, y: top + h - d };
-}
-
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
 export function QSwarmPointer() {
@@ -93,11 +75,6 @@ export function QSwarmPointer() {
     if (context === null) return;
     let flight: Flight | null = null;
     let raf = 0;
-    const seeds = Array.from({ length: PARTICLES }, (_, i) => ({
-      u: i / PARTICLES,
-      bend: (Math.sin(i * 12.9898) * 43_758.5453) % 1,
-      size: 0.8 + ((i * 7) % 5) * 0.25,
-    }));
 
     const fit = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -115,6 +92,34 @@ export function QSwarmPointer() {
       return value.length > 0 ? value : "#6aa8ff";
     };
 
+    // Owner, 10 Nov (client): "just a cursor, similar colour, an arrow
+    // that moves as a pointer" -- one arrow, not a cloud of particles.
+    const arrow = (x: number, y: number, alpha: number) => {
+      // Tip at (x, y), the shape of a system pointer, 22 px tall.
+      context.save();
+      context.translate(x, y);
+      context.globalAlpha = alpha;
+      context.beginPath();
+      context.moveTo(0, 0);
+      context.lineTo(0, 20);
+      context.lineTo(5, 15.5);
+      context.lineTo(8.5, 23);
+      context.lineTo(11.5, 21.6);
+      context.lineTo(8, 14.4);
+      context.lineTo(14.5, 14.4);
+      context.closePath();
+      context.shadowColor = "rgba(0, 0, 0, 0.35)";
+      context.shadowBlur = 4;
+      context.shadowOffsetY = 1;
+      context.fillStyle = colour();
+      context.fill();
+      context.shadowColor = "transparent";
+      context.lineWidth = 1.25;
+      context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+      context.stroke();
+      context.restore();
+    };
+
     const draw = (now: number) => {
       context.clearRect(0, 0, window.innerWidth, window.innerHeight);
       const current = flight;
@@ -126,43 +131,32 @@ export function QSwarmPointer() {
         return;
       }
       const rect = current.target.getBoundingClientRect();
-      context.fillStyle = colour();
-      for (const seed of seeds) {
-        const spin = seed.u + (elapsed / 1000) * 0.35;
-        const home = outline(rect, spin, 8 + seed.bend * 6);
-        let x: number;
-        let y: number;
-        let alpha = 0.85;
-        if (elapsed < FLY_MS) {
-          // Each point leaves at its own moment and arcs to its place.
-          const t = ease(
-            Math.min(1, Math.max(0, (elapsed - seed.u * 240) / (FLY_MS - 240))),
-          );
-          const lift = Math.sin(t * Math.PI) * (60 + seed.bend * 80);
-          x = current.from.x + (home.x - current.from.x) * t;
-          y = current.from.y + (home.y - current.from.y) * t - lift;
-        } else if (elapsed < FLY_MS + CIRCLE_MS) {
-          const shimmer = Math.sin(now / 180 + seed.u * TAU * 3);
-          x = home.x + shimmer * 1.5;
-          y = home.y + Math.cos(now / 210 + seed.u * TAU * 2) * 1.5;
-          alpha = 0.6 + 0.4 * Math.max(0, shimmer);
-        } else {
-          const t = ease((elapsed - FLY_MS - CIRCLE_MS) / RETURN_MS);
-          const origin = presenceOrigin();
-          x = home.x + (origin.x - home.x) * t;
-          y = home.y + (origin.y - home.y) * t + Math.sin(t * Math.PI) * 40;
-          alpha = 0.85 * (1 - t * 0.7);
-        }
-        context.globalAlpha = alpha;
-        context.beginPath();
-        context.arc(x, y, seed.size * 1.4, 0, TAU);
-        context.fill();
-        context.globalAlpha = alpha * 0.25;
-        context.beginPath();
-        context.arc(x, y, seed.size * 4, 0, TAU);
-        context.fill();
+      // The tip rests just inside the item's lower-left, as a hand would.
+      const rest = {
+        x: rect.left + Math.min(rect.width * 0.35, 28),
+        y: rect.top + rect.height * 0.62,
+      };
+      let x: number;
+      let y: number;
+      let alpha = 1;
+      if (elapsed < FLY_MS) {
+        const t = ease(elapsed / FLY_MS);
+        x = current.from.x + (rest.x - current.from.x) * t;
+        y = current.from.y + (rest.y - current.from.y) * t;
+        alpha = Math.min(1, t * 3);
+      } else if (elapsed < FLY_MS + CIRCLE_MS) {
+        // A small nudge, as a presenter taps the thing they mean.
+        const held = elapsed - FLY_MS;
+        const tap = Math.max(0, Math.sin((held / 650) * TAU)) * 3;
+        x = rest.x + tap * 0.5;
+        y = rest.y + tap;
+      } else {
+        const t = (elapsed - FLY_MS - CIRCLE_MS) / RETURN_MS;
+        x = rest.x;
+        y = rest.y;
+        alpha = 1 - t;
       }
-      context.globalAlpha = 1;
+      arrow(x, y, alpha);
       raf = requestAnimationFrame(draw);
     };
 

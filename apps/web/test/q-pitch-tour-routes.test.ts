@@ -33,6 +33,9 @@ describe("pages a tour opens are app routes", () => {
 
 describe("where Q's Q_PITCH move starts the tour", () => {
   it("opens the story (v7) for everyone, on a new Home conversation", () => {
-    expect(tourStartFor()).toBe("/home?qpitch=story&new=1");
+    // Asked for: it starts on arrival (owner live 10 Nov).
+    expect(tourStartFor()).toMatch(
+      /^\/home\?qpitch=story&new=1&start=[0-9a-z]+$/u,
+    );
   });
 });

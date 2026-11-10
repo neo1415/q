@@ -141,35 +141,45 @@ function waveFigure(count: number): Figure {
   };
 }
 
-/** Thinking: two arms turning, dense at the centre, tipped towards the viewer. */
+/**
+ * Thinking: a double helix turning on its axis, like DNA (owner, 10 Nov:
+ * "it would be nice if it moved like a DNA instead"). Two strands with the
+ * rungs between them, laid on a slight diagonal; the turn is the motion.
+ */
 function spiralFigure(count: number): Figure {
   const s = seedsFor(count);
-  const tilt = 0.95;
+  const tilt = -0.42;
   const ct = Math.cos(tilt);
   const st = Math.sin(tilt);
+  const turns = 2.25;
+  const radius = 0.3;
   return {
     kind: "SPIRAL",
     flow: 0.035,
     evaluate: ({ t }, out) => {
       for (let i = 0; i < count; i += 1) {
-        const rho = 0.06 + 0.92 * Math.sqrt(s.u0[i] ?? 0);
-        const arm = i % 2;
-        const phi =
-          arm * Math.PI +
-          rho * 5.4 +
-          t * 0.45 +
-          (s.g0[i] ?? 0) * 0.22 * (1.1 - rho);
-        const px = rho * Math.cos(phi);
-        const pz = rho * Math.sin(phi);
-        const py = (s.g1[i] ?? 0) * 0.045 * (1.3 - rho);
-        put(
-          out,
-          i,
-          px,
-          py * ct - pz * st,
-          py * st + pz * ct,
-          0.5 + 0.45 * (1 - rho),
-        );
+        // Along the axis, -1.05..1.05.
+        const along = (s.u0[i] ?? 0) * 2.1 - 1.05;
+        const phase = along * turns * Math.PI + t * 0.9;
+        const rung = (s.u1[i] ?? 0) < 0.28;
+        let ry: number;
+        let rz: number;
+        if (rung) {
+          // A base pair: a point between the two strands at this height.
+          const k = (s.u2[i] ?? 0) * 2 - 1;
+          ry = radius * Math.cos(phase) * k;
+          rz = radius * Math.sin(phase) * k;
+        } else {
+          const strand = i % 2 === 0 ? 0 : Math.PI;
+          const jitter = (s.g0[i] ?? 0) * 0.018;
+          ry = (radius + jitter) * Math.cos(phase + strand);
+          rz = (radius + jitter) * Math.sin(phase + strand);
+        }
+        const ax = along + (s.g1[i] ?? 0) * 0.012;
+        // The axis on a diagonal: rotate (ax, ry) in the picture plane.
+        const px = ax * ct - ry * st;
+        const py = ax * st + ry * ct;
+        put(out, i, px, py, rz, rung ? 0.45 : 0.55 + 0.4 * (0.5 + rz));
       }
     },
   };

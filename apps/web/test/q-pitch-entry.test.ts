@@ -39,10 +39,12 @@ describe("tour entry model", () => {
   it("offers the v7 story only (the v5 tours are retired), with its honest standing", () => {
     const options = tourOptions(NOW);
     // Three cuts (owner, 22 Oct): everyone, investors, founders.
+    // A press of Start starts the story on arrival (owner live 10 Nov).
+    const token = Date.parse(NOW).toString(36);
     expect(options.map((o) => o.href)).toEqual([
-      "/home?qpitch=story&new=1",
-      "/home?qpitch=story&new=1&edition=investor",
-      "/home?qpitch=story&new=1&edition=founder",
+      `/home?qpitch=story&new=1&start=${token}`,
+      `/home?qpitch=story&new=1&edition=investor&start=${token}`,
+      `/home?qpitch=story&new=1&edition=founder&start=${token}`,
     ]);
     expect(options.map((o) => o.title)).toEqual([
       "Everyone",

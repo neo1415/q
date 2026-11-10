@@ -34,12 +34,18 @@ const NAME =
  * comes before it ("Hey, cue. Pitch yourself." live, 23 Oct).
  */
 const LEAD =
-  "(?:(?:q|cue|queue|kyu|kew|hey|hi|hello|ok|okay|so|alright|please|now|can you|could you|would you|will you)\\s+)*";
+  "(?:(?:q|cue|queue|kyu|kew|hey|hi|hello|ok|okay|so|alright|please|now|can you|could you|would you|will you|yes|yeah|yep|great|right|thanks|thank you|go ahead and|go on and|just)\\s+)*";
 const STORY = new RegExp(
   `^${LEAD}(?:(?:present|pitch|demo|introduce)\\s+(?:us\\s+|me\\s+)?(?:${NAME}|yourself)|(?:tell|show)\\s+(?:me|us)\\s+(?:your|the)\\s+story|(?:tell|show)\\s+(?:me|us)\\s+the\\s+capital ?q\\s+story|give\\s+(?:me|us)\\s+(?:the|your)\\s+pitch|pitch)(?:\\s+(?:to|for)\\s+(?:an?\\s+|the\\s+)?(investors?|founders?|business(?:es)?|companies|company|everyone|everybody|all))?(?:\\s+(?:please|now|to me|to us))*$`,
   "u",
 );
-const BARE = new RegExp(`^${LEAD}pitch(?:\\s+(?:please|now))*$`, "u");
+/** "pitch" said alone, to no one: not an ask ("Hey Q, pitch" is one). */
+const BARE = /^pitch(?:\s+(?:please|now))*$/u;
+/** The product by name: "open Q Pitch", "start the Q pitch", "play Q Pitch". */
+const BY_NAME = new RegExp(
+  `^${LEAD}(?:(?:open|start|play|launch|run|show|do)\\s+(?:me\\s+|us\\s+)?(?:the\\s+|your\\s+)?)?(?:q|cue|queue|kyu|kew)\\s*pitch(?:\\s+(?:to|for)\\s+(?:an?\\s+|the\\s+)?(investors?|founders?|business(?:es)?|companies|company|everyone|everybody|all))?(?:\\s+(?:please|now))*$`,
+  "u",
+);
 const BRIEF = new RegExp(
   `^${LEAD}(?:what\\s+is|what\\s+s|whats)\\s+${NAME}$`,
   "u",
@@ -52,12 +58,30 @@ function audience(word: string | undefined): StoryEditionId {
   return "FULL";
 }
 
-export function classifyStoryTrigger(text: string): StoryTrigger | null {
+/**
+ * Owner, live voice 10 Nov: "Thank you. Pitch yourself to investors" and
+ * "Yes, pitch yourself to investors" went to the model as questions: the
+ * ask was read only from the start of the whole line. Each sentence or
+ * clause they said is read on its own, the last first, so an ask after
+ * "thank you" or "yes" is still the ask.
+ */
+function clauses(text: string): string[] {
+  const parts = text
+    .split(/[.!?;,\n]+/u)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  // The whole line too, for asks whose words a comma splits ("Q, pitch").
+  return [...parts.reverse(), text];
+}
+
+function classifyOne(text: string): StoryTrigger | null {
   const said = normaliseCommand(text);
   if (said.length === 0 || said.length > 80) return null;
+  const named = BY_NAME.exec(said);
+  if (named !== null) return { kind: "STORY", edition: audience(named[1]) };
   const story = STORY.exec(said);
-  // "pitch" alone is not an ask; "pitch to an investor" and "give me the
-  // pitch" are.
+  // "pitch" alone is not an ask; "Hey Q, pitch", "pitch to an investor"
+  // and "give me the pitch" are.
   if (story !== null && !BARE.test(said)) {
     return { kind: "STORY", edition: audience(story[1]) };
   }
@@ -65,4 +89,15 @@ export function classifyStoryTrigger(text: string): StoryTrigger | null {
     return { kind: "BRIEF", answer: CAPITAL_Q_BRIEF, offer: CAPITAL_Q_OFFER };
   }
   return null;
+}
+
+export function classifyStoryTrigger(text: string): StoryTrigger | null {
+  if (text.length > 400) return null;
+  let brief: StoryTrigger | null = null;
+  for (const part of clauses(text)) {
+    const found = classifyOne(part);
+    if (found?.kind === "STORY") return found;
+    brief ??= found;
+  }
+  return brief;
 }
