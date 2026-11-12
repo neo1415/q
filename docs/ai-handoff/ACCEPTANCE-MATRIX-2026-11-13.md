@@ -1,0 +1,69 @@
+# Acceptance matrix — consolidated directive (13 Nov 2026)
+
+The owner's directive is in [`directives/2026-11-13-consolidated-execution-gateq-capability.md`](directives/2026-11-13-consolidated-execution-gateq-capability.md) (Parts A, B and C). This matrix is the live status. Each status is backed by evidence: a commit SHA, a gate receipt, a live identity and stored rows. Statuses: **LIVE_VERIFIED · DEPLOYED · LOCAL_TESTED · PARTIAL · ABSENT · BLOCKED**.
+
+**Continuation:**
+
+- Scheduled task `trig_01Lw52gWWexsrrMf7kbrPnPc`, hourly at :31 UTC. The platform minimum is one hour; 30 minutes is refused.
+- It fires into this session (`session_01Wncmn73d4XJWmh1N9ECao7`).
+- It inspects running gates and deploys before starting anything, and resumes the queue below.
+
+**Production:** `3743dc48b` (receipt 21:10:23Z, 12 Nov).
+**Integration branch:** `418e2d203`, gating.
+
+## Part A — demo completion
+
+| #   | Item                                                                                                 | Status       | Evidence / gap                                                                                                                                                                                                          |
+| --- | ---------------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | Continuous execution, scheduled continuation                                                         | LIVE         | Trigger above; ledger and matrix kept in `docs/ai-handoff/`                                                                                                                                                             |
+| A2  | Real current state, acceptance matrix                                                                | LIVE         | This file; `BASELINE-LEDGER-2026-11-12.md`                                                                                                                                                                              |
+| A3  | One marketplace-eligible universe for investors                                                      | LOCAL_TESTED | `cca69db1a`: search, name resolution and slate fallback keep only marketplace-ready companies. Express Interest `D2` was already LIVE_VERIFIED; Discover is enforced in discovery. **To verify:** Save and Compare APIs |
+| A3  | Curated fictional demo companies activated (synthetic basis, auditable, reversible)                  | ABSENT       | Need a controlled activation via readiness/verification, marked synthetic; an idempotent seed/activation script with checks and rollback                                                                                |
+| A3  | Curated investor mandates coherent                                                                   | NOT AUDITED  | —                                                                                                                                                                                                                       |
+| A4  | Verification workflow: submit → admin queue → four-eyes → decision → readiness → investor visibility | PARTIAL      | Four-eyes self-decision guard and private ID upload hidden (12 Nov). Not certified end to end with a fictional company                                                                                                  |
+| A5  | Canonical data parity (Q / comparison / page)                                                        | NOT STARTED  | Reproduce "unknown" where the page shows the fact; field-by-field parity tests                                                                                                                                          |
+| A6  | Faster release gate                                                                                  | NOT STARTED  | Gate takes about 46 min: static 670 s, typecheck 141 s, build 99 s, test 1,486 s, database 58 s, integration 332 s                                                                                                      |
+| A7  | Founder and investor end-to-end stories                                                              | PARTIAL      | Investor plan and analysis LIVE_VERIFIED, and founder plan with research plus Execute LIVE_VERIFIED (`3743dc48b`). Sign-up → verification → activation → interest → meeting not certified in one run                    |
+| A8  | Q intelligence and rich interaction                                                                  | PARTIAL      | Research reuse, conflicts, timeline and citations are LIVE. Charts from typed figures: ABSENT (`chartBlock` has no caller). Claim extraction in chat: ABSENT. Voice paths: pending a real session                       |
+| A9  | Planning and execution performance                                                                   | PARTIAL      | Measured: plan 161 s; analysis job 196–226 s, three draft cycles of about 50 s each. Turn-reading fallback to Claude Sonnet at $0.065 not yet addressed                                                                 |
+| A10 | Egress audit: the remaining 1 of 13 queries in the Clinicrest plan not minimised                     | NOT STARTED  | —                                                                                                                                                                                                                       |
+
+## Part B — GateQ (audit, 13 Nov)
+
+| #     | Item                                        | Status  | Evidence / gap                                                                                                                          |
+| ----- | ------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| B2    | "Draft my GateQ rules with Q"               | PARTIAL | The button uses the fixed reader `gateq-mandate-reader.v1`, not Q. In chat, `offer.gateway_mandate` only opens the page. No focus notes |
+| B3    | Form back/forward, empty step, controls     | PARTIAL | Steps live in React state only; browser Back leaves the form (no `history`/`popstate`). Native `<select>`. Session recovery is built    |
+| B3    | Contact verification                        | PARTIAL | Email code built, with cross-instance limits; phone captured, not verified                                                              |
+| B4/B5 | Interview: text, Q voice, Tavus             | PARTIAL | Text and Tavus (iframe) built; 180 s paid cap. Q voice-only mode ABSENT. No Daily/React CVI                                             |
+| B6    | Branding studio and "brand from my website" | ABSENT  | Brand-from-website exists only for documents (`brand-from-website.ts`)                                                                  |
+| B7    | Embedding                                   | PARTIAL | Link, QR and launcher (`public/gateq.js`) built. `frame-ancestors *`; no per-gateway allowed origins; no postMessage                    |
+| B8    | Abuse controls                              | PARTIAL | Guest throttle is in-process per instance; contact-code limits shared in Postgres; no duplicate-application check                       |
+| B9    | Inbox                                       | BUILT   | Fit band, rules met, reply clock, comparison. Q reads applicants as `GATEQ_SUBMISSION`, not marketplace companies                       |
+| B10   | Outreach via connected Gmail/Calendar       | PARTIAL | Replies go through Capital Q's own sender after approval; connected channels not used                                                   |
+| B11   | Existing founder prefill                    | BUILT   | `form/founder-prefill.ts`                                                                                                               |
+
+## Part C — capability awareness and working actions (audit, 13 Nov)
+
+| #   | Item                                  | Status      | Evidence / gap                                                                                                                                                                                                  |
+| --- | ------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | No feature spam on ordinary questions | AT RISK     | `NEXT_STEP_NOTE` and a fixed 2k-character `CAPABILITIES_NOTE` tell Q to close every substantive answer with an offer; only the model decides when not to                                                        |
+| C2  | Versioned capability projection       | PARTIAL     | `Q_CAPABILITIES` plus `eligibleCapabilities` exist, without plan/entitlement state or versioning                                                                                                                |
+| C3  | Offers are durable and executable     | PARTIAL     | Only plan offers are recorded. Prose offers are unrecorded (`offerTakenUnrecorded`). `awaiting_action` and `core_state` did not persist until `b220961d2` (deployed)                                            |
+| C4  | Every Q control works                 | PARTIAL     | Inert or context-losing: SCHEDULE "Open the prep brief" → fixed `/relationships`; "Edit with Q" / "Try again" send fixed text with no artifact or job id; NAVIGATION_OFFER is a bare route; chips are free text |
+| C5  | Cross-feature scenarios 1–10          | NOT STARTED | —                                                                                                                                                                                                               |
+
+## Queue (in order; each item is one bounded slice, batched into gates)
+
+1. Gate and deploy `418e2d203` (A3 universe; date wording); live-verify investor search and name resolution.
+2. C4: SCHEDULE "Open the prep brief" opens that meeting's brief; "Edit with Q" / "Try again" carry the artifact or job id.
+3. C1: gate the next-step offer in code: no offer on casual, lookup or navigation turns. Measure false positives on ordinary questions.
+4. B3: GateQ form browser Back/Forward via history; no empty step; design-system selects.
+5. A5: canonical data parity — reproduce and fix "unknown" against the company page.
+6. A3: controlled synthetic activation of curated demo companies (readiness via the real path, synthetic basis recorded, reversible).
+7. A4: certify verification end to end with a fictional company.
+8. B2: Q drafts GateQ rules from the authorised mandate (chat and button), as an editable draft for approval.
+9. A6: faster gate (measure, parallelise safely, keep every check).
+10. B6/B7/B8/B10: branding studio, embed origins and postMessage, distributed throttle and duplicate check, connected-channel outreach.
+11. C2/C3: versioned capability projection; durable capability offers.
+12. A8: charts from typed figures; claim extraction in chat.
