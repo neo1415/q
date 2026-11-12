@@ -988,7 +988,7 @@ describe("a research answer as a document keeps its sources and dated record", (
     expect(document?.content.sections[1]?.body).toBe(
       [
         "Anchor raises a seed round — news.example.com — https://news.example.com/anchor-raises-seed",
-        "published 2026-03-04",
+        "date as the search listed it: 2026-03-04",
         "read 2026-11-12",
         "",
         "About Anchor — anchor.example.com — https://anchor.example.com/about",
@@ -996,7 +996,7 @@ describe("a research answer as a document keeps its sources and dated record", (
       ].join("\n"),
     );
     // A page with no date of its own shows none.
-    expect(document?.content.sections[1]?.body).not.toMatch(/published null/);
+    expect(document?.content.sections[1]?.body).not.toMatch(/listed it: null/);
     expect(document?.content.sections[2]?.body).toBe(
       [
         "2025-06-01 — Anchor founded",

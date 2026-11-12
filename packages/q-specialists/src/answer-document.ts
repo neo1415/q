@@ -271,7 +271,8 @@ type TimelineBlock = Extract<QResultBlock, { kind: "TIMELINE" }>;
 /**
  * Owner 2026-11-12: a public-web research answer is filed with what it
  * stood on. Each page as the answer listed it: title, domain, address,
- * the page's own date only when it had one, and the day it was read,
+ * the date the search listed for it (its meaning is not known: not
+ * necessarily when it was published), and the day it was read,
  * under a heading that says these pages are not verified.
  */
 export function sourcesSection(sources: readonly PublicSourceBlock[]): {
@@ -286,7 +287,7 @@ export function sourcesSection(sources: readonly PublicSourceBlock[]): {
           `${plain(source.title)} — ${source.domain} — ${source.url}`,
           ...(source.publishedOn === null
             ? []
-            : [`published ${source.publishedOn}`]),
+            : [`date as the search listed it: ${source.publishedOn}`]),
           `read ${source.retrievedOn}`,
         ].join("\n"),
       )
