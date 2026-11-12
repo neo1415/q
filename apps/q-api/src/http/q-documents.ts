@@ -348,10 +348,20 @@ export function registerQDocumentRoutes(
         }
         return undefined;
       })();
+      // Owner 2026-11-12: the answer's own table, the public pages it read
+      // and its dated record go in with the words, from the stored blocks
+      // as the public contract parsed them; nothing new is looked up.
+      const blocks = chosen?.blocks ?? [];
       const document =
         chosen === undefined
           ? null
-          : composeAnswerDocument({ answer: answerText(chosen), question });
+          : composeAnswerDocument({
+              answer: answerText(chosen),
+              question,
+              table: blocks.find((block) => block.kind === "TABLE"),
+              sources: blocks.filter((block) => block.kind === "PUBLIC_SOURCE"),
+              timelines: blocks.filter((block) => block.kind === "TIMELINE"),
+            });
       if (document === null) {
         return refuse(
           reply,

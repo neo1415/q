@@ -925,6 +925,108 @@ describe("an answer as a document, deterministically", () => {
 });
 
 /**
+ * Owner 2026-11-12: a public-web research answer's PDF carries its
+ * sources and dated record, not only the prose; the notes are copied as
+ * written, never strengthened.
+ */
+describe("a research answer as a document keeps its sources and dated record", () => {
+  const SOURCES: Extract<QResultBlock, { kind: "PUBLIC_SOURCE" }>[] = [
+    {
+      kind: "PUBLIC_SOURCE",
+      url: "https://news.example.com/anchor-raises-seed",
+      domain: "news.example.com",
+      title: "Anchor raises a seed round",
+      publishedOn: "2026-03-04",
+      retrievedOn: "2026-11-12",
+    },
+    {
+      kind: "PUBLIC_SOURCE",
+      url: "https://anchor.example.com/about",
+      domain: "anchor.example.com",
+      title: "About Anchor",
+      publishedOn: null,
+      retrievedOn: "2026-11-12",
+    },
+  ];
+  const TIMELINE: Extract<QResultBlock, { kind: "TIMELINE" }> = {
+    kind: "TIMELINE",
+    title: "Anchor on the public web",
+    events: [
+      {
+        at: "2025-06-01",
+        label: "Anchor founded",
+        note: "Date as the search listed it · not verified",
+        subject: null,
+      },
+      {
+        at: "2026-03-04",
+        label: "Seed round announced",
+        note: "Public web: news.example.com · not verified",
+        subject: null,
+      },
+      {
+        at: "2026-09-10",
+        label: "Hiring page opened",
+        note: null,
+        subject: null,
+      },
+    ],
+  };
+
+  it("files the answer, then its sources, then its dated record", () => {
+    const document = composeAnswerDocument({
+      answer: "Anchor raised a seed round in March 2026, per public reports.",
+      question: "what is public about Anchor?",
+      sources: SOURCES,
+      timelines: [TIMELINE],
+    });
+    expect(document?.content.sections.map((x) => x.heading)).toEqual([
+      "Answer",
+      "Sources (public pages, not verified)",
+      "Dated record",
+    ]);
+    expect(document?.content.sections[1]?.body).toBe(
+      [
+        "Anchor raises a seed round — news.example.com — https://news.example.com/anchor-raises-seed",
+        "published 2026-03-04",
+        "read 2026-11-12",
+        "",
+        "About Anchor — anchor.example.com — https://anchor.example.com/about",
+        "read 2026-11-12",
+      ].join("\n"),
+    );
+    // A page with no date of its own shows none.
+    expect(document?.content.sections[1]?.body).not.toMatch(/published null/);
+    expect(document?.content.sections[2]?.body).toBe(
+      [
+        "2025-06-01 — Anchor founded",
+        "Date as the search listed it · not verified",
+        "",
+        "2026-03-04 — Seed round announced",
+        "Public web: news.example.com · not verified",
+        "",
+        "2026-09-10 — Hiring page opened",
+      ].join("\n"),
+    );
+  });
+
+  it("adds no section when the answer had no sources or dated record", () => {
+    const document = composeAnswerDocument({
+      answer: "Anchor raised a seed round.",
+      sources: [],
+      timelines: [],
+    });
+    expect(document?.content.sections.map((x) => x.heading)).toEqual([
+      "Answer",
+    ]);
+  });
+
+  it("files nothing for sources alone, with no answer to file", () => {
+    expect(composeAnswerDocument({ answer: "", sources: SOURCES })).toBeNull();
+  });
+});
+
+/**
  * XLSX-002 (live 2026-10-28): "put that side-by-side thing you showed me
  * earlier into a file I can send to the committee" made a PDF that said
  * "The full comparison is on screen". An answer that showed a table is

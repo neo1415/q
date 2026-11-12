@@ -4,6 +4,7 @@ import {
   Q_ARTIFACT_SUMMARY_MAX,
   Q_ARTIFACT_TITLE_MAX,
   type QArtifactContent,
+  type QResultBlock,
 } from "@capital-q/contracts";
 import { claimsOnScreen } from "@capital-q/model-gateway/q";
 import { cutAtWord, splitSentences } from "@capital-q/q-core";
@@ -264,6 +265,61 @@ export function aboutTheDocumentItself(sentence: string): boolean {
   return ABOUT_ITSELF.test(sentence);
 }
 
+type PublicSourceBlock = Extract<QResultBlock, { kind: "PUBLIC_SOURCE" }>;
+type TimelineBlock = Extract<QResultBlock, { kind: "TIMELINE" }>;
+
+/**
+ * Owner 2026-11-12: a public-web research answer is filed with what it
+ * stood on. Each page as the answer listed it: title, domain, address,
+ * the page's own date only when it had one, and the day it was read,
+ * under a heading that says these pages are not verified.
+ */
+export function sourcesSection(sources: readonly PublicSourceBlock[]): {
+  readonly heading: string;
+  readonly body: string;
+} {
+  return {
+    heading: "Sources (public pages, not verified)",
+    body: sources
+      .map((source) =>
+        [
+          `${plain(source.title)} — ${source.domain} — ${source.url}`,
+          ...(source.publishedOn === null
+            ? []
+            : [`published ${source.publishedOn}`]),
+          `read ${source.retrievedOn}`,
+        ].join("\n"),
+      )
+      .join("\n\n"),
+  };
+}
+
+/**
+ * The dated record the answer showed, oldest first as code ordered it.
+ * Each event's note is copied exactly ("Public web: … · not verified"):
+ * it says how far the date can be trusted, and the document must never
+ * read as a stronger claim than the answer made.
+ */
+export function datedRecordSection(timelines: readonly TimelineBlock[]): {
+  readonly heading: string;
+  readonly body: string;
+} {
+  return {
+    heading: "Dated record",
+    body: timelines
+      .flatMap((timeline) => timeline.events)
+      .map((event) =>
+        [
+          `${event.at.slice(0, 10)} — ${plain(event.label)}`,
+          ...(event.note === null || event.note.length === 0
+            ? []
+            : [event.note]),
+        ].join("\n"),
+      )
+      .join("\n\n"),
+  };
+}
+
 export function composeAnswerDocument(input: {
   /** The answer, as Q wrote it (markdown). */
   readonly answer: string;
@@ -278,6 +334,10 @@ export function composeAnswerDocument(input: {
    */
   readonly table?: TabularBlock | undefined;
   readonly names?: ReadonlyMap<string, string> | undefined;
+  /** The public pages a research answer read; filed after the answer. */
+  readonly sources?: readonly PublicSourceBlock[] | undefined;
+  /** The dated record the answer showed; filed after its sources. */
+  readonly timelines?: readonly TimelineBlock[] | undefined;
 }): AnswerDocument | null {
   const prose = splitSentences(input.answer)
     .filter(
@@ -328,6 +388,18 @@ export function composeAnswerDocument(input: {
     }),
   ];
   if (filed.length === 0) return null;
+  // What the answer stood on comes after it, only when there is any, and
+  // room is kept for it so a long answer never crowds it out.
+  const sources = input.sources ?? [];
+  const timelines = input.timelines ?? [];
+  const after = [
+    ...(sources.length === 0 ? [] : [sourcesSection(sources)]),
+    ...(timelines.length === 0 ? [] : [datedRecordSection(timelines)]),
+  ].map((section) => ({
+    heading: clip(section.heading, Q_ARTIFACT_TITLE_MAX),
+    body: clip(section.body, Q_ARTIFACT_SECTION_BODY_MAX),
+    findings: [],
+  }));
 
   const question = input.question?.trim().replace(/\s+/g, " ") ?? "";
   const named = sections.find((s) => s.heading.length > 0)?.heading ?? null;
@@ -344,6 +416,12 @@ export function composeAnswerDocument(input: {
   return {
     title,
     summary,
-    content: { sections: filed.slice(0, Q_ARTIFACT_SECTIONS_MAX), gaps: [] },
+    content: {
+      sections: [
+        ...filed.slice(0, Q_ARTIFACT_SECTIONS_MAX - after.length),
+        ...after,
+      ],
+      gaps: [],
+    },
   };
 }

@@ -377,6 +377,78 @@ describe("filing one answer as a PDF", () => {
     await app.close();
   });
 
+  it("files a research answer with its table, sources and dated record", async () => {
+    const research: QMessage[] = [
+      messages[0] as QMessage,
+      {
+        messageId: QMessageIdSchema.parse(
+          "33333333-0000-4000-8000-000000000003",
+        ),
+        runId: RUN,
+        role: "Q",
+        text: "Anchor raised a seed round in March 2026, per public reports.",
+        blocks: [
+          {
+            kind: "TABLE",
+            title: "Anchor at a glance",
+            columns: [{ label: "Public web", subject: null }],
+            rows: [{ label: "Stage", cells: ["Seed"] }],
+          },
+          {
+            kind: "PUBLIC_SOURCE",
+            url: "https://news.example.com/anchor-raises-seed",
+            domain: "news.example.com",
+            title: "Anchor raises a seed round",
+            publishedOn: null,
+            retrievedOn: "2026-11-12",
+          },
+          {
+            kind: "TIMELINE",
+            title: "Anchor on the public web",
+            events: [
+              {
+                at: "2026-03-04",
+                label: "Seed round announced",
+                note: "Public web: news.example.com · not verified",
+                subject: null,
+              },
+            ],
+          },
+        ],
+        createdAt: NOW,
+      },
+    ];
+    const { app, filed } = build({ messages: research });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/q/answer-exports",
+      payload: { runId: RUN },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(filed[0]).toMatchObject({
+      content: {
+        content: {
+          sections: [
+            { heading: "Anchor at a glance", body: "Stage — Public web: Seed" },
+            {
+              heading: "Answer",
+              body: "Anchor raised a seed round in March 2026, per public reports.",
+            },
+            {
+              heading: "Sources (public pages, not verified)",
+              body: "Anchor raises a seed round — news.example.com — https://news.example.com/anchor-raises-seed\nread 2026-11-12",
+            },
+            {
+              heading: "Dated record",
+              body: "2026-03-04 — Seed round announced\nPublic web: news.example.com · not verified",
+            },
+          ],
+        },
+      },
+    });
+    await app.close();
+  });
+
   it("refuses an answer with no words", async () => {
     const { app } = build({ messages: [] });
     const response = await app.inject({
