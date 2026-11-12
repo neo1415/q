@@ -275,3 +275,24 @@ Production `945138faf`; fictional investor `investor.savanna-seed`; marketplace-
   - **Defect 1 — presentation:** 12 s after delivery, the Document dialog covered the conversation, unasked. `deliverWork` opened the viewer whenever a job settled on the Q page (owner 2026-10-28). Fixed in `596bd01da`: typed chat delivers the inline card only; voice and the immersive Q view keep the open-in-place.
   - **Defect 2 — namesakes as evidence:** the analysis's Sources cited "GitHub - Syed-99/ledgerline" (a billing engine) and "Ledgerline Software (McKinsey) | PrepLounge". Deep research never checks pages against the subject (`entityResolution: NOT_APPLICABLE` on all 18 lanes). Fixed in `262e75106`: drop pages that name the company but place it only in other countries, or are someone else's repository of that name; market pages are untouched.
 - **In the gate:** `262e75106` (both fixes). Next: deploy; rerun the same certification (expect no dialog, no namesake sources); a q_plans plan ask that needs research (expect a PUBLIC section READ); the founder side on their own records.
+
+## Certification run 2 — deployed `3743dc48b` (12 Nov, 22:10–22:35 Lagos)
+
+- **Receipt:** `ci-local PASS sha=3743dc48b at=2026-11-12T21:10:23Z took=2786s` (all six steps). **DEPLOYED** by `deploy-promote.sh`; rollback point `afbcd6df3`; all four services SUCCESS.
+- **Gate-lock defect found and fixed (`3743dc48b`):** a Docker daemon started by a gate inherited the machine lock and held it, so the next gate was refused. Fixed; the lock was free after the following gate.
+- **Investor, Ledgerline investment plan, Chat:** **LIVE_VERIFIED.**
+  - Delivered at 21:23:05 as the inline card; no dialog or overlay in 330 s.
+  - Its sources are relevant African B2B payments and fintech pages; no namesakes.
+  - The analysis keeps self-reported figures labelled, notes that subscription revenue isn't comparable with transaction-fee peers, and labels Q's inference.
+- **Founder, Clinicrest:** "Make me a 90-day plan to benchmark our pricing against competitors…". **LIVE_VERIFIED.**
+  - The first plan in production with public research: research MARKET; PUBLIC section READ with 12 facts.
+    - Topics: Nigerian digital health, competitor consultation fees, EMR comparisons, regulation, market size. One fact is off-topic (IrokoTV).
+    - Context Firewall: 12 of 13 searches were minimised.
+  - Drafted in 161 s, no redraft, first-review score 97, OFFERED.
+  - **Execute:** running at +6 s with "0 of 7".
+    - Two Q steps stayed PROPOSED, awaiting their own approval.
+    - The founder's two steps went to the board.
+    - Q's two running steps finished in parallel at 78 s and 120 s.
+    - No dialog.
+- **Remaining limitation:**
+  - The analysis document's Sources section still says "published <date>" for a search-listed date. Fix in the next batch.
