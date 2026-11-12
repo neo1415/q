@@ -92,6 +92,7 @@ function slate(options: {
                 headquartersCountry: p.headquartersCountry,
                 shortDescription: p.primaryDescription,
                 marketplaceVisibility: p.marketplaceVisibility,
+                marketplaceReadinessState: p.marketplaceReadinessState,
                 ownedByViewer: false,
               })),
               nextCursor: null,

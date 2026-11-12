@@ -42,7 +42,15 @@ describe("a spoken name with other spacing (live 2026-10-09)", () => {
           // A text search: "tensor gate" does not find "Tensorgate".
           const hit = query.text?.toLowerCase() === "tensorgate";
           return Promise.resolve({
-            items: hit ? [{ id: TENSORGATE, canonicalName: "Tensorgate" }] : [],
+            items: hit
+              ? [
+                  {
+                    id: TENSORGATE,
+                    canonicalName: "Tensorgate",
+                    marketplaceReadinessState: "marketplace_ready",
+                  },
+                ]
+              : [],
             nextCursor: null,
           });
         },

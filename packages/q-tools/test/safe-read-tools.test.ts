@@ -611,3 +611,28 @@ describe("SEARCH_COMPANIES", () => {
     expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
   });
 });
+
+/**
+ * PADL #57/#58 (owner, 13 Nov): another organisation's company is found,
+ * named and offered only once it takes part in the marketplace. Live 12 Nov:
+ * ten unassessed "Ledgerline … (fictional)" sign-ups made "Ledgerline"
+ * ambiguous for an investor who could open none of them.
+ */
+describe("the marketplace universe for search and names", () => {
+  it("leaves out a network-visible company that is not marketplace-ready", async () => {
+    const { networkVisibleCompanies } =
+      await import("../src/tools/network-companies.js");
+    const { actorA, fakeCompanies, fakeDisclosure, COMPANY_B_UNASSESSED } =
+      await import("./support.js");
+    const found = await networkVisibleCompanies(
+      { companies: fakeCompanies(), disclosure: fakeDisclosure() },
+      actorA,
+      { limit: 10 },
+    );
+    const ids = found.items.map((item) => item.id as string);
+    expect(ids).not.toContain(COMPANY_B_UNASSESSED);
+    expect(found.items.map((item) => item.canonicalName)).toContain(
+      "Beacon Analytics",
+    );
+  });
+});

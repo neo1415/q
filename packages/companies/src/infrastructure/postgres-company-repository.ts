@@ -551,6 +551,7 @@ const SearchRowSchema = CompanyRowSchema.pick({
   headquarters_country: true,
   short_description: true,
   marketplace_visibility: true,
+  marketplace_readiness_state: true,
 });
 
 const SearchScoreSchema = z.object({ score: z.coerce.number().int().min(0) });
@@ -762,7 +763,8 @@ export function createPostgresCompanyQueryPort(options: {
         parsed === null
           ? await sql`
         select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
-               c.headquarters_country, c.short_description, c.marketplace_visibility
+               c.headquarters_country, c.short_description, c.marketplace_visibility,
+               c.marketplace_readiness_state
           from core.companies c
          where ${visible}
            and (${after?.n ?? null}::text is null
@@ -772,7 +774,7 @@ export function createPostgresCompanyQueryPort(options: {
           : await sql`
         select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
                c.headquarters_country, c.short_description, c.marketplace_visibility,
-               s.score
+               c.marketplace_readiness_state, s.score
           from core.companies c
           ${companySearchJoins(sql, parsed)}
          where ${visible}
@@ -795,6 +797,7 @@ export function createPostgresCompanyQueryPort(options: {
           headquartersCountry: p.headquarters_country,
           shortDescription: p.short_description,
           marketplaceVisibility: p.marketplace_visibility,
+          marketplaceReadinessState: p.marketplace_readiness_state,
           ownedByViewer:
             viewerOrganisation !== null &&
             p.tenant_id === query.viewer.tenantId &&

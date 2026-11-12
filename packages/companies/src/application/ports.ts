@@ -312,6 +312,8 @@ export type CompanySearchCandidate = {
   readonly headquartersCountry: string | null;
   readonly shortDescription: string | null;
   readonly marketplaceVisibility: MarketplaceVisibility;
+  /** Raw readiness state; read it through `marketplaceParticipationOf`. */
+  readonly marketplaceReadinessState: string;
   /** True when the viewer's own organisation owns the company. */
   readonly ownedByViewer: boolean;
 };

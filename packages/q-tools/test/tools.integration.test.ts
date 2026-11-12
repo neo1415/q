@@ -271,8 +271,10 @@ describe("@capital-q/q-tools against local PostgreSQL", () => {
           values (${objectiveAlpha}, ${tenantC}, ${companyAlpha}, 5000000, 'USD', ${founder.userId}, 'Use of funds (synthetic)', 'seed')`;
 
         const companyBeacon = randomUUID();
-        await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, short_description, marketplace_visibility, current_stage_code, headquarters_country)
-          values (${companyBeacon}, ${tenantN}, ${orgBeacon}, ${`Beacon Analytics ${token}`}, ${`beacon-${companyBeacon.slice(0, 8)}`}, 'Network-visible analytics company (synthetic).', 'network_visible', 'series_a', 'DE')`;
+        // Marketplace-ready: search and names reach only the marketplace
+        // (PADL #57/#58), so the network company these checks find is one.
+        await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, short_description, marketplace_visibility, marketplace_readiness_state, current_stage_code, headquarters_country)
+          values (${companyBeacon}, ${tenantN}, ${orgBeacon}, ${`Beacon Analytics ${token}`}, ${`beacon-${companyBeacon.slice(0, 8)}`}, 'Network-visible analytics company (synthetic).', 'network_visible', 'marketplace_ready', 'series_a', 'DE')`;
         const companyHidden = randomUUID();
         await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, primary_description)
           values (${companyHidden}, ${tenantN}, ${orgHidden}, ${`Beacon Hidden ${token} Ltd`}, ${`hidden-${companyHidden.slice(0, 8)}`}, ${`Private. ${MARKERS.crossTenant}`})`;

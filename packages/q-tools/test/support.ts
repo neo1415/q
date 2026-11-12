@@ -79,10 +79,15 @@ export const actorB: ActorContext = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
+/** A fixture company: its profile, and its marketplace readiness (PADL #57/#58). */
+export type FixtureCompany = CompanyProfileFacts & {
+  readonly marketplaceReadinessState: string;
+};
+
 function profile(
-  overrides: Partial<CompanyProfileFacts> &
+  overrides: Partial<FixtureCompany> &
     Pick<CompanyProfileFacts, "id" | "tenantId" | "organisationId">,
-): CompanyProfileFacts {
+): FixtureCompany {
   return {
     canonicalName: "Company",
     legalName: null,
@@ -95,11 +100,14 @@ function profile(
     shortDescription: null,
     companyStatus: "active",
     marketplaceVisibility: "organisation_private",
+    marketplaceReadinessState: "not_assessed",
     ...overrides,
   };
 }
 
-export const PROFILES: readonly CompanyProfileFacts[] = [
+export const COMPANY_B_UNASSESSED = "c0000000-0000-4000-8000-0000000000b9";
+
+export const PROFILES: readonly FixtureCompany[] = [
   profile({
     id: COMPANY_A as CompanyProfileFacts["id"],
     tenantId: TENANT_A as CompanyProfileFacts["tenantId"],
@@ -120,7 +128,18 @@ export const PROFILES: readonly CompanyProfileFacts[] = [
     organisationId: ORG_B as CompanyProfileFacts["organisationId"],
     canonicalName: "Beacon Analytics",
     marketplaceVisibility: "network_visible",
+    marketplaceReadinessState: "marketplace_ready",
     shortDescription: "Network-visible analytics company (synthetic).",
+  }),
+  // A sign-up the readiness engine never assessed (live 12 Nov: ten
+  // "Ledgerline … (fictional)"): network-visible, not in the marketplace.
+  profile({
+    id: COMPANY_B_UNASSESSED as CompanyProfileFacts["id"],
+    tenantId: TENANT_B as CompanyProfileFacts["tenantId"],
+    organisationId: ORG_B as CompanyProfileFacts["organisationId"],
+    canonicalName: "Beacon Analytics Labs (fictional)",
+    marketplaceVisibility: "network_visible",
+    marketplaceReadinessState: "not_assessed",
   }),
 ];
 
@@ -191,6 +210,7 @@ export function fakeCompanies(
         headquartersCountry: p.headquartersCountry,
         shortDescription: p.shortDescription,
         marketplaceVisibility: p.marketplaceVisibility,
+        marketplaceReadinessState: p.marketplaceReadinessState,
         ownedByViewer: p.organisationId === query.viewer.organisationId,
       }));
       return Promise.resolve({ items, nextCursor: null });

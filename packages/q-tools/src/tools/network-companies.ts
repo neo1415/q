@@ -1,3 +1,4 @@
+import { marketplaceParticipationOf } from "@capital-q/companies";
 import { actorPrincipal } from "@capital-q/permissions";
 import type { ActorContext } from "@capital-q/security";
 
@@ -42,13 +43,21 @@ export async function networkVisibleCompanies(
           })),
         );
   return {
-    items: page.items.filter((_item, index) => {
+    items: page.items.filter((item, index) => {
       const decision = decisions[index];
       return (
         decision !== undefined &&
         decision.outcome === "ALLOW" &&
         (decision.reasonCode === "NETWORK_VISIBLE" ||
-          decision.reasonCode === "PUBLIC_EXTERNAL")
+          decision.reasonCode === "PUBLIC_EXTERNAL") &&
+        // PADL #57/#58: another organisation's company is found, named and
+        // offered only once it takes part in the marketplace (live 12 Nov:
+        // ten unassessed "Ledgerline … (fictional)" sign-ups made
+        // "Ledgerline" ambiguous, though an investor opening any of them
+        // got a 404). Their own company is always theirs to find.
+        (item.ownedByViewer ||
+          marketplaceParticipationOf(item.marketplaceReadinessState) ===
+            "ELIGIBLE")
       );
     }),
     nextCursor: page.nextCursor,
