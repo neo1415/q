@@ -547,6 +547,7 @@ import {
   findingBlockOf,
   suppliedStandingsOf,
   publicStandingsOf,
+  publicRecordTimeline,
   withFactLabels,
   type SuppliedStanding,
   namesReadByRun,
@@ -7704,6 +7705,10 @@ export function createModelGatewayQAnswer(
        * picture of them must stand on (QA QO-09).
        */
       const webEvidence: SearchEvidence[] = [];
+      // Slice 2 (12 Nov): whether the research matched each page to the
+      // subject asked about, by page, so a namesake's page is never placed
+      // on that subject's public-record timeline.
+      const pageSubjectMatch = new Map<string, string>();
       // C's receipts (UI acts and moves), read once for the whole turn.
       const screenReceipts: readonly string[] =
         dependencies.uiActReceipts?.(request.actor) ?? [];
@@ -9135,6 +9140,12 @@ export function createModelGatewayQAnswer(
             typeof source.index !== "number"
           ) {
             continue;
+          }
+          if (
+            typeof source.url === "string" &&
+            typeof source.subjectMatch === "string"
+          ) {
+            pageSubjectMatch.set(source.url, source.subjectMatch);
           }
           if (!publicSources.some((known) => known.url === source.url)) {
             publicSources.push({
@@ -11685,9 +11696,25 @@ export function createModelGatewayQAnswer(
           comparedTable !== null && comparisonOnScreen(earlier, comparedTable)
             ? null
             : comparedTable;
+        // Slice 2 (12 Nov): the dated public pages this turn read about the
+        // one company or person it names, in date order -- code's layout of
+        // what was read, never a date the model wrote. A model timeline wins.
+        const publicRecord =
+          namedSubject === null ||
+          (modelBlocks ?? []).some((block) => block.kind === "TIMELINE")
+            ? null
+            : publicRecordTimeline({
+                name: namedSubject,
+                sources: publicSources,
+                matched: (url) => {
+                  const match = pageSubjectMatch.get(url);
+                  return match === "MATCH" || match === "POSSIBLE";
+                },
+              });
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
           ...(tableToShow === null ? [] : [tableToShow]),
+          ...(publicRecord === null ? [] : [publicRecord]),
           ...fromPages,
           ...(picture === null ? [] : [picture]),
         ];

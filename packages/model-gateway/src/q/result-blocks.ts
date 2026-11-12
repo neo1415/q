@@ -207,6 +207,52 @@ export function publicStandingsOf(
   return out;
 }
 
+/** Fewer dated pages than this is a list, not a record over time. */
+export const PUBLIC_RECORD_MIN_EVENTS = 2;
+
+/**
+ * Slice 2 (12 Nov): the public record of one named company or person, as a
+ * timeline of the pages this turn read about them, by each page's own
+ * publication date. Only pages the research matched to them (a namesake's
+ * never), only a date the page carried (a retrieval date is not when
+ * anything happened, and none is guessed), each marked as an unverified
+ * public page (decision 87: a retrieved source is never verified).
+ */
+export function publicRecordTimeline(input: {
+  readonly name: string;
+  readonly sources: readonly {
+    readonly url: string;
+    readonly domain: string;
+    readonly title: string | null;
+    readonly publishedAt: string | null;
+  }[];
+  readonly matched: (url: string) => boolean;
+  readonly now?: Date | undefined;
+}): QResultBlock | null {
+  const latest = (input.now ?? new Date()).getTime() + 24 * 60 * 60 * 1000;
+  const seen = new Set<string>();
+  const events: { at: string; label: string; note: string }[] = [];
+  for (const page of input.sources) {
+    if (seen.has(page.url) || !input.matched(page.url)) continue;
+    const at = Date.parse(page.publishedAt ?? "");
+    if (!Number.isFinite(at) || at > latest) continue;
+    seen.add(page.url);
+    const title = page.title?.trim() ?? "";
+    events.push({
+      // The day only: a page's date is not a moment to the second.
+      at: new Date(at).toISOString().slice(0, 10),
+      label: title.length > 0 ? title : page.domain,
+      note: `Public web: ${page.domain} · not verified`,
+    });
+  }
+  if (events.length < PUBLIC_RECORD_MIN_EVENTS) return null;
+  const name = input.name.trim().slice(0, 80);
+  return timelineBlock({
+    title: name.length > 0 ? `Public record: ${name}` : "Public record",
+    events,
+  });
+}
+
 /**
  * Every supplied fact citable (slice 1, 12 Nov): facts the gateway adds
  * itself (the canonical profile, readiness, documents on screen) arrived
