@@ -151,3 +151,9 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 - **DEPLOYED:** all four services on `2f8227fe9` (CI 43187826194 green; the integration job ran the 5 app-path tenant-isolation suites and the four-eyes integration test for the first time: **CI_GREEN**). Rollback `19e149590`.
 - **LIVE_VERIFIED:** /verification as the fictional founder `v1-fdr-202611120653-uifk` shows "Who is asking" (name, role) with no ID document field (`[data-verify-file="person"]` count 0). Four-eyes: CI_GREEN only (no live admin decision exercised).
 - **D3 grounding** (`c4c4ae1bc`, findings never outrank the supplied facts they cite) is in CI. Scope: Q conversation answers (live and final findings); workforce/research findings are not yet covered.
+
+## Execution control (owner, 12 Nov)
+
+- One integration lead (this session) owns shared contracts, merge order, release gates and production verification. At most one additional implementation agent on a bounded, non-overlapping slice; short read-only research/review agents allowed. One significant change set per release batch.
+- Intelligence programme started: a bounded read-only audit of Q intelligence, memory, conversation, web research and rich answers for the journey "an investor asks Q to investigate a company → authorised internal + public research with grounded citations → natural follow-ups". Output: the highest-impact observed failure and the smallest vertical slice; then implement it. Second slice: sourced images/media/interactive results through the existing presentation blocks.
+- Not blocked by the RLS migration or the founder-verification decision.
