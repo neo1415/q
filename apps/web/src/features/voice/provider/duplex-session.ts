@@ -282,6 +282,20 @@ export function useDuplexVoiceSession(
     [],
   );
 
+  /**
+   * A quiet note to the open line (D86 steer, research found while they
+   * talk): added to the model's context, never a reply of its own.
+   * Owner live 10 Nov: the duplex client had no `brief`, so every steer
+   * the onboarding call fetched (what is saved, what to ask next) was
+   * dropped, and Q asked again for what was already on record.
+   */
+  const brief = useCallback((text: string): boolean => {
+    const line = lineRef.current;
+    if (line === null) return false;
+    line.note(text, false);
+    return true;
+  }, []);
+
   return useMemo(
     () => ({
       state,
@@ -290,6 +304,7 @@ export function useDuplexVoiceSession(
       transcript,
       start,
       end,
+      brief,
       sendText,
       setMuted,
       setVolume,
@@ -303,6 +318,7 @@ export function useDuplexVoiceSession(
       transcript,
       start,
       end,
+      brief,
       sendText,
       setMuted,
       setVolume,
