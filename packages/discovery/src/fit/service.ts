@@ -43,7 +43,12 @@ import {
   notApplicableObservation,
   type FitAssessment,
 } from "./model.js";
-import { compareFitOrder, fitOrderScore } from "./order.js";
+import {
+  compareFitOrder,
+  fitOrderScore,
+  orderByFit,
+  outsideDeclaredGeography,
+} from "./order.js";
 import {
   observeFit,
   type DeclaredFitFacts,
@@ -182,6 +187,11 @@ export type FitProfileItem = {
   readonly raiseView?: CompanyRaiseView | undefined;
   /** Investability and Suitability: two scores, never blended. */
   readonly scores?: CompanyScoresDto | undefined;
+  /**
+   * fit-order v5's geography tier: outside a geography the investor
+   * declared Must or Strong. Q's top N uses it as Discover does (P1-9).
+   */
+  readonly outsideDeclaredGeography?: boolean | undefined;
 };
 
 export type FitProfilesResult =
@@ -464,6 +474,10 @@ export function createFitService(
       });
       items.push({
         assessment: assessFit(observed, config, computedAt),
+        outsideDeclaredGeography: outsideDeclaredGeography(
+          observed.observations.GEOGRAPHY.outcome,
+          input.declared.geographyStrength,
+        ),
         name: input.name,
         line: isUnclaimed
           ? [input.line, UNCLAIMED_PUBLIC_PROFILE_LABEL]
@@ -618,25 +632,59 @@ export function buildFitComparison(input: {
   const thin = input.items.filter(
     (i) => i.assessment.profile.band === "NOT_ENOUGH_INFORMATION",
   ).length;
-  const ranked = input.items
+  const kept = input.items
     .filter(
       (i) =>
         input.keepAll === true ||
         (i.assessment.profile.band !== "OUTSIDE_MANDATE" &&
           i.assessment.profile.band !== "NOT_ENOUGH_INFORMATION"),
     )
-    // The same comparator as the Discover feed (fit-order.v1): a higher
-    // score out of 10 is never listed below a lower one.
-    // No base rank here, so the config's company-id fallback keeps the
-    // order total and stable.
+    // A stable base order (no base rank here): the fit comparator, then
+    // the config's company-id fallback.
     .sort(
       (a, b) =>
         compareFitOrder(
           { assessment: a.assessment, score: fitOrderScore(a.assessment) },
           { assessment: b.assessment, score: fitOrderScore(b.assessment) },
         ) || compareAssessments(a.assessment, b.assessment),
-    )
-    .slice(0, input.limit);
+    );
+  // Metrics audit P1-9 (7 Nov): Q's top N used the bare comparator, so it
+  // could disagree with Discover across the declared geography tier and
+  // among equal fits. It is now ordered by Discover's own fit order
+  // (orderByFit: tier, fit, scored Investability among equal fits only).
+  const byId = new Map(
+    kept.map((item) => [item.assessment.profile.companyId, item] as const),
+  );
+  const keys = new Map(
+    kept.map((item) => {
+      const investability = item.scores?.investability;
+      return [
+        item.assessment.profile.companyId,
+        {
+          assessment: item.assessment,
+          score: fitOrderScore(item.assessment),
+          outsideDeclaredGeography: item.outsideDeclaredGeography === true,
+          // Discover orders on non-provisional Investability only (P0-3).
+          investability:
+            investability === undefined || investability.provisional === true
+              ? null
+              : investability.score,
+        },
+      ] as const;
+    }),
+  );
+  const ranked = orderByFit(
+    kept.map((item, index) => ({
+      companyId: item.assessment.profile.companyId,
+      baseRank: index + 1,
+    })),
+    keys,
+  )
+    .slice(0, input.limit)
+    .flatMap((placed) => {
+      const item = byId.get(placed.companyId);
+      return item === undefined ? [] : [item];
+    });
 
   const bestOn = (index: number): FitParameter[] =>
     ranked.length < 2

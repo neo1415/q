@@ -11,6 +11,7 @@ import {
   type FitParameter,
   fitScoreOutOf10,
   notAssessedInvestability,
+  suitabilityFromFit,
   type InvestabilityDto,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -585,6 +586,53 @@ describe("top N side by side", () => {
     assessment: assessFit(row(pattern, evidence, ID(n)), FIT_CONFIG_V4, AT),
     name: `Company ${n}`,
     line: null,
+  });
+
+  // Metrics audit P1-9 (7 Nov): Q's top N must agree with Discover's
+  // fit order: the declared geography tier first, then fit, then scored
+  // non-provisional Investability among equal fits only.
+  it("P1-9: orders as Discover does across the geography tier and equal fits", () => {
+    const scores = (n: number, score: number, provisional = false) => {
+      const investability: InvestabilityDto = {
+        ...notAssessedInvestability("investiq/v1+investability-inputs.v1"),
+        status: "SCORED",
+        score,
+        band: "DEVELOPING",
+        confidence: "LOW",
+        coverage: {
+          areasScored: 5,
+          areasTotal: 8,
+          criteriaScored: 15,
+          criteriaApplicable: 46,
+        },
+        ...(provisional ? { provisional: true } : {}),
+      };
+      const assessment = item("SSSSSSSSS", n).assessment;
+      return {
+        companyId: ID(n),
+        investability,
+        suitability: suitabilityFromFit(assessment.profile),
+      };
+    };
+    const items = [
+      { ...item("SSSSSSSSS", 1), outsideDeclaredGeography: true },
+      { ...item("SSSSSSSSS", 2), scores: scores(2, 40) },
+      { ...item("SSSSSSSSS", 3), scores: scores(3, 80) },
+      { ...item("SSSSSSSSS", 4), scores: scores(4, 99, true) },
+    ];
+    const comparison = buildFitComparison({
+      items,
+      sources: new Map(),
+      limit: 4,
+      config: FIT_CONFIG_V4,
+      computedAt: AT,
+    });
+    const ids = comparison.entries.map((e) => e.companyId);
+    // Outside the declared geography: last, whatever its fit.
+    expect(ids.at(-1)).toBe(ID(1));
+    // Among the equal fits, the higher scored Investability first; a
+    // provisional score keeps its place (never orders).
+    expect(ids.indexOf(ID(3))).toBeLessThan(ids.indexOf(ID(2)));
   });
 
   it("orders by fit, leaves out declared exclusions and thin profiles, marks a strict best", () => {
