@@ -1412,6 +1412,9 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../q-core
+      '@capital-q/q-research':
+        specifier: workspace:*
+        version: link:../q-research
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../q-runtime

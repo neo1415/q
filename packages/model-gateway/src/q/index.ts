@@ -301,6 +301,11 @@ import {
 } from "./picture-corroboration.js";
 import { boundedCompletedMessage } from "./completed-event.js";
 import {
+  type ConflictFact,
+  figureConflictBlocks,
+  figureConflicts,
+} from "./figure-conflicts.js";
+import {
   earlierResearchNote,
   earlierResearchPages,
   earlierResearchSubjects,
@@ -6715,6 +6720,9 @@ export function createModelGatewayQAnswer(
       // D3 (owner review 12 Nov): the standing of every fact the model is
       // given, so no finding outranks the facts it cites.
       let suppliedStandings: ReadonlyMap<string, SuppliedStanding> = new Map();
+      // Gap 2 (12 Nov): the same facts, for code to set their figures
+      // beside the public pages' (figure-conflicts.ts).
+      let suppliedFacts: readonly ConflictFact[] = [];
       const assemblePrompt = async (w: WideReads) => {
         const assembled = await assembledRead;
         const facts: readonly AuthorisedFact[] = [
@@ -6747,6 +6755,7 @@ export function createModelGatewayQAnswer(
         // (the prompt the model answers is the last one assembled).
         const citable = withFactLabels(facts);
         suppliedStandings = suppliedStandingsOf(citable);
+        suppliedFacts = citable;
 
         const variables: Omit<
           CompanyAnalystV4Variables,
@@ -11744,7 +11753,30 @@ export function createModelGatewayQAnswer(
                   return match === "MATCH" || match === "POSSIBLE";
                 },
               });
+        // Gap 2 (12 Nov): where the company's own figure and a public page
+        // read this turn or earlier in the investigation disagree, both are
+        // shown, unreconciled. Code's reading; no model call.
+        const conflicts = figureConflictBlocks(
+          figureConflicts({
+            facts: suppliedFacts,
+            pages: [
+              ...webEvidence.map((source) => ({
+                domain: source.domain,
+                excerpt: source.text,
+                subjectMatch: source.subjectMatch,
+              })),
+              ...earlierPages,
+            ],
+          }),
+        );
+        if (conflicts.length > 0) {
+          logger?.info(
+            { qRunId: request.runId, conflicts: conflicts.length },
+            "q figure conflicts shown",
+          );
+        }
         const codeBlocks = [
+          ...conflicts,
           ...(builtCards === null ? [] : [builtCards]),
           ...(tableToShow === null ? [] : [tableToShow]),
           ...(publicRecord === null ? [] : [publicRecord]),
