@@ -127,3 +127,14 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 
 - P1-15 per owner direction: deck-section evidence lines are now USER_CLAIM / DOCUMENT_SUPPORTED with "Q's reading of your deck, not independently verified" (`9105544de`, `25bc601cb`).
 - D1 (verification pathway): per PADL the gate stays. Next: analyse and complete the operational verification workflow (authorised review, activation, founder-visible status); release tests use verified fictional fixtures.
+
+## Verification pathway audit and integrity fixes (12 Nov)
+
+- Built end to end in code (read-only audit): KYB submission → admin queue (`identity.platform_admins`; `verification.decide` needs step-up) → append-only HUMAN decision, audit, outbox `verification.claim.decided` → worker readiness reconcile → slate refresh on `marketplace_readiness_changed` → founder-visible KybView. Production's only admin is the owner (platform_owner). Not yet proven live: delivery of `verification.claim.decided` to the workers.
+- **Fixed `41879f125` (integration, not deployed):** (1) four eyes: an operator cannot decide a claim they requested (`SELF_DECISION`, 403); integration test. (2) The founder ID upload is hidden: it went up as an ordinary CORPORATE organisation document while the page promised "seen only by the person at Capital Q who checks it". Production had 0 ID documents.
+- Remaining slices: private identity-document path (S3, migration + RLS tests), "request more information" (S2), close the KYB submission inside the decision transaction, a synthetic-operator guard (S4) before any automated fictional reviewer. Release tests get a VERIFIED fictional company only through the real path: fictional founder submits, an authorised admin approves in /admin/verification with the basis "fictional release-test account; no real-world check".
+
+## Application-path tenant isolation (merged `e924be4b6`, 12 Nov)
+
+- 5 suites, 12 tests, run as `postgres` through the real services (network, mandates, evidence, onboarding, q-runtime): a foreign tenant's real id gets exactly the answer of a random id, nothing is written. Ran green locally on a fresh Postgres 16 with every migration (`scripts/local-pg/setup.sh`, port 54339); CI will run them in the integration job.
+- **Owner decisions** (`docs/ai-handoff/PERSON-VS-ORG-DATA.md`): (1) onboarding sessions are person-owned: a founder who left a company can still read and answer that company's onboarding session; recommended: company-bound sessions require current membership. (2) Q conversations opened in an organisation context do not re-check membership. (3) `founder_background_entries` document links can point at the old company's document after the founder moves. (4) minor: some reads look up before checking permission, so a stale former member sees forbidden vs not found.
