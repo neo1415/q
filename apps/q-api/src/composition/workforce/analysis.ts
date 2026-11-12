@@ -1332,7 +1332,7 @@ export function analysisContent(input: {
   // removed, is listed apart, under its own plain heading.
   const setAside = (index: number) => identity !== null && namesakes.has(index);
   const sourceLine = (source: AnalysisSource, standing: string | null) =>
-    `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, published ${source.publishedAt.slice(0, 10)}`}${standing === null ? "" : ` (${standing})`}. ${source.url}`;
+    `[S${String(source.index)}] ${source.title ?? source.domain} — ${source.domain}${source.publishedAt === null ? "" : `, dated ${source.publishedAt.slice(0, 10)} as the search listed it`}${standing === null ? "" : ` (${standing})`}. ${source.url}`;
   const sourceLines = input.sources
     .filter((source) => cited.has(source.index) && !setAside(source.index))
     .map((source) =>

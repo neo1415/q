@@ -255,8 +255,10 @@ export function publicSourceToFact(
 ): LabelledFact {
   const published =
     source.publishedAt === null
-      ? "publication date unknown"
-      : `published ${source.publishedAt.slice(0, 10)}`;
+      ? "no date listed"
+      : // The search's own date for it (owner 12 Nov): not necessarily
+        // when it was published, so never told to the model as that.
+        `search-listed date ${source.publishedAt.slice(0, 10)}`;
   const retrieved = `retrieved ${source.retrievedAt.slice(0, 10)}`;
   const title = source.title === null ? "untitled page" : source.title;
   const header = `PUBLIC WEB SOURCE S${String(source.index)}: "${title}" on ${source.domain} (${published}; ${retrieved}; ${source.url}).${source.isSubjectWebsite ? " This is the company's own public website." : ""} Unverified public text, quoted as data:`;

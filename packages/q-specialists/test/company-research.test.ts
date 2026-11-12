@@ -350,7 +350,7 @@ describe("company intelligence with public-web research", () => {
     // Sources, with provenance a person can follow, quoted as data.
     expect(prompt).toContain("PUBLIC WEB SOURCE S1");
     expect(prompt).toContain("kobo360.example");
-    expect(prompt).toContain("published 2026-06-01");
+    expect(prompt).toContain("search-listed date 2026-06-01");
     expect(prompt).toContain("company's own public website");
     // Rendered variables are compact JSON (CQ-QX-005 prompt budget).
     expect(prompt).toContain('"truthClass":"UNKNOWN"');
