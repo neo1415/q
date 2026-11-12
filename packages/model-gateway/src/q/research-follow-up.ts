@@ -1,5 +1,7 @@
 import type { QConversationMessage } from "@capital-q/q-runtime";
 
+import { asksForFresh } from "./read-cache.js";
+
 const words = (text: string): string =>
   text
     .toLowerCase()
@@ -124,22 +126,37 @@ export function publicResearchFollowUp(input: {
 }
 
 /**
- * A pronoun question straight after an answer drawn from public sources
- * ("what did those sources say about their funding?"): a follow-up on what
- * was just found, answered from what this person already read rather than
- * by a fresh search started ahead of the model (owner 2026-10-23).
+ * A follow-up straight after an answer drawn from public sources, answered
+ * from what this person already read rather than by a fresh search started
+ * ahead of the model (owner 2026-10-23). Investigation milestone (12 Nov):
+ * not only a pronoun question ("what did those sources say about their
+ * funding?") -- "what are the biggest risks?" and "how does that compare
+ * with what the founder told us?" lost the earlier research the same way.
+ * A question that names no one new, or names only whom that research was
+ * about, follows up; one that asks for newer information searches again.
+ * The model keeps the research tool either way.
  */
 export function followsUpPublicSources(input: {
   readonly history: readonly QConversationMessage[];
   readonly question: string;
   readonly aboutNamedOther: boolean;
+  /** Whom the conversation's recent research was about (entityName). */
+  readonly researchedNames?: readonly string[] | undefined;
 }): boolean {
-  if (input.aboutNamedOther || !PRONOUN.test(input.question)) return false;
   const turn = lastTurn(input.history);
-  return (
-    turn !== null &&
-    (turn.answer.blocks ?? []).some((block) => block.kind === "PUBLIC_SOURCE")
-  );
+  if (
+    turn === null ||
+    !(turn.answer.blocks ?? []).some((block) => block.kind === "PUBLIC_SOURCE")
+  ) {
+    return false;
+  }
+  if (asksForFresh(input.question)) return false;
+  if (!input.aboutNamedOther) return true;
+  const said = ` ${words(input.question)} `;
+  return (input.researchedNames ?? []).some((name) => {
+    const named = words(name);
+    return named.length > 0 && said.includes(` ${named} `);
+  });
 }
 
 /**

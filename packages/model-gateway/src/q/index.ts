@@ -301,6 +301,12 @@ import {
 } from "./picture-corroboration.js";
 import { boundedCompletedMessage } from "./completed-event.js";
 import {
+  earlierResearchNote,
+  earlierResearchPages,
+  earlierResearchSubjects,
+  RESEARCH_TOOL_NAME,
+} from "./earlier-research.js";
+import {
   asksForFresh,
   canonical,
   createReadCache,
@@ -3674,6 +3680,12 @@ export function createModelGatewayQAnswer(
       return null;
     }
     const earlier = history.filter((m) => m.id !== latest.id);
+    // Investigation milestone (12 Nov): pages this conversation's recent
+    // research already read, for the follow-up to answer from and cite.
+    const earlierPages = earlierResearchPages({
+      history: earlier,
+      fetched: request.fetchedInConversation ?? [],
+    });
     const toolContext: QToolExecutionContext = {
       actor: request.actor,
       runId: request.runId,
@@ -5412,6 +5424,7 @@ export function createModelGatewayQAnswer(
       openDocumentTitle,
       latest,
       earlier,
+      earlierPages,
       toolContext,
       assembled,
       profile,
@@ -5810,6 +5823,7 @@ export function createModelGatewayQAnswer(
         openDocumentTitle,
         latest,
         earlier,
+        earlierPages,
         toolContext: preparedToolContext,
         assembled: warmedAssembled,
         profile,
@@ -6245,6 +6259,10 @@ export function createModelGatewayQAnswer(
           history: earlier,
           question: latest.content,
           aboutNamedOther: request.aboutNamedOther === true,
+          researchedNames: earlierResearchSubjects({
+            history: earlier,
+            fetched: request.fetchedInConversation ?? [],
+          }),
         })
           ? (() => {
               const call = researchCallOf(4);
@@ -9352,11 +9370,19 @@ export function createModelGatewayQAnswer(
         ];
       }
       // Owner live 2026-10-17: what Q already showed here, as context.
+      // The earlier research goes in its own note (below), whole; the
+      // compact record would cut its pages to a few words each.
       const shownNote = shownContextNote(
         earlier,
-        request.fetchedInConversation,
+        earlierPages.length === 0
+          ? request.fetchedInConversation
+          : request.fetchedInConversation?.filter(
+              (fetch) => fetch.toolName !== RESEARCH_TOOL_NAME,
+            ),
       );
       if (shownNote !== null) messages = [...messages, shownNote];
+      const pagesNote = earlierResearchNote(earlierPages);
+      if (pagesNote !== null) messages = [...messages, pagesNote];
       // C's request: whether Q's last screen acts happened, from the
       // browser's receipts, so Q says so honestly next turn.
       const screenActs = screenActsNote(screenReceipts);
@@ -11541,6 +11567,13 @@ export function createModelGatewayQAnswer(
           supplied: new Map([
             ...suppliedStandings,
             ...publicStandingsOf(publicSources),
+            // Pages earlier research here read: citable by site or S1xx.
+            ...publicStandingsOf(
+              earlierPages.filter(
+                (page) =>
+                  !publicSources.some((known) => known.url === page.url),
+              ),
+            ),
           ]),
           // A finding already shown live keeps the id it was shown under.
           findingId: (_index, statement) =>
