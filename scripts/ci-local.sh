@@ -18,13 +18,12 @@
 #   typecheck    typecheck            pnpm typecheck
 #   build        build                pnpm build
 #   test         test (1-3/3)         pnpm test (all shards in one run)
-#   database     database (pgTAP)     fresh local Postgres 16 + every migration
-#                                     (scripts/local-pg/setup.sh), pg_prove over
-#                                     supabase/tests/database, then the GateQ
+#   database     database (pgTAP)     a fresh local Supabase stack (Docker, as
+#                                     CI), supabase test db, then the GateQ
 #                                     concurrent-correction proof
 #   integration  integration          pnpm test:integration against a fresh
-#                                     local database
-# Needs root for the local Postgres (apt packages, the postgres user).
+#                                     local Supabase stack
+# Needs root to start Docker when it is not running.
 set -uo pipefail
 # CI uses .nvmrc (Node 24); the cloud image defaults to Node 22.
 [ -x /opt/node24/bin/node ] && export PATH="/opt/node24/bin:$PATH"
@@ -62,7 +61,6 @@ else
 fi
 repo="$(pwd)"
 steps="${STEPS:-static typecheck build test database integration}"
-port="${CI_LOCAL_PGPORT:-54329}"
 
 # No live provider call, ever (CLAUDE.md): non-empty disabled values.
 for key in OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY \
@@ -87,9 +85,26 @@ run() {
   echo "   ${result[$name]}"
 }
 
-fresh_db() {
-  PGPORT="$port" bash scripts/local-pg/setup.sh
+# The database and integration jobs run on the same local Supabase stack as
+# CI (Docker; Postgres 17 with the real pgmq, Auth and the REST gateway),
+# from this commit's own migrations: a fresh stack for each job.
+SUPABASE_EXCLUDE=studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api,realtime,postgres-meta,supavisor
+docker_up() {
+  timeout 10 docker info >/dev/null 2>&1 && return 0
+  (nohup dockerd >"$out/dockerd.log" 2>&1 &)
+  for _ in $(seq 1 60); do
+    timeout 5 docker info >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  echo "ci-local: Docker did not start (see $out/dockerd.log)" >&2
+  return 1
 }
+fresh_supabase() {
+  docker_up || return 1
+  pnpm exec supabase stop --no-backup >/dev/null 2>&1
+  pnpm exec supabase start -x "$SUPABASE_EXCLUDE"
+}
+stop_supabase() { pnpm exec supabase stop --no-backup >/dev/null 2>&1; }
 
 step_static() { pnpm format:check && pnpm lint; }
 step_typecheck() { pnpm typecheck; }
@@ -99,26 +114,30 @@ step_test() {
     pnpm test
 }
 step_database() {
-  fresh_db || return 1
-  pg_prove -h /tmp -p "$port" -U postgres -d cq -r supabase/tests/database ||
-    return 1
-  pnpm exec turbo run build --filter=@capital-q/gateq-intake... --concurrency=2 ||
-    return 1
-  local psql=(psql -h /tmp -p "$port" -U postgres -X -v ON_ERROR_STOP=1)
-  "${psql[@]}" -c "drop database if exists cq_gateq_supersession_test with (force)" \
-    -c "create database cq_gateq_supersession_test template template0" || return 1
-  "${psql[@]}" -d cq_gateq_supersession_test \
-    -f supabase/tests/database/rls/support/gateq-supersession-local-bootstrap.psql ||
-    return 1
-  CQ_GATEQ_CONCURRENCY_URL="postgresql://postgres@127.0.0.1:$port/cq_gateq_supersession_test" \
-    node supabase/tests/database/rls/support/gateq-supersession-concurrency.mjs
+  fresh_supabase || return 1
+  local rc=0
+  pnpm exec supabase test db || rc=1
+  if [ "$rc" = 0 ]; then
+    pnpm exec turbo run build --filter=@capital-q/gateq-intake... --concurrency=2 &&
+      docker exec supabase_db_capital-q createdb -U postgres -T template0 cq_gateq_supersession_test &&
+      docker cp supabase supabase_db_capital-q:/tmp/cq-supersession &&
+      docker exec supabase_db_capital-q psql -X -v ON_ERROR_STOP=1 -U postgres -d cq_gateq_supersession_test \
+        -f /tmp/cq-supersession/tests/database/rls/support/gateq-supersession-local-bootstrap.psql &&
+      CQ_GATEQ_CONCURRENCY_URL=postgres://postgres:postgres@127.0.0.1:54322/cq_gateq_supersession_test \
+        node supabase/tests/database/rls/support/gateq-supersession-concurrency.mjs || rc=1
+  fi
+  stop_supabase
+  return "$rc"
 }
 step_integration() {
-  fresh_db || return 1
-  pnpm exec turbo run build --filter=./packages/* --concurrency=2 || return 1
-  CQ_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$port/cq" \
-    DATABASE_URL="postgresql://postgres@127.0.0.1:$port/cq" \
-    pnpm test:integration
+  fresh_supabase || return 1
+  local rc=0
+  pnpm exec turbo run build --filter=./packages/* --concurrency=2 &&
+    CQ_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+      DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+      pnpm test:integration || rc=1
+  stop_supabase
+  return "$rc"
 }
 
 started=$SECONDS
