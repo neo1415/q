@@ -50,6 +50,24 @@ export const EDIT_WITH_Q_PROMPT =
 export const RETRY_PROMPT = "Try preparing that document again.";
 
 /**
+ * C4 (13 Nov): the card's own controls name their document, as the viewer's
+ * "Edit with Q" already does, so the request reaches that document however
+ * long ago it was made or whichever document is open; Q finds the person's
+ * own documents by title. Without a title, the general wording stands.
+ */
+export function editWithQPrompt(title: string | null | undefined): string {
+  const named = title?.trim() ?? "";
+  return named.length === 0
+    ? EDIT_WITH_Q_PROMPT
+    : `Edit "${named}" with me — what would you change first?`;
+}
+
+export function retryPrompt(title: string | null | undefined): string {
+  const named = title?.trim() ?? "";
+  return named.length === 0 ? RETRY_PROMPT : `Try preparing "${named}" again.`;
+}
+
+/**
  * A card that arrived while its document was still being prepared asks
  * where it is until it has settled (founder live 2026-09-30: a new
  * document needed a refresh to appear). Bounded: every few seconds, for a
@@ -242,7 +260,7 @@ export function ArtifactCard({
                 // A normal question in the same thread: the revision is
                 // composed and written by the same authorised path any
                 // other answer takes.
-                onAsk(EDIT_WITH_Q_PROMPT);
+                onAsk(editWithQPrompt(block.title));
               }}
               data-q-artifact-edit
             >
@@ -278,7 +296,7 @@ export function ArtifactCard({
                 type="button"
                 className={buttonClassName("secondary", "regular")}
                 onClick={() => {
-                  onAsk(RETRY_PROMPT);
+                  onAsk(retryPrompt(block.title));
                 }}
                 data-q-artifact-retry
               >

@@ -219,7 +219,10 @@ describe("QX-003E · the card in an answer", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Ask Q to try again" }),
     );
-    expect(onAsk).toHaveBeenCalledWith("Try preparing that document again.");
+    // C4 (13 Nov): the retry names its document.
+    expect(onAsk).toHaveBeenCalledWith(
+      'Try preparing "Investment brief" again.',
+    );
   });
 });
 

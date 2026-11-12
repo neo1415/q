@@ -38,7 +38,7 @@ import {
 
 import { useT } from "@/features/i18n/language";
 
-import { ArtifactCard, RETRY_PROMPT } from "./artifact-card";
+import { ArtifactCard, retryPrompt } from "./artifact-card";
 import {
   elapsedWords,
   liveLine,
@@ -931,7 +931,7 @@ export function WorkInProgressCard({
                 type="button"
                 className={buttonClassName("secondary", "regular")}
                 onClick={() => {
-                  onAsk(RETRY_PROMPT);
+                  onAsk(retryPrompt(title));
                 }}
                 data-q-work-retry
               >
