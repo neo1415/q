@@ -217,3 +217,50 @@ The browser check reported ~26 s, but that figure includes its own 12 s "page un
 - **LIVE_VERIFIED, two turns** (investor.savanna-seed, conversation `aabdff7a`): turn 1 — four findings, each citing its page ("Public web: techcabal.com — …", linkedin.com, trustpilot.com), all UNKNOWN; timeline as before. Turn 2, "What are the biggest risks for an investor here?" — analysis carrying turn 1's governance issue and customer-count claim, six "not established" gaps (revenue/margin, retention, uptime, licensing, the investigation's outcome, profitability); answer in 9.1 s server time.
 - **Defect seen live, fixed (LOCAL_TESTED, next batch):** the follow-up still started an early web search (served from the 10-minute read cache in ~3 ms, so no cost this time): the reader read "here" as Paystack, and the rule matched only the question's own words. The rule now also accepts the reader's resolved subject when it is the one already researched.
 - **Imprecision noted:** a finding naming a site ("TechCabal") cites every page of that site the turn read (two here). Acceptable for now; exact-page citation would need the model to cite S-labels.
+
+## Q planning and plan execution — log-driven audit (12 Nov, 19:50–21:20 Lagos)
+
+Production `945138faf`; fictional investor `investor.savanna-seed`; marketplace-ready fictional companies.
+
+**Research decision (false negatives), from `q_plans` / `agent_work_queue`:**
+
+- All 15 stored plans ran with `research: NONE`; every PUBLIC section reads `UNAVAILABLE / NOT_OFFERED`. This includes "Run diligence on Ajopot", "Check Ledgerline's unit economics" and "Check Silo Credit's loan book quality". No plan has ever read a public source.
+- Causes:
+  - The reader's `research` defaults to NONE: its examples never set it, and the schema defaults it.
+  - A yes to Q's offer is NONE by construction.
+  - The research hook researched `Public context: <topics>`, where the topics are the investor's mandate keywords, never the plan's question.
+  - The 25 s situation race would end deep research (68 s observed) before its first round.
+- Fixed in `afbcd6df3` (LOCAL_TESTED, gating):
+  - Code adds MARKET when the ask turns on the outside world; own-record work stays NONE.
+  - The ask leads the research.
+  - Plan research gets 90 s.
+  - An unreachable public web records a failed section.
+
+**Live reproduction 1** — "Prepare an investment plan for Ledgerline: how do its unit economics compare…":
+
+- Refused before approval (`NO_NAMED_COMPANY`, twice; 11.6 s) and nothing was planned.
+- Cause: `matchCounterpart` found "Ledgerline" beside ten "Ledgerline XXXX (fictional)" companies created by this morning's live sign-up journeys, and called it ambiguous.
+- Fixed in `8ad903701`: an exact name wins; identical duplicates stay ambiguous.
+
+**Live reproduction 2** — "Prepare an investment plan for Ajopot…": a team job, 226 s from request to filed.
+
+- Research: 68 s; 17 Brave searches.
+- Document: 157 s; three draft-and-critique cycles (38.5 + 8.5, 42 + 8.5, 46 + 9.7 s). It filed failing review: 31 issues found, 9 open. Model spend $0.033.
+- The research ran unanchored: "ajopot market size growth", `entityResolution: NOT_APPLICABLE`.
+  - It kept namesakes and noise as sources: Ajovy, AJO, Ajaokuta, an adoption agency, modelling agencies, Cajeput oil.
+  - Cause: only a DILIGENCE-profile analysis bound its company to the research step.
+- Fixed in `e31d896bd`: any named-company analysis binds it.
+
+**Presentation:**
+
+- The delivery message carries an ARTIFACT_REFERENCE (READY) and the work card, with no open-intent.
+- The modal viewer opens only on an explicit open (Q's OPEN_RECORD_PAGE or the person's ask).
+- To be confirmed in a browser after deploy (`deliver.cjs` watches for any dialog or overlay until delivery).
+
+**Owner items (not changed unilaterally):**
+
+- Visibility of not-assessed sign-ups:
+  - 49 "… (fictional)" companies are `network_visible` and not assessed, and investor name search and resolution can reach them. An investor gets a 404 on their profile (D2).
+  - Should investor-side search and name resolution exclude companies that are not marketplace-ready, consistent with PADL #57/#58?
+- Provider credits:
+  - Tavily and Serper are still out of credit; Brave carries all research.
