@@ -57,6 +57,7 @@ import {
   type RuleStanding,
   type StepErrors,
 } from "./form-model";
+import { useStepHistory } from "./step-history";
 import { InterviewStep } from "./interview-step";
 import { ReviewStep } from "./review-step";
 import { useT } from "@/features/i18n/language";
@@ -168,6 +169,8 @@ export function GateQForm({
   // Design gatepub-1: the questions come first, with the standing beside
   // them; the contact is confirmed once they choose to go on.
   const [step, setStep] = useState<FormStep>(preview?.step ?? "company");
+  // Browser Back/Forward move between the steps (owner, 13 Nov).
+  useStepHistory(step, setStep, preview === undefined);
   // Slice 1: the contact as the API holds it, and why we came back to it.
   const [contact, setContact] = useState<ApplicationContactDto | null>(
     preview?.contact ?? null,
