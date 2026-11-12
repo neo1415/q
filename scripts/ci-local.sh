@@ -91,7 +91,9 @@ run() {
 SUPABASE_EXCLUDE=studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api,realtime,postgres-meta,supavisor
 docker_up() {
   timeout 10 docker info >/dev/null 2>&1 && return 0
-  (nohup dockerd >"$out/dockerd.log" 2>&1 &)
+  # The daemon outlives the gate: it must not inherit the gate's lock
+  # (fd 9), or every later gate is refused as "another gate is running".
+  (nohup dockerd >"$out/dockerd.log" 2>&1 9>&- &)
   for _ in $(seq 1 60); do
     timeout 5 docker info >/dev/null 2>&1 && return 0
     sleep 1
