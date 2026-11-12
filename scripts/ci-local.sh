@@ -21,6 +21,8 @@
 #                                     local database
 # Needs root for the local Postgres (apt packages, the postgres user).
 set -uo pipefail
+# CI uses .nvmrc (Node 24); the cloud image defaults to Node 22.
+[ -x /opt/node24/bin/node ] && export PATH="/opt/node24/bin:$PATH"
 cd "$(dirname "$0")/.."
 repo="$(pwd)"
 sha="$(git rev-parse --short=9 HEAD)"
