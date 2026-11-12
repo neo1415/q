@@ -207,61 +207,31 @@ export function publicStandingsOf(
   return out;
 }
 
-/**
- * Pages that change all the time (owner, live 12 Nov: LinkedIn and
- * Trustpilot placed on Paystack's timeline as if something happened that
- * day). Their date is when the page was last updated, not an event.
- */
-const LIVING_PAGE_HOSTS = [
-  "linkedin.com",
-  "trustpilot.com",
-  "hellopeter.com",
-  "glassdoor.com",
-  "g2.com",
-  "capterra.com",
-  "crunchbase.com",
-  "pitchbook.com",
-  "cbinsights.com",
-  "tracxn.com",
-  "dealroom.co",
-  "owler.com",
-  "zoominfo.com",
-  "wikipedia.org",
-  "facebook.com",
-  "instagram.com",
-  "x.com",
-  "twitter.com",
-  "youtube.com",
-  "tiktok.com",
-  "github.com",
-  "apps.apple.com",
-  "play.google.com",
-];
-/** A date in the address (/2025/11/14/, 2025-11-14): a dated article. */
-const DATED_PATH = /\/(?:19|20)\d{2}[/-](?:0?[1-9]|1[0-2])(?:[/-]|$)/u;
+/** A date in a page's address: /2025/11/14/, /2025-11-14-, /2025/11/. */
+const ADDRESS_DATE =
+  /\/((?:19|20)\d{2})[/-](0?[1-9]|1[0-2])(?:[/-](0?[1-9]|[12]\d|3[01]))?(?=[/-]|$)/u;
 
 /**
- * Whether a page's date is a last update rather than an event: a profile,
- * review or reference site, or a site's home page, unless its address is
- * itself dated. Read from the address only, so it costs nothing.
+ * Whether the page's own address carries the date the search listed for
+ * it (the same month, and the same day when the address has one). Owner,
+ * 12 Nov: a search provider's date (Serper/ScrapingBee `date`, Tavily
+ * `publishedDate`) states no meaning -- not publication, not last update --
+ * so only this agreement lets a date stand as the page's own.
  */
-export function isLivingPage(url: string): boolean {
-  let parsed: URL;
+export function dateInAddress(url: string, day: string): boolean {
+  let path: string;
   try {
-    parsed = new URL(url);
+    path = new URL(url).pathname;
   } catch {
     return false;
   }
-  if (DATED_PATH.test(parsed.pathname)) return false;
-  const host = parsed.hostname.toLowerCase().replace(/^www\./u, "");
-  if (
-    LIVING_PAGE_HOSTS.some(
-      (living) => host === living || host.endsWith(`.${living}`),
-    )
-  ) {
-    return true;
-  }
-  return parsed.pathname === "/" || parsed.pathname === "";
+  const found = ADDRESS_DATE.exec(path);
+  if (found === null) return false;
+  const [, year, month, date] = found;
+  const pad = (value: string) => value.padStart(2, "0");
+  const listed = day.split("-");
+  if (year !== listed[0] || pad(month ?? "") !== listed[1]) return false;
+  return date === undefined || pad(date) === listed[2];
 }
 
 /** Fewer dated pages than this is a list, not a record over time. */
@@ -274,8 +244,8 @@ export const PUBLIC_RECORD_MIN_EVENTS = 2;
  * never), only a date the page carried (a retrieval date is not when
  * anything happened, and none is guessed), each marked as an unverified
  * public page (decision 87: a retrieved source is never verified). A
- * profile or review page is placed by its last update and says so; a
- * record of nothing but updates is not shown.
+ * date the page's own address does not carry is shown as the search listed
+ * it, claiming no meaning; a record with no such backed date is not shown.
  */
 export function publicRecordTimeline(input: {
   readonly name: string;
@@ -299,15 +269,16 @@ export function publicRecordTimeline(input: {
     if (!Number.isFinite(at) || at > latest) continue;
     seen.add(page.url);
     const title = page.title?.trim() ?? "";
-    const updated = isLivingPage(page.url);
-    if (!updated) dated += 1;
+    // The day only: a page's date is not a moment to the second.
+    const day = new Date(at).toISOString().slice(0, 10);
+    const backed = dateInAddress(page.url, day);
+    if (backed) dated += 1;
     events.push({
-      // The day only: a page's date is not a moment to the second.
-      at: new Date(at).toISOString().slice(0, 10),
+      at: day,
       label: title.length > 0 ? title : page.domain,
-      note: updated
-        ? `Page last updated · Public web: ${page.domain} · not verified`
-        : `Public web: ${page.domain} · not verified`,
+      note: backed
+        ? `Public web: ${page.domain} · not verified`
+        : `Date as the search listed it · Public web: ${page.domain} · not verified`,
       // The page itself, to open; a non-https address is left off.
       ...(/^https:\/\//iu.test(page.url) ? { url: page.url } : {}),
     });
