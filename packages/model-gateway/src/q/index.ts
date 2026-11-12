@@ -6268,6 +6268,7 @@ export function createModelGatewayQAnswer(
             history: earlier,
             fetched: request.fetchedInConversation ?? [],
           }),
+          namedEntity: namedOther?.name ?? null,
         })
           ? (() => {
               const call = researchCallOf(4);

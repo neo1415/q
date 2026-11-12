@@ -142,6 +142,12 @@ export function followsUpPublicSources(input: {
   readonly aboutNamedOther: boolean;
   /** Whom the conversation's recent research was about (entityName). */
   readonly researchedNames?: readonly string[] | undefined;
+  /**
+   * Whom the turn reader read this turn as about, when someone not theirs
+   * (live 12 Nov: "what are the biggest risks for an investor here?" was
+   * read as about Paystack, so the words alone never matched).
+   */
+  readonly namedEntity?: string | null | undefined;
 }): boolean {
   const turn = lastTurn(input.history);
   if (
@@ -153,9 +159,12 @@ export function followsUpPublicSources(input: {
   if (asksForFresh(input.question)) return false;
   if (!input.aboutNamedOther) return true;
   const said = ` ${words(input.question)} `;
+  const entity = words(input.namedEntity ?? "");
   return (input.researchedNames ?? []).some((name) => {
     const named = words(name);
-    return named.length > 0 && said.includes(` ${named} `);
+    return (
+      named.length > 0 && (said.includes(` ${named} `) || entity === named)
+    );
   });
 }
 

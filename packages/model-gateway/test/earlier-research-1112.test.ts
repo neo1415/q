@@ -193,6 +193,25 @@ describe("a follow-up answers from what was already read", () => {
       follows("How does that compare with what the founder told us?"),
     ).toBe(true);
     expect(follows("What are Paystack's biggest risks?", true)).toBe(true);
+    // Live 12 Nov: the reader read "here" as Paystack.
+    expect(
+      followsUpPublicSources({
+        history,
+        question: "What are the biggest risks for an investor here?",
+        aboutNamedOther: true,
+        researchedNames: ["Paystack"],
+        namedEntity: "Paystack",
+      }),
+    ).toBe(true);
+    expect(
+      followsUpPublicSources({
+        history,
+        question: "And them?",
+        aboutNamedOther: true,
+        researchedNames: ["Paystack"],
+        namedEntity: "Flutterwave",
+      }),
+    ).toBe(false);
   });
 
   it("not when it names someone new, asks for newer news, or follows no research", () => {
