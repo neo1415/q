@@ -58,3 +58,15 @@ All 9 P0s are RESOLVED or settled by owner decision (P0-8 by D76/D78; a PADL #04
 | P0-9 leftover | —                                                 | unused "never counted against you" string in `i18n/catalog/sweep.ts:78`                                                                                                                                                                                                                              |
 
 Tests run by the replay: 13 files, 130 tests, 0 failed.
+
+## Integrated slice 1 — deployed 12 Nov 05:09 Lagos (04:09 UTC)
+
+- **DEPLOYED:** web and q-api `53271540e` (CI 43150091213 green); api and workers unchanged on `74d33a828`. Rollback: web `600cca432`, q-api `74d33a828`.
+- **LIVE_VERIFIED (typed + form only):** onboarding-e2e on the deployed SHAs, fresh fictional accounts `e2e-fou-202611120548-xyo8` and `e2e-inv-202611120548-q62o` (`@fictional.capitalq.local`): founder and investor **ALL PASS** J1–J6 (one introduction; dense line answers 5–6 topics; ramble said back, saved only after the yes; required refusal re-asked with its reason; chat → voice-text turn without re-greeting; continue later and resume on the same question; the form reopens on the same step; finish lands on /verification). Canonical rows: two onboarding sessions COMPLETED, investor 44 responses, founder 39.
+- **Voice: PENDING.** The steer fix and the no-re-introduction fix are deployed but not proven: no sustained live voice session has run on these SHAs (the sandbox has no UDP). Needed: one owner voice onboarding showing steer received, read-back confirmed, saved, and resumed after a reconnect.
+
+## CI and performance (read-only analysis, 12 Nov)
+
+- `quality` needed only static/typecheck/test/build; **pgTAP and integration were not gating** (run 42667454783 failed pgTAP, quality still passed). Fixed in `a029a2f3d` (CI_GREEN pending). GitHub has **no branch protection or rulesets** on either recovery branch; Railway "Wait for CI" is the only gate.
+- Wall time p50 about 13.9 min (12 sharded runs). Critical path: lint (p50 12.0 min, 12 sequential eslint batches) and the slowest test shard (p50 12.5). The 55-task package build runs cold about 8 times per run (no Turbo cache). Proposed, not done: persist the Turbo cache; split lint into 2–3 parallel jobs; trial 4–5 test shards. Estimated 8–10 min wall.
+- Latency: first useful text and first audio are **unmeasured** on the current SHAs; the newest timings are from 31 Oct, and first audio has never been measured.

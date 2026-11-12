@@ -2239,3 +2239,10 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 
 - Owner: "it does what I ask, opens the page, then just dies". Line ad831b91 ended (reason "user") the second "my pipeline" was heard. Cause: `q-conversation.tsx` ended any open line whenever Chat showed, including when the Q pane mounted on Chat after Q's move. Now only the person's own switch to Chat (or a line coming up on Chat) ends it; arriving with a line open shows the voice view.
 - CI run 42763378115 green before the deploy. Web on 600cca432; api, q-api and workers on 74d33a828. Web rollback: 74d33a828. Not voice-tested live (the sandbox has no UDP).
+
+## 2026-11-12 07:00 Lagos — master directive, slice 1 live; batch 2 in CI (integration lead)
+
+- Deployed web + q-api `53271540e`: the duplex onboarding call now receives Capital Q's steer (it was dropped: no `brief`), and a resumed setup never re-introduces Q. Typed + form founder/investor e2e ALL PASS on it, canonical rows checked. Voice pending a real session.
+- Batch 2 `a029a2f3d` in CI: metrics P1-14 (failed read is unknown, not a Gap), P1-8 (rerank never crosses the declared geography tier), P1-9 (Q's top N = Discover's fit order), CI gate now waits for pgTAP and integration.
+- Security: production server SQL runs as `postgres` (bypasses RLS); the phased plan and new cross-tenant negative tests are being prepared on `sec/tenant-isolation-tests` (no database-wide switch). Supabase access is through the environment's network secret now; nothing stored in the repo.
+- Ledger: `BASELINE-LEDGER-2026-11-12.md`.
