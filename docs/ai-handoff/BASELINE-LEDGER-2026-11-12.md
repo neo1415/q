@@ -145,3 +145,9 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 - **LIVE_VERIFIED (D2 alignment):** as investor.savanna-seed, `GET /v1/network/companies/:id/interest` → the unverified Lane H company `321ad3b3…` **404** RESOURCE_NOT_FOUND, byte-for-byte the same problem as a random id (anti-enumeration holds); a marketplace-ready company with an existing interest (`b439cd80…`) **200** with its interest. No new interest was created by the check. The write path (express-interest) shares the same `authorise()`; covered by the unit test.
 - P1-15 labels: DEPLOYED (unit-tested; no live founder readiness view exercised).
 - Batch 4 (`3e78448d0` and its parents: four-eyes verification, hidden ID upload, app-path isolation suites) sent to CI.
+
+## Integrated slice 4 — deployed 12 Nov 10:28 Lagos (09:18 UTC)
+
+- **DEPLOYED:** all four services on `2f8227fe9` (CI 43187826194 green; the integration job ran the 5 app-path tenant-isolation suites and the four-eyes integration test for the first time: **CI_GREEN**). Rollback `19e149590`.
+- **LIVE_VERIFIED:** /verification as the fictional founder `v1-fdr-202611120653-uifk` shows "Who is asking" (name, role) with no ID document field (`[data-verify-file="person"]` count 0). Four-eyes: CI_GREEN only (no live admin decision exercised).
+- **D3 grounding** (`c4c4ae1bc`, findings never outrank the supplied facts they cite) is in CI. Scope: Q conversation answers (live and final findings); workforce/research findings are not yet covered.
