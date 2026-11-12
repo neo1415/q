@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseQResultBlocks } from "@capital-q/contracts";
 
-import { publicRecordTimeline } from "../src/q/result-blocks.js";
+import { isLivingPage, publicRecordTimeline } from "../src/q/result-blocks.js";
 
 /**
  * Slice 2 (12 Nov): a company investigation lays out the dated public pages
@@ -54,7 +54,7 @@ describe("public record timeline", () => {
         {
           at: "2026-09-07",
           label: "Paystack reviews",
-          note: "Public web: hellopeter.com · not verified",
+          note: "Page last updated · Public web: hellopeter.com · not verified",
           subject: null,
           url: "https://hellopeter.com/paystack",
         },
@@ -96,5 +96,73 @@ describe("public record timeline", () => {
         matched: () => true,
       }),
     ).toBeNull();
+  });
+});
+
+/**
+ * Owner, live 12 Nov: LinkedIn (5 Nov) and Trustpilot (9 Nov) were placed
+ * on Paystack's timeline as if something happened those days; their dates
+ * are last updates. A dated article stays an event.
+ */
+describe("a profile or review page is a last update, not an event", () => {
+  it("reads the live Paystack pages as they are", () => {
+    expect(
+      isLivingPage(
+        "https://techcabal.com/2025/11/14/paystack-suspends-ezra-olubi/",
+      ),
+    ).toBe(false);
+    expect(isLivingPage("https://www.hellopeter.com/paystack")).toBe(true);
+    expect(isLivingPage("https://www.linkedin.com/company/paystack")).toBe(
+      true,
+    );
+    expect(isLivingPage("https://www.trustpilot.com/review/paystack.com")).toBe(
+      true,
+    );
+  });
+
+  it("a site's home page is living; an article path or a dated address is not", () => {
+    expect(isLivingPage("https://paystack.com/")).toBe(true);
+    expect(isLivingPage("https://paystack.com/blog/company/series-b")).toBe(
+      false,
+    );
+    expect(
+      isLivingPage("https://www.linkedin.com/pulse/2025-11-02-paystack-news"),
+    ).toBe(false);
+    expect(isLivingPage("https://news.ycombinator.com/item?id=1")).toBe(false);
+    expect(isLivingPage("not a url")).toBe(false);
+  });
+
+  it("labels updates on the timeline and shows no record of updates alone", () => {
+    const sources = [
+      page(
+        "www.linkedin.com/company/paystack",
+        "2026-11-05",
+        "Paystack | LinkedIn",
+      ),
+      page("www.trustpilot.com/review/paystack.com", "2026-11-09", "Reviews"),
+    ];
+    expect(
+      publicRecordTimeline({
+        name: "Paystack",
+        now,
+        sources,
+        matched: () => true,
+      }),
+    ).toBeNull();
+    const block = publicRecordTimeline({
+      name: "Paystack",
+      now,
+      sources: [
+        page("techcabal.com/2025/11/14/x", "2025-11-14", "Suspension"),
+        ...sources,
+      ],
+      matched: () => true,
+    });
+    if (block?.kind !== "TIMELINE") throw new Error("expected a timeline");
+    expect(block.events.map((event) => event.note)).toEqual([
+      "Public web: techcabal.com · not verified",
+      "Page last updated · Public web: www.linkedin.com · not verified",
+      "Page last updated · Public web: www.trustpilot.com · not verified",
+    ]);
   });
 });
