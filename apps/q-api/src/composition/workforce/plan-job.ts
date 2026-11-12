@@ -1656,6 +1656,14 @@ export function planPromptVersion(
 export const PLAN_JOB_REDRAFTS = Math.min(2, Q_PLAN_MAX_REDRAFTS);
 /** Write (and one refused retry), then up to three rounds of two reviews and two redrafts. */
 export const PLAN_JOB_MODEL_CALLS_MAX = 10;
+/**
+ * Plan research (12 Nov 2026): the situation's 25 s default would end deep
+ * research before its first round (68 s for the Ajopot job), and the plan
+ * would read "public: not known" while the person had been told public
+ * sources were being checked. Bounded by deep research's own deadline and
+ * the hook's $0.30, inside PLAN_JOB_TIME_BUDGET_MS.
+ */
+export const PLAN_RESEARCH_TIMEOUT_MS = 90_000;
 /** The whole job, gathering to the last review: about 330 s at most. */
 export const PLAN_JOB_TIME_BUDGET_MS = 330_000;
 /** Within reach: both reviews at or above this after a redraft. */
@@ -1951,7 +1959,11 @@ export async function runPlanJob(
     hook === undefined
       ? Promise.resolve(dossier)
       : dependencies.assembler
-          .research(dossier, { hook, ask: payload.ask })
+          .research(dossier, {
+            hook,
+            ask: payload.ask,
+            timeoutMs: PLAN_RESEARCH_TIMEOUT_MS,
+          })
           .catch(() => dossier);
   const figures =
     ownCompany && dependencies.figures !== undefined

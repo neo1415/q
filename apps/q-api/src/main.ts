@@ -4329,19 +4329,35 @@ const plans = createPlans({
       const research = workforcePortsFor(actor).research;
       if (research === undefined) return undefined;
       return async ({ topics, ask }) => {
-        const about = topics.length === 0 ? ask : topics.join("; ");
+        // The plan's own question leads (live 12 Nov: "Run diligence on
+        // Ajopot" would have researched the investor's mandate topics, never
+        // Ajopot); the public-safe topics are context. What may leave is
+        // still decided by the research brief's public-safe vocabulary.
+        const context = topics.length === 0 ? "" : topics.join("; ");
         const found = await research(
           { tenantId: actor.tenantId, userId: actor.userId },
           {
             runId,
-            request: `Public context: ${about}`.slice(0, 2_000),
-            query: about.slice(0, 400),
+            request: (context.length === 0
+              ? ask
+              : `${ask}\nPublic context: ${context}`
+            ).slice(0, 2_000),
+            query: ask.slice(0, 400),
             jobId,
             budgetUsd: 0.3,
             progress,
           },
         );
-        if (found.status !== "OK") return [];
+        // Found nothing is an answer; sources that could not be reached are
+        // not (they were read as "searched, found nothing"): the section
+        // records the failure, so the plan says public sources were not
+        // checked rather than that there were none.
+        if (found.status !== "OK") {
+          if (found.reason === "PUBLIC_UNAVAILABLE") {
+            throw new Error("public sources could not be reached");
+          }
+          return [];
+        }
         return (found.dossier?.facts ?? []).slice(0, 12).map((fact) => ({
           statement: fact.statement,
           url: fact.url,

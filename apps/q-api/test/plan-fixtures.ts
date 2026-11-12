@@ -234,14 +234,18 @@ export const INVESTOR_DOSSIER = dossierOf("INVESTOR", {
 
 /** A dossier the fake assembler hands back, recording how it was asked. */
 export function fakeAssembler(dossier: QSituationDossier) {
-  const calls: { kind: "assemble" | "research"; subject?: unknown }[] = [];
+  const calls: {
+    kind: "assemble" | "research";
+    subject?: unknown;
+    timeoutMs?: number | undefined;
+  }[] = [];
   const assembler: SituationAssembler = {
     assemble: (request) => {
       calls.push({ kind: "assemble", subject: request.subject });
       return Promise.resolve(dossier);
     },
-    research: (current) => {
-      calls.push({ kind: "research" });
+    research: (current, input) => {
+      calls.push({ kind: "research", timeoutMs: input.timeoutMs });
       return Promise.resolve(current);
     },
     invalidate: () => undefined,

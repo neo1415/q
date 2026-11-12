@@ -48,6 +48,7 @@ import {
 import type { AgentWorkQueue, EndState, WorkRow } from "./queue.js";
 import { filedDocumentIds } from "./results.js";
 import type { Owner } from "./store.js";
+import { planResearch } from "./plan-research.js";
 
 /**
  * Situation-first planning, composed (S4-S6): starting a plan from a turn,
@@ -332,7 +333,8 @@ export function createPlans(dependencies: PlansDependencies) {
         input.planAsk.deliverable,
       ),
       subject,
-      research: input.planAsk.research,
+      // Production 12 Nov: every plan ran without public research.
+      research: planResearch(input.planAsk.research, ask),
       deliverable: input.planAsk.deliverable,
       mode: "NEW",
       planId: null,

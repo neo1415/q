@@ -30,6 +30,7 @@ import {
   planRoster,
   planStartLine,
   PLAN_JOB_MODEL_CALLS_MAX,
+  PLAN_RESEARCH_TIMEOUT_MS,
   reviewOf,
   runPlanJob,
   situationText,
@@ -664,5 +665,69 @@ describe("speed budgets (addendum 4)", () => {
       `situation round trips: ${String(counter.count)} (${String(calls.length)} tool reads)`,
     );
     expect(counter.count).toBeLessThanOrEqual(25);
+  });
+});
+
+/**
+ * Production 12 Nov: no stored plan had read a public source. A plan whose
+ * research is MARKET now researches, with room for deep research's first
+ * round (the situation's 25 s default ended it before that).
+ */
+describe("a plan that needs the outside world researches it", () => {
+  it("calls research with the plan's own limit when research is MARKET", async () => {
+    const h = harness({
+      dossier: FOUNDER_DOSSIER,
+      writes: [FOUNDER_PLAN, FOUNDER_PLAN],
+      reviews: [review(0), review(0), review(0), review(0)],
+    });
+    const hooked: string[] = [];
+    await runPlanJob(
+      {
+        ...h.dependencies,
+        research: () => {
+          hooked.push("hook");
+          return () => Promise.resolve([]);
+        },
+      },
+      {
+        actor: founder,
+        owner: { tenantId: TENANT, userId: founder.userId },
+        jobId: JOB,
+        leadRunId: LEAD_RUN,
+        runId: RUN,
+        payload: founderPayload("benchmark us against competitors", {
+          research: "MARKET",
+        }),
+        progress: h.progress,
+      },
+    );
+    expect(hooked).toEqual(["hook"]);
+    expect(h.assemblerCalls.filter((call) => call.kind === "research")).toEqual(
+      [{ kind: "research", timeoutMs: PLAN_RESEARCH_TIMEOUT_MS }],
+    );
+    expect(PLAN_RESEARCH_TIMEOUT_MS).toBeGreaterThan(25_000);
+  });
+
+  it("does not research when research is NONE", async () => {
+    const h = harness({
+      dossier: FOUNDER_DOSSIER,
+      writes: [FOUNDER_PLAN, FOUNDER_PLAN],
+      reviews: [review(0), review(0), review(0), review(0)],
+    });
+    await runPlanJob(
+      { ...h.dependencies, research: () => () => Promise.resolve([]) },
+      {
+        actor: founder,
+        owner: { tenantId: TENANT, userId: founder.userId },
+        jobId: JOB,
+        leadRunId: LEAD_RUN,
+        runId: RUN,
+        payload: founderPayload(ASK),
+        progress: h.progress,
+      },
+    );
+    expect(h.assemblerCalls.some((call) => call.kind === "research")).toBe(
+      false,
+    );
   });
 });
