@@ -2028,6 +2028,41 @@ export async function clearsOnPurpose(
  * person's one-tap approval (Prepare -> Approve -> Execute). Offering never
  * gives the model authority it did not have.
  */
+/**
+ * C1 (owner, 13 Nov: "not every question needs a Capital Q feature
+ * recommendation"): whether this turn may close with one next-step offer and
+ * carry the proactive capabilities guidance. Read from the turn reader's own
+ * classification, so it costs no model call. Doing or advising -- yes;
+ * a remark, a control word, an unclear transcript, a lookup of their own
+ * records, a plain public fact or a progress check -- no: those are
+ * answered and left there. Unread turns keep the note's own rules.
+ */
+const NO_OFFER_TURNS: ReadonlySet<string> = new Set([
+  "SMALL_TALK",
+  "OFF_TOPIC",
+  "CONTROL",
+  "UNCLEAR_TRANSCRIPT",
+]);
+const NO_OFFER_QUESTIONS: ReadonlySet<string> = new Set([
+  "THEIR_OWN_RECORDS",
+  "PUBLIC_FACTS",
+  "PROGRESS",
+]);
+
+export function nextStepTurn(request: {
+  readonly turnKind?: string | undefined;
+  readonly questionKind?: string | undefined;
+}): boolean {
+  if (request.turnKind !== undefined && NO_OFFER_TURNS.has(request.turnKind)) {
+    return false;
+  }
+  return !(
+    request.questionKind !== undefined &&
+    NO_OFFER_QUESTIONS.has(request.questionKind) &&
+    request.turnKind !== "TOOL_REQUEST"
+  );
+}
+
 export const NEXT_STEP_NOTE =
   'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as a question ("Want me to draft the intro to Ada?"), never as a statement. Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
 
@@ -2192,6 +2227,11 @@ export function environmentNoteParts(
     readonly openDocumentTitle?: string | undefined;
     /** The turn could not be read: nothing can be started this turn. */
     readonly turnUnread?: boolean | undefined;
+    /**
+     * C1 (owner, 13 Nov): no closing offer and no "be proactive" guidance on
+     * this turn -- a remark, a record lookup, a plain fact (nextStepTurn).
+     */
+    readonly noNextStep?: boolean | undefined;
     /** They asked for this answer as a document (Q_REPORT). */
     readonly writingDocument?: boolean | undefined;
     /** That document is to be one page, in their own words (live6). */
@@ -2345,6 +2385,7 @@ export function environmentNoteParts(
     // Not while a requested series of questions is still being asked:
     // that reply ends with the next question (R35).
     ...(options.turnUnread === true ||
+    options.noNextStep === true ||
     options.questionSequence?.kind === "ASK" ||
     options.questionSequence?.kind === "REASK"
       ? []
@@ -2355,7 +2396,7 @@ export function environmentNoteParts(
     ...(options.generalKnowledge === true ? [GENERAL_KNOWLEDGE_NOTE] : []),
     ...(researchNote === null ? [] : [researchNote]),
     ...(aboutACompany ? [PROFILE_UPDATE_NOTE] : []),
-    ...(capabilities ? [CAPABILITIES_NOTE] : []),
+    ...(capabilities && options.noNextStep !== true ? [CAPABILITIES_NOTE] : []),
     ...(options.onboardingNudge === undefined
       ? []
       : [onboardingNudgeNote(options.onboardingNudge)]),
@@ -6803,6 +6844,7 @@ export function createModelGatewayQAnswer(
           ),
           ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
           ...(request.turnUnread === true ? { turnUnread: true } : {}),
+          ...(nextStepTurn(request) ? {} : { noNextStep: true }),
           ...(request.writingDocument === true
             ? {
                 writingDocument: true,

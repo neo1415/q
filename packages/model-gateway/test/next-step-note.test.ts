@@ -11,6 +11,7 @@ import {
   REMEMBER_FIRST_NOTE,
   VIEWING_NOT_DISCLOSED_NOTE,
   environmentNotesFor,
+  nextStepTurn,
 } from "../src/q/index.js";
 
 /**
@@ -112,5 +113,55 @@ describe("how a reply ends", () => {
     expect(REMEMBER_FIRST_NOTE).toMatch(
       /declared mandate is separate: change it only when they ask/u,
     );
+  });
+});
+
+/**
+ * C1 (owner, 13 Nov): "Not every question needs a Capital Q feature
+ * recommendation." A remark, a lookup of their own records, a plain fact or
+ * a progress check is answered and left there: no closing offer and no
+ * "be proactive" guidance. Doing or advising keeps both.
+ */
+describe("which turns end with an offer", () => {
+  it("not a remark, a control word, a record lookup or a plain fact", () => {
+    expect(nextStepTurn({ turnKind: "SMALL_TALK" })).toBe(false);
+    expect(nextStepTurn({ turnKind: "OFF_TOPIC" })).toBe(false);
+    expect(nextStepTurn({ turnKind: "CONTROL" })).toBe(false);
+    expect(
+      nextStepTurn({
+        turnKind: "QUESTION_TO_Q",
+        questionKind: "THEIR_OWN_RECORDS",
+      }),
+    ).toBe(false);
+    expect(
+      nextStepTurn({ turnKind: "QUESTION_TO_Q", questionKind: "PUBLIC_FACTS" }),
+    ).toBe(false);
+    expect(nextStepTurn({ questionKind: "PROGRESS" })).toBe(false);
+  });
+
+  it("advice, options, fit, discovery, an action, an acceptance, or an unread turn", () => {
+    expect(
+      nextStepTurn({ turnKind: "QUESTION_TO_Q", questionKind: "ADVICE" }),
+    ).toBe(true);
+    expect(nextStepTurn({ questionKind: "FIT" })).toBe(true);
+    expect(nextStepTurn({ questionKind: "DISCOVER_COMPANIES" })).toBe(true);
+    expect(nextStepTurn({ turnKind: "TOOL_REQUEST" })).toBe(true);
+    // Acting on their own records is doing, not a lookup.
+    expect(
+      nextStepTurn({
+        turnKind: "TOOL_REQUEST",
+        questionKind: "THEIR_OWN_RECORDS",
+      }),
+    ).toBe(true);
+    expect(nextStepTurn({ turnKind: "ANSWER" })).toBe(true);
+    expect(nextStepTurn({})).toBe(true);
+  });
+
+  it("a lookup turn's notes carry neither the offer nor the proactive guidance", () => {
+    const notes = environmentNotesFor([], TOOLS, [], { noNextStep: true });
+    expect(notes).not.toContain(NEXT_STEP_NOTE);
+    expect(notes).not.toContain(CAPABILITIES_NOTE);
+    const doing = environmentNotesFor([], TOOLS, [], {});
+    expect(doing).toContain(NEXT_STEP_NOTE);
   });
 });
