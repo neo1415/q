@@ -83,3 +83,8 @@ Tests run by the replay: 13 files, 130 tests, 0 failed.
 - Metrics P1-14, P1-8, P1-9: DEPLOYED. Live smoke as investor.savanna-seed: Discover loads; "What are my top 3 matches right now?" moved to /investors/top and answered "Ranked by fit with your mandate, the top three…" with the 9.1 breakdown, no page errors. The specific tier/tie orderings are test-covered, not live-exercised (no live pair stages that case).
 - Security tests merged (`0333c4401`) and in CI: the two new pgTAP suites run for the first time there.
 - **Priority 0 journey:** the 05:48 UTC founder's company is `organisation_private` (onboarding ends at /verification; the visibility choice is a separate step), so no investor can find it yet. Lane H (worktree branch `qa/v1-journey`) is building and running the full fictional founder → investor certification on production.
+
+## Security tests on CI (12 Nov 06:47 UTC)
+
+- `5bdca3689`, CI run 43170047380: **database (pgTAP) green**, including both new suites (`999_tenant_isolation_server_only_probe` 165, `999_tenant_isolation_person_scoped_policies` 43). The first run (43167966525) failed and the new gate held: `q_runtime` revokes all from browser roles, so `person_standing` reads now assert 42501 (stricter than the test assumed). Test-only; nothing to deploy.
+- Status: tenant-isolation negative coverage CI_GREEN for the tables listed above. The server-SQL-as-`postgres` exposure is unchanged (the plan in `RLS-RUNTIME-ROLE-PLAN.md` is PROPOSED, awaiting owner approval).
