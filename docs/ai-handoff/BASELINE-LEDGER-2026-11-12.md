@@ -264,3 +264,14 @@ Production `945138faf`; fictional investor `investor.savanna-seed`; marketplace-
   - Should investor-side search and name resolution exclude companies that are not marketplace-ready, consistent with PADL #57/#58?
 - Provider credits:
   - Tavily and Serper are still out of credit; Brave carries all research.
+
+## Planning batch deployed; certification run 1 (12 Nov, 21:00–21:40 Lagos)
+
+- **Receipt:** `ci-local PASS sha=afbcd6df3 at=2026-11-12T19:57:53Z took=2683s` (all six steps). **DEPLOYED** by `deploy-promote.sh`; rollback point `945138faf`; all four services SUCCESS.
+- **Certification run 1** (investor, "Prepare an investment plan for Ledgerline: how do its unit economics compare…", Chat view, watched to delivery):
+  - **Pass:** Ledgerline resolved and the job started (fixes `8ad903701`).
+  - **Timings:** 196 s in all — research 63 s (anchored query: "ledgerline founders team africa payments"), document 132 s (3 drafts; filed with 10 open points; $0.029).
+  - **Content:** well labelled (company record, self-reported; estimates), and it states plainly that public research gave no comparable unit economics.
+  - **Defect 1 — presentation:** 12 s after delivery, the Document dialog covered the conversation, unasked. `deliverWork` opened the viewer whenever a job settled on the Q page (owner 2026-10-28). Fixed in `596bd01da`: typed chat delivers the inline card only; voice and the immersive Q view keep the open-in-place.
+  - **Defect 2 — namesakes as evidence:** the analysis's Sources cited "GitHub - Syed-99/ledgerline" (a billing engine) and "Ledgerline Software (McKinsey) | PrepLounge". Deep research never checks pages against the subject (`entityResolution: NOT_APPLICABLE` on all 18 lanes). Fixed in `262e75106`: drop pages that name the company but place it only in other countries, or are someone else's repository of that name; market pages are untouched.
+- **In the gate:** `262e75106` (both fixes). Next: deploy; rerun the same certification (expect no dialog, no namesake sources); a q_plans plan ask that needs research (expect a PUBLIC section READ); the founder side on their own records.
