@@ -23,7 +23,6 @@ import {
 } from "@capital-q/q-orchestrator";
 import {
   isWorkforceAnalysisRequest,
-  WORKFORCE_DILIGENCE_PROFILE,
   workforceCorrelationId,
   type QAgentRole,
   type WorkforceDocumentRequest,
@@ -997,9 +996,17 @@ export function documentStepSummary(
 }
 
 /**
- * The company a RESEARCH step researches for diligence: a later diligence
- * document in the approved plan that waits on it names it (bound by code
- * at planning). Null: an ordinary research step.
+ * The company a RESEARCH step researches: a later analysis document in the
+ * approved plan, about one named company, waits on it (the company bound by
+ * code at planning). Null: an ordinary research step.
+ *
+ * Live 12 Nov (job 072918f2): only a *diligence* analysis bound its
+ * company, so research feeding "Prepare an investment plan for Ajopot" ran
+ * without a subject: the query "ajopot market size growth" went out
+ * unanchored and Ajovy, AJO, Ajaokuta, adoption agencies and Cajeput oil
+ * came back as sources. Any named-company analysis now binds its company,
+ * so the research is about that company (name, country and sectors as the
+ * person may read them) and pages about namesakes are told apart.
  */
 export function diligenceSubjectFor(
   stepKey: string,
@@ -1011,7 +1018,6 @@ export function diligenceSubjectFor(
       document !== undefined &&
       isWorkforceAnalysisRequest(document) &&
       document.scope === "NAMED_COMPANY" &&
-      document.profile === WORKFORCE_DILIGENCE_PROFILE &&
       step.dependsOn.includes(stepKey)
     ) {
       return { companyId: document.companyId };
