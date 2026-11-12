@@ -545,6 +545,8 @@ import {
   askedSubjects,
   COMPANIES_TABLE_TITLE,
   findingBlockOf,
+  suppliedStandingsOf,
+  type SuppliedStanding,
   namesReadByRun,
   askerSideOf,
   ownInvestorOrganisationIn,
@@ -6689,6 +6691,9 @@ export function createModelGatewayQAnswer(
       // S2: the prompt is assembled from the facts in hand and can be
       // assembled again once the wide reads land (a turn that skipped them
       // and was not, after all, answered by code).
+      // D3 (owner review 12 Nov): the standing of every fact the model is
+      // given, so no finding outranks the facts it cites.
+      let suppliedStandings: ReadonlyMap<string, SuppliedStanding> = new Map();
       const assemblePrompt = async (w: WideReads) => {
         const assembled = await assembledRead;
         const facts: readonly AuthorisedFact[] = [
@@ -6717,6 +6722,9 @@ export function createModelGatewayQAnswer(
           ...(pitchMoment === null ? [] : [pitchMoment]),
           ...assembled.facts,
         ];
+        // D3: what each supplied fact is, by the label the model may cite
+        // (the prompt the model answers is the last one assembled).
+        suppliedStandings = suppliedStandingsOf(facts);
 
         const variables: Omit<
           CompanyAnalystV4Variables,
@@ -7053,6 +7061,7 @@ export function createModelGatewayQAnswer(
             ? []
             : askedSubjects(request.subjects, plan),
           id,
+          suppliedStandings,
         );
         if (block === null) return;
         liveFindingIds.set(key, id);
@@ -11514,6 +11523,7 @@ export function createModelGatewayQAnswer(
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
           question: latest.content,
+          supplied: suppliedStandings,
           // A finding already shown live keeps the id it was shown under.
           findingId: (_index, statement) =>
             liveFindingIds.get(findingKey(statement)) ?? randomUUID(),

@@ -156,6 +156,98 @@ export function coherentEvidence(
     : evidenceStatus;
 }
 
+/** A supplied fact's own standing, by the label the model may cite. */
+export type SuppliedStanding = {
+  readonly truthClass: string;
+  readonly evidenceStatus: string;
+};
+
+/** The standings of the supplied facts, by their `F<n>` label. */
+export function suppliedStandingsOf(
+  facts: readonly {
+    readonly ref?: string | undefined;
+    readonly truthClass: string;
+    readonly evidenceStatus: string;
+  }[],
+): ReadonlyMap<string, SuppliedStanding> {
+  const out = new Map<string, SuppliedStanding>();
+  for (const fact of facts) {
+    if (fact.ref === undefined) continue;
+    out.set(fact.ref, {
+      truthClass: fact.truthClass,
+      evidenceStatus: fact.evidenceStatus,
+    });
+  }
+  return out;
+}
+
+const TRUTH_RANK: Readonly<Record<string, number>> = {
+  UNKNOWN: 0,
+  Q_INFERENCE: 1,
+  ESTIMATE: 2,
+  USER_CLAIM: 3,
+  VERIFIED: 4,
+};
+const EVIDENCE_RANK: Readonly<Record<string, number>> = {
+  NO_EVIDENCE: 0,
+  SELF_REPORTED: 1,
+  DOCUMENT_SUPPORTED: 2,
+  MULTI_SOURCE_SUPPORTED: 3,
+};
+
+/**
+ * Owner review 12 Nov (D3): a finding is never more verified than the
+ * supplied facts it cites. VERIFIED, and EXTERNALLY_VERIFIED or
+ * PLATFORM_VERIFIED evidence, are a supplied fact's own standing carried
+ * over; the model's free-text basis is checked against the labels of the
+ * facts it was actually given (`F<n>`), never taken on its word. A claim
+ * stronger than what it cites falls to the strongest it does cite, and to
+ * Q's own inference with no evidence when it cites none.
+ */
+export function groundedStanding(
+  claimed: {
+    readonly truthClass: TruthClass;
+    readonly evidenceStatus: EvidenceStatus;
+  },
+  basis: readonly string[],
+  supplied: ReadonlyMap<string, SuppliedStanding>,
+): {
+  readonly truthClass: TruthClass;
+  readonly evidenceStatus: EvidenceStatus;
+} {
+  const cited = [
+    ...new Set(basis.flatMap((one) => one.match(/\bF\d{1,3}\b/gu) ?? [])),
+  ]
+    .map((label) => supplied.get(label))
+    .filter((standing): standing is SuppliedStanding => standing !== undefined);
+  let truthClass = claimed.truthClass;
+  if (
+    truthClass === "VERIFIED" &&
+    !cited.some((c) => c.truthClass === "VERIFIED")
+  ) {
+    const best = cited
+      .map((c) => c.truthClass)
+      .filter((t) => TRUTH_CLASSES.has(t) && t !== "VERIFIED")
+      .sort((a, b) => (TRUTH_RANK[b] ?? 0) - (TRUTH_RANK[a] ?? 0))[0];
+    truthClass = (best ?? "Q_INFERENCE") as TruthClass;
+  }
+  let evidenceStatus = claimed.evidenceStatus;
+  if (
+    VERIFIED_EVIDENCE.has(evidenceStatus) &&
+    !cited.some((c) => c.evidenceStatus === evidenceStatus)
+  ) {
+    const best = cited
+      .map((c) => c.evidenceStatus)
+      .filter((e) => EVIDENCE_RANK[e] !== undefined)
+      .sort((a, b) => (EVIDENCE_RANK[b] ?? 0) - (EVIDENCE_RANK[a] ?? 0))[0];
+    evidenceStatus = (best ?? "NO_EVIDENCE") as EvidenceStatus;
+  }
+  return {
+    truthClass,
+    evidenceStatus: coherentEvidence(truthClass, evidenceStatus),
+  };
+}
+
 const CONFIDENCE_LEVELS = new Set<string>([
   "HIGH",
   "MODERATE",
@@ -425,6 +517,8 @@ export function findingBlockOf(
   finding: FindingLike,
   subjects: readonly QSubjectRef[],
   findingId: string,
+  /** The supplied facts' standings (D3); absent: the basis is not checked. */
+  supplied?: ReadonlyMap<string, SuppliedStanding>,
 ): Extract<QResultBlock, { kind: "FINDING" }> | null {
   const statement = finding.statement.trim();
   if (statement.length === 0) return null;
@@ -447,15 +541,22 @@ export function findingBlockOf(
     finding.derivation !== "DETERMINISTIC" &&
     finding.basis !== undefined &&
     finding.basis.every((one) => one.trim().length === 0);
-  const truthClass: TruthClass = unsupported ? "Q_INFERENCE" : read;
-  const evidenceStatus = unsupported
-    ? "NO_EVIDENCE"
-    : coherentEvidence(
-        truthClass,
-        (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
-          ? finding.evidenceStatus
-          : "SELF_REPORTED") as EvidenceStatus,
-      );
+  const asRead: { truthClass: TruthClass; evidenceStatus: EvidenceStatus } = {
+    truthClass: unsupported ? "Q_INFERENCE" : read,
+    evidenceStatus: unsupported
+      ? "NO_EVIDENCE"
+      : coherentEvidence(
+          unsupported ? "Q_INFERENCE" : read,
+          (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
+            ? finding.evidenceStatus
+            : "SELF_REPORTED") as EvidenceStatus,
+        ),
+  };
+  // Code's own findings stand on state, not on a cited fact.
+  const { truthClass, evidenceStatus } =
+    supplied === undefined || finding.derivation === "DETERMINISTIC"
+      ? asRead
+      : groundedStanding(asRead, finding.basis ?? [], supplied);
   return {
     kind: "FINDING",
     finding: {
@@ -498,6 +599,8 @@ export function analystResultBlocks(input: {
     ((index: number, statement: string) => string) | undefined;
   /** The person's question: a summary asked for is laid out as one (L-14). */
   readonly question?: string | undefined;
+  /** D3: the supplied facts' standings, so no finding outranks what it cites. */
+  readonly supplied?: ReadonlyMap<string, SuppliedStanding> | undefined;
 }): QResultBlock[] | undefined {
   const idFor = input.findingId ?? (() => randomUUID());
   const blocks: QResultBlock[] = [];
@@ -530,6 +633,7 @@ export function analystResultBlocks(input: {
       finding,
       input.subjects,
       idFor(index, finding.statement),
+      input.supplied,
     );
     if (block !== null) blocks.push(block);
   }
