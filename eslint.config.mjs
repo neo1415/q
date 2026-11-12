@@ -163,6 +163,9 @@ export default tseslint.config(
       // Escalation packets: proposed file copies for a human to review,
       // outside every tsconfig and never built or imported.
       "docs/escalations/**",
+      // Agent worktrees: whole checkouts of other branches (each linted in
+      // its own tree). Scanning them ran the root lint out of memory.
+      ".claude/**",
     ],
   },
 
