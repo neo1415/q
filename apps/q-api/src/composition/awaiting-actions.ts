@@ -1,4 +1,8 @@
-import type { DatabaseExecutor } from "@capital-q/database";
+import {
+  decodeJsonbString,
+  jsonbParam,
+  type DatabaseExecutor,
+} from "@capital-q/database";
 import type {
   PendingAppAction,
   PendingAppActionStore,
@@ -18,15 +22,17 @@ export function createPostgresAwaitingActions(dependencies: {
   const ttl = dependencies.ttlMs ?? 30 * 60_000;
   return {
     hold: async (scope, pending) => {
-      const value = JSON.stringify({ ...pending, at: Date.now() });
+      // jsonbParam, not a pre-stringified `${text}::jsonb`: postgres.js
+      // sends that as a JSON string, so the row held a string, never the
+      // object (production 12 Nov: every row; see packages/database/jsonb).
       await sql`
         update q_runtime.conversations
-           set awaiting_action = ${value}::jsonb
+           set awaiting_action = ${jsonbParam(sql, { ...pending, at: Date.now() })}::jsonb
          where id = ${scope.conversationId}
            and tenant_id = ${scope.tenantId}`;
     },
     take: async (scope) => {
-      const rows = await sql<{ awaiting: PendingAppAction | null }[]>`
+      const rows = await sql<{ awaiting: unknown }[]>`
         update q_runtime.conversations c
            set awaiting_action = null
           from (select awaiting_action from q_runtime.conversations
@@ -36,7 +42,9 @@ export function createPostgresAwaitingActions(dependencies: {
          where c.id = ${scope.conversationId}
            and c.tenant_id = ${scope.tenantId}
         returning before.awaiting_action as awaiting`;
-      const held = rows[0]?.awaiting ?? null;
+      // A row written before the fix holds the string; read it as its value.
+      const held = (decodeJsonbString(rows[0]?.awaiting ?? null) ??
+        null) as PendingAppAction | null;
       if (
         held === null ||
         typeof held.at !== "number" ||

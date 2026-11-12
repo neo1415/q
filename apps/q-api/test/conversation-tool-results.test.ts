@@ -122,10 +122,13 @@ describe("tool results kept for follow-ups", () => {
 describe("the Postgres store", () => {
   function fakeSql(rows: unknown[] = []) {
     const calls: { text: string; values: unknown[] }[] = [];
-    const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
-      calls.push({ text: strings.join("$").replace(/\s+/g, " "), values });
-      return Promise.resolve(rows);
-    }) as unknown as DatabaseExecutor;
+    const sql = Object.assign(
+      (strings: TemplateStringsArray, ...values: unknown[]) => {
+        calls.push({ text: strings.join("$").replace(/\s+/g, " "), values });
+        return Promise.resolve(rows);
+      },
+      { json: (value: unknown) => ({ json: value }) },
+    ) as unknown as DatabaseExecutor;
     return { sql, calls };
   }
 
@@ -205,5 +208,53 @@ describe("the Postgres store", () => {
         fetchedAt: "2026-10-17T09:14:19.000Z",
       },
     ]);
+  });
+
+  /**
+   * Production 12 Nov: every row held its JSON as a string (postgres.js
+   * double-encodes a pre-stringified ::jsonb parameter), so a follow-up saw
+   * 240 characters of escaped JSON instead of the earlier research.
+   */
+  it("writes the result and arguments as JSON values, not as strings", async () => {
+    const { sql, calls } = fakeSql();
+    await createPostgresConversationToolResults({ sql }).record({
+      tenantId: TENANT,
+      userId: USER,
+      runId: RUN,
+      callIndex: 0,
+      toolName: "public_web.search",
+      arguments: { query: "paystack" },
+      result: { sources: [{ index: 1 }] },
+      sensitivity: "PUBLIC",
+    });
+    expect(calls[0]?.values).toContainEqual({ json: { query: "paystack" } });
+    expect(calls[0]?.values).toContainEqual({
+      json: { sources: [{ index: 1 }] },
+    });
+    expect(
+      calls[0]?.values.some(
+        (value) => typeof value === "string" && value.startsWith("{"),
+      ),
+    ).toBe(false);
+  });
+
+  it("reads a row written before the fix as its value", async () => {
+    const { sql } = fakeSql([
+      {
+        run_id: "r0",
+        tool_name: "public_web.search",
+        arguments: '{"query":"paystack"}',
+        result: '{"sources":[{"index":1}]}',
+        sensitivity: "PUBLIC",
+        created_at: "2026-11-12T14:48:04Z",
+      },
+    ]);
+    const [row] = await createPostgresConversationToolResults({ sql }).recent({
+      tenantId: TENANT,
+      userId: USER,
+      runId: RUN,
+    });
+    expect(row?.arguments).toEqual({ query: "paystack" });
+    expect(row?.result).toEqual({ sources: [{ index: 1 }] });
   });
 });

@@ -2,7 +2,11 @@ import {
   Q_SENSITIVITY_RANK,
   type QSensitivityClass,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor } from "@capital-q/database";
+import {
+  decodeJsonbString,
+  jsonbParam,
+  type DatabaseExecutor,
+} from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { QConversationFetch, QToolPort } from "@capital-q/q-runtime";
 
@@ -65,6 +69,9 @@ export function createPostgresConversationToolResults(dependencies: {
   const { sql } = dependencies;
   return {
     record: async (entry) => {
+      // jsonbParam, not a pre-stringified `${text}::jsonb`: postgres.js
+      // sends that as a JSON string, so the row held a string, never the
+      // object (production 12 Nov: every row; see packages/database/jsonb).
       const result = JSON.stringify(entry.result);
       const args = JSON.stringify(entry.arguments ?? {});
       if (result.length > RESULT_CHARS_MAX) return;
@@ -74,8 +81,8 @@ export function createPostgresConversationToolResults(dependencies: {
            tool_name, arguments, result, sensitivity)
         select r.tenant_id, r.conversation_id, r.actor_user_id, r.id,
                ${entry.callIndex}, ${entry.toolName.slice(0, 120)},
-               ${args.length > ARGUMENTS_CHARS_MAX ? "{}" : args}::jsonb,
-               ${result}::jsonb, ${entry.sensitivity}
+               ${jsonbParam(sql, args.length > ARGUMENTS_CHARS_MAX ? {} : (entry.arguments ?? {}))}::jsonb,
+               ${jsonbParam(sql, entry.result)}::jsonb, ${entry.sensitivity}
           from q_runtime.runs r
          where r.id = ${entry.runId}
            and r.tenant_id = ${entry.tenantId}
@@ -114,8 +121,9 @@ export function createPostgresConversationToolResults(dependencies: {
               {
                 runId: row.run_id,
                 toolName: row.tool_name,
-                arguments: row.arguments,
-                result: row.result,
+                // Rows written before 12 Nov hold the JSON as a string.
+                arguments: decodeJsonbString(row.arguments),
+                result: decodeJsonbString(row.result),
                 sensitivity: row.sensitivity,
                 fetchedAt:
                   row.created_at instanceof Date

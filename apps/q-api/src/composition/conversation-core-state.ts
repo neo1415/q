@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@capital-q/database";
+import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 import type { ConversationCoreStore } from "@capital-q/q-specialists";
 
 /** conversations_core_state_check (20261220200000). */
@@ -31,10 +31,13 @@ export function createPostgresConversationCore(dependencies: {
       // snapshot broke conversations_core_state_check), so the database
       // measures it in the same statement. This is only a cheap pre-cut.
       if (value.length > CORE_STATE_MAX_CHARS) return;
+      // jsonbParam, not a pre-stringified `${text}::jsonb`: postgres.js
+      // sends that as a JSON string, so `jsonb_typeof = object` refused
+      // every save (production 12 Nov: every row; see packages/database/jsonb).
       await sql`
         update q_runtime.conversations
            set core_state = candidate.value
-          from (select ${value}::jsonb as value) as candidate
+          from (select ${jsonbParam(sql, snapshot)}::jsonb as value) as candidate
          where id = ${scope.conversationId}
            and tenant_id = ${scope.tenantId}
            and jsonb_typeof(candidate.value) = 'object'
