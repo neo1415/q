@@ -167,6 +167,9 @@ export type OnboardingConversation = {
 
 /** Quiet after something they said before it is read (coalesced). */
 const READ_AFTER_MS = 2_500;
+/** The checklist's first line when they have already spoken in this setup. */
+export const UNDER_WAY_LINE =
+  "Setup already under way: they have spoken with you in this setup before.";
 /** A settle waits this long for saving before it answers from the record. */
 const SETTLE_WAIT_MS = 15_000;
 const THREAD_LIMIT = 100;
@@ -1464,8 +1467,22 @@ export function createOnboardingConversation(dependencies: {
 
     brief: async (line) => {
       try {
-        const state = await portFor(line, []).state();
-        return briefOf(state);
+        // Owner live 10 Nov 08:52: a replaced line opened with "Hey! … I'm
+        // Q, I'll walk you through setting up your investor profile"
+        // mid-setup. The checklist says when the setup is already under way
+        // (they have spoken in it), and the prompt then never introduces Q
+        // again.
+        const [state, thread] = await Promise.all([
+          portFor(line, []).state(),
+          listOnboardingInterviewTurns(
+            sessionOf(line),
+            line.onboarding.sessionId,
+            4,
+          ).catch(() => ({ items: [] })),
+        ]);
+        const underWay = thread.items.some((turn) => turn.role === "PERSON");
+        const checklist = briefOf(state);
+        return underWay ? `${UNDER_WAY_LINE}\n${checklist}` : checklist;
       } catch (error: unknown) {
         logger.warn(
           { err: error },

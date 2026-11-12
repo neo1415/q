@@ -17,7 +17,9 @@ import {
   briefOf,
   createOnboardingConversation,
   type ConversationLine,
+  UNDER_WAY_LINE,
 } from "../src/voice/onboarding-conversation.js";
+import { livePrompt } from "../src/voice/live/prompt.js";
 import {
   createOnboardingPort,
   summaryContent,
@@ -565,5 +567,31 @@ describe("5. wrap-up turns never wait on setting aside or on a yes that adds not
       ),
     ).toBe(true);
     expect(statesMore(null, "investor")).toBe(true);
+  });
+});
+
+describe("6. a setup already under way never opens with Q introducing itself (owner live 10 Nov)", () => {
+  it("the checklist says so once they have spoken, and the prompt honours it", async () => {
+    const world = founderWorld({});
+    const conversation = createOnboardingConversation({
+      apiBaseUrl: "http://api.test",
+      fetch: world.fetch,
+      logger,
+      readAfterMs: 5,
+      recommendations: world.recommendations,
+      reader: readerOf(reading([])),
+    });
+    const line = lineOf("founder");
+    const before = await conversation.brief(line);
+    expect(before?.startsWith(UNDER_WAY_LINE)).toBe(false);
+    await conversation.said?.(line, "PERSON", "We make cold-chain lockers.");
+    await conversation.flush?.(line);
+    const after = await conversation.brief(line);
+    expect(after?.startsWith(UNDER_WAY_LINE)).toBe(true);
+    const instructions = livePrompt({ interview: after ?? "" });
+    expect(instructions).toContain(
+      'the checklist begins "Setup already under way"',
+    );
+    expect(instructions).toContain("never introduce yourself");
   });
 });
