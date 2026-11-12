@@ -76,3 +76,10 @@ Tests run by the replay: 13 files, 130 tests, 0 failed.
 - Adds two pgTAP suites (165 + 43 assertions; **never run**: no Docker here, CI will run them), one vitest file (12/12 pass locally: Q subject resolvers refuse a foreign-tenant row even when a repository loses its tenant filter), and `docs/ai-handoff/RLS-RUNTIME-ROLE-PLAN.md` (PROPOSED: ~186 files / ~1,400 SQL call sites; six flag-gated reversible phases; six items for owner approval).
 - **Owner findings:** (1) `core.founder_person_facts` and `core.founder_background_entries` stay readable by their owner after the owner's membership is revoked (the policy checks only the user). A tightening migration is possible but changes access semantics; decision requested. (2) some tables grant `service_role` (e.g. `q_runtime.conversation_states`) though the RLS fixture says it holds none.
 - Not yet covered: onboarding.utterances, other server-only onboarding/evidence/network/q_runtime tables (catalogue-level guard only), revoked-member cases for q_runtime.instruction_grants/steps.
+
+## Integrated slice 2 — deployed 12 Nov 07:21 Lagos (06:13 UTC)
+
+- **DEPLOYED:** all four services on `a029a2f3d` (CI 43164614960 green, the first run where `quality` also gated pgTAP and integration). Rollback: web/q-api `53271540e`, api/workers `74d33a828`.
+- Metrics P1-14, P1-8, P1-9: DEPLOYED. Live smoke as investor.savanna-seed: Discover loads; "What are my top 3 matches right now?" moved to /investors/top and answered "Ranked by fit with your mandate, the top three…" with the 9.1 breakdown, no page errors. The specific tier/tie orderings are test-covered, not live-exercised (no live pair stages that case).
+- Security tests merged (`0333c4401`) and in CI: the two new pgTAP suites run for the first time there.
+- **Priority 0 journey:** the 05:48 UTC founder's company is `organisation_private` (onboarding ends at /verification; the visibility choice is a separate step), so no investor can find it yet. Lane H (worktree branch `qa/v1-journey`) is building and running the full fictional founder → investor certification on production.
