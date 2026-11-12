@@ -364,3 +364,8 @@ Core Seven remains the governing assessment framework. The new directive authori
     - Missing or malformed citation metadata degrades gracefully: never invent a citation, never discard otherwise useful permitted information.
     - Ordinary questions, casual conversation, navigation and plain summaries stay on fast paths; no extra model calls to enforce citation formatting; no repetitive disclaimers in the conversation — detailed provenance lives behind Sources.
     - Acceptance: Q stays fast, natural, informative and capable of investigation while distinguishing facts, claims, uncertainties and inferences.
+88. **CI runs locally before every deploy; GitHub CI only by hand** (owner, 12 Nov 2026 ~13:00 Lagos: "if you can keep working without using the github ci … and we don't lose anything, then that's fine"; GitHub Actions minutes for November were spent).
+    - `.github/workflows/ci.yml` triggers only on `workflow_dispatch`. Do not re-add push or pull_request triggers, and do not dispatch it without the owner's word: it spends the account's monthly minutes.
+    - The deploy gate is `bash scripts/ci-local.sh` on the exact commit to be deployed. It runs the same jobs as ci.yml (format and lint, typecheck, build, every test shard, pgTAP on a fresh local Postgres 16 with every migration, the GateQ concurrency proof, integration) in a clean checkout of that commit, on Node 24, with disabled provider keys. Its last line, `ci-local PASS sha=… at=…`, is the receipt; record it in the handoff with the deploy.
+    - "Run CI before every deploy" (the standing rule) is met by that receipt. Rollback and live verification after every deploy are unchanged.
+    - Railway deploys from a push to `recovery/2026-09-12` regardless of GitHub Actions.

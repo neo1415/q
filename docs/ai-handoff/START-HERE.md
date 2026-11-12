@@ -51,9 +51,9 @@ Locked PADL → Product Specification → Final System Review → MVP/V1 Release
    - `tsc` for each app touched.
    - eslint and prettier on changed files.
    - `pnpm check` runs everything; it's slow.
-3. Merge to the integration branch. Push the same commit to `recovery/2026-09-12-8y2j4w` to run CI; CI does **not** trigger on `build/*`. That gives the quality job plus pgTAP.
+3. Merge to the integration branch. **Since 12 Nov 2026 (decision 88) CI runs locally:** `bash scripts/ci-local.sh` (or `CI_LOCAL_REF=<sha> bash scripts/ci-local.sh`) runs every ci.yml job, pgTAP included, in a clean checkout of the commit; its last line `ci-local PASS sha=…` is the deploy receipt. GitHub CI (`.github/workflows/ci.yml`) runs only by hand (`workflow_dispatch`) and spends the owner's monthly Actions minutes: never re-add push triggers or dispatch it without the owner's word. Pushing to `recovery/2026-09-12-8y2j4w` no longer runs anything.
 4. For a migration:
-   1. Wait for the pgTAP job to pass.
+   1. Wait for the local gate's database (pgTAP) step to pass.
    2. Apply with `node scripts/handoff/hosted-migrate-https.mjs --apply <version>`. It refuses DROP and RLS-loosening; `--founder-approved <version>` exists only for a reviewed exception.
    3. Apply **before** deploying code that reads the new columns.
 5. Deploy by pushing to `recovery/2026-09-12`. Railway rebuilds web, api, q-api and workers; unchanged services may show SKIPPED.
