@@ -138,3 +138,10 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 
 - 5 suites, 12 tests, run as `postgres` through the real services (network, mandates, evidence, onboarding, q-runtime): a foreign tenant's real id gets exactly the answer of a random id, nothing is written. Ran green locally on a fresh Postgres 16 with every migration (`scripts/local-pg/setup.sh`, port 54339); CI will run them in the integration job.
 - **Owner decisions** (`docs/ai-handoff/PERSON-VS-ORG-DATA.md`): (1) onboarding sessions are person-owned: a founder who left a company can still read and answer that company's onboarding session; recommended: company-bound sessions require current membership. (2) Q conversations opened in an organisation context do not re-check membership. (3) `founder_background_entries` document links can point at the old company's document after the founder moves. (4) minor: some reads look up before checking permission, so a stale former member sees forbidden vs not found.
+
+## Integrated slice 3 — deployed 12 Nov 10:00 Lagos (08:51 UTC)
+
+- **DEPLOYED:** all four services on `19e149590` (CI 43183881835 green, pgTAP and integration gating). Rollback `a029a2f3d`.
+- **LIVE_VERIFIED (D2 alignment):** as investor.savanna-seed, `GET /v1/network/companies/:id/interest` → the unverified Lane H company `321ad3b3…` **404** RESOURCE_NOT_FOUND, byte-for-byte the same problem as a random id (anti-enumeration holds); a marketplace-ready company with an existing interest (`b439cd80…`) **200** with its interest. No new interest was created by the check. The write path (express-interest) shares the same `authorise()`; covered by the unit test.
+- P1-15 labels: DEPLOYED (unit-tested; no live founder readiness view exercised).
+- Batch 4 (`3e78448d0` and its parents: four-eyes verification, hidden ID upload, app-path isolation suites) sent to CI.
