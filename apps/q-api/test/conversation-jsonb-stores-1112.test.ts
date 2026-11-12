@@ -59,8 +59,15 @@ describe("awaiting actions", () => {
 describe("conversation core state", () => {
   it("saves the snapshot as a JSON value, still bounded and object-only", async () => {
     const { sql, calls } = fakeSql();
-    await createPostgresConversationCore({ sql }).save(SCOPE, { series: 2 });
-    expect(calls[0]?.values).toContainEqual({ json: { series: 2 } });
+    const snapshot = {
+      v: 1 as const,
+      unclearInARow: 2,
+      lastAction: null,
+      sequence: null,
+      focus: null,
+    };
+    await createPostgresConversationCore({ sql }).save(SCOPE, snapshot);
+    expect(calls[0]?.values).toContainEqual({ json: snapshot });
     expect(calls[0]?.text).toContain(
       "jsonb_typeof(candidate.value) = 'object'",
     );

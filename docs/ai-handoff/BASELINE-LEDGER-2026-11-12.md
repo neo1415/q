@@ -184,14 +184,14 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 
 The browser check reported ~26 s, but that figure includes its own 12 s "page unchanged" wait. Server time from run accepted to answer produced: **12.6 s**.
 
-| Stage | From → to (s after accept) | Took | Notes |
-|---|---|---|---|
-| Run setup, firewall, records | 0 → 1.1 | 1.1 s | |
-| Turn reading (FAST_CLASSIFICATION) | ~1.0 → 5.3 | readMs 4519 | OpenAI first choice timed out three times (2 s hedge); the hedge on Claude Sonnet served it in 2.3 s at **$0.065**, ~50× the usual reading cost |
-| Web search | 5.6 → 6.7 | 1.1 s | **Tavily 432 and Serper 402 — both out of credit or limited**, 15-min cool-off; Brave answered (10 hits) |
-| Page reading | 6.7 → 7.7 | 0.8 s | direct extract, 3 pages read, 4 retained |
-| Answer (2 model calls, overlapping) | 7.7 → 12.6 | ~4.9 s | NORMAL_DIALOGUE, $0.008 together; 52 k prompt characters |
-| Memory learning (after the answer) | → 14.9 | 2.0 s | off the critical path |
+| Stage                               | From → to (s after accept) | Took        | Notes                                                                                                                                           |
+| ----------------------------------- | -------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run setup, firewall, records        | 0 → 1.1                    | 1.1 s       |                                                                                                                                                 |
+| Turn reading (FAST_CLASSIFICATION)  | ~1.0 → 5.3                 | readMs 4519 | OpenAI first choice timed out three times (2 s hedge); the hedge on Claude Sonnet served it in 2.3 s at **$0.065**, ~50× the usual reading cost |
+| Web search                          | 5.6 → 6.7                  | 1.1 s       | **Tavily 432 and Serper 402 — both out of credit or limited**, 15-min cool-off; Brave answered (10 hits)                                        |
+| Page reading                        | 6.7 → 7.7                  | 0.8 s       | direct extract, 3 pages read, 4 retained                                                                                                        |
+| Answer (2 model calls, overlapping) | 7.7 → 12.6                 | ~4.9 s      | NORMAL_DIALOGUE, $0.008 together; 52 k prompt characters                                                                                        |
+| Memory learning (after the answer)  | → 14.9                     | 2.0 s       | off the critical path                                                                                                                           |
 
 - **Time to first useful output:** a progress line at ~5.2 s after the stream opened (firstTextMs 5172); the answer itself arrives at ~12.6 s, essentially all at once (7 deltas). The answer is not streamed sentence by sentence on this path.
 - **Biggest single delay:** turn reading (4.5 s), caused by the first-choice model timing out, then a costly hedge.
