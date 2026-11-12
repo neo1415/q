@@ -179,3 +179,20 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 - **DEPLOYED** `5ba018530` by `deploy-promote.sh` (15:35 Lagos); rollback point `fd63e1b84`. Contains: site-name citation match (slice 1b), the public-record timeline (slice 2a) and its page links (2b, additive optional `url` on TIMELINE events).
 - **LIVE_VERIFIED** `5ba018530` (all four services SUCCESS except workers still building at the check; web, api, q-api live), 15:50 Lagos, investor.savanna-seed: "What does the public web say about Paystack recently? Which sources?" → 25.8 s; "Public record: Paystack" timeline with 4 events oldest first (TechCabal 14 Nov 2025, Hellopeter 7 Sep 2026, LinkedIn 5 Nov 2026, Trustpilot 9 Nov 2026), each linking its page in a new tab and marked "Public web: <domain> · not verified"; Sources · 4; every finding now carries "Source: Public web: <domain> — <title> · Not verified · <date>" (the site-name match works: the 1b gap is closed).
 - Caveat for the next slice: page dates are the search provider's dates. For a news article that is when it was published; for a profile or review page (LinkedIn, Trustpilot) it is when the page was last updated, not an event. Next: label such pages "updated" rather than placing them as events, or leave them off the timeline.
+
+## Paystack public-research turn, measured by stage (production logs, run of 14:47:57 UTC on `5ba018530`)
+
+The browser check reported ~26 s, but that figure includes its own 12 s "page unchanged" wait. Server time from run accepted to answer produced: **12.6 s**.
+
+| Stage | From → to (s after accept) | Took | Notes |
+|---|---|---|---|
+| Run setup, firewall, records | 0 → 1.1 | 1.1 s | |
+| Turn reading (FAST_CLASSIFICATION) | ~1.0 → 5.3 | readMs 4519 | OpenAI first choice timed out three times (2 s hedge); the hedge on Claude Sonnet served it in 2.3 s at **$0.065**, ~50× the usual reading cost |
+| Web search | 5.6 → 6.7 | 1.1 s | **Tavily 432 and Serper 402 — both out of credit or limited**, 15-min cool-off; Brave answered (10 hits) |
+| Page reading | 6.7 → 7.7 | 0.8 s | direct extract, 3 pages read, 4 retained |
+| Answer (2 model calls, overlapping) | 7.7 → 12.6 | ~4.9 s | NORMAL_DIALOGUE, $0.008 together; 52 k prompt characters |
+| Memory learning (after the answer) | → 14.9 | 2.0 s | off the critical path |
+
+- **Time to first useful output:** a progress line at ~5.2 s after the stream opened (firstTextMs 5172); the answer itself arrives at ~12.6 s, essentially all at once (7 deltas). The answer is not streamed sentence by sentence on this path.
+- **Biggest single delay:** turn reading (4.5 s), caused by the first-choice model timing out, then a costly hedge.
+- **Owner items:** Tavily and Serper credits need topping up or the keys checking (Brave carried the search). The turn-reading fallback to Claude Sonnet costs about $0.065 per research turn whenever the first-choice model is slow.
