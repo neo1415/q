@@ -56,7 +56,7 @@ Locked PADL → Product Specification → Final System Review → MVP/V1 Release
    1. Wait for the local gate's database (pgTAP) step to pass.
    2. Apply with `node scripts/handoff/hosted-migrate-https.mjs --apply <version>`. It refuses DROP and RLS-loosening; `--founder-approved <version>` exists only for a reviewed exception.
    3. Apply **before** deploying code that reads the new columns.
-5. Deploy by pushing to `recovery/2026-09-12`. Railway rebuilds web, api, q-api and workers; unchanged services may show SKIPPED.
+5. Deploy only with `bash scripts/deploy-promote.sh <sha>`: it refuses unless the local gate wrote a full PASS receipt for that exact SHA, the commit is on the integration branch and production fast-forwards to it, and it prints the rollback point. Enable the guard once per clone with `git config core.hooksPath .githooks`: its pre-push hook refuses any push to `recovery/2026-09-12` without that receipt. One gate runs per machine (a lock; a second exits 75): check `/tmp/ci-local/gate.owner` before starting one. Gate and deploy the latest commit once, rather than each commit in turn. Railway rebuilds web, api, q-api and workers; unchanged services may show SKIPPED.
 6. Verify on production straight away:
    - the Railway deployment status per service;
    - `scripts/handoff/live/*` checks;

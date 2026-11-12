@@ -7,6 +7,10 @@
 #
 #   bash scripts/ci-local.sh            # everything, on HEAD, in a clean checkout
 #   CI_LOCAL_REF=<sha> bash scripts/ci-local.sh          # another commit
+#
+# One gate runs per machine (a lock; a second exits 75). A full PASS writes
+# a receipt for the full commit SHA, which scripts/deploy-promote.sh checks
+# before it pushes the production branch.
 #   STEPS="static typecheck" bash scripts/ci-local.sh   # a subset
 #
 # Steps (CI job → here):
@@ -25,9 +29,20 @@ set -uo pipefail
 # CI uses .nvmrc (Node 24); the cloud image defaults to Node 22.
 [ -x /opt/node24/bin/node ] && export PATH="/opt/node24/bin:$PATH"
 cd "$(dirname "$0")/.."
-sha="$(git rev-parse --short=9 "${CI_LOCAL_REF:-HEAD}")" || exit 1
-out="${CI_LOCAL_OUT:-/tmp/ci-local}/$sha"
-mkdir -p "$out"
+full="$(git rev-parse --verify "${CI_LOCAL_REF:-HEAD}^{commit}")" || exit 1
+sha="${full:0:9}"
+root="${CI_LOCAL_OUT:-/tmp/ci-local}"
+out="$root/$sha"
+mkdir -p "$out" "$root/receipts"
+# One gate per machine at a time: two would share the Postgres port, the
+# checkout and the 4 vCPU / 16 GB. A second run stops here and says which
+# run holds the lock (owner, 12 Nov 2026).
+exec 9>"$root/gate.lock"
+if ! flock -n 9; then
+  echo "ci-local: another gate is running ($(cat "$root/gate.owner" 2>/dev/null)); not starting a second one" >&2
+  exit 75
+fi
+echo "pid=$$ sha=$full started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$root/gate.owner"
 # The gate runs in its own clean checkout of the commit (CI_LOCAL_INPLACE=1
 # runs here instead), so work in this tree can go on while it runs and the
 # receipt is for exactly that commit, never for files edited mid-run.
@@ -117,6 +132,13 @@ for name in $steps; do
 done
 [ "$dirty" = "0" ] || verdict="$verdict (uncommitted changes: not a receipt)"
 echo
-echo "ci-local $verdict sha=$sha at=$(date -u +%Y-%m-%dT%H:%M:%SZ) took=$((SECONDS - started))s"
+at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "ci-local $verdict sha=$sha at=$at took=$((SECONDS - started))s"
 for name in $steps; do echo "  $name: ${result[$name]}"; done
+# The receipt scripts/deploy-promote.sh requires: every step, a clean tree,
+# for this full commit SHA. A subset or a dirty tree writes none.
+if [ "$verdict" = PASS ] && [ "$steps" = "static typecheck build test database integration" ]; then
+  echo "PASS $full $at" >"$root/receipts/$full"
+  echo "receipt: $root/receipts/$full"
+fi
 case "$verdict" in PASS) exit 0 ;; *) exit 1 ;; esac
