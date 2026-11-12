@@ -6,6 +6,7 @@ import type { QScheduleBlock } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { useT } from "@/features/i18n/language";
+import { relationshipCallsLink } from "@/features/relationships/relationship-href";
 
 /**
  * Their day as Q read it (live 2026-10-28: "what's on my schedule today?"
@@ -86,7 +87,11 @@ export function ScheduleBody({ block }: { readonly block: QScheduleBlock }) {
                 </span>
                 {call.briefReady ? (
                   <Link
-                    href={CALLS_HREF}
+                    href={
+                      call.relationshipId === null
+                        ? CALLS_HREF
+                        : relationshipCallsLink(call.relationshipId)
+                    }
                     className={buttonClassName("secondary", "compact")}
                     data-q-schedule-brief={call.meetingId}
                   >

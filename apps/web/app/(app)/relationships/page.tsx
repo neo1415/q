@@ -1,3 +1,7 @@
+import {
+  ownRelationshipHref,
+  RELATIONSHIP_PARAM,
+} from "@/features/relationships/relationship-href";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -137,6 +141,14 @@ export default async function RelationshipsPage({
   // An old Relationships link opens the Pipeline's List layout.
   const listed = pipelineListHref(params);
   if (listed !== null) redirect(listed);
+  // One relationship by id (Q's schedule card): theirs only, else the hub.
+  if (params[RELATIONSHIP_PARAM] !== undefined) {
+    const one = ownRelationshipHref(
+      params,
+      await ownRelationships(await resolveOwnContext()),
+    );
+    if (one !== null) redirect(one);
+  }
   const view = hubViewOf(params["view"]);
   const layout = pipelineLayoutOf(params["layout"]);
   if (view === "capital") {
