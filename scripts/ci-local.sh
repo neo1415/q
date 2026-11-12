@@ -5,7 +5,8 @@
 # no-live-provider rule. A deploy needs a PASS from this script on the exact
 # commit, recorded in docs/ai-handoff (the summary line below is the receipt).
 #
-#   bash scripts/ci-local.sh            # everything
+#   bash scripts/ci-local.sh            # everything, on HEAD, in a clean checkout
+#   CI_LOCAL_REF=<sha> bash scripts/ci-local.sh          # another commit
 #   STEPS="static typecheck" bash scripts/ci-local.sh   # a subset
 #
 # Steps (CI job → here):
@@ -24,11 +25,27 @@ set -uo pipefail
 # CI uses .nvmrc (Node 24); the cloud image defaults to Node 22.
 [ -x /opt/node24/bin/node ] && export PATH="/opt/node24/bin:$PATH"
 cd "$(dirname "$0")/.."
-repo="$(pwd)"
-sha="$(git rev-parse --short=9 HEAD)"
-dirty="$(git status --porcelain | grep -v '^??' | wc -l | tr -d ' ')"
+sha="$(git rev-parse --short=9 "${CI_LOCAL_REF:-HEAD}")" || exit 1
 out="${CI_LOCAL_OUT:-/tmp/ci-local}/$sha"
 mkdir -p "$out"
+# The gate runs in its own clean checkout of the commit (CI_LOCAL_INPLACE=1
+# runs here instead), so work in this tree can go on while it runs and the
+# receipt is for exactly that commit, never for files edited mid-run.
+dirty=0
+if [ "${CI_LOCAL_INPLACE:-0}" = "1" ]; then
+  dirty="$(git status --porcelain | grep -v '^??' | wc -l | tr -d ' ')"
+else
+  main="$(pwd)"
+  tree="$out/tree"
+  git worktree remove --force "$tree" >/dev/null 2>&1
+  git worktree add --detach "$tree" "$sha" >/dev/null || exit 1
+  trap 'git -C "$main" worktree remove --force "$tree" >/dev/null 2>&1' EXIT
+  cd "$tree" || exit 1
+  echo "== install (clean checkout of $sha)"
+  pnpm install --frozen-lockfile --prefer-offline >"$out/install.log" 2>&1 ||
+    { tail -25 "$out/install.log"; exit 1; }
+fi
+repo="$(pwd)"
 steps="${STEPS:-static typecheck build test database integration}"
 port="${CI_LOCAL_PGPORT:-54329}"
 
