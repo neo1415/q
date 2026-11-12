@@ -42,6 +42,7 @@ function turn(
         type: "INFERENCE",
         statement: "Growth is likely seasonal.",
         confidence: "LOW",
+        citations: [],
         sourceCount: 1,
       },
     ],

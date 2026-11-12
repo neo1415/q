@@ -4,6 +4,7 @@ import type { QFindingType } from "@capital-q/contracts";
 
 import { useCardHidden } from "./cards/card-visibility";
 import type { QTurn, QTurnObjectBlock } from "./conversation";
+import { standingWords } from "./blocks/data-block-logic";
 import { PublicSourceList } from "./public-source-card";
 import { QResultBlocks } from "./q-result-blocks";
 import { Q_CONFIDENCE_LABELS } from "./wire-constants";
@@ -183,6 +184,30 @@ export function QEvidenceBody({
                     ? ` · ${sources(finding.sourceCount)}`
                     : ""}
                 </span>
+                {/* Owner review 12 Nov: each finding shows what it rests
+                    on, with that source's own standing and date. */}
+                {finding.citations.length > 0 ? (
+                  <ul
+                    className="flex flex-col gap-0.5"
+                    data-q-finding-citations
+                  >
+                    {finding.citations.map((citation) => (
+                      <li
+                        key={`${citation.source}|${citation.asOf ?? ""}`}
+                        className="cq-caption text-(--cq-text-secondary)"
+                      >
+                        {t("Source")}: {citation.source} ·{" "}
+                        {standingWords(
+                          citation.truthClass,
+                          citation.evidenceStatus,
+                        )}
+                        {citation.asOf === undefined
+                          ? ""
+                          : ` · ${citation.asOf.slice(0, 10)}`}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </dd>
             </div>
           ))}

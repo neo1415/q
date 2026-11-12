@@ -546,6 +546,7 @@ import {
   COMPANIES_TABLE_TITLE,
   findingBlockOf,
   suppliedStandingsOf,
+  withFactLabels,
   type SuppliedStanding,
   namesReadByRun,
   askerSideOf,
@@ -6722,9 +6723,10 @@ export function createModelGatewayQAnswer(
           ...(pitchMoment === null ? [] : [pitchMoment]),
           ...assembled.facts,
         ];
-        // D3: what each supplied fact is, by the label the model may cite
+        // D3 and slice 1: every fact citable by label, and what each is
         // (the prompt the model answers is the last one assembled).
-        suppliedStandings = suppliedStandingsOf(facts);
+        const citable = withFactLabels(facts);
+        suppliedStandings = suppliedStandingsOf(citable);
 
         const variables: Omit<
           CompanyAnalystV4Variables,
@@ -6739,7 +6741,7 @@ export function createModelGatewayQAnswer(
             role: m.role,
             content: m.content,
           })),
-          authorisedFacts: [...facts],
+          authorisedFacts: [...citable],
           subjectDescription: assembled.subjectDescription,
           institutionalNotes:
             assembled.institutionalNotes ??

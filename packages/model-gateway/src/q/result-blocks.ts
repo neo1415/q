@@ -7,6 +7,7 @@ import { asksForSummary } from "./artifact-preview.js";
 import { RunRead, type ReadInvestor } from "./card-subjects.js";
 import {
   EvidenceStatusSchema,
+  Q_FINDING_CITATIONS_MAX,
   Q_SUMMARY_POINTS_MAX,
   QFindingIdSchema,
   TruthClassSchema,
@@ -15,6 +16,7 @@ import {
   type QResultBlockDrop,
   type PermittedContextPlan,
   type QConfidenceLevel,
+  type QFindingCitation,
   type QFindingType,
   type EvidenceStatus,
   type QResultBlock,
@@ -160,7 +162,35 @@ export function coherentEvidence(
 export type SuppliedStanding = {
   readonly truthClass: string;
   readonly evidenceStatus: string;
+  /** The fact's coarse source line, as the firewall admitted it. */
+  readonly source?: string | undefined;
+  readonly asOf?: string | undefined;
 };
+
+/**
+ * Every supplied fact citable (slice 1, 12 Nov): facts the gateway adds
+ * itself (the canonical profile, readiness, documents on screen) arrived
+ * without an `F<n>` label, so the model could not cite them and their
+ * findings showed no source. Unlabelled facts get the next free labels;
+ * labelled ones keep theirs. Labels stay opaque and per-render.
+ */
+export function withFactLabels<T extends { readonly ref?: string | undefined }>(
+  facts: readonly T[],
+): T[] {
+  let next =
+    Math.max(
+      0,
+      ...facts.map((fact) => {
+        const found = /^F(\d{1,3})$/u.exec(fact.ref ?? "");
+        return found === null ? 0 : Number(found[1]);
+      }),
+    ) + 1;
+  return facts.map((fact) =>
+    fact.ref !== undefined || next > 999
+      ? fact
+      : { ...fact, ref: `F${String(next++)}` },
+  );
+}
 
 /** The standings of the supplied facts, by their `F<n>` label. */
 export function suppliedStandingsOf(
@@ -168,6 +198,8 @@ export function suppliedStandingsOf(
     readonly ref?: string | undefined;
     readonly truthClass: string;
     readonly evidenceStatus: string;
+    readonly source?: string | undefined;
+    readonly asOf?: string | undefined;
   }[],
 ): ReadonlyMap<string, SuppliedStanding> {
   const out = new Map<string, SuppliedStanding>();
@@ -176,6 +208,8 @@ export function suppliedStandingsOf(
     out.set(fact.ref, {
       truthClass: fact.truthClass,
       evidenceStatus: fact.evidenceStatus,
+      ...(fact.source === undefined ? {} : { source: fact.source }),
+      ...(fact.asOf === undefined ? {} : { asOf: fact.asOf }),
     });
   }
   return out;
@@ -204,6 +238,47 @@ const EVIDENCE_RANK: Readonly<Record<string, number>> = {
  * stronger than what it cites falls to the strongest it does cite, and to
  * Q's own inference with no evidence when it cites none.
  */
+/** The supplied facts a basis cites by label; invented labels cite nothing. */
+function citedFacts(
+  basis: readonly string[],
+  supplied: ReadonlyMap<string, SuppliedStanding>,
+): SuppliedStanding[] {
+  return [...new Set(basis.flatMap((one) => one.match(/\bF\d{1,3}\b/gu) ?? []))]
+    .map((label) => supplied.get(label))
+    .filter((standing): standing is SuppliedStanding => standing !== undefined);
+}
+
+/**
+ * Owner review 12 Nov (slice 1): each finding shows what it rests on: the
+ * cited facts' own source lines, standings and dates. Code builds them from
+ * facts the run was given; a fact with no source line is not shown.
+ */
+export function citationsOf(
+  basis: readonly string[],
+  supplied: ReadonlyMap<string, SuppliedStanding>,
+): QFindingCitation[] {
+  const seen = new Set<string>();
+  const out: QFindingCitation[] = [];
+  for (const fact of citedFacts(basis, supplied)) {
+    const source = fact.source?.trim() ?? "";
+    if (source.length === 0) continue;
+    if (!TRUTH_CLASSES.has(fact.truthClass)) continue;
+    if (!EVIDENCE_STATUSES.has(fact.evidenceStatus)) continue;
+    const asOf = fact.asOf?.trim().slice(0, 40);
+    const key = `${source}|${asOf ?? ""}|${fact.truthClass}|${fact.evidenceStatus}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      source: source.slice(0, 200),
+      truthClass: fact.truthClass as TruthClass,
+      evidenceStatus: fact.evidenceStatus as EvidenceStatus,
+      ...(asOf === undefined || asOf.length === 0 ? {} : { asOf }),
+    });
+    if (out.length === Q_FINDING_CITATIONS_MAX) break;
+  }
+  return out;
+}
+
 export function groundedStanding(
   claimed: {
     readonly truthClass: TruthClass;
@@ -215,11 +290,7 @@ export function groundedStanding(
   readonly truthClass: TruthClass;
   readonly evidenceStatus: EvidenceStatus;
 } {
-  const cited = [
-    ...new Set(basis.flatMap((one) => one.match(/\bF\d{1,3}\b/gu) ?? [])),
-  ]
-    .map((label) => supplied.get(label))
-    .filter((standing): standing is SuppliedStanding => standing !== undefined);
+  const cited = citedFacts(basis, supplied);
   let truthClass = claimed.truthClass;
   if (
     truthClass === "VERIFIED" &&
@@ -557,6 +628,10 @@ export function findingBlockOf(
     supplied === undefined || finding.derivation === "DETERMINISTIC"
       ? asRead
       : groundedStanding(asRead, finding.basis ?? [], supplied);
+  const citations =
+    supplied === undefined || finding.derivation === "DETERMINISTIC"
+      ? []
+      : citationsOf(finding.basis ?? [], supplied);
   return {
     kind: "FINDING",
     finding: {
@@ -576,6 +651,8 @@ export function findingBlockOf(
       // Deliberately empty. The finding's supporting evidence is real
       // and its identifiers are not the browser's to hold.
       evidenceRefs: [],
+      // What it rests on, as the reader may see it (slice 1, 12 Nov).
+      ...(citations.length === 0 ? {} : { citations }),
       // What the run was authorised about, never what the model named.
       subjects: [...subjects],
     },

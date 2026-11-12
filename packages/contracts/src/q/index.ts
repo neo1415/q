@@ -464,12 +464,15 @@ export {
   QFindingTypeSchema,
   QInternalFindingSchema,
   QPublicFindingSchema,
+  QFindingCitationSchema,
+  Q_FINDING_CITATIONS_MAX,
   QArtifactFindingSchema,
   Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH,
   type QArtifactFinding,
   type QFindingType,
   type QInternalFinding,
   type QPublicFinding,
+  type QFindingCitation,
 } from "./finding.js";
 
 export {

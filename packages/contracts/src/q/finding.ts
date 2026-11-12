@@ -45,6 +45,28 @@ export const Q_FINDING_STATEMENT_MAX_LENGTH = 2000;
 export const Q_FINDING_ASSUMPTION_MAX_LENGTH = 500;
 export const Q_FINDING_ASSUMPTIONS_MAX = 10;
 
+export const Q_FINDING_CITATIONS_MAX = 5;
+
+/**
+ * What a finding rests on, as the reader may see it (owner review 12 Nov:
+ * each material assertion shows its source, its standing and its date).
+ * Built by code only from the facts the model cited by label and that the
+ * Context Firewall already admitted to this run: the coarse source line
+ * those facts carry ("Company profile", "Public web: example.com"), never
+ * an identifier, a path or a private document name. The standing is the
+ * cited fact's own, so a finding can never show a stronger one than it.
+ */
+export const QFindingCitationSchema = z
+  .object({
+    source: z.string().trim().min(1).max(200),
+    truthClass: TruthClassSchema,
+    evidenceStatus: EvidenceStatusSchema,
+    /** The cited fact's own date (published or as-of), when it has one. */
+    asOf: z.string().trim().min(1).max(40).optional(),
+  })
+  .strict();
+export type QFindingCitation = z.infer<typeof QFindingCitationSchema>;
+
 const findingShape = {
   findingId: QFindingIdSchema,
   type: QFindingTypeSchema,
@@ -63,6 +85,11 @@ const findingShape = {
     .optional(),
   /** When the finding was true, if it is time-bound. */
   validAt: UtcTimestampSchema.optional(),
+  /** The cited facts' sources and standings; absent: none established. */
+  citations: z
+    .array(QFindingCitationSchema)
+    .max(Q_FINDING_CITATIONS_MAX)
+    .optional(),
 };
 
 /**

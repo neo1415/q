@@ -1,6 +1,7 @@
 import type {
   QArtifactPreview,
   QConfidenceLevel,
+  QFindingCitation,
   QFindingType,
   QMessage,
   QPublicFinding,
@@ -213,6 +214,8 @@ export type QTurnFinding = {
   readonly confidence: QConfidenceLevel;
   /** How many recorded sources this finding rests on. */
   readonly sourceCount: number;
+  /** What it rests on, as the reader may see it (source, standing, date). */
+  readonly citations: readonly QFindingCitation[];
 };
 
 export type QTurnUncertainty = {
@@ -227,6 +230,7 @@ function turnFinding(finding: QPublicFinding): QTurnFinding {
     statement: finding.statement,
     confidence: finding.confidence,
     sourceCount: finding.evidenceRefs.length,
+    citations: finding.citations ?? [],
   };
 }
 
