@@ -4,7 +4,7 @@
 --   core.founder_person_facts          own row only (suite 800 checks B, not writes)
 --   core.founder_background_entries    own rows only (no suite before this one)
 --   core.investor_portfolio_references members of the investor's organisation
---   q_runtime.person_standing          own row, active member of its tenant
+--   q_runtime.person_standing          server-only: browser roles have no schema access
 --   integrations.inbound_addresses     own row, active member of its tenant
 --   integrations.inbound_emails        own row, active member of its tenant
 --
@@ -81,10 +81,10 @@ select is((select count(*)::int from core.investor_portfolio_references where id
   'portfolio: a member of investor A''s organisation reads its references (positive control)');
 select is((select count(*)::int from core.investor_portfolio_references where tenant_id <> pg_temp.rls_id('tenant_a')), 0,
   'portfolio: A reads no other tenant''s references');
-select is((select count(*)::int from q_runtime.person_standing where user_id = pg_temp.rls_id('user_a')), 1,
-  'standing: A reads their own (positive control)');
-select is((select count(*)::int from q_runtime.person_standing where user_id = pg_temp.rls_id('user_b')), 0,
-  'standing: A cannot read tenant B''s standing');
+select throws_ok($$ select count(*) from q_runtime.person_standing $$, '42501', null,
+  'standing: A reads their own (positive control) (q_runtime is server-only: browser roles have no schema access)');
+select throws_ok($$ select count(*) from q_runtime.person_standing $$, '42501', null,
+  'standing: A cannot read tenant B''s standing (q_runtime is server-only: browser roles have no schema access)');
 select is((select count(*)::int from integrations.inbound_addresses where id = '00000000-0000-4000-8000-000000072aa1'), 1,
   'inbound address: A reads their own (positive control)');
 select is((select count(*)::int from integrations.inbound_addresses where token = 'bbbbbbbbbbbbbbbbbbbbbbbbbb'), 0,
@@ -133,8 +133,8 @@ select is((select count(*)::int from core.founder_background_entries where user_
   'founder background: B cannot read A''s');
 select is((select count(*)::int from core.investor_portfolio_references where id = '00000000-0000-4000-8000-000000072fa1'), 0,
   'portfolio: B cannot read investor A''s references');
-select is((select count(*)::int from q_runtime.person_standing where user_id = pg_temp.rls_id('user_a')), 0,
-  'standing: B cannot read A''s');
+select throws_ok($$ select count(*) from q_runtime.person_standing $$, '42501', null,
+  'standing: B cannot read A''s (q_runtime is server-only: browser roles have no schema access)');
 select is((select count(*)::int from integrations.inbound_addresses where user_id = pg_temp.rls_id('user_a')), 0,
   'inbound address: B cannot read A''s');
 select is((select count(*)::int from integrations.inbound_emails where user_id = pg_temp.rls_id('user_a')), 0,
@@ -144,8 +144,8 @@ select is((select count(*)::int from integrations.inbound_emails where user_id =
 select pg_temp.act_as_revoked_user();
 select is((select count(*)::int from core.investor_portfolio_references), 0,
   'portfolio: a revoked member reads nothing, their former organisation''s included');
-select is((select count(*)::int from q_runtime.person_standing), 0,
-  'standing: a revoked member reads nothing, their own row included');
+select throws_ok($$ select count(*) from q_runtime.person_standing $$, '42501', null,
+  'standing: a revoked member reads nothing, their own row included (q_runtime is server-only: browser roles have no schema access)');
 select is((select count(*)::int from integrations.inbound_addresses), 0,
   'inbound address: a revoked member reads nothing, their own included');
 select is((select count(*)::int from integrations.inbound_emails), 0,
@@ -163,8 +163,8 @@ update identity.organisation_memberships
 select pg_temp.act_as_user_a();
 select is((select count(*)::int from core.investor_portfolio_references), 0,
   'portfolio: after revocation A reads nothing');
-select is((select count(*)::int from q_runtime.person_standing), 0,
-  'standing: after revocation A reads nothing');
+select throws_ok($$ select count(*) from q_runtime.person_standing $$, '42501', null,
+  'standing: after revocation A reads nothing (q_runtime is server-only: browser roles have no schema access)');
 select is((select count(*)::int from integrations.inbound_addresses), 0,
   'inbound address: after revocation A reads nothing');
 select is((select count(*)::int from integrations.inbound_emails), 0,
