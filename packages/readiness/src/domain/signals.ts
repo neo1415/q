@@ -200,9 +200,15 @@ function deckSection(
   const line: ReadinessEvidenceLine = {
     label: `Deck: ${section.toLowerCase().replace(/_/g, " ")} section`,
     source: "DECK",
-    truthClass: null,
-    evidenceStatus: null,
-    note: `Coaching: ${LEVEL_WORDS[found.level] ?? found.level}`,
+    // Metrics audit P1-15 (owner 12 Nov): a statement in the company's own
+    // deck is the company's claim, supported by its own document; Q's
+    // reading of it is not independent verification, and it never reads
+    // as verified. The three axes stay apart: what the deck says (a
+    // USER_CLAIM), its support (DOCUMENT_SUPPORTED), and Q's grading of
+    // the section (the coaching note).
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "DOCUMENT_SUPPORTED",
+    note: `Q's reading of your deck, not independently verified. Coaching: ${LEVEL_WORDS[found.level] ?? found.level}`,
     ref: { kind: "DOCUMENT", documentId: inputs.deck.documentId },
   };
   return {

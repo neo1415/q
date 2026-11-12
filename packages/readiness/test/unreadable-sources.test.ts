@@ -46,3 +46,34 @@ describe("a source that could not be read is unknown, never a Gap", () => {
     }
   });
 });
+
+/**
+ * Metrics audit P1-15 (owner 12 Nov): a deck section at the rubric's
+ * standard is the company's claim supported by its own document, as read
+ * by Q; never independently verified.
+ */
+describe("a deck section is the company's claim, never verified", () => {
+  it("labels the line USER_CLAIM / DOCUMENT_SUPPORTED with Q's reading named", () => {
+    const deck = {
+      documentId: "11111111-1111-4111-8111-111111111111",
+      sections: [
+        {
+          section: "PROBLEM",
+          score: 3,
+          level: "STRONG",
+          atStandard: true,
+          improve: null,
+        },
+      ],
+    } as unknown as ReadinessInputs["deck"];
+    const result = readSignal("deck.section.PROBLEM" as never, {
+      ...EMPTY,
+      deck,
+    });
+    const line = result?.evidence[0];
+    expect(line?.truthClass).toBe("USER_CLAIM");
+    expect(line?.evidenceStatus).toBe("DOCUMENT_SUPPORTED");
+    expect(line?.note).toMatch(/not independently verified/u);
+    expect(line?.truthClass).not.toBe("VERIFIED");
+  });
+});
