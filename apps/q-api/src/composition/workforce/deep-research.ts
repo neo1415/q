@@ -1516,6 +1516,10 @@ export function workforceDeepResearch(dependencies: {
                 : roundOneDeadline(started, deadlineMs, now()),
           pagesPerQuestion: state.round === 1 ? PAGES_PER_LANE : 3,
           searchBudget: budget,
+          // A named company's namesakes are not its evidence (live 12 Nov).
+          ...(named === null
+            ? {}
+            : { subjectOf: { name: named.name, country: named.country } }),
         });
         const knownIndex = new Set(state.sources.map((one) => one.index));
         const found = result.sources.filter(

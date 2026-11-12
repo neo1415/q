@@ -3,6 +3,7 @@ import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
 import type { PublicWebFreshness } from "../contracts.js";
+import { textNames } from "../domain/ranking.js";
 import { normaliseWebAddress } from "../domain/url-safety.js";
 import type {
   PublicWebResearchService,
@@ -139,7 +140,63 @@ export type DeepResearchCommand = {
   readonly known?: readonly DeepResearchSource[] | undefined;
   /** The job's search budget, shared by every round and step of it. */
   readonly searchBudget?: SearchBudget | undefined;
+  /**
+   * The one named company the research is about (live 12 Nov: an
+   * investment analysis of Ledgerline cited a GitHub billing engine and a
+   * McKinsey case study of the same name). Pages that are evidently
+   * another organisation of that name are not kept; pages that do not name
+   * it -- the market, comparables -- are untouched.
+   */
+  readonly subjectOf?:
+    { readonly name: string; readonly country: string | null } | undefined;
 };
+
+const CODE_HOSTS = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
+const compact = (text: string): string =>
+  text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/**
+ * A page about another organisation of the subject's name: it names the
+ * subject but places it only in other countries, or it is a code
+ * repository of that name under someone else's account. Its own site and
+ * pages that do not name it are never namesakes here.
+ */
+export function namesakePage(
+  source: {
+    readonly url: string;
+    readonly title: string | null;
+    readonly excerpt: string;
+    readonly mentionedCountries: readonly string[];
+  },
+  subject: { readonly name: string; readonly country: string | null },
+): boolean {
+  if (!textNames(`${source.title ?? ""} ${source.excerpt}`, subject.name)) {
+    return false;
+  }
+  if (
+    subject.country !== null &&
+    source.mentionedCountries.length > 0 &&
+    !source.mentionedCountries.includes(subject.country)
+  ) {
+    return true;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(source.url);
+  } catch {
+    return false;
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./u, "");
+  if (!CODE_HOSTS.has(host)) return false;
+  const [owner, repository] = parsed.pathname.split("/").filter(Boolean);
+  const name = compact(subject.name);
+  return (
+    owner !== undefined &&
+    repository !== undefined &&
+    compact(repository) === name &&
+    compact(owner) !== name
+  );
+}
 
 export const DEEP_RESEARCH_BOUNDS = {
   maxQuestions: 12,
@@ -257,7 +314,13 @@ export function createDeepResearch(dependencies: {
             });
             if (outcome.status === "OK") {
               sent = outcome.budget.searchCalls;
-              found[position] = outcome.sources;
+              const subjectOf = command.subjectOf;
+              found[position] =
+                subjectOf === undefined
+                  ? outcome.sources
+                  : outcome.sources.filter(
+                      (source) => !namesakePage(source, subjectOf),
+                    );
               outcomes[position] = {
                 lane: question.lane,
                 query: outcome.query,
