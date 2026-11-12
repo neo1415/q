@@ -557,6 +557,21 @@ export function matchCounterpart(
     .sort((left, right) => right.score - left.score);
   const best = scored[0];
   if (best === undefined || best.score < NAME_MATCH_FLOOR) return null;
+  // The one record whose name is exactly what was said wins over names
+  // that only begin with it (live 12 Nov: "an investment plan for
+  // Ledgerline" was refused as naming no company, beside ten "Ledgerline
+  // XXXX (fictional)" sign-ups). Two records with that exact name stay
+  // ambiguous, as identical duplicates always were.
+  const said = nameKey(name);
+  const exact = new Set(
+    candidates
+      .filter(
+        (candidate) => said.length > 0 && nameKey(candidate.name) === said,
+      )
+      .map((candidate) => candidate.id),
+  );
+  if (exact.size === 1) return [...exact][0] ?? null;
+  if (exact.size > 1) return null;
   const next = scored.find((entry) => entry.id !== best.id);
   if (next !== undefined && best.score - next.score < NAME_MATCH_LEAD) {
     return null;
