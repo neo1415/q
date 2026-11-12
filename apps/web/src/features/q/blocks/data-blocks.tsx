@@ -512,12 +512,22 @@ export function TimelineBody({ block }: { readonly block: Block<"TIMELINE"> }) {
               {timelineDate(event.at)}
             </time>
             <span className="cq-body-sm text-(--cq-text-primary)">
-              {href === null ? (
-                event.label
-              ) : (
+              {href !== null ? (
                 <Link href={href} className={LINK}>
                   {event.label}
                 </Link>
+              ) : event.url !== undefined && /^https:\/\//iu.test(event.url) ? (
+                // A public page opens in a new tab, outside Capital Q.
+                <a
+                  href={event.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={LINK}
+                >
+                  {event.label}
+                </a>
+              ) : (
+                event.label
               )}
             </span>
             {event.note === null ? null : (

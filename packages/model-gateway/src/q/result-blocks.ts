@@ -231,7 +231,8 @@ export function publicRecordTimeline(input: {
 }): QResultBlock | null {
   const latest = (input.now ?? new Date()).getTime() + 24 * 60 * 60 * 1000;
   const seen = new Set<string>();
-  const events: { at: string; label: string; note: string }[] = [];
+  const events: { at: string; label: string; note: string; url?: string }[] =
+    [];
   for (const page of input.sources) {
     if (seen.has(page.url) || !input.matched(page.url)) continue;
     const at = Date.parse(page.publishedAt ?? "");
@@ -243,6 +244,8 @@ export function publicRecordTimeline(input: {
       at: new Date(at).toISOString().slice(0, 10),
       label: title.length > 0 ? title : page.domain,
       note: `Public web: ${page.domain} · not verified`,
+      // The page itself, to open; a non-https address is left off.
+      ...(/^https:\/\//iu.test(page.url) ? { url: page.url } : {}),
     });
   }
   if (events.length < PUBLIC_RECORD_MIN_EVENTS) return null;
@@ -1108,6 +1111,7 @@ export function timelineBlock(input: {
     readonly label: string;
     readonly note?: string | null | undefined;
     readonly subject?: QSubjectRef | null | undefined;
+    readonly url?: string | undefined;
   }[];
 }): QResultBlock | null {
   const dated = input.events
@@ -1123,6 +1127,7 @@ export function timelineBlock(input: {
       label: event.label.slice(0, 120),
       note: event.note?.slice(0, 240) ?? null,
       subject: event.subject ?? null,
+      ...(event.url === undefined ? {} : { url: event.url }),
     })),
   };
 }

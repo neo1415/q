@@ -474,6 +474,17 @@ export const QTimelineBlockSchema = z
             // "note", not "detail": `detail` is reserved on public Q schemas.
             note: z.string().trim().max(240).nullable(),
             subject: QSubjectRefSchema.nullable(),
+            /**
+             * Slice 2 (12 Nov): the public page the event is, when it is
+             * one, so the reader can open it. https only; optional.
+             */
+            url: z
+              .string()
+              .max(2048)
+              .refine((value) => isHttpsOn(value, null), {
+                message: "expected an https address",
+              })
+              .optional(),
           })
           .strict(),
       )

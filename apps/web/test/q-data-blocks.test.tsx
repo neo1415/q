@@ -162,6 +162,13 @@ describe("E4: tables, charts, maps and timelines", () => {
                 note: "Tuesday 10:00",
                 subject: null,
               },
+              {
+                at: "2026-10-05",
+                label: "Paystack reviews",
+                note: "Public web: hellopeter.com · not verified",
+                subject: null,
+                url: "https://hellopeter.com/paystack",
+              },
             ],
           },
         ]}
@@ -197,6 +204,18 @@ describe("E4: tables, charts, maps and timelines", () => {
     ].map((event) => event.textContent);
     expect(events[0]).toContain("Interest expressed");
     expect(events[1]).toContain("Tuesday 10:00");
+    // Slice 2: a public page's event opens that page, in a new tab.
+    const page = document.querySelectorAll("[data-q-timeline-event]")[2];
+    const link = page?.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("https://hellopeter.com/paystack");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+    // An event with no page is plain text.
+    expect(
+      document
+        .querySelectorAll("[data-q-timeline-event]")[0]
+        ?.querySelector("a"),
+    ).toBeNull();
   });
 });
 

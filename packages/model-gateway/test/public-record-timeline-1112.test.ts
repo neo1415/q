@@ -49,12 +49,14 @@ describe("public record timeline", () => {
           label: "Paystack suspends co-founder",
           note: "Public web: techcabal.com · not verified",
           subject: null,
+          url: "https://techcabal.com/2025/11/14/x",
         },
         {
           at: "2026-09-07",
           label: "Paystack reviews",
           note: "Public web: hellopeter.com · not verified",
           subject: null,
+          url: "https://hellopeter.com/paystack",
         },
       ],
     });
