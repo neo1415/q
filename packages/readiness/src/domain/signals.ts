@@ -438,6 +438,14 @@ export function readSignal(
   signal: ReadinessSignal,
   inputs: ReadinessInputs,
 ): SignalResult | null {
+  // A source that failed to load is unknown, never missing (P1-14).
+  if (
+    (inputs.unreadable?.deck === true &&
+      (signal === "deck.present" || signal.startsWith("deck."))) ||
+    (inputs.unreadable?.raise === true && signal.startsWith("raise."))
+  ) {
+    return null;
+  }
   const result = base(signal, inputs);
   const contradicted = inputs.followUps.some(
     (followUp) =>

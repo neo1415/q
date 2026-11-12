@@ -138,6 +138,18 @@ const safe = async <T>(work: () => Promise<T>, fallback: T): Promise<T> => {
   }
 };
 
+/** Read failures, noted so the assessment shows them as unknown (P1-14). */
+const FAILED = Symbol("read failed");
+const attempt = async <T>(
+  work: () => Promise<T>,
+): Promise<T | typeof FAILED> => {
+  try {
+    return await work();
+  } catch {
+    return FAILED;
+  }
+};
+
 export function createReadinessService(ports: ReadinessPorts) {
   const rules = ports.rules ?? READINESS_RULES_V1;
   const now = ports.now ?? (() => new Date());
@@ -149,13 +161,12 @@ export function createReadinessService(ports: ReadinessPorts) {
     if (facts === null) return null;
     // A source that cannot be read is unknown for this read (never zero):
     // the deck and raise read null, the data room null, follow-ups none.
-    const [deck, dataRoom, recorded, followUps, marks, stated] =
+    const [deckRead, dataRoom, recordedRead, followUps, marks, stated] =
       await Promise.all([
         ports.deck === undefined
           ? Promise.resolve(null)
-          : safe(
+          : attempt(
               () => ports.deck?.(actor, companyId) ?? Promise.resolve(null),
-              null,
             ),
         ports.dataRoom === undefined
           ? Promise.resolve(null)
@@ -165,9 +176,8 @@ export function createReadinessService(ports: ReadinessPorts) {
             ),
         ports.raise === undefined
           ? Promise.resolve(null)
-          : safe(
+          : attempt(
               () => ports.raise?.(actor, companyId) ?? Promise.resolve(null),
-              null,
             ),
         ports.followUps === undefined
           ? Promise.resolve([] as readonly ReadinessFollowUpSource[])
@@ -185,6 +195,8 @@ export function createReadinessService(ports: ReadinessPorts) {
               null,
             ),
       ]);
+    const deck = deckRead === FAILED ? null : deckRead;
+    const recorded = recordedRead === FAILED ? null : recordedRead;
     // A recorded raise always wins; a stated one is shown as stated.
     const raise =
       recorded ??
@@ -205,6 +217,12 @@ export function createReadinessService(ports: ReadinessPorts) {
       deck,
       dataRoom,
       raise,
+      // Unknown, not missing, when the read failed and nothing else speaks
+      // to it (a stated raise still shows as stated).
+      unreadable: {
+        deck: deckRead === FAILED,
+        raise: recordedRead === FAILED && raise === null,
+      },
       followUps: followUps.map((item) => ({
         factKey: item.factKey,
         reason: item.reason,

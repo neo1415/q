@@ -82,6 +82,17 @@ export type ReadinessInputs = {
      */
     readonly figures?: readonly ReadinessDeckFigure[] | undefined;
   } | null;
+  /**
+   * P1-14 (metrics audit 7 Nov): sources that could not be read on this
+   * assessment. Their signals are unknown (no signal), never MISSING: a
+   * read failure is never shown to the founder as a Gap.
+   */
+  readonly unreadable?:
+    | {
+        readonly deck?: boolean | undefined;
+        readonly raise?: boolean | undefined;
+      }
+    | undefined;
   /** Null: the data room could not be read. */
   readonly dataRoom: {
     readonly checklist: readonly {
