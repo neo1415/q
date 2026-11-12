@@ -203,7 +203,7 @@ export function QEvidenceBody({
                         )}
                         {citation.asOf === undefined
                           ? ""
-                          : ` · ${citation.asOf.slice(0, 10)}`}
+                          : ` · ${citationDate(citation.asOf)}`}
                       </li>
                     ))}
                   </ul>
@@ -256,4 +256,9 @@ export function QEvidenceBody({
       ) : null}
     </div>
   );
+}
+
+/** An ISO date shows its day; any other date ("September 2026") as given. */
+function citationDate(asOf: string): string {
+  return /^\d{4}-\d{2}-\d{2}/u.test(asOf) ? asOf.slice(0, 10) : asOf;
 }

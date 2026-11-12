@@ -209,3 +209,32 @@ describe("every supplied fact is citable", () => {
     ]);
   });
 });
+
+describe("one citation per source and standing", () => {
+  it("merges the same source cited with and without a date, keeping the date", async () => {
+    const { citationsOf } = await import("../src/q/result-blocks.js");
+    const supplied = suppliedStandingsOf([
+      {
+        ref: "F1",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        source: "Pitch deck",
+      },
+      {
+        ref: "F2",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        source: "Pitch deck",
+        asOf: "September 2026",
+      },
+    ]);
+    expect(citationsOf(["F1", "F2"], supplied)).toEqual([
+      {
+        source: "Pitch deck",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        asOf: "September 2026",
+      },
+    ]);
+  });
+});

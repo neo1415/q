@@ -33,6 +33,12 @@ const TURN: Extract<QTurn, { kind: "Q" }> = {
           evidenceStatus: "SELF_REPORTED",
           asOf: "2026-10-01T09:00:00.000Z",
         },
+        {
+          source: "Pitch deck, as Q read it",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          asOf: "September 2026",
+        },
       ],
     },
     {
@@ -52,7 +58,8 @@ describe("finding citations", () => {
     const lists = container.querySelectorAll("[data-q-finding-citations]");
     expect(lists).toHaveLength(1);
     expect(lists[0]?.textContent).toBe(
-      "Source: Company profile · Claimed by the company, self-reported · 2026-10-01",
+      "Source: Company profile · Claimed by the company, self-reported · 2026-10-01" +
+        "Source: Pitch deck, as Q read it · Claimed by the company, self-reported · September 2026",
     );
     expect(container.textContent).not.toContain("Verified");
   });

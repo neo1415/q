@@ -265,7 +265,19 @@ export function citationsOf(
     if (!TRUTH_CLASSES.has(fact.truthClass)) continue;
     if (!EVIDENCE_STATUSES.has(fact.evidenceStatus)) continue;
     const asOf = fact.asOf?.trim().slice(0, 40);
-    const key = `${source}|${asOf ?? ""}|${fact.truthClass}|${fact.evidenceStatus}`;
+    const key = `${source}|${fact.truthClass}|${fact.evidenceStatus}`;
+    // One line per source and standing (live 12 Nov: the deck cited twice,
+    // with and without its date); the dated one is kept.
+    const already = out.findIndex(
+      (c) => `${c.source}|${c.truthClass}|${c.evidenceStatus}` === key,
+    );
+    if (already >= 0) {
+      const kept = out[already];
+      if (kept !== undefined && kept.asOf === undefined && asOf) {
+        out[already] = { ...kept, asOf };
+      }
+      continue;
+    }
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({

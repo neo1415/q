@@ -157,3 +157,10 @@ PADL #57/#58 (locked): required verification and Marketplace Readiness precede i
 - One integration lead (this session) owns shared contracts, merge order, release gates and production verification. At most one additional implementation agent on a bounded, non-overlapping slice; short read-only research/review agents allowed. One significant change set per release batch.
 - Intelligence programme started: a bounded read-only audit of Q intelligence, memory, conversation, web research and rich answers for the journey "an investor asks Q to investigate a company → authorised internal + public research with grounded citations → natural follow-ups". Output: the highest-impact observed failure and the smallest vertical slice; then implement it. Second slice: sourced images/media/interactive results through the existing presentation blocks.
 - Not blocked by the RLS migration or the founder-verification decision.
+
+## Intelligence slice 1 — finding citations (12 Nov)
+
+- D3 **LIVE_VERIFIED** on `c4c4ae1bc` (10:54 Lagos): "What does MedTrail do, and which source says so?" as investor.savanna-seed → findings USER_CLAIM/SELF_REPORTED, text names the self-reported profile; no VERIFIED overclaim.
+- Slice 1 **DEPLOYED** `ba4063266` (11:55 Lagos, CI 43199882693 green) and **LIVE_VERIFIED** at the data level: the same question stored 4 findings, each with `citations` — the canonical profile (USER_CLAIM/SELF_REPORTED) and, for the traction figure, "The company's pitch deck, as Q read it (founder's claims)", asOf "September 2026". Each finding's standing equals its cited facts'.
+- Two defects found in that live run, fixed in the follow-up (in CI): the deck cited twice (with and without its date) → one line per source and standing, keeping the date; the web cut dates to 10 characters ("September ") → ISO dates show the day, other dates as given.
+- Not yet covered: public-web pages from research tools are PUBLIC_SOURCE blocks, not labelled facts, so a finding from a web search does not yet cite its page (next: bind research results as citable facts; Sources to list only cited pages — owner/lead decision).
