@@ -288,17 +288,23 @@ function citedFacts(
   ]
     .map((label) => supplied.get(label))
     .filter((standing): standing is SuppliedStanding => standing !== undefined);
-  // A public page named by its link or its site rather than its number.
+  // A public page named by its link, its site ("techcabal.com") or the
+  // site's name as people say it ("TechCabal", "LinkedIn"); live 12 Nov:
+  // Q named the sites in words and no finding got a citation. Only pages
+  // this run read can match, and only as a whole word, so nothing is
+  // invented.
   const text = basis.join(" ").toLowerCase();
-  const byPage = [...supplied.values()].filter(
-    (standing) =>
-      !byLabel.includes(standing) &&
-      ((standing.url !== undefined &&
-        text.includes(standing.url.toLowerCase())) ||
-        (standing.domain !== undefined &&
-          standing.domain.length > 3 &&
-          text.includes(standing.domain.toLowerCase()))),
-  );
+  const words = new Set(text.split(/[^\p{L}\p{N}]+/u));
+  const byPage = [...supplied.values()].filter((standing) => {
+    if (byLabel.includes(standing)) return false;
+    if (standing.url !== undefined && text.includes(standing.url.toLowerCase()))
+      return true;
+    if (standing.domain === undefined) return false;
+    const site = standing.domain.toLowerCase().replace(/^www\./u, "");
+    if (site.length > 3 && text.includes(site)) return true;
+    const name = site.split(".")[0] ?? "";
+    return name.length >= 4 && words.has(name);
+  });
   return [...byLabel, ...byPage];
 }
 

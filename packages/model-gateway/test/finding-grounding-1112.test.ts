@@ -330,3 +330,35 @@ describe("public pages as citations", () => {
     ]);
   });
 });
+
+describe("a site named the way people say it", () => {
+  it("cites a page read by this run when the basis names its site in words; never a site it did not read", async () => {
+    const { publicStandingsOf, citationsOf } =
+      await import("../src/q/result-blocks.js");
+    const pages = publicStandingsOf([
+      {
+        index: 3,
+        url: "https://techcabal.com/2025/11/14/paystack-suspends-ezra-olubi/",
+        domain: "techcabal.com",
+        title: null,
+        publishedAt: "2025-11-14",
+      },
+      {
+        index: 2,
+        url: "https://www.linkedin.com/company/paystack",
+        domain: "www.linkedin.com",
+        title: null,
+        publishedAt: null,
+      },
+    ]);
+    expect(
+      citationsOf(["TechCabal report, November 2025"], pages).map(
+        (c) => c.source,
+      ),
+    ).toEqual(["Public web: techcabal.com"]);
+    expect(
+      citationsOf(["Paystack's LinkedIn page"], pages).map((c) => c.source),
+    ).toEqual(["Public web: www.linkedin.com"]);
+    expect(citationsOf(["a Bloomberg article"], pages)).toEqual([]);
+  });
+});
