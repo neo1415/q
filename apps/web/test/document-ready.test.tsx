@@ -27,6 +27,7 @@ const {
   announceDocument,
   documentsOnStage,
   expectDocument,
+  openDocumentViewer,
   readyChanges,
   resetReadyDocuments,
   useReadyDocuments,
@@ -287,6 +288,26 @@ describe("owner 2026-10-28: promised work is announced and opened", () => {
     expect(say).toHaveBeenCalledWith(
       "Your Nixo: 12-month growth plan is ready — here it is.",
     );
+    expect(viewingDocumentNow()).toBe(BRIEF);
+  });
+
+  // Owner 2026-11-12: typed chat is not covered by the viewer, unasked.
+  it("in typed chat on the Q page: no viewer opens; the thread's card is the delivery", () => {
+    openDocumentViewer(null);
+    const say = vi.fn(() => false);
+    deliverWork(delivered, { onQPage: true, say, immersive: false });
+    expect(viewingDocumentNow()).toBeNull();
+    deliverWork(delivered, { onQPage: true, say });
+    expect(viewingDocumentNow()).toBeNull();
+  });
+
+  it("in the immersive Q view, without a line, it still opens in place", () => {
+    openDocumentViewer(null);
+    deliverWork(delivered, {
+      onQPage: true,
+      say: () => false,
+      immersive: true,
+    });
     expect(viewingDocumentNow()).toBe(BRIEF);
   });
 

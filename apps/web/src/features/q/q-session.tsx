@@ -80,6 +80,7 @@ import { useQRoomFeed } from "./room-feed";
 import type { QWorkingStage } from "./stage-line";
 import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
+import { readStageView } from "./stage-view";
 import { useQConversation, type QConversation } from "./use-q-conversation";
 import { rereadUntilSettled } from "./voice-reread";
 
@@ -482,6 +483,7 @@ export function QSessionProvider({
       if (delivered == null) return;
       deliverWork(delivered, {
         onQPage: window.location.pathname === Q_PAGE,
+        immersive: readStageView() === "presence",
         say: (line) => {
           const now = voiceRef.current;
           return now.active && isLineLive(now.client)

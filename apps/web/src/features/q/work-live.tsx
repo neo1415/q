@@ -77,6 +77,12 @@ const WorkSettledSchema = WorkforceLiveSchema.pick({
  * Owner 2026-10-28: done is announced and opened. Q says it on an open
  * live line; on the Q page the document opens in place (the one viewer);
  * on any other page its ready card stays until they act on it.
+ *
+ * Owner 2026-11-12, refining it: in typed chat a finished document is not
+ * opened over the conversation (live: the viewer covered the thread 12 s
+ * after the Ledgerline analysis arrived, unasked). The thread's own message
+ * already carries it as an inline card with Open and PDF; the viewer opens
+ * when they open it. Voice and the immersive Q view keep the open in place.
  */
 export function deliverWork(
   document: NonNullable<WorkforceLive["document"]>,
@@ -84,12 +90,17 @@ export function deliverWork(
     readonly onQPage: boolean;
     /** Says one line on the open voice line; false when none is open. */
     readonly say: (line: string) => boolean;
+    /** The immersive Q view is showing (not Chat). Absent: Chat. */
+    readonly immersive?: boolean | undefined;
   },
 ): void {
-  how.say(readyNote(document.title));
+  const spoken = how.say(readyNote(document.title));
   if (how.onQPage) {
+    // The thread shows it; no second card on the Q page.
     dismissDocument(document.artifactId);
-    openDocumentViewer(document.artifactId);
+    if (spoken || how.immersive === true) {
+      openDocumentViewer(document.artifactId);
+    }
     return;
   }
   announceDocument({
