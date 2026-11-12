@@ -54,7 +54,7 @@ describe("a source that could not be read is unknown, never a Gap", () => {
  */
 describe("a deck section is the company's claim, never verified", () => {
   it("labels the line USER_CLAIM / DOCUMENT_SUPPORTED with Q's reading named", () => {
-    const deck = {
+    const deck: ReadinessInputs["deck"] = {
       documentId: "11111111-1111-4111-8111-111111111111",
       sections: [
         {
@@ -65,8 +65,8 @@ describe("a deck section is the company's claim, never verified", () => {
           improve: null,
         },
       ],
-    } as unknown as ReadinessInputs["deck"];
-    const result = readSignal("deck.section.PROBLEM" as never, {
+    };
+    const result = readSignal("deck.section.PROBLEM", {
       ...EMPTY,
       deck,
     });
