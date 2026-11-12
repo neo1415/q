@@ -546,6 +546,7 @@ import {
   COMPANIES_TABLE_TITLE,
   findingBlockOf,
   suppliedStandingsOf,
+  publicStandingsOf,
   withFactLabels,
   type SuppliedStanding,
   namesReadByRun,
@@ -11525,7 +11526,11 @@ export function createModelGatewayQAnswer(
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
           question: latest.content,
-          supplied: suppliedStandings,
+          // Slice 1b: the public pages this run read are citable as S<n>.
+          supplied: new Map([
+            ...suppliedStandings,
+            ...publicStandingsOf(publicSources),
+          ]),
           // A finding already shown live keeps the id it was shown under.
           findingId: (_index, statement) =>
             liveFindingIds.get(findingKey(statement)) ?? randomUUID(),

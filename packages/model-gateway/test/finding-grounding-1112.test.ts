@@ -238,3 +238,95 @@ describe("one citation per source and standing", () => {
     ]);
   });
 });
+
+/**
+ * Slice 1b (decision 87, 12 Nov): pages the run read are citable as S<n>,
+ * or by their link or site. A page that loaded is a public claim, never a
+ * verified one; the finding is kept, labelled for what it rests on.
+ */
+describe("public pages as citations", () => {
+  const read = async () => {
+    const { publicStandingsOf } = await import("../src/q/result-blocks.js");
+    return new Map([
+      ...suppliedStandingsOf([
+        {
+          ref: "F1",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          source: "Capital Q canonical company profile",
+        },
+      ]),
+      ...publicStandingsOf([
+        {
+          index: 1,
+          url: "https://news.example.com/2026/09/medtrail-raise",
+          domain: "news.example.com",
+          title: "MedTrail raises seed round",
+          publishedAt: "2026-09-02",
+        },
+      ]),
+    ]);
+  };
+  const blockFor = async (
+    basis: readonly string[],
+    truthClass = "USER_CLAIM",
+    evidenceStatus = "SELF_REPORTED",
+  ) => {
+    const blocks =
+      analystResultBlocks({
+        result: {
+          findings: [
+            {
+              statement: "MedTrail raised a seed round in September.",
+              type: "FACT",
+              confidence: "MODERATE",
+              truthClass,
+              evidenceStatus,
+              basis,
+            },
+          ],
+        },
+        subjects: [],
+        supplied: await read(),
+        findingId: () => "00000000-0000-4000-8000-000000000004",
+      }) ?? [];
+    const block = blocks.find((b) => b.kind === "FINDING");
+    if (block?.kind !== "FINDING") throw new Error("no finding");
+    return block.finding;
+  };
+  const PAGE = {
+    source: "Public web: news.example.com — MedTrail raises seed round",
+    truthClass: "UNKNOWN",
+    evidenceStatus: "NO_EVIDENCE",
+    asOf: "2026-09-02",
+  };
+
+  it("cites a page by its S-number, its link or its site", async () => {
+    expect((await blockFor(["S1"])).citations).toEqual([PAGE]);
+    expect(
+      (await blockFor(["https://news.example.com/2026/09/medtrail-raise"]))
+        .citations,
+    ).toEqual([PAGE]);
+    expect(
+      (await blockFor(["reported on news.example.com"])).citations,
+    ).toEqual([PAGE]);
+  });
+
+  it("a page that loaded is never verification: a VERIFIED claim resting on it is kept, as unverified", async () => {
+    const finding = await blockFor(["S1"], "VERIFIED", "EXTERNALLY_VERIFIED");
+    expect(finding.statement).toContain("seed round");
+    expect(finding.truthClass).toBe("UNKNOWN");
+    expect(finding.evidenceStatus).toBe("NO_EVIDENCE");
+  });
+
+  it("a finding resting on the company's own claim and a page shows both", async () => {
+    expect((await blockFor(["F1", "S1"])).citations).toEqual([
+      {
+        source: "Capital Q canonical company profile",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+      },
+      PAGE,
+    ]);
+  });
+});

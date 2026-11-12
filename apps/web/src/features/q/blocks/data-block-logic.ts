@@ -117,6 +117,10 @@ export function formatValue(
 const TRUTH_WORDS: Readonly<Record<string, string>> = {
   VERIFIED: "Verified",
   USER_CLAIM: "Claimed by the company",
+  // Decision 87: a public page that loaded is reported, not verified.
+  UNKNOWN: "Not verified",
+  ESTIMATE: "An estimate",
+  Q_INFERENCE: "Q's inference",
 };
 const EVIDENCE_WORDS: Readonly<Record<string, string>> = {
   DOCUMENT_SUPPORTED: "backed by a document",

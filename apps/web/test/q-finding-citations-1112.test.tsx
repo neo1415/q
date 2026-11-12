@@ -39,6 +39,12 @@ const TURN: Extract<QTurn, { kind: "Q" }> = {
           evidenceStatus: "SELF_REPORTED",
           asOf: "September 2026",
         },
+        {
+          source: "Public web: news.example.com — MedTrail raises seed round",
+          truthClass: "UNKNOWN",
+          evidenceStatus: "NO_EVIDENCE",
+          asOf: "2026-09-02",
+        },
       ],
     },
     {
@@ -59,7 +65,8 @@ describe("finding citations", () => {
     expect(lists).toHaveLength(1);
     expect(lists[0]?.textContent).toBe(
       "Source: Company profile · Claimed by the company, self-reported · 2026-10-01" +
-        "Source: Pitch deck, as Q read it · Claimed by the company, self-reported · September 2026",
+        "Source: Pitch deck, as Q read it · Claimed by the company, self-reported · September 2026" +
+        "Source: Public web: news.example.com — MedTrail raises seed round · Not verified · 2026-09-02",
     );
     expect(container.textContent).not.toContain("Verified");
   });

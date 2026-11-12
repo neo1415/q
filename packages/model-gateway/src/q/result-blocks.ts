@@ -165,7 +165,47 @@ export type SuppliedStanding = {
   /** The fact's coarse source line, as the firewall admitted it. */
   readonly source?: string | undefined;
   readonly asOf?: string | undefined;
+  /**
+   * A public page's address and site, so a basis that names the page by
+   * its link or site (not its S-number) still cites it (decision 87:
+   * degrade gracefully, never invent).
+   */
+  readonly url?: string | undefined;
+  readonly domain?: string | undefined;
 };
+
+/**
+ * The public pages this run read, citable as S<n> (their research index).
+ * Decision 87: a page that loaded is a public claim, never a verified
+ * one: UNKNOWN truth, NO_EVIDENCE support, dated by its publication.
+ */
+export function publicStandingsOf(
+  sources: readonly {
+    readonly index: number;
+    readonly url: string;
+    readonly domain: string;
+    readonly title: string | null;
+    readonly publishedAt: string | null;
+  }[],
+): ReadonlyMap<string, SuppliedStanding> {
+  const out = new Map<string, SuppliedStanding>();
+  for (const page of sources) {
+    const title = page.title?.trim() ?? "";
+    const named =
+      title.length > 0 && title !== page.domain ? ` — ${title}` : "";
+    out.set(`S${String(page.index)}`, {
+      truthClass: "UNKNOWN",
+      evidenceStatus: "NO_EVIDENCE",
+      source: `Public web: ${page.domain}${named}`.slice(0, 200),
+      ...(page.publishedAt === null
+        ? {}
+        : { asOf: page.publishedAt.slice(0, 40) }),
+      url: page.url,
+      domain: page.domain,
+    });
+  }
+  return out;
+}
 
 /**
  * Every supplied fact citable (slice 1, 12 Nov): facts the gateway adds
@@ -243,9 +283,23 @@ function citedFacts(
   basis: readonly string[],
   supplied: ReadonlyMap<string, SuppliedStanding>,
 ): SuppliedStanding[] {
-  return [...new Set(basis.flatMap((one) => one.match(/\bF\d{1,3}\b/gu) ?? []))]
+  const byLabel = [
+    ...new Set(basis.flatMap((one) => one.match(/\b[FS]\d{1,3}\b/gu) ?? [])),
+  ]
     .map((label) => supplied.get(label))
     .filter((standing): standing is SuppliedStanding => standing !== undefined);
+  // A public page named by its link or its site rather than its number.
+  const text = basis.join(" ").toLowerCase();
+  const byPage = [...supplied.values()].filter(
+    (standing) =>
+      !byLabel.includes(standing) &&
+      ((standing.url !== undefined &&
+        text.includes(standing.url.toLowerCase())) ||
+        (standing.domain !== undefined &&
+          standing.domain.length > 3 &&
+          text.includes(standing.domain.toLowerCase()))),
+  );
+  return [...byLabel, ...byPage];
 }
 
 /**
