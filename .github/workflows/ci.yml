@@ -10,13 +10,13 @@ name: CI
 # "Wait for CI" (checkSuites: true in .railway/railway.ts) a deploy waits
 # for these jobs on the commit it is about to ship.
 
+# Owner decision 88 (12 Nov 2026): GitHub-hosted Actions minutes ran out,
+# so this workflow runs only when started by hand (Actions -> CI -> Run
+# workflow). The same gate runs locally before every deploy:
+# `bash scripts/ci-local.sh` on the exact commit, its summary line recorded
+# in docs/ai-handoff. Pushes no longer start runs, so Railway's "Wait for
+# CI" finds no check suite and deploys after the local gate.
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - "recovery/**"
-      - "build/rec-*"
   workflow_dispatch:
     inputs:
       e2e:
