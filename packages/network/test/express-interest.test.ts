@@ -70,6 +70,7 @@ function build(options: {
   readonly investor?: string | null;
   readonly allow?: boolean;
   readonly visible?: boolean;
+  readonly ready?: boolean;
 }) {
   const requests: AuthorizationRequest[] = [];
   const authorization: AuthorizationService = {
@@ -109,6 +110,11 @@ function build(options: {
         visibilityAsked.push(companyId);
         return Promise.resolve(options.visible ?? true);
       },
+      ...(options.ready === undefined
+        ? {}
+        : {
+            isMarketplaceReady: () => Promise.resolve(options.ready === true),
+          }),
     },
   });
   return { service, requests, visibilityAsked };
@@ -165,6 +171,20 @@ describe("Express Interest refuses before it writes", () => {
       malformed.service.expressInterest(command("../../companies")),
     ).rejects.toBeInstanceOf(InterestCompanyNotFoundError);
     expect(malformed.visibilityAsked).toHaveLength(0);
+  });
+
+  // PADL #57/#58 (Lane H, 12 Nov): an unverified, network-visible company
+  // took an interest while Save refused it. Not marketplace-ready is the
+  // same answer as absent, and nothing is written.
+  it("answers not-found for a visible company that is not marketplace-ready", async () => {
+    const unready = build({ ready: false });
+    await expect(
+      unready.service.expressInterest(command()),
+    ).rejects.toBeInstanceOf(InterestCompanyNotFoundError);
+    const ready = build({ ready: true });
+    await expect(
+      ready.service.expressInterest(command()),
+    ).rejects.not.toBeInstanceOf(InterestCompanyNotFoundError);
   });
 
   it("applies the same checks to the status read", async () => {

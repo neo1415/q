@@ -105,6 +105,7 @@ import {
   CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyMarketplaceQueryPort,
+  marketplaceParticipationOf,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
 import {
@@ -1789,6 +1790,18 @@ const interestServiceOptions: InterestServiceOptions = {
   authorization,
   investorSubject: slateRead.eligibilityPorts.investorSubject,
   companyVisibility: {
+    // PADL #57/#58: interest needs the company marketplace-ready, as Save,
+    // Compare and Discover do (the same refusal as absent).
+    isMarketplaceReady: async (companyId) => {
+      const [facts] = await pitchMarketplaceFacts.findCanonicalMarketplaceFacts(
+        [companyId],
+      );
+      return (
+        facts !== undefined &&
+        marketplaceParticipationOf(facts.marketplaceReadinessState) ===
+          "ELIGIBLE"
+      );
+    },
     isVisibleToInvestor: async (actor, companyId) => {
       const decision = await disclosure.canDisclose({
         principal: actorPrincipal(actor),

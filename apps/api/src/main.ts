@@ -142,6 +142,7 @@ import {
   CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyMarketplaceQueryPort,
+  marketplaceParticipationOf,
   createPostgresCompanyQueryPort,
   createPostgresCompanyTeamProjection,
 } from "@capital-q/companies";
@@ -1687,6 +1688,22 @@ const explore = createExploreService({
  * idempotency, the one canonical relationship, the history event and the
  * outbox — is the Network context's.
  */
+/**
+ * PADL #57/#58: Express Interest needs the company marketplace-ready (its
+ * required verification done), the same rule as Save, Compare and Discover.
+ */
+const interestMarketplaceFacts = createPostgresCompanyMarketplaceQueryPort({
+  sql: database.sql,
+});
+const marketplaceReadyCheck = async (companyId: string): Promise<boolean> => {
+  const [facts] = await interestMarketplaceFacts.findCanonicalMarketplaceFacts([
+    CompanyIdSchema.parse(companyId),
+  ]);
+  return (
+    facts !== undefined &&
+    marketplaceParticipationOf(facts.marketplaceReadinessState) === "ELIGIBLE"
+  );
+};
 const interests = createInterestService({
   sql: database.sql,
   transactions: database.transactions,
@@ -1696,7 +1713,10 @@ const interests = createInterestService({
   audit,
   authorization,
   investorSubject: slates.eligibilityPorts.investorSubject,
-  companyVisibility: { isVisibleToInvestor: isCompanyNetworkVisible },
+  companyVisibility: {
+    isVisibleToInvestor: isCompanyNetworkVisible,
+    isMarketplaceReady: marketplaceReadyCheck,
+  },
 });
 
 /**

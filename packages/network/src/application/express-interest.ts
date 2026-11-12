@@ -108,6 +108,15 @@ export type ExpressInterestDependencies = NetworkServiceDependencies & {
     ) => Promise<{ readonly investorOrganisationId: string } | null>;
   };
   readonly companyVisibility: {
+    /**
+     * PADL #57/#58: required verification and Marketplace Readiness come
+     * before fundraising participation. Express Interest needs the company
+     * marketplace-ready, as Save, Compare and Discover do (Lane H, 12 Nov:
+     * an unverified, network-visible company took an interest while Save
+     * refused it). Absent only in tests that predate the rule.
+     */
+    readonly isMarketplaceReady?:
+      ((companyId: CompanyId) => Promise<boolean>) | undefined;
     /** The network preview's rule: network-visible or public to this actor. */
     readonly isVisibleToInvestor: (
       actor: ActorContext,
@@ -209,6 +218,15 @@ async function authorise(
     parsed.data,
   );
   if (!visible) {
+    throw new InterestCompanyNotFoundError();
+  }
+  // Not ready is the same answer as absent: never a way to learn which
+  // visible companies are still unverified (anti-enumeration).
+  const ready =
+    dependencies.companyVisibility.isMarketplaceReady === undefined
+      ? true
+      : await dependencies.companyVisibility.isMarketplaceReady(parsed.data);
+  if (!ready) {
     throw new InterestCompanyNotFoundError();
   }
   return {
