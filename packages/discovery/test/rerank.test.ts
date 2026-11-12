@@ -44,6 +44,7 @@ type Spec = {
   readonly seenHoursAgo?: number | undefined;
   readonly passed?: boolean | undefined;
   readonly reintroduction?: "EXPLICIT_PASS_RESET" | null | undefined;
+  readonly outside?: boolean | undefined;
 };
 
 function world(specs: readonly Spec[]) {
@@ -51,6 +52,7 @@ function world(specs: readonly Spec[]) {
     companyId: id(i + 1),
     rank: i + 1,
     internalScore: s.score,
+    ...(s.outside === undefined ? {} : { outsideDeclaredGeography: s.outside }),
   }));
   const facts = new Map<string, RerankFacts>(
     specs.map((s, i) => [
@@ -257,6 +259,28 @@ describe("what the investor has already seen", () => {
     expect(
       result.candidates.find((c) => c.baseRank === 2)?.rerankReasonCodes,
     ).toContain("RECENTLY_SEEN_SUPPRESSION");
+  });
+
+  // Metrics audit P1-8 (7 Nov): exploration could lift a company outside
+  // the investor's Must/Strong declared geography over one inside it.
+  // The declared geography tier is never crossed by a rerank.
+  it("P1-8: a move never crosses the declared geography tier", () => {
+    const result = run([
+      { score: 0.9, cluster: CLUSTER.a, exposed: true, seenHoursAgo: 1 },
+      { score: 0.89, cluster: CLUSTER.b, outside: true },
+    ]);
+    expect(order(result)).toEqual([1, 2]);
+    const inside = run([
+      {
+        score: 0.9,
+        cluster: CLUSTER.a,
+        exposed: true,
+        seenHoursAgo: 1,
+        outside: false,
+      },
+      { score: 0.89, cluster: CLUSTER.b, outside: false },
+    ]);
+    expect(order(inside)).toEqual([2, 1]);
   });
 
   it("7: but it is a nudge, not a ban -- with no alternative it keeps its place", () => {

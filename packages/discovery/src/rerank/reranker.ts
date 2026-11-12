@@ -37,6 +37,12 @@ export type BaseRankedCandidate = {
   /** REC-005's 1-based rank. */
   readonly rank: number;
   readonly internalScore: number | null;
+  /**
+   * Outside the investor's Must or Strong declared geography (fit-order v5
+   * tier). A rerank never moves a company across this tier (metrics audit
+   * P1-8). Absent: no such tier, treated as inside.
+   */
+  readonly outsideDeclaredGeography?: boolean | undefined;
 };
 
 export type RerankInput = {
@@ -226,7 +232,10 @@ export function createReranker(dependencies?: {
           const item = remaining[index] as Working;
           return (
             withinFloor(head.candidate, item.candidate) &&
-            item.candidate.rank - position <= policy.maxPromotion
+            item.candidate.rank - position <= policy.maxPromotion &&
+            // The declared geography tier is never crossed (P1-8).
+            (item.candidate.outsideDeclaredGeography === true) ===
+              (head.candidate.outsideDeclaredGeography === true)
           );
         };
         const firstMovable = (

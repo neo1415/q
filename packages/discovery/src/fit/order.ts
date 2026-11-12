@@ -248,6 +248,8 @@ export type FitOrderedCandidate = {
   /** score / 10 in [0, 1]; null when no score is shown. Internal only. */
   readonly internalScore: number | null;
   readonly score: number | null;
+  /** The v5 geography tier, carried so a rerank never crosses it (P1-8). */
+  readonly outsideDeclaredGeography?: boolean | undefined;
 };
 
 /** The score a reader sees for this assessment, as a number. */
@@ -365,6 +367,9 @@ export function orderByFit(
       rank: index + 1,
       internalScore: value === null ? null : value / 100,
       score,
+      ...(key.outsideDeclaredGeography === true
+        ? { outsideDeclaredGeography: true }
+        : {}),
     };
   });
 }

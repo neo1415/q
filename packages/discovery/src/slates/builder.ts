@@ -430,6 +430,10 @@ export function createSlateBuilder(
             companyId: o.companyId,
             rank: o.rank,
             internalScore: o.internalScore,
+            ...("outsideDeclaredGeography" in o &&
+            o.outsideDeclaredGeography === true
+              ? { outsideDeclaredGeography: true }
+              : {}),
           })),
           pool: eligible,
           evaluatedAt: generatedAt.toISOString(),
