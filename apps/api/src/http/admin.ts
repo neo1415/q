@@ -145,6 +145,8 @@ export type OperatorVerificationDecider = (command: {
 }) => Promise<
   | { readonly kind: "DECIDED"; readonly status: "VERIFIED" | "REVOKED" }
   | { readonly kind: "NOTHING_TO_DECIDE" }
+  /** The operator asked for this claim: another admin must decide it. */
+  | { readonly kind: "SELF_DECISION" }
 >;
 
 export type AdminRoutesDependencies = ActorContextDependencies & {
@@ -553,6 +555,14 @@ export function registerAdminRoutes(
         revocationReason: input.revocationReason ?? null,
         correlationId: correlation(),
       });
+      if (outcome.kind === "SELF_DECISION") {
+        return send(
+          request,
+          reply,
+          "PERMISSION_DENIED",
+          "Another admin must decide a verification you asked for.",
+        );
+      }
       // ADMIN-3: the KYB submission that asked for this claim closes with it.
       if (outcome.kind === "DECIDED" && dependencies.closeKyb !== undefined) {
         await dependencies.closeKyb({

@@ -415,6 +415,38 @@ describe("@capital-q/verification against local PostgreSQL", () => {
   });
 
   // R43, temporary until BIZ-006 /ops: the hosted staging workers' sweep.
+  // Verification audit 12 Nov: the person who asked for a claim never
+  // decides it, even as a platform admin (four eyes).
+  it("refuses an operator deciding a claim they asked for, and writes nothing", async () => {
+    await withWorld(async (world) => {
+      await request(world, world.realMemberA);
+      const [identity] = await pendingIds(world.tx, world.tenantA);
+      if (identity === undefined) throw new Error("expected a pending request");
+      const [requester] = await world.tx.sql<{ id: string }[]>`
+        select requested_by_user_id as id from evidence.verification_claims
+         where id = ${identity}`;
+      const decide = createDecideByOperator({
+        transactions: nestedTransactions(world.tx),
+        repository: createPostgresVerificationClaimRepository(),
+        outbox: createOutboxWriter({ registry }),
+        audit: createPostgresMaterialActionAuditWriter(),
+      });
+      expect(
+        await decide({
+          tenantId: world.tenantA,
+          operatorUserId: requester?.id ?? "",
+          correlationId: CORRELATION(),
+          claimId: identity,
+          status: "VERIFIED",
+          decisionBasis: "Approving my own request",
+          revocationReason: null,
+        }),
+      ).toEqual({ kind: "SELF_DECISION" });
+      const still = await pendingIds(world.tx, world.tenantA);
+      expect(still).toContain(identity);
+    });
+  });
+
   it("lets an operator decide a real person's request by hand, as a HUMAN, exactly once (ADR 0033)", async () => {
     await withWorld(async (world) => {
       await request(world, world.realMemberA);

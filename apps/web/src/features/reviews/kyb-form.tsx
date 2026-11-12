@@ -94,6 +94,9 @@ function StandingRow({
   );
 }
 
+/** See the note at the ID field: off until identity documents are private. */
+const ID_DOCUMENT_UPLOAD_PRIVATE = false;
+
 const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = ["application/pdf", "image/png", "image/jpeg"];
 
@@ -416,15 +419,25 @@ function VerifySteps({
                 className={fieldClassName}
               />
             </Field>
-            <DropZone
-              title={t("ID document (optional)")}
-              note={t(
-                "A passport or national ID. PDF, PNG or JPEG, up to 10 MB. Seen only by the person at Capital Q who checks it.",
-              )}
-              file={personFile}
-              onFile={setPersonFile}
-              data-verify-file="person"
-            />
+            {/* Owner review 12 Nov (verification audit): the ID went up as an
+                ordinary CORPORATE organisation document, so the promise "seen
+                only by the person at Capital Q who checks it" was not true.
+                Hidden until identity documents have their own private path
+                (excluded from the document pipeline, Q and organisation
+                lists; RLS to the submitter and the reviewer's signed link).
+                The reviewer can decide without one (documentId is optional).
+                Production had 0 ID documents when this was hidden. */}
+            {ID_DOCUMENT_UPLOAD_PRIVATE ? (
+              <DropZone
+                title={t("ID document (optional)")}
+                note={t(
+                  "A passport or national ID. PDF, PNG or JPEG, up to 10 MB. Seen only by the person at Capital Q who checks it.",
+                )}
+                file={personFile}
+                onFile={setPersonFile}
+                data-verify-file="person"
+              />
+            ) : null}
             <button
               type="button"
               className={accountButton("primary", "regular", "mt-1 self-start")}

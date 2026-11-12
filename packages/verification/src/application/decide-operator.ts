@@ -47,7 +47,9 @@ export type DecideByOperatorOutcome =
       readonly decidesClaimId: string;
       readonly status: "VERIFIED" | "REVOKED";
     }
-  | { readonly kind: "NOTHING_TO_DECIDE" };
+  | { readonly kind: "NOTHING_TO_DECIDE" }
+  /** The operator asked for this claim: another admin must decide it. */
+  | { readonly kind: "SELF_DECISION" };
 
 export function createDecideByOperator(dependencies: {
   readonly transactions: TransactionManager;
@@ -82,6 +84,13 @@ export function createDecideByOperator(dependencies: {
         request.organisationId,
       );
       if (request.status !== "PENDING") return { kind: "NOTHING_TO_DECIDE" };
+      // Verification audit 12 Nov: the person who asked for a claim never
+      // decides it (four eyes, as human reviews already require). Today's
+      // one reviewer is also a founder, so their own company's claims wait
+      // for a second admin.
+      if (request.requestedByUserId === operator) {
+        return { kind: "SELF_DECISION" };
+      }
       const current = await repository.currentRevision(tx.sql, request);
       if (current !== request.revision) return { kind: "NOTHING_TO_DECIDE" };
 
