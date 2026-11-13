@@ -89,18 +89,23 @@ export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
 export CQ_VITEST_MAX_WORKERS="${CQ_VITEST_MAX_WORKERS:-$(nproc)}"
 
 declare -A result
+# Each step's result is also written to a file, so a step run in the
+# database lane (a background subshell) reports back to this shell.
 run() {
   local name="$1"
   shift
   local started=$SECONDS
   echo "== $name"
+  local verdict
   if "$@" >"$out/$name.log" 2>&1; then
-    result[$name]="PASS $((SECONDS - started))s"
+    verdict="PASS $((SECONDS - started))s"
   else
-    result[$name]="FAIL $((SECONDS - started))s (see $out/$name.log)"
+    verdict="FAIL $((SECONDS - started))s (see $out/$name.log)"
     tail -25 "$out/$name.log"
   fi
-  echo "   ${result[$name]}"
+  result[$name]="$verdict"
+  echo "$verdict" >"$out/result.$name"
+  echo "   $name: $verdict"
 }
 
 # The database and integration jobs run on the same local Supabase stack as
@@ -135,19 +140,28 @@ step_static() {
   pnpm exec prettier --check . --cache --cache-strategy content \
     --cache-location "$root/cache/prettier/.prettiercache" && pnpm lint
 }
-step_typecheck() { pnpm typecheck; }
-step_build() { pnpm build; }
-step_test() {
-  pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only &&
-    pnpm test
+# Workspace packages are built once, before the lanes (prebuild below), at
+# this exact commit. Later steps reuse that output instead of re-running
+# turbo builds, which would rewrite dist/ while the other lane reads it.
+# The set of tasks is unchanged: typecheck runs every typecheck task
+# (--only: without re-running their ^build dependencies, already built)
+# plus the root tsc, exactly as `pnpm typecheck`; build runs the apps'
+# builds, which with the prebuild is exactly `pnpm build`.
+step_prebuild() {
+  pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only
 }
+step_typecheck() {
+  pnpm exec turbo run typecheck --only &&
+    node --max-old-space-size=7168 node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
+}
+step_build() { pnpm exec turbo run build --filter=./apps/* --only; }
+step_test() { pnpm test; }
 step_database() {
   fresh_supabase || return 1
   local rc=0
   pnpm exec supabase test db || rc=1
   if [ "$rc" = 0 ]; then
-    pnpm exec turbo run build --filter=@capital-q/gateq-intake... --concurrency=2 &&
-      docker exec supabase_db_capital-q createdb -U postgres -T template0 cq_gateq_supersession_test &&
+    docker exec supabase_db_capital-q createdb -U postgres -T template0 cq_gateq_supersession_test &&
       docker cp supabase supabase_db_capital-q:/tmp/cq-supersession &&
       docker exec supabase_db_capital-q psql -X -v ON_ERROR_STOP=1 -U postgres -d cq_gateq_supersession_test \
         -f /tmp/cq-supersession/tests/database/rls/support/gateq-supersession-local-bootstrap.psql &&
@@ -160,8 +174,7 @@ step_database() {
 step_integration() {
   fresh_supabase || return 1
   local rc=0
-  pnpm exec turbo run build --filter=./packages/* --concurrency=2 &&
-    CQ_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  CQ_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
       DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
       pnpm test:integration || rc=1
   stop_supabase
@@ -170,17 +183,66 @@ step_integration() {
 
 started=$SECONDS
 mkdir -p "$root/cache/prettier"
-stopped=""
+rm -f "$out"/result.*
+# ESLint worker threads per batch (scripts/lint.mjs; 2 measured safe on
+# 16 GB, 4 ran out of memory).
+export CQ_LINT_CONCURRENCY="${CQ_LINT_CONCURRENCY:-2}"
+export CQ_LINT_PREBUILT=1
+# The one package build every step relies on; a failure stops the gate.
+run prebuild step_prebuild
+case "${result[prebuild]}" in
+  PASS*) ;;
+  *)
+    echo "ci-local FAIL sha=$sha: workspace packages did not build (see $out/prebuild.log)"
+    exit 1
+    ;;
+esac
+
+# Two lanes (owner, 13 Nov: overlap only what measurement supports).
+#   database lane: database, then integration, in the background. Both use
+#     the local Supabase stack in Docker (one at a time: they share its
+#     ports) and little CPU: pgTAP is mostly container start-up, and the
+#     integration suite runs its files one after another.
+#   code lane: static, typecheck, build, test, in this shell.
+# Every step still runs on its own terms; only the waiting overlaps. The
+# lanes stop independently at their first failure (CI_LOCAL_DIAGNOSE=1:
+# never), and the receipt still needs every step to pass.
+lane() {
+  local stopped=""
+  for name in "$@"; do
+    if [ -n "$stopped" ]; then
+      echo "NOT RUN (after $stopped failed)" >"$out/result.$name"
+      continue
+    fi
+    run "$name" "step_$name"
+    case "$(cat "$out/result.$name")" in
+      PASS*) ;;
+      *) [ "${CI_LOCAL_DIAGNOSE:-0}" = "1" ] || stopped="$name" ;;
+    esac
+  done
+}
+db_steps=""
+code_steps=""
 for name in $steps; do
-  if [ -n "$stopped" ]; then
-    result[$name]="NOT RUN (after $stopped failed)"
-    continue
-  fi
-  run "$name" "step_$name"
-  case "${result[$name]}" in
-    PASS*) ;;
-    *) [ "${CI_LOCAL_DIAGNOSE:-0}" = "1" ] || stopped="$name" ;;
+  case "$name" in
+    database | integration) db_steps="$db_steps $name" ;;
+    *) code_steps="$code_steps $name" ;;
   esac
+done
+db_pid=""
+if [ -n "$db_steps" ]; then
+  # shellcheck disable=SC2086
+  lane $db_steps >"$out/db-lane.log" 2>&1 &
+  db_pid=$!
+fi
+# shellcheck disable=SC2086
+lane $code_steps
+if [ -n "$db_pid" ]; then
+  wait "$db_pid"
+  cat "$out/db-lane.log"
+fi
+for name in $steps; do
+  result[$name]="$(cat "$out/result.$name" 2>/dev/null || echo "NOT RUN")"
 done
 
 verdict=PASS

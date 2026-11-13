@@ -30,18 +30,22 @@ const batches = [
 // declarations, as `pnpm typecheck` does (turbo `^build`). Without them every
 // cross-package type reads as unresolved `any` (CI, 2026-10-10). Turbo caches
 // the build, so a warm run costs seconds.
-const built = spawnSync(
-  "pnpm",
-  [
-    "exec",
-    "turbo",
-    "run",
-    "build",
-    "--filter=./packages/*",
-    "--output-logs=errors-only",
-  ],
-  { stdio: "inherit" },
-);
+// CQ_LINT_PREBUILT=1: the gate already built the packages at this commit.
+const built =
+  process.env["CQ_LINT_PREBUILT"] === "1"
+    ? { status: 0 }
+    : spawnSync(
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "build",
+          "--filter=./packages/*",
+          "--output-logs=errors-only",
+        ],
+        { stdio: "inherit" },
+      );
 if (built.status !== 0) {
   console.log("lint: workspace packages failed to build");
   process.exit(1);
@@ -59,6 +63,12 @@ for (const batch of batches) {
       "node_modules/eslint/bin/eslint.js",
       "--max-warnings=0",
       "--no-warn-ignored",
+      // CQ_LINT_CONCURRENCY (the gate sets 2): ESLint's own worker threads
+      // per batch. Measured 13 Nov on apps/web: off 243 s / 5.0 GB peak, 2
+      // 167 s / 8.3 GB, 4 killed for memory (14 GB). Default: one thread.
+      ...(/^[1-9]$/.test(process.env["CQ_LINT_CONCURRENCY"] ?? "")
+        ? ["--concurrency", String(process.env["CQ_LINT_CONCURRENCY"])]
+        : []),
       ...batch,
     ],
     { stdio: "inherit" },
