@@ -435,3 +435,16 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Contents: the chart fact (`4375d1155`) and C10 comparison by reading (`c455c03d2`).
 - **Live:** the Ledgerline chart's words now describe the drawn series: "₦31.72m in June 2026 to ₦33.69m in July, ₦35.78m in August, and ₦38.0m in September… about ₦6.28m, or 19.8%… self-reported". One CHART block.
   - It also cites an older October 2025 growth start (₦19.6m) and says honestly that the months in between are not given.
+
+## C10 batch deployed — `5af6c8ad3` (13 Nov, 15:10 Lagos)
+
+- **Gate:** `ci-local PASS sha=5af6c8ad3 at=2026-11-13T13:58:43Z took=2101s`. Rollback point `c455c03d2`; four services SUCCESS.
+- **Contents:**
+  - TURN_READER v82 typed chart intent; the chart path no longer reads words (`5af6c8ad3`).
+  - Re-render by the reading (`e36f156fb`).
+  - Comparison by the reading (deployed earlier).
+- **Live** (`investor.savanna-seed`, one conversation):
+  1. "How has Ledgerline's monthly recurring revenue moved since June? Let me see it visually." The word "chart" is never said. Answer: a 4-point Ledgerline MRR chart, and words that match it ("₦31.72m in June to ₦38.0m in September 2026… about 19.8%").
+  2. "Now do the same for Silo Credit." The follow-up is understood and the metric kept. Silo Credit, a lender, has no MRR claim, so Q says MRR "isn't available on record". No other metric is substituted and no chart is drawn.
+  3. "What stage is Ledgerline at?" Answer: "Ledgerline is at the seed stage… isn't verified." No chart.
+- **Noise seen (audit item 2, navigation):** each turn also stored an unasked move or offer: "I've opened Overview.", "Overview is ready to open.", "Relationship is ready to open." The pane moved to Ledgerline's profile on the chart ask.
