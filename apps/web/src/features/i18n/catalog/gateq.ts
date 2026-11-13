@@ -1195,4 +1195,7 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
     "تعِد {fund} بالرد خلال {n} أيام عمل. لا يُرسل شيء حتى تضغط «أرسل».",
   "Signed in as": "مسجّل الدخول باسم",
   "Back to your answers": "عُد إلى إجاباتك",
+  "Use my Capital Q mandate": "استخدم تفويضي في Capital Q",
+  "Filled in from your Capital Q mandate. Change anything, then let Q draft the rules; nothing is published until you do it.":
+    "مُلئ من تفويضك في Capital Q. غيّر ما تشاء، ثم دع Q يصوغ القواعد؛ لا يُنشر شيء حتى تنشره أنت.",
 };

@@ -10,6 +10,7 @@ import type {
 import {
   PermittedContextPlanSchema,
   Q_TASK_CLASSES,
+  type CompanyRaiseView,
   type PermittedContextPlan,
   type QTaskClass,
 } from "@capital-q/contracts";
@@ -863,6 +864,15 @@ describe("a claim's own scope decides the result's sensitivity", () => {
   const claimCall = async (
     visibility: "network_visible" | "relationship_shared",
   ) => {
+    const view = {
+      source: "DECK_CLAIM" as const,
+      money: { amount: "1200000000", currency: "NGN" },
+      truthClass: "USER_CLAIM" as const,
+      evidenceStatus: "SELF_REPORTED" as const,
+      visibility,
+      asOf: null,
+      pitch: null,
+    } as const satisfies CompanyRaiseView;
     const ports = fakePorts({
       companies,
       capital,
@@ -871,16 +881,9 @@ describe("a claim's own scope decides the result's sensitivity", () => {
       relationships,
       investorFeed,
       companyRaise: {
-        raiseFor: () =>
-          Promise.resolve({
-            source: "DECK_CLAIM" as const,
-            money: { amount: "1200000000", currency: "NGN" },
-            truthClass: "USER_CLAIM" as const,
-            evidenceStatus: "SELF_REPORTED" as const,
-            visibility,
-            asOf: null,
-            pitch: null,
-          }),
+        raiseFor: () => Promise.resolve(view),
+        raisesFor: (_actor, ids) =>
+          Promise.resolve(new Map(ids.map((id) => [id, view]))),
       },
     });
     const executor = createQToolExecutor({

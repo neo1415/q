@@ -13,14 +13,32 @@ import {
  * Owner, 13 Nov: Back and Continue navigate reliably. The GateQ form's steps
  * lived in React state only, so the browser's Back left the application.
  */
-let goTo: (step: FormStep) => void = () => undefined;
+const STEPS: readonly FormStep[] = [
+  "company",
+  "contact",
+  "interview",
+  "review",
+  "sent",
+];
 
 function Harness({ enabled = true }: { readonly enabled?: boolean }) {
   const [step, setStep] = useState<FormStep>("company");
-  goTo = setStep;
   useStepHistory(step, setStep, enabled);
-  return <p data-testid="step">{step}</p>;
+  return (
+    <>
+      <p data-testid="step">{step}</p>
+      {STEPS.map((one) => (
+        <button key={one} type="button" onClick={() => setStep(one)}>
+          {`go ${one}`}
+        </button>
+      ))}
+    </>
+  );
 }
+
+const goTo = (step: FormStep) => {
+  screen.getByRole("button", { name: `go ${step}` }).click();
+};
 
 const shown = () => screen.getByTestId("step").textContent;
 const back = async (expected: string) => {

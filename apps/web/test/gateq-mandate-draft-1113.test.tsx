@@ -75,9 +75,7 @@ describe("their mandate, in words, for the rules editor", () => {
   it("with no rules yet, the editor starts from it, and says so", () => {
     const text = mandateDraftText(mandate);
     render(<PolicyEditor hasRules={false} fromMandate={text} />);
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
-      text,
-    );
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe(text);
     expect(
       document.querySelector("[data-gateq-mandate-filled]")?.textContent,
     ).toMatch(/nothing is published until you do it/u);
@@ -86,7 +84,7 @@ describe("their mandate, in words, for the rules editor", () => {
   it("with rules already, one button fills it in; without a mandate, none", async () => {
     const text = mandateDraftText(mandate);
     render(<PolicyEditor hasRules fromMandate={text} />);
-    const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
     expect(box.value).toBe("");
     await userEvent.click(
       screen.getByRole("button", { name: "Use my Capital Q mandate" }),
