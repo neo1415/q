@@ -79,6 +79,12 @@ const OutputSchema = z
             truthClass: z.string(),
             evidenceStatus: z.string(),
             lifecycleStatus: z.literal("CURRENT"),
+            /**
+             * True on an earlier dated reading of a metric the company also
+             * states for a later date: history (a chart's points), never
+             * today's figure. Absent on the latest reading.
+             */
+            earlier: z.literal(true).optional(),
           })
           .strict(),
       )
@@ -112,6 +118,37 @@ const NETWORK: readonly CompanyFigureScope[] = [
 ];
 const PUBLIC_ONLY: readonly CompanyFigureScope[] = ["public_external"];
 
+const DAY = /^(\d{4}-\d{2}-\d{2})/u;
+
+function dayOf(raw: unknown): string | null {
+  return typeof raw === "string" ? (DAY.exec(raw.trim())?.[1] ?? null) : null;
+}
+
+/** The date a reading is for: its value's own date, else the claim's. */
+function readingDate(f: CompanyFigure): string | null {
+  const v = f.structuredValue;
+  return dayOf(v?.["asOf"]) ?? dayOf(v?.["periodEnd"]) ?? dayOf(f.validFrom);
+}
+
+/**
+ * Several CURRENT claims of one key with different dates are the
+ * company's history of that metric. Per key, the latest dated reading is
+ * the figure; an earlier dated one, or an undated one beside a dated one,
+ * is marked earlier (and said so in its statement), so the model is never
+ * invited to quote June as today's. Two readings for the same latest date
+ * both stay current: a contradiction is never resolved by picking one.
+ */
+function latestByKey(figures: readonly CompanyFigure[]): Map<string, string> {
+  const latest = new Map<string, string>();
+  for (const f of figures) {
+    const date = readingDate(f);
+    if (date === null) continue;
+    const before = latest.get(f.claimKey);
+    if (before === undefined || date > before) latest.set(f.claimKey, date);
+  }
+  return latest;
+}
+
 /** Only what the grant reaches leaves the tool, whatever the port returned. */
 export function shapeCompanyFigures(
   companyId: string,
@@ -121,25 +158,39 @@ export function shapeCompanyFigures(
 ): Output {
   const reach = new Set<string>(scopes);
   const within = WITHIN[sensitivity];
-  const kept = figures
-    .filter(
-      (f) =>
-        // Only the current reading: a superseded, disputed, withdrawn or
-        // stale claim is history, never today's figure.
-        f.lifecycleStatus === "CURRENT" &&
-        reach.has(f.visibilityScope) &&
-        within.has(f.sensitivityClass),
-    )
-    .slice(0, FIGURES_MAX)
-    .map((f) => ({
+  const admitted = figures.filter(
+    (f) =>
+      // Only the current reading: a superseded, disputed, withdrawn or
+      // stale claim is history, never today's figure.
+      f.lifecycleStatus === "CURRENT" &&
+      reach.has(f.visibilityScope) &&
+      within.has(f.sensitivityClass),
+  );
+  const latest = latestByKey(admitted);
+  const shaped = admitted.map((f) => {
+    const newest = latest.get(f.claimKey);
+    const date = readingDate(f);
+    const earlier = newest !== undefined && date !== newest;
+    const statement = earlier
+      ? `Earlier reading${date === null ? " (undated)" : ` (${date})`}, not the latest figure: ${f.statement}`
+      : f.statement;
+    return {
       key: f.claimKey,
-      statement: f.statement.slice(0, STATEMENT_MAX),
+      statement: statement.slice(0, STATEMENT_MAX),
       value: f.structuredValue,
       asOf: f.validFrom,
       truthClass: f.truthClass,
       evidenceStatus: f.evidenceStatus,
       lifecycleStatus: "CURRENT" as const,
-    }));
+      ...(earlier ? { earlier: true as const } : {}),
+    };
+  });
+  // The latest readings first, so the cap never drops a current figure
+  // for an earlier month of another.
+  const kept = [
+    ...shaped.filter((f) => f.earlier !== true),
+    ...shaped.filter((f) => f.earlier === true),
+  ].slice(0, FIGURES_MAX);
   return {
     companyId,
     figures: kept,
@@ -156,7 +207,7 @@ export function createReadCompanyFiguresTool(
     status: "ACTIVE",
     providerName: "read_company_figures",
     description:
-      "Reads a company's current figures as the company published them: revenue (MRR, ARR), growth, customers and users, margins, team size, the raise target and market size, each with its date, truth class and evidence status. Call it for any question about a company's traction, numbers, raise or performance, and when describing a company. Every figure is the company's own claim unless its evidence status says otherwise: say \"self-reported\" and never call it verified. NONE means the company has published no figures: say they are not known, never zero. A figure not returned (burn, runway or any other) is unknown to this read, not absent: the company's deck (read_company_deck) may state it, and the person's screen may show it from there. Never say the company or its profile has no such figure; say you can't see or verify it.",
+      "Reads a company's current figures as the company published them: revenue (MRR, ARR), growth, customers and users, margins, team size, the raise target and market size, each with its date, truth class and evidence status. Call it for any question about a company's traction, numbers, raise or performance, and when describing a company. A figure marked earlier is an earlier month of a metric the company also states for a later date: history, never today's figure. Every figure is the company's own claim unless its evidence status says otherwise: say \"self-reported\" and never call it verified. NONE means the company has published no figures: say they are not known, never zero. A figure not returned (burn, runway or any other) is unknown to this read, not absent: the company's deck (read_company_deck) may state it, and the person's screen may show it from there. Never say the company or its profile has no such figure; say you can't see or verify it.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [capability("company.view")],

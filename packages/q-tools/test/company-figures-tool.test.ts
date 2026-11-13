@@ -295,3 +295,96 @@ describe("read_company_figures", () => {
     expect(shaped.figures.map((f) => f.key)).toEqual(["a"]);
   });
 });
+
+/**
+ * A8 demo figures (13 Nov 2026): several CURRENT claims of one key with
+ * different dates are history. Every reading still reaches a chart, but an
+ * earlier one is marked and said as earlier, so the model never quotes
+ * June as today's.
+ */
+describe("read_company_figures: history of one metric", () => {
+  const SCOPES: readonly CompanyFigureScope[] = [
+    "network_visible",
+    "public_external",
+  ];
+  const month = (validFrom: string, amount: string) =>
+    figure({
+      statement: `Monthly revenue USD ${amount}.`,
+      validFrom,
+      structuredValue: {
+        kind: "MONEY",
+        amount,
+        currency: "USD",
+        asOf: validFrom,
+      },
+    });
+
+  it("keeps every reading, the latest first and unmarked, earlier ones marked and said as earlier", () => {
+    const shaped = shapeCompanyFigures(
+      COMPANY_B_NETWORK,
+      [
+        month("2026-07-31", "4200"),
+        month("2026-09-30", "4800"),
+        month("2026-08-31", "4500"),
+      ],
+      SCOPES,
+      "NETWORK_VISIBLE",
+    );
+    expect(shaped.figures).toHaveLength(3);
+    const [latest, ...rest] = shaped.figures;
+    expect(latest?.asOf).toBe("2026-09-30");
+    expect(latest?.earlier).toBeUndefined();
+    expect(latest?.statement).toBe("Monthly revenue USD 4800.");
+    for (const one of rest) {
+      expect(one.earlier).toBe(true);
+      expect(one.statement).toMatch(
+        /^Earlier reading \(2026-0[78]-\d\d\), not the latest figure: /u,
+      );
+    }
+  });
+
+  it("an undated reading beside a dated one is earlier; with no dates none is", () => {
+    const undated = figure({
+      validFrom: null,
+      statement: "Revenue about USD 4,000.",
+    });
+    const shaped = shapeCompanyFigures(
+      COMPANY_B_NETWORK,
+      [undated, month("2026-09-30", "4800")],
+      SCOPES,
+      "NETWORK_VISIBLE",
+    );
+    expect(shaped.figures.map((f) => f.earlier ?? false)).toEqual([
+      false,
+      true,
+    ]);
+    expect(shaped.figures[1]?.statement).toMatch(
+      /^Earlier reading \(undated\)/u,
+    );
+    const onlyUndated = shapeCompanyFigures(
+      COMPANY_B_NETWORK,
+      [undated, { ...undated, statement: "Revenue near USD 4,100." }],
+      SCOPES,
+      "NETWORK_VISIBLE",
+    );
+    expect(onlyUndated.figures.every((f) => f.earlier === undefined)).toBe(
+      true,
+    );
+  });
+
+  it("two different values for the same latest date both stay current: a contradiction", () => {
+    const shaped = shapeCompanyFigures(
+      COMPANY_B_NETWORK,
+      [
+        month("2026-09-30", "4800"),
+        month("2026-09-30", "5200"),
+        month("2026-08-31", "4500"),
+      ],
+      SCOPES,
+      "NETWORK_VISIBLE",
+    );
+    expect(shaped.figures.filter((f) => f.earlier === undefined)).toHaveLength(
+      2,
+    );
+  });
+});

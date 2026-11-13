@@ -19,6 +19,7 @@ import {
 import { restatesVerdict } from "./compare-answer.js";
 import { cardRaiseWords, type RunFit } from "./fit-cards.js";
 import { companyNameCandidates } from "./named-company-fact.js";
+import { latestFigures } from "./latest-figures.js";
 
 /**
  * Owner 23 Oct 2026 ("compare the top two side by side" came back as two
@@ -231,7 +232,9 @@ function tractionCell(
   description?: string | null,
   deck?: readonly ReadDeckFigure[],
 ): string {
-  const stated = (figures ?? [])
+  // One value per metric: the latest dated reading, never an earlier
+  // month shown as today's (the chart draws the history).
+  const stated = latestFigures(figures ?? [])
     .filter((figure) => Number.isFinite(tractionRank(figure)))
     .sort((a, b) => tractionRank(a) - tractionRank(b))
     .slice(0, 4)

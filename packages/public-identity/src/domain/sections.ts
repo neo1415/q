@@ -210,6 +210,48 @@ function periodOf(claim: SectionClaim): string | null {
   })}`;
 }
 
+const DAY = /^(\d{4}-\d{2}-\d{2})/u;
+
+function dayOf(raw: unknown): string | null {
+  return typeof raw === "string" ? (DAY.exec(raw.trim())?.[1] ?? null) : null;
+}
+
+/** The date a reading is for, in the order the card's "As of" reads it. */
+function readingDate(claim: SectionClaim): string | null {
+  const v = claim.structuredValue;
+  return (
+    dayOf(v?.["periodEnd"]) ??
+    dayOf(v?.["asOf"]) ??
+    dayOf(claim.validTo) ??
+    dayOf(claim.validFrom)
+  );
+}
+
+/**
+ * A card shows ONE reading per metric: several CURRENT claims of one key
+ * with different dates are the company's history (a chart's points), and
+ * an earlier month is never shown as today's. Per claim key the latest
+ * dated reading wins and an undated one gives way to any dated one; with
+ * no date at all every reading stays. Readings for the same latest date
+ * that differ all stay (a contradiction coexists; the favourable one is
+ * never picked).
+ */
+export function latestReadings(
+  claims: readonly SectionClaim[],
+): readonly SectionClaim[] {
+  const latest = new Map<string, string>();
+  for (const claim of claims) {
+    const date = readingDate(claim);
+    if (date === null) continue;
+    const before = latest.get(claim.claimKey);
+    if (before === undefined || date > before) latest.set(claim.claimKey, date);
+  }
+  return claims.filter((claim) => {
+    const newest = latest.get(claim.claimKey);
+    return newest === undefined || readingDate(claim) === newest;
+  });
+}
+
 const SCOPE_REACH: Readonly<Record<QCardScope, ReadonlySet<string>>> = {
   public_external: new Set(["public_external"]),
   network_visible: new Set(["public_external", "network_visible"]),
@@ -220,13 +262,19 @@ function metricsFor(
   scope: QCardScope,
 ): CardDetail | null {
   const reach = SCOPE_REACH[scope];
+  // The latest among what this scope may see: a later reading kept to
+  // members never hides the latest public one from a public card.
+  const readable = latestReadings(
+    claims.filter(
+      (claim) => reach.has(claim.visibilityScope) && !isForecast(claim),
+    ),
+  );
   const metrics: CardMetric[] = [];
   for (const spec of METRICS) {
     // Every current reading of the fact, side by side: contradictions
     // coexist until reconciled, and the favourable one is never picked.
-    for (const claim of claims) {
+    for (const claim of readable) {
       if (!spec.keys.includes(claim.claimKey)) continue;
-      if (!reach.has(claim.visibilityScope) || isForecast(claim)) continue;
       const metric = metricOf(claim, spec.label, spec.unit);
       if (metric === null) continue;
       if (

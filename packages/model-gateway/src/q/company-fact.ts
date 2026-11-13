@@ -1,4 +1,5 @@
 import { AuthorisedFactSchema, type AuthorisedFact } from "@capital-q/q-core";
+import { latestFigures } from "./latest-figures.js";
 
 /**
  * The company on the person's screen, read for them before the model is
@@ -164,10 +165,29 @@ export function companyFiguresFacts(
   if (typeof data !== "object" || data === null) return [];
   const figures = (data as { readonly figures?: unknown }).figures;
   if (!Array.isArray(figures)) return [];
-  const facts: AuthorisedFact[] = [];
-  for (const figure of figures.slice(0, FIGURES_MAX) as readonly unknown[]) {
-    if (typeof figure !== "object" || figure === null) continue;
+  // One value per metric: an earlier month of a metric the company also
+  // states for a later date is history (the chart's), never handed to the
+  // model as a current figure it could quote as today's.
+  const readable = (figures as readonly unknown[]).flatMap((figure, index) => {
+    if (typeof figure !== "object" || figure === null) return [];
     const f = figure as Record<string, unknown>;
+    const value = f["value"];
+    return [
+      {
+        record: f,
+        // A reading with no key is never grouped with another.
+        key: typeof f["key"] === "string" ? f["key"] : `#${String(index)}`,
+        statement: text(f["statement"]) ?? "",
+        asOf: text(f["asOf"]),
+        value:
+          typeof value === "object" && value !== null && !Array.isArray(value)
+            ? (value as Readonly<Record<string, unknown>>)
+            : null,
+      },
+    ];
+  });
+  const facts: AuthorisedFact[] = [];
+  for (const { record: f } of latestFigures(readable).slice(0, FIGURES_MAX)) {
     const statement = text(f["statement"]);
     if (statement === null) continue;
     const parsed = AuthorisedFactSchema.safeParse({

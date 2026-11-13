@@ -478,3 +478,83 @@ describe("team faces", () => {
     expect(sections.details["team"]?.public_external).toBeNull();
   });
 });
+
+/**
+ * A8 demo figures (13 Nov 2026): several CURRENT claims of one key with
+ * different dates are the company's history. A card shows one reading
+ * per metric: the latest, never an earlier month as today's.
+ */
+describe("a metric's history on a card", () => {
+  const month = (asOf: string, amount: number, scope = "network_visible") =>
+    claim({
+      claimKey: "financial.mrr",
+      statement: `MRR ${String(amount)}`,
+      structuredValue: { kind: "MONEY", amount, currency: "NGN", asOf },
+      validFrom: asOf,
+      validTo: null,
+      visibilityScope: scope,
+    });
+  const amounts = (
+    claims: SectionClaim[],
+    audience: "PUBLIC" | "PARTICIPANT" = "PARTICIPANT",
+  ) => {
+    const [field] = project(
+      inputs({ claims }),
+      audience,
+      audience === "PUBLIC"
+        ? ALL_ON
+        : {
+            canonicalName: "public_external",
+            tractionMetrics: "network_visible",
+          },
+    );
+    return field?.detail?.kind === "METRICS"
+      ? field.detail.metrics.map((m) => m.amount)
+      : [];
+  };
+
+  it("shows the latest dated reading only, whatever the order", () => {
+    expect(
+      amounts([
+        month("2026-06-30", 31722470),
+        month("2026-09-30", 38000000),
+        month("2026-07-31", 33690377),
+      ]),
+    ).toEqual(["38000000"]);
+  });
+
+  it("a dated reading beats an undated one", () => {
+    const undated = claim({
+      claimKey: "financial.mrr",
+      structuredValue: { kind: "MONEY", amount: 30000000, currency: "NGN" },
+      validFrom: null,
+      validTo: null,
+      visibilityScope: "network_visible",
+    });
+    expect(amounts([undated, month("2026-09-30", 38000000)])).toEqual([
+      "38000000",
+    ]);
+  });
+
+  it("two different values for the same latest date both show: a contradiction", () => {
+    expect(
+      amounts([
+        month("2026-08-31", 35780362),
+        month("2026-09-30", 38000000),
+        month("2026-09-30", 40000000),
+      ]),
+    ).toEqual(["38000000", "40000000"]);
+  });
+
+  it("a public card shows the latest it may see, not one kept to members", () => {
+    expect(
+      amounts(
+        [
+          month("2026-06-30", 31722470, "public_external"),
+          month("2026-09-30", 38000000),
+        ],
+        "PUBLIC",
+      ),
+    ).toEqual(["31722470"]);
+  });
+});
