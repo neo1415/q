@@ -62,17 +62,18 @@ The owner's directive is in [`directives/2026-11-13-consolidated-execution-gateq
 | C7  | Private, permission-aware retrieval and public search when useful | PARTIAL                                             | Public research with citations live (Paystack, Clinicrest plan); Brave only (Tavily and Serper out of credit, owner)                                                                                                                                                                                                                                                                                                                                                                                          |
 | C8  | Investment analysis, contradictions and grounded recommendations  | PARTIAL                                             | Grounding (D3) for conversation answers; contradictions coexist on the profile; not certified across a full investigation journey                                                                                                                                                                                                                                                                                                                                                                             |
 | C9  | Inline artifacts and document interactions                        | PARTIAL                                             | Typed chat delivers an inline card with no auto viewer (live 12 Nov); edit and retry name their document (`aa4d9634a`)                                                                                                                                                                                                                                                                                                                                                                                        |
+| C10 | Semantic intent, not keyword routing (owner addendum, 13 Nov)     | IN PROGRESS                                         | Directive `directives/2026-11-13-addendum-semantic-intelligence.md`. A read-only audit of keyword-driven interpretation across Q is running. First slice in progress: chart intent (companies, canonical metric, period, "same as before") carried by the existing turn reader. The 1d267d200 stop-word patch and the revenue-first metric fallback are being removed. Paraphrase, follow-up, negative and multilingual tests are being added, plus an eval dataset for a small live paraphrase run           |
 
 ## Queue (in order; each item is one bounded slice, batched into gates)
 
 Ranked by the owner's order (13 Nov addendum): integrity → broken journeys → capability gaps → performance → cosmetic. Every pick is made from the whole matrix.
 
-2. A4 (integrity): certify the real verification workflow with a synthetic reviewer scoped by code to synthetic applicants (S4 guard; a reviewed migration for the reviewer row; no owner step).
-3. A8 (capability, explicit priority): charts from permitted figures in the existing CHART block. Then claim extraction from documents and research, company images and pitch media in answers, all inside real investor and founder workflows, typed and voice.
-4. A6 (performance): the measured gate changes (ESLint concurrency 2, Vitest threads after a full-suite check, overlapping independent stages, one Supabase start); one complete optimised gate with timings.
-5. A11 / A12 (journeys): audit relationship progression and Discover → profile → interest end to end as the fictional investor and founder; fix what breaks.
-6. B4 / B5 / B12 (GateQ capability): an end-to-end application through the interview into the inbox, the plan gate for interviews, voice interview; video only with an approved paid run.
-7. C2 / C3 (capability): a versioned capability projection; record model prose offers or drop them.
-8. A3 remainder: LedgerBridge, MoneyHash, ekko (needs the service key, or a reviewed migration for LedgerBridge).
-9. B7 / B6 / B10: per-gateway allowed origins, the branding studio, connected-channel outreach.
-10. A10, A5 owner question (revoked raise vs deck figure).
+1. C10 (owner addendum, explicit priority): chart intent through the turn reader. Then the audit's highest-impact keyword-routing paths, one slice each, with paraphrase and follow-up tests and a small live eval.
+2. A8: deploy the chart-fact fix (`4375d1155`, gating). Then claim extraction from documents and research, then company images and pitch media in answers.
+3. A6: hybrid test isolation (node tests not isolated, web/jsdom isolated) after shuffled-order stability runs; target under 25 min.
+4. A11 / A12 (journeys): audit relationship progression and Discover → profile → interest end to end as the fictional investor and founder.
+5. B4 / B5 / B12 (GateQ): an application through the interview into the inbox; the plan gate for interviews; the voice interview.
+6. C2 / C3: a versioned capability projection; record model prose offers or drop them.
+7. A3 remainder: LedgerBridge, MoneyHash, ekko (the service key, or a reviewed migration for LedgerBridge).
+8. B7 / B6 / B10: per-gateway allowed origins, the branding studio, connected-channel outreach.
+9. A10; the A5 owner question (revoked raise vs deck figure).
