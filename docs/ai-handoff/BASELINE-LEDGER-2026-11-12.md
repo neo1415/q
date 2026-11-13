@@ -375,3 +375,16 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - **LedgerBridge:** its founder needs the `synthetic` app_metadata marker. That is an admin API write; once marked, the workers' sweep decides its PENDING claims.
 - **Root cause fixed:** the live e2e scripts now create users with the synthetic marker (`synthetic-account.mjs`) and refuse non-fictional emails.
 - **Gate timing note:** the gate on `6ad638a1b` ran static in 974 s against 793 s before. The browser runs overlapped it and the prettier cache was cold, so this is not a fair measurement.
+
+## Batch deployed — `6ad638a1b` (13 Nov, 09:45 Lagos)
+
+- **Gate:**
+  - The run on `4517feada` failed only on the schema guards (130, 450): the new throttle table was not classified. Fixed in `6ad638a1b`.
+  - Receipt: `ci-local PASS sha=6ad638a1b at=2026-11-13T08:30:37Z took=3145s` (static 974 s, typecheck 132 s, build 3 s, test 1518 s, database 74 s, integration 444 s).
+  - This was the first run with fail-fast and the prettier cache. Static and test were slowed by demo-activation browser runs and an agent alongside, so the timings are not a fair measurement.
+- **Migration:** `20261231500000_gateq_guest_throttle_buckets` applied with `hosted-migrate-https.mjs` before the deploy. Hosted head is `20261231500000`; RLS is on and anon has no select.
+- **Deploy:** `scripts/deploy-promote.sh 6ad638a1b`, rollback point `61b94f9d6`. All four Railway services SUCCESS.
+- **Live:**
+  - **C3:** as `investor.savanna-seed`, the call prep for Clinicrest ends with "Want to rehearse it? I'll play Clinicrest." and carries a `NAVIGATION_OFFER` to `COMPANY_REHEARSAL`. "yes" answers "Opening a rehearsal with Clinicrest." and moves to `/rehearsals/company/6b2f9851…` (move 3.1 s). No page errors.
+    - Oddity seen in the same turn: a separate "Overview is ready to open." profile offer was stored before the prep answer.
+  - **B8:** `gateq.guest_throttle_buckets` went from 0 to 2 rows after a guest walk on Lagos Forge Fund (fictional), so charges are shared in Postgres. The walk still reached "Your details".
