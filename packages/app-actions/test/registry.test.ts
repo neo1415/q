@@ -372,6 +372,8 @@ describe("the action registry", () => {
       ["relationship.report.generate", "relationship_report", "INSTANT"],
       ["relationship.deal.checklist", "deal_checklist", "INSTANT"],
       ["relationship.deal.status", "relationship_deal_status", "READ"],
+      // A8: a figure a founder tells Q, recorded on their approval.
+      ["company.figure.record", "propose_company_figure", "CONSEQUENTIAL"],
     ]);
   });
 });

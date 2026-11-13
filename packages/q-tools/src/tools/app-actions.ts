@@ -545,6 +545,16 @@ function toolFor(
         // rather than failing the person's action.
         correlationId: correlationOf(execution.correlationId),
         surface: "Q",
+        // A8: the person's own messages, verbatim from the run (never the
+        // model's account of them), so a quote can be checked against them.
+        ...(execution.conversation === undefined
+          ? {}
+          : {
+              theirWords: [
+                execution.conversation.latestUserText,
+                ...(execution.conversation.earlierUserText ?? []).toReversed(),
+              ],
+            }),
       };
       const canonical = await declared
         .toCanonical(resolved, context, own)

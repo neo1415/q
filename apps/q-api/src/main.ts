@@ -3200,6 +3200,9 @@ const appActionPorts: OwnReadPorts = {
   // Recovery D6: "Stop this job", shared by Q and the Work screen.
   workforceJobs: workforceJobStopPort(agentWorkQueue, workforceStore),
   readiness: readinessService,
+  // A8: a figure a founder tells Q, recorded on their approval through
+  // Evidence (which authorises, audits and emits).
+  companyFigures: researchComposition.evidence,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
   // F3: "Find my startup": claim requests and saved startup searches.

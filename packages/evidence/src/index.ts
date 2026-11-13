@@ -155,6 +155,25 @@ export {
   proposeDeterministically,
 } from "./interpretation/deterministic.js";
 export {
+  recordStatedFigure,
+  saidByThem,
+  STATED_FIGURE_METRIC_CODES,
+  STATED_FIGURE_METRICS,
+  statedFigureAmountWords,
+  statedFigureClashes,
+  statedFigureDateWords,
+  StatedFigureMetricSchema,
+  StatedFigureSchema,
+  statedFigureStructuredValue,
+  StatedFigureValueSchema,
+  statedFigureWords,
+  type StatedFigure,
+  type StatedFigureEvidence,
+  type StatedFigureMetric,
+  type StatedFigureOutcome,
+  type StatedFigureValue,
+} from "./interpretation/stated-figure.js";
+export {
   createClaimInterpretationService,
   type ClaimInterpretationDependencies,
   type ClaimInterpretationService,

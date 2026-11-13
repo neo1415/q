@@ -39,6 +39,7 @@ import { READINESS_ACTIONS } from "./actions/readiness.js";
 import { INVESTOR_PROMISE_ACTIONS } from "./actions/investor-promises.js";
 import { DEAL_CLOSE_ACTIONS } from "./actions/deal-close.js";
 import { ENGAGEMENT_ACTIONS } from "./actions/engagement.js";
+import { COMPANY_FIGURE_ACTIONS } from "./actions/company-figures.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -85,6 +86,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...INVESTOR_PROMISE_ACTIONS,
   // 2026-10-08: deal close -- terms, signed, close, reports, deal status.
   ...DEAL_CLOSE_ACTIONS,
+  // A8 (13 Nov 2026): a figure a founder tells Q, recorded on approval.
+  ...COMPANY_FIGURE_ACTIONS,
 ]);
 
 /**

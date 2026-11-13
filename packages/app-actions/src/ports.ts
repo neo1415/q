@@ -23,7 +23,10 @@ import type {
   ViewingVisibility,
 } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
-import type { EvidenceService } from "@capital-q/evidence";
+import type {
+  EvidenceService,
+  StatedFigureEvidence,
+} from "@capital-q/evidence";
 import type { InvestorService } from "@capital-q/investors";
 import type {
   OnboardingNudges,
@@ -178,6 +181,11 @@ export type AppActionPorts = {
     | undefined;
   /** ADR 0050: their own business etiquette guide (How Q speaks for you). */
   readonly etiquetteGuides?: EtiquetteGuidePort | undefined;
+  /**
+   * A8: a figure they told Q about their own company, recorded on their
+   * approval as their private, dated claim (the Evidence services).
+   */
+  readonly companyFigures?: StatedFigureEvidence | undefined;
   /** Q.03/Q.04: their own company's readiness, plan and follow-ups (founder-private). */
   readonly readiness?: ReadinessService | undefined;
   /** G1/G2: the person's company or firm as a team (invitations, roles). */

@@ -63,6 +63,14 @@ export type AppActionContext = {
    */
   readonly qActionId?: string | undefined;
   readonly qDelegationId?: string | undefined;
+  /**
+   * A8: the person's own messages in this conversation (latest first), set
+   * only by trusted server code when Q prepares an action from the run's
+   * conversation. An action that records what they said checks a quote
+   * against these words, never against a model's account of them. Absent:
+   * no conversation (a screen, or code acting on its own).
+   */
+  readonly theirWords?: readonly string[] | undefined;
 };
 
 export type AppActionVerdict =
