@@ -1921,6 +1921,80 @@ function movesAlready(blocks: readonly QResultBlock[]): boolean {
   );
 }
 
+// --- Fast contextual placement: only complete screens -------------------
+
+/**
+ * Own destinations that stand for a record page (their company's or
+ * firm's profile, pitch, data room, deck): placing them early would land
+ * on the record without the tab the decision names.
+ */
+const RECORD_STANDINS: ReadonlySet<string> = new Set([
+  "PROFILE",
+  "PITCH",
+  "OWN_DATA_ROOM",
+  "OWN_DECK",
+]);
+
+/** A screen of their own that is already the exact place (no tab to add). */
+export function completeScreen(destination: string): boolean {
+  return !RECORD_STANDINS.has(destination);
+}
+
+/** Whether the words name one of the records they may open (by its name). */
+export function namesARecord(
+  utterance: string,
+  records: QNavigationRecords,
+): boolean {
+  const words = utterance.toLocaleLowerCase();
+  const names = [
+    ...records.companies.map((one) => one.name),
+    ...records.investors.map((one) => one.name),
+    ...records.things.map((one) => one.title),
+  ];
+  return names.some((name) => {
+    const named = name.trim().toLocaleLowerCase();
+    return named.length >= 3 && words.includes(named);
+  });
+}
+
+const REFINING_FIELDS = [
+  "tab",
+  "sectionId",
+  "documentId",
+  "threadId",
+  "itemId",
+] as const satisfies readonly (keyof QNavigateTarget)[];
+
+/**
+ * The decision's verdict is the early move's own page and record, more
+ * exactly: every field the early move set is the same, and it adds at
+ * least one of tab, section, document, thread or item. Never another
+ * page or record (never a refinement across records).
+ */
+export function refinesPlace(
+  early: QNavigationOutcome,
+  later: QNavigationOutcome,
+): boolean {
+  if (early.decision !== "MOVE" || later.decision !== "MOVE") return false;
+  const a = early.target;
+  const b = later.target;
+  if (a === null || b === null) return false;
+  if (
+    a.page !== b.page ||
+    (a.recordId ?? null) !== (b.recordId ?? null) ||
+    (a.companyId ?? null) !== (b.companyId ?? null)
+  )
+    return false;
+  let adds = false;
+  for (const field of REFINING_FIELDS) {
+    const was = a[field] ?? null;
+    const now = b[field] ?? null;
+    if (was !== null && was !== now) return false;
+    if (was === null && now !== null) adds = true;
+  }
+  return adds;
+}
+
 // --- Pinned workspace (owner addendum, 13 Nov 2026) ----------------------
 
 /** Whether this turn's workspace is pinned (screen.workspace.pinned). */
@@ -2333,12 +2407,22 @@ export function createQPageMoves(dependencies: {
       // state, none of them the decider's verdict. Whichever lands first
       // places the page; the other never moves it a second time.
       const early = (async (): Promise<QNavigationOutcome | null> => {
+        // Without publish the move joins the answer (settle waits for the
+        // decision anyway): nothing to gain, so the decision alone places it.
+        if (turn.publish === undefined) return null;
         const reading = await heard;
         const navigation = reading?.navigation ?? null;
         if (!readsAsContext(navigation) || navigation?.destination == null)
           return null;
+        // Deep-link regression (live, b1bfae8e7: "Can I see Clinicrest's
+        // data room?" lost ?tab=dataroom): only a complete screen of their
+        // own is placed early. A screen that stands for a record (their
+        // profile, pitch, data room, deck), or words that name one of their
+        // records, wait for the decision: it is the one that knows the tab.
+        if (!completeScreen(navigation.destination)) return null;
         const [listed] = await read;
         const records = listed ?? NO_RECORDS;
+        if (namesARecord(turn.utterance, records)) return null;
         const paneNow = navigationPaneFromWorkspace(workspace, map);
         const placed = readingPlacesContext({
           proposed: STAY(null),
@@ -2371,11 +2455,13 @@ export function createQPageMoves(dependencies: {
         );
         return outcome;
       })().catch(() => null);
+      let placedEarly: QNavigationOutcome | null = null;
       const decided = new Promise<QNavigationOutcome | null>((resolve) => {
         let placed = false;
         void early.then((outcome) => {
           if (outcome === null || placed) return;
           placed = true;
+          placedEarly = outcome;
           resolve(outcome);
         });
         void deciding.then(async (outcome) => {
@@ -2385,6 +2471,17 @@ export function createQPageMoves(dependencies: {
           const notYet = Symbol("not yet");
           const first = await Promise.race([early, Promise.resolve(notYet)]);
           if (placed) {
+            // The same page or record, more exactly (a tab, section,
+            // document, thread or item the early move lacks): refined in
+            // place -- the same move, never a second one away.
+            if (
+              placedEarly !== null &&
+              outcome !== null &&
+              refinesPlace(placedEarly, outcome)
+            ) {
+              refine(outcome);
+              return;
+            }
             if (outcome !== null && outcome.decision !== "STAY")
               dependencies.logger?.info(
                 {
@@ -2404,6 +2501,36 @@ export function createQPageMoves(dependencies: {
       pending.set(request.runId, decided);
       startedAt.set(request.runId, Date.now());
       const publish = turn.publish;
+      // After the early move's own message: the decision's exact place on
+      // the same page or record, published as the same move refined.
+      function refine(outcome: QNavigationOutcome): void {
+        const runId = request.runId;
+        const moved = blocksOf(outcome);
+        if (publish === undefined || moved === null || outcome.target === null)
+          return;
+        const target = outcome.target;
+        const after = publications.get(runId) ?? Promise.resolve(null);
+        publications.set(
+          runId,
+          after.then(async (first) => {
+            published.set(runId, [...(published.get(runId) ?? []), ...moved]);
+            dependencies.logger?.info(
+              {
+                qRunId: runId,
+                page: target.page,
+                tab: target.tab ?? null,
+                ms: Date.now() - began,
+              },
+              "q page move refined to the decision's exact place",
+            );
+            const stored = await publish({
+              content: lineFor(outcome, placeTitle(target)),
+              blocks: moved,
+            }).catch(() => undefined);
+            return first ?? stored?.messageId ?? null;
+          }),
+        );
+      }
       if (publish !== undefined) {
         const runId = request.runId;
         publications.set(
