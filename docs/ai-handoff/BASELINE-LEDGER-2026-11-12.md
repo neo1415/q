@@ -296,3 +296,23 @@ Production `945138faf`; fictional investor `investor.savanna-seed`; marketplace-
     - No dialog.
 - **Remaining limitation:**
   - The analysis document's Sources section still says "published <date>" for a search-listed date. Fix in the next batch.
+
+## Consolidated directive (13 Nov, from 00:30 Lagos) — first slices
+
+The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq-capability.md`; the live status is in `ACCEPTANCE-MATRIX-2026-11-13.md`.
+
+- **Continuation:** `trig_01Lw52gWWexsrrMf7kbrPnPc` re-enabled, hourly at :31 UTC (the platform minimum is one hour), with a prompt rewritten for the local gate and receipt-checked deploys.
+- **Audits (read-only agents):**
+  - GateQ (Part B): Back/Forward missing; branding absent; `frame-ancestors *`; in-process throttle; Q's rules drafting only opened the page.
+  - Capabilities and action surfaces (Part C): an unconditional next-step offer and a 2k-character "BE PROACTIVE" note; the SCHEDULE prep-brief link was inert; "Edit with Q" and "Try again" sent fixed text; prose offers are unrecorded.
+- **Slices (LOCAL_TESTED, gating):**
+  - `cca69db1a`: A3, one marketplace universe for search, names and slates.
+  - `418e2d203`: search-listed dates are not called "published".
+  - `0e69109e4`: C4, the schedule card opens its call's relationship.
+  - `aa4d9634a`: C4, edit and retry name their document.
+  - `f47010e5e`: C1, no offer or proactive guidance on remarks, record lookups, plain facts or progress checks.
+  - `029198f0d`: B3, GateQ Back/Forward.
+  - `bbc5ab17a`: A6, gate unit tests use every core. Measured: imports took 2,124 s against 435 s of tests over 2 workers.
+  - `412eec74e`: B2, the rules editor starts from the investor's own mandate.
+- **A5 reproduced live:** Ajopot's Raise cell is blank while the cheque-fit row quotes the deck's raise. Cause and fix are in the matrix; an implementation agent is working on the deck-claim source in its own worktree.
+- **A3 measured:** 445 network-visible, marketplace-ready companies; the curated demo set is active.
