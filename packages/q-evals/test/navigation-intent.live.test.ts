@@ -26,7 +26,7 @@ import {
 
 /**
  * LIVE navigation-intent check (C10, owner directive 13 Nov 2026: semantic
- * intent, not keyword routing). The real TURN_READER (v83) on the hosted
+ * intent, not keyword routing). The real TURN_READER (v84) on the hosted
  * reader model reads each case once; code grades the typed `navigation`
  * intent (mode, negated, and parts for a multi-part turn) against the
  * dataset. No LLM judge. Synthetic, fictional companies only.
@@ -218,7 +218,7 @@ describe("the navigation-intent check runs end to end ($0, no provider)", () => 
 });
 
 describe.skipIf(!LIVE || KEY === undefined)(
-  "live: the navigation intent on the real reader (TURN_READER v83)",
+  "live: the navigation intent on the real reader (TURN_READER v84)",
   () => {
     it("reads every case's typed navigation intent within $1.50", async () => {
       const { results, usage } = await runCases(

@@ -1406,18 +1406,69 @@ export const TurnReaderV83ResultSchema = TurnReaderV82ResultSchema.extend({
 }).strict();
 export type TurnReaderV83Result = z.infer<typeof TurnReaderV83ResultSchema>;
 
+/**
+ * v84 (owner correction 13 Nov 2026, C10). v83's GO / OFFER_ONLY / NONE
+ * turned most ordinary turns into NONE, and with them the contextual
+ * workspace navigation the owner values: while they talk in the Q
+ * Workspace, Q brings the page the conversation is now about into the
+ * adjacent pane without a literal "open". v84 adds CONTEXT:
+ *
+ *   GO          they asked to be taken somewhere: code moves at once
+ *   CONTEXT     the conversation turned to something a Capital Q page holds
+ *               (their pipeline, a relationship, a company's profile or a
+ *               section of it, a deal room, their Daily) and that page beside
+ *               the conversation would materially help: the existing page-move
+ *               decision places it, under all its guards
+ *   OFFER_ONLY  a page could help but the answer belongs here: offered
+ *   NONE        answered best inline (an ordinary question, an inline chart,
+ *               table or document, web research, small talk), or "stay"
+ *
+ * Only where an adjacent workspace pane exists; elsewhere CONTEXT is not a
+ * reading code acts on (its documented word fallback stands).
+ */
+export const TURN_READER_V84_SCHEMA_VERSION = 84;
+export const TURN_NAVIGATION_MODES_V84 = [
+  "GO",
+  "CONTEXT",
+  "OFFER_ONLY",
+  "NONE",
+] as const;
+export type TurnNavigationModeV84 = (typeof TURN_NAVIGATION_MODES_V84)[number];
+export const TurnNavigationIntentV84Schema = z
+  .object({
+    mode: z.enum(TURN_NAVIGATION_MODES_V84).default("NONE").catch("NONE"),
+    negated: z.boolean().default(false).catch(false),
+  })
+  .strict();
+export type TurnNavigationIntentV84 = z.infer<
+  typeof TurnNavigationIntentV84Schema
+>;
+export const TurnReaderV84ResultSchema = TurnReaderV82ResultSchema.extend({
+  navigation: TurnNavigationIntentV84Schema.nullable()
+    .default(null)
+    .catch(null),
+}).strict();
+export type TurnReaderV84Result = z.infer<typeof TurnReaderV84ResultSchema>;
+
 /** Whether a navigation reading asks to be taken somewhere (GO, not negated). */
 export function readsAsGo(
-  navigation: TurnNavigationIntent | null | undefined,
+  navigation: TurnNavigationIntentV84 | null | undefined,
 ): boolean {
   return navigation?.mode === "GO" && !navigation.negated;
 }
 
-/** Whether a navigation reading asks for no move and no offer. */
+/** Whether a navigation reading asks for no move and no offer (NONE, or negated). */
 export function readsAsNoNavigation(
-  navigation: TurnNavigationIntent | null | undefined,
+  navigation: TurnNavigationIntentV84 | null | undefined,
 ): boolean {
   return (
     navigation != null && (navigation.negated || navigation.mode === "NONE")
   );
+}
+
+/** Whether the conversation turned to a page's subject (CONTEXT, not negated). */
+export function readsAsContext(
+  navigation: TurnNavigationIntentV84 | null | undefined,
+): boolean {
+  return navigation?.mode === "CONTEXT" && !navigation.negated;
 }

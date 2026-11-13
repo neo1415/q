@@ -20,10 +20,11 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   NavigationDecisionResultV3Schema,
+  readsAsContext,
   readsAsNoNavigation,
   renderPrompt,
   type NavigationDecisionResult,
-  type TurnNavigationIntent,
+  type TurnNavigationIntentV84,
   type NavigationDecisionVariables,
 } from "@capital-q/q-core";
 
@@ -142,7 +143,13 @@ export type QNavigationGuard =
   /** C10: the turn reader read no navigation asked (NONE, or negated). */
   | "NOT_ASKED"
   /** C10: the turn reader read OFFER_ONLY: the page is offered, never moved to. */
-  | "OFFER_ONLY";
+  | "OFFER_ONLY"
+  /** C10 v84: CONTEXT, and the pane already shows that subject: kept. */
+  | "SAME_SUBJECT"
+  /** C10 v84: CONTEXT back to the page Q just moved away from: no ping-pong. */
+  | "BACK_AND_FORTH"
+  /** C10 v84: GO to a destination code itself moves to at once. */
+  | "ANSWER_MOVES";
 
 // --- 0. The site map (W2) ---------------------------------------------
 
@@ -1209,24 +1216,38 @@ export function applyNavigationPolicy(input: {
 }
 
 /**
- * C10 (owner directive 13 Nov 2026: semantic intent, not keyword routing).
- * The decision ran on every turn in the Q Workspace and moved or offered a
- * page nobody asked for (live on 5af6c8ad3: a chart question opened the
- * company's Overview; "What stage is Ledgerline at?" stored "Relationship
- * is ready to open."). The turn reader's navigation intent (TURN_READER
- * v83), read by meaning in the same single reading, now decides WHETHER
- * the pane may move; the decision still decides WHERE, and the policy
- * whether the person may open it:
+ * C10 (owner directive and correction, 13 Nov 2026: semantic intent, not
+ * keyword routing; keep contextual workspace navigation). The decision ran
+ * on every turn and moved or offered pages nobody needed (live on
+ * 5af6c8ad3: a chart question opened the company's Overview; "What stage
+ * is Ledgerline at?" stored "Relationship is ready to open."), yet the
+ * owner values Q bringing the page the conversation is now about into the
+ * adjacent pane. The turn reader's navigation intent (TURN_READER v84),
+ * read in the same single reading, decides WHETHER the pane may change;
+ * the decision decides WHERE, and its policy (applied before this) whether
+ * it may: no access, unresolved or inexact names, two places, unsure, a
+ * dirty or busy pane, a collapsed pane, already there.
  *
  *   NONE or negated  nothing moves, nothing is offered, nothing remembered
  *   OFFER_ONLY       a MOVE becomes an OFFER of the same place
- *   GO               the decision and its policy stand
+ *   CONTEXT          the decision stands under its policy -- deep links
+ *                    included (a record's tab, section, document, thread) --
+ *                    with two holds: the pane already shows that subject
+ *                    (sameSubject) -- SAME_SUBJECT; or it is the page Q just
+ *                    moved away from -- BACK_AND_FORTH
+ *   GO               the decision stands; when code itself moves to the
+ *                    reader's destination at once (fast GO), the decision
+ *                    adds nothing -- ANSWER_MOVES
  *   null             no reading (a code lane, a failed or older reading):
  *                    the decision stands as before -- the documented fallback
  */
 export function gateByReading(
   outcome: QNavigationOutcome,
-  navigation: TurnNavigationIntent | null,
+  navigation: TurnNavigationIntentV84 | null,
+  context: {
+    readonly pane?: QNavigationPane | undefined;
+    readonly codeMoves?: boolean | undefined;
+  } = {},
 ): QNavigationOutcome {
   if (navigation === null) return outcome;
   if (readsAsNoNavigation(navigation)) {
@@ -1243,7 +1264,44 @@ export function gateByReading(
       guard: "OFFER_ONLY",
     };
   }
+  if (navigation.mode === "GO" && context.codeMoves === true) {
+    return outcome.decision === "STAY" && outcome.remembered === null
+      ? outcome
+      : STAY("ANSWER_MOVES");
+  }
+  if (readsAsContext(navigation)) {
+    const place = outcome.target ?? outcome.remembered;
+    const pane = context.pane;
+    if (place !== null && pane !== undefined) {
+      if (pane.at !== null && sameSubject(place, pane.at))
+        return STAY("SAME_SUBJECT");
+      if (pane.previous !== null && sameSubject(place, pane.previous))
+        return STAY("BACK_AND_FORTH");
+    }
+  }
   return outcome;
+}
+
+/**
+ * The same subject on screen: the same page, record, tab, document, thread
+ * and item -- whatever its section, slide, message or scroll position. A
+ * follow-up about what the pane already shows keeps it; a deep link to
+ * another tab of the same record ("can I see their data room?" while the
+ * company's Overview is open) is a new subject and moves.
+ */
+const SUBJECT_FIELDS = [
+  "page",
+  "recordId",
+  "companyId",
+  "tab",
+  "documentId",
+  "threadId",
+  "itemId",
+] as const satisfies readonly (keyof QNavigateTarget)[];
+export function sameSubject(a: QNavigateTarget, b: QNavigateTarget): boolean {
+  return SUBJECT_FIELDS.every(
+    (field) => (a[field] ?? null) === (b[field] ?? null),
+  );
 }
 
 /** A real second place: resolved, theirs to open, and not the same place. */
@@ -1551,6 +1609,13 @@ export async function decideNavigation(
 
 // --- 4. The answer path: one move per turn, beside the answer ------------
 
+/** What the turn reader read about navigation, as the port is told it (C10). */
+export type QPageMoveReading = {
+  readonly navigation: TurnNavigationIntentV84 | null;
+  /** Fast GO: code moves to the reader's destination itself, at once. */
+  readonly codeMoves?: boolean | undefined;
+};
+
 /** The turn as the decision reads it (the answer path's own reads). */
 export type QPageMoveTurn = {
   readonly utterance: string;
@@ -1589,17 +1654,17 @@ export type QPageMoveTurn = {
 export type QPageMovePort = {
   readonly start: (request: QAnswerRequest, turn: QPageMoveTurn) => void;
   /**
-   * C10 (TURN_READER v83): the turn reader's navigation intent for this
-   * run, as soon as its reading has started. The decision waits for it
-   * (bounded by its own deadline) and is gated by it (`gateByReading`):
-   * NONE or negated moves and offers nothing, OFFER_ONLY offers, GO lets
-   * the decision stand. A run that never reads (a code lane) is heard as
-   * null when its answer is stored: the decision stands, as before.
+   * C10 (TURN_READER v84): the turn reader's navigation intent for this
+   * run, as soon as its reading has started, and whether code itself moves
+   * to the reader's GO destination at once. The decision waits for it
+   * (bounded by its own deadline) and is gated by it (`gateByReading`). A
+   * run that never reads (a code lane) is heard as null when its answer is
+   * stored: the decision stands, as before.
    */
   readonly heard?:
     | ((
         request: QAnswerRequest,
-        navigation: Promise<TurnNavigationIntent | null>,
+        reading: Promise<QPageMoveReading | null>,
       ) => void)
     | undefined;
   readonly settle: (
@@ -1802,14 +1867,15 @@ export function createQPageMoves(dependencies: {
   const readings = new Map<
     string,
     {
-      readonly hear: (
-        navigation: Promise<TurnNavigationIntent | null> | null,
-      ) => void;
-      readonly heard: Promise<TurnNavigationIntent | null>;
+      readonly hear: (reading: Promise<QPageMoveReading | null> | null) => void;
+      readonly heard: Promise<QPageMoveReading | null>;
     }
   >();
   // The reading once it has landed, for settle's synchronous check.
-  const heardNow = new Map<string, TurnNavigationIntent | null>();
+  const heardNow = new Map<string, QPageMoveReading | null>();
+  // Fast GO: the decision's move, held while code moves itself; used only
+  // if the stored answer turns out to move nothing (never neither).
+  const heldForCode = new Map<string, QNavigationOutcome>();
   const hearNothing = (runId: string): void => {
     readings.get(runId)?.hear(null);
   };
@@ -1890,11 +1956,11 @@ export function createQPageMoves(dependencies: {
       let sampled: readonly QNavigationSample[] = [];
       const began = Date.now();
       let hear: (
-        navigation: Promise<TurnNavigationIntent | null> | null,
+        reading: Promise<QPageMoveReading | null> | null,
       ) => void = () => undefined;
       const heard =
         turn.readingFollows === true
-          ? new Promise<TurnNavigationIntent | null>((resolve) => {
+          ? new Promise<QPageMoveReading | null>((resolve) => {
               hear = resolve;
             }).catch(() => null)
           : Promise.resolve(null);
@@ -1936,10 +2002,10 @@ export function createQPageMoves(dependencies: {
             correlationId: request.correlationId,
           },
         ).then(async (proposed) => {
-          // C10: whether to move at all is the reading's (v83), never the
+          // C10: whether to move at all is the reading's (v84), never the
           // words'; waited for no longer than the decision's own deadline.
           let timer: ReturnType<typeof setTimeout> | undefined;
-          const navigation = await Promise.race([
+          const reading = await Promise.race([
             heard,
             new Promise<null>((resolve) => {
               timer = setTimeout(
@@ -1951,7 +2017,20 @@ export function createQPageMoves(dependencies: {
               );
             }),
           ]).finally(() => clearTimeout(timer));
-          const outcome = gateByReading(proposed, navigation);
+          const navigation = reading?.navigation ?? null;
+          const outcome = gateByReading(proposed, navigation, {
+            pane: {
+              ...input.pane,
+              at:
+                input.pane.at === null
+                  ? null
+                  : ownPlace(input.pane.at, records),
+            },
+            codeMoves: reading?.codeMoves,
+          });
+          // Fast GO: held, in case the answer stored moves nothing after all.
+          if (outcome.guard === "ANSWER_MOVES" && proposed.target !== null)
+            heldForCode.set(request.runId, proposed);
           if (outcome !== proposed)
             dependencies.logger?.info(
               {
@@ -2042,21 +2121,37 @@ export function createQPageMoves(dependencies: {
         consumed.delete(request.runId);
         readings.delete(request.runId);
         heardNow.delete(request.runId);
+        heldForCode.delete(request.runId);
       }, 120_000).unref?.();
     },
-    heard: (request, navigation) => {
-      readings.get(request.runId)?.hear(navigation.catch(() => null));
+    heard: (request, reading) => {
+      readings.get(request.runId)?.hear(reading.catch(() => null));
     },
     settle: async (request, blocks, options) => {
       // An answer stored with no reading heard is a code lane: unread.
       hearNothing(request.runId);
       const settled = await settleMoves(request, blocks, options);
+      // Fast GO held the decision's move for code's own; if the answer
+      // stored moves nothing after all, the decision's move joins it, so a
+      // GO is never left with neither.
+      const held = heldForCode.get(request.runId);
+      heldForCode.delete(request.runId);
+      if (held !== undefined && !(settled ?? []).some(movesPaneItself)) {
+        const moved = blocksOf(held);
+        if (moved !== null) {
+          dependencies.logger?.info(
+            { qRunId: request.runId, decision: held.decision },
+            "q page move: code did not move after a GO; the decision's move joins the answer",
+          );
+          return [...(settled ?? []), ...moved];
+        }
+      }
       // C10: the answer model's own place moves stand only where the
-      // reading asked to go somewhere; code's exact commands always stand.
+      // reading asked for navigation; code's exact commands always stand.
       if (
         settled === undefined ||
         options?.keepAnswerMoves === true ||
-        !readsAsNoNavigation(heardNow.get(request.runId))
+        !readsAsNoNavigation(heardNow.get(request.runId)?.navigation)
       ) {
         return settled;
       }

@@ -1,8 +1,9 @@
 /**
- * C10 navigation-intent eval (owner directive 13 Nov 2026: semantic intent,
- * not keyword routing). Natural paraphrases, spoken and non-English
- * phrasings, follow-ups, multi-part turns and negatives for TURN_READER
- * v83's typed `navigation` intent, each with the intent a correct reading
+ * C10 navigation-intent eval (owner directive and correction 13 Nov 2026:
+ * semantic intent, not keyword routing; keep contextual workspace
+ * navigation). Natural paraphrases, spoken and non-English phrasings,
+ * follow-ups, multi-part turns, contextual (CONTEXT) turns and negatives
+ * for TURN_READER v84's typed `navigation` intent, each with the intent a correct reading
  * carries. Graded by code (test/navigation-intent.test.ts offline,
  * test/navigation-intent.live.test.ts on the real reader), never by a
  * model. Synthetic, fictional companies only.
@@ -12,7 +13,7 @@
  * Ledgerline at?" each moved or offered a page nobody asked for.
  */
 
-import type { TurnNavigationMode } from "@capital-q/q-core";
+import type { TurnNavigationModeV84 } from "@capital-q/q-core";
 
 export type NavigationIntentTurn = {
   readonly role: "USER" | "Q";
@@ -20,7 +21,8 @@ export type NavigationIntentTurn = {
 };
 
 export type NavigationIntentExpected = {
-  readonly mode: TurnNavigationMode;
+  /** The mode, or the modes any one of which is right (an inline fact may be offered). */
+  readonly mode: TurnNavigationModeV84 | readonly TurnNavigationModeV84[];
   /** True: they said not to go or open anything (mode NONE then). */
   readonly negated?: boolean | undefined;
   /** True: the turn also asks more, so the reading's parts hold two or more. */
@@ -147,7 +149,8 @@ export const NAVIGATION_INTENT_CASES: readonly NavigationIntentCase[] = [
     id: "none-03 stage (live)",
     said: "What stage is Ledgerline at?",
     recent: LEDGERLINE_CHART,
-    expected: { mode: "NONE" },
+    // An inline fact: answered here, offered at most.
+    expected: { mode: ["NONE", "OFFER_ONLY"] },
   },
   {
     id: "none-04 comparison",
@@ -186,6 +189,87 @@ export const NAVIGATION_INTENT_CASES: readonly NavigationIntentCase[] = [
     recent: [],
     expected: { mode: "NONE", negated: true },
   },
+  {
+    id: "neg-03 don't move the page",
+    said: "Don't move the page, just tell me who's waiting on me",
+    recent: [],
+    expected: { mode: "NONE", negated: true },
+  },
+  // NONE, more: a definition and public-web research.
+  {
+    id: "none-08 definition",
+    said: "What is a SAFE?",
+    recent: [],
+    expected: { mode: "NONE" },
+  },
+  {
+    id: "none-09 web research",
+    said: "What's the press saying about Ledgerline this month?",
+    recent: [],
+    expected: { mode: "NONE" },
+  },
+  // CONTEXT: the conversation turned to something a page holds, and that
+  // page beside it would help -- no "open" said (owner correction).
+  {
+    id: "ctx-01 stalled deals",
+    said: "Which of my deals are stalled?",
+    recent: [],
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-02 follow up this week",
+    said: "Who should I follow up with this week?",
+    recent: [],
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-03 a relationship",
+    said: "Let's go through where things stand with Savanna Seed Partners",
+    recent: [],
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-04 what message is that",
+    said: "What message is that?",
+    recent: [
+      { role: "USER", text: "What needs me today?" },
+      {
+        role: "Q",
+        text: "You haven't replied to Savanna Seed Partners' message from Tuesday.",
+      },
+    ],
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-05 how's GateQ doing",
+    said: "How's GateQ doing?",
+    recent: [],
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-06 anything in my inbox",
+    said: "Anything new in my inbox?",
+    recent: [],
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-07 a company's team",
+    said: "Talk me through their team",
+    recent: CLINICREST_SHOWN,
+    expected: { mode: "CONTEXT" },
+  },
+  {
+    id: "ctx-08 their data room",
+    said: "Can I see their data room?",
+    recent: CLINICREST_SHOWN,
+    expected: { mode: ["GO", "CONTEXT"] },
+  },
+  {
+    id: "ctx-09 their pitch deck",
+    said: "Show me their pitch deck",
+    recent: CLINICREST_SHOWN,
+    expected: { mode: ["GO", "CONTEXT"] },
+  },
 ];
 
 /** The reading's navigation intent and parts, as the grader sees them. */
@@ -203,7 +287,9 @@ export function gradeNavigationIntent(
   if (reading === null) return "not read";
   const navigation = reading.navigation ?? null;
   if (navigation === null) return "no navigation read";
-  if (navigation.mode !== expected.mode) return `mode ${navigation.mode}`;
+  const modes: readonly string[] =
+    typeof expected.mode === "string" ? [expected.mode] : expected.mode;
+  if (!modes.includes(navigation.mode)) return `mode ${navigation.mode}`;
   if (navigation.negated !== (expected.negated ?? false)) {
     return `negated ${String(navigation.negated)}`;
   }

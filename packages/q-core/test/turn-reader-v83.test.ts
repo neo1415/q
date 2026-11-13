@@ -9,6 +9,7 @@ import {
   TURN_READER_V83,
   TurnNavigationIntentSchema,
   TurnReaderV83ResultSchema,
+  TurnReaderV84ResultSchema,
   V83_NAVIGATION,
   V83_NAVIGATION_BEFORE,
 } from "../src/index.js";
@@ -20,15 +21,15 @@ import {
  * decision that runs on every turn.
  */
 describe("TURN_READER v83", () => {
-  it("is active: v82 with one NAVIGATION paragraph before REFERENCES BY NAME, on v83's schema", () => {
+  it("v82 with one NAVIGATION paragraph before REFERENCES BY NAME (v84 is active, on its schema)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(83);
+    expect(active.version).toBe(84);
     expect(registry.get("TURN_READER", 82)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV83ResultSchema,
+      TurnReaderV84ResultSchema,
     );
     expect(TURN_READER_V83.variables).toEqual(TURN_READER_V82.variables);
     expect(TURN_READER_V83.template.replace(`\n${V83_NAVIGATION}`, "")).toBe(

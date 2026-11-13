@@ -18,6 +18,7 @@ import {
   createQPageMoves,
   decideNavigation,
   gateByReading,
+  sameNavigationSubject,
   NAVIGATION_VOTES,
   voteNavigation,
   navigateTargetFromPath,
@@ -2383,22 +2384,30 @@ describe("batch-13 replay (owner 8 Nov: 'it's just giving me buttons'): two of t
 });
 
 /**
- * C10 (owner directive 13 Nov 2026: semantic intent, not keyword routing).
- * Live on 5af6c8ad3: a chart question stored "I've opened Overview." and
- * "What stage is Ledgerline at?" stored "Relationship is ready to open."
- * The decision proposed on every turn; the turn reader's navigation intent
- * (TURN_READER v83) now decides whether anything moves or is offered.
+ * C10 (owner directive and correction 13 Nov 2026). Live on 5af6c8ad3: a
+ * chart question stored "I've opened Overview." and "What stage is
+ * Ledgerline at?" stored "Relationship is ready to open." -- yet the owner
+ * values Q bringing the page the conversation is about into the adjacent
+ * pane, as deep links. The turn reader's navigation intent (TURN_READER
+ * v84) decides WHETHER: GO moves at once, CONTEXT is the decision's to
+ * place under all its guards (deep links kept), OFFER_ONLY offers, NONE or
+ * negated moves and offers nothing.
  */
-describe("C10: the decision is gated by the turn reader's navigation intent", () => {
-  const OVERVIEW: QNavigateTarget = { page: "COMPANY", recordId: SILO };
-  const moved = {
+describe("C10: the decision is gated by the turn reader's navigation intent (v84)", () => {
+  const OVERVIEW: QNavigateTarget = {
+    page: "COMPANY",
+    recordId: SILO,
+    tab: "overview",
+  };
+  const DATAROOM: QNavigateTarget = { ...OVERVIEW, tab: "dataroom" };
+  const moved = (target: QNavigateTarget = OVERVIEW) => ({
     decision: "MOVE" as const,
-    target: OVERVIEW,
+    target,
     openPane: false,
     remembered: null,
     guard: null,
-  };
-  const offered = { ...moved, decision: "OFFER" as const };
+  });
+  const offered = { ...moved(), decision: "OFFER" as const };
   const kept = {
     decision: "STAY" as const,
     target: null,
@@ -2406,56 +2415,105 @@ describe("C10: the decision is gated by the turn reader's navigation intent", ()
     remembered: OVERVIEW,
     guard: "COLLAPSED_PANE" as const,
   };
+  const nav = (
+    mode: "GO" | "CONTEXT" | "OFFER_ONLY" | "NONE",
+    negated = false,
+  ) => ({ mode, negated });
+  const STAYED = (guard: string) => ({
+    decision: "STAY",
+    target: null,
+    openPane: false,
+    remembered: null,
+    guard,
+  });
 
-  it("NONE or negated moves, offers and remembers nothing; OFFER_ONLY offers; GO and no reading stand", () => {
-    for (const outcome of [moved, offered, kept]) {
+  it("NONE or negated moves, offers and remembers nothing; OFFER_ONLY offers; GO, CONTEXT and no reading stand", () => {
+    for (const outcome of [moved(), offered, kept]) {
       for (const navigation of [
-        { mode: "NONE" as const, negated: false },
-        { mode: "GO" as const, negated: true },
+        nav("NONE"),
+        nav("GO", true),
+        nav("CONTEXT", true),
       ]) {
-        expect(gateByReading(outcome, navigation)).toEqual({
-          decision: "STAY",
-          target: null,
-          openPane: false,
-          remembered: null,
-          guard: "NOT_ASKED",
-        });
+        expect(gateByReading(outcome, navigation)).toEqual(STAYED("NOT_ASKED"));
       }
-      expect(gateByReading(outcome, { mode: "GO", negated: false })).toBe(
-        outcome,
-      );
+      expect(gateByReading(outcome, nav("GO"))).toBe(outcome);
+      expect(gateByReading(outcome, nav("CONTEXT"))).toBe(outcome);
       expect(gateByReading(outcome, null)).toBe(outcome);
     }
-    expect(
-      gateByReading(moved, { mode: "OFFER_ONLY", negated: false }),
-    ).toEqual({ ...offered, guard: "OFFER_ONLY" });
-    expect(gateByReading(offered, { mode: "OFFER_ONLY", negated: false })).toBe(
-      offered,
+    expect(gateByReading(moved(), nav("OFFER_ONLY"))).toEqual({
+      ...offered,
+      guard: "OFFER_ONLY",
+    });
+    expect(gateByReading(offered, nav("OFFER_ONLY"))).toBe(offered);
+  });
+
+  it("GO with code's own move: the decision adds nothing (ANSWER_MOVES)", () => {
+    expect(gateByReading(moved(), nav("GO"), { codeMoves: true })).toEqual(
+      STAYED("ANSWER_MOVES"),
+    );
+    expect(gateByReading(moved(), nav("GO"), { codeMoves: false })).toEqual(
+      moved(),
     );
   });
 
-  const request = (runId: string) =>
+  it("CONTEXT keeps the subject on screen, takes a deep link to another tab, and never bounces back", () => {
+    const at = (
+      where: QNavigateTarget,
+      previous: QNavigateTarget | null = null,
+    ) => pane({ at: where, previous });
+    // A follow-up about what the pane shows (another section of the same
+    // tab) keeps the page.
+    expect(
+      gateByReading(moved({ ...OVERVIEW, sectionId: "team" }), nav("CONTEXT"), {
+        pane: at(OVERVIEW),
+      }),
+    ).toEqual(STAYED("SAME_SUBJECT"));
+    // "Can I see their data room?" on the Overview: a deep link, moved.
+    expect(
+      gateByReading(moved(DATAROOM), nav("CONTEXT"), { pane: at(OVERVIEW) }),
+    ).toEqual(moved(DATAROOM));
+    // Back to the page Q just moved away from: held (no ping-pong).
+    expect(
+      gateByReading(moved(OVERVIEW), nav("CONTEXT"), {
+        pane: at(DATAROOM, OVERVIEW),
+      }),
+    ).toEqual(STAYED("BACK_AND_FORTH"));
+    // GO goes back when they ask.
+    expect(
+      gateByReading(moved(OVERVIEW), nav("GO"), {
+        pane: at(DATAROOM, OVERVIEW),
+      }),
+    ).toEqual(moved(OVERVIEW));
+    expect(sameNavigationSubject(OVERVIEW, { ...OVERVIEW, slide: 3 })).toBe(
+      true,
+    );
+    expect(sameNavigationSubject(OVERVIEW, DATAROOM)).toBe(false);
+  });
+
+  const request = (runId: string, at = "/home", extra = {}) =>
     ({
       runId,
       tenantId: "t",
       actorUserId: "u",
       correlationId: "c",
+      askerSide: "INVESTOR",
       plan: {
         scopes: [],
         screen: {
           route: "HOME",
-          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+          workspace: { qPane: "open", pagePane: "open", at, ...extra },
         },
       },
     }) as unknown as QAnswerRequest;
   const team = proposal({ place: place({ route: "/work", tab: "team" }) });
 
-  it("the decision waits for the reading: NONE publishes nothing, GO the move, OFFER_ONLY an offer", async () => {
+  it("the decision waits for the reading: NONE publishes nothing, GO and CONTEXT the move, OFFER_ONLY an offer", async () => {
     vi.useFakeTimers();
     try {
       for (const [mode, expected] of [
         ["NONE", []],
         ["GO", ["I've opened Q's team."]],
+        ["CONTEXT", ["I've opened Q's team."]],
         ["OFFER_ONLY", ["Q's team is ready to open."]],
       ] as const) {
         const published: string[] = [];
@@ -2465,7 +2523,7 @@ describe("C10: the decision is gated by the turn reader's navigation intent", ()
         });
         const r = request(`c10-${mode}`);
         moves.start(r, {
-          utterance: "How has Ledgerline's MRR moved since June?",
+          utterance: "who's working on what?",
           recentTurns: [],
           pageText: null,
           readingFollows: true,
@@ -2474,17 +2532,61 @@ describe("C10: the decision is gated by the turn reader's navigation intent", ()
             return Promise.resolve({ messageId: "m" });
           },
         });
-        // The decision lands at once; the reading 700 ms later.
         await vi.advanceTimersByTimeAsync(100);
         expect(published).toEqual([]);
         moves.heard?.(
           r,
           new Promise((resolve) =>
-            setTimeout(() => resolve({ mode, negated: false }), 700),
+            setTimeout(() => resolve({ navigation: nav(mode) }), 700),
           ),
         );
         await vi.advanceTimersByTimeAsync(800);
         expect(published, mode).toEqual(expected);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("speed: a GO or CONTEXT move is published the moment both the decision and the reading are in, never at the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      for (const [decisionMs, readingMs, expectedAt] of [
+        [2_000, 500, 2_000],
+        [800, 1_500, 1_500],
+      ] as const) {
+        for (const mode of ["GO", "CONTEXT"] as const) {
+          const at: number[] = [];
+          const t0 = Date.now();
+          const moves = createQPageMoves({
+            decider: {
+              decide: () =>
+                new Promise((resolve) =>
+                  setTimeout(() => resolve(team), decisionMs),
+                ),
+            },
+            config: { movesAllowed: true },
+          });
+          const r = request(`c10-speed-${mode}-${String(decisionMs)}`);
+          moves.start(r, {
+            utterance: "who's on the team?",
+            recentTurns: [],
+            pageText: null,
+            readingFollows: true,
+            publish: () => {
+              at.push(Date.now() - t0);
+              return Promise.resolve({ messageId: "m" });
+            },
+          });
+          moves.heard?.(
+            r,
+            new Promise((resolve) =>
+              setTimeout(() => resolve({ navigation: nav(mode) }), readingMs),
+            ),
+          );
+          await vi.advanceTimersByTimeAsync(3_000);
+          expect(at, `${mode} ${String(decisionMs)}`).toEqual([expectedAt]);
+        }
       }
     } finally {
       vi.useRealTimers();
@@ -2548,6 +2650,54 @@ describe("C10: the decision is gated by the turn reader's navigation intent", ()
     }
   });
 
+  it("fast GO: code's own move stands and the decision publishes nothing; if code moved nothing after all, the decision's move joins", async () => {
+    const own = {
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "DISCOVER" },
+    };
+    for (const answerMoves of [true, false]) {
+      const published: string[] = [];
+      const moves = createQPageMoves({
+        decider: { decide: () => Promise.resolve(team) },
+        config: { movesAllowed: true },
+      });
+      const r = request(`c10-fast-${String(answerMoves)}`);
+      moves.start(r, {
+        utterance: "take me to discover",
+        recentTurns: [],
+        pageText: null,
+        readingFollows: true,
+        publish: (move) => {
+          published.push(move.content);
+          return Promise.resolve({ messageId: "m" });
+        },
+      });
+      moves.heard?.(
+        r,
+        Promise.resolve({ navigation: nav("GO"), codeMoves: true }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const settled = await moves.settle(
+        r,
+        answerMoves ? ([own] as never) : [],
+        {
+          keepAnswerMoves: true,
+        },
+      );
+      expect(published).toEqual([]);
+      expect(settled).toEqual(
+        answerMoves
+          ? [own]
+          : [
+              {
+                kind: "UI_INTENT",
+                intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
+              },
+            ],
+      );
+    }
+  });
+
   it("NONE also drops the answer model's own place move; code's exact commands stand", async () => {
     const own = {
       kind: "UI_INTENT",
@@ -2568,12 +2718,151 @@ describe("C10: the decision is gated by the turn reader's navigation intent", ()
         pageText: null,
         readingFollows: true,
       });
-      moves.heard?.(r, Promise.resolve({ mode: "NONE", negated: false }));
+      moves.heard?.(r, Promise.resolve({ navigation: nav("NONE") }));
       await new Promise((resolve) => setTimeout(resolve, 5));
       const settled = await moves.settle(r, [own] as never, {
         keepAnswerMoves,
       });
       expect(settled).toEqual(keepAnswerMoves ? [own] : []);
     }
+  });
+
+  // Deep links, as Q placed them before (owner addition 13 Nov): the
+  // decision's place with its record, tab, section or anchor, carried
+  // whole through the gate for GO and CONTEXT alike.
+  const CLINICREST = "abababab-abab-4bab-8bab-abababababab";
+  const SPHEROS = "99999999-9999-4999-8999-999999999999";
+  const RECORDS = {
+    companies: [
+      { id: SILO, name: "Silo Credit" },
+      { id: CLINICREST, name: "Clinicrest" },
+      { id: SPHEROS, name: "Spheros" },
+      { id: SILO_HEALTH, name: "Silo Health" },
+    ],
+    investors: [{ id: KESTREL, name: "Savanna Seed" }],
+    things: [],
+    deleted: [],
+  };
+  const placed = async (
+    proposed: NavigationDecisionResult,
+    mode: "GO" | "CONTEXT",
+    at = "/home",
+    extra = {},
+  ) => {
+    const moves = createQPageMoves({
+      decider: { decide: () => Promise.resolve(proposed) },
+      config: { movesAllowed: true },
+      records: () => Promise.resolve(RECORDS),
+      settleWithinMs: 500,
+    });
+    const r = request(
+      `c10-deep-${mode}-${JSON.stringify(proposed.place)}-${at}`,
+      at,
+      extra,
+    );
+    moves.start(r, {
+      utterance: "-",
+      recentTurns: [],
+      pageText: null,
+      readingFollows: true,
+    });
+    moves.heard?.(r, Promise.resolve({ navigation: nav(mode) }));
+    return moves.settle(r, []);
+  };
+  const opened = (intent: Record<string, unknown>) => [
+    { kind: "UI_INTENT", intent: expect.objectContaining(intent) as unknown },
+  ];
+
+  it.each([
+    [
+      '"can I see their data room?" -> the company\'s data room tab',
+      place({ record: company("Silo Credit"), tab: "dataroom" }),
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: SILO, tab: "dataroom" },
+    ],
+    [
+      '"show me their pitch deck" -> the company\'s deck tab',
+      place({ record: company("Silo Credit"), tab: "deck" }),
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: SILO, tab: "deck" },
+    ],
+    [
+      '"talk me through Clinicrest\'s team" -> its team tab',
+      place({ record: company("Clinicrest"), tab: "team" }),
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: CLINICREST,
+        tab: "team",
+      },
+    ],
+    [
+      '"what message is that?" -> that relationship\'s message thread',
+      place({
+        route: "/relationships/company/[companyId]/messages",
+        record: company("Spheros"),
+      }),
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY_MESSAGES",
+        id: SPHEROS,
+      },
+    ],
+    [
+      '"which of my deals are stalled?" -> the pipeline',
+      place({ route: "/relationships", tab: "pipeline" }),
+      { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    ],
+    [
+      '"anything new in my inbox?" -> the GateQ inbox',
+      place({ route: "/gateq", tab: "inbox" }),
+      { kind: "NAVIGATE", destination: "GATEQ_INBOX" },
+    ],
+    [
+      "\"what's in today's Daily?\" -> the Daily",
+      place({ route: "/daily" }),
+      { kind: "NAVIGATE", destination: "DAILY" },
+    ],
+  ] as const)("CONTEXT and GO: %s", async (_said, where, intent) => {
+    for (const mode of ["CONTEXT", "GO"] as const) {
+      expect(await placed(proposal({ place: where }), mode), mode).toEqual(
+        opened(intent),
+      );
+    }
+  });
+
+  it("CONTEXT negatives: the decision's guards hold -- unsaved work, an ambiguous name, a page they cannot open, the same subject", async () => {
+    const dataroom = place({ record: company("Silo Credit"), tab: "dataroom" });
+    // Unsaved work in the pane: offered, never moved.
+    expect(
+      await placed(proposal({ place: dataroom }), "CONTEXT", "/home", {
+        dirty: true,
+      }),
+    ).toEqual([expect.objectContaining({ kind: "NAVIGATION_OFFER" })]);
+    // "Silo" fits two records: no guess.
+    expect(
+      await placed(
+        proposal({ place: place({ record: company("Silo"), tab: "deck" }) }),
+        "CONTEXT",
+      ),
+    ).toEqual([]);
+    // An investor's page for a company's side they cannot open.
+    expect(
+      await placed(
+        proposal({
+          place: place({
+            route: "/relationships/investor/[investorOrganisationId]/messages",
+            record: { kind: "INVESTOR" as const, name: "Savanna Seed" },
+          }),
+        }),
+        "CONTEXT",
+      ),
+    ).toEqual([]);
+    // A follow-up about the data room while the data room is open.
+    expect(
+      await placed(
+        proposal({ place: dataroom }),
+        "CONTEXT",
+        `/company/${SILO}?tab=dataroom`,
+      ),
+    ).toEqual([]);
   });
 });

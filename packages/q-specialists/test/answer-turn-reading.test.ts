@@ -2028,6 +2028,363 @@ describe("C10: navigation is the reader's typed intent (TURN_READER v83)", () =>
   });
 });
 
+/**
+ * C10 owner correction (13 Nov 2026, TURN_READER v84). In the Q Workspace,
+ * Q keeps bringing the page the conversation is about into the adjacent
+ * pane without a literal "open" (CONTEXT, placed by the page-move decision
+ * under its guards, deep links kept), moves at once on GO, and moves
+ * nothing for inline answers (NONE). Readings are fixtures; the decision
+ * is a scripted decider through the real port.
+ */
+describe("C10 v84: contextual workspace navigation is the reader's CONTEXT, placed by the decision", () => {
+  type Mode = "GO" | "CONTEXT" | "OFFER_ONLY" | "NONE";
+  const reading = (
+    mode: Mode,
+    extra: Record<string, unknown> = {},
+    negated = false,
+  ): TurnReaderResult =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      navigation: { mode, negated },
+      ...extra,
+    }) as unknown as TurnReaderResult;
+  const goTo = (destination: string): TurnReaderResult =>
+    ({
+      ...toolReading({
+        kind: "NAVIGATE",
+        destination: destination as "DISCOVER",
+        visibility: null,
+      }),
+      navigation: { mode: "GO", negated: false },
+    }) as unknown as TurnReaderResult;
+  const blocksOf = (run: ReturnType<typeof seam>) =>
+    run.stored.flatMap((message) => message.blocks ?? []);
+  const SAVANNA = "5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a";
+  const LEDGERLINE = "1e1e1e1e-1e1e-4e1e-8e1e-1e1e1e1e1e1e";
+  const WORKSPACE = {
+    route: "HOME",
+    workspace: { qPane: "open", pagePane: "open", at: "/home" },
+  };
+  const deciding = (
+    where: Record<string, unknown>,
+    decision: "MOVE" | "OFFER" = "MOVE",
+    delayMs = 0,
+  ) => {
+    const decided: string[] = [];
+    const port = createQPageMoves({
+      decider: {
+        decide: (input) => {
+          decided.push(input.utterance);
+          const result = {
+            decision,
+            place: {
+              route: "/work",
+              record: null,
+              tab: null,
+              document: null,
+              slide: null,
+              sectionId: null,
+              position: null,
+              ...where,
+            },
+            back: false,
+            askedForPage: decision === "MOVE",
+            reason: "",
+          } as const;
+          return new Promise((resolve) =>
+            setTimeout(() => resolve(result), delayMs),
+          );
+        },
+      },
+      config: { movesAllowed: true },
+      records: () =>
+        Promise.resolve({
+          companies: [{ id: LEDGERLINE, name: "Ledgerline" }],
+          investors: [{ id: SAVANNA, name: "Savanna Seed Partners" }],
+          things: [],
+          deleted: [],
+        }),
+    });
+    return { port, decided };
+  };
+
+  it.each([
+    [
+      "Who should I follow up with this week?",
+      { route: "/relationships", tab: "pipeline" },
+      { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    ],
+    [
+      "Which of my deals are stalled?",
+      { route: "/relationships", tab: "pipeline" },
+      { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    ],
+    [
+      "Let's go through where things stand with Savanna Seed Partners",
+      {
+        route: "/relationships/investor/[investorOrganisationId]",
+        record: { kind: "INVESTOR", name: "Savanna Seed Partners" },
+      },
+      { kind: "OPEN_RECORD_PAGE", page: "RELATIONSHIP_INVESTOR", id: SAVANNA },
+    ],
+  ])(
+    "CONTEXT: %j brings that page into the pane, without 'open', and is answered here",
+    async (said, where, intent) => {
+      const { port } = deciding(where);
+      const run = seam({
+        said,
+        reading: reading("CONTEXT"),
+        outcomes: [],
+        pageMoves: port,
+      });
+      await run.answer.answer(request(WORKSPACE));
+      expect(run.delegated()).toBe(1);
+      expect(blocksOf(run)).toContainEqual({
+        kind: "UI_INTENT",
+        intent: expect.objectContaining(intent) as unknown,
+      });
+    },
+  );
+
+  it("CONTEXT: Q said a message is waiting; 'what message is that?' is answered in the chat and that person's message thread comes up", async () => {
+    const { port } = deciding({
+      route: "/relationships/investor/[investorOrganisationId]/messages",
+      record: { kind: "INVESTOR", name: "Savanna Seed Partners" },
+    });
+    const run = seam({
+      said: "What message is that?",
+      earlier: [
+        { role: "USER", content: "What needs me today?" },
+        {
+          role: "Q",
+          content:
+            "You haven't replied to Savanna Seed Partners' message from Tuesday.",
+        },
+      ],
+      reading: reading("CONTEXT"),
+      outcomes: [],
+      pageMoves: port,
+    });
+    await run.answer.answer(request(WORKSPACE));
+    expect(run.delegated()).toBe(1);
+    expect(blocksOf(run)).toContainEqual({
+      kind: "UI_INTENT",
+      intent: expect.objectContaining({
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_INVESTOR_MESSAGES",
+        id: SAVANNA,
+      }) as unknown,
+    });
+  });
+
+  it.each([
+    ["Can I see their data room?", "dataroom"],
+    ["Show me their pitch deck", "deck"],
+    ["Talk me through Ledgerline's team", "team"],
+  ])(
+    "CONTEXT and GO: %j opens straight to the company's %s tab",
+    async (said, tab) => {
+      for (const mode of ["CONTEXT", "GO"] as const) {
+        const { port } = deciding({
+          route: "/company/[companyId]",
+          record: { kind: "COMPANY", name: "Ledgerline" },
+          tab,
+        });
+        const run = seam({
+          said,
+          reading: reading(mode),
+          outcomes: [],
+          pageMoves: port,
+        });
+        await run.answer.answer(request(WORKSPACE));
+        expect(blocksOf(run), mode).toContainEqual({
+          kind: "UI_INTENT",
+          intent: {
+            kind: "OPEN_RECORD_PAGE",
+            page: "COMPANY",
+            id: LEDGERLINE,
+            tab,
+          },
+        });
+      }
+    },
+  );
+
+  it.each([
+    ["Take me to Discover", "DISCOVER", false],
+    ["Llévame a Descubrir", "DISCOVER", false],
+    ["emmène-moi à mon profil", "PROFILE", false],
+    ["abeg carry me go discover", "DISCOVER", true],
+    ["خذني إلى ملفي الشخصي", "PROFILE", false],
+  ])(
+    "fast GO: %j moves at once, before a slow decision lands, and the decision adds no second move",
+    async (said, destination, spoken) => {
+      const { port } = deciding({ route: "/work", tab: "team" }, "MOVE", 400);
+      const run = seam({
+        said,
+        spoken,
+        reading: goTo(destination),
+        outcomes: [],
+        pageMoves: port,
+      });
+      const t0 = Date.now();
+      const answering = run.answer.answer({
+        ...request(WORKSPACE),
+        askerSide: "INVESTOR",
+      });
+      // Code's own move is stored well before the decision's 400 ms.
+      while (run.stored.length === 0 && Date.now() - t0 < 350) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(Date.now() - t0).toBeLessThan(350);
+      expect(run.stored[0]?.blocks).toContainEqual({
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination },
+      });
+      await answering;
+      expect(run.delegated()).toBe(0);
+      expect(run.stored.map((message) => message.content)).not.toContain(
+        "I've opened Q's team.",
+      );
+      expect(
+        blocksOf(run).filter((block) => block.kind === "UI_INTENT"),
+      ).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    ["What is a SAFE?", "NONE"],
+    ["Thanks, that's really useful", "NONE"],
+    [
+      "How has Ledgerline's monthly recurring revenue moved since June? Let me see it visually.",
+      "NONE",
+    ],
+    ["Now do the same for Silo Credit.", "NONE"],
+    ["What stage is Ledgerline at?", "NONE"],
+    ["What's the press saying about Ledgerline this month?", "NONE"],
+  ] as const)(
+    "NONE: %j moves nothing and offers nothing, whatever the decision proposed",
+    async (said, mode) => {
+      for (const decision of ["MOVE", "OFFER"] as const) {
+        const { port } = deciding(
+          {
+            route: "/company/[companyId]",
+            record: { kind: "COMPANY", name: "Ledgerline" },
+            tab: "overview",
+          },
+          decision,
+        );
+        const run = seam({
+          said,
+          reading: reading(
+            mode,
+            said.includes("press") ? { asksForWeb: true } : {},
+          ),
+          outcomes: [],
+          pageMoves: port,
+        });
+        await run.answer.answer(request(WORKSPACE));
+        expect(blocksOf(run), decision).not.toContainEqual(
+          expect.objectContaining({ kind: "UI_INTENT" }),
+        );
+        expect(blocksOf(run), decision).not.toContainEqual(
+          expect.objectContaining({ kind: "NAVIGATION_OFFER" }),
+        );
+        for (const message of run.stored) {
+          expect(message.content).not.toMatch(/ready to open|I've opened/u);
+        }
+      }
+    },
+  );
+
+  it("'What stage is Ledgerline at?' read OFFER_ONLY: offered, never moved", async () => {
+    const { port } = deciding({
+      route: "/company/[companyId]",
+      record: { kind: "COMPANY", name: "Ledgerline" },
+      tab: "overview",
+    });
+    const run = seam({
+      said: "What stage is Ledgerline at?",
+      reading: reading("OFFER_ONLY"),
+      outcomes: [],
+      pageMoves: port,
+    });
+    await run.answer.answer(request(WORKSPACE));
+    expect(blocksOf(run)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+    expect(blocksOf(run)).toContainEqual(
+      expect.objectContaining({ kind: "NAVIGATION_OFFER" }),
+    );
+  });
+
+  it("negated: 'don't move the page, just tell me' stays, even read CONTEXT beside it", async () => {
+    const { port } = deciding({ route: "/relationships", tab: "pipeline" });
+    const run = seam({
+      said: "Don't move the page, just tell me who's waiting on me",
+      reading: reading("CONTEXT", {}, true),
+      outcomes: [],
+      pageMoves: port,
+    });
+    await run.answer.answer(request(WORKSPACE));
+    expect(blocksOf(run)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+  });
+
+  it("CONTEXT guards: unsaved work is offered, an ambiguous or unknown record never moves", async () => {
+    const dirty = {
+      route: "HOME",
+      workspace: { qPane: "open", pagePane: "open", at: "/home", dirty: true },
+    };
+    const pipeline = deciding({ route: "/relationships", tab: "pipeline" });
+    const unsaved = seam({
+      said: "Which of my deals are stalled?",
+      reading: reading("CONTEXT"),
+      outcomes: [],
+      pageMoves: pipeline.port,
+    });
+    await unsaved.answer.answer(request(dirty));
+    expect(blocksOf(unsaved)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+    expect(blocksOf(unsaved)).toContainEqual(
+      expect.objectContaining({ kind: "NAVIGATION_OFFER" }),
+    );
+    const unknown = deciding({
+      route: "/company/[companyId]",
+      record: { kind: "COMPANY", name: "Harrow Mills" },
+      tab: "deck",
+    });
+    const nobody = seam({
+      said: "Talk me through Harrow Mills' deck",
+      reading: reading("CONTEXT"),
+      outcomes: [],
+      pageMoves: unknown.port,
+    });
+    await nobody.answer.answer(request(WORKSPACE));
+    expect(blocksOf(nobody)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+  });
+
+  it("outside the workspace, CONTEXT changes nothing: the turn is answered as before", async () => {
+    const run = seam({
+      said: "Which of my deals are stalled?",
+      reading: reading("CONTEXT"),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(blocksOf(run)).toEqual([]);
+  });
+});
+
 describe("a move with a question after it", () => {
   it("is answered, carrying the move", async () => {
     const run = seam({

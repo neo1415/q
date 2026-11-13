@@ -11,9 +11,9 @@ import {
  * CQ_LIVE_MODEL_TESTS=1).
  */
 describe("the navigation-intent dataset and grader", () => {
-  it("has at least 15 cases: GO, OFFER_ONLY, NONE, negated, spoken, non-English and multi-part", () => {
+  it("has at least 30 cases: GO, CONTEXT, OFFER_ONLY, NONE, negated, spoken, non-English and multi-part", () => {
     const cases = NAVIGATION_INTENT_CASES;
-    expect(cases.length).toBeGreaterThanOrEqual(15);
+    expect(cases.length).toBeGreaterThanOrEqual(30);
     expect(new Set(cases.map((one) => one.id)).size).toBe(cases.length);
     const count = (test: (one: (typeof cases)[number]) => boolean) =>
       cases.filter(test).length;
@@ -24,11 +24,14 @@ describe("the navigation-intent dataset and grader", () => {
       count((one) => one.expected.mode === "OFFER_ONLY"),
     ).toBeGreaterThanOrEqual(4);
     expect(
+      count((one) => one.expected.mode === "CONTEXT"),
+    ).toBeGreaterThanOrEqual(6);
+    expect(
       count((one) => one.expected.mode === "NONE" && !one.expected.negated),
-    ).toBeGreaterThanOrEqual(5);
+    ).toBeGreaterThanOrEqual(7);
     expect(
       count((one) => one.expected.negated === true),
-    ).toBeGreaterThanOrEqual(2);
+    ).toBeGreaterThanOrEqual(3);
     expect(
       count((one) => one.expected.multiPart === true),
     ).toBeGreaterThanOrEqual(1);
@@ -75,5 +78,17 @@ describe("the navigation-intent dataset and grader", () => {
         parts: [{ ask: "open Clinicrest" }, { ask: "its stage" }],
       }),
     ).toBe(true);
+    // An inline fact may be offered: either mode is right.
+    const inline = { mode: ["NONE", "OFFER_ONLY"] as const };
+    expect(
+      gradeNavigationIntent(inline, {
+        navigation: { mode: "OFFER_ONLY", negated: false },
+      }),
+    ).toBe(true);
+    expect(
+      gradeNavigationIntent(inline, {
+        navigation: { mode: "CONTEXT", negated: false },
+      }),
+    ).toBe("mode CONTEXT");
   });
 });

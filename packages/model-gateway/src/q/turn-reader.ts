@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV83ResultSchema,
+  TurnReaderV84ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -25,7 +25,7 @@ import {
   type TurnReaderV70Result,
   type TurnReaderV79Result,
   type TurnReaderV82Result,
-  type TurnReaderV83Result,
+  type TurnReaderV84Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -240,13 +240,14 @@ export type QTurnReading = Omit<
    */
   readonly chart?: TurnReaderV82Result["chart"] | undefined;
   /**
-   * v83 (C10, owner directive 13 Nov 2026): whether the turn asks to be
-   * taken somewhere, by meaning -- GO, OFFER_ONLY or NONE, and negated.
-   * Code moves the page only on GO and offers it only on OFFER_ONLY; where
-   * and whether they may open it stay code's. Absent or null: not read,
-   * and code's documented word rules are the fallback.
+   * v83/v84 (C10, owner directive and correction 13 Nov 2026): whether the
+   * turn should change the page beside the conversation, by meaning -- GO
+   * (moved at once), CONTEXT (the page-move decision places it, under its
+   * guards; workspace only), OFFER_ONLY (offered) or NONE, and negated.
+   * Where, and whether they may open it, stay code's. Absent or null: not
+   * read, and code's documented word rules are the fallback.
    */
-  readonly navigation?: TurnReaderV83Result["navigation"] | undefined;
+  readonly navigation?: TurnReaderV84Result["navigation"] | undefined;
   /** v78: they ask for the public web, news or press. */
   readonly asksForWeb?: boolean | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -624,8 +625,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV83Result>> =>
-          gateway.execute<TurnReaderV83Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV84Result>> =>
+          gateway.execute<TurnReaderV84Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -640,7 +641,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV83ResultSchema,
+              schema: TurnReaderV84ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -683,7 +684,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV83ResultSchema.safeParse(
+        const parsed = TurnReaderV84ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;

@@ -12811,6 +12811,7 @@ export function appActionLineOf(data: unknown): string | null {
 export {
   applyNavigationPolicy,
   gateByReading,
+  sameSubject as sameNavigationSubject,
   canOpenFor,
   createQNavigationDecider,
   createQPageMoves,
@@ -12855,6 +12856,7 @@ export {
   type QWorkspaceScreen,
   type QPageMovePort,
   type QPageMoveTurn,
+  type QPageMoveReading,
 } from "./navigation-decision.js";
 
 /**

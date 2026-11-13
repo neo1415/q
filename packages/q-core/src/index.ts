@@ -571,6 +571,14 @@ export {
   type TurnReaderV83Result,
   readsAsGo,
   readsAsNoNavigation,
+  readsAsContext,
+  TURN_READER_V84_SCHEMA_VERSION,
+  TURN_NAVIGATION_MODES_V84,
+  type TurnNavigationModeV84,
+  TurnNavigationIntentV84Schema,
+  type TurnNavigationIntentV84,
+  TurnReaderV84ResultSchema,
+  type TurnReaderV84Result,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -2149,6 +2157,10 @@ export {
   V83_NAVIGATION,
   V83_NAVIGATION_BEFORE,
 } from "./prompts/tasks/turn-reader.v83.js";
+export {
+  TURN_READER_V84,
+  V84_NAVIGATION,
+} from "./prompts/tasks/turn-reader.v84.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

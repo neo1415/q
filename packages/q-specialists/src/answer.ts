@@ -109,7 +109,7 @@ import {
   type TurnToolV14,
   readsAsGo,
   readsAsNoNavigation,
-  type TurnNavigationIntent,
+  type TurnNavigationIntentV84,
   quietlyNoted,
   inTurnLanguage,
   streamedPiece,
@@ -140,6 +140,8 @@ import {
   TURN_READER_RECENT_TURNS_MAX,
   priorListings,
   type QPageMovePort,
+  canOpenFor,
+  type QTurnReading,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
@@ -1643,33 +1645,43 @@ function onlyAMove(text: string): boolean {
 }
 
 /**
- * C10 (owner directive 13 Nov 2026: semantic intent, not keyword routing).
- * What a reading says about navigation (TURN_READER v83) and the turn's
- * parts. Whether a turn asks to be taken somewhere is the reading's
- * `navigation`; the word rules beside it (asksToGo, onlyAMove,
- * wordsNamePage, asksToGoExplicitly, questionAfterMove) are kept ONLY as
- * the fallback for a turn with no navigation reading -- a reading that
- * failed, an older reader, or one that left the field out -- so Q never
- * moves on a guess the words alone made where the reader said otherwise.
+ * C10 (owner directive and correction 13 Nov 2026: semantic intent, not
+ * keyword routing; keep contextual workspace navigation). What a reading
+ * says about navigation (TURN_READER v84) and the turn's parts. Whether a
+ * turn asks to be taken somewhere is the reading's `navigation`; the word
+ * rules beside it (asksToGo, onlyAMove, wordsNamePage, asksToGoExplicitly,
+ * questionAfterMove) are kept ONLY as the fallback for a turn with no
+ * navigation reading -- a reading that failed, an older reader, or one
+ * that left the field out -- and for CONTEXT where no workspace pane
+ * exists (there is no adjacent pane to bring a page into, so behaviour
+ * there is as before).
  */
 type NavigationReading = {
-  readonly navigation?: TurnNavigationIntent | null | undefined;
+  readonly navigation?: TurnNavigationIntentV84 | null | undefined;
   readonly parts?: readonly unknown[] | undefined;
 };
 
 /** The reading's navigation intent; null when there is none (word fallback). */
 function navigationOf(
   read: NavigationReading | null | undefined,
-): TurnNavigationIntent | null {
-  return read?.navigation ?? null;
+  workspace: boolean,
+): TurnNavigationIntentV84 | null {
+  const navigation = read?.navigation ?? null;
+  return navigation?.mode === "CONTEXT" && !workspace ? null : navigation;
+}
+
+/** Whether this run's screen has the Q Workspace's adjacent page pane. */
+function inWorkspace(request: QAnswerRequest): boolean {
+  return request.plan.screen?.workspace !== undefined;
 }
 
 /** They ask to go somewhere: the reading's GO; with none, the words (fallback). */
 function asksToGoRead(
   read: NavigationReading | null | undefined,
   text: string,
+  workspace: boolean,
 ): boolean {
-  const navigation = navigationOf(read);
+  const navigation = navigationOf(read, workspace);
   return navigation === null ? asksToGo(text) : readsAsGo(navigation);
 }
 
@@ -1681,9 +1693,43 @@ function asksToGoRead(
 function moreThanTheMove(
   read: NavigationReading | null | undefined,
   text: string,
+  workspace: boolean,
 ): boolean {
-  if (navigationOf(read) === null) return questionAfterMove(text);
+  if (navigationOf(read, workspace) === null) return questionAfterMove(text);
   return (read?.parts?.length ?? 0) > 1;
+}
+
+/**
+ * The reader's own tool this turn acts on, if any: a LOW reading is a
+ * guess and acts on nothing; a reply continuing Q's question moves no
+ * screen unless they ask to go. Shared by the answer path and the fast GO
+ * check, so both read the same tool.
+ */
+function readerToolOf(
+  read: QTurnReading | null,
+  text: string,
+  workspace: boolean,
+): TurnToolV14 | null {
+  return read !== null &&
+    read.confidence !== "LOW" &&
+    // v65: no screen move for a reply that continues Q's question.
+    !(
+      read.tool?.kind === "NAVIGATE" &&
+      read.replyTo?.kind === "Q_QUESTION" &&
+      !asksToGoRead(read, text, workspace)
+    ) &&
+    (read.kind === "TOOL_REQUEST" ||
+      (read.kind === "RESEARCH_REQUEST" &&
+        read.tool?.kind === "PREPARE_DOCUMENT") ||
+      // Q Pitch v6 (live 2026-10-17): "Can you pitch Capital Q to me?"
+      // is read as a question about Capital Q that carries NAVIGATE to
+      // Q_PITCH; the tour is the answer to it. Still gated by the words
+      // (wordsNamePage) in actOnTool when there is no navigation reading.
+      (read.kind === "QUESTION_TO_Q" &&
+        read.tool?.kind === "NAVIGATE" &&
+        read.tool.destination === "Q_PITCH"))
+    ? read.tool
+    : null;
 }
 
 /** Their own Q Card, asked about: read and offered by the answer, never a page move (F-34). */
@@ -4004,6 +4050,41 @@ export function createSpecialistQAnswer(
    * through the companies context — the capability the Visibility screen
    * calls. Null: not something this seam performs; answer normally.
    */
+  /**
+   * C10 v84 (owner correction 13 Nov 2026): GO moves fast. In the Q
+   * Workspace, a turn read GO whose reader tool names one of the person's
+   * own destinations is code's exact command when code may open it: not a
+   * founder asking for an investor's screen, not a founder's own page for
+   * an investor, a page the site map and this run's capabilities let them
+   * open (canOpenFor), and not one of their counterparts named with a page
+   * word (F5). Null: the page-move decision places the page as before.
+   */
+  const fastGoes = new Map<string, Promise<QNavigateDestination | null>>();
+  async function fastGoOf(
+    request: QAnswerRequest,
+    read: QTurnReading | null,
+    words: string,
+  ): Promise<QNavigateDestination | null> {
+    if (!inWorkspace(request) || read === null) return null;
+    if (!readsAsGo(read.navigation)) return null;
+    const tool = readerToolOf(read, words, true);
+    if (tool?.kind !== "NAVIGATE" || tool.destination === null) return null;
+    const destination = tool.destination;
+    const side = askerSideOf(request);
+    if (
+      (destination === "COMPANY_VISIBILITY" &&
+        !request.subjects.some((subject) => subject.kind === "COMPANY")) ||
+      (INVESTOR_SCREENS.has(destination) && side === "FOUNDER") ||
+      (FOUNDER_OWN_PAGES.has(destination) && side !== "FOUNDER") ||
+      !canOpenFor(request)(destination)
+    ) {
+      return null;
+    }
+    if (ownCounterpartWithin(words, await counterpartsOf(request)) !== null)
+      return null;
+    return destination;
+  }
+
   async function actOnTool(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
@@ -4035,15 +4116,24 @@ export function createSpecialistQAnswer(
     // a page is missing (batch 7 replay: "can i see their elevator" -- a
     // company's tab -- was told Capital Q has no elevator page). The turn is
     // answered and the decision places the page.
-    if (
-      tool.kind === "NAVIGATE" &&
-      request.plan.screen?.workspace !== undefined
-    ) {
+    //
+    // C10 v84 (owner correction): GO to one of the reader's own
+    // destinations that code may open (fastGoOf) is code's exact command
+    // and moves at once, never waiting on the decision (which is told and
+    // adds nothing).
+    if (tool.kind === "NAVIGATE" && inWorkspace(request)) {
+      const fast = await (fastGoes.get(request.runId) ?? Promise.resolve(null));
+      if (fast === null || fast !== tool.destination) {
+        logger?.info(
+          { qRunId: request.runId, destination: tool.destination },
+          "q workspace: the page-move decision places the page, not the reader",
+        );
+        return null;
+      }
       logger?.info(
-        { qRunId: request.runId, destination: tool.destination },
-        "q workspace: the page-move decision places the page, not the reader",
+        { qRunId: request.runId, destination: fast },
+        "q workspace: GO to the reader's destination moves at once",
       );
-      return null;
     }
     if (tool.kind === "NAVIGATE" && tool.unknownScreen !== null) {
       // Founder report 2026-09-30: "open my chat with young field agro"
@@ -4091,10 +4181,14 @@ export function createSpecialistQAnswer(
         );
       }
       const words = askedIn(history);
-      // C10 (TURN_READER v83): whether they asked to go is the reading's
-      // navigation intent, by meaning, in any language. NONE or negated
-      // ("don't open it, just tell me") moves nothing: answered.
-      const navigation = navigationOf(reading);
+      // C10 (TURN_READER v84): whether they asked to go is the reading's
+      // navigation intent, by meaning, in any language. Negated ("don't
+      // open it, just tell me") moves nothing. NONE beside the reader's
+      // own NAVIGATE contradicts itself: a destination their words name
+      // is never suppressed, so the word fallback below decides it.
+      const readNav = navigationOf(reading, inWorkspace(request));
+      const navigation =
+        readNav?.mode === "NONE" && !readNav.negated ? null : readNav;
       if (readsAsNoNavigation(navigation)) {
         logger?.info(
           { qRunId: request.runId, destination },
@@ -4132,7 +4226,7 @@ export function createSpecialistQAnswer(
       }
       // U4/F8: a move with a question after it goes with the answer
       // (C10: the reading's parts; the clause split only as the fallback).
-      if (moreThanTheMove(reading, words)) {
+      if (moreThanTheMove(reading, words, inWorkspace(request))) {
         queueMoveWithAnswer(request.runId, {
           blocks: [
             { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
@@ -5486,7 +5580,7 @@ export function createSpecialistQAnswer(
       // reading's parts; the clause split only as the fallback).
       if (
         page !== "EXTERNAL_REHEARSAL" &&
-        moreThanTheMove(reading, askedIn(history))
+        moreThanTheMove(reading, askedIn(history), inWorkspace(request))
       ) {
         queueMoveWithAnswer(request.runId, {
           blocks: [{ kind: "UI_INTENT", intent }],
@@ -6538,10 +6632,21 @@ export function createSpecialistQAnswer(
     // C10 (TURN_READER v83): the page-move decision moves or offers a page
     // only where this reading asks for navigation; it is told the reading's
     // navigation intent the moment the reading lands (null: not read).
+    // C10 v84: fast GO -- the reader's own destination, read GO, that code
+    // may open moves at once in actOnTool; the decision is told so that it
+    // adds no second move.
+    const fastGo = readingFirst
+      .then((reading) => fastGoOf(request, reading, latest.content))
+      .catch(() => null);
+    fastGoes.set(request.runId, fastGo);
+    setTimeout(() => fastGoes.delete(request.runId), 120_000).unref?.();
     dependencies.pageMoves?.heard?.(
       request,
-      readingFirst.then(
-        (reading) => reading?.navigation ?? null,
+      Promise.all([readingFirst, fastGo]).then(
+        ([reading, go]) => ({
+          navigation: reading?.navigation ?? null,
+          codeMoves: go !== null,
+        }),
         () => null,
       ),
     );
@@ -7393,7 +7498,7 @@ export function createSpecialistQAnswer(
     // words ask to go (coordinator replay 2026-10-24).
     const continuesByReading =
       read?.replyTo?.kind === "Q_QUESTION" &&
-      !asksToGoRead(read, latest.content);
+      !asksToGoRead(read, latest.content, inWorkspace(request));
     if (
       reference !== null &&
       reference.open !== null &&
@@ -7402,12 +7507,13 @@ export function createSpecialistQAnswer(
       // name above, with more asked after it): never opened twice.
       !movesWithQuestion.has(request.runId) &&
       (reference.open === "REHEARSAL" ||
-        // C10: the reading's GO opens it (with the rest answered when
-        // parts asks more); NONE or OFFER_ONLY never does. Words decide
-        // only with no navigation reading (fallback).
-        (navigationOf(read) === null
+        // C10: the reading's GO opens it at once (with the rest answered
+        // when parts asks more); CONTEXT is the page-move decision's to
+        // place (workspace); NONE or OFFER_ONLY never opens it. Words
+        // decide only with no navigation reading (fallback).
+        (navigationOf(read, inWorkspace(request)) === null
           ? !asksAboutIt && onlyAMove(latest.content)
-          : readsAsGo(navigationOf(read))))
+          : readsAsGo(navigationOf(read, inWorkspace(request)))))
     ) {
       const opened = await openReferenced(
         request,
@@ -7620,27 +7726,7 @@ export function createSpecialistQAnswer(
     // asked for "from what you can find publicly" may be read as a
     // research request as much as a tool request; either way it is a
     // request for the document, and the document is what they get.
-    const tool =
-      read !== null &&
-      read.confidence !== "LOW" &&
-      // v65: no screen move for a reply that continues Q's question.
-      !(
-        read.tool?.kind === "NAVIGATE" &&
-        read.replyTo?.kind === "Q_QUESTION" &&
-        !asksToGoRead(read, latest.content)
-      ) &&
-      (read.kind === "TOOL_REQUEST" ||
-        (read.kind === "RESEARCH_REQUEST" &&
-          read.tool?.kind === "PREPARE_DOCUMENT") ||
-        // Q Pitch v6 (live 2026-10-17): "Can you pitch Capital Q to me?"
-        // is read as a question about Capital Q that carries NAVIGATE to
-        // Q_PITCH; the tour is the answer to it. Still gated by the words
-        // (wordsNamePage) in actOnTool.
-        (read.kind === "QUESTION_TO_Q" &&
-          read.tool?.kind === "NAVIGATE" &&
-          read.tool.destination === "Q_PITCH"))
-        ? read.tool
-        : null;
+    const tool = readerToolOf(read, latest.content, inWorkspace(request));
     // A piece Q writes for them as a document (Q_REPORT) is answered
     // first and filed after; any other document asked with it is made
     // then too, in the same follow-up.
