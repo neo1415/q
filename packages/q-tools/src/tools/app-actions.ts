@@ -416,6 +416,11 @@ function toolFor(
     // The purposes shape only the unfocused offer: named, it is eligible
     // wherever its scopes hold (lead 2026-10-03).
     eligibleWhenNamed: true,
+    // A8: what they tell Q about their own organisation can come with any
+    // turn; only for an action on their own organisation alone.
+    ...(declared.offeredOnOwnTurns === true && ownOrganisationTool(declared)
+      ? { offeredOnOwnTurns: true }
+      : {}),
     // Offered where it can apply (a founder's conversation, not an
     // investor organisation's tool); authorize still requires their own.
     requiredScopeKinds: [...(declared.scopes ?? ["OWN_Q_CONVERSATION"])],

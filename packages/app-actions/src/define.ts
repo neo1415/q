@@ -170,6 +170,14 @@ export type AppActionTool<In, ToolIn> = {
    */
   readonly purposes?: readonly QTaskClass[] | undefined;
   /**
+   * A8: what the person TELLS Q about their own organisation (a figure
+   * they reached), which can come with any turn: offered on every turn
+   * whose plan holds their own organisation, whatever the turn's focus.
+   * Only for an action whose purposes name their own organisation's turn
+   * alone. Absent: false.
+   */
+  readonly offeredOnOwnTurns?: boolean | undefined;
+  /**
    * How a person asks for it, for the parity eval (scripts/evals/q-parity):
    * two phrasings, `{name}` standing for the record it names. The eval adds
    * a misheard variant of the name itself.

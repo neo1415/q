@@ -24,9 +24,13 @@ describe("COMPANY_ANALYST v30: the offer is a record", () => {
     recommendation: null,
   };
 
-  it("is active on schema v30, keeps v29 published, and differs only by its listed changes", () => {
+  it("was active on schema v30 (now v31), keeps v29 published, and differs only by its listed changes", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(30);
+    // v31 (A8) succeeds it on the same schema; v30 stays published, deprecated.
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(31);
+    expect(registry.get("COMPANY_ANALYST", 30)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("COMPANY_ANALYST", 29)?.definition.status).toBe(
       "DEPRECATED",
     );
