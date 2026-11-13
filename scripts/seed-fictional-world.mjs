@@ -48,6 +48,10 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+// --gateq-applicant: instead of the world, one run-scoped fictional GateQ
+// applicant founder (company private, one owned document); takes
+// --run <id> and --dry-run. See apps/q-api/src/dev/fictional-world/gateq-applicant.ts.
+const applicant = process.argv.includes("--gateq-applicant");
 const entry = resolve(
   root,
   "apps",
@@ -55,7 +59,7 @@ const entry = resolve(
   "dist",
   "dev",
   "fictional-world",
-  "seed.js",
+  applicant ? "gateq-applicant.js" : "seed.js",
 );
 if (!existsSync(entry)) {
   console.error(
@@ -64,7 +68,9 @@ if (!existsSync(entry)) {
   process.exit(2);
 }
 
-const args = process.argv.slice(2).filter((a) => a !== "--");
+const args = process.argv
+  .slice(2)
+  .filter((a) => a !== "--" && a !== "--gateq-applicant");
 const env = { ...process.env };
 
 if (args.includes("--local-stack")) {
