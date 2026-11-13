@@ -800,7 +800,9 @@ describe("the form, driven like a founder", () => {
       screen.getByText(/sets its round and cheque sizes in NGN/),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Use NGN" }));
-    expect(screen.getByLabelText("Currency").value).toBe("NGN");
+    expect(screen.getByLabelText<HTMLSelectElement>("Currency").value).toBe(
+      "NGN",
+    );
     expect(screen.queryByText(/sets its round and cheque sizes in/)).toBeNull();
   });
 
