@@ -503,6 +503,7 @@ import {
   type ComparisonVerdict,
   comparisonSpokenLine,
   withoutCompareOffers,
+  withoutMarkdownTables,
   comparisonTableBlock,
   tractionUnstated,
   verdictSentence,
@@ -7917,7 +7918,7 @@ export function createModelGatewayQAnswer(
           );
         }
         if (compareTable !== null) {
-          const done = withoutCompareOffers(content);
+          const done = withoutMarkdownTables(withoutCompareOffers(content));
           const spoken = tableHere ? comparisonSpokenLine(compareTable) : null;
           content = (
             spoken === null

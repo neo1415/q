@@ -15,6 +15,7 @@ import {
   withoutCompareOffers,
   namesToCompare,
   tractionUnstated,
+  withoutMarkdownTables,
 } from "../src/q/compare-table.js";
 import { fitsInOutcome } from "../src/q/fit-cards.js";
 
@@ -884,5 +885,30 @@ describe("live6: the table already on screen is not drawn again", () => {
     expect(comparisonOnScreen([{ role: "Q", blocks: [other] }], table)).toBe(
       false,
     );
+  });
+});
+
+describe("the table is drawn once, never again in the words", () => {
+  it("drops a markdown table and keeps the prose around it", () => {
+    const text = [
+      "The full comparison is on screen. The decision turns on round terms.",
+      "",
+      "| Company | Stage |",
+      "|---|---|",
+      "| Ajopot | Seed |",
+      "| Ledgerline | Seed |",
+      "",
+      "The traction figures are company-stated.",
+    ].join("\n");
+    expect(withoutMarkdownTables(text)).toBe(
+      "The full comparison is on screen. The decision turns on round terms.\n\nThe traction figures are company-stated.",
+    );
+  });
+
+  it("keeps a line with pipes that is not a table", () => {
+    const text = "Revenue | margin is the split they report.\nNext line.";
+    expect(withoutMarkdownTables(text)).toBe(text);
+    const unseparated = "| a | b |\n| c | d |\n| e | f |";
+    expect(withoutMarkdownTables(unseparated)).toBe(unseparated);
   });
 });

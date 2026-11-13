@@ -600,6 +600,44 @@ export function comparisonFactStatement(
 const OFFERS_TO_COMPARE =
   /[^.!?\n]*\b(?:I can|I could|I'd be happy to|happy to|want me to|shall I|should I|would you like me to|let me know if you'd like me to)\b[^.!?\n]*\bcompar[^.!?\n]*[.!?]?/giu;
 
+/**
+ * Live 2026-11-13 (81aa5cf3e, savanna-seed): with the comparison table on
+ * screen, the answer said "The full comparison is on screen" and then wrote
+ * the whole table again in markdown. A markdown table (pipe rows with a
+ * |---| separator) in the words of an answer whose table is drawn is
+ * dropped; prose around it stays.
+ */
+export function withoutMarkdownTables(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let at = 0;
+  const piped = (line: string | undefined): boolean =>
+    line !== undefined && /^\s*\|.*\|\s*$/u.test(line);
+  while (at < lines.length) {
+    if (piped(lines[at])) {
+      let end = at;
+      while (piped(lines[end])) end++;
+      const block = lines.slice(at, end);
+      const separated = block.some((line) =>
+        /^\s*\|(\s*:?-{3,}:?\s*\|)+\s*$/u.test(line),
+      );
+      if (separated && block.length >= 3) {
+        at = end;
+        continue;
+      }
+      out.push(...block);
+      at = end;
+      continue;
+    }
+    out.push(lines[at] ?? "");
+    at++;
+  }
+  return out
+    .join("\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
 export function withoutCompareOffers(text: string): string {
   return text
     .replace(OFFERS_TO_COMPARE, "")
