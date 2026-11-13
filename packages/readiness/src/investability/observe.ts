@@ -24,6 +24,7 @@ import type { InvestIQObservation } from "../investiq/contracts.js";
 import { stageBandOf, type StageBand } from "../investiq/method-v1.js";
 import {
   INVESTOR_ELIGIBLE_SCOPES,
+  type InvestabilityClaimInput,
   type InvestabilityInputs,
 } from "./inputs.js";
 
@@ -435,6 +436,30 @@ function pitchSignals(
 }
 
 /** The single rule that turns the inputs into observations. */
+/**
+ * Several CURRENT claims under one key and different dates are a metric's
+ * history (13 Nov, A8: dated monthly readings for charts). History is not
+ * more evidence: per key only the latest dated reading is observed, as the
+ * one-value readers show it. A dated reading beats an undated one; with no
+ * dates every reading stays; different readings on the same latest date
+ * all stay, so a contradiction is never hidden.
+ */
+export function latestPerClaimKey<
+  T extends Pick<InvestabilityClaimInput, "claimKey" | "validFrom">,
+>(claims: readonly T[]): readonly T[] {
+  const latest = new Map<string, string>();
+  for (const claim of claims) {
+    const at = claim.validFrom ?? null;
+    if (at === null) continue;
+    const seen = latest.get(claim.claimKey);
+    if (seen === undefined || at > seen) latest.set(claim.claimKey, at);
+  }
+  return claims.filter((claim) => {
+    const newest = latest.get(claim.claimKey);
+    return newest === undefined || (claim.validFrom ?? null) === newest;
+  });
+}
+
 export function observeInvestability(
   inputs: InvestabilityInputs,
 ): readonly InvestIQObservation[] {
@@ -519,7 +544,7 @@ export function observeInvestability(
 
   // Network-visible claims only; anything else is dropped here as well as
   // in the reader (defence in depth for the Context Firewall).
-  for (const claim of inputs.claims) {
+  for (const claim of latestPerClaimKey(inputs.claims)) {
     if (
       !(INVESTOR_ELIGIBLE_SCOPES as readonly string[]).includes(
         claim.visibilityScope,
