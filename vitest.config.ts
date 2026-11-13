@@ -87,9 +87,16 @@ const TEST_EXCLUDE = [
  * graph goes in NEEDS_ISOLATION (found by a full no-isolation run: these
  * two keep module state between files), never in a skip list.
  */
-const NEEDS_ISOLATION = [
+export const NEEDS_ISOLATION = [
   "packages/model-gateway/test/q-result-visuals.test.ts",
   "packages/model-gateway/test/q-answer-compare-follow-up.test.ts",
+  // Module mocks (vi.mock) only apply to a module graph that has not loaded
+  // the real module yet, so a file that mocks modules needs a fresh graph:
+  // gate on 5abedc3cf, the real @google/genai, loaded by another file in the
+  // same worker, defeated this file's mock. tests/support/isolation-guard
+  // fails the suite if a node-side test mocks modules and is not listed here.
+  "packages/model-gateway/test/google-key-rotation.test.ts",
+  "packages/gateq-intake/test/interview-slice1.test.ts",
 ];
 const NODE_SIDE = [
   "packages/**/*.{test,spec}.{ts,tsx}",
