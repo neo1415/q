@@ -564,3 +564,36 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   | 4   | "What does ARR mean?"                                                | stayed; no new media                                                                                                                                                                                                                              |
 
 - **In progress:** an agent is reconciling record-tab navigation across the paths. The plan has five edits: the decision overlay; tab-chosen pages; deck by reading; follow-ups on the record in play; and investor and relationship records added to the remembered screen. It also carries the pitch fix above.
+
+## Record-tab navigation deployed — `d96c63ee1` (13 Nov, 22:20 Lagos)
+
+- **Gate:** `ci-local PASS sha=d96c63ee1 at=2026-11-13T21:16:33Z took=1195s`. Rollback point `550ecdd5c`; four services SUCCESS.
+- **Contents:**
+  - The decision overlays the reading's tab (`readingTabPlace`).
+  - Pages are chosen from the tab (`pagesForTab`).
+  - Deck by reading.
+  - A tab with no record named (`readTabAnswer`, outside the Workspace).
+  - The INVESTOR page is in follow-up memory.
+  - A pitch ask plays inline.
+- **Live** (`investor.savanna-seed`, Workspace, `steps-rt.json` and `steps-rtpin.json`):
+
+  | #   | Turn                                                            | Result                                                                                                              |
+  | --- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+  | 1   | "Tell me about Clinicrest." (from /work)                        | answered, stayed                                                                                                    |
+  | 2   | "Can I see their data room?" (indirect, cross-turn)             | **PASS** `?tab=dataroom` (5.1 s)                                                                                    |
+  | 3   | "Does their data room have audited accounts?"                   | **PASS**: answered, stayed                                                                                          |
+  | 4   | "…Play me their pitch."                                         | **FAIL**: inline player shown, but the decision moved to `?tab=deck` and the prose claimed the pitch would not open |
+  | 5   | "Show me my messages with Clinicrest."                          | **PASS**: thread (1.1 s)                                                                                            |
+  | 6   | "Tell me about Ledgerline." (pane on Clinicrest messages)       | **GAP**: CONTEXT tab overview, decision STAY; picture shown                                                         |
+  | 7   | "And what's their team like?"                                   | **GAP**: CONTEXT tab team, SPLIT_VOTE STAY; answered about Ledgerline's team                                        |
+  | 8   | "Can I see their data room?" (after Ledgerline turns)           | **FAIL (wrong referent)**: opened Clinicrest's data room, the record in the pane, not the subject discussed         |
+  | 9   | "Can I see Ledger's data room?"                                 | Ledgerline `?tab=dataroom` (only one match visible to this account)                                                 |
+  | 10  | "Can I see Orbitwell Robotics's data room?"                     | **PASS**: nothing opened, "No company on record matches"                                                            |
+  | P   | Pinned: "Open Clinicrest." → Pin → "Can I see their data room?" | **PASS**: stayed, one "Unpin and open"; clicking it → `?tab=dataroom`                                               |
+
+- **Final bounded batch with an agent:**
+  1. A pitch ask places on `elevator`, never `deck`, with honest prose.
+  2. A contextual record not in the pane is placed with its tab, for one authorised record only.
+  3. "their" binds to the conversation's subject over the pane's record.
+
+  The re-certification replay follows. After it, the parallel lanes move off navigation: A8 claim extraction and C3 durable offers are already running.
