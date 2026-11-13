@@ -207,6 +207,21 @@ export type QConversationFetch = {
   readonly fetchedAt: string;
 };
 
+/**
+ * v82 (A8): the typed chart intent the turn reader read by meaning. The
+ * metric is a canonical chart metric name (q-core CHART_METRICS) or
+ * "UNSPECIFIED"; a period month is YYYY-MM.
+ */
+export type QChartIntent = {
+  readonly companies: readonly string[];
+  readonly metric: string;
+  readonly period: {
+    readonly from: string | null;
+    readonly to: string | null;
+  } | null;
+  readonly sameAsBefore: boolean;
+};
+
 export type QAnswerRequest = QOrchestrationSubjectContext & {
   /**
    * Turn latency row 5: the conversation as this turn already read it
@@ -316,6 +331,15 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly rememberAsk?: { readonly fact: string | null } | undefined;
   /** v78: they asked for a chart, graph or plot (read by meaning). */
   readonly asksForChart?: boolean | undefined;
+  /**
+   * v82 (A8, owner directive 13 Nov 2026): the chart asked for, as the
+   * turn reader read it by meaning. `companies` are names as the person
+   * said them (empty: the companies already in context), never ids: code
+   * resolves each by authorised exact search. `metric` is a canonical chart
+   * metric (q-core CHART_METRICS) or UNSPECIFIED, validated by code against
+   * the figures read. Absent: no typed intent (unread, or an older reading).
+   */
+  readonly chartIntent?: QChartIntent | undefined;
   /** v78: they asked for the public web, news or press (read by meaning). */
   readonly asksForWeb?: boolean | undefined;
   /**

@@ -532,7 +532,17 @@ describe("compare the top two, right after a list of five", () => {
     try {
       const { seam, request, executed, stored, alpha } = build(
         "Chart the monthly recurring revenue for Mizan over the last few months",
-        { asksForChart: true },
+        // A8 (owner 13 Nov): the reader's typed intent names the company;
+        // code never takes it from capitalised words.
+        {
+          asksForChart: true,
+          chartIntent: {
+            companies: ["Mizan"],
+            metric: "MRR",
+            period: null,
+            sameAsBefore: false,
+          },
+        },
         "Mizan's monthly recurring revenue grew from USD 30,000 to USD 42,000.",
         true,
       );

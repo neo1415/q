@@ -1275,3 +1275,95 @@ export const TurnReaderV79ResultSchema = TurnReaderV78ResultSchema.extend({
     .catch([]),
 }).strict();
 export type TurnReaderV79Result = z.infer<typeof TurnReaderV79ResultSchema>;
+
+/**
+ * v82 (A8, owner directive 13 Nov 2026: Q must not degenerate into keyword
+ * routing). A chart was decided by the reader (asksForChart) but WHAT to
+ * chart -- whose figures and which one -- was chosen by code from the
+ * words: capitalised name candidates (with "chart", "plot" and "graph"
+ * listed as never a company's name) and a regex ranking with revenue
+ * first. v82 reads the chart ask by meaning in the same single pass:
+ * `chart` is the typed intent. Code still does everything deterministic:
+ * it resolves each name by authorised exact search, validates the metric
+ * against the figures read under the firewall, checks currencies and draws
+ * the chart. `asksForChart` stays for compatibility and is true exactly
+ * when `chart.wanted` is.
+ *
+ * The metric is a closed list of canonical chart metrics. Each maps, in
+ * code (model-gateway figure-chart), to the claim keys that state it --
+ * structured-data mapping, never a reading of the person's words.
+ */
+export const TURN_READER_V82_SCHEMA_VERSION = 82;
+export const CHART_METRICS = [
+  "MRR",
+  "ARR",
+  "REVENUE",
+  "GROWTH",
+  "GROSS_MARGIN",
+  "RETENTION",
+  "CHURN",
+  "CUSTOMERS",
+  "USERS",
+  "TEAM_SIZE",
+  "BURN",
+  "CASH",
+  "RUNWAY",
+] as const;
+export type ChartMetric = (typeof CHART_METRICS)[number];
+export const ChartMetricSchema = z.enum(CHART_METRICS);
+/** How each canonical chart metric is said to a person (plain English). */
+export const CHART_METRIC_LABELS: Readonly<Record<ChartMetric, string>> = {
+  MRR: "monthly recurring revenue (MRR)",
+  ARR: "annual recurring revenue (ARR)",
+  REVENUE: "revenue",
+  GROWTH: "revenue growth",
+  GROSS_MARGIN: "gross margin",
+  RETENTION: "retention",
+  CHURN: "churn",
+  CUSTOMERS: "customers",
+  USERS: "active users",
+  TEAM_SIZE: "team size",
+  BURN: "burn",
+  CASH: "cash",
+  RUNWAY: "runway",
+};
+export const CHART_METRIC_UNSPECIFIED = "UNSPECIFIED" as const;
+export const TURN_CHART_COMPANIES_MAX = 4;
+const YearMonthSchema = z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/u);
+export const TurnChartPeriodSchema = z
+  .object({
+    from: YearMonthSchema.nullable().default(null).catch(null),
+    to: YearMonthSchema.nullable().default(null).catch(null),
+  })
+  .strict();
+export type TurnChartPeriod = z.infer<typeof TurnChartPeriodSchema>;
+export const TurnChartIntentSchema = z
+  .object({
+    /** They want a visual answer (a chart, graph or plot), however said. */
+    wanted: z.boolean().default(false).catch(false),
+    /**
+     * The companies, as the person referred to them (never completed or
+     * corrected); empty when they mean the companies already in context.
+     */
+    companies: z
+      .array(z.string().trim().min(1).max(120))
+      .max(TURN_CHART_COMPANIES_MAX)
+      .default([])
+      .catch([]),
+    metric: z
+      .enum([...CHART_METRICS, CHART_METRIC_UNSPECIFIED])
+      .default(CHART_METRIC_UNSPECIFIED)
+      .catch(CHART_METRIC_UNSPECIFIED),
+    period: TurnChartPeriodSchema.nullable().default(null).catch(null),
+    /**
+     * A follow-up repeating the previous chart's request for other
+     * companies or another metric ("now do the same for Clinicrest").
+     */
+    sameAsBefore: z.boolean().default(false).catch(false),
+  })
+  .strict();
+export type TurnChartIntent = z.infer<typeof TurnChartIntentSchema>;
+export const TurnReaderV82ResultSchema = TurnReaderV79ResultSchema.extend({
+  chart: TurnChartIntentSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV82Result = z.infer<typeof TurnReaderV82ResultSchema>;

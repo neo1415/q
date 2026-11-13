@@ -8264,6 +8264,18 @@ export function createSpecialistQAnswer(
         ? {}
         : { rememberAsk: read.remember }),
       ...(read?.asksForChart === true ? { asksForChart: true } : {}),
+      // v82 (A8, owner directive 13 Nov 2026): what chart, read by meaning.
+      // Names as said and a canonical metric; code resolves and validates.
+      ...(read?.chart === undefined || read.chart === null
+        ? {}
+        : {
+            chartIntent: {
+              companies: read.chart.companies,
+              metric: read.chart.metric,
+              period: read.chart.period,
+              sameAsBefore: read.chart.sameAsBefore,
+            },
+          }),
       ...(read?.asksForWeb === true ? { asksForWeb: true } : {}),
       ...(read !== null &&
       read.fromShown !== null &&

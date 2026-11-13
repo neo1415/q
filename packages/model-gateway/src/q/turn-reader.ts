@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV79ResultSchema,
+  TurnReaderV82ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -24,6 +24,7 @@ import {
   type TurnReaderV65Result,
   type TurnReaderV70Result,
   type TurnReaderV79Result,
+  type TurnReaderV82Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -225,8 +226,18 @@ export type QTurnReading = Omit<
   readonly parts?: TurnReaderV79Result["parts"] | undefined;
   /** v78: a fact they ask Q to keep in mind, said back in the second person. */
   readonly remember?: TurnReaderV79Result["remember"] | undefined;
-  /** v78: they ask for a chart, graph or plot. */
+  /**
+   * v78: they ask for a chart, graph or plot. v82: true exactly when
+   * `chart.wanted` is (derived here, so an older field never disagrees).
+   */
   readonly asksForChart?: boolean | undefined;
+  /**
+   * v82 (A8, owner directive 13 Nov 2026): the chart asked for, read by
+   * meaning -- the companies as said (empty: those in context), the
+   * canonical metric or UNSPECIFIED, the period and whether it repeats the
+   * previous chart. Code resolves, validates and draws; null: none asked.
+   */
+  readonly chart?: TurnReaderV82Result["chart"] | undefined;
   /** v78: they ask for the public web, news or press. */
   readonly asksForWeb?: boolean | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -450,6 +461,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "remember",
   "asksForChart",
   "asksForWeb",
+  // v82: a malformed chart intent is no chart intent, never a lost reading.
+  "chart",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -600,8 +613,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV79Result>> =>
-          gateway.execute<TurnReaderV79Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV82Result>> =>
+          gateway.execute<TurnReaderV82Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -616,7 +629,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV79ResultSchema,
+              schema: TurnReaderV82ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -659,11 +672,20 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV79ResultSchema.safeParse(
+        const parsed = TurnReaderV82ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
+        if (!parsed.success) return null;
+        // v82: one source of truth for "a chart was asked for" -- the
+        // typed intent; asksForChart is kept for compatibility, derived.
+        const chart =
+          parsed.data.chart?.wanted === true ? parsed.data.chart : null;
         // A comparison is never answered from an earlier turn (lane 4).
-        return parsed.success ? compareOverFromShown(parsed.data) : null;
+        return compareOverFromShown({
+          ...parsed.data,
+          chart,
+          asksForChart: chart !== null || parsed.data.asksForChart,
+        });
       } catch (error: unknown) {
         if (!(
           isModelGatewayError(error) && error.failureClass === "CANCELLED"

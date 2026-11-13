@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
-import { PLAN_F03_ASK, TurnReaderV79ResultSchema } from "@capital-q/q-core";
+import { PLAN_F03_ASK, TurnReaderV82ResultSchema } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
 import { acceptStructuredOutput } from "../src/policy/structured.js";
@@ -52,7 +52,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
   it("asks the provider with the active (v79) schema and the lenient fields", async () => {
     const { gateway, options } = fake(BASE);
     await read(gateway, "What should I do this week?");
-    expect(options[0]).toMatchObject({ schema: TurnReaderV79ResultSchema });
+    expect(options[0]).toMatchObject({ schema: TurnReaderV82ResultSchema });
     expect(TURN_READER_LENIENT_FIELDS).toEqual(
       expect.arrayContaining([
         "planAsk",
@@ -132,7 +132,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
       directsWork: "maybe",
       discoverWhom: "INVESTORS",
     });
-    const kept = acceptStructuredOutput(raw, TurnReaderV79ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV82ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);

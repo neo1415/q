@@ -201,6 +201,7 @@ export {
   type QAnswerPort,
   type QPrereadInput,
   type QAnswerRequest,
+  type QChartIntent,
   type QConversationFetch,
   type QCapabilityManifest,
   type QResearchDirective,

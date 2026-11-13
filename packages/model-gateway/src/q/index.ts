@@ -512,7 +512,18 @@ import {
   newestAnswerCards,
   answerCardCompanies,
 } from "./compare-table.js";
-import { answerChart, chartFactOf } from "./figure-chart.js";
+import {
+  answerChart,
+  answerChartOutcome,
+  chartFactOf,
+  chartMetricOf,
+  chartNotDrawnFact,
+  chartNotDrawnLine,
+  previousChartOf,
+  type ChartMetricAsked,
+  type ChartOutcome,
+  type ChartPeriod,
+} from "./figure-chart.js";
 import {
   attachedDocumentIntent,
   attachedDocumentNote,
@@ -4366,34 +4377,84 @@ export function createModelGatewayQAnswer(
       };
     };
     /**
-     * A8 live 2026-11-13 ("Chart Ledgerline's monthly recurring revenue
-     * over the last few months", savanna-seed): the run never read the
-     * company's figures, took the research path and said there was no
-     * series, while Ledgerline's dated MRR was on Capital Q. A chart the
-     * reader heard asked for (asksForChart), about companies on Capital Q,
-     * has their figures read here through the executor (the plan's firewall
-     * applies), so the chart code has them; nothing is drawn from prose.
-     * Only names found by exact name, at most four; a comparison reads its
-     * own figures (compareFor).
+     * A8 (owner directive 13 Nov 2026: no keyword routing). Which
+     * companies a chart ask is about comes from the turn reader's typed
+     * intent (TURN_READER v82 `chart`), never from capitalised words: each
+     * name it heard is found by authorised exact search (the plan's
+     * firewall applies), and their figures are read through the executor so
+     * the chart code has them; nothing is drawn from prose. With no names
+     * (they mean the companies already in context), or a follow-up that
+     * repeats the previous chart: the previous CHART block's companies (a
+     * repeat with names now draws those named now: "the same for
+     * Clinicrest" is Clinicrest's chart), else the companies the reader's
+     * pointing words bound (retrievalFocus), else the places bound on
+     * Q's list. A name two companies fit is asked about, never guessed.
+     * Takes the answer's own request: the prepare is warmed before the
+     * turn is read (see compareLate).
      */
-    const chartFiguresFor = async (): Promise<void> => {
-      if (latest === undefined) return;
+    type ChartResolution = {
+      /** Resolved companies, in order; undefined: none named or in context. */
+      readonly ids: readonly string[] | undefined;
+      readonly metric: ChartMetricAsked;
+      readonly period: ChartPeriod;
+      readonly ambiguous: {
+        readonly said: string;
+        readonly candidates: readonly string[];
+      } | null;
+      readonly notFound: readonly string[];
+    };
+    const chartFiguresFor = async (
+      asked: Pick<
+        QAnswerRequest,
+        "chartIntent" | "retrievalFocus" | "referencedCompanyIds"
+      >,
+    ): Promise<ChartResolution> => {
+      const intent = asked.chartIntent;
+      const previous =
+        intent?.sameAsBefore === true ? previousChartOf(earlier) : null;
+      const intentMetric = chartMetricOf(intent?.metric);
+      const metric: ChartMetricAsked =
+        intentMetric === "UNSPECIFIED" && previous?.metric != null
+          ? previous.metric
+          : intentMetric;
+      const period = intent?.period ?? null;
+      const none: ChartResolution = {
+        ids: undefined,
+        metric,
+        period,
+        ambiguous: null,
+        notFound: [],
+      };
       const { names } = await prefetchToolsRead;
       if (
         !names.has("search_companies") ||
         !names.has("read_company_figures")
       ) {
-        return;
+        return none;
       }
-      const said = companyNameCandidates(latest.content, 4, heardNames(request))
+      const said = (intent?.companies ?? [])
         .map((name) => name.trim())
         .filter(
           (name, index, all) => name.length > 0 && all.indexOf(name) === index,
         )
         .slice(0, 4);
-      const ids = (
-        await Promise.all(
-          said.map(async (name, index) => {
+      const ledgerIds = (() => {
+        const focus = asked.retrievalFocus;
+        if (focus === undefined) return [];
+        return focus.boundRefs.flatMap((ref) => {
+          const entity = focus.ledger.entities.find((one) => one.ref === ref);
+          return entity?.kind === "COMPANY" && entity.id !== null
+            ? [entity.id]
+            : [];
+        });
+      })();
+      const searchFor = (
+        lookups: readonly string[],
+      ): Promise<
+        readonly { said: string; ids: readonly string[]; names: string[] }[]
+      > =>
+        Promise.all(
+          lookups.map(async (name, index) => {
             const found = await tools
               .execute(
                 {
@@ -4404,31 +4465,73 @@ export function createModelGatewayQAnswer(
                 toolContext,
               )
               .catch(() => null);
+            // Exact name only (trimmed, case-insensitive): structured
+            // matching of a search result, never a guess at a near name.
             const exact = (itemsOf(found) ?? []).filter(
               (item) =>
                 item.canonicalName.trim().toLowerCase() === name.toLowerCase(),
             );
-            return exact.length === 1 ? (exact[0]?.companyId ?? null) : null;
+            return {
+              said: name,
+              ids: exact.map((item) => item.companyId),
+              names: exact.map((item) => item.canonicalName),
+            };
           }),
-        )
-      ).filter(
-        (id, index, all): id is string =>
-          id !== null && all.indexOf(id) === index,
-      );
-      await Promise.all(
-        ids.map((companyId, index) =>
-          tools
-            .execute(
-              {
-                callId: `q-chart-figures-${String(index)}`,
-                name: "read_company_figures",
-                arguments: { companyId },
-              },
-              toolContext,
-            )
-            .catch(() => null),
-        ),
-      );
+        );
+      const fromNames = async (
+        lookups: readonly string[],
+      ): Promise<Pick<ChartResolution, "ids" | "ambiguous" | "notFound">> => {
+        const found = await searchFor(lookups);
+        const twice = found.find((one) => new Set(one.ids).size >= 2);
+        if (twice !== undefined) {
+          return {
+            ids: [],
+            ambiguous: {
+              said: twice.said,
+              candidates: twice.names.slice(0, 4),
+            },
+            notFound: [],
+          };
+        }
+        const notFound = found
+          .filter((one) => one.ids.length === 0)
+          .map((one) => one.said);
+        const ids = found
+          .flatMap((one) => one.ids.slice(0, 1))
+          .filter((id, index, all) => all.indexOf(id) === index);
+        return { ids, ambiguous: null, notFound };
+      };
+      const resolved =
+        said.length > 0
+          ? await fromNames(said)
+          : previous !== null && previous.companies.length > 0
+            ? await fromNames(previous.companies.slice(0, 4))
+            : ledgerIds.length > 0
+              ? { ids: ledgerIds.slice(0, 4), ambiguous: null, notFound: [] }
+              : (asked.referencedCompanyIds ?? []).length > 0
+                ? {
+                    ids: (asked.referencedCompanyIds ?? []).slice(0, 4),
+                    ambiguous: null,
+                    notFound: [],
+                  }
+                : { ids: undefined, ambiguous: null, notFound: [] };
+      if (resolved.ambiguous === null && resolved.notFound.length === 0) {
+        await Promise.all(
+          (resolved.ids ?? []).map((companyId, index) =>
+            tools
+              .execute(
+                {
+                  callId: `q-chart-figures-${String(index)}`,
+                  name: "read_company_figures",
+                  arguments: { companyId },
+                },
+                toolContext,
+              )
+              .catch(() => null),
+          ),
+        );
+      }
+      return { ...resolved, metric, period };
     };
     const compareRead = (async (): Promise<void> => {
       const outcome = await compareFor(request.compare);
@@ -6116,24 +6219,68 @@ export function createModelGatewayQAnswer(
       const compareFacts = lateCompare?.facts ?? preparedCompareFacts;
       const compareIds = lateCompare?.ids ?? preparedCompareIds;
       const compareTable = lateCompare?.table ?? preparedCompareTable;
-      // A8: a chart asked for, not a comparison: the named companies'
-      // figures are read before the answer is composed (chartFiguresFor).
-      if (request.asksForChart === true && compareTable === null) {
-        await prepared.chartFigures().catch(() => undefined);
-      }
-      // The chart code will draw, as a fact for the words (chartFactOf).
-      const chartFact =
-        request.asksForChart === true
-          ? chartFactOf(
-              answerChart({
-                read: runCompanies.read(request.runId),
-                question: latest?.content ?? "",
-                asked: true,
-                compareIds,
-                blocks: compareTable === null ? [] : [compareTable],
-              }),
-            )
-          : null;
+      // A8 (owner directive 13 Nov 2026, no keyword routing): the chart
+      // asked for is the reader's typed intent (TURN_READER v82 `chart`).
+      // Its companies are resolved by code (authorised exact search, the
+      // conversation's previous chart or bound references) and their
+      // figures read before the answer is composed (chartFiguresFor).
+      const chartAsked =
+        request.asksForChart === true || request.chartIntent !== undefined;
+      const chartResolution = chartAsked
+        ? await prepared.chartFigures(request).catch(() => null)
+        : null;
+      const chartMetric: ChartMetricAsked =
+        chartResolution?.metric ?? chartMetricOf(request.chartIntent?.metric);
+      const chartPeriod: ChartPeriod =
+        chartResolution?.period ?? request.chartIntent?.period ?? null;
+      /** What the asked chart came to: code decides; the words follow it. */
+      const chartAskOutcome = (
+        blocks: readonly QResultBlock[],
+        read: RunRead = runCompanies.read(request.runId),
+      ): ChartOutcome => {
+        if (chartResolution?.ambiguous != null) {
+          return { kind: "AMBIGUOUS", ...chartResolution.ambiguous };
+        }
+        if (chartResolution != null && chartResolution.notFound.length > 0) {
+          return { kind: "NOT_FOUND", said: chartResolution.notFound };
+        }
+        return answerChartOutcome({
+          read,
+          metric: chartMetric,
+          asked: true,
+          compareIds,
+          blocks,
+          chartIds: chartResolution?.ids,
+          period: chartPeriod,
+        });
+      };
+      /** The one chart this answer carries, asked for or beside a table. */
+      const chartFor = (
+        blocks: readonly QResultBlock[],
+        read: RunRead = runCompanies.read(request.runId),
+      ): QResultBlock | null => {
+        if (!chartAsked) {
+          return answerChart({
+            read,
+            metric: chartMetric,
+            asked: false,
+            compareIds,
+            blocks,
+          });
+        }
+        const outcome = chartAskOutcome(blocks, read);
+        return outcome.kind === "DRAWN" ? outcome.block : null;
+      };
+      // The chart code will draw, as a fact for the words (chartFactOf), or
+      // why none is drawn and the one question to ask (chartNotDrawnFact).
+      const chartFact = chartAsked
+        ? ((outcome: ChartOutcome) =>
+            outcome.kind === "DRAWN"
+              ? chartFactOf(outcome.block)
+              : chartNotDrawnFact(outcome))(
+            chartAskOutcome(compareTable === null ? [] : [compareTable]),
+          )
+        : null;
       const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
       /**
        * Step 11 (A2): the warmed prepare searched the documents before the
@@ -8053,16 +8200,10 @@ export function createModelGatewayQAnswer(
             ANSWER_LIMIT_CHARS,
           );
         }
-        const chart = answerChart({
-          read: runCompanies.read(request.runId),
-          question: latest.content,
-          asked: request.asksForChart === true,
-          compareIds,
-          blocks: [
-            ...(given ?? []),
-            ...(tableHere && compareTable !== null ? [compareTable] : []),
-          ],
-        });
+        const chart = chartFor([
+          ...(given ?? []),
+          ...(tableHere && compareTable !== null ? [compareTable] : []),
+        ]);
         const carried = withoutUnaskedMoves(
           withFitIntegrity(
             [
@@ -11547,16 +11688,7 @@ export function createModelGatewayQAnswer(
         // reader's asksForChart) is drawn by code from the figures this
         // run read under the firewall, never from the answer's words. None
         // honest to draw: the could-not line below says so plainly.
-        const askedChart =
-          request.asksForChart === true
-            ? answerChart({
-                read: runCompanies.read(request.runId),
-                question: latest.content,
-                asked: true,
-                compareIds,
-                blocks: [],
-              })
-            : null;
+        const askedChart = chartAsked ? chartAskOutcome([]) : null;
         const couldNot =
           parityGap !== null &&
           actedLines.length === 0 &&
@@ -11603,13 +11735,14 @@ export function createModelGatewayQAnswer(
               ? // Guard run 1 (2026-10-25, run b6f9236c): the draft was
                 // written above; "I didn't prepare that" contradicted it.
                 DRAFT_NOT_ON_CARD_LINE
-              : askedChart !== null
+              : askedChart?.kind === "DRAWN"
                 ? // The chart they asked for is drawn: that is what was done.
                   null
                 : couldNotLineFor(
                     parityGap,
-                    request.asksForChart === true,
+                    chartAsked,
                     statusTalk?.text ?? guarded.text,
+                    askedChart,
                   )
             : null;
         if (couldNot !== null) {
@@ -12028,16 +12161,13 @@ export function createModelGatewayQAnswer(
         // A8: the chart they asked for, or one beside the comparison table
         // when a comparable metric exists; from this run's figure reads
         // only (the run's read is taken above, so it is drawn here).
-        const chartToShow = answerChart({
-          read: companiesRead,
-          question: latest.content,
-          asked: request.asksForChart === true,
-          compareIds,
-          blocks: [
+        const chartToShow = chartFor(
+          [
             ...(modelBlocks ?? []),
             ...(tableToShow === null ? [] : [tableToShow]),
           ],
-        });
+          companiesRead,
+        );
         const codeBlocks = [
           ...conflicts,
           ...(builtCards === null ? [] : [builtCards]),
@@ -12476,9 +12606,12 @@ export function couldNotLineFor(
   gap: string,
   asksForChart: boolean,
   answerText: string,
+  /** A8: what the asked chart came to, for its own honest line. */
+  chart: ChartOutcome | null = null,
 ): string | null {
   if (asksForChart) {
-    return SAID_NO_CHART.test(answerText) ? null : CHART_NOT_YET_LINE;
+    if (SAID_NO_CHART.test(answerText)) return null;
+    return chart === null ? CHART_NOT_YET_LINE : chartNotDrawnLine(chart);
   }
   return couldNotDoLine(gap);
 }

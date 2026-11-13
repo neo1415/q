@@ -69,7 +69,7 @@ describe("a chart from the figures this run read", () => {
       read: read({
         [A]: ["Ledgerline", [mrr("4800"), growth("3000", "4800")]],
       }),
-      question: "Show me Ledgerline's revenue growth",
+      metric: "GROWTH",
     });
     valid(block);
     expect(block?.kind).toBe("CHART");
@@ -99,7 +99,7 @@ describe("a chart from the figures this run read", () => {
         [A]: ["Ledgerline", [mrr("4800", "USD", "2026-09-30")]],
         [B]: ["Clinicrest", [mrr("6500", "USD", "2026-08-31")]],
       }),
-      question: "Chart MRR for Clinicrest vs Ledgerline",
+      metric: "MRR",
       companies: [B, A],
     });
     valid(block);
@@ -119,7 +119,7 @@ describe("a chart from the figures this run read", () => {
         [A]: ["Ledgerline", [mrr("4800"), growth("3000", "4800")]],
         [B]: ["Clinicrest", [mrr("6500"), growth("5000", "6500")]],
       }),
-      question: "chart their MRR",
+      metric: "MRR",
       companies: [A, B],
     });
     valid(block);
@@ -138,7 +138,7 @@ describe("a chart from the figures this run read", () => {
           [A]: ["Ledgerline", [mrr("38000000", "NGN")]],
           [B]: ["Clinicrest", [mrr("95000", "USD")]],
         }),
-        question: "Chart MRR for Clinicrest vs Ledgerline",
+        metric: "MRR",
         companies: [A, B],
       }),
     ).toBeNull();
@@ -154,7 +154,7 @@ describe("a chart from the figures this run read", () => {
           ],
           [B]: ["Clinicrest", [mrr("95000")]],
         }),
-        question: "Chart MRR",
+        metric: "MRR",
         companies: [A, B],
       }),
     ).toBeNull();
@@ -164,7 +164,7 @@ describe("a chart from the figures this run read", () => {
     expect(
       figureChartBlock({
         read: read({ [A]: ["Ledgerline", [mrr("4800")]] }),
-        question: "Chart Ledgerline's revenue",
+        metric: "MRR",
       }),
     ).toBeNull();
   });
@@ -177,7 +177,7 @@ describe("a chart from the figures this run read", () => {
           [B]: ["Clinicrest", [mrr("95000")]],
           [C]: ["Mizan", [mrr("42000")]],
         }),
-        question: "Chart MRR for Ledgerline, Clinicrest and Mizan",
+        metric: "MRR",
         companies: [A, B, C],
       }),
     ).toBeNull();
@@ -211,7 +211,7 @@ describe("a chart from the figures this run read", () => {
             [A]: ["Ledgerline", figures],
             [B]: ["Clinicrest", figures],
           }),
-          question: "chart it",
+          metric: "UNSPECIFIED",
         }),
       ).toBeNull();
     }
@@ -230,7 +230,7 @@ describe("a chart from the figures this run read", () => {
             ],
           ],
         }),
-        question: "Chart Ledgerline's revenue",
+        metric: "MRR",
       }),
     ).toBeNull();
   });
@@ -240,7 +240,7 @@ describe("a chart from the figures this run read", () => {
       read: read({
         [A]: ["Ledgerline", [mrr("5100"), growth("3000", "4800")]],
       }),
-      question: "Chart Ledgerline's revenue",
+      metric: "REVENUE",
     });
     if (block?.kind !== "CHART") throw new Error("no chart");
     expect(block.title).toBe("Ledgerline: revenue");
@@ -283,7 +283,7 @@ describe("a chart from the figures this run read", () => {
           ],
         ],
       }),
-      question: "compare their MRR on a chart",
+      metric: "MRR",
       companies: [A, B],
     });
     valid(block);
@@ -322,7 +322,7 @@ describe("a chart from the figures this run read", () => {
           ],
         ],
       }),
-      question: "chart their gross margins",
+      metric: "GROSS_MARGIN",
       companies: [A, B],
     });
     if (block?.kind !== "CHART") throw new Error("no chart");
@@ -337,7 +337,7 @@ describe("a chart from the figures this run read", () => {
         read: read({
           [A]: ["Ledgerline", [mrr("4800"), growth("3000", "4800")]],
         }),
-        question: "Chart MRR for Clinicrest vs Ledgerline",
+        metric: "MRR",
         companies: [B, A],
       }),
     ).toBeNull();
@@ -346,7 +346,7 @@ describe("a chart from the figures this run read", () => {
   it("a company with no name read is never drawn under a made-up one", () => {
     const run = new RunRead();
     run.companyFigures.set(A, [mrr("4800"), growth("3000", "4800")]);
-    expect(figureChartBlock({ read: run, question: "chart it" })).toBeNull();
+    expect(figureChartBlock({ read: run, metric: "UNSPECIFIED" })).toBeNull();
   });
 });
 
@@ -371,7 +371,11 @@ describe("which answers carry a chart (no chart spam)", () => {
     ],
     rows: [{ label: "Stage", cells: ["Seed", "Seed"] }],
   };
-  const base = { read: run(), question: "Compare them", compareIds: [A, B] };
+  const base = {
+    read: run(),
+    metric: "UNSPECIFIED" as const,
+    compareIds: [A, B],
+  };
 
   it("an answer that asked for none and shows no table carries none", () => {
     expect(answerChart({ ...base, asked: false, blocks: [] })).toBeNull();

@@ -549,6 +549,19 @@ export {
   type TurnReaderV79Reference,
   TurnReaderV79ResultSchema,
   type TurnReaderV79Result,
+  TURN_READER_V82_SCHEMA_VERSION,
+  CHART_METRICS,
+  type ChartMetric,
+  ChartMetricSchema,
+  CHART_METRIC_LABELS,
+  CHART_METRIC_UNSPECIFIED,
+  TURN_CHART_COMPANIES_MAX,
+  TurnChartPeriodSchema,
+  type TurnChartPeriod,
+  TurnChartIntentSchema,
+  type TurnChartIntent,
+  TurnReaderV82ResultSchema,
+  type TurnReaderV82Result,
   TURN_REPLY_KINDS,
   TURN_DISCOVER_WHOM,
   TURN_REFERENCE_OPEN_KINDS_V64,
@@ -2117,6 +2130,11 @@ export {
   V81_SINGLE_ASK,
   V81_SINGLE_ASK_FROM,
 } from "./prompts/tasks/turn-reader.v81.js";
+export {
+  TURN_READER_V82,
+  V82_CHART_ASK,
+  V82_CHART_ASK_FROM,
+} from "./prompts/tasks/turn-reader.v82.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

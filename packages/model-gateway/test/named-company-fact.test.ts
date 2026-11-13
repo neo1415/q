@@ -434,17 +434,3 @@ describe("Capital Q as the company, not the platform (owner 2026-10-23)", () => 
     ).toBe(false);
   });
 });
-
-describe("a chart verb is never part of a company's name (A8 live 2026-11-13)", () => {
-  it("'Chart Ledgerline's monthly recurring revenue' looks up Ledgerline", () => {
-    for (const said of [
-      "Chart Ledgerline's monthly recurring revenue over the last few months.",
-      "Plot Ledgerline's revenue",
-      "Graph Ledgerline revenue for me",
-    ]) {
-      expect(companyNameCandidates(said, 2, ["Ledgerline"])).toEqual([
-        "Ledgerline",
-      ]);
-    }
-  });
-});
