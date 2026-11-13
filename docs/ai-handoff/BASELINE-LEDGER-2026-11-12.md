@@ -528,3 +528,25 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Pin, then reload → still pinned.
 - **Regression found:** "Can I see Clinicrest's data room?" landed on `/company/6b2f…` without `?tab=dataroom` (it was `?tab=dataroom` at 4.1 s on v85), in 6.2 s. The fast CONTEXT placement uses the reading's coarser destination, and the decider's deep link cannot move a second time. A fix is with the agent: refine within the same record; fast-place only destinations that are already complete.
 - **A8 media** (`bbb1d7d36` with lint fix `19330f169`): COMPANY_MEDIA block, TURN_READER v86 `companyMedia`. Gating now.
+
+## A8 media and deep-link fix deployed — `a37e844d5` (13 Nov, 20:40 Lagos)
+
+- **Gate:** `ci-local PASS sha=a37e844d5 at=2026-11-13T19:39:30Z took=1436s`. Two earlier gates on this batch failed and were fixed: `5230a2b86` (switch exhaustiveness for `COMPANY_MEDIA`) and `c46a16e10` (Arabic for three media-block strings). Rollback point `b1bfae8e7`; four services SUCCESS.
+- **Contents:**
+  - COMPANY_MEDIA block, TURN_READER v86.
+  - Fast CONTEXT limited to complete screens, with refinement inside the same record (`5230a2b86`).
+  - Arabic for the media-block strings.
+- **Live** (`investor.savanna-seed`, /work, `steps-media.json`):
+
+  | #   | Turn                                                                 | Result                                                       |
+  | --- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
+  | 1   | "Can I see Clinicrest's data room?"                                  | **FAIL**: `/company/6b2f…` with no `?tab=dataroom` (6.2 s)   |
+  | 2   | "Could I watch how Clinicrest presents itself? Play me their pitch." | COMPANY_MEDIA with the pitch player, Clinicrest only; stayed |
+  | 3   | "Tell me about Ledgerline."                                          | COMPANY_MEDIA with Ledgerline's own picture; no player       |
+  | 4   | "What does ARR mean?"                                                | no new media; stayed                                         |
+
+  No page errors.
+
+- **Root cause of #1** (q-api logs): the reading this time was TOOL_REQUEST with GO and a COMPANY reference, so `openReferenced` opened the record at once and never carried a tab. On v85 the same words had been read as CONTEXT, so the decision placed the tab. The words-based tab parser does not read "Can I see …", and widening it would be keyword routing.
+- **Fix in progress:** TURN_READER v87 `navigation.tab`, the record tab read by meaning. `openReferenced` applies it, with the words parser only when there is no reading.
+- **Seen:** on turn 2, Q offered "Open Company profile" while that profile was already open (cosmetic; queued).
