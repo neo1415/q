@@ -3,13 +3,14 @@
 // Demo activation, founder-session path: sign in as the fictional founder in the web app (seed password),
 // take that founder's own API session from the app's own requests, then set the stage (if still absent) and assess.
 // Prints no token. Fictional accounts only.
-const { chromium } = require("playwright");
-const crypto = require("node:crypto");
+import { createHash } from "node:crypto";
+
+import { chromium } from "@playwright/test";
 const WEB = "https://capital-qweb-production.up.railway.app";
 const API = "https://capital-qapi-production.up.railway.app";
 const jobs = JSON.parse(process.env.JOBS); // [{email, companyId, stage, source}]
 const idem = (...p) => {
-  const h = crypto.createHash("sha256").update(p.join("|")).digest("hex");
+  const h = createHash("sha256").update(p.join("|")).digest("hex");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 };
 (async () => {
@@ -26,7 +27,9 @@ const idem = (...p) => {
     await ctx.addInitScript(() => {
       try {
         sessionStorage.setItem("cq.splash.seen", "1");
-      } catch {}
+      } catch {
+        // Storage can be unavailable; the splash then shows, nothing else.
+      }
     });
     const p = await ctx.newPage();
     let bearer = null;
@@ -67,7 +70,9 @@ const idem = (...p) => {
         const s = JSON.parse(decodeURIComponent(raw));
         if (typeof s.access_token === "string")
           bearer = `Bearer ${s.access_token}`;
-      } catch {}
+      } catch {
+        // Not a session cookie: reported below as "no session cookie".
+      }
       if (!bearer)
         throw new Error(`no session cookie (${cookies.length} auth cookies)`);
       const call = async (method, path, body, key) => {
@@ -83,7 +88,9 @@ const idem = (...p) => {
         let j = null;
         try {
           j = await r.json();
-        } catch {}
+        } catch {
+          // A body that is not JSON: the status alone is reported.
+        }
         return { status: r.status(), body: j };
       };
       const base = `/v1/companies/${job.companyId}`;
