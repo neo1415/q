@@ -25,6 +25,8 @@ export type NavigationIntentExpected = {
   readonly mode: TurnNavigationModeV84 | readonly TurnNavigationModeV84[];
   /** True: they said not to go or open anything (mode NONE then). */
   readonly negated?: boolean | undefined;
+  /** v85: the screen the reading names (navigation.destination). */
+  readonly destination?: string | undefined;
   /** True: the turn also asks more, so the reading's parts hold two or more. */
   readonly multiPart?: boolean | undefined;
 };
@@ -214,13 +216,19 @@ export const NAVIGATION_INTENT_CASES: readonly NavigationIntentCase[] = [
     id: "ctx-01 stalled deals",
     said: "Which of my deals are stalled?",
     recent: [],
-    expected: { mode: "CONTEXT" },
+    expected: { mode: "CONTEXT", destination: "CRM_PIPELINE" },
   },
   {
-    id: "ctx-02 follow up this week",
+    id: "ctx-02 follow up this week (live miss 12baf142c)",
     said: "Who should I follow up with this week?",
     recent: [],
-    expected: { mode: "CONTEXT" },
+    expected: { mode: "CONTEXT", destination: "CRM_PIPELINE" },
+  },
+  {
+    id: "ctx-10 where conversations stand",
+    said: "Where do my conversations stand?",
+    recent: [],
+    expected: { mode: "CONTEXT", destination: "CRM_PIPELINE" },
   },
   {
     id: "ctx-03 a relationship",
@@ -275,7 +283,13 @@ export const NAVIGATION_INTENT_CASES: readonly NavigationIntentCase[] = [
 /** The reading's navigation intent and parts, as the grader sees them. */
 export type NavigationIntentReading = {
   readonly navigation?:
-    { readonly mode: string; readonly negated: boolean } | null | undefined;
+    | {
+        readonly mode: string;
+        readonly negated: boolean;
+        readonly destination?: string | null | undefined;
+      }
+    | null
+    | undefined;
   readonly parts?: readonly unknown[] | undefined;
 };
 
@@ -292,6 +306,12 @@ export function gradeNavigationIntent(
   if (!modes.includes(navigation.mode)) return `mode ${navigation.mode}`;
   if (navigation.negated !== (expected.negated ?? false)) {
     return `negated ${String(navigation.negated)}`;
+  }
+  if (
+    expected.destination !== undefined &&
+    (navigation.destination ?? null) !== expected.destination
+  ) {
+    return `destination ${String(navigation.destination ?? null)}`;
   }
   if (expected.multiPart === true && (reading.parts?.length ?? 0) < 2) {
     return `parts ${String(reading.parts?.length ?? 0)}`;

@@ -10,6 +10,7 @@ import {
   TURN_READER_V84,
   TurnNavigationIntentV84Schema,
   TurnReaderV84ResultSchema,
+  TurnReaderV85ResultSchema,
   V83_NAVIGATION,
   V84_NAVIGATION,
 } from "../src/index.js";
@@ -20,15 +21,15 @@ import {
  * about into the adjacent workspace pane without a literal "open".
  */
 describe("TURN_READER v84", () => {
-  it("is active: v83 with its NAVIGATION paragraph replaced, on v84's schema", () => {
+  it("v83 with its NAVIGATION paragraph replaced (v85 is active, on its schema)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(84);
+    expect(active.version).toBe(85);
     expect(registry.get("TURN_READER", 83)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV84ResultSchema,
+      TurnReaderV85ResultSchema,
     );
     expect(TURN_READER_V84.variables).toEqual(TURN_READER_V83.variables);
     expect(TURN_READER_V84.template).not.toContain(V83_NAVIGATION);

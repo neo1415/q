@@ -18,6 +18,7 @@ import {
   createQPageMoves,
   decideNavigation,
   gateByReading,
+  readingPlacesContext,
   sameNavigationSubject,
   NAVIGATION_VOTES,
   voteNavigation,
@@ -2864,5 +2865,190 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
         `/company/${SILO}?tab=dataroom`,
       ),
     ).toEqual([]);
+  });
+});
+
+/**
+ * C10 v85 (live 13 Nov 2026 on 12baf142c): "Who should I follow up with
+ * this week?" was read CONTEXT, the decision voted STAY with no guard, and
+ * the pipeline never came up. A CONTEXT reading that names one of the
+ * person's own screens is placed by code where the decision proposed
+ * nothing -- under the same policy and holds; NONE never moves.
+ */
+describe("C10 v85: a CONTEXT reading's own destination, where the decision stayed", () => {
+  const stayed = {
+    decision: "STAY" as const,
+    target: null,
+    openPane: false,
+    remembered: null,
+    guard: null,
+  };
+  const context = (destination: string | null, mode = "CONTEXT") =>
+    ({ mode, negated: false, destination }) as never;
+  const base = {
+    pane: pane({ at: { page: "WORK" } }),
+    canOpen: () => true,
+    config: { movesAllowed: true },
+  };
+
+  it("places the destination through the policy, only for CONTEXT with a destination after a guardless STAY", () => {
+    expect(
+      readingPlacesContext({
+        ...base,
+        proposed: stayed,
+        navigation: context("CRM_PIPELINE"),
+      }),
+    ).toEqual({
+      decision: "MOVE",
+      target: { page: "CRM_PIPELINE" },
+      openPane: false,
+      remembered: null,
+      guard: null,
+    });
+    for (const navigation of [
+      context(null),
+      context("CRM_PIPELINE", "NONE"),
+      context("CRM_PIPELINE", "OFFER_ONLY"),
+      context("CRM_PIPELINE", "GO"),
+      { mode: "CONTEXT", negated: true, destination: "CRM_PIPELINE" } as never,
+      null,
+    ]) {
+      expect(
+        readingPlacesContext({ ...base, proposed: stayed, navigation }),
+      ).toBeNull();
+    }
+    // The decision's own guarded STAY, or its own move, stands.
+    for (const proposed of [
+      { ...stayed, guard: "SPLIT_VOTE" as const },
+      { ...stayed, guard: "NO_ACCESS" as const },
+      {
+        decision: "MOVE" as const,
+        target: { page: "WORK_TEAM" } as QNavigateTarget,
+        openPane: false,
+        remembered: null,
+        guard: null,
+      },
+    ]) {
+      expect(
+        readingPlacesContext({
+          ...base,
+          proposed,
+          navigation: context("CRM_PIPELINE"),
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("the same guards: no access, already there, unsaved work, a collapsed pane", () => {
+    const place = (over: Partial<typeof base>) =>
+      readingPlacesContext({
+        ...base,
+        ...over,
+        proposed: stayed,
+        navigation: context("CRM_PIPELINE"),
+      });
+    expect(place({ canOpen: () => false })).toMatchObject({
+      decision: "STAY",
+      guard: "NO_ACCESS",
+    });
+    expect(
+      place({ pane: pane({ at: { page: "CRM_PIPELINE" } }) }),
+    ).toMatchObject({ decision: "STAY", guard: "ALREADY_THERE" });
+    expect(place({ pane: pane({ dirty: true }) })).toMatchObject({
+      decision: "OFFER",
+      guard: "UNSAVED_WORK",
+    });
+    expect(place({ pane: pane({ pane: "COLLAPSED" }) })).toMatchObject({
+      decision: "STAY",
+      guard: "COLLAPSED_PANE",
+      remembered: { page: "CRM_PIPELINE" },
+    });
+  });
+
+  const investor = (runId: string, at = "/work") =>
+    ({
+      runId,
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      askerSide: "INVESTOR",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "WORK",
+          workspace: { qPane: "open", pagePane: "open", at },
+        },
+      },
+    }) as unknown as QAnswerRequest;
+
+  it("live replay: 'Who should I follow up with this week?' on Work brings the pipeline up; NONE never moves", async () => {
+    for (const [mode, expected] of [
+      ["CONTEXT", ["I've opened Pipeline."]],
+      ["NONE", []],
+    ] as const) {
+      const published: { content: string; blocks: unknown }[] = [];
+      const moves = createQPageMoves({
+        decider: {
+          decide: () =>
+            Promise.resolve(
+              proposal({ decision: "STAY", askedForPage: false }),
+            ),
+        },
+        config: { movesAllowed: true },
+      });
+      const r = investor(`c10-v85-${mode}`);
+      moves.start(r, {
+        utterance: "Who should I follow up with this week?",
+        recentTurns: [],
+        pageText: null,
+        readingFollows: true,
+        publish: (move) => {
+          published.push(move);
+          return Promise.resolve({ messageId: "m" });
+        },
+      });
+      moves.heard?.(
+        r,
+        Promise.resolve({ navigation: context("CRM_PIPELINE", mode) }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(
+        published.map((one) => one.content),
+        mode,
+      ).toEqual(expected);
+      if (mode === "CONTEXT") {
+        expect(published[0]?.blocks).toEqual([
+          {
+            kind: "UI_INTENT",
+            intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+          },
+        ]);
+      }
+    }
+  });
+
+  it("the pane already on the pipeline keeps it (no second move)", async () => {
+    const published: string[] = [];
+    const moves = createQPageMoves({
+      decider: {
+        decide: () =>
+          Promise.resolve(proposal({ decision: "STAY", askedForPage: false })),
+      },
+      config: { movesAllowed: true },
+    });
+    const r = investor("c10-v85-there", "/relationships?view=pipeline");
+    moves.start(r, {
+      utterance: "and which of those deals are stalled?",
+      recentTurns: [],
+      pageText: null,
+      readingFollows: true,
+      publish: (move) => {
+        published.push(move.content);
+        return Promise.resolve({ messageId: "m" });
+      },
+    });
+    moves.heard?.(r, Promise.resolve({ navigation: context("CRM_PIPELINE") }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(published).toEqual([]);
   });
 });

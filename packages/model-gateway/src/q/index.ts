@@ -12811,6 +12811,7 @@ export function appActionLineOf(data: unknown): string | null {
 export {
   applyNavigationPolicy,
   gateByReading,
+  readingPlacesContext,
   sameSubject as sameNavigationSubject,
   canOpenFor,
   createQNavigationDecider,

@@ -5,7 +5,7 @@ import {
   TURN_READER_V80,
   TURN_READER_V81,
   TurnReaderV79ResultSchema,
-  TurnReaderV84ResultSchema,
+  TurnReaderV85ResultSchema,
   V81_SINGLE_ASK,
   V81_SINGLE_ASK_FROM,
 } from "../src/index.js";
@@ -20,12 +20,12 @@ describe("TURN_READER v81", () => {
   it("v80 with one sentence of the parts rule replaced (v82 is active)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(84);
+    expect(active.version).toBe(85);
     expect(registry.get("TURN_READER", 80)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV84ResultSchema,
+      TurnReaderV85ResultSchema,
     );
     expect(TURN_READER_V81.variables).toEqual(TURN_READER_V80.variables);
     expect(TURN_READER_V80.template).toContain(V81_SINGLE_ASK_FROM);

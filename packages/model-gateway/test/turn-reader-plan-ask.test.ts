@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
-import { PLAN_F03_ASK, TurnReaderV84ResultSchema } from "@capital-q/q-core";
+import { PLAN_F03_ASK, TurnReaderV85ResultSchema } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
 import { acceptStructuredOutput } from "../src/policy/structured.js";
@@ -52,7 +52,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
   it("asks the provider with the active (v83) schema and the lenient fields", async () => {
     const { gateway, options } = fake(BASE);
     await read(gateway, "What should I do this week?");
-    expect(options[0]).toMatchObject({ schema: TurnReaderV84ResultSchema });
+    expect(options[0]).toMatchObject({ schema: TurnReaderV85ResultSchema });
     expect(TURN_READER_LENIENT_FIELDS).toEqual(
       expect.arrayContaining([
         "planAsk",
@@ -132,7 +132,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
       directsWork: "maybe",
       discoverWhom: "INVESTORS",
     });
-    const kept = acceptStructuredOutput(raw, TurnReaderV84ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV85ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);
@@ -152,22 +152,27 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
  * it, and a malformed intent is not read (code's word fallback), never a
  * lost reading.
  */
-describe("the turn reader's navigation intent (v83, v84 CONTEXT)", () => {
+describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination)", () => {
   it("reaches the caller, with negation read as no move", async () => {
+    const none = { destination: null };
     for (const [navigation, expected] of [
       [
         { mode: "GO", negated: false },
-        { mode: "GO", negated: false },
+        { mode: "GO", negated: false, ...none },
       ],
-      [{ mode: "OFFER_ONLY" }, { mode: "OFFER_ONLY", negated: false }],
-      [{ mode: "CONTEXT" }, { mode: "CONTEXT", negated: false }],
+      [{ mode: "OFFER_ONLY" }, { mode: "OFFER_ONLY", negated: false, ...none }],
+      [{ mode: "CONTEXT" }, { mode: "CONTEXT", negated: false, ...none }],
       [
-        { mode: "CONTEXT", negated: true },
-        { mode: "NONE", negated: true },
+        { mode: "CONTEXT", destination: "CRM_PIPELINE" },
+        { mode: "CONTEXT", negated: false, destination: "CRM_PIPELINE" },
+      ],
+      [
+        { mode: "CONTEXT", negated: true, destination: "CRM_PIPELINE" },
+        { mode: "NONE", negated: true, ...none },
       ],
       [
         { mode: "GO", negated: true },
-        { mode: "NONE", negated: true },
+        { mode: "NONE", negated: true, ...none },
       ],
       [undefined, null],
     ] as const) {
@@ -180,7 +185,7 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT)", () => {
 
   it("a malformed navigation intent costs itself, never the reading", () => {
     const raw = JSON.stringify({ ...BASE, navigation: "take me there" });
-    const kept = acceptStructuredOutput(raw, TurnReaderV84ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV85ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);

@@ -1472,3 +1472,30 @@ export function readsAsContext(
 ): boolean {
   return navigation?.mode === "CONTEXT" && !navigation.negated;
 }
+
+/**
+ * v85 (C10, live 13 Nov 2026 on 12baf142c): "Who should I follow up with
+ * this week?" in the Q Workspace was answered about their relationships
+ * while the page-move decision voted STAY, so the pipeline never came up.
+ * The reading now names the page it means, when that page is one of
+ * Capital Q's own screens: `navigation.destination` (the NAVIGATE
+ * destinations' closed list). On CONTEXT, when the decision stays with no
+ * guard, code places that destination itself, under the same policy and
+ * holds. Null: the reading names none; the decision alone places pages.
+ */
+export const TURN_READER_V85_SCHEMA_VERSION = 85;
+export const TurnNavigationIntentV85Schema =
+  TurnNavigationIntentV84Schema.extend({
+    destination: QNavigateDestinationSchema.nullable()
+      .default(null)
+      .catch(null),
+  }).strict();
+export type TurnNavigationIntentV85 = z.infer<
+  typeof TurnNavigationIntentV85Schema
+>;
+export const TurnReaderV85ResultSchema = TurnReaderV82ResultSchema.extend({
+  navigation: TurnNavigationIntentV85Schema.nullable()
+    .default(null)
+    .catch(null),
+}).strict();
+export type TurnReaderV85Result = z.infer<typeof TurnReaderV85ResultSchema>;

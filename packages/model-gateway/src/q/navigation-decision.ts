@@ -25,6 +25,7 @@ import {
   renderPrompt,
   type NavigationDecisionResult,
   type TurnNavigationIntentV84,
+  type TurnNavigationIntentV85,
   type NavigationDecisionVariables,
 } from "@capital-q/q-core";
 
@@ -1304,6 +1305,58 @@ export function sameSubject(a: QNavigateTarget, b: QNavigateTarget): boolean {
   );
 }
 
+/**
+ * C10 v85 (live 13 Nov 2026 on 12baf142c): "Who should I follow up with
+ * this week?" was read CONTEXT but the decision voted STAY (no guard), so
+ * the pipeline never came up. When the reading is CONTEXT and names one of
+ * the person's own screens (`navigation.destination`), and the decision
+ * stayed with no guard and nothing remembered, that destination is placed
+ * through the same policy (applyNavigationPolicy: may they open it, already
+ * there, unsaved work or a busy pane is an offer, a collapsed pane only
+ * remembers it, the moves gate). gateByReading's holds apply after it.
+ * Null: nothing to place this way; the decision's outcome stands.
+ *
+ * Why this and not the reading in the decision's prompt: the decision runs
+ * beside the reading, not after it; feeding it the reading would make every
+ * workspace turn wait for both in series. Here code adds no model call and
+ * no wait, and only ever acts where the decision itself proposed nothing.
+ */
+export function readingPlacesContext(input: {
+  readonly proposed: QNavigationOutcome;
+  readonly navigation: QReadNavigation | null;
+  readonly pane: QNavigationPane;
+  readonly canOpen: (page: string) => boolean;
+  readonly config: QNavigationPolicyConfig;
+  readonly records?: QNavigationRecords | undefined;
+}): QNavigationOutcome | null {
+  const { navigation, proposed } = input;
+  const destination = navigation?.destination ?? null;
+  if (!readsAsContext(navigation) || destination === null) return null;
+  if (
+    proposed.decision !== "STAY" ||
+    proposed.guard !== null ||
+    proposed.remembered !== null
+  ) {
+    return null;
+  }
+  return applyNavigationPolicy({
+    proposal: {
+      decision: "MOVE",
+      place: null,
+      back: false,
+      // A page the conversation turned to, not one they asked to see: a
+      // collapsed pane only remembers it.
+      askedForPage: false,
+      reason: "",
+    },
+    resolution: { kind: "TARGET", target: { page: destination } },
+    pane: input.pane,
+    canOpen: input.canOpen,
+    config: input.config,
+    records: input.records,
+  });
+}
+
 /** A real second place: resolved, theirs to open, and not the same place. */
 function secondPlace(
   target: QNavigateTarget,
@@ -1609,9 +1662,16 @@ export async function decideNavigation(
 
 // --- 4. The answer path: one move per turn, beside the answer ------------
 
+/**
+ * A navigation reading as code takes it: v84's intent, with v85's
+ * destination when the reading names one (absent: none named).
+ */
+export type QReadNavigation = TurnNavigationIntentV84 &
+  Partial<Pick<TurnNavigationIntentV85, "destination">>;
+
 /** What the turn reader read about navigation, as the port is told it (C10). */
 export type QPageMoveReading = {
-  readonly navigation: TurnNavigationIntentV84 | null;
+  readonly navigation: QReadNavigation | null;
   /** Fast GO: code moves to the reader's destination itself, at once. */
   readonly codeMoves?: boolean | undefined;
 };
@@ -2018,16 +2078,30 @@ export function createQPageMoves(dependencies: {
             }),
           ]).finally(() => clearTimeout(timer));
           const navigation = reading?.navigation ?? null;
-          const outcome = gateByReading(proposed, navigation, {
-            pane: {
-              ...input.pane,
-              at:
-                input.pane.at === null
-                  ? null
-                  : ownPlace(input.pane.at, records),
-            },
-            codeMoves: reading?.codeMoves,
+          // v85: CONTEXT naming one of their own screens, where the
+          // decision proposed nothing, is placed by code (same policy).
+          const placedByReading = readingPlacesContext({
+            proposed,
+            navigation,
+            pane: input.pane,
+            canOpen: canOpenFor(request, map),
+            config: dependencies.config,
+            records,
           });
+          const outcome = gateByReading(
+            placedByReading ?? proposed,
+            navigation,
+            {
+              pane: {
+                ...input.pane,
+                at:
+                  input.pane.at === null
+                    ? null
+                    : ownPlace(input.pane.at, records),
+              },
+              codeMoves: reading?.codeMoves,
+            },
+          );
           // Fast GO: held, in case the answer stored moves nothing after all.
           if (outcome.guard === "ANSWER_MOVES" && proposed.target !== null)
             heldForCode.set(request.runId, proposed);
@@ -2039,6 +2113,8 @@ export function createQPageMoves(dependencies: {
                 decision: outcome.decision,
                 navigation: navigation?.mode ?? null,
                 negated: navigation?.negated ?? null,
+                placedByReading: placedByReading?.decision ?? null,
+                guard: outcome.guard,
               },
               "q page move gated by the turn's navigation reading",
             );
@@ -2056,6 +2132,16 @@ export function createQPageMoves(dependencies: {
               openPane: outcome.openPane,
               remembered: outcome.remembered?.page ?? null,
               guard: outcome.guard,
+              // C10: the reading the verdict was gated by (live checks);
+              // the hold that applied is the guard above (NOT_ASKED,
+              // OFFER_ONLY, SAME_SUBJECT, BACK_AND_FORTH, ANSWER_MOVES).
+              proposed: proposed.decision,
+              proposedGuard: proposed.guard,
+              navigation: navigation?.mode ?? null,
+              negated: navigation?.negated ?? null,
+              navigationDestination: navigation?.destination ?? null,
+              codeMoves: reading?.codeMoves ?? null,
+              placedByReading: placedByReading?.decision ?? null,
               samples: sampled.map(sampleForLog),
               ms: Date.now() - began,
             },

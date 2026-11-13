@@ -6870,6 +6870,10 @@ export function createSpecialistQAnswer(
           meetingPrep: read.meetingPrep != null,
           namedOther: read.namedOther != null,
           fromShown: read.fromShown?.turn ?? null,
+          // C10: the navigation intent, for live checks (no words, no ids).
+          navigation: read.navigation?.mode ?? null,
+          navigationNegated: read.navigation?.negated ?? null,
+          navigationDestination: read.navigation?.destination ?? null,
         },
         "q turn read",
       );

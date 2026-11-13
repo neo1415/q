@@ -2385,6 +2385,78 @@ describe("C10 v84: contextual workspace navigation is the reader's CONTEXT, plac
   });
 });
 
+/**
+ * C10 v85 (live 13 Nov 2026 on 12baf142c, investor in /work): "Who should
+ * I follow up with this week?" stayed on Work while the decision voted
+ * STAY. Read CONTEXT with destination CRM_PIPELINE, the pipeline comes up
+ * beside the answer; read NONE, nothing moves.
+ */
+describe("C10 v85: the reading's own destination when the decision stays", () => {
+  const WORK = {
+    route: "WORK",
+    workspace: { qPane: "open", pagePane: "open", at: "/work" },
+  };
+  const staying = () =>
+    createQPageMoves({
+      decider: {
+        decide: () =>
+          Promise.resolve({
+            decision: "STAY",
+            place: null,
+            back: false,
+            askedForPage: false,
+            reason: "",
+          }),
+      },
+      config: { movesAllowed: true },
+    });
+  const reading = (mode: "CONTEXT" | "NONE"): TurnReaderResult =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "THEIR_OWN_RECORDS" },
+      aboutNamedOther: false,
+      tool: null,
+      navigation: { mode, negated: false, destination: "CRM_PIPELINE" },
+    }) as unknown as TurnReaderResult;
+
+  it.each([
+    "Who should I follow up with this week?",
+    "Which of my deals are stalled?",
+    "Where do my conversations stand?",
+  ])(
+    "CONTEXT: %j brings the pipeline into the pane beside the answer",
+    async (said) => {
+      const run = seam({
+        said,
+        reading: reading("CONTEXT"),
+        outcomes: [],
+        pageMoves: staying(),
+      });
+      await run.answer.answer({ ...request(WORK), askerSide: "INVESTOR" });
+      expect(run.delegated()).toBe(1);
+      expect(
+        run.stored.flatMap((message) => message.blocks ?? []),
+      ).toContainEqual({
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      });
+    },
+  );
+
+  it("NONE with the same destination never moves or offers", async () => {
+    const run = seam({
+      said: "Who should I follow up with this week?",
+      reading: reading("NONE"),
+      outcomes: [],
+      pageMoves: staying(),
+    });
+    await run.answer.answer({ ...request(WORK), askerSide: "INVESTOR" });
+    expect(run.stored.flatMap((message) => message.blocks ?? [])).toEqual([]);
+  });
+});
+
 describe("a move with a question after it", () => {
   it("is answered, carrying the move", async () => {
     const run = seam({
