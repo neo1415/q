@@ -56,7 +56,49 @@ const MAX_WORKERS =
  * probabilistic Q behaviour to the eval harness -- all separate systems
  * (TEO-001).
  */
-export default defineConfig({
+
+// Playwright owns tests/e2e. Excluded explicitly so the two runners can
+// never discover the same file, even if the include globs widen later.
+const TEST_EXCLUDE = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/.next/**",
+  "**/.turbo/**",
+  "tests/e2e/**",
+  // The web app's own Playwright suite (apps/web/e2e/playwright.config.ts).
+  "apps/web/e2e/**",
+  // Real-infrastructure tests run separately via `pnpm test:integration`.
+  "**/*.integration.test.ts",
+  // Real model calls run only via `pnpm test:live-model` (CQ-Q-005).
+  "**/*.live.test.ts",
+];
+
+/**
+ * Release gate speed (owner, 13 Nov; A6). Most of the unit step was module
+ * import, repeated for every file because each file runs in a fresh module
+ * graph (isolation). Measured on this 4 vCPU machine:
+ *   - all files isolated: 1,200 s;
+ *   - the node-side tests (packages, api, q-api, workers: 1,520 files,
+ *     17,169 tests) without isolation: 134 s, identical results in two
+ *     shuffled orders (seeds 101, 202), so no test depends on file order;
+ *   - the rest isolated (web/jsdom, 511 files): 510 s.
+ * So the node side shares module graphs and the rest keeps isolation.
+ * Every file still runs; none is skipped. A test that needs a fresh module
+ * graph goes in NEEDS_ISOLATION (found by a full no-isolation run: these
+ * two keep module state between files), never in a skip list.
+ */
+const NEEDS_ISOLATION = [
+  "packages/model-gateway/test/q-result-visuals.test.ts",
+  "packages/model-gateway/test/q-answer-compare-follow-up.test.ts",
+];
+const NODE_SIDE = [
+  "packages/**/*.{test,spec}.{ts,tsx}",
+  "apps/api/**/*.{test,spec}.{ts,tsx}",
+  "apps/q-api/**/*.{test,spec}.{ts,tsx}",
+  "apps/workers/**/*.{test,spec}.{ts,tsx}",
+];
+
+const SHARED_TOP = {
   // Component tests are TSX; opt into the automatic React runtime.
   oxc: { jsx: { runtime: "automatic" } },
   resolve: {
@@ -85,6 +127,19 @@ export default defineConfig({
       },
     ],
   },
+} as const;
+
+/** The settings every project repeats (see the root `test` block's notes). */
+const PROJECT_TEST = {
+  globals: true,
+  environment: "node",
+  testTimeout: 10_000,
+  hookTimeout: 10_000,
+  retry: 0,
+} as const;
+
+export default defineConfig({
+  ...SHARED_TOP,
   test: {
     // Testing Library auto-cleans between tests when the globals exist.
     globals: true,
@@ -101,21 +156,9 @@ export default defineConfig({
       "packages/**/*.{test,spec}.{ts,tsx}",
     ],
 
-    // Playwright owns tests/e2e. Excluded explicitly so the two runners can
-    // never discover the same file, even if the include globs widen later.
-    exclude: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/.next/**",
-      "**/.turbo/**",
-      "tests/e2e/**",
-      // The web app's own Playwright suite (apps/web/e2e/playwright.config.ts).
-      "apps/web/e2e/**",
-      // Real-infrastructure tests run separately via `pnpm test:integration`.
-      "**/*.integration.test.ts",
-      // Real model calls run only via `pnpm test:live-model` (CQ-Q-005).
-      "**/*.live.test.ts",
-    ],
+    // Playwright owns tests/e2e, integration and live suites run elsewhere
+    // (TEST_EXCLUDE below).
+    exclude: [...TEST_EXCLUDE],
 
     // Deterministic tests fail fast. Long-running integration and browser
     // suites get their own explicit configuration rather than inflating this
@@ -135,5 +178,31 @@ export default defineConfig({
     maxWorkers: MAX_WORKERS,
 
     reporters: ["default"],
+
+    // Two projects with their own isolation (see NEEDS_ISOLATION). Each
+    // repeats the shared settings rather than `extends`, because Vite's
+    // config merge would concatenate the include globs.
+    projects: [
+      {
+        ...SHARED_TOP,
+        test: {
+          ...PROJECT_TEST,
+          name: "node",
+          include: NODE_SIDE,
+          exclude: [...TEST_EXCLUDE, ...NEEDS_ISOLATION],
+          isolate: false,
+        },
+      },
+      {
+        ...SHARED_TOP,
+        test: {
+          ...PROJECT_TEST,
+          name: "isolated",
+          include: ["apps/web/**/*.{test,spec}.{ts,tsx}", ...NEEDS_ISOLATION],
+          exclude: [...TEST_EXCLUDE],
+          isolate: true,
+        },
+      },
+    ],
   },
 });
