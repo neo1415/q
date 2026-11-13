@@ -490,13 +490,27 @@ export type SeededCompany = {
   readonly token: string;
 };
 
+export type SeedCompanyOptions = {
+  /**
+   * Make the company visible to investors (the demo world's choice).
+   * False keeps it organisation-private: a run-scoped GateQ applicant
+   * must not fill investors' Discover with test companies.
+   */
+  readonly discoverable?: boolean;
+  /** Ask Capital Q to verify the company, as a founder would. */
+  readonly requestVerification?: boolean;
+};
+
 export async function seedCompany(
   http: SeedHttp,
   company: FictionalCompany,
   taxonomy: Taxonomy,
   password: string,
   log: SeedLog,
+  options: SeedCompanyOptions = {},
 ): Promise<SeededCompany> {
+  const discoverable = options.discoverable ?? true;
+  const requestVerification = options.requestVerification ?? true;
   const email = founderEmail(company.key);
   const account = await http.ensureAccount({
     email,
@@ -578,7 +592,7 @@ export async function seedCompany(
   });
 
   // Discoverability is the founder's declared choice; this founder makes it.
-  if (visibility !== "network_visible") {
+  if (discoverable && visibility !== "network_visible") {
     await http.apiOk(token, "POST", `${base}${COMPANY_VISIBILITY_SEGMENT}`, {
       visibility: "network_visible",
       expectedVersion: version,
@@ -587,12 +601,19 @@ export async function seedCompany(
 
   // Ask Capital Q to verify, as the founder would; the worker decides it
   // under the deployment's own synthetic attestation, or leaves it pending.
-  const standing = asRecord(
-    await http.apiOk(token, "GET", `${base}/verification`),
-  );
-  if (standing["requestable"] === true) {
-    await http.apiOk(token, "POST", `${base}/verification/requests`, undefined);
-    log("    verification requested");
+  if (requestVerification) {
+    const standing = asRecord(
+      await http.apiOk(token, "GET", `${base}/verification`),
+    );
+    if (standing["requestable"] === true) {
+      await http.apiOk(
+        token,
+        "POST",
+        `${base}/verification/requests`,
+        undefined,
+      );
+      log("    verification requested");
+    }
   }
   return {
     key: company.key,
