@@ -87,6 +87,22 @@ export function waitingLine(summaries: readonly string[]): string {
     : waitingLineOf([latest]).replace(/\.$/u, ` (and ${String(more)} more).`);
 }
 
+/**
+ * Journey audit 2026-11-13 D3: beside a new card, "Still waiting for your
+ * approval: Message Watchly" was said while the only card on screen was
+ * the NEW one (the conversation screen carries one card; an earlier card
+ * leaves it once the talk moves on). It read as if the earlier draft had
+ * been silently replaced. It was not: it still waits, bound to its own
+ * payload. The line now says so, and where to decide it.
+ */
+export function alsoWaitingLine(summaries: readonly string[]): string {
+  const where =
+    summaries.length > 1
+      ? "The new card doesn't replace them: decide them on Work, under Needs you."
+      : "The new card doesn't replace it: decide it on Work, under Needs you.";
+  return `${waitingLine(summaries)} ${where}`;
+}
+
 function waitingLineOf(summaries: readonly string[]): string {
   // A demo record's "(fictional)" marker is never said (QA F-62).
   const names = summaries.map((summary) =>
@@ -212,7 +228,7 @@ export function createQActionPort(options: {
         return null;
       }
       log("said", "other card waiting");
-      return waitingLine(others.map((card) => card.summary));
+      return alsoWaitingLine(others.map((card) => card.summary));
     };
     const outcome = await prepare(context, covered, prepared, alsoWaiting);
     if (outcome.kind === "AWAITING_APPROVAL") return outcome;

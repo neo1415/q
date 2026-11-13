@@ -635,7 +635,28 @@ type ProposalGrant = {
   readonly counterpartName: string;
   readonly connected: boolean;
   readonly blocked: boolean;
+  /**
+   * Not connected because interest is already expressed and awaits its
+   * answer (relationship state INTEREST_EXPRESSED, read from the
+   * projection, never from the person's words).
+   */
+  readonly awaitingAnswer: boolean;
 };
+
+/**
+ * Journey audit 2026-11-13 D2: with interest awaiting the founder's answer,
+ * "draft a follow-up" made Q prepare a second Express Interest card; on
+ * approval the server said it already existed and the note was lost. The
+ * state says what is possible: nothing can reach them until they accept.
+ */
+export function notConnectedLine(
+  counterpartName: string,
+  awaitingAnswer: boolean,
+): string {
+  return awaitingAnswer
+    ? `Interest between you and ${counterpartName} is already expressed and waiting for an answer, so nothing was prepared: messages open once it is accepted. Do not prepare Express Interest or a connection request again; that would send nothing new and any note would be lost. Say so plainly; if the answer is the person's own to give, offer to prepare it.`
+    : "Messages open once you're connected with them: interest expressed and accepted.";
+}
 
 function proposalTool<I extends ProposeChatMessageInput>(
   chat: ChatIntelligencePort,
@@ -692,11 +713,19 @@ function proposalTool<I extends ProposeChatMessageInput>(
         if (relationshipId === null) return deny("NOT_AVAILABLE");
         const thread = await chat.thread(actor, relationshipId);
         if (thread === null) return deny("NOT_AVAILABLE");
+        // A read that fails only loses the more precise words.
+        const awaitingAnswer = thread.connected
+          ? false
+          : await Promise.resolve()
+              .then(() => relationships.byRelationship(actor, relationshipId))
+              .then((view) => view?.status?.state === "INTEREST_EXPRESSED")
+              .catch(() => false);
         return allow("CONFIDENTIAL", {
           relationshipId,
           counterpartName: thread.counterpartName,
           connected: thread.connected,
           blocked: thread.blocked === true,
+          awaitingAnswer,
         });
       } catch {
         return deny("NOT_AVAILABLE");
@@ -706,8 +735,10 @@ function proposalTool<I extends ProposeChatMessageInput>(
       if (spec.requiresConnection && !grant.connected) {
         return Promise.resolve({
           status: "NOT_CONNECTED" as const,
-          awaitingApprovalOf:
-            "Messages open once you're connected with them: interest expressed and accepted.",
+          awaitingApprovalOf: notConnectedLine(
+            grant.counterpartName,
+            grant.awaitingAnswer,
+          ),
         });
       }
       // Never a way around a block; the person unblocks on the chat itself.

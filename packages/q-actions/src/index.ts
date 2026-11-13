@@ -114,6 +114,7 @@ export {
   type QActionRefusal,
   type QWaitingLines,
   waitingLine,
+  alsoWaitingLine,
 } from "./application/port.js";
 export {
   createQActionNarrator,

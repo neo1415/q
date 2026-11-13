@@ -13,6 +13,8 @@ import type { DatabaseExecutor } from "@capital-q/database";
 export type CounterpartNoticeKind =
   | "INTEREST_RECEIVED"
   | "CONNECTION_REQUESTED"
+  /** The other side accepted the interest or request (audit 2026-11-13 D1). */
+  | "INTEREST_ACCEPTED"
   | "Q_MESSAGE"
   | "TIME_PROPOSED"
   /** A pass, pause or resume on the relationship (2026-10-02). */

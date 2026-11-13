@@ -132,9 +132,12 @@ describe("withInterestNotices", () => {
           }),
         ),
       );
-      expect(h.told).toEqual([]);
+      // A decline tells nobody anything new; an acceptance is D1's notice.
+      expect(h.told.map((t) => t.kind)).toEqual(
+        decision === "ACCEPTED" ? ["INTEREST_ACCEPTED"] : [],
+      );
       expect(h.passed).toHaveLength(1);
-      expect(h.queries).toHaveLength(1);
+      expect(h.queries).toHaveLength(decision === "ACCEPTED" ? 2 : 1);
       expect(h.queries[0]?.text).toContain("set read_at");
       expect(h.queries[0]?.values).toEqual([
         `interest_received:${INTEREST}`,
@@ -177,6 +180,127 @@ describe("withInterestNotices", () => {
       kind: "RETRY",
       errorCode: "INTEREST_NOTICE_FAILED",
     });
+  });
+});
+
+/**
+ * Journey audit 2026-11-13 D1: the side that expressed interest hears that
+ * it was accepted, once per interest, and only that side.
+ */
+describe("an accepted interest", () => {
+  const MATCH = "55555555-0000-4000-8000-000000000001";
+  const accepted = () =>
+    interestAnsweredEvent({
+      ...envelope,
+      correlationId: cor(),
+      decision: "ACCEPTED",
+      interestId: INTEREST,
+      matchId: MATCH,
+    });
+
+  it("tells the investor's people when the company accepts their interest", async () => {
+    const h = harness("INVESTOR");
+    expect(await h.handle(message(accepted()))).toEqual({ kind: "DONE" });
+    // The company accepted, so the company is the acting side and the
+    // investor organisation's members are the ones told.
+    expect(h.told).toEqual([
+      {
+        kind: "INTEREST_ACCEPTED",
+        title: "Pay Co accepted your interest",
+        actingSide: "COMPANY",
+        key: INTEREST,
+      },
+    ]);
+    // The lookup is bound to this interest on this relationship.
+    expect(h.queries[1]?.values).toEqual([INTEREST, RELATIONSHIP]);
+    expect(h.passed).toHaveLength(1);
+  });
+
+  it("tells the founder's people when the investor accepts their request", async () => {
+    const h = harness("COMPANY");
+    await h.handle(message(accepted()));
+    expect(h.told).toEqual([
+      {
+        kind: "INTEREST_ACCEPTED",
+        title: "Ada Capital accepted your request to connect",
+        actingSide: "INVESTOR",
+        key: INTEREST,
+      },
+    ]);
+  });
+
+  it("keys every delivery to the interest, so redelivery adds nothing", async () => {
+    const h = harness("INVESTOR");
+    const event = accepted();
+    await h.handle(message(event));
+    await h.handle(message(event));
+    // Same dedupe key both times; the insert's on-conflict absorbs it.
+    expect(h.told.map((t) => t.key)).toEqual([INTEREST, INTEREST]);
+  });
+
+  it("tells nobody about a decline or an unknown interest", async () => {
+    const declined = harness("INVESTOR");
+    await declined.handle(
+      message(
+        interestAnsweredEvent({
+          ...envelope,
+          correlationId: cor(),
+          decision: "DECLINED",
+          interestId: INTEREST,
+          matchId: null,
+        }),
+      ),
+    );
+    expect(declined.told).toEqual([]);
+
+    const told: string[] = [];
+    const empty = withInterestNotices(() => Promise.resolve({ kind: "DONE" }), {
+      registry,
+      sql: (() => Promise.resolve([])) as unknown as DatabaseExecutor,
+      notices: {
+        notify: (input) => {
+          told.push(input.kind);
+          return Promise.resolve(1);
+        },
+      },
+      logger: createRecordingLogger(),
+    });
+    expect(await empty(message(accepted()))).toEqual({ kind: "DONE" });
+    expect(told).toEqual([]);
+  });
+
+  it("never wedges the matched event: a missing kind is skipped, a transient failure retried", async () => {
+    const run = async (code: string) => {
+      const passed: unknown[] = [];
+      const handle = withInterestNotices(
+        (inner) => {
+          passed.push(inner);
+          return Promise.resolve({ kind: "DONE" });
+        },
+        {
+          registry,
+          sql: (() =>
+            Promise.resolve([
+              { party: "INVESTOR", company: "Pay Co", investor: "Ada Capital" },
+            ])) as unknown as DatabaseExecutor,
+          notices: {
+            notify: () =>
+              Promise.reject(Object.assign(new Error("x"), { code })),
+          },
+          logger: createRecordingLogger(),
+        },
+      );
+      return { outcome: await handle(message(accepted())), passed };
+    };
+    const missingKind = await run("23514");
+    expect(missingKind.outcome).toEqual({ kind: "DONE" });
+    expect(missingKind.passed).toHaveLength(1);
+    const transient = await run("08006");
+    expect(transient.outcome).toEqual({
+      kind: "RETRY",
+      errorCode: "INTEREST_NOTICE_FAILED",
+    });
+    expect(transient.passed).toHaveLength(0);
   });
 });
 

@@ -230,6 +230,52 @@ describe("RelationshipChat", () => {
     expect(askAbout).not.toHaveBeenCalled();
   });
 
+  // Journey audit 2026-11-13 D5: the conversation list beside the thread
+  // read "No messages yet" after the first send, until a reload.
+  it("refreshes the page's reads after a sent message, and not after a refused one", async () => {
+    const changed = vi.fn();
+    window.addEventListener("cq:page-data-changed", changed);
+    send.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        ...thread("OPEN").messages[0],
+        messageId: "00000000-0000-4000-8000-00000000d003",
+        mine: true,
+        body: "Hello",
+      },
+    });
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={thread("OPEN")}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Message Apex"), {
+      target: { value: "Hello" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      await Promise.resolve();
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    send.mockResolvedValueOnce({
+      ok: false,
+      kind: "CLOSED",
+      message: "Messaging isn't open.",
+    });
+    fireEvent.change(screen.getByLabelText("Message Apex"), {
+      target: { value: "Again" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      await Promise.resolve();
+    });
+    expect(changed).toHaveBeenCalledTimes(1);
+    window.removeEventListener("cq:page-data-changed", changed);
+  });
+
   it("hands @Q to Q and never sends it to the other side", async () => {
     render(
       <RelationshipChat

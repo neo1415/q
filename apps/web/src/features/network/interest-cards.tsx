@@ -33,6 +33,7 @@ import {
 } from "@/features/relationships/crm-kit";
 import { TabCount } from "@/features/relationships/record-parts";
 import { useT } from "@/features/i18n/language";
+import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
 import {
   answerInterestAction,
@@ -238,6 +239,11 @@ function InterestCard({
   const [refusal, setRefusal] = useState<string | null>(null);
   // One key per intended answer, reused across retries of it.
   const key = useRef<string | null>(null);
+  // Journey audit 2026-11-13 D4 (phone): Q's briefing covered Accept and
+  // Decline. The answer row is a primary action no floating Q surface
+  // may cover.
+  const answerRow = useRef<HTMLDivElement>(null);
+  useDockAvoid(answerRow, item.response !== "DECLINED");
   const name = item.investorName;
   const type = investorTypeLabel(item.investorType);
 
@@ -349,7 +355,10 @@ function InterestCard({
           {t("Declined. They see a polite no, never a reason you didn’t give.")}
         </span>
       ) : item.response === "ACCEPTED" ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div
+          ref={answerRow}
+          className="flex flex-wrap items-center justify-end gap-2"
+        >
           <Link
             href={`/relationships/investor/${encodeURIComponent(item.investorOrganisationId)}`}
             className={crmButton("quiet")}
@@ -364,7 +373,7 @@ function InterestCard({
           />
         </div>
       ) : (
-        <div className="flex gap-2 sm:justify-end">
+        <div ref={answerRow} className="flex gap-2 sm:justify-end">
           <button
             type="button"
             className={crmButton("secondary", "max-sm:flex-1")}

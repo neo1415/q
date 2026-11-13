@@ -76,6 +76,15 @@
   .cq-brief-link[data-quiet] {
     color: var(--cq-text-secondary);
   }
+  /* Journey audit 2026-11-13 D8: on touch the header links ("$1M seed
+     safe", "Your relationship") were 20px tall; touch targets >= 44px. */
+  @media (pointer: coarse) {
+    .cq-brief-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
+  }
 
   /* A label in words, with its mark: never colour alone. */
   .cq-brief-tag {

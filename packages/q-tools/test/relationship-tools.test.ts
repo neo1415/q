@@ -640,6 +640,57 @@ describe("proposal tools write nothing but a prepared proposal", () => {
     expect(calls.prepared).toEqual([]);
   });
 
+  it("journey audit D2: a pending interest the gate still admits gets no second Express Interest card", async () => {
+    // The command's gate admits the company (mayExpress true); the
+    // interest already exists and awaits the founder's answer.
+    const { port: base, calls } = fakeRelationships(randomHistory(5));
+    const port: RelationshipIntelligencePort = {
+      ...base,
+      ownInterest: () =>
+        Promise.resolve({
+          expressedAt: "2026-11-13T21:43:00.000Z",
+          response: "PENDING" as const,
+          connected: false,
+        }),
+    };
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "p1d2",
+        name: "propose_express_interest",
+        arguments: {
+          companyId: COMPANY_B_NETWORK,
+          note: "Could you share your pilot results?",
+        },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "ALREADY_EXPRESSED" },
+    });
+    const said = JSON.stringify(outcome.result);
+    expect(said).toContain("they haven't answered yet");
+    expect(said).toContain("Messages open once they accept.");
+    expect(calls.prepared).toEqual([]);
+
+    // No interest yet: the card is still prepared as before.
+    const fresh: RelationshipIntelligencePort = {
+      ...base,
+      ownInterest: () => Promise.resolve(null),
+    };
+    const first = await executorWith(fresh).execute(
+      {
+        callId: "p1d2b",
+        name: "propose_express_interest",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(first.status).toBe("SUCCEEDED");
+    expect(calls.prepared).toHaveLength(1);
+  });
+
   it("prepares nothing when the command itself would refuse", async () => {
     const { port, calls } = fakeRelationships(randomHistory(5), {
       mayExpress: false,

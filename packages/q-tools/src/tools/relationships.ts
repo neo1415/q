@@ -646,14 +646,21 @@ function createProposeExpressInterestTool(
               input.company ?? "",
             );
       if (companyId === null) return deny("NOT_AVAILABLE");
-      if (!(await relationships.mayExpressInterest(actor, companyId))) {
-        // Already expressed (QA QO-39, live 2026-10-23: "express interest
-        // in Ledgerfold with a note" opened the page; it was sent on 5
-        // Oct and Q never said so): when, and where it stands, read as
-        // them. Anything else stays the one refusal.
-        const already = await relationships
-          .ownInterest?.(actor, companyId)
-          .catch(() => null);
+      // Already expressed (QA QO-39, live 2026-10-23: "express interest
+      // in Ledgerfold with a note" opened the page; it was sent on 5 Oct
+      // and Q never said so): when, and where it stands, read as them.
+      // Read FIRST (journey audit 2026-11-13 D2): the gate admits a
+      // company whose interest already exists, so a follow-up became a
+      // second Express Interest card whose note was lost on approval.
+      const existing = await relationships
+        .ownInterest?.(actor, companyId)
+        .catch(() => null);
+      if (
+        existing != null ||
+        !(await relationships.mayExpressInterest(actor, companyId))
+      ) {
+        // Anything but an existing interest stays the one refusal.
+        const already = existing;
         const named =
           already == null
             ? null

@@ -64,6 +64,8 @@ function world(
     readonly withCounterpart?: boolean;
     /** A second relationship on their own list. */
     readonly several?: boolean;
+    /** The projected relationship state, as byRelationship reads it. */
+    readonly state?: string;
   } = {},
 ) {
   const counterpart = options.counterpart ?? "Apex";
@@ -120,6 +122,16 @@ function world(
   };
   // Their own relationships by name: only actor B is a party, to Apex.
   const relationships = {
+    ...(options.state === undefined
+      ? {}
+      : {
+          byRelationship: (actor: typeof actorA, relationshipId: string) =>
+            Promise.resolve(
+              actor.userId === actorB.userId && relationshipId === RELATIONSHIP
+                ? { side: "INVESTOR", status: { state: options.state } }
+                : null,
+            ),
+        }),
     ownRelationships: (actor: typeof actorA) =>
       Promise.resolve({
         side: "INVESTOR" as const,
@@ -542,6 +554,42 @@ describe("chat proposals", () => {
       data: { status: "NOT_CONNECTED" },
     });
     expect(prepared).toEqual([]);
+  });
+
+  it("journey audit D2: with interest awaiting an answer it says so, by state, and steers away from a second Express Interest", async () => {
+    const awaiting = world({ connected: false, state: "INTEREST_EXPRESSED" });
+    const outcome = await awaiting.executor.execute(
+      {
+        callId: "c5a",
+        name: "propose_chat_message",
+        arguments: {
+          relationshipId: RELATIONSHIP,
+          body: "Could you share your pilot results?",
+        },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "NOT_CONNECTED" },
+    });
+    const said = JSON.stringify(outcome.result);
+    expect(said).toContain("already expressed and waiting for an answer");
+    expect(said).toContain("Do not prepare Express Interest");
+    expect(awaiting.prepared).toEqual([]);
+
+    // Declined: not "awaiting", so the general line, and still nothing.
+    const declined = world({ connected: false, state: "DECLINED" });
+    const other = await declined.executor.execute(
+      {
+        callId: "c5b",
+        name: "propose_chat_message",
+        arguments: { relationshipId: RELATIONSHIP, body: "Hello" },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(JSON.stringify(other.result)).not.toContain("waiting for an answer");
+    expect(declined.prepared).toEqual([]);
   });
 
   it("does not prepare a message while messaging is blocked, and reads as not open", async () => {

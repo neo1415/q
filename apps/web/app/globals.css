@@ -5753,7 +5753,8 @@
     }
     .cq-room-shelf {
       flex-shrink: 0;
-      min-height: 36px;
+      /* Journey audit 2026-11-13 D8: 39px on a phone; touch targets >= 44px. */
+      min-height: 44px;
       border-color: var(--cq-border);
       border-radius: var(--cq-radius-full);
       background: var(--cq-surface-raised);

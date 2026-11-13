@@ -11,6 +11,85 @@ import type { RunnerLogger } from "../outbox-runner.js";
 import type { QueueMessage } from "../queue/pgmq.js";
 import type { MessageOutcome } from "../queue/runner.js";
 
+/** Postgres check_violation: the kind is not in notifications_kind_check. */
+const CHECK_VIOLATION = "23514";
+
+/**
+ * The side that expressed the interest hears that it was accepted (journey
+ * audit 2026-11-13 D1: the investor's gate promised "You'll get a
+ * notification" and none was ever written). The accepting side is the
+ * acting side, so the notice reaches the expressing organisation's active
+ * members only, linked to their own relationship page. Once per interest
+ * (dedupe `interest_accepted:<interestId>`), so redelivery and a repeated
+ * accept tell nobody twice; a decline tells nobody anything new.
+ *
+ * Returns a RETRY outcome when the write failed transiently, else null.
+ * A database that does not yet allow the kind (migration
+ * 20261231510000 not applied) is logged and skipped, never retried, so
+ * the matched event still reaches the handlers after this one.
+ */
+async function tellAccepted(
+  options: InterestNoticeOptions,
+  message: QueueMessage,
+  data: { readonly relationshipId?: unknown },
+  interestId: string,
+): Promise<MessageOutcome | null> {
+  if (
+    typeof data.relationshipId !== "string" ||
+    !UUID.test(data.relationshipId)
+  ) {
+    return null;
+  }
+  try {
+    const rows = await options.sql<
+      { party: "INVESTOR" | "COMPANY"; company: string; investor: string }[]
+    >`
+      select n.expressed_by_party as party, c.canonical_name as company,
+             i.display_name as investor
+        from network.interests n
+        join network.relationships r on r.id = n.relationship_id
+        join core.companies c on c.id = r.company_id
+        join core.investor_organisations i on i.id = r.investor_organisation_id
+       where n.id = ${interestId} and r.id = ${data.relationshipId}`;
+    const row = rows[0];
+    if (row === undefined) return null;
+    const investorExpressed = row.party === "INVESTOR";
+    await options.notices.notify({
+      relationshipId: data.relationshipId,
+      // The side that accepted acted; the side that expressed is told.
+      actingSide: investorExpressed ? "COMPANY" : "INVESTOR",
+      kind: "INTEREST_ACCEPTED",
+      title: investorExpressed
+        ? `${row.company} accepted your interest`
+        : `${row.investor} accepted your request to connect`,
+      body: investorExpressed
+        ? "You're connected. Messages are open, and the data room shows what the founders share with connected investors."
+        : "You're connected. Messages are open.",
+      target: "RELATIONSHIP",
+      key: interestId,
+      priority: "NEEDS_YOU",
+    });
+    return null;
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      (error as { readonly code?: unknown }).code === CHECK_VIOLATION
+    ) {
+      options.logger.warn(
+        { msgId: message.msgId, err: error },
+        "interest-accepted notice kind not allowed yet (migration 20261231510000); skipped",
+      );
+      return null;
+    }
+    options.logger.warn(
+      { msgId: message.msgId, err: error },
+      "interest-accepted notice not written; retrying",
+    );
+    return { kind: "RETRY", errorCode: "INTEREST_NOTICE_FAILED" };
+  }
+}
+
 /**
  * The receiving side hears about it (AUTO, 2026-10-02): an investor's
  * interest reaches the company's people, a founder's connection request
@@ -76,6 +155,15 @@ export function withInterestNotices(
             "answered interest notice not resolved; retrying",
           );
           return { kind: "RETRY", errorCode: "INTEREST_NOTICE_FAILED" };
+        }
+        if (parsed.message.type === RelationshipMatchedEvent.name) {
+          const told = await tellAccepted(
+            options,
+            message,
+            parsed.message.data as { readonly relationshipId?: unknown },
+            answered.interestId,
+          );
+          if (told !== null) return told;
         }
       }
       return inner(message);

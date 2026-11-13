@@ -384,6 +384,9 @@ export const NotificationKindSchema = z.enum([
   // the saver's viewing level; and the week's passive viewing, aggregate.
   "COMPANY_SAVED",
   "VIEWING_DIGEST",
+  // Journey audit 2026-11-13 D1 (20261231510000): the side that expressed
+  // interest hears that it was accepted.
+  "INTEREST_ACCEPTED",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

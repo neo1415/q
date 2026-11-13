@@ -39,6 +39,7 @@ import {
   type ChatSafetyDialog,
 } from "./chat-safety";
 import { useFollowNewest } from "@/features/q/follow-newest";
+import { announcePageDataChanged } from "@/features/q/page-data-changed";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
 import {
@@ -255,6 +256,11 @@ export function RelationshipChat({
       if (result.ok) {
         setMessages((current) => merge(current, [result.value]));
         setNotice(null);
+        // Journey audit 2026-11-13 D5: the conversation list beside the
+        // thread (server-rendered) still read "No messages yet" after the
+        // first send. The page's own reads are refreshed; this thread's
+        // client state is kept.
+        announcePageDataChanged();
         return true;
       }
       if (result.kind === "NOT_READY" && attempt < CHECK_RETRIES) {

@@ -544,6 +544,9 @@ function actionFor(
     case "INTEREST_RECEIVED":
     case "CONNECTION_REQUESTED":
       return { label: "Answer", href };
+    // Accepted: the conversation is open, so the next move is to write.
+    case "INTEREST_ACCEPTED":
+      return { label: "Open", href };
     case "CHAT_MESSAGE":
     case "Q_MESSAGE":
     case "EMAIL_RECEIVED":

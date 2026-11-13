@@ -471,10 +471,31 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     ]);
     await port.prepare(context);
     expect(said.at(-1)).toBe(
-      "(same message) Still waiting for your approval: Message Savanna Seed Partners.",
+      "(same message) Still waiting for your approval: Message Savanna Seed Partners. The new card doesn't replace it: decide it on Work, under Needs you.",
     );
     // No separate message, and so no older card after the new one.
     expect(shown).toEqual([]);
+  });
+
+  // Journey audit 2026-11-13 D3: a second "Message Watchly" draft while the
+  // first still waited read as a silent replacement. The earlier card is
+  // never dropped: it stays PENDING with its own payload, and the line
+  // says the new card does not replace it and where to decide it.
+  it("D3: an earlier waiting draft to the same side is named as not replaced, and is not superseded", async () => {
+    const { port, said } = build([
+      {
+        proposalId: RAISE,
+        summary: "Message Watchly",
+        status: "PENDING",
+      },
+    ]);
+    const outcome = await port.prepare(context);
+    expect(outcome.kind).toBe("AWAITING_APPROVAL");
+    expect(said.at(-1)).toBe(
+      "(same message) Still waiting for your approval: Message Watchly. The new card doesn't replace it: decide it on Work, under Needs you.",
+    );
+    // A card the engine DID supersede is said as replaced instead, never
+    // as still waiting (the replaces line, covered below).
   });
 
   it("the exact sequence: the diligence card, then the raise card still waiting", async () => {
@@ -495,7 +516,7 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     expect(said).toEqual([
       "Share this document with them. Not saved yet: tap Approve on the card, or tell me to go ahead.",
       // QA F-62: the demo record's "(fictional)" marker is not said.
-      "(same message) Still waiting for your approval: Share your raise with Savanna Seed Partners.",
+      "(same message) Still waiting for your approval: Share your raise with Savanna Seed Partners. The new card doesn't replace it: decide it on Work, under Needs you.",
     ]);
     expect(logged).toEqual([
       expect.objectContaining({
@@ -542,7 +563,7 @@ describe("a new card beside another still waiting (run 0d1ffa3f)", () => {
     ]);
     await port.prepare(context);
     expect(said.at(-1)).toBe(
-      "(same message) Still waiting for your approval: Share your raise with Savanna Seed Partners (and 1 more).",
+      "(same message) Still waiting for your approval: Share your raise with Savanna Seed Partners (and 1 more). The new card doesn't replace them: decide them on Work, under Needs you.",
     );
   });
 

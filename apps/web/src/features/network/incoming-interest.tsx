@@ -17,6 +17,7 @@ import {
 } from "./interest-actions";
 import { formatDay } from "@/components/date-format";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 import { STATE_WORDS } from "@/features/relationships/relationship-words";
 import { useT } from "@/features/i18n/language";
 import type { ApprovalPayload } from "@/features/q/control/approval";
@@ -128,6 +129,10 @@ function Row({
   const name = current.investorName;
   const acceptRef = useRef<HTMLSpanElement>(null);
   const declineRef = useRef<HTMLSpanElement>(null);
+  // Journey audit 2026-11-13 D4: the answer row is a primary action; no
+  // floating Q surface (the dock, the arrival briefing) may cover it.
+  const answerRow = useRef<HTMLDivElement>(null);
+  useDockAvoid(answerRow);
 
   // Where it stands after the accept (QA run 8a1d57b9: the line read
   // "Connected... Now: interest expressed" -- the state loaded with the
@@ -267,7 +272,9 @@ function Row({
           </p>
         </div>
       </div>
-      {outcome}
+      <div ref={answerRow} data-dock-avoid>
+        {outcome}
+      </div>
       {qTarget &&
       current.response !== "ACCEPTED" &&
       current.response !== "DECLINED" ? (
