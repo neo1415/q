@@ -77,6 +77,8 @@ const OFFERED = [
 
 /** Live 2026-11-13 (Ajopot): Silo Credit has published no figures. */
 let siloPublishedNone = false;
+/** A8: the MRR claims carry their structured value (MONEY, USD, dated). */
+let structuredFigures = false;
 
 const PROFILES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   [MIZAN]: {
@@ -219,7 +221,14 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
                 companyId === MIZAN
                   ? "Monthly recurring revenue is $42,000."
                   : "Monthly recurring revenue is $9,000.",
-              value: null,
+              value: structuredFigures
+                ? {
+                    kind: "MONEY",
+                    amount: companyId === MIZAN ? "42000" : "9000",
+                    currency: "USD",
+                    asOf: "2026-09-30",
+                  }
+                : null,
               asOf: "2026-09-30",
               truthClass: "USER_CLAIM",
               evidenceStatus: "SELF_REPORTED",
@@ -950,6 +959,82 @@ describe("compare the top two, right after a list of five", () => {
     });
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     expect(stored.at(-1)?.blocks ?? []).toContainEqual(move);
+  });
+
+  describe("A8: a chart of the figures read, drawn by code", () => {
+    const chartsOf = (blocks: readonly unknown[] | undefined) =>
+      (blocks ?? []).filter(
+        (block) => Reflect.get(block as object, "kind") === "CHART",
+      ) as {
+        chart: string;
+        currency: string | null;
+        series: {
+          truthClass: string;
+          evidenceStatus: string;
+          source: string;
+          points: { label: string; value: number; asOf?: string | null }[];
+        }[];
+      }[];
+
+    it("a chart ask yields the chart from the read figures, with no number from the model's words", async () => {
+      structuredFigures = true;
+      try {
+        const { seam, request, stored } = build(
+          "Chart MRR for Mizan vs Silo Credit",
+          {
+            compare: { count: null, names: ["Mizan", "Silo Credit"] },
+            asksForChart: true,
+          },
+          // The model's words carry numbers the reads never gave.
+          "Mizan has $42,000 MRR against Silo Credit's $9,000; together about $51,500, up 77% on last year.",
+        );
+        expect((await seam.answer(request)).kind).toBe("ANSWERED");
+        const charts = chartsOf(stored.at(-1)?.blocks);
+        expect(charts).toHaveLength(1);
+        const [chart] = charts;
+        expect(chart?.chart).toBe("BAR");
+        expect(chart?.currency).toBe("USD");
+        const points = chart?.series.flatMap((series) => series.points) ?? [];
+        expect(points.map((point) => [point.label, point.value])).toEqual([
+          ["Mizan", 42000],
+          ["Silo Credit", 9000],
+        ]);
+        for (const point of points) expect(point.asOf).toBe("2026-09-30");
+        const values = new Set(points.map((point) => point.value));
+        for (const fromWords of [51500, 51_500, 77]) {
+          expect(values.has(fromWords)).toBe(false);
+        }
+        expect(chart?.series[0]?.truthClass).toBe("USER_CLAIM");
+        expect(chart?.series[0]?.evidenceStatus).toBe("SELF_REPORTED");
+        expect(chart?.series[0]?.source).toMatch(/company-stated/iu);
+        // Drawn: never also "I can't draw a chart".
+        expect(stored.at(-1)?.content ?? "").not.toMatch(
+          /can't (?:draw a )?chart/iu,
+        );
+      } finally {
+        structuredFigures = false;
+      }
+    });
+
+    it("figures with no structured value draw no chart, even when asked", async () => {
+      const { seam, request, stored } = build(
+        "Chart MRR for Mizan vs Silo Credit",
+        {
+          compare: { count: null, names: ["Mizan", "Silo Credit"] },
+          asksForChart: true,
+        },
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(chartsOf(stored.at(-1)?.blocks)).toEqual([]);
+    });
+
+    it("a comparison that did not ask still gets no chart without comparable figures", async () => {
+      const { seam, request, stored } = build(
+        "Compare the top two side by side",
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(chartsOf(stored.at(-1)?.blocks)).toEqual([]);
+    });
   });
 
   it("an ordinary follow-up reads nothing extra", async () => {

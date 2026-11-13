@@ -343,8 +343,12 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
                   return (
                     <td key={series.label} className="pe-3 cq-numeric">
                       {point === undefined
-                        ? "Not known"
+                        ? t("Not known")
                         : formatValue(point.value, block.currency)}
+                      {/* A8: each figure's own date, as its source gives it. */}
+                      {point?.asOf === undefined || point.asOf === null
+                        ? null
+                        : ` (${timelineDate(point.asOf)})`}
                     </td>
                   );
                 })}

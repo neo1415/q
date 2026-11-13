@@ -334,6 +334,12 @@ export type ReadCompanyFigure = {
   readonly asOf: string | null;
   readonly truthClass: string;
   readonly evidenceStatus: string;
+  /**
+   * A8: the claim's structured value exactly as the tool returned it
+   * (e.g. MONEY amount and currency, COUNT, PERCENT, a growth period's
+   * start and end), for a chart drawn by code; absent or null: none.
+   */
+  readonly value?: Readonly<Record<string, unknown>> | null | undefined;
 };
 
 const READ_COMPANY_FIGURES = "company.figures.read";
@@ -346,6 +352,7 @@ const CompanyFiguresReadSchema = z.object({
       z.object({
         key: z.string().min(1).max(120),
         statement: z.string().max(600),
+        value: z.record(z.string(), z.unknown()).nullable().optional(),
         asOf: z.string().nullable(),
         truthClass: z.string(),
         evidenceStatus: z.string(),
@@ -472,6 +479,7 @@ export function createRunCompanies(limit = 200) {
             asOf: figure.asOf,
             truthClass: figure.truthClass,
             evidenceStatus: figure.evidenceStatus,
+            value: figure.value ?? null,
           })),
         );
       }

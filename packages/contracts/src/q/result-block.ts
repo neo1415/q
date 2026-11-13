@@ -377,6 +377,7 @@ export const QTableBlockSchema = z
   );
 
 const CHARTABLE_CLAIM_EVIDENCE: ReadonlySet<string> = new Set([
+  "SELF_REPORTED",
   "DOCUMENT_SUPPORTED",
   "MULTI_SOURCE_SUPPORTED",
   "EXTERNALLY_VERIFIED",
@@ -384,10 +385,17 @@ const CHARTABLE_CLAIM_EVIDENCE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Whether a series may be drawn: verified figures, or a claim backed by a
- * document or better (shown labelled as the claim it is). Never an
- * inference, an estimate, an unknown, or a bare self-report: a line on a
- * chart reads as fact, so only what is evidenced earns one.
+ * Whether a series may be drawn: verified figures, or the company's own
+ * claim (self-reported, or backed by a document or better), shown labelled
+ * as the claim it is: its standing is said under the chart and its source
+ * says "company-stated". Never an inference, an estimate, an unknown, or a
+ * figure with no evidence at all: a line on a chart reads as fact, so what
+ * nobody stated never earns one.
+ *
+ * A8 (owner priority, 13 Nov 2026): Q answers with actual charts of the
+ * figures companies publish, and on Capital Q nearly every published
+ * figure is a self-reported company claim. It is admitted as that claim,
+ * labelled on screen, and never shown as verified.
  */
 export function chartableSeries(series: {
   readonly truthClass: string;
@@ -430,6 +438,15 @@ export const QChartBlockSchema = z
                   .object({
                     label: z.string().trim().min(1).max(40),
                     value: z.number().finite(),
+                    /**
+                     * A8: the date the figure is stated for (YYYY-MM-DD),
+                     * when its source gives one; null or absent: undated.
+                     */
+                    asOf: z
+                      .string()
+                      .regex(/^\d{4}-\d{2}-\d{2}$/u)
+                      .nullable()
+                      .optional(),
                   })
                   .strict(),
               )

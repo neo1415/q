@@ -1169,7 +1169,7 @@ export function timelineBlock(input: {
 
 /**
  * A chart from figures that carry their own standing. A series that is
- * not chartable (an inference, an estimate, a bare self-report) is left
+ * not chartable (an inference, an estimate, an unevidenced figure) is left
  * out rather than drawn as if it were fact; none left, no chart.
  */
 export function chartBlock(input: {

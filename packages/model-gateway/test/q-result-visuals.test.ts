@@ -295,7 +295,7 @@ describe("E4: timeline and chart refuse what must not be drawn", () => {
     ).toBe(false);
   });
 
-  it("charts only verified or document-backed figures", () => {
+  it("charts only verified figures or company claims, never inferences or estimates", () => {
     const series = (truthClass: string, evidenceStatus: string) => ({
       label: "Revenue",
       truthClass,
@@ -318,7 +318,18 @@ describe("E4: timeline and chart refuse what must not be drawn", () => {
         series("ESTIMATE", "DOCUMENT_SUPPORTED"),
       ] as never,
     });
-    expect(built?.kind === "CHART" && built.series).toHaveLength(1);
+    // A8: the document-backed claim and the self-reported claim, each
+    // labelled as the claim it is; never the inference or the estimate.
+    expect(built?.kind === "CHART" && built.series).toHaveLength(2);
+    expect(
+      chartBlock({
+        chart: "BAR",
+        title: "x",
+        unit: "x",
+        currency: null,
+        series: [series("USER_CLAIM", "NO_EVIDENCE")] as never,
+      }),
+    ).toBeNull();
     expect(
       chartBlock({
         chart: "BAR",

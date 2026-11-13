@@ -512,6 +512,7 @@ import {
   newestAnswerCards,
   answerCardCompanies,
 } from "./compare-table.js";
+import { answerChart } from "./figure-chart.js";
 import {
   attachedDocumentIntent,
   attachedDocumentNote,
@@ -7939,11 +7940,22 @@ export function createModelGatewayQAnswer(
             ANSWER_LIMIT_CHARS,
           );
         }
+        const chart = answerChart({
+          read: runCompanies.read(request.runId),
+          question: latest.content,
+          asked: request.asksForChart === true,
+          compareIds,
+          blocks: [
+            ...(given ?? []),
+            ...(tableHere && compareTable !== null ? [compareTable] : []),
+          ],
+        });
         const carried = withoutUnaskedMoves(
           withFitIntegrity(
             [
               ...(given ?? []),
               ...(tableHere && compareTable !== null ? [compareTable] : []),
+              ...(chart === null ? [] : [chart]),
               ...publicSources.map((source) => ({
                 kind: "PUBLIC_SOURCE" as const,
                 ...publicSourceBlockFields(source),
@@ -11418,6 +11430,20 @@ export function createModelGatewayQAnswer(
         // businesses." was the model's whole reply on one run, "I'll
         // remember that…" on the one before).
         const rememberLine = rememberConfirmation(request.rememberAsk);
+        // A8 (owner priority, 13 Nov 2026): a chart they asked for (the
+        // reader's asksForChart) is drawn by code from the figures this
+        // run read under the firewall, never from the answer's words. None
+        // honest to draw: the could-not line below says so plainly.
+        const askedChart =
+          request.asksForChart === true
+            ? answerChart({
+                read: runCompanies.read(request.runId),
+                question: latest.content,
+                asked: true,
+                compareIds,
+                blocks: [],
+              })
+            : null;
         const couldNot =
           parityGap !== null &&
           actedLines.length === 0 &&
@@ -11464,11 +11490,14 @@ export function createModelGatewayQAnswer(
               ? // Guard run 1 (2026-10-25, run b6f9236c): the draft was
                 // written above; "I didn't prepare that" contradicted it.
                 DRAFT_NOT_ON_CARD_LINE
-              : couldNotLineFor(
-                  parityGap,
-                  request.asksForChart === true,
-                  statusTalk?.text ?? guarded.text,
-                )
+              : askedChart !== null
+                ? // The chart they asked for is drawn: that is what was done.
+                  null
+                : couldNotLineFor(
+                    parityGap,
+                    request.asksForChart === true,
+                    statusTalk?.text ?? guarded.text,
+                  )
             : null;
         if (couldNot !== null) {
           logger?.warn(
@@ -11879,10 +11908,24 @@ export function createModelGatewayQAnswer(
             "q figure conflicts shown",
           );
         }
+        // A8: the chart they asked for, or one beside the comparison table
+        // when a comparable metric exists; from this run's figure reads
+        // only (the run's read is taken above, so it is drawn here).
+        const chartToShow = answerChart({
+          read: companiesRead,
+          question: latest.content,
+          asked: request.asksForChart === true,
+          compareIds,
+          blocks: [
+            ...(modelBlocks ?? []),
+            ...(tableToShow === null ? [] : [tableToShow]),
+          ],
+        });
         const codeBlocks = [
           ...conflicts,
           ...(builtCards === null ? [] : [builtCards]),
           ...(tableToShow === null ? [] : [tableToShow]),
+          ...(chartToShow === null ? [] : [chartToShow]),
           ...(publicRecord === null ? [] : [publicRecord]),
           ...fromPages,
           ...(picture === null ? [] : [picture]),
@@ -12301,8 +12344,11 @@ export const DRAFT_NOT_ON_CARD_LINE =
  */
 const SAID_NO_CHART =
   /\b(?:couldn['’]?t|could not|can['’]?t|cannot|unable to)\b[^.!?\n]{0,40}\b(?:chart|graph|plot|display|draw)/iu;
+// A8 (13 Nov 2026): charts are now drawn by code from the figures a run
+// read (figure-chart.ts). This line is for an ask with nothing honest to
+// draw: fewer than two comparable, dated, published figures.
 export const CHART_NOT_YET_LINE =
-  "I can't draw a chart of that here yet. I can give you the figures, with where each one comes from.";
+  "I can't chart that: I don't have two or more comparable published figures for it. I can give you the figures that are known, with where each one comes from.";
 
 /**
  * The could-not line for a turn with nothing done: a chart they asked for
