@@ -15,6 +15,14 @@
   frame.title = "Apply with Capital Q";
   frame.loading = "lazy";
   frame.allow = "clipboard-write";
+  // As the launcher's frame (gateq.js): no full URL of the host page leaves
+  // with the request, and the frame runs on its own origin with its own
+  // scripts and forms, never the host's top window.
+  frame.referrerPolicy = "strict-origin-when-cross-origin";
+  frame.setAttribute(
+    "sandbox",
+    "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+  );
   frame.style.width = "100%";
   frame.style.maxWidth = "640px";
   frame.style.height = script.getAttribute("data-height") || "680px";
