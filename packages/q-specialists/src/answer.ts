@@ -74,10 +74,12 @@ export function recordAudienceTool(
 }
 import {
   QMessageIdSchema,
+  recordPageHasTab,
   sensitivityWithin,
   type QAskSurface,
   type QNavigateDestination,
   type QPageManifest,
+  type QRecordPage,
   type QResponseMessage,
   type QResultBlock,
   type QRunId,
@@ -501,6 +503,7 @@ import {
   wordsNamePage,
 } from "./page-request.js";
 import {
+  pagesForTab,
   resolveNamedRecord,
   withTabs,
   type OpenRecordIntent,
@@ -1667,15 +1670,40 @@ type NavigationReading = {
     | null
     | undefined;
   readonly parts?: readonly unknown[] | undefined;
+  /** A8: their company's pitch video or picture asked for (by meaning). */
+  readonly companyMedia?:
+    { readonly pitch: boolean; readonly picture: boolean } | null | undefined;
 };
+
+/**
+ * The reading's navigation with its record tab as placed. Live 13 Nov 2026
+ * (550ecdd5c): "Could I watch how Clinicrest presents itself? Play me their
+ * pitch." was read tab deck with companyMedia.pitch: a pitch to watch lives
+ * on the profile's Elevator pitch tab, never the deck (a pitch-deck request
+ * reads pitch false and keeps deck). The reading's own fields; no words.
+ */
+function placedNavigation(
+  navigation: NavigationReading["navigation"],
+  companyMedia: NavigationReading["companyMedia"],
+): NonNullable<NavigationReading["navigation"]> | null {
+  if (navigation === null || navigation === undefined) return null;
+  return companyMedia?.pitch === true && navigation.tab === "deck"
+    ? { ...navigation, tab: "elevator" }
+    : navigation;
+}
 
 /** The reading's navigation intent; null when there is none (word fallback). */
 function navigationOf(
   read: NavigationReading | null | undefined,
   workspace: boolean,
 ): NonNullable<NavigationReading["navigation"]> | null {
-  const navigation = read?.navigation ?? null;
+  const navigation = placedNavigation(read?.navigation, read?.companyMedia);
   return navigation?.mode === "CONTEXT" && !workspace ? null : navigation;
+}
+
+/** A8: the pitch is played in the answer (COMPANY_MEDIA), never opened. */
+function asksToWatchPitch(read: NavigationReading | null | undefined): boolean {
+  return read?.companyMedia?.pitch === true;
 }
 
 /** Whether this run's screen has the Q Workspace's adjacent page pane. */
@@ -4828,6 +4856,69 @@ export function createSpecialistQAnswer(
     };
   };
 
+  /**
+   * v87 (owner clarification, 13 Nov 2026): a tab the reading names, read
+   * GO, with no record named ("can I see their team?" after Nixo was
+   * opened): the record on screen, else the one Q last opened in this
+   * conversation (screenTabTarget, as for a tab said by name), opened
+   * through open_page's own authorize step. Nothing on screen or in the
+   * conversation, a page without that tab, or a record they may not open:
+   * null, and the turn is answered. The Q Workspace's pane is the page-move
+   * decision's (readingTabPlace), so this is outside it only.
+   */
+  const readTabAnswer = async (
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    history: readonly QConversationMessage[],
+    reading: NavigationReading | null,
+  ): Promise<QAnswerOutcome | null> => {
+    const port = dependencies.openRecord;
+    if (port === undefined || inWorkspace(request) || asksToWatchPitch(reading))
+      return null;
+    const navigation = navigationOf(reading, false);
+    const tab = navigation?.tab ?? null;
+    if (navigation === null || tab === null || !readsAsGo(navigation))
+      return null;
+    const ask: TabAsk = {
+      tab,
+      subTab: null,
+      name: null,
+      viewer: tab === "deck",
+    };
+    const target =
+      screenTabTarget(request.plan.screen, ask) ??
+      screenTabTarget(lastOpenedScreen(history), ask);
+    if (target === null) return null;
+    const opened = await port
+      .open(request, { page: target.page, id: target.id })
+      .catch(() => null);
+    if (opened === null) return null;
+    const intent = withTabs(opened, ask);
+    if (intent.tab === undefined) return null;
+    if (moreThanTheMove(reading, askedIn(history), false)) {
+      queueMoveWithAnswer(request.runId, {
+        blocks: [{ kind: "UI_INTENT", intent }],
+        conversationId,
+      });
+      logger?.info(
+        { qRunId: request.runId, tab },
+        "the tab the reading named and more asked: the move goes with the answer",
+      );
+      return null;
+    }
+    const spoken = await withDeckSpoken(
+      request,
+      intent,
+      null,
+      movePhaseLine("PENDING", tabPlace(ask)),
+    );
+    logger?.info(
+      { qRunId: request.runId, tab, refused: spoken.refused },
+      "q opened the tab the reading named on the record in view",
+    );
+    return recordAnswer(request, conversationId, spoken.said, spoken.blocks);
+  };
+
   /** B6: the reference each run's words were bound to, for its answer. */
   const resolvedInRun = new Map<string, string>();
   /** A2: the companies explicit places bound, in the order said. */
@@ -5505,19 +5596,28 @@ export function createSpecialistQAnswer(
       readonly id?: string | undefined;
       readonly name?: string | undefined;
     },
+    /** v87: the turn's reading; its deck tab stands for the words. */
+    reading: NavigationReading | null = null,
   ): Promise<QAnswerOutcome | null> => {
     const port = dependencies.openRecord;
     const said = [...history].reverse().find((m) => m.role === "USER")?.content;
     if (port === undefined || said === undefined) return null;
-    if (MAKES_A_DECK.test(said) || !DECK_WORD.test(said)) return null;
+    // The reading names the deck by meaning (any language; "make Nixo a
+    // deck" is no navigation at all); the words decide only with no
+    // navigation reading, or one from before v87 (no tab field: fallback).
+    const readNavigation = navigationOf(reading, inWorkspace(request));
+    const readTab = readNavigation?.tab;
+    if (readNavigation === null || readTab === undefined) {
+      if (MAKES_A_DECK.test(said) || !DECK_WORD.test(said)) return null;
+    } else if (readTab !== "deck" || !readsAsGo(readNavigation)) {
+      return null;
+    }
     const ask = tabAskOf(said);
     const name = ask?.name ?? target.name ?? null;
-    const screenAsk: TabAsk = ask ?? {
-      tab: "deck",
-      subTab: null,
-      name: null,
-      viewer: true,
-    };
+    const screenAsk: TabAsk =
+      ask?.tab === "deck" || readTab === undefined
+        ? (ask ?? { tab: "deck", subTab: null, name: null, viewer: true })
+        : { tab: "deck", subTab: null, name: null, viewer: true };
     if (screenAsk.tab !== "deck") return null;
     const opened =
       target.id !== undefined || name !== null
@@ -5567,6 +5667,9 @@ export function createSpecialistQAnswer(
   ): Promise<QAnswerOutcome | null> => {
     const port = dependencies.openRecord;
     if (port === undefined) return null;
+    // A8: a pitch to watch is played inline by the answer path
+    // (COMPANY_MEDIA); opening the record would take the turn from it.
+    if (asksToWatchPitch(reading)) return null;
     const side = askerSideOf(request);
     const target = openTarget(reference, shown, side);
     if (target === null) return null;
@@ -5590,7 +5693,42 @@ export function createSpecialistQAnswer(
               viewer: false,
             };
     const tab = asked !== null && asked.tab !== "deck" ? asked : null;
-    for (const page of target.pages) {
+    // v87: the deck the reading names opens in its own spoken path first.
+    if (readNavigation?.tab === "deck") {
+      const deck = await openDeckAsked(
+        request,
+        conversationId,
+        history,
+        target,
+        reading,
+      );
+      if (deck !== null) return deck;
+    }
+    // v87: the reading's tab chooses among the record's pages: the ones
+    // the turn pointed at that have it, else the pages a tab said by name
+    // opens (pagesForTab: "show me Clinicrest's messages" is the
+    // relationship's thread, "their deal" the relationship). A document,
+    // pitch or rehearsal keeps its own page. Each opens through open_page.
+    const readTab =
+      tab !== null &&
+      readNavigation?.tab != null &&
+      !target.pages.includes("DOCUMENT") &&
+      reference.open !== "REHEARSAL" &&
+      reference.open !== "PITCH"
+        ? tab.tab
+        : null;
+    const hasReadTab = (page: QRecordPage): boolean =>
+      readTab !== null &&
+      recordPageHasTab(page, readTab) &&
+      // A relationship's messages are its thread page; its other tabs are not.
+      (readTab === "messages") === page.endsWith("_MESSAGES");
+    const pages =
+      readTab === null
+        ? target.pages
+        : target.pages.some(hasReadTab)
+          ? target.pages.filter(hasReadTab)
+          : pagesForTab(readTab, side);
+    for (const page of pages) {
       const opened = await port
         .open(request, { page, id: target.id, name: target.name })
         .catch(() => null);
@@ -5660,7 +5798,16 @@ export function createSpecialistQAnswer(
     // DOCUMENT, which covers only what Q prepared for them): a company's
     // deck is opened as that company's Pitch deck tab, under its own
     // authorize step, and spoken from what the deck says.
-    const deck = await openDeckAsked(request, conversationId, history, target);
+    const deck =
+      readNavigation?.tab === "deck"
+        ? null
+        : await openDeckAsked(
+            request,
+            conversationId,
+            history,
+            target,
+            reading,
+          );
     if (deck !== null) return deck;
     logger?.info(
       { qRunId: request.runId, open: reference.open },
@@ -6680,7 +6827,14 @@ export function createSpecialistQAnswer(
       request,
       Promise.all([readingFirst, fastGo]).then(
         ([reading, go]) => ({
-          navigation: reading?.navigation ?? null,
+          // A pitch to watch is placed on the Elevator pitch tab, as in
+          // placedNavigation (the decision is told the same tab).
+          navigation:
+            reading?.navigation != null &&
+            reading.companyMedia?.pitch === true &&
+            reading.navigation.tab === "deck"
+              ? { ...reading.navigation, tab: "elevator" as const }
+              : (reading?.navigation ?? null),
           codeMoves: go !== null,
         }),
         () => null,
@@ -7569,6 +7723,15 @@ export function createSpecialistQAnswer(
         read,
       );
       if (opened !== null) return opened;
+    }
+    // v87: a tab read GO with no record named is the record in view.
+    if (
+      (reference === null || reference.open === null) &&
+      !continuesByReading &&
+      !movesWithQuestion.has(request.runId)
+    ) {
+      const onTab = await readTabAnswer(request, conversationId, history, read);
+      if (onTab !== null) return onTab;
     }
     // An action waiting on their reply is continued with it below, never
     // repeated with its old inputs (live 2026-10-16: "Lagos. Set both

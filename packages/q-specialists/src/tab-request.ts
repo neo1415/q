@@ -442,9 +442,12 @@ export function lastOpenedScreen(
       ) {
         return { route: "RELATIONSHIP_COMPANY", companyId: id };
       }
+      // v87: an investor organisation's own tabs are its relationship's
+      // ("open Savanna", then "and the calls?"); open_page still decides.
       if (
         page === "RELATIONSHIP_INVESTOR" ||
-        page === "RELATIONSHIP_INVESTOR_MESSAGES"
+        page === "RELATIONSHIP_INVESTOR_MESSAGES" ||
+        page === "INVESTOR"
       ) {
         return {
           route: "RELATIONSHIP_INVESTOR",

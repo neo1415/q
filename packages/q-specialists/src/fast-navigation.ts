@@ -65,6 +65,19 @@ const FACET_OF_TAB: Readonly<Record<TabAsk["tab"], NamedRecordFacet>> = {
 };
 
 /**
+ * The record pages a tab is on, for their side, in the order tried (v87:
+ * the reading names the tab by meaning; the pages follow from it, as for
+ * a tab said by name): a company's tabs on its profile, messages on the
+ * relationship's thread, calls, deal and diligence on the relationship.
+ */
+export function pagesForTab(
+  tab: TabAsk["tab"],
+  side: "INVESTOR" | "FOUNDER",
+): readonly QRecordPage[] {
+  return pagesFor(FACET_OF_TAB[tab], side);
+}
+
+/**
  * N2: the tab (and deck section) a request names, on a page that has it.
  * The page was authorised by open_page; the tab only selects a view of it,
  * so one the page lacks is simply not added (the contract says which).

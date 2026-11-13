@@ -6,8 +6,10 @@ import {
   Q_SITE_MAP,
   QNavigateDestinationSchema,
   QNavigateTargetSchema,
+  QRecordPageSchema,
   QRecordTabSchema,
   recordPageHasTab,
+  type QRecordTab,
   type QResultBlock,
   qSiteMapDigest,
   qSiteMapLandingFor,
@@ -1427,6 +1429,109 @@ export function readingPlacesContext(input: {
   });
 }
 
+/**
+ * A record's place on another of its tabs: the same page and record, the
+ * tab selected (a relationship's messages are its thread page); nothing
+ * else of the old place (a section, document or slide belongs to its own
+ * tab). The place itself when it already shows that tab (a company
+ * profile with no tab is its Overview); null when the page has no such tab.
+ */
+function onRecordTab(
+  place: QNavigateTarget,
+  tab: QRecordTab,
+): QNavigateTarget | null {
+  const page = QRecordPageSchema.safeParse(place.page);
+  if (!page.success || place.recordId === undefined) return null;
+  const thread =
+    page.data === "RELATIONSHIP_COMPANY_MESSAGES" ||
+    page.data === "RELATIONSHIP_INVESTOR_MESSAGES";
+  const record =
+    page.data === "RELATIONSHIP_COMPANY_MESSAGES"
+      ? "RELATIONSHIP_COMPANY"
+      : page.data === "RELATIONSHIP_INVESTOR_MESSAGES"
+        ? "RELATIONSHIP_INVESTOR"
+        : page.data;
+  if (!recordPageHasTab(record, tab)) return null;
+  const showing = thread
+    ? "messages"
+    : (place.tab ??
+      (recordPageHasTab(record, "overview") ? "overview" : undefined));
+  if (showing === tab) return place;
+  const parsed = QNavigateTargetSchema.safeParse(
+    tab === "messages" &&
+      (record === "RELATIONSHIP_COMPANY" || record === "RELATIONSHIP_INVESTOR")
+      ? { page: `${record}_MESSAGES`, recordId: place.recordId }
+      : { page: record, recordId: place.recordId, tab },
+  );
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Record tabs (owner clarification, 13 Nov 2026; TURN_READER v87): the
+ * reading names the part of a record the turn is about (`navigation.tab`,
+ * by meaning, any language); the decision, which runs beside the reading,
+ * never sees it. "Can I see their data room?" with Clinicrest's Overview
+ * in the pane was a SAME_SUBJECT stay. Applied before gateByReading:
+ *
+ *   the decision's place (or the remembered one) is a record page with
+ *   that tab      the same record on that tab (already there is a STAY)
+ *   the decision stayed with nothing proposed (or "already there") and the
+ *   pane shows a record page with that tab
+ *                 that record on that tab, through the same policy
+ *                 (access, unsaved work, busy, collapsed, the moves gate)
+ *
+ * A tab the page lacks adds nothing and invents no move; NONE adds nothing.
+ * gateByReading's holds (NONE, OFFER_ONLY, SAME_SUBJECT, pinned) apply
+ * after it, so a pinned pane gets an offer that carries the tab. No model
+ * call and no words: only the reading and the screen. Null: unchanged.
+ */
+export function readingTabPlace(input: {
+  readonly proposed: QNavigationOutcome;
+  readonly navigation: QReadNavigation | null;
+  readonly pane: QNavigationPane;
+  readonly canOpen: (page: string) => boolean;
+  readonly config: QNavigationPolicyConfig;
+  readonly records?: QNavigationRecords | undefined;
+}): QNavigationOutcome | null {
+  const { navigation, proposed, pane } = input;
+  const tab = navigation?.tab ?? null;
+  if (navigation === null || tab === null || readsAsNoNavigation(navigation))
+    return null;
+  const place = proposed.target ?? proposed.remembered;
+  if (place !== null) {
+    const tabbed = onRecordTab(place, tab);
+    if (tabbed === null || tabbed === place) return null;
+    if (proposed.target === null) return { ...proposed, remembered: tabbed };
+    if (pane.at !== null && samePlace(tabbed, pane.at))
+      return STAY("ALREADY_THERE");
+    return { ...proposed, target: tabbed };
+  }
+  if (
+    proposed.decision !== "STAY" ||
+    (proposed.guard !== null && proposed.guard !== "ALREADY_THERE") ||
+    pane.at === null
+  )
+    return null;
+  const tabbed = onRecordTab(pane.at, tab);
+  if (tabbed === null || tabbed === pane.at) return null;
+  return applyNavigationPolicy({
+    proposal: {
+      decision: "MOVE",
+      place: null,
+      back: false,
+      // GO asked for that page; CONTEXT is a page the conversation turned
+      // to (a collapsed pane only remembers it).
+      askedForPage: readsAsGo(navigation),
+      reason: "",
+    },
+    resolution: { kind: "TARGET", target: tabbed },
+    pane,
+    canOpen: input.canOpen,
+    config: input.config,
+    records: input.records,
+  });
+}
+
 /** A real second place: resolved, theirs to open, and not the same place. */
 function secondPlace(
   target: QNavigateTarget,
@@ -2332,19 +2437,25 @@ export function createQPageMoves(dependencies: {
             config: dependencies.config,
             records,
           });
-          const outcome = gateByReading(
-            placedByReading ?? proposed,
+          const paneHere = {
+            ...input.pane,
+            at:
+              input.pane.at === null ? null : ownPlace(input.pane.at, records),
+          };
+          // v87: the record's tab the reading names, on the decision's
+          // place or the record in the pane (readingTabPlace).
+          const onTab = readingTabPlace({
+            proposed,
             navigation,
-            {
-              pane: {
-                ...input.pane,
-                at:
-                  input.pane.at === null
-                    ? null
-                    : ownPlace(input.pane.at, records),
-              },
-              codeMoves: reading?.codeMoves,
-            },
+            pane: paneHere,
+            canOpen: canOpenFor(request, map),
+            config: dependencies.config,
+            records,
+          });
+          const outcome = gateByReading(
+            onTab ?? placedByReading ?? proposed,
+            navigation,
+            { pane: paneHere, codeMoves: reading?.codeMoves },
           );
           // Fast GO: held, in case the answer stored moves nothing after all.
           if (outcome.guard === "ANSWER_MOVES" && proposed.target !== null)
@@ -2358,6 +2469,7 @@ export function createQPageMoves(dependencies: {
                 navigation: navigation?.mode ?? null,
                 negated: navigation?.negated ?? null,
                 placedByReading: placedByReading?.decision ?? null,
+                onTab: onTab?.decision ?? null,
                 guard: outcome.guard,
               },
               "q page move gated by the turn's navigation reading",

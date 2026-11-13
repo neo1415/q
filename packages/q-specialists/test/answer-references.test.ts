@@ -107,6 +107,8 @@ function conversation(options: {
   ) => Promise<Record<string, unknown> | null>;
   readonly appActionRouter?: () => Promise<string | null>;
   readonly earlier?: readonly Line[];
+  /** What the page-move decision is told the reading read (heard). */
+  readonly heard?: (reading: unknown) => void;
 }) {
   const conversationId = randomUUID();
   const lines: QConversationMessage[] = (options.earlier ?? []).map(
@@ -199,6 +201,18 @@ function conversation(options: {
     ...(options.appActionRouter === undefined
       ? {}
       : { appActionRouter: options.appActionRouter }),
+    ...(options.heard === undefined
+      ? {}
+      : {
+          pageMoves: {
+            start: () => undefined,
+            settle: (_request: unknown, blocks: unknown) =>
+              Promise.resolve(blocks),
+            heard: (_request: unknown, reading: Promise<unknown>) => {
+              void reading.then(options.heard);
+            },
+          } as never,
+        }),
   });
   const say = async (
     said: string,
@@ -946,5 +960,334 @@ describe("an asked action or question is never turned into a page move (QA 2026-
       kind: "UI_INTENT",
       intent: { kind: "OPEN_RECORD_PAGE", id: LEDGERFOLD },
     });
+  });
+});
+
+/**
+ * v87 record tabs (owner clarification, 13 Nov 2026): the reading names the
+ * part of a record by meaning (navigation.tab, any language); the record is
+ * the one the turn points at, the one on screen, or the one Q last opened.
+ * Each opens through open_page (this double); readings are fixtures.
+ */
+describe("record tabs by the reading, explicit and contextual (v87)", () => {
+  const CLINICREST_ID = "6b2f0000-0000-4000-8000-000000000001";
+  const SAVANNA_ID = "5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a";
+  const opened: { page: string; id?: string; name?: string }[] = [];
+  const COMPANIES: Readonly<Record<string, string>> = {
+    Clinicrest: CLINICREST_ID,
+    Nixo: NIXO,
+  };
+  const COMPANY_PAGES = new Set([
+    "COMPANY",
+    "COMPANY_TEAM",
+    "COMPANY_DECK",
+    "COMPANY_DATA_ROOM",
+    "RELATIONSHIP_COMPANY",
+    "RELATIONSHIP_COMPANY_MESSAGES",
+  ]);
+  const ids = new Set([CLINICREST_ID, NIXO]);
+  // Their companies (by name or id) and their relationship with Savanna;
+  // Ledgerline is not theirs to open (open_page refuses: null).
+  const openRecord: QOpenRecordPort = {
+    open: (_request, target) => {
+      opened.push({
+        page: target.page,
+        ...(target.id === undefined ? {} : { id: target.id }),
+        ...(target.name === undefined ? {} : { name: target.name }),
+      });
+      const company =
+        (target.name === undefined ? undefined : COMPANIES[target.name]) ??
+        (target.id !== undefined && ids.has(target.id) ? target.id : undefined);
+      if (company !== undefined && COMPANY_PAGES.has(target.page)) {
+        return Promise.resolve({
+          kind: "OPEN_RECORD_PAGE",
+          page: target.page,
+          id: company,
+        } as never);
+      }
+      const savanna =
+        target.name?.startsWith("Savanna") === true || target.id === SAVANNA_ID;
+      if (
+        savanna &&
+        (target.page === "INVESTOR" ||
+          target.page === "RELATIONSHIP_INVESTOR" ||
+          target.page === "RELATIONSHIP_INVESTOR_MESSAGES")
+      ) {
+        return Promise.resolve({
+          kind: "OPEN_RECORD_PAGE",
+          page: target.page,
+          id: SAVANNA_ID,
+        } as never);
+      }
+      return Promise.resolve(null);
+    },
+  };
+  const go = (tab: string | null, mode = "GO") =>
+    ({ mode, negated: false, destination: null, tab }) as never;
+  const named = (open: string, name: string) =>
+    ({
+      open,
+      name,
+      shown: null,
+      retryLast: false,
+      sameFor: null,
+    }) as never;
+  const moveOf = (
+    line: { blocks?: readonly QResultBlock[] | undefined } | undefined,
+  ) =>
+    (line?.blocks ?? []).flatMap((block) =>
+      block.kind === "UI_INTENT" && block.intent.kind === "OPEN_RECORD_PAGE"
+        ? [block.intent]
+        : [],
+    );
+
+  it.each([
+    ["Show me Clinicrest's messages", "messages"],
+    ["Montre-moi les messages de Clinicrest", "messages"],
+  ])(
+    "'%s' read GO tab messages opens the relationship's thread",
+    async (said, tab) => {
+      const chat = conversation({ openRecord });
+      const reply = await chat.say(said, {
+        ...BASE,
+        navigation: go(tab),
+        reference: named("COMPANY", "Clinicrest"),
+      });
+      expect(moveOf(reply)).toEqual([
+        expect.objectContaining({
+          page: "RELATIONSHIP_COMPANY_MESSAGES",
+          id: CLINICREST_ID,
+        }),
+      ]);
+    },
+  );
+
+  it("'I'd like to look at where things stand on terms with Clinicrest' read GO tab deal opens the relationship on its deal tab", async () => {
+    const chat = conversation({ openRecord });
+    const reply = await chat.say(
+      "I'd like to look at where things stand on terms with Clinicrest",
+      {
+        ...BASE,
+        navigation: go("deal"),
+        reference: named("COMPANY", "Clinicrest"),
+      },
+    );
+    expect(moveOf(reply)).toEqual([
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY",
+        id: CLINICREST_ID,
+        tab: "deal",
+      },
+    ]);
+  });
+
+  it("'muéstrame el deck de Nixo' read GO tab deck opens the deck viewer", async () => {
+    const chat = conversation({ openRecord });
+    const reply = await chat.say("muéstrame el deck de Nixo", {
+      ...BASE,
+      navigation: go("deck"),
+      reference: named("COMPANY", "Nixo"),
+    });
+    expect(moveOf(reply)).toEqual([
+      expect.objectContaining({
+        page: "COMPANY_DECK",
+        id: NIXO,
+        tab: "deck",
+        viewer: "OPEN",
+      }),
+    ]);
+  });
+
+  it("'Make Nixo a deck' with no navigation read opens nothing", async () => {
+    opened.length = 0;
+    const chat = conversation({ openRecord });
+    const reply = await chat.say("Make Nixo a deck.", {
+      ...BASE,
+      navigation: go(null, "NONE"),
+      reference: named("COMPANY", "Nixo"),
+    });
+    expect(opened).toEqual([]);
+    expect(moveOf(reply)).toEqual([]);
+    expect(chat.delegated()).toBe(1);
+  });
+
+  it("cross-turn: 'Open Nixo.' then 'Can I see their team?' opens Nixo's team tab", async () => {
+    const chat = conversation({ openRecord });
+    const first = await chat.say("Open Nixo.", {
+      ...BASE,
+      navigation: go(null),
+      reference: named("COMPANY", "Nixo"),
+    });
+    expect(moveOf(first)).toEqual([
+      expect.objectContaining({ page: "COMPANY", id: NIXO }),
+    ]);
+    const second = await chat.say("Can I see their team?", {
+      ...BASE,
+      navigation: go("team"),
+      reference: null,
+    });
+    expect(moveOf(second)).toEqual([
+      expect.objectContaining({ page: "COMPANY_TEAM", id: NIXO, tab: "team" }),
+    ]);
+    expect(chat.delegated()).toBe(0);
+  });
+
+  it("on Clinicrest's page, 'Can I see their data room?' opens its data room", async () => {
+    const chat = conversation({ openRecord });
+    const reply = await chat.say(
+      "Can I see their data room?",
+      { ...BASE, navigation: go("dataroom"), reference: null },
+      CLINICREST_ID,
+    );
+    expect(moveOf(reply)).toEqual([
+      expect.objectContaining({
+        page: "COMPANY_DATA_ROOM",
+        id: CLINICREST_ID,
+        tab: "dataroom",
+      }),
+    ]);
+  });
+
+  it.each([
+    ["RELATIONSHIP", "Open my relationship with Savanna."],
+    ["INVESTOR", "Open Savanna Seed Partners."],
+  ])(
+    "cross-turn (%s): '%s' then 'And the calls?' opens the relationship's calls tab",
+    async (open, said) => {
+      const chat = conversation({ openRecord });
+      const first = await chat.say(said, {
+        ...BASE,
+        navigation: go(null),
+        reference: named(open, "Savanna Seed Partners"),
+      });
+      expect(moveOf(first)).toHaveLength(1);
+      const second = await chat.say("And the calls?", {
+        ...BASE,
+        navigation: go("calls", "CONTEXT"),
+        reference: null,
+      });
+      // CONTEXT outside the workspace is not a move; GO is.
+      expect(moveOf(second)).toEqual([]);
+      const third = await chat.say("Show me the calls.", {
+        ...BASE,
+        navigation: go("calls"),
+        reference: null,
+      });
+      expect(moveOf(third)).toEqual([
+        {
+          kind: "OPEN_RECORD_PAGE",
+          page: "RELATIONSHIP_INVESTOR",
+          id: SAVANNA_ID,
+          tab: "calls",
+        },
+      ]);
+    },
+  );
+
+  it("nothing on screen or in the conversation: 'Can I see their team?' is answered, nothing opens", async () => {
+    opened.length = 0;
+    const chat = conversation({ openRecord });
+    const reply = await chat.say("Can I see their team?", {
+      ...BASE,
+      navigation: go("team"),
+      reference: null,
+    });
+    expect(opened).toEqual([]);
+    expect(moveOf(reply)).toEqual([]);
+    expect(chat.delegated()).toBe(1);
+  });
+
+  it("a tab the record in view lacks (a team on an investor relationship) opens nothing", async () => {
+    const chat = conversation({ openRecord });
+    await chat.say("Open my relationship with Savanna.", {
+      ...BASE,
+      navigation: go(null),
+      reference: named("RELATIONSHIP", "Savanna Seed Partners"),
+    });
+    const reply = await chat.say("Can I see their team?", {
+      ...BASE,
+      navigation: go("team"),
+      reference: null,
+    });
+    expect(moveOf(reply)).toEqual([]);
+    expect(chat.delegated()).toBe(1);
+  });
+
+  it("a record they may not open never opens and Q never says it did", async () => {
+    const chat = conversation({ openRecord });
+    const reply = await chat.say("Can I see Ledgerline's data room?", {
+      ...BASE,
+      navigation: go("dataroom"),
+      reference: named("COMPANY", "Ledgerline"),
+    });
+    expect(moveOf(reply)).toEqual([]);
+    expect(reply?.content).not.toMatch(/^Opening/u);
+    expect(chat.delegated()).toBe(1);
+  });
+
+  // Live 13 Nov 2026 on 550ecdd5c (workspace, Clinicrest's data room tab):
+  // the exact reading production logged. The pitch plays inline (A8
+  // COMPANY_MEDIA, the answer path); nothing opens; the decision is told
+  // the Elevator pitch tab, never the deck.
+  const WATCH_PITCH = {
+    ...BASE,
+    navigation: go("deck"),
+    reference: named("PITCH", "Clinicrest"),
+    companyMedia: { pitch: true, picture: false },
+  } as never;
+
+  it("'Could I watch how Clinicrest presents itself? Play me their pitch.' opens nothing; the answer plays it", async () => {
+    opened.length = 0;
+    const told: unknown[] = [];
+    const chat = conversation({
+      openRecord,
+      heard: (reading) => told.push(reading),
+    });
+    const reply = await chat.say(
+      "Could I watch how Clinicrest presents itself? Play me their pitch.",
+      WATCH_PITCH,
+    );
+    expect(opened).toEqual([]);
+    expect(moveOf(reply)).toEqual([]);
+    expect(chat.delegated()).toBe(1);
+    await Promise.resolve();
+    expect(told).toMatchObject([
+      { navigation: { mode: "GO", tab: "elevator" } },
+    ]);
+  });
+
+  it("on Clinicrest's page, a pitch to watch with no record named opens no tab", async () => {
+    opened.length = 0;
+    const chat = conversation({ openRecord });
+    await chat.say(
+      "Play me their pitch.",
+      { ...(WATCH_PITCH as object), reference: null } as never,
+      CLINICREST_ID,
+    );
+    expect(opened).toEqual([]);
+    expect(chat.delegated()).toBe(1);
+  });
+
+  it("'Show me Clinicrest's pitch deck' (tab deck, pitch false) still opens the deck", async () => {
+    const told: unknown[] = [];
+    const chat = conversation({
+      openRecord,
+      heard: (reading) => told.push(reading),
+    });
+    const reply = await chat.say("Show me Clinicrest's pitch deck", {
+      ...BASE,
+      navigation: go("deck"),
+      reference: named("COMPANY", "Clinicrest"),
+      companyMedia: { pitch: false, picture: false },
+    });
+    expect(moveOf(reply)).toEqual([
+      expect.objectContaining({ page: "COMPANY_DECK", id: CLINICREST_ID }),
+    ]);
+    // Said by name, the deck may open before the reading lands; when the
+    // decision is told the reading, its tab stays the deck.
+    await Promise.resolve();
+    for (const reading of told)
+      expect(reading).toMatchObject({ navigation: { tab: "deck" } });
   });
 });

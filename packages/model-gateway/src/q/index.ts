@@ -12861,6 +12861,7 @@ export {
   applyNavigationPolicy,
   gateByReading,
   readingPlacesContext,
+  readingTabPlace,
   sameSubject as sameNavigationSubject,
   canOpenFor,
   pinnedOf,
