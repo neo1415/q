@@ -448,3 +448,23 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   2. "Now do the same for Silo Credit." The follow-up is understood and the metric kept. Silo Credit, a lender, has no MRR claim, so Q says MRR "isn't available on record". No other metric is substituted and no chart is drawn.
   3. "What stage is Ledgerline at?" Answer: "Ledgerline is at the seed stage… isn't verified." No chart.
 - **Noise seen (audit item 2, navigation):** each turn also stored an unasked move or offer: "I've opened Overview.", "Overview is ready to open.", "Relationship is ready to open." The pane moved to Ledgerline's profile on the chart ask.
+
+## Release gate under 25 minutes — `a43968b40` (13 Nov, 16:03 Lagos)
+
+- **Receipt:** `ci-local PASS sha=a43968b40 at=2026-11-13T15:03:09Z took=1320s` (22.0 min, against the 47-min baseline).
+  - Steps: prebuild 2, static 768, typecheck 92, build 2 (apps cached), test 456, database 71 and integration 495 (both overlapped).
+- **Gate changes made 13 Nov, measured; every check still runs:**
+  - fail-fast;
+  - prettier content cache;
+  - one package prebuild;
+  - two lanes;
+  - ESLint concurrency 2;
+  - hybrid test isolation, two Vitest projects (`a43968b40`):
+    - the node side (1,520 files) without isolation, stable in two shuffled orders;
+    - web plus 2 stateful files isolated;
+    - same 2,033 files.
+- **Rejected, with reasons:**
+  - the ESLint cache: type-aware rules make it stale;
+  - ESLint concurrency 4: ran out of memory;
+  - the Vitest threads pool: timing tests flaked and there was no clean gain.
+- No deploy: this commit changes only the test configuration and docs. Production stays on `5af6c8ad3`.
