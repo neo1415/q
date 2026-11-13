@@ -852,3 +852,64 @@ describe("R2: Q's raise is the one company read", () => {
     expect(JSON.stringify(outcome)).not.toContain("3000000");
   });
 });
+
+/**
+ * Review of the deck-claim change (13 Nov): with nothing disclosed, a pitch
+ * or deck claim may reach this reader only through a relationship grant.
+ * Its own scope decides the result's sensitivity, so such a figure goes
+ * only to a model tier cleared for CONFIDENTIAL (Context Firewall).
+ */
+describe("a claim's own scope decides the result's sensitivity", () => {
+  const claimCall = async (
+    visibility: "network_visible" | "relationship_shared",
+  ) => {
+    const ports = fakePorts({
+      companies,
+      capital,
+      disclosure,
+      authorization: fakeAuthorization(),
+      relationships,
+      investorFeed,
+      companyRaise: {
+        raiseFor: () =>
+          Promise.resolve({
+            source: "DECK_CLAIM" as const,
+            money: { amount: "1200000000", currency: "NGN" },
+            truthClass: "USER_CLAIM" as const,
+            evidenceStatus: "SELF_REPORTED" as const,
+            visibility,
+            asOf: null,
+            pitch: null,
+          }),
+      },
+    });
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(createDefaultQTools(ports)),
+    });
+    return executor.execute(
+      {
+        callId: randomUUID(),
+        name: "get_capital_objective",
+        arguments: { companyId: SAVED_CO },
+      },
+      contextFor(investorI, unnamedPlan(investorI, "GENERAL_QUESTION")),
+    );
+  };
+
+  it("network-visible deck claim: network-visible result", async () => {
+    const outcome = await claimCall("network_visible");
+    expect(outcome.sensitivity).toBe("NETWORK_VISIBLE");
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        availability: "NOT_SHARED_WITH_YOU",
+        raise: { source: "DECK_CLAIM" },
+      },
+    });
+  });
+
+  it("a claim held through a relationship: confidential result", async () => {
+    const outcome = await claimCall("relationship_shared");
+    expect(outcome.sensitivity).toBe("CONFIDENTIAL");
+  });
+});

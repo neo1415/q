@@ -11,6 +11,7 @@ import {
   CapitalTargetSchema,
   CompanyRaiseViewSchema,
   UuidSchema,
+  type CompanyRaiseView,
   type QSensitivityClass,
 } from "@capital-q/contracts";
 import { actorPrincipal } from "@capital-q/permissions";
@@ -98,7 +99,45 @@ type Grant = {
   /** Null with `shared` false: nothing shared with this person. */
   readonly snapshot: CapitalObjectiveSnapshot | null;
   readonly shared: boolean;
+  /** Read at authorize where it decides the result's sensitivity. */
+  readonly raise?: CompanyRaiseView | undefined;
 };
+
+/** Scopes at which a model of any tier may read a claim. */
+const OPEN_SCOPES: ReadonlySet<string> = new Set([
+  "network_visible",
+  "public_external",
+]);
+
+/**
+ * Nothing disclosed, but a pitch or deck claim may still reach this reader
+ * -- possibly only through a relationship grant (relationship_shared). The
+ * claim's own scope then decides the result's sensitivity, so a figure held
+ * through a relationship goes only to a model tier cleared for CONFIDENTIAL
+ * (Context Firewall; review of the deck-claim change, 13 Nov).
+ */
+async function notSharedGrant(
+  ports: QToolPorts,
+  actor: Parameters<NonNullable<QToolPorts["companyRaise"]>["raiseFor"]>[0],
+  company: CompanyIdentity,
+) {
+  const raise =
+    ports.companyRaise === undefined
+      ? undefined
+      : await ports.companyRaise
+          .raiseFor(actor, company.id)
+          .catch(() => undefined);
+  const narrow =
+    raise !== undefined &&
+    raise.source !== "NONE" &&
+    !OPEN_SCOPES.has(raise.visibility ?? "");
+  return allow(narrow ? "CONFIDENTIAL" : "NETWORK_VISIBLE", {
+    company,
+    snapshot: null,
+    shared: false,
+    raise,
+  });
+}
 
 function sensitivityOf(reasonCode: string): QSensitivityClass {
   return reasonCode === "PUBLIC_EXTERNAL"
@@ -225,11 +264,7 @@ export function createGetCapitalObjectiveTool(
       // relationship), the same rule the company's audience preview uses.
       // Anything else, including no objective, is one answer.
       if (snapshot === null) {
-        return allow("NETWORK_VISIBLE", {
-          company,
-          snapshot: null,
-          shared: false,
-        });
+        return notSharedGrant(ports, actor, company);
       }
       const disclosed = await ports.disclosure.canDisclose({
         principal,
@@ -245,17 +280,18 @@ export function createGetCapitalObjectiveTool(
             snapshot,
             shared: true,
           })
-        : allow("NETWORK_VISIBLE", { company, snapshot: null, shared: false });
+        : notSharedGrant(ports, actor, company);
     },
     execute: async (_input, context, grant) => {
       // The one raise read, for the reader authorize already admitted.
       // A failed read says nothing more than the objective's own answer.
       const raise =
-        ports.companyRaise === undefined
+        grant.raise ??
+        (ports.companyRaise === undefined
           ? undefined
           : await ports.companyRaise
               .raiseFor(context.actor, grant.company.id)
-              .catch(() => undefined);
+              .catch(() => undefined));
       return {
         ...(raise === undefined ? {} : { raise }),
         companyId: grant.company.id,
