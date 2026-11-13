@@ -69,6 +69,9 @@ for key in OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY GOOGLE_API_KEY \
   export "$key=disabled-locally-000000000000"
 done
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
+# The gate holds the machine alone (the lock below): unit tests may use
+# every core (vitest.config.ts). Integration keeps its own setting.
+export CQ_VITEST_MAX_WORKERS="${CQ_VITEST_MAX_WORKERS:-$(nproc)}"
 
 declare -A result
 run() {

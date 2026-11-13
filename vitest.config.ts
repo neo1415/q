@@ -23,7 +23,22 @@ import { defineConfig } from "vitest/config";
  * fraction: it is the count Vitest itself picks for watch mode, where it
  * expects to share the machine.
  */
-const MAX_WORKERS = Math.max(2, Math.floor(availableParallelism() / 2));
+const SHARED_WORKERS = Math.max(2, Math.floor(availableParallelism() / 2));
+/**
+ * The release gate holds the machine alone (scripts/ci-local.sh takes a
+ * machine lock), so it may use every core: CQ_VITEST_MAX_WORKERS. Measured
+ * 13 Nov: the gate's test step was 1,483 s, of which tests ran 435 s and
+ * module imports took 2,124 s summed over two workers on four cores. Any
+ * other run keeps half the machine.
+ */
+const GATE_WORKERS = Number.parseInt(
+  process.env["CQ_VITEST_MAX_WORKERS"] ?? "",
+  10,
+);
+const MAX_WORKERS =
+  Number.isInteger(GATE_WORKERS) && GATE_WORKERS >= 1
+    ? Math.min(GATE_WORKERS, availableParallelism())
+    : SHARED_WORKERS;
 
 /**
  * Capital Q deterministic test runner (ERA-057, TEO-001).
