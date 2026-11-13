@@ -513,3 +513,18 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   1. Contextual moves take 4–7 s, because the CONTEXT placement waits for the decider's verdict. Owner asked for "very fast": act on a CONTEXT reading with a resolved destination as soon as the reading lands, unless the decider has guarded.
   2. The voice/immersive path is not exercisable from the sandbox (no UDP).
   3. Pinned workspace is in progress.
+
+## Pinned workspace deployed — `b1bfae8e7` (13 Nov, 19:15 Lagos)
+
+- **Gate:** `ci-local PASS sha=b1bfae8e7 at=2026-11-13T18:09:06Z took=1451s`. Rollback point `f3589102d`; four services SUCCESS.
+- **Contents:**
+  - Pinned workspace: an optional `workspace.pinned` on the screen manifest and `NAVIGATION_OFFER.unpin`, session-scoped in sessionStorage; a PINNED hold last in the gate.
+  - Fast CONTEXT placement.
+- **Live** (`investor.savanna-seed`, /work):
+  - Pin → "Workspace pinned" indicator.
+  - "And what's their team like?" while pinned → stayed.
+  - "Take me to my pipeline." while pinned → stayed, with one "Unpin and open" offer.
+  - Clicking it → unpinned and at `/relationships?view=pipeline`.
+  - Pin, then reload → still pinned.
+- **Regression found:** "Can I see Clinicrest's data room?" landed on `/company/6b2f…` without `?tab=dataroom` (it was `?tab=dataroom` at 4.1 s on v85), in 6.2 s. The fast CONTEXT placement uses the reading's coarser destination, and the decider's deep link cannot move a second time. A fix is with the agent: refine within the same record; fast-place only destinations that are already complete.
+- **A8 media** (`bbb1d7d36` with lint fix `19330f169`): COMPANY_MEDIA block, TURN_READER v86 `companyMedia`. Gating now.
