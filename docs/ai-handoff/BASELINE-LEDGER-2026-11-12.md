@@ -489,3 +489,27 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **Owner-acceptance gaps still open:**
   - no pinned-workspace state in the screen contract;
   - the live evals wait for `CQ_EVAL_ANTHROPIC_API_KEY`.
+
+## Navigation v85 live-verified — `f3589102d` (13 Nov, 18:25 Lagos)
+
+- **Gate:** `ci-local PASS sha=f3589102d at=2026-11-13T17:17:32Z took=1346s`. Rollback point `12baf142c`; four services SUCCESS.
+- **Contents:**
+  - TURN_READER v85: pipeline work read as CONTEXT with destination CRM_PIPELINE.
+  - A CONTEXT reading with a destination places a move when the decider stayed unguarded; same guards and holds.
+  - Navigation fields logged.
+- **Live journey** (`investor.savanna-seed`, /work), all 7 pass:
+
+  | #   | Turn                                     | Result                         | Time   |
+  | --- | ---------------------------------------- | ------------------------------ | ------ |
+  | 1   | "Who should I follow up with this week?" | `/relationships?view=pipeline` | 6.7 s  |
+  | 2   | "Can I see Clinicrest's data room?"      | `?tab=dataroom`                | 4.1 s  |
+  | 3   | "And what's their team like?"            | `?tab=team`                    | 4.9 s  |
+  | 4   | "What does ARR mean?"                    | stayed                         | —      |
+  | 5   | Ledgerline MRR chart question            | stayed (chart inline)          | —      |
+  | 6   | "Don't move the page…"                   | stayed                         | —      |
+  | 7   | "Take me to my pipeline."                | moved                          | 0.86 s |
+
+- **Open:**
+  1. Contextual moves take 4–7 s, because the CONTEXT placement waits for the decider's verdict. Owner asked for "very fast": act on a CONTEXT reading with a resolved destination as soon as the reading lands, unless the decider has guarded.
+  2. The voice/immersive path is not exercisable from the sandbox (no UDP).
+  3. Pinned workspace is in progress.
