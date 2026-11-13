@@ -329,3 +329,18 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The deck's "The ask" (NGN 1,200,000,000) is founder-confirmed on a PUBLIC deck, and `deckMoneyFrom` parses it.
   - The raise reader still withholds it, because the founder shared the raise with one relationship and revoked it three times on 3 Oct. That makes the raise HIDDEN, and the policy's step 3 ("a raise the founder hid stays hidden") applies.
   - This is the locked privacy rule, so nothing was changed. Whether a revocation should also hide a deck the founder confirmed for investors is an owner question.
+
+## Batch deployed — `81aa5cf3e` (13 Nov, 05:05 Lagos)
+
+- **Gate:** the run on `257dd6459` was lost to a container restart. Its leftover checkout then stopped the retry; the gate now clears a stale tree under its lock (`81aa5cf3e`).
+  - Receipt: `ci-local PASS sha=81aa5cf3e at=2026-11-13T03:54:22Z took=2621s` (static 855 s, typecheck 99 s, build 4 s, test 1179 s, database 99 s, integration 385 s).
+- **Deploy:** `scripts/deploy-promote.sh 81aa5cf3e`, rollback point `e57f6025f`. All four Railway services SUCCESS.
+- **Contents:** no catalog top ten under a comparison (`b40678d93`); Traction from the reader's deck when nothing else states it (`eeb36277d`); the inline embed frame sandboxed (`cb360f30f`); B8 duplicate application refused (`257dd6459`).
+- **Live** (`investor.savanna-seed`, "Compare Ajopot, Ledgerline and Clinicrest side by side …", 34 s):
+  - Ajopot's Traction reads "Registered users: 52,000; Circles: 3,900; Monthly active users: 4,200, September 2025 (company-stated, from their deck)".
+  - No ranked list is appended.
+  - The Raise cell stays blank (hidden-raise rule).
+- **New findings:**
+  1. The prose says Ajopot's deck "mentions NGN 1.2bn, but does not identify it as the raise", although the deck's "The ask" says "Amount sought". This is authorised deck content, not a leak, but it is wrong and inconsistent with the blank cell (owner question in the matrix, A5).
+  2. The answer repeats the whole on-screen table as a markdown table after "The full comparison is on screen".
+- **B7:** a synthetic site on another origin framed a fictional gateway (inline and launcher), desktop and 390 px. The host could not read the frame and held no Capital Q cookie.
