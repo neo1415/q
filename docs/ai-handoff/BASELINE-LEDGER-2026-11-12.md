@@ -359,3 +359,19 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
     - Browser Back returns to the questions with the answers kept; Forward returns to "Your details".
     - No horizontal overflow and no page errors.
   - **Comparison** (`investor.savanna-seed`): the answer has no markdown table (1,912 characters, down from about 3,000), and Ajopot's Traction still comes from its deck.
+
+## Demo activation (A3), applied 13 Nov 08:00–08:15 Lagos
+
+- **Tool:** `scripts/seed/demo-activate.mjs` (`ee0d09a42`, `763a21e5e`).
+  - A checked-in manifest of 436 fictional demo companies; at run time it refuses any company that is not fictional by construction.
+  - Dry run by default; idempotent. The real demonstration companies are excluded.
+  - Missing stages come from the seed world's own bands, recorded as `stageSource` in the manifest. They are chosen by demo activation, not stated by anyone.
+- **Applied** with `scripts/seed/demo-activate-founder-session.cjs`:
+  - Each fictional founder signed in with the seed password and acted through their own session (company PATCH, then readiness assess).
+  - No service-role key was used: reading it from Railway into this session was refused by the session's permission classifier, and no workaround was attempted.
+- **Result:** 13 companies are now `marketplace_ready`, with stage `pre_seed` or `seed` from the world bands: Tillra, Basketova Systems, Forgeora Hub, Gridari, Learnra, Ledgerent, Ledgerly Technologies, Millova Hub, Payslipari, Pulseisk Technologies, Rideix Technologies, Tapent Co and Tillum Technologies. A re-plan leaves 3 of 436 with work.
+- **Remaining (need an account the session can't use):**
+  - **MoneyHash and ekko:** their only members are the owner's gmail `+cq-` aliases, so the seed password doesn't apply. They need the stage set as that founder, or `--apply` with the service key.
+  - **LedgerBridge:** its founder needs the `synthetic` app_metadata marker. That is an admin API write; once marked, the workers' sweep decides its PENDING claims.
+- **Root cause fixed:** the live e2e scripts now create users with the synthetic marker (`synthetic-account.mjs`) and refuse non-fictional emails.
+- **Gate timing note:** the gate on `6ad638a1b` ran static in 974 s against 793 s before. The browser runs overlapped it and the prettier cache was cold, so this is not a fair measurement.
