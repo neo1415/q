@@ -344,3 +344,18 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   1. The prose says Ajopot's deck "mentions NGN 1.2bn, but does not identify it as the raise", although the deck's "The ask" says "Amount sought". This is authorised deck content, not a leak, but it is wrong and inconsistent with the blank cell (owner question in the matrix, A5).
   2. The answer repeats the whole on-screen table as a markdown table after "The full comparison is on screen".
 - **B7:** a synthetic site on another origin framed a fictional gateway (inline and launcher), desktop and 390 px. The host could not read the frame and held no Capital Q cookie.
+
+## Batch deployed — `61b94f9d6` (13 Nov, 07:15 Lagos)
+
+- **Gate:**
+  - The first run, on `4832d4d15`, failed: the web typecheck and build broke because an eslint autofix had removed a cast in my new test. Fixed in `61b94f9d6`.
+  - Receipt: `ci-local PASS sha=61b94f9d6 at=2026-11-13T05:59:53Z took=2824s` (static 793 s, typecheck 158 s, build 110 s, test 1252 s, database 70 s, integration 441 s).
+- **Deploy:** `scripts/deploy-promote.sh 61b94f9d6`, rollback point `81aa5cf3e`. All four Railway services SUCCESS.
+- **Live checks (fictional only; nothing submitted):**
+  - **GateQ at phone width** (iPhone 13 profile, Lagos Forge Fund, fictional):
+    - The currency select is 112 px wide.
+    - With the amount in USD, the form says "Lagos Forge Fund (fictional) sets its round and cheque sizes in NGN. Give the amount in that currency so they can be checked." and offers "Use NGN".
+    - After "Use NGN" and NGN 400,000,000, "Continue to interview" reaches "Your details".
+    - Browser Back returns to the questions with the answers kept; Forward returns to "Your details".
+    - No horizontal overflow and no page errors.
+  - **Comparison** (`investor.savanna-seed`): the answer has no markdown table (1,912 characters, down from about 3,000), and Ajopot's Traction still comes from its deck.
