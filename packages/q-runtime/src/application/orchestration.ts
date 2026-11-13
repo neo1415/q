@@ -550,6 +550,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly offerTakenUnrecorded?: true | undefined;
   /**
+   * C3 (13 Nov 2026): they took Q up on the offer recorded with Q's last
+   * answer (QRecordedOffer), read by meaning (TURN_READER acceptsOffer).
+   * The answer does exactly that offer now, with the tool it named, under
+   * that tool's own authorize step and approval rules (Prepare -> Approval
+   * where it acts). Absent: no recorded offer was taken.
+   */
+  readonly offerTaken?: QRecordedOffer | undefined;
+  /**
    * U4/F8 (QA 24 Oct 2026): a screen move their words also asked for ("open
    * the data room and tell me what's missing"), carried by the answer to
    * the question so the move is made and the question still answered.
@@ -661,6 +669,12 @@ export type QAnswerOutcome =
       readonly modelPolicyVersion: string;
       /** The prompt bundle that produced the answer (CQ-Q-006). */
       readonly promptBundleVersion: string;
+      /**
+       * C3 (13 Nov 2026): the offer this answer closed with, bound by code
+       * to a tool offered in this run and still said in the stored answer.
+       * Absent: the answer made no offer code could carry out.
+       */
+      readonly offer?: QRecordedOffer | undefined;
     }
   | {
       /**
@@ -671,6 +685,19 @@ export type QAnswerOutcome =
       readonly kind: "FAILED";
       readonly diagnosticCode: QFailureDiagnosticCode;
     };
+
+/**
+ * C3 (13 Nov 2026): an offer Q made, as a record a yes binds to. `action`
+ * is a tool offered in the run that made it (or the document writer,
+ * ANALYST_OFFER_DOCUMENT); `request` is what exactly it would do; `said`
+ * is the offer sentence as the person read it. Never an approval: taking
+ * it up runs the tool through its own authorize step and approval rules.
+ */
+export type QRecordedOffer = {
+  readonly action: string;
+  readonly request: string;
+  readonly said: string;
+};
 
 export type QAnswerPort = {
   readonly answer: (request: QAnswerRequest) => Promise<QAnswerOutcome>;

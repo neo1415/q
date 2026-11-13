@@ -4749,3 +4749,142 @@ describe("batch 19: a prepared change to their own mandate says what it changes,
     expect(said).not.toContain("COMPANY_REFERENCE");
   });
 });
+
+/**
+ * C3 (acceptance 13 Nov 2026): Q's offers are durable and executable. The
+ * offer the answer closes with is bound to a tool this run holds, or it is
+ * not said; a yes to an offer code never recorded acts on nothing.
+ */
+describe("C3: an offer is a record a yes binds to", () => {
+  const FOLLOW_UP_OFFERED: QOfferedTool = {
+    toolName: "message.follow_up.prepare",
+    toolVersion: 1,
+    classification: "PREPARE",
+    definition: {
+      name: "draft_follow_up",
+      description: "Drafts a follow-up to a counterpart, for their approval.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const OFFER_LINE = "Want me to draft a follow-up to Savanna?";
+  const withOffer = (action: string) =>
+    JSON.stringify({
+      ...analystResult(`Savanna replied last week. ${OFFER_LINE}`),
+      offer: {
+        said: OFFER_LINE,
+        action,
+        request: "Draft a follow-up note to Savanna Seed about the call.",
+      },
+    });
+  const prepared = (proposal: QToolProposal): QToolCallOutcome => ({
+    ...succeeded(proposal, { status: "PREPARED" }),
+    toolName: "message.follow_up.prepare",
+    classification: "PREPARE",
+  });
+  const saidOf = (completed: unknown[]): string =>
+    (completed.at(-1) as { message: { text: string } }).message.text;
+
+  it("an offer bound to a tool of this run is recorded with the answer and said", async () => {
+    const tools = toolPort([FOLLOW_UP_OFFERED], prepared);
+    const { seam, request, completed } = build({
+      script: [{ kind: "TEXT", text: withOffer("draft_follow_up") }],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome).toMatchObject({
+      kind: "ANSWERED",
+      offer: {
+        action: "draft_follow_up",
+        request: "Draft a follow-up note to Savanna Seed about the call.",
+        said: OFFER_LINE,
+      },
+    });
+    expect(saidOf(completed)).toContain(OFFER_LINE);
+    // Recording an offer executes nothing.
+    expect(tools.executed).toEqual([]);
+  });
+
+  it("an offer of something no tool of this run does is never made: not said, not recorded", async () => {
+    const tools = toolPort([FOLLOW_UP_OFFERED], prepared);
+    const { seam, request, completed, logLines } = build({
+      script: [{ kind: "TEXT", text: withOffer("schedule_call") }],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(outcome.kind === "ANSWERED" ? outcome.offer : null).toBeUndefined();
+    expect(saidOf(completed)).not.toContain(OFFER_LINE);
+    expect(saidOf(completed)).toContain("Savanna replied last week.");
+    expect(logLines.join("\n")).toContain(
+      "an offer no tool of this run can carry out was not said",
+    );
+  });
+
+  it("a yes to the recorded offer: the answer is told exactly what was offered and with which tool", async () => {
+    const tools = toolPort([FOLLOW_UP_OFFERED], prepared);
+    const { seam, request, alpha } = build({
+      said: "go for it",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "f1", name: "draft_follow_up", arguments: {} }],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("It's ready for you to check.")),
+        },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      askedAction: "draft_follow_up",
+      offerTaken: {
+        action: "draft_follow_up",
+        request: "Draft a follow-up note to Savanna Seed about the call.",
+        said: OFFER_LINE,
+      },
+    });
+    const prompt = JSON.stringify(alpha.calls[0]);
+    expect(prompt).toContain(
+      "THEY SAID YES TO THE OFFER YOUR LAST ANSWER MADE",
+    );
+    expect(prompt).toContain(
+      "Draft a follow-up note to Savanna Seed about the call.",
+    );
+    expect(prompt).toContain("with draft_follow_up");
+    // The tool ran through the port (its own authorize and approval rules):
+    // a PREPARE tool prepares; nothing is executed past it here.
+    expect(tools.executed.map((p) => p.name)).toEqual(["draft_follow_up"]);
+  });
+
+  it("a yes to an offer code never recorded acts on nothing: the acting tool is refused and the answer told why", async () => {
+    const tools = toolPort([FOLLOW_UP_OFFERED], prepared);
+    const { seam, request, alpha } = build({
+      said: "yes",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "f1", name: "draft_follow_up", arguments: {} }],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult(
+              "I didn't keep exactly what I offered. What would you like me to do?",
+            ),
+          ),
+        },
+      ],
+      tools,
+    });
+    expect(
+      (await seam.answer({ ...request, offerTakenUnrecorded: true })).kind,
+    ).toBe("ANSWERED");
+    expect(tools.executed).toEqual([]);
+    const conversation = JSON.stringify(alpha.calls);
+    expect(conversation).toContain("AN OFFER CAPITAL Q HAS NO RECORD OF");
+    expect(conversation).toContain("that offer was not recorded");
+  });
+});

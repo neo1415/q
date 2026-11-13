@@ -14,9 +14,13 @@ import {
  * conflicting figures side by side. Every v28 rule stays.
  */
 describe("COMPANY_ANALYST v29: the live Q-IQ gaps", () => {
-  it("is active, on v28's output, and differs from v28 only by its listed changes", () => {
+  it("was active (now v30), on v28's output, and differs from v28 only by its listed changes", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(29);
+    // v30 (C3) succeeds it; v29 stays published, deprecated.
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(30);
+    expect(registry.get("COMPANY_ANALYST", 29)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("COMPANY_ANALYST", 28)?.definition.status).toBe(
       "DEPRECATED",
     );

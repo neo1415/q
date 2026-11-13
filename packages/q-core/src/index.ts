@@ -1144,6 +1144,14 @@ export {
   COMPANY_ANALYST_V26_SCHEMA_VERSION,
   CompanyAnalystV26ResultSchema,
   type CompanyAnalystV26Result,
+  ANALYST_OFFER_DOCUMENT,
+  ANALYST_OFFER_MAX_LENGTH,
+  COMPANY_ANALYST_V30_SCHEMA_VERSION,
+  CompanyAnalystV30ResultSchema,
+  ModelOfferSchema,
+  OFFER_GUIDANCE,
+  type CompanyAnalystV30Result,
+  type ModelOffer,
   ArtifactRequestV3Schema,
   ARTIFACT_REQUEST_TYPES_V3,
   type CompanyAnalystV19Result,
@@ -2268,3 +2276,8 @@ export {
   COMPANY_ANALYST_V29,
   V29_CHANGES,
 } from "./prompts/tasks/company-analyst.v29.js";
+export {
+  COMPANY_ANALYST_V30,
+  V30_ALLOWED_ROOT_KEYS,
+  V30_CHANGES,
+} from "./prompts/tasks/company-analyst.v30.js";

@@ -26,6 +26,21 @@ export type ConversationCoreSnapshot = {
   readonly lastAction: LastAction | null;
   readonly sequence: QuestionSequence | null;
   readonly focus: QToolFocus | null;
+  /**
+   * C3 (13 Nov 2026): the offer Q's last answer closed with, bound by code
+   * to a tool of that run, with that run's id -- so a yes after a deploy or
+   * on another instance binds to it. Optional: a snapshot written before
+   * it carries none.
+   */
+  readonly offer?: CoreOffer | null | undefined;
+};
+
+/** A recorded action offer, as the core keeps it (answer.ts RecordedOffer). */
+export type CoreOffer = {
+  readonly runId: string;
+  readonly action: string;
+  readonly request: string;
+  readonly said: string;
 };
 
 /** Where the snapshot is kept; q-api composes it over the conversation row. */
@@ -65,6 +80,15 @@ const SnapshotSchema = z.object({
       readsOnly: z.boolean().optional(),
     })
     .nullable(),
+  offer: z
+    .object({
+      runId: z.string().min(1).max(120),
+      action: z.string().min(1).max(120),
+      request: z.string().min(1).max(400),
+      said: z.string().min(1).max(400),
+    })
+    .nullable()
+    .optional(),
 });
 
 /** A stored snapshot, or null when it is absent or not one we wrote. */
@@ -73,11 +97,12 @@ export function readCoreSnapshot(
 ): ConversationCoreSnapshot | null {
   const read = SnapshotSchema.safeParse(stored);
   if (!read.success) return null;
-  const { focus, unclearInARow, lastAction, sequence } = read.data;
+  const { focus, unclearInARow, lastAction, sequence, offer } = read.data;
   return {
     unclearInARow,
     lastAction,
     sequence,
+    ...(offer === undefined || offer === null ? {} : { offer }),
     focus:
       focus === null
         ? null

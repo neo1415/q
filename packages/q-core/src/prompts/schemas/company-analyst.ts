@@ -563,6 +563,40 @@ export type CompanyAnalystV26Result = z.infer<
 >;
 export const COMPANY_ANALYST_V26_SCHEMA_VERSION = 26;
 
+/**
+ * v30 (C3, acceptance 13 Nov 2026): Q's closing offer is a record, not
+ * only words. "Want me to draft a follow-up to Savanna?" was said, the
+ * person said yes, and nothing was bound to it (offerTakenUnrecorded):
+ * the next turn had to guess. The model names the offer it made, the one
+ * tool of this turn that does it, and what exactly it would do; Capital Q
+ * keeps the offer only when that tool is offered this run and the sentence
+ * stands in the answer, and removes an offer it cannot carry out. A yes
+ * then binds to exactly this record, through the tool's own authorize
+ * step and approval rules. The record never acts by itself.
+ */
+export const ANALYST_OFFER_MAX_LENGTH = 300;
+/** The offer of a document written up (artifactRequest), not a tool. */
+export const ANALYST_OFFER_DOCUMENT = "WRITE_DOCUMENT";
+export const OFFER_GUIDANCE = `Fill when your answer offers to do something next: said is that offer sentence exactly as written in answer; action is the exact name of the one tool you hold this turn that would do it (${ANALYST_OFFER_DOCUMENT} for writing a document); request is what exactly you would do, naming who or what. Never offer what none of your tools does: such an offer is removed. Else null.`;
+export const ModelOfferSchema = z
+  .object({
+    said: z.string().trim().min(1).max(ANALYST_OFFER_MAX_LENGTH),
+    action: z.string().trim().min(1).max(120),
+    request: z.string().trim().min(1).max(ANALYST_OFFER_MAX_LENGTH),
+  })
+  .strict()
+  .describe(OFFER_GUIDANCE);
+export type ModelOffer = z.infer<typeof ModelOfferSchema>;
+
+export const CompanyAnalystV30ResultSchema =
+  CompanyAnalystV26ResultSchema.extend({
+    offer: ModelOfferSchema.nullable().default(null),
+  }).strict();
+export type CompanyAnalystV30Result = z.infer<
+  typeof CompanyAnalystV30ResultSchema
+>;
+export const COMPANY_ANALYST_V30_SCHEMA_VERSION = 30;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

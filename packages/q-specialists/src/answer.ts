@@ -81,6 +81,7 @@ import {
   type QPageManifest,
   type QRecordPage,
   type QResponseMessage,
+  type QNavigationOfferBlock,
   type QResultBlock,
   type QRunId,
   type QScreenRoute,
@@ -176,6 +177,7 @@ import {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QRecordedOffer,
   type QPrereadInput,
   type QCapabilityManifest,
   type QConversationFetch,
@@ -235,6 +237,7 @@ import {
   readCoreSnapshot,
   type ConversationCoreScope,
   type ConversationCoreStore,
+  type CoreOffer,
 } from "./conversation-core.js";
 import {
   asksToOperate,
@@ -259,11 +262,32 @@ import { bindReferences, boundCompanyIds } from "./reference-binding.js";
  * to do now; `ask` is the question that answer answered, which is what
  * the plan is for.
  */
-export type RecordedOffer = {
-  readonly kind: "PLAN";
-  readonly runId: string;
-  readonly ask: string;
-};
+export type RecordedOffer =
+  | {
+      readonly kind: "PLAN";
+      readonly runId: string;
+      readonly ask: string;
+    }
+  /**
+   * C3 (13 Nov 2026): the offer the answer model made and code bound to a
+   * tool of that run (model-gateway offer-binding). A yes runs exactly that
+   * tool, for exactly that request, under its own approval rules.
+   */
+  | ({ readonly kind: "ACTION"; readonly runId: string } & QRecordedOffer);
+
+/** C3: the action offer as the conversation core keeps it durably. */
+function coreOfferOf(offer: RecordedOffer | undefined): CoreOffer | null {
+  if (offer?.kind !== "ACTION") return null;
+  return {
+    runId: offer.runId,
+    action: offer.action,
+    request: offer.request,
+    said: offer.said,
+  };
+}
+
+/** The plan offer alone (what planStartWords reads). */
+type RecordedPlanOffer = Extract<RecordedOffer, { readonly kind: "PLAN" }>;
 
 /** A stored line of the conversation, as the plan offer reads it. */
 type StoredLine = {
@@ -305,7 +329,7 @@ export function holdingLine(
 export function storedPlanOffer(
   history: readonly StoredLine[],
   lastQ: StoredLine,
-): RecordedOffer | null {
+): RecordedPlanOffer | null {
   const said = lastQ.content.trimEnd();
   if (!PLAN_OFFER_LINES.some((line) => said.endsWith(line))) return null;
   const asked = history.find(
@@ -325,8 +349,8 @@ export function storedPlanOffer(
  */
 export function planStartWords(input: {
   readonly latest: string;
-  readonly taken: RecordedOffer | null;
-  readonly standing: RecordedOffer | null;
+  readonly taken: RecordedPlanOffer | null;
+  readonly standing: RecordedPlanOffer | null;
 }): { readonly ask: string; readonly quote?: string | null } {
   if (input.taken !== null) return { ask: input.taken.ask };
   if (input.standing === null) return { ask: input.latest };
@@ -1981,6 +2005,33 @@ const OFFER_WORDS: Readonly<
 
 /** N1: what Q says when they choose to stay where they are. */
 const STAY_HERE_LINE = "Sure, we'll stay here. Ask me anything about it.";
+
+/**
+ * C3: a yes to an offer whose tool this run no longer holds. Nothing is
+ * done, and no other tool is tried in its place.
+ */
+export const OFFER_NOT_AVAILABLE_LINE =
+  "I can't do that from here right now, so I haven't started anything. Tell me what you'd like instead and I'll take it from there.";
+
+/** N1: the page Q's last answer offered to open, from its stored blocks. */
+function navigationOfferOf(
+  history: readonly QConversationMessage[],
+): QNavigationOfferBlock | null {
+  const before = [...history];
+  if (before.at(-1)?.role === "USER") before.pop();
+  const lastQ = before.reverse().find((m) => m.role === "Q");
+  const offer = (lastQ?.blocks ?? []).findLast(
+    (block) => block.kind === "NAVIGATION_OFFER",
+  );
+  return offer?.kind === "NAVIGATION_OFFER" ? offer : null;
+}
+
+/** What Q says as it opens the offered page. */
+function openedOfferLine(offer: QNavigationOfferBlock): string {
+  return offer.intent.kind === "NAVIGATE"
+    ? DESTINATION_LINES[offer.intent.destination]
+    : `Opening ${offer.place}.`;
+}
 
 /**
  * A founder's own data room: never where an investor is taken (QO-15). The
@@ -4555,22 +4606,14 @@ export function createSpecialistQAnswer(
     readonly blocks: readonly QResultBlock[];
     readonly log: "OPEN" | "STAY";
   } | null => {
-    const before = [...history];
-    if (before.at(-1)?.role === "USER") before.pop();
-    const lastQ = before.reverse().find((m) => m.role === "Q");
-    const offer = (lastQ?.blocks ?? []).findLast(
-      (block) => block.kind === "NAVIGATION_OFFER",
-    );
-    if (offer?.kind !== "NAVIGATION_OFFER") return null;
+    const offer = navigationOfferOf(history);
+    if (offer === null) return null;
     const reply = offerReplyOf(text);
     if (reply === null) return null;
     if (reply === "STAY")
       return { said: STAY_HERE_LINE, blocks: [], log: reply };
     return {
-      said:
-        offer.intent.kind === "NAVIGATE"
-          ? DESTINATION_LINES[offer.intent.destination]
-          : `Opening ${offer.place}.`,
+      said: openedOfferLine(offer),
       blocks: [{ kind: "UI_INTENT", intent: offer.intent }],
       log: reply,
     };
@@ -5066,6 +5109,12 @@ export function createSpecialistQAnswer(
     if (!focuses.has(id) && snapshot.focus !== null) {
       focuses.set(id, snapshot.focus);
     }
+    // C3: an action offer survives a deploy; it binds only while the run
+    // that made it is still Q's last turn (offerOfLastTurn).
+    const offer = snapshot.offer ?? null;
+    if (!offers.has(id) && offer !== null) {
+      recordOffer(id, { kind: "ACTION", ...offer });
+    }
   };
   const persistCore = async (runId: string): Promise<void> => {
     const scope = scopeOfRun.get(runId);
@@ -5081,6 +5130,7 @@ export function createSpecialistQAnswer(
           lastAction: lastActed.get(id) ?? null,
           sequence: sequences.get(id) ?? null,
           focus: focuses.get(id) ?? null,
+          offer: coreOfferOf(offers.get(id)),
         } as const),
       )
       .catch((error: unknown) => {
@@ -7801,6 +7851,39 @@ export function createSpecialistQAnswer(
       : null;
     const offerTaken = takesOffer ? standingOffer : null;
     const offeredPlan = offerTaken?.kind === "PLAN" ? offerTaken : null;
+    // C3: the action offer Q's last answer closed with, taken up by
+    // meaning ("go for it", "sí, hazlo"), never by its words. It runs that
+    // exact tool for that exact request, under the tool's own approval.
+    const offeredAction = offerTaken?.kind === "ACTION" ? offerTaken : null;
+    const offeredTool =
+      offeredAction === null
+        ? undefined
+        : actions.find((action) => action.name === offeredAction.action);
+    if (offeredAction !== null && offeredTool?.available === false) {
+      // Offered last turn, not offered now (its eligibility changed): said
+      // plainly, nothing done, never a different tool in its place.
+      logger?.info(
+        { qRunId: request.runId, action: offeredAction.action },
+        "a yes to Q's offer of something this run cannot do: said so",
+      );
+      speculative.current?.cancel("ACTED");
+      return recordAnswer(request, conversationId, OFFER_NOT_AVAILABLE_LINE);
+    }
+    // N1 by meaning: a yes to Q's offer of a page that the word rule did
+    // not take ("go for it", "sí, ábrela") opens exactly the offered page.
+    if (takesOffer && offerTaken === null && conversationId !== undefined) {
+      const page = navigationOfferOf(history);
+      if (page !== null) {
+        logger?.info(
+          { qRunId: request.runId, reply: "OPEN", by: "READING" },
+          "a reply to Q's offer to open a page",
+        );
+        speculative.current?.cancel("ACTED");
+        return recordAnswer(request, conversationId, openedOfferLine(page), [
+          { kind: "UI_INTENT", intent: page.intent },
+        ]);
+      }
+    }
     const planWords = planStartWords({
       latest: latest.content,
       taken: offeredPlan,
@@ -7871,7 +7954,10 @@ export function createSpecialistQAnswer(
     // one in-run brief, never a hand-over (live 2026-10-12). A plan that
     // could not be made is said plainly; it is not covered by an ordinary
     // answer. (The keyword fast path beside it is gone, 2026-10-28.)
-    const teamJobBy = confident && read?.teamJob === true ? "READING" : null;
+    const teamJobBy =
+      confident && read?.teamJob === true && offeredAction === null
+        ? "READING"
+        : null;
     if (dependencies.teamJob !== undefined && teamJobBy !== null) {
       const startedAt = Date.now();
       // The go-ahead is a reply to Q's question, as the reader read it.
@@ -8823,16 +8909,30 @@ export function createSpecialistQAnswer(
       ...(confident && read?.acceptsOffer === true && offerTaken === null
         ? { offerTakenUnrecorded: true as const }
         : {}),
-      // Only a name the reader was given counts (ADR 0040 parity).
-      ...(redirectedTo !== null
-        ? { askedAction: redirectedTo }
-        : read?.askedAction === undefined ||
-            read.askedAction === null ||
-            !actions.some((action) => action.name === read.askedAction)
-          ? routedAsked === null
-            ? {}
-            : { askedAction: routedAsked }
-          : { askedAction: read.askedAction }),
+      // C3: the recorded offer they took up, for the answer to do exactly.
+      ...(offeredAction === null
+        ? {}
+        : {
+            offerTaken: {
+              action: offeredAction.action,
+              request: offeredAction.request,
+              said: offeredAction.said,
+            },
+          }),
+      // Only a name the reader was given counts (ADR 0040 parity). A taken
+      // offer's acting tool is the action asked: its own authorize step and
+      // approval rules decide what happens, never this turn's words.
+      ...(offeredAction !== null && offeredTool !== undefined
+        ? { askedAction: offeredAction.action }
+        : redirectedTo !== null
+          ? { askedAction: redirectedTo }
+          : read?.askedAction === undefined ||
+              read.askedAction === null ||
+              !actions.some((action) => action.name === read.askedAction)
+            ? routedAsked === null
+              ? {}
+              : { askedAction: routedAsked }
+            : { askedAction: read.askedAction }),
       ...(writingDocument ? { writingDocument: true } : {}),
       ...(series.step === null ? {} : { questionSequence: series.step }),
       ...(toolFocus === null ? {} : { toolFocus }),
@@ -8957,6 +9057,28 @@ export function createSpecialistQAnswer(
         runId: request.runId,
         ask: latest.content,
       });
+    }
+    // C3: the offer the answer closed with, as the gateway bound it to a
+    // tool of this run and kept it said, is recorded with this run; the
+    // next turn's yes (TURN_READER acceptsOffer) runs exactly that offer.
+    // Code's own plan offer closes the answer when it was made; it stands.
+    const planOfferedNow =
+      offers.get(conversationId)?.kind === "PLAN" &&
+      offers.get(conversationId)?.runId === request.runId;
+    if (
+      outcome.kind === "ANSWERED" &&
+      outcome.offer !== undefined &&
+      !planOfferedNow
+    ) {
+      recordOffer(conversationId, {
+        kind: "ACTION",
+        runId: request.runId,
+        action: outcome.offer.action,
+        request: outcome.offer.request,
+        said: outcome.offer.said,
+      });
+    } else if (offers.get(conversationId)?.kind === "ACTION") {
+      offers.delete(conversationId);
     }
     if (outcome.kind === "FAILED") {
       const operation = operationOf(outcome.diagnosticCode);

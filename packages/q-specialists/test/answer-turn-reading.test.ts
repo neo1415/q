@@ -55,6 +55,7 @@ import {
   asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
+  OFFER_NOT_AVAILABLE_LINE,
   planStartWords,
   storedPlanOffer,
   TURN_REREAD_DEADLINE_MS,
@@ -62,6 +63,7 @@ import {
   TURN_UNREAD_REPLY,
   unknownScreenLine,
 } from "../src/answer.js";
+import { readCoreSnapshot } from "../src/conversation-core.js";
 import {
   RESEARCHED_MEMO_WAIT,
   teamJobLine,
@@ -293,6 +295,7 @@ function seam(options: {
   const deltasAtDelegate: number[] = [];
   const closings: (string | undefined)[] = [];
   const unrecordedOffers: boolean[] = [];
+  const offersTaken: QAnswerRequest["offerTaken"][] = [];
   let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
@@ -325,6 +328,7 @@ function seam(options: {
         deltasAtDelegate.push(options.deltas?.length ?? 0);
         closings.push(req.closingLines);
         unrecordedOffers.push(req.offerTakenUnrecorded === true);
+        offersTaken.push(req.offerTaken);
         focuses.push(req.toolFocus);
         namedOthers.push(req.aboutNamedOther);
         compares.push(req.compare);
@@ -494,6 +498,7 @@ function seam(options: {
     deltasAtDelegate,
     closings,
     unrecordedOffers,
+    offersTaken,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -8458,5 +8463,230 @@ describe("the turn reader is given the situation header", () => {
       expect(situation).toContain("On their screen now: Spheros (a company).");
       expect(situation).toMatch(/me, my, I or myself[^.]*mean themselves/u);
     }
+  });
+});
+
+/**
+ * C3 (acceptance 13 Nov 2026): Q's offers are durable and executable. The
+ * offer an answer closed with is recorded with its run (the gateway bound
+ * it to a tool of that run); a yes read by meaning (TURN_READER
+ * acceptsOffer) runs exactly that tool for exactly that request, under
+ * the tool's own approval rules. Readings are fixtures.
+ */
+describe("C3: a yes binds to the offer recorded with Q's last answer", () => {
+  const OFFER = {
+    action: "propose_chat_message",
+    request: "Draft a follow-up chat to Savanna Seed about last week's call.",
+    said: "Want me to draft a follow-up to Savanna?",
+  };
+  const taking = (accepts: boolean): TurnReaderResult =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      acceptsOffer: accepts,
+      replyTo: { kind: "Q_QUESTION", card: null },
+      tool: null,
+      handOver: null,
+    }) as unknown as TurnReaderResult;
+  /** Turn 1 answers and closes with OFFER; turn 2 says `reply`. */
+  async function offeredThen(
+    reply: string,
+    accepts: boolean,
+    offeredTools: string[] = ["propose_chat_message", "get_company"],
+  ) {
+    let reading: TurnReaderResult = advice;
+    const run = seam({
+      said: "How is Savanna Seed doing?",
+      earlier: [
+        { role: "USER", content: "How is Savanna Seed doing?" },
+        { role: "Q", content: `They replied last week. ${OFFER.said}` },
+      ],
+      reading: () => reading,
+      offeredTools,
+      outcomes: [
+        {
+          kind: "ANSWERED",
+          messageId: "m1",
+          modelPolicyVersion: "p",
+          promptBundleVersion: "b",
+          offer: OFFER,
+        },
+      ],
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    (run.message as { content: string }).content = reply;
+    reading = taking(accepts);
+    await run.answer.answer(request());
+    return run;
+  }
+
+  it("the recorded offer, taken up: the same tool with the same request, nothing else", async () => {
+    const run = await offeredThen("yes please", true);
+    expect(run.delegated()).toBe(2);
+    expect(run.askedActions[1]).toBe("propose_chat_message");
+    expect(run.offersTaken[1]).toEqual(OFFER);
+    expect(run.unrecordedOffers[1]).toBe(false);
+  });
+
+  it("a consequential offer is prepared for approval, never executed by the yes", async () => {
+    const run = await offeredThen("yes", true);
+    // The yes names the tool; the tool's own rule is Prepare -> Approval.
+    const capability = Q_CAPABILITIES.find(
+      (one) =>
+        one.performedBy.kind === "TOOL" &&
+        one.performedBy.providerName === OFFER.action,
+    );
+    expect(capability?.approval).toBe("PREPARE_APPROVE");
+    expect(run.askedActions[1]).toBe(OFFER.action);
+    // Code executes nothing itself and says nothing was done.
+    expect(run.stored).toEqual([]);
+  });
+
+  it.each(["go for it", "sí, hazlo", "please do", "that'd be great"])(
+    'a paraphrased acceptance ("%s") is read by meaning, never by its words',
+    async (reply) => {
+      const run = await offeredThen(reply, true);
+      expect(run.askedActions[1]).toBe(OFFER.action);
+      expect(run.offersTaken[1]).toEqual(OFFER);
+    },
+  );
+
+  it.each(["no", "not now", "no thanks, just tell me more"])(
+    '"%s" executes nothing of the offer',
+    async (reply) => {
+      const run = await offeredThen(reply, false);
+      expect(run.offersTaken[1]).toBeUndefined();
+      expect(run.askedActions[1]).toBeUndefined();
+      expect(run.unrecordedOffers[1]).toBe(false);
+    },
+  );
+
+  it("an offer whose tool this run no longer holds: said plainly, nothing started, no other tool", async () => {
+    const tools = ["propose_chat_message", "get_company"];
+    let reading: TurnReaderResult = advice;
+    const run = seam({
+      said: "How is Savanna Seed doing?",
+      earlier: [{ role: "Q", content: `They replied. ${OFFER.said}` }],
+      reading: () => reading,
+      offeredTools: tools,
+      outcomes: [
+        {
+          kind: "ANSWERED",
+          messageId: "m1",
+          modelPolicyVersion: "p",
+          promptBundleVersion: "b",
+          offer: OFFER,
+        },
+      ],
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    tools.splice(0, 1);
+    (run.message as { content: string }).content = "yes";
+    reading = taking(true);
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.stored.at(-1)?.content).toBe(OFFER_NOT_AVAILABLE_LINE);
+  });
+
+  it("a yes after an offer that was never recorded: the answer is told so and no action is named", async () => {
+    const run = seam({
+      said: "go for it",
+      earlier: [{ role: "Q", content: `They replied. ${OFFER.said}` }],
+      reading: taking(true),
+      offeredTools: ["propose_chat_message"],
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.unrecordedOffers).toEqual([true]);
+    expect(run.askedActions).toEqual([undefined]);
+    expect(run.offersTaken).toEqual([undefined]);
+  });
+
+  it("an answer with no offer clears the one before it: a later yes binds to nothing", async () => {
+    let reading: TurnReaderResult = advice;
+    const run = seam({
+      said: "How is Savanna Seed doing?",
+      earlier: [{ role: "Q", content: `They replied. ${OFFER.said}` }],
+      reading: () => reading,
+      offeredTools: ["propose_chat_message"],
+      outcomes: [
+        {
+          kind: "ANSWERED",
+          messageId: "m1",
+          modelPolicyVersion: "p",
+          promptBundleVersion: "b",
+          offer: OFFER,
+        },
+        {
+          kind: "ANSWERED",
+          messageId: "m2",
+          modelPolicyVersion: "p",
+          promptBundleVersion: "b",
+        },
+      ],
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    (run.message as { content: string }).content = "yes";
+    reading = taking(true);
+    await run.answer.answer(request());
+    expect(run.offersTaken[2]).toBeUndefined();
+    expect(run.unrecordedOffers[2]).toBe(true);
+  });
+
+  it("N1 by meaning: a paraphrased yes to Q's page offer opens exactly that page", async () => {
+    const run = seam({
+      said: "sí, ábrela",
+      earlier: [
+        {
+          role: "Q",
+          content: "You have three live relationships. Want to open them?",
+          blocks: [
+            {
+              kind: "NAVIGATION_OFFER",
+              intent: { kind: "NAVIGATE", destination: "RELATIONSHIPS" },
+              place: "Relationships",
+              openLabel: "Open pipeline",
+            },
+          ],
+        },
+      ],
+      reading: taking(true),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    expect(run.stored.at(-1)?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "RELATIONSHIPS" },
+      },
+    ]);
+  });
+});
+
+describe("C3: the action offer survives a restart in the conversation core", () => {
+  it("is written with the core's snapshot and read back; a snapshot without one still reads", () => {
+    const offer = {
+      runId: "r1",
+      action: "propose_chat_message",
+      request: "Draft a follow-up to Savanna Seed.",
+      said: "Want me to draft a follow-up to Savanna?",
+    };
+    const base = {
+      v: 1 as const,
+      unclearInARow: 0,
+      lastAction: null,
+      sequence: null,
+      focus: null,
+    };
+    expect(readCoreSnapshot({ ...base, offer })?.offer).toEqual(offer);
+    expect(readCoreSnapshot(base)?.offer).toBeUndefined();
+    expect(
+      readCoreSnapshot({ ...base, offer: { ...offer, action: "" } }),
+    ).toBeNull();
   });
 });

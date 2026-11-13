@@ -82,7 +82,7 @@ describe("how a reply ends", () => {
   it("offers one step, only what Capital Q can do, and acts on an acceptance through a tool", () => {
     expect(NEXT_STEP_NOTE).toContain("one offer, never a list");
     expect(NEXT_STEP_NOTE).toContain(
-      "Offer only what your tools or Capital Q can do",
+      "Offer only what one of your tools does, and record it in offer",
     );
     expect(NEXT_STEP_NOTE).toContain(
       "do exactly that now with the matching tool",

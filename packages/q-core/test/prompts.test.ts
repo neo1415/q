@@ -328,7 +328,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v29_comm.v1",
+      "q-system.v2_company-analyst.v30_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -461,7 +461,8 @@ describe("renderer", () => {
     // v28 (step 10): the subject description is fenced; three trims pay for it.
     // v29 (live Q-IQ gaps): ~70 tokens -- name the subject, a fact is on
     // record, a worked figure shows its inputs, conflicts side by side.
-    expect(rendered.bundle.task).toBe("company-analyst/v29");
+    // v30 (C3): ~25 tokens -- the offer key and where an offer goes.
+    expect(rendered.bundle.task).toBe("company-analyst/v30");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

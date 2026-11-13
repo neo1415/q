@@ -96,8 +96,8 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV26Result,
-  CompanyAnalystV26ResultSchema,
+  type CompanyAnalystV30Result,
+  CompanyAnalystV30ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -140,6 +140,7 @@ import {
   type QAnswerOutcome,
   type QAnswerPort,
   type QAnswerRequest,
+  type QRecordedOffer,
   type QConversationFetch,
   type QConversationMessage,
   type QOfferedTool,
@@ -775,6 +776,21 @@ export {
   type QOnboardingNudge,
   type QOnboardingNudgePort,
 } from "./onboarding-nudge.js";
+export {
+  bindOffer,
+  offerStanding,
+  offerTakenNote,
+  OFFER_UNRECORDED_NOTE,
+  OFFER_UNRECORDED_REFUSAL,
+  type OfferBinding,
+} from "./offer-binding.js";
+import {
+  bindOffer,
+  offerStanding,
+  offerTakenNote,
+  OFFER_UNRECORDED_NOTE,
+  OFFER_UNRECORDED_REFUSAL,
+} from "./offer-binding.js";
 
 /** Q room R5: any tool result that carries the calendar connect card. */
 const CalendarConnectCarrierSchema = z
@@ -806,7 +822,7 @@ const RoomCardCarrierSchema = z
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV26Result → Q message + bundle version on the run
+ *   CompanyAnalystV30Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -1455,11 +1471,11 @@ const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
  */
 /**
  * The schema the analyst's answer is checked against: the one the prompt in
- * use writes to (COMPANY_ANALYST v26, schema v26). Pinned by a test, because a lag here
+ * use writes to (COMPANY_ANALYST v30, schema v30). Pinned by a test, because a lag here
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
-export const ANALYST_RESULT_SCHEMA = CompanyAnalystV26ResultSchema;
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV30ResultSchema;
 
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
@@ -1471,6 +1487,8 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "visual",
   // v26 (L-13): a malformed search loses the picture, never the answer.
   "pictureQuery",
+  // v30 (C3): a malformed offer is no offer (its sentence goes with it).
+  "offer",
   // Live 2026-10-26 (run 186c0788): a malformed display-name request or
   // status flag refused a whole readiness answer. Each stands as its
   // "nothing" value (no rename asked; no status line), never the answer.
@@ -2114,7 +2132,7 @@ export function nextStepTurn(request: {
 }
 
 export const NEXT_STEP_NOTE =
-  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as a question ("Want me to draft the intro to Ada?"), never as a statement. Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
+  'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as a question ("Want me to draft the intro to Ada?"), never as a statement. Offer only what one of your tools does, and record it in offer with the exact name of that tool (an offer of what no tool does is removed); one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
 
 /**
  * Answer what they mean, not only what they literally asked (founder
@@ -2277,6 +2295,10 @@ export function environmentNoteParts(
     readonly openDocumentTitle?: string | undefined;
     /** The turn could not be read: nothing can be started this turn. */
     readonly turnUnread?: boolean | undefined;
+    /** C3: the recorded offer of Q's last answer, taken up this turn. */
+    readonly offerTaken?: QRecordedOffer | undefined;
+    /** C3: a yes to an offer code holds no record of. */
+    readonly offerUnrecorded?: boolean | undefined;
     /**
      * C1 (owner, 13 Nov): no closing offer and no "be proactive" guidance on
      * this turn -- a remark, a record lookup, a plain fact (nextStepTurn).
@@ -2402,6 +2424,10 @@ export function environmentNoteParts(
     // read as chat, or a series cut short, are the bugs these prevent
     // (QX-003F, B1, R35).
     ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
+    ...(options.offerTaken === undefined
+      ? []
+      : [offerTakenNote(options.offerTaken)]),
+    ...(options.offerUnrecorded === true ? [OFFER_UNRECORDED_NOTE] : []),
     ...(options.capitalQCompany === true ? [CAPITAL_Q_COMPANY_NOTE] : []),
     ...(options.attachedDocument === undefined
       ? []
@@ -2961,7 +2987,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV26Result;
+  readonly result: CompanyAnalystV30Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -3239,19 +3265,34 @@ export function createModelGatewayQAnswer(
     { readonly outcome: QToolCallOutcome; readonly at: number }
   >();
   const readOnlyByRun = new Map<string, Set<string>>();
+  /** C3: each run's tools that act (PREPARE or SIDE_EFFECT). Bounded. */
+  const actingByRun = new Map<string, Set<string>>();
   const noteOffer = (
     runId: string,
     offered: readonly QOfferedTool[] | null,
   ): void => {
     if (offered === null) return;
     const names = readOnlyByRun.get(runId) ?? new Set<string>();
+    const acting = actingByRun.get(runId) ?? new Set<string>();
     for (const tool of offered) {
       if (tool.classification === "READ_ONLY") names.add(tool.definition.name);
+      // A screen act (client.*) is not acted on here: whether it may move
+      // their screen is the move guard's (unmovedRuns, after it runs).
+      if (
+        (tool.classification === "PREPARE" ||
+          tool.classification === "SIDE_EFFECT") &&
+        !tool.toolName.startsWith("client.")
+      ) {
+        acting.add(tool.definition.name);
+      }
     }
     readOnlyByRun.set(runId, names);
-    if (readOnlyByRun.size > 256) {
-      const oldest = readOnlyByRun.keys().next().value;
-      if (oldest !== undefined) readOnlyByRun.delete(oldest);
+    actingByRun.set(runId, acting);
+    for (const map of [readOnlyByRun, actingByRun]) {
+      if (map.size > 256) {
+        const oldest = map.keys().next().value;
+        if (oldest !== undefined) map.delete(oldest);
+      }
     }
   };
   /**
@@ -3411,6 +3452,11 @@ export function createModelGatewayQAnswer(
       if (oldest !== undefined) discoverRuleByRun.delete(oldest);
     }
   };
+  /** Their decision on a change already waiting: theirs, never an offer. */
+  const PENDING_DECISION_TOOLS: ReadonlySet<string> = new Set([
+    APPROVE_PENDING_TOOL,
+    "decline_pending_proposal",
+  ]);
   /** A call refused because the person did not ask for it. */
   const notAsked = (callId: string, safeMessage: string): QToolCallOutcome => ({
     callId,
@@ -3474,6 +3520,20 @@ export function createModelGatewayQAnswer(
         discover?.kind === "SET"
           ? { ...asked, arguments: discover.arguments }
           : asked;
+      // C3: a yes to an offer code holds no record of acts on nothing --
+      // what was offered would be a guess. Their approval of a change
+      // already waiting is theirs, not an offer, and still goes through.
+      if (
+        unmovedRuns.has(toolContext.runId) &&
+        actingByRun.get(toolContext.runId)?.has(proposal.name) === true &&
+        !PENDING_DECISION_TOOLS.has(proposal.name)
+      ) {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: proposal.name },
+          "q acted on nothing: the offer taken was not recorded",
+        );
+        return notAsked(proposal.callId, OFFER_UNRECORDED_REFUSAL);
+      }
       const isRead =
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
       const thisTurn = turnReads.get(toolContext.runId);
@@ -7177,6 +7237,12 @@ export function createModelGatewayQAnswer(
           ),
           ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
           ...(request.turnUnread === true ? { turnUnread: true } : {}),
+          ...(request.offerTaken === undefined
+            ? {}
+            : { offerTaken: request.offerTaken }),
+          ...(request.offerTakenUnrecorded === true
+            ? { offerUnrecorded: true }
+            : {}),
           ...(nextStepTurn(request) ? {} : { noNextStep: true }),
           ...(request.writingDocument === true
             ? {
@@ -7916,7 +7982,7 @@ export function createModelGatewayQAnswer(
         compareTable !== null
           ? compareAnswerOutput(rendered.output)
           : conversationAnswerOutput(rendered.output, splitExtras);
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV26Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV30Result> = {
         signal: request.signal,
         // The schema the prompt in use (COMPANY_ANALYST v26, schema v26) writes to: live
         // 2026-10-09, v17 refused every answer carrying v22's `visual` as an
@@ -7946,7 +8012,7 @@ export function createModelGatewayQAnswer(
        */
       let roundStop: AbortController | null = null;
       const roundOptions =
-        (): ModelGatewayExecuteOptions<CompanyAnalystV26Result> => {
+        (): ModelGatewayExecuteOptions<CompanyAnalystV30Result> => {
           if (!earlyWebPending()) {
             roundStop = null;
             return options;
@@ -9787,7 +9853,7 @@ export function createModelGatewayQAnswer(
       if (screenActs !== null) messages = [...messages, screenActs];
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV30Result>>
       >;
 
       /**
@@ -9825,7 +9891,7 @@ export function createModelGatewayQAnswer(
         extrasFindings = createPartialFindingsReader();
         modelCalls += 1;
         const result = gateway
-          .execute<CompanyAnalystV26Result>(
+          .execute<CompanyAnalystV30Result>(
             // The side fields run beside the answer and must not become
             // the slowest call: they never think (step 7).
             {
@@ -9871,7 +9937,7 @@ export function createModelGatewayQAnswer(
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV26Result | undefined;
+        let analyst: CompanyAnalystV30Result | undefined;
         // Lead 2026-10-16: the early grounded line is said now, as the
         // model is asked, not after its tool round (first text 6-8 s).
         if (earlyLead !== null && leadLines === undefined) {
@@ -10190,10 +10256,10 @@ export function createModelGatewayQAnswer(
             // Visible stages: the model is now working on the answer.
             if (rounds === 0) void stageOnce(writingStage);
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV30Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV26Result>(
+              result = await gateway.execute<CompanyAnalystV30Result>(
                 {
                   ...base,
                   messages,
@@ -10275,7 +10341,7 @@ export function createModelGatewayQAnswer(
              * later, with nothing started. One round to do it now.
              */
             const deferredInsteadOfDone = (
-              value: CompanyAnalystV26Result,
+              value: CompanyAnalystV30Result,
             ): boolean =>
               defersAskedWork(value.answer, askedNow, lastQText) &&
               !startedWork() &&
@@ -10283,7 +10349,7 @@ export function createModelGatewayQAnswer(
               calls < loopBudget.maxCalls &&
               request.signal?.aborted !== true;
             const saidInsteadOfDone = (
-              value: CompanyAnalystV26Result,
+              value: CompanyAnalystV30Result,
               dropped: readonly string[] | undefined,
             ): boolean =>
               (value.actionTalk.length > 0 ||
@@ -10316,7 +10382,7 @@ export function createModelGatewayQAnswer(
              */
             const screenNote = screenSubjectNote(plan.screen);
             const askedWhatScreenShows = (
-              value: CompanyAnalystV26Result,
+              value: CompanyAnalystV30Result,
             ): boolean =>
               screenNote !== null &&
               value.clarifyingQuestions.length > 0 &&
@@ -11253,7 +11319,7 @@ export function createModelGatewayQAnswer(
           // This call is the answer, so its extras start with it.
           cancelExtras();
           roundMessages = messages;
-          const answering = gateway.execute<CompanyAnalystV26Result>(
+          const answering = gateway.execute<CompanyAnalystV30Result>(
             { ...base, messages, output: answerOutput() },
             options,
           );
@@ -11341,9 +11407,24 @@ export function createModelGatewayQAnswer(
         // What the analyst said about acting is Capital Q's to say, from
         // the action it actually holds (CQ-QX-007): the sentences the
         // model itself named as such are removed before anything else.
+        // C3: the offer the answer closes with is bound to a tool this
+        // run holds, or it is not said: Q never offers what it cannot then
+        // do, and a yes binds to the record, never to the words.
+        const offerBinding = bindOffer(analyst.offer, {
+          holdsTool: (name) => classificationOf(name) !== undefined,
+          documents: dependencies.artifacts !== undefined,
+        });
+        if (offerBinding.kind === "UNBOUND") {
+          logger?.info(
+            { qRunId: request.runId, action: offerBinding.action },
+            "an offer no tool of this run can carry out was not said",
+          );
+        }
         const spoken = withoutActionTalk(
           analyst.answer,
-          analyst.actionTalk,
+          offerBinding.kind === "UNBOUND"
+            ? [...analyst.actionTalk, offerBinding.said]
+            : analyst.actionTalk,
           requestedChangeValues(analyst, latest.content),
         );
         if (spoken.removed > 0) {
@@ -12428,11 +12509,23 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
               );
             });
         }
+        const offerKept = offerStanding(offerBinding, reply);
+        if (offerBinding.kind === "BOUND") {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              action: offerBinding.offer.action,
+              recorded: offerKept !== null,
+            },
+            "q answer closed with an offer",
+          );
+        }
         return {
           kind: "ANSWERED",
           messageId: message.id,
           modelPolicyVersion: final.routingPolicyCode,
           promptBundleVersion: rendered.bundle.bundleVersion,
+          ...(offerKept === null ? {} : { offer: offerKept }),
         };
       } catch (error: unknown) {
         if (isModelGatewayError(error)) {

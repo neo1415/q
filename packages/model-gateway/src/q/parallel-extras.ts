@@ -113,12 +113,12 @@ export { statedNumbers } from "./claim-check.js";
  * - a finding stating a number found in neither the answer nor the
  *   messages both writers read is left out.
  */
-export function joinExtras(
-  answer: CompanyAnalystV26Result,
+export function joinExtras<T extends CompanyAnalystV26Result>(
+  answer: T,
   extras: Extras | null,
   read: readonly ModelMessage[],
 ): {
-  readonly value: CompanyAnalystV26Result;
+  readonly value: T;
   readonly join: ExtrasJoin;
   readonly ungrounded: number;
 } {
