@@ -58,6 +58,7 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
       case "ATTENTION":
       case "SUMMARY":
       case "PICTURE":
+      case "COMPANY_MEDIA":
       case "WORK_IN_PROGRESS":
       case "SCHEDULE":
       case "PLAN":

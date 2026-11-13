@@ -8,7 +8,7 @@ import {
   TURN_READER_V82,
   TurnChartIntentSchema,
   TurnReaderV82ResultSchema,
-  TurnReaderV85ResultSchema,
+  TurnReaderV86ResultSchema,
   V82_CHART_ASK,
   V82_CHART_ASK_FROM,
 } from "../src/index.js";
@@ -22,12 +22,12 @@ describe("TURN_READER v82", () => {
   it("v81 with the asksForChart sentence replaced (v83 is active, on its schema)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(85);
+    expect(active.version).toBe(86);
     expect(registry.get("TURN_READER", 81)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV85ResultSchema,
+      TurnReaderV86ResultSchema,
     );
     expect(TURN_READER_V82.variables).toEqual(TURN_READER_V81.variables);
     expect(TURN_READER_V81.template).toContain(V82_CHART_ASK_FROM);

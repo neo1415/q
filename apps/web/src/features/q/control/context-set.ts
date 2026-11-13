@@ -138,6 +138,8 @@ function subjectsOfBlock(block: QTurnObjectBlock): Subject[] {
       );
     case "COMPANY_REFERENCE":
       return [{ kind: "COMPANY", id: block.companyId, name: null }];
+    case "COMPANY_MEDIA":
+      return [{ kind: "COMPANY", id: block.companyId, name: block.name }];
     case "INVESTOR_REFERENCE":
       return [
         { kind: "INVESTOR", id: block.investorOrganisationId, name: null },

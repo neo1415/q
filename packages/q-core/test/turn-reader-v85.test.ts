@@ -17,10 +17,12 @@ import {
  * pipeline is CONTEXT with destination CRM_PIPELINE.
  */
 describe("TURN_READER v85", () => {
-  it("is active: v84 with one NAVIGATION DESTINATION paragraph after NAVIGATION, on v85's schema", () => {
+  it("is v84 with one NAVIGATION DESTINATION paragraph after NAVIGATION, on v85's schema (deprecated by v86)", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(85);
+    const active = { ...TURN_READER_V85 };
+    expect(registry.get("TURN_READER", 85)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("TURN_READER", 84)?.definition.status).toBe(
       "DEPRECATED",
     );

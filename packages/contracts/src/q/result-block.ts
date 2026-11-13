@@ -5,6 +5,7 @@ import {
   EvidenceStatusSchema,
   TruthClassSchema,
 } from "../evidence/vocabulary.js";
+import { PitchSummaryDtoSchema } from "../http/media.js";
 import { QActionProposalSchema } from "./action.js";
 import { QAnswerCardsBlockSchema, QMapSpecSchema } from "./answer-cards.js";
 import { QArtifactStatusSchema, QArtifactTypeSchema } from "./artifact.js";
@@ -83,6 +84,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "PLAN",
   // N1 (owner 2026-11-04): a page Q offers to open, never opened by itself.
   "NAVIGATION_OFFER",
+  // A8 (owner 13 Nov 2026): a company's own picture and pitch, as permitted.
+  "COMPANY_MEDIA",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -788,6 +791,40 @@ export const QNavigationOfferBlockSchema = z
   .strict();
 export type QNavigationOfferBlock = z.infer<typeof QNavigationOfferBlockSchema>;
 
+/**
+ * A8 (owner directive 13 Nov 2026): the company an answer is about, shown
+ * with its own Capital Q media -- its profile picture, and its pitch when
+ * they asked to see it. Code puts it on the answer, for a company the run
+ * was already authorised against, and only after the media context said
+ * this reader may see each part: `image` true only where the company's own
+ * picture is shown to them; `pitch` only where the playback rule lets them
+ * play it now.
+ *
+ * Neither part grants anything. The picture carries no address: the
+ * browser asks for it by company through the gated photo route, under the
+ * reader's own session, every time. The pitch is our asset id and the
+ * player's display hints, never a provider id; the player asks for a
+ * signed, per-reader playback authorization when it is pressed, and a
+ * pitch they may no longer play simply does not start. Never a public-web
+ * image: that is PICTURE's, labelled as such.
+ */
+export const QCompanyMediaBlockSchema = z
+  .object({
+    kind: z.literal("COMPANY_MEDIA"),
+    companyId: UuidSchema,
+    /** The company's name as the run read it (alt text and labels). */
+    name: z.string().trim().min(1).max(160),
+    /** The company's own Capital Q picture is shown to this reader. */
+    image: z.boolean(),
+    /** Its pitch, when they asked to see it and may play it. */
+    pitch: PitchSummaryDtoSchema.nullable(),
+  })
+  .strict()
+  .refine((block) => block.image || block.pitch !== null, {
+    message: "a media block shows a picture, a pitch or both",
+  });
+export type QCompanyMediaBlock = z.infer<typeof QCompanyMediaBlockSchema>;
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -814,6 +851,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QScheduleBlockSchema,
   QPlanBlockSchema,
   QNavigationOfferBlockSchema,
+  QCompanyMediaBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

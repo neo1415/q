@@ -118,6 +118,7 @@ import {
   extractPitchClaims,
   MediaAssetIdSchema,
   firstPitchRaise,
+  pitchSummary,
 } from "@capital-q/media";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
@@ -809,6 +810,7 @@ import {
 import { createApprovedContinuation } from "./composition/approved-continuation.js";
 import {
   createNamedImageReader,
+  namedImageKey,
   createPostgresNamedImageStore,
   createPostgresPublicIdentityRepository,
   createPublicIdentityService,
@@ -5222,6 +5224,75 @@ const qIntelligence = composeQIntelligence({
     },
     logger,
   ),
+  // A8 (owner 13 Nov 2026): a company's own picture and its pitch on the
+  // answer about it. Each company is resolved again as this reader's
+  // subject (their tenant, or disclosure's view rule) before anything is
+  // read; the picture follows its name's scope (founder decision
+  // 2026-10-04, as the profile's photo route), and a pitch is offered only
+  // where the player's own playback rule admits this reader now. Nothing
+  // signed travels: the browser asks for both again under its session.
+  companyMedia: {
+    read: async ({ actor, companyIds, pitch }) => {
+      const out = new Map<
+        string,
+        {
+          readonly name: string | null;
+          readonly image: boolean;
+          readonly pitch: ReturnType<typeof pitchSummary> | null;
+        }
+      >();
+      const visible = (
+        await Promise.all(
+          companyIds.slice(0, 4).map(async (raw) => {
+            const parsed = CompanyIdSchema.safeParse(raw);
+            if (!parsed.success) return null;
+            const resolved = await subjects
+              .resolve(actor, { kind: "COMPANY", companyId: parsed.data })
+              .catch(() => null);
+            return resolved === null ? null : parsed.data;
+          }),
+        )
+      ).filter((id) => id !== null);
+      if (visible.length === 0) return out;
+      const keyed = visible.map((id) => ({
+        id,
+        subject: { subjectType: "COMPANY", subjectId: id } as const,
+      }));
+      const [photos, identities, pitchSets] = await Promise.all([
+        namedPhotos
+          .photos(keyed.map((entry) => entry.subject))
+          .catch(() => new Map<string, string>()),
+        Promise.all(
+          visible.map((id) =>
+            companies.findCanonicalCompany(id).catch(() => null),
+          ),
+        ),
+        pitch
+          ? createPostgresDiscoverablePitchQueryPort({ sql: database.sql })
+              .findDiscoverablePitches(visible)
+              .catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      for (const [index, entry] of keyed.entries()) {
+        const set = pitchSets?.get(entry.id);
+        const playable =
+          set !== undefined &&
+          (await pitchMedia
+            .mayPlayPitch({
+              actor,
+              companyId: entry.id,
+              mediaAssetId: set.mediaAssetId,
+            })
+            .catch(() => false));
+        out.set(entry.id, {
+          name: identities[index]?.canonicalName ?? null,
+          image: photos.has(namedImageKey(entry.subject)),
+          pitch: playable && set !== undefined ? pitchSummary(set) : null,
+        });
+      }
+      return out;
+    },
+  },
   arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),
   // RECOVERY (C's request): what came of Q's recent screen acts, from the
   // receipts ledger (composed further down; read only once turns run).

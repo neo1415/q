@@ -87,6 +87,8 @@ export const Q_BLOCK_SURFACES: Readonly<
   SCHEDULE: { thread: "OBJECT", stage: "OBJECT", drawn: true },
   PLAN: { thread: "OBJECT", stage: "OBJECT", drawn: true },
   NAVIGATION_OFFER: { thread: "OBJECT", stage: "BESIDE", drawn: false },
+  // A8: a company's own picture or pitch, drawn as the answer arrives.
+  COMPANY_MEDIA: { thread: "OBJECT", stage: "OBJECT", drawn: true },
 };
 
 /** The kinds whose presence backs "it's on your screen" (screen-claims). */

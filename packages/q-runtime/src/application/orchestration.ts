@@ -340,6 +340,15 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * the figures read. Absent: no typed intent (unread, or an older reading).
    */
   readonly chartIntent?: QChartIntent | undefined;
+  /**
+   * v86 (A8, owner directive 13 Nov 2026): the turn reader read that they
+   * ask to watch a company's pitch (`pitch`), or ask about a company as a
+   * whole (`picture`). The company is the run's authorised subject, and
+   * whether this reader may see or play its media is the media context's
+   * decision. Absent: not read, and no company media is added.
+   */
+  readonly companyMediaAsk?:
+    { readonly pitch: boolean; readonly picture: boolean } | undefined;
   /** v78: they asked for the public web, news or press (read by meaning). */
   readonly asksForWeb?: boolean | undefined;
   /**

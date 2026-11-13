@@ -266,6 +266,13 @@ const completedRun = {
       title: "Deck for Nixo",
     },
     {
+      kind: "COMPANY_MEDIA",
+      companyId: "7f0c3a52-2c55-4c71-9a4a-6f1e2d3c4b5a",
+      name: "Clinicrest",
+      image: true,
+      pitch: null,
+    },
+    {
       kind: "NAVIGATION_OFFER",
       intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
       place: "Relationships",
@@ -450,6 +457,8 @@ describe("type-level guarantees", () => {
           return block.jobId;
         case "PLAN":
           return block.planId;
+        case "COMPANY_MEDIA":
+          return block.name;
         case "NAVIGATION_OFFER":
           return block.intent.kind;
         default: {

@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV85ResultSchema,
+  TurnReaderV86ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -26,6 +26,7 @@ import {
   type TurnReaderV79Result,
   type TurnReaderV82Result,
   type TurnReaderV85Result,
+  type TurnReaderV86Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -248,6 +249,13 @@ export type QTurnReading = Omit<
    * read, and code's documented word rules are the fallback.
    */
   readonly navigation?: TurnReaderV85Result["navigation"] | undefined;
+  /**
+   * v86 (A8, owner directive 13 Nov 2026): they ask to watch a company's
+   * pitch, or about a company as a whole, read by meaning. Which company,
+   * and whether they may see its picture or play its pitch, stay code's.
+   * Absent or null: not read, and no media is added.
+   */
+  readonly companyMedia?: TurnReaderV86Result["companyMedia"] | undefined;
   /** v78: they ask for the public web, news or press. */
   readonly asksForWeb?: boolean | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -475,6 +483,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "chart",
   // v83: a malformed navigation intent is not read (word fallback), never a lost reading.
   "navigation",
+  // v86: a malformed company media ask is no media, never a lost reading.
+  "companyMedia",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -625,8 +635,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV85Result>> =>
-          gateway.execute<TurnReaderV85Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV86Result>> =>
+          gateway.execute<TurnReaderV86Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -641,7 +651,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV85ResultSchema,
+              schema: TurnReaderV86ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -684,7 +694,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV85ResultSchema.safeParse(
+        const parsed = TurnReaderV86ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;

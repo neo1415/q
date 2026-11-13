@@ -76,6 +76,8 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
         return "Comparison";
       case "CLARIFICATION_REQUEST":
         return block.question;
+      case "COMPANY_MEDIA":
+        return block.name;
       case "PICTURE":
         return block.alt;
       case "ATTENTION":
@@ -320,6 +322,10 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
         break;
       case "TIMELINE":
         for (const event of block.events) id(event.subject);
+        break;
+      case "COMPANY_MEDIA":
+        name(block.name);
+        id({ kind: "COMPANY", companyId: block.companyId });
         break;
       case "CHART":
         for (const series of block.series) name(series.label);

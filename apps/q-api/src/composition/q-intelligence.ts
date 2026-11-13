@@ -330,6 +330,8 @@ export type QIntelligenceDependencies = {
   readonly pictures?: ModelGatewayQAnswerDependencies["pictures"];
   /** Pictures of who a turn names, from public pages; absent, none. */
   readonly publicPictures?: ModelGatewayQAnswerDependencies["publicPictures"];
+  /** A8: a company's own picture and playable pitch; absent, none. */
+  readonly companyMedia?: ModelGatewayQAnswerDependencies["companyMedia"];
   /**
    * Batch 13: the side of the actor's own organisation, from their
    * membership on the server, stamped on every answer request (see
@@ -477,6 +479,9 @@ export function composeQIntelligence(
     ...(dependencies.publicPictures === undefined
       ? {}
       : { publicPictures: dependencies.publicPictures }),
+    ...(dependencies.companyMedia === undefined
+      ? {}
+      : { companyMedia: dependencies.companyMedia }),
     // K Part 4: their own mandate read, kept per actor (Tier A) while D's
     // version for it is current; F's scope key, epoch read per request.
     ownMandateReads: createOwnMandateReads({

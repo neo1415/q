@@ -541,6 +541,9 @@ export {
   Q_NAVIGATION_OFFER_LABEL_MAX,
   QNavigationOfferBlockSchema,
   type QNavigationOfferBlock,
+  // A8: a company's own picture and pitch.
+  QCompanyMediaBlockSchema,
+  type QCompanyMediaBlock,
   type QPictureSource,
   chartableSeries,
   parseQResultBlocks,

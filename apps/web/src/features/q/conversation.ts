@@ -130,6 +130,8 @@ export type QTurnObjectBlock = Extract<
       | "SUMMARY"
       // L-13: a credited picture of something visual.
       | "PICTURE"
+      // A8: a company's own picture and pitch.
+      | "COMPANY_MEDIA"
       // Owner 2026-10-24: a document being made, followed as it is.
       | "WORK_IN_PROGRESS"
       // Live 2026-10-28: their day as a card.
@@ -185,6 +187,7 @@ function objectBlocksOf(
       case "ATTENTION":
       case "SUMMARY":
       case "PICTURE":
+      case "COMPANY_MEDIA":
       case "WORK_IN_PROGRESS":
       case "SCHEDULE":
       case "PLAN":

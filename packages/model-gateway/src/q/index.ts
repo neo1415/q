@@ -586,6 +586,7 @@ import {
   type QPicturePort,
   type QPublicPicturePort,
 } from "./result-blocks.js";
+import { companyMediaFor, type QCompanyMediaPort } from "./company-media.js";
 
 // The names a turn's words give, for the conversation core's first words.
 export { companyNameCandidates } from "./named-company-fact.js";
@@ -605,6 +606,18 @@ export {
   type QPicturePort,
   type QPublicPicturePort,
 } from "./result-blocks.js";
+// A8: a company's own picture and pitch on the answer about it.
+export {
+  COMPANY_MEDIA_COMPANIES_MAX,
+  companyMediaAskOf,
+  companyMediaBlocks,
+  companyMediaFor,
+  companyMediaPlan,
+  type QCompanyMediaAsk,
+  type QCompanyMediaPlan,
+  type QCompanyMediaPort,
+  type QCompanyMediaRead,
+} from "./company-media.js";
 export {
   createDiligenceDocumentSummariser,
   DILIGENCE_SUMMARY_TEXT_MAX,
@@ -2742,6 +2755,12 @@ export type ModelGatewayQAnswerDependencies = {
    * public pages, found beside the turn's web search. Absent: none.
    */
   readonly publicPictures?: QPublicPicturePort | undefined;
+  /**
+   * A8 (owner 13 Nov 2026): the company's own picture and its playable
+   * pitch, as the media context lets this reader see them, for an answer
+   * the turn reader read as about a company (v86). Absent: none.
+   */
+  readonly companyMedia?: QCompanyMediaPort | undefined;
   /** How long an answer waits for the turn's web search (default 9 s). */
   readonly webLaneBudgetMs?: number | undefined;
   /**
@@ -11948,6 +11967,22 @@ export function createModelGatewayQAnswer(
                   subject.companyId === screenCompanyId,
               )
             : [];
+        // Screen focus is not the target of a question naming another
+        // company. Its reference must come from an exact name and a
+        // successful authorised profile read, never a model-written id.
+        // Ordinary screen questions retain the run's allowed subjects.
+        // Batch 19 (owner live 9 Nov: "Company · 1" on a mandate change):
+        // a turn whose only act was on their own records carries no
+        // other subject's card -- the conversation's company was not
+        // what it was about.
+        const answerSubjects =
+          ownRecordsOnly === true
+            ? []
+            : request.aboutNamedOther === true
+              ? namedSubjects.length > 0
+                ? namedSubjects
+                : selectedCompanySubjects
+              : askedSubjects(request.subjects, plan);
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
           question: latest.content,
@@ -11966,22 +12001,7 @@ export function createModelGatewayQAnswer(
           // A finding already shown live keeps the id it was shown under.
           findingId: (_index, statement) =>
             liveFindingIds.get(findingKey(statement)) ?? randomUUID(),
-          // Screen focus is not the target of a question naming another
-          // company. Its reference must come from an exact name and a
-          // successful authorised profile read, never a model-written id.
-          // Ordinary screen questions retain the run's allowed subjects.
-          // Batch 19 (owner live 9 Nov: "Company · 1" on a mandate change):
-          // a turn whose only act was on their own records carries no
-          // other subject's card -- the conversation's company was not
-          // what it was about.
-          subjects:
-            ownRecordsOnly === true
-              ? []
-              : request.aboutNamedOther === true
-                ? namedSubjects.length > 0
-                  ? namedSubjects
-                  : selectedCompanySubjects
-                : askedSubjects(request.subjects, plan),
+          subjects: answerSubjects,
           // RECOVERY E4: investors and places this run's tools returned,
           // so investor cards and maps name only what was read.
           read: companiesRead,
@@ -12168,14 +12188,43 @@ export function createModelGatewayQAnswer(
           ],
           companiesRead,
         );
+        // A8 (owner 13 Nov 2026): the company this answer is about, with
+        // its own Capital Q picture and, when they asked to watch it, its
+        // pitch -- asked for by the reading (v86), for the answer's own
+        // authorised company subjects, and only what the media context
+        // lets this reader see or play. Unread or unasked: nothing.
+        const companyMedia = await companyMediaFor({
+          ask: request.companyMediaAsk,
+          subjects: answerSubjects,
+          actor: request.actor,
+          port: dependencies.companyMedia,
+          names: companiesRead.profiles,
+        });
+        if (request.companyMediaAsk !== undefined) {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              askedPitch: request.companyMediaAsk.pitch,
+              askedPicture: request.companyMediaAsk.picture,
+              mediaBlocks: companyMedia.length,
+              pitches: companyMedia.filter((block) => block.pitch !== null)
+                .length,
+            },
+            "q company media",
+          );
+        }
+        // One picture per company: its own picture stands in for a public
+        // page's or a stock illustration, never beside them.
+        const ownPictureShown = companyMedia.some((block) => block.image);
         const codeBlocks = [
           ...conflicts,
           ...(builtCards === null ? [] : [builtCards]),
           ...(tableToShow === null ? [] : [tableToShow]),
           ...(chartToShow === null ? [] : [chartToShow]),
           ...(publicRecord === null ? [] : [publicRecord]),
-          ...fromPages,
-          ...(picture === null ? [] : [picture]),
+          ...companyMedia,
+          ...(ownPictureShown ? [] : fromPages),
+          ...(picture === null || companyMedia.length > 0 ? [] : [picture]),
         ];
         const keptModelBlocks =
           comparedTable === null

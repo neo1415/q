@@ -306,6 +306,9 @@ function disclosable(
       case "SCHEDULE": // their own calls and reminders by id, no evidence
       case "PLAN": // their own plan by id and version; read as its owner
       case "NAVIGATION_OFFER": // N1: a registered move by name; the page authorises itself
+      // A8: a company id and pitch asset id; the picture and the playback
+      // are authorised again for the reader when drawn, so it grants nothing.
+      case "COMPANY_MEDIA":
         return true;
       default: {
         // A new kind fails typecheck here instead of silently vanishing.

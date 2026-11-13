@@ -221,6 +221,18 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
     jobId: UUID,
     title: "Deck for Nixo",
   },
+  COMPANY_MEDIA: {
+    kind: "COMPANY_MEDIA",
+    companyId: UUID,
+    name: "Clinicrest",
+    image: true,
+    pitch: {
+      mediaAssetId: UUID,
+      aspectRatio: "9:16",
+      durationSeconds: 94,
+      captionState: "AVAILABLE",
+    },
+  },
   NAVIGATION_OFFER: {
     kind: "NAVIGATION_OFFER",
     intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },

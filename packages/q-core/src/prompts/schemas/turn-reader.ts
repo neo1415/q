@@ -1499,3 +1499,33 @@ export const TurnReaderV85ResultSchema = TurnReaderV82ResultSchema.extend({
     .catch(null),
 }).strict();
 export type TurnReaderV85Result = z.infer<typeof TurnReaderV85ResultSchema>;
+
+/**
+ * v86 (A8, owner directive 13 Nov 2026: rich media must not stay behind).
+ * Whether the answer should show the company it is about with its own
+ * Capital Q media, read by meaning, in any language:
+ *
+ *   pitch    they ask to see, watch or play a company's pitch video
+ *            ("show me their pitch", "can I watch Clinicrest's pitch?",
+ *            "¿puedo ver su vídeo?")
+ *   picture  the turn asks about a company as a whole -- who they are,
+ *            what they do, an overview or profile, "tell me about X", or
+ *            companies side by side -- not one figure or fact
+ *
+ * Which company stays code's (the run's authorised subjects), and so does
+ * whether this reader may see its picture or play its pitch. Lenient: a
+ * malformed value is null. Null (not written, or an older reading): no
+ * media is added, never a word rule in its place.
+ */
+export const TURN_READER_V86_SCHEMA_VERSION = 86;
+export const TurnCompanyMediaAskSchema = z
+  .object({
+    pitch: z.boolean().default(false).catch(false),
+    picture: z.boolean().default(false).catch(false),
+  })
+  .strict();
+export type TurnCompanyMediaAsk = z.infer<typeof TurnCompanyMediaAskSchema>;
+export const TurnReaderV86ResultSchema = TurnReaderV85ResultSchema.extend({
+  companyMedia: TurnCompanyMediaAskSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV86Result = z.infer<typeof TurnReaderV86ResultSchema>;

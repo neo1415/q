@@ -143,6 +143,7 @@ import {
   canOpenFor,
   pinnedOf,
   type QTurnReading,
+  companyMediaAskOf,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
@@ -6879,6 +6880,9 @@ export function createSpecialistQAnswer(
           navigation: read.navigation?.mode ?? null,
           navigationNegated: read.navigation?.negated ?? null,
           navigationDestination: read.navigation?.destination ?? null,
+          // A8 v86: the company media asked for (booleans only).
+          mediaPitch: read.companyMedia?.pitch ?? null,
+          mediaPicture: read.companyMedia?.picture ?? null,
         },
         "q turn read",
       );
@@ -8477,6 +8481,12 @@ export function createSpecialistQAnswer(
             },
           }),
       ...(read?.asksForWeb === true ? { asksForWeb: true } : {}),
+      // v86 (A8): they ask to watch a company's pitch, or about a company
+      // as a whole, by meaning. Code picks the company and checks access.
+      ...(() => {
+        const companyMediaAsk = companyMediaAskOf(read);
+        return companyMediaAsk === undefined ? {} : { companyMediaAsk };
+      })(),
       ...(read !== null &&
       read.fromShown !== null &&
       read.fromShown !== undefined &&

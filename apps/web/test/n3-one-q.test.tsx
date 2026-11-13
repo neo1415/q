@@ -232,6 +232,13 @@ const OBJECT_FIXTURES: Readonly<Record<QTurnObjectBlock["kind"], unknown>> = {
     source: "PEXELS",
     pageUrl: "https://www.pexels.com/photo/market-street-1/",
   },
+  COMPANY_MEDIA: {
+    kind: "COMPANY_MEDIA",
+    companyId: "22222222-2222-4222-8222-222222222222",
+    name: "Clinicrest",
+    image: true,
+    pitch: null,
+  },
   WORK_IN_PROGRESS: {
     kind: "WORK_IN_PROGRESS",
     jobId: UUID,

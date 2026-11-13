@@ -30,6 +30,7 @@ import { AttentionBody } from "./blocks/attention-block";
 import { SummaryBody } from "./blocks/summary-block";
 import { ScheduleBody } from "./blocks/schedule-block";
 import { PictureBody } from "./blocks/picture-block";
+import { CompanyMediaBody } from "./blocks/company-media-block";
 import {
   ChartBody,
   MapBody,
@@ -548,6 +549,19 @@ export function QResultBlocks({
             return (
               <QResultCard key={key} label={t("Picture")}>
                 <PictureBody block={block} />
+              </QResultCard>
+            );
+
+          case "COMPANY_MEDIA":
+            // A8: the company's own picture and, when asked, its pitch;
+            // each authorised again for this reader as it is drawn.
+            return (
+              <QResultCard
+                key={key}
+                label={block.pitch === null ? t("Company") : t("Pitch")}
+                title={block.name}
+              >
+                <CompanyMediaBody block={block} />
               </QResultCard>
             );
 
