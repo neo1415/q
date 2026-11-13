@@ -1475,10 +1475,19 @@ function onRecordTab(
  *
  *   the decision's place (or the remembered one) is a record page with
  *   that tab      the same record on that tab (already there is a STAY)
- *   the decision stayed with nothing proposed (or "already there") and the
- *   pane shows a record page with that tab
+ *   the decision stayed with nothing proposed (no guard, "already there"
+ *   or a split vote) and the turn's record is known
  *                 that record on that tab, through the same policy
  *                 (access, unsaved work, busy, collapsed, the moves gate)
+ *
+ * The turn's record (live 13 Nov 2026 on d96c63ee1: "Tell me about
+ * Ledgerline." then "And what's their team like?" stayed on Clinicrest's
+ * messages): `subject`, the one record the conversation is about, resolved
+ * as the person (subjectPlace); with none told (undefined), the record in
+ * the pane. A subject told as unresolved (null: two candidates, or none
+ * they may open) places nothing -- never the pane's record in its stead,
+ * never a guess. A subject the reading named (`named`) with no tab is
+ * placed as its own page (CONTEXT turned to it).
  *
  * A tab the page lacks adds nothing and invents no move; NONE adds nothing.
  * gateByReading's holds (NONE, OFFER_ONLY, SAME_SUBJECT, pinned) apply
@@ -1492,13 +1501,18 @@ export function readingTabPlace(input: {
   readonly canOpen: (page: string) => boolean;
   readonly config: QNavigationPolicyConfig;
   readonly records?: QNavigationRecords | undefined;
+  /**
+   * The turn's one record, resolved (subjectPlace): a place; null when
+   * told but unresolved; undefined when not told (the pane's record).
+   */
+  readonly subject?: QPlacedSubject | null | undefined;
 }): QNavigationOutcome | null {
-  const { navigation, proposed, pane } = input;
+  const { navigation, proposed, pane, subject } = input;
   const tab = navigation?.tab ?? null;
-  if (navigation === null || tab === null || readsAsNoNavigation(navigation))
-    return null;
+  if (navigation === null || readsAsNoNavigation(navigation)) return null;
   const place = proposed.target ?? proposed.remembered;
   if (place !== null) {
+    if (tab === null) return null;
     const tabbed = onRecordTab(place, tab);
     if (tabbed === null || tabbed === place) return null;
     if (proposed.target === null) return { ...proposed, remembered: tabbed };
@@ -1508,12 +1522,13 @@ export function readingTabPlace(input: {
   }
   if (
     proposed.decision !== "STAY" ||
-    (proposed.guard !== null && proposed.guard !== "ALREADY_THERE") ||
-    pane.at === null
+    (proposed.guard !== null &&
+      proposed.guard !== "ALREADY_THERE" &&
+      proposed.guard !== "SPLIT_VOTE")
   )
     return null;
-  const tabbed = onRecordTab(pane.at, tab);
-  if (tabbed === null || tabbed === pane.at) return null;
+  const tabbed = subjectOnTab(pane.at, subject, tab, navigation);
+  if (tabbed === null) return null;
   return applyNavigationPolicy({
     proposal: {
       decision: "MOVE",
@@ -1530,6 +1545,121 @@ export function readingTabPlace(input: {
     config: input.config,
     records: input.records,
   });
+}
+
+/** The turn's record as placed: its record page, and whether the reading named it. */
+export type QPlacedSubject = {
+  readonly place: QNavigateTarget;
+  readonly named: boolean;
+};
+
+/**
+ * Where the reading's tab lands when the decision proposed nothing: the
+ * turn's record on that tab (the pane's own page of it first, when the
+ * pane shows that record), else the record in the pane when no subject
+ * was told. Null: nothing to place (unresolved subject, no tab where none
+ * was named, a page lacking the tab, or the pane already there).
+ */
+function subjectOnTab(
+  at: QNavigateTarget | null,
+  subject: QPlacedSubject | null | undefined,
+  tab: QRecordTab | null,
+  navigation: QReadNavigation,
+): QNavigateTarget | null {
+  if (subject === null) return null;
+  const sameRecord =
+    subject !== undefined &&
+    at !== null &&
+    at.recordId !== undefined &&
+    at.recordId === subject.place.recordId;
+  if (subject === undefined || sameRecord) {
+    if (at === null || tab === null) return null;
+    const onPane = onRecordTab(at, tab);
+    if (onPane !== null) return onPane === at ? null : onPane;
+    // The pane already shows that record (its thread, say): its Overview
+    // is no new subject; another of its tabs is on its own page.
+    if (subject === undefined || tab === "overview") return null;
+  }
+  if (tab === null) {
+    // No tab: only a record the reading named, as its own page (CONTEXT
+    // turned to it); already on that record, nothing.
+    return subject.named && readsAsContext(navigation) && !sameRecord
+      ? subject.place
+      : null;
+  }
+  const onSubject = onRecordTab(subject.place, tab);
+  if (onSubject === null) return null;
+  return at !== null && samePlace(onSubject, at) ? null : onSubject;
+}
+
+/**
+ * The record the turn is about (QPageMoveReading.subject), resolved as the
+ * person (W2.3's resolver, or their listed records): exactly one record
+ * they may open, by its name; a known id that the name does not resolve
+ * to, two records, a lookalike or none: null. Undefined: not told.
+ */
+export async function subjectPlace(
+  subject: QPageMoveSubject | null | undefined,
+  resolver: QNavigationRecordResolver,
+  records: QNavigationRecords,
+  map: QSiteMap = Q_SITE_MAP,
+): Promise<QPlacedSubject | null | undefined> {
+  if (subject === undefined) return undefined;
+  if (subject === null) return null;
+  const page = subject.kind;
+  const route = qSiteMapLandingFor(map, page)?.page.route;
+  let recordId: string | null = null;
+  if (subject.name !== null && route !== undefined) {
+    const found = await resolver({
+      kind: subject.kind,
+      name: subject.name,
+      document: null,
+      route,
+      tab: null,
+    }).catch(() => null);
+    if (found?.status !== "FOUND" || found.exact === false) return null;
+    recordId = found.recordId;
+    if (subject.id !== null && subject.id !== recordId) return null;
+  } else if (subject.id !== null) {
+    // No name: only a record among those they may open, by its id.
+    const listed =
+      subject.kind === "COMPANY" ? records.companies : records.investors;
+    recordId = listed.some((one) => one.id === subject.id) ? subject.id : null;
+  }
+  if (recordId === null) return null;
+  const parsed = QNavigateTargetSchema.safeParse({ page, recordId });
+  return parsed.success ? { place: parsed.data, named: subject.named } : null;
+}
+
+/**
+ * A pitch to watch (the reading's companyMedia.pitch) lives on the
+ * profile's Elevator pitch tab, never the deck (live 13 Nov 2026 on
+ * d96c63ee1: "Play me their pitch." was read tab null and the decision's
+ * own place was the company's deck). The decided or overlaid place on
+ * tab deck becomes that record's elevator tab; already there: a STAY.
+ */
+export function pitchOnElevator(
+  outcome: QNavigationOutcome,
+  pitch: boolean,
+  pane: QNavigationPane,
+): QNavigationOutcome {
+  if (!pitch) return outcome;
+  const elevator = (place: QNavigateTarget | null): QNavigateTarget | null =>
+    place !== null && place.page === "COMPANY" && place.tab === "deck"
+      ? (onRecordTab(place, "elevator") ?? place)
+      : place;
+  const target = elevator(outcome.target);
+  const remembered = elevator(outcome.remembered);
+  if (target === outcome.target && remembered === outcome.remembered)
+    return outcome;
+  if (
+    target !== null &&
+    outcome.decision !== "STAY" &&
+    pane.at !== null &&
+    samePlace(target, pane.at)
+  )
+    return STAY("ALREADY_THERE");
+  return { ...outcome, target, remembered };
 }
 
 /** A real second place: resolved, theirs to open, and not the same place. */
@@ -1845,11 +1975,32 @@ export async function decideNavigation(
 export type QReadNavigation = TurnNavigationIntentV84 &
   Partial<Pick<TurnNavigationIntentV87, "destination" | "tab">>;
 
+/**
+ * The one record the turn is about, as the answer path resolved it from
+ * the reading and the conversation (never from the pane alone): a name
+ * and/or the id the conversation holds for it. `named`: the reading named
+ * it (namedOther), so a CONTEXT turn with no tab turns to its page.
+ */
+export type QPageMoveSubject = {
+  readonly kind: "COMPANY" | "INVESTOR";
+  readonly name: string | null;
+  readonly id: string | null;
+  readonly named: boolean;
+};
+
 /** What the turn reader read about navigation, as the port is told it (C10). */
 export type QPageMoveReading = {
   readonly navigation: QReadNavigation | null;
   /** Fast GO: code moves to the reader's destination itself, at once. */
   readonly codeMoves?: boolean | undefined;
+  /** A8: they asked to watch the company's pitch (companyMedia.pitch). */
+  readonly pitch?: boolean | undefined;
+  /**
+   * The turn's record (readingTabPlace): one record; null when the
+   * conversation leaves it open (two, or none resolvable) -- then nothing
+   * is placed on the pane's record in its stead; undefined: not told.
+   */
+  readonly subject?: QPageMoveSubject | null | undefined;
 };
 
 /** The turn as the decision reads it (the answer path's own reads). */
@@ -2443,7 +2594,14 @@ export function createQPageMoves(dependencies: {
               input.pane.at === null ? null : ownPlace(input.pane.at, records),
           };
           // v87: the record's tab the reading names, on the decision's
-          // place or the record in the pane (readingTabPlace).
+          // place or the turn's record (readingTabPlace): the one record
+          // the conversation is about, resolved as the person.
+          const subject = await subjectPlace(
+            reading?.subject,
+            dependencies.resolver?.(request) ?? listedRecordResolver(records),
+            records,
+            map,
+          );
           const onTab = readingTabPlace({
             proposed,
             navigation,
@@ -2451,9 +2609,15 @@ export function createQPageMoves(dependencies: {
             canOpen: canOpenFor(request, map),
             config: dependencies.config,
             records,
+            subject,
           });
+          // A pitch to watch: the deck the decision chose is its elevator.
           const outcome = gateByReading(
-            onTab ?? placedByReading ?? proposed,
+            pitchOnElevator(
+              onTab ?? placedByReading ?? proposed,
+              reading?.pitch === true,
+              paneHere,
+            ),
             navigation,
             { pane: paneHere, codeMoves: reading?.codeMoves },
           );
@@ -2470,6 +2634,12 @@ export function createQPageMoves(dependencies: {
                 negated: navigation?.negated ?? null,
                 placedByReading: placedByReading?.decision ?? null,
                 onTab: onTab?.decision ?? null,
+                subject:
+                  subject === undefined
+                    ? null
+                    : subject === null
+                      ? "OPEN"
+                      : "ONE",
                 guard: outcome.guard,
               },
               "q page move gated by the turn's navigation reading",

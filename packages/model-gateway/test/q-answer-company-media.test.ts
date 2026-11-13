@@ -30,6 +30,8 @@ import {
   companyMediaBlocks,
   companyMediaPlan,
   createModelGatewayQAnswer,
+  couldNotDoLine,
+  withoutPitchFailureTalk,
   type QCompanyMediaPort,
   type QCompanyMediaRead,
 } from "../src/q/index.js";
@@ -100,6 +102,8 @@ function build(input: {
   readonly reading: Readonly<Record<string, unknown>> | null;
   readonly subjects: readonly QSubjectRef[];
   readonly port: QCompanyMediaPort;
+  /** The model's own words (default: a plain line). */
+  readonly answer?: string;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -107,7 +111,7 @@ function build(input: {
       {
         kind: "JSON",
         value: {
-          answer: "Here is what Capital Q holds on them.",
+          answer: input.answer ?? "Here is what Capital Q holds on them.",
           responseShape: "CONCISE",
           findings: [],
           missingEvidence: [],
@@ -433,5 +437,68 @@ describe("answers, with readings as fixtures", () => {
       [LEDGERLINE, null],
     ]);
     expect(port.calls.map((call) => call.pitch)).toEqual([false]);
+  });
+});
+
+/**
+ * Live 13 Nov 2026 (d96c63ee1): "Could I watch how Clinicrest presents
+ * itself? Play me their pitch." played inline, but the reply said "I
+ * couldn't open the pitch in the workspace … I tried, but it didn't go
+ * through" (the model's own refused `show`, then the could-not line).
+ */
+describe("a pitch that plays inline is never reported as a failed open", () => {
+  const WATCH = { companyMedia: { pitch: true, picture: false } };
+  const FAILED =
+    "I couldn't open the pitch in the workspace. Clinicrest presents itself as a clinic operations platform.";
+
+  it("the model's failed-open sentence goes when the pitch block is in the answer", async () => {
+    const built = build({
+      said: "Could I watch how Clinicrest presents itself? Play me their pitch.",
+      reading: WATCH,
+      subjects: [company(CLINICREST)],
+      port: mediaPort({ [CLINICREST]: CLINICREST_MEDIA }),
+      answer: FAILED,
+    });
+    expect((await built.seam.answer(built.request)).kind).toBe("ANSWERED");
+    const stored = built.stored.at(-1);
+    expect(stored?.content).not.toMatch(/couldn't open|didn't go through/iu);
+    expect(stored?.content).toContain("clinic operations platform");
+    expect(
+      (stored?.blocks ?? []).some(
+        (block) => Reflect.get(block as object, "kind") === "COMPANY_MEDIA",
+      ),
+    ).toBe(true);
+  });
+
+  it("no playable pitch: the failure stays said (no fake success)", async () => {
+    const built = build({
+      said: "Play me their pitch.",
+      reading: WATCH,
+      subjects: [company(CLINICREST)],
+      port: mediaPort({
+        [CLINICREST]: { ...CLINICREST_MEDIA, image: true, pitch: null },
+      }),
+      answer: FAILED,
+    });
+    expect((await built.seam.answer(built.request)).kind).toBe("ANSWERED");
+    expect(built.stored.at(-1)?.content).toContain(
+      "I couldn't open the pitch in the workspace.",
+    );
+  });
+
+  it("the could-not line goes with it; other failures stay; nothing left says what is there", () => {
+    const couldNot = couldNotDoLine("CALLED_DID_NOTHING");
+    expect(
+      withoutPitchFailureTalk(
+        `I couldn't open the pitch in the workspace.\n\n${couldNot}`,
+        couldNot,
+        "Clinicrest",
+      ),
+    ).toEqual({ text: "Here's Clinicrest's pitch.", removed: 2 });
+    const unrelated = "I couldn't find their revenue figures.";
+    expect(withoutPitchFailureTalk(unrelated, null, "Clinicrest")).toEqual({
+      text: unrelated,
+      removed: 0,
+    });
   });
 });

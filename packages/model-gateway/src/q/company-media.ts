@@ -190,3 +190,55 @@ export async function companyMediaFor(input: {
     names: input.names,
   });
 }
+
+/**
+ * A sentence saying Q could not open, play or show something, or that its
+ * attempt did not go through: the answer's own account of a screen act.
+ */
+const COULD_NOT_SHOW =
+  /^\s*(?:sorry,?\s+)?(?:(?:unfortunately,?\s+)?i\s+(?:couldn['’]t|could\s+not|can['’]t|cannot|wasn['’]t\s+able\s+to|was\s+unable\s+to|was\s+not\s+able\s+to)\s+(?:\w+\s+){0,2}?(?:open|play|show|load|pull\s+up|bring\s+up|display|start)\b|i\s+tried,?\s+but\b)/iu;
+/** What the failed act was about: the pitch, its video, or the screen. */
+const ABOUT_THE_PITCH = /\b(?:pitch|video|workspace|screen|pane|player)\b/iu;
+
+/**
+ * Live 13 Nov 2026 (d96c63ee1): "Play me their pitch." played inline (the
+ * answer's COMPANY_MEDIA pitch), yet the reply said "I couldn't open the
+ * pitch in the workspace … I tried, but it didn't go through": the model
+ * had also tried to open it on screen (a `show` refused), and the
+ * could-not line followed. With the pitch in the answer, that attempt is
+ * not what they asked for, so neither failure is said. Only applied when
+ * a pitch block this reader may play is in the answer -- never otherwise,
+ * so a pitch that is not there still gets its honest line. With nothing
+ * left, the reply says what is there.
+ */
+export function withoutPitchFailureTalk(
+  text: string,
+  couldNot: string | null,
+  pitchOf: string,
+): { readonly text: string; readonly removed: number } {
+  const parts = text.split(/\n{2,}/u);
+  let removed = 0;
+  const kept = parts
+    .map((part) => {
+      if (couldNot !== null && part.trim() === couldNot.trim()) {
+        removed += 1;
+        return "";
+      }
+      const sentences = part.match(/[^.!?\n]+[.!?…]*\s*/gu) ?? [part];
+      const left = sentences.filter((sentence) => {
+        const failed =
+          COULD_NOT_SHOW.test(sentence) && ABOUT_THE_PITCH.test(sentence);
+        if (failed) removed += 1;
+        return !failed;
+      });
+      return left.join("").trim();
+    })
+    .filter((part) => part.length > 0)
+    .join("\n\n")
+    .trim();
+  if (removed === 0) return { text, removed: 0 };
+  return {
+    text: kept.length > 0 ? kept : `Here's ${pitchOf}'s pitch.`,
+    removed,
+  };
+}

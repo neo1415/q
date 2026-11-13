@@ -46,9 +46,13 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-function request(screenCompanyId?: string): QAnswerRequest {
+function request(
+  screenCompanyId?: string,
+  askerSide?: "INVESTOR" | "FOUNDER",
+): QAnswerRequest {
   const runId = randomUUID();
   return {
+    ...(askerSide === undefined ? {} : { askerSide }),
     runId: runId as QAnswerRequest["runId"],
     tenantId: TENANT as QAnswerRequest["tenantId"],
     actorUserId: USER as QAnswerRequest["actorUserId"],
@@ -218,6 +222,7 @@ function conversation(options: {
     said: string,
     read: QTurnReading | null,
     screenCompanyId?: string,
+    askerSide?: "INVESTOR" | "FOUNDER",
   ) => {
     lines.push({
       ...(lines[0] ?? {
@@ -232,7 +237,7 @@ function conversation(options: {
       content: said,
     } as QConversationMessage);
     reading = read;
-    await answer.answer(request(screenCompanyId));
+    await answer.answer(request(screenCompanyId, askerSide));
     return lines.at(-1);
   };
   return {
@@ -1289,5 +1294,282 @@ describe("record tabs by the reading, explicit and contextual (v87)", () => {
     await Promise.resolve();
     for (const reading of told)
       expect(reading).toMatchObject({ navigation: { tab: "deck" } });
+  });
+});
+
+/**
+ * Live replay on d96c63ee1 (13 Nov 2026, investor). The conversation's
+ * stored turns build the ledger (code, no model); readings are the logged
+ * ones, as fixtures. "Their" binds to what the conversation is about now,
+ * over the record merely in view; two in play: Q asks.
+ */
+describe("live d96c63ee1: their record is the conversation's, not the pane's", () => {
+  const CLINICREST_ID = "6b2f0000-0000-4000-8000-000000000001";
+  const LEDGERLINE_ID = "1e1e1e1e-1e1e-4e1e-8e1e-1e1e1e1e1e1e";
+  const MEDIBASE_ID = "3c3c3c3c-3c3c-4c3c-8c3c-3c3c3c3c3c3c";
+  const media = (companyId: string, name: string) =>
+    ({
+      kind: "COMPANY_MEDIA",
+      companyId,
+      name,
+      image: true,
+      pitch: null,
+    }) as unknown as QResultBlock;
+  const openPage = (page: string, id: string) =>
+    ({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", page, id },
+    }) as unknown as QResultBlock;
+  /** The logged conversation up to "Can I see their data room?". */
+  const EARLIER: readonly Line[] = [
+    { role: "USER", content: "Tell me about Clinicrest." },
+    {
+      role: "Q",
+      content: "Clinicrest runs clinics.",
+      blocks: [media(CLINICREST_ID, "Clinicrest")],
+    },
+    { role: "USER", content: "Can I see their data room?" },
+    {
+      role: "Q",
+      content: "Opening the data room.",
+      blocks: [openPage("COMPANY", CLINICREST_ID)],
+    },
+    { role: "USER", content: "Show me my messages with Clinicrest." },
+    {
+      role: "Q",
+      content: "Here's your thread.",
+      blocks: [openPage("RELATIONSHIP_COMPANY_MESSAGES", CLINICREST_ID)],
+    },
+    { role: "USER", content: "Tell me about Ledgerline." },
+    {
+      role: "Q",
+      content: "Ledgerline does bookkeeping.",
+      blocks: [media(LEDGERLINE_ID, "Ledgerline")],
+    },
+    { role: "USER", content: "And what's their team like?" },
+    {
+      role: "Q",
+      content: "A team of six.",
+      blocks: [
+        { kind: "COMPANY_REFERENCE", companyId: LEDGERLINE_ID } as never,
+      ],
+    },
+  ];
+  const ALL: Readonly<Record<string, string>> = {
+    Clinicrest: CLINICREST_ID,
+    Ledgerline: LEDGERLINE_ID,
+    Medibase: MEDIBASE_ID,
+  };
+  const recordPort = (
+    openable: Readonly<Record<string, string>>,
+    opened: { page: string; name?: string; id?: string }[],
+  ): QOpenRecordPort => ({
+    open: (_request, target) => {
+      opened.push({
+        page: target.page,
+        ...(target.name === undefined ? {} : { name: target.name }),
+        ...(target.id === undefined ? {} : { id: target.id }),
+      });
+      const id = target.name === undefined ? target.id : openable[target.name];
+      return Promise.resolve(
+        id === undefined ||
+          !Object.values(openable).includes(id) ||
+          target.page !== "COMPANY"
+          ? null
+          : ({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id } as never),
+      );
+    },
+  });
+  const theirDataRoom = (name: string) =>
+    ({
+      ...BASE,
+      aboutNamedOther: true,
+      navigation: {
+        mode: "GO",
+        negated: false,
+        destination: null,
+        tab: "dataroom",
+      },
+      reference: {
+        open: "COMPANY",
+        name,
+        shown: null,
+        retryLast: false,
+        sameFor: null,
+      },
+    }) as unknown as QTurnReading;
+  const moveOf = (
+    line: { blocks?: readonly QResultBlock[] | undefined } | undefined,
+  ) =>
+    (line?.blocks ?? []).flatMap((block) =>
+      block.kind === "UI_INTENT" && block.intent.kind === "OPEN_RECORD_PAGE"
+        ? [block.intent]
+        : [],
+    );
+
+  it("'Can I see their data room?' read to Clinicrest (in view) opens Ledgerline's, the conversation's record", async () => {
+    const opened: { page: string; name?: string }[] = [];
+    const chat = conversation({
+      openRecord: recordPort(ALL, opened),
+      earlier: EARLIER,
+    });
+    const reply = await chat.say(
+      "Can I see their data room?",
+      theirDataRoom("Clinicrest"),
+      CLINICREST_ID,
+    );
+    expect(opened[0]).toMatchObject({ page: "COMPANY", name: "Ledgerline" });
+    expect(moveOf(reply)).toEqual([
+      expect.objectContaining({
+        page: "COMPANY",
+        id: LEDGERLINE_ID,
+        tab: "dataroom",
+      }),
+    ]);
+  });
+
+  it("the name said in their words stands: 'Can I see Clinicrest's data room?' opens Clinicrest's", async () => {
+    const chat = conversation({
+      openRecord: recordPort(ALL, []),
+      earlier: EARLIER,
+    });
+    const reply = await chat.say(
+      "Can I see Clinicrest's data room?",
+      theirDataRoom("Clinicrest"),
+      CLINICREST_ID,
+    );
+    expect(moveOf(reply)).toEqual([
+      expect.objectContaining({ id: CLINICREST_ID, tab: "dataroom" }),
+    ]);
+  });
+
+  it("two records in the latest turn, neither the one read: Q asks which, and opens nothing", async () => {
+    const opened: { page: string }[] = [];
+    const chat = conversation({
+      openRecord: recordPort(ALL, opened),
+      earlier: [
+        ...EARLIER,
+        { role: "USER", content: "Compare Ledgerline and Medibase." },
+        {
+          role: "Q",
+          content: "Side by side.",
+          blocks: [
+            media(LEDGERLINE_ID, "Ledgerline"),
+            media(MEDIBASE_ID, "Medibase"),
+          ],
+        },
+      ],
+    });
+    const reply = await chat.say(
+      "Can I see their data room?",
+      theirDataRoom("Clinicrest"),
+      CLINICREST_ID,
+    );
+    expect(opened).toEqual([]);
+    expect(moveOf(reply)).toEqual([]);
+    expect(reply?.content).toBe("Do you mean Ledgerline or Medibase?");
+  });
+
+  it("the conversation's record they may not open: nothing opens (never the one in view instead)", async () => {
+    const opened: { page: string; name?: string }[] = [];
+    const chat = conversation({
+      openRecord: recordPort({ Clinicrest: CLINICREST_ID }, opened),
+      earlier: EARLIER,
+    });
+    const reply = await chat.say(
+      "Can I see their data room?",
+      theirDataRoom("Clinicrest"),
+      CLINICREST_ID,
+    );
+    expect(opened.map((one) => one.name)).toEqual(["Ledgerline"]);
+    expect(moveOf(reply)).toEqual([]);
+  });
+
+  it("the page-move decision is told the turn's record: named Ledgerline, then their team (Ledgerline from the ledger)", async () => {
+    const told: unknown[] = [];
+    const chat = conversation({
+      earlier: EARLIER.slice(0, 6),
+      heard: (reading) => told.push(reading),
+    });
+    await chat.say(
+      "Tell me about Ledgerline.",
+      {
+        ...BASE,
+        kind: "QUESTION_TO_Q",
+        aboutNamedOther: true,
+        namedOther: { name: "Ledgerline", kind: "COMPANY" },
+        navigation: {
+          mode: "CONTEXT",
+          negated: false,
+          destination: null,
+          tab: "overview",
+        },
+      } as unknown as QTurnReading,
+      CLINICREST_ID,
+    );
+    const later = conversation({
+      earlier: EARLIER.slice(0, 8),
+      heard: (reading) => told.push(reading),
+    });
+    await later.say(
+      "And what's their team like?",
+      {
+        ...BASE,
+        kind: "QUESTION_TO_Q",
+        navigation: {
+          mode: "CONTEXT",
+          negated: false,
+          destination: null,
+          tab: "team",
+        },
+      } as unknown as QTurnReading,
+      CLINICREST_ID,
+      "INVESTOR",
+    );
+    await Promise.resolve();
+    expect(told).toEqual([
+      expect.objectContaining({
+        subject: {
+          kind: "COMPANY",
+          name: "Ledgerline",
+          id: null,
+          named: true,
+        },
+      }),
+      expect.objectContaining({
+        subject: {
+          kind: "COMPANY",
+          name: "Ledgerline",
+          id: LEDGERLINE_ID,
+          named: false,
+        },
+      }),
+    ]);
+  });
+
+  it("'Play me their pitch.' (GO, tab null, pitch) tells the decision pitch, and no subject", async () => {
+    const told: unknown[] = [];
+    const chat = conversation({
+      earlier: EARLIER.slice(0, 4),
+      heard: (reading) => told.push(reading),
+    });
+    await chat.say(
+      "Could I watch how Clinicrest presents itself? Play me their pitch.",
+      {
+        ...BASE,
+        companyMedia: { pitch: true, picture: false },
+        navigation: {
+          mode: "GO",
+          negated: false,
+          destination: null,
+          tab: null,
+        },
+      } as unknown as QTurnReading,
+      CLINICREST_ID,
+    );
+    await Promise.resolve();
+    expect(told).toEqual([
+      expect.objectContaining({ pitch: true, subject: undefined }),
+    ]);
   });
 });

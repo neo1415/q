@@ -859,3 +859,80 @@ export function personAnchorOf(
   );
   return inPlay.length === 1 ? (inPlay[0]?.name ?? null) : null;
 }
+
+/** The one record a turn is about, or the two it could be. */
+export type QTurnSubject =
+  | {
+      readonly kind: "ONE";
+      readonly name: string | null;
+      readonly id: string | null;
+      /** The reading named it (in their words, or by resolving their pointer). */
+      readonly named: boolean;
+    }
+  | { readonly kind: "TWO"; readonly names: readonly string[] };
+
+/**
+ * Live 13 Nov 2026 (d96c63ee1): after two turns about Ledgerline, with
+ * Clinicrest's data room still in the pane, "Can I see their data room?"
+ * opened Clinicrest's. "Their" binds to what the conversation is about
+ * now -- the ledger's entry of that kind seen most recently (Q's blocks,
+ * the records it opened, names said) -- over a record merely in view.
+ *
+ *   the reading's name, said in their words      that record
+ *   the reading resolved a pointer to a name     kept when it is one the
+ *                                                conversation is about now;
+ *                                                else the conversation's one
+ *                                                current record
+ *   no name                                      the current record
+ *   two records seen in the latest turn          TWO: ask, never a guess
+ *
+ * Code over the stored ledger only (no words matched but the reading's own
+ * name; no model call). Binding grants nothing: the record still opens
+ * only through its own authorize step. Null: nothing to bind.
+ */
+export function turnSubjectOf(input: {
+  readonly state: QConversationState | null | undefined;
+  readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+  /** The reading's name for the record (namedOther or reference), if any. */
+  readonly readName: string | null;
+  readonly utterance: string;
+}): QTurnSubject | null {
+  const readName = cleanName(input.readName);
+  const entries = (input.state?.ledger.entities ?? []).filter(
+    (entity) =>
+      entity.kind === input.kind &&
+      (entity.id !== null || entity.name !== null),
+  );
+  const byName = (name: string) =>
+    entries.find((entity) => entity.name?.toLowerCase() === name.toLowerCase());
+  const one = (
+    name: string | null,
+    id: string | null,
+    named: boolean,
+  ): QTurnSubject => ({ kind: "ONE", name, id, named });
+  if (readName !== null && namesIn(input.utterance, readName))
+    return one(readName, byName(readName)?.id ?? null, true);
+  const latest = entries.reduce(
+    (most, entity) => Math.max(most, entity.lastTurn),
+    Number.NEGATIVE_INFINITY,
+  );
+  const now = entries.filter((entity) => entity.lastTurn === latest);
+  if (readName !== null) {
+    const kept = now.find(
+      (entity) => entity.name?.toLowerCase() === readName.toLowerCase(),
+    );
+    if (now.length === 0 || kept !== undefined)
+      return one(readName, kept?.id ?? byName(readName)?.id ?? null, true);
+  }
+  if (now.length === 0) return null;
+  if (now.length === 1) {
+    const entity = now[0];
+    return entity === undefined
+      ? null
+      : one(entity.name, entity.id, readName !== null);
+  }
+  const names = now.flatMap((entity) =>
+    entity.name === null ? [] : [entity.name],
+  );
+  return { kind: "TWO", names };
+}

@@ -587,7 +587,11 @@ import {
   type QPicturePort,
   type QPublicPicturePort,
 } from "./result-blocks.js";
-import { companyMediaFor, type QCompanyMediaPort } from "./company-media.js";
+import {
+  companyMediaFor,
+  type QCompanyMediaPort,
+  withoutPitchFailureTalk,
+} from "./company-media.js";
 
 // The names a turn's words give, for the conversation core's first words.
 export { companyNameCandidates } from "./named-company-fact.js";
@@ -614,6 +618,7 @@ export {
   companyMediaBlocks,
   companyMediaFor,
   companyMediaPlan,
+  withoutPitchFailureTalk,
   type QCompanyMediaAsk,
   type QCompanyMediaPlan,
   type QCompanyMediaPort,
@@ -12294,6 +12299,23 @@ export function createModelGatewayQAnswer(
             "q company media",
           );
         }
+        // Live d96c63ee1: the pitch plays inline; a failed attempt to also
+        // open it on screen, and the could-not line after it, are not said.
+        const pitchPlayed = companyMedia.find((block) => block.pitch !== null);
+        if (pitchPlayed !== undefined) {
+          const kept = withoutPitchFailureTalk(
+            content,
+            couldNot,
+            pitchPlayed.name,
+          );
+          if (kept.removed > 0) {
+            logger?.info(
+              { qRunId: request.runId, removed: kept.removed },
+              "the pitch plays in the answer; its failed screen attempt is not said",
+            );
+            content = kept.text;
+          }
+        }
         // One picture per company: its own picture stands in for a public
         // page's or a stock illustration, never beside them.
         const ownPictureShown = companyMedia.some((block) => block.image);
@@ -12955,6 +12977,8 @@ export {
   gateByReading,
   readingPlacesContext,
   readingTabPlace,
+  pitchOnElevator,
+  subjectPlace,
   sameSubject as sameNavigationSubject,
   canOpenFor,
   pinnedOf,
@@ -13007,6 +13031,8 @@ export {
   type QPageMovePort,
   type QPageMoveTurn,
   type QPageMoveReading,
+  type QPageMoveSubject,
+  type QPlacedSubject,
 } from "./navigation-decision.js";
 
 /**

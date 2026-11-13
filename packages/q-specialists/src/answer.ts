@@ -143,6 +143,7 @@ import {
   TURN_READER_RECENT_TURNS_MAX,
   priorListings,
   type QPageMovePort,
+  type QPageMoveSubject,
   canOpenFor,
   pinnedOf,
   type QTurnReading,
@@ -197,8 +198,10 @@ import {
   foldConversationState,
   personAnchorOf,
   renderConversationState,
+  turnSubjectOf,
   withFetchedRecords,
   withNamedReferences,
+  type QTurnSubject,
 } from "./conversation-ledger.js";
 import type {
   QSpecialist,
@@ -1832,6 +1835,15 @@ export function continuesQsQuestion(
 }
 
 /** The person's latest words in this conversation, for varied wording. */
+/** Two records the turn could mean: which one, by name (never a guess). */
+export function whichRecordLine(names: readonly string[]): string {
+  const shown = names.slice(0, 4);
+  const last = shown.at(-1) ?? "";
+  return shown.length < 2
+    ? `Do you mean ${last}?`
+    : `Do you mean ${shown.slice(0, -1).join(", ")} or ${last}?`;
+}
+
 function askedIn(history: readonly QConversationMessage[]): string {
   return [...history].reverse().find((m) => m.role === "USER")?.content ?? "";
 }
@@ -2535,6 +2547,75 @@ export function createSpecialistQAnswer(
       stateTextInRun.set(who.runId, text);
     }
     return text;
+  };
+
+  /**
+   * The one record this turn is about (turnSubjectOf), over the stored
+   * ledger this run read for its reader: their own counterparts' kind (a
+   * company for an investor, a firm for a founder). Null: nothing to bind.
+   */
+  const turnSubjectIn = async (
+    request: QAnswerRequest,
+    readName: string | null,
+    utterance: string,
+    kind: "COMPANY" | "INVESTOR_ORGANISATION",
+  ): Promise<QTurnSubject | null> => {
+    const loaded = await (statesInRun.get(request.runId) ??
+      Promise.resolve(null));
+    return turnSubjectOf({
+      state: loaded?.state ?? null,
+      kind,
+      readName,
+      utterance,
+    });
+  };
+  /** Their counterparts' kind: a company for an investor, a firm for a founder. */
+  const counterpartKind = (
+    request: QAnswerRequest,
+  ): "COMPANY" | "INVESTOR_ORGANISATION" =>
+    askerSideOf(request) === "FOUNDER" ? "INVESTOR_ORGANISATION" : "COMPANY";
+  /**
+   * The page-move decision's subject (QPageMoveReading.subject): told only
+   * when the reading names a record's tab, or turns CONTEXT to a record it
+   * named; the one record the conversation is about, or null when two are
+   * (the pane's record is then never used in its stead). Undefined: not
+   * told, as before.
+   */
+  const pageMoveSubject = async (
+    request: QAnswerRequest,
+    reading: {
+      readonly navigation?: NavigationReading["navigation"];
+      readonly namedOther?:
+        { readonly name: string; readonly kind: string } | null | undefined;
+      readonly reference?: { readonly name: string | null } | null | undefined;
+    } | null,
+    utterance: string,
+  ): Promise<QPageMoveSubject | null | undefined> => {
+    const navigation = reading?.navigation ?? null;
+    if (navigation === null) return undefined;
+    const namedOther =
+      reading?.namedOther?.kind === "COMPANY" ? reading.namedOther.name : null;
+    if (
+      navigation.tab == null &&
+      !(navigation.mode === "CONTEXT" && namedOther !== null)
+    )
+      return undefined;
+    // A company they named is a company; else their counterparts' kind.
+    const kind = namedOther !== null ? "COMPANY" : counterpartKind(request);
+    const subject = await turnSubjectIn(
+      request,
+      namedOther ?? reading?.reference?.name ?? null,
+      utterance,
+      kind,
+    );
+    if (subject === null) return undefined;
+    if (subject.kind === "TWO") return null;
+    return {
+      kind: kind === "COMPANY" ? "COMPANY" : "INVESTOR",
+      name: subject.name,
+      id: subject.id,
+      named: subject.named,
+    };
   };
 
   const delegate: typeof answerPath = {
@@ -5721,8 +5802,61 @@ export function createSpecialistQAnswer(
     // (COMPANY_MEDIA); opening the record would take the turn from it.
     if (asksToWatchPitch(reading)) return null;
     const side = askerSideOf(request);
-    const target = openTarget(reference, shown, side);
+    // Live 13 Nov 2026 (d96c63ee1): after two turns about Ledgerline, with
+    // Clinicrest's data room in the pane, "Can I see their data room?" was
+    // read to Clinicrest and opened it. A name the reading resolved from a
+    // pointer ("their"), not said and not a shown card, binds to the record
+    // the conversation is about now (turnSubjectOf); two in play: asked.
+    const subject =
+      reference.name === null ||
+      reference.shown !== null ||
+      reference.open === "DOCUMENT"
+        ? null
+        : await turnSubjectIn(
+            request,
+            reference.name,
+            askedIn(history),
+            reference.open === "COMPANY" || reference.open === "PITCH"
+              ? "COMPANY"
+              : reference.open === "INVESTOR"
+                ? "INVESTOR_ORGANISATION"
+                : counterpartKind(request),
+          );
+    if (subject?.kind === "TWO" && subject.names.length >= 2) {
+      logger?.info(
+        { qRunId: request.runId, candidates: subject.names.length },
+        "the record the turn pointed at could be two in the conversation; asked",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        whichRecordLine(subject.names),
+      );
+    }
+    const pointedTarget = openTarget(reference, shown, side);
+    const rebound =
+      pointedTarget !== null &&
+      subject?.kind === "ONE" &&
+      subject.name?.toLowerCase() !== reference.name?.toLowerCase()
+        ? subject
+        : null;
+    const target =
+      rebound === null || pointedTarget === null
+        ? pointedTarget
+        : {
+            pages: pointedTarget.pages,
+            ...(rebound.name === null
+              ? rebound.id === null
+                ? {}
+                : { id: rebound.id }
+              : { name: rebound.name }),
+          };
     if (target === null) return null;
+    if (rebound !== null)
+      logger?.info(
+        { qRunId: request.runId },
+        "the record the turn pointed at bound to the conversation's current record",
+      );
     // Live 2026-11-13 (a37e844d5): "Can I see Clinicrest's data room?"
     // opened the bare profile: the part of the page they meant was dropped.
     // TURN_READER v87 names it by meaning (navigation.tab, any language);
@@ -6876,7 +7010,7 @@ export function createSpecialistQAnswer(
     dependencies.pageMoves?.heard?.(
       request,
       Promise.all([readingFirst, fastGo]).then(
-        ([reading, go]) => ({
+        async ([reading, go]) => ({
           // A pitch to watch is placed on the Elevator pitch tab, as in
           // placedNavigation (the decision is told the same tab).
           navigation:
@@ -6886,6 +7020,14 @@ export function createSpecialistQAnswer(
               ? { ...reading.navigation, tab: "elevator" as const }
               : (reading?.navigation ?? null),
           codeMoves: go !== null,
+          // Live d96c63ee1: with tab null, the decision's own deck too.
+          pitch: reading?.companyMedia?.pitch === true,
+          // Live d96c63ee1: the record the turn is about, not the pane's.
+          subject: await pageMoveSubject(
+            request,
+            reading,
+            latest.content,
+          ).catch(() => undefined),
         }),
         () => null,
       ),

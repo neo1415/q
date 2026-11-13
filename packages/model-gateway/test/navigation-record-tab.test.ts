@@ -5,9 +5,12 @@ import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import {
   createQPageMoves,
+  pitchOnElevator,
   readingTabPlace,
+  subjectPlace,
   type QNavigationOutcome,
   type QNavigationRecords,
+  type QPageMoveSubject,
 } from "../src/q/index.js";
 
 /**
@@ -81,20 +84,32 @@ function turn(options: {
   readonly id: string;
   readonly said: string;
   readonly decision: NavigationDecisionResult;
+  /** One proposal per sample, in turn (a split vote); else `decision`. */
+  readonly samples?: readonly NavigationDecisionResult[];
   readonly mode: "GO" | "CONTEXT" | "NONE" | "OFFER_ONLY";
   readonly tab: string | null;
   readonly at?: string;
   readonly pinned?: boolean;
+  readonly pitch?: boolean;
+  readonly subject?: QPageMoveSubject | null;
+  readonly records?: QNavigationRecords;
 }) {
   const published: { content: string; blocks: readonly unknown[] }[] = [];
+  let sampled = 0;
   const moves = createQPageMoves({
     decider: {
       decide: () =>
         new Promise((resolve) =>
-          setTimeout(() => resolve(options.decision), 20),
+          setTimeout(() => {
+            const one =
+              options.samples?.[sampled % options.samples.length] ??
+              options.decision;
+            sampled += 1;
+            resolve(one);
+          }, 20),
         ),
     },
-    records: () => Promise.resolve(RECORDS),
+    records: () => Promise.resolve(options.records ?? RECORDS),
     config: { movesAllowed: true },
   });
   const r = request(options.id, {
@@ -120,6 +135,8 @@ function turn(options: {
         destination: null,
         tab: options.tab,
       } as never,
+      ...(options.pitch === undefined ? {} : { pitch: options.pitch }),
+      ...(options.subject === undefined ? {} : { subject: options.subject }),
     }),
   );
   return published;
@@ -374,5 +391,373 @@ describe("readingTabPlace", () => {
         navigation: nav("team"),
       }),
     ).toBeNull();
+  });
+});
+
+/**
+ * Live replay on d96c63ee1 (13 Nov 2026, investor, Q Workspace). Readings,
+ * decisions and the pane are the logged ones; the subject is what the
+ * answer path tells the port (turnSubjectOf over the conversation).
+ */
+const company = (
+  name: string,
+  tab: string | null,
+): NavigationDecisionResult => ({
+  decision: "MOVE",
+  place: {
+    route: "/company/[companyId]",
+    record: { kind: "COMPANY", name },
+    tab,
+    document: null,
+    slide: null,
+    sectionId: null,
+    position: null,
+  },
+  back: false,
+  askedForPage: false,
+  reason: "",
+});
+const STAYS: NavigationDecisionResult = clinicrest("STAY");
+const ledgerline = (named: boolean): QPageMoveSubject => ({
+  kind: "COMPANY",
+  name: "Ledgerline",
+  id: LEDGERLINE,
+  named,
+});
+const MESSAGES_AT = `/relationships/company/${CLINICREST}/messages`;
+
+describe("live d96c63ee1: a pitch to watch, read tab null", () => {
+  it("on Clinicrest's data room, 'Play me their pitch.' (GO, tab null, pitch) moves to elevator, never the decision's deck", async () => {
+    const published = turn({
+      id: "live-pitch-null-tab",
+      said: "Could I watch how Clinicrest presents itself? Play me their pitch.",
+      decision: company("Clinicrest", "deck"),
+      mode: "GO",
+      tab: null,
+      pitch: true,
+      at: `/company/${CLINICREST}?tab=dataroom`,
+    });
+    await wait(80);
+    expect(blocksOf(published, "UI_INTENT")).toEqual([
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: CLINICREST,
+        tab: "elevator",
+      },
+    ]);
+  });
+
+  it("a pitch deck asked for (pitch false) keeps the deck", async () => {
+    const published = turn({
+      id: "live-pitch-deck",
+      said: "Show me Clinicrest's pitch deck.",
+      decision: company("Clinicrest", "deck"),
+      mode: "GO",
+      tab: null,
+      pitch: false,
+      at: `/company/${CLINICREST}?tab=dataroom`,
+    });
+    await wait(80);
+    expect(blocksOf(published, "UI_INTENT")).toEqual([
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: CLINICREST,
+        tab: "deck",
+      },
+    ]);
+  });
+
+  it("pitchOnElevator: already on the elevator tab is a STAY; a remembered deck becomes elevator", () => {
+    const pane = {
+      at: { page: "COMPANY", recordId: CLINICREST, tab: "elevator" } as const,
+      previous: null,
+      pane: "OPEN" as const,
+      dirty: false,
+      busy: null,
+    };
+    const deck = {
+      page: "COMPANY",
+      recordId: CLINICREST,
+      tab: "deck",
+    } as const;
+    expect(
+      pitchOnElevator(
+        {
+          decision: "MOVE",
+          target: deck,
+          openPane: false,
+          remembered: null,
+          guard: null,
+        },
+        true,
+        pane,
+      ),
+    ).toMatchObject({ decision: "STAY", guard: "ALREADY_THERE" });
+    expect(
+      pitchOnElevator(
+        {
+          decision: "STAY",
+          target: null,
+          openPane: false,
+          remembered: deck,
+          guard: "COLLAPSED_PANE",
+        },
+        true,
+        { ...pane, at: null },
+      ).remembered,
+    ).toEqual({ page: "COMPANY", recordId: CLINICREST, tab: "elevator" });
+  });
+});
+
+describe("live d96c63ee1: the conversation's record, not the pane's", () => {
+  it("pane on Clinicrest's messages, 'Tell me about Ledgerline.' (CONTEXT, overview; decision STAY) moves to Ledgerline", async () => {
+    const published = turn({
+      id: "live-ctx-ledgerline",
+      said: "Tell me about Ledgerline.",
+      decision: STAYS,
+      mode: "CONTEXT",
+      tab: "overview",
+      subject: ledgerline(true),
+      at: MESSAGES_AT,
+    });
+    await wait(80);
+    expect(blocksOf(published, "UI_INTENT")).toEqual([
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: LEDGERLINE },
+    ]);
+  });
+
+  it("then 'And what's their team like?' (CONTEXT, team; SPLIT_VOTE stay) moves to Ledgerline's team tab", async () => {
+    const published = turn({
+      id: "live-ctx-team",
+      said: "And what's their team like?",
+      decision: STAYS,
+      // Two places, one vote each, and a stay: the logged SPLIT_VOTE.
+      samples: [
+        company("Ledgerline", "team"),
+        company("Clinicrest", "team"),
+        STAYS,
+      ],
+      mode: "CONTEXT",
+      tab: "team",
+      subject: ledgerline(false),
+      at: `/company/${LEDGERLINE}`,
+    });
+    await wait(80);
+    expect(blocksOf(published, "UI_INTENT")).toEqual([
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: LEDGERLINE,
+        tab: "team",
+      },
+    ]);
+  });
+
+  it("the same turn with the pane still on Clinicrest's messages lands on Ledgerline, never Clinicrest's team", async () => {
+    const published = turn({
+      id: "live-ctx-team-from-messages",
+      said: "And what's their team like?",
+      decision: STAYS,
+      mode: "CONTEXT",
+      tab: "team",
+      subject: ledgerline(false),
+      at: MESSAGES_AT,
+    });
+    await wait(80);
+    expect(blocksOf(published, "UI_INTENT")).toEqual([
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: LEDGERLINE,
+        tab: "team",
+      },
+    ]);
+  });
+
+  it("pinned: Ledgerline's team is offered; the page stays", async () => {
+    const published = turn({
+      id: "live-ctx-pinned",
+      said: "And what's their team like?",
+      decision: STAYS,
+      mode: "CONTEXT",
+      tab: "team",
+      subject: ledgerline(false),
+      at: MESSAGES_AT,
+      pinned: true,
+    });
+    await wait(80);
+    expect(blocksOf(published, "UI_INTENT")).toEqual([]);
+    expect(blocksOf(published, "NAVIGATION_OFFER")).toEqual([
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: LEDGERLINE,
+        tab: "team",
+      },
+    ]);
+  });
+
+  it("NONE: nothing moves or is offered", async () => {
+    const published = turn({
+      id: "live-ctx-none",
+      said: "Is their team any good?",
+      decision: STAYS,
+      mode: "NONE",
+      tab: "team",
+      subject: ledgerline(false),
+      at: MESSAGES_AT,
+    });
+    await wait(80);
+    expect(published).toEqual([]);
+  });
+
+  it("two records in play (subject null): nothing, and never the pane's record in its stead", async () => {
+    const published = turn({
+      id: "live-ctx-two",
+      said: "Can I see their team?",
+      decision: STAYS,
+      mode: "CONTEXT",
+      tab: "team",
+      subject: null,
+      at: `/company/${CLINICREST}`,
+    });
+    await wait(80);
+    expect(published).toEqual([]);
+  });
+
+  it("a record they may not open: nothing", async () => {
+    const published = turn({
+      id: "live-ctx-no-access",
+      said: "Tell me about Ledgerline.",
+      decision: STAYS,
+      mode: "CONTEXT",
+      tab: "overview",
+      subject: ledgerline(true),
+      at: MESSAGES_AT,
+      records: {
+        ...RECORDS,
+        companies: [{ id: CLINICREST, name: "Clinicrest" }],
+      },
+    });
+    await wait(80);
+    expect(published).toEqual([]);
+  });
+
+  it("a guarded stay other than a split vote (unsaved work proposed nothing; NO_ACCESS) places nothing", () => {
+    const outcome = readingTabPlace({
+      proposed: {
+        decision: "STAY",
+        target: null,
+        openPane: false,
+        remembered: null,
+        guard: "NO_ACCESS",
+      },
+      navigation: {
+        mode: "CONTEXT",
+        negated: false,
+        destination: null,
+        tab: "team",
+      } as never,
+      pane: {
+        at: { page: "COMPANY", recordId: CLINICREST },
+        previous: null,
+        pane: "OPEN",
+        dirty: false,
+        busy: null,
+      },
+      canOpen: () => true,
+      config: { movesAllowed: true },
+      records: RECORDS,
+      subject: {
+        place: { page: "COMPANY", recordId: LEDGERLINE },
+        named: false,
+      },
+    });
+    expect(outcome).toBeNull();
+  });
+
+  it("unsaved work in the pane: Ledgerline's team is an offer", () => {
+    const outcome = readingTabPlace({
+      proposed: {
+        decision: "STAY",
+        target: null,
+        openPane: false,
+        remembered: null,
+        guard: "SPLIT_VOTE",
+      },
+      navigation: {
+        mode: "CONTEXT",
+        negated: false,
+        destination: null,
+        tab: "team",
+      } as never,
+      pane: {
+        at: { page: "COMPANY", recordId: CLINICREST },
+        previous: null,
+        pane: "OPEN",
+        dirty: true,
+        busy: null,
+      },
+      canOpen: () => true,
+      config: { movesAllowed: true },
+      records: RECORDS,
+      subject: {
+        place: { page: "COMPANY", recordId: LEDGERLINE },
+        named: false,
+      },
+    });
+    expect(outcome).toMatchObject({
+      decision: "OFFER",
+      guard: "UNSAVED_WORK",
+      target: { page: "COMPANY", recordId: LEDGERLINE, tab: "team" },
+    });
+  });
+});
+
+describe("subjectPlace", () => {
+  const resolver =
+    (status: "FOUND" | "WHICH_ONE" | "NONE", exact = true) =>
+    () =>
+      Promise.resolve(
+        status === "FOUND"
+          ? {
+              status,
+              recordId: LEDGERLINE,
+              documentId: null,
+              exact,
+            }
+          : { status },
+      );
+  it("one record they may open, by name: its page", async () => {
+    await expect(
+      subjectPlace(ledgerline(true), resolver("FOUND"), RECORDS),
+    ).resolves.toEqual({
+      place: { page: "COMPANY", recordId: LEDGERLINE },
+      named: true,
+    });
+  });
+  it("two, none, a lookalike, or an id the name does not resolve to: null", async () => {
+    for (const found of [
+      resolver("WHICH_ONE"),
+      resolver("NONE"),
+      resolver("FOUND", false),
+    ])
+      await expect(
+        subjectPlace(ledgerline(true), found, RECORDS),
+      ).resolves.toBeNull();
+    await expect(
+      subjectPlace(
+        { ...ledgerline(true), id: CLINICREST },
+        resolver("FOUND"),
+        RECORDS,
+      ),
+    ).resolves.toBeNull();
+  });
+  it("not told: undefined (the pane's record, as before)", async () => {
+    await expect(
+      subjectPlace(undefined, resolver("FOUND"), RECORDS),
+    ).resolves.toBeUndefined();
   });
 });
