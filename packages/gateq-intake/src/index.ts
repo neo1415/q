@@ -35,6 +35,7 @@ export {
   type GuestQuota,
   type GuestThrottle,
 } from "./domain/throttle.js";
+export { createPostgresGuestThrottle } from "./infrastructure/postgres-guest-throttle.js";
 export {
   generateApplicationReference,
   hashSessionToken,

@@ -26,10 +26,11 @@
  * an attacker their own oldest counter rather than anybody else's current
  * one.
  *
- * In process, on purpose: no Redis, no new service, no new credential.
- * Each API instance holds its own counters, which is a weaker bound than a
- * shared one and a much stronger bound than none. A distributed limiter is
- * a real thing to want and it is not this packet.
+ * Two implementations behind one async port. This in-process one serves
+ * tests and local runs. Production composes `createPostgresGuestThrottle`
+ * (B8): the same buckets in one Postgres table, so the bound holds across
+ * API instances and survives a deploy, with this one as its fail-open
+ * fallback. No Redis, no new service, no new credential.
  */
 
 /** What a guest can do, and what each costs them. */
@@ -114,8 +115,11 @@ export type GuestThrottle = {
      */
     readonly sessionId: string;
     readonly operation: GateQGuestOperation;
-  }) => boolean;
-  /** Live bucket count, for a test or a gauge. Never the keys. */
+  }) => Promise<boolean>;
+  /**
+   * Live bucket count in this process, for a test or a gauge. Never the
+   * keys. The Postgres throttle reports its fallback's count.
+   */
   readonly size: () => number;
 };
 
@@ -145,26 +149,31 @@ export function createGuestThrottle(options?: {
     }
   };
 
-  return {
-    charge: ({ sessionId, operation }) => {
-      const quota = quotas[operation];
-      const now = clock();
-      // Operation in the key: spending a turn allowance must not spend a
-      // submit allowance, or a long conversation would lock the applicant
-      // out of finishing it.
-      const key = `${operation}:${sessionId}`;
-      const bucket = buckets.get(key);
+  const chargeNow = (
+    sessionId: string,
+    operation: GateQGuestOperation,
+  ): boolean => {
+    const quota = quotas[operation];
+    const now = clock();
+    // Operation in the key: spending a turn allowance must not spend a
+    // submit allowance, or a long conversation would lock the applicant
+    // out of finishing it.
+    const key = `${operation}:${sessionId}`;
+    const bucket = buckets.get(key);
 
-      if (bucket === undefined || bucket.resetAt <= now) {
-        if (buckets.size >= maxTracked) sweep(now);
-        buckets.set(key, { count: 1, resetAt: now + quota.windowMs });
-        return true;
-      }
-      if (bucket.count >= quota.limit) return false;
-      bucket.count += 1;
+    if (bucket === undefined || bucket.resetAt <= now) {
+      if (buckets.size >= maxTracked) sweep(now);
+      buckets.set(key, { count: 1, resetAt: now + quota.windowMs });
       return true;
-    },
+    }
+    if (bucket.count >= quota.limit) return false;
+    bucket.count += 1;
+    return true;
+  };
 
+  return {
+    charge: ({ sessionId, operation }) =>
+      Promise.resolve(chargeNow(sessionId, operation)),
     size: () => buckets.size,
   };
 }

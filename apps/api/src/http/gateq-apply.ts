@@ -190,7 +190,7 @@ export function registerGateQApplyRoutes(
     // which the caller already turns into the same 404 as every other way
     // a guest request can be wrong.
     const guest = await intake.authorise(credential);
-    if (!throttle.charge({ sessionId: guest.sessionId, operation })) {
+    if (!(await throttle.charge({ sessionId: guest.sessionId, operation }))) {
       throw new IntakeRefusedError("TOO_MANY_REQUESTS");
     }
   };
@@ -206,10 +206,10 @@ export function registerGateQApplyRoutes(
       // stranger has no session yet; the web tier adds a per-visitor limit.
       if (
         throttle !== undefined &&
-        !throttle.charge({
+        !(await throttle.charge({
           sessionId: `start:${input.gatewayPublicId}`,
           operation: "START",
-        })
+        }))
       ) {
         throw new IntakeRefusedError("TOO_MANY_REQUESTS");
       }

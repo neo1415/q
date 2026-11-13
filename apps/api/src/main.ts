@@ -208,8 +208,8 @@ import {
 import {
   createConversationService,
   createGateQInterviewer,
-  createGuestThrottle,
   createIntakeService,
+  createPostgresGuestThrottle,
   createPostgresApplicationDocumentRepository,
   createPostgresApplicationFactRepository,
   createPostgresApplicationRepository,
@@ -1108,10 +1108,19 @@ const gateqApply =
             level: config.observability.logLevel,
           }),
         });
-        // One instance's counters (CQ-GATE-002S §8). Weaker than a shared
-        // limiter and far stronger than none; a distributed one is a real
-        // thing to want and not this packet.
-        return { intake, conversation, throttle: createGuestThrottle() };
+        // Shared counters (CQ-GATE-002S §8, B8): one Postgres table, so the
+        // allowance holds across replicas and survives a deploy. A database
+        // error fails open to this instance's in-process counters.
+        return {
+          intake,
+          conversation,
+          throttle: createPostgresGuestThrottle({
+            sql: database.sql,
+            logger: createLogger(apiServiceIdentity(config), {
+              level: config.observability.logLevel,
+            }),
+          }),
+        };
       })();
 
 // Onboarding owns journey state only. The Founder integration registers the
@@ -3220,10 +3229,10 @@ const { app, logger } = createApp(config, security, {
           // can send an email too.
           const guest = await gateqApply.intake.authorise(sessionToken);
           if (
-            !gateqApply.throttle.charge({
+            !(await gateqApply.throttle.charge({
               sessionId: guest.sessionId,
               operation: "CONTACT",
-            })
+            }))
           ) {
             throw new IntakeRefusedError("TOO_MANY_REQUESTS");
           }
