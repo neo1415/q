@@ -530,7 +530,7 @@ describe("compare the top two, right after a list of five", () => {
   it("A8 live 2026-11-13: a chart asked for about one company reads its figures and draws them", async () => {
     mizanSeries = true;
     try {
-      const { seam, request, executed, stored } = build(
+      const { seam, request, executed, stored, alpha } = build(
         "Chart the monthly recurring revenue for Mizan over the last few months",
         { asksForChart: true },
         "Mizan's monthly recurring revenue grew from USD 30,000 to USD 42,000.",
@@ -552,6 +552,13 @@ describe("compare the top two, right after a list of five", () => {
       expect(chart?.series[0]?.points.map((point) => point.value)).toEqual([
         30000, 42000,
       ]);
+      // The words are written knowing what the chart shows (live: the prose
+      // said the monthly values were unavailable beside a four-month chart).
+      const sent = sentTo(alpha);
+      expect(alpha.calls.length).toBeGreaterThan(0);
+      expect(sent).toContain("Shown on screen now");
+      expect(sent).toContain("30,000");
+      expect(sent).toContain("42,000");
     } finally {
       mizanSeries = false;
     }

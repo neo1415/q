@@ -7,6 +7,8 @@ import {
   type TruthClass,
 } from "@capital-q/contracts";
 
+import type { AuthorisedFact } from "@capital-q/q-core";
+
 import type { ReadCompanyFigure, RunRead } from "./card-subjects.js";
 
 /**
@@ -568,4 +570,37 @@ export function answerChart(input: {
     question: input.question,
     companies,
   });
+}
+
+/**
+ * A8 live 2026-11-13 (Ledgerline): the chart showed four months while the
+ * words said the record "doesn't provide each month's value" and quoted
+ * another start. The chart code drew is handed to the answer as a fact,
+ * point by point, so the words describe what is on screen. Null when no
+ * chart is drawn.
+ */
+export function chartFactOf(block: QResultBlock | null): AuthorisedFact | null {
+  if (block?.kind !== "CHART") return null;
+  const series = block.series
+    .map((one) => {
+      const points = one.points
+        .map((point) => `${point.label} ${point.value.toLocaleString("en-US")}`)
+        .join("; ");
+      return `${one.label}: ${points}`;
+    })
+    .join(". ");
+  const first = block.series[0];
+  if (first === undefined) return null;
+  const unit = [block.currency ?? null, block.unit ?? null]
+    .filter((part): part is string => part !== null && part.length > 0)
+    .join(" ");
+  return {
+    scope: "NETWORK_VISIBLE_DATA",
+    statement:
+      `Shown on screen now, drawn by Capital Q from the company's own published figures (${first.source}): "${block.title}"${unit.length === 0 ? "" : ` (${unit})`}. ${series}. ` +
+      "Describe this series as shown, month by month where it helps; never say the monthly values are unavailable, and never give a different figure for a month shown here.",
+    truthClass: first.truthClass,
+    evidenceStatus: first.evidenceStatus,
+    source: "Capital Q chart of company-stated figures",
+  };
 }

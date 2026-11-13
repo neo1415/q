@@ -512,7 +512,7 @@ import {
   newestAnswerCards,
   answerCardCompanies,
 } from "./compare-table.js";
-import { answerChart } from "./figure-chart.js";
+import { answerChart, chartFactOf } from "./figure-chart.js";
 import {
   attachedDocumentIntent,
   attachedDocumentNote,
@@ -6100,6 +6100,19 @@ export function createModelGatewayQAnswer(
       if (request.asksForChart === true && compareTable === null) {
         await prepared.chartFigures().catch(() => undefined);
       }
+      // The chart code will draw, as a fact for the words (chartFactOf).
+      const chartFact =
+        request.asksForChart === true
+          ? chartFactOf(
+              answerChart({
+                read: runCompanies.read(request.runId),
+                question: latest?.content ?? "",
+                asked: true,
+                compareIds,
+                blocks: compareTable === null ? [] : [compareTable],
+              }),
+            )
+          : null;
       const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
       /**
        * Step 11 (A2): the warmed prepare searched the documents before the
@@ -6908,6 +6921,7 @@ export function createModelGatewayQAnswer(
           ...(onScreenDocument === null ? [] : [onScreenDocument]),
           ...attachedDocuments,
           ...compareFacts,
+          ...(chartFact === null ? [] : [chartFact]),
           ...dataRoomFacts,
           ...onScreenPage,
           ...(w.ownDay === null ? [] : [w.ownDay]),
