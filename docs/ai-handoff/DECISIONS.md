@@ -369,3 +369,10 @@ Core Seven remains the governing assessment framework. The new directive authori
     - The deploy gate is `bash scripts/ci-local.sh` on the exact commit to be deployed. It runs the same jobs as ci.yml (format and lint, typecheck, build, every test shard, pgTAP on a fresh local Postgres 16 with every migration, the GateQ concurrency proof, integration) in a clean checkout of that commit, on Node 24, with disabled provider keys. Its last line, `ci-local PASS sha=… at=…`, is the receipt; record it in the handoff with the deploy.
     - "Run CI before every deploy" (the standing rule) is met by that receipt. Rollback and live verification after every deploy are unchanged.
     - Railway deploys from a push to `recovery/2026-09-12` regardless of GitHub Actions.
+89. **Fictional demo data and the real verification workflow** (owner, 2026-11-13).
+    - Curated fictional companies, investors, founders and organisations are demo data. They are never verified for real.
+    - They are prepared for the marketplace by a controlled, idempotent activation through the synthetic-demo path, with synthetic provenance recorded and labelled "Demo verified (synthetic)". Routine fictional-data approvals are not raised to the owner.
+    - The real verification workflow is certified separately, with synthetic applicants and a synthetic reviewer role scoped to them. The real-user workflow is not weakened.
+90. **Real demonstration companies and network-visible fictional names** (owner, 2026-11-13).
+    - Capital Q, KUUZA AI and SongScribe AI stay in the marketplace as they are; their synthetic claims are not revoked.
+    - MoneyHash and ekko stay network-visible, like the other fictional companies.
