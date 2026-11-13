@@ -27,7 +27,7 @@ import {
   renderPrompt,
   type NavigationDecisionResult,
   type TurnNavigationIntentV84,
-  type TurnNavigationIntentV85,
+  type TurnNavigationIntentV87,
   type NavigationDecisionVariables,
 } from "@capital-q/q-core";
 
@@ -1734,10 +1734,11 @@ export async function decideNavigation(
 
 /**
  * A navigation reading as code takes it: v84's intent, with v85's
- * destination when the reading names one (absent: none named).
+ * destination and v87's record tab when the reading names them (absent:
+ * none named).
  */
 export type QReadNavigation = TurnNavigationIntentV84 &
-  Partial<Pick<TurnNavigationIntentV85, "destination">>;
+  Partial<Pick<TurnNavigationIntentV87, "destination" | "tab">>;
 
 /** What the turn reader read about navigation, as the port is told it (C10). */
 export type QPageMoveReading = {
@@ -2383,6 +2384,7 @@ export function createQPageMoves(dependencies: {
               navigation: navigation?.mode ?? null,
               negated: navigation?.negated ?? null,
               navigationDestination: navigation?.destination ?? null,
+              navigationTab: navigation?.tab ?? null,
               codeMoves: reading?.codeMoves ?? null,
               placedByReading: placedByReading?.decision ?? null,
               samples: sampled.map(sampleForLog),

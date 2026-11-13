@@ -411,6 +411,13 @@ describe("opening the one record a turn points at (Zino live 2026-10-04)", () =>
           id: DOC,
         });
       }
+      if (target.page === "COMPANY" && target.name === "Clinicrest") {
+        return Promise.resolve({
+          kind: "OPEN_RECORD_PAGE",
+          page: "COMPANY",
+          id: NIXO,
+        });
+      }
       if (target.page === "RELATIONSHIP_COMPANY_MESSAGES") {
         return Promise.resolve({
           kind: "OPEN_RECORD_PAGE",
@@ -508,6 +515,138 @@ describe("opening the one record a turn points at (Zino live 2026-10-04)", () =>
         page: "RELATIONSHIP_COMPANY_MESSAGES",
         id: NIXO,
       },
+    });
+  });
+
+  const CLINICREST = {
+    open: "COMPANY",
+    name: "Clinicrest",
+    shown: null,
+    retryLast: false,
+    sameFor: null,
+  } as const;
+
+  it("live 2026-11-13: 'Can I see Clinicrest's data room?' opens that company on its data room tab, never the bare profile", async () => {
+    const chat = conversation({ openRecord });
+    const said = await chat.say("Can I see Clinicrest's data room?", {
+      ...BASE,
+      // Production read GO, no destination; v87 names the tab by meaning.
+      navigation: {
+        mode: "GO",
+        negated: false,
+        destination: null,
+        tab: "dataroom",
+      },
+      reference: CLINICREST,
+    });
+    expect(said?.blocks?.[0]).toEqual({
+      kind: "UI_INTENT",
+      intent: {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: NIXO,
+        tab: "dataroom",
+      },
+    });
+    expect(said?.content).toBe("Opening the data room…");
+  });
+
+  // v87: the tab is the reading's, by meaning and in any language; the
+  // words are never consulted when there is a navigation reading.
+  it.each([
+    "let me look through the documents Clinicrest shared for diligence",
+    "Je voudrais parcourir les documents que Clinicrest a partagés",
+  ])("'%s' read as tab dataroom opens the data room tab", async (words) => {
+    const chat = conversation({ openRecord });
+    const said = await chat.say(words, {
+      ...BASE,
+      navigation: {
+        mode: "GO",
+        negated: false,
+        destination: null,
+        tab: "dataroom",
+      },
+      reference: CLINICREST,
+    });
+    expect(said?.blocks?.[0]).toEqual({
+      kind: "UI_INTENT",
+      intent: {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY",
+        id: NIXO,
+        tab: "dataroom",
+      },
+    });
+  });
+
+  it("a reading with tab null opens the record whole, whatever the words say", async () => {
+    const chat = conversation({ openRecord });
+    const said = await chat.say("Can I see Clinicrest's data room?", {
+      ...BASE,
+      navigation: { mode: "GO", negated: false, destination: null, tab: null },
+      reference: CLINICREST,
+    });
+    expect(said?.blocks?.[0]).toEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: NIXO },
+    });
+  });
+
+  it("a tab the page does not have is dropped; the record still opens", async () => {
+    const chat = conversation({ openRecord });
+    const said = await chat.say("Open the Clinicrest deal.", {
+      ...BASE,
+      navigation: {
+        mode: "GO",
+        negated: false,
+        destination: null,
+        tab: "deal",
+      },
+      reference: CLINICREST,
+    });
+    expect(said?.blocks?.[0]).toEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: NIXO },
+    });
+  });
+
+  it.each(["NONE", "OFFER_ONLY"] as const)(
+    "a %s reading with a tab never opens the record",
+    async (mode) => {
+      opened.length = 0;
+      const chat = conversation({ openRecord });
+      const said = await chat.say("Can I see Clinicrest's data room?", {
+        ...BASE,
+        navigation: {
+          mode,
+          negated: false,
+          destination: null,
+          tab: "dataroom",
+        },
+        reference: CLINICREST,
+      });
+      expect(opened).toEqual([]);
+      expect(
+        (said?.blocks ?? []).some(
+          (block) =>
+            block.kind === "UI_INTENT" &&
+            block.intent.kind === "OPEN_RECORD_PAGE",
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it("'Open Clinicrest.' still opens the profile, with no tab added", async () => {
+    const chat = conversation({ openRecord });
+    const said = await chat.say("Open Clinicrest.", {
+      ...BASE,
+      // The reading production logged for this turn: GO, no destination.
+      navigation: { mode: "GO", negated: false, destination: null, tab: null },
+      reference: CLINICREST,
+    });
+    expect(said?.blocks?.[0]).toEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: NIXO },
     });
   });
 

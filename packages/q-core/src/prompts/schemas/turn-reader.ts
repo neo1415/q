@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   QControlIdSchema,
   QNavigateDestinationSchema,
+  QRecordTabSchema,
 } from "@capital-q/contracts";
 
 import {
@@ -1529,3 +1530,26 @@ export const TurnReaderV86ResultSchema = TurnReaderV85ResultSchema.extend({
   companyMedia: TurnCompanyMediaAskSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV86Result = z.infer<typeof TurnReaderV86ResultSchema>;
+
+/**
+ * v87 (live 13 Nov 2026 on a37e844d5): "Can I see Clinicrest's data room?"
+ * was read GO with the company referenced, and opened the bare profile: the
+ * part of the page they named was not read. The reading now names the
+ * record tab by meaning, in any language (`navigation.tab`, the record
+ * tabs' closed list). Code keeps only a tab the opened page has. Lenient:
+ * a malformed tab is null; null is the record as a whole.
+ */
+export const TURN_READER_V87_SCHEMA_VERSION = 87;
+export const TurnNavigationIntentV87Schema =
+  TurnNavigationIntentV85Schema.extend({
+    tab: QRecordTabSchema.nullable().default(null).catch(null),
+  }).strict();
+export type TurnNavigationIntentV87 = z.infer<
+  typeof TurnNavigationIntentV87Schema
+>;
+export const TurnReaderV87ResultSchema = TurnReaderV86ResultSchema.extend({
+  navigation: TurnNavigationIntentV87Schema.nullable()
+    .default(null)
+    .catch(null),
+}).strict();
+export type TurnReaderV87Result = z.infer<typeof TurnReaderV87ResultSchema>;

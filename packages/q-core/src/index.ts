@@ -572,6 +572,11 @@ export {
   readsAsGo,
   readsAsNoNavigation,
   readsAsContext,
+  TURN_READER_V87_SCHEMA_VERSION,
+  TurnNavigationIntentV87Schema,
+  type TurnNavigationIntentV87,
+  TurnReaderV87ResultSchema,
+  type TurnReaderV87Result,
   TURN_READER_V86_SCHEMA_VERSION,
   TurnCompanyMediaAskSchema,
   type TurnCompanyMediaAsk,
@@ -2179,6 +2184,10 @@ export {
   TURN_READER_V86,
   V86_COMPANY_MEDIA,
 } from "./prompts/tasks/turn-reader.v86.js";
+export {
+  TURN_READER_V87,
+  V87_NAVIGATION_TAB,
+} from "./prompts/tasks/turn-reader.v87.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

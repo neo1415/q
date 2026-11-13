@@ -16,10 +16,12 @@ import {
  * they ask to watch it, read by meaning -- never by keyword rules.
  */
 describe("TURN_READER v86", () => {
-  it("is active: v85 with one COMPANY MEDIA paragraph after NAVIGATION DESTINATION, on v86's schema", () => {
+  it("is v85 with one COMPANY MEDIA paragraph after NAVIGATION DESTINATION, on v86's schema (deprecated by v87)", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(86);
+    const active = { ...TURN_READER_V86 };
+    expect(registry.get("TURN_READER", 86)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("TURN_READER", 85)?.definition.status).toBe(
       "DEPRECATED",
     );

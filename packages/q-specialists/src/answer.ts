@@ -1659,7 +1659,13 @@ function onlyAMove(text: string): boolean {
  * there is as before).
  */
 type NavigationReading = {
-  readonly navigation?: TurnNavigationIntentV84 | null | undefined;
+  /** v87: `tab`, the part of a record page they mean, read by meaning. */
+  readonly navigation?:
+    | (TurnNavigationIntentV84 & {
+        readonly tab?: TabAsk["tab"] | null | undefined;
+      })
+    | null
+    | undefined;
   readonly parts?: readonly unknown[] | undefined;
 };
 
@@ -1667,7 +1673,7 @@ type NavigationReading = {
 function navigationOf(
   read: NavigationReading | null | undefined,
   workspace: boolean,
-): TurnNavigationIntentV84 | null {
+): NonNullable<NavigationReading["navigation"]> | null {
   const navigation = read?.navigation ?? null;
   return navigation?.mode === "CONTEXT" && !workspace ? null : navigation;
 }
@@ -5564,11 +5570,32 @@ export function createSpecialistQAnswer(
     const side = askerSideOf(request);
     const target = openTarget(reference, shown, side);
     if (target === null) return null;
+    // Live 2026-11-13 (a37e844d5): "Can I see Clinicrest's data room?"
+    // opened the bare profile: the part of the page they meant was dropped.
+    // TURN_READER v87 names it by meaning (navigation.tab, any language);
+    // the words decide only when there is no navigation reading at all
+    // (fallback, as for the open itself). The tab only selects a view of
+    // the page open_page authorised (withTabs keeps the ones the page has);
+    // a deck keeps its own spoken path below.
+    const readNavigation = navigationOf(reading, inWorkspace(request));
+    const asked: TabAsk | null =
+      readNavigation === null
+        ? tabAskOf(askedIn(history))
+        : readNavigation.tab === null || readNavigation.tab === undefined
+          ? null
+          : {
+              tab: readNavigation.tab,
+              subTab: null,
+              name: null,
+              viewer: false,
+            };
+    const tab = asked !== null && asked.tab !== "deck" ? asked : null;
     for (const page of target.pages) {
-      const intent = await port
+      const opened = await port
         .open(request, { page, id: target.id, name: target.name })
         .catch(() => null);
-      if (intent === null) continue;
+      if (opened === null) continue;
+      const intent = tab === null ? opened : withTabs(opened, tab);
       // Live 2026-10-11 (investor rehearsal): on Ledgerfold's own page,
       // "What does this company actually do and why does it fit my
       // mandate?" was read as "open it", and Q answered by re-opening the
@@ -5612,7 +5639,10 @@ export function createSpecialistQAnswer(
       );
       // Said from the card on screen when it is one (what they do, the
       // fit and why), else plainly ("Here's Tensorgate.").
-      const opening = openingLine(page, target.name);
+      const opening =
+        tab !== null && intent.tab !== undefined
+          ? movePhaseLine("PENDING", tabPlace(tab))
+          : openingLine(page, target.name);
       const facts =
         page === "COMPANY"
           ? spokenFactsOf({
@@ -6880,6 +6910,8 @@ export function createSpecialistQAnswer(
           navigation: read.navigation?.mode ?? null,
           navigationNegated: read.navigation?.negated ?? null,
           navigationDestination: read.navigation?.destination ?? null,
+          // v87: the record tab read (a closed list; no words, no ids).
+          navigationTab: read.navigation?.tab ?? null,
           // A8 v86: the company media asked for (booleans only).
           mediaPitch: read.companyMedia?.pitch ?? null,
           mediaPicture: read.companyMedia?.picture ?? null,

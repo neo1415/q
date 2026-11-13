@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
-import { PLAN_F03_ASK, TurnReaderV86ResultSchema } from "@capital-q/q-core";
+import { PLAN_F03_ASK, TurnReaderV87ResultSchema } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
 import { acceptStructuredOutput } from "../src/policy/structured.js";
@@ -52,7 +52,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
   it("asks the provider with the active (v83) schema and the lenient fields", async () => {
     const { gateway, options } = fake(BASE);
     await read(gateway, "What should I do this week?");
-    expect(options[0]).toMatchObject({ schema: TurnReaderV86ResultSchema });
+    expect(options[0]).toMatchObject({ schema: TurnReaderV87ResultSchema });
     expect(TURN_READER_LENIENT_FIELDS).toEqual(
       expect.arrayContaining([
         "planAsk",
@@ -132,7 +132,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
       directsWork: "maybe",
       discoverWhom: "INVESTORS",
     });
-    const kept = acceptStructuredOutput(raw, TurnReaderV86ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV87ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);
@@ -154,7 +154,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
  */
 describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination)", () => {
   it("reaches the caller, with negation read as no move", async () => {
-    const none = { destination: null };
+    const none = { destination: null, tab: null };
     for (const [navigation, expected] of [
       [
         { mode: "GO", negated: false },
@@ -164,7 +164,12 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination
       [{ mode: "CONTEXT" }, { mode: "CONTEXT", negated: false, ...none }],
       [
         { mode: "CONTEXT", destination: "CRM_PIPELINE" },
-        { mode: "CONTEXT", negated: false, destination: "CRM_PIPELINE" },
+        {
+          mode: "CONTEXT",
+          negated: false,
+          destination: "CRM_PIPELINE",
+          tab: null,
+        },
       ],
       [
         { mode: "CONTEXT", negated: true, destination: "CRM_PIPELINE" },
@@ -183,6 +188,31 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination
     expect(TURN_READER_LENIENT_FIELDS).toContain("navigation");
   });
 
+  it("v87: the record tab reaches the caller; an unknown one is none; negated drops it", async () => {
+    for (const [navigation, expected] of [
+      [
+        { mode: "GO", tab: "dataroom" },
+        { mode: "GO", negated: false, destination: null, tab: "dataroom" },
+      ],
+      [
+        { mode: "CONTEXT", tab: "team" },
+        { mode: "CONTEXT", negated: false, destination: null, tab: "team" },
+      ],
+      [
+        { mode: "GO", tab: "the documents room" },
+        { mode: "GO", negated: false, destination: null, tab: null },
+      ],
+      [
+        { mode: "GO", negated: true, tab: "dataroom" },
+        { mode: "NONE", negated: true, destination: null, tab: null },
+      ],
+    ] as const) {
+      const { gateway } = fake({ ...BASE, navigation });
+      const reading = await read(gateway, "Can I see Clinicrest's data room?");
+      expect(reading?.navigation ?? null).toEqual(expected);
+    }
+  });
+
   it("v86: the company media ask reaches the caller; a malformed one is none", async () => {
     for (const [companyMedia, expected] of [
       [
@@ -199,7 +229,7 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination
     expect(TURN_READER_LENIENT_FIELDS).toContain("companyMedia");
     const kept = acceptStructuredOutput(
       JSON.stringify({ ...BASE, companyMedia: "the video" }),
-      TurnReaderV86ResultSchema,
+      TurnReaderV87ResultSchema,
       { lenientFields: TURN_READER_LENIENT_FIELDS },
     );
     expect(kept.ok && kept.value.companyMedia).toBeNull();
@@ -207,7 +237,7 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination
 
   it("a malformed navigation intent costs itself, never the reading", () => {
     const raw = JSON.stringify({ ...BASE, navigation: "take me there" });
-    const kept = acceptStructuredOutput(raw, TurnReaderV86ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV87ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);

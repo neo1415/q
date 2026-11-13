@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV86ResultSchema,
+  TurnReaderV87ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -25,8 +25,8 @@ import {
   type TurnReaderV70Result,
   type TurnReaderV79Result,
   type TurnReaderV82Result,
-  type TurnReaderV85Result,
   type TurnReaderV86Result,
+  type TurnReaderV87Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -246,9 +246,11 @@ export type QTurnReading = Omit<
    * (moved at once), CONTEXT (the page-move decision places it, under its
    * guards; workspace only), OFFER_ONLY (offered) or NONE, and negated.
    * Where, and whether they may open it, stay code's. Absent or null: not
-   * read, and code's documented word rules are the fallback.
+   * read, and code's documented word rules are the fallback. v87 (live 13
+   * Nov 2026): `tab` names the part of a record page they mean (data room,
+   * team, ...), by meaning; code keeps it only where the page has it.
    */
-  readonly navigation?: TurnReaderV85Result["navigation"] | undefined;
+  readonly navigation?: TurnReaderV87Result["navigation"] | undefined;
   /**
    * v86 (A8, owner directive 13 Nov 2026): they ask to watch a company's
    * pitch, or about a company as a whole, read by meaning. Which company,
@@ -635,8 +637,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV86Result>> =>
-          gateway.execute<TurnReaderV86Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV87Result>> =>
+          gateway.execute<TurnReaderV87Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -651,7 +653,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV86ResultSchema,
+              schema: TurnReaderV87ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -694,7 +696,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV86ResultSchema.safeParse(
+        const parsed = TurnReaderV87ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;
@@ -707,7 +709,12 @@ export function createQTurnReader(dependencies: {
         // mode was written beside it.
         const navigation =
           parsed.data.navigation?.negated === true
-            ? { mode: "NONE" as const, negated: true, destination: null }
+            ? {
+                mode: "NONE" as const,
+                negated: true,
+                destination: null,
+                tab: null,
+              }
             : parsed.data.navigation;
         return compareOverFromShown({
           ...parsed.data,
