@@ -12,6 +12,14 @@
 # a receipt for the full commit SHA, which scripts/deploy-promote.sh checks
 # before it pushes the production branch.
 #   STEPS="static typecheck" bash scripts/ci-local.sh   # a subset
+#   CI_LOCAL_DIAGNOSE=1 bash scripts/ci-local.sh       # run every step even
+#                                                      # after one fails
+#
+# Fail fast (owner, 13 Nov 2026): by default the gate stops at the first
+# step that fails, since a failed step already means no receipt; the
+# remaining steps are reported as NOT RUN. CI_LOCAL_DIAGNOSE=1 runs them
+# all, to collect every failure at once. Either way only a run in which
+# every step passed writes a receipt.
 #
 # Steps (CI job → here):
 #   static       format and lint      pnpm format:check; pnpm lint
@@ -118,7 +126,15 @@ fresh_supabase() {
 }
 stop_supabase() { pnpm exec supabase stop --no-backup >/dev/null 2>&1; }
 
-step_static() { pnpm format:check && pnpm lint; }
+# Prettier's own cache is safe to keep across gates: a file's formatting
+# depends only on its content, the resolved config and Prettier's version,
+# all of which the cache keys on (content strategy, not mtime: a fresh
+# checkout's mtimes are all new). ESLint's cache is NOT used: type-aware
+# rules read other files' types, which its per-file cache does not track.
+step_static() {
+  pnpm exec prettier --check . --cache --cache-strategy content \
+    --cache-location "$root/cache/prettier/.prettiercache" && pnpm lint
+}
 step_typecheck() { pnpm typecheck; }
 step_build() { pnpm build; }
 step_test() {
@@ -153,8 +169,18 @@ step_integration() {
 }
 
 started=$SECONDS
+mkdir -p "$root/cache/prettier"
+stopped=""
 for name in $steps; do
+  if [ -n "$stopped" ]; then
+    result[$name]="NOT RUN (after $stopped failed)"
+    continue
+  fi
   run "$name" "step_$name"
+  case "${result[$name]}" in
+    PASS*) ;;
+    *) [ "${CI_LOCAL_DIAGNOSE:-0}" = "1" ] || stopped="$name" ;;
+  esac
 done
 
 verdict=PASS

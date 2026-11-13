@@ -178,7 +178,7 @@ select is(
   array['application_contacts', 'application_documents', 'application_facts', 'application_founders',
         'application_sessions', 'application_submissions', 'application_syntheses', 'application_turns', 'application_video_sessions', 'applications',
         'contact_verification_limits', 'gateway_criteria', 'gateway_versions', 'gateways',
-        'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
+        'guest_throttle_buckets', 'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
         'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
         'pass_reasons', 'policy_extractions', 'startup_alerts']::text[],
   'the gateq tables are exactly the gateway, application, mandate-reading provenance, inbox and startup-alert sets');
