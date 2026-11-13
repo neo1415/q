@@ -468,3 +468,24 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - ESLint concurrency 4: ran out of memory;
   - the Vitest threads pool: timing tests flaked and there was no clean gain.
 - No deploy: this commit changes only the test configuration and docs. Production stays on `5af6c8ad3`.
+
+## Navigation v84 deployed — `12baf142c` (13 Nov, 17:25 Lagos)
+
+- **Gate:** `ci-local PASS sha=12baf142c at=2026-11-13T16:23:23Z took=1343s` (22.4 min). Rollback point `5af6c8ad3`; four services SUCCESS.
+- **Contents:**
+  - TURN_READER v84 navigation intent (GO / CONTEXT / OFFER_ONLY / NONE), with CONTEXT going through the existing decider and its guards, plus SAME_SUBJECT and BACK_AND_FORTH holds.
+  - GO moves at once (`12baf142c`).
+  - Module-mocking tests isolated, with a guard (`0863278cb`).
+  - The eval key name (`583eccbca`).
+- **Live journey** (`investor.savanna-seed`, /work, one conversation):
+  1. "Who should I follow up with this week?" — **stayed on /work** (miss). The reader read THEIR_OWN_RECORDS; the decider decided STAY with no guard.
+  2. "Can I see Clinicrest's data room?" → `/company/6b2f…?tab=dataroom`, 3.6 s.
+  3. "And what's their team like?" → `?tab=team`, 3.9 s (deep link, same record).
+  4. "What does ARR mean?" — stayed.
+  5. The Ledgerline MRR chart question — stayed (chart inline, no Overview).
+  6. "Don't move the page, just tell me what stage Ledgerline is at." — stayed.
+  7. "Take me to my pipeline." → `/relationships?view=pipeline`, **0.8 s**.
+- **Not yet accepted.** The CONTEXT pipeline case misses because CONTEXT cannot overcome a decider STAY, and the reading's mode is not logged. A follow-up is with the navigation agent.
+- **Owner-acceptance gaps still open:**
+  - no pinned-workspace state in the screen contract;
+  - the live evals wait for `CQ_EVAL_ANTHROPIC_API_KEY`.
