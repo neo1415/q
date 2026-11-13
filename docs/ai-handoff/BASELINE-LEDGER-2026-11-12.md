@@ -429,3 +429,9 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **Defect (next):** the prose contradicts the chart. It says "from ₦19.6m in October 2025" and "the record doesn't provide each month's value".
   - Likely sources: an older growth claim's start, and the figures tool's "Earlier reading… not the latest figure" labels.
   - The analyst is not told what the code drew. Fix: give the answer the chart's own points as an authorised fact (as the comparison's fact statement does), so the words describe the series on screen.
+- **`c455c03d2` deployed.**
+  - Gate: `ci-local PASS sha=c455c03d2 at=2026-11-13T13:02:48Z took=2143s`. The earlier run on `4375d1155` failed only because the kernel killed a lint worker for memory (concurrent checks); no lint error was reported.
+  - Rollback point `1d267d200`; four services SUCCESS.
+  - Contents: the chart fact (`4375d1155`) and C10 comparison by reading (`c455c03d2`).
+- **Live:** the Ledgerline chart's words now describe the drawn series: "₦31.72m in June 2026 to ₦33.69m in July, ₦35.78m in August, and ₦38.0m in September… about ₦6.28m, or 19.8%… self-reported". One CHART block.
+  - It also cites an older October 2025 growth start (₦19.6m) and says honestly that the months in between are not given.
