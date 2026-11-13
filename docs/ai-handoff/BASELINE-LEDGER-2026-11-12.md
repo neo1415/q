@@ -550,3 +550,17 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **Root cause of #1** (q-api logs): the reading this time was TOOL_REQUEST with GO and a COMPANY reference, so `openReferenced` opened the record at once and never carried a tab. On v85 the same words had been read as CONTEXT, so the decision placed the tab. The words-based tab parser does not read "Can I see …", and widening it would be keyword routing.
 - **Fix in progress:** TURN_READER v87 `navigation.tab`, the record tab read by meaning. `openReferenced` applies it, with the words parser only when there is no reading.
 - **Seen:** on turn 2, Q offered "Open Company profile" while that profile was already open (cosmetic; queued).
+
+## TURN_READER v87 (record tab) deployed — `550ecdd5c` (13 Nov, 21:35 Lagos)
+
+- **Gate:** `ci-local PASS sha=550ecdd5c at=2026-11-13T20:34:04Z took=1295s`. Rollback point `a37e844d5`; four services SUCCESS.
+- **Live** (`investor.savanna-seed`, /work, `steps-media.json`; q-api logs now show `navigationTab`):
+
+  | #   | Turn                                                                 | Result                                                                                                                                                                                                                                            |
+  | --- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 1   | "Can I see Clinicrest's data room?"                                  | **PASS**: `/company/6b2f…?tab=dataroom` (6.7 s); reading GO, tab `dataroom`. Q also prepared an "ask for everything on request" card, which waits for approval and was not sent.                                                                  |
+  | 2   | "Could I watch how Clinicrest presents itself? Play me their pitch." | **REGRESSION**: reading GO, tab `deck`, `companyMedia.pitch`. `openReferenced` opened COMPANY_PITCH (`/discover?tab=yours&company=…`); no inline player. Fix with the agent: a pitch ask plays inline, and any placement uses the `elevator` tab. |
+  | 3   | "Tell me about Ledgerline."                                          | moved to Ledgerline `?tab=overview` (CONTEXT, 6.0 s), with Ledgerline's own picture                                                                                                                                                               |
+  | 4   | "What does ARR mean?"                                                | stayed; no new media                                                                                                                                                                                                                              |
+
+- **In progress:** an agent is reconciling record-tab navigation across the paths. The plan has five edits: the decision overlay; tab-chosen pages; deck by reading; follow-ups on the record in play; and investor and relationship records added to the remembered screen. It also carries the pitch fix above.
