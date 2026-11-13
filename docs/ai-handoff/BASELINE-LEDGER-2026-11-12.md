@@ -411,3 +411,16 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The answer carries a code-built CHART (BAR, USD a month): SongScribe AI 3,200 and Capital Q 4,800, both as of 2026-09-30, USER_CLAIM / SELF_REPORTED, sourced "Company-stated on Capital Q, as each claim gives it; not verified by Capital Q".
   - KUUZA AI is said to be "Not established"; nothing is invented. 28 s, no page errors.
 - **A4:** certified by `apps/api/test/synthetic-reviewer.integration.test.ts` in the integration step of `0a6f0e298`'s gate (PASS). No production surface by design: no synthetic reviewer is provisioned there.
+
+## Release `c58d71d9c` and the demo figures seed (13 Nov, 12:00 Lagos)
+
+- **Gate:** `ci-local PASS sha=c58d71d9c at=2026-11-13T10:54:01Z took=1951s` (static 665 s, typecheck 101 s, build 2 s (apps cached), test 1,182 s, database 62 s, integration 438 s).
+- **Deploy:** `scripts/deploy-promote.sh c58d71d9c`, rollback point `0a6f0e298`. All four services SUCCESS.
+- **Seed applied** (`scripts/seed/demo-figures.mjs --apply`, owner-approved 13 Nov):
+  - 32 fictional companies, 363 company-stated figure claims (USER_CLAIM / SELF_REPORTED, CURRENT, network_visible). Each statement says "(Demonstration data, self-reported by the company.)".
+  - Audit rows are `capital_q_system`, with no person. A re-plan finds nothing left (idempotent).
+  - Ledgerline was the canary: 16 claims, e.g. MRR NGN 31.7m (June) to NGN 38.0m (September 2026).
+- **Live chart check exposed a defect:**
+  - "Chart Ledgerline's monthly recurring revenue over the last few months" drew no chart. Q answered from the profile text and searched the public web.
+  - Cause: the name candidate was "Chart Ledgerline", because "chart" was not among the words that are never a company's name. The exact-name search failed, so no figures were read.
+  - Fixed in `1d267d200`: the chart verbs are not names, and a chart ask (not a comparison) now reads its named companies' figures through the executor. Test-proven: the new test fails without the fix. Gating now.
