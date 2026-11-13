@@ -406,3 +406,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The dry run plans 32 fictional companies, 111 metrics and 363 claims, attributed to the SYSTEM audit actor.
   - Readers now show the latest point per metric.
   - **Held before `--apply`:** the readiness and investability readers count every network-visible current claim, so monthly history could inflate evidence. They must group by claim key first.
+- **Egress restored by 10:31 UTC. Live check of `0a6f0e298`, A8:**
+  - Asked as `investor.savanna-seed`: "Chart monthly revenue for Capital Q, KUUZA AI and SongScribe AI side by side."
+  - The answer carries a code-built CHART (BAR, USD a month): SongScribe AI 3,200 and Capital Q 4,800, both as of 2026-09-30, USER_CLAIM / SELF_REPORTED, sourced "Company-stated on Capital Q, as each claim gives it; not verified by Capital Q".
+  - KUUZA AI is said to be "Not established"; nothing is invented. 28 s, no page errors.
+- **A4:** certified by `apps/api/test/synthetic-reviewer.integration.test.ts` in the integration step of `0a6f0e298`'s gate (PASS). No production surface by design: no synthetic reviewer is provisioned there.
