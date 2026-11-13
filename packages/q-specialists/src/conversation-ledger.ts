@@ -235,6 +235,17 @@ function foldBlocks(
           via: "OPENED",
         });
         break;
+      // A8: a company's own picture or pitch shown in the answer names that
+      // company, as a reference does.
+      case "COMPANY_MEDIA":
+        upsert(draft, {
+          kind: "COMPANY",
+          id: block.companyId,
+          name: block.name,
+          turn,
+          via: "OPENED",
+        });
+        break;
       case "INVESTOR_REFERENCE":
         upsert(draft, {
           kind: "INVESTOR_ORGANISATION",

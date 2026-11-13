@@ -92,6 +92,7 @@ export function drawnArtifacts(
       case "SCHEDULE": // their day as a card: no table, map, chart or timeline claim
       case "PLAN": // the plan card: steps, not a table, map, chart or timeline
       case "NAVIGATION_OFFER": // an offer to open a page draws nothing
+      case "COMPANY_MEDIA": // a company's own picture or pitch: no claim drawn
         break;
     }
   }
