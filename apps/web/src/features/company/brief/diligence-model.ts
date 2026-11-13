@@ -167,11 +167,13 @@ export function diligenceLedger(input: {
           ? terms.amount === undefined
             ? null
             : askWhere(terms.amount)
-          : said !== undefined &&
-              said !== null &&
-              view?.source !== "DISCLOSED_OBJECTIVE"
-            ? pitchWhere(said)
-            : "Declared on Capital Q",
+          : view?.source === "DECK_CLAIM"
+            ? askWhere(terms.amount)
+            : said !== undefined &&
+                said !== null &&
+                view?.source !== "DISCLOSED_OBJECTIVE"
+              ? pitchWhere(said)
+              : "Declared on Capital Q",
     },
     ...(instrument === undefined && terms.instrument === undefined
       ? []

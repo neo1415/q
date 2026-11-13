@@ -188,6 +188,20 @@ describe("R2: Q's company card says the raise the Discover card says", () => {
       }),
     ).toBe("$4 million (from their pitch)");
   });
+  it("labels a deck claim as their deck, never as the disclosed raise", () => {
+    expect(
+      cardRaiseWords({
+        raise: null,
+        raiseView: {
+          ...base,
+          source: "DECK_CLAIM",
+          money: { amount: "1200000000", currency: "NGN" },
+          asOf: null,
+          pitch: null,
+        },
+      }),
+    ).toBe("1.2 billion naira (from their deck)");
+  });
   it("a disclosed raise is said plainly; NONE says nothing", () => {
     expect(
       cardRaiseWords({

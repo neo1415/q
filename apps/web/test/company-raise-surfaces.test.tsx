@@ -92,7 +92,17 @@ const NONE: CompanyRaiseView = {
   asOf: null,
   pitch: null,
 };
-const VIEWS = { pitch: PITCH, disclosed: DISCLOSED, none: NONE };
+// 2026-11-13: a raise only the deck states (sections confirmed for investors).
+const DECK: CompanyRaiseView = {
+  source: "DECK_CLAIM",
+  money: { amount: "1200000000", currency: "NGN" },
+  truthClass: "USER_CLAIM",
+  evidenceStatus: "SELF_REPORTED",
+  visibility: "network_visible",
+  asOf: null,
+  pitch: null,
+};
+const VIEWS = { pitch: PITCH, disclosed: DISCLOSED, deck: DECK, none: NONE };
 
 function cardWords(view: CompanyRaiseView): string {
   const company = {
@@ -250,6 +260,14 @@ describe("R2: Discover and the profile say the same raise to the same reader", (
       "$5M · Declared by the company",
     );
     expect(profileWords(NONE).split("#")[1]).toBe("Not shared with you");
+  });
+
+  it("labels a deck claim as their deck, never as a disclosed raise", () => {
+    const [card, line] = [cardWords(DECK), profileWords(DECK).split("#")[1]];
+    expect(card.startsWith("DECK_CLAIM|")).toBe(true);
+    expect(card.endsWith("|From their deck")).toBe(true);
+    expect(line?.endsWith(" · From their deck")).toBe(true);
+    expect(card).not.toContain("Declared");
   });
 });
 

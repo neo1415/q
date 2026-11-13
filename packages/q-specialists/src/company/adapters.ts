@@ -144,7 +144,8 @@ export function createToolCanonicalPort(
             availability?: "CURRENT" | "NONE" | "NOT_SHARED_WITH_YOU";
             /** R2: the one raise read, as the card and the profile say it. */
             raise?: {
-              source: "DISCLOSED_OBJECTIVE" | "PITCH_CLAIM" | "NONE";
+              source:
+                "DISCLOSED_OBJECTIVE" | "PITCH_CLAIM" | "DECK_CLAIM" | "NONE";
               money: { amount: string; currency: string } | null;
               pitch: { atSeconds: number } | null;
             };
@@ -165,6 +166,11 @@ export function createToolCanonicalPort(
             payload.raise.money !== null
               ? payload.raise.money
               : null;
+          const deckRaise =
+            payload.raise?.source === "DECK_CLAIM" &&
+            payload.raise.money !== null
+              ? payload.raise.money
+              : null;
           if (
             payload.availability === "NOT_SHARED_WITH_YOU" &&
             pitchRaise !== null
@@ -179,6 +185,20 @@ export function createToolCanonicalPort(
               truthClass: "USER_CLAIM",
               evidenceStatus: "SELF_REPORTED",
               source: "The company's pitch video (its own words)",
+            });
+          } else if (
+            payload.availability === "NOT_SHARED_WITH_YOU" &&
+            deckRaise !== null
+          ) {
+            // 2026-11-13: nothing disclosed and no pitch says it, but the
+            // deck sections they may read state it -- the figure the
+            // Discover card and the profile show, as the deck's own words.
+            facts.push({
+              scope: "CAPITAL_OBJECTIVE",
+              statement: `The company has not disclosed a raise to you on Capital Q. Their deck says they are raising ${deckRaise.amount} ${deckRaise.currency}: the company's own claim from its deck, not a disclosed or verified figure.`,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              source: "The company's deck (its own words)",
             });
           } else if (payload.availability === "NOT_SHARED_WITH_YOU") {
             // Private (or absent) to this person: said as such, so the

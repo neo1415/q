@@ -83,8 +83,8 @@ export const GetCapitalObjectiveOutputSchema = z
     /**
      * R2: the raise as this person sees it on every surface (`raiseFor`):
      * the Discover card and the profile say exactly this. PITCH_CLAIM is
-     * the company's own words in a pitch they may play, where nothing is
-     * disclosed to them. Absent where the deployment composes no reader.
+     * the company's own words in a pitch they may play, DECK_CLAIM in the
+     * deck sections they may read, where nothing is disclosed to them. Absent where the deployment composes no reader.
      */
     raise: CompanyRaiseViewSchema.optional(),
   })
@@ -121,7 +121,7 @@ export function createGetCapitalObjectiveTool(
     status: "ACTIVE",
     providerName: "get_capital_objective",
     description:
-      "Returns a company's current raise -- type, target amount and currency, target stage, instrument, target close date, status -- as far as the company has shared it with this person. Call it whenever the answer depends on how much a company is raising or on what terms, including for each company in a comparison. availability NOT_SHARED_WITH_YOU means the company has not shared its raise with them: say exactly that, never that it is unknown and never guess an amount -- unless raise.source is PITCH_CLAIM: then no raise is disclosed to them, but the company's own pitch video says the amount in raise.money; say it as what they say in their pitch (e.g. 'in their pitch they say they are raising $4M'), never as a disclosed, confirmed or verified figure. NONE (their own company only) means no current raise is recorded.",
+      "Returns a company's current raise -- type, target amount and currency, target stage, instrument, target close date, status -- as far as the company has shared it with this person. Call it whenever the answer depends on how much a company is raising or on what terms, including for each company in a comparison. availability NOT_SHARED_WITH_YOU means the company has not shared its raise with them: say exactly that, never that it is unknown and never guess an amount -- unless raise.source is PITCH_CLAIM or DECK_CLAIM: then no raise is disclosed to them, but the company's own pitch video or deck says the amount in raise.money; say it as what their pitch or deck says (e.g. 'their deck says they are raising $4M'), never as a disclosed, confirmed or verified figure. NONE (their own company only) means no current raise is recorded.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [capability("capital_objective.view")],

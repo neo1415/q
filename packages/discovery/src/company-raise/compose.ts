@@ -1,4 +1,9 @@
 import type { CompanyIdentity, CompanyQueryPort } from "@capital-q/companies";
+import {
+  deckAskTerms,
+  type CompanyDeckView,
+  type MarketplaceVisibility,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type {
   DisclosureAccessService,
@@ -11,7 +16,34 @@ import {
   RAISE_PITCHES_MAX,
   type CompanyRaiseReader,
   type CompanyRaiseReaderPorts,
+  type DeckRaiseStatement,
 } from "./reader.js";
+
+/**
+ * The raise a deck view states, as the fit's stated context reads it
+ * (fit/stated.ts: the confirmed "The ask" amount), with the scope the
+ * reader holds the deck under. The view is already the reader's own
+ * (investors: sections the founder confirmed); nothing wider is read.
+ */
+export function deckRaiseStatementOf(
+  view: CompanyDeckView | null | undefined,
+): DeckRaiseStatement | null {
+  if (view === null || view === undefined || view.deck === null) return null;
+  const sections = (view.extraction?.sections ?? []).filter(
+    (section) => section.status === "PRESENT",
+  );
+  const amountText = deckAskTerms(sections).amount;
+  if (amountText === undefined) return null;
+  const visibility: MarketplaceVisibility =
+    view.viewer === "OWNER"
+      ? "organisation_private"
+      : view.deck.downloadable
+        ? // Offered to every investor who may find the company.
+          "network_visible"
+        : // Reached them some narrower way (a relationship grant).
+          "relationship_shared";
+  return { amountText, visibility };
+}
 
 /**
  * `raiseFor` composed over the owning contexts' ports, one way for every
@@ -84,6 +116,17 @@ export type CompanyRaiseContextPorts = {
    * play. It is the only playback check the raise makes.
    */
   readonly pitchRaise: CompanyRaiseReaderPorts["pitchRaise"];
+  /**
+   * The deck as this reader may see it, for many companies (the deck
+   * service's `views`, the same read the fit's stated context makes).
+   * Absent: no deck claim.
+   */
+  readonly deckViews?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, CompanyDeckView | null>>)
+    | undefined;
 };
 
 export function composeCompanyRaiseReader(
@@ -106,6 +149,7 @@ export function composeCompanyRaiseReader(
   const findMany = ports.companies.findCanonicalCompanies;
   const objectivesMany = ports.capital.getCurrentForCompanies;
   const policiesMany = ports.policies.findAllForResources;
+  const deckViews = ports.deckViews;
   // Coordinator 2026-10-26 (live trace, a top-five ranking): each of these
   // was one query per company shown, twice; now one read for the set.
   return createCompanyRaiseReader({
@@ -220,5 +264,18 @@ export function composeCompanyRaiseReader(
       }));
     },
     pitchRaise: ports.pitchRaise,
+    ...(deckViews === undefined
+      ? {}
+      : {
+          deckRaises: async (actor, companyIds) => {
+            const views = await deckViews(actor, companyIds);
+            const out = new Map<string, DeckRaiseStatement>();
+            for (const companyId of companyIds) {
+              const statement = deckRaiseStatementOf(views.get(companyId));
+              if (statement !== null) out.set(companyId, statement);
+            }
+            return out;
+          },
+        }),
   });
 }

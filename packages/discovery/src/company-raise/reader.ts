@@ -12,8 +12,10 @@ import {
 } from "@capital-q/permissions";
 import type { ActorContext } from "@capital-q/security";
 
+import { deckMoneyFrom } from "./deck-money.js";
 import {
   presentCompanyRaise,
+  type DeckRaiseClaimFact,
   type PitchRaiseClaimFact,
   type RaiseObjectiveFact,
   type RaiseSharing,
@@ -30,7 +32,10 @@ import {
  *   sharing     the objective's disclosure-policy history (a revoked share
  *               means the founder hid it);
  *   pitch       the first raise said in a pitch this reader may play,
- *               newest first, read under Media's playback rule.
+ *               newest first, read under Media's playback rule;
+ *   deck        the raise the deck states in the sections this reader may
+ *               read (the deck service's own view for them), parsed by
+ *               `deckMoneyFrom`; used only where no pitch says it.
  *
  * Callers must already have decided the reader may see the company (the
  * slate reader, the profile route, Q's firewall). Any read that fails is
@@ -53,6 +58,14 @@ export type RaisePitchCandidate = {
 export type RaisePolicyRow = {
   readonly scopeType: string;
   readonly revokedAt: unknown;
+};
+
+/** The deck's own raise words, as this reader may read the deck. */
+export type DeckRaiseStatement = {
+  /** The deck's amount as written ("₦1.2bn"); parsed by the reader. */
+  readonly amountText: string;
+  /** The scope under which this reader may read the deck. */
+  readonly visibility: MarketplaceVisibility;
 };
 
 export type CompanyRaiseReaderPorts = {
@@ -147,6 +160,18 @@ export type CompanyRaiseReaderPorts = {
           } | null
         >
       >)
+    | undefined;
+  /**
+   * The raise each company's deck states, from the deck view THIS reader
+   * already gets (an investor: sections confirmed for investors only), by
+   * company id. Absent, or a company missing: no deck claim. Never a wider
+   * read than the deck service gives this reader.
+   */
+  readonly deckRaises?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, DeckRaiseStatement>>)
     | undefined;
 };
 
@@ -345,6 +370,29 @@ export function createCompanyRaiseReader(
     return claims;
   };
 
+  /** The deck's stated raise per company, where it parses; else none. */
+  const deckClaimsOf = async (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DeckRaiseClaimFact>> => {
+    const read = ports.deckRaises;
+    if (read === undefined || companyIds.length === 0) return new Map();
+    const said = await settled(
+      read(actor, companyIds),
+      new Map<string, DeckRaiseStatement>(),
+    );
+    const claims = new Map<string, DeckRaiseClaimFact>();
+    for (const companyId of companyIds) {
+      const statement = said.get(companyId);
+      if (statement === undefined) continue;
+      const money = deckMoneyFrom(statement.amountText);
+      if (money !== null) {
+        claims.set(companyId, { ...money, visibility: statement.visibility });
+      }
+    }
+    return claims;
+  };
+
   const raisesFor = async (
     actor: ActorContext,
     companyIds: readonly string[],
@@ -420,16 +468,19 @@ export function createCompanyRaiseReader(
         ? "PRIVATE"
         : (sharings.get(objective.id) ?? "HIDDEN");
     };
-    const claims = await pitchClaimsOf(
-      actor,
-      companies.flatMap((company, index) =>
-        settledByDisclosure[index] === true ||
-        sharingAt(index) === "HIDDEN" ||
-        (viewers[index] === "OWNER" && objectives[index] !== null)
-          ? []
-          : [company.id as string],
-      ),
+    const claimable = companies.flatMap((company, index) =>
+      settledByDisclosure[index] === true ||
+      sharingAt(index) === "HIDDEN" ||
+      (viewers[index] === "OWNER" && objectives[index] !== null)
+        ? []
+        : [company.id as string],
     );
+    // The deck is read beside the pitches (not after), so a profile waits
+    // for the slower of the two, never both in turn.
+    const [claims, deckClaims] = await Promise.all([
+      pitchClaimsOf(actor, claimable),
+      deckClaimsOf(actor, claimable),
+    ]);
     return new Map(
       companies.map((company, index) => {
         const viewer = viewers[index] ?? "FOUNDER";
@@ -450,6 +501,7 @@ export function createCompanyRaiseReader(
                 disclosedBecause,
                 sharing: sharingAt(index),
                 pitchClaim: claims.get(company.id) ?? null,
+                deckClaim: deckClaims.get(company.id) ?? null,
               });
         return [company.id, view] as const;
       }),

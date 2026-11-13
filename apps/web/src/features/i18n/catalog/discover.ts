@@ -53,6 +53,8 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "A customer type you named": "نوع عملاء حددته",
   "Said in their pitch": "قالوه في عرضهم",
   "Said in your pitch": "قلته في عرضك",
+  "From their deck": "من عرضهم التقديمي",
+  "From your deck": "من عرضك التقديمي",
   "Your raise": "جولتك",
   "Declared by the company": "أعلنته الشركة",
   "Not added yet": "لم يُضَف بعد",

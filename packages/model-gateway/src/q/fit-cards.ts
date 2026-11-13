@@ -49,8 +49,8 @@ export type RunFit = {
 
 /**
  * The card's raise in words, from the one raise read when the tool carried
- * it (R2): a pitch claim is said as the company's pitch, never as the
- * disclosed raise. Without it, the disclosed raise as before.
+ * it (R2): a pitch or deck claim is said as the company's pitch or deck,
+ * never as the disclosed raise. Without it, the disclosed raise as before.
  */
 export function cardRaiseWords(
   fit: Pick<RunFit, "raise" | "raiseView">,
@@ -60,7 +60,11 @@ export function cardRaiseWords(
   if (view.source === "NONE") return null;
   const words = raiseWords(view.money);
   if (words === null) return null;
-  return view.source === "PITCH_CLAIM" ? `${words} (from their pitch)` : words;
+  return view.source === "PITCH_CLAIM"
+    ? `${words} (from their pitch)`
+    : view.source === "DECK_CLAIM"
+      ? `${words} (from their deck)`
+      : words;
 }
 
 function raiseViewOf(value: unknown): CompanyRaiseView | undefined {

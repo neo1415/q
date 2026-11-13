@@ -1730,6 +1730,11 @@ const companyRaise = composeCompanyRaiseReader({
       ]),
     );
   },
+  // 2026-11-13: the raise the deck states, from the deck view this reader
+  // already gets (investors: confirmed sections only); the same deck the
+  // fit's stated context reads. Called per request, after start-up.
+  deckViews: (actor, companyIds) =>
+    profileMaterial.companyDeck.views(actor, companyIds),
 });
 const recommendationExplanations = createRecommendationExplanationService({
   ports: slateRead.eligibilityPorts,

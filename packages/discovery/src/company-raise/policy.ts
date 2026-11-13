@@ -28,7 +28,12 @@ import type { DisclosureAllowReason } from "@capital-q/permissions";
  *      pitch is not used to leak it on their behalf;
  *   4. the raise as said in a pitch this reader may play -- PITCH_CLAIM,
  *      labelled as the company's pitch claim, never as the disclosed one;
- *   5. NONE: unknown, never zero, never "not raising".
+ *   5. the raise the company's deck states, in the sections this reader
+ *      may read (an investor: those the founder confirmed for investors),
+ *      parsed deterministically from the deck's own amount -- DECK_CLAIM,
+ *      labelled as from their deck (live 2026-11-13: a comparison left
+ *      Ajopot's raise blank while its fit row quoted the deck's figure);
+ *   6. NONE: unknown, never zero, never "not raising".
  *
  * The founder-private figure itself never reaches a non-owner unless
  * disclosure allows it: step 1 is the only path that reads it.
@@ -64,6 +69,16 @@ export type CompanyRaisePolicyInput = {
   readonly sharing: RaiseSharing;
   /** The first raise said in a pitch this reader may play, newest first. */
   readonly pitchClaim: PitchRaiseClaimFact | null;
+  /** The raise the deck states in sections this reader may read (absent: none). */
+  readonly deckClaim?: DeckRaiseClaimFact | null | undefined;
+};
+
+export type DeckRaiseClaimFact = {
+  /** Parsed from the deck's own amount text; never converted. */
+  readonly amount: string;
+  readonly currency: string;
+  /** The scope under which this reader may read the deck. */
+  readonly visibility: MarketplaceVisibility;
 };
 
 const SCOPE_OF_REASON: Readonly<
@@ -95,7 +110,20 @@ export function presentCompanyRaise(
   if (input.viewer === "FOUNDER") return NO_RAISE_VIEW;
   if (input.sharing === "HIDDEN") return NO_RAISE_VIEW;
   const claim = input.pitchClaim;
-  if (claim === null) return NO_RAISE_VIEW;
+  if (claim === null) {
+    const deck = input.deckClaim ?? null;
+    if (deck === null) return NO_RAISE_VIEW;
+    return {
+      source: "DECK_CLAIM",
+      money: { amount: deck.amount, currency: deck.currency },
+      // The company's own statement in its deck, never verified by it.
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      visibility: deck.visibility,
+      asOf: null,
+      pitch: null,
+    };
+  }
   return {
     source: "PITCH_CLAIM",
     money: { amount: claim.amount, currency: claim.currency },

@@ -6,9 +6,9 @@ import { compactMoneyText, moneyText } from "./money-text";
  * The words for a company's raise, from the server's one raise read
  * (`raiseFor`, R2). The Discover card and the profile both say exactly
  * these, so one reader never sees "not shared" in one place and an amount
- * in the other. The label names where the figure came from: a pitch claim
- * is the company's own words in a video, never presented as the disclosed
- * raise, and neither is ever called verified.
+ * in the other. The label names where the figure came from: a pitch or
+ * deck claim is the company's own words in a video or its deck, never
+ * presented as the disclosed raise, and none is ever called verified.
  */
 export type RaiseWords = {
   readonly source: CompanyRaiseView["source"];
@@ -40,9 +40,15 @@ export function raiseWords(view: CompanyRaiseView, own: boolean): RaiseWords {
         ? own
           ? "Said in your pitch"
           : "Said in their pitch"
-        : own
-          ? "Your raise"
-          : "Declared by the company",
+        : view.source === "DECK_CLAIM"
+          ? // The amount the deck's "The ask" states, as confirmed for
+            // investors: the company's own words, never a disclosure.
+            own
+            ? "From your deck"
+            : "From their deck"
+          : own
+            ? "Your raise"
+            : "Declared by the company",
   };
 }
 

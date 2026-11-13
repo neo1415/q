@@ -923,6 +923,7 @@ export {
 export {
   presentCompanyRaise,
   type CompanyRaisePolicyInput,
+  type DeckRaiseClaimFact,
   type PitchRaiseClaimFact,
   type RaiseObjectiveFact,
   type RaiseSharing,
@@ -935,13 +936,16 @@ export {
   sharingFromPolicies,
   type CompanyRaiseReader,
   type CompanyRaiseReaderPorts,
+  type DeckRaiseStatement,
   type RaisePitchCandidate,
   type RaisePolicyRow,
 } from "./company-raise/reader.js";
 export {
   composeCompanyRaiseReader,
+  deckRaiseStatementOf,
   type CompanyRaiseContextPorts,
 } from "./company-raise/compose.js";
+export { deckMoneyFrom, type DeckMoney } from "./company-raise/deck-money.js";
 export {
   createPostgresInvestabilityScores,
   createPostgresSuitabilityRecorder,

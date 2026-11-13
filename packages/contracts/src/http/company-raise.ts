@@ -25,16 +25,27 @@ import { MarketplaceVisibilitySchema } from "./companies.js";
  *                        the founder has not hidden the raise. The
  *                        company's own words: labelled as said in the
  *                        pitch, never as the disclosed objective.
+ *   DECK_CLAIM           the raise the company's deck states, in the
+ *                        sections this reader may read (an investor: only
+ *                        those the founder confirmed for investors), where
+ *                        no objective is disclosed to them, no pitch says
+ *                        it and the founder has not hidden the raise.
+ *                        Added 2026-11-13 (additive: older readers that
+ *                        know only the first three sources ignore it).
+ *                        The company's own words, labelled as from their
+ *                        deck; the figure is the deck's own amount parsed
+ *                        deterministically, never converted.
  *   NONE                 nothing this reader may see. Unknown, never zero
  *                        and never "not raising".
  *
  * `visibility` is the ADR-001 scope under which this reader holds the
- * figure; `asOf` is when the objective started, or null for a pitch claim
- * and for NONE.
+ * figure; `asOf` is when the objective started, or null for a pitch or
+ * deck claim and for NONE.
  */
 export const COMPANY_RAISE_SOURCES = [
   "DISCLOSED_OBJECTIVE",
   "PITCH_CLAIM",
+  "DECK_CLAIM",
   "NONE",
 ] as const;
 export const CompanyRaiseSourceSchema = z.enum(COMPANY_RAISE_SOURCES);
@@ -59,8 +70,8 @@ export const CompanyRaiseViewSchema = z
   })
   .strict()
   .superRefine((view, ctx) => {
-    // The axes follow the source; a pitch claim can never pass as anything
-    // stronger than the company's own statement.
+    // The axes follow the source; a pitch or deck claim can never pass as
+    // anything stronger than the company's own statement.
     const none = view.source === "NONE";
     if (none !== (view.money === null)) {
       ctx.addIssue({ code: "custom", message: "money iff source is not NONE" });

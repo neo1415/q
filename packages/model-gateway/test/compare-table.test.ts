@@ -109,6 +109,40 @@ describe("compare side by side", () => {
     expect(block.rows.find((row) => row.label === "Raise")).toBeUndefined();
   });
 
+  // Live 2026-11-13: Ajopot's Raise cell was blank while its cheque-fit
+  // row quoted the deck; its objective is founder-private, its deck,
+  // confirmed for investors, states the raise (DECK_CLAIM).
+  it("a raise stated only in the deck fills the Raise row, labelled as their deck", () => {
+    const { read, fits } = run();
+    const withDeck = fits.map((fit) =>
+      fit.companyId === MIZAN
+        ? {
+            ...fit,
+            raise: null,
+            raiseView: {
+              source: "DECK_CLAIM" as const,
+              money: { amount: "1200000000", currency: "NGN" },
+              truthClass: "USER_CLAIM" as const,
+              evidenceStatus: "SELF_REPORTED" as const,
+              visibility: "network_visible" as const,
+              asOf: null,
+              pitch: null,
+            },
+          }
+        : fit,
+    );
+    const block = comparisonTableBlock({
+      question: "Compare Silo Credit and Mizan side by side",
+      read,
+      fits: withDeck,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    expect(block.rows.find((row) => row.label === "Raise")?.cells).toEqual([
+      "",
+      "1.2 billion naira (from their deck) (company-stated)",
+    ]);
+  });
+
   it("only when asked to compare, and only with two companies read", () => {
     const { read, fits } = run();
     expect(

@@ -2045,6 +2045,11 @@ const companyRaise = createApiCompanyRaiseReader({
     });
     return view.status === "AVAILABLE" ? view.cues : null;
   },
+  // 2026-11-13: the raise the deck states, from the deck view this reader
+  // already gets (investors: confirmed sections only); the same deck the
+  // fit reads. Called per request, after start-up.
+  deckViews: (actor, companyIds) =>
+    profileMaterial.companyDeck.views(actor, companyIds),
 });
 
 /**
