@@ -2281,3 +2281,7 @@ export {
   V30_ALLOWED_ROOT_KEYS,
   V30_CHANGES,
 } from "./prompts/tasks/company-analyst.v30.js";
+export {
+  COMPANY_ANALYST_V31,
+  V31_CHANGES,
+} from "./prompts/tasks/company-analyst.v31.js";

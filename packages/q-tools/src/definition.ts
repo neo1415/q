@@ -133,6 +133,19 @@ export type QToolDefinition<I, O, G> = {
    */
   readonly offerLast?: boolean | undefined;
   /**
+   * A8 (live 13 Nov, founder.maji-loop: "Good news: we hit $120k MRR in
+   * October." was read as an ANSWER; nothing the turn named kept the
+   * figure tool in reach, and no card was made): an action on the
+   * person's own organisation for what they TELL Q about it, which can
+   * come with any turn -- a reply, news, a question. Offered on every turn
+   * of a purpose it serves whose plan holds their own organisation (a
+   * founder's own company), whatever the turn's focus, questions included,
+   * and ranked just after the core so no bound cuts it. Never on a plan without their own
+   * organisation (an investor's): offering is not authority, and its
+   * authorize step still decides. Absent: false.
+   */
+  readonly offeredOnOwnTurns?: boolean | undefined;
+  /**
    * Whether it can apply to this person at all right now, before any input
    * is known (a reply to an investor's open question, with none open).
    * False: left off the list the turn reader and router choose from this

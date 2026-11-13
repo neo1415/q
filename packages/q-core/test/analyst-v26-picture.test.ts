@@ -27,7 +27,7 @@ const answer = {
 describe("COMPANY_ANALYST v26", () => {
   it("is active, keeps v25 for its runs, and changes two lines plus listed trims", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(30);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(31);
     expect(registry.get("COMPANY_ANALYST", 25)?.definition.status).toBe(
       "DEPRECATED",
     );

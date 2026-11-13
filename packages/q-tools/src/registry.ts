@@ -337,9 +337,21 @@ export function createQToolRegistry(
     const workspace =
       context.plan.screen?.workspace !== undefined &&
       context.invokedBy !== "CODE";
+    // A8: what they tell Q about their own organisation can come with any
+    // turn of their own organisation's purpose (a reply, news, a question),
+    // so such an action is in reach whatever the turn's focus, questions
+    // included -- only when the plan holds that organisation (never an
+    // investor's plan for a founder's tool). Another purpose is unchanged:
+    // named, or loaded by use_capability.
+    const ownStatement = (record: QToolRecord): boolean =>
+      record.definition.offeredOnOwnTurns === true &&
+      directly(record) &&
+      ownOrganisationAction(record) &&
+      ownHeldFor(record);
     const relevant = (record: QToolRecord): boolean => {
       const name = record.definition.providerName;
       if (workspace && record.definition.movesPagePane === true) return false;
+      if (ownStatement(record)) return true;
       // A question keeps the core's reads, its browser actions (Q shows
       // and navigates while it answers) and use_capability; the core's
       // own change-makers (approve, edit, stop) wait for a request to act.
@@ -394,6 +406,8 @@ export function createQToolRegistry(
       .sort(
         (a, b) =>
           Number(core(b)) - Number(core(a)) ||
+          // A8: right after the core, so no bound cuts it on their turns.
+          Number(ownStatement(b)) - Number(ownStatement(a)) ||
           // What the turn named leads, so no bound can cut it.
           Number(named.has(b.definition.providerName)) -
             Number(named.has(a.definition.providerName)) ||

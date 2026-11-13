@@ -209,12 +209,15 @@ const RECORD = defineAppAction<
   tool: {
     name: "propose_company_figure",
     description:
-      "For a founder: when they tell you a figure about their own company -- MRR, ARR, revenue, burn, cash, runway, gross margin, customers, active users or churn, in any words or language -- prepare it for their approval as their dated, self-reported figure, in this same turn. One figure per turn: when they stated several, prepare the first and say you'll record the next once they answer. Never for a figure you read in a document or found yourself, a target or a forecast, or another company's figure. Nothing is recorded until they approve exactly it.",
+      "For a founder, about their own company: whenever their message states a figure the company has reached -- MRR, ARR, revenue, burn, cash, runway, gross margin, customers, active users or churn, in any words or language, even said in passing as news or inside a reply or a question (\"Good news: we hit $120k MRR in October\") -- call this in that same turn to prepare it for their approval as their dated, self-reported figure. Remembering what they said does not record it; only this card does. One figure per turn: when they stated several, prepare the first and say you'll record the next once they answer. Never for a figure you read in a document or found yourself, a target or a forecast, or another company's figure. Nothing is recorded until they approve exactly this card: until then never say or imply it is recorded or on file.",
     input: RecordTool,
     references: {},
     scopes: ["COMPANY_PROFILE"],
     // Their own company's turn; on any other the reader names it (focus).
     purposes: ["OWN_COMPANY_QUESTION"],
+    // A figure they tell Q can come with any turn (live 13 Nov: news read
+    // as an answer to Q): in reach on every turn that holds their company.
+    offeredOnOwnTurns: true,
     eval: {
       say: ["We hit $120k MRR in October.", "We have 42 paying customers now."],
     },
