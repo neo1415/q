@@ -131,7 +131,6 @@ import {
   asksForOwnMandate,
   conversationContextOf,
   askerSideOf,
-  reRenderAskOf,
   reshownBlocks,
   shownTurnOf,
   withoutStatusTalk,
@@ -6637,12 +6636,13 @@ export function createSpecialistQAnswer(
     }
     const research: Promise<QResearchDirective> = Promise.resolve(
       read === null ||
-        // Lane S: "put those three in a table" re-renders what was shown;
-        // whatever the reading, it never reaches the public web.
-        reRenderAskOf(
-          latest.content,
-          history.some((message) => message.role === "Q"),
-        )
+        // Lane S / C10 (audit item 6): a turn the reader read as answered
+        // from what Q already showed ("put those three in a table", v54
+        // fromShown), not asking for the web, re-renders those records and
+        // never reaches the public web. The reading decides, not the words.
+        (read.fromShown !== null &&
+          read.fromShown !== undefined &&
+          read.asksForWeb !== true)
         ? NO_RESEARCH
         : researchDirectiveFor(state, readingFromTurnReader(read), {
             available: dependencies.researchAvailable ?? true,
@@ -8265,6 +8265,12 @@ export function createSpecialistQAnswer(
         : { rememberAsk: read.remember }),
       ...(read?.asksForChart === true ? { asksForChart: true } : {}),
       ...(read?.asksForWeb === true ? { asksForWeb: true } : {}),
+      ...(read !== null &&
+      read.fromShown !== null &&
+      read.fromShown !== undefined &&
+      read.asksForWeb !== true
+        ? { answersFromShown: true }
+        : {}),
       // K8: a question about a prepared subject.
       ...(read?.kind === "QUESTION_TO_Q" &&
       read.question?.subject !== undefined &&

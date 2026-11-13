@@ -6253,10 +6253,16 @@ export function createModelGatewayQAnswer(
        */
       // Lane S: "put those three in a table" re-renders what was shown; it
       // never reaches the public web (re-render.ts).
-      const reRender = reRenderAskOf(
-        latest.content,
-        earlier.some((message) => message.role === "Q"),
-      );
+      // C10 (audit item 6): with a reading, the reader decides (it read
+      // the turn as answered from what was shown); the words decide only
+      // when there is no reading, as a bounded fallback.
+      const reRender =
+        request.turnKind !== undefined
+          ? request.answersFromShown === true
+          : reRenderAskOf(
+              latest.content,
+              earlier.some((message) => message.role === "Q"),
+            );
       /**
        * A turn about someone nobody in this conversation named: neither the
        * person nor Q said the name the reader gave. Someone they pointed at

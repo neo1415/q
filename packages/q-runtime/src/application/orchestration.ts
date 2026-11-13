@@ -318,6 +318,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly asksForChart?: boolean | undefined;
   /** v78: they asked for the public web, news or press (read by meaning). */
   readonly asksForWeb?: boolean | undefined;
+  /**
+   * C10 (audit item 6): the reader read the turn as answered from what Q
+   * already showed in this conversation (v54 fromShown: "put those three
+   * in a table") and not as asking for the web. Such a turn re-renders
+   * those records and never reaches the public web.
+   */
+  readonly answersFromShown?: boolean | undefined;
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**

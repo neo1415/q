@@ -3151,51 +3151,63 @@ describe("a re-render ask never reaches the public web", () => {
     toolName: "public_web.search",
     definition: { ...GET_COMPANY.definition, name: "research_public_web" },
   };
+  // C10 (owner 13 Nov; audit item 6): with a reading, the reader's verdict
+  // (answersFromShown, from v54 fromShown) decides, whatever the words;
+  // with no reading the words are the bounded fallback.
   it.each([
-    ["put those three in a table", 1],
-    ["What are the risks with Northwind Ledger?", 2],
-  ] as const)("%s -> %s tools offered", async (said, offeredCount) => {
-    const tools = toolPort([WEB, GET_COMPANY], (p) => succeeded(p, {}));
-    const { seam, request, messages, logLines } = build({
-      tools,
-      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
-    });
-    const first = messages[0];
-    if (first === undefined) throw new Error("fixture");
-    messages.splice(
-      0,
-      1,
-      { ...first, content: "Which three companies fit my mandate?" },
-      {
-        ...first,
-        id: randomUUID() as QConversationMessage["id"],
-        role: "Q",
-        content: "Ledgerfold, Baridi and Maji Loop fit best.",
-      },
-      {
-        ...first,
-        id: randomUUID() as QConversationMessage["id"],
-        content: said,
-      },
-    );
-    await seam.answer({
-      ...request,
-      turnKind: "QUESTION_TO_Q",
-      research: Promise.resolve({
-        mode: "EXPLICIT",
-        announceSourceChange: false,
-      }),
-    });
-    const path = logLines
-      .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
-      .find(([, message]) => message === "q answer path");
-    expect(path?.[0]).toMatchObject({ tools: offeredCount });
-    if (offeredCount === 1) {
-      expect(tools.executed.some((p) => p.name === "research_public_web")).toBe(
-        false,
+    ["put those three in a table", "READ_FROM_SHOWN", 1],
+    ["can I have those as a grid, one line each", "READ_FROM_SHOWN", 1],
+    ["put those three in a table", "READ_OTHERWISE", 2],
+    ["put those three in a table", "NO_READING", 1],
+    ["What are the risks with Northwind Ledger?", "READ_OTHERWISE", 2],
+  ] as const)(
+    "%s (%s) -> %s tools offered",
+    async (said, reading, offeredCount) => {
+      const tools = toolPort([WEB, GET_COMPANY], (p) => succeeded(p, {}));
+      const { seam, request, messages, logLines } = build({
+        tools,
+        script: [
+          { kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) },
+        ],
+      });
+      const first = messages[0];
+      if (first === undefined) throw new Error("fixture");
+      messages.splice(
+        0,
+        1,
+        { ...first, content: "Which three companies fit my mandate?" },
+        {
+          ...first,
+          id: randomUUID() as QConversationMessage["id"],
+          role: "Q",
+          content: "Ledgerfold, Baridi and Maji Loop fit best.",
+        },
+        {
+          ...first,
+          id: randomUUID() as QConversationMessage["id"],
+          content: said,
+        },
       );
-    }
-  });
+      await seam.answer({
+        ...request,
+        ...(reading === "NO_READING" ? {} : { turnKind: "QUESTION_TO_Q" }),
+        ...(reading === "READ_FROM_SHOWN" ? { answersFromShown: true } : {}),
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+      });
+      const path = logLines
+        .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+        .find(([, message]) => message === "q answer path");
+      expect(path?.[0]).toMatchObject({ tools: offeredCount });
+      if (offeredCount === 1) {
+        expect(
+          tools.executed.some((p) => p.name === "research_public_web"),
+        ).toBe(false);
+      }
+    },
+  );
 });
 
 describe("findings and cards written beside the answer (owner 2026-10-22)", () => {
