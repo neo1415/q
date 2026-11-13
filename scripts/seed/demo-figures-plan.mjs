@@ -44,6 +44,9 @@ import { createHash } from "node:crypto";
 import { refusalsFor } from "./demo-activate-plan.mjs";
 
 export const SEED_KEY = "demo-figures.v1";
+export const TAVUS_SOURCE_FILE = "docs/seed/tavus-20/companies-full.json";
+export const DEV_WORLD_SOURCE_FILE =
+  "apps/q-api/src/dev/fictional-world/companies.ts";
 export const DEMO_STATEMENT_SUFFIX =
   " (Demonstration data, self-reported by the company.)";
 /** read_company_figures returns at most this many figures per company. */
@@ -184,7 +187,7 @@ export function monthlyTail(points, code) {
 
 /** Every chartable metric a tavus-20 company states, as figure specs. */
 export function tavusFigures(company) {
-  const source = `docs/seed/tavus-20/companies-full.json #${company.n} metrics.points`;
+  const source = `${TAVUS_SOURCE_FILE} #${company.n} metrics.points`;
   const figures = [];
   const skipped = [];
   for (const kpi of company.metrics?.kpis ?? []) {
@@ -215,6 +218,7 @@ export function tavusFigures(company) {
       label: kpi.label,
       kind: unit.kind,
       currency: unit.kind === "MONEY" ? kpi.currency : null,
+      sourceFile: TAVUS_SOURCE_FILE,
       points,
       provenance:
         points.length === 1
@@ -255,7 +259,7 @@ const DATE = /^(\d{4})-(\d{2})-(\d{2})$/u;
  * CONTRADICTORY claims and unstructured ones are skipped.
  */
 export function devWorldFigures(company) {
-  const source = `apps/q-api/src/dev/fictional-world/companies.ts ${company.key} claims`;
+  const source = `${DEV_WORLD_SOURCE_FILE} ${company.key} claims`;
   const figures = [];
   const skipped = [];
   for (const claim of company.claims ?? []) {
@@ -310,6 +314,7 @@ export function devWorldFigures(company) {
       statement: claim.statement,
       kind,
       currency: kind === "MONEY" ? value.currency : null,
+      sourceFile: DEV_WORLD_SOURCE_FILE,
       period:
         typeof value.period === "string" && periodMonth === null
           ? value.period
@@ -449,6 +454,7 @@ export function planCompanyFigures(entry, snapshot, sourced) {
         // Newest point listed first by readers that order by asserted_at.
         assertOffsetSeconds: figure.points.length - 1 - index,
         provenance: figure.provenance,
+        sourceFile: figure.sourceFile,
         seriesLength: figure.points.length,
       });
     });
@@ -482,11 +488,16 @@ export const lit = (v) => {
 };
 const json = (v) => `${lit(JSON.stringify(v))}::jsonb`;
 
-/** One transaction for one company's plan; null when there is nothing to do. */
-export function renderFiguresSql(plan, { authorityUserId, now }) {
+/**
+ * One transaction for one company's plan; null when there is nothing to do.
+ * Audit: the actor is the Capital Q system (actor_type capital_q_system,
+ * actor_id and authority_user_id null; audit.material_actions requires a
+ * human authority only for actor_type q), never a person: no person
+ * performed or approved these rows individually. The metadata names the
+ * seed and the source file instead.
+ */
+export function renderFiguresSql(plan, { now }) {
   if (plan.refused || plan.claims.length === 0) return null;
-  if (!/^[0-9a-f-]{36}$/u.test(authorityUserId ?? ""))
-    throw new Error("an approving owner's user id is required");
   const t = lit(plan.tenantId);
   const c = lit(plan.companyId);
   const correlation = seedUuid(plan.companyId, "correlation", now);
@@ -498,6 +509,7 @@ export function renderFiguresSql(plan, { authorityUserId, now }) {
       cp.validFrom === null ? "null" : `${lit(cp.validFrom)}::timestamptz`;
     const meta = {
       seed: SEED_KEY,
+      sourceFile: cp.sourceFile,
       demonstrationData: true,
       provenance: cp.provenance.slice(0, 900),
     };
@@ -508,7 +520,7 @@ export function renderFiguresSql(plan, { authorityUserId, now }) {
       `insert into evidence.claim_revisions (id, tenant_id, claim_id, revision_number, statement, structured_value, truth_class, evidence_status, lifecycle_status, valid_from, changed_by_type, changed_by_id, source_id) values (${lit(cp.revisionId)}, ${t}, ${lit(cp.id)}, 1, ${lit(cp.statement)}, ${json(cp.value)}, 'USER_CLAIM', 'SELF_REPORTED', 'CURRENT', ${validFrom}, 'SOURCE', ${lit(cp.sourceId)}, ${lit(cp.sourceId)}) on conflict (id) do nothing;`,
       `insert into evidence.claims (id, tenant_id, subject_type, subject_id, claim_type, claim_key, statement, structured_value, asserted_by_type, asserted_by_id, asserted_at, valid_from, truth_class, evidence_status, lifecycle_status, visibility_scope, sensitivity_class, current_revision_id, current_revision_number) values (${lit(cp.id)}, ${t}, 'COMPANY', ${c}, ${lit(cp.type)}, ${lit(cp.key)}, ${lit(cp.statement)}, ${json(cp.value)}, 'SOURCE', ${lit(cp.sourceId)}, ${lit(at(cp.assertOffsetSeconds))}, ${validFrom}, 'USER_CLAIM', 'SELF_REPORTED', 'CURRENT', 'network_visible', 'NETWORK_VISIBLE', ${lit(cp.revisionId)}, 1) on conflict (id) do nothing;`,
       `insert into evidence.claim_evidence (tenant_id, claim_id, evidence_item_id, relationship, created_by_user_id) values (${t}, ${lit(cp.id)}, ${lit(cp.itemId)}, 'SUPPORTS', null) on conflict do nothing;`,
-      `insert into audit.material_actions (event_id, tenant_id, actor_type, actor_id, authority_user_id, organisation_id, action_type, resource_type, resource_id, occurred_at, outcome, metadata, correlation_id) values (${lit(seedUuid(plan.companyId, "audit", cp.id, now))}, ${t}, 'capital_q_system', null, ${lit(authorityUserId)}, ${lit(plan.organisationId)}, 'claim.created', 'claim', ${lit(cp.id)}, ${lit(now)}, 'SUCCEEDED', ${json({ claimKey: cp.key, truthClass: "USER_CLAIM", evidenceStatus: "SELF_REPORTED", ...meta })}, ${lit(correlation)}) on conflict do nothing;`,
+      `insert into audit.material_actions (event_id, tenant_id, actor_type, actor_id, authority_user_id, organisation_id, action_type, resource_type, resource_id, occurred_at, outcome, metadata, correlation_id) values (${lit(seedUuid(plan.companyId, "audit", cp.id, now))}, ${t}, 'capital_q_system', null, null, ${lit(plan.organisationId)}, 'claim.created', 'claim', ${lit(cp.id)}, ${lit(now)}, 'SUCCEEDED', ${json({ claimKey: cp.key, truthClass: "USER_CLAIM", evidenceStatus: "SELF_REPORTED", ...meta })}, ${lit(correlation)}) on conflict do nothing;`,
       `insert into events.outbox (event_id, tenant_id, event_type, event_version, payload) values (${lit(eventId)}, ${t}, 'evidence.claim.changed', 1, ${json(
         {
           specVersion: "1.0",

@@ -165,14 +165,9 @@ async function main() {
     );
     return;
   }
-  const [owner] = await read(
-    "select user_id from identity.platform_admins where role = 'platform_owner' order by granted_at limit 1",
-  );
-  if (!owner?.user_id)
-    throw new Error("no platform owner to attribute the seed to");
   const now = new Date().toISOString();
   for (const plan of plans) {
-    const sql = renderFiguresSql(plan, { authorityUserId: owner.user_id, now });
+    const sql = renderFiguresSql(plan, { now });
     if (sql === null) continue;
     await query(sql, false);
     console.log(`applied ${plan.name}: ${plan.claims.length} claims`);

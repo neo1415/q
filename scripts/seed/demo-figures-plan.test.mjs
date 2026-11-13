@@ -18,7 +18,6 @@ import {
 } from "./demo-figures-plan.mjs";
 
 const COMPANY = "00000000-0000-4000-8000-0000000000d1";
-const OWNER = "00000000-0000-4000-8000-0000000000e1";
 const NOW = "2026-11-13T12:00:00.000Z";
 
 const fictional = (over = {}) => ({
@@ -275,10 +274,7 @@ test("only fictional companies: a genuine account, a demonstration company or a 
   assert.deepEqual(planCompanyFigures(entry, null, sourced).refused, [
     "company not found",
   ]);
-  assert.equal(
-    renderFiguresSql(real, { authorityUserId: OWNER, now: NOW }),
-    null,
-  );
+  assert.equal(renderFiguresSql(real, { now: NOW }), null);
 });
 
 test("the plan publishes USER_CLAIM / SELF_REPORTED, network_visible, labelled demonstration data", () => {
@@ -290,7 +286,7 @@ test("the plan publishes USER_CLAIM / SELF_REPORTED, network_visible, labelled d
       /\(Demonstration data, self-reported by the company\.\)$/,
     );
   }
-  const sql = renderFiguresSql(plan, { authorityUserId: OWNER, now: NOW });
+  const sql = renderFiguresSql(plan, { now: NOW });
   assert.match(sql, /^begin;/);
   assert.match(sql, /commit;$/);
   assert.doesNotMatch(sql, /'VERIFIED'|PLATFORM_VERIFIED|EXTERNALLY_VERIFIED/);
@@ -328,10 +324,7 @@ test("idempotent: a re-run with the seed's own rows plans nothing", () => {
     tavusFigures(tavus),
   );
   assert.equal(again.claims.length, 0);
-  assert.equal(
-    renderFiguresSql(again, { authorityUserId: OWNER, now: NOW }),
-    null,
-  );
+  assert.equal(renderFiguresSql(again, { now: NOW }), null);
 });
 
 test("an already-published figure for the same date: equal is kept, different is reported and never overwritten", () => {
@@ -383,11 +376,21 @@ test("warns when published figures would exceed what read_company_figures reads"
   assert.ok(plan.notes.some((n) => /^WARNING/.test(n)));
 });
 
-test("SQL needs an approving owner", () => {
+test("audit rows name the system and the seed, never a person", () => {
   const plan = planCompanyFigures(entry, fictional(), tavusFigures(tavus));
-  assert.throws(() =>
-    renderFiguresSql(plan, { authorityUserId: "", now: NOW }),
-  );
+  const sql = renderFiguresSql(plan, { now: NOW });
+  const audits = sql
+    .split("\n")
+    .filter((l) => l.startsWith("insert into audit.material_actions"));
+  assert.equal(audits.length, plan.claims.length);
+  for (const row of audits) {
+    assert.match(row, /'capital_q_system', null, null,/);
+    assert.match(row, /"seed":"demo-figures\.v1"/);
+    assert.match(
+      row,
+      /"sourceFile":"docs\/seed\/tavus-20\/companies-full\.json"/,
+    );
+  }
 });
 
 test("every tavus-20 company's latest published value is the source's own latest point", () => {
