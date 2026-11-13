@@ -4,6 +4,7 @@ import { useId, useState, type RefObject } from "react";
 
 import type { PublicGatewayDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
+import { Select } from "@capital-q/ui/select";
 import {
   Check,
   CircleAlert,
@@ -418,17 +419,18 @@ export function AnswersPage({
                 {t("Exact amount")}
               </label>
               <div className="flex gap-2">
-                <select
-                  className="gq-input"
-                  style={{ width: 96 }}
-                  aria-label={t("Currency")}
-                  value={answers.currency}
-                  onChange={(e) => set("currency", e.target.value)}
-                >
-                  {CURRENCIES.map((c) => (
-                    <option key={c}>{t(c)}</option>
-                  ))}
-                </select>
+                {/* Design system select (owner, 13 Nov); the value is the
+                    currency code, never its translated label. */}
+                <div style={{ width: 112 }}>
+                  <Select
+                    id="gq-currency"
+                    label={t("Currency")}
+                    labelHidden
+                    value={answers.currency}
+                    onChange={(e) => set("currency", e.target.value)}
+                    options={CURRENCIES.map((c) => ({ value: c, label: t(c) }))}
+                  />
+                </div>
                 <input
                   id="gq-amount"
                   className="gq-input"
@@ -505,21 +507,20 @@ export function AnswersPage({
               </button>
             </div>
             {elsewhere ? (
-              <select
-                className="gq-input"
-                aria-label={t("Country")}
+              <Select
+                id="gq-country-more"
+                label={t("Country")}
+                labelHidden
+                placeholder={t("Choose a country")}
                 value={
                   inList || answers.country === DECLINED ? "" : answers.country
                 }
                 onChange={(e) => set("country", e.target.value)}
-              >
-                <option value="">{t("Choose a country")}</option>
-                {MORE_COUNTRIES.map((choice) => (
-                  <option key={choice.value} value={choice.value}>
-                    {countryName(choice.value, language) ?? t(choice.label)}
-                  </option>
-                ))}
-              </select>
+                options={MORE_COUNTRIES.map((choice) => ({
+                  value: choice.value,
+                  label: countryName(choice.value, language) ?? t(choice.label),
+                }))}
+              />
             ) : null}
             {errors.country ? (
               <p className="gq-err">{t(errors.country)}</p>
