@@ -5091,6 +5091,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "This document isn't available to download right now.",
   "This draft is no longer waiting for you.",
   "This edition couldn't load. Reload in a moment.",
+  "This email has already applied to this organisation. They have your application.",
   "This feed shows only companies with a pitch you can play. The others pass your hard rules and are in Search and Explore; they join the feed when they add a pitch.",
   "This file can't be shown here. Save a copy to open it.",
   "This investor couldn't load.",

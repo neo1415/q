@@ -333,7 +333,7 @@ export function registerGateQApplyRoutes(
       // unknown (stage) was told it had vanished. Only a verified
       // credential reaches this refusal, so saying "not ready" tells the
       // applicant nothing they cannot read on their own coverage screen.
-      return refuse(error, reply, ["NOT_READY_TO_SUBMIT"]);
+      return refuse(error, reply, ["NOT_READY_TO_SUBMIT", "ALREADY_APPLIED"]);
     }
   });
 

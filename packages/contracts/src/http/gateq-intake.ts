@@ -174,6 +174,13 @@ export const SubmitApplicationRequestSchema = z
  */
 export const GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL =
   "Confirm your contact email before submitting." as const;
+/**
+ * B8: this confirmed email already applied to this gateway. Told apart so
+ * the applicant knows the organisation has their application; the earlier
+ * application is never named.
+ */
+export const GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL =
+  "This email has already applied to this organisation. They have your application." as const;
 export const GATEQ_SUBMIT_NOT_READY_DETAIL =
   "Your application isn't ready to submit yet. Answer what's still needed, then submit." as const;
 

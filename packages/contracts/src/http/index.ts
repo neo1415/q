@@ -1003,6 +1003,7 @@ export {
   type GatewayApplicationListDto,
   SubmitApplicationRequestSchema,
   GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+  GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_NOT_READY_DETAIL,
   SubmitApplicationResponseSchema,
   type ApplicationSummaryDto,

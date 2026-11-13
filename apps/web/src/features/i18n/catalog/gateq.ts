@@ -321,6 +321,8 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   " (not checked)": " (لم يُتحقَّق منه)",
   "Confirm your contact email before submitting.":
     "أكّد بريد التواصل قبل التقديم.",
+  "This email has already applied to this organisation. They have your application.":
+    "سبق أن تقدّم هذا البريد إلى هذه الجهة. طلبك لديهم.",
   "Confirm your contact email before submitting. Your answers and interview are saved.":
     "أكّد بريد التواصل قبل التقديم. إجاباتك ومقابلتك محفوظة.",
   "Confirm your contact email first, so {fund} can reach you.":

@@ -12,6 +12,7 @@ import {
   GATEQ_APPLY_INTERVIEW_OPEN_PATH,
   GATEQ_APPLY_SUBMIT_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
+  GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_NOT_READY_DETAIL,
   type ApplicationContactResponse,
   type ApplicationCoverageDto,
@@ -115,6 +116,7 @@ function build(
   options: {
     readonly contactUnconfirmed?: boolean;
     readonly notReady?: boolean;
+    readonly alreadyApplied?: boolean;
   } = {},
 ) {
   const recorded = {
@@ -173,6 +175,9 @@ function build(
       }
       if (options.notReady === true) {
         throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+      }
+      if (options.alreadyApplied === true) {
+        throw new IntakeRefusedError("ALREADY_APPLIED");
       }
       return Promise.resolve({
         submittedAt: "2026-10-13T12:00:00.000Z",
@@ -386,6 +391,20 @@ describe("the applicant contact over HTTP (GateQ slice 1)", () => {
       payload: { clientRequestId: "req-000000000001" },
     });
     expect(forged.statusCode).toBe(404);
+  });
+
+  it("refuses a duplicate application with a 409 that names nothing", async () => {
+    const { app } = build({ alreadyApplied: true });
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_SUBMIT_PATH,
+      headers: bearer(TOKEN),
+      payload: { clientRequestId: "req-000000000001" },
+    });
+    expect(response.statusCode).toBe(409);
+    const body = response.json<{ code: string; detail: string }>();
+    expect(body.code).toBe("RESOURCE_CONFLICT");
+    expect(body.detail).toBe(GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL);
   });
 
   it("needs a signed-in account for the account-confirmed contact", async () => {

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   createProblemDetails,
+  GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
   GATEQ_SUBMIT_NOT_READY_DETAIL,
   PROBLEM_CONTENT_TYPE,
@@ -298,6 +299,19 @@ function toProblem(
       code: "RESOURCE_CONFLICT",
       requestId,
       detail: GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+    });
+  }
+  // B8: this confirmed email already applied to this gateway. Only the
+  // submit route lets it through, after the credential verified; the
+  // earlier application is never named.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "ALREADY_APPLIED"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
     });
   }
   // Submit with a required answer still missing. Only the submit route lets

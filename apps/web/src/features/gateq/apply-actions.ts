@@ -25,6 +25,7 @@ import type {
   GateqVideoStateDto,
 } from "@capital-q/contracts";
 import {
+  GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
   ApplicationAnswersRequestSchema,
   ApplicationContactRequestSchema,
@@ -200,6 +201,17 @@ export async function submitApplicationAction(
         ok: false,
         contactNotConfirmed: true,
         message: "Confirm your contact email before submitting.",
+      };
+    if (
+      // B8: one confirmed email, one application per organisation.
+      error instanceof ApiProblemError &&
+      error.status === 409 &&
+      error.problem?.detail === GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL
+    )
+      return {
+        ok: false,
+        message:
+          "This email has already applied to this organisation. They have your application.",
       };
     return failure(error);
   }

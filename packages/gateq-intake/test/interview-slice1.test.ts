@@ -444,6 +444,27 @@ function world(
       }),
     findFor: (applicationId: string) =>
       Promise.resolve(contactRows.get(applicationId) ?? null),
+    // As the Postgres repository: same tenant and gateway, another
+    // application, submitted in the window, confirmed email equal ignoring
+    // case and surrounding space.
+    submittedForGatewayEmail: (_tx, input) =>
+      Promise.resolve(
+        submissions.some((row) => {
+          const other = applications.get(row.applicationId);
+          const contact = contactRows.get(row.applicationId);
+          return (
+            other !== undefined &&
+            contact !== undefined &&
+            other.id !== input.excludeApplicationId &&
+            other.tenantId === input.tenantId &&
+            other.gatewayId === input.gatewayId &&
+            Date.parse(row.submittedAt) >= Date.parse(input.since) &&
+            contact.emailConfirmedAt !== null &&
+            contact.email.trim().toLowerCase() ===
+              input.email.trim().toLowerCase()
+          );
+        }),
+      ),
     save: (
       input: Omit<StoredContact, "codeAttempts"> & { tenantId: string },
     ) => {
@@ -1791,6 +1812,130 @@ describe("review: races", () => {
     expect(
       refused?.status === "rejected" ? refused.reason : null,
     ).toMatchObject({ refusal: "ALREADY_SUBMITTED" });
+  });
+});
+
+describe("B8: one confirmed email, one application per gateway", () => {
+  /** A second, qualifying application with its own confirmed contact. */
+  const readyAs = async (
+    w: ReturnType<typeof world>,
+    contact: typeof CONTACT,
+  ) => {
+    const started = await w.start();
+    await w.intake.recordFacts({ token: started.token, facts: QUALIFYING });
+    await w.intake.startContact({ token: started.token, contact });
+    await w.intake.confirmContact({
+      token: started.token,
+      code: w.mailed.at(-1)?.code ?? "",
+    });
+    return started;
+  };
+  const idOf = (w: ReturnType<typeof world>, reference: string) => {
+    const found = [...w.applications.values()].find(
+      (a) => a.publicReference === reference,
+    );
+    if (found === undefined) throw new Error("no application");
+    return found.id;
+  };
+
+  it("refuses a second application from the same email, naming nothing", async () => {
+    const w = world();
+    const first = await readyToSubmit(w);
+    await w.intake.submit({
+      token: first.token,
+      clientRequestId: "req-000000000001",
+    });
+    const second = await readyAs(w, {
+      ...CONTACT,
+      email: "ADA@EXAMPLE.TEST",
+    });
+    const refused = await w.intake
+      .submit({ token: second.token, clientRequestId: "req-000000000002" })
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    expect(refused).toMatchObject({ refusal: "ALREADY_APPLIED" });
+    // Nothing about the earlier application leaks through the refusal.
+    expect(String((refused as Error).message)).not.toContain(first.reference);
+    expect(w.submissions).toHaveLength(1);
+    expect(w.applications.get(idOf(w, second.reference))?.status).not.toBe(
+      "SUBMITTED",
+    );
+  });
+
+  it("allows the same email at a different gateway", async () => {
+    const w = world();
+    const first = await readyToSubmit(w);
+    await w.intake.submit({
+      token: first.token,
+      clientRequestId: "req-000000000001",
+    });
+    const earlier = w.applications.get(idOf(w, first.reference));
+    if (earlier === undefined) throw new Error("no first application");
+    w.applications.set(earlier.id, {
+      ...earlier,
+      gatewayId: randomUUID(),
+    });
+    const second = await readyAs(w, CONTACT);
+    const submitted = await w.intake.submit({
+      token: second.token,
+      clientRequestId: "req-000000000002",
+    });
+    expect(submitted.deduplicated).toBe(false);
+    expect(w.submissions).toHaveLength(2);
+  });
+
+  it("allows a different email at the same gateway", async () => {
+    const w = world();
+    const first = await readyToSubmit(w);
+    await w.intake.submit({
+      token: first.token,
+      clientRequestId: "req-000000000001",
+    });
+    const second = await readyAs(w, {
+      ...CONTACT,
+      email: "grace@example.test",
+    });
+    const submitted = await w.intake.submit({
+      token: second.token,
+      clientRequestId: "req-000000000002",
+    });
+    expect(submitted.deduplicated).toBe(false);
+    expect(w.submissions).toHaveLength(2);
+  });
+
+  it("allows the same email again after 180 days", async () => {
+    const w = world();
+    const first = await readyToSubmit(w);
+    await w.intake.submit({
+      token: first.token,
+      clientRequestId: "req-000000000001",
+    });
+    w.setNow(new Date(NOW.getTime() + 181 * 24 * 60 * 60 * 1000));
+    const second = await readyAs(w, CONTACT);
+    const submitted = await w.intake.submit({
+      token: second.token,
+      clientRequestId: "req-000000000002",
+    });
+    expect(submitted.deduplicated).toBe(false);
+    expect(w.submissions).toHaveLength(2);
+  });
+
+  it("still returns the first answer to a retry of the same submission", async () => {
+    const w = world();
+    const first = await readyToSubmit(w);
+    const original = await w.intake.submit({
+      token: first.token,
+      clientRequestId: "req-000000000001",
+    });
+    const retried = await w.intake.submit({
+      token: first.token,
+      clientRequestId: "req-000000000001",
+    });
+    expect(retried.deduplicated).toBe(true);
+    expect(retried.submittedAt).toBe(original.submittedAt);
+    expect(w.submissions).toHaveLength(1);
   });
 });
 

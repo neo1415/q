@@ -204,6 +204,8 @@ export function transcriptDto(
  * was cut rather than failing the founder's Submit.
  */
 const SNAPSHOT_TRANSCRIPT_CHARS = 150_000;
+/** B8: how long one confirmed email's submission blocks another to the same gateway. */
+const DUPLICATE_APPLICATION_WINDOW_MS = 180 * 24 * 60 * 60 * 1000;
 
 /** A verified guest: one application, and the policy it was bound to. */
 export type GuestContext = {
@@ -734,6 +736,25 @@ export function createIntakeService(
         const standing = await contactStanding(application);
         if (standing.required && !standing.confirmed) {
           throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
+        }
+        // B8: one confirmed email, one application per gateway in the
+        // window. Only a fresh submission reaches here; a retry of this
+        // application's own submission returned above with its first answer.
+        if (
+          standing.contact !== null &&
+          standing.confirmed &&
+          contacts?.submittedForGatewayEmail !== undefined &&
+          (await contacts.submittedForGatewayEmail(tx, {
+            tenantId: application.tenantId,
+            gatewayId: application.gatewayId,
+            email: standing.contact.email,
+            since: new Date(
+              clock().getTime() - DUPLICATE_APPLICATION_WINDOW_MS,
+            ).toISOString(),
+            excludeApplicationId: application.id,
+          }))
+        ) {
+          throw new IntakeRefusedError("ALREADY_APPLIED");
         }
 
         const submittedAt = clock().toISOString();

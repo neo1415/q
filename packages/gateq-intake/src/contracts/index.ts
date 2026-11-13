@@ -337,6 +337,12 @@ export const INTAKE_REFUSALS = [
    * guest is told apart, because they can fix it on the same screen.
    */
   "CONTACT_NOT_CONFIRMED",
+  /**
+   * B8: this confirmed contact email has already submitted an application
+   * to this gateway recently. Told apart so the applicant is not left
+   * thinking their application vanished; the earlier one is never named.
+   */
+  "ALREADY_APPLIED",
 ] as const;
 export const IntakeRefusalSchema = z.enum(INTAKE_REFUSALS);
 export type IntakeRefusal = z.infer<typeof IntakeRefusalSchema>;

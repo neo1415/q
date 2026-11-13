@@ -306,6 +306,23 @@ export type ApplicationContactRepository = {
     readonly emailConfirmedAt: string | null;
     readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
   }) => Promise<StoredContact>;
+  /**
+   * B8: whether another application to the same gateway (same tenant), with
+   * a confirmed contact email equal to `email` (trimmed, case-insensitive),
+   * was submitted at or after `since`. Read on the submitting transaction.
+   * Answers yes or no only: the earlier application is never named.
+   * Optional so a composition without it keeps working (no check).
+   */
+  readonly submittedForGatewayEmail?: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: string;
+      readonly gatewayId: string;
+      readonly email: string;
+      readonly since: string;
+      readonly excludeApplicationId: ApplicationId;
+    },
+  ) => Promise<boolean>;
 };
 
 /** Titles of Evidence-owned documents, by id. Display only. */

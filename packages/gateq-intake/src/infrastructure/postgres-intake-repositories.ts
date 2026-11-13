@@ -736,6 +736,28 @@ export function createPostgresApplicationContactRepository(options: {
     }
   };
   return {
+    submittedForGatewayEmail: async (tx, input) => {
+      const email = input.email.trim().toLowerCase();
+      // Two different applications from one email submitting at once each
+      // hold only their own row lock; this transaction-scoped lock on
+      // (gateway, email) makes the second wait and then see the first.
+      await tx.sql`select pg_advisory_xact_lock(hashtextextended(${`gateq-submit:${input.tenantId}:${input.gatewayId}:${email}`}, 0))`;
+      const rows = await tx.sql`
+        select exists (
+          select 1
+            from gateq.application_submissions s
+            join gateq.applications a on a.id = s.application_id
+            join gateq.application_contacts c on c.application_id = a.id
+           where a.tenant_id = ${input.tenantId}
+             and a.gateway_id = ${input.gatewayId}
+             and a.id <> ${input.excludeApplicationId}
+             and s.tenant_id = ${input.tenantId}
+             and s.submitted_at >= ${input.since}::timestamptz
+             and c.email_confirmed_at is not null
+             and lower(btrim(c.email)) = ${email}
+        ) as found`;
+      return (rows[0] as { found?: unknown } | undefined)?.found === true;
+    },
     issue: async (input) =>
       transactions.run(async (tx) => {
         const app =
