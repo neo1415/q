@@ -597,3 +597,43 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   3. "their" binds to the conversation's subject over the pane's record.
 
   The re-certification replay follows. After it, the parallel lanes move off navigation: A8 claim extraction and C3 durable offers are already running.
+
+## Navigation certified; A8 figure claims and C3 offers deployed — `3293f344e` (13 Nov, 23:40 Lagos)
+
+- **Gate:** `ci-local PASS sha=3293f344e at=2026-11-13T22:17:52Z took=1353s`. Rollback point `d96c63ee1`; four services SUCCESS.
+- **Contents:**
+  - **Navigation:** the pitch goes to the elevator tab; the conversation's record is placed on the reading's tab; "their" binds to the current record.
+  - **A8:** `company.figure.record` approval card, `2bddb4f33`.
+  - **C3:** recorded answer offers, `c57d24b9c`.
+- **Navigation live replay** (`investor.savanna-seed`, Workspace, `steps-rt.json`). **CERTIFIED: 11/11.**
+
+  | #   | Turn                                                      | Result                                                                                                                           |
+  | --- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+  | 1   | "Tell me about Clinicrest." (from /work)                  | contextual move to Clinicrest `?tab=overview` (7.9 s)                                                                            |
+  | 2   | "Can I see their data room?"                              | `?tab=dataroom` (4.4 s)                                                                                                          |
+  | 3   | "Does their data room have audited accounts?"             | answered, stayed                                                                                                                 |
+  | 4   | "…Play me their pitch."                                   | inline pitch player; stayed (no deck move); no failure claim. A redundant "Open Company profile" offer is still shown (cosmetic) |
+  | 5   | "Show me my messages with Clinicrest."                    | thread (1.6 s)                                                                                                                   |
+  | 6   | "Tell me about Ledgerline." (pane on Clinicrest messages) | contextual move to Ledgerline profile (4.6 s), with its picture                                                                  |
+  | 7   | "And what's their team like?"                             | Ledgerline `?tab=team` (4.9 s)                                                                                                   |
+  | 8   | Pin, then "Can I see their data room?"                    | stayed; "Your workspace is pinned…" with one "Unpin and open"                                                                    |
+  | 9   | "Unpin and open"                                          | **Ledgerline** `?tab=dataroom`: the conversation's record, not the earlier Clinicrest                                            |
+  | 10  | "Can I see Ledger's data room?"                           | already there; answered (locked until interest is accepted)                                                                      |
+  | 11  | "Can I see Orbitwell Robotics's data room?"               | nothing opened; "couldn't locate … a company record"                                                                             |
+
+- **C3 live** (`steps-off.json`, `steps-off2.json`):
+  - Page offer "Would you like to open it?" → "sí, ábrela" → opened. **PASS**
+  - Call-prep rehearsal offer → "go for it" → rehearsal lobby for Watchly. **PASS**
+  - "not now" → nothing prepared or changed. **PASS**
+  - A prose offer recorded from the analyst model ("q answer closed with an offer") was **not observed**: the model made no offer in three analyst turns. **UNPROVEN live**
+- **A8 live** (`founder.maji-loop`, `steps-fig.json`): "Good news: we hit $120k MRR in October." **FAIL.**
+  - Reading ANSWER; path DEEP_ANALYSIS with 124 tools; the model did not call `propose_company_figure`. Q replied "I don't yet have that recorded as an approved company figure" and showed no card.
+  - Nothing was written, so no stray data. Sent to an agent: make the tool reachable and chosen on a founder's own-company statement, by reading, with no keyword routing.
+- **Journey fixes** (`7e3e22153`):
+  - D1: INTEREST_ACCEPTED notice, with migration `20261231510000`. It only adds a kind, and all 27 production kinds were checked kept. The migrator does not flag DROP CONSTRAINT.
+  - D2: no duplicate interest card.
+  - D3: an honest waiting line.
+  - D4: the briefing stays clear of actions.
+  - D5: refresh after a send.
+  - D8: touch targets.
+  - Gating now. The migration is applied after the gate's database step passes and before the deploy.
