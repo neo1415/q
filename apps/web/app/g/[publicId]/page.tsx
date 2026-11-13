@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 
 import { founderFormContext } from "@/features/gateq/form/founder-prefill";
 import { GateQForm } from "@/features/gateq/form/gateq-form";
+import {
+  GatewayAccentStyle,
+  GatewayBrandMark,
+} from "@/features/gateq/gateway-brand";
 import { publicGateway } from "@/features/gateq/public-gateway";
 import { serverT } from "@/features/i18n/server";
 
@@ -33,13 +37,14 @@ export default async function GatewayPage({ params }: Props) {
   if (gateway === null) notFound();
   const founder = await founderFormContext();
   const signedInAs = founder.prefill?.contactName ?? null;
-  // Design gatepub-1: Capital Q's bar, who is signed in, then the form.
+  // Design gatepub-1: the bar, who is signed in, then the form. B6: the bar
+  // carries the investing organisation's name, mark and (AA-safe) accent;
+  // Capital Q stays attributed in the footer.
   return (
     <div className="min-h-dvh bg-(--cq-canvas)">
-      <header className="sticky top-0 z-(--cq-z-sticky) flex h-14 items-center gap-3 border-b border-(--cq-border-subtle) bg-(--cq-canvas) px-4 sm:h-16 sm:px-8">
-        <span className="text-lg font-semibold tracking-tight text-(--cq-text-primary)">
-          Capital Q
-        </span>
+      <GatewayAccentStyle hex={gateway.organisationAccentHex} />
+      <header className="sticky top-0 z-(--cq-z-sticky) flex h-14 items-center gap-3 border-t-2 border-b border-t-(--cq-accent) border-b-(--cq-border-subtle) bg-(--cq-canvas) px-4 sm:h-16 sm:px-8">
+        <GatewayBrandMark gateway={gateway} />
         <span className="flex-1" />
         {signedInAs === null ? null : (
           <span className="cq-caption text-(--cq-text-tertiary)">

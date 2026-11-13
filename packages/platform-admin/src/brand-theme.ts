@@ -64,6 +64,24 @@ export async function effectiveBrandTheme(
   return toTheme(row);
 }
 
+/**
+ * A tenant's OWN theme, or null when it has none (the platform default is
+ * not returned here). B6: the public GateQ gateway shows an investing
+ * organisation's colour only when its tenant chose one; Capital Q's own
+ * default is already what a public page paints.
+ */
+export async function tenantOwnBrandTheme(
+  sql: DatabaseExecutor,
+  tenantId: string,
+): Promise<BrandTheme | null> {
+  const [row] = await sql<Row[]>`
+    select preset_key, primary_hex, updated_at
+      from platform_ops.brand_themes
+     where tenant_id = ${tenantId}
+     limit 1`;
+  return row === undefined ? null : toTheme(row);
+}
+
 /** The platform default only (the console's view). */
 export async function platformBrandTheme(
   sql: DatabaseExecutor,
@@ -140,6 +158,7 @@ export async function setPlatformBrandTheme(
 export type BrandThemeStore = {
   readonly effective: (tenantId: string | null) => Promise<BrandTheme>;
   readonly platform: () => Promise<BrandTheme>;
+  readonly tenantOwn: (tenantId: string) => Promise<BrandTheme | null>;
   readonly setPlatform: (
     grant: AdminGrant,
     change: BrandThemeChange,
@@ -153,6 +172,7 @@ export function createBrandThemeStore(options: {
   return {
     effective: (tenantId) => effectiveBrandTheme(options.sql, tenantId),
     platform: () => platformBrandTheme(options.sql),
+    tenantOwn: (tenantId) => tenantOwnBrandTheme(options.sql, tenantId),
     setPlatform: (grant, change) =>
       setPlatformBrandTheme(options.transactions, grant, change),
   };

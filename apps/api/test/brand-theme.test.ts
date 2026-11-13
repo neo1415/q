@@ -75,6 +75,7 @@ function memoryBrand() {
       return Promise.resolve(current);
     },
     platform: () => Promise.resolve(current),
+    tenantOwn: () => Promise.resolve(null),
     setPlatform: (_grant, change) => {
       current = isBrandReset(change)
         ? initial

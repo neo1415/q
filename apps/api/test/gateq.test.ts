@@ -91,14 +91,17 @@ function buildApp(options: {
   readonly publicGateway?: PublicGateway | null;
   readonly created?: Gateway | Error;
   readonly images?: { photo: string | null; cover: string | null };
+  readonly accent?: string | null;
   readonly editDenied?: boolean;
   readonly extractions?: PolicyExtractionRecord[];
 }): {
   readonly app: FastifyInstance;
   readonly publicLookups: string[];
   readonly imageLookups: string[];
+  readonly accentLookups: string[];
 } {
   const imageLookups: string[] = [];
+  const accentLookups: string[] = [];
   const publicLookups: string[] = [];
   const gateq: GateQService = {
     createGateway: () =>
@@ -186,8 +189,16 @@ function buildApp(options: {
             return Promise.resolve(images);
           },
         }),
+    ...(options.accent === undefined
+      ? {}
+      : {
+          gateqPublicAccent: (publicId: string) => {
+            accentLookups.push(publicId);
+            return Promise.resolve(options.accent ?? null);
+          },
+        }),
   });
-  return { app, publicLookups, imageLookups };
+  return { app, publicLookups, imageLookups, accentLookups };
 }
 
 describe("the configuration routes", () => {
@@ -303,6 +314,62 @@ describe("the public route", () => {
     );
     // A cover the card keeps from the public is null, not a URL.
     expect(body["organisationCoverUrl"]).toBeNull();
+  });
+
+  it("B6: carries only the organisation's own accent colour, nothing else of its theme", async () => {
+    const { app } = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      accent: "#0f766e",
+    });
+    const body = (
+      await app.inject({ method: "GET", url: url(PUBLIC_ID) })
+    ).json<Record<string, unknown>>();
+    expect(body["organisationAccentHex"]).toBe("#0f766e");
+    // The whitelist plus the one colour: no preset, tenant or timestamp.
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        "acceptingApplications",
+        "criteria",
+        "description",
+        "inboundMode",
+        "organisationAccentHex",
+        "organisationDisplayName",
+        "publicId",
+        "publishedAt",
+        "title",
+      ].sort(),
+    );
+  });
+
+  it("B6: no theme of its own, or a value that is not a colour, is no accent", async () => {
+    for (const accent of [null, "red;}body{display:none", "#ABCDEF"]) {
+      const { app } = buildApp({
+        principal: null,
+        publicGateway: PUBLIC_PROJECTION,
+        accent,
+      });
+      const response = await app.inject({
+        method: "GET",
+        url: url(PUBLIC_ID),
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<Record<string, unknown>>()).not.toHaveProperty(
+        "organisationAccentHex",
+      );
+    }
+  });
+
+  it("B6: never asks for an accent for an unpublished or unknown gateway", async () => {
+    const { app, accentLookups } = buildApp({
+      principal: null,
+      publicGateway: null,
+      accent: "#0f766e",
+    });
+    const response = await app.inject({ method: "GET", url: url(PUBLIC_ID) });
+    expect(response.statusCode).toBe(404);
+    expect(accentLookups).toEqual([]);
+    expect(response.body).not.toContain("#0f766e");
   });
 
   it("never asks for images for an unpublished or unknown gateway", async () => {

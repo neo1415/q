@@ -18,6 +18,7 @@ import {
   type InvestorGateFitDto,
   type GateqUnicornPotentialDto,
   GATEQ_MY_APPLICATIONS_PATH,
+  BrandHexSchema,
   ClaimableCompanyListDtoSchema,
   COMPANY_CLAIM_CONFIRM_PATH,
   COMPANY_CLAIM_REQUESTS_PATH,
@@ -199,6 +200,13 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
         readonly cover: string | null;
       }>)
     | undefined;
+  /**
+   * B6: the owning organisation's own brand colour (lowercase #rrggbb) for
+   * the public page, or null for Capital Q's. Asked only once the gateway
+   * is published. Absent: the page keeps Capital Q's accent.
+   */
+  readonly publicAccent?:
+    ((publicId: GatewayPublicId) => Promise<string | null>) | undefined;
 };
 
 const gatewayIdOf = (request: FastifyRequest): GatewayId =>
@@ -821,11 +829,22 @@ export function registerGateQRoutes(
         : await dependencies
             .publicReplyPromise(publicId.data)
             .catch(() => null);
+    const accent =
+      dependencies.publicAccent === undefined
+        ? null
+        : await dependencies.publicAccent(publicId.data).catch(() => null);
+    // Only a colour in the one stored spelling travels; anything else is
+    // dropped rather than failing the page.
+    const accentHex =
+      accent !== null && BrandHexSchema.safeParse(accent).success
+        ? accent
+        : null;
     // Briefly cacheable, well inside the signed URLs' own lifetime.
     void reply.header("Cache-Control", "public, max-age=60");
     return PublicGatewayDtoSchema.parse({
       ...projection,
       ...(replyWithinDays === null ? {} : { replyWithinDays }),
+      ...(accentHex === null ? {} : { organisationAccentHex: accentHex }),
       ...(images === null
         ? {}
         : {
