@@ -44,6 +44,8 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
+import { syntheticAccountMetadata } from "./synthetic-account.mjs";
+
 const WEB = process.env.WEB ?? "https://capital-qweb-production.up.railway.app";
 const API =
   process.env.CQ_API_URL ?? "https://capital-qapi-production.up.railway.app";
@@ -148,11 +150,11 @@ async function createAccount(email, person, organisation) {
       email,
       password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
       email_confirm: true,
-      user_metadata: {
+      ...syntheticAccountMetadata(email, {
         display_name: person,
         full_name: person,
         organisation_name: organisation,
-      },
+      }),
     }),
   });
   if (!res.ok) throw new Error(`account not created: HTTP ${res.status}`);

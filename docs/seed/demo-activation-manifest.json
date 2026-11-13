@@ -1,0 +1,3059 @@
+{
+  "description": "Intended fictional demo companies for scripts/seed/demo-activate.mjs. Built by --write-manifest from repo sources (fictional-bulk seed-state + world, tavus-20 seed-state, dev fictional world, packages/q-pitch demo companies, the 13 Nov acceptance matrix) plus a read-only lookup of the dev world's founder companies. Membership here is intent only: every company is re-checked at run time and refused unless every attached person is fictional. Excluded on purpose: real demonstration companies (demonstration_data = true; owner 13 Nov: they stay as they are), the rest of the real-companies seed (MoneyHash and ekko are in by owner decision 13 Nov), and the live e2e release-test companies (e.g. Ledgerline UIFK (fictional), kept for the human four-eyes verification test).",
+  "version": 1,
+  "companies": [
+    {
+      "companyId": "ca8dffad-387e-4a19-a52e-36d3085d82b1",
+      "name": "Abodeeon Systems",
+      "why": ["fictional-bulk world fb0369"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0369"
+    },
+    {
+      "companyId": "ef59cd28-fdff-46b9-b16e-bcae9c129561",
+      "name": "Abodeio Technologies",
+      "why": ["fictional-bulk world fb0103"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0103"
+    },
+    {
+      "companyId": "47c006c3-6da5-411e-b0d6-c9d640c17e2d",
+      "name": "Abodely",
+      "why": ["fictional-bulk world fb0093"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0093"
+    },
+    {
+      "companyId": "c7e02d43-5cd9-42c7-afa9-5c9add0c09f2",
+      "name": "Abodely Hub",
+      "why": ["fictional-bulk world fb0064"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0064"
+    },
+    {
+      "companyId": "21845ab6-d5cb-4606-9fca-861184084724",
+      "name": "Adjustana Co",
+      "why": ["fictional-bulk world fb0159"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0159"
+    },
+    {
+      "companyId": "07fbcd70-8b2f-4df5-8dbc-4f24f46368c5",
+      "name": "Adjustio Works",
+      "why": ["fictional-bulk world fb0358"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0358"
+    },
+    {
+      "companyId": "7cc6413d-fbef-48f5-bbdf-65ca3c853720",
+      "name": "Adjustly Systems",
+      "why": ["fictional-bulk world fb0023"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0023"
+    },
+    {
+      "companyId": "f808a9e3-08f5-4b65-820c-5d6fa67646ca",
+      "name": "Adjustra",
+      "why": ["fictional-bulk world fb0354"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0354"
+    },
+    {
+      "companyId": "86db7458-979c-4b63-9696-463063f4288f",
+      "name": "Agroova Africa",
+      "why": ["fictional-bulk world fb0370"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0370"
+    },
+    {
+      "companyId": "91de2a77-fe47-4af0-8534-d9abf9c55949",
+      "name": "Ajopot",
+      "why": ["dev fictional world ajopot"],
+      "stage": "seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts ajopot"
+    },
+    {
+      "companyId": "71765150-4f97-4102-89a2-8c38f10334ef",
+      "name": "Akshar",
+      "why": ["tavus-20 seed #19"],
+      "stage": "pre_seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #19"
+    },
+    {
+      "companyId": "6ffbff8f-3436-44d5-99ad-fbbb7e8513ce",
+      "name": "Assayari Systems",
+      "why": ["fictional-bulk world fb0276"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0276"
+    },
+    {
+      "companyId": "b432c9b9-1618-4a9a-bfd0-7c839c64235f",
+      "name": "Assayo Works",
+      "why": ["fictional-bulk world fb0038"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0038"
+    },
+    {
+      "companyId": "9edac220-e8f6-46a2-8ab8-f6e51e2f4a3d",
+      "name": "Assureari",
+      "why": ["fictional-bulk world fb0076"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0076"
+    },
+    {
+      "companyId": "6fde7b45-675f-43f0-9d94-1a9de4a39697",
+      "name": "Assureisk",
+      "why": ["fictional-bulk world fb0082"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0082"
+    },
+    {
+      "companyId": "1287d154-fa88-452f-89c7-ab4229eff518",
+      "name": "Assureisk Co",
+      "why": ["fictional-bulk world fb0375"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0375"
+    },
+    {
+      "companyId": "ae0c5e79-8106-4989-8dc3-78deb20f4255",
+      "name": "Assurely",
+      "why": ["fictional-bulk world fb0355"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0355"
+    },
+    {
+      "companyId": "057aa928-e698-4c9a-9862-5b242ad54d56",
+      "name": "Assureova Works",
+      "why": ["fictional-bulk world fb0110"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0110"
+    },
+    {
+      "companyId": "7e5a7a76-857a-4528-9641-08c7bab9cc22",
+      "name": "Baridi",
+      "why": ["tavus-20 seed #09"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #09"
+    },
+    {
+      "companyId": "63dec1b9-0bb5-49e0-8f2d-ae33a74e1263",
+      "name": "Basketari",
+      "why": ["fictional-bulk world fb0037"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0037"
+    },
+    {
+      "companyId": "96bde752-fb48-47af-9eb5-80e9143a84bc",
+      "name": "Basketova Systems",
+      "why": ["fictional-bulk world fb0099"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0099 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "fe054879-e959-439f-9591-99d0d59267cc",
+      "name": "Basketum Systems",
+      "why": ["fictional-bulk world fb0151"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0151"
+    },
+    {
+      "companyId": "fc80b7c2-9fdb-46bf-8767-d5addfbccd99",
+      "name": "Batchent Technologies",
+      "why": ["fictional-bulk world fb0234"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0234"
+    },
+    {
+      "companyId": "be912de4-4e2b-49a5-b806-2bfecacc6155",
+      "name": "Batchisk",
+      "why": ["fictional-bulk world fb0317"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0317"
+    },
+    {
+      "companyId": "08b4e584-fe65-40d5-915e-8551e3fe0df0",
+      "name": "Batchly Technologies",
+      "why": ["fictional-bulk world fb0104"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0104"
+    },
+    {
+      "companyId": "e2e08d66-9d0d-42a5-bf94-4acb9a80471e",
+      "name": "Batchra Works",
+      "why": ["fictional-bulk world fb0022"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0022"
+    },
+    {
+      "companyId": "1046de66-2c7f-411d-9e85-68b49e49dbde",
+      "name": "Batchum Labs",
+      "why": ["fictional-bulk world fb0039"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0039"
+    },
+    {
+      "companyId": "cfee197a-2583-4910-a28a-728bce7d6784",
+      "name": "Branchari",
+      "why": ["fictional-bulk world fb0008"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0008"
+    },
+    {
+      "companyId": "5be654c3-eb80-4bdf-aa5a-9cb29c521dbe",
+      "name": "Brancheon Works",
+      "why": ["fictional-bulk world fb0010"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0010"
+    },
+    {
+      "companyId": "24ff1193-162d-4125-acdc-4f8fd709bbe0",
+      "name": "Branchio Africa",
+      "why": ["fictional-bulk world fb0371"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0371"
+    },
+    {
+      "companyId": "94e3cb7c-4889-4da5-a797-2db3c18d3972",
+      "name": "Branchisk",
+      "why": ["fictional-bulk world fb0340"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0340"
+    },
+    {
+      "companyId": "5bd1b9c4-d905-4031-93b5-e9e238b6a0fc",
+      "name": "Bridgeisk",
+      "why": ["fictional-bulk world fb0170"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0170"
+    },
+    {
+      "companyId": "37b0c9a0-c160-406e-9b83-04496665965d",
+      "name": "Brightkloof Energy",
+      "why": ["dev fictional world brightkloof-energy"],
+      "stage": "series_b",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts brightkloof-energy"
+    },
+    {
+      "companyId": "adfbc698-6228-4229-9142-8bf4897f65fe",
+      "name": "Byteio Systems",
+      "why": ["fictional-bulk world fb0033"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0033"
+    },
+    {
+      "companyId": "5f08bcf2-7f17-4d2d-b00a-7c94e433c09b",
+      "name": "Careent Technologies",
+      "why": ["fictional-bulk world fb0331"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0331"
+    },
+    {
+      "companyId": "dba4f35d-4d20-4137-9425-a691fbfce9da",
+      "name": "Careent Works",
+      "why": ["fictional-bulk world fb0001"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0001"
+    },
+    {
+      "companyId": "3eef772e-7f7b-4fbc-8eeb-cbcae1ffff05",
+      "name": "Careova Co",
+      "why": ["fictional-bulk world fb0219"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0219"
+    },
+    {
+      "companyId": "3eefc00f-b38f-4f40-8136-a5f48ce3f146",
+      "name": "Careum Labs",
+      "why": ["fictional-bulk world fb0311"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0311"
+    },
+    {
+      "companyId": "20ef2206-fd3f-4899-a775-822d2992694b",
+      "name": "Cargoana Works",
+      "why": ["fictional-bulk world fb0062"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0062"
+    },
+    {
+      "companyId": "01ed6cfe-0872-48d9-9d93-dee0ec0d95a3",
+      "name": "Cargoum",
+      "why": ["fictional-bulk world fb0155"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0155"
+    },
+    {
+      "companyId": "45c02862-43cd-463a-b80d-74d40ca24f26",
+      "name": "Cargoum Labs",
+      "why": ["fictional-bulk world fb0191"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0191"
+    },
+    {
+      "companyId": "1033662f-a3dd-4484-a887-68c6ea58b396",
+      "name": "Cargoum Works",
+      "why": ["fictional-bulk world fb0112"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0112"
+    },
+    {
+      "companyId": "d755b5d8-a81d-4c22-9da0-f416ad0122a6",
+      "name": "Chainana Labs",
+      "why": ["fictional-bulk world fb0391"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0391"
+    },
+    {
+      "companyId": "0fbec7ab-ef6b-420a-8264-ca81a9fb4513",
+      "name": "Chainana Works",
+      "why": ["fictional-bulk world fb0266"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0266"
+    },
+    {
+      "companyId": "7b30d4f7-08fb-42f0-bf46-a50064d5adb9",
+      "name": "Chainent Technologies",
+      "why": ["fictional-bulk world fb0085"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0085"
+    },
+    {
+      "companyId": "a0b04600-3393-441c-8639-f2c9d2a5d160",
+      "name": "Charta",
+      "why": ["fictional-bulk world fb0043"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0043"
+    },
+    {
+      "companyId": "5b189deb-d474-4027-a716-0fbd8d888134",
+      "name": "Chartelle Hub",
+      "why": ["fictional-bulk world fb0316"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0316"
+    },
+    {
+      "companyId": "8850b1c8-297e-43b9-a9dd-e5adad694f82",
+      "name": "Charteon Works",
+      "why": ["fictional-bulk world fb0120"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0120"
+    },
+    {
+      "companyId": "d681138a-aa31-434f-969e-ce2c91f030bf",
+      "name": "Chartly",
+      "why": ["fictional-bulk world fb0060"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0060"
+    },
+    {
+      "companyId": "8141494b-0135-46f6-9852-a75336db4e8a",
+      "name": "Chartly Co",
+      "why": ["fictional-bulk world fb0072"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0072"
+    },
+    {
+      "companyId": "c20ea3a2-da7e-42bb-b334-05917bc35bd2",
+      "name": "Chartova Systems",
+      "why": ["fictional-bulk world fb0052"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0052"
+    },
+    {
+      "companyId": "63a9487f-7f2f-45e6-92cc-34ae3d7d6edb",
+      "name": "Cipherisk Labs",
+      "why": ["fictional-bulk world fb0293"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0293"
+    },
+    {
+      "companyId": "6506baff-9ccb-4eb5-aa05-d7a223ec8648",
+      "name": "Cipherova",
+      "why": ["fictional-bulk world fb0333"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0333"
+    },
+    {
+      "companyId": "1eda448b-c7b1-47b2-bdb5-99410a2df744",
+      "name": "Cipherra Works",
+      "why": ["fictional-bulk world fb0257"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0257"
+    },
+    {
+      "companyId": "2ecc954e-939f-4ba3-83ab-fe0af0f70e23",
+      "name": "Cipherum Co",
+      "why": ["fictional-bulk world fb0012"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0012"
+    },
+    {
+      "companyId": "89a4414e-c51f-4960-8a40-310d998b0930",
+      "name": "Claimix Labs",
+      "why": ["fictional-bulk world fb0267"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0267"
+    },
+    {
+      "companyId": "1c32c5b0-8185-441e-8f46-b21c0610c469",
+      "name": "Classeon Co",
+      "why": ["fictional-bulk world fb0223"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0223"
+    },
+    {
+      "companyId": "8dfe2e53-4964-4490-9e8f-2dee4ca2f5e3",
+      "name": "Classra Africa",
+      "why": ["fictional-bulk world fb0127"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0127"
+    },
+    {
+      "companyId": "5ea900ca-2e8b-4a29-a392-5a9d5c71c18e",
+      "name": "Classum",
+      "why": ["fictional-bulk world fb0135"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0135"
+    },
+    {
+      "companyId": "6ed1da85-cddc-4015-b5c2-86a95a48cfc8",
+      "name": "Clearwater Assurance",
+      "why": ["tavus-20 seed #03"],
+      "stage": "series_a",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #03"
+    },
+    {
+      "companyId": "0a160452-d9a2-4583-8396-207de755aa5a",
+      "name": "Clinicly",
+      "why": ["fictional-bulk world fb0217"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0217"
+    },
+    {
+      "companyId": "6b2f9851-d7e3-4197-9fd1-beffbdc153fe",
+      "name": "Clinicrest",
+      "why": [
+        "dev fictional world clinicrest",
+        "packages/q-pitch demo company clinicrest"
+      ],
+      "stage": "seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts clinicrest"
+    },
+    {
+      "companyId": "ad74f178-8644-4268-b529-fc5a83bc3669",
+      "name": "Coineon",
+      "why": ["fictional-bulk world fb0308"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0308"
+    },
+    {
+      "companyId": "0d6763db-75f0-4854-b473-ccffd2b4603b",
+      "name": "Coinix Africa",
+      "why": ["fictional-bulk world fb0360"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0360"
+    },
+    {
+      "companyId": "c96e3bd3-ded7-4d20-bbb6-635f7baac472",
+      "name": "Coinra",
+      "why": ["fictional-bulk world fb0196"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0196"
+    },
+    {
+      "companyId": "1f4df201-0e17-4dbe-b6ab-b9b55938760a",
+      "name": "Coreeon Africa",
+      "why": ["fictional-bulk world fb0250"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0250"
+    },
+    {
+      "companyId": "557bf575-bc2d-4590-839c-413cd6ce1b23",
+      "name": "Coreisk",
+      "why": ["fictional-bulk world fb0003"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0003"
+    },
+    {
+      "companyId": "c1233e66-2f78-402c-b212-42599adce1f2",
+      "name": "Coreova",
+      "why": ["fictional-bulk world fb0304"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0304"
+    },
+    {
+      "companyId": "e9d9d8e3-162e-4b6a-b629-4e338216a54a",
+      "name": "Corridorly Labs",
+      "why": ["fictional-bulk world fb0383"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0383"
+    },
+    {
+      "companyId": "08842e02-2067-42dc-99cd-f7c9147178e1",
+      "name": "Corridorra",
+      "why": ["fictional-bulk world fb0374"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0374"
+    },
+    {
+      "companyId": "e41832f9-f513-423a-82fe-7d7e0a0b3a65",
+      "name": "Corridorra Labs",
+      "why": ["fictional-bulk world fb0302"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0302"
+    },
+    {
+      "companyId": "011867c1-3c66-4466-aa05-b8986e4337ed",
+      "name": "Cosecha Labs",
+      "why": ["tavus-20 seed #15"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #15"
+    },
+    {
+      "companyId": "89e8c316-5f1f-4812-978b-0662a5dbda20",
+      "name": "Counterix Co",
+      "why": ["fictional-bulk world fb0297"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0297"
+    },
+    {
+      "companyId": "bf1c6f23-26e6-47d9-a486-d712e271b358",
+      "name": "Counterora",
+      "why": ["fictional-bulk world fb0221"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0221"
+    },
+    {
+      "companyId": "a6cdef10-f6cb-4d36-a63b-1a10b7bd8441",
+      "name": "Counterova",
+      "why": ["fictional-bulk world fb0385"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0385"
+    },
+    {
+      "companyId": "101d1feb-eba2-4fdf-b6ff-e1f780a154cb",
+      "name": "Covera Hub",
+      "why": ["fictional-bulk world fb0166"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0166"
+    },
+    {
+      "companyId": "7a12285e-ec08-45be-a6a9-ff1d03cbc833",
+      "name": "Coverelle Technologies",
+      "why": ["fictional-bulk world fb0201"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0201"
+    },
+    {
+      "companyId": "866dcb82-9615-40f4-b4cc-28d05179d7fa",
+      "name": "Covereon",
+      "why": ["fictional-bulk world fb0359"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0359"
+    },
+    {
+      "companyId": "4724eb48-267d-45db-854f-9ca09c924852",
+      "name": "Coverio",
+      "why": ["fictional-bulk world fb0199"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0199"
+    },
+    {
+      "companyId": "9d5643d6-312b-4a7e-92c2-bbf1e171b783",
+      "name": "Coverisk",
+      "why": ["fictional-bulk world fb0372"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0372"
+    },
+    {
+      "companyId": "139dd712-7f46-4851-a385-9a2f77938e71",
+      "name": "Coverisk Africa",
+      "why": ["fictional-bulk world fb0019"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0019"
+    },
+    {
+      "companyId": "5da3e82a-0193-4a33-adbe-8ebfb6cd9dc5",
+      "name": "Covero",
+      "why": ["fictional-bulk world fb0363"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0363"
+    },
+    {
+      "companyId": "de362468-156e-4b5f-af90-9e2072574759",
+      "name": "Coverra",
+      "why": ["fictional-bulk world fb0133"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0133"
+    },
+    {
+      "companyId": "c6ba15ae-2a40-4856-a8eb-adbbe3bc7c33",
+      "name": "Credoana",
+      "why": ["fictional-bulk world fb0270"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0270"
+    },
+    {
+      "companyId": "6d388c49-fd5b-4721-ba8b-edfa35e8fa18",
+      "name": "Credoo Africa",
+      "why": ["fictional-bulk world fb0318"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0318"
+    },
+    {
+      "companyId": "c4c3cabc-8d5e-4c1a-88b5-52abeab19c6e",
+      "name": "Credoora Works",
+      "why": ["fictional-bulk world fb0379"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0379"
+    },
+    {
+      "companyId": "42e1bc2c-0c93-4278-b98b-d5641bb912c1",
+      "name": "Crewa Labs",
+      "why": ["fictional-bulk world fb0240"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0240"
+    },
+    {
+      "companyId": "0b2ecbc1-9a46-480d-b3e1-0511d676d626",
+      "name": "Crewo Systems",
+      "why": ["fictional-bulk world fb0048"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0048"
+    },
+    {
+      "companyId": "cdca7993-142c-44d4-850e-5a190d63b055",
+      "name": "Crewora Labs",
+      "why": ["fictional-bulk world fb0074"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0074"
+    },
+    {
+      "companyId": "6d7784c7-e931-4bed-83c2-bc071e0a9090",
+      "name": "Crewum Africa",
+      "why": ["fictional-bulk world fb0373"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0373"
+    },
+    {
+      "companyId": "dddd3d18-2638-4d27-812a-e82fca2dba93",
+      "name": "Depota Co",
+      "why": ["fictional-bulk world fb0017"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0017"
+    },
+    {
+      "companyId": "1f4f35e8-69a9-4d13-b229-017fb4780920",
+      "name": "Depotana Co",
+      "why": ["fictional-bulk world fb0378"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0378"
+    },
+    {
+      "companyId": "69dadda5-ec87-44a4-80e1-a756e65e1d3b",
+      "name": "Depoteon",
+      "why": ["fictional-bulk world fb0087"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0087"
+    },
+    {
+      "companyId": "fb4737ad-3ebe-49bf-8721-55c36f8cb52e",
+      "name": "Depotisk Systems",
+      "why": ["fictional-bulk world fb0242"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0242"
+    },
+    {
+      "companyId": "e4e4f474-cf76-4119-9c94-3f5e1d7b77f2",
+      "name": "Depotix Co",
+      "why": ["fictional-bulk world fb0154"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0154"
+    },
+    {
+      "companyId": "b320def7-781f-43b7-869e-1a878cf35202",
+      "name": "Depotly Labs",
+      "why": ["fictional-bulk world fb0322"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0322"
+    },
+    {
+      "companyId": "4b1f768b-243f-4944-9800-4040e85f77df",
+      "name": "Depoto",
+      "why": ["fictional-bulk world fb0167"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0167"
+    },
+    {
+      "companyId": "7b7b91ba-0424-4e29-9fa5-7a1ca97cee83",
+      "name": "Depotova Africa",
+      "why": ["fictional-bulk world fb0125"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0125"
+    },
+    {
+      "companyId": "9de8915c-c3d4-4aa2-adc5-8af58a8f8d19",
+      "name": "Depotum Technologies",
+      "why": ["fictional-bulk world fb0198"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0198"
+    },
+    {
+      "companyId": "ba7189d9-6aab-44ef-8f02-d82c386527ed",
+      "name": "Drishti Health",
+      "why": ["tavus-20 seed #05"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #05"
+    },
+    {
+      "companyId": "9c514def-bb2c-428f-924e-0d819c4190a2",
+      "name": "Dukaari",
+      "why": ["fictional-bulk world fb0146"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0146"
+    },
+    {
+      "companyId": "d9bb8f77-a721-438d-91e3-9213114dae00",
+      "name": "Dukaari Africa",
+      "why": ["fictional-bulk world fb0249"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0249"
+    },
+    {
+      "companyId": "9522d9c7-700b-48b9-8f6f-2a765993a800",
+      "name": "Dwellisk Africa",
+      "why": ["fictional-bulk world fb0195"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0195"
+    },
+    {
+      "companyId": "a6b5f28e-fe02-4187-b2c6-a7cdbfaa9b15",
+      "name": "Dwellra Works",
+      "why": ["fictional-bulk world fb0102"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0102"
+    },
+    {
+      "companyId": "8207fefb-9022-4a10-92fe-29326d8dd7cd",
+      "name": "Dxa Co",
+      "why": ["fictional-bulk world fb0357"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0357"
+    },
+    {
+      "companyId": "b97a78cd-41a7-442b-889e-75bcbd9604eb",
+      "name": "Dxelle Systems",
+      "why": ["fictional-bulk world fb0264"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0264"
+    },
+    {
+      "companyId": "5cc29948-d579-48a6-b6d0-8f580049e8d6",
+      "name": "Echoio Works",
+      "why": ["fictional-bulk world fb0115"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0115"
+    },
+    {
+      "companyId": "2bb633aa-1b8a-4cc2-9740-59cbb182b138",
+      "name": "Echoova Systems",
+      "why": ["fictional-bulk world fb0122"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0122"
+    },
+    {
+      "companyId": "20752c5e-419c-543f-a5c1-fc0ddc5180f0",
+      "name": "ekko",
+      "why": ["real-companies seed demo company (owner decision 13 Nov)"],
+      "stage": null,
+      "stageSource": "docs/seed/real-companies/companies.json ekko stage null"
+    },
+    {
+      "companyId": "0dde81c7-6763-41fe-9aa9-7f18ad051b81",
+      "name": "Embedo Systems",
+      "why": ["fictional-bulk world fb0028"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0028"
+    },
+    {
+      "companyId": "05bcbe16-9a06-466c-a822-a3d7f3201245",
+      "name": "Embedova Co",
+      "why": ["fictional-bulk world fb0177"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0177"
+    },
+    {
+      "companyId": "742e15e5-db75-4a55-b4b6-1c87ffb252d6",
+      "name": "Ferrolith",
+      "why": ["tavus-20 seed #11"],
+      "stage": "series_a",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #11"
+    },
+    {
+      "companyId": "4f4bdaac-3784-4edc-9eab-220833138180",
+      "name": "Fieldana Technologies",
+      "why": ["fictional-bulk world fb0169"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0169"
+    },
+    {
+      "companyId": "1ad9a5f1-62f9-443b-8824-b1b92a63b01e",
+      "name": "Fieldent",
+      "why": ["fictional-bulk world fb0053"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0053"
+    },
+    {
+      "companyId": "168cd5ea-9c67-4255-b1a5-37d3459167af",
+      "name": "Fieldo Labs",
+      "why": ["fictional-bulk world fb0187"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0187"
+    },
+    {
+      "companyId": "635fc544-716c-48e2-8756-d8dcd9d8d9c2",
+      "name": "Fieldra Labs",
+      "why": ["fictional-bulk world fb0330"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0330"
+    },
+    {
+      "companyId": "43551eb3-092c-4da3-9ce7-e6efe9fe4953",
+      "name": "Fieldum Co",
+      "why": ["fictional-bulk world fb0338"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0338"
+    },
+    {
+      "companyId": "b3d59389-06e7-47fc-a476-da62a2d36860",
+      "name": "Flageon Africa",
+      "why": ["fictional-bulk world fb0029"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0029"
+    },
+    {
+      "companyId": "682f1aab-2642-4513-aa3e-27dc8f700536",
+      "name": "Floatra",
+      "why": ["fictional-bulk world fb0380"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0380"
+    },
+    {
+      "companyId": "d510db5b-bfa7-49b0-b965-add4b3b88bfc",
+      "name": "Forgeo Hub",
+      "why": ["fictional-bulk world fb0200"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0200"
+    },
+    {
+      "companyId": "2fac3018-7d26-469a-b03a-11bb3c6b954b",
+      "name": "Forgeora Hub",
+      "why": ["fictional-bulk world fb0278"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0278 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "f3514b2e-8bb5-4c6a-8f97-7ce34d35583a",
+      "name": "Fortent Co",
+      "why": ["fictional-bulk world fb0069"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0069"
+    },
+    {
+      "companyId": "2c276e93-1e0b-4b94-9f3c-7ad52440a12b",
+      "name": "Fortora Systems",
+      "why": ["fictional-bulk world fb0285"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0285"
+    },
+    {
+      "companyId": "7ad21442-d83b-4846-9a77-ba5aad0671e3",
+      "name": "Grainari",
+      "why": ["fictional-bulk world fb0088"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0088"
+    },
+    {
+      "companyId": "b0ed6a2b-b40e-487a-95c3-df6e1095bd8c",
+      "name": "Grainari Technologies",
+      "why": ["fictional-bulk world fb0050"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0050"
+    },
+    {
+      "companyId": "1af3db4c-1c9e-4134-b89c-7b2ef6bb5c2b",
+      "name": "Gridari",
+      "why": ["fictional-bulk world fb0094"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0094 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "27ca310a-a38b-48d7-bbb7-f28cbc10db88",
+      "name": "Gridari Technologies",
+      "why": ["fictional-bulk world fb0006"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0006"
+    },
+    {
+      "companyId": "1fcc45b2-cd9b-4b66-8e42-3fc700ee2ac7",
+      "name": "Gridisk",
+      "why": ["fictional-bulk world fb0058"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0058"
+    },
+    {
+      "companyId": "c6e41406-2b93-4721-862a-3785cbd1cfee",
+      "name": "Gridova",
+      "why": ["fictional-bulk world fb0129"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0129"
+    },
+    {
+      "companyId": "d687fb6d-673c-45f8-ac35-7c8e2725bb75",
+      "name": "Guardo Technologies",
+      "why": ["fictional-bulk world fb0341"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0341"
+    },
+    {
+      "companyId": "1ab2cc02-160f-4812-a6b1-8be7e43afd3e",
+      "name": "Halyard Security",
+      "why": ["tavus-20 seed #13"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #13"
+    },
+    {
+      "companyId": "ceb6ec2d-4a4a-41a2-9b71-377d72c26407",
+      "name": "Harbourline Cargo",
+      "why": ["packages/q-pitch demo company harbourline-cargo"]
+    },
+    {
+      "companyId": "6eb7a8b1-5ca6-473f-be59-c6d3a304d343",
+      "name": "Harvestelle",
+      "why": ["fictional-bulk world fb0054"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0054"
+    },
+    {
+      "companyId": "d73daf88-ca44-464d-bc8a-b372a7b24835",
+      "name": "Harvestent",
+      "why": ["fictional-bulk world fb0300"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0300"
+    },
+    {
+      "companyId": "e3c29a23-0bd4-4107-b319-c03fa7313f56",
+      "name": "Harvestly Systems",
+      "why": ["fictional-bulk world fb0204"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0204"
+    },
+    {
+      "companyId": "dd777600-02d1-4479-82ff-f4f00515053a",
+      "name": "Haveneon Africa",
+      "why": ["fictional-bulk world fb0231"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0231"
+    },
+    {
+      "companyId": "32bbfc63-82af-4ad9-858d-68caba6d6d21",
+      "name": "Havenisk Systems",
+      "why": ["fictional-bulk world fb0230"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0230"
+    },
+    {
+      "companyId": "b7478d6f-9f76-4206-a2fb-3f620699aca3",
+      "name": "Hookent",
+      "why": ["fictional-bulk world fb0015"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0015"
+    },
+    {
+      "companyId": "465e0a39-4dc8-4183-a82f-35b065f4fcc4",
+      "name": "Hookova Co",
+      "why": ["fictional-bulk world fb0335"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0335"
+    },
+    {
+      "companyId": "c20a3630-4cb9-4c36-9f03-538a3214435d",
+      "name": "Hookra Works",
+      "why": ["fictional-bulk world fb0310"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0310"
+    },
+    {
+      "companyId": "ddf6f558-7c22-432e-8fa9-1c6c34a6413b",
+      "name": "Hui",
+      "why": ["tavus-20 seed #14"],
+      "stage": "pre_seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #14"
+    },
+    {
+      "companyId": "2297c928-d507-45cf-bbb1-ebb1cefb1ba5",
+      "name": "Identova Works",
+      "why": ["fictional-bulk world fb0140"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0140"
+    },
+    {
+      "companyId": "8e2c40e7-d1e2-4063-a179-abdea4f0cd83",
+      "name": "Kazikit",
+      "why": ["dev fictional world kazikit"],
+      "stage": "pre_seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts kazikit"
+    },
+    {
+      "companyId": "0a5baa81-38b2-4a7e-b413-5ff87fc9eec4",
+      "name": "Keysa Africa",
+      "why": ["fictional-bulk world fb0288"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0288"
+    },
+    {
+      "companyId": "c4874458-3211-43cf-b0cb-e0d740b9b477",
+      "name": "Kioskari Africa",
+      "why": ["fictional-bulk world fb0194"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0194"
+    },
+    {
+      "companyId": "cf42834c-46e3-4ad1-806a-c9c43f946745",
+      "name": "Kioskari Co",
+      "why": ["fictional-bulk world fb0272"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0272"
+    },
+    {
+      "companyId": "d1bd2f25-6af7-4aba-9f53-287b9739ac5c",
+      "name": "Kioskelle",
+      "why": ["fictional-bulk world fb0172"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0172"
+    },
+    {
+      "companyId": "53611136-426e-4aa8-a34b-6c1e3115c28c",
+      "name": "Kioskix Technologies",
+      "why": ["fictional-bulk world fb0132"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0132"
+    },
+    {
+      "companyId": "4177d734-d457-404b-83f6-e0cf6ad426aa",
+      "name": "Kopaisk",
+      "why": ["fictional-bulk world fb0175"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0175"
+    },
+    {
+      "companyId": "472f6b0b-13bb-436d-865a-d0b53fed5845",
+      "name": "Kopaly",
+      "why": ["fictional-bulk world fb0137"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0137"
+    },
+    {
+      "companyId": "8ead162c-3a61-4ccb-9eba-f4b26e1a4733",
+      "name": "Kopaly Works",
+      "why": ["fictional-bulk world fb0071"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0071"
+    },
+    {
+      "companyId": "46aba358-b1ba-4505-863d-c4a24da71367",
+      "name": "Kyca Systems",
+      "why": ["fictional-bulk world fb0277"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0277"
+    },
+    {
+      "companyId": "f93a71f8-0cae-4067-b41d-641eb9a2b7d6",
+      "name": "Kycana Africa",
+      "why": ["fictional-bulk world fb0143"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0143"
+    },
+    {
+      "companyId": "e9904cea-1c03-434a-bc7b-efb93bde9a14",
+      "name": "Kycana Hub",
+      "why": ["fictional-bulk world fb0183"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0183"
+    },
+    {
+      "companyId": "10b7bc18-9fee-42ae-8ed3-56f3b5bf8134",
+      "name": "Kyceon Africa",
+      "why": ["fictional-bulk world fb0283"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0283"
+    },
+    {
+      "companyId": "df502b50-839a-43ae-ba95-35c2d68f971c",
+      "name": "Kyceon Works",
+      "why": ["fictional-bulk world fb0141"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0141"
+    },
+    {
+      "companyId": "a71e9d3f-9dc1-47ec-b5b2-f4f0b0cf9755",
+      "name": "Kycix Labs",
+      "why": ["fictional-bulk world fb0292"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0292"
+    },
+    {
+      "companyId": "e16a00f1-c833-48e2-b0f0-aa54a3a8b6f7",
+      "name": "Kycora Labs",
+      "why": ["fictional-bulk world fb0319"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0319"
+    },
+    {
+      "companyId": "7a44bf07-d94b-41d5-8d27-36906c882ead",
+      "name": "Labix Works",
+      "why": ["fictional-bulk world fb0077"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0077"
+    },
+    {
+      "companyId": "a71a1438-87c6-41e0-a100-965bc2d65a7f",
+      "name": "Labo",
+      "why": ["fictional-bulk world fb0290"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0290"
+    },
+    {
+      "companyId": "26097041-9e3f-4142-b157-eb647dc75ff2",
+      "name": "Lakeana Africa",
+      "why": ["fictional-bulk world fb0394"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0394"
+    },
+    {
+      "companyId": "ab2d36d2-9d8e-4e95-a9f1-36f56e151170",
+      "name": "Lakely Co",
+      "why": ["fictional-bulk world fb0229"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0229"
+    },
+    {
+      "companyId": "65ad2270-7588-4267-a0ad-b25bc9b26c27",
+      "name": "Lakely Works",
+      "why": ["fictional-bulk world fb0312"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0312"
+    },
+    {
+      "companyId": "c974628d-4599-40cf-a4fa-e1aadbb07a02",
+      "name": "Lanea Co",
+      "why": ["fictional-bulk world fb0182"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0182"
+    },
+    {
+      "companyId": "e084d586-b60b-4680-8330-e3dbc6bcf26f",
+      "name": "Laneix Africa",
+      "why": ["fictional-bulk world fb0081"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0081"
+    },
+    {
+      "companyId": "de252705-d72c-4c98-8b85-0f68117f2c14",
+      "name": "Laneova",
+      "why": ["fictional-bulk world fb0303"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0303"
+    },
+    {
+      "companyId": "c58265b3-ae18-4c32-96b3-3a405e3b037d",
+      "name": "Latheana",
+      "why": ["fictional-bulk world fb0161"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0161"
+    },
+    {
+      "companyId": "9806c785-9a7e-411a-88cd-f082351f8d74",
+      "name": "Latheari",
+      "why": ["fictional-bulk world fb0232"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0232"
+    },
+    {
+      "companyId": "aa0df452-4301-4400-a781-3601b7bf8370",
+      "name": "Latheent",
+      "why": ["fictional-bulk world fb0213"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0213"
+    },
+    {
+      "companyId": "ca550238-eb8f-4985-9b8b-da257c6a0334",
+      "name": "Latheora Technologies",
+      "why": ["fictional-bulk world fb0046"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0046"
+    },
+    {
+      "companyId": "c0c856b7-eb82-48fa-bcb3-f6888e19e3e1",
+      "name": "Latheum",
+      "why": ["fictional-bulk world fb0192"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0192"
+    },
+    {
+      "companyId": "28f5ca42-d4e0-410c-906b-3951aaa902ce",
+      "name": "Layerent Systems",
+      "why": ["fictional-bulk world fb0185"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0185"
+    },
+    {
+      "companyId": "17c052c9-6520-455e-9e19-7867fb51d6eb",
+      "name": "Layerix Technologies",
+      "why": ["fictional-bulk world fb0365"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0365"
+    },
+    {
+      "companyId": "38cf5bfa-08db-4be4-a927-b0f51ba689a7",
+      "name": "Layero",
+      "why": ["fictional-bulk world fb0235"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0235"
+    },
+    {
+      "companyId": "0a958018-b858-416d-9fa8-fabc1d66095e",
+      "name": "Layerora",
+      "why": ["fictional-bulk world fb0203"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0203"
+    },
+    {
+      "companyId": "a167d8a5-68ee-4ee3-a921-bbed04f421cb",
+      "name": "Layerum Hub",
+      "why": ["fictional-bulk world fb0339"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0339"
+    },
+    {
+      "companyId": "1750e30d-ddc6-4fd6-80a3-903026fa4285",
+      "name": "Learnra",
+      "why": ["fictional-bulk world fb0332"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0332 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "13d19230-9f2c-4122-b41a-d39f15292ca5",
+      "name": "Ledgerari Systems",
+      "why": ["fictional-bulk world fb0212"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0212"
+    },
+    {
+      "companyId": "31633da0-87f9-4c5f-bd9a-a892a9251207",
+      "name": "LedgerBridge",
+      "why": [
+        "ACCEPTANCE-MATRIX-2026-11-13 A3: curated, network-visible, not assessed"
+      ]
+    },
+    {
+      "companyId": "dc078711-6ff6-4928-b8de-711d51bab020",
+      "name": "Ledgerelle Hub",
+      "why": ["fictional-bulk world fb0282"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0282"
+    },
+    {
+      "companyId": "3b968f64-517a-4757-ae78-69526f1d2a63",
+      "name": "Ledgerelle Technologies",
+      "why": ["fictional-bulk world fb0313"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0313"
+    },
+    {
+      "companyId": "3ee7fcae-aeea-4fd6-bf84-dd3f06272c95",
+      "name": "Ledgerent",
+      "why": ["fictional-bulk world fb0348"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0348 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "84b9641f-b618-4fa3-8b35-1d19b1c71d82",
+      "name": "Ledgerfold",
+      "why": ["dev fictional world ledgerfold"],
+      "stage": "seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts ledgerfold"
+    },
+    {
+      "companyId": "deb2c676-8ef1-4411-abec-195faacc8837",
+      "name": "Ledgerio Works",
+      "why": ["fictional-bulk world fb0070"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0070"
+    },
+    {
+      "companyId": "6f075a0b-8372-4458-9060-09afd73a9c37",
+      "name": "Ledgerline",
+      "why": ["tavus-20 seed #01"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #01"
+    },
+    {
+      "companyId": "4757ff28-be5e-4b8f-b613-df74e5733d29",
+      "name": "Ledgerly Technologies",
+      "why": ["fictional-bulk world fb0163"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0163 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "5fbcaa1e-2cbd-4323-91ab-002c4aedb19d",
+      "name": "Ledgerova Africa",
+      "why": ["fictional-bulk world fb0190"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0190"
+    },
+    {
+      "companyId": "f50d7c19-9d5f-46e5-9e01-e9b599b8bd75",
+      "name": "Ledgerra Co",
+      "why": ["fictional-bulk world fb0148"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0148"
+    },
+    {
+      "companyId": "6bbbdee1-9827-4a3c-9d65-2ad8f6917ed4",
+      "name": "Lensisk",
+      "why": ["fictional-bulk world fb0368"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0368"
+    },
+    {
+      "companyId": "2a5d4f60-4930-4252-b5d6-4e2323c712a5",
+      "name": "Lumenio",
+      "why": ["fictional-bulk world fb0156"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0156"
+    },
+    {
+      "companyId": "ea9f9df3-1fc2-4990-9942-3a3cf57352fd",
+      "name": "Lumeno Labs",
+      "why": ["fictional-bulk world fb0027"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0027"
+    },
+    {
+      "companyId": "21346729-412e-4bc9-9044-c6b116f64983",
+      "name": "Lumenra Labs",
+      "why": ["fictional-bulk world fb0041"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0041"
+    },
+    {
+      "companyId": "01c554bf-8bf1-4eb7-b460-5d841764c40b",
+      "name": "Maji Loop",
+      "why": ["dev fictional world maji-loop"],
+      "stage": "seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts maji-loop"
+    },
+    {
+      "companyId": "58540e1e-5be1-473e-bd88-72ac932c94cb",
+      "name": "Marketlight Grids",
+      "why": ["dev fictional world marketlight-grids"],
+      "stage": "series_a",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts marketlight-grids"
+    },
+    {
+      "companyId": "ea1e24ba-76d0-4e27-9ba4-8b48f6027292",
+      "name": "Medielle Labs",
+      "why": ["fictional-bulk world fb0101"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0101"
+    },
+    {
+      "companyId": "c98ac407-f3fc-44c2-a8f9-e6bc106a84cf",
+      "name": "Medily Africa",
+      "why": ["fictional-bulk world fb0109"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0109"
+    },
+    {
+      "companyId": "bb145766-5f09-4ddf-b6b5-394976d2beca",
+      "name": "Medily Hub",
+      "why": ["fictional-bulk world fb0296"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0296"
+    },
+    {
+      "companyId": "b5280fd1-c2ee-4824-8658-09529453f7be",
+      "name": "MedTrail",
+      "why": ["tavus-20 seed #08"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #08"
+    },
+    {
+      "companyId": "010c8a02-efa1-4b90-967d-9dd5227b3d6a",
+      "name": "Milla Africa",
+      "why": ["fictional-bulk world fb0208"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0208"
+    },
+    {
+      "companyId": "efa2edc7-ec75-448a-951d-dc98dab3800e",
+      "name": "Milla Systems",
+      "why": ["fictional-bulk world fb0239"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0239"
+    },
+    {
+      "companyId": "e679be86-f511-4cfc-9725-9b0c80c0616d",
+      "name": "Millova Hub",
+      "why": ["fictional-bulk world fb0397"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0397 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "fd1e1dfa-4a64-4c13-b2d5-298b35652966",
+      "name": "Millum Works",
+      "why": ["fictional-bulk world fb0252"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0252"
+    },
+    {
+      "companyId": "7f0a9119-f602-4726-883f-b569243eb4a3",
+      "name": "Mintora",
+      "why": ["fictional-bulk world fb0131"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0131"
+    },
+    {
+      "companyId": "c3b95b3c-a1c3-4cb5-b445-91e56798dd9b",
+      "name": "Mintora Works",
+      "why": ["fictional-bulk world fb0014"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0014"
+    },
+    {
+      "companyId": "d9c03bb4-fa9b-4c55-8924-038d386cc8a8",
+      "name": "Mizan",
+      "why": ["tavus-20 seed #16"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #16"
+    },
+    {
+      "companyId": "8b1c25b2-7e8b-5e78-9f51-c307e6b869e8",
+      "name": "MoneyHash",
+      "why": ["real-companies seed demo company (owner decision 13 Nov)"],
+      "stage": null,
+      "stageSource": "docs/seed/real-companies/companies.json MoneyHash stage \"pre-series_a\""
+    },
+    {
+      "companyId": "7cac79c5-a199-49d5-b56a-5f5bfbf8ae2c",
+      "name": "Motoix",
+      "why": ["fictional-bulk world fb0134"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0134"
+    },
+    {
+      "companyId": "6a128b01-4f8a-47a6-9db4-7c30dfbfd4ce",
+      "name": "Motoly Systems",
+      "why": ["fictional-bulk world fb0241"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0241"
+    },
+    {
+      "companyId": "736896eb-4a0f-45eb-bf77-f57d0be5ee4e",
+      "name": "Nesta Systems",
+      "why": ["fictional-bulk world fb0016"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0016"
+    },
+    {
+      "companyId": "faa7fee5-242b-48b0-a320-8fdde889b110",
+      "name": "Nestana Technologies",
+      "why": ["fictional-bulk world fb0009"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0009"
+    },
+    {
+      "companyId": "49dfdb90-885e-45a4-a1df-660d8c9e42c0",
+      "name": "Nestio",
+      "why": ["fictional-bulk world fb0258"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0258"
+    },
+    {
+      "companyId": "d9e2db7e-6617-4ce4-83d8-d4f95d368107",
+      "name": "Nestisk Africa",
+      "why": ["fictional-bulk world fb0152"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0152"
+    },
+    {
+      "companyId": "428b36af-3533-4722-a481-d1f2fbcd1875",
+      "name": "Nestix Co",
+      "why": ["fictional-bulk world fb0184"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0184"
+    },
+    {
+      "companyId": "f64699fa-c197-45ad-9fc1-8107fb6c3d81",
+      "name": "Nestra",
+      "why": ["fictional-bulk world fb0171"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0171"
+    },
+    {
+      "companyId": "b439cd80-55d4-491a-922f-95650c38a056",
+      "name": "Nsuo Labs",
+      "why": ["dev fictional world nsuo-labs"],
+      "stage": "pre_seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts nsuo-labs"
+    },
+    {
+      "companyId": "d5d4544d-e8df-479b-83a1-acb778f0cf2d",
+      "name": "Ordereon",
+      "why": ["fictional-bulk world fb0119"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0119"
+    },
+    {
+      "companyId": "2278ec76-4ff8-44e5-9613-1c9bb096eb4a",
+      "name": "Orderio Co",
+      "why": ["fictional-bulk world fb0096"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0096"
+    },
+    {
+      "companyId": "89050ca5-244e-4fb3-8f32-ccc2d8e5261e",
+      "name": "Orderora Africa",
+      "why": ["fictional-bulk world fb0286"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0286"
+    },
+    {
+      "companyId": "5752dc11-874b-4792-9c3a-bc9a64ceef57",
+      "name": "Orderra Co",
+      "why": ["fictional-bulk world fb0173"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0173"
+    },
+    {
+      "companyId": "fb7bb485-017f-44d3-9a3b-bdf3b8f9c5f4",
+      "name": "Orphéa Genomics",
+      "why": ["tavus-20 seed #18"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #18"
+    },
+    {
+      "companyId": "cc44ebda-8587-4308-9415-443a1b4c6818",
+      "name": "Payslipari",
+      "why": ["fictional-bulk world fb0281"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0281 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "954fa498-a379-4777-aa2d-1fdcd478157f",
+      "name": "Payslipent Technologies",
+      "why": ["fictional-bulk world fb0328"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0328"
+    },
+    {
+      "companyId": "2fe4a981-ae03-4695-969e-fa2cbefcc787",
+      "name": "Payslipeon Works",
+      "why": ["fictional-bulk world fb0083"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0083"
+    },
+    {
+      "companyId": "3604ad36-32ac-4e89-992a-33218940758b",
+      "name": "Payslipova Hub",
+      "why": ["fictional-bulk world fb0079"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0079"
+    },
+    {
+      "companyId": "b6c41cf1-1c2c-4162-a6a8-c588da52e80b",
+      "name": "Pipeum",
+      "why": ["fictional-bulk world fb0271"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0271"
+    },
+    {
+      "companyId": "67a86d5d-50f8-42fb-a22c-cf11bda61c84",
+      "name": "Plantio Labs",
+      "why": ["fictional-bulk world fb0350"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0350"
+    },
+    {
+      "companyId": "15aee041-f935-405e-8271-d5713017224c",
+      "name": "Plantio Works",
+      "why": ["fictional-bulk world fb0275"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0275"
+    },
+    {
+      "companyId": "fb7a929e-a11d-4802-b9f4-9da30f44f6d9",
+      "name": "Plugova Hub",
+      "why": ["fictional-bulk world fb0032"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0032"
+    },
+    {
+      "companyId": "c4026069-b856-47b4-8ca6-1ca491cb8b89",
+      "name": "Plugova Technologies",
+      "why": ["fictional-bulk world fb0108"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0108"
+    },
+    {
+      "companyId": "7b62eab6-39b9-4cb6-884a-878301f6928f",
+      "name": "Portside",
+      "why": ["tavus-20 seed #07"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #07"
+    },
+    {
+      "companyId": "2462314c-913c-4563-adba-9454f2b7f21b",
+      "name": "Proofa Hub",
+      "why": ["fictional-bulk world fb0090"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0090"
+    },
+    {
+      "companyId": "05cefa81-d76d-4cf9-98c3-38b4490b6e80",
+      "name": "Proofio Africa",
+      "why": ["fictional-bulk world fb0337"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0337"
+    },
+    {
+      "companyId": "5acf391e-18d2-4569-8c22-261b08ff6d6b",
+      "name": "Proofra Technologies",
+      "why": ["fictional-bulk world fb0220"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0220"
+    },
+    {
+      "companyId": "f02c2a50-da07-4889-b68f-024fdb9cd131",
+      "name": "Prumo",
+      "why": ["tavus-20 seed #10"],
+      "stage": "series_a",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #10"
+    },
+    {
+      "companyId": "e74de29e-b2b7-44df-a92a-c915449302a6",
+      "name": "Pulseisk Technologies",
+      "why": ["fictional-bulk world fb0225"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0225 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "adc380f5-c32b-44b5-a3f7-393aba4d00d8",
+      "name": "Pulseora",
+      "why": ["fictional-bulk world fb0024"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0024"
+    },
+    {
+      "companyId": "075a4c72-a5df-4c02-944a-ce065572bab6",
+      "name": "Pulseova Africa",
+      "why": ["fictional-bulk world fb0092"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0092"
+    },
+    {
+      "companyId": "2833f40e-0478-49fc-b037-8ad039e18814",
+      "name": "Purseana",
+      "why": ["fictional-bulk world fb0237"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0237"
+    },
+    {
+      "companyId": "dcf46dfa-163f-4ab6-ae82-beab78a33c41",
+      "name": "Pursera Hub",
+      "why": ["fictional-bulk world fb0080"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0080"
+    },
+    {
+      "companyId": "9009fd7c-5b50-4fcf-bf47-e23f4e0db144",
+      "name": "Queryio Africa",
+      "why": ["fictional-bulk world fb0013"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0013"
+    },
+    {
+      "companyId": "636d7564-f287-407f-866d-fbd2419d3fbd",
+      "name": "Quilla",
+      "why": ["fictional-bulk world fb0128"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0128"
+    },
+    {
+      "companyId": "39ae10b2-aee6-4371-ad85-18325cda8df2",
+      "name": "Quillari",
+      "why": ["fictional-bulk world fb0260"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0260"
+    },
+    {
+      "companyId": "70adfbb8-904d-4e44-b3e2-3cc07ae68542",
+      "name": "Quillari Hub",
+      "why": ["fictional-bulk world fb0144"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0144"
+    },
+    {
+      "companyId": "252795a1-e107-472c-a09a-3b15b02c3290",
+      "name": "Radario Systems",
+      "why": ["fictional-bulk world fb0107"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0107"
+    },
+    {
+      "companyId": "7864f797-c05f-4364-9217-6a6e001f66bd",
+      "name": "Radarisk Africa",
+      "why": ["fictional-bulk world fb0306"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0306"
+    },
+    {
+      "companyId": "6840702f-b0b4-4f39-aa5f-cf2b01d3b75c",
+      "name": "Railent Labs",
+      "why": ["fictional-bulk world fb0100"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0100"
+    },
+    {
+      "companyId": "c60d5fd1-25fc-4ac4-a446-41e79a0bf3d4",
+      "name": "Railhead Robotics",
+      "why": ["tavus-20 seed #20"],
+      "stage": "series_a",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #20"
+    },
+    {
+      "companyId": "f027f73e-6872-4129-b562-327160fab164",
+      "name": "Rand Treasury",
+      "why": ["tavus-20 seed #17"],
+      "stage": "series_a",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #17"
+    },
+    {
+      "companyId": "b9491033-9ec3-427e-b4b7-b7fb60f0670a",
+      "name": "Recordana Technologies",
+      "why": ["fictional-bulk world fb0254"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0254"
+    },
+    {
+      "companyId": "be754357-43fa-4bc4-8dc3-0ef5d6947c4f",
+      "name": "Recordelle",
+      "why": ["fictional-bulk world fb0352"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0352"
+    },
+    {
+      "companyId": "a657ad7b-9de7-4be8-a413-8dc3f582af76",
+      "name": "Recordio Hub",
+      "why": ["fictional-bulk world fb0034"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0034"
+    },
+    {
+      "companyId": "9e31a97a-7065-41ce-bba6-8c2ce4a11d4e",
+      "name": "Recordix Labs",
+      "why": ["fictional-bulk world fb0045"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0045"
+    },
+    {
+      "companyId": "be3300e8-4ac1-49ef-a315-0aaf4997020f",
+      "name": "Recordum Co",
+      "why": ["fictional-bulk world fb0095"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0095"
+    },
+    {
+      "companyId": "4b24b767-90e9-4f76-9add-5a20fe4df1e8",
+      "name": "Relayana",
+      "why": ["fictional-bulk world fb0063"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0063"
+    },
+    {
+      "companyId": "e02df658-daad-4811-a4f4-296f07614704",
+      "name": "Relayana Hub",
+      "why": ["fictional-bulk world fb0314"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0314"
+    },
+    {
+      "companyId": "2fb1f7b2-fd58-495b-89af-2f73e8ff9753",
+      "name": "Relayix Systems",
+      "why": ["fictional-bulk world fb0084"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0084"
+    },
+    {
+      "companyId": "c3c847ee-3015-433b-82fd-7c11bf2f6407",
+      "name": "Relayix Works",
+      "why": ["fictional-bulk world fb0390"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0390"
+    },
+    {
+      "companyId": "6d891958-3d17-472b-9958-941be83776a0",
+      "name": "Remiteon",
+      "why": ["fictional-bulk world fb0121"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0121"
+    },
+    {
+      "companyId": "329c487e-7e2e-4190-9068-bf9b5dcc68ab",
+      "name": "Remiteon Co",
+      "why": ["fictional-bulk world fb0327"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0327"
+    },
+    {
+      "companyId": "6068f68b-df7f-4b3a-b997-52c896d2230a",
+      "name": "Remitio Systems",
+      "why": ["fictional-bulk world fb0251"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0251"
+    },
+    {
+      "companyId": "1b0b873f-3ae4-4578-a42c-bded158cbb5e",
+      "name": "Remitova Systems",
+      "why": ["fictional-bulk world fb0262"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0262"
+    },
+    {
+      "companyId": "e4931e08-7e77-4c22-900b-332087dc13d3",
+      "name": "Rideelle Works",
+      "why": ["fictional-bulk world fb0106"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0106"
+    },
+    {
+      "companyId": "b462a90e-fbc8-46ef-a490-fee50c0e3d54",
+      "name": "Rideeon Labs",
+      "why": ["fictional-bulk world fb0130"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0130"
+    },
+    {
+      "companyId": "5637e402-5186-4af4-9d94-db0d0dd80411",
+      "name": "Rideix Technologies",
+      "why": ["fictional-bulk world fb0345"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0345 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "cce7920a-5b36-44d9-99a8-46278574531e",
+      "name": "Ridely",
+      "why": ["fictional-bulk world fb0388"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0388"
+    },
+    {
+      "companyId": "6e27d9d8-517f-4636-a2aa-d3ee23e11182",
+      "name": "Rideum",
+      "why": ["fictional-bulk world fb0165"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0165"
+    },
+    {
+      "companyId": "cac845f5-5744-49cd-a655-beb5b3df0b4b",
+      "name": "Rosterisk Labs",
+      "why": ["fictional-bulk world fb0218"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0218"
+    },
+    {
+      "companyId": "60ce429f-a2ef-4931-929c-7973bd4e4a14",
+      "name": "Rosterix Technologies",
+      "why": ["fictional-bulk world fb0162"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0162"
+    },
+    {
+      "companyId": "790d45d6-887f-46d7-bd9f-8772e467fa6b",
+      "name": "Rostero Technologies",
+      "why": ["fictional-bulk world fb0065"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0065"
+    },
+    {
+      "companyId": "3649991b-a100-4a6e-ab7c-9d779c350bdb",
+      "name": "Routeana Co",
+      "why": ["fictional-bulk world fb0123"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0123"
+    },
+    {
+      "companyId": "1eaff7db-e19a-4cbd-b45d-35c6198f97a1",
+      "name": "Routeio",
+      "why": ["fictional-bulk world fb0238"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0238"
+    },
+    {
+      "companyId": "a19d6440-1338-43af-a462-d720b0ef37f0",
+      "name": "Routeix Hub",
+      "why": ["fictional-bulk world fb0325"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0325"
+    },
+    {
+      "companyId": "0a56a0ea-afb2-4905-aa5a-dea0d5ffab0f",
+      "name": "Routeix Systems",
+      "why": ["fictional-bulk world fb0336"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0336"
+    },
+    {
+      "companyId": "aa8787ae-b5f0-4498-8c87-81bcab4ea322",
+      "name": "Routeo Works",
+      "why": ["fictional-bulk world fb0326"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0326"
+    },
+    {
+      "companyId": "92c76333-118c-4053-99c8-69ae26e985d1",
+      "name": "Sampleora Systems",
+      "why": ["fictional-bulk world fb0305"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0305"
+    },
+    {
+      "companyId": "e469044c-2ace-4213-950b-45b348be5904",
+      "name": "Sautiari Africa",
+      "why": ["fictional-bulk world fb0347"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0347"
+    },
+    {
+      "companyId": "e6c25a0a-5461-4027-9f23-e245166c352a",
+      "name": "Sautieon Works",
+      "why": ["fictional-bulk world fb0057"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0057"
+    },
+    {
+      "companyId": "d1fb4f0b-754d-438a-9874-dd3c2598a7cc",
+      "name": "Savera",
+      "why": ["fictional-bulk world fb0098"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0098"
+    },
+    {
+      "companyId": "fbd7fe97-19cf-4f2e-8470-1b9314117977",
+      "name": "Schemaora Systems",
+      "why": ["fictional-bulk world fb0018"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0018"
+    },
+    {
+      "companyId": "78bc265c-9fc5-4d60-b277-183ac8e2c950",
+      "name": "Schemaora Works",
+      "why": ["fictional-bulk world fb0233"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0233"
+    },
+    {
+      "companyId": "2ac49572-8132-43d8-94de-39bf92f623ef",
+      "name": "Schemaova Hub",
+      "why": ["fictional-bulk world fb0351"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0351"
+    },
+    {
+      "companyId": "ead4eb56-00da-4ff6-ad5c-c093ae276f43",
+      "name": "Scholara Hub",
+      "why": ["fictional-bulk world fb0049"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0049"
+    },
+    {
+      "companyId": "07d4cba9-f49d-4e27-9215-8714c3fe5829",
+      "name": "Scholarelle",
+      "why": ["fictional-bulk world fb0236"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0236"
+    },
+    {
+      "companyId": "499c3c78-8b33-4d2d-a1c0-6cc2252a2cf1",
+      "name": "Scholareon Systems",
+      "why": ["fictional-bulk world fb0294"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0294"
+    },
+    {
+      "companyId": "9adff85b-dece-4ff9-a6f8-213383b0c2c4",
+      "name": "Scholario Co",
+      "why": ["fictional-bulk world fb0301"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0301"
+    },
+    {
+      "companyId": "2dc37ee8-3127-46c2-8071-ee56cc2336be",
+      "name": "Scholarly Africa",
+      "why": ["fictional-bulk world fb0178"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0178"
+    },
+    {
+      "companyId": "24c107f3-012f-4ce5-ba17-5b788b67f180",
+      "name": "Scholaro",
+      "why": ["fictional-bulk world fb0324"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0324"
+    },
+    {
+      "companyId": "83099dbd-0b48-4108-bec4-0c985866662e",
+      "name": "Scopeelle Systems",
+      "why": ["fictional-bulk world fb0214"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0214"
+    },
+    {
+      "companyId": "da2331d3-700d-4344-b0bc-820daaa34d3b",
+      "name": "Scopeisk Works",
+      "why": ["fictional-bulk world fb0384"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0384"
+    },
+    {
+      "companyId": "12199820-ffc1-4d80-bfa5-3d6269ba952c",
+      "name": "Scopeora Africa",
+      "why": ["fictional-bulk world fb0248"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0248"
+    },
+    {
+      "companyId": "1fc55f54-b294-40bd-8728-c3f3a2cd394d",
+      "name": "Scopera Africa",
+      "why": ["fictional-bulk world fb0226"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0226"
+    },
+    {
+      "companyId": "2bd3e828-618c-42c1-ac88-8f3c2dcd498b",
+      "name": "Sentinela",
+      "why": ["fictional-bulk world fb0126"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0126"
+    },
+    {
+      "companyId": "631d8f8b-488f-4d81-a2e0-56389d1825f5",
+      "name": "Sentinelly Co",
+      "why": ["fictional-bulk world fb0273"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0273"
+    },
+    {
+      "companyId": "4908adb3-388c-472b-a961-a142250af393",
+      "name": "Sentinelly Systems",
+      "why": ["fictional-bulk world fb0343"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0343"
+    },
+    {
+      "companyId": "c92ef316-c7ea-4996-9b83-0c60428dda61",
+      "name": "Sentinelora Technologies",
+      "why": ["fictional-bulk world fb0188"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0188"
+    },
+    {
+      "companyId": "2419750a-b2bd-428e-baa5-1fec4f09ea34",
+      "name": "Sentryari Africa",
+      "why": ["fictional-bulk world fb0097"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0097"
+    },
+    {
+      "companyId": "8b010bbf-8888-4322-8c6c-97eb5153049e",
+      "name": "Sentryeon Africa",
+      "why": ["fictional-bulk world fb0367"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0367"
+    },
+    {
+      "companyId": "61d4ae57-5533-4d2c-b8a4-5f2826570df1",
+      "name": "Sentryova Hub",
+      "why": ["fictional-bulk world fb0164"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0164"
+    },
+    {
+      "companyId": "7f3c9b94-054f-4678-b571-d13b56e28493",
+      "name": "Shambaari Technologies",
+      "why": ["fictional-bulk world fb0011"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0011"
+    },
+    {
+      "companyId": "aaa5269a-90fa-40e2-a420-dff10e00d840",
+      "name": "Shambaent Systems",
+      "why": ["fictional-bulk world fb0228"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0228"
+    },
+    {
+      "companyId": "274cc1e1-fd49-46e2-ae45-8910f7156453",
+      "name": "Shambaum Africa",
+      "why": ["fictional-bulk world fb0344"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0344"
+    },
+    {
+      "companyId": "948edb59-0e96-40b6-b1ea-27b759fea3ff",
+      "name": "Shambaum Works",
+      "why": ["fictional-bulk world fb0393"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0393"
+    },
+    {
+      "companyId": "aa498566-1114-419a-bcdd-b4c0119af215",
+      "name": "Shieldisk Technologies",
+      "why": ["fictional-bulk world fb0361"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0361"
+    },
+    {
+      "companyId": "e783d69f-54d8-4721-b036-0136a4c0507d",
+      "name": "Shieldix",
+      "why": ["fictional-bulk world fb0227"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0227"
+    },
+    {
+      "companyId": "cf067d25-507a-4af9-baf8-0d8d698a79c6",
+      "name": "Shieldly Labs",
+      "why": ["fictional-bulk world fb0040"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0040"
+    },
+    {
+      "companyId": "2fafd284-c0b0-4ac2-b81c-036878d0f622",
+      "name": "Shieldora Labs",
+      "why": ["fictional-bulk world fb0026"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0026"
+    },
+    {
+      "companyId": "e33622a6-2ba7-4a8c-b96a-e521f1defb1e",
+      "name": "Shieldora Systems",
+      "why": ["fictional-bulk world fb0147"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0147"
+    },
+    {
+      "companyId": "bc05c59e-03f7-485e-8b95-707f44fd3a93",
+      "name": "Shieldra Works",
+      "why": ["fictional-bulk world fb0150"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0150"
+    },
+    {
+      "companyId": "bfa975be-5611-4282-93b9-e886295b1140",
+      "name": "Shiftwell",
+      "why": ["tavus-20 seed #12"],
+      "stage": "series_a",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #12"
+    },
+    {
+      "companyId": "b8e77d13-1932-4c59-a22d-e7af82ca534f",
+      "name": "Signalent Africa",
+      "why": ["fictional-bulk world fb0209"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0209"
+    },
+    {
+      "companyId": "690e8739-2769-4193-80d3-3ec4d9c7cac2",
+      "name": "Signalo",
+      "why": ["fictional-bulk world fb0056"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0056"
+    },
+    {
+      "companyId": "8996c656-458f-4c89-b8be-6fcfd3dfe93b",
+      "name": "Signalora Labs",
+      "why": ["fictional-bulk world fb0256"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0256"
+    },
+    {
+      "companyId": "3c2ccc70-c278-47d6-9a90-8df4e13eed5a",
+      "name": "Signalra",
+      "why": ["fictional-bulk world fb0222"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0222"
+    },
+    {
+      "companyId": "fbff8cff-e09b-4a2c-9aa6-97cb68432613",
+      "name": "Silo Credit",
+      "why": ["tavus-20 seed #06"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #06"
+    },
+    {
+      "companyId": "e646af35-d910-420d-be3b-4bd97eeeb06c",
+      "name": "Solaeon Systems",
+      "why": ["fictional-bulk world fb0025"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0025"
+    },
+    {
+      "companyId": "5021dde7-8e9e-4265-917f-62168b1f8349",
+      "name": "Solaio",
+      "why": ["fictional-bulk world fb0382"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0382"
+    },
+    {
+      "companyId": "e7e6cfb9-ffb5-43ef-bedd-74ff7fe82a35",
+      "name": "Solaio Africa",
+      "why": ["fictional-bulk world fb0307"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0307"
+    },
+    {
+      "companyId": "20d8311f-5b66-48bd-a722-7073c87548e7",
+      "name": "Solaix Co",
+      "why": ["fictional-bulk world fb0002"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0002"
+    },
+    {
+      "companyId": "601a1923-fc40-4fe2-a775-d01af89f60ea",
+      "name": "Souqsheet",
+      "why": ["dev fictional world souqsheet"],
+      "stage": "series_a",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts souqsheet"
+    },
+    {
+      "companyId": "ba451dce-ddc4-49e0-8d35-de23f38fec92",
+      "name": "Sourceisk Works",
+      "why": ["fictional-bulk world fb0168"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0168"
+    },
+    {
+      "companyId": "caeec96f-4857-47c6-b7db-11d9dd87e14f",
+      "name": "Sourcely Labs",
+      "why": ["fictional-bulk world fb0400"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0400"
+    },
+    {
+      "companyId": "1b679c78-c538-4212-a990-ed77bb37a22d",
+      "name": "Sourceum Works",
+      "why": ["fictional-bulk world fb0176"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0176"
+    },
+    {
+      "companyId": "09b401e5-845b-409e-aa82-30a92e7312e0",
+      "name": "Sparkari",
+      "why": ["fictional-bulk world fb0211"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0211"
+    },
+    {
+      "companyId": "81fdf47c-f9c4-4b04-985a-f4028481c867",
+      "name": "Sparkisk Africa",
+      "why": ["fictional-bulk world fb0105"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0105"
+    },
+    {
+      "companyId": "ee75dd62-5013-43ed-846d-1069fd47d743",
+      "name": "Sparkra Works",
+      "why": ["fictional-bulk world fb0205"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0205"
+    },
+    {
+      "companyId": "1bc828ad-9c88-4a06-8348-ec2273d22af2",
+      "name": "Stackeon",
+      "why": ["fictional-bulk world fb0395"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0395"
+    },
+    {
+      "companyId": "f8de9fa4-d315-4aaa-99f9-f8ce174d3172",
+      "name": "Stackisk Hub",
+      "why": ["fictional-bulk world fb0089"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0089"
+    },
+    {
+      "companyId": "85461da9-8693-4124-8f9b-155bb844c5be",
+      "name": "Stackly",
+      "why": ["fictional-bulk world fb0389"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0389"
+    },
+    {
+      "companyId": "c06283a4-8b1f-4854-87e4-08c2194cc896",
+      "name": "Stackova Works",
+      "why": ["fictional-bulk world fb0364"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0364"
+    },
+    {
+      "companyId": "b3357d46-a858-4f50-a107-5765fd555be5",
+      "name": "Staffeon Hub",
+      "why": ["fictional-bulk world fb0066"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0066"
+    },
+    {
+      "companyId": "da61f228-1e37-4fec-91c9-aa78b5f78006",
+      "name": "Staffeon Systems",
+      "why": ["fictional-bulk world fb0366"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0366"
+    },
+    {
+      "companyId": "aa8f0d4c-eb8d-4c01-a218-0d05c7f3dc58",
+      "name": "Staffora",
+      "why": ["fictional-bulk world fb0202"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0202"
+    },
+    {
+      "companyId": "5b8d356b-fd5f-41a8-a091-98d9f25c62f5",
+      "name": "Staffora Africa",
+      "why": ["fictional-bulk world fb0197"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0197"
+    },
+    {
+      "companyId": "34f080dc-f856-40d9-b8c3-2eb58f91abc3",
+      "name": "Staffova",
+      "why": ["fictional-bulk world fb0035"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0035"
+    },
+    {
+      "companyId": "9c2bafd5-32dd-4112-99ed-395bf2cfe9f0",
+      "name": "Staffova Africa",
+      "why": ["fictional-bulk world fb0111"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0111"
+    },
+    {
+      "companyId": "6013810f-0949-4b45-b966-e3b5acef8a9d",
+      "name": "Staffova Systems",
+      "why": ["fictional-bulk world fb0291"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0291"
+    },
+    {
+      "companyId": "2d077df4-6621-452c-9981-cbb12155c821",
+      "name": "Stockova",
+      "why": ["fictional-bulk world fb0387"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0387"
+    },
+    {
+      "companyId": "ad28275f-1644-4b2e-a048-ac7ca04e328d",
+      "name": "Stockum",
+      "why": ["fictional-bulk world fb0031"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0031"
+    },
+    {
+      "companyId": "f7dc0e12-1d5d-4c3e-a400-b1284885eee0",
+      "name": "Storeelle",
+      "why": ["fictional-bulk world fb0021"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0021"
+    },
+    {
+      "companyId": "490f0dd5-9e26-43c5-bedf-a3971a44c4b2",
+      "name": "Storely Systems",
+      "why": ["fictional-bulk world fb0216"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0216"
+    },
+    {
+      "companyId": "5b3743a7-1836-475e-a54f-95b6de76f2af",
+      "name": "Storeo",
+      "why": ["fictional-bulk world fb0181"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0181"
+    },
+    {
+      "companyId": "fed43f93-e689-4591-b77c-a2c5f31aafb2",
+      "name": "Storeora",
+      "why": ["fictional-bulk world fb0334"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0334"
+    },
+    {
+      "companyId": "5392c657-bf73-44dc-9880-a59442a0aa67",
+      "name": "Storeum Africa",
+      "why": ["fictional-bulk world fb0193"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0193"
+    },
+    {
+      "companyId": "ddf98a06-ee61-4245-a483-ddef828c5f89",
+      "name": "Streamari Labs",
+      "why": ["fictional-bulk world fb0298"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0298"
+    },
+    {
+      "companyId": "e820e4f3-6db8-419a-9425-2d5482c08e18",
+      "name": "Studioelle Africa",
+      "why": ["fictional-bulk world fb0289"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0289"
+    },
+    {
+      "companyId": "4eb43e16-1a66-422f-b4ed-6b5db405b1f3",
+      "name": "Studioisk",
+      "why": ["fictional-bulk world fb0189"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0189"
+    },
+    {
+      "companyId": "b83ea58f-d7a0-4ee0-b780-3bf4d1e51881",
+      "name": "Studioisk Works",
+      "why": ["fictional-bulk world fb0392"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0392"
+    },
+    {
+      "companyId": "4336f097-aac7-49b0-88c2-cd0e07efb8d9",
+      "name": "Studioly Co",
+      "why": ["fictional-bulk world fb0113"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0113"
+    },
+    {
+      "companyId": "eab3223a-3993-4815-a094-e451f107e397",
+      "name": "Studioum Hub",
+      "why": ["fictional-bulk world fb0138"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0138"
+    },
+    {
+      "companyId": "10627d98-ce20-43f2-9856-b5c7dab3c50b",
+      "name": "Suno",
+      "why": ["fictional-bulk world fb0263"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0263"
+    },
+    {
+      "companyId": "46649509-2f62-4a4b-98f1-dd15003f1c17",
+      "name": "Sunum Co",
+      "why": ["fictional-bulk world fb0210"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0210"
+    },
+    {
+      "companyId": "b0cc7fad-a74e-48da-b109-0d38ba5c123d",
+      "name": "Supplyelle Hub",
+      "why": ["fictional-bulk world fb0157"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0157"
+    },
+    {
+      "companyId": "56e96a8c-c14a-42e7-a6e3-a696f064d04f",
+      "name": "Swiftisk",
+      "why": ["fictional-bulk world fb0075"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0075"
+    },
+    {
+      "companyId": "7c50caf0-7c5d-44e4-99dc-0af4cae92455",
+      "name": "Swiftix Works",
+      "why": ["fictional-bulk world fb0158"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0158"
+    },
+    {
+      "companyId": "4637d505-9ebd-47c2-b39c-13157b3a859a",
+      "name": "Swiftova Labs",
+      "why": ["fictional-bulk world fb0160"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0160"
+    },
+    {
+      "companyId": "40b1e42b-8b81-45ac-bacd-688c70852b17",
+      "name": "Tallyloom",
+      "why": ["dev fictional world tallyloom"],
+      "stage": "series_b",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts tallyloom"
+    },
+    {
+      "companyId": "37f75083-412e-4d33-9a40-7a2bd3415473",
+      "name": "Tapent Co",
+      "why": ["fictional-bulk world fb0174"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0174 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "de760158-a9fd-4041-b9c0-091445c35731",
+      "name": "Tapeon Co",
+      "why": ["fictional-bulk world fb0067"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0067"
+    },
+    {
+      "companyId": "94ec9c88-d157-49d1-9bf4-fc01d1e7b8d3",
+      "name": "Tarmacly",
+      "why": ["dev fictional world tarmacly"],
+      "stage": "series_a",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts tarmacly"
+    },
+    {
+      "companyId": "a0d059da-7935-4a5a-ace4-d81d162d78e6",
+      "name": "Teama",
+      "why": ["fictional-bulk world fb0315"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0315"
+    },
+    {
+      "companyId": "17a5d289-445c-422f-b4a6-c80db76596a7",
+      "name": "Teament Labs",
+      "why": ["fictional-bulk world fb0139"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0139"
+    },
+    {
+      "companyId": "9aad8458-6e88-4e04-87c8-412c65bf284c",
+      "name": "Teamo Technologies",
+      "why": ["fictional-bulk world fb0362"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0362"
+    },
+    {
+      "companyId": "f93a5773-6607-4528-82d7-b944e0521aad",
+      "name": "Teamra Labs",
+      "why": ["fictional-bulk world fb0377"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0377"
+    },
+    {
+      "companyId": "0bc11e60-7a6d-4d61-9b88-f2ddd0237d7c",
+      "name": "Teamum Labs",
+      "why": ["fictional-bulk world fb0149"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0149"
+    },
+    {
+      "companyId": "3c4389ce-c064-4865-9757-1a286e56a35b",
+      "name": "Tellerent Works",
+      "why": ["fictional-bulk world fb0396"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0396"
+    },
+    {
+      "companyId": "b371d57b-9016-4741-8aaa-a40fd10d30d7",
+      "name": "Tellereon Co",
+      "why": ["fictional-bulk world fb0078"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0078"
+    },
+    {
+      "companyId": "5dbef13d-ab91-43e2-9a18-5f16f2f17ec8",
+      "name": "Tellerly Co",
+      "why": ["fictional-bulk world fb0399"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0399"
+    },
+    {
+      "companyId": "00f63b99-aaf4-452b-a02a-f4800fce33fe",
+      "name": "Tenantelle Works",
+      "why": ["fictional-bulk world fb0356"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0356"
+    },
+    {
+      "companyId": "87c3d6e4-c5de-4c0b-8bc9-68698c117280",
+      "name": "Tenantisk Labs",
+      "why": ["fictional-bulk world fb0284"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0284"
+    },
+    {
+      "companyId": "9d3a08f1-55f5-4afd-9929-8e884026a6c8",
+      "name": "Tenantly",
+      "why": ["fictional-bulk world fb0346"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0346"
+    },
+    {
+      "companyId": "10a35162-bc4e-487f-bb8a-de7e06834f67",
+      "name": "Tenantova Labs",
+      "why": ["fictional-bulk world fb0086"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0086"
+    },
+    {
+      "companyId": "bf55d6e1-567a-470b-954d-054ae05990e2",
+      "name": "Tensorgate",
+      "why": ["tavus-20 seed #04"],
+      "stage": "seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #04"
+    },
+    {
+      "companyId": "1d243b5e-fe0d-4be5-9549-cb60e28652e6",
+      "name": "Termly",
+      "why": ["tavus-20 seed #02"],
+      "stage": "pre_seed",
+      "stageSource": "docs/seed/tavus-20/companies-full.json #02"
+    },
+    {
+      "companyId": "c9d58bcd-609a-40ff-950e-36f1ee17540d",
+      "name": "Tilleon Africa",
+      "why": ["fictional-bulk world fb0381"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0381"
+    },
+    {
+      "companyId": "ff41d42d-5ed1-4217-a808-3b40c1c68611",
+      "name": "Tillix Works",
+      "why": ["fictional-bulk world fb0206"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0206"
+    },
+    {
+      "companyId": "0edca5a9-0340-4f83-8e8d-dba167f11521",
+      "name": "Tillora Labs",
+      "why": ["fictional-bulk world fb0280"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0280"
+    },
+    {
+      "companyId": "3244e2d2-a24c-4427-812c-3571ed8f352a",
+      "name": "Tillra",
+      "why": ["fictional-bulk world fb0047"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0047 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "490f757a-9341-4425-a336-90aca24a4c74",
+      "name": "Tillum Technologies",
+      "why": ["fictional-bulk world fb0136"],
+      "stage": null,
+      "stageSource": "fictional-bulk world fb0136 defines the stage as \"unsure\""
+    },
+    {
+      "companyId": "5896e458-97ba-4e2f-9042-a021fc5eee41",
+      "name": "Triageana Labs",
+      "why": ["fictional-bulk world fb0255"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0255"
+    },
+    {
+      "companyId": "4a3e9aec-13de-45cb-9c9a-d7115136bbcd",
+      "name": "Triageent Works",
+      "why": ["fictional-bulk world fb0274"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0274"
+    },
+    {
+      "companyId": "829412ac-6610-47f1-9f7c-39f57a49657b",
+      "name": "Triageio Labs",
+      "why": ["fictional-bulk world fb0287"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0287"
+    },
+    {
+      "companyId": "735bbc42-b681-4290-ba81-7a4412e1736d",
+      "name": "Triageo Labs",
+      "why": ["fictional-bulk world fb0207"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0207"
+    },
+    {
+      "companyId": "8d154dc7-fcd5-421b-8ecf-1973528a2c0a",
+      "name": "Triageum Systems",
+      "why": ["fictional-bulk world fb0073"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0073"
+    },
+    {
+      "companyId": "2af43c90-dda2-4052-ada7-b653eaf0fbdf",
+      "name": "Trustelle Africa",
+      "why": ["fictional-bulk world fb0042"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0042"
+    },
+    {
+      "companyId": "40a432fb-ad67-4cce-a5e7-086f4398c3cc",
+      "name": "Trusteon Labs",
+      "why": ["fictional-bulk world fb0153"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0153"
+    },
+    {
+      "companyId": "7449a605-c6bf-460d-af6b-817211a575d0",
+      "name": "Trustio",
+      "why": ["fictional-bulk world fb0323"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0323"
+    },
+    {
+      "companyId": "431bf708-4e29-4b00-ba9f-bed63269fb71",
+      "name": "Trustio Systems",
+      "why": ["fictional-bulk world fb0061"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0061"
+    },
+    {
+      "companyId": "b11727d5-e746-484b-85c4-44477ee78400",
+      "name": "Trustisk",
+      "why": ["fictional-bulk world fb0246"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0246"
+    },
+    {
+      "companyId": "ec188304-8580-4d25-bd43-667002f6ab67",
+      "name": "Trustly Co",
+      "why": ["fictional-bulk world fb0261"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0261"
+    },
+    {
+      "companyId": "710e34f7-8507-4335-801f-08661a89dcc7",
+      "name": "Trustum Works",
+      "why": ["fictional-bulk world fb0321"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0321"
+    },
+    {
+      "companyId": "2b2d0901-74cd-4366-90a1-236c536067b1",
+      "name": "Tuneelle Works",
+      "why": ["fictional-bulk world fb0353"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0353"
+    },
+    {
+      "companyId": "037f0fde-00ea-43cc-ad0c-c00096b052cf",
+      "name": "Tuneeon Technologies",
+      "why": ["fictional-bulk world fb0044"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0044"
+    },
+    {
+      "companyId": "91ab790e-8137-494f-bd1d-8cc60e326387",
+      "name": "Tuneora Africa",
+      "why": ["fictional-bulk world fb0055"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0055"
+    },
+    {
+      "companyId": "0302e089-2702-42e1-93f6-4093a6411a1e",
+      "name": "Tutora",
+      "why": ["fictional-bulk world fb0295"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0295"
+    },
+    {
+      "companyId": "ba27bf82-24d8-4fd2-a356-a55ab917d6eb",
+      "name": "Tutorent Technologies",
+      "why": ["fictional-bulk world fb0299"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0299"
+    },
+    {
+      "companyId": "80ce0e6c-72b5-4e01-835a-1ac8703c51b2",
+      "name": "Umbrellaum Africa",
+      "why": ["fictional-bulk world fb0269"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0269"
+    },
+    {
+      "companyId": "f4358e90-fca5-42e0-8bde-d03752ce6c06",
+      "name": "Vaultana",
+      "why": ["fictional-bulk world fb0342"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0342"
+    },
+    {
+      "companyId": "a330fc3d-d133-48a2-9729-1effea51c230",
+      "name": "Vaultana Africa",
+      "why": ["fictional-bulk world fb0051"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0051"
+    },
+    {
+      "companyId": "2b9fc3a1-ca1a-4244-9d87-810aa832c3db",
+      "name": "Vaultio",
+      "why": ["fictional-bulk world fb0124"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0124"
+    },
+    {
+      "companyId": "9ca1fe3c-96b3-45d8-9e65-ceb9666bc7ee",
+      "name": "Vaultix Technologies",
+      "why": ["fictional-bulk world fb0279"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0279"
+    },
+    {
+      "companyId": "c6f1fe40-db84-493f-9883-acbcf23a3b64",
+      "name": "Vaulto",
+      "why": ["fictional-bulk world fb0180"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0180"
+    },
+    {
+      "companyId": "1ae7c4e5-217a-409c-98ee-3e8981696b00",
+      "name": "Vaultova Africa",
+      "why": ["fictional-bulk world fb0020"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0020"
+    },
+    {
+      "companyId": "28169968-1106-4427-85d9-bde811b026cc",
+      "name": "Vaultra",
+      "why": ["fictional-bulk world fb0059"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0059"
+    },
+    {
+      "companyId": "38f4873f-322f-4a85-8543-5992da07de19",
+      "name": "Vendorana Hub",
+      "why": ["fictional-bulk world fb0030"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0030"
+    },
+    {
+      "companyId": "3ab09b12-b507-4b8f-a679-36af494c684d",
+      "name": "Vendorari",
+      "why": ["fictional-bulk world fb0265"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0265"
+    },
+    {
+      "companyId": "c55950eb-56c8-440e-99f7-27904ce37aae",
+      "name": "Vendoreon",
+      "why": ["fictional-bulk world fb0036"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0036"
+    },
+    {
+      "companyId": "8ef0d612-27f7-4b70-830d-deb637c7cda7",
+      "name": "Vendorora Works",
+      "why": ["fictional-bulk world fb0320"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0320"
+    },
+    {
+      "companyId": "b222e5d4-9633-42be-8325-b9a6b49bd060",
+      "name": "Vendorum Works",
+      "why": ["fictional-bulk world fb0091"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0091"
+    },
+    {
+      "companyId": "f5b237be-f585-4e32-b621-530835bd885e",
+      "name": "Verifyly Technologies",
+      "why": ["fictional-bulk world fb0117"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0117"
+    },
+    {
+      "companyId": "5658dd51-a6df-4aee-8a43-96784a699c0c",
+      "name": "Verifyo",
+      "why": ["fictional-bulk world fb0243"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0243"
+    },
+    {
+      "companyId": "8d1929ce-8593-4332-a7d3-1da89427e955",
+      "name": "Verifyora",
+      "why": ["fictional-bulk world fb0114"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0114"
+    },
+    {
+      "companyId": "e2e55d60-f1c0-4ac3-9193-cad937be856b",
+      "name": "Vitaana Labs",
+      "why": ["fictional-bulk world fb0247"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0247"
+    },
+    {
+      "companyId": "2d57c858-a7f9-49bb-b736-d8cf1c95f5ad",
+      "name": "Vitaelle",
+      "why": ["fictional-bulk world fb0349"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0349"
+    },
+    {
+      "companyId": "310c0672-9cf9-473e-a89e-30796ac34e9f",
+      "name": "Vitaum Africa",
+      "why": ["fictional-bulk world fb0142"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0142"
+    },
+    {
+      "companyId": "7e52db33-7de8-4ce5-bbe8-68143de6a5ff",
+      "name": "Voltix Labs",
+      "why": ["fictional-bulk world fb0253"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0253"
+    },
+    {
+      "companyId": "e20f0102-daa9-4870-bf10-71de14cb29f3",
+      "name": "Warda Systems",
+      "why": ["fictional-bulk world fb0329"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0329"
+    },
+    {
+      "companyId": "05e2684a-b84b-48ea-993b-ebcfb907c4b7",
+      "name": "Wardeon Africa",
+      "why": ["fictional-bulk world fb0186"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0186"
+    },
+    {
+      "companyId": "005804fc-6603-4a20-aad5-1bb4a453f864",
+      "name": "Wardora Hub",
+      "why": ["fictional-bulk world fb0244"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0244"
+    },
+    {
+      "companyId": "0c1b9fc5-3488-4fce-8f06-772f28d810b7",
+      "name": "Wardum Systems",
+      "why": ["fictional-bulk world fb0386"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0386"
+    },
+    {
+      "companyId": "0ef946a8-51c1-4ad3-8749-e789359e0edc",
+      "name": "Watcha Africa",
+      "why": ["fictional-bulk world fb0004"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0004"
+    },
+    {
+      "companyId": "f9303bdd-0b4a-423e-af71-77921c1dab79",
+      "name": "Watcha Works",
+      "why": ["fictional-bulk world fb0268"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0268"
+    },
+    {
+      "companyId": "5dc320ff-23b9-47e3-936c-2d0911d002e5",
+      "name": "Watchisk Hub",
+      "why": ["fictional-bulk world fb0007"],
+      "stage": "series_b",
+      "stageSource": "fictional-bulk world fb0007"
+    },
+    {
+      "companyId": "526c2d72-9142-4e48-b106-ee4910f19318",
+      "name": "Watchly",
+      "why": ["fictional-bulk world fb0005"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0005"
+    },
+    {
+      "companyId": "ff35b351-a4fe-453a-81c9-6ad07b713493",
+      "name": "Waveelle Technologies",
+      "why": ["fictional-bulk world fb0309"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0309"
+    },
+    {
+      "companyId": "b1498653-f0f5-4ea9-a4ee-c5f4d5636942",
+      "name": "Waveeon",
+      "why": ["fictional-bulk world fb0398"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0398"
+    },
+    {
+      "companyId": "f785d6b3-7594-4a0c-9b0b-1f0d290aa7aa",
+      "name": "Waveisk",
+      "why": ["fictional-bulk world fb0215"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0215"
+    },
+    {
+      "companyId": "deccd168-11f5-4a28-abf2-1cd29d8c8bf6",
+      "name": "Waveix Systems",
+      "why": ["fictional-bulk world fb0145"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0145"
+    },
+    {
+      "companyId": "b8b0c199-7c06-4e9a-a800-73088053466c",
+      "name": "Weaveisk Works",
+      "why": ["fictional-bulk world fb0224"],
+      "stage": "series_a",
+      "stageSource": "fictional-bulk world fb0224"
+    },
+    {
+      "companyId": "8a10be56-5daa-40a0-9f33-23156d3b5ab9",
+      "name": "Weavely Hub",
+      "why": ["fictional-bulk world fb0376"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0376"
+    },
+    {
+      "companyId": "b87f050b-19e0-4174-9662-edf1d454c1da",
+      "name": "Weavera Technologies",
+      "why": ["fictional-bulk world fb0179"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0179"
+    },
+    {
+      "companyId": "c3cfd275-cee6-4de7-a60e-6e960b0dedae",
+      "name": "Wellisk",
+      "why": ["fictional-bulk world fb0116"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0116"
+    },
+    {
+      "companyId": "747d3a3d-8d18-445d-87e2-0b693bd213fc",
+      "name": "Wheela Technologies",
+      "why": ["fictional-bulk world fb0259"],
+      "stage": "series_c_plus",
+      "stageSource": "fictional-bulk world fb0259"
+    },
+    {
+      "companyId": "625a4511-b39d-4ca2-974a-ddaee9698d30",
+      "name": "Wheelelle",
+      "why": ["fictional-bulk world fb0118"],
+      "stage": "seed",
+      "stageSource": "fictional-bulk world fb0118"
+    },
+    {
+      "companyId": "fc9aa45f-f3aa-457f-a68c-8eaa79410279",
+      "name": "Wheelo",
+      "why": ["fictional-bulk world fb0068"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0068"
+    },
+    {
+      "companyId": "e850cde3-bc05-443a-92d6-5b327d41644f",
+      "name": "Yamfield Agro",
+      "why": ["dev fictional world yamfield-agro"],
+      "stage": "pre_seed",
+      "stageSource": "apps/q-api/src/dev/fictional-world/companies.ts yamfield-agro"
+    },
+    {
+      "companyId": "c6fdf104-17f2-4616-b5e1-4c06ecb41177",
+      "name": "Yielda",
+      "why": ["fictional-bulk world fb0245"],
+      "stage": "pre_seed",
+      "stageSource": "fictional-bulk world fb0245"
+    }
+  ]
+}

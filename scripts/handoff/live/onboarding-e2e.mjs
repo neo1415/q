@@ -24,6 +24,8 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 
+import { syntheticAccountMetadata } from "./synthetic-account.mjs";
+
 const WEB = process.env.WEB ?? "https://capital-qweb-production.up.railway.app";
 const API =
   process.env.CQ_API_URL ?? "https://capital-qapi-production.up.railway.app";
@@ -120,11 +122,11 @@ const note = (journey, name, detail) => {
       email: EMAIL,
       password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
       email_confirm: true,
-      user_metadata: {
+      ...syntheticAccountMetadata(EMAIL, {
         display_name: PERSON,
         full_name: PERSON,
         organisation_name: ORG,
-      },
+      }),
     }),
   });
   if (!res.ok) {

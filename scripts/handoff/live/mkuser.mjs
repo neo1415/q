@@ -1,4 +1,7 @@
-// Creates a confirmed fictional user. Keys come from env only.
+// Creates a confirmed fictional user, marked synthetic like the seeds
+// (see synthetic-account.mjs). Keys come from env only.
+import { syntheticAccountMetadata } from "./synthetic-account.mjs";
+
 const [email, name, org] = process.argv.slice(2);
 const res = await fetch(`${process.env.SB_URL}/auth/v1/admin/users`, {
   method: "POST",
@@ -11,11 +14,11 @@ const res = await fetch(`${process.env.SB_URL}/auth/v1/admin/users`, {
     email,
     password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
     email_confirm: true,
-    user_metadata: {
+    ...syntheticAccountMetadata(email, {
       display_name: name,
       full_name: name,
       ...(org ? { organisation_name: org } : {}),
-    },
+    }),
   }),
 });
 console.log(res.status, (await res.text()).slice(0, 200));
