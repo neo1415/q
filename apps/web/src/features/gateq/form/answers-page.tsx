@@ -217,6 +217,7 @@ export function AnswersPage({
   compact,
   set,
   onContinue,
+  askCurrency,
 }: {
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
   readonly gateway: PublicGatewayDto;
@@ -232,6 +233,11 @@ export function AnswersPage({
   readonly compact: boolean;
   readonly set: SetAnswer;
   readonly onContinue: () => void;
+  /**
+   * The currency the fund's round or cheque rule is set in, when the
+   * amount given was in another (the engine then leaves it unanswered).
+   */
+  readonly askCurrency?: string | null | undefined;
 }) {
   const t = useT();
   const language = useUiLanguage();
@@ -421,7 +427,9 @@ export function AnswersPage({
               <div className="flex gap-2">
                 {/* Design system select (owner, 13 Nov); the value is the
                     currency code, never its translated label. */}
-                <div style={{ width: 112 }}>
+                {/* Live 390 px (13 Nov): as a flex child it shrank to "USI";
+                    it keeps its width and the amount takes the rest. */}
+                <div className="shrink-0" style={{ width: 112 }}>
                   <Select
                     id="gq-currency"
                     label={t("Currency")}
@@ -433,7 +441,7 @@ export function AnswersPage({
                 </div>
                 <input
                   id="gq-amount"
-                  className="gq-input"
+                  className="gq-input min-w-0 flex-1"
                   inputMode="decimal"
                   placeholder={t("Exact amount, like 1,200,000")}
                   value={answers.amount}
@@ -447,6 +455,23 @@ export function AnswersPage({
               </div>
               {errors.amount ? (
                 <p className="gq-err">{t(errors.amount)}</p>
+              ) : null}
+              {askCurrency !== null &&
+              askCurrency !== undefined &&
+              askCurrency !== answers.currency &&
+              (CURRENCIES as readonly string[]).includes(askCurrency) ? (
+                <p className="cq-caption" role="status">
+                  {t(
+                    `${fund} sets its round and cheque sizes in ${askCurrency}. Give the amount in that currency so they can be checked.`,
+                  )}{" "}
+                  <button
+                    type="button"
+                    className="underline underline-offset-4"
+                    onClick={() => set("currency", askCurrency)}
+                  >
+                    {t(`Use ${askCurrency}`)}
+                  </button>
+                </p>
               ) : null}
               <small id="gq-amount-hint" className="cq-caption gq-t3">
                 {t(

@@ -55,19 +55,13 @@ The owner's directive is in [`directives/2026-11-13-consolidated-execution-gateq
 
 ## Queue (in order; each item is one bounded slice, batched into gates)
 
-1. Gate and deploy the batch, then live-verify each item:
-   - A3 universe `cca69db1a`
-   - date wording `418e2d203`
-   - C4 schedule link `0e69109e4`
-   - C4 edit and retry naming `aa4d9634a`
-   - C1 offer gate `f47010e5e` (gating)
-   - B3 GateQ Back/Forward `029198f0d` (next batch)
-2. A5: DECK_CLAIM raise source and parity tests; Ajopot traction and business model against the page; the unrequested top-ten list.
-3. B3 (rest): design-system selects; no empty step; mobile 390px run.
-4. A3: controlled synthetic activation of curated demo companies (readiness via the real path, synthetic basis recorded, reversible).
-5. A4: certify verification end to end with a fictional company.
-6. B2: Q drafts GateQ rules from the authorised mandate (chat and button), as an editable draft for approval.
-7. A6: faster gate (measure, parallelise safely, keep every check).
-8. B6/B7/B8/B10: branding studio, embed origins and postMessage, distributed throttle and duplicate check, connected-channel outreach.
-9. C2/C3: versioned capability projection; durable capability offers.
-10. A8: charts from typed figures; claim extraction in chat.
+1. Gate and deploy `c94311705` (the comparison's table is not repeated as markdown); live-verify.
+2. B3 (rest): a live Back/Forward walk at 390 px; no empty step.
+3. A4: certify verification end to end with a fictional company.
+4. A3: controlled synthetic activation of curated demo companies (readiness via the real path, synthetic basis recorded, reversible); LedgerBridge.
+5. A5 (owner question): should a revoked raise share hide a deck figure the founder confirmed for investors? Today the cell is blank while the prose may cite the deck.
+6. B8 (rest): a distributed guest throttle; B7 (rest): per-gateway allowed origins.
+7. C2/C3: a versioned capability projection; durable capability offers.
+8. A6: a faster gate (static step 706–855 s).
+9. A8: charts from typed figures; claim extraction in chat.
+10. B6/B10: a branding studio; connected-channel outreach.

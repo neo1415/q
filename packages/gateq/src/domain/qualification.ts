@@ -46,6 +46,8 @@ type Verdict = {
   readonly status: CriterionStatus;
   readonly reasonCode: CriterionReasonCode;
   readonly observed: string | null;
+  /** The currency the rule is set in, only when the founder's differs. */
+  readonly expected?: string;
 };
 
 function taxonomyVerdict(
@@ -150,6 +152,7 @@ function raiseVerdict(
       status: "UNKNOWN",
       reasonCode: "RAISE_CURRENCY_DIFFERS",
       observed: raise.currency,
+      expected: config.currency,
     };
   }
   if (
@@ -208,6 +211,7 @@ function chequeVerdict(
       status: "UNKNOWN",
       reasonCode: "CHEQUE_CURRENCY_DIFFERS",
       observed: raise.currency,
+      expected: config.currency,
     };
   }
   return compareDecimal(config.minCheque, raise.amount) <= 0
@@ -334,6 +338,9 @@ export function qualify(input: QualifyInput): QualificationResult {
         status: verdict.status,
         reasonCode: verdict.reasonCode,
         observed: verdict.observed,
+        ...(verdict.expected === undefined
+          ? {}
+          : { expected: verdict.expected }),
       };
     });
 

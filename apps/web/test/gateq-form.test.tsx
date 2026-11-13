@@ -779,6 +779,31 @@ describe("the form, driven like a founder", () => {
     expect(calls.contact).toHaveBeenCalledTimes(2);
   });
 
+  // Live 2026-11-13 (Lagos Forge Fund, fictional, 390 px): its sizes are
+  // in NGN, the amount was given in USD, and the form said only "needs
+  // cheque size to decide".
+  it("says which currency the fund's sizes are in, and switches to it in one tap", () => {
+    render(
+      <GateQForm
+        gateway={GATEWAY}
+        preview={{
+          step: "check",
+          application: summary({
+            access: "NEEDS_INFORMATION",
+            stillNeeded: ["Our cheque size"],
+            askCurrency: "NGN",
+          }),
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(/sets its round and cheque sizes in NGN/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Use NGN" }));
+    expect(screen.getByLabelText("Currency").value).toBe("NGN");
+    expect(screen.queryByText(/sets its round and cheque sizes in/)).toBeNull();
+  });
+
   it("never offers to continue when a required rule is not met", () => {
     render(
       <GateQForm

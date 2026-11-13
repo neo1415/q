@@ -228,6 +228,15 @@ export const ApplicationSummaryDtoSchema = z
     unmet: z.array(z.string().max(120)).max(32),
     /** Published criteria nobody can answer yet, by label. */
     stillNeeded: z.array(z.string().max(120)).max(32),
+    /**
+     * The currency a round or cheque rule is set in, only when the amount
+     * given was in another one (the rule then stays unanswered: no rate is
+     * invented). A currency code, never a size.
+     */
+    askCurrency: z
+      .string()
+      .regex(/^[A-Z]{3}$/u)
+      .optional(),
   })
   .strict();
 export type ApplicationSummaryDto = z.infer<typeof ApplicationSummaryDtoSchema>;

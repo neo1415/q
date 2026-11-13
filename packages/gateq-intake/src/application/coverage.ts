@@ -175,6 +175,14 @@ export function explainQualification(
   readonly access: QualificationResult["access"];
   readonly unmet: readonly string[];
   readonly stillNeeded: readonly string[];
+  /**
+   * Live 2026-11-13 (Lagos Forge Fund, fictional): a round and cheque set
+   * in NGN against an amount given in USD stays unknown (no rate is ever
+   * invented), and the form said only "needs cheque size". The currency
+   * the rule is set in, so the founder can give the amount in it; absent
+   * when no rule is undecided for that reason. A currency, never a size.
+   */
+  readonly askCurrency?: string;
 } {
   const label = (criterionId: string) =>
     policy.criteria.find((c) => c.id === criterionId)?.label ?? "a criterion";
@@ -191,7 +199,20 @@ export function explainQualification(
     stillNeeded: qualification.criteria
       .filter((criterion) => criterion.status === "UNKNOWN")
       .map((criterion) => label(criterion.criterionId)),
+    ...askCurrencyOf(qualification),
   };
+}
+
+function askCurrencyOf(
+  qualification: QualificationResult,
+): { readonly askCurrency: string } | Record<string, never> {
+  const expected = qualification.criteria.find(
+    (criterion) =>
+      criterion.expected !== undefined &&
+      criterion.status === "UNKNOWN" &&
+      criterion.reasonCode.endsWith("_CURRENCY_DIFFERS"),
+  )?.expected;
+  return expected === undefined ? {} : { askCurrency: expected };
 }
 
 function applicantReason(

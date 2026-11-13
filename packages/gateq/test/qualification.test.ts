@@ -455,6 +455,9 @@ describe("cheque compatibility", () => {
     );
     expect(result.criteria[0]?.status).toBe("UNKNOWN");
     expect(result.criteria[0]?.reasonCode).toBe("CHEQUE_CURRENCY_DIFFERS");
+    // The rule's currency, so the founder can be asked for it; never a size.
+    expect(result.criteria[0]?.observed).toBe("NGN");
+    expect(result.criteria[0]?.expected).toBe("USD");
   });
 });
 

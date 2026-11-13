@@ -570,6 +570,7 @@ export function GateQForm({
         compact={compact}
         set={set}
         onContinue={onContinue}
+        askCurrency={application?.askCurrency ?? null}
       />
     );
   }

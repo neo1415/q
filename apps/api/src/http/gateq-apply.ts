@@ -123,6 +123,9 @@ function summaryDto(result: ApplicantTurnResult): unknown {
     // Labels the investor published, never the configuration behind them.
     unmet: result.unmet,
     stillNeeded: result.stillNeeded,
+    ...(result.askCurrency === undefined
+      ? {}
+      : { askCurrency: result.askCurrency }),
   });
 }
 

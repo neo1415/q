@@ -502,6 +502,14 @@ export const CriterionResultSchema = z
      * a document, never internal arithmetic.
      */
     observed: z.string().max(64).nullable(),
+    /**
+     * Only for a *_CURRENCY_DIFFERS reason: the ISO currency the rule is
+     * set in, so the founder can give the amount in it. Never an amount.
+     */
+    expected: z
+      .string()
+      .regex(/^[A-Z]{3}$/u)
+      .optional(),
   })
   .strict();
 export type CriterionResult = z.infer<typeof CriterionResultSchema>;

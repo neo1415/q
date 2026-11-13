@@ -187,6 +187,9 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "How are you raising?": "كيف تجمع التمويل؟",
   "Exact amount": "المبلغ الدقيق",
   "Exact amount, like 1,200,000": "المبلغ الدقيق، مثل 1,200,000",
+  "{fund} sets its round and cheque sizes in {currency}. Give the amount in that currency so they can be checked.":
+    "تحدد {fund} أحجام الجولة والشيك بعملة {currency}. أدخل المبلغ بهذه العملة حتى يمكن التحقق منه.",
+  "Use {currency}": "استخدم {currency}",
   "Use numbers only, like 1,200,000.": "استخدم الأرقام فقط، مثل 1,200,000.",
   "Add the exact amount so the round-size rule can be checked. Without it, that rule stays unanswered.":
     "أضف المبلغ الدقيق ليتسنى فحص قاعدة حجم الجولة. دونه تبقى تلك القاعدة دون إجابة.",
