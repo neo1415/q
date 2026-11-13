@@ -115,7 +115,8 @@ function readJson(rel) {
 }
 
 async function writeManifest() {
-  const { buildWorld } = await import("./fictional-bulk/world.mjs");
+  const { buildWorld, PER_USD, RAISE_USD, TEAM_SIZE } =
+    await import("./fictional-bulk/world.mjs");
   const world = buildWorld({ count: 400 });
   const bulkState = readJson("docs/seed/fictional-bulk/seed-state.json");
   const fictionalBulk = world.companies
@@ -125,6 +126,14 @@ async function writeManifest() {
       name: bulkState.companies[c.key].name ?? c.name,
       companyId: bulkState.companies[c.key].companyId,
       stage: c.stageOption === "unsure" ? null : c.stageOption,
+      rawStage: c.stageOption,
+      signal: {
+        targetUsd:
+          Number(c.raise?.target?.amount) /
+          (PER_USD[String(c.raise?.target?.currency ?? "").toLowerCase()] ??
+            NaN),
+        teamSize: Number(c.team?.teamSize),
+      },
     }));
   const tavusState = readJson("docs/seed/tavus-20/seed-state.json");
   const tavusFull = readJson("docs/seed/tavus-20/companies-full.json");
@@ -149,6 +158,7 @@ async function writeManifest() {
     key,
     name,
     stage: stage === "unsure" ? null : stage,
+    rawStage: stage,
   }));
   const emails = devWorld.map(
     (c) => `founder.${c.key}@fictional.capitalq.local`,
@@ -205,10 +215,12 @@ async function writeManifest() {
         name: c.name,
         why: "real-companies seed demo company (owner decision 13 Nov)",
         stage: stageCode(c.stage ?? null),
-        stageSource: `docs/seed/real-companies/companies.json ${c.name} stage ${JSON.stringify(c.stage ?? null)}`,
+        rawStage: c.stage ?? undefined,
+        stageSource: `docs/seed/real-companies/companies.json ${c.name}`,
       })),
     ],
     holds: [],
+    bands: { raiseUsd: RAISE_USD, teamSize: TEAM_SIZE },
   });
   writeFileSync(
     MANIFEST_FILE,

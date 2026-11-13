@@ -42,7 +42,70 @@ export const NOTE = Object.freeze({
 });
 
 const CLAIM_TYPES = ["FOUNDER_IDENTITY", "ORGANISATION"];
-const STAGE_CODE = /^[a-z][a-z0-9_]*$/;
+/**
+ * The stage vocabulary's ACTIVE codes (taxonomy vocabulary
+ * 581f6374-…, seeded by 20260904180000_taxonomy_foundation.sql and read on
+ * production 13 Nov). A test keeps this list equal to the migration.
+ */
+export const STAGE_CODES = Object.freeze([
+  "pre_seed",
+  "seed",
+  "series_a",
+  "series_b",
+  "series_c_plus",
+]);
+/** Recognisable non-code stage wording in seed data, and the code it maps to. */
+const MAPPED_STAGES = Object.freeze({
+  "pre-series_a": "seed",
+  "pre-series a": "seed",
+  pre_series_a: "seed",
+});
+export const DEMO_DEFAULT_STAGE = "seed";
+
+const inBand = (band, v) =>
+  Array.isArray(band) && Number.isFinite(v) && v >= band[0] && v <= band[1];
+
+/**
+ * A company's stage for demo activation (owner direction 13 Nov: missing
+ * demo requirements are completed for fictional demo data). A stage a
+ * source states wins. Otherwise the value is CHOSEN by demo activation and
+ * says so in `stageSource` (demo-mapped / demo-derived / demo-default) with
+ * the rule in `stageRule`: never presented as anyone's statement.
+ *
+ *   declared  a stage code the source states
+ *   raw       the source's own wording when it is not a code ("pre-series_a", "unsure")
+ *   signal    { targetUsd, teamSize } from the seed world, with `bands`
+ *             { raiseUsd, teamSize } (the world's own per-stage ranges)
+ */
+export function resolveStage({ declared, source, raw, signal, bands }) {
+  if (STAGE_CODES.includes(declared))
+    return { stage: declared, stageSource: source };
+  const key = typeof raw === "string" ? raw.trim().toLowerCase() : null;
+  if (key !== null && Object.hasOwn(MAPPED_STAGES, key))
+    return {
+      stage: MAPPED_STAGES[key],
+      stageSource: `demo-mapped:${key}`,
+      stageRule: `${source} states "${raw}", which is not a stage code; demo activation maps it to ${MAPPED_STAGES[key]}`,
+    };
+  if (signal && bands) {
+    for (const code of STAGE_CODES) {
+      if (
+        inBand(bands.raiseUsd?.[code], signal.targetUsd) &&
+        inBand(bands.teamSize?.[code], signal.teamSize)
+      )
+        return {
+          stage: code,
+          stageSource: "demo-derived:world-bands",
+          stageRule: `${source} states ${raw === undefined ? "no stage" : `"${raw}"`}; demo activation chose the earliest stage whose seed-world raise band (USD ${bands.raiseUsd[code].join("-")}) and team band (${bands.teamSize[code].join("-")}) hold the company's raise target (USD ${Math.round(signal.targetUsd)}) and team size (${signal.teamSize})`,
+        };
+    }
+  }
+  return {
+    stage: DEMO_DEFAULT_STAGE,
+    stageSource: "demo-default",
+    stageRule: `${source ?? "no source"} ${raw === undefined || raw === null ? "states no stage" : `states "${raw}"`} and gives no usable signal; demo activation uses ${DEMO_DEFAULT_STAGE}`,
+  };
+}
 
 /** Why a person makes the company out of scope, or null when they are fictional. */
 export function personRefusal(person) {
@@ -187,13 +250,18 @@ export function planCompany(entry, snapshot, { now = new Date() } = {}) {
     blocked = true;
   }
 
-  // (b) Minimum profile: the stage from the seed world's own definition.
+  // (b) Minimum profile: the stage the manifest resolved (stated by a
+  // source, or chosen by demo activation and labelled as such).
   if (!present(company.current_stage_code)) {
-    if (typeof entry.stage === "string" && STAGE_CODE.test(entry.stage)) {
+    if (STAGE_CODES.includes(entry.stage)) {
+      const chosen = String(entry.stageSource ?? "").startsWith("demo-");
       steps.push({
         kind: STEP.SET_STAGE,
         value: entry.stage,
-        reason: `current_stage_code absent; ${entry.stageSource ?? "seed world"} defines ${entry.stage}`,
+        stageSource: entry.stageSource,
+        reason: chosen
+          ? `current_stage_code absent; ${entry.stage} chosen by demo activation (${entry.stageSource}), not stated by anyone`
+          : `current_stage_code absent; ${entry.stageSource ?? "seed world"} defines ${entry.stage}`,
       });
     } else {
       notes.push({
@@ -352,9 +420,11 @@ export function renderPlan(plans) {
 }
 
 /**
- * The checked-in manifest, from repo sources. `rows` maps a company id to
- * its canonical name, `devWorldIds` maps a dev-world key to a company id
- * (resolved read-only by founder email). Later sources only add reasons.
+ * The checked-in manifest, from repo sources. Sources are merged by
+ * company id; the first source that speaks to the stage is the one
+ * resolved (see `resolveStage`), so every entry carries a valid code and
+ * an explicit `stageSource`. `devWorldIds` maps a dev-world key to a
+ * company id (resolved read-only by founder email).
  */
 export function buildManifest({
   fictionalBulk,
@@ -363,45 +433,60 @@ export function buildManifest({
   devWorldIds,
   demoCompanies,
   curated,
-  holds,
+  holds = [],
+  bands,
 }) {
   const byId = new Map();
-  const add = (companyId, name, why, extra = {}) => {
+  const add = (companyId, name, why, stageInput, extra = {}) => {
     if (!companyId) return;
-    const hit = byId.get(companyId);
-    if (hit) {
-      if (!hit.why.includes(why)) hit.why.push(why);
-      for (const [k, v] of Object.entries(extra))
-        if (hit[k] === undefined || k === "hold") hit[k] = v;
-      return;
+    let hit = byId.get(companyId);
+    if (!hit) {
+      hit = { companyId, name, why: [] };
+      byId.set(companyId, hit);
     }
-    byId.set(companyId, { companyId, name, why: [why], ...extra });
+    if (!hit.why.includes(why)) hit.why.push(why);
+    if (stageInput && hit.stageInput === undefined) hit.stageInput = stageInput;
+    Object.assign(hit, extra);
   };
   for (const c of fictionalBulk)
     add(c.companyId, c.name, `fictional-bulk world ${c.key}`, {
-      stage: c.stage,
-      stageSource:
-        c.stage === null
-          ? `fictional-bulk world ${c.key} defines the stage as "unsure"`
-          : `fictional-bulk world ${c.key}`,
+      declared: c.stage,
+      source: `fictional-bulk world ${c.key}`,
+      raw: c.rawStage,
+      signal: c.signal,
     });
   for (const c of tavus20)
     add(c.companyId, c.name, `tavus-20 seed #${c.n}`, {
-      stage: c.stage ?? null,
-      stageSource: `docs/seed/tavus-20/companies-full.json #${c.n}`,
+      declared: c.stage,
+      source: `docs/seed/tavus-20/companies-full.json #${c.n}`,
+      raw: c.stage ?? undefined,
     });
   for (const c of devWorld)
     add(devWorldIds[c.key], c.name, `dev fictional world ${c.key}`, {
-      stage: c.stage ?? null,
-      stageSource: `apps/q-api/src/dev/fictional-world/companies.ts ${c.key}`,
+      declared: c.stage,
+      source: `apps/q-api/src/dev/fictional-world/companies.ts ${c.key}`,
+      raw: c.rawStage,
     });
   for (const c of demoCompanies)
     add(c.companyId, c.name, `packages/q-pitch demo company ${c.key}`);
   for (const c of curated)
-    add(c.companyId, c.name, c.why, {
-      ...(c.stage === undefined ? {} : { stage: c.stage }),
-      ...(c.stageSource === undefined ? {} : { stageSource: c.stageSource }),
-    });
-  for (const h of holds) add(h.companyId, h.name, h.why, { hold: h.hold });
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+    add(
+      c.companyId,
+      c.name,
+      c.why,
+      c.stageSource === undefined
+        ? undefined
+        : { declared: c.stage, source: c.stageSource, raw: c.rawStage },
+    );
+  for (const h of holds)
+    add(h.companyId, h.name, h.why, undefined, { hold: h.hold });
+  return [...byId.values()]
+    .map(({ stageInput, ...entry }) => ({
+      ...entry,
+      ...resolveStage({
+        ...(stageInput ?? { source: "no repo source" }),
+        bands,
+      }),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

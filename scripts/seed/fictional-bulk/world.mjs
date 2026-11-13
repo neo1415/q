@@ -213,7 +213,7 @@ export const COUNTRIES = {
 };
 
 /** Units of each currency per US dollar: an approximate demo rate, only to size raises plausibly. */
-const PER_USD = {
+export const PER_USD = {
   usd: 1,
   eur: 0.92,
   gbp: 0.78,
@@ -889,7 +889,7 @@ const STAGE_WEIGHTS = [
   ["unsure", 3],
 ];
 /** Raise range in USD by stage. */
-const RAISE_USD = {
+export const RAISE_USD = {
   pre_seed: [120_000, 1_200_000],
   seed: [500_000, 4_500_000],
   series_a: [3_000_000, 16_000_000],
@@ -897,7 +897,7 @@ const RAISE_USD = {
   series_c_plus: [30_000_000, 90_000_000],
   unsure: [200_000, 2_000_000],
 };
-const TEAM_SIZE = {
+export const TEAM_SIZE = {
   pre_seed: [2, 7],
   seed: [4, 22],
   series_a: [15, 70],

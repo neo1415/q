@@ -5,6 +5,9 @@ import { test } from "node:test";
 
 import {
   buildManifest,
+  DEMO_DEFAULT_STAGE,
+  resolveStage,
+  STAGE_CODES,
   NOTE,
   personRefusal,
   planCompany,
@@ -129,27 +132,106 @@ test("verified but not assessed plans exactly one assess", () => {
   assert.deepEqual(kinds(p), [STEP.ASSESS]);
 });
 
-test("a missing stage is set only from the seed's own definition, never invented", () => {
+test("a missing stage is set from the manifest, labelled when demo activation chose it", () => {
   const missing = {
     company: {
       current_stage_code: null,
       marketplace_readiness_state: "requirements_outstanding",
     },
   };
-  const withSource = plan(snapshot(missing), {
+  const stated = plan(snapshot(missing), {
     ...entry,
     stage: "pre_seed",
     stageSource: "world",
   });
-  assert.deepEqual(kinds(withSource), [STEP.SET_STAGE, STEP.ASSESS]);
-  assert.equal(withSource.steps[0].value, "pre_seed");
+  assert.deepEqual(kinds(stated), [STEP.SET_STAGE, STEP.ASSESS]);
+  assert.equal(stated.steps[0].value, "pre_seed");
+  assert.match(stated.steps[0].reason, /world defines pre_seed/);
 
-  const unsure = plan(snapshot(missing), { ...entry, stage: null });
-  assert.deepEqual(kinds(unsure), []);
-  assert.equal(unsure.notes[0].kind, NOTE.NEEDS_VALUE);
-  assert.deepEqual(summarise([unsure]).needsValue[0].fields, [
-    "current_stage_code",
-  ]);
+  const chosen = plan(snapshot(missing), {
+    ...entry,
+    stage: "seed",
+    stageSource: "demo-default",
+  });
+  assert.deepEqual(kinds(chosen), [STEP.SET_STAGE, STEP.ASSESS]);
+  assert.match(
+    chosen.steps[0].reason,
+    /chosen by demo activation \(demo-default\), not stated by anyone/,
+  );
+
+  // A code outside the vocabulary is never written.
+  const invalid = plan(snapshot(missing), { ...entry, stage: "pre-series_a" });
+  assert.deepEqual(kinds(invalid), []);
+  assert.equal(invalid.notes[0].kind, NOTE.NEEDS_VALUE);
+});
+
+const BANDS = {
+  raiseUsd: {
+    pre_seed: [120_000, 1_200_000],
+    seed: [500_000, 4_500_000],
+    series_a: [3_000_000, 16_000_000],
+  },
+  teamSize: { pre_seed: [2, 7], seed: [4, 22], series_a: [15, 70] },
+};
+
+test("resolveStage: a stated code wins and keeps its source", () => {
+  assert.deepEqual(resolveStage({ declared: "series_a", source: "world x" }), {
+    stage: "series_a",
+    stageSource: "world x",
+  });
+});
+
+test("resolveStage: recognisable wording is mapped and labelled demo-mapped", () => {
+  for (const raw of ["pre-series_a", "Pre-Series A", "pre_series_a"]) {
+    const r = resolveStage({ declared: null, source: "seed s", raw });
+    assert.equal(r.stage, "seed");
+    assert.match(r.stageSource, /^demo-mapped:/);
+    assert.match(r.stageRule, /demo activation maps it to seed/);
+  }
+});
+
+test("resolveStage: world bands derive the earliest matching stage, deterministically", () => {
+  const derive = (targetUsd, teamSize) =>
+    resolveStage({
+      declared: null,
+      source: "w",
+      raw: "unsure",
+      signal: { targetUsd, teamSize },
+      bands: BANDS,
+    });
+  assert.equal(derive(550_000, 3).stage, "pre_seed");
+  assert.equal(derive(564_516, 8).stage, "seed");
+  assert.equal(derive(1_900_000, 6).stage, "seed");
+  assert.equal(derive(1_900_000, 6).stageSource, "demo-derived:world-bands");
+  assert.deepEqual(derive(550_000, 3), derive(550_000, 3));
+  // No band holds both figures: the demo default.
+  assert.equal(derive(50_000_000, 900).stageSource, "demo-default");
+  assert.equal(derive(Number.NaN, 3).stageSource, "demo-default");
+});
+
+test("resolveStage: no source and no signal is the demo default, seed", () => {
+  const r = resolveStage({ declared: null, source: "s" });
+  assert.deepEqual(
+    { stage: r.stage, stageSource: r.stageSource },
+    { stage: DEMO_DEFAULT_STAGE, stageSource: "demo-default" },
+  );
+  assert.equal(DEMO_DEFAULT_STAGE, "seed");
+});
+
+test("STAGE_CODES equal the stage vocabulary seeded by the taxonomy migration", () => {
+  const sql = readFileSync(
+    new URL(
+      "../../supabase/migrations/20260904180000_taxonomy_foundation.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const codes = [
+    ...sql.matchAll(
+      /'[0-9a-f-]{36}', '581f6374-71d2-5ea3-bb4b-6365d49ed79f', '([a-z_]+)', '[^']*', [^\n]*'ACTIVE'/g,
+    ),
+  ].map((m) => m[1]);
+  assert.deepEqual([...codes].sort(), [...STAGE_CODES].sort());
 });
 
 test("absent claims are requested by the founder; decided ones are left alone", () => {
@@ -208,21 +290,44 @@ test("a pending claim requested by an unmarked outsider blocks instead of loopin
   assert.match(p.notes[0].reason, /requester is not a marked member/);
 });
 
-test("manifest merges sources by id and a hold always wins", () => {
+test("manifest merges sources by id, resolves every stage and a hold wins", () => {
   const m = buildManifest({
-    fictionalBulk: [{ key: "fb1", name: "A", companyId: "id-a", stage: null }],
+    fictionalBulk: [
+      {
+        key: "fb1",
+        name: "A",
+        companyId: "id-a",
+        stage: null,
+        rawStage: "unsure",
+        signal: { targetUsd: 300_000, teamSize: 3 },
+      },
+    ],
     tavus20: [],
     devWorld: [{ key: "b", name: "B", stage: "seed" }],
     devWorldIds: { b: "id-b" },
-    demoCompanies: [{ key: "a", name: "A", companyId: "id-a" }],
+    demoCompanies: [
+      { key: "a", name: "A", companyId: "id-a" },
+      { key: "c", name: "C", companyId: "id-c" },
+    ],
     curated: [],
     holds: [{ companyId: "id-b", name: "B", why: "held", hold: "owner" }],
+    bands: BANDS,
   });
-  assert.equal(m.length, 2);
+  assert.equal(m.length, 3);
   const a = m.find((x) => x.companyId === "id-a");
   assert.equal(a.why.length, 2);
-  assert.equal(a.stage, null);
-  assert.equal(m.find((x) => x.companyId === "id-b").hold, "owner");
+  assert.equal(a.stage, "pre_seed");
+  assert.equal(a.stageSource, "demo-derived:world-bands");
+  const b = m.find((x) => x.companyId === "id-b");
+  assert.equal(b.hold, "owner");
+  assert.equal(
+    b.stageSource,
+    "apps/q-api/src/dev/fictional-world/companies.ts b",
+  );
+  assert.equal(
+    m.find((x) => x.companyId === "id-c").stageSource,
+    "demo-default",
+  );
 });
 
 test("the checked-in manifest excludes real demonstration companies and e2e release tests", () => {
@@ -239,6 +344,11 @@ test("the checked-in manifest excludes real demonstration companies and e2e rele
     !names.some((n) => /\(fictional\)$/.test(n) && /^Ledgerline /.test(n)),
   );
   assert.ok(names.includes("LedgerBridge"));
+  for (const c of manifest.companies) {
+    assert.ok(STAGE_CODES.includes(c.stage), `${c.name} stage ${c.stage}`);
+    assert.equal(typeof c.stageSource, "string", c.name);
+    if (c.stageSource.startsWith("demo-")) assert.ok(c.stageRule, c.name);
+  }
   assert.equal(
     new Set(manifest.companies.map((c) => c.companyId)).size,
     names.length,

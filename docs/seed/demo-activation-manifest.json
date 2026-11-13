@@ -146,8 +146,9 @@
       "companyId": "96bde752-fb48-47af-9eb5-80e9143a84bc",
       "name": "Basketova Systems",
       "why": ["fictional-bulk world fb0099"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0099 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0099 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 550000) and team size (3)"
     },
     {
       "companyId": "fe054879-e959-439f-9591-99d0d59267cc",
@@ -765,8 +766,9 @@
       "companyId": "20752c5e-419c-543f-a5c1-fc0ddc5180f0",
       "name": "ekko",
       "why": ["real-companies seed demo company (owner decision 13 Nov)"],
-      "stage": null,
-      "stageSource": "docs/seed/real-companies/companies.json ekko stage null"
+      "stage": "seed",
+      "stageSource": "demo-default",
+      "stageRule": "docs/seed/real-companies/companies.json ekko states no stage and gives no usable signal; demo activation uses seed"
     },
     {
       "companyId": "0dde81c7-6763-41fe-9aa9-7f18ad051b81",
@@ -849,8 +851,9 @@
       "companyId": "2fac3018-7d26-469a-b03a-11bb3c6b954b",
       "name": "Forgeora Hub",
       "why": ["fictional-bulk world fb0278"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0278 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0278 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 450000) and team size (3)"
     },
     {
       "companyId": "f3514b2e-8bb5-4c6a-8f97-7ce34d35583a",
@@ -884,8 +887,9 @@
       "companyId": "1af3db4c-1c9e-4134-b89c-7b2ef6bb5c2b",
       "name": "Gridari",
       "why": ["fictional-bulk world fb0094"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0094 defines the stage as \"unsure\""
+      "stage": "seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0094 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 500000-4500000) and team band (4-22) hold the company's raise target (USD 564516) and team size (8)"
     },
     {
       "companyId": "27ca310a-a38b-48d7-bbb7-f28cbc10db88",
@@ -925,7 +929,10 @@
     {
       "companyId": "ceb6ec2d-4a4a-41a2-9b71-377d72c26407",
       "name": "Harbourline Cargo",
-      "why": ["packages/q-pitch demo company harbourline-cargo"]
+      "why": ["packages/q-pitch demo company harbourline-cargo"],
+      "stage": "seed",
+      "stageSource": "demo-default",
+      "stageRule": "no repo source states no stage and gives no usable signal; demo activation uses seed"
     },
     {
       "companyId": "6eb7a8b1-5ca6-473f-be59-c6d3a304d343",
@@ -1239,8 +1246,9 @@
       "companyId": "1750e30d-ddc6-4fd6-80a3-903026fa4285",
       "name": "Learnra",
       "why": ["fictional-bulk world fb0332"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0332 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0332 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 325000) and team size (4)"
     },
     {
       "companyId": "13d19230-9f2c-4122-b41a-d39f15292ca5",
@@ -1254,7 +1262,10 @@
       "name": "LedgerBridge",
       "why": [
         "ACCEPTANCE-MATRIX-2026-11-13 A3: curated, network-visible, not assessed"
-      ]
+      ],
+      "stage": "seed",
+      "stageSource": "demo-default",
+      "stageRule": "no repo source states no stage and gives no usable signal; demo activation uses seed"
     },
     {
       "companyId": "dc078711-6ff6-4928-b8de-711d51bab020",
@@ -1274,8 +1285,9 @@
       "companyId": "3ee7fcae-aeea-4fd6-bf84-dd3f06272c95",
       "name": "Ledgerent",
       "why": ["fictional-bulk world fb0348"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0348 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0348 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 380000) and team size (3)"
     },
     {
       "companyId": "84b9641f-b618-4fa3-8b35-1d19b1c71d82",
@@ -1302,8 +1314,9 @@
       "companyId": "4757ff28-be5e-4b8f-b613-df74e5733d29",
       "name": "Ledgerly Technologies",
       "why": ["fictional-bulk world fb0163"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0163 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0163 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 782609) and team size (5)"
     },
     {
       "companyId": "5fbcaa1e-2cbd-4323-91ab-002c4aedb19d",
@@ -1407,8 +1420,9 @@
       "companyId": "e679be86-f511-4cfc-9725-9b0c80c0616d",
       "name": "Millova Hub",
       "why": ["fictional-bulk world fb0397"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0397 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0397 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 450000) and team size (7)"
     },
     {
       "companyId": "fd1e1dfa-4a64-4c13-b2d5-298b35652966",
@@ -1442,8 +1456,9 @@
       "companyId": "8b1c25b2-7e8b-5e78-9f51-c307e6b869e8",
       "name": "MoneyHash",
       "why": ["real-companies seed demo company (owner decision 13 Nov)"],
-      "stage": null,
-      "stageSource": "docs/seed/real-companies/companies.json MoneyHash stage \"pre-series_a\""
+      "stage": "seed",
+      "stageSource": "demo-mapped:pre-series_a",
+      "stageRule": "docs/seed/real-companies/companies.json MoneyHash states \"pre-series_a\", which is not a stage code; demo activation maps it to seed"
     },
     {
       "companyId": "7cac79c5-a199-49d5-b56a-5f5bfbf8ae2c",
@@ -1547,8 +1562,9 @@
       "companyId": "cc44ebda-8587-4308-9415-443a1b4c6818",
       "name": "Payslipari",
       "why": ["fictional-bulk world fb0281"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0281 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0281 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 313000) and team size (3)"
     },
     {
       "companyId": "954fa498-a379-4777-aa2d-1fdcd478157f",
@@ -1645,8 +1661,9 @@
       "companyId": "e74de29e-b2b7-44df-a92a-c915449302a6",
       "name": "Pulseisk Technologies",
       "why": ["fictional-bulk world fb0225"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0225 defines the stage as \"unsure\""
+      "stage": "seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0225 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 500000-4500000) and team band (4-22) hold the company's raise target (USD 1774194) and team size (5)"
     },
     {
       "companyId": "adc380f5-c32b-44b5-a3f7-393aba4d00d8",
@@ -1848,8 +1865,9 @@
       "companyId": "5637e402-5186-4af4-9d94-db0d0dd80411",
       "name": "Rideix Technologies",
       "why": ["fictional-bulk world fb0345"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0345 defines the stage as \"unsure\""
+      "stage": "seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0345 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 500000-4500000) and team band (4-22) hold the company's raise target (USD 1900000) and team size (6)"
     },
     {
       "companyId": "cce7920a-5b36-44d9-99a8-46278574531e",
@@ -2499,8 +2517,9 @@
       "companyId": "37f75083-412e-4d33-9a40-7a2bd3415473",
       "name": "Tapent Co",
       "why": ["fictional-bulk world fb0174"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0174 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0174 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 239130) and team size (3)"
     },
     {
       "companyId": "de760158-a9fd-4041-b9c0-091445c35731",
@@ -2639,15 +2658,17 @@
       "companyId": "3244e2d2-a24c-4427-812c-3571ed8f352a",
       "name": "Tillra",
       "why": ["fictional-bulk world fb0047"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0047 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0047 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 961240) and team size (3)"
     },
     {
       "companyId": "490f757a-9341-4425-a336-90aca24a4c74",
       "name": "Tillum Technologies",
       "why": ["fictional-bulk world fb0136"],
-      "stage": null,
-      "stageSource": "fictional-bulk world fb0136 defines the stage as \"unsure\""
+      "stage": "pre_seed",
+      "stageSource": "demo-derived:world-bands",
+      "stageRule": "fictional-bulk world fb0136 states \"unsure\"; demo activation chose the earliest stage whose seed-world raise band (USD 120000-1200000) and team band (2-7) hold the company's raise target (USD 510000) and team size (3)"
     },
     {
       "companyId": "5896e458-97ba-4e2f-9042-a021fc5eee41",
