@@ -388,3 +388,21 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - **C3:** as `investor.savanna-seed`, the call prep for Clinicrest ends with "Want to rehearse it? I'll play Clinicrest." and carries a `NAVIGATION_OFFER` to `COMPANY_REHEARSAL`. "yes" answers "Opening a rehearsal with Clinicrest." and moves to `/rehearsals/company/6b2f9851…` (move 3.1 s). No page errors.
     - Oddity seen in the same turn: a separate "Overview is ready to open." profile offer was stored before the prep answer.
   - **B8:** `gateq.guest_throttle_buckets` went from 0 to 2 rows after a guest walk on Lagos Forge Fund (fictional), so charges are shared in Postgres. The walk still reached "Your details".
+
+## Batch deployed — `0a6f0e298` (13 Nov, 11:05 Lagos); live checks pending
+
+- **Gate:** the first optimised run (two lanes, prebuild, ESLint concurrency 2), with the same steps and an exact-commit receipt: `ci-local PASS sha=0a6f0e298 at=2026-11-13T10:04:25Z took=2307s` (baseline 2,824 s).
+  - An earlier run on `881a50c9e` failed only on the root lint batch: my `.cjs` script was outside the typed-lint config. Fixed in `0a6f0e298`.
+- **Deploy:** `scripts/deploy-promote.sh 0a6f0e298`, rollback point `6ad638a1b`. All four Railway services SUCCESS. No migrations.
+- **Contents:**
+  - A4 synthetic reviewer guard and certification test (`635c548d2`). The integration test runs in every gate and passed here.
+  - A8 charts drawn by code (`881a50c9e`).
+  - The demo-activation tools (`ee0d09a42`, `763a21e5e`, `0a6f0e298`).
+- **Live verification blocked from the sandbox (10:16 UTC on):**
+  - The egress gateway answers 403 to CONNECT for `capital-qweb-production.up.railway.app`, `capital-qapi-production.up.railway.app` and even `www.google.com`.
+  - The environment tools (`get_environment`, `read_documentation`) fail with "a credential for this connector could not be obtained".
+  - Not routed around. The A8 chart check ("Chart monthly revenue for Capital Q, KUUZA AI and SongScribe AI side by side") and an A4 smoke check are to be re-run once egress works.
+- **A8 demo figures seed:** `scripts/seed/demo-figures.mjs`, local branch `a8-demo-figures` (`69e058841`, `5725dd900`, `967669f5f`).
+  - The dry run plans 32 fictional companies, 111 metrics and 363 claims, attributed to the SYSTEM audit actor.
+  - Readers now show the latest point per metric.
+  - **Held before `--apply`:** the readiness and investability readers count every network-visible current claim, so monthly history could inflate evidence. They must group by claim key first.
