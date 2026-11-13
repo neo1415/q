@@ -14,6 +14,7 @@ import {
   newestAnswerCards,
   withoutCompareOffers,
   namesToCompare,
+  tractionUnstated,
 } from "../src/q/compare-table.js";
 import { fitsInOutcome } from "../src/q/fit-cards.js";
 
@@ -550,6 +551,118 @@ describe("fact rows are the company's facts (F-126)", () => {
     }
     // "Not stated" is not said aloud as a figure.
     expect(comparisonSpokenLine(block)).not.toMatch(/traction: Not stated/u);
+  });
+});
+
+// Live 2026-11-13 (Ajopot): no published figures and no figure in its
+// description, so Traction was empty while its deck, confirmed by the
+// founder for investors, states it.
+describe("traction from the deck, only when nothing else states it", () => {
+  const deckOutcome = (sections: unknown) => ({
+    toolName: "company.deck.read",
+    status: "SUCCEEDED" as const,
+    classification: "READ_ONLY" as const,
+    result: {
+      ok: true as const,
+      data: {
+        viewer: "INVESTOR",
+        deck: null,
+        sections,
+        confirmedByFounder: true,
+        truthClass: "USER_CLAIM",
+      },
+    },
+  });
+  const traction = {
+    section: "TRACTION",
+    status: "PRESENT",
+    summary: "Savings groups on the app.",
+    pages: [4],
+    facts: [
+      {
+        label: "Active savings groups",
+        value: "2,300",
+        unknownReason: null,
+        kind: "FIGURE",
+        asOf: "Sep 2026",
+        pages: [4],
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        confidence: "HIGH",
+      },
+      {
+        label: "Monthly contributions",
+        value: null,
+        unknownReason: "NOT_IN_DECK",
+        kind: "FIGURE",
+        asOf: null,
+        pages: [],
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        confidence: "LOW",
+      },
+    ],
+    confidence: "HIGH",
+  };
+
+  it("fills an otherwise empty Traction cell from the deck, labelled as the deck's", () => {
+    const companies = createRunCompanies();
+    const { fits } = run();
+    const read0 = companies.read("r1");
+    expect(tractionUnstated(read0.companyFigures.get(SILO), null)).toBe(true);
+    companies.noteDeck("r1", SILO, deckOutcome([traction]));
+    const read = companies.read("r1");
+    read.companyNames.set(MIZAN, "Mizan");
+    read.companyNames.set(SILO, "Silo Credit");
+    const block = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit in a table",
+      read,
+      fits,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    const cells = block.rows.find((row) => row.label === "Traction")?.cells;
+    expect(cells?.[1]).toBe(
+      "Active savings groups: 2,300, Sep 2026 (company-stated, from their deck)",
+    );
+    // A fact the deck leaves unknown is not said; the other company's cell
+    // stays the contract's empty "not known".
+    expect(cells?.[1]).not.toMatch(/Monthly contributions/u);
+    expect(cells?.[0]).toBe("");
+  });
+
+  it("records nothing from a deck section that is not present, or a read that did not succeed", () => {
+    const companies = createRunCompanies();
+    companies.noteDeck(
+      "r2",
+      SILO,
+      deckOutcome([{ ...traction, status: "NOT_IN_DECK" }]),
+    );
+    expect(companies.read("r2").deckTraction.get(SILO)).toEqual([]);
+    companies.noteDeck("r3", SILO, {
+      ...deckOutcome([traction]),
+      status: "FAILED",
+    });
+    expect(companies.read("r3").deckTraction.has(SILO)).toBe(false);
+  });
+
+  it("a published figure or a profile figure keeps the deck out", () => {
+    expect(
+      tractionUnstated(
+        [
+          {
+            key: "revenue.mrr",
+            statement: "Monthly recurring revenue is $42,000.",
+            asOf: null,
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "SELF_REPORTED",
+          },
+        ],
+        null,
+      ),
+    ).toBe(false);
+    expect(
+      tractionUnstated([], "We serve 1,140 paying customers in Lagos."),
+    ).toBe(false);
   });
 });
 

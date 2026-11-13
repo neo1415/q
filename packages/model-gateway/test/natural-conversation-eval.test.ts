@@ -807,7 +807,7 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       reading: {
         questionKind: "FIT",
         fitQuestion: { text: words, count: 3 },
-        compare: { names: ["Ajopot", "Ledgerline", "Clinicrest"] },
+        compare: { count: null, names: ["Ajopot", "Ledgerline", "Clinicrest"] },
       },
     });
     expect(executed).not.toContain("discover_companies");

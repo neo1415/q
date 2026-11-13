@@ -72,7 +72,11 @@ const OFFERED = [
   offered("get_company", "company.get", "REVIEWING_COMPANY"),
   offered("read_company_figures", "company.figures.read", "REVIEWING_COMPANY"),
   offered("fit_profile", "fit.profile", "COMPARING_OPPORTUNITIES"),
+  offered("read_company_deck", "company.deck.read", "REVIEWING_COMPANY"),
 ];
+
+/** Live 2026-11-13 (Ajopot): Silo Credit has published no figures. */
+let siloPublishedNone = false;
 
 const PROFILES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   [MIZAN]: {
@@ -148,6 +152,55 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
           truthClass: "USER_CLAIM",
         },
       },
+    } as unknown as Omit<QToolCallOutcome, "callId">;
+  }
+  if (proposal.name === "read_company_deck") {
+    return {
+      ...base,
+      sensitivity: "CONFIDENTIAL",
+      toolName: "company.deck.read",
+      result: {
+        ok: true,
+        data: {
+          viewer: "INVESTOR",
+          deck: null,
+          sections: [
+            {
+              section: "TRACTION",
+              status: "PRESENT",
+              summary: "Agri-dealers financed.",
+              pages: [5],
+              facts: [
+                {
+                  label: "Agri-dealers financed",
+                  value: "410",
+                  unknownReason: null,
+                  kind: "FIGURE",
+                  asOf: "Aug 2026",
+                  pages: [5],
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                  confidence: "HIGH",
+                },
+              ],
+              confidence: "HIGH",
+            },
+          ],
+          confirmedByFounder: true,
+          truthClass: "USER_CLAIM",
+        },
+      },
+    } as unknown as Omit<QToolCallOutcome, "callId">;
+  }
+  if (
+    proposal.name === "read_company_figures" &&
+    siloPublishedNone &&
+    companyId === SILO
+  ) {
+    return {
+      ...base,
+      toolName: "company.figures.read",
+      result: { ok: true, data: { companyId, status: "NONE", figures: [] } },
     } as unknown as Omit<QToolCallOutcome, "callId">;
   }
   if (proposal.name === "read_company_figures") {
@@ -405,6 +458,32 @@ describe("compare the top two, right after a list of five", () => {
     const traction = table?.rows.find((row) => row.label === "Traction");
     expect(traction?.cells[0]).toContain("$42,000");
     expect(traction?.cells[1]).toContain("$9,000");
+  });
+
+  it("reads a deck only for a company whose traction is otherwise unstated, and labels it", async () => {
+    siloPublishedNone = true;
+    try {
+      const { seam, request, executed, stored } = build(
+        "Compare the top two side by side",
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      const deckCalls = executed.filter(
+        (call) => call.name === "read_company_deck",
+      );
+      expect(deckCalls).toEqual([
+        expect.objectContaining({ arguments: { companyId: SILO } }),
+      ]);
+      const table = (stored.at(-1)?.blocks ?? []).find(
+        (block) => Reflect.get(block as object, "kind") === "TABLE",
+      ) as { rows: { label: string; cells: string[] }[] } | undefined;
+      const traction = table?.rows.find((row) => row.label === "Traction");
+      expect(traction?.cells[0]).toContain("$42,000");
+      expect(traction?.cells[1]).toBe(
+        "Agri-dealers financed: 410, Aug 2026 (company-stated, from their deck)",
+      );
+    } finally {
+      siloPublishedNone = false;
+    }
   });
 
   // Coordinator 2026-10-25 (I21, live 5a3490b6, 16.4 s): the table was

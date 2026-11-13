@@ -504,6 +504,7 @@ import {
   comparisonSpokenLine,
   withoutCompareOffers,
   comparisonTableBlock,
+  tractionUnstated,
   verdictSentence,
   compareTargets,
   namesToCompare,
@@ -4261,6 +4262,55 @@ export function createModelGatewayQAnswer(
       if (reads.length === 0) return null;
       stepStarts(request, "COMPARING_OPPORTUNITIES");
       await Promise.all(reads);
+      // Live 2026-11-13 (Ajopot): a company whose Traction cell would be
+      // empty after its published figures and profile has its deck read,
+      // as the deck service shows it to this reader (an investor: the
+      // sections the founder confirmed). Only then: the deck read is the
+      // company's confidential material and raises the run's sensitivity
+      // through the executor, so a comparison that needs nothing from a
+      // deck stays as it was.
+      const deckRead = names.has("read_company_deck")
+        ? targets.filter((companyId) => {
+            const known = runCompanies.read(request.runId);
+            return tractionUnstated(
+              known.companyFigures.get(companyId),
+              known.companyFacts.get(companyId)?.description,
+            );
+          })
+        : [];
+      let deckUsed = false;
+      await Promise.all(
+        deckRead.map((companyId, index) =>
+          tools
+            .execute(
+              {
+                callId: `q-compare-deck-${String(index)}`,
+                name: "read_company_deck",
+                arguments: { companyId },
+              },
+              toolContext,
+            )
+            .then((outcome) => {
+              runCompanies.noteDeck(request.runId, companyId, outcome);
+              if (
+                (runCompanies.read(request.runId).deckTraction.get(companyId)
+                  ?.length ?? 0) > 0
+              )
+                deckUsed = true;
+            })
+            .catch((error: unknown) => {
+              logger?.warn(
+                {
+                  qRunId: request.runId,
+                  tool: "read_company_deck",
+                  companyId,
+                  error: error instanceof Error ? error.name : "UNKNOWN",
+                },
+                "q compare read threw",
+              );
+            }),
+        ),
+      );
       const table = comparisonTableBlock({
         question: latest.content,
         read: runCompanies.read(request.runId),
@@ -4283,7 +4333,9 @@ export function createModelGatewayQAnswer(
             statement,
             truthClass: "USER_CLAIM",
             evidenceStatus: "SELF_REPORTED",
-            source: "Capital Q profiles, published figures and computed fit",
+            source: deckUsed
+              ? "Capital Q profiles, published figures, their decks and computed fit"
+              : "Capital Q profiles, published figures and computed fit",
           },
         ],
       };

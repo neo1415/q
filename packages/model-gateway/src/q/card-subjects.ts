@@ -272,6 +272,59 @@ export class RunRead extends Map<string, string> {
    * the comparison table's traction row. Company-stated, never verified.
    */
   readonly companyFigures = new Map<string, readonly ReadCompanyFigure[]>();
+  /**
+   * Live 2026-11-13 (Ajopot's Traction blank in a comparison while its deck
+   * states it): company id -> the traction figures read_company_deck
+   * returned, only from a section the deck service gave this reader (an
+   * investor: those the founder confirmed). The company's own claims.
+   */
+  readonly deckTraction = new Map<string, readonly ReadDeckFigure[]>();
+}
+
+/** One traction fact as the company's deck states it. */
+export type ReadDeckFigure = {
+  readonly label: string;
+  readonly value: string;
+  readonly asOf: string | null;
+};
+
+const READ_COMPANY_DECK = "company.deck.read";
+
+/**
+ * Only the fields the table reads from read_company_deck's output (the
+ * sections the deck service gave this reader); the rest is ignored.
+ */
+const CompanyDeckReadSchema = z.object({
+  sections: z.array(
+    z.object({
+      section: z.string(),
+      status: z.string(),
+      facts: z.array(
+        z.object({
+          label: z.string().min(1).max(80),
+          value: z.string().max(300).nullable(),
+          asOf: z.string().max(40).nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+
+/** The deck's PRESENT traction facts with a value; empty when none. */
+function deckTractionOf(
+  deck: z.infer<typeof CompanyDeckReadSchema>,
+): readonly ReadDeckFigure[] {
+  return deck.sections
+    .filter(
+      (section) =>
+        section.section === "TRACTION" && section.status === "PRESENT",
+    )
+    .flatMap((section) => section.facts)
+    .flatMap((fact) =>
+      fact.value === null
+        ? []
+        : [{ label: fact.label, value: fact.value, asOf: fact.asOf }],
+    );
 }
 
 /** One company-stated figure, as read_company_figures returned it. */
@@ -501,6 +554,39 @@ export function createRunCompanies(limit = 200) {
           );
         }
       }
+    },
+    /**
+     * A read_company_deck outcome for one company (its output does not name
+     * the company, so the caller that asked says which). Only a succeeded
+     * read-only call counts; anything else records nothing.
+     */
+    noteDeck(
+      runId: string,
+      companyId: string,
+      outcome: Pick<QToolCallOutcome, "result"> &
+        Partial<
+          Pick<QToolCallOutcome, "toolName" | "status" | "classification">
+        >,
+    ): void {
+      if (
+        outcome.toolName !== READ_COMPANY_DECK ||
+        outcome.status !== "SUCCEEDED" ||
+        outcome.classification !== "READ_ONLY" ||
+        !outcome.result.ok
+      )
+        return;
+      const deck = CompanyDeckReadSchema.safeParse(outcome.result.data);
+      if (!deck.success) return;
+      let known = runs.get(runId);
+      if (known === undefined) {
+        known = new RunRead();
+        runs.set(runId, known);
+        if (runs.size > limit) {
+          const oldest = runs.keys().next().value;
+          if (oldest !== undefined) runs.delete(oldest);
+        }
+      }
+      known.deckTraction.set(companyId, deckTractionOf(deck.data));
     },
     /** Inspect fresh reads while preparing the prompt; final projection still takes them. */
     read(runId: string): RunRead {

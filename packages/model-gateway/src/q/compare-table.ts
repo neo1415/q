@@ -13,6 +13,7 @@ import {
   containsCompanyName,
   type ReadCompanyFacts,
   type ReadCompanyFigure,
+  type ReadDeckFigure,
   type RunRead,
 } from "./card-subjects.js";
 import { restatesVerdict } from "./compare-answer.js";
@@ -192,9 +193,43 @@ function openingOf(description: string | null | undefined): string {
   return first.replace(/[.\s]+$/u, "");
 }
 
+/**
+ * Live 2026-11-13 (Ajopot): no published figures and no figure in its
+ * description, so the cell was empty while its deck, confirmed by the
+ * founder for investors, states its traction. The deck's own words, after
+ * the company's published figures and profile, labelled as from the deck.
+ */
+function deckTractionWords(
+  deck: readonly ReadDeckFigure[] | undefined,
+): string {
+  const said = (deck ?? []).slice(0, 3).map((fact) => {
+    const value = fact.value
+      .trim()
+      .replace(/[.\s]+$/u, "")
+      .slice(0, 140);
+    const when = fact.asOf === null ? "" : `, ${fact.asOf.trim().slice(0, 40)}`;
+    return `${fact.label.trim()}: ${value}`.slice(0, 200) + when;
+  });
+  return said.length === 0
+    ? ""
+    : `${said.join("; ")} (company-stated, from their deck)`;
+}
+
+/**
+ * Whether the Traction cell would be empty from what the comparison read
+ * so far (published figures and profile): the deck is read only then.
+ */
+export function tractionUnstated(
+  figures: readonly ReadCompanyFigure[] | undefined,
+  description?: string | null,
+): boolean {
+  return tractionCell(figures, description) === NOT_STATED;
+}
+
 function tractionCell(
   figures: readonly ReadCompanyFigure[] | undefined,
   description?: string | null,
+  deck?: readonly ReadDeckFigure[],
 ): string {
   const stated = (figures ?? [])
     .filter((figure) => Number.isFinite(tractionRank(figure)))
@@ -210,7 +245,9 @@ function tractionCell(
     });
   if (stated.length > 0) return stated.join("; ");
   const described = describedTraction(description);
-  return described.length === 0 ? NOT_STATED : described;
+  if (described.length > 0) return described;
+  const fromDeck = deckTractionWords(deck);
+  return fromDeck.length === 0 ? NOT_STATED : fromDeck;
 }
 
 function measures(profile: FitProfileDto | null): {
@@ -362,7 +399,11 @@ export function comparisonTableBlock(input: {
     {
       label: "Traction",
       cells: columns.map((id) =>
-        tractionCell(input.read.companyFigures.get(id), facts(id)?.description),
+        tractionCell(
+          input.read.companyFigures.get(id),
+          facts(id)?.description,
+          input.read.deckTraction.get(id),
+        ),
       ),
     },
     { label: "Team", cells: columns.map((id) => teamCell(facts(id)?.team)) },
