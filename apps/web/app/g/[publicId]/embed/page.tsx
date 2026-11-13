@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { GateQForm } from "@/features/gateq/form/gateq-form";
+import { GatewayAccentStyle } from "@/features/gateq/gateway-brand";
 import { publicGateway } from "@/features/gateq/public-gateway";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export default async function GatewayEmbedPage({ params }: Props) {
   if (gateway === null) notFound();
   return (
     <main className="flex min-h-dvh w-full flex-col px-4 py-5">
+      {/* B6: the organisation's accent; its name and mark are in the form. */}
+      <GatewayAccentStyle hex={gateway.organisationAccentHex} />
       <GateQForm gateway={gateway} compact />
     </main>
   );

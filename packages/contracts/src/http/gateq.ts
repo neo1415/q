@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 
+import { BrandHexSchema } from "./brand-theme.js";
+
 /**
  * `/v1/gateq` — an investor organisation's inbound gateway (CQ-GATE-001).
  *
@@ -258,6 +260,13 @@ export const PublicGatewayDtoSchema = z
      * promise was made, and none is implied.
      */
     replyWithinDays: z.number().int().min(1).max(60).nullable().optional(),
+    /**
+     * B6: the investing organisation's own brand colour, lowercase
+     * #rrggbb, only when its tenant set one of its own (the platform
+     * default is Capital Q's and is never echoed). The web derives AA-safe
+     * accent tokens from it; absent or null: Capital Q's accent.
+     */
+    organisationAccentHex: BrandHexSchema.nullable().optional(),
   })
   .strict();
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;

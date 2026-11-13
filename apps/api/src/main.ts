@@ -656,6 +656,11 @@ const taxonomy = createTaxonomyService({
 // contexts' own query ports, and carries three declared facts and one
 // declared raise. No document, no conversation, no Q inference reaches it.
 const gateqGateways = createPostgresGatewayRepository({ sql: database.sql });
+// P5 brand theming; B6 also reads a tenant's own colour for its gateway.
+const brandThemes = createBrandThemeStore({
+  sql: database.sql,
+  transactions: database.transactions,
+});
 const gateqVersions = createPostgresGatewayVersionRepository({
   sql: database.sql,
 });
@@ -3142,10 +3147,7 @@ const { app, logger } = createApp(config, security, {
     };
   })(),
   // P5: brand colour
-  brand: createBrandThemeStore({
-    sql: database.sql,
-    transactions: database.transactions,
-  }),
+  brand: brandThemes,
   results,
   engagement,
   engagementNotices: createEngagementNotices(database.sql),
@@ -3216,6 +3218,15 @@ const { app, logger } = createApp(config, security, {
       },
       audience: "PUBLIC",
     });
+  },
+  // B6: the public gateway's accent is the owning tenant's OWN brand
+  // colour, never the platform default and nothing else from the theme
+  // row. Only a published, active gateway reaches here.
+  gateqPublicAccent: async (publicId) => {
+    const gateway = await gateqGateways.findByPublicId(publicId);
+    if (gateway === null) return null;
+    const theme = await brandThemes.tenantOwn(gateway.tenantId);
+    return theme?.primaryHex ?? null;
   },
   gateqVideo:
     gateqApply === undefined

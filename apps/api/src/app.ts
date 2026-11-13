@@ -401,6 +401,8 @@ export type ApiModules = {
   readonly gateq?: GateQRoutesDependencies["gateq"] | undefined;
   /** The public gateway page's card-scoped organisation images. */
   readonly gateqPublicImages?: GateQRoutesDependencies["publicImages"];
+  /** B6: the organisation's own brand colour for the public gateway page. */
+  readonly gateqPublicAccent?: GateQRoutesDependencies["publicAccent"];
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
   readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
   /** C3: the GateQ video interview session and its provider bridge. */
@@ -1055,6 +1057,7 @@ export function createApp(
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,
+      publicAccent: modules.gateqPublicAccent,
     });
   }
 
