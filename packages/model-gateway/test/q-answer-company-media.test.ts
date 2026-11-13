@@ -424,9 +424,9 @@ describe("answers, with readings as fixtures", () => {
       port,
     });
     expect(
-      blocks.map((block) => [
-        Reflect.get(block as object, "companyId"),
-        Reflect.get(block as object, "pitch"),
+      blocks.map((block): unknown[] => [
+        Reflect.get(block as object, "companyId") as unknown,
+        Reflect.get(block as object, "pitch") as unknown,
       ]),
     ).toEqual([
       [CLINICREST, null],
