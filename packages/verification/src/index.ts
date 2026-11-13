@@ -53,6 +53,7 @@ export type {
   NewSyntheticDecision,
   PendingSyntheticClaimSource,
   SyntheticPrincipalPort,
+  SyntheticReviewerScopePort,
   VerificationClaimRepository,
 } from "./application/ports.js";
 export {
@@ -86,9 +87,11 @@ export {
 } from "./application/kyb.js";
 export {
   createDecideByOperator,
+  SYNTHETIC_REVIEWER_BASIS_PREFIX,
   type DecideByOperatorCommand,
   type DecideByOperatorOutcome,
 } from "./application/decide-operator.js";
+export { createPostgresSyntheticReviewerScope } from "./infrastructure/synthetic-reviewer-scope.js";
 export type {
   DecideSyntheticCommand,
   DecideSyntheticOutcome,

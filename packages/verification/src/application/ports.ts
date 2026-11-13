@@ -36,6 +36,14 @@ export type NewOperatorDecision = {
   readonly decisionBasis: string;
   readonly revocationReason: string | null;
   readonly operatorUserId: string;
+  /**
+   * Owner 13 Nov (S4): decided by a synthetic release-test reviewer. The
+   * row is then written as SYNTHETIC_DEMO_ATTESTATION by
+   * CAPITAL_Q_SYNTHETIC_DEMO, so no reader can take it for real
+   * verification. The table's decider check names that method's decider
+   * SYSTEM with no user; who reviewed is in the audit row.
+   */
+  readonly syntheticReviewer?: boolean | undefined;
 };
 
 /**
@@ -99,6 +107,32 @@ export type SyntheticPrincipalPort = {
   readonly isSynthetic: (
     executor: DatabaseExecutor,
     userId: string,
+  ) => Promise<boolean>;
+};
+
+/**
+ * Owner 13 Nov (S4): the release lane certifies the REAL operator workflow
+ * with an authorised synthetic reviewer (a platform admin whose auth
+ * account carries the service-role synthetic marker). Such a reviewer may
+ * decide only fictional applicants. Both answers are read from the
+ * database inside the deciding transaction, never from a message.
+ */
+export type SyntheticReviewerScopePort = {
+  /** The operator's auth account carries `app_metadata.synthetic = true`. */
+  readonly isSyntheticReviewer: (
+    executor: DatabaseExecutor,
+    operatorUserId: string,
+  ) => Promise<boolean>;
+  /**
+   * Nothing real is involved in the request: the requester and a PERSON
+   * subject are marked synthetic, the tenant passes the same rule the
+   * synthetic decider and model routing use (members, all marked), every
+   * current member of the claim's organisation is marked, and no company
+   * of the organisation is a real company carrying demonstration data.
+   */
+  readonly isSyntheticApplicant: (
+    executor: DatabaseExecutor,
+    request: VerificationClaim,
   ) => Promise<boolean>;
 };
 

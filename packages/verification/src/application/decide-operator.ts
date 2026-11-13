@@ -15,7 +15,10 @@ import {
 } from "@capital-q/security";
 
 import { verificationClaimDecidedEvent } from "../events/index.js";
-import type { VerificationClaimRepository } from "./ports.js";
+import type {
+  SyntheticReviewerScopePort,
+  VerificationClaimRepository,
+} from "./ports.js";
 
 /**
  * ADR 0033: a Capital Q operator decides a verification request by hand
@@ -25,7 +28,19 @@ import type { VerificationClaimRepository } from "./ports.js";
  * function trusts nothing else and re-checks the request: still PENDING and
  * still the current revision. Same append-only row, audit and event as the
  * synthetic decider, in one transaction. Deterministic; no model.
+ *
+ * Owner 13 Nov (S4): a synthetic release-test reviewer (an operator whose
+ * auth account carries the service-role synthetic marker) goes through
+ * exactly this workflow, but may decide only fictional applicants, and
+ * what it writes says so: SYNTHETIC_DEMO_ATTESTATION by
+ * CAPITAL_Q_SYNTHETIC_DEMO with a basis that names it, never
+ * OPERATOR_DECISION. The API composes `syntheticReviewers`; without it a
+ * synthetic operator cannot be told apart and is treated as any operator.
  */
+
+/** Prefixed to every basis a synthetic reviewer writes (owner 13 Nov). */
+export const SYNTHETIC_REVIEWER_BASIS_PREFIX =
+  "synthetic release-test reviewer; fictional applicant; no real-world check: ";
 
 const RESOURCE = AuditResourceTypeSchema.parse("verification_claim");
 const DECIDED = AuditActionTypeSchema.parse("verification.claim.decided");
@@ -49,15 +64,23 @@ export type DecideByOperatorOutcome =
     }
   | { readonly kind: "NOTHING_TO_DECIDE" }
   /** The operator asked for this claim: another admin must decide it. */
-  | { readonly kind: "SELF_DECISION" };
+  | { readonly kind: "SELF_DECISION" }
+  /**
+   * A synthetic release-test reviewer asked to decide an applicant that is
+   * not wholly fictional. Nothing is written.
+   */
+  | { readonly kind: "SYNTHETIC_REVIEWER_SCOPE" };
 
 export function createDecideByOperator(dependencies: {
   readonly transactions: TransactionManager;
   readonly repository: VerificationClaimRepository;
   readonly outbox: OutboxWriter;
   readonly audit: MaterialActionAuditWriter;
+  /** S4: tells a synthetic reviewer apart and bounds what it may decide. */
+  readonly syntheticReviewers?: SyntheticReviewerScopePort | undefined;
 }) {
-  const { repository, audit, outbox, transactions } = dependencies;
+  const { repository, audit, outbox, transactions, syntheticReviewers } =
+    dependencies;
   return async (
     command: DecideByOperatorCommand,
   ): Promise<DecideByOperatorOutcome> => {
@@ -91,16 +114,42 @@ export function createDecideByOperator(dependencies: {
       if (request.requestedByUserId === operator) {
         return { kind: "SELF_DECISION" };
       }
+      // S4: a synthetic reviewer certifies the real workflow on fictional
+      // applicants only; a real person's claim is never decided by one.
+      const synthetic =
+        syntheticReviewers !== undefined &&
+        (await syntheticReviewers.isSyntheticReviewer(tx.sql, operator));
+      if (
+        synthetic &&
+        !(await syntheticReviewers.isSyntheticApplicant(tx.sql, request))
+      ) {
+        return { kind: "SYNTHETIC_REVIEWER_SCOPE" };
+      }
       const current = await repository.currentRevision(tx.sql, request);
       if (current !== request.revision) return { kind: "NOTHING_TO_DECIDE" };
 
-      const decision = await repository.insertOperatorDecision(tx, {
-        decides: request,
-        status: command.status,
-        decisionBasis: basis.slice(0, 1000),
-        revocationReason: reason,
-        operatorUserId: operator,
-      });
+      const decision = await repository.insertOperatorDecision(
+        tx,
+        synthetic
+          ? {
+              decides: request,
+              status: command.status,
+              decisionBasis: (SYNTHETIC_REVIEWER_BASIS_PREFIX + basis).slice(
+                0,
+                1000,
+              ),
+              revocationReason: reason,
+              operatorUserId: operator,
+              syntheticReviewer: true,
+            }
+          : {
+              decides: request,
+              status: command.status,
+              decisionBasis: basis.slice(0, 1000),
+              revocationReason: reason,
+              operatorUserId: operator,
+            },
+      );
       const organisationId = OrganisationIdSchema.parse(
         decision.organisationId,
       );
@@ -118,7 +167,9 @@ export function createDecideByOperator(dependencies: {
         metadata: {
           claimType: decision.claimType,
           status: decision.status,
-          method: "OPERATOR_DECISION",
+          method: synthetic
+            ? "OPERATOR_DECISION_BY_SYNTHETIC_REVIEWER"
+            : "OPERATOR_DECISION",
           decidesClaimId: request.id,
           revision: decision.revision,
         },
@@ -138,7 +189,11 @@ export function createDecideByOperator(dependencies: {
             decidesClaimId: request.id,
             claimType: decision.claimType,
             status: command.status,
-            method: "OPERATOR_DECISION",
+            // The event names what the row says, so readiness and readers
+            // downstream never see OPERATOR_DECISION for a synthetic one.
+            method: synthetic
+              ? "SYNTHETIC_DEMO_ATTESTATION"
+              : "OPERATOR_DECISION",
             revision: decision.revision,
           },
         ),

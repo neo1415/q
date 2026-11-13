@@ -308,6 +308,7 @@ import {
   closeKybForClaim,
   createDecideByOperator,
   createKybService,
+  createPostgresSyntheticReviewerScope,
   createPostgresSyntheticSubjectReader,
   createPostgresVerificationClaimRepository,
   createPublicVerificationReader,
@@ -3155,6 +3156,9 @@ const { app, logger } = createApp(config, security, {
     repository: createPostgresVerificationClaimRepository(),
     outbox,
     audit,
+    // Owner 13 Nov (S4): a synthetic release-test reviewer decides only
+    // fictional applicants, and its decision is written as synthetic.
+    syntheticReviewers: createPostgresSyntheticReviewerScope(),
   }),
   // end ADMIN block
   // ADMIN-3 block: manual KYB and the console's side of it.

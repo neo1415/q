@@ -147,6 +147,8 @@ export type OperatorVerificationDecider = (command: {
   | { readonly kind: "NOTHING_TO_DECIDE" }
   /** The operator asked for this claim: another admin must decide it. */
   | { readonly kind: "SELF_DECISION" }
+  /** Owner 13 Nov (S4): a synthetic reviewer decides fictional applicants only. */
+  | { readonly kind: "SYNTHETIC_REVIEWER_SCOPE" }
 >;
 
 export type AdminRoutesDependencies = ActorContextDependencies & {
@@ -561,6 +563,15 @@ export function registerAdminRoutes(
           reply,
           "PERMISSION_DENIED",
           "Another admin must decide a verification you asked for.",
+        );
+      }
+      // Says nothing about the claim: only that this reviewer may not.
+      if (outcome.kind === "SYNTHETIC_REVIEWER_SCOPE") {
+        return send(
+          request,
+          reply,
+          "PERMISSION_DENIED",
+          "This reviewer cannot decide this verification.",
         );
       }
       // ADMIN-3: the KYB submission that asked for this claim closes with it.

@@ -176,6 +176,32 @@ export function createPostgresVerificationClaimRepository(): VerificationClaimRe
     insertOperatorDecision: async (tx, decision) => {
       const request = decision.decides;
       const verified = decision.status === "VERIFIED";
+      if (decision.syntheticReviewer === true) {
+        // S4: the synthetic method and provider, so readers show "Demo
+        // verified (synthetic)". The table names that method's decider
+        // SYSTEM with no user; the reviewer is named in the audit row.
+        const [synthetic] = await tx.sql`
+          insert into evidence.verification_claims
+            (tenant_id, organisation_id, claim_type, subject_type, subject_id,
+             subject_domain, status, revision, decides_claim_id, method, provider,
+             decision_basis, decided_by_actor_type, decided_at,
+             verified_at, revoked_at, revocation_reason, requested_by_user_id)
+          select ${request.tenantId}, ${request.organisationId}, ${request.claimType},
+                 ${request.subjectType}, ${request.subjectId}::uuid, ${request.subjectDomain},
+                 ${decision.status}, coalesce(max(v.revision), 0) + 1, ${request.id},
+                 'SYNTHETIC_DEMO_ATTESTATION', 'CAPITAL_Q_SYNTHETIC_DEMO', ${decision.decisionBasis},
+                 'SYSTEM', now(),
+                 case when ${verified} then now() end,
+                 case when ${verified} then null else now() end,
+                 ${verified ? null : decision.revocationReason},
+                 ${request.requestedByUserId}
+            from evidence.verification_claims v
+           where v.tenant_id = ${request.tenantId}
+             and v.claim_type = ${request.claimType}
+             and v.subject_key = ${request.subjectKey}
+          returning *`;
+        return toClaim(synthetic);
+      }
       const [row] = await tx.sql`
         insert into evidence.verification_claims
           (tenant_id, organisation_id, claim_type, subject_type, subject_id,

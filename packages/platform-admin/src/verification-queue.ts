@@ -1,4 +1,5 @@
 import type { DatabaseExecutor } from "@capital-q/database";
+import { PERSONAL_BOOTSTRAP_TENANT_ID } from "@capital-q/security";
 
 import type { AdminGrant } from "./access.js";
 
@@ -49,9 +50,20 @@ export type VerificationQueueRow = {
   } | null;
 };
 
+/**
+ * Owner 13 Nov (S4): a synthetic release-test reviewer (an admin whose auth
+ * account carries the service-role synthetic marker) is shown fictional
+ * applicants only: requester and PERSON subject marked, the tenant's and
+ * organisation's current members all marked (the tenant must have
+ * members, except the personal bootstrap tenant, where the requester
+ * decides alone), and no company of the organisation carrying
+ * demonstration_data (a real company with demo figures). This only
+ * narrows the list; the verification decider re-checks the same rule
+ * inside its transaction and refuses with SYNTHETIC_REVIEWER_SCOPE.
+ */
 export async function verificationQueue(
   sql: DatabaseExecutor,
-  _grant: AdminGrant,
+  grant: AdminGrant,
 ): Promise<readonly VerificationQueueRow[]> {
   const rows = await sql<
     {
@@ -117,6 +129,36 @@ export async function verificationQueue(
        and c.revision = (select max(v.revision) from evidence.verification_claims v
                           where v.tenant_id = c.tenant_id and v.claim_type = c.claim_type
                             and v.subject_key = c.subject_key)
+       and (
+         not exists (
+           select 1 from identity.user_profiles gp
+             join auth.users gu on gu.id = gp.auth_user_id
+            where gp.id = ${grant.userId}::uuid
+              and coalesce(gu.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false))
+         or (
+           coalesce(ru.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false)
+           and (c.subject_type <> 'PERSON' or exists (
+             select 1 from identity.user_profiles xp
+               join auth.users xu on xu.id = xp.auth_user_id
+              where xp.id = c.subject_id
+                and coalesce(xu.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false)))
+           and (c.tenant_id = ${PERSONAL_BOOTSTRAP_TENANT_ID}::uuid or exists (
+             select 1 from identity.organisation_memberships m
+              where m.tenant_id = c.tenant_id and m.left_at is null))
+           and not exists (
+             select 1 from identity.organisation_memberships m
+               join identity.user_profiles mp on mp.id = m.user_id
+               join auth.users mu on mu.id = mp.auth_user_id
+              where m.left_at is null
+                and (m.organisation_id = c.organisation_id
+                     or (m.tenant_id = c.tenant_id
+                         and c.tenant_id <> ${PERSONAL_BOOTSTRAP_TENANT_ID}::uuid))
+                and not coalesce(mu.raw_app_meta_data -> 'synthetic' = 'true'::jsonb, false))
+           and not exists (
+             select 1 from core.companies dc
+              where dc.tenant_id = c.tenant_id
+                and dc.organisation_id = c.organisation_id
+                and dc.demonstration_data)))
      order by c.created_at, c.id
      limit 200`;
   return rows.map((row) => ({
