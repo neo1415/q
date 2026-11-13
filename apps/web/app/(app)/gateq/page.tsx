@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import {
   getGatewayPolicy,
   getGateqInbox,
+  getInvestorMandate,
+  listInvestorMandates,
   getGateqInboxItem,
   listGateways,
   listMyGateqApplications,
@@ -40,6 +42,7 @@ import { publicGateway } from "@/features/gateq/public-gateway";
 import { appOrigin } from "@/features/q-card/public-card-data";
 import { qrSvg } from "@/features/q-card/qr";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { mandateDraftText } from "@/features/gateq/mandate-draft";
 import { serverT } from "@/features/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -185,12 +188,14 @@ export default async function GateqPage({ searchParams }: Props) {
   const gatewayId = gateway?.id ?? "";
 
   if (tab === "gate") {
-    const [policy, published, inbox] = await Promise.all([
+    const [policy, published, inbox, fromMandate] = await Promise.all([
       getGatewayPolicy(session, gatewayId).catch(
         (): GatewayPolicyDto | null => null,
       ),
       publicGateway(gateway?.publicId ?? ""),
       getGateqInbox(session, gatewayId, "INBOX").catch(() => null),
+      // B2: their active mandate, read as them, for the rules editor.
+      activeMandateDraft(session, context.investorOrganisationId),
     ]);
     const snippet = `<script src="${origin}/gateq.js" data-gate="${gateway?.publicId ?? ""}" async></script>`;
     const publishedPolicy =
@@ -221,6 +226,7 @@ export default async function GateqPage({ searchParams }: Props) {
             editor={
               <PolicyEditor
                 hasRules={(publishedPolicy?.criteria.length ?? 0) > 0}
+                fromMandate={fromMandate}
               />
             }
           />
@@ -331,4 +337,25 @@ export default async function GateqPage({ searchParams }: Props) {
       </GateqChrome>
     </PageContainer>
   );
+}
+
+/** Their active mandate in plain words; null when none or unreadable. */
+async function activeMandateDraft(
+  session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  investorOrganisationId: string,
+): Promise<string | null> {
+  try {
+    const page = await listInvestorMandates(session, investorOrganisationId, {
+      status: "ACTIVE",
+      limit: 1,
+    });
+    const first = page.items[0];
+    if (first === undefined) return null;
+    const text = mandateDraftText(
+      await getInvestorMandate(session, investorOrganisationId, first.id),
+    );
+    return text.length === 0 ? null : text;
+  } catch {
+    return null;
+  }
 }

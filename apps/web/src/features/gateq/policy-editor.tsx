@@ -103,10 +103,17 @@ export type PolicyEditorPreview = {
 export function PolicyEditor({
   hasRules,
   preview,
+  fromMandate,
 }: {
   /** Whether a published version already has rules (wording only). */
   readonly hasRules: boolean;
   readonly preview?: PolicyEditorPreview;
+  /**
+   * B2 (owner, 13 Nov): their active Capital Q mandate in plain words
+   * (mandate-draft.ts), read as them. With no rules yet the editor starts
+   * from it; otherwise one button fills it in. Null: no active mandate.
+   */
+  readonly fromMandate?: string | null;
 }) {
   const t = useT();
 
@@ -114,7 +121,10 @@ export function PolicyEditor({
   const textId = useId();
   const publishNoteId = useId();
   const file = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState(preview?.text ?? "");
+  const mandate = fromMandate?.trim() ?? "";
+  const [text, setText] = useState(
+    preview?.text ?? (!hasRules && mandate.length > 0 ? mandate : ""),
+  );
   const [source, setSource] = useState<"PASTED_TEXT" | "UPLOADED_FILE">(
     "PASTED_TEXT",
   );
@@ -234,6 +244,16 @@ export function PolicyEditor({
                   "Paste your mandate or thesis. Q drafts the rules founders are checked against; you confirm each one.",
                 )}
           </label>
+          {mandate.length > 0 && text === mandate ? (
+            <p
+              className="cq-caption m-0 text-(--cq-text-tertiary)"
+              data-gateq-mandate-filled
+            >
+              {t(
+                "Filled in from your Capital Q mandate. Change anything, then let Q draft the rules; nothing is published until you do it.",
+              )}
+            </p>
+          ) : null}
           <textarea
             id={textId}
             value={text}
@@ -257,6 +277,19 @@ export function PolicyEditor({
             >
               {pending ? t("Q is reading…") : t("Draft rules with Q")}
             </Button>
+            {mandate.length === 0 || text === mandate ? null : (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setText(mandate);
+                  setSource("PASTED_TEXT");
+                  requestKey.current = null;
+                }}
+                data-gateq-from-mandate
+              >
+                {t("Use my Capital Q mandate")}
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={() => file.current?.click()}

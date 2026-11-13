@@ -628,7 +628,7 @@ const OFFERS: readonly QCapability[] = [
   offer(
     "gateway_mandate",
     "SETTINGS",
-    "Set up their GateQ gateway from their mandate: paste or upload it, Q drafts the rules, they confirm and publish, then copy the website snippet",
+    "Set up their GateQ gateway from their Capital Q mandate: the Gateway page opens with their active mandate already written in (or they paste or upload another), Q drafts the rules, they confirm and publish, then copy the website snippet",
     "GATEWAY",
     "Q drafts the rules from their mandate on the Gateway page, but publishing who may approach their organisation is the investor's own act there, after reviewing every rule.",
     false,
