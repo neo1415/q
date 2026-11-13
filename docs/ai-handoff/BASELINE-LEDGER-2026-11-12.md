@@ -424,3 +424,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - "Chart Ledgerline's monthly recurring revenue over the last few months" drew no chart. Q answered from the profile text and searched the public web.
   - Cause: the name candidate was "Chart Ledgerline", because "chart" was not among the words that are never a company's name. The exact-name search failed, so no figures were read.
   - Fixed in `1d267d200`: the chart verbs are not names, and a chart ask (not a comparison) now reads its named companies' figures through the executor. Test-proven: the new test fails without the fix. Gating now.
+- **`1d267d200` deployed** (gate `ci-local PASS sha=1d267d200 at=2026-11-13T11:49:40Z took=2014s`; rollback point `c58d71d9c`; four services SUCCESS).
+- **Live:** "Chart Ledgerline's monthly recurring revenue over the last few months" now draws a code-built LINE chart: NGN 31,722,470 (June) → 38,000,000 (September 2026), 4 dated points, labelled company-stated and not verified.
+- **Defect (next):** the prose contradicts the chart. It says "from ₦19.6m in October 2025" and "the record doesn't provide each month's value".
+  - Likely sources: an older growth claim's start, and the figures tool's "Earlier reading… not the latest figure" labels.
+  - The analyst is not told what the code drew. Fix: give the answer the chart's own points as an authorised fact (as the comparison's fact statement does), so the words describe the series on screen.
