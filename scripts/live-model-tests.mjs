@@ -46,6 +46,20 @@ if (existsSync(envFile)) {
   }
 }
 
+// In a Claude Code cloud session the environment's ANTHROPIC_API_KEY is
+// reserved for Claude Code itself and never reaches commands. The same key,
+// saved a second time as CQ_EVAL_ANTHROPIC_API_KEY, does (owner, 13 Nov).
+if (
+  env.ANTHROPIC_API_KEY === undefined &&
+  (env.CQ_EVAL_ANTHROPIC_API_KEY ?? "").length > 0
+) {
+  env.ANTHROPIC_API_KEY = env.CQ_EVAL_ANTHROPIC_API_KEY;
+}
+delete env.CQ_EVAL_ANTHROPIC_API_KEY;
+// Claude Code's own endpoint must not receive these calls: the provider
+// SDK honours ANTHROPIC_BASE_URL, which Claude Code sets for itself.
+delete env.ANTHROPIC_BASE_URL;
+
 for (const name of NAMES) {
   console.log(`${name}: ${env[name] === undefined ? "MISSING" : "PRESENT"}`);
 }
