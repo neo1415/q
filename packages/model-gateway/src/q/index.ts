@@ -4342,6 +4342,71 @@ export function createModelGatewayQAnswer(
         ],
       };
     };
+    /**
+     * A8 live 2026-11-13 ("Chart Ledgerline's monthly recurring revenue
+     * over the last few months", savanna-seed): the run never read the
+     * company's figures, took the research path and said there was no
+     * series, while Ledgerline's dated MRR was on Capital Q. A chart the
+     * reader heard asked for (asksForChart), about companies on Capital Q,
+     * has their figures read here through the executor (the plan's firewall
+     * applies), so the chart code has them; nothing is drawn from prose.
+     * Only names found by exact name, at most four; a comparison reads its
+     * own figures (compareFor).
+     */
+    const chartFiguresFor = async (): Promise<void> => {
+      if (latest === undefined) return;
+      const { names } = await prefetchToolsRead;
+      if (
+        !names.has("search_companies") ||
+        !names.has("read_company_figures")
+      ) {
+        return;
+      }
+      const said = companyNameCandidates(latest.content, 4, heardNames(request))
+        .map((name) => name.trim())
+        .filter(
+          (name, index, all) => name.length > 0 && all.indexOf(name) === index,
+        )
+        .slice(0, 4);
+      const ids = (
+        await Promise.all(
+          said.map(async (name, index) => {
+            const found = await tools
+              .execute(
+                {
+                  callId: `q-chart-search-${String(index)}`,
+                  name: "search_companies",
+                  arguments: { query: name, limit: 5 },
+                },
+                toolContext,
+              )
+              .catch(() => null);
+            const exact = (itemsOf(found) ?? []).filter(
+              (item) =>
+                item.canonicalName.trim().toLowerCase() === name.toLowerCase(),
+            );
+            return exact.length === 1 ? (exact[0]?.companyId ?? null) : null;
+          }),
+        )
+      ).filter(
+        (id, index, all): id is string =>
+          id !== null && all.indexOf(id) === index,
+      );
+      await Promise.all(
+        ids.map((companyId, index) =>
+          tools
+            .execute(
+              {
+                callId: `q-chart-figures-${String(index)}`,
+                name: "read_company_figures",
+                arguments: { companyId },
+              },
+              toolContext,
+            )
+            .catch(() => null),
+        ),
+      );
+    };
     const compareRead = (async (): Promise<void> => {
       const outcome = await compareFor(request.compare);
       if (outcome === null) return;
@@ -5558,6 +5623,7 @@ export function createModelGatewayQAnswer(
       compareTable,
       compareVerdict,
       compareLate: compareFor,
+      chartFigures: chartFiguresFor,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -6029,6 +6095,11 @@ export function createModelGatewayQAnswer(
       const compareFacts = lateCompare?.facts ?? preparedCompareFacts;
       const compareIds = lateCompare?.ids ?? preparedCompareIds;
       const compareTable = lateCompare?.table ?? preparedCompareTable;
+      // A8: a chart asked for, not a comparison: the named companies'
+      // figures are read before the answer is composed (chartFiguresFor).
+      if (request.asksForChart === true && compareTable === null) {
+        await prepared.chartFigures().catch(() => undefined);
+      }
       const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
       /**
        * Step 11 (A2): the warmed prepare searched the documents before the

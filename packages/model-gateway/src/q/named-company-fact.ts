@@ -337,6 +337,14 @@ const NOT_COMPANY_WORDS = new Set([
   "compare",
   "find",
   "open",
+  // A8 live 2026-11-13: "Chart Ledgerline's monthly recurring revenue"
+  // searched "Chart Ledgerline", found nothing and read no figures.
+  "chart",
+  "plot",
+  "graph",
+  "draw",
+  "visualise",
+  "visualize",
   "and",
   "so",
   "the",

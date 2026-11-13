@@ -77,6 +77,8 @@ const OFFERED = [
 
 /** Live 2026-11-13 (Ajopot): Silo Credit has published no figures. */
 let siloPublishedNone = false;
+/** A8 live 2026-11-13: Mizan has two dated monthly MRR readings. */
+let mizanSeries = false;
 /** A8: the MRR claims carry their structured value (MONEY, USD, dated). */
 let structuredFigures = false;
 
@@ -203,6 +205,36 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
       ...base,
       toolName: "company.figures.read",
       result: { ok: true, data: { companyId, status: "NONE", figures: [] } },
+    } as unknown as Omit<QToolCallOutcome, "callId">;
+  }
+  if (
+    proposal.name === "read_company_figures" &&
+    mizanSeries &&
+    companyId === MIZAN
+  ) {
+    const reading = (amount: string, asOf: string) => ({
+      key: "financial.mrr",
+      statement: `Monthly recurring revenue: USD ${amount}.`,
+      value: { kind: "MONEY", amount, currency: "USD", asOf },
+      asOf,
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      lifecycleStatus: "CURRENT",
+    });
+    return {
+      ...base,
+      toolName: "company.figures.read",
+      result: {
+        ok: true,
+        data: {
+          companyId,
+          status: "AVAILABLE",
+          figures: [
+            reading("42000", "2026-09-30"),
+            reading("30000", "2026-06-30"),
+          ],
+        },
+      },
     } as unknown as Omit<QToolCallOutcome, "callId">;
   }
   if (proposal.name === "read_company_figures") {
@@ -492,6 +524,36 @@ describe("compare the top two, right after a list of five", () => {
       );
     } finally {
       siloPublishedNone = false;
+    }
+  });
+
+  it("A8 live 2026-11-13: a chart asked for about one company reads its figures and draws them", async () => {
+    mizanSeries = true;
+    try {
+      const { seam, request, executed, stored } = build(
+        "Chart the monthly recurring revenue for Mizan over the last few months",
+        { asksForChart: true },
+        "Mizan's monthly recurring revenue grew from USD 30,000 to USD 42,000.",
+        true,
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(executed).toContainEqual(
+        expect.objectContaining({
+          name: "read_company_figures",
+          arguments: { companyId: MIZAN },
+        }),
+      );
+      const chart = (stored.at(-1)?.blocks ?? []).find(
+        (block) => Reflect.get(block as object, "kind") === "CHART",
+      ) as
+        | { chart: string; series: { points: { value: number }[] }[] }
+        | undefined;
+      expect(chart?.chart).toBe("LINE");
+      expect(chart?.series[0]?.points.map((point) => point.value)).toEqual([
+        30000, 42000,
+      ]);
+    } finally {
+      mizanSeries = false;
     }
   });
 
