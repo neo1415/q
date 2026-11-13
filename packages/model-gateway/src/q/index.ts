@@ -994,6 +994,29 @@ export function readAnswerKinds(request: {
   });
 }
 
+/**
+ * Whether this turn asks for a comparison (C10, owner 13 Nov: semantic
+ * intent, not keyword routing). When the turn reader read the turn, its
+ * reading decides: a comparison it heard (`compare`) or an answer kind of
+ * COMPARISON. The words decide only when there is no reading (FAKE mode, a
+ * reader that failed or timed out): a bounded fallback, never an override
+ * of what the reader said (audit 2026-11-13, item 4).
+ */
+export function comparisonAsked(
+  request: Parameters<typeof readAnswerKinds>[0] & {
+    readonly turnKind?: string | undefined;
+    readonly compare?: unknown;
+  },
+  words: string,
+  wordsAsk: (text: string) => boolean,
+): boolean {
+  // A comparison the reader heard is one, whatever the words.
+  if (request.compare !== undefined && request.compare !== null) return true;
+  // A reading that heard no comparison decides; the words do not override it.
+  if (request.turnKind !== undefined) return readAsComparison(request);
+  return wordsAsk(words);
+}
+
 /** The reader read the turn (or one of its parts) as a comparison. */
 export function readAsComparison(
   request: Parameters<typeof readAnswerKinds>[0],
@@ -5135,9 +5158,7 @@ export function createModelGatewayQAnswer(
         ...(request.compare?.names ?? []),
         ...companyNameCandidates(
           latest.content,
-          request.compare !== undefined || asksToCompare(latest.content)
-            ? 4
-            : 2,
+          comparisonAsked(request, latest.content, asksToCompare) ? 4 : 2,
           // A word opening a sentence is a name only when the reader heard
           // it as one (live 2026-10-28: "My" was searched).
           heardNames(request),
@@ -6778,7 +6799,8 @@ export function createModelGatewayQAnswer(
         // F-45 (QA 2026-10-23): a question about one company is not opened
         // with a fixed line of its declared stage and place; the answer's
         // own first sentence, written for this question, leads.
-        if (!asksForComparison(latest.content)) return null;
+        if (!comparisonAsked(request, latest.content, asksForComparison))
+          return null;
         // The named companies this run already read in full (prepare's
         // named-visible reads): read again from the run's own kept reads.
         const named = [...runCompanies.read(request.runId).profiles].filter(
@@ -11941,7 +11963,11 @@ export function createModelGatewayQAnswer(
               read: companiesRead,
               fits: fitsRead,
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
-              ...(request.compare === undefined ? {} : { compareAsked: true }),
+              compareAsked: comparisonAsked(
+                request,
+                latest.content,
+                asksToCompare,
+              ),
               shown: answerCardCompanies([
                 ...(modelBlocks ?? []),
                 ...(builtCards === null ? [] : [builtCards]),
