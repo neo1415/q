@@ -8682,8 +8682,16 @@ export function createModelGatewayQAnswer(
        * fit service's scores over every match. The sweep answers only
        * when the catalog cannot.
        */
+      // Live 2026-11-13 (savanna-seed, "Compare Ajopot, Ledgerline and
+      // Clinicrest side by side: ... fit with my mandate"): the reader read
+      // a FIT question naming no single company, so the catalog's top ten
+      // was appended under the comparison. A turn that compares the
+      // companies it names is about those companies, never the catalog.
+      const comparingNamed =
+        (request.compare ?? null) !== null || compareTable !== null;
       const unscopedFit =
         investorAsking &&
+        !comparingNamed &&
         request.discoverCompanies === undefined &&
         request.fitQuestion !== undefined &&
         request.fitQuestion.previous !== true &&

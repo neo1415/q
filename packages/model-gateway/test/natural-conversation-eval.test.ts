@@ -359,6 +359,7 @@ async function replay(input: {
     | "preparedSubject"
     | "aboutNamedOther"
     | "webDiscovery"
+    | "compare"
   >;
 }): Promise<{
   text: string;
@@ -791,6 +792,26 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       // F-60: one ranking truth, the catalog's fit ranking over every match.
       expect(executed).toContain("discover_companies");
     }
+  });
+
+  it("a comparison of named companies, fit with the mandate included, never appends the catalog's ranking", async () => {
+    // Live 2026-11-13 (savanna-seed): "Compare Ajopot, Ledgerline and
+    // Clinicrest side by side: ... and fit with my mandate" was read as a
+    // FIT question naming no single company, so the catalog's top ten was
+    // appended under the comparison.
+    const words =
+      "Compare Ajopot, Ledgerline and Clinicrest side by side: country, stage, sector, how much each is raising, traction, and fit with my mandate.";
+    const { text, executed } = await replay({
+      question: words,
+      script: [answer("A model answer.")],
+      reading: {
+        questionKind: "FIT",
+        fitQuestion: { text: words, count: 3 },
+        compare: { names: ["Ajopot", "Ledgerline", "Clinicrest"] },
+      },
+    });
+    expect(executed).not.toContain("discover_companies");
+    expect(text).not.toMatch(/Ranked by fit with your mandate, the top/u);
   });
 
   it("with a sector named, the catalog of that kind, ranked by fit with the mandate", async () => {
