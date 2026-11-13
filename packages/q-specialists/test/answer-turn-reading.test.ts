@@ -6927,6 +6927,10 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
     ],
     ask: "Ask for a second meeting with their partner",
     waiting,
+    counterpart: {
+      kind: "INVESTOR_ORGANISATION",
+      id: "5a5a5a5a-0000-4000-8000-000000000001",
+    },
   });
 
   // QA F-98 (live 2026-10-24, founder): "Let us rehearse my call with
@@ -7021,6 +7025,56 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
       text.endsWith("Want to rehearse it? I'll play Savanna Seed Partners."),
     ).toBe(true);
     expect(text).not.toMatch(/Q['’]s team|\.\.|plan this one anyway/u);
+    // Live 2026-11-13: the offer is the rehearsal's own page, so "yes"
+    // opens it (N1 offer reply) and the button works on its own.
+    expect(stored.at(-1)?.blocks).toEqual([
+      {
+        kind: "NAVIGATION_OFFER",
+        intent: {
+          kind: "OPEN_RECORD_PAGE",
+          page: "INVESTOR_REHEARSAL",
+          id: "5a5a5a5a-0000-4000-8000-000000000001",
+        },
+        place: "a rehearsal with Savanna Seed Partners",
+        openLabel: "Rehearse with Savanna Seed Partners",
+      },
+    ]);
+  });
+
+  it("live 2026-11-13: 'yes' to the rehearsal offer opens the rehearsal, never 'not available'", async () => {
+    const offer = {
+      kind: "NAVIGATION_OFFER" as const,
+      intent: {
+        kind: "OPEN_RECORD_PAGE" as const,
+        page: "COMPANY_REHEARSAL" as const,
+        id: "6b2f9851-d7e3-4197-9fd1-beffbdc153fe",
+      },
+      place: "a rehearsal with Clinicrest",
+      openLabel: "Rehearse with Clinicrest",
+    };
+    const run = seam({
+      said: "yes",
+      earlier: [
+        {
+          role: "USER" as const,
+          content:
+            "How should I approach a first call with Clinicrest's founders?",
+        },
+        {
+          role: "Q" as const,
+          content:
+            "**Who they are**\n…\n\nWant to rehearse it? I'll play Clinicrest.",
+          blocks: [offer],
+        },
+      ],
+      reading: null,
+      outcomes: [],
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(run.stored[0]?.content).toBe("Opening a rehearsal with Clinicrest.");
+    expect(run.stored[0]?.blocks).toEqual([
+      { kind: "UI_INTENT", intent: offer.intent },
+    ]);
   });
 
   it("live 20:31, the three-turn sequence: after a list of investors, the prep is not answered as a follow-up", async () => {

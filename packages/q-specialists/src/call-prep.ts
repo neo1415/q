@@ -1,3 +1,7 @@
+import {
+  Q_NAVIGATION_OFFER_LABEL_MAX,
+  type QResultBlock,
+} from "@capital-q/contracts";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import { waitingWork } from "./team-job.js";
@@ -38,6 +42,19 @@ export type CallPrep = {
   readonly theyWant?: string | null | undefined;
   /** Summaries of related work already waiting for their approval. */
   readonly waiting: readonly string[];
+  /**
+   * The counterpart's record, when they could open it: the rehearsal is
+   * offered only then, as a page they can open (live 2026-11-13: "Want to
+   * rehearse it? I'll play Clinicrest." then, on "yes", "A rehearsal with
+   * Clinicrest isn't available as an action here").
+   */
+  readonly counterpart?:
+    | {
+        readonly kind: "COMPANY" | "INVESTOR_ORGANISATION";
+        readonly id: string;
+      }
+    | null
+    | undefined;
 };
 
 export type QCallPrepPort = {
@@ -82,6 +99,38 @@ export function callPrepLine(prep: CallPrep): string {
       : [
           `Related work is already waiting for your approval: ${waitingWork(first)}.`,
         ]),
-    `Want to rehearse it? I'll play ${prep.counterpartName.trim()}.`,
+    ...(rehearsalOffer(prep) === null
+      ? []
+      : [`Want to rehearse it? I'll play ${prep.counterpartName.trim()}.`]),
   ].join("\n\n");
+}
+
+/**
+ * The rehearsal offered as the page that holds it (the rehearsal lobby for
+ * that company or investor), so "yes" opens it through the offer-reply
+ * path (N1) like any other offered page, and the Open button works on its
+ * own. Null when the counterpart is not a record they can open: then no
+ * rehearsal is offered at all, since one could not be started.
+ */
+export function rehearsalOffer(prep: CallPrep): QResultBlock | null {
+  const counterpart = prep.counterpart ?? null;
+  if (counterpart === null) return null;
+  const name = prep.counterpartName.trim();
+  const fit = (prefix: string) =>
+    `${prefix}${name}`.length <= Q_NAVIGATION_OFFER_LABEL_MAX
+      ? `${prefix}${name}`
+      : `${prefix}${name.slice(0, Q_NAVIGATION_OFFER_LABEL_MAX - prefix.length - 1)}…`;
+  return {
+    kind: "NAVIGATION_OFFER",
+    intent: {
+      kind: "OPEN_RECORD_PAGE",
+      page:
+        counterpart.kind === "COMPANY"
+          ? "COMPANY_REHEARSAL"
+          : "INVESTOR_REHEARSAL",
+      id: counterpart.id,
+    },
+    place: fit("a rehearsal with "),
+    openLabel: fit("Rehearse with "),
+  };
 }

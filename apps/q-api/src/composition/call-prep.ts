@@ -159,6 +159,8 @@ export function createCallPrepPort(
           counterpartName: name,
           ...prep,
           waiting: related.about === "SAME_PEOPLE" ? related.waiting : [],
+          // Only a record they could open: the rehearsal lobby for it.
+          counterpart: them === null || id === null ? null : { kind, id },
         };
       } catch (error: unknown) {
         if (request.signal?.aborted === true) throw error;

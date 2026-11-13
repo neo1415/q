@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { callPrepLine, type CallPrep } from "../src/call-prep.js";
+import {
+  callPrepLine,
+  rehearsalOffer,
+  type CallPrep,
+} from "../src/call-prep.js";
 
 /**
  * Owner QA O-I12 (2026-10-24): an investor's prep for Spheros read as the
@@ -27,6 +31,10 @@ const base = {
   ],
   ask: "Propose a data request and a partner meeting",
   waiting: [],
+  counterpart: {
+    kind: "COMPANY",
+    id: "7b62eab6-39b9-4cb6-884a-878301f6928f",
+  },
 } as const;
 
 describe("a call prep, by whose side it is from", () => {
@@ -63,5 +71,43 @@ describe("a call prep, by whose side it is from", () => {
     expect(text).toContain("**Weak spots**");
     expect(text).not.toContain("What they'll want from you");
     expect(text).not.toContain("Listen for:");
+  });
+});
+
+// Live 2026-11-13: "Want to rehearse it? I'll play Clinicrest." then, on
+// "yes", "A rehearsal with Clinicrest isn't available as an action here".
+describe("the rehearsal is offered only as a page that can be opened", () => {
+  it("offers the company's rehearsal lobby", () => {
+    expect(rehearsalOffer({ ...base, viewerRole: "INVESTOR" })).toEqual({
+      kind: "NAVIGATION_OFFER",
+      intent: {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_REHEARSAL",
+        id: "7b62eab6-39b9-4cb6-884a-878301f6928f",
+      },
+      place: "a rehearsal with Spheros",
+      openLabel: "Rehearse with Spheros",
+    });
+  });
+
+  it("offers nothing, in words or as a button, when the counterpart is not a record they can open", () => {
+    const prep: CallPrep = {
+      ...base,
+      viewerRole: "INVESTOR",
+      counterpart: null,
+    };
+    expect(rehearsalOffer(prep)).toBeNull();
+    expect(callPrepLine(prep)).not.toMatch(/rehearse/iu);
+  });
+
+  it("keeps a long name's labels within the offer's limit", () => {
+    const offer = rehearsalOffer({
+      ...base,
+      viewerRole: "FOUNDER",
+      counterpartName: "The Extremely Long Name Venture Partners Fund II",
+    });
+    if (offer?.kind !== "NAVIGATION_OFFER") throw new Error("no offer");
+    expect(offer.openLabel.length).toBeLessThanOrEqual(48);
+    expect(offer.place.length).toBeLessThanOrEqual(48);
   });
 });

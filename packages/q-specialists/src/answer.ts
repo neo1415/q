@@ -13,7 +13,11 @@ import {
   PLAIN_QUESTION_FOCUS,
   toolFocusOf,
 } from "./tool-focus.js";
-import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
+import {
+  callPrepLine,
+  rehearsalOffer,
+  type QCallPrepPort,
+} from "./call-prep.js";
 import {
   offeredPlanAccepted,
   offeredPlanChoice,
@@ -7121,7 +7125,13 @@ export function createSpecialistQAnswer(
       );
       if (prep !== null) {
         speculative.current?.cancel("ACTED");
-        return recordAnswer(request, conversationId, callPrepLine(prep));
+        const offer = rehearsalOffer(prep);
+        return recordAnswer(
+          request,
+          conversationId,
+          callPrepLine(prep),
+          offer === null ? undefined : [offer],
+        );
       }
     }
     // Owner live 2026-10-17 (conversation 971c5a53): the reader found the
