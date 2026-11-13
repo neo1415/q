@@ -637,3 +637,16 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - D5: refresh after a send.
   - D8: touch targets.
   - Gating now. The migration is applied after the gate's database step passes and before the deploy.
+
+## Journey fixes deployed — `7e3e22153` (14 Nov, 00:10 Lagos)
+
+- **Disk incident (22:38 UTC):**
+  - The sandbox disk reached 0 MB free, which broke the first gate run on `7e3e22153`.
+  - Freed by removing 15 merged, clean agent worktrees (their branches are kept) and stale `/tmp/ci-local/*/tree` checkouts (receipts kept): 0 → 14 GB free.
+  - The broken gate was stopped and re-run clean.
+- **Gate:** `ci-local PASS sha=7e3e22153 at=2026-11-13T23:07:03Z took=1323s`, database (pgTAP) included.
+- **Migration:**
+  - `20261231510000_interest_accepted_notices` applied to hosted with `hosted-migrate-https.mjs --apply`. Hosted now has 294 migrations, none missing.
+  - Before applying, the production constraint's 27 kinds were compared with the new list: identical, plus INTEREST_ACCEPTED. After applying it holds 28.
+  - Applied before the deploy.
+- **Deploy:** rollback point `3293f344e`.
