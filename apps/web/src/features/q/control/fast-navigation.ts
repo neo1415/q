@@ -37,6 +37,7 @@ import {
 } from "../client-actions";
 import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
+import { pinHoldsMoves } from "@/features/workspace/workspace-pin";
 import { resolveContext, type ContextTarget, type Scored } from "./context-set";
 import { instantAct } from "./instant-acts";
 import { noteOpened, subjectOfPage } from "./instant-ledger";
@@ -326,6 +327,9 @@ export async function navigationHeard(
     applyCardsIntent(cardsIntentOf(cards));
     return null;
   }
+  // Pinned workspace: the fast path changes no page, tab or record here;
+  // Q's answer decides, and offers the place ("Unpin and open ...").
+  if (pinHoldsMoves()) return null;
   const started = performance.now();
   // Owner 2026-10-17/20 ("open the data room", "now the pitch deck" took
   // 1.6-2 s, after a turn reading): a tab of the page on screen, named

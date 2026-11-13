@@ -141,6 +141,7 @@ import {
   priorListings,
   type QPageMovePort,
   canOpenFor,
+  pinnedOf,
   type QTurnReading,
 } from "@capital-q/model-gateway/q";
 import {
@@ -4067,6 +4068,10 @@ export function createSpecialistQAnswer(
   ): Promise<QNavigateDestination | null> {
     if (!inWorkspace(request) || read === null) return null;
     if (!readsAsGo(read.navigation)) return null;
+    // Pinned workspace: code never moves the page at once; the page-move
+    // decision places the destination and offers "unpin and open" (its
+    // PINNED hold), so the explicit request is offered, never dropped.
+    if (pinnedOf(request)) return null;
     const tool = readerToolOf(read, words, true);
     if (tool?.kind !== "NAVIGATE" || tool.destination === null) return null;
     const destination = tool.destination;

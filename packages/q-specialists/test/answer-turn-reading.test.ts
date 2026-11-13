@@ -2257,6 +2257,33 @@ describe("C10 v84: contextual workspace navigation is the reader's CONTEXT, plac
     },
   );
 
+  it("pinned workspace: a GO never moves the page; it is offered as unpin-and-open", async () => {
+    const { port } = deciding({ route: "/work", tab: "team" }, "MOVE");
+    const run = seam({
+      said: "Take me to Discover",
+      reading: goTo("DISCOVER"),
+      outcomes: [],
+      pageMoves: port,
+    });
+    await run.answer.answer({
+      ...request({
+        ...WORKSPACE,
+        workspace: { ...WORKSPACE.workspace, pinned: true },
+      }),
+      askerSide: "INVESTOR",
+    });
+    // Neither code's fast GO nor the decision moved the pane.
+    expect(blocksOf(run)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+    expect(blocksOf(run)).toContainEqual(
+      expect.objectContaining({ kind: "NAVIGATION_OFFER", unpin: true }),
+    );
+    for (const message of run.stored) {
+      expect(message.content).not.toMatch(/I've opened/u);
+    }
+  });
+
   it.each([
     ["What is a SAFE?", "NONE"],
     ["Thanks, that's really useful", "NONE"],

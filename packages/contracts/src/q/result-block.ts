@@ -776,6 +776,14 @@ export const QNavigationOfferBlockSchema = z
     place: z.string().trim().min(1).max(Q_NAVIGATION_OFFER_LABEL_MAX),
     /** The Open button's words ("Open pipeline"). */
     openLabel: z.string().trim().min(1).max(Q_NAVIGATION_OFFER_LABEL_MAX),
+    /**
+     * Pinned workspace (owner addendum, 13 Nov 2026): an explicit request
+     * to go somewhere while the person has pinned the workspace. The
+     * browser's one tap unpins, then opens the place ("Unpin and open
+     * Relationships"). Absent: an ordinary offer (opening it leaves a pin
+     * as it is, like any move of the person's own).
+     */
+    unpin: z.literal(true).optional(),
   })
   .strict();
 export type QNavigationOfferBlock = z.infer<typeof QNavigationOfferBlockSchema>;

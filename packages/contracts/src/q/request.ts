@@ -112,6 +112,20 @@ export const QWorkspaceScreenSchema = z
     dirty: z.boolean().optional(),
     /** The person is typing or scrolling in the page pane. */
     busy: z.boolean().optional(),
+    /**
+     * Pinned workspace (owner addendum, 13 Nov 2026). Shared-contract
+     * assessment: the pin is client state of this tab (sessionStorage,
+     * like the pane layout's own store; no DB), so it travels here, in the
+     * one workspace screen W4's move policy already reads -- a minor,
+     * optional addition (absent = not pinned; the web sends it only when
+     * true, so an older q-api never sees it unless a person pins). The
+     * navigation decision applies it as one more guard (PINNED, in
+     * gateByReading): a move becomes an offer, an explicit GO becomes an
+     * "unpin and open" offer. No independent navigation system, no new
+     * intent kind, no persistence. A hint like `dirty`: it only ever holds
+     * a move back, never grants one.
+     */
+    pinned: z.boolean().optional(),
   })
   .strict();
 export type QWorkspaceScreen = z.infer<typeof QWorkspaceScreenSchema>;

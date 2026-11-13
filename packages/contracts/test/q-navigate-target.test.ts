@@ -324,6 +324,25 @@ describe("Q Workspace screen context and set_layout (W1/W4 via W3)", () => {
     ).toBe(true);
   });
 
+  it("pinned is an optional addition: absent means not pinned", () => {
+    const pinned = {
+      route,
+      workspace: { pagePane: "open", qPane: "open", pinned: true },
+    };
+    expect(QScreenContextSchema.parse(pinned)).toEqual(pinned);
+    const unpinned = QScreenContextSchema.parse({
+      route,
+      workspace: { pagePane: "open", qPane: "open" },
+    });
+    expect(unpinned.workspace?.pinned).toBeUndefined();
+    expect(
+      QScreenContextSchema.safeParse({
+        route,
+        workspace: { pagePane: "open", qPane: "open", pinned: "yes" },
+      }).success,
+    ).toBe(false);
+  });
+
   it.each([
     [{ pagePane: "open" }],
     [{ pagePane: "open", qPane: "hidden" }],

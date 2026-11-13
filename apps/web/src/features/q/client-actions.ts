@@ -30,6 +30,7 @@ import { performUiAct, requestMove } from "./ui-act-controller";
 import { announceLanguage } from "@/features/i18n/language";
 import { openDocumentViewer } from "@/features/documents/document-ready";
 import { performLayoutSet } from "@/features/workspace/layout-action";
+import { pinHoldsMoves } from "@/features/workspace/workspace-pin";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -467,6 +468,10 @@ export function movedEarlyRecently(path: string, withinMs: number): boolean {
  * fast move that FAILED is tried again by the answer.
  */
 export function answerMove(path: string): boolean {
+  // Pinned workspace: Q's own move never changes the visible page. The
+  // server offers it instead (its PINNED hold); this holds a move from an
+  // older server, or one an action implies, in this browser too.
+  if (pinHoldsMoves()) return false;
   const early = movedEarlyTo(path);
   const last = lastNavigationTo(path);
   if (early && last !== null && last.phase === "VERIFIED") {

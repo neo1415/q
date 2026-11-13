@@ -1,4 +1,5 @@
 import {
+  intentToNavigateTarget,
   navigateTargetToIntent,
   Q_NAVIGATION_OFFER_LABEL_MAX,
   audienceOf,
@@ -21,6 +22,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   NavigationDecisionResultV3Schema,
   readsAsContext,
+  readsAsGo,
   readsAsNoNavigation,
   renderPrompt,
   type NavigationDecisionResult,
@@ -63,6 +65,11 @@ export type QNavigationPane = {
   readonly dirty: boolean;
   /** ACTIVE: recent input of a kind the screen did not say (W1). */
   readonly busy: "TYPING" | "SCROLLING" | "ACTIVE" | null;
+  /**
+   * The person pinned the workspace (owner addendum, 13 Nov 2026): no
+   * move changes the page; a move is offered (gateByReading's PINNED).
+   */
+  readonly pinned?: boolean | undefined;
 };
 
 /** The records a person may open, by name (W2.3 resolves these). */
@@ -123,6 +130,11 @@ export type QNavigationOutcome = {
   readonly remembered: QNavigateTarget | null;
   /** Why code changed the model's proposal, if it did. */
   readonly guard: QNavigationGuard | null;
+  /**
+   * OFFER while the workspace is pinned and they asked to go (GO): the
+   * offer's one tap unpins, then opens it. Absent: an ordinary offer.
+   */
+  readonly unpin?: boolean | undefined;
 };
 
 export type QNavigationGuard =
@@ -150,7 +162,9 @@ export type QNavigationGuard =
   /** C10 v84: CONTEXT back to the page Q just moved away from: no ping-pong. */
   | "BACK_AND_FORTH"
   /** C10 v84: GO to a destination code itself moves to at once. */
-  | "ANSWER_MOVES";
+  | "ANSWER_MOVES"
+  /** The person pinned the workspace: the move is offered, never made. */
+  | "PINNED";
 
 // --- 0. The site map (W2) ---------------------------------------------
 
@@ -368,6 +382,7 @@ export function navigationPaneFromWorkspace(
     pane: screen.pagePane === "open" ? "OPEN" : "COLLAPSED",
     dirty: screen.dirty === true,
     busy: screen.busy === true ? "ACTIVE" : null,
+    ...(screen.pinned === true ? { pinned: true } : {}),
   };
 }
 
@@ -1250,6 +1265,53 @@ export function gateByReading(
     readonly codeMoves?: boolean | undefined;
   } = {},
 ): QNavigationOutcome {
+  const gated = gateByReadingAlone(outcome, navigation, context);
+  return context.pane?.pinned === true ? holdForPin(gated, navigation) : gated;
+}
+
+/**
+ * Pinned workspace (owner addendum, 13 Nov 2026), the last hold: the
+ * reading's own holds (NONE, OFFER_ONLY, SAME_SUBJECT, BACK_AND_FORTH,
+ * ANSWER_MOVES) and the policy's guards (no access, unsaved work, busy,
+ * collapsed, ambiguity) have already applied, so it only ever turns a
+ * move that would have happened into an offer of the same place:
+ *
+ *   MOVE              an OFFER, guard PINNED (the page never changes)
+ *   MOVE, read GO     an OFFER whose one tap unpins and opens (`unpin`):
+ *                     an exact request is never silently dropped
+ *   OFFER, read GO    the same offer, with `unpin`
+ *   STAY              unchanged (nothing offered that was not proposed;
+ *                     a collapsed pane's remembered move stays remembered)
+ *
+ * A place they may not open never reaches here as a target (the policy's
+ * NO_ACCESS is a STAY), so pinning never produces such an offer.
+ */
+function holdForPin(
+  outcome: QNavigationOutcome,
+  navigation: TurnNavigationIntentV84 | null,
+): QNavigationOutcome {
+  if (outcome.decision === "STAY" || outcome.target === null) return outcome;
+  const go = readsAsGo(navigation);
+  if (outcome.decision === "OFFER")
+    return go ? { ...outcome, unpin: true } : outcome;
+  return {
+    decision: "OFFER",
+    target: outcome.target,
+    openPane: false,
+    remembered: null,
+    guard: "PINNED",
+    ...(go ? { unpin: true } : {}),
+  };
+}
+
+function gateByReadingAlone(
+  outcome: QNavigationOutcome,
+  navigation: TurnNavigationIntentV84 | null,
+  context: {
+    readonly pane?: QNavigationPane | undefined;
+    readonly codeMoves?: boolean | undefined;
+  },
+): QNavigationOutcome {
   if (navigation === null) return outcome;
   if (readsAsNoNavigation(navigation)) {
     return outcome.decision === "STAY" && outcome.remembered === null
@@ -1331,10 +1393,18 @@ export function readingPlacesContext(input: {
 }): QNavigationOutcome | null {
   const { navigation, proposed } = input;
   const destination = navigation?.destination ?? null;
-  if (!readsAsContext(navigation) || destination === null) return null;
+  if (destination === null) return null;
+  // Pinned workspace: a GO to one of their own screens is code's fast GO
+  // when unpinned (answer.ts fastGoOf moves at once); pinned, code does not
+  // move, so the destination is placed here and gateByReading's PINNED
+  // hold makes it an "unpin and open" offer -- an exact request is never
+  // silently dropped, whatever the decision voted. Placed through the same
+  // policy, so a place they may not open is never offered.
+  const pinnedGo = input.pane.pinned === true && readsAsGo(navigation);
+  if (!pinnedGo && !readsAsContext(navigation)) return null;
   if (
     proposed.decision !== "STAY" ||
-    proposed.guard !== null ||
+    (proposed.guard !== null && !pinnedGo) ||
     proposed.remembered !== null
   ) {
     return null;
@@ -1851,6 +1921,100 @@ function movesAlready(blocks: readonly QResultBlock[]): boolean {
   );
 }
 
+// --- Pinned workspace (owner addendum, 13 Nov 2026) ----------------------
+
+/** Whether this turn's workspace is pinned (screen.workspace.pinned). */
+export function pinnedOf(request: QAnswerRequest): boolean {
+  return request.plan.screen?.workspace?.pinned === true;
+}
+
+/** What Q says when a pinned workspace kept the page where it is. */
+export function pinnedLine(title: string): string {
+  return `Your workspace is pinned, so the page stays as it is. ${title} is ready when you want it.`;
+}
+
+/**
+ * Pinned: an answer's blocks with every block that would move the page
+ * pane (movesPaneItself: a page, a record's page, Settings, a tab or
+ * history act) held back. A page, record page or Settings move becomes an
+ * offer of the same place -- `unpin` when the request was explicit (code's
+ * exact command, a GO reading), so one tap unpins and opens it; never an
+ * offer of a page they may not open. A tab or history act has no offer
+ * shape and is held. A document opened in its viewer, layout changes,
+ * conversation, analysis and every other block pass unchanged.
+ */
+export function pinnedBlocks(
+  blocks: readonly QResultBlock[],
+  options: {
+    readonly explicit: boolean;
+    readonly canOpen: (page: string) => boolean;
+    readonly title: (target: QNavigateTarget) => string;
+    /** Offers this run already made elsewhere (its published move). */
+    readonly alreadyOffered?: readonly QResultBlock[] | undefined;
+    readonly logger?: Logger | undefined;
+    readonly runId?: string | undefined;
+  },
+): QResultBlock[] {
+  const offered = new Set(
+    [...blocks, ...(options.alreadyOffered ?? [])].flatMap((block) =>
+      block.kind === "NAVIGATION_OFFER" ? [intentPlace(block.intent)] : [],
+    ),
+  );
+  const kept: QResultBlock[] = [];
+  const held: string[] = [];
+  for (const block of blocks) {
+    if (!movesPaneItself(block) || block.kind !== "UI_INTENT") {
+      kept.push(block);
+      continue;
+    }
+    held.push(blockKind(block));
+    const offer = pinnedOffer(block.intent, options);
+    if (offer === null) continue;
+    const place = intentPlace(offer.intent);
+    if (offered.has(place)) continue;
+    offered.add(place);
+    kept.push(offer);
+  }
+  if (held.length > 0)
+    options.logger?.info(
+      { qRunId: options.runId, held, explicit: options.explicit },
+      "q page move: the workspace is pinned; the answer's move is offered",
+    );
+  return kept;
+}
+
+function pinnedOffer(
+  intent: Extract<QResultBlock, { kind: "UI_INTENT" }>["intent"],
+  options: {
+    readonly explicit: boolean;
+    readonly canOpen: (page: string) => boolean;
+    readonly title: (target: QNavigateTarget) => string;
+  },
+): Extract<QResultBlock, { kind: "NAVIGATION_OFFER" }> | null {
+  const unpin = options.explicit ? { unpin: true as const } : {};
+  if (intent.kind === "OPEN_SETTINGS") {
+    return {
+      kind: "NAVIGATION_OFFER",
+      intent,
+      place: "Settings",
+      openLabel: "Open Settings",
+      ...unpin,
+    };
+  }
+  if (intent.kind !== "NAVIGATE" && intent.kind !== "OPEN_RECORD_PAGE")
+    return null;
+  const target = intentToNavigateTarget(intent);
+  if (!options.canOpen(target.page)) return null;
+  const title = options.title(target);
+  return {
+    kind: "NAVIGATION_OFFER",
+    intent,
+    place: title,
+    openLabel: `Open ${title}`,
+    ...unpin,
+  };
+}
+
 export function sideOfRequest(request: QAnswerRequest): QNavigationSide {
   return askerSideOf(request);
 }
@@ -1940,9 +2104,11 @@ export function createQPageMoves(dependencies: {
     readings.get(runId)?.hear(null);
   };
   const lineFor = (outcome: QNavigationOutcome, title: string): string =>
-    outcome.decision === "OFFER"
-      ? `${title} is ready to open.`
-      : `I've opened ${title}.`;
+    outcome.guard === "PINNED" || outcome.unpin === true
+      ? pinnedLine(title)
+      : outcome.decision === "OFFER"
+        ? `${title} is ready to open.`
+        : `I've opened ${title}.`;
   const lateRuns = new Map<
     string,
     {
@@ -1979,6 +2145,7 @@ export function createQPageMoves(dependencies: {
           intent,
           place: title,
           openLabel: `Open ${title}`,
+          ...(outcome.unpin === true ? { unpin: true as const } : {}),
         },
       ];
     }
@@ -2028,11 +2195,13 @@ export function createQPageMoves(dependencies: {
         heardNow.set(request.runId, navigation);
       });
       readings.set(request.runId, { hear, heard });
-      const decided = (async () => {
-        const [listed, situation] = await Promise.all([
-          dependencies.records?.(request).catch(() => null),
-          dependencies.situation?.(request).catch(() => null),
-        ]);
+      // Read once, for both the reading's early placement and the decision.
+      const read = Promise.all([
+        dependencies.records?.(request).catch(() => null),
+        dependencies.situation?.(request).catch(() => null),
+      ]);
+      const deciding = (async () => {
+        const [listed, situation] = await read;
         const records = listed ?? NO_RECORDS;
         const input: QNavigationInput = {
           utterance: turn.utterance,
@@ -2156,6 +2325,82 @@ export function createQPageMoves(dependencies: {
         );
         return null;
       });
+      // Contextual moves "very fast" (owner, 13 Nov 2026; v85 live 7/7 but
+      // CONTEXT took 4-7 s): a CONTEXT reading that names one of their own
+      // screens is placed the moment the reading lands, through the same
+      // policy and holds (access, already there, unsaved work, busy,
+      // collapsed, same subject, back and forth, pinned) -- all screen
+      // state, none of them the decider's verdict. Whichever lands first
+      // places the page; the other never moves it a second time.
+      const early = (async (): Promise<QNavigationOutcome | null> => {
+        const reading = await heard;
+        const navigation = reading?.navigation ?? null;
+        if (!readsAsContext(navigation) || navigation?.destination == null)
+          return null;
+        const [listed] = await read;
+        const records = listed ?? NO_RECORDS;
+        const paneNow = navigationPaneFromWorkspace(workspace, map);
+        const placed = readingPlacesContext({
+          proposed: STAY(null),
+          navigation,
+          pane: paneNow,
+          canOpen: canOpenFor(request, map),
+          config: dependencies.config,
+          records,
+        });
+        if (placed === null) return null;
+        const outcome = gateByReading(placed, navigation, {
+          pane: {
+            ...paneNow,
+            at: paneNow.at === null ? null : ownPlace(paneNow.at, records),
+          },
+          codeMoves: reading?.codeMoves,
+        });
+        if (outcome.decision === "STAY") return null;
+        dependencies.logger?.info(
+          {
+            qRunId: request.runId,
+            decision: outcome.decision,
+            page: outcome.target?.page ?? null,
+            guard: outcome.guard,
+            navigation: "CONTEXT",
+            placedByReading: "EARLY",
+            ms: Date.now() - began,
+          },
+          "q page move placed by the reading as it landed",
+        );
+        return outcome;
+      })().catch(() => null);
+      const decided = new Promise<QNavigationOutcome | null>((resolve) => {
+        let placed = false;
+        void early.then((outcome) => {
+          if (outcome === null || placed) return;
+          placed = true;
+          resolve(outcome);
+        });
+        void deciding.then(async (outcome) => {
+          // The reading's own placement, if it has already landed, goes
+          // first; never waited for (a reading that never comes must not
+          // hold the decision's own verdict).
+          const notYet = Symbol("not yet");
+          const first = await Promise.race([early, Promise.resolve(notYet)]);
+          if (placed) {
+            if (outcome !== null && outcome.decision !== "STAY")
+              dependencies.logger?.info(
+                {
+                  qRunId: request.runId,
+                  decision: outcome.decision,
+                  page: outcome.target?.page ?? null,
+                },
+                "q page move: the decision landed after the reading placed the page; no second move",
+              );
+            return;
+          }
+          if (first !== null && first !== notYet) return;
+          placed = true;
+          resolve(outcome);
+        });
+      });
       pending.set(request.runId, decided);
       startedAt.set(request.runId, Date.now());
       const publish = turn.publish;
@@ -2214,6 +2459,39 @@ export function createQPageMoves(dependencies: {
       readings.get(request.runId)?.hear(reading.catch(() => null));
     },
     settle: async (request, blocks, options) => {
+      const settled = await settleUnpinned(request, blocks, options);
+      if (settled === undefined || !pinnedOf(request)) return settled;
+      // Pinned workspace: whatever still moves the page here (code's exact
+      // commands, the answer model's own moves) is offered instead. Code's
+      // commands and a GO reading are explicit: their offer unpins.
+      const explicit =
+        options?.keepAnswerMoves === true ||
+        readsAsGo(heardNow.get(request.runId)?.navigation);
+      return pinnedBlocks(settled, {
+        explicit,
+        // The decision's own offer, published as its own message: once.
+        alreadyOffered: published.get(request.runId) ?? [],
+        canOpen: canOpenFor(request, map),
+        title: placeTitle,
+        logger: dependencies.logger,
+        runId: request.runId,
+      });
+    },
+    awaitPublished: async (request) => {
+      hearNothing(request.runId);
+      return awaitPublishedMove(request);
+    },
+    late: async (request) => {
+      hearNothing(request.runId);
+      return lateMove(request);
+    },
+  };
+  async function settleUnpinned(
+    request: QAnswerRequest,
+    blocks: readonly QResultBlock[] | undefined,
+    options?: { readonly keepAnswerMoves?: boolean | undefined },
+  ): Promise<readonly QResultBlock[] | undefined> {
+    {
       // An answer stored with no reading heard is a code lane: unread.
       hearNothing(request.runId);
       const settled = await settleMoves(request, blocks, options);
@@ -2251,16 +2529,8 @@ export function createQPageMoves(dependencies: {
           "q page move: the reading asked for no move; the answer's own move dropped",
         );
       return kept;
-    },
-    awaitPublished: async (request) => {
-      hearNothing(request.runId);
-      return awaitPublishedMove(request);
-    },
-    late: async (request) => {
-      hearNothing(request.runId);
-      return lateMove(request);
-    },
-  };
+    }
+  }
   async function settleMoves(
     request: QAnswerRequest,
     blocks: readonly QResultBlock[] | undefined,
@@ -2441,12 +2711,6 @@ export function createQPageMoves(dependencies: {
       },
       "q page move applied after the answer",
     );
-    return {
-      content:
-        settled.decision === "OFFER"
-          ? `${title} is ready to open.`
-          : `I've opened ${title}.`,
-      blocks: moved,
-    };
+    return { content: lineFor(settled, title), blocks: moved };
   }
 }

@@ -27,6 +27,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import { useT } from "@/features/i18n/language";
 
 import { PagePaneWidthContext } from "./page-pane-width";
+import { WorkspacePinToggle } from "./workspace-pin-toggle";
 import { QPaneWidthContext } from "./q-pane-width";
 
 import {
@@ -401,6 +402,7 @@ export function WorkspacePagePane({
             />
             {t("Back to Q")}
           </button>
+          {phone ? <WorkspacePinToggle place="sheet" /> : null}
         </div>
         <PagePaneWidthContext.Provider value={width}>
           {children}
@@ -420,6 +422,7 @@ export function WorkspacePagePane({
               aria-hidden="true"
             />
           </button>
+          {phone ? null : <WorkspacePinToggle place="foot" />}
         </div>
       </div>
     </>

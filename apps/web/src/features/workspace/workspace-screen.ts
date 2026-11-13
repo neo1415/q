@@ -9,6 +9,7 @@ import {
 
 import { dirtyFormsNow } from "./dirty-forms";
 import { getWorkspaceLayout } from "./layout-store";
+import { workspacePinned } from "./workspace-pin";
 
 /**
  * What Q is told about the Q Workspace on every turn (screen.workspace,
@@ -125,6 +126,9 @@ export function workspaceScreen(
     ...(previous === undefined || previous === at ? {} : { previous }),
     ...(hasDirtyWork() ? { dirty: true } : {}),
     ...(now - lastPageActivity < BUSY_WINDOW_MS ? { busy: true } : {}),
+    // Pinned workspace: sent only when pinned (absent = not pinned), so a
+    // q-api from before the field never sees it unless someone pins.
+    ...(workspacePinned() ? { pinned: true } : {}),
   };
 }
 

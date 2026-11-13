@@ -17,6 +17,7 @@ import {
 import { noteToLine } from "./line-cards";
 import { voiceMovePath } from "./live/move";
 import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
+import { pinHoldsMoves } from "@/features/workspace/workspace-pin";
 import type { VoiceSessionClient } from "./session";
 
 /**
@@ -66,6 +67,11 @@ export function watchSpokenMove(
   });
 }
 
+/** What Q says when a pinned workspace kept a spoken move from happening. */
+export const PINNED_MOVE_LINE =
+  "Your workspace is pinned, so I've left the page as it is. Unpin it and I'll open it.";
+const PINNED_MOVE_NOTE = `Screen note (data, not the person's words): the person pinned their workspace, so the page you named was NOT opened. Tell them briefly, in your own words: "${PINNED_MOVE_LINE}" Never say it is open.`;
+
 /** The board's move, made through the one navigation lifecycle. */
 export function moveForTurn(path: string): void {
   requestMove({ path });
@@ -99,8 +105,14 @@ export function performTurnChain(
   // Every move gets its receipt, even to where they already are (VERIFIED
   // at once): the GPT-Live voice waits for it before it speaks.
   if (path !== null && typeof window !== "undefined") {
-    watch(path);
-    move?.(path);
+    if (pinHoldsMoves()) {
+      // Pinned workspace: the page stays; the line is told, so Q never
+      // says it opened (and can say how to unpin).
+      noteToLine(PINNED_MOVE_NOTE, true, PINNED_MOVE_LINE);
+    } else {
+      watch(path);
+      move?.(path);
+    }
   }
   for (const action of chain) perform(action);
   return { ...turn, clientAction: null, clientActions: [] };

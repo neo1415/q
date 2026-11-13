@@ -377,6 +377,13 @@ describe("QResultBlock", () => {
       openLabel: "Open pipeline",
     };
     expect(QResultBlockSchema.safeParse(offer).success).toBe(true);
+    // Pinned workspace: an unpin-and-open offer; only `true` is accepted.
+    expect(
+      QResultBlockSchema.safeParse({ ...offer, unpin: true }).success,
+    ).toBe(true);
+    expect(
+      QResultBlockSchema.safeParse({ ...offer, unpin: false }).success,
+    ).toBe(false);
     for (const intent of [
       { kind: "OPEN_SETTINGS", section: "notifications" },
       { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },

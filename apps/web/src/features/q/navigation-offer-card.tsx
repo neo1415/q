@@ -11,6 +11,7 @@ import { openOfferedPage } from "./client-actions";
 import { offerAnsweredLater, offerKey } from "./navigation-offers";
 import { useQSessionOptional } from "./q-session";
 import { setPane } from "@/features/workspace/layout-store";
+import { setWorkspacePinned } from "@/features/workspace/workspace-pin";
 import { useWorkspacePlace } from "@/features/workspace/workspace-place";
 
 /**
@@ -101,16 +102,24 @@ export function NavigationOfferCard({
     if (settleKey !== undefined) settle(settleKey, how);
     setSettledHereNow(true);
   };
+  // Pinned workspace: they asked to go while the workspace was pinned.
+  // One tap unpins, then opens the place; an ordinary offer's Open is a
+  // move of their own and leaves a pin as it is.
+  const unpin = block.unpin === true;
+  const openLabel = unpin
+    ? t(`Unpin and open ${t(block.place)}`)
+    : t(block.openLabel);
   return (
     <section
       className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-q-result-card
       data-q-navigation-offer
       aria-label={t("Where this lives")}
+      {...(unpin ? { "data-q-navigation-offer-unpin": "" } : {})}
     >
       <div className="flex flex-col gap-1">
         <span className="cq-label text-(--cq-text-tertiary)">
-          {t("Where this lives")}
+          {unpin ? t("Workspace pinned") : t("Where this lives")}
         </span>
         <p className="cq-body font-medium text-(--cq-text-primary)">
           {t(block.place)}
@@ -122,12 +131,13 @@ export function NavigationOfferCard({
           className={buttonClassName("secondary", "compact")}
           onClick={() => {
             done("OPENED");
+            if (unpin) setWorkspacePinned(false);
             // Folded over the same place: show it rather than move.
             if (place === "COLLAPSED") setPane("pagePane", "open");
             else openOfferedPage(href);
           }}
         >
-          {place === "COLLAPSED" ? t("Show the page") : t(block.openLabel)}
+          {place === "COLLAPSED" ? t("Show the page") : openLabel}
         </button>
         <button
           type="button"

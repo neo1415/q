@@ -6188,6 +6188,27 @@
     inset-block-end: 6px;
     inset-inline-start: 6px;
   }
+  /* Pinned workspace (owner addendum, 13 Nov 2026): beside the pane's
+     collapse toggle; pinned, the pin fills and "Pinned" shows (never
+     colour alone). */
+  .cq-ws-page-foot .cq-ws-toggle.cq-ws-pin {
+    inset-inline-start: 54px;
+  }
+  .cq-ws-toggle.cq-ws-pin {
+    width: auto;
+    min-width: 44px;
+    gap: 6px;
+    padding-inline: 10px;
+  }
+  .cq-ws-toggle.cq-ws-pin[data-pinned] {
+    opacity: 1;
+    color: var(--cq-text-primary);
+    background-color: var(--cq-surface-subtle);
+  }
+  .cq-ws-pin-word {
+    font-size: 13px;
+    font-weight: 500;
+  }
 
   /* Batch 8: Q's prompts in the pane's flow; with nothing below them
      (the empty home), clear of the pane's foot control. */
@@ -6337,6 +6358,9 @@
       border-bottom: 1px solid var(--cq-border-subtle);
       background: var(--cq-canvas);
       padding-inline: 8px;
+    }
+    .cq-ws-sheet-bar .cq-ws-pin {
+      margin-inline-start: auto;
     }
     .cq-ws-back-to-q {
       display: inline-flex;

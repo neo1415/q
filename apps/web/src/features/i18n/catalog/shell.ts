@@ -307,6 +307,12 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "Resize Q": "تغيير حجم Q",
   Opened: "فُتحت",
   "the page": "الصفحة",
+  // Pinned workspace (owner addendum, 13 Nov 2026).
+  "Pin workspace": "تثبيت مساحة العمل",
+  "Workspace pinned": "مساحة العمل مثبّتة",
+  "Workspace pinned. Select to unpin.":
+    "مساحة العمل مثبّتة. اختر لإلغاء التثبيت.",
+  "Unpin and open {place}": "ألغِ التثبيت وافتح {place}",
   "Q Workspace (preview)": "مساحة عمل Q (معاينة)",
   "Q and your pages side by side. Q can open the page you are talking about.":
     "Q وصفحاتك جنباً إلى جنب. يستطيع Q فتح الصفحة التي تتحدث عنها.",
