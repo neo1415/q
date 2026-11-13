@@ -107,6 +107,9 @@ import {
   type FailureOperation,
   type QuestionSequence,
   type TurnToolV14,
+  readsAsGo,
+  readsAsNoNavigation,
+  type TurnNavigationIntent,
   quietlyNoted,
   inTurnLanguage,
   streamedPiece,
@@ -1637,6 +1640,50 @@ function onlyAMove(text: string): boolean {
     /\bopen(?:ed|ing|s)?\b/iu.test(text) ||
     !/\p{Script=Latin}/u.test(text)
   );
+}
+
+/**
+ * C10 (owner directive 13 Nov 2026: semantic intent, not keyword routing).
+ * What a reading says about navigation (TURN_READER v83) and the turn's
+ * parts. Whether a turn asks to be taken somewhere is the reading's
+ * `navigation`; the word rules beside it (asksToGo, onlyAMove,
+ * wordsNamePage, asksToGoExplicitly, questionAfterMove) are kept ONLY as
+ * the fallback for a turn with no navigation reading -- a reading that
+ * failed, an older reader, or one that left the field out -- so Q never
+ * moves on a guess the words alone made where the reader said otherwise.
+ */
+type NavigationReading = {
+  readonly navigation?: TurnNavigationIntent | null | undefined;
+  readonly parts?: readonly unknown[] | undefined;
+};
+
+/** The reading's navigation intent; null when there is none (word fallback). */
+function navigationOf(
+  read: NavigationReading | null | undefined,
+): TurnNavigationIntent | null {
+  return read?.navigation ?? null;
+}
+
+/** They ask to go somewhere: the reading's GO; with none, the words (fallback). */
+function asksToGoRead(
+  read: NavigationReading | null | undefined,
+  text: string,
+): boolean {
+  const navigation = navigationOf(read);
+  return navigation === null ? asksToGo(text) : readsAsGo(navigation);
+}
+
+/**
+ * More is asked beside the move ("open Clinicrest and tell me its stage"):
+ * the reading's parts (two or more asks); with no navigation reading, the
+ * clause split of the words (fallback).
+ */
+function moreThanTheMove(
+  read: NavigationReading | null | undefined,
+  text: string,
+): boolean {
+  if (navigationOf(read) === null) return questionAfterMove(text);
+  return (read?.parts?.length ?? 0) > 1;
 }
 
 /** Their own Q Card, asked about: read and offered by the answer, never a page move (F-34). */
@@ -3967,6 +4014,8 @@ export function createSpecialistQAnswer(
     moreDocuments: readonly TurnToolV14[] = [],
     /** The answer can open one record's page itself (open_page). */
     opensRecords = false,
+    /** C10: the turn's reading (navigation intent and parts), if read. */
+    reading: NavigationReading | null = null,
   ): Promise<QAnswerOutcome | null> {
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
@@ -4041,13 +4090,26 @@ export function createSpecialistQAnswer(
           other.blocks.length === 0 ? undefined : other.blocks,
         );
       }
-      // The reader's move is followed only when their words ask for that
-      // page (live 2026-10-09: statements and negations moved the screen).
       const words = askedIn(history);
+      // C10 (TURN_READER v83): whether they asked to go is the reading's
+      // navigation intent, by meaning, in any language. NONE or negated
+      // ("don't open it, just tell me") moves nothing: answered.
+      const navigation = navigationOf(reading);
+      if (readsAsNoNavigation(navigation)) {
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "q did not move: the reading asks for no move",
+        );
+        return null;
+      }
+      // Fallback, no navigation reading only: the reader's move is
+      // followed only when their words ask for that page (live
+      // 2026-10-09: statements and negations moved the screen).
       if (
-        (!wordsNamePage(words, { kind: "DESTINATION", destination }) &&
+        navigation === null &&
+        ((!wordsNamePage(words, { kind: "DESTINATION", destination }) &&
           /\p{Script=Latin}/u.test(words)) ||
-        NAMES_Q_CARD.test(words)
+          NAMES_Q_CARD.test(words))
       ) {
         logger?.info(
           { qRunId: request.runId, destination },
@@ -4056,7 +4118,8 @@ export function createSpecialistQAnswer(
         return null;
       }
       // F5 (owner live test 7 Nov): the reader names only the person's own
-      // destinations, so "the profile for Tensorgate" could only be read as
+      // destinations (validation of that closed list against the names of
+      // their own counterparts, kept with or without a reading), so "the profile for Tensorgate" could only be read as
       // their own profile. A sentence naming one of their own counterparts
       // asks about that record's page: never moved to one of their own; the
       // answer (and, in the Q Workspace, the page-move decision) takes it.
@@ -4067,8 +4130,9 @@ export function createSpecialistQAnswer(
         );
         return null;
       }
-      // U4/F8: a move with a question after it goes with the answer.
-      if (questionAfterMove(askedIn(history))) {
+      // U4/F8: a move with a question after it goes with the answer
+      // (C10: the reading's parts; the clause split only as the fallback).
+      if (moreThanTheMove(reading, words)) {
         queueMoveWithAnswer(request.runId, {
           blocks: [
             { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
@@ -4081,10 +4145,15 @@ export function createSpecialistQAnswer(
         );
         return null;
       }
-      // N1: a move the reader read from words that do not plainly ask to
-      // go ("where's my pipeline?") is optional: answered in place, with
-      // the page offered, where Q can say what is there.
-      if (!asksToGoExplicitly(words)) {
+      // N1: a page asked about but not asked to be gone to ("show me my
+      // pipeline", "where's my pipeline?") is answered in place, with the
+      // page offered, where Q can say what is there. C10: the reading's
+      // OFFER_ONLY says so; asksToGoExplicitly only as the fallback.
+      const offerOnly =
+        navigation === null
+          ? !asksToGoExplicitly(words)
+          : navigation.mode === "OFFER_ONLY";
+      if (offerOnly) {
         const offered = await offeredInPlace(request, destination);
         if (offered !== null) {
           logger?.info(
@@ -4097,6 +4166,15 @@ export function createSpecialistQAnswer(
             offered.said,
             offered.blocks,
           );
+        }
+        // Read as OFFER_ONLY with nothing to say in place: never moved;
+        // the answer takes the question.
+        if (navigation !== null) {
+          logger?.info(
+            { qRunId: request.runId, destination },
+            "q did not move: the reading asks about the page, not to go",
+          );
+          return null;
         }
       }
       logger?.info(
@@ -5378,6 +5456,8 @@ export function createSpecialistQAnswer(
     reference: TurnReference,
     shown: ReturnType<typeof shownItems>,
     history: readonly QConversationMessage[],
+    /** C10: the turn's reading (navigation intent and parts). */
+    reading: NavigationReading | null = null,
   ): Promise<QAnswerOutcome | null> => {
     const port = dependencies.openRecord;
     if (port === undefined) return null;
@@ -5402,10 +5482,11 @@ export function createSpecialistQAnswer(
         return null;
       }
       // A3: more asked after the move ("… and show the financials"): the
-      // record opens with the answer to the rest, never alone.
+      // record opens with the answer to the rest, never alone (C10: the
+      // reading's parts; the clause split only as the fallback).
       if (
         page !== "EXTERNAL_REHEARSAL" &&
-        questionAfterMove(askedIn(history))
+        moreThanTheMove(reading, askedIn(history))
       ) {
         queueMoveWithAnswer(request.runId, {
           blocks: [{ kind: "UI_INTENT", intent }],
@@ -5526,6 +5607,9 @@ export function createSpecialistQAnswer(
         utterance: latest.content,
         recentTurns: recentTurnPairs(history, latest),
         pageText: null,
+        // C10: the turn's navigation reading follows (heard below), or the
+        // answer is stored unread; either way the decision is told.
+        readingFollows: true,
         // Batch-12 latency: the move is its own message the moment the
         // decision lands, while the answer may still be writing.
         ...(conversationId === undefined
@@ -6207,6 +6291,8 @@ export function createSpecialistQAnswer(
       byName !== null &&
       byName.name !== undefined &&
       byName.blocks.some((block) => block.kind === "UI_INTENT");
+    // Pre-reader lane: no reading exists yet, so the clause split is the
+    // documented fallback here (audit item 1 moves this lane to the reader).
     if (openedByName && questionAfterMove(latest.content)) {
       queueMoveWithAnswer(request.runId, {
         blocks: byName.blocks,
@@ -6235,6 +6321,7 @@ export function createSpecialistQAnswer(
         : pageAnswer(latest.content, history, capabilities);
     // U4/F8: "open the data room and tell me what's missing" opened the
     // page and lost the question. The move goes with the answer instead.
+    // Pre-reader lane, as above: the clause split is the fallback.
     if (paged !== null && questionAfterMove(latest.content)) {
       queueMoveWithAnswer(request.runId, {
         blocks: paged.blocks,
@@ -6448,6 +6535,16 @@ export function createSpecialistQAnswer(
       }
       return earlyRead ?? (await readTurn().catch(() => null));
     })();
+    // C10 (TURN_READER v83): the page-move decision moves or offers a page
+    // only where this reading asks for navigation; it is told the reading's
+    // navigation intent the moment the reading lands (null: not read).
+    dependencies.pageMoves?.heard?.(
+      request,
+      readingFirst.then(
+        (reading) => reading?.navigation ?? null,
+        () => null,
+      ),
+    );
     // Read beside the reading rather than after it: a request to act that
     // names one of their counterparts needs these names once it is read.
     if (!companyAcrossRelationship(request)) void counterpartsOf(request);
@@ -7295,7 +7392,8 @@ export function createSpecialistQAnswer(
     // v65: a reply that continues Q's question opens nothing unless the
     // words ask to go (coordinator replay 2026-10-24).
     const continuesByReading =
-      read?.replyTo?.kind === "Q_QUESTION" && !asksToGo(latest.content);
+      read?.replyTo?.kind === "Q_QUESTION" &&
+      !asksToGoRead(read, latest.content);
     if (
       reference !== null &&
       reference.open !== null &&
@@ -7304,7 +7402,12 @@ export function createSpecialistQAnswer(
       // name above, with more asked after it): never opened twice.
       !movesWithQuestion.has(request.runId) &&
       (reference.open === "REHEARSAL" ||
-        (!asksAboutIt && onlyAMove(latest.content)))
+        // C10: the reading's GO opens it (with the rest answered when
+        // parts asks more); NONE or OFFER_ONLY never does. Words decide
+        // only with no navigation reading (fallback).
+        (navigationOf(read) === null
+          ? !asksAboutIt && onlyAMove(latest.content)
+          : readsAsGo(navigationOf(read))))
     ) {
       const opened = await openReferenced(
         request,
@@ -7312,6 +7415,7 @@ export function createSpecialistQAnswer(
         reference,
         shown,
         history,
+        read,
       );
       if (opened !== null) return opened;
     }
@@ -7523,7 +7627,7 @@ export function createSpecialistQAnswer(
       !(
         read.tool?.kind === "NAVIGATE" &&
         read.replyTo?.kind === "Q_QUESTION" &&
-        !asksToGo(latest.content)
+        !asksToGoRead(read, latest.content)
       ) &&
       (read.kind === "TOOL_REQUEST" ||
         (read.kind === "RESEARCH_REQUEST" &&
@@ -7615,6 +7719,7 @@ export function createSpecialistQAnswer(
             capability.performedBy.kind === "TOOL" &&
             capability.performedBy.providerName === "open_page",
         ),
+        read,
       );
       if (acted !== null) {
         remember(

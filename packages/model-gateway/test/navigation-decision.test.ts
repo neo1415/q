@@ -17,6 +17,7 @@ import {
   createQNavigationDecider,
   createQPageMoves,
   decideNavigation,
+  gateByReading,
   NAVIGATION_VOTES,
   voteNavigation,
   navigateTargetFromPath,
@@ -2378,5 +2379,201 @@ describe("batch-13 replay (owner 8 Nov: 'it's just giving me buttons'): two of t
       decision: "OFFER",
       guard: "INEXACT_NAME",
     });
+  });
+});
+
+/**
+ * C10 (owner directive 13 Nov 2026: semantic intent, not keyword routing).
+ * Live on 5af6c8ad3: a chart question stored "I've opened Overview." and
+ * "What stage is Ledgerline at?" stored "Relationship is ready to open."
+ * The decision proposed on every turn; the turn reader's navigation intent
+ * (TURN_READER v83) now decides whether anything moves or is offered.
+ */
+describe("C10: the decision is gated by the turn reader's navigation intent", () => {
+  const OVERVIEW: QNavigateTarget = { page: "COMPANY", recordId: SILO };
+  const moved = {
+    decision: "MOVE" as const,
+    target: OVERVIEW,
+    openPane: false,
+    remembered: null,
+    guard: null,
+  };
+  const offered = { ...moved, decision: "OFFER" as const };
+  const kept = {
+    decision: "STAY" as const,
+    target: null,
+    openPane: false,
+    remembered: OVERVIEW,
+    guard: "COLLAPSED_PANE" as const,
+  };
+
+  it("NONE or negated moves, offers and remembers nothing; OFFER_ONLY offers; GO and no reading stand", () => {
+    for (const outcome of [moved, offered, kept]) {
+      for (const navigation of [
+        { mode: "NONE" as const, negated: false },
+        { mode: "GO" as const, negated: true },
+      ]) {
+        expect(gateByReading(outcome, navigation)).toEqual({
+          decision: "STAY",
+          target: null,
+          openPane: false,
+          remembered: null,
+          guard: "NOT_ASKED",
+        });
+      }
+      expect(gateByReading(outcome, { mode: "GO", negated: false })).toBe(
+        outcome,
+      );
+      expect(gateByReading(outcome, null)).toBe(outcome);
+    }
+    expect(
+      gateByReading(moved, { mode: "OFFER_ONLY", negated: false }),
+    ).toEqual({ ...offered, guard: "OFFER_ONLY" });
+    expect(gateByReading(offered, { mode: "OFFER_ONLY", negated: false })).toBe(
+      offered,
+    );
+  });
+
+  const request = (runId: string) =>
+    ({
+      runId,
+      tenantId: "t",
+      actorUserId: "u",
+      correlationId: "c",
+      plan: {
+        scopes: [],
+        screen: {
+          route: "HOME",
+          workspace: { qPane: "open", pagePane: "open", at: "/home" },
+        },
+      },
+    }) as unknown as QAnswerRequest;
+  const team = proposal({ place: place({ route: "/work", tab: "team" }) });
+
+  it("the decision waits for the reading: NONE publishes nothing, GO the move, OFFER_ONLY an offer", async () => {
+    vi.useFakeTimers();
+    try {
+      for (const [mode, expected] of [
+        ["NONE", []],
+        ["GO", ["I've opened Q's team."]],
+        ["OFFER_ONLY", ["Q's team is ready to open."]],
+      ] as const) {
+        const published: string[] = [];
+        const moves = createQPageMoves({
+          decider: { decide: () => Promise.resolve(team) },
+          config: { movesAllowed: true },
+        });
+        const r = request(`c10-${mode}`);
+        moves.start(r, {
+          utterance: "How has Ledgerline's MRR moved since June?",
+          recentTurns: [],
+          pageText: null,
+          readingFollows: true,
+          publish: (move) => {
+            published.push(move.content);
+            return Promise.resolve({ messageId: "m" });
+          },
+        });
+        // The decision lands at once; the reading 700 ms later.
+        await vi.advanceTimersByTimeAsync(100);
+        expect(published).toEqual([]);
+        moves.heard?.(
+          r,
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ mode, negated: false }), 700),
+          ),
+        );
+        await vi.advanceTimersByTimeAsync(800);
+        expect(published, mode).toEqual(expected);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a turn answered unread (a code lane) is told at once: the decision stands, with no wait", async () => {
+    vi.useFakeTimers();
+    try {
+      const published: string[] = [];
+      const moves = createQPageMoves({
+        decider: { decide: () => Promise.resolve(team) },
+        config: { movesAllowed: true },
+        settleWithinMs: 1,
+      });
+      const r = request("c10-unread");
+      moves.start(r, {
+        utterance: "open work",
+        recentTurns: [],
+        pageText: null,
+        readingFollows: true,
+        publish: (move) => {
+          published.push(move.content);
+          return Promise.resolve({ messageId: "m" });
+        },
+      });
+      await moves.settle(r, [], { keepAnswerMoves: true });
+      await vi.advanceTimersByTimeAsync(5);
+      expect(published).toEqual(["I've opened Q's team."]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a reading that never lands holds the decision no longer than its deadline (then the decision stands)", async () => {
+    vi.useFakeTimers();
+    try {
+      const published: number[] = [];
+      const moves = createQPageMoves({
+        decider: { decide: () => Promise.resolve(team) },
+        config: { movesAllowed: true },
+      });
+      const r = request("c10-slow");
+      moves.start(r, {
+        utterance: "go to the team page",
+        recentTurns: [],
+        pageText: null,
+        readingFollows: true,
+        publish: () => {
+          published.push(1);
+          return Promise.resolve({ messageId: "m" });
+        },
+      });
+      moves.heard?.(r, new Promise(() => undefined));
+      await vi.advanceTimersByTimeAsync(5_900);
+      expect(published).toEqual([]);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(published).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("NONE also drops the answer model's own place move; code's exact commands stand", async () => {
+    const own = {
+      kind: "UI_INTENT",
+      intent: { kind: "NAVIGATE", destination: "PROFILE" },
+    };
+    for (const keepAnswerMoves of [false, true]) {
+      const moves = createQPageMoves({
+        decider: {
+          decide: () => Promise.resolve(proposal({ decision: "STAY" })),
+        },
+        config: { movesAllowed: true },
+        settleWithinMs: 1,
+      });
+      const r = request(`c10-own-${String(keepAnswerMoves)}`);
+      moves.start(r, {
+        utterance: "What stage is Ledgerline at?",
+        recentTurns: [],
+        pageText: null,
+        readingFollows: true,
+      });
+      moves.heard?.(r, Promise.resolve({ mode: "NONE", negated: false }));
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const settled = await moves.settle(r, [own] as never, {
+        keepAnswerMoves,
+      });
+      expect(settled).toEqual(keepAnswerMoves ? [own] : []);
+    }
   });
 });

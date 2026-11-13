@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV82ResultSchema,
+  TurnReaderV83ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -25,6 +25,7 @@ import {
   type TurnReaderV70Result,
   type TurnReaderV79Result,
   type TurnReaderV82Result,
+  type TurnReaderV83Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -238,6 +239,14 @@ export type QTurnReading = Omit<
    * previous chart. Code resolves, validates and draws; null: none asked.
    */
   readonly chart?: TurnReaderV82Result["chart"] | undefined;
+  /**
+   * v83 (C10, owner directive 13 Nov 2026): whether the turn asks to be
+   * taken somewhere, by meaning -- GO, OFFER_ONLY or NONE, and negated.
+   * Code moves the page only on GO and offers it only on OFFER_ONLY; where
+   * and whether they may open it stay code's. Absent or null: not read,
+   * and code's documented word rules are the fallback.
+   */
+  readonly navigation?: TurnReaderV83Result["navigation"] | undefined;
   /** v78: they ask for the public web, news or press. */
   readonly asksForWeb?: boolean | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -463,6 +472,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "asksForWeb",
   // v82: a malformed chart intent is no chart intent, never a lost reading.
   "chart",
+  // v83: a malformed navigation intent is not read (word fallback), never a lost reading.
+  "navigation",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -613,8 +624,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV82Result>> =>
-          gateway.execute<TurnReaderV82Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV83Result>> =>
+          gateway.execute<TurnReaderV83Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -629,7 +640,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV82ResultSchema,
+              schema: TurnReaderV83ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -672,7 +683,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV82ResultSchema.safeParse(
+        const parsed = TurnReaderV83ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;
@@ -681,10 +692,17 @@ export function createQTurnReader(dependencies: {
         const chart =
           parsed.data.chart?.wanted === true ? parsed.data.chart : null;
         // A comparison is never answered from an earlier turn (lane 4).
+        // v83: "don't open it, just tell me" asks for no move, whatever
+        // mode was written beside it.
+        const navigation =
+          parsed.data.navigation?.negated === true
+            ? { mode: "NONE" as const, negated: true }
+            : parsed.data.navigation;
         return compareOverFromShown({
           ...parsed.data,
           chart,
           asksForChart: chart !== null || parsed.data.asksForChart,
+          navigation,
         });
       } catch (error: unknown) {
         if (!(

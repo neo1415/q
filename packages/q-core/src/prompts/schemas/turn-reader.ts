@@ -1367,3 +1367,57 @@ export const TurnReaderV82ResultSchema = TurnReaderV79ResultSchema.extend({
   chart: TurnChartIntentSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV82Result = z.infer<typeof TurnReaderV82ResultSchema>;
+
+/**
+ * v83 (C10, owner directive 13 Nov 2026: semantic intent, not keyword
+ * routing). Live on 5af6c8ad3: a chart question ("How has Ledgerline's
+ * MRR moved since June? Let me see it visually") moved the page pane to
+ * Ledgerline's Overview, and "What stage is Ledgerline at?" stored
+ * "Relationship is ready to open." -- nobody asked to go anywhere. Whether
+ * the turn asks to be taken somewhere was decided by word rules
+ * (wordsNamePage, asksToGoExplicitly, "open", clause splits) and by the
+ * page-move decision on every turn. v83 has the same single reading say
+ * it, by meaning, in any language:
+ *
+ *   GO          they ask to be taken to a place (a screen, a record's page)
+ *   OFFER_ONLY  they ask what one of their own screens holds, or to see it,
+ *               without asking to go: answered here, the page offered
+ *   NONE        no navigation asked or implied (facts, figures, charts,
+ *               comparisons, analysis, lookups): nothing moves or is offered
+ *
+ * `negated` is true when they say not to go or open anything. Code still
+ * decides where (the reader's destination, or the page-move decision
+ * resolved to a record the person may open) and whether they may open it.
+ * Null (the field not written, or a malformed one): not read -- code keeps
+ * its documented word rules as the fallback.
+ */
+export const TURN_READER_V83_SCHEMA_VERSION = 83;
+export const TURN_NAVIGATION_MODES = ["GO", "OFFER_ONLY", "NONE"] as const;
+export type TurnNavigationMode = (typeof TURN_NAVIGATION_MODES)[number];
+export const TurnNavigationIntentSchema = z
+  .object({
+    mode: z.enum(TURN_NAVIGATION_MODES).default("NONE").catch("NONE"),
+    negated: z.boolean().default(false).catch(false),
+  })
+  .strict();
+export type TurnNavigationIntent = z.infer<typeof TurnNavigationIntentSchema>;
+export const TurnReaderV83ResultSchema = TurnReaderV82ResultSchema.extend({
+  navigation: TurnNavigationIntentSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV83Result = z.infer<typeof TurnReaderV83ResultSchema>;
+
+/** Whether a navigation reading asks to be taken somewhere (GO, not negated). */
+export function readsAsGo(
+  navigation: TurnNavigationIntent | null | undefined,
+): boolean {
+  return navigation?.mode === "GO" && !navigation.negated;
+}
+
+/** Whether a navigation reading asks for no move and no offer. */
+export function readsAsNoNavigation(
+  navigation: TurnNavigationIntent | null | undefined,
+): boolean {
+  return (
+    navigation != null && (navigation.negated || navigation.mode === "NONE")
+  );
+}

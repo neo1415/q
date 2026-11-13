@@ -1692,6 +1692,342 @@ const advice: TurnReaderResult = {
 // the reader read goes the full way, carrying the reading, in any words.
 // U4/F8 (QA 24 Oct 2026): "open the data room and tell me X" opened the
 // page and lost the question. The move goes with the answer.
+/**
+ * C10 (owner directive 13 Nov 2026: semantic intent, not keyword routing).
+ * Whether a turn asks to be taken somewhere is the reader's typed
+ * navigation intent (TURN_READER v83): GO moves, OFFER_ONLY answers here
+ * and offers the page, NONE (or negated) moves and offers nothing. The
+ * reading is the fixture: these phrasings would have been vetoed, offered
+ * or split differently by the word rules, which now apply only when a
+ * reading carries no navigation (the existing tests above keep covering
+ * that fallback, unchanged).
+ */
+describe("C10: navigation is the reader's typed intent (TURN_READER v83)", () => {
+  type Mode = "GO" | "OFFER_ONLY" | "NONE";
+  const navigateReading = (
+    destination: string,
+    mode: Mode,
+    negated = false,
+    extra: Record<string, unknown> = {},
+  ): TurnReaderResult =>
+    ({
+      ...toolReading({
+        kind: "NAVIGATE",
+        destination: destination as "DISCOVER",
+        visibility: null,
+      }),
+      navigation: { mode, negated },
+      ...extra,
+    }) as unknown as TurnReaderResult;
+  const questionReading = (
+    mode: Mode,
+    extra: Record<string, unknown> = {},
+  ): TurnReaderResult =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: true,
+      tool: null,
+      navigation: { mode, negated: false },
+      ...extra,
+    }) as unknown as TurnReaderResult;
+  const moveTo = (destination: string) => ({
+    kind: "UI_INTENT",
+    intent: { kind: "NAVIGATE", destination },
+  });
+  const blocksOf = (run: ReturnType<typeof seam>) =>
+    run.stored.flatMap((message) => message.blocks ?? []);
+  const SUMMARY_NOW =
+    "3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply.";
+  const OFFER = {
+    kind: "NAVIGATION_OFFER",
+    intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+    place: "Relationships",
+    openLabel: "Open pipeline",
+  };
+
+  it.each([
+    // Words that never name the page the way the word rules know it.
+    [
+      "Could you bring up the screen with everyone I'm talking to?",
+      "CRM_PIPELINE",
+      false,
+    ],
+    ["I'd love to be looking at Discover now", "DISCOVER", false],
+    ["Llévame a Descubrir, por favor", "DISCOVER", false],
+    ["emmène-moi à mon profil", "PROFILE", false],
+    ["abeg carry me go discover", "DISCOVER", false],
+    ["uh so yeah my own profile let's head over there", "PROFILE", true],
+    ["خذني إلى ملفي الشخصي", "PROFILE", false],
+  ])("GO: %j moves to %s", async (said, destination, spoken) => {
+    const run = seam({
+      said,
+      spoken,
+      reading: navigateReading(destination, "GO"),
+      outcomes: [],
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(blocksOf(run)).toContainEqual(moveTo(destination));
+    expect(blocksOf(run)).not.toContainEqual(
+      expect.objectContaining({ kind: "NAVIGATION_OFFER" }),
+    );
+  });
+
+  it.each([
+    ["What's sitting in my pipeline right now?", false],
+    ["Where do things stand with my investors?", false],
+    ["¿Qué hay en mi pipeline?", false],
+    ["Give me a quick look at my pipeline", false],
+    ["so um what's in my pipeline", true],
+  ])(
+    "OFFER_ONLY: %j is answered here with the page offered",
+    async (said, spoken) => {
+      const run = seam({
+        said,
+        spoken,
+        reading: navigateReading("CRM_PIPELINE", "OFFER_ONLY"),
+        outcomes: [],
+        destinationSummary: () => Promise.resolve(SUMMARY_NOW),
+      });
+      expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+      expect(run.stored[0]?.content).toContain(SUMMARY_NOW);
+      expect(run.stored[0]?.blocks).toEqual([OFFER]);
+    },
+  );
+
+  it("OFFER_ONLY with nothing to say in place never moves: the answer takes it", async () => {
+    const run = seam({
+      said: "What's in my pipeline?",
+      reading: navigateReading("CRM_PIPELINE", "OFFER_ONLY"),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      destinationSummary: () => Promise.resolve(null),
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(blocksOf(run)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+  });
+
+  it.each([
+    // The live turns on 5af6c8ad3 (investor.savanna-seed, 13 Nov), and more.
+    "How has Ledgerline's monthly recurring revenue moved since June? Let me see it visually.",
+    "Now do the same for Silo Credit.",
+    "What stage is Ledgerline at?",
+    "Compare Ledgerline and Silo Credit on burn",
+    "Is Ledgerline's burn sustainable given its runway?",
+    "Show me how Clinicrest's revenue grew",
+  ])(
+    "NONE: %j is answered with no move and no offer, even beside a NAVIGATE tool",
+    async (said) => {
+      const run = seam({
+        said,
+        // The reader may still name a tool; NONE is what decides.
+        reading: navigateReading("CRM_PIPELINE", "NONE"),
+        outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+        destinationSummary: () => Promise.resolve(SUMMARY_NOW),
+      });
+      await run.answer.answer(request());
+      expect(run.delegated()).toBe(1);
+      expect(blocksOf(run)).not.toContainEqual(
+        expect.objectContaining({ kind: "UI_INTENT" }),
+      );
+      expect(blocksOf(run)).not.toContainEqual(
+        expect.objectContaining({ kind: "NAVIGATION_OFFER" }),
+      );
+      for (const message of run.stored) {
+        expect(message.content).not.toMatch(/ready to open|I've opened/u);
+      }
+    },
+  );
+
+  it.each([
+    "Don't open it, just tell me where Discover's companies come from",
+    "No need to take me anywhere, stay here and tell me about Discover",
+  ])("negated: %j moves nothing, even read with GO beside it", async (said) => {
+    const run = seam({
+      said,
+      reading: navigateReading("DISCOVER", "GO", true),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(blocksOf(run)).not.toContainEqual(
+      expect.objectContaining({ kind: "UI_INTENT" }),
+    );
+  });
+
+  const CLINICREST = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
+  const openClinicrest = {
+    open: () =>
+      Promise.resolve({
+        kind: "OPEN_RECORD_PAGE" as const,
+        page: "COMPANY" as const,
+        id: CLINICREST,
+      }),
+  };
+  const reference = {
+    open: "COMPANY",
+    name: "Clinicrest",
+    shown: null,
+    retryLast: false,
+    sameFor: null,
+  };
+
+  it("a multi-part turn (parts) opens the record and answers the rest; the words alone would have split nothing", async () => {
+    const run = seam({
+      // No comma, "and" or "then" for the clause split to find.
+      said: "Pull up Clinicrest so I can see what stage it's at",
+      reading: questionReading("GO", {
+        kind: "TOOL_REQUEST",
+        reference,
+        parts: [
+          { ask: "Open Clinicrest's page", kind: "LOOKUP" },
+          { ask: "What stage is Clinicrest at?", kind: "LOOKUP" },
+        ],
+      }),
+      outcomes: [],
+      openRecord: openClinicrest,
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.leadBlocks).toEqual([
+      [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: CLINICREST },
+        },
+      ],
+    ]);
+  });
+
+  it("a page asked about as a question, read GO, still opens (asksAboutIt is the fallback only)", async () => {
+    const run = seam({
+      said: "Can I get Clinicrest up on the screen?",
+      reading: questionReading("GO", { reference }),
+      outcomes: [],
+      openRecord: openClinicrest,
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    expect(blocksOf(run)).toContainEqual({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: CLINICREST },
+    });
+  });
+
+  it("a record the reader points at, read NONE, is answered about and never opened", async () => {
+    let opened = 0;
+    const run = seam({
+      said: "Open question: what stage is Clinicrest at?",
+      reading: questionReading("NONE", { kind: "TOOL_REQUEST", reference }),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      openRecord: {
+        open: () => {
+          opened += 1;
+          return openClinicrest.open();
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(opened).toBe(0);
+    expect(run.delegated()).toBe(1);
+  });
+
+  // The Q Workspace: the page-move decision proposes on every turn; the
+  // reading decides whether anything moves or is offered (the live bug).
+  const WORKSPACE = {
+    route: "HOME",
+    workspace: { qPane: "open", pagePane: "open", at: "/home" },
+  };
+  const deciding = (decision: "MOVE" | "OFFER") =>
+    createQPageMoves({
+      decider: {
+        decide: () =>
+          Promise.resolve({
+            decision,
+            place: {
+              route: "/work",
+              record: null,
+              tab: "team",
+              document: null,
+              slide: null,
+              sectionId: null,
+              position: null,
+            },
+            back: false,
+            askedForPage: decision === "MOVE",
+            reason: "",
+          }),
+      },
+      config: { movesAllowed: true },
+    });
+
+  it.each([
+    [
+      "MOVE",
+      "How has Ledgerline's monthly recurring revenue moved since June? Let me see it visually.",
+    ],
+    ["OFFER", "Now do the same for Silo Credit."],
+    ["OFFER", "What stage is Ledgerline at?"],
+  ] as const)(
+    "workspace, NONE: a decision to %s stores no 'I've opened' and no 'ready to open' for %j",
+    async (decision, said) => {
+      const run = seam({
+        said,
+        reading: questionReading("NONE"),
+        outcomes: [],
+        pageMoves: deciding(decision),
+      });
+      await run.answer.answer(request(WORKSPACE));
+      expect(run.delegated()).toBe(1);
+      for (const message of run.stored) {
+        expect(message.content).not.toMatch(/ready to open|I've opened/u);
+      }
+      expect(blocksOf(run)).not.toContainEqual(
+        expect.objectContaining({ kind: "NAVIGATION_OFFER" }),
+      );
+      expect(blocksOf(run)).not.toContainEqual(
+        expect.objectContaining({ kind: "UI_INTENT" }),
+      );
+    },
+  );
+
+  it("workspace: GO lets the decision move; OFFER_ONLY turns its move into an offer", async () => {
+    const go = seam({
+      said: "Could you get me over to the team page?",
+      reading: questionReading("GO", { kind: "TOOL_REQUEST" }),
+      outcomes: [],
+      pageMoves: deciding("MOVE"),
+    });
+    await go.answer.answer(request(WORKSPACE));
+    expect(go.stored.map((message) => message.content)).toContain(
+      "I've opened Q's team.",
+    );
+    expect(blocksOf(go)).toContainEqual(moveTo("WORK_TEAM"));
+
+    const offered = seam({
+      said: "Who's on Q's team at the moment?",
+      reading: questionReading("OFFER_ONLY"),
+      outcomes: [],
+      pageMoves: deciding("MOVE"),
+    });
+    await offered.answer.answer(request(WORKSPACE));
+    expect(offered.stored.map((message) => message.content)).not.toContain(
+      "I've opened Q's team.",
+    );
+    expect(blocksOf(offered)).toContainEqual(
+      expect.objectContaining({
+        kind: "NAVIGATION_OFFER",
+        intent: { kind: "NAVIGATE", destination: "WORK_TEAM" },
+      }),
+    );
+    expect(blocksOf(offered)).not.toContainEqual(moveTo("WORK_TEAM"));
+  });
+});
+
 describe("a move with a question after it", () => {
   it("is answered, carrying the move", async () => {
     const run = seam({

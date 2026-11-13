@@ -12810,6 +12810,7 @@ export function appActionLineOf(data: unknown): string | null {
 // Q Workspace W4 (DECISIONS 71): the page pane's MOVE / OFFER / STAY.
 export {
   applyNavigationPolicy,
+  gateByReading,
   canOpenFor,
   createQNavigationDecider,
   createQPageMoves,
