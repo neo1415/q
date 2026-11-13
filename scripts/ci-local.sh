@@ -52,6 +52,13 @@ else
   main="$(pwd)"
   tree="$out/tree"
   git worktree remove --force "$tree" >/dev/null 2>&1
+  # A run killed by a container restart can leave the directory without
+  # git's record of it (worktree remove then fails). This gate holds the
+  # machine lock, so no live run owns it: clear it.
+  if [ -e "$tree" ]; then
+    rm -rf "$tree"
+    git worktree prune
+  fi
   git worktree add --detach "$tree" "$sha" >/dev/null || exit 1
   trap 'git -C "$main" worktree remove --force "$tree" >/dev/null 2>&1' EXIT
   cd "$tree" || exit 1
