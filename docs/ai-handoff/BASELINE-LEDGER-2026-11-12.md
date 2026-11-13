@@ -316,3 +316,16 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - `412eec74e`: B2, the rules editor starts from the investor's own mandate.
 - **A5 reproduced live:** Ajopot's Raise cell is blank while the cheque-fit row quotes the deck's raise. Cause and fix are in the matrix; an implementation agent is working on the deck-claim source in its own worktree.
 - **A3 measured:** 445 network-visible, marketplace-ready companies; the curated demo set is active.
+
+## Directive batch deployed — `e57f6025f` (13 Nov, 03:00 Lagos)
+
+- **Gate:** `ci-local PASS sha=e57f6025f at=2026-11-13T02:00:39Z took=2370s` (static 706 s, typecheck 157 s, build 101 s, test 1007 s, database 58 s, integration 341 s). The first gate, on `f4ce1a011`, failed on lint, a fake reader's type and missing Arabic strings, all mine; `e57f6025f` fixes them.
+- **Deploy:** `scripts/deploy-promote.sh e57f6025f`; rollback point `3743dc48b`. All four Railway services SUCCESS.
+- **Live checks** (`investor.savanna-seed`, fictional):
+  - a search finds Ledgerline once and ignores a LinkedIn namesake;
+  - a record lookup ("Clinicrest is at the seed stage and is based in Ibadan, Nigeria.") carries no offer;
+  - an advice answer ends with one offer ("Want to rehearse it? I'll play Clinicrest.").
+- **A5, Ajopot's blank Raise, explained:**
+  - The deck's "The ask" (NGN 1,200,000,000) is founder-confirmed on a PUBLIC deck, and `deckMoneyFrom` parses it.
+  - The raise reader still withholds it, because the founder shared the raise with one relationship and revoked it three times on 3 Oct. That makes the raise HIDDEN, and the policy's step 3 ("a raise the founder hid stays hidden") applies.
+  - This is the locked privacy rule, so nothing was changed. Whether a revocation should also hide a deck the founder confirmed for investors is an owner question.
