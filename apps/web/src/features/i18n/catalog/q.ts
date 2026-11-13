@@ -243,4 +243,8 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "This plan has run.": "نُفّذت هذه الخطة.",
   "Running: each step shows here as it lands.":
     "قيد التنفيذ: تظهر كل خطوة هنا عند اكتمالها.",
+  // A8: a company's own picture and pitch in Q's answer.
+  "Captions available": "الترجمة النصية متاحة",
+  "From their Capital Q profile": "من ملفهم التعريفي على Capital Q",
+  pitch: "العرض التقديمي",
 };
