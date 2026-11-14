@@ -23,11 +23,14 @@ import {
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import {
+  coalescedSegments,
   createLiveBroker,
   leadTurns,
   LIVE_INACTIVE_GRACE_MS,
   LIVE_SWEEP_MS,
   liveMoveOf,
+  LIVE_NOT_FINISHED,
+  sayExactly,
 } from "../src/voice/live/broker.js";
 import { liveContextPackage, referentsOf } from "../src/voice/live/context.js";
 import { heardRequest, spokenWords } from "../src/voice/live/heard.js";
@@ -404,42 +407,50 @@ describe("GPT-Live prompt", () => {
     expect(prompt).toContain(
       '"How far" followed by what it is about ("how far with the task I gave you", "how far with that plan") is not a greeting',
     );
-    const delegateWhen = prompt.slice(
-      prompt.indexOf("Delegate to the backend when:"),
-      prompt.indexOf("Do not delegate to the backend when:"),
-    );
-    expect(delegateWhen).toContain(
-      "they ask about a task, plan or piece of work they gave you or Q",
-    );
-    expect(delegateWhen).toContain("Never say they have not given you a task");
-    const notWhen = prompt.slice(
-      prompt.indexOf("Do not delegate to the backend when:"),
-    );
-    expect(notWhen).toContain("(not a plan or task on Capital Q)");
-    expect(notWhen).toContain(
-      "A question about a task or plan from before this call is not a nudge: delegate it.",
+    // Owner 14 Nov 2026: every turn but small talk is Q's, work included.
+    expect(prompt).toContain(
+      "anything about their records, their work or the platform",
     );
   });
 
-  it("has the three policies and no scripted filler", () => {
+  it("makes the voice an I/O channel for Q: every turn but small talk delegated, Q's words said exactly (owner 14 Nov)", () => {
     const prompt = livePrompt({ role: "investor" });
     for (const heading of [
       "Backchannel policy:",
       "Interruption policy:",
       "Delegation policy:",
-      "Backend tools:",
-      "Delegate to the backend when:",
-      "Do not delegate to the backend when:",
     ]) {
       expect(prompt).toContain(heading);
     }
+    expect(prompt).toContain(
+      "Delegate every turn of theirs, passing their exact words in the first person",
+    );
+    expect(prompt).toContain('"go ahead"');
+    expect(prompt).toContain('"I\'m waiting"');
+    expect(prompt).toContain("say exactly those words and nothing else");
+    // The voice's discretion and its licences to ad-lib are gone (D2-D7).
+    expect(prompt).not.toContain("Do not delegate to the backend when:");
+    expect(prompt).not.toContain("answer it yourself");
+    expect(prompt).not.toContain("keep the conversation going");
+    expect(prompt).not.toContain("otherwise say it is coming up");
+    expect(prompt).not.toContain("Never leave them in silence");
+    expect(prompt).not.toContain("tell them it is coming");
+    expect(prompt).not.toContain("Never read lists or templates word for word");
     expect(prompt).toContain("always speak natural, standard English");
     expect(prompt).toContain("Never switch into Pidgin");
     expect(prompt).not.toContain("Call opening:");
     expect(prompt).toContain("laugh naturally and lightly");
-    expect(prompt).toContain("Never leave them in silence");
     expect(prompt).toContain("no invented idioms");
-    expect(prompt).toContain("still waiting");
+  });
+
+  it("leaves the onboarding interview's conversation to the voice (owner 27 Oct; who leads is pending)", () => {
+    const prompt = livePrompt({ role: "investor", interview: "CHECKLIST" });
+    expect(prompt).toContain("Do not delegate their answers");
+    expect(prompt).toContain("Never leave them in silence");
+    expect(prompt).toContain("Do not delegate to the backend when:");
+    // No page claims of the voice's own, and no ad-libbed filler.
+    expect(prompt).not.toContain("otherwise say it is coming up");
+    expect(prompt).not.toContain("keep the conversation going");
   });
 
   it("opens with a warm hello and the delegated briefing when asked", () => {
@@ -524,11 +535,10 @@ describe("GPT-Live line", () => {
     // Owner live 7 Nov (R6): a delegation written about them ("on the
     // person's screen") reached Q as their words and was echoed back.
     expect(created[0]?.instructions).toContain(
-      "hand the backend their request in their own words, as they said it, in the first person",
+      "passing their exact words in the first person",
     );
-    expect(created[0]?.instructions).toContain(
-      "opening pages, cards and records on their screen",
-    );
+    // Owner 14 Nov 2026: code routes the line's turns, the duplex rule.
+    expect(opened.result.routing).toBe("ALL_BUT_SMALL_TALK");
   });
 
   it("carries a person's confidential onboarding when the provider's review allows it, with no demo attestation (launch 2026-10-28)", async () => {
@@ -1152,9 +1162,10 @@ describe("GPT-Live line", () => {
     expect(stored).toHaveLength(before);
   });
 
-  it("B1: mirrors the turns the voice answered itself into the conversation, never the delegated ones", async () => {
+  it("never writes the voice's own lines into Q's conversation; stores whole utterances (owner 14 Nov, D3/D10)", async () => {
     let clock = 5_000_000;
-    const mirrored: { conversationId: string; messages: unknown }[] = [];
+    const mirrored: unknown[] = [];
+    const stored: { role: string; content: string }[] = [];
     const conversation = QConversationIdSchema.parse(
       "7f000000-0000-4000-8000-000000000002",
     );
@@ -1175,15 +1186,18 @@ describe("GPT-Live line", () => {
       logger,
       now: () => clock,
       transcripts: {
-        record: () => Promise.resolve(),
-        mirror: (input) => {
-          expect(input.actor).toEqual(ACTOR);
-          mirrored.push({
-            conversationId: input.conversationId,
-            messages: input.messages,
-          });
-          return Promise.resolve(input.messages.length);
+        record: (input) => {
+          stored.push({ role: input.role, content: input.content });
+          return Promise.resolve();
         },
+        // A store that could mirror is never asked to (the type no longer
+        // takes it; the object still has it, as the duplex store does).
+        ...({
+          mirror: (input: unknown) => {
+            mirrored.push(input);
+            return Promise.resolve(1);
+          },
+        } as object),
       },
     });
     const line = binding();
@@ -1200,8 +1214,16 @@ describe("GPT-Live line", () => {
       voiceSessionId: SESSION,
       report: {
         segments: [
-          { role: "USER", text: "What does Duplo do?", at: clock - 6_000 },
-          { role: "Q", text: "Duplo runs B2B payments.", at: clock - 5_000 },
+          // D10 (9 Nov, run a6278476): one utterance arrived as fragments.
+          { role: "USER", text: "switch", at: clock - 7_000 },
+          { role: "USER", text: "to turn", at: clock - 6_500 },
+          { role: "USER", text: "off.", at: clock - 6_000 },
+          // D3 (14 Nov 21:29): the voice's own unbacked promise.
+          {
+            role: "Q",
+            text: "Still getting you that highest-fit new name.",
+            at: clock - 5_000,
+          },
           {
             role: "USER",
             text: "Compare the second and third",
@@ -1217,26 +1239,30 @@ describe("GPT-Live line", () => {
         ],
       },
     });
-    expect(mirrored).toEqual([
-      {
-        conversationId: conversation,
-        messages: [
-          { role: "USER", content: "What does Duplo do?" },
-          { role: "Q", content: "Duplo runs B2B payments." },
-        ],
-      },
+    // Nothing the voice said is a Q message in Q's conversation.
+    expect(mirrored).toEqual([]);
+    // The line's own record keeps whole utterances, both sides.
+    expect(stored).toEqual([
+      { role: "USER", content: "switch to turn off." },
+      { role: "Q", content: "Still getting you that highest-fit new name." },
+      { role: "USER", content: "Compare the second and third" },
+      { role: "Q", content: "Duplo leads on traction." },
     ]);
-    // Only delegated words: nothing new in the conversation.
-    await broker.transcript({
-      actor: ACTOR,
-      voiceSessionId: SESSION,
-      report: {
-        segments: [
-          { role: "USER", text: "Open it", at: clock, delegated: true },
-        ],
-      },
-    });
-    expect(mirrored).toHaveLength(1);
+  });
+
+  it("joins one side's consecutive transcript pieces into one utterance (D10)", () => {
+    expect(
+      coalescedSegments([
+        { role: "Q", text: "I don't have a task from", at: 1 },
+        { role: "Q", text: "you yet.", at: 2 },
+        { role: "USER", text: "Tensorg", at: 3 },
+        { role: "USER", text: "ate", at: 4 },
+        { role: "Q", text: " ", at: 5 },
+      ]),
+    ).toEqual([
+      { role: "Q", text: "I don't have a task from you yet.", at: 1 },
+      { role: "USER", text: "Tensorg ate", at: 3 },
+    ]);
   });
 
   it("marks an approval as waiting, never done", async () => {
@@ -1246,8 +1272,95 @@ describe("GPT-Live line", () => {
     await open(broker);
     const result = await ask(broker, "dlg_1", "Send an intro to Savanna Seed");
     expect(result?.approvalPending).toBe(true);
-    expect(result?.commentary).toContain("never say it is done");
-    expect(result?.commentary).not.toContain(APPROVAL_QUESTION);
+    // Q's own words, approval question included: code routes their "yes"
+    // back to Q (owner 14 Nov), and nothing is said to be done.
+    expect(result?.commentary).toBe(
+      sayExactly(`I've drafted the intro to Savanna Seed. ${APPROVAL_QUESTION}`),
+    );
+    expect(result?.commentary).not.toMatch(/\b(sent|done)\b/u);
+  });
+
+  it("hands the voice Q's words exactly: no request text, no fact dump, no page claim (owner 14 Nov, D2/D4)", async () => {
+    // D4 (14 Nov 21:23, run bcef0b87): Q said the deck is not available;
+    // the voice said "It's coming up" and added a raise figure.
+    const answer =
+      "Tensorgate's pitch deck isn't available to open. Their profile says they sell fleet software to logistics firms.";
+    const { broker } = setup({ answer });
+    await open(broker);
+    const result = await ask(
+      broker,
+      "dlg_1",
+      "Excluding anyone I've been in touch with, open Tensorgate's deck",
+    );
+    expect(result?.commentary).toBe(sayExactly(answer));
+    const commentary = result?.commentary ?? "";
+    expect(commentary).not.toMatch(
+      /They asked|Excluding|own words|Details for follow-up|coming up|You may offer/u,
+    );
+  });
+
+  it("says a code-built answer's own spoken line exactly, with no item details for the voice to mine", async () => {
+    const facts = spokenFactsOfAttention({
+      items: [
+        {
+          key: "msg-1",
+          source: "UNANSWERED_MESSAGE",
+          title: "Spheros is waiting for your reply",
+          note: 'They wrote: "Thanks"',
+          counterpart: "Spheros",
+          since: "2026-10-09T07:00:00.000Z",
+          decidable: false,
+        },
+      ],
+      activity: null,
+      unread: [],
+      readAt: "2026-10-09T07:00:00.000Z",
+    });
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({ sessionId: "s", sdp: "v=0 a", model: null }),
+      },
+      firewall: firewall(),
+      turn: async (_b, _t, _s, speaker) => {
+        speaker.facts?.(facts);
+        await speaker.speak(facts.fallback);
+        return { kind: "SPOKEN", path: "Q" };
+      },
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+    });
+    await broker.open({ binding: binding(), sdp: "v=0 offer" });
+    const result = await ask(broker, "dlg_1", "What needs me?");
+    expect(result?.commentary).toBe(sayExactly(facts.fallback));
+  });
+
+  it("a run that did not come back is said in code's words, never the voice's", async () => {
+    const { broker, runs, holds } = setup({ hold: true });
+    await open(broker);
+    const first = ask(broker, "dlg_1", "Rank my pipeline");
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    expect(
+      await broker.cancel({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        delegationId: "dlg_1",
+      }),
+    ).toBe(true);
+    const failed = await first;
+    expect(failed?.failed).toBe(true);
+    expect(failed?.commentary).toBe(sayExactly(LIVE_NOT_FINISHED));
+    const retry = ask(broker, "dlg_2", "yes, try again");
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    holds[1]?.resolve();
+    await retry;
+    expect(runs).toEqual(["Rank my pipeline", "yes, try again"]);
   });
 
   it("is someone else's line: the same as no line", async () => {

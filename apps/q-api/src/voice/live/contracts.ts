@@ -73,6 +73,13 @@ export const LiveOpenResultSchema = z
     context: z.string().max(2_000).nullable().optional(),
     /** Present only for a trial: the allowance and what is left of it. */
     trial: QVoiceLiveTrialSchema.optional(),
+    /**
+     * Owner 14 Nov 2026: code, not the voice model, routes the person's
+     * turns to Q. EVERY_TURN: Q leads (the guided welcome). ALL_BUT_SMALL_TALK:
+     * the duplex rule. Absent: the voice holds the call (the onboarding
+     * interview, a rehearsal), unchanged pending the owner's decision.
+     */
+    routing: z.enum(["EVERY_TURN", "ALL_BUT_SMALL_TALK"]).optional(),
   })
   .strict();
 export type LiveOpenResult = z.infer<typeof LiveOpenResultSchema>;
@@ -188,10 +195,9 @@ export const LiveTranscriptReportSchema = z
             at: z.number().int().min(0),
             /**
              * B1: part of a turn the voice handed to Q (its request, or the
-             * reply that read Q's answer). Q's run already wrote those to
-             * the conversation, so only unmarked turns are mirrored there.
-             * Browser input: a wrong mark can only duplicate or omit the
-             * person's own turn in their own conversation.
+             * reply that read Q's answer). Kept with the line's transcript
+             * only: since 14 Nov nothing on this line is mirrored into Q's
+             * conversation (only Q's runs write there).
              */
             delegated: z.boolean().optional(),
           })

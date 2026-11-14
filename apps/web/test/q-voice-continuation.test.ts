@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 import type { QTurn } from "../src/features/q/conversation";
 import {
+  CONTINUATION_LINE,
   continuationLine,
   threadOfTurns,
 } from "../src/features/q/continuation";
 
 /**
  * Owner 2026-11-06: voice opened on a conversation under way carries on
- * from it -- the thread's own words -- never the arrival greeting.
+ * from it, never the arrival greeting. D9 (audit 14 Nov 2026): it never
+ * quotes the person's last transcribed fragment back; what to carry on
+ * with is Q's to say once they answer.
  */
 
 type Block = Extract<QTurn, { kind: "Q" }>["blocks"][number];
@@ -41,61 +44,41 @@ describe("Q's first words on a line opened mid-conversation", () => {
     expect(continuationLine([])).toBeNull();
   });
 
-  it("names what was found when the last answer laid out cards", () => {
+  it("never quotes the last raw fragment back (D9 live shapes)", () => {
+    for (const fragment of [
+      "Hey-ky",
+      "I'm not sure yet. Let's just have",
+      "turning off Q",
+    ]) {
+      const line =
+        continuationLine(
+          threadOfTurns([
+            person("p1", "What changed this week?"),
+            answer("q1", "Two replies came in."),
+            person("p2", fragment),
+          ]),
+        ) ?? "";
+      expect(line).toBe(CONTINUATION_LINE);
+      expect(line).not.toContain(fragment);
+      expect(line).not.toMatch(/[“"]/u);
+    }
+  });
+
+  it("claims no content of its own, even after cards", () => {
     const line = continuationLine(
       threadOfTurns([
-        person("p1", "What changed this week?"),
-        answer("q1", "Two replies came in."),
         person("p2", "Find me more companies online."),
         answer("q2", "Here they are.", [
           { ...demoTop(5), kind: "ANSWER_CARDS" },
         ]),
       ]),
     );
-    expect(line).toBe(
-      "You'd asked “Find me more companies online”, and I found five. Want me to go through them, or something else?",
-    );
+    expect(line).toBe(CONTINUATION_LINE);
+    expect(line).not.toMatch(/found|five|\d/iu);
   });
 
-  it("picks up the subject when the last answer was words", () => {
-    expect(
-      continuationLine(
-        threadOfTurns([
-          person("p1", "What's Brightwell's runway?"),
-          answer("q1", "About 14 months at the current burn."),
-        ]),
-      ),
-    ).toBe(
-      "We were on “What's Brightwell's runway”. Want to pick up from there, or something else?",
-    );
-  });
-
-  it("offers to carry on when Q had not answered yet", () => {
-    expect(
-      continuationLine(
-        threadOfTurns([person("p1", "Draft a note to Spheros")]),
-      ),
-    ).toBe(
-      "You'd asked “Draft a note to Spheros”. Want me to carry on with that, or something else?",
-    );
-  });
-
-  it("says long words back short, at a word", () => {
-    const line =
-      continuationLine(
-        threadOfTurns([
-          person(
-            "p1",
-            "Can you compare every fintech founder raising a seed round in Lagos and Nairobi this quarter against my mandate please",
-          ),
-        ]),
-      ) ?? "";
-    const said = /“(.+)”/u.exec(line)?.[1] ?? "";
-    expect(said.endsWith("…")).toBe(true);
-    expect(said.length).toBeLessThanOrEqual(91);
-    // Cut at a word: the last word before the ellipsis is whole.
-    expect(said).toMatch(/ Nairobi this…$/u);
-    expect(said).not.toContain("mandate");
+  it("ends on a question, so a bare yes goes to Q on the live line", () => {
+    expect(CONTINUATION_LINE.trim().endsWith("?")).toBe(true);
   });
 
   it("never says the arrival's waiting count", () => {

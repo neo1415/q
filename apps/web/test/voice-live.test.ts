@@ -14,8 +14,13 @@ vi.mock("@/auth/session", () => ({
   getSessionAccessToken: () => Promise.resolve("session-bearer"),
 }));
 
-const { createLiveBridge, LIVE_APPEND_MAX_CHARS, UNHEARD_WAIT_MS } =
-  await import("../src/features/voice/live/bridge");
+const {
+  createLiveBridge,
+  HOLDING_CONTENT,
+  HOLDING_LINE,
+  LIVE_APPEND_MAX_CHARS,
+  UNHEARD_WAIT_MS,
+} = await import("../src/features/voice/live/bridge");
 const { contextPackage, pageNote } =
   await import("../src/features/voice/live/live-call");
 const { relayLive, voicePreviewEnabled } =
@@ -293,7 +298,7 @@ describe("the GPT-Live delegation bridge", () => {
     });
   });
 
-  it("says one natural progress line after about five seconds, never repeated", () => {
+  it("says one code-chosen holding line after about five seconds, never repeated, never a question (D6)", () => {
     const h = harness({ progressAfterMs: 5_000 });
     h.heard("Give me three good examples");
     h.delegation("dlg_1");
@@ -305,8 +310,10 @@ describe("the GPT-Live delegation bridge", () => {
       (e) => e.type === "session.commentary.append",
     );
     expect(progress).toHaveLength(1);
-    expect(progress[0]?.content).toContain("Give me three good examples");
-    expect(progress[0]?.content).toContain("do not say this again");
+    expect(progress[0]?.content).toBe(HOLDING_CONTENT);
+    expect(progress[0]?.content).toContain(`"${HOLDING_LINE}"`);
+    expect(progress[0]?.content).not.toMatch(/keep the conversation/iu);
+    expect(HOLDING_LINE).not.toContain("?");
   });
 
   it("sends typed words straight to Q Brain and speaks the answer", async () => {

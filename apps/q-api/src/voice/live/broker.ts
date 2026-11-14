@@ -27,7 +27,7 @@ import type {
 } from "../onboarding-conversation.js";
 import type { ExternalRehearsalLatency } from "../../composition/external-rehearsal-latency.js";
 import type { VoiceSessionBinding } from "../bindings.js";
-import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
+import { forRealtime } from "../duplex/broker.js";
 import type { DuplexSpendLedger } from "../duplex/spend.js";
 import type { DuplexTranscriptStore } from "../duplex/transcript.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
@@ -99,6 +99,35 @@ export function leadTurns(
     turns.pop();
   }
   return turns.slice(-LEAD_TURNS_MAX);
+}
+
+const SEGMENT_MAX_CHARS = 4_000;
+
+/**
+ * D10 (audit 14 Nov): one side's consecutive transcript pieces joined into
+ * one utterance before they are stored ("switch" / "to turn" / "off." was
+ * three rows). The first piece's time is the utterance's.
+ */
+export function coalescedSegments(
+  segments: LiveTranscriptReport["segments"],
+): LiveTranscriptReport["segments"] {
+  const joined: LiveTranscriptReport["segments"][number][] = [];
+  for (const segment of segments) {
+    const text = segment.text.trim();
+    if (text.length === 0) continue;
+    const last = joined[joined.length - 1];
+    if (
+      last !== undefined &&
+      last.role === segment.role &&
+      last.delegated === segment.delegated &&
+      last.text.length + text.length < SEGMENT_MAX_CHARS
+    ) {
+      joined[joined.length - 1] = { ...last, text: `${last.text} ${text}` };
+    } else {
+      joined.push({ ...segment, text });
+    }
+  }
+  return joined;
 }
 
 /**
@@ -377,10 +406,7 @@ export type LiveBrokerDependencies = {
    * q_runtime.voice_line_turns (A's duplex write path): both sides of the
    * line, routed 'live', so what GPT-Live said can be audited.
    */
-  readonly transcripts?:
-    | (Pick<DuplexTranscriptStore, "record"> &
-        Partial<Pick<DuplexTranscriptStore, "mirror">>)
-    | undefined;
+  readonly transcripts?: Pick<DuplexTranscriptStore, "record"> | undefined;
   /**
    * Owner 2026-10-27: an onboarding line is a conversation Q holds itself;
    * this keeps what is said in the onboarding thread and saves it from the
@@ -495,37 +521,52 @@ function collector(
   };
 }
 
-export const LIVE_SPEAK_GUIDE =
-  "Verified by Q's backend. Say it in your own words, as an analyst would: the point first, then what separates the options. Never read it out as a list, never add names or numbers that are not here.";
-
-/** What one run verified, as content for `session.commentary.append`. */
 /**
- * The voice turn's SPOKEN output for the live line (founder 2026-10-09:
- * "Spheros thanked you and said the rest is on your screen"): what the
- * duplex line would say -- the facts' own spoken line and the names it
- * must say -- never the written answer. An attention item's note quotes
- * the counterpart's message ("They wrote: …"); it is never handed to the
- * voice, which paraphrased it. Other kinds keep their item details (fit,
- * strengths, unknowns) for follow-ups; none of those quote anyone.
+ * Owner 14 Nov 2026 ("say exactly this, add nothing"): the voice speaks Q's
+ * words, never a paraphrase. D2/D4/D5/D13 (audit 14 Nov) came from "in
+ * your own words", the request text and a fact dump "for follow-up
+ * questions": the voice framed a ranking as meeting an exclusion Q never
+ * applied, said a deck was "coming up" that Q said was not available,
+ * mined a raise figure Q did not say and dropped Q's scope qualifier.
+ * GPT-Live has no exact-text speech call, so the content says it as an
+ * instruction (the web bridge's `sayExactly`, the Q Pitch narration's
+ * wording). Follow-ups go back to Q, which holds the facts.
  */
-function spokenCommentary(facts: SpokenFacts, context: string): string {
-  const say = `Say this in your own words: ${JSON.stringify(facts.fallback)}.`;
-  const names =
-    facts.mustSay.length === 0
-      ? ""
-      : ` Mention each of: ${JSON.stringify(facts.mustSay)}.`;
-  const next =
-    facts.next === null ? "" : ` You may offer: ${JSON.stringify(facts.next)}.`;
-  if (facts.kind === "ATTENTION") {
-    return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Never quote anyone's message.`;
-  }
-  return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Details for follow-up questions: ${JSON.stringify(askQFactsOutput(facts))}`;
+export const LIVE_SAY_EXACTLY =
+  "Say exactly the following words aloud, as yourself, in their order, and nothing else: no lead-in, no summary, no opinion, no question or offer of your own, nothing before or after them. Words:";
+
+/** The provider takes about 500 tokens per append: whole sentences within it. */
+const SAY_MAX_CHARS = 1_500;
+
+function withinSay(words: string): string {
+  if (words.length <= SAY_MAX_CHARS) return words;
+  const cut = words.slice(0, SAY_MAX_CHARS);
+  const end = Math.max(
+    cut.lastIndexOf(". "),
+    cut.lastIndexOf("? "),
+    cut.lastIndexOf("! "),
+  );
+  return end > SAY_MAX_CHARS / 2 ? cut.slice(0, end + 1) : cut.trimEnd();
 }
 
-/** The start of an answer, handed to the voice while the run goes on. */
-export function partialCommentary(request: string, words: string): string {
+export function sayExactly(words: string): string {
+  return `${LIVE_SAY_EXACTLY} ${withinSay(words.trim())}`;
+}
+
+/** Said when an approval waits and Q's words said nothing else. */
+export const LIVE_APPROVAL_READY =
+  "It's ready for you to approve on your screen.";
+/** Said when Q's run did not come back (code's words, never invented). */
+export const LIVE_NOT_FINISHED =
+  "I couldn't get that done just now. Want me to try it again?";
+
+/**
+ * The start of an answer, handed to the voice while the run goes on: Q's
+ * words exactly, and nothing that closes the answer.
+ */
+export function partialCommentary(words: string): string {
   const { say } = forRealtime(words);
-  return `${LIVE_SPEAK_GUIDE} They asked: ${JSON.stringify(request.slice(0, 300))}. Q's backend has begun answering and the rest follows in a moment: say this much in your own words now, and do not close or ask whether they want more yet: ${JSON.stringify(say)}`;
+  return `The rest of this answer follows in a moment: do not close it or ask anything yet. ${sayExactly(say)}`;
 }
 
 /**
@@ -534,14 +575,14 @@ export function partialCommentary(request: string, words: string): string {
  * and flags when it ended differently from how it began.
  */
 function restOf(
-  running: Pick<Delegation, "request" | "partialSent" | "ended">,
+  running: Pick<Delegation, "partialSent" | "ended">,
   result: Omit<LiveDelegationResult, "stale">,
 ): Omit<LiveDelegationResult, "stale"> {
   const ended = running.ended;
   const sent = running.partialSent ?? "";
   if (ended === null) return result;
   const already =
-    "You have already said the start of this answer; say only what follows, continuing naturally, never repeating it. ";
+    "You have already said the start of this answer; do not repeat it. ";
   if (ended.facts !== null) {
     return {
       ...result,
@@ -553,7 +594,6 @@ function restOf(
     ? ended.said.slice(sent.length).trim()
     : ended.said;
   const commentary = commentaryFor({
-    request: running.request,
     facts: null,
     said: rest,
     approvalPending: result.approvalPending,
@@ -564,26 +604,31 @@ function restOf(
   };
 }
 
-export function commentaryFor(input: {
-  readonly request: string;
+/**
+ * Q's spoken words for one run: what the standard line says aloud.
+ * Code-built facts are said as their own spoken line (`fallback`, which
+ * never quotes anyone's message); otherwise Q's own words, approval
+ * question included (code routes their "yes" back to Q). Null: nothing.
+ */
+export function qSpokenWords(input: {
   readonly facts: SpokenFacts | null;
   readonly said: string;
   readonly approvalPending: boolean;
 }): string | null {
-  const asked = `They asked: ${JSON.stringify(input.request.slice(0, 300))}.`;
-  const approval = input.approvalPending
-    ? " Q prepared an action that waits for their approval on screen: say it is ready for them to approve; never say it is done."
-    : "";
-  if (input.facts !== null) {
-    return spokenCommentary(input.facts, `${asked}${approval}`);
-  }
+  if (input.facts !== null) return input.facts.fallback;
   const { say } = forRealtime(input.said);
-  const words = input.approvalPending
-    ? say.replace(APPROVAL_QUESTION, "").trim()
-    : say;
-  if (words.length === 0)
-    return input.approvalPending ? `${asked}${approval}` : null;
-  return `${LIVE_SPEAK_GUIDE} ${asked}${approval} Q's answer: ${JSON.stringify(words)}`;
+  if (say.length > 0) return say;
+  return input.approvalPending ? LIVE_APPROVAL_READY : null;
+}
+
+/** What one run verified, as content for `session.commentary.append`. */
+export function commentaryFor(input: {
+  readonly facts: SpokenFacts | null;
+  readonly said: string;
+  readonly approvalPending: boolean;
+}): string | null {
+  const words = qSpokenWords(input);
+  return words === null ? null : sayExactly(words);
 }
 
 /** The onboarding conversation a line carries, or null for any other line. */
@@ -994,6 +1039,15 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         failed: true,
       }),
     };
+    // The request and Q's could-not line stay in the line's history, so
+    // their "yes, try again" reaches Q with what it answers.
+    const unfinished = () => {
+      line.history.push(...lead, asked, {
+        role: "agent",
+        content: LIVE_NOT_FINISHED,
+      });
+      line.history.splice(0, Math.max(0, line.history.length - HISTORY_MAX));
+    };
     delegation.result = (async () => {
       try {
         // After the delegation before it on this line, whatever its end.
@@ -1018,10 +1072,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           speaker.speaker,
         );
         if (controller.signal.aborted || outcome.kind === "INTERRUPTED") {
+          if (controller.signal.aborted) unfinished();
           return {
             delegationId: id,
             commentary: controller.signal.aborted
-              ? "That request did not come back from Q's backend. Say plainly it didn't come through and offer to try it again; never invent it."
+              ? sayExactly(LIVE_NOT_FINISHED)
               : null,
             approvalPending: false,
             failed: true,
@@ -1034,7 +1089,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         const commentary =
           line.qBackedRehearsal === true
             ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(said)}`
-            : commentaryFor({ request, facts, said, approvalPending });
+            : commentaryFor({ facts, said, approvalPending });
         line.history.push(...lead, asked);
         line.referents = [
           ...referentsOf(facts?.mustSay),
@@ -1064,10 +1119,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           { err: error, qVoiceSessionId: line.voiceSessionId },
           "live delegation failed",
         );
+        unfinished();
         return {
           delegationId: id,
-          commentary:
-            "Q's backend could not complete that. Say so plainly and offer to try again; do not invent an answer.",
+          commentary: sayExactly(LIVE_NOT_FINISHED),
           approvalPending: false,
           failed: true,
         };
@@ -1425,6 +1480,19 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
           context,
+          // Owner 14 Nov 2026: code routes every turn but small talk to Q
+          // (duplex/routing.ts). Not on the onboarding interview (the
+          // voice holds it, owner 27 Oct; who leads is pending) or on a
+          // rehearsal, which has its own counterpart.
+          ...(persona !== null || line.conversational
+            ? {}
+            : {
+                routing:
+                  binding.thread.onboarding !== undefined ||
+                  binding.thread.welcome === true
+                    ? ("EVERY_TURN" as const)
+                    : ("ALL_BUT_SMALL_TALK" as const),
+              }),
           ...(allowance === undefined
             ? {}
             : {
@@ -1542,7 +1610,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
             commentary:
               line.qBackedRehearsal === true
                 ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(words)}`
-                : partialCommentary(running.request, words),
+                : partialCommentary(words),
             stale: line.latest !== delegation.delegationId,
             approvalPending: false,
             failed: false,
@@ -1604,8 +1672,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       if (store === undefined) return 0;
       const at = now();
       let recorded = 0;
-      // In order, one at a time: the segments are one conversation.
-      for (const segment of report.segments) {
+      // In order, one at a time: the segments are one conversation. D10
+      // (audit 14 Nov): a pause split one utterance into word fragments,
+      // each stored on its own; consecutive pieces of one side are one.
+      for (const segment of coalescedSegments(report.segments)) {
         try {
           await store.record({
             actor: line.actor,
@@ -1630,36 +1700,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           );
         }
       }
-      // B1 (audit 2026-11-04): a turn the voice answered itself goes into
-      // the conversation too, so a typed follow-up and a refresh see it.
-      // Delegated turns are already there (Q's run wrote them). Not for the
-      // onboarding interview, which keeps its own conversation.
-      const conversationId = line.binding.thread.conversationId;
-      const own = report.segments.filter(
-        (segment) => segment.delegated !== true,
-      );
-      if (
-        store.mirror !== undefined &&
-        conversationId !== undefined &&
-        !line.conversational &&
-        own.length > 0
-      ) {
-        try {
-          await store.mirror({
-            actor: line.actor,
-            conversationId,
-            messages: own.map((segment) => ({
-              role: segment.role,
-              content: segment.text,
-            })),
-          });
-        } catch (error: unknown) {
-          logger.warn(
-            { err: error, qVoiceSessionId: line.voiceSessionId },
-            "live voice self-answered turn not mirrored",
-          );
-        }
-      }
+      // Owner 14 Nov 2026 (audit D3, D10): the voice's own lines are never
+      // written into Q's conversation as Q messages. The B1 mirror stored
+      // its unbacked promises ("still getting you that name") and word
+      // fragments as Q's words, and the next turn read them as Q's. Only
+      // Q's runs write Q messages; every turn but small talk is one now
+      // (code routes it), and the line's words stay in voice_line_turns.
       return recorded;
     },
 
