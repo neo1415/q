@@ -329,6 +329,7 @@ export function GateView({
   replyWithinDays,
   canDecide,
   editor,
+  appearance,
 }: {
   readonly state: "full" | "loading" | "empty" | "error" | "limited";
   readonly gatewayId: string;
@@ -340,6 +341,8 @@ export function GateView({
   readonly replyWithinDays: number | null;
   readonly canDecide: boolean;
   readonly editor?: ReactNode;
+  /** B6/B7: the gateway's look, embed sites and open/paused state. */
+  readonly appearance?: ReactNode;
 }) {
   const t = useT();
 
@@ -484,6 +487,7 @@ export function GateView({
       </div>
 
       <aside className="flex min-w-0 flex-col gap-3.5">
+        {appearance}
         <section className="gq2-card" aria-labelledby="gq2-strict">
           <h3 id="gq2-strict">{t("How strict")}</h3>
           <div role="radiogroup" aria-labelledby="gq2-strict">

@@ -38,6 +38,7 @@ export {
 export {
   GATEQ_ACTIONS,
   type GateQPolicyExtractionPort,
+  type GateqGatewayAdminPort,
 } from "./actions/gateq.js";
 export { delegableOnItsOwn, settleGrant } from "./delegation.js";
 export {

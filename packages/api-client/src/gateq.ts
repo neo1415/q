@@ -38,7 +38,9 @@ import {
   GatewayApplicationListDtoSchema,
   GATEQ_GATEWAY_PATH,
   GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
+  GatewayAppearanceDtoSchema,
   GatewayDtoSchema,
+  type GatewayAppearanceRequest,
   GatewayPolicyDtoSchema,
   GatewayVersionDtoSchema,
   PolicyExtractionDtoSchema,
@@ -100,6 +102,46 @@ export function draftGatewayVersion(
     path("/v1/gateq/gateways/:gatewayId/versions", { gatewayId }),
     GatewayVersionDtoSchema,
     { body: draft },
+  );
+}
+
+/** B6/B7: the gateway's accent colour and embed sites, for its settings. */
+export function getGatewayAppearance(session: ApiSession, gatewayId: string) {
+  return call(
+    session,
+    "GET",
+    path("/v1/gateq/gateways/:gatewayId/appearance", { gatewayId }),
+    GatewayAppearanceDtoSchema,
+  );
+}
+
+/** B6/B7: a new appearance revision (an admin of the organisation). */
+export function setGatewayAppearance(
+  session: ApiSession,
+  gatewayId: string,
+  input: GatewayAppearanceRequest,
+) {
+  return call(
+    session,
+    "PUT",
+    path("/v1/gateq/gateways/:gatewayId/appearance", { gatewayId }),
+    GatewayAppearanceDtoSchema,
+    { body: input },
+  );
+}
+
+/** Pause (DISABLED) or reopen (ACTIVE) the gateway (an admin). */
+export function setGatewayStatus(
+  session: ApiSession,
+  gatewayId: string,
+  status: "ACTIVE" | "DISABLED",
+) {
+  return call(
+    session,
+    "PUT",
+    path("/v1/gateq/gateways/:gatewayId/status", { gatewayId }),
+    GatewayDtoSchema,
+    { body: { status } },
   );
 }
 

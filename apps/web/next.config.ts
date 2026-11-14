@@ -80,12 +80,10 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // GateQ embed (spec §1): the one page another site may frame.
+        // GateQ embed (spec §1): the one page another site may frame. Its
+        // frame-ancestors is per gateway (B7), set by proxy.ts.
         source: "/g/:publicId/embed",
-        headers: [
-          { key: "Content-Security-Policy", value: "frame-ancestors *" },
-          { key: "Cache-Control", value: "no-store" },
-        ],
+        headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
         // P7: the one-line launcher any website loads. Short-lived cache so

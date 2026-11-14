@@ -1,6 +1,10 @@
 import type { NextRequest } from "next/server";
 
 import { handleSessionProxy } from "./src/auth/session-proxy";
+import {
+  handleGatewayEmbedProxy,
+  isGatewayEmbedPath,
+} from "./src/features/gateq/embed-frame-policy";
 
 /**
  * Next.js request proxy: session refresh and route protection, and nothing
@@ -8,6 +12,11 @@ import { handleSessionProxy } from "./src/auth/session-proxy";
  * the same list, written out literally because Next reads it statically.
  */
 export function proxy(request: NextRequest) {
+  // B7: a gateway embed carries its organisation's frame-ancestors; it is
+  // public, so no session work runs for it.
+  if (isGatewayEmbedPath(request.nextUrl.pathname)) {
+    return handleGatewayEmbedProxy(request);
+  }
   return handleSessionProxy(request);
 }
 
@@ -52,5 +61,7 @@ export const config = {
     "/admin/:path*",
     "/paused/:path*",
     "/auth/:path*",
+    // B7: the gateway embed's per-gateway frame-ancestors.
+    "/g/:publicId/embed",
   ],
 };
