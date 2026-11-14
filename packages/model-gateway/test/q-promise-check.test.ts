@@ -367,3 +367,43 @@ describe("promise check: APPROVE (step 10, planted 'approve the plan')", () => {
     }
   });
 });
+
+describe("promise check: a figure said corrected or kept (A8, live 14 Nov)", () => {
+  const LIVE =
+    "You've corrected Maji Loop's October MRR to $110k. The earlier $120k figure remains on record as a conflicting self-reported statement, so I'm keeping both separate.";
+  const PREPARED_FIGURE: PromiseGrounds = {
+    ...NONE,
+    actions: [action("propose_company_figure", ok({ status: "PREPARED" }))],
+  };
+
+  it("a run with no write never claims the correction (the live answer)", () => {
+    const checked = check(LIVE, NONE);
+    expect(checked.unbacked).toContain("SAVE");
+    expect(checked.text).toBe("I haven't saved that yet.");
+  });
+
+  it("a prepared card does not back it either; the honest line says it awaits approval", () => {
+    expect(check(LIVE, PREPARED_FIGURE).text).toBe(
+      "I haven't saved that yet; it's ready for your approval.",
+    );
+  });
+
+  it("only an applied write of this run backs it", () => {
+    expect(check(LIVE, APPROVED)).toEqual({ text: LIVE, unbacked: [] });
+    expect(check("I've corrected your October MRR.", NONE).unbacked).toEqual([
+      "SAVE",
+    ]);
+  });
+
+  it("stays narrow: an offer, a negation or the person correcting Q is not a claim", () => {
+    for (const sentence of [
+      "You've corrected me, thanks: October was $110k, not $120k.",
+      "I can record $110k for October once you approve the card.",
+      "I haven't corrected anything yet.",
+      "Keeping it short: October MRR is $120k on your deck.",
+      "Both figures are in your deck.",
+    ]) {
+      expect(actionClaims(sentence), sentence).toEqual([]);
+    }
+  });
+});

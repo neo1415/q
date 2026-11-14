@@ -2285,3 +2285,7 @@ export {
   COMPANY_ANALYST_V31,
   V31_CHANGES,
 } from "./prompts/tasks/company-analyst.v31.js";
+export {
+  COMPANY_ANALYST_V32,
+  V32_CHANGES,
+} from "./prompts/tasks/company-analyst.v32.js";

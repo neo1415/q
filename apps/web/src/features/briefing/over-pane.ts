@@ -114,6 +114,68 @@ export function useOverPane(place: () => Box | null, watch: unknown): boolean {
 }
 
 /**
+ * Where the OPENED briefing sits so it covers none of `controls` (D4
+ * remainder, live 14 Nov at 390px: opened over an interest, it covered
+ * Accept/Decline and no scroll cleared it). It rises above the controls
+ * it would meet; when that leaves too little room under the top edge, it
+ * keeps that room and scrolls inside (maxHeight) rather than covering a
+ * control. Null: clear where it is. Pure, for its test.
+ */
+export function openedPlacement(
+  box: Box,
+  controls: readonly Box[],
+  viewportHeight: number,
+  edge = 8,
+  minHeight = 96,
+): { readonly bottom: number; readonly maxHeight: number | null } | null {
+  const bottom = clearBottom(box, controls, viewportHeight);
+  if (bottom === null) return null;
+  const height = box.bottom - box.top;
+  const room = viewportHeight - bottom - edge;
+  return {
+    bottom,
+    maxHeight: room >= height ? null : Math.max(minHeight, Math.floor(room)),
+  };
+}
+
+/**
+ * Measures where an element sits by its own classes (before any move) and
+ * keeps `place` of that box against the registered controls current.
+ */
+function usePlacement<T>(
+  ref: RefObject<Element | null>,
+  active: boolean,
+  watch: unknown,
+  place: (natural: Box) => T | null,
+): T | null {
+  const [placed, setPlaced] = useState<T | null>(null);
+  // Inactive: forget the move, so the next activation measures afresh.
+  const [wasActive, setWasActive] = useState(active);
+  if (wasActive !== active) {
+    setWasActive(active);
+    if (!active) setPlaced(null);
+  }
+  const natural = useRef<Box | null>(null);
+  useRecheck(
+    () => {
+      const element = ref.current;
+      if (element === null) return;
+      if (placed === null) {
+        const rect = element.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        natural.current = rect;
+      }
+      const from = natural.current;
+      if (from === null) return;
+      setPlaced(place(from));
+    },
+    watch,
+    active,
+  );
+  return active ? placed : null;
+}
+
+/**
  * The bottom offset (px) that keeps a small bottom-anchored element (the
  * tucked briefing button) off every registered primary control; null when
  * it is clear where its own classes put it.
@@ -123,30 +185,18 @@ export function useClearBottom(
   active: boolean,
   watch: unknown,
 ): number | null {
-  const [lift, setLift] = useState<number | null>(null);
-  // Untucked: forget the lift, so the next tuck measures afresh.
-  const [wasActive, setWasActive] = useState(active);
-  if (wasActive !== active) {
-    setWasActive(active);
-    if (!active) setLift(null);
-  }
-  // Where the element sits by its classes, measured before any lift.
-  const natural = useRef<Box | null>(null);
-  useRecheck(
-    () => {
-      const element = ref.current;
-      if (element === null) return;
-      if (lift === null) {
-        const rect = element.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) return;
-        natural.current = rect;
-      }
-      const from = natural.current;
-      if (from === null) return;
-      setLift(clearBottom(from, avoidRects(), window.innerHeight));
-    },
-    watch,
-    active,
+  return usePlacement(ref, active, watch, (natural) =>
+    clearBottom(natural, avoidRects(), window.innerHeight),
   );
-  return active ? lift : null;
+}
+
+/** The opened briefing's placement off every registered control. */
+export function useOpenedPlacement(
+  ref: RefObject<Element | null>,
+  active: boolean,
+  watch: unknown,
+): ReturnType<typeof openedPlacement> {
+  return usePlacement(ref, active, watch, (natural) =>
+    openedPlacement(natural, avoidRects(), window.innerHeight),
+  );
 }

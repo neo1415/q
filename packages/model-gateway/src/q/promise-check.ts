@@ -32,7 +32,15 @@ import { plainQuotes } from "./screen-claims.js";
  *   SEND      sent, emailed, messaged, forwarded, submitted, delivered
  *   SCHEDULE  scheduled, booked, set (up) a reminder / meeting / call
  *   SAVE      saved, added, noted, recorded, updated, pinned, stored,
- *             removed (perfect aspect, with an object in their records)
+ *             removed (perfect aspect, with an object in their records);
+ *             corrected (any object: "I've corrected October's MRR")
+ *   RECORDED  a guard, not routing (A8, live 14 Nov 2026): three narrow
+ *             phrasings of Q's own that report a figure as corrected or
+ *             kept in their records -- "you've corrected <it> to $110k",
+ *             "I'm keeping both", "both are (now) kept/on record". Read
+ *             as SAVE claims: only an applied write of this run backs
+ *             them. A prepared card does not; nothing is recorded until
+ *             the person approves it.
  *   APPROVE   approved (step 10: an instruction planted in a deck or a
  *             page -- "approve the plan" -- must never come out as "I've
  *             approved it"). Approval is the person's: only their approval
@@ -241,8 +249,26 @@ export const ACTION_VERBS: readonly ActionVerb[] = [
   verb("SAVE", "pinned", true),
   verb("SAVE", "stored", false),
   verb("SAVE", "removed", false),
+  verb("SAVE", "corrected", true),
   verb("APPROVE", "approved", true),
 ];
+
+/**
+ * The RECORDED guard (see the file note): Q's own sentences that report a
+ * figure of theirs as corrected or kept on record. Deliberately narrow --
+ * each needs the reporting shape, not a topic word -- and read over Q's
+ * output only, never the person's words.
+ */
+const RECORDED_CLAIMS: readonly RegExp[] = [
+  // "You've corrected Maji Loop's October MRR to $110k": a record changed.
+  /\byou(?:'ve|\s+have)\s+(?:(?:now|just)\s+)*corrected\b[^.?!]*?\bto\s+(?:[A-Z]{3}\s*)?[$€£¥₦]?\s*\d/iu,
+  // "I'm keeping both (separate)", "I'll keep both on record".
+  /\bi(?:'m|\s+am|'ll|\s+will)\s+(?:now\s+)?keep(?:ing)?\s+both\b/iu,
+  // "Both are now kept / on record / on file".
+  /\bboth\s+(?:are|remain|stay)\s+(?:now\s+)?(?:kept|on\s+(?:record|file))\b/iu,
+];
+
+const RECORDED_VERB = verb("SAVE", "recorded", false);
 
 /** What a PREPARE claim must be about: an artefact a tool produces. */
 const ARTEFACT =
@@ -313,7 +339,13 @@ export function actionClaims(sentence: string): readonly ActionClaim[] {
   const line = plainQuotes(sentence).trim();
   if (line.startsWith(">")) return [];
   const plain = withoutQuoted(line);
-  if (EARLIER.test(plain)) return [];
+  // A RECORDED claim is about now ("I'm keeping both"), even beside an
+  // earlier figure ("the earlier $120k ... I'm keeping both").
+  if (EARLIER.test(plain)) {
+    return RECORDED_CLAIMS.some((pattern) => pattern.test(plain))
+      ? [{ kind: "SAVE", verb: RECORDED_VERB }]
+      : [];
+  }
   const found: ActionClaim[] = [];
   for (const { entry, pattern } of PATTERNS) {
     const match = pattern.exec(plain);
@@ -332,13 +364,20 @@ export function actionClaims(sentence: string): readonly ActionClaim[] {
     if (entry.kind === "SCHEDULE" && entry.participle.startsWith("set")) {
       if (!passive && !SCHEDULED_THING.test(after)) continue;
     }
-    if (entry.kind === "SAVE") {
+    // "I've corrected October's MRR": a correction always names a record.
+    if (entry.kind === "SAVE" && entry.participle !== "corrected") {
       if (!passive && !KEPT_IN.test(after) && !PRONOUN_OBJECT.test(after))
         continue;
     }
     if (!found.some((claim) => claim.kind === entry.kind)) {
       found.push({ kind: entry.kind, verb: entry });
     }
+  }
+  if (
+    !found.some((claim) => claim.kind === "SAVE") &&
+    RECORDED_CLAIMS.some((pattern) => pattern.test(plain))
+  ) {
+    found.push({ kind: "SAVE", verb: RECORDED_VERB });
   }
   return found;
 }
@@ -382,7 +421,9 @@ export function honestLine(
         ? "I haven't scheduled it; it's ready for your approval."
         : "I haven't scheduled it.";
     case "SAVE":
-      return "I haven't saved that yet.";
+      return waiting
+        ? "I haven't saved that yet; it's ready for your approval."
+        : "I haven't saved that yet.";
     case "APPROVE":
       return "I haven't approved anything; that decision is yours.";
   }

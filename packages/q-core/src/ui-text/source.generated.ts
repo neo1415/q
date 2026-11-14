@@ -1365,6 +1365,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Drop",
   "Drop a deck, model or contract here. Q reads it and tells you what's missing.",
   "Drop to upload",
+  "Dropped. Nothing was sent.",
   "Due to run now.",
   "Due {date}",
   "E-commerce",

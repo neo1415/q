@@ -17,7 +17,7 @@ describe("COMPANY_ANALYST v29: the live Q-IQ gaps", () => {
   it("was active (now v30), on v28's output, and differs from v28 only by its listed changes", () => {
     const registry = createDefaultPromptRegistry();
     // v30 (C3) succeeds it; v29 stays published, deprecated.
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(31);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(32);
     expect(registry.get("COMPANY_ANALYST", 29)?.definition.status).toBe(
       "DEPRECATED",
     );

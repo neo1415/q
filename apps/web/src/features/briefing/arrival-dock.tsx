@@ -10,7 +10,7 @@ import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 
 import { ArrivalBriefing } from "./arrival-briefing";
 import { useArrivalStatus } from "./arrival-store";
-import { useClearBottom, useOverPane } from "./over-pane";
+import { useClearBottom, useOpenedPlacement, useOverPane } from "./over-pane";
 import { useT } from "@/features/i18n/language";
 
 /** The Q page gives the briefing itself; everywhere else, the dock does. */
@@ -88,6 +88,24 @@ export function ArrivalDock() {
   // D4 (journey audit 2026-11-13): tucked, the small button still rises
   // above a registered primary control (a composer's Send) in its corner.
   const lift = useClearBottom(box, tucked, pathname);
+  // D4 remainder (live 14 Nov, 390px): opened by the person over a page's
+  // primary controls (an interest's Accept/Decline), it rises above them
+  // and scrolls inside when room is short, rather than covering them.
+  const placed = useOpenedPlacement(box, opened && !tucked, pathname);
+  const style =
+    tucked && lift !== null
+      ? { bottom: `${String(lift)}px` }
+      : placed !== null
+        ? {
+            bottom: `${String(placed.bottom)}px`,
+            ...(placed.maxHeight === null
+              ? {}
+              : {
+                  maxHeight: `${String(placed.maxHeight)}px`,
+                  overflowY: "auto" as const,
+                }),
+          }
+        : undefined;
   if (session === null || pathname === Q_PAGE || closed || pitchMode) {
     return null;
   }
@@ -102,9 +120,8 @@ export function ArrivalDock() {
       }
       data-arrival-dock
       data-tucked={tucked ? "" : undefined}
-      style={
-        tucked && lift !== null ? { bottom: `${String(lift)}px` } : undefined
-      }
+      data-placed={placed === null ? undefined : ""}
+      style={style}
     >
       {tucked ? (
         <button
