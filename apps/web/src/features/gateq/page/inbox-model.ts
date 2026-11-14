@@ -147,10 +147,7 @@ export function qView(item: GateqInboxItemDto): {
   }
   return {
     lead: "Worth a look",
-    why:
-      item.replyState === "DUE_SOON" || item.replyState === "OVERDUE"
-        ? "Meets every rule of your gate, and your reply promise is close."
-        : "Meets every rule of your gate.",
+    why: meetsWords(item),
   };
 }
 
@@ -459,10 +456,25 @@ export function paneWhy(item: GateqInboxItemDto): string {
         : `Not enough information to decide: ${String(n)} rule${n === 1 ? "" : "s"} not answered.`;
     }
     case "YES":
-      return item.replyState === "DUE_SOON" || item.replyState === "OVERDUE"
-        ? "Meets every rule of your gate, and your reply promise is close."
-        : "Meets every rule of your gate.";
+      return meetsWords(item);
   }
+}
+
+/**
+ * Live D7 (2026-11-13): "Meets every rule of your gate" was shown while a
+ * preferred rule was not met. Qualifying needs every REQUIRED rule; a
+ * preferred one that is not met is said, never hidden.
+ */
+function meetsWords(
+  item: Pick<GateqInboxItemDto, "rules" | "replyState">,
+): string {
+  const close =
+    item.replyState === "DUE_SOON" || item.replyState === "OVERDUE"
+      ? ", and your reply promise is close"
+      : "";
+  const short = item.rules.total - item.rules.met - item.rules.unknown;
+  if (short <= 0) return `Meets every rule of your gate${close}.`;
+  return `Meets every required rule of your gate; ${String(short)} preferred rule${short === 1 ? " isn't" : "s aren't"} met${close}.`;
 }
 
 /** "Reply today", "Reply overdue", "Reply by 24 Oct": the firm's own promise. */

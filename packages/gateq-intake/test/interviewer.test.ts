@@ -73,6 +73,8 @@ const RESULT: GateQInterviewerResult = {
   asking: "company.solution",
   questionForQ: null,
   readyToReview: false,
+  conflicts: [],
+  readBackConfirmed: null,
 };
 
 function interviewer(
@@ -329,6 +331,8 @@ describe("what survives validation", () => {
       asking: null,
       questionForQ: null,
       readyToReview: false,
+      conflicts: [],
+      readBackConfirmed: null,
     });
     expect(outcome.reply).toBe(RESULT.reply);
     expect(outcome.facts.map((fact) => fact.dimension)).toEqual([
@@ -448,6 +452,8 @@ describe("what survives validation", () => {
         "questionForQ",
         "readyToReview",
         "reply",
+        "conflicts",
+        "readBackConfirmed",
       ].sort(),
     );
     for (const forbidden of ["qualified", "outcome", "score", "access"]) {

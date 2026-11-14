@@ -493,6 +493,7 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "The investment team will review your application and may contact you at your confirmed email address.":
     "سيراجع فريق الاستثمار طلبك وقد يتواصل معك على بريدك الإلكتروني المؤكد.",
   "See your applications": "اطّلع على طلباتك",
+  "See your application": "اطّلع على طلبك",
   "Your applications": "طلباتك",
 
   // The founder's GateQ page
@@ -737,6 +738,8 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "Q's reading": "قراءة Q",
   "Q's reading of this submission isn't ready yet.":
     "قراءة Q لهذا التقديم ليست جاهزة بعد.",
+  "Q couldn't write its reading of this submission. Everything the founder sent is above, unchanged.":
+    "لم يتمكن Q من كتابة قراءته لهذا التقديم. كل ما أرسله المؤسس موجود أعلاه دون تغيير.",
   "Q synthesis: not yet available.": "خلاصة Q: غير متاحة بعد.",
   "Q's inference from this submission only. Not verified, not a score and not a decision.":
     "استنتاج Q من هذا التقديم فقط. ليس متحقَّقاً منه، وليس درجة ولا قراراً.",

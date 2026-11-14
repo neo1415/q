@@ -9,6 +9,7 @@ import {
   missingSpecifics,
   QUANTITATIVE_DIMENSIONS,
 } from "./answer-specificity.js";
+import { unreconciledStatements } from "./fact-history.js";
 
 /**
  * What is worth asking next, and why (CQ-GATE-002 §22, §28).
@@ -250,5 +251,8 @@ export function contradictionsIn(
       "the stated revenue is larger than the raise; worth checking which period each figure covers",
     );
   }
+  // Their own statements that disagree (Q's reading of the turn flagged it):
+  // both are kept and shown, never one picked.
+  out.push(...unreconciledStatements(facts));
   return out;
 }

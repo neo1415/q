@@ -120,6 +120,7 @@ function harness(
     /** GateQ slice 1: a v2 submission for APP_FIT (dossier + transcript). */
     readonly v2?: { readonly dossier: unknown; readonly transcript: unknown };
     readonly descriptionPhrases?: readonly string[];
+    readonly synthesisState?: InboxRow["synthesisState"];
   } = {},
 ) {
   const emailEvents: GateqEmailEvent[] = [];
@@ -213,6 +214,7 @@ function harness(
           : s.snapshot,
       qualification: s.qualification,
       dossier: id === APP_FIT ? (options.v2?.dossier ?? null) : null,
+      synthesisState: options.synthesisState,
       folder: state.folder.get(id) ?? "INBOX",
       assigneeUserId: state.assignee.get(id) ?? null,
       starred: state.stars.get(`${id}:${userId}`) ?? false,
@@ -777,6 +779,27 @@ describe("the dossier in the inbox (GateQ slice 1)", () => {
     expect(detail.transcript?.map((t) => t.role)).toEqual(["PERSON", "Q"]);
     // The confirmed contact is the one the investor reaches.
     expect(detail.contact.email).toBe("amara@confirmed.example");
+  });
+
+  it("says plainly when Q's reading will not come, never 'not ready' forever (live D1)", async () => {
+    const pending = harness({ v2: { dossier, transcript } });
+    const waiting = await pending.service.detail(
+      actor(MEMBER),
+      GATEWAY,
+      APP_FIT,
+    );
+    if (!("item" in waiting)) throw new Error("refused");
+    expect(waiting.synthesis).toBeNull();
+    expect(waiting.synthesisState).toBe("PENDING");
+
+    const spent = harness({
+      v2: { dossier, transcript },
+      synthesisState: "UNAVAILABLE",
+    });
+    const failed = await spent.service.detail(actor(MEMBER), GATEWAY, APP_FIT);
+    if (!("item" in failed)) throw new Error("refused");
+    expect(failed.synthesis).toBeNull();
+    expect(failed.synthesisState).toBe("UNAVAILABLE");
   });
 
   it("answers null for a submission made before dossiers existed", async () => {

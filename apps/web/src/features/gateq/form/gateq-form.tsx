@@ -157,14 +157,11 @@ export function GateQForm({
   const fund = gateway.organisationDisplayName;
   const anonymous = prefill === null;
   const initial = answersFromProfile(prefill);
-  const [answers, setAnswers] = useState<FormAnswers>(() => {
-    const base = preview?.answers ?? initial.answers;
-    // The deck goes by default; everything else only if ticked.
-    const deck = materials.find((m) => /deck/i.test(m.name));
-    return preview?.answers !== undefined || deck === undefined
-      ? base
-      : { ...base, materials: [deck.id] };
-  });
+  // Live D7 (2026-11-13): every document, the deck too, goes only if they
+  // tick it, as the copy beside each one says. Nothing is pre-ticked.
+  const [answers, setAnswers] = useState<FormAnswers>(
+    () => preview?.answers ?? initial.answers,
+  );
   const fromProfile = initial.fromProfile;
   // Design gatepub-1: the questions come first, with the standing beside
   // them; the contact is confirmed once they choose to go on.
@@ -506,6 +503,7 @@ export function GateQForm({
       lines={lines}
       showResults={showResults && (pastCheck || verdict === "NOT_A_FIT")}
       openByDefault={!compact}
+      sent={step === "sent"}
     />
   );
 
@@ -744,11 +742,14 @@ function GateCard({
   lines,
   showResults,
   openByDefault,
+  sent = false,
 }: {
   readonly gateway: PublicGatewayDto;
   readonly lines: readonly RuleLine[];
   readonly showResults: boolean;
   readonly openByDefault: boolean;
+  /** Live D7: after Submit, "nothing is sent until…" is no longer true. */
+  readonly sent?: boolean;
 }) {
   const t = useT();
 
@@ -836,7 +837,11 @@ function GateCard({
             </ul>
           )}
           <p className="cq-caption gq-t3">
-            {t("Nothing is sent until you press Submit.")}
+            {sent
+              ? t(
+                  `Sent. ${gateway.organisationDisplayName} has your application.`,
+                )
+              : t("Nothing is sent until you press Submit.")}
           </p>
         </div>
       </details>

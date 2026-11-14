@@ -362,6 +362,7 @@ export {
   saveAccountApplicationContact,
   saveApplicationContact,
   confirmAccountApplicationContact,
+  startAccountApplication,
   confirmApplicationContact,
   getApplicationTranscript,
   getApplicationCoverage,

@@ -30,6 +30,7 @@ export type FounderApplication = {
   /** The investor's published reply promise for it; null: none made. */
   readonly replyBy: string | null;
   readonly investorOrganisationId: string | null;
+  readonly gatewayPublicId: string;
 };
 
 export function createPostgresApplicationFounders(options: {
@@ -97,7 +98,10 @@ export function createPostgresApplicationFounders(options: {
       await sql`
         insert into gateq.application_founders (application_id, tenant_id, founder_user_id, company_id)
         values (${input.applicationId}, ${input.tenantId}, ${input.actor.userId}, ${companies[0]?.id ?? null})
-        on conflict (application_id) do nothing`;
+        on conflict (application_id) do update
+           set company_id = excluded.company_id
+         where gateq.application_founders.company_id is null
+           and gateq.application_founders.founder_user_id = excluded.founder_user_id`;
       const pairs = await sql<
         { company_id: string; investor_organisation_id: string }[]
       >`
@@ -115,6 +119,46 @@ export function createPostgresApplicationFounders(options: {
             companyId: pair.company_id,
             investorOrganisationId: pair.investor_organisation_id,
           };
+    },
+
+    /**
+     * Live D5 (2026-11-13): the founder's own unsent draft at this gateway,
+     * newest first, so opening the page again reopens it instead of making
+     * another. Only a draft this account opened (draftOwned) qualifies.
+     */
+    draftAt: async (
+      actor: ActorContext,
+      gatewayPublicId: string,
+    ): Promise<{ readonly applicationId: string } | null> => {
+      const rows = await sql<{ application_id: string }[]>`
+        select a.id as application_id
+          from gateq.application_founders f
+          join gateq.applications a on a.id = f.application_id
+          join gateq.gateways g on g.id = a.gateway_id and g.tenant_id = a.tenant_id
+         where f.founder_user_id = ${actor.userId}
+           and g.public_id = ${gatewayPublicId}
+           and a.status = 'IN_PROGRESS'
+           and a.created_at > now() - interval '30 days'
+         order by a.created_at desc
+         limit 1`;
+      const row = rows[0];
+      return row === undefined ? null : { applicationId: row.application_id };
+    },
+
+    /**
+     * Records that this account opened the draft, without naming a company
+     * (so nothing joins a relationship until the founder shares or submits:
+     * `link` fills the company then).
+     */
+    draftOwned: async (input: {
+      readonly applicationId: string;
+      readonly tenantId: string;
+      readonly actor: ActorContext;
+    }): Promise<void> => {
+      await sql`
+        insert into gateq.application_founders (application_id, tenant_id, founder_user_id, company_id)
+        values (${input.applicationId}, ${input.tenantId}, ${input.actor.userId}, null)
+        on conflict (application_id) do nothing`;
     },
 
     /** P14: the canonical relationship the application joined. */
@@ -222,9 +266,11 @@ export function createPostgresApplicationFounders(options: {
           qualification: unknown;
           reply_within_days: number | null;
           investor_organisation_id: string | null;
+          gateway_public_id: string;
         }[]
       >`
         select f.application_id, io.display_name as fund, g.name as gateway_name,
+               g.public_id as gateway_public_id,
                s.submitted_at as sent_at, m.kind, m.reason_code, m.body,
                s.qualification, st.reply_within_days,
                g.investor_organisation_id
@@ -266,6 +312,7 @@ export function createPostgresApplicationFounders(options: {
           now,
         }).replyBy,
         investorOrganisationId: row.investor_organisation_id,
+        gatewayPublicId: row.gateway_public_id,
       }));
     },
   };

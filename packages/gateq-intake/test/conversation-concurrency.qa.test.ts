@@ -136,6 +136,7 @@ function exchangeWorld() {
     qualification: () => Promise.resolve(qualification),
     factsFor: () => Promise.resolve([]),
     resume: () => Promise.resolve(view),
+    reopen: () => Promise.resolve(null),
     recordFacts: () => Promise.resolve(view),
     start: unused,
     attachDocument: unused,

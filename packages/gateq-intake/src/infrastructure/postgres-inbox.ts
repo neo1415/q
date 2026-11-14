@@ -1,5 +1,6 @@
 import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
+import { GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT } from "../application/dossier-synthesis.js";
 import type {
   InboxActivityKind,
   InboxFolder,
@@ -21,6 +22,7 @@ type Row = {
   qualification: unknown;
   dossier: unknown;
   synthesis: unknown;
+  synthesis_state: string | null;
   folder: string | null;
   assignee_user_id: string | null;
   starred: boolean | null;
@@ -40,6 +42,10 @@ function toRow(row: Row): InboxRow {
     qualification: row.qualification,
     dossier: row.dossier,
     synthesis: row.synthesis,
+    synthesisState:
+      row.synthesis_state === "READY" || row.synthesis_state === "UNAVAILABLE"
+        ? row.synthesis_state
+        : "PENDING",
     folder: folderOf(row.folder),
     assigneeUserId: row.assignee_user_id,
     starred: row.starred === true,
@@ -51,8 +57,15 @@ function toRow(row: Row): InboxRow {
 
 export function createPostgresInboxRepository(options: {
   readonly sql: DatabaseExecutor;
+  /**
+   * The synthesis job's attempt bound: a FAILED reading that has spent it
+   * will not be tried again, so the investor is told so (not "not ready").
+   */
+  readonly synthesisMaxAttempts?: number | undefined;
 }): InboxRepository {
   const { sql } = options;
+  const maxAttempts =
+    options.synthesisMaxAttempts ?? GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT;
 
   const select = (input: {
     tenantId: string;
@@ -70,6 +83,18 @@ export function createPostgresInboxRepository(options: {
                          and y.tenant_id = s.tenant_id
                          and y.status = 'READY')`
            } as synthesis,
+           ${
+             input.applicationId === undefined
+               ? sql`null::text`
+               : sql`(select case
+                               when y.status = 'READY' then 'READY'
+                               when y.attempts >= ${maxAttempts} then 'UNAVAILABLE'
+                               else 'PENDING'
+                             end
+                        from gateq.application_syntheses y
+                       where y.application_id = s.application_id
+                         and y.tenant_id = s.tenant_id)`
+           } as synthesis_state,
            i.folder, i.assignee_user_id, u.starred, u.read_at,
            (select coalesce(array_agg(l.name order by l.name), '{}')
               from gateq.inbox_item_labels il

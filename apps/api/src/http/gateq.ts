@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   ApplicationContactAccountRequestSchema,
   ApplicationContactResponseSchema,
+  GATEQ_APPLY_ACCOUNT_START_PATH,
   GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
   type ApplicationContactAccountRequest,
   type ApplicationContactResponse,
@@ -50,6 +51,8 @@ import {
   PublicGatewayDtoSchema,
   QualificationResultDtoSchema,
   QualifyCompanyRequestSchema,
+  StartApplicationRequestSchema,
+  StartApplicationResponseSchema,
   UuidSchema,
 } from "@capital-q/contracts";
 import {
@@ -172,6 +175,18 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
         readonly actor: ActorContext;
         readonly request: ApplicationContactAccountRequest;
       }) => Promise<ApplicationContactResponse>)
+    | undefined;
+  /**
+   * Live D5: a signed-in founder opens a gateway's form. Their own unsent
+   * draft there is reopened (a new session for it) instead of a new draft
+   * on every visit. Answers like the public start.
+   */
+  readonly accountStart?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly gatewayPublicId: string;
+        readonly mode: "conversation" | "form";
+      }) => Promise<unknown>)
     | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
   readonly inbox?: SubmissionInbox | undefined;
@@ -399,6 +414,7 @@ export function registerGateQRoutes(
             rules: row.rules,
             replyBy: row.replyBy,
             investorOrganisationId: row.investorOrganisationId,
+            gatewayPublicId: row.gatewayPublicId,
           })),
         });
       },
@@ -604,6 +620,41 @@ export function registerGateQRoutes(
           if (
             error instanceof IntakeRefusedError ||
             error instanceof MaterialNotSharableError
+          ) {
+            reply.callNotFound();
+            return undefined;
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  const accountStart = dependencies.accountStart;
+  if (accountStart !== undefined) {
+    app.post(
+      GATEQ_APPLY_ACCOUNT_START_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = parseContract(
+          StartApplicationRequestSchema,
+          request.body,
+          "No such gateway.",
+        );
+        try {
+          const started = await accountStart({
+            actor: getActorContext(request),
+            gatewayPublicId: input.gatewayPublicId,
+            mode: input.mode ?? "conversation",
+          });
+          void reply.code(201).header("Cache-Control", "no-store");
+          return StartApplicationResponseSchema.parse(started);
+        } catch (error: unknown) {
+          // The same answers as the public start: an unknown, unpublished
+          // or closed gateway is one 404; a spent allowance is a 429.
+          if (
+            error instanceof IntakeRefusedError &&
+            error.refusal !== "TOO_MANY_REQUESTS"
           ) {
             reply.callNotFound();
             return undefined;

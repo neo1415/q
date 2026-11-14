@@ -143,6 +143,30 @@ export const GateQInterviewerResultSchema = z
      * submitted, and a human decides whether it is.
      */
     readyToReview: z.boolean().default(false),
+    /**
+     * v4: what they just said disagrees with something already on record or
+     * said earlier, about the same thing, and they did not say it replaces
+     * it. `earlier` quotes those earlier words. Code keeps both and flags
+     * them; nothing here decides which is right.
+     */
+    conflicts: z
+      .array(
+        z
+          .object({
+            dimension: GateQDimensionSchema,
+            earlier: z.string().max(300).nullable().default(null),
+          })
+          .strict(),
+      )
+      .max(4)
+      .default([]),
+    /**
+     * v4: Q's last line asked them to confirm a figure ("So that's USD 0 for
+     * revenue, right?"). True when their words agree with it, even when
+     * they go on to say more; false when they disagree, correct it or do
+     * not answer it; null when Q's last line asked no such thing.
+     */
+    readBackConfirmed: z.boolean().nullable().default(null),
   })
   .strict();
 export type GateQInterviewerResult = z.infer<

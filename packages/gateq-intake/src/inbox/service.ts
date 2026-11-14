@@ -43,6 +43,8 @@ import type {
   InboxRepository,
   InboxRow,
   SharedDocumentPort,
+  SubmittedDocumentReading,
+  SubmittedDocumentTextPort,
 } from "./ports.js";
 import {
   renderGateqAnswerEmail,
@@ -94,6 +96,8 @@ export function createInboxService(dependencies: {
   readonly authority: InboxAuthority;
   readonly transactions: TransactionManager;
   readonly documents?: SharedDocumentPort | undefined;
+  /** The submitted documents' text, for Q's reading of one application. */
+  readonly documentText?: SubmittedDocumentTextPort | undefined;
   readonly clock?: (() => Date) | undefined;
   /** P14: the founder hears a pass or a reply by email (after commit). */
   readonly founderMail?: GateqOutboundSender | undefined;
@@ -295,6 +299,33 @@ export function createInboxService(dependencies: {
       };
     },
 
+    /**
+     * The documents the founder attached to this submission, read for Q's
+     * answer to the receiving organisation (live D4, 2026-11-13: Q said no
+     * document was read while a deck and a brief were attached). Null when
+     * this composition cannot read them; each one not read says why.
+     */
+    submittedDocuments: async (
+      actor: ActorContext,
+      gatewayId: string,
+      applicationId: string,
+    ): Promise<readonly SubmittedDocumentReading[] | null | InboxRefused> => {
+      const granted = await authority.authorise(actor, gatewayId);
+      if (granted === null) return REFUSED;
+      const { gateway } = granted;
+      const row = await repository.one({
+        tenantId: gateway.tenantId,
+        gatewayId: gateway.gatewayId,
+        userId: actor.userId,
+        applicationId,
+      });
+      if (row === null) return REFUSED;
+      if (dependencies.documentText === undefined) return null;
+      return dependencies.documentText
+        .read({ tenantId: gateway.tenantId, applicationId })
+        .catch(() => null);
+    },
+
     detail: async (
       actor: ActorContext,
       gatewayId: string,
@@ -421,6 +452,13 @@ export function createInboxService(dependencies: {
         transcript,
         // Q's reading of the same frozen submission; never a guess when absent.
         synthesis: GateqSynthesisV1Schema.safeParse(row.synthesis).data ?? null,
+        // Honest about a reading that will not come: every bounded attempt
+        // failed, or there is no frozen dossier for Q to read.
+        synthesisState: GateqSynthesisV1Schema.safeParse(row.synthesis).success
+          ? "READY"
+          : row.synthesisState === "UNAVAILABLE" || !dossier.success
+            ? "UNAVAILABLE"
+            : "PENDING",
       } satisfies GateqInboxDetailDto;
     },
 

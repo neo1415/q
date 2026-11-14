@@ -76,6 +76,7 @@ import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { connectedCompanies } from "./http/your-companies.js";
+import { summaryDto as gateqSummaryDto } from "./http/gateq-apply.js";
 import { createInvestorAnswers } from "./investor-answers.js";
 import { createProfileMaterial } from "./profile-material.js";
 import {
@@ -234,6 +235,7 @@ import {
   createGateqVideoInterview,
   createDossierSynthesis,
   createPostgresSynthesisStore,
+  gateqSynthesisMaxAttempts,
   createPostgresGateqVideoSessions,
   gateqVideoConfigFrom,
 } from "@capital-q/gateq-intake";
@@ -819,7 +821,8 @@ function gateqContactRequiredFrom(): string | undefined {
  * unless CQ_GATEQ_SYNTHESIS=on with CQ_GATEQ_SYNTHESIS_FROM (an ISO
  * instant: only submissions from then on are read, so switching it on
  * never spends on the backlog). One application at a time, at most
- * CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS (default 2, at most 3) model calls each.
+ * CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS (default 3, at most 3) model calls each,
+ * 10 then 20 minutes apart; after the last, the investor is told plainly.
  */
 const gateqSynthesisFrom = Date.parse(
   process.env["CQ_GATEQ_SYNTHESIS_FROM"]?.trim() ?? "",
@@ -829,7 +832,6 @@ if (
   gateqModelProviders.length > 0 &&
   Number.isFinite(gateqSynthesisFrom)
 ) {
-  const attempts = Number(process.env["CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS"]);
   const synthesis = createDossierSynthesis({
     gateway: createModelGateway({
       catalog: createPostgresModelCatalog({ sql: database.sql }),
@@ -848,10 +850,9 @@ if (
     store: createPostgresSynthesisStore({
       sql: database.sql,
       from: new Date(gateqSynthesisFrom),
-      maxAttempts:
-        Number.isSafeInteger(attempts) && attempts >= 1 && attempts <= 3
-          ? attempts
-          : 2,
+      maxAttempts: gateqSynthesisMaxAttempts(
+        process.env["CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS"],
+      ),
     }),
     logger: teamLogger,
   });
@@ -1500,6 +1501,9 @@ const gateqInboxService = createGateqInbox({
   sql: database.sql,
   transactions: database.transactions,
   gateq,
+  synthesisMaxAttempts: gateqSynthesisMaxAttempts(
+    process.env["CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS"],
+  ),
   founderMail: gateqFounderMail,
   onEmail: logGateqEmail,
   documents: sharedDocumentsPort({
@@ -3233,6 +3237,55 @@ const { app, logger } = createApp(config, security, {
       ? undefined
       : { video: composeGateqVideo(gateqApply) },
   gateqApply,
+  // Live D5 (2026-11-13): every visit by a signed-in founder made a new
+  // draft. Their own unsent draft at the gateway is reopened instead; a new
+  // one is recorded as theirs (no company named, so nothing joins a
+  // relationship before they share or submit).
+  gateqAccountStart:
+    gateqApply === undefined
+      ? undefined
+      : async ({ actor, gatewayPublicId, mode }) => {
+          if (
+            !(await gateqApply.throttle.charge({
+              sessionId: `start:${gatewayPublicId}`,
+              operation: "START",
+            }))
+          ) {
+            throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+          }
+          const draft = await gateqFounders.draftAt(actor, gatewayPublicId);
+          const reopened =
+            draft === null
+              ? null
+              : await gateqApply.intake.reopen({
+                  applicationId: draft.applicationId,
+                  gatewayPublicId,
+                });
+          const started =
+            reopened ?? (await gateqApply.intake.start({ gatewayPublicId }));
+          if (reopened === null) {
+            const guest = await gateqApply.intake.authorise(started.token);
+            await gateqFounders.draftOwned({
+              applicationId: guest.application.id,
+              tenantId: guest.application.tenantId,
+              actor,
+            });
+          }
+          const opening =
+            mode === "form"
+              ? ""
+              : await gateqApply.conversation.openingFor({
+                  token: started.token,
+                  correlationId: crypto.randomUUID(),
+                });
+          const summary = await gateqApply.conversation.summary(started.token);
+          return {
+            sessionToken: started.token,
+            expiresAt: started.expiresAt,
+            application: gateqSummaryDto(summary),
+            reply: opening,
+          };
+        },
   // GateQ slice 1: a signed-in founder's contact; their own verified
   // account email confirms a matching address without a code.
   gateqApplicationContact:

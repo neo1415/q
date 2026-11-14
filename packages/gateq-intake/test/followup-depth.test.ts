@@ -138,6 +138,8 @@ describe("the follow-up reaches the model, phrased per founder", () => {
     asking: "company.market",
     questionForQ: null,
     readyToReview: false,
+    conflicts: [],
+    readBackConfirmed: null,
   };
   const PUBLIC_GATEWAY: PublicGateway = {
     publicId: "gq_0123456789abcdefghjkmnpqrs",

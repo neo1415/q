@@ -94,7 +94,7 @@ function credential(request: FastifyRequest): string {
   return scheme?.toLowerCase() === "bearer" ? (value ?? "") : "";
 }
 
-function summaryDto(result: ApplicantTurnResult): unknown {
+export function summaryDto(result: ApplicantTurnResult): unknown {
   return ApplicationSummaryDtoSchema.parse({
     reference: result.view.reference,
     status: result.view.status,

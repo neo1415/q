@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { submittedReading } from "./gateq-submitted-reading.js";
+import {
+  APPLICATION_ONLY,
+  documentsReading,
+  submittedReading,
+  type SubmittedDocumentRead,
+} from "./gateq-submitted-reading.js";
 
 import {
   GATEQ_INBOX_ARCHIVE_PATH,
@@ -154,6 +159,18 @@ export type GateqInboxPort = {
     gatewayId: string,
     applicationId: string,
   ) => Promise<GateqInboxDetailDto | Refused>;
+  /**
+   * The documents the founder attached to this submission, read (or each
+   * one not read, with why). Null when the composition cannot read them.
+   * Optional: older compositions lack it.
+   */
+  readonly submittedDocuments?:
+    | ((
+        actor: ActorContext,
+        gatewayId: string,
+        applicationId: string,
+      ) => Promise<readonly SubmittedDocumentRead[] | null | Refused>)
+    | undefined;
   /** The actor's organisation's active gateway, for Q, which has no screen. */
   readonly ownGatewayId: (actor: ActorContext) => Promise<string | null>;
   /**
@@ -907,7 +924,11 @@ const DRAFT_PASS = defineAppAction<
   },
 });
 
-type SummaryOut = GateqInboxDetailDto | Refused;
+type SummaryOut =
+  | (GateqInboxDetailDto & {
+      readonly documentsRead?: readonly SubmittedDocumentRead[] | null;
+    })
+  | Refused;
 const SummaryIn = z
   .object({ gatewayId: UuidSchema, applicationId: UuidSchema })
   .strict();
@@ -929,8 +950,23 @@ const SUMMARISE = defineAppAction<
   input: SummaryIn,
   output: z.custom<SummaryOut>(),
   authorize: serviceDecides,
-  run: (ports, context, input) =>
-    port(ports).detail(context.actor, input.gatewayId, input.applicationId),
+  run: async (ports, context, input) => {
+    const inbox = port(ports);
+    const detail = await inbox.detail(
+      context.actor,
+      input.gatewayId,
+      input.applicationId,
+    );
+    if (!("item" in detail) || inbox.submittedDocuments === undefined)
+      return detail;
+    const read = await inbox
+      .submittedDocuments(context.actor, input.gatewayId, input.applicationId)
+      .catch(() => null);
+    return {
+      ...detail,
+      documentsRead: read === null || !Array.isArray(read) ? null : read,
+    };
+  },
   targets: () => [],
   card: () => ({ summary: "Summary", preview: "" }),
   succeeded: (out) => "item" in out,
@@ -956,6 +992,8 @@ const SUMMARISE = defineAppAction<
       `Your gate's rules: ${out.rules.map((r) => `${r.label} ${STAND_WORDS[r.standing]}`).join("; ") || "none published"}.`,
       out.note === null ? "No note." : `Their note: "${out.note}"`,
       `Shared: ${out.shared.map((d) => d.title).join(", ") || "nothing beyond the form"}.`,
+      APPLICATION_ONLY,
+      documentsReading(out.shared, out.documentsRead),
       out.notes.length === 0
         ? "No team notes."
         : `Team notes: ${out.notes.map((n) => `${n.author.name}: ${n.body}`).join(" | ")}`,

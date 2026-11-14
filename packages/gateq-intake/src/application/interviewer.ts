@@ -45,6 +45,11 @@ import {
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
 import { regionIn } from "./cities.js";
+import {
+  ACCUMULATING_DIMENSIONS,
+  addedStatement,
+  asStatement,
+} from "./fact-history.js";
 import { normaliseProposedFact } from "./normalise-fact.js";
 import { readBackLine, readBacksIn, type NotRecorded } from "./not-recorded.js";
 import { affirmsReadBack, amountStatedIn } from "./stated-amount.js";
@@ -676,6 +681,24 @@ export function createGateQInterviewer(
       const lastQ = [...input.recentTurns]
         .reverse()
         .find((turn) => turn.role === "q")?.text;
+      /**
+       * Did they agree to the figure Q read back? Q's own reading of the
+       * turn says (live 2026-11-13: "Yes, zero revenue so far. Of our
+       * roughly 1,500 weekly users…" was a yes, and Q asked again because a
+       * word match saw another number). Code still checks the figure is the
+       * one Q's own line read back. Only when the reading says nothing (an
+       * older prompt, a checkpointed outcome) does the bounded word check
+       * in affirmsReadBack stand in for it.
+       */
+      const agreedTo = (amount: string): boolean => {
+        if (lastQ === undefined || !amountStatedIn(amount, lastQ)) return false;
+        if (result.readBackConfirmed === true) return true;
+        if (result.readBackConfirmed === false) return false;
+        return affirmsReadBack(amount, lastQ, input.utterance);
+      };
+      const conflictOn = new Map(
+        result.conflicts.map((c) => [c.dimension, c.earlier] as const),
+      );
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;
@@ -727,7 +750,7 @@ export function createGateQInterviewer(
         if (
           normalised.value.kind === "AMOUNT" &&
           !amountStatedIn(normalised.value.amount, input.utterance) &&
-          !affirmsReadBack(normalised.value.amount, lastQ, input.utterance)
+          !agreedTo(normalised.value.amount)
         ) {
           rejected += 1;
           notRecorded.push({
@@ -741,6 +764,33 @@ export function createGateQInterviewer(
         // The same contact detail again ("I'm Laura" with "Laura Mensah"
         // on record) is already held: nothing to write, nothing refused.
         if (sameContact(normalised, held(dimension))) continue;
+        // A new statement about a narrative dimension adds to what they
+        // said before unless they said it replaces it (fact-history.ts):
+        // "willingness to pay not tested" never erases the user numbers,
+        // and two numbers that disagree are both kept and flagged.
+        const before = held(dimension);
+        const heldText =
+          before === undefined ? null : asStatement(before.value);
+        const saidText = asStatement(normalised.value);
+        if (
+          !candidate.correction &&
+          ACCUMULATING_DIMENSIONS.has(dimension) &&
+          before !== undefined &&
+          heldText !== null &&
+          saidText !== null
+        ) {
+          const added = addedStatement({
+            held: { value: heldText, provenance: before.provenance },
+            statement: saidText.text,
+            provenance: normalised.provenance,
+            conflict: conflictOn.has(dimension)
+              ? { earlier: conflictOn.get(dimension) ?? null }
+              : null,
+          });
+          if (added === null) continue;
+          facts.push({ ...normalised, ...added });
+          continue;
+        }
         const current = input.application?.facts.find(
           (fact) =>
             fact.dimension === normalised.dimension &&
@@ -764,7 +814,7 @@ export function createGateQInterviewer(
         for (const back of readBacksIn(lastQ ?? "")) {
           if (
             facts.some((fact) => fact.dimension === back.dimension) ||
-            !affirmsReadBack(back.amount, lastQ, input.utterance)
+            !agreedTo(back.amount)
           ) {
             continue;
           }

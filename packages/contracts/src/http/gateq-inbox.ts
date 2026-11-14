@@ -296,6 +296,12 @@ export const GateqInboxDetailDtoSchema = z
      * founder sent; null until it is ready or when it could not be made.
      */
     synthesis: GateqSynthesisV1Schema.nullable().optional(),
+    /**
+     * READY with a synthesis; PENDING while the bounded job may still make
+     * one; UNAVAILABLE once it will not (every attempt failed, or nothing
+     * frozen to read). Optional on the wire for older APIs (read: PENDING).
+     */
+    synthesisState: z.enum(["READY", "PENDING", "UNAVAILABLE"]).optional(),
   })
   .strict();
 export type GateqInboxDetailDto = z.infer<typeof GateqInboxDetailDtoSchema>;
@@ -407,6 +413,12 @@ export const FounderApplicationDtoSchema = z
     replyBy: z.string().nullable().optional(),
     /** Whose gate it was, for the founder's own relationship record. */
     investorOrganisationId: z.string().uuid().nullable().optional(),
+    /**
+     * The gate's public handle (live D5, 2026-11-13): the gateway page says
+     * "You applied on <date>" on entry instead of a fresh form. Optional
+     * so an older API and a newer client agree.
+     */
+    gatewayPublicId: z.string().max(64).optional(),
   })
   .strict();
 export type FounderApplicationDto = z.infer<typeof FounderApplicationDtoSchema>;

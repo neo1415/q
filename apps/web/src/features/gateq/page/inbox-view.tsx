@@ -1411,6 +1411,7 @@ function Dossier({
             <SubmittedBrief
               dossier={dossier}
               synthesis={detail.synthesis ?? null}
+              synthesisState={detail.synthesisState}
             />
           )}
           <GateqUnicornAssessment value={detail.unicornPotential} />

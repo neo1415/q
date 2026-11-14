@@ -146,7 +146,28 @@ export type FactProvenance = z.infer<typeof FactProvenanceSchema>;
 /** A bounded value. No free JSON: a model cannot post an object of its own shape. */
 export const FactValueSchema = z.discriminatedUnion("kind", [
   z
-    .object({ kind: z.literal("TEXT"), text: z.string().min(1).max(2000) })
+    .object({
+      kind: z.literal("TEXT"),
+      /** One statement per line, oldest first, in the founder's words. */
+      text: z.string().min(1).max(2000),
+      /**
+       * Statements of theirs that disagree and are not yet reconciled
+       * (fact-history.ts): both stand, flagged, until a correction says
+       * which is right. Absent on every value written before it existed.
+       */
+      unreconciled: z
+        .array(
+          z
+            .object({
+              earlier: z.string().min(1).max(300),
+              later: z.string().min(1).max(300),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(4)
+        .optional(),
+    })
     .strict(),
   z
     .object({

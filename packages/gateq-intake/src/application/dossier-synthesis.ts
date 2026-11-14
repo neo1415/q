@@ -40,6 +40,37 @@ import { withDerivedAmountsMarked } from "./dossier.js";
 
 export const GATEQ_SYNTHESIS_PROMPT_VERSION = "GATEQ_DOSSIER_SYNTHESIS@v1";
 
+/**
+ * Model calls one application may ever cost. After the last one fails the
+ * investor is told plainly that Q's reading could not be made, rather than
+ * "not ready yet" forever. The store and the inbox read the same number.
+ */
+export const GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT = 3;
+export const GATEQ_SYNTHESIS_MAX_ATTEMPTS_CAP = 3;
+
+/** CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS, bounded to 1..3; anything else is 3. */
+export function gateqSynthesisMaxAttempts(raw: string | undefined): number {
+  const value = Number(raw);
+  return Number.isSafeInteger(value) &&
+    value >= 1 &&
+    value <= GATEQ_SYNTHESIS_MAX_ATTEMPTS_CAP
+    ? value
+    : GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT;
+}
+
+/**
+ * Seconds a failed attempt waits before the next: the base, doubled for each
+ * attempt already spent (10 min, then 20 min by default), so a provider
+ * outage is not hammered and a transient fault still recovers the same hour.
+ */
+export function gateqSynthesisRetryDelaySeconds(
+  attemptsSpent: number,
+  baseSeconds: number,
+): number {
+  const spent = Math.max(1, Math.min(6, Math.trunc(attemptsSpent)));
+  return Math.max(60, baseSeconds) * 2 ** (spent - 1);
+}
+
 export type PendingSynthesis = {
   readonly applicationId: string;
   readonly tenantId: string;
@@ -252,14 +283,32 @@ export function createDossierSynthesis(deps: {
         },
         {
           schema: GateqDossierSynthesisResultSchema,
+          // Live 2026-11-13 (application 3ec9713b): both attempts were
+          // refused whole as "points:too_big" -- ten points against a bound
+          // of nine -- and the investor got no reading at all. A list over
+          // its bound keeps its first items (reported by the gateway, never
+          // repaired); every kept point is still checked for citations below.
+          invalidListItems: "DROP",
           signal: AbortSignal.timeout(120_000),
         },
       );
-      if (response.output.kind !== "STRUCTURED") return "FAILED";
+      if (response.output.kind !== "STRUCTURED") {
+        deps.logger?.warn(
+          { applicationId: item.applicationId, output: response.output.kind },
+          "gateq synthesis failed: no structured answer",
+        );
+        return "FAILED";
+      }
       const parsed = GateqDossierSynthesisResultSchema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
-      if (!parsed.success) return "FAILED";
+      if (!parsed.success) {
+        deps.logger?.warn(
+          { applicationId: item.applicationId },
+          "gateq synthesis failed: answer did not match its schema",
+        );
+        return "FAILED";
+      }
       await deps.store.ready({
         applicationId: item.applicationId,
         synthesis: citedSynthesis(parsed.data, context, now().toISOString()),

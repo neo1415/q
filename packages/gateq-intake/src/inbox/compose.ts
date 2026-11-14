@@ -3,7 +3,11 @@ import { GatewayIdSchema, type GateQService } from "@capital-q/gateq";
 import type { ActorContext } from "@capital-q/security";
 
 import { createPostgresInboxRepository } from "../infrastructure/postgres-inbox.js";
-import type { InboxAuthority, SharedDocumentPort } from "./ports.js";
+import type {
+  InboxAuthority,
+  SharedDocumentPort,
+  SubmittedDocumentTextPort,
+} from "./ports.js";
 import { createInboxService, type InboxService } from "./service.js";
 import type { GateqEmailEvent, GateqOutboundSender } from "./founder-mail.js";
 
@@ -47,12 +51,20 @@ export function createGateqInbox(options: {
   readonly documents?: SharedDocumentPort | undefined;
   readonly founderMail?: GateqOutboundSender | undefined;
   readonly onEmail?: ((event: GateqEmailEvent) => void) | undefined;
+  /** The synthesis job's attempt bound (gateqSynthesisMaxAttempts). */
+  readonly synthesisMaxAttempts?: number | undefined;
+  /** The submitted documents' text, for Q's reading of an application. */
+  readonly documentText?: SubmittedDocumentTextPort | undefined;
 }): InboxService {
   return createInboxService({
-    repository: createPostgresInboxRepository({ sql: options.sql }),
+    repository: createPostgresInboxRepository({
+      sql: options.sql,
+      synthesisMaxAttempts: options.synthesisMaxAttempts,
+    }),
     authority: gateqInboxAuthority(options.gateq),
     transactions: options.transactions,
     documents: options.documents,
+    documentText: options.documentText,
     founderMail: options.founderMail,
     onEmail: options.onEmail,
   });
@@ -79,6 +91,7 @@ export function gateqInboxActionsPort(
     triage: service.triage,
     list: service.list,
     detail: service.detail,
+    submittedDocuments: service.submittedDocuments,
     draftPass: service.draftPass,
     findApplication: service.findApplication,
     findMember: service.findMember,

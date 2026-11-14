@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getCompany, listDocuments } from "@capital-q/api-client";
+import { getCompany, getMyProfile, listDocuments } from "@capital-q/api-client";
 
 import { getSessionUser } from "@/auth/session";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
@@ -51,11 +51,13 @@ export async function founderFormContext(): Promise<FounderFormContext> {
       materials: [],
     };
   }
-  const [company, documents] = await Promise.all([
+  const [company, documents, profile] = await Promise.all([
     getCompany(session, context.companyId).catch(() => null),
     listDocuments(session, { companyId: context.companyId, limit: 20 })
       .then((result) => result.documents)
       .catch(() => []),
+    // Live D7: the contact's full name is their own profile name.
+    getMyProfile(session).catch(() => null),
   ]);
   const name = company?.canonicalName ?? context.label;
   if (name === null) {
@@ -69,7 +71,7 @@ export async function founderFormContext(): Promise<FounderFormContext> {
       oneLiner: company?.shortDescription ?? null,
       stageCode: company?.currentStageCode ?? null,
       country: company?.headquartersCountry ?? null,
-      contactName: null,
+      contactName: profile?.displayName ?? null,
       contactEmail: user.email,
     },
     materials: documents

@@ -18,6 +18,7 @@ import {
   resumeApplication,
   saveApplicationAnswers,
   startApplication,
+  startAccountApplication,
   submitApplication,
 } from "@capital-q/api-client";
 import type {
@@ -252,7 +253,13 @@ export async function startFormAction(publicId: string): Promise<FormResult> {
   if (!id.success || url === null) return { ok: false, message: "Not found." };
   if (!(await visitorMayStart())) return RATE_LIMITED;
   try {
-    const started = await startApplication(url, id.data, "form");
+    // Signed in: their own unsent draft here is reopened (live D5), so a
+    // visit never leaves another empty draft behind.
+    const account = await apiSession();
+    const started =
+      account === null
+        ? await startApplication(url, id.data, "form")
+        : await startAccountApplication(account, id.data, "form");
     return {
       ok: true,
       sessionToken: started.sessionToken,

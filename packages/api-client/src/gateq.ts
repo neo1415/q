@@ -26,6 +26,7 @@ import {
   GATEQ_APPLY_MATERIALS_PATH,
   ShareApplicationMaterialsResponseSchema,
   type ApplicationAnswersRequest,
+  GATEQ_APPLY_ACCOUNT_START_PATH,
   GATEQ_APPLY_START_PATH,
   GATEQ_APPLY_SUBMIT_PATH,
   GATEQ_APPLY_TURN_PATH,
@@ -147,6 +148,27 @@ export function startApplication(
     { baseUrl, accessToken: "" },
     "POST",
     GATEQ_APPLY_START_PATH,
+    StartApplicationResponseSchema,
+    {
+      body:
+        mode === undefined ? { gatewayPublicId } : { gatewayPublicId, mode },
+    },
+  );
+}
+
+/**
+ * Live D5: a signed-in founder's start. Their own unsent draft at the
+ * gateway is reopened rather than a new one made on every visit.
+ */
+export function startAccountApplication(
+  session: ApiSession,
+  gatewayPublicId: string,
+  mode?: "conversation" | "form",
+) {
+  return call(
+    session,
+    "POST",
+    GATEQ_APPLY_ACCOUNT_START_PATH,
     StartApplicationResponseSchema,
     {
       body:

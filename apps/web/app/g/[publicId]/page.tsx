@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { buttonClassName } from "@capital-q/ui/button";
+
+import {
+  appliedHere,
+  appliedOnWords,
+} from "@/features/gateq/form/already-applied";
 import { founderFormContext } from "@/features/gateq/form/founder-prefill";
 import { GateQForm } from "@/features/gateq/form/gateq-form";
 import {
@@ -35,7 +41,10 @@ export default async function GatewayPage({ params }: Props) {
 
   const gateway = await publicGateway((await params).publicId);
   if (gateway === null) notFound();
-  const founder = await founderFormContext();
+  const [founder, applied] = await Promise.all([
+    founderFormContext(),
+    appliedHere(gateway.publicId),
+  ]);
   const signedInAs = founder.prefill?.contactName ?? null;
   // Design gatepub-1: the bar, who is signed in, then the form. B6: the bar
   // carries the investing organisation's name, mark and (AA-safe) accent;
@@ -53,12 +62,39 @@ export default async function GatewayPage({ params }: Props) {
         )}
       </header>
       <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 pt-5 pb-16 sm:px-10 sm:pt-8">
-        <GateQForm
-          gateway={gateway}
-          prefill={founder.prefill}
-          needsCompany={founder.needsCompany}
-          materials={founder.materials}
-        />
+        {applied === null ? (
+          <GateQForm
+            gateway={gateway}
+            prefill={founder.prefill}
+            needsCompany={founder.needsCompany}
+            materials={founder.materials}
+          />
+        ) : (
+          // Live D5: said on entry, not after the form and interview are
+          // redone and Submit refuses. No draft is opened by this page.
+          <section
+            aria-labelledby="gq-applied"
+            className="flex flex-col gap-3"
+            style={{ maxWidth: "60ch" }}
+          >
+            <h1 id="gq-applied" className="cq-title-lg">
+              {t(`You applied on ${appliedOnWords(applied.sentAt)}`)}
+            </h1>
+            <p className="cq-body text-(--cq-text-secondary)">
+              {t(
+                `${applied.fund} has your application. One application per organisation every 180 days, so there is nothing to fill in again here.`,
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/gateq?tab=applications"
+                className={buttonClassName("primary")}
+              >
+                {t("See your application")}
+              </a>
+            </div>
+          </section>
+        )}
         <p className="cq-caption text-(--cq-text-tertiary)">
           {t("Powered by Capital Q")}
         </p>

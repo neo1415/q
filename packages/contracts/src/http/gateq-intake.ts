@@ -321,6 +321,13 @@ export const GATEQ_APPLY_CONTACT_CONFIRM_PATH =
  */
 export const GATEQ_APPLY_CONTACT_ACCOUNT_PATH =
   "/v1/gateq/apply/contact/account" as const;
+/**
+ * A signed-in founder opens a gateway's form (live D5, 2026-11-13): their
+ * own unsent draft there is reopened rather than a new one made on every
+ * visit. Needs an actor; answers like the public start.
+ */
+export const GATEQ_APPLY_ACCOUNT_START_PATH =
+  "/v1/gateq/apply/account/start" as const;
 /** The interview so far, both sides, in order. */
 export const GATEQ_APPLY_TRANSCRIPT_PATH =
   "/v1/gateq/apply/transcript" as const;

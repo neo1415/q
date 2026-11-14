@@ -79,7 +79,10 @@ export { amountStatedIn, amountsIn } from "./application/stated-amount.js";
 export {
   citedSynthesis,
   createDossierSynthesis,
+  GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT,
   GATEQ_SYNTHESIS_PROMPT_VERSION,
+  gateqSynthesisMaxAttempts,
+  gateqSynthesisRetryDelaySeconds,
   synthesisContext,
   type DossierSynthesis,
   type PendingSynthesis,
@@ -162,6 +165,8 @@ export type {
   InboxRepository,
   InboxRow,
   SharedDocumentPort,
+  SubmittedDocumentReading,
+  SubmittedDocumentTextPort,
 } from "./inbox/ports.js";
 export {
   createInboxService,

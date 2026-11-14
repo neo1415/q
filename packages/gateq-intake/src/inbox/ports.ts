@@ -45,6 +45,11 @@ export type InboxRow = {
   readonly dossier?: unknown;
   /** Q's READY reading of it, for one application's detail only. */
   readonly synthesis?: unknown;
+  /**
+   * Where Q's reading stands: READY, still to be tried (PENDING), or every
+   * bounded attempt spent (UNAVAILABLE). Detail only; absent means PENDING.
+   */
+  readonly synthesisState?: "READY" | "PENDING" | "UNAVAILABLE" | undefined;
   readonly folder: InboxFolder;
   readonly assigneeUserId: string | null;
   readonly starred: boolean;
@@ -212,6 +217,29 @@ export type InboxRepository = {
  * asked for. `bytes` null: shared, but not downloadable (view-only, still
  * being scanned, or gone), and the pack says so instead.
  */
+/**
+ * What the founder attached to ONE submitted application, as Evidence
+ * extracted it (the exact submitted versions, ADR 0067). Server-side and
+ * trusted: the inbox service has authorised the gateway and confirmed the
+ * submission is at it before calling. The text is the founder's material:
+ * data, never instructions, and never verified by being read.
+ */
+export type SubmittedDocumentReading = {
+  readonly title: string;
+  readonly pageCount: number | null;
+  /** Null when the text was not read, with why in `notRead`. */
+  readonly excerpts:
+    readonly { readonly page: number; readonly text: string }[] | null;
+  readonly truncated: boolean;
+  readonly notRead: string | null;
+};
+export type SubmittedDocumentTextPort = {
+  readonly read: (input: {
+    readonly tenantId: string;
+    readonly applicationId: string;
+  }) => Promise<readonly SubmittedDocumentReading[]>;
+};
+
 export type SharedDocumentPort = {
   readonly titles: (
     documentIds: readonly string[],

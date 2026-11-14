@@ -6,9 +6,14 @@ import {
   type GateqSynthesisV1,
 } from "@capital-q/contracts";
 
+import { acceptStructuredOutput } from "@capital-q/model-gateway";
+import { GateqDossierSynthesisResultSchema } from "@capital-q/q-core";
+
 import {
   citedSynthesis,
   createDossierSynthesis,
+  gateqSynthesisMaxAttempts,
+  gateqSynthesisRetryDelaySeconds,
   synthesisContext,
   type PendingSynthesis,
   type SynthesisStore,
@@ -310,5 +315,168 @@ describe("money in the dossier (live check 2026-10-16)", () => {
       currency: "USD",
     });
     expect(amountOfSummary("USD 36,00")).toBeNull();
+  });
+});
+
+describe("a reading that overflows its bounds (live D1, application 3ec9713b)", () => {
+  const point = (n: number) => ({
+    kind: "RISK",
+    text: `Point ${String(n)}`,
+    factIds: [FACT_REVENUE, FACT_TRACTION],
+    turnSeqs: [6],
+  });
+  const answer = JSON.stringify({
+    takeaway: "An early marketplace with founder-reported sign-ups.",
+    points: Array.from({ length: 11 }, (_, i) => point(i + 1)),
+  });
+
+  it("was refused whole as points:too_big without list dropping", () => {
+    const refused = acceptStructuredOutput(
+      answer,
+      GateqDossierSynthesisResultSchema,
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.refusals?.some((r) => r.startsWith("points"))).toBe(true);
+  });
+
+  it("is kept, cut to its first nine points, with the job's options", async () => {
+    const accepted = acceptStructuredOutput(
+      answer,
+      GateqDossierSynthesisResultSchema,
+      { invalidListItems: "DROP" },
+    );
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) return;
+    expect(accepted.value.points).toHaveLength(9);
+    expect(accepted.value.points[0]?.text).toBe("Point 1");
+
+    // The job asks the gateway for exactly that.
+    const execute = vi.fn(() =>
+      Promise.resolve({
+        output: { kind: "STRUCTURED", value: accepted.value },
+      }),
+    );
+    const s: SynthesisStore = {
+      pending: () =>
+        Promise.resolve([
+          {
+            applicationId: "3ec9713b-f060-428e-9cc7-abedd3e0e7cb",
+            tenantId: "a27357f9-e431-4ed8-b6cf-c7f6a5498a1b",
+            investorName: "Kilima Angel Network",
+            dossier,
+            transcript,
+          },
+        ]),
+      claim: () => Promise.resolve(true),
+      ready: () => Promise.resolve(),
+    };
+    const job = createDossierSynthesis({
+      gateway: { execute } as never,
+      store: s,
+    });
+    expect(await job.sweep(1)).toEqual({ ready: 1, failed: 0 });
+    const options = (
+      execute.mock.calls[0] as unknown as [
+        unknown,
+        { invalidListItems?: string },
+      ]
+    )[1];
+    expect(options.invalidListItems).toBe("DROP");
+  });
+});
+
+describe("bounded retry", () => {
+  it("fails, is tried again later, and then records the reading", async () => {
+    let attempts = 0;
+    const recorded: GateqSynthesisV1[] = [];
+    const s: SynthesisStore = {
+      pending: () =>
+        Promise.resolve(
+          recorded.length > 0
+            ? []
+            : [
+                {
+                  applicationId: "9ac8e432-4108-4492-9ea5-eb9e1faaba20",
+                  tenantId: "3965fb62-6225-48f2-8daf-480a8c6cb05b",
+                  investorName: "Savanna Seed Partners",
+                  dossier,
+                  transcript,
+                },
+              ],
+        ),
+      claim: () => {
+        attempts += 1;
+        return Promise.resolve(
+          attempts <= gateqSynthesisMaxAttempts(undefined),
+        );
+      },
+      ready: (input) => {
+        recorded.push(input.synthesis);
+        return Promise.resolve();
+      },
+    };
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("provider timed out"))
+      .mockResolvedValue({
+        output: {
+          kind: "STRUCTURED",
+          value: {
+            takeaway: "Founder-reported early traction.",
+            points: [
+              {
+                kind: "QUESTION",
+                text: "See the contracts",
+                factIds: [],
+                turnSeqs: [6],
+              },
+            ],
+          },
+        },
+      });
+    const job = createDossierSynthesis({
+      gateway: { execute } as never,
+      store: s,
+    });
+    expect(await job.sweep(1)).toEqual({ ready: 0, failed: 1 });
+    expect(recorded).toEqual([]);
+    expect(await job.sweep(1)).toEqual({ ready: 1, failed: 0 });
+    expect(recorded).toHaveLength(1);
+    expect(await job.sweep(1)).toEqual({ ready: 0, failed: 0 });
+  });
+
+  it("stops after its bound: no model call once the attempts are spent", async () => {
+    const execute = vi.fn();
+    const s: SynthesisStore = {
+      pending: () =>
+        Promise.resolve([
+          {
+            applicationId: "9ac8e432-4108-4492-9ea5-eb9e1faaba20",
+            tenantId: "3965fb62-6225-48f2-8daf-480a8c6cb05b",
+            investorName: "Savanna Seed Partners",
+            dossier,
+            transcript,
+          },
+        ]),
+      // The store refuses a claim once the attempts are spent.
+      claim: () => Promise.resolve(false),
+      ready: () => Promise.resolve(),
+    };
+    const job = createDossierSynthesis({
+      gateway: { execute } as never,
+      store: s,
+    });
+    expect(await job.sweep(1)).toEqual({ ready: 0, failed: 1 });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("backs off: 10 minutes, then 20; bounded to three attempts by default", () => {
+    expect(gateqSynthesisRetryDelaySeconds(1, 600)).toBe(600);
+    expect(gateqSynthesisRetryDelaySeconds(2, 600)).toBe(1200);
+    expect(gateqSynthesisRetryDelaySeconds(1, 5)).toBe(60);
+    expect(gateqSynthesisMaxAttempts(undefined)).toBe(3);
+    expect(gateqSynthesisMaxAttempts("2")).toBe(2);
+    expect(gateqSynthesisMaxAttempts("9")).toBe(3);
   });
 });

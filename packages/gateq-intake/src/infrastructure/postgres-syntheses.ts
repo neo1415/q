@@ -4,9 +4,10 @@ import {
 } from "@capital-q/contracts";
 import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
-import type {
-  PendingSynthesis,
-  SynthesisStore,
+import {
+  gateqSynthesisRetryDelaySeconds,
+  type PendingSynthesis,
+  type SynthesisStore,
 } from "../application/dossier-synthesis.js";
 
 /**
@@ -19,11 +20,19 @@ export function createPostgresSynthesisStore(deps: {
   readonly sql: DatabaseExecutor;
   readonly from: Date;
   readonly maxAttempts: number;
-  /** A failed attempt waits this long before it is tried again. */
+  /**
+   * A failed first attempt waits this long before it is tried again; each
+   * later failure doubles the wait (gateqSynthesisRetryDelaySeconds).
+   */
   readonly retryAfterSeconds?: number | undefined;
 }): SynthesisStore {
   const { sql } = deps;
-  const retry = Math.max(60, deps.retryAfterSeconds ?? 600);
+  // Mirrors gateqSynthesisRetryDelaySeconds in SQL: the base doubled for
+  // each attempt already spent (at most 2^5).
+  const base = gateqSynthesisRetryDelaySeconds(
+    1,
+    deps.retryAfterSeconds ?? 600,
+  );
   return {
     pending: async (limit) => {
       const rows = await sql<
@@ -48,7 +57,8 @@ export function createPostgresSynthesisStore(deps: {
            and s.submitted_at >= ${deps.from}
            and (y.application_id is null
                 or (y.status = 'FAILED' and y.attempts < ${deps.maxAttempts}
-                    and y.updated_at < now() - make_interval(secs => ${retry})))
+                    and y.updated_at < now() - make_interval(secs => ${base}::double precision
+                                       * power(2, least(greatest(y.attempts, 1), 6) - 1))))
          order by s.submitted_at
          limit ${Math.max(1, Math.min(10, limit))}`;
       return rows.map((row): PendingSynthesis => ({
@@ -70,7 +80,8 @@ export function createPostgresSynthesisStore(deps: {
          where gateq.application_syntheses.status = 'FAILED'
            and gateq.application_syntheses.tenant_id = ${input.tenantId}
            and gateq.application_syntheses.attempts < ${deps.maxAttempts}
-           and gateq.application_syntheses.updated_at < now() - make_interval(secs => ${retry})
+           and gateq.application_syntheses.updated_at < now() - make_interval(secs => ${base}::double precision
+                 * power(2, least(greatest(gateq.application_syntheses.attempts, 1), 6) - 1))
         returning attempts`;
       return rows.length === 1;
     },

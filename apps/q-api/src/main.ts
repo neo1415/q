@@ -54,6 +54,7 @@ import {
   createPostgresArrivalProbe,
 } from "./composition/arrival-snapshot.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
+import { createSubmittedDocumentText } from "./composition/gateq-submitted-documents.js";
 import { createInvestorSectorFocusPort } from "./composition/investor-sector-focus.js";
 import { rehearsalWeb } from "./composition/rehearsal-web.js";
 import {
@@ -73,6 +74,7 @@ import {
 } from "@capital-q/companies";
 import {
   createGateqInbox,
+  gateqSynthesisMaxAttempts,
   createStartupAlerts,
   gateqInboxActionsPort,
   ownGatewayIdFrom,
@@ -404,6 +406,7 @@ import {
   waitMaxMsFromEnv,
 } from "@capital-q/communication";
 import {
+  createGateQApplicationDocumentPort,
   createPostgresClaimQueryPort,
   createPostgresDocumentQueryPort,
   createSupabaseDocumentStorageProvider,
@@ -3047,6 +3050,14 @@ const gateqInbox = gateqInboxActionsPort(
     sql: database.sql,
     transactions: database.transactions,
     gateq: gateqForInbox,
+    // D4 (live 2026-11-13): Q reads what the founder attached to the
+    // application it is asked about, the exact submitted versions.
+    documentText: createSubmittedDocumentText(
+      createGateQApplicationDocumentPort({ sql: database.sql }),
+    ),
+    synthesisMaxAttempts: gateqSynthesisMaxAttempts(
+      process.env["CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS"],
+    ),
     // P14: an approved pass or reply reaches the founder by email too.
     founderMail:
       teamEmailConfig.brevoApi !== undefined

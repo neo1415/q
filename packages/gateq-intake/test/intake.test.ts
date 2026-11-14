@@ -442,6 +442,56 @@ describe("starting an application", () => {
   });
 });
 
+describe("reopening a founder's own draft (live D5, 2026-11-13)", () => {
+  it("gives the same draft a new session instead of a new application", async () => {
+    const w = world(policyOf("OPEN", []));
+    const started = await w.service.start({ gatewayPublicId: PUBLIC_ID });
+    await w.service.recordFacts({
+      token: started.token,
+      facts: [fact("company.name", { kind: "TEXT", text: "Kazikit" })],
+    });
+    const application = [...w.applications.values()][0];
+    if (application === undefined) throw new Error("no draft");
+
+    const again = await w.service.reopen({
+      applicationId: application.id,
+      gatewayPublicId: PUBLIC_ID,
+    });
+    expect(again).not.toBeNull();
+    expect(again?.reference).toBe(started.reference);
+    expect(again?.token).not.toBe(started.token);
+    expect(w.applications.size).toBe(1);
+    // The new credential opens the same answers; the old one still works.
+    const view = await w.service.resume(again?.token ?? "");
+    expect(view.declaredName).toBe("Kazikit");
+    await expect(w.service.resume(started.token)).resolves.toBeDefined();
+  });
+
+  it("never reopens a submitted application, nor one at another gateway", async () => {
+    const w = world(policyOf("QUALIFIED", [GEO, STAGE, SECTOR]));
+    const started = await w.service.start({ gatewayPublicId: PUBLIC_ID });
+    await w.service.recordFacts({ token: started.token, facts: QUALIFYING });
+    await w.service.submit({
+      token: started.token,
+      clientRequestId: "req-000000000001",
+    });
+    const application = [...w.applications.values()][0];
+    if (application === undefined) throw new Error("no application");
+    expect(
+      await w.service.reopen({
+        applicationId: application.id,
+        gatewayPublicId: PUBLIC_ID,
+      }),
+    ).toBeNull();
+    expect(
+      await w.service.reopen({
+        applicationId: application.id,
+        gatewayPublicId: "gq_zzzzzzzzzzzzzzzzzzzzzzzzzz",
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("the frozen policy version", () => {
   it("judges an application under the version it started on", async () => {
     // The investor opens the gateway up after this applicant started.

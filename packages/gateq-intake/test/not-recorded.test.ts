@@ -67,6 +67,8 @@ const ACKNOWLEDGED: GateQInterviewerResult = {
   asking: "company.customers",
   questionForQ: null,
   readyToReview: false,
+  conflicts: [],
+  readBackConfirmed: null,
 };
 
 describe("a worked-out figure is read back for a yes, like a person would (owner 2026-10-21)", () => {
@@ -96,6 +98,8 @@ describe("a worked-out figure is read back for a yes, like a person would (owner
         asking: "company.customers",
         questionForQ: null,
         readyToReview: false,
+        conflicts: [],
+        readBackConfirmed: null,
       },
       {
         utterance: "Yes, that's right.",
@@ -130,6 +134,8 @@ describe("a worked-out figure is read back for a yes, like a person would (owner
       asking: "claims.revenue",
       questionForQ: null,
       readyToReview: false,
+      conflicts: [],
+      readBackConfirmed: null,
     };
     for (const utterance of [
       "No, not quite.",
@@ -150,6 +156,8 @@ describe("a worked-out figure is read back for a yes, like a person would (owner
         asking: "company.customers",
         questionForQ: null,
         readyToReview: false,
+        conflicts: [],
+        readBackConfirmed: null,
       },
       {
         locale: "fr",

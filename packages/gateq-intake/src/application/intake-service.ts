@@ -226,6 +226,16 @@ export type IntakeService = {
     readonly gatewayPublicId: string;
   }) => Promise<StartApplicationResult>;
   readonly resume: (token: string) => Promise<ApplicationView>;
+  /**
+   * Live D5: a new session for the founder's own unsent draft at this
+   * gateway. TRUSTED: the caller has established that this account opened
+   * the draft; a draft already submitted, or at another gateway, or under
+   * a gateway version no longer current, is not reopened (null).
+   */
+  readonly reopen: (input: {
+    readonly applicationId: string;
+    readonly gatewayPublicId: string;
+  }) => Promise<StartApplicationResult | null>;
   readonly recordFacts: (input: {
     readonly token: string;
     readonly facts: readonly NewApplicationFact[];
@@ -569,6 +579,45 @@ export function createIntakeService(
     resume: async (token) => {
       const { application } = await authorise(token);
       return viewOf(application);
+    },
+
+    reopen: async (input) => {
+      const policy = await policies.currentPolicyByPublicId(
+        input.gatewayPublicId,
+      );
+      if (policy === null || policy.version.inboundMode === "CLOSED")
+        return null;
+      const found = await applications.findById(
+        ApplicationIdSchema.parse(input.applicationId),
+      );
+      if (
+        found === null ||
+        found.status !== "IN_PROGRESS" ||
+        found.gatewayId !== policy.gateway.id ||
+        found.tenantId !== policy.gateway.tenantId ||
+        // A draft bound to an older published version would be judged by
+        // rules the gateway no longer shows; a fresh one is opened instead.
+        found.gatewayVersionId !== policy.version.id
+      )
+        return null;
+      const token = issueSessionToken();
+      const expiresAt = new Date(
+        clock().getTime() + SESSION_LIFETIME_MS,
+      ).toISOString();
+      await transactions.run(async (tx) => {
+        await sessions.create(tx, {
+          applicationId: found.id,
+          tenantId: found.tenantId,
+          tokenHash: hashSessionToken(token),
+          expiresAt,
+        });
+      });
+      return {
+        token,
+        reference: found.publicReference,
+        view: await viewOf(found),
+        expiresAt,
+      };
     },
 
     recordFacts: async (input) => {

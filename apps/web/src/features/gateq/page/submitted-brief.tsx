@@ -91,9 +91,12 @@ const POINT = {
 export function SubmittedBrief({
   dossier,
   synthesis = null,
+  synthesisState = "PENDING",
 }: {
   readonly dossier: GateqDossierV1;
   readonly synthesis?: GateqSynthesisV1 | null | undefined;
+  /** UNAVAILABLE: every bounded attempt failed; say so, never "not ready". */
+  readonly synthesisState?: "READY" | "PENDING" | "UNAVAILABLE" | undefined;
 }) {
   const t = useT();
 
@@ -418,7 +421,11 @@ export function SubmittedBrief({
         )}
         {synthesis === null ? (
           <p className="cq-caption gq-t2 mt-3">
-            {t("Q's reading of this submission isn't ready yet.")}
+            {synthesisState === "UNAVAILABLE"
+              ? t(
+                  "Q couldn't write its reading of this submission. Everything the founder sent is above, unchanged.",
+                )
+              : t("Q's reading of this submission isn't ready yet.")}
           </p>
         ) : (
           <section
