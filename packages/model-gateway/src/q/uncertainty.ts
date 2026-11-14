@@ -89,27 +89,53 @@ export function publicCheckOf(input: {
 }
 
 /**
- * The research tool's guidance when the web could not be searched and
- * Capital Q says so itself in its closing line: the answer is told not to
- * say it again (one statement of it, never two), and never to read the
- * absence as "nothing exists".
+ * The research tool's guidance when the web could not be searched. Code
+ * says so itself, in one short line, where it matters to the answer: the
+ * answer is told not to say it again (one statement of it, never two), and
+ * never to read the absence as "nothing exists".
  */
 export const UNAVAILABLE_CODE_SAYS_GUIDANCE =
-  "PUBLIC WEB SEARCH UNAVAILABLE: nothing on the public web was looked at this turn. Capital Q adds one closing line saying what was checked and that public sources were not read: do not say that yourself. Answer from Capital Q's records and the conversation, saying what they hold and what they don't. Never say or suggest that nothing exists, that nothing was found, or that they have no public presence: it was not checked. Never guess public facts.";
+  "PUBLIC WEB SEARCH UNAVAILABLE: nothing on the public web was looked at this turn. Where it matters to the answer, Capital Q says in one short line that public sources were not read: do not say that yourself. Answer from Capital Q's records and the conversation, saying what they hold and what they don't. Never say or suggest that nothing exists, that nothing was found, or that they have no public presence: it was not checked. Never guess public facts.";
+
+/**
+ * When code says what was checked (owner directive 14 Nov 2026, point 4:
+ * Q is an analyst, not a compliance workflow). Read from the turn reader's
+ * structured reading and the answer's own fields, never from words.
+ */
+export type CheckedLineNeed = {
+  /**
+   * The reader read the turn as about the public web or public facts
+   * (asksForWeb, a RESEARCH_REQUEST, or a PUBLIC_FACTS question): what
+   * was checked is then part of the answer.
+   */
+  readonly askedPublic: boolean;
+  /** The answer's own fields say it could not answer (insufficientEvidence). */
+  readonly cannotAnswer: boolean;
+  /** The answer's own fields list evidence it lacks (missingEvidence). */
+  readonly lacksEvidence: boolean;
+};
 
 /**
  * Live gap (production 4d61457fd, investor.savanna-seed): "What was Maji
  * Loop's MRR in October 2026?" was answered "isn't on record" while the
  * turn's public search could not run (every provider resting), and nothing
- * said the public web had not been read. On a turn about a named company
- * or person not theirs, code says what was checked: the records Capital Q
- * holds that they may see, and whether public sources were read this turn.
+ * said the public web had not been read. Owner directive 14 Nov 2026
+ * (point 4): the line was then added to nearly every answer about another
+ * company -- an operational disclosure, not analysis. Where the answer
+ * stands on Capital Q's records, the record source labels and public
+ * source cards already show what it rests on; the line is said only where
+ * it changes how the answer reads:
  *
- * - UNAVAILABLE: always said (the turn was meant to search, and did not).
- * - NOTHING_FOUND / NOT_RUN: said only when the answer's own structure
- *   reports something missing or uncertain (insufficientEvidence,
- *   missingEvidence, uncertainties); otherwise the records answered.
- * - READ: nothing added; the answer says what the sources report.
+ * - READ: never (the answer and its source cards say what pages report).
+ * - they asked about public sources or public facts: always, so what was
+ *   looked at is part of the answer.
+ * - UNAVAILABLE: the turn meant to search and could not; said when the
+ *   answer lacks evidence or cannot answer, since silence would read as
+ *   "nothing public exists" (research absence honesty).
+ * - NOT_RUN: said when the answer cannot answer at all, for the same
+ *   reason; a records answer that merely notes a gap stands on its own.
+ * - NOTHING_FOUND: the search ran, so no absence is implied by not
+ *   looking; said only when asked.
  *
  * Built from Capital Q's own records' scope and the tool's status only:
  * nothing of a founder's private record can be in it.
@@ -118,25 +144,64 @@ export function checkedLine(input: {
   readonly check: PublicCheck;
   /** Whom the turn is about, as the reader named them; null: unknown. */
   readonly subject: string | null;
-  /** The answer's own fields report a gap (never read from its words). */
-  readonly reportsGap: boolean;
+  readonly need: CheckedLineNeed;
 }): string | null {
   const whom = input.subject === null ? "" : ` on ${input.subject}`;
   const them = input.subject ?? "them";
+  const { askedPublic, cannotAnswer, lacksEvidence } = input.need;
   switch (input.check) {
     case "READ":
       return null;
     case "UNAVAILABLE":
-      return `What I checked: Capital Q's records you can see${whom}. Public sources weren't read this turn because the web search was unavailable, so anything published about ${them} isn't reflected here; I can look again later.`;
+      return askedPublic || cannotAnswer || lacksEvidence
+        ? `What I checked: Capital Q's records you can see${whom}. The public web search was unavailable this turn, so anything published about ${them} isn't reflected here.`
+        : null;
     case "NOTHING_FOUND":
-      return input.reportsGap
-        ? `What I checked: Capital Q's records you can see${whom}, and a public web search this turn, which found no page about ${them}.`
+      return askedPublic
+        ? `What I checked: Capital Q's records you can see${whom}, and a public web search, which found no page about ${them}.`
         : null;
     case "NOT_RUN":
-      return input.reportsGap
-        ? `What I checked: Capital Q's records you can see${whom}. I didn't search public sources this turn; ask and I'll look.`
+      return askedPublic || cannotAnswer
+        ? `What I checked: Capital Q's records you can see${whom}. I haven't searched public sources this turn.`
         : null;
   }
+}
+
+/**
+ * Whether the reader read the turn as about public sources or public
+ * facts. Structured fields only (TURN_READER asksForWeb, turn kind,
+ * question kind).
+ */
+export function askedAboutPublic(request: {
+  readonly asksForWeb?: boolean | undefined;
+  readonly turnKind?: string | undefined;
+  readonly questionKind?: string | undefined;
+}): boolean {
+  return (
+    request.asksForWeb === true ||
+    request.turnKind === "RESEARCH_REQUEST" ||
+    request.questionKind === "PUBLIC_FACTS"
+  );
+}
+
+/**
+ * Owner directive 14 Nov 2026 (point 4): a line code closes answers with
+ * (what was checked, the relationship step) is said once in a
+ * conversation, not on every answer about the same company. True when one
+ * of Q's earlier answers already holds it word for word -- code's own
+ * sentence, never the person's words.
+ */
+export function saidEarlier(
+  line: string,
+  earlierAnswers: readonly string[],
+): boolean {
+  const wanted = line.replace(/\s+/gu, " ").trim();
+  return (
+    wanted.length > 0 &&
+    earlierAnswers.some((answer) =>
+      answer.replace(/\s+/gu, " ").includes(wanted),
+    )
+  );
 }
 
 /** A public-web noun: where the turn would have looked. */
@@ -206,18 +271,29 @@ export function uncertaintiesOf(analyst: unknown): readonly ModelUncertainty[] {
   });
 }
 
-/** Whether the answer's own fields report something missing or uncertain. */
-export function reportsGap(analyst: unknown): boolean {
-  if (analyst === null || typeof analyst !== "object") return false;
-  const read = analyst as {
-    readonly insufficientEvidence?: unknown;
-    readonly missingEvidence?: unknown;
+/**
+ * When the "what was checked" line is needed, from the reader's structured
+ * reading and the answer's own fields. Uncertainties alone never call for
+ * it: how solid a figure is is said by the answer and its offer path, not
+ * by a disclosure of where Q looked.
+ */
+export function checkedLineNeedOf(
+  analyst: unknown,
+  request: Parameters<typeof askedAboutPublic>[0],
+): CheckedLineNeed {
+  const read =
+    analyst !== null && typeof analyst === "object"
+      ? (analyst as {
+          readonly insufficientEvidence?: unknown;
+          readonly missingEvidence?: unknown;
+        })
+      : {};
+  return {
+    askedPublic: askedAboutPublic(request),
+    cannotAnswer: read.insufficientEvidence === true,
+    lacksEvidence:
+      Array.isArray(read.missingEvidence) && read.missingEvidence.length > 0,
   };
-  return (
-    read.insufficientEvidence === true ||
-    (Array.isArray(read.missingEvidence) && read.missingEvidence.length > 0) ||
-    uncertaintiesOf(analyst).length > 0
-  );
 }
 
 const sameWords = (a: string, b: string): boolean =>

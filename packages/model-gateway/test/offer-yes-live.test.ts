@@ -170,9 +170,9 @@ describe("D3: the public-search absence is said once", () => {
       checkedLine({
         check: "UNAVAILABLE",
         subject: "Ajopot",
-        reportsGap: true,
+        need: { askedPublic: false, cannotAnswer: false, lacksEvidence: true },
       }),
-    ).toContain("Public sources weren't read this turn");
+    ).toContain("public web search was unavailable this turn");
     // Neither noun alone nor "unavailable" alone is the absence.
     expect(answerSaysPublicCheck("The data room is unavailable to you.")).toBe(
       false,

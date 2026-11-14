@@ -806,7 +806,9 @@ import {
 } from "./offer-binding.js";
 export {
   answerSaysPublicCheck,
+  askedAboutPublic,
   checkedLine,
+  checkedLineNeedOf,
   chooseVehicle,
   codeUncertaintyOffer,
   decideUncertaintyOffer,
@@ -815,12 +817,14 @@ export {
   publicCheckOf,
   publicWebSeenOf,
   reassessmentNote,
+  saidEarlier,
   stepLineWithoutOffer,
   uncertaintiesOf,
   withResolves,
   UNAVAILABLE_CODE_SAYS_GUIDANCE,
   UNCERTAINTY_VEHICLES,
   MESSAGE_TO_COMPANY_TOOLS,
+  type CheckedLineNeed,
   type PublicCheck,
   type PublicWebSeen,
   type RelationshipStanding,
@@ -836,8 +840,9 @@ import {
   decideUncertaintyOffer,
   publicCheckOf,
   publicWebSeenOf,
+  checkedLineNeedOf,
   reassessmentNote,
-  reportsGap,
+  saidEarlier,
   stepLineWithoutOffer,
   uncertaintiesOf,
   withResolves,
@@ -11726,6 +11731,10 @@ export function createModelGatewayQAnswer(
         const offerRemoved: string[] =
           offerBinding.kind === "UNBOUND" ? [offerBinding.said] : [];
         const uncertaintyLines: string[] = [];
+        /** Q's own earlier answers in this conversation (code's record). */
+        const earlierAnswers = earlier
+          .filter((message) => message.role === "Q")
+          .map((message) => message.content);
         const investorTurn = ownInvestorOrganisationIn(plan) !== null;
         /** The one company this run read in full, if exactly one. */
         const subjectCompany = (): {
@@ -11856,9 +11865,12 @@ export function createModelGatewayQAnswer(
               offerRemoved.push(bound.said);
               // Said once: not beside code's own closing line (D7's stage
               // limit already says what the relationship allows).
+              // Owner directive 14 Nov (point 4): the relationship step is
+              // said once in a conversation, not on every answer about them.
               if (
                 decision.line !== null &&
-                request.closingLines === undefined
+                request.closingLines === undefined &&
+                !saidEarlier(decision.line, earlierAnswers)
               ) {
                 uncertaintyLines.push(decision.line);
               }
@@ -11911,11 +11923,15 @@ export function createModelGatewayQAnswer(
             );
           } else if (request.closingLines === undefined) {
             const step = stepLineWithoutOffer({ uncertainties, vehicle });
-            if (step !== null) uncertaintyLines.push(step);
+            if (step !== null && !saidEarlier(step, earlierAnswers)) {
+              uncertaintyLines.push(step);
+            }
           }
         }
-        // Slice 0: on a turn about someone not theirs, what was checked.
+        // Slice 0: on a turn about someone not theirs, what was checked --
+        // only where it changes how the answer reads (checkedLine).
         if (codeSaysCheckedRuns.has(request.runId)) {
+          const need = checkedLineNeedOf(analyst, request);
           const line = checkedLine({
             check: publicCheckOf({
               seen: publicWebByRun.get(request.runId) ?? [],
@@ -11926,11 +11942,17 @@ export function createModelGatewayQAnswer(
               ),
             }),
             subject: request.namedOther?.name ?? null,
-            reportsGap: reportsGap(analyst),
+            need,
           });
           // D3 (live 76234bfc): said once -- not again when the answer
-          // already says the public web was not looked at this turn.
-          if (line !== null && !answerSaysPublicCheck(analyst.answer)) {
+          // already says the public web was not looked at this turn. Owner
+          // directive 14 Nov (point 4): nor again in a conversation that
+          // already heard it, unless they ask about public sources now.
+          if (
+            line !== null &&
+            !answerSaysPublicCheck(analyst.answer) &&
+            (need.askedPublic || !saidEarlier(line, earlierAnswers))
+          ) {
             uncertaintyLines.unshift(line);
           }
         }

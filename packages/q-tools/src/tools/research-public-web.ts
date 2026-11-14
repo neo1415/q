@@ -309,10 +309,12 @@ export const AMBIGUOUS_GUIDANCE =
 /**
  * Production 2026-10-25: every index was refused or spent, and answers read
  * as if the facts did not exist. A search that could not run found nothing
- * only because it did not run.
+ * only because it did not run. Owner directive 14 Nov 2026 (point 4): the
+ * answer leads, and the absence is said once where it matters, never as an
+ * opening disclaimer or a standing offer to look again.
  */
 export const UNAVAILABLE_GUIDANCE =
-  "PUBLIC WEB SEARCH UNAVAILABLE: the public web could not be searched just now; nothing was looked at. Say so plainly, once, in your first sentence (\"I can't search the public web right now\"), then answer from Capital Q's records and the conversation. Never say or suggest that nothing exists, that nothing was found, or that they have no public presence: it was not checked. Never guess public facts to fill the gap; offer to look again later.";
+  "PUBLIC WEB SEARCH UNAVAILABLE: the public web could not be searched just now; nothing was looked at. Answer first, from Capital Q's records and the conversation. Where public sources would change the answer, or they asked about them, say once, briefly, that you can't search the public web right now; never as an opening disclaimer. Never say or suggest that nothing exists, that nothing was found, or that they have no public presence: it was not checked. Never guess public facts to fill the gap.";
 export const NOT_FOUND_GUIDANCE =
   " NOT FOUND: no public page found is about that name. When Capital Q's records or the conversation answer the question, do not mention the web at all; only when nothing answers it, say once, naturally (\"I couldn't find anything about them online\"). Never describe pages not about them; never guess.";
 
