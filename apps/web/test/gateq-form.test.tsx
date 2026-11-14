@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  ApplicationAnswersRequest,
   ApplicationContactDto,
   ApplicationCoverageDto,
   ApplicationSummaryDto,
@@ -854,6 +855,16 @@ describe("the form, driven like a founder", () => {
   it("a signed-in founder confirms through the account, and shares only ticked documents on Submit", async () => {
     const deck = "00000000-0000-4000-8000-0000000000d1";
     const accounts = "00000000-0000-4000-8000-0000000000d2";
+    // Entry reopens their draft here: a fresh one, nothing said yet.
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application: summary({}),
+      transcript: { turns: [] },
+      coverage: {
+        ...coverageDto({}, { required: true, confirmed: false }),
+        transcriptTurns: 0,
+      },
+    });
     render(
       <GateQForm
         gateway={GATEWAY}
@@ -916,6 +927,93 @@ describe("the form, driven like a founder", () => {
     await press("Submit to Sahel Capital");
     expect(calls.share).toHaveBeenCalledWith(TOKEN, [deck]);
     expect(calls.submit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("live 14 Nov: entering the gateway again never saves over the application", () => {
+  const PROFILE = {
+    companyName: "Coverisk Africa",
+    oneLiner: "Embedded insurance for informal retailers",
+    // The profile says series_b; the application said otherwise.
+    stageCode: "series_b",
+    country: "KE",
+    contactName: "Kamau Barasa",
+    contactEmail: "kamau@example.com",
+  } as const;
+  const ON_RECORD: ApplicationAnswersRequest = {
+    companyName: "Coverisk Africa",
+    oneLiner: "Embedded insurance for informal retailers",
+    stage: "seed",
+    sectors: ["Fintech", "Insurance for shops"],
+    country: "KE",
+    raise: { amount: "400000", currency: "USD" },
+    contactName: "Kamau Barasa",
+    contactEmail: "kamau@example.com",
+  };
+  const settle = async (ms: number) => {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    });
+    await flush();
+  };
+
+  it("the stored answers, sent back unchanged, are the same request (idempotent)", () => {
+    const shown = model.answersFromRecord(
+      model.answersFromProfile(PROFILE).answers,
+      ON_RECORD,
+    );
+    expect(shown.stage).toBe("seed");
+    expect(model.pageRequest(shown)).toEqual(ON_RECORD);
+  });
+
+  it("reopens the draft in a new browser, shows what it holds, saves nothing, and returns to the interview", async () => {
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application: summary({ access: "MAY_APPLY" }),
+      transcript: { turns: [] },
+      coverage: {
+        ...coverageDto({}, { required: true, confirmed: true }),
+        contact: {
+          required: true,
+          confirmed: true,
+          details: contactDto({ name: "Kamau Barasa" }),
+        },
+        transcriptTurns: 49,
+        answers: ON_RECORD,
+      },
+    });
+    render(<GateQForm gateway={GATEWAY} prefill={PROFILE} />);
+    await flush();
+    await settle(700);
+    expect(calls.start).toHaveBeenCalledTimes(1);
+    expect(calls.progress).toHaveBeenCalledWith(TOKEN);
+    // (i) No write without the founder doing something.
+    expect(calls.save).not.toHaveBeenCalled();
+    // The contact step (and its role question) is not asked again.
+    expect(screen.queryByLabelText("Your role")).toBeNull();
+    expect(screen.queryByLabelText("Company name")).toBeNull();
+  });
+
+  it("a fresh draft shows the profile's answers but saves only after the founder edits", async () => {
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application: summary({}),
+      transcript: { turns: [] },
+      coverage: {
+        ...coverageDto({}, { required: true, confirmed: false }),
+        transcriptTurns: 0,
+      },
+    });
+    render(<GateQForm gateway={GATEWAY} prefill={PROFILE} />);
+    await flush();
+    await settle(700);
+    expect(screen.getByLabelText<HTMLInputElement>("Company name").value).toBe(
+      "Coverisk Africa",
+    );
+    expect(calls.save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Health" }));
+    await settle(700);
+    expect(calls.save).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -31,11 +31,17 @@ import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import "../gateq.css";
 import "../gateq-v2.css";
 import { shareMaterialsAction } from "../materials-actions";
-import { readRecovery, saveRecovery, amendRecovery } from "./session-recovery";
+import {
+  readRecovery,
+  saveRecovery,
+  amendRecovery,
+  type GateqRecovery,
+} from "./session-recovery";
 import { AnswersPage } from "./answers-page";
 import { ContactStep } from "./contact-step";
 import {
   answersFromProfile,
+  answersFromRecord,
   contactFromProfile,
   dimensionWord,
   ownLabel,
@@ -194,23 +200,50 @@ export function GateQForm({
   const [submissionStarted, setSubmissionStarted] = useState(false);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const firstRender = useRef(true);
+  // Read once, on entry: a signed-in founder's own draft here is reopened
+  // and shown as it stands, never saved over (live 2026-11-14).
+  const initialAnswers = useRef(initial.answers);
+  const reopenOnEntry = useRef(
+    prefill !== null && !needsCompany && gateway.acceptingApplications,
+  );
 
   useEffect(() => {
     if (preview !== undefined) return;
     startTransition(async () => {
       await Promise.resolve();
-      const restored = readRecovery(gateway.publicId);
+      const remembered = readRecovery(gateway.publicId);
+      // Live 2026-11-14: a signed-in founder in a new browser has no
+      // remembered draft here, but has one on record. It is reopened and
+      // shown as it stands (read only; nothing is saved until they act),
+      // instead of a profile-prefilled form whose save rewrote it.
+      let restored: GateqRecovery | null = remembered;
+      if (restored === null && reopenOnEntry.current) {
+        const reopened = await formRequest(() =>
+          startFormAction(gateway.publicId),
+        );
+        if (reopened.ok)
+          restored = {
+            token: reopened.sessionToken,
+            answers: initialAnswers.current,
+            step: "company",
+            contact: null,
+            interview: false,
+            pendingTurn: null,
+            submitKey: "",
+          };
+      }
       if (restored === null) {
         setRecovering(false);
         return;
       }
-      token.current = restored.token;
-      setCredential(restored.token);
+      const resumedToken = restored.token;
+      token.current = resumedToken;
+      setCredential(resumedToken);
       setAnswers(restored.answers);
       submitKey.current = restored.submitKey;
       setSubmissionStarted(restored.submitKey !== "");
       const progress = await formRequest(() =>
-        interviewProgressAction(restored.token),
+        interviewProgressAction(resumedToken),
       );
       if (!progress.ok) {
         setProblem(progress.message);
@@ -219,6 +252,11 @@ export function GateQForm({
         return;
       }
       setApplication(progress.application);
+      // The application's own answers as they stand, over what this browser
+      // or the profile had: sent back unchanged, they record nothing.
+      const onRecord = progress.coverage.answers;
+      if (onRecord !== undefined)
+        setAnswers(answersFromRecord(restored.answers, onRecord));
       const details = ApplicationContactDtoSchema.safeParse(
         Reflect.get(progress.coverage.contact, "details"),
       );
@@ -237,6 +275,7 @@ export function GateQForm({
             },
       );
       const pastQuestions =
+        progress.coverage.transcriptTurns > 0 ||
         restored.interview ||
         restored.step === "interview" ||
         restored.step === "review" ||
@@ -354,9 +393,10 @@ export function GateQForm({
     liveRef.current = liveCheck;
   });
   const questionsPage = onQuestionsPage(step);
-  // A signed-in founder's profile already answers some questions: check
-  // those at once, so the panel never says "not answered" for them.
-  const live = touched || (prefill !== null && fromProfile.size > 1);
+  // Only the founder's own edit saves (live 2026-11-14: the profile's
+  // prefill, saved on page load with no action, rewrote the interview's
+  // stage). A prefilled or restored form is shown, never sent, until then.
+  const live = touched;
   useEffect(() => {
     if (
       preview !== undefined ||

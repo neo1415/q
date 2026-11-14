@@ -229,6 +229,65 @@ export function answersFromProfile(prefill: FormPrefill | null): {
   };
 }
 
+/**
+ * A resumed application's form: what the application already holds (the
+ * API's `answers`, from the one statement view) over `base` (the profile
+ * prefill or what this browser remembered), so a resumed form never shows
+ * a blank or profile value where the founder already answered (live
+ * 2026-11-14: the resume form saved series_b over the interview's stage).
+ * Sent back unchanged it is the same request, which records nothing.
+ */
+export function answersFromRecord(
+  base: FormAnswers,
+  saved: ApplicationAnswersRequest,
+): FormAnswers {
+  let sectors = base.sectors;
+  let otherSector = base.otherSector;
+  if (saved.sectors === DECLINED) {
+    sectors = DECLINED;
+    otherSector = "";
+  } else if (saved.sectors !== undefined) {
+    const chosen = saved.sectors.filter((word) =>
+      SECTOR_CHOICES.some((choice) => choice.value === word),
+    );
+    const other = saved.sectors.filter((word) => !chosen.includes(word));
+    // One free-text sector shows in "Other"; any more stay as they were
+    // given, so the request sent back is the same one.
+    otherSector = other[0] ?? "";
+    sectors = [...chosen, ...other.slice(1)];
+  }
+  const raise = saved.raise;
+  return {
+    ...base,
+    ...(saved.companyName === undefined
+      ? {}
+      : { companyName: saved.companyName }),
+    ...(saved.oneLiner === undefined ? {} : { oneLiner: saved.oneLiner }),
+    ...(saved.stage === undefined ? {} : { stage: saved.stage }),
+    sectors,
+    otherSector,
+    ...(saved.country === undefined ? {} : { country: saved.country }),
+    ...(raise === undefined
+      ? {}
+      : raise === DECLINED
+        ? { band: DECLINED, amount: "" }
+        : {
+            band: bandFor(raise.amount),
+            amount: raise.amount,
+            currency: raise.currency,
+          }),
+    ...(saved.instrument === undefined ? {} : { instrument: saved.instrument }),
+    ...(saved.lead === undefined ? {} : { lead: saved.lead }),
+    ...(saved.note === undefined ? {} : { note: saved.note }),
+    ...(saved.contactName === undefined
+      ? {}
+      : { contactName: saved.contactName }),
+    ...(saved.contactEmail === undefined
+      ? {}
+      : { contactEmail: saved.contactEmail }),
+  };
+}
+
 /** Digits and one decimal point; "1,200,000" and "1 200 000" are fine. */
 export function normaliseAmount(raw: string): string | null {
   const cleaned = raw.replace(/[\s,_]/g, "");
