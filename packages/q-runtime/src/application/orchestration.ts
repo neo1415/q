@@ -502,6 +502,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly names: readonly string[];
       }
     | undefined;
+  /**
+   * TURN_READER v88 (owner live 14 Nov 2026, D1): on a FIT or
+   * DISCOVER_COMPANIES question they want companies other than those they
+   * are already in contact with. Code leaves their own relationships out of
+   * the list and drops any card a list still shows. Absent is false.
+   */
+  readonly excludeRelationships?: boolean | undefined;
   readonly fitQuestion?:
     | {
         readonly text: string;

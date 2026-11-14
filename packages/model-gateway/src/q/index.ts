@@ -66,6 +66,7 @@ import {
   type QCommunicationProfile,
   type QFailureDiagnosticCode,
   type QOperatingMode,
+  type QAccountDigest,
   type QResponseMessage,
   type QScreenContext,
   type QSubjectRef,
@@ -187,6 +188,7 @@ import {
   fitSweepAskOfReading,
   withReadCount,
   isSingleCompanyQuestion,
+  ownSetOf,
   runFitSweep,
   type FitSweepAsk,
   type FitSweepResult,
@@ -547,6 +549,14 @@ import {
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import {
+  ACCOUNT_DIGEST_BLOCK_MAX_CHARS,
+  accountDigestBlock,
+  exclusionLine,
+  relationshipCounterparts,
+  withoutExcludedCompanies,
+  type QAccountDigestPort,
+} from "./account-digest.js";
+import {
   asComparison,
   namedCardCompanyIds,
   previousCardCompanyIds,
@@ -666,6 +676,15 @@ export {
   type DeckPassage,
   type DeckReader,
 } from "./deck-reader.js";
+export {
+  ACCOUNT_DIGEST_BLOCK_MAX_CHARS,
+  accountDigestBlock,
+  exclusionLine,
+  localWhen,
+  relationshipCounterparts,
+  withoutExcludedCompanies,
+  type QAccountDigestPort,
+} from "./account-digest.js";
 export {
   personTimeZone,
   situationHeader,
@@ -2487,7 +2506,9 @@ export function environmentNoteParts(
         ]),
     ...(options.language === undefined ? [] : [options.language]),
   ];
-  const situation = options.situation?.slice(0, SITUATION_HEADER_MAX_CHARS);
+  // The situation carries the account digest beside it (owner 14 Nov
+  // 2026); both are bounded where they are built and never cut here.
+  const situation = options.situation?.slice(0, SITUATION_WITH_ACCOUNT_MAX_CHARS);
   const turnNotes = (
     researchNote: string | null,
     capabilities: boolean,
@@ -3020,6 +3041,13 @@ export type ModelGatewayQAnswerDependencies = {
    * server for the actor. Absent: the situation says they are unknown.
    */
   readonly situationOf?: QSituationPort | undefined;
+  /**
+   * Owner 14 Nov 2026 (audit P0 #2): the person's account digest --
+   * relationships and what is owed, approvals, calls, Q's work, requests,
+   * GateQ, recent events -- read by code as them, once per turn, typed or
+   * spoken, and told to the answer beside the situation. Absent: none.
+   */
+  readonly accountDigestOf?: QAccountDigestPort | undefined;
   /** The clock for the situation and the own-day read; tests fix it. */
   readonly now?: (() => Date) | undefined;
   readonly askerOf?:
@@ -4016,6 +4044,14 @@ export function createModelGatewayQAnswer(
       return null;
     }
     const earlier = history.filter((m) => m.id !== latest.id);
+    // Owner 14 Nov 2026: the account digest, read once per turn as the
+    // person, beside every other read and before any lane answers. Typed
+    // and spoken turns take this same path; a failed read is null (the
+    // answer then says nothing of the account rather than guessing).
+    const accountDigest =
+      dependencies.accountDigestOf === undefined
+        ? Promise.resolve(null)
+        : dependencies.accountDigestOf(request.actor).catch(() => null);
     // Investigation milestone (12 Nov): pages this conversation's recent
     // research already read, for the follow-up to answer from and cite.
     const earlierPages = earlierResearchPages({
@@ -5007,7 +5043,22 @@ export function createModelGatewayQAnswer(
     const sweepAsk = !sweepable
       ? null
       : withReadCount(
-          request.fitQuestion?.excludeShown === true &&
+          // v88 (D1): "leaving out companies I'm already in contact with"
+          // is decided by the reading; the words' cue would pick exactly
+          // those relationships.
+          request.excludeRelationships === true
+            ? fitSweepAskOfReading(
+                {
+                  text: request.fitQuestion?.text ?? latest.content,
+                  count: request.fitQuestion?.count ?? null,
+                  excludeShown: request.fitQuestion?.excludeShown === true,
+                  excludeRelationships: true,
+                },
+                shownBefore,
+                namedComparison,
+                shownInConversation,
+              )
+            : request.fitQuestion?.excludeShown === true &&
             shownInConversation.length > 0
             ? fitSweepAskOfReading(
                 request.fitQuestion,
@@ -5040,7 +5091,12 @@ export function createModelGatewayQAnswer(
       sweepable
         ? sweepFor(
             fitSweepAskOfReading(
-              fitQuestion,
+              {
+                ...fitQuestion,
+                ...(request.excludeRelationships === true
+                  ? { excludeRelationships: true }
+                  : {}),
+              },
               shownBefore,
               namedComparison,
               shownInConversation,
@@ -6076,6 +6132,9 @@ export function createModelGatewayQAnswer(
       sweptAtPrepare: sweepAsk !== null,
       /** v56: the prepared sweep already left the shown companies out. */
       sweptExcludingShown: (sweepAsk?.exclude?.length ?? 0) > 0,
+      /** v88: the prepared sweep already left their relationships out. */
+      sweptExcludingRelationships: sweepAsk?.excludeRelationships === true,
+      accountDigest,
       shownInConversation,
       discoverFor,
       /** Why the network's fit ranking failed this run, once it has. */
@@ -6483,6 +6542,8 @@ export function createModelGatewayQAnswer(
         fitSweep,
         sweptAtPrepare,
         sweptExcludingShown,
+        sweptExcludingRelationships,
+        accountDigest,
         shownInConversation,
         discoverFor,
         networkRankFailedOf,
@@ -7469,15 +7530,27 @@ export function createModelGatewayQAnswer(
         const language = await languageRead;
         const asker = await askerRead;
         // Step 1: the date, their time and who is asking, on every answer.
-        const situation = situationHeader({
-          now: (dependencies.now ?? (() => new Date()))(),
-          asker: await situationRead,
-          deviceTimeZone: plan.screen?.timeZone,
-          surface: situationSurfaceOf(
-            request.spoken === true,
-            plan.screen?.surface,
+        const situationNow = (dependencies.now ?? (() => new Date()))();
+        const situationAsker = await situationRead;
+        const situation = situationWithAccount({
+          header: situationHeader({
+            now: situationNow,
+            asker: situationAsker,
+            deviceTimeZone: plan.screen?.timeZone,
+            surface: situationSurfaceOf(
+              request.spoken === true,
+              plan.screen?.surface,
+            ),
+            page: plan.screen?.route ?? null,
+          }),
+          // Owner 14 Nov 2026: what is happening in their account, the
+          // same digest for a typed and a spoken turn.
+          digest: await accountDigest,
+          now: situationNow,
+          timeZone: personTimeZone(
+            situationAsker?.timeZone ?? null,
+            plan.screen?.timeZone ?? null,
           ),
-          page: plan.screen?.route ?? null,
         });
         let noteParts = environmentNoteParts(facts, offered, request.subjects, {
           situation,
@@ -8567,7 +8640,37 @@ export function createModelGatewayQAnswer(
           // A map they asked to see is not replaced by a page they did not.
           latest.content,
         );
-        const answerBlocks = carried.length === 0 ? undefined : carried;
+        // v88 (owner live 14 Nov 2026, D1): a stated "not the ones I'm
+        // already in touch with" holds on every path. Any company card of
+        // their own relationships still in the answer is dropped and the
+        // answer says so -- the digest's relationships, and those this
+        // turn's own read found, as them.
+        let answerBlocks = carried.length === 0 ? undefined : carried;
+        if (request.excludeRelationships === true) {
+          const standing = await (standingOf() ?? Promise.resolve(null)).catch(
+            () => null,
+          );
+          const own = ownSetOf(
+            standing !== null && standing.result.ok ? standing.result.data : null,
+          );
+          const inTouch = new Set([
+            ...relationshipCounterparts(await accountDigest),
+            ...own.relationships.map((row) => row.id),
+          ]);
+          const checked = withoutExcludedCompanies(answerBlocks, inTouch);
+          answerBlocks =
+            checked.blocks === undefined || checked.blocks.length === 0
+              ? undefined
+              : checked.blocks;
+          const line = exclusionLine(checked.dropped);
+          if (line !== null) {
+            content = `${content}\n\n${line}`.slice(0, ANSWER_LIMIT_CHARS);
+            logger?.warn(
+              { qRunId: request.runId, dropped: checked.dropped.length },
+              "q answer listed companies the person asked to leave out; dropped by code",
+            );
+          }
+        }
         // A tie is said as a tie, with why (INC-1: three cards at 8.8 read
         // as a ranking).
         const ranked = carried.find(
@@ -9354,6 +9457,9 @@ export function createModelGatewayQAnswer(
         request.fitQuestion !== undefined &&
         request.fitQuestion.previous !== true &&
         request.fitQuestion.excludeShown !== true &&
+        // v88: the sweep leaves their relationships out; the catalog's
+        // ranking does not know them.
+        request.excludeRelationships !== true &&
         request.aboutNamedOther !== true &&
         (request.namedOther ?? null) === null;
       const catalogAsk =
@@ -9474,8 +9580,12 @@ export function createModelGatewayQAnswer(
         readFit?.excludeShown === true &&
         shownInConversation.length > 0 &&
         !sweptExcludingShown;
+      // v88: a prepare warmed on the words alone ranked their own
+      // relationships in; the reading's sweep leaves them out.
+      const pastRelationships =
+        request.excludeRelationships === true && !sweptExcludingRelationships;
       const swept =
-        pastShown && readFit !== undefined
+        (pastShown || pastRelationships) && readFit !== undefined
           ? await sweepForReading(readFit)
           : recommendAll && readFit !== undefined
             ? // The reading decides: the words' sweep may have read
@@ -9583,7 +9693,9 @@ export function createModelGatewayQAnswer(
         // Every company Capital Q can rank for them was already shown:
         // said plainly, never the same cards again (v56).
         const message = await persistCodeAnswer(
-          "Beyond the companies I've already shown you, I don't have another one I can put against your mandate right now.",
+          sweep.ask.excludeRelationships === true
+            ? "Leaving out the companies you're already in touch with, I don't have another one I can put against your mandate right now."
+            : "Beyond the companies I've already shown you, I don't have another one I can put against your mandate right now.",
         );
         logger?.info(
           {
@@ -9650,7 +9762,16 @@ export function createModelGatewayQAnswer(
             networkRankFailedOf() === null || sweep.ask.scope !== "CANDIDATES"
               ? ""
               : `I couldn't rank the whole network just now; here ${shownCount === 1 ? "is one" : `are ${String(shownCount)}`} from your own pipeline. `;
+          // v88 (D1, D2): the answer itself says the exclusion it applied,
+          // so nothing downstream can claim one that was not made.
+          const leftOutLine =
+            sweep.ask.excludeRelationships !== true
+              ? ""
+              : sweep.excludedRelationships.length > 0
+                ? `I've left out the ${sweep.excludedRelationships.length === 1 ? "company" : `${String(sweep.excludedRelationships.length)} companies`} you're already in touch with. `
+                : "None of these is a company you're already in touch with. ";
           const text =
+            leftOutLine +
             fromPipeline +
             (sweep === reRanked
               ? `None of the companies I just listed has enough on record to score against your mandate yet. Ranked by fit with your mandate, these are the strongest. ${summary}`
@@ -13677,6 +13798,30 @@ export {
   type QPageMoveSubject,
   type QPlacedSubject,
 } from "./navigation-decision.js";
+
+/** The situation header and the account digest beside it, at most. */
+export const SITUATION_WITH_ACCOUNT_MAX_CHARS =
+  SITUATION_HEADER_MAX_CHARS + 1 + ACCOUNT_DIGEST_BLOCK_MAX_CHARS;
+
+/**
+ * Owner 14 Nov 2026 (audit P0 #2): the situation every answer is told,
+ * with the person's account digest beside it. Deterministic for the same
+ * inputs; spoken or typed makes no difference to the digest.
+ */
+export function situationWithAccount(input: {
+  readonly header: string;
+  readonly digest: QAccountDigest | null;
+  readonly now: Date;
+  readonly timeZone: string | null;
+}): string {
+  const header = input.header.slice(0, SITUATION_HEADER_MAX_CHARS);
+  if (input.digest === null) return header;
+  return `${header} ${accountDigestBlock({
+    digest: input.digest,
+    now: input.now,
+    timeZone: input.timeZone,
+  })}`;
+}
 
 /**
  * R2 (owner live 7 Nov): the record on their screen, by id, as the firewall

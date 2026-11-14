@@ -9068,6 +9068,14 @@ export function createSpecialistQAnswer(
             },
           }
         : {}),
+      // v88 (owner live 14 Nov 2026, D1): companies other than those they
+      // are already in contact with, on a FIT or catalog question.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      (read.question?.kind === "FIT" ||
+        read.question?.kind === "DISCOVER_COMPANIES") &&
+      read.question.excludeRelationships === true
+        ? { excludeRelationships: true }
+        : {}),
       // v62: a comparison as the reader understood it (never recall: the
       // reader drops fromShown when compare is set), so the answer builds
       // the comparison table whatever words asked for it.

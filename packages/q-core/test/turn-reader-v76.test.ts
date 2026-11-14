@@ -6,7 +6,7 @@ import {
   renderPrompt,
   TURN_READER_V75,
   TURN_READER_V76,
-  TurnReaderV87ResultSchema,
+  TurnReaderV88ResultSchema,
   TurnReaderV76VariablesSchema,
   V75_INVESTMENT_MEMO,
   V76_CONVERSATION_STATE,
@@ -22,9 +22,9 @@ describe("TURN_READER v76", () => {
   it("is the active reader: v75 kept whole plus one CONVERSATION STATE rule and the state before RECENT TURNS", () => {
     const active =
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
-    expect(active.version).toBe(87);
+    expect(active.version).toBe(88);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV87ResultSchema,
+      TurnReaderV88ResultSchema,
     );
     expect(
       TURN_READER_V76.template

@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV87ResultSchema,
+  TurnReaderV88ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -27,6 +27,7 @@ import {
   type TurnReaderV82Result,
   type TurnReaderV86Result,
   type TurnReaderV87Result,
+  type TurnReaderV88Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -129,6 +130,11 @@ export type QTurnReading = Omit<
         /** v58: INVESTOR_PROSPECTS joins the earlier kinds. */
         readonly kind: QuestionKindV58;
         readonly excludeShown?: boolean | undefined;
+        /**
+         * v88 (owner live 14 Nov 2026, D1): they want companies other than
+         * those they are already in contact with. Absent is false.
+         */
+        readonly excludeRelationships?: boolean | undefined;
       })
     | null;
   /** v15: false when spoken words were plainly for someone else. */
@@ -637,8 +643,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV87Result>> =>
-          gateway.execute<TurnReaderV87Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV88Result>> =>
+          gateway.execute<TurnReaderV88Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -653,7 +659,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV87ResultSchema,
+              schema: TurnReaderV88ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -696,7 +702,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV87ResultSchema.safeParse(
+        const parsed = TurnReaderV88ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;

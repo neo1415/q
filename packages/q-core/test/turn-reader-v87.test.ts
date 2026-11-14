@@ -16,11 +16,13 @@ import {
  * record page they mean (`navigation.tab`) by meaning, never by a word list.
  */
 describe("TURN_READER v87", () => {
-  it("is active: v86 with one NAVIGATION TAB paragraph after COMPANY MEDIA, on v87's schema", () => {
+  it("is v86 with one NAVIGATION TAB paragraph after COMPANY MEDIA, on v87's schema (deprecated by v88)", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
+    const active = { ...TURN_READER_V87 };
     expect(active.version).toBe(87);
-    expect(active.status).toBe("ACTIVE");
+    expect(registry.get("TURN_READER", 87)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("TURN_READER", 86)?.definition.status).toBe(
       "DEPRECATED",
     );
