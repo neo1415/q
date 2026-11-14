@@ -79,7 +79,9 @@ try {
     assert.equal(
       results.filter(
         (x) =>
-          x.status === "rejected" && x.reason.refusal === "TOO_MANY_REQUESTS",
+          // Live D8 (a047ddf63): a reply already in progress is refused as
+          // what it is, never as rate limiting.
+          x.status === "rejected" && x.reason.refusal === "REPLY_IN_PROGRESS",
       ).length,
       7,
     );
