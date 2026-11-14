@@ -1,5 +1,7 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 
+import { isKnownTimeZone } from "./schedule/slots.js";
+
 /**
  * Notices for the OTHER side of a relationship (AUTO, 2026-10-02): an
  * investor's interest or a founder's connection request arriving, the
@@ -34,6 +36,13 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
       readonly title: string;
       readonly body: string | null;
       /**
+       * The body in one recipient's own time zone (a call time said in
+       * their local time, live audit 2026-11-14 D2). Used for each
+       * recipient whose profile names a known zone; everyone else reads
+       * `body`, already worded in the proposal's own zone.
+       */
+      readonly bodyInZone?: ((timeZone: string) => string) | undefined;
+      /**
        * Where they act: their inbox, their chat, the relationship page, or
        * its Diligence tab, or Capital. `{actor}` in the title becomes the acting side's
        * own name, read here from the relationship, never from the caller.
@@ -54,6 +63,7 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
       readonly key: string;
       readonly priority: "NEEDS_YOU" | "UPDATE";
     }): Promise<number> => {
+      const zoned = await zonedBodies(input);
       const rows = await sql<{ id: string }[]>`
         insert into communication.notifications
           (tenant_id, user_id, kind, title, body, link_path, dedupe_key, priority)
@@ -61,7 +71,12 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
                left(replace(${input.title}, '{actor}',
                             case when ${input.actingSide} = 'INVESTOR' then i.display_name
                                  else c.canonical_name end), 200),
-               ${input.body === null ? null : input.body.slice(0, 1000)},
+               coalesce(
+                 (select z.body
+                    from unnest(${zoned.zones}::text[], ${zoned.bodies}::text[]) as z(zone, body)
+                   where z.zone = up.timezone
+                   limit 1),
+                 ${input.body === null ? null : input.body.slice(0, 1000)}),
                case
                  when ${input.target} = 'DOCUMENTS'
                    then '/documents?tab=requested&item=' || ${encodeURIComponent(input.key)}
@@ -91,6 +106,7 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
             on m.organisation_id = case when ${input.actingSide} = 'INVESTOR'
                                         then c.organisation_id else i.organisation_id end
            and m.membership_status = 'active'
+          left join identity.user_profiles up on up.id = m.user_id
          where r.id = ${input.relationshipId}
          limit 20
         on conflict (user_id, dedupe_key) do nothing
@@ -98,6 +114,38 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
       return rows.length;
     },
   };
+
+  /**
+   * One body per zone the receiving side's people have set: read first
+   * (a short select), worded here, matched to each person in the insert.
+   */
+  async function zonedBodies(input: {
+    readonly relationshipId: string;
+    readonly actingSide: "INVESTOR" | "COMPANY";
+    readonly bodyInZone?: ((timeZone: string) => string) | undefined;
+  }): Promise<{ zones: string[]; bodies: string[] }> {
+    const zones: string[] = [];
+    const bodies: string[] = [];
+    if (input.bodyInZone === undefined) return { zones, bodies };
+    const rows = await sql<{ timezone: string }[]>`
+      select distinct up.timezone
+        from network.relationships r
+        join core.companies c on c.id = r.company_id
+        join core.investor_organisations i on i.id = r.investor_organisation_id
+        join identity.organisation_memberships m
+          on m.organisation_id = case when ${input.actingSide} = 'INVESTOR'
+                                      then c.organisation_id else i.organisation_id end
+         and m.membership_status = 'active'
+        join identity.user_profiles up on up.id = m.user_id
+       where r.id = ${input.relationshipId} and up.timezone is not null
+       limit 20`;
+    for (const row of rows) {
+      if (!isKnownTimeZone(row.timezone)) continue;
+      zones.push(row.timezone);
+      bodies.push(input.bodyInZone(row.timezone).slice(0, 1000));
+    }
+    return { zones, bodies };
+  }
 }
 
 export type CounterpartNotices = ReturnType<typeof createCounterpartNotices>;

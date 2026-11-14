@@ -370,3 +370,75 @@ describe("meeting time proposal actions", () => {
     expect(said).not.toMatch(/^Confirmed/m);
   });
 });
+
+// Live audit 2026-11-14.
+describe("meeting time proposal wire and card wording", () => {
+  const record = (meetingId: string | null): ProposalRecord => ({
+    id: "00000000-0000-4000-8000-0000000f0001",
+    tenantId: TENANT,
+    relationshipId: REL,
+    purpose: "Intro",
+    proposedByUserId: FOUNDER.userId,
+    state: "CONFIRMED",
+    options: [SLOT(14)],
+    counterOptions: null,
+    acceptedFrom: "OPTIONS",
+    acceptedOption: 0,
+    acceptedByUserId: INVESTOR.userId,
+    acceptedAt: NOW,
+    rescheduleOfMeetingId: null,
+    meetingId,
+    revision: 1,
+    idempotencyKey: "key-propose-1",
+  });
+  const input = { ...ids, proposalId: "p", idempotencyKey: "k", input: {} };
+
+  it("D1: the accept response says whether it is booked and whether a calendar invite went out (additive)", () => {
+    const http = action("schedule.proposal.accept").http;
+    const out = http?.respond(
+      {
+        outcome: "OK",
+        proposal: record("00000000-0000-4000-8000-0000000f0abc"),
+        recorded: true,
+        confirmed: true,
+        booked: true,
+        calendarInvite: false,
+      },
+      input,
+      {},
+    );
+    expect(out).toMatchObject({
+      state: "CONFIRMED",
+      confirmed: true,
+      booked: true,
+      calendarInvite: false,
+    });
+    // Unknown stays unknown: no invite flag when this step did not book.
+    const unbooked = http?.respond(
+      {
+        outcome: "OK",
+        proposal: record(null),
+        recorded: false,
+        confirmed: true,
+        booked: false,
+      },
+      input,
+      {},
+    );
+    expect(unbooked).toMatchObject({ booked: false });
+    expect(unbooked).not.toHaveProperty("calendarInvite");
+  });
+
+  it("D2: a proposal card shows local time in the named zone, never a UTC instant under a zone label", () => {
+    const card = action("schedule.proposal.propose").card(
+      {
+        ...ids,
+        idempotencyKey: "k",
+        input: { purpose: "Intro", options: [SLOT(14)] },
+      },
+      null,
+    );
+    expect(card.preview).toContain("Wed 14 Oct, 15:00 West Africa Time");
+    expect(card.preview).not.toContain("2026-10-14T14:00");
+  });
+});

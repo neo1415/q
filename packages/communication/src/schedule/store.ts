@@ -334,6 +334,14 @@ export type MeetingDirectory = {
   readonly person: (
     userId: string,
   ) => Promise<{ readonly name: string; readonly email: string } | null>;
+  /**
+   * The time zone each person set on their profile, where they set one
+   * (a call's time is told in each person's own zone). Absent or missing
+   * a person: the meeting's own zone is used for them.
+   */
+  readonly timeZones?:
+    | ((userIds: readonly string[]) => Promise<ReadonlyMap<string, string>>)
+    | undefined;
   /** The display name of the side the organiser is not on. */
   readonly counterpartName: (input: {
     readonly relationshipId: string;

@@ -235,6 +235,17 @@ export const MeetingTimeProposalDtoSchema = z
     /** The booked call, once the booking followed the acceptance. */
     meetingId: UuidSchema.nullable(),
     revision: z.number().int().min(1).max(20),
+    /**
+     * Only on an accept/decline/counter response (additive, 2026-11-14):
+     * whether the call is booked after this step. Absent on lists.
+     */
+    booked: z.boolean().optional(),
+    /**
+     * Only when this step booked it: true, a calendar invite went to both
+     * sides; false, the time is recorded on Capital Q with no calendar
+     * invite (both sides were told). Absent: not known.
+     */
+    calendarInvite: z.boolean().optional(),
   })
   .strict();
 export type MeetingTimeProposalDto = z.infer<

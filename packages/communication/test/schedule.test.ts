@@ -5,6 +5,7 @@ import type { ActorContext } from "@capital-q/security";
 import {
   createScheduleService,
   googleEventIdFor,
+  hasCalendarEvent,
   proposeSlots,
   type ChatParty,
 } from "../src/index.js";
@@ -54,6 +55,8 @@ function world(
     state?: string;
     /** meetfix-57: each side's calendar as stored; default connected. */
     calendarsOf?: Partial<Record<string, CalendarFixture>>;
+    /** Each person's profile time zone, where set. */
+    zones?: Readonly<Record<string, string>>;
   } = {},
 ) {
   const stateOf = (userId: string): CalendarFixture =>
@@ -111,6 +114,7 @@ function world(
         [INVESTOR.userId]: { name: "Ben", email: "ben@vc.example.invalid" },
         [FOUNDER.userId]: { name: "Ada", email: "ada@co.example.invalid" },
       },
+      ...(options.zones === undefined ? {} : { zones: options.zones }),
     }),
     calendars: (userId) =>
       Promise.resolve(
@@ -364,7 +368,7 @@ describe("schedule, reschedule, cancel", () => {
       w.store.notifications.find(
         (n) => n.kind === "MEETING_SCHEDULED" && n.userId === FOUNDER.userId,
       )?.body,
-    ).toBe("Meet link: https://meet.google.com/abc-defg-hij");
+    ).toBe("Tue 6 Oct, 10:00 BST · Meet link: https://meet.google.com/abc-defg-hij");
     // voiceq-63: the organiser is told in the app that it is booked.
     const booked = w.store.notifications.find(
       (n) => n.kind === "MEETING_SCHEDULED" && n.userId === INVESTOR.userId,
@@ -804,6 +808,145 @@ describe("recordAgreed", () => {
       timeZone: "Nowhere/Else",
     });
     expect(odd.outcome === "OK" && odd.meeting.timeZone).toBe("UTC");
+  });
+
+  // Live audit 2026-11-14 D4: the attendee's notice had no time, and the
+  // organiser's "Booked" time had no zone.
+  it("every MEETING_SCHEDULED notice carries the local time, labelled, in each person's own zone where known", async () => {
+    const note =
+      "No calendar invite was sent: no Google Calendar is connected.";
+    // No profile zones: both read the meeting's own zone (Lagos).
+    const w = world();
+    await w.service.recordAgreed({ ...AGREED, noInviteNote: note });
+    const bodyOf = (
+      store: typeof w.store,
+      userId: string,
+    ): string | null | undefined =>
+      store.notifications.find(
+        (n) => n.kind === "MEETING_SCHEDULED" && n.userId === userId,
+      )?.body;
+    expect(bodyOf(w.store, FOUNDER.userId)).toBe(
+      `Tue 6 Oct, 10:00 West Africa Time · ${note}`,
+    );
+    expect(bodyOf(w.store, INVESTOR.userId)).toBe(
+      `Tue 6 Oct, 10:00 West Africa Time · ${note}`,
+    );
+    // The founder set New York on their profile: their own local time.
+    const z = world({ zones: { [FOUNDER.userId]: "America/New_York" } });
+    await z.service.recordAgreed({ ...AGREED, noInviteNote: note });
+    expect(bodyOf(z.store, FOUNDER.userId)).toBe(
+      `Tue 6 Oct, 05:00 Eastern Daylight Time · ${note}`,
+    );
+    expect(bodyOf(z.store, INVESTOR.userId)).toContain(
+      "10:00 West Africa Time",
+    );
+    for (const notice of z.store.notifications) {
+      expect(notice.body ?? "").not.toMatch(/\d{4}-\d{2}-\d{2}T/u);
+    }
+  });
+
+  // Live audit 2026-11-14 D6: the row carried a Google-looking event id
+  // though no calendar event exists.
+  it("a no-calendar meeting stores no provider event id; move and cancel never touch a calendar, update the record and tell the other side", async () => {
+    const w = world({
+      calendarsOf: {
+        [INVESTOR.userId]: "NOT_CONNECTED",
+        [FOUNDER.userId]: "NOT_CONNECTED",
+      },
+    });
+    const agreed = await w.service.recordAgreed({
+      ...AGREED,
+      noInviteNote: "No calendar invite was sent.",
+    });
+    if (agreed.outcome !== "OK") throw new Error("not recorded");
+    const id = agreed.meeting.id;
+    const row = w.store.meetings.find((m) => m.id === id);
+    expect(row?.googleEventId).not.toBe(googleEventIdFor(id));
+    expect(row && hasCalendarEvent(row)).toBe(false);
+
+    const moved = await w.service.reschedule({
+      actor: INVESTOR,
+      meetingId: id,
+      startsAt: new Date("2026-10-07T13:00:00Z"),
+      correlationId: AGREED.correlationId,
+    });
+    expect(moved.outcome === "OK" && moved.meeting.startsAt).toBe(
+      "2026-10-07T13:00:00.000Z",
+    );
+    // A retried move is the same move: one notice.
+    await w.service.reschedule({
+      actor: INVESTOR,
+      meetingId: id,
+      startsAt: new Date("2026-10-07T13:00:00Z"),
+      correlationId: AGREED.correlationId,
+    });
+    const movedNotices = w.store.notifications.filter((n) =>
+      n.title.startsWith("Call moved:"),
+    );
+    expect(movedNotices.map((n) => n.userId)).toEqual([FOUNDER.userId]);
+    expect(movedNotices[0]?.body).toContain(
+      "Now Wed 7 Oct, 14:00 West Africa Time.",
+    );
+
+    const cancelled = await w.service.cancel({
+      actor: INVESTOR,
+      meetingId: id,
+      correlationId: AGREED.correlationId,
+    });
+    expect(cancelled).toEqual({ outcome: "OK", alreadyDone: false });
+    expect(
+      w.store.notifications
+        .filter((n) => n.kind === "MEETING_CANCELLED")
+        .map((n) => n.userId),
+    ).toEqual([FOUNDER.userId]);
+    expect(w.activity.recorded.map((r) => r.eventType)).toEqual([
+      "meeting_scheduled",
+      "meeting_rescheduled",
+      "meeting_cancelled",
+    ]);
+    for (const calendar of [w.investorCalendar, w.founderCalendar]) {
+      expect(calendar.inserted).toHaveLength(0);
+      expect(calendar.moved).toHaveLength(0);
+      expect(calendar.cancelled).toHaveLength(0);
+    }
+  });
+
+  it("a no-calendar meeting is never sent to a calendar connected later (move, cancel, Meet link re-read)", async () => {
+    const w = world();
+    const agreed = await w.service.recordAgreed(AGREED);
+    if (agreed.outcome !== "OK") throw new Error("not recorded");
+    await w.service.refreshMeetLinks("cor_x");
+    await w.service.reschedule({
+      actor: INVESTOR,
+      meetingId: agreed.meeting.id,
+      startsAt: new Date("2026-10-08T09:00:00Z"),
+      correlationId: AGREED.correlationId,
+    });
+    await w.service.cancel({
+      actor: INVESTOR,
+      meetingId: agreed.meeting.id,
+      correlationId: AGREED.correlationId,
+    });
+    expect(w.investorCalendar.conferenceReads).toHaveLength(0);
+    expect(w.investorCalendar.moved).toHaveLength(0);
+    expect(w.investorCalendar.cancelled).toHaveLength(0);
+  });
+
+  it("a row recorded before the marker (the proposal path's :no-calendar key) is treated as having no calendar event", () => {
+    expect(
+      hasCalendarEvent({
+        origin: "BOOKED",
+        googleEventId: googleEventIdFor("460c95ba-af54-4ebb-85d7-8753137d009b"),
+        idempotencyKey: "web:u:k:booking:no-calendar",
+      }),
+    ).toBe(false);
+    expect(
+      hasCalendarEvent({
+        origin: "BOOKED",
+        googleEventId: googleEventIdFor("460c95ba-af54-4ebb-85d7-8753137d009b"),
+        idempotencyKey: "web:u:k:booking",
+      }),
+    ).toBe(true);
   });
 });
 

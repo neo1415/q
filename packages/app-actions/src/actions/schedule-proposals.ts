@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  meetingTimeLabel,
   transitionProposal,
   type ProposalAction,
   type ProposalOutcome,
@@ -125,8 +126,9 @@ export function proposalDto(record: ProposalRecord): MeetingTimeProposalDto {
   });
 }
 
+/** Local time in the option's own zone, labelled (live audit 2026-11-14 D2). */
 const when = (option: { startsAt: string; timeZone: string }): string =>
-  `${option.startsAt} (${option.timeZone})`;
+  meetingTimeLabel(option.startsAt, option.timeZone);
 
 /** The actor's side on this relationship, from membership; null: not a party. */
 async function sideOf(
@@ -444,8 +446,18 @@ const respondHttp = <In extends { relationshipId: string }>(
   }),
   problem: proposalProblem,
   status: 200 as const,
+  // D1 (live audit 2026-11-14): what THIS call did about the booking, so a
+  // client can say "no calendar invite was sent" as Q's own line does.
   respond: (out: ProposalOutcome, _input: In) =>
-    out.outcome === "OK" ? proposalDto(out.proposal) : undefined,
+    out.outcome === "OK"
+      ? MeetingTimeProposalDtoSchema.parse({
+          ...proposalDto(out.proposal),
+          booked: out.booked,
+          ...(out.calendarInvite === undefined
+            ? {}
+            : { calendarInvite: out.calendarInvite }),
+        })
+      : undefined,
 });
 
 const ACCEPT = defineAppAction<

@@ -15,6 +15,7 @@ import {
   createPostgresProposalStore,
 } from "./proposal-postgres.js";
 import type { ScheduleService } from "./service.js";
+import { meetingTimeLabel } from "./when.js";
 
 /**
  * The composition of meeting time proposals for the app-action registry.
@@ -130,25 +131,64 @@ export function noInviteNote(
     : "No calendar invite was sent: no Google Calendar is connected. The time is agreed on Capital Q. To send an invite with a Meet link, connect Google Calendar in Settings, or share a video link in the chat.";
 }
 
-function timesOf(options: readonly TimeOption[]): string {
+/**
+ * The options as people read them: local time in a named zone (the
+ * recipient's own when given, else each option's own), never a raw UTC
+ * instant under a zone label (live audit 2026-11-14 D2).
+ */
+export function timesOf(
+  options: readonly TimeOption[],
+  recipientZone?: string,
+): string {
   return options
     .map(
       (option, index) =>
-        `${String(index + 1)}. ${option.startsAt} (${option.timeZone})`,
+        `${String(index + 1)}. ${meetingTimeLabel(option.startsAt, recipientZone ?? option.timeZone)}`,
     )
     .join("\n");
 }
 
 /**
  * TIME_PROPOSED to the other side: the investor for a proposal or
- * re-proposal, the founder for a counter. Once per proposal and revision
- * (the notice's dedupe key), however often the step is retried.
+ * re-proposal, the founder for a counter, and whoever was waiting when the
+ * times are declined. Once per proposal and revision (the notice's dedupe
+ * key), however often the step is retried.
  */
 function noticesFor(
   notices: Pick<CounterpartNotices, "notify">,
 ): NonNullable<Parameters<typeof createProposalService>[0]["notify"]> {
   return async ({ proposal, kind }) => {
+    const revision = `proposal:${proposal.id}:r${String(proposal.revision)}`;
+    if (kind === "DECLINED" || kind === "COUNTER_DECLINED") {
+      // The investor declined the founder's times, or the founder declined
+      // the investor's counter: the side waiting on an answer hears it.
+      const investorDeclined = kind === "DECLINED";
+      const declined = investorDeclined
+        ? proposal.options
+        : (proposal.counterOptions ?? []);
+      const body = (zone?: string) =>
+        `${proposal.purpose}\n${timesOf(declined, zone)}\nNothing is booked. You can propose other times on the relationship page.`;
+      await notices.notify({
+        relationshipId: proposal.relationshipId,
+        actingSide: investorDeclined ? "INVESTOR" : "COMPANY",
+        kind: "TIME_PROPOSED",
+        title: investorDeclined
+          ? "{actor} declined the proposed call times"
+          : "{actor} declined the times you suggested",
+        body: body(),
+        bodyInZone: body,
+        target: "RELATIONSHIP",
+        key: `${revision}:${investorDeclined ? "declined" : "counter-declined"}`,
+        priority: "UPDATE",
+      });
+      return;
+    }
     const countered = kind === "COUNTERPROPOSED";
+    const offered = countered
+      ? (proposal.counterOptions ?? [])
+      : proposal.options;
+    const body = (zone?: string) =>
+      `${proposal.purpose}\n${timesOf(offered, zone)}\nNothing is booked until a time is accepted.`;
     await notices.notify({
       relationshipId: proposal.relationshipId,
       actingSide: countered ? "INVESTOR" : "COMPANY",
@@ -156,11 +196,10 @@ function noticesFor(
       title: countered
         ? "{actor} suggested other times for the call"
         : "{actor} proposed times for a call",
-      body: `${proposal.purpose}\n${timesOf(
-        countered ? (proposal.counterOptions ?? []) : proposal.options,
-      )}\nNothing is booked until a time is accepted.`,
+      body: body(),
+      bodyInZone: body,
       target: "RELATIONSHIP",
-      key: `proposal:${proposal.id}:r${String(proposal.revision)}${countered ? ":counter" : ""}`,
+      key: `${revision}${countered ? ":counter" : ""}`,
       priority: "NEEDS_YOU",
     });
   };
