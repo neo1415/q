@@ -734,3 +734,15 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 
 - **New LOW defect:** the job's proposals appear in the founder's conversation as "You: From your document: …", attributed to the founder rather than Q or the system.
 - **Still open:** GateQ D8–D10 live re-check on `faa48e867` (the Layerum draft should be unblocked).
+
+## Voice slice 1, research-to-claims and the decision-96 gate deployed — `d37458856` (14 Nov, 09:55 Lagos)
+
+- **Gates:**
+  - `fb6c99973` FAIL: pgTAP 130/450 did not classify `gateq.application_voice_sessions`. Fixed in `d37458856`.
+  - `d37458856` first run FAIL: lint stopped in `apps/q-api` while 8 worker test and typecheck processes ran. A clean re-lint passed.
+  - `d37458856` re-run with the machine idle: `ci-local PASS at=2026-11-14T08:52:04Z took=1315s`.
+- **Migration:** `20261231530000_gateq_application_voice_sessions` applied before the deploy. Hosted has 296 migrations, none missing; `relrowsecurity` is true. Rollback point `86dc95a75`; four services SUCCESS.
+- **Live (no cost):** `/v1/gateq/apply/voice` without a credential returns a uniform 404, so it does not reveal whether a resource exists.
+- **Voice interview:** stays OFF. It needs `DEEPGRAM_API_KEY`, `CQ_GATEQ_VOICE_INTERVIEW=1`, `API_PUBLIC_URL` and a seal key on the api service, and live voice uses the owner's Deepgram account. Audio cannot be tested from the sandbox (no UDP).
+- **Research figure job:** OFF by default (`CQ_RESEARCH_FIGURE_CARDS`), per decision 96.
+- **Gating now (`6a416c3ab`):** the research-evidence rework (`55d53c7b5`; decisions 92–96; ADR proposal `docs/adr/proposals/2026-11-14-research-evidence-standing.md`, not applied) and atomic-statements slice 1 (migration `20261231540000`, not applied; decision 91 UNRESOLVED qualification, contract v2).
