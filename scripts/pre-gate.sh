@@ -59,6 +59,18 @@ tsc_status=$?
 printf '%s\n' "$tsc_out" | tail -20
 [ "$tsc_status" -eq 0 ] || bad "root tsc (exit $tsc_status)"
 
+step "app typechecks (each touched app's own tsconfig)"
+# The root tsconfig does not cover every app's own config (apps/web test
+# typing slipped through to the gate, 14 Nov).
+for app in $(printf '%s\n' "${changed[@]}" | grep -oE '^apps/[^/]+' | sort -u); do
+  if [ -f "$app/package.json" ] && grep -q '"typecheck"' "$app/package.json"; then
+    app_out=$(cd "$app" && NODE_OPTIONS=--max-old-space-size=6144 pnpm run -s typecheck 2>&1)
+    app_status=$?
+    printf '%s\n' "$app_out" | grep -E 'error TS' | head -20
+    [ "$app_status" -eq 0 ] || bad "$app typecheck (exit $app_status)"
+  fi
+done
+
 step "tests related to changed source"
 src=()
 for f in "${changed[@]}"; do case "$f" in apps/*|packages/*) case "$f" in *.ts|*.tsx) [ -f "$f" ] && src+=("$f");; esac;; esac; done

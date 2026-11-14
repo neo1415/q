@@ -66,20 +66,30 @@ async function world(tx: TransactionContext) {
             'gateq-qualification.v1', ${user}, ${user}, now())`;
   await sql`insert into gateq.applications (id, tenant_id, gateway_id, gateway_version_id, public_reference)
     values (${application}, ${tenant}, ${gateway}, ${version}, ${`ga_23456789abcdefghjk${suffix.replace(/[^a-z2-9]/gu, "m")}`.slice(0, 31)})`;
+  // Two founder turns: a disagreement only exists between statements said in
+  // different turns (gateqRelatable, 715f55bbc); one sentence is one reading.
+  const earlierTurn = randomUUID();
   const personTurn = randomUUID();
   await sql`insert into gateq.application_turns (id, application_id, tenant_id, seq, role, text, client_turn_id)
-    values (${personTurn}, ${application}, ${tenant}, 1, 'PERSON', 'About 600 weekly active; actually 1,500.', 'turn-int-0001')`;
+    values (${earlierTurn}, ${application}, ${tenant}, 1, 'PERSON', 'About 600 weekly active.', 'turn-int-0001'),
+           (${personTurn}, ${application}, ${tenant}, 2, 'PERSON', 'We have 1,500 weekly active.', 'turn-int-0002')`;
   return {
     tenant,
     application: ApplicationIdSchema.parse(application),
+    earlierTurn,
     personTurn,
   };
 }
 
-function rows(applicationId: string, turnId: string) {
+function rows(applicationId: string, earlierTurnId: string, turnId: string) {
   const at = (ms: number) =>
     new Date(Date.UTC(2026, 10, 14, 10, 0, 0, ms)).toISOString();
-  const s = (id: string, count: string, ms: number): ApplicationStatement => ({
+  const s = (
+    id: string,
+    count: string,
+    ms: number,
+    sourceTurn: string,
+  ): ApplicationStatement => ({
     id: id as ApplicationStatement["id"],
     applicationId: applicationId as ApplicationStatement["applicationId"],
     dimension: "claims.traction",
@@ -89,13 +99,13 @@ function rows(applicationId: string, turnId: string) {
     words: `${count} weekly active`,
     provenance: "APPLICANT_PROVIDED",
     origin: "TURN",
-    sourceTurnId: turnId as ApplicationStatement["sourceTurnId"],
+    sourceTurnId: sourceTurn as ApplicationStatement["sourceTurnId"],
     backfillKey: null,
     statedAt: at(ms),
     recordedAt: at(ms),
   });
-  const older = s(randomUUID(), "600", 1);
-  const newer = s(randomUUID(), "1500", 2);
+  const older = s(randomUUID(), "600", 1, earlierTurnId);
+  const newer = s(randomUUID(), "1500", 2, turnId);
   const link: StatementLink = {
     id: randomUUID() as StatementLink["id"],
     applicationId: older.applicationId,
@@ -103,7 +113,7 @@ function rows(applicationId: string, turnId: string) {
     fromStatementId: newer.id,
     toStatementId: older.id,
     origin: "CODE_DETECTED",
-    sourceTurnId: older.sourceTurnId,
+    sourceTurnId: newer.sourceTurnId,
     createdAt: at(3),
   };
   const event: DisagreementEvent = {
@@ -112,24 +122,31 @@ function rows(applicationId: string, turnId: string) {
     linkId: link.id,
     state: "LEFT_OPEN",
     resolvedByStatementId: null,
-    sourceTurnId: older.sourceTurnId,
+    sourceTurnId: newer.sourceTurnId,
     recordedAt: at(4),
   };
-  const reading: TurnReading = {
+  const reading = (
+    turn: string,
+    ids: readonly ApplicationStatement["id"][],
+    ms: number,
+  ): TurnReading => ({
     id: randomUUID() as TurnReading["id"],
     applicationId: older.applicationId,
-    turnId: turnId as TurnReading["turnId"],
+    turnId: turn as TurnReading["turnId"],
     outcome: "READ",
-    recordedStatementIds: [older.id, newer.id],
+    recordedStatementIds: [...ids],
     notRecorded: [],
     readingVersion: 2,
-    recordedAt: at(5),
-  };
+    recordedAt: at(ms),
+  });
   return {
     statements: [older, newer],
     links: [link],
     events: [event],
-    readings: [reading],
+    readings: [
+      reading(earlierTurnId, [older.id], 5),
+      reading(turnId, [newer.id], 6),
+    ],
   };
 }
 
@@ -170,12 +187,13 @@ describe("gateq statements against local Supabase Postgres", () => {
     let completed = false;
     await db.transactions
       .run(async (tx) => {
-        const { tenant, application, personTurn } = await world(tx);
+        const { tenant, application, earlierTurn, personTurn } =
+          await world(tx);
         const statements = createPostgresApplicationStatementRepository({
           sql: tx.sql,
         });
         const facts = createPostgresApplicationFactRepository({ sql: tx.sql });
-        const planned = rows(application, personTurn);
+        const planned = rows(application, earlierTurn, personTurn);
         const tables = [
           "application_statements",
           "application_statement_links",
@@ -228,7 +246,9 @@ describe("gateq statements against local Supabase Postgres", () => {
           count: "1500",
         });
         expect(back.statements[0]?.asOf).toBe("2026-11-01");
-        expect(back.readTurnIds).toEqual([personTurn]);
+        expect([...back.readTurnIds].sort()).toEqual(
+          [earlierTurn, personTurn].sort(),
+        );
         const view = projectView(back.statements, back.links, back.events);
         expect(
           view.dimensions.find((d) => d.dimension === "claims.traction")

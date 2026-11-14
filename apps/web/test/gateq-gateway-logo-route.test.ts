@@ -23,7 +23,8 @@ async function serve(body: string | Uint8Array, contentType: string) {
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      new Response(body, {
+      // A fresh ArrayBuffer-backed copy is a BodyInit; a view over any buffer is not.
+      new Response(typeof body === "string" ? body : body.slice(), {
         status: 200,
         headers: { "content-type": contentType },
       }),
