@@ -132,7 +132,9 @@ export {
   type ProposedValue,
 } from "./interpretation/contracts.js";
 export {
+  CLAIM_PROPOSAL_BLOCKED_REASONS,
   ClaimProposalBlockedError,
+  type ClaimProposalBlockedReason,
   type ClaimProposerPort,
 } from "./interpretation/ports.js";
 export {
@@ -162,6 +164,7 @@ export {
   statedFigureAmountWords,
   statedFigureClashes,
   statedFigureDateWords,
+  statedFigurePeriod,
   StatedFigureMetricSchema,
   StatedFigureSchema,
   statedFigureStructuredValue,

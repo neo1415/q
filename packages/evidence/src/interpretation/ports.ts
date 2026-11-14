@@ -31,17 +31,53 @@ export type ClaimProposerPort = {
  * provider may receive material of this source's sensitivity. The correct
  * response is to record nothing and say so — never to relabel the passage
  * as less sensitive so that a cheaper provider will accept it.
+ *
+ * The other reasons say what actually happened, because "no eligible
+ * provider" for an answer the schema refused sends whoever reads the alert
+ * to the wrong place (A8 live 2026-11-14):
+ *
+ *   PROVIDER_UNAVAILABLE — no provider could be reached (outage, account,
+ *                          spend limit, none configured).
+ *   SCHEMA_REFUSED       — a provider answered and the answer did not fit
+ *                          the task's schema; `refusals` says which fields.
+ *   MODEL_FAILED         — a provider was asked and gave nothing usable for
+ *                          another reason (timeout, rate limit, context).
  */
-export class ClaimProposalBlockedError extends Error {
-  readonly reason: "PROVIDER_INELIGIBLE" | "PROVIDER_UNAVAILABLE";
+export const CLAIM_PROPOSAL_BLOCKED_REASONS = [
+  "PROVIDER_INELIGIBLE",
+  "PROVIDER_UNAVAILABLE",
+  "SCHEMA_REFUSED",
+  "MODEL_FAILED",
+] as const;
+export type ClaimProposalBlockedReason =
+  (typeof CLAIM_PROPOSAL_BLOCKED_REASONS)[number];
 
-  constructor(reason: "PROVIDER_INELIGIBLE" | "PROVIDER_UNAVAILABLE") {
-    super(
-      reason === "PROVIDER_INELIGIBLE"
-        ? "no configured provider may receive material of this sensitivity"
-        : "no proposer was available",
-    );
+const BLOCKED_MESSAGES: Readonly<Record<ClaimProposalBlockedReason, string>> = {
+  PROVIDER_INELIGIBLE:
+    "no configured provider may receive material of this sensitivity",
+  PROVIDER_UNAVAILABLE: "no proposer was available",
+  SCHEMA_REFUSED: "the proposer's answer did not fit the extraction schema",
+  MODEL_FAILED: "the proposer gave no usable answer",
+};
+
+export class ClaimProposalBlockedError extends Error {
+  readonly reason: ClaimProposalBlockedReason;
+  /** The gateway's failure class, when a gateway said why. Never model text. */
+  readonly failureClass: string | undefined;
+  /** Field paths and schema codes the answer was refused for. Bounded. */
+  readonly refusals: readonly string[];
+
+  constructor(
+    reason: ClaimProposalBlockedReason,
+    detail: {
+      readonly failureClass?: string | undefined;
+      readonly refusals?: readonly string[] | undefined;
+    } = {},
+  ) {
+    super(BLOCKED_MESSAGES[reason]);
     this.name = "ClaimProposalBlockedError";
     this.reason = reason;
+    this.failureClass = detail.failureClass;
+    this.refusals = (detail.refusals ?? []).slice(0, 8);
   }
 }

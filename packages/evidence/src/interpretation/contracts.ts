@@ -20,6 +20,7 @@ import {
   type EvidenceSubjectRef,
   type TruthClass,
 } from "../contracts/index.js";
+import type { ClaimProposalBlockedReason } from "./ports.js";
 
 /**
  * Claim interpretation (CQ-KNW-001).
@@ -229,7 +230,7 @@ export type ClaimInterpretationResult = {
    * extraction is not an empty one: the difference is whether Capital Q
    * looked, and the caller must be able to tell.
    */
-  readonly blocked: "PROVIDER_INELIGIBLE" | "PROVIDER_UNAVAILABLE" | null;
+  readonly blocked: ClaimProposalBlockedReason | null;
   readonly counts: {
     readonly proposed: number;
     readonly accepted: number;

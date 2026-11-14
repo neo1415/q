@@ -141,6 +141,42 @@ export const ClaimExtractionResultSchema = z
   .strict();
 export type ClaimExtractionResult = z.infer<typeof ClaimExtractionResultSchema>;
 
+// ---------------------------------------------------------------------------
+// v2 (A8 live 2026-11-14): `asOf` may be a month.
+//
+// A founder's deck gave its figures by month; the model wrote month
+// strings, v1 accepted only YYYY-MM-DD, and the whole batch was refused, so
+// no figure was proposed. A month is a period the passage named: it is
+// carried as YYYY-MM, and code (never the model) dates it at the period's
+// end, the convention the founder's own typed figures already use. A day
+// is never invented: YYYY-MM-DD only when the passage gives the day.
+// ---------------------------------------------------------------------------
+
+export const CLAIM_EXTRACTION_V2_SCHEMA_VERSION = 2;
+
+/** A real calendar day (YYYY-MM-DD) or a month (YYYY-MM). Nothing else. */
+export const ClaimAsOfSchema = z.union([
+  z.iso.date(),
+  z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u),
+]);
+
+export const ProposedClaimV2Schema = ProposedClaimSchema.extend({
+  /**
+   * The period or as-at date the passage attached: YYYY-MM-DD when it
+   * gives a day, YYYY-MM when it names only a month. Null when it did not
+   * say — never "now".
+   */
+  asOf: ClaimAsOfSchema.nullable(),
+}).strict();
+export type ProposedClaimV2 = z.infer<typeof ProposedClaimV2Schema>;
+
+export const ClaimExtractionResultV2Schema = ClaimExtractionResultSchema.extend(
+  { claims: z.array(ProposedClaimV2Schema).max(20) },
+).strict();
+export type ClaimExtractionResultV2 = z.infer<
+  typeof ClaimExtractionResultV2Schema
+>;
+
 export const ClaimExtractionVariablesSchema = z
   .object({
     ...TaskFrameSchema,

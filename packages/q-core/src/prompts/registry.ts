@@ -53,6 +53,7 @@ import { Q_SYSTEM_VOICE_V3 } from "./charter/q-system-voice.v3.js";
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
 import { Q_SYSTEM_V2 } from "./charter/q-system.v2.js";
 import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
+import { CLAIM_EXTRACTION_V2 } from "./tasks/claim-extraction.v2.js";
 import { COMPANY_ANALYST_V1 } from "./tasks/company-analyst.v1.js";
 import { COMPANY_ANALYST_V2 } from "./tasks/company-analyst.v2.js";
 import { COMPANY_ANALYST_V3 } from "./tasks/company-analyst.v3.js";
@@ -645,7 +646,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     ONBOARDING_TYPED_REPLY_V11,
     WELCOME_CONDUCTOR_V1,
     WELCOME_CONDUCTOR_V2,
-    CLAIM_EXTRACTION_V1,
+    // A8 live 2026-11-14: a month-dated deck refused whole; v2 states the
+    // asOf shapes and accepts a month.
+    { ...CLAIM_EXTRACTION_V1, status: "DEPRECATED" },
+    CLAIM_EXTRACTION_V2,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     INVESTOR_MANDATE_SYNTHESIS_V2,
     INVESTOR_MANDATE_SYNTHESIS_V3,

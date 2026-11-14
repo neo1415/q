@@ -7,19 +7,20 @@ import type {
 import {
   ClaimProposalBlockedError,
   CLAIM_EXTRACTION_PIPELINE_VERSION,
+  statedFigurePeriod,
 } from "@capital-q/evidence";
 import type { Logger } from "@capital-q/observability";
 import {
-  ClaimExtractionResultSchema,
+  ClaimExtractionResultV2Schema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  type ClaimExtractionResult,
+  type ClaimExtractionResultV2,
   type ClaimExtractionVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
 
-import { isModelGatewayError } from "../errors.js";
+import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
 import type { ModelGateway } from "../gateway.js";
 import { budgetForTaskClass } from "../q/index.js";
 
@@ -108,24 +109,27 @@ export function createModelClaimProposer(
         },
       };
       const options = {
-        schema: ClaimExtractionResultSchema,
+        schema: ClaimExtractionResultV2Schema,
+        // Each claim is an independent reading: one the schema refuses (a
+        // malformed date, a key off the list) is dropped and reported, and
+        // the others are kept (A8 live 2026-11-14: three month-dated
+        // figures refused the whole batch).
+        invalidListItems: "DROP" as const,
         ...(signal === undefined ? {} : { signal }),
       };
 
       let result;
       try {
-        result = await gateway.execute<ClaimExtractionResult>(request, options);
+        result = await gateway.execute<ClaimExtractionResultV2>(
+          request,
+          options,
+        );
       } catch (error: unknown) {
         // A refusal on sensitivity is a policy answer, not an outage, and
         // the answer is "not this material". Re-declaring the passage as
         // less sensitive so a provider would accept it is the one thing
         // this file must never do, so there is no branch that does.
-        throw new ClaimProposalBlockedError(
-          isModelGatewayError(error) &&
-            error.failureClass === "POLICY_INELIGIBLE"
-            ? "PROVIDER_INELIGIBLE"
-            : "PROVIDER_UNAVAILABLE",
-        );
+        throw blockedFor(error);
       }
 
       const provenance = {
@@ -150,15 +154,39 @@ export function createModelClaimProposer(
       }
 
       const extracted = result.output.value;
-      const proposals: ClaimProposal[] = extracted.claims.map((claim) => ({
-        claimKey: claim.claimKey,
-        statement: claim.statement,
-        value: claim.value,
-        assertionKind: claim.assertionKind,
-        excerpt: claim.excerpt,
-        ...(claim.locator === undefined ? {} : { locatorHint: claim.locator }),
-        asOf: claim.asOf,
-      }));
+      const dropped = result.output.dropped ?? [];
+      if (dropped.length > 0) {
+        // Paths and codes only: never a value the model wrote.
+        logger?.warn(
+          {
+            sourceId: passage.sourceId,
+            promptVersionId: provenance.promptVersionId,
+            dropped,
+          },
+          "claim extraction kept; refused claims were dropped",
+        );
+      }
+      const proposals: ClaimProposal[] = extracted.claims.flatMap((claim) => {
+        // A month is dated at its end, by code; a day is itself. A shape
+        // the schema let through but no calendar has is dropped, never
+        // re-dated.
+        const asOf =
+          claim.asOf === null ? null : statedFigurePeriod(claim.asOf).asOf;
+        if (claim.asOf !== null && asOf === null) return [];
+        return [
+          {
+            claimKey: claim.claimKey,
+            statement: claim.statement,
+            value: claim.value,
+            assertionKind: claim.assertionKind,
+            excerpt: claim.excerpt,
+            ...(claim.locator === undefined
+              ? {}
+              : { locatorHint: claim.locator }),
+            asOf,
+          },
+        ];
+      });
       const produced = new Set(proposals.map((p) => p.claimKey));
       return {
         proposals,
@@ -171,6 +199,31 @@ export function createModelClaimProposer(
       } satisfies ClaimProposalBatch;
     },
   };
+}
+
+/**
+ * What actually stopped the proposer, said as it is (A8 live 2026-11-14:
+ * an answer the schema refused was reported as "no eligible provider").
+ * The refusals are field paths and schema codes, never model text.
+ */
+export function blockedFor(error: unknown): ClaimProposalBlockedError {
+  if (!isModelGatewayError(error)) {
+    return new ClaimProposalBlockedError("PROVIDER_UNAVAILABLE");
+  }
+  const detail = {
+    failureClass: error.failureClass,
+    refusals: error.refusals ?? [],
+  };
+  if (isModelServiceUnavailable(error)) {
+    return new ClaimProposalBlockedError("PROVIDER_UNAVAILABLE", detail);
+  }
+  if (error.failureClass === "POLICY_INELIGIBLE") {
+    return new ClaimProposalBlockedError("PROVIDER_INELIGIBLE", detail);
+  }
+  if (error.failureClass === "INVALID_MODEL_OUTPUT") {
+    return new ClaimProposalBlockedError("SCHEMA_REFUSED", detail);
+  }
+  return new ClaimProposalBlockedError("MODEL_FAILED", detail);
 }
 
 /** Trusted, human-readable, never a storage path or a signed URL. */
