@@ -181,6 +181,16 @@ export const GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL =
  */
 export const GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL =
   "This email has already applied to this organisation. They have your application." as const;
+/**
+ * Live D8 (2026-11-14): the two interview states that used to read as a
+ * rate limit. Q is still writing its reply to their last message (a 409:
+ * wait a moment), or that reply failed and their message is kept (a 503:
+ * send it again). The web tells them apart by this exact detail.
+ */
+export const GATEQ_REPLY_IN_PROGRESS_DETAIL =
+  "Q is still answering your last message. Give it a moment, then carry on." as const;
+export const GATEQ_REPLY_FAILED_DETAIL =
+  "Q couldn't answer that just now. Your message is saved; send it again." as const;
 export const GATEQ_SUBMIT_NOT_READY_DETAIL =
   "Your application isn't ready to submit yet. Answer what's still needed, then submit." as const;
 

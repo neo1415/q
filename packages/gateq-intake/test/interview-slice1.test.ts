@@ -41,9 +41,10 @@ import {
   createIntakeService,
   type IntakeDependencies,
 } from "../src/application/intake-service.js";
-import type {
-  InterviewTurnInput,
-  InterviewTurnOutcome,
+import {
+  InterviewUnavailableError,
+  type InterviewTurnInput,
+  type InterviewTurnOutcome,
 } from "../src/application/interviewer.js";
 import type {
   ApplicationContactRepository,
@@ -219,10 +220,21 @@ function world(
     txReleases.get(tx)?.push(release);
   };
 
+  // As the Postgres repository: one live claim per application, bounded
+  // in time; a released or expired one holds nothing (live D8).
+  const CLAIM_TTL_MS = 120_000;
   const claims = new Map<
     string,
-    { id: string | null; turnId: string; outcome: unknown }
+    { id: string | null; turnId: string; outcome: unknown; expiresAt: number }
   >();
+  const liveClaim = (applicationId: string) => {
+    const claim = claims.get(applicationId);
+    return claim !== undefined &&
+      claim.id !== null &&
+      claim.expiresAt > now.getTime()
+      ? claim
+      : undefined;
+  };
   const turns: ApplicationTurnRepository = {
     claimExchange: async (
       input: Parameters<ApplicationTurnRepository["claimExchange"]>[0],
@@ -236,16 +248,16 @@ function world(
       );
       if (person !== undefined && person.text !== input.text)
         throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-      if (
-        prior !== undefined &&
-        (prior.id !== null || prior.turnId !== input.clientTurnId)
-      )
-        throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+      if (liveClaim(input.applicationId) !== undefined)
+        throw new IntakeRefusedError("REPLY_IN_PROGRESS");
       const id = randomUUID();
       claims.set(input.applicationId, {
         id,
         turnId: input.clientTurnId,
-        outcome: prior?.outcome ?? null,
+        // A paid reply is reused by its own turn only.
+        outcome:
+          prior?.turnId === input.clientTurnId ? prior.outcome : null,
+        expiresAt: now.getTime() + CLAIM_TTL_MS,
       });
       // As the Postgres repository: the applicant's words are text-only.
       if (input.recordPerson !== false)
@@ -270,7 +282,7 @@ function world(
       });
     },
     assertClaim: (_tx: unknown, applicationId: string, id: string) =>
-      Promise.resolve(claims.get(applicationId)?.id === id),
+      Promise.resolve(liveClaim(applicationId)?.id === id),
     releaseExchange: (applicationId: string, id: string) => {
       return Promise.resolve().then(() => {
         const claim = claims.get(applicationId);
@@ -283,7 +295,7 @@ function world(
       });
     },
     pendingFor: (applicationId: string) =>
-      Promise.resolve(claims.has(applicationId)),
+      Promise.resolve(liveClaim(applicationId) !== undefined),
     appendInTransaction: (
       _tx: unknown,
       input: Parameters<ApplicationTurnRepository["append"]>[0],
@@ -508,6 +520,9 @@ function world(
         if (row === undefined) throw new Error("no such application");
         const next = { ...row, status, submittedAt: submittedAt ?? null };
         applications.set(id, next);
+        // As the Postgres repository: a submitted application holds no
+        // pending exchange.
+        if (status === "SUBMITTED") claims.delete(id);
         return Promise.resolve(next);
       },
       setDeclaredName: (_tx, id, declaredName) => {
@@ -816,7 +831,7 @@ describe("the interview transcript", () => {
     await vi.waitFor(() => expect(w.interviewer.turn).toHaveBeenCalledTimes(1));
     await expect(
       w.intake.submit({ token, clientRequestId: "submit-final" }),
-    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    ).rejects.toMatchObject({ refusal: "REPLY_IN_PROGRESS" });
     expect(w.submissions).toHaveLength(0);
     if (release === undefined) throw new Error("model not started");
     release({
@@ -990,6 +1005,111 @@ describe("the interview transcript", () => {
     expect(w.turnRows.map((t) => t.role)).toEqual(["PERSON", "Q"]);
   });
 
+  describe("live D8: a failed reply never locks the application", () => {
+    const say = (token: string, clientTurnId: string, message: string) => ({
+      token,
+      message,
+      clientTurnId,
+      correlationId: clientTurnId,
+    });
+
+    it("releases the claim when the run fails: saves, another turn and Submit go through", async () => {
+      const w = world();
+      const { token } = await w.start();
+      w.interviewer.turn.mockRejectedValueOnce(
+        new InterviewUnavailableError(true),
+      );
+      await expect(
+        w.conversation.turn(say(token, "turn-failed1", "We build APIs.")),
+      ).rejects.toBeInstanceOf(InterviewUnavailableError);
+      // A fresh browser knows nothing of that turn id. Nothing is refused.
+      await expect(
+        w.intake.recordFacts({ token, facts: QUALIFYING }),
+      ).resolves.toBeDefined();
+      const next = await w.conversation.turn(
+        say(token, "turn-fresh01", "We have pilots."),
+      );
+      expect(next.deduplicated).toBe(false);
+      expect(w.turnRows.map((t) => [t.clientTurnId, t.role])).toEqual([
+        ["turn-failed1", "PERSON"],
+        ["turn-fresh01", "PERSON"],
+        ["turn-fresh01", "Q"],
+      ]);
+      await w.intake.submit({ token, clientRequestId: "submit-after-fail" });
+      expect(w.submissions).toHaveLength(1);
+    });
+
+    it("lets a stale claim expire after its bound when its process never released it", async () => {
+      const w = world();
+      const { token } = await w.start();
+      // The run never comes back (a process that died mid-reply).
+      w.interviewer.turn.mockImplementationOnce(
+        () => new Promise<InterviewTurnOutcome>(() => undefined),
+      );
+      void w.conversation
+        .turn(say(token, "turn-stuck01", "We build APIs."))
+        .catch(() => undefined);
+      await vi.waitFor(() =>
+        expect(w.interviewer.turn).toHaveBeenCalledTimes(1),
+      );
+      // While it is live, the refusal says what is happening.
+      await expect(
+        w.intake.recordFacts({ token, facts: QUALIFYING }),
+      ).rejects.toMatchObject({ refusal: "REPLY_IN_PROGRESS" });
+      await expect(
+        w.conversation.turn(say(token, "turn-other01", "Hello?")),
+      ).rejects.toMatchObject({ refusal: "REPLY_IN_PROGRESS" });
+      w.setNow(new Date(NOW.getTime() + 3 * 60_000));
+      await expect(
+        w.intake.recordFacts({ token, facts: QUALIFYING }),
+      ).resolves.toBeDefined();
+      const next = await w.conversation.turn(
+        say(token, "turn-other01", "Hello?"),
+      );
+      expect(next.reply).toBe("Tell me more.");
+    });
+
+    it("answers a failed turn once when it is sent again with the same id", async () => {
+      const w = world();
+      const { token } = await w.start();
+      w.interviewer.turn.mockRejectedValueOnce(
+        new InterviewUnavailableError(true),
+      );
+      await expect(
+        w.conversation.turn(say(token, "turn-retry01", "We build APIs.")),
+      ).rejects.toBeInstanceOf(InterviewUnavailableError);
+      const retried = await w.conversation.turn(
+        say(token, "turn-retry01", "We build APIs."),
+      );
+      const again = await w.conversation.turn(
+        say(token, "turn-retry01", "We build APIs."),
+      );
+      expect(retried.deduplicated).toBe(false);
+      expect(again.deduplicated).toBe(true);
+      expect(again.reply).toBe(retried.reply);
+      expect(w.interviewer.turn).toHaveBeenCalledTimes(2);
+      expect(w.turnRows.map((t) => t.role)).toEqual(["PERSON", "Q"]);
+    });
+
+    it("never replays one turn's paid reply as another turn's answer", async () => {
+      const w = world();
+      const { token } = await w.start();
+      // The reply was paid for and checkpointed, then finalization failed.
+      vi.spyOn(w.turns, "appendInTransaction").mockRejectedValueOnce(
+        new Error("temporary write failure"),
+      );
+      w.script.push({ reply: "Reply to the first turn." });
+      await expect(
+        w.conversation.turn(say(token, "turn-first01", "We build APIs.")),
+      ).rejects.toThrow("temporary write failure");
+      w.script.push({ reply: "Reply to the second turn." });
+      const second = await w.conversation.turn(
+        say(token, "turn-second1", "We have pilots."),
+      );
+      expect(second.reply).toBe("Reply to the second turn.");
+    });
+  });
+
   it("stores the opening line once", async () => {
     const w = world();
     const { token } = await w.start();
@@ -1034,7 +1154,7 @@ describe("the interview transcript", () => {
     await vi.waitFor(() => expect(w.interviewer.turn).toHaveBeenCalledTimes(1));
     await expect(
       w.conversation.openingFor({ token, correlationId: "opening-second" }),
-    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    ).rejects.toMatchObject({ refusal: "REPLY_IN_PROGRESS" });
     if (!release) throw new Error("opening model not started");
     release();
     await first;
@@ -1775,7 +1895,7 @@ describe("review: races", () => {
     });
     await expect(
       w.intake.submit({ token, clientRequestId: "req-000000000001" }),
-    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    ).rejects.toMatchObject({ refusal: "REPLY_IN_PROGRESS" });
     expect(w.submissions).toHaveLength(0);
     release();
     await turn;

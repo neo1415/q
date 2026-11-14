@@ -233,6 +233,43 @@ describe("what survives validation", () => {
     },
   );
 
+  it("live D8: a phrase longer than the stored shape never costs the reply", async () => {
+    // Layerum 2026-11-14: one long sector phrase refused the whole reading
+    // and the founder's first message never got an answer.
+    const long =
+      "embedded finance APIs that let software platforms serving merchants in Kisumu and across Kenya launch wallets cards and payouts";
+    expect(long.length).toBeGreaterThan(120);
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          dimension: "company.sector_phrases",
+          value: { kind: "PHRASES", phrases: [long] },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+        {
+          dimension: "company.description",
+          value: { kind: "PHRASES", phrases: [long] },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(turn({ utterance: long }));
+    expect(outcome.reply).toBe(RESULT.reply);
+    const sector = outcome.facts.find(
+      (f) => f.dimension === "company.sector_phrases",
+    );
+    expect(sector?.value.kind).toBe("PHRASES");
+    if (sector?.value.kind === "PHRASES")
+      for (const phrase of sector.value.phrases)
+        expect(phrase.length).toBeLessThanOrEqual(120);
+    expect(
+      outcome.facts.find((f) => f.dimension === "company.description")?.value,
+    ).toEqual({ kind: "TEXT", text: long });
+  });
+
   it("saves an amount said in words", async () => {
     const { service } = interviewer({
       ...RESULT,

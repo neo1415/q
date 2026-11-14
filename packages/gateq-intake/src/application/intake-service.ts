@@ -638,8 +638,11 @@ export function createIntakeService(
         if (locked === null) throw new IntakeRefusedError("NOT_FOUND");
         if (locked.status === "SUBMITTED")
           throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        // Q's reply to their last message would record its own reading
+        // over this one; wait for it. A failed or expired reply holds
+        // nothing (live D8).
         if (turns !== undefined && (await turns.pendingFor(application.id)))
-          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+          throw new IntakeRefusedError("REPLY_IN_PROGRESS");
         await facts.record(tx, {
           applicationId: application.id,
           tenantId: application.tenantId,
@@ -695,7 +698,7 @@ export function createIntakeService(
         const application = await applications.lock(tx, guest.application.id);
         if (application === null) throw new IntakeRefusedError("NOT_FOUND");
         if (turns !== undefined && (await turns.pendingFor(application.id)))
-          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+          throw new IntakeRefusedError("REPLY_IN_PROGRESS");
 
         // Idempotence first: a double-click and a retried request are one
         // submission, and the second one gets the first one's answer.

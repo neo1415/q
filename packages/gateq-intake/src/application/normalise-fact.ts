@@ -294,6 +294,13 @@ export function normaliseProposedFact(
         value = { kind: "TEXT", text: websiteIn(words) };
         break;
       default:
+        // Phrases longer than the stored phrase shape are prose (live D8):
+        // kept as the words they are rather than refused.
+        if (
+          proposal.value.kind === "PHRASES" &&
+          proposal.value.phrases.some((phrase) => phrase.length > 120)
+        )
+          value = { kind: "TEXT", text: words.slice(0, 2000) };
         break;
     }
   }

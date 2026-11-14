@@ -61,10 +61,17 @@ export const GateQProposedValueSchema = z.discriminatedUnion("kind", [
       currency: z.string().regex(/^[A-Z]{3}$/),
     })
     .strict(),
+  /**
+   * Phrases as read, as long as a TEXT value may be. Live D8 (2026-11-14):
+   * one sector phrase over the store's 120 characters refused the whole
+   * reading, every provider failed it, and the founder's first message
+   * never got a reply. A bound on one proposal must never cost the turn:
+   * the platform splits and trims phrases into the stored shape itself.
+   */
   z
     .object({
       kind: z.literal("PHRASES"),
-      phrases: z.array(z.string().min(1).max(120)).min(1).max(12),
+      phrases: z.array(z.string().min(1).max(2000)).min(1).max(12),
     })
     .strict(),
   /** They were asked and do not know. A real answer, not an absence. */

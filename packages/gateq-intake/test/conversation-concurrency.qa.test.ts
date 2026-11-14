@@ -208,7 +208,7 @@ function exchangeWorld() {
           if (person && person.text !== input.text)
             throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
           if (activeClaim !== null)
-            throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+            throw new IntakeRefusedError("REPLY_IN_PROGRESS");
           activeClaim = randomUUID();
           if (person === undefined)
             rows.push({

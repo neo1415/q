@@ -1039,6 +1039,10 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "Please try again.": "يُرجى المحاولة مرة أخرى.",
   "Couldn't reach Capital Q just now. Please try again.":
     "تعذّر الوصول إلى Capital Q الآن. يُرجى المحاولة مرة أخرى.",
+  "Q is still answering your last message. Give it a moment, then carry on.":
+    "لا يزال Q يردّ على رسالتك الأخيرة. انتظر لحظة ثم تابع.",
+  "Q couldn't answer that just now. Your message is saved; send it again.":
+    "تعذّر على Q الرد الآن. رسالتك محفوظة؛ أرسلها مرة أخرى.",
   "That didn't go through. Please try again.":
     "لم تتم العملية. يُرجى المحاولة مرة أخرى.",
   "I lead product, joined in May": "أقود المنتج، انضممت في مايو",
