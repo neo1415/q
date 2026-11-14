@@ -216,3 +216,93 @@ No settled item was asked again: team, revenue, CAC, raise, problem, pricing. Us
    - Leave-open phrases are stored in `application.note`.
    - "40 percent of signed-up students are girls" is stored as a `users` PERCENT.
    - First page load creates an IN_PROGRESS application before the founder acts (`startFormAction` on entry).
+
+## Re-certification 14 Nov (78f8d72d5)
+
+- **Production:** `78f8d72d5`. It includes the shared-cause fix `715f55bbc` (restored in `1ebe465ea`) and the document-selection fix `fc68b217a`. Migration `20261231590000` is applied, and `gateq.application_document_selections` exists.
+- **Founder:** `founder.fb0018.zawadi-abdi@fictional.capitalq.local`, Schemaora Systems, KE. The profile stage is "Later" (`series_c_plus`). The founder was fresh, with no `application_founders` row. **Investor:** `investor.kilima-angels.njeri-kamau@fictional.capitalq.local`.
+- **Window:** 22:56:37–23:06:28Z. **Cost:** 35 model calls, **$0.1202** (ai_ops.model_usage; the investor accounts for $0.0848 of it), recorded against reservation `3ca38fd7`.
+- **Records created:**
+  - application `6f16ad1a-0c7c-4f29-9f25-d9d1c28814c3`, created 22:57:24Z on the first form action and SUBMITTED 23:03:47Z (ref `ga_3zsmdea98fpqtk4jjcjsqn1z46`);
+  - 53 turns (26 PERSON) and 26 readings (19 READ, 7 NO_STATEMENTS);
+  - 41 statements (10 FORM), 6 links and **1** disagreement event;
+  - submission `dd96b0b6` (dossier snapshot v3, `documentsTotal` 2);
+  - synthesis READY (`GATEQ_DOSSIER_SYNTHESIS@v2`, 17 points, complete, 53/53 turns read, uncitedDropped 0);
+  - 1 investor Q turn.
+- **Evidence:** `/tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/gq9/`. It holds `shots/J-*` (first browser), `K-*` (resumed browser, deviceScaleFactor 2), `I-*` (investor, deviceScaleFactor 2), `sub.json`, `review.txt`, `inbox.txt` and `resume-before.txt`. Not durable.
+- **Journey:**
+  - Form: Seed, Software, USD 350,000, deck and product brief ticked.
+  - 2,300 pipelines and 600 WAU; "Nobody pays yet"; "from 1 pilot company to 4 since March"; "We don't know our CAC yet"; team; "really a Series A company now, not seed".
+  - "Back to users: about 1,500 weekly active users" (undated); use of funds; 350k→400k; market not sized; data-residency risk; pricing.
+  - "Lead angel calls us seed…" → "Leave the stage open for now", then a second request to leave the stage open.
+  - "600 … and about 1,500 … two different dashboards" → "Leave it open for now".
+  - **Browser closed. A new context signed in and resumed:** "Still leave it open", acquisition, "Anything else?", confirmation, "That's all".
+  - Review, submit, investor inbox, one investor Q turn.
+- **Operator error:** after resume, the driver also sent three lines left in a copied script from the Quilla run (t38, t40, t42: "students who finished a practice set", "exam coordinators at our 4 partner schools", "Anything else?"). The founder then said at t50 that the school line was pasted by mistake. Q flagged the mismatch itself (t41, t43, t47). The run has 26 founder turns instead of 23. No verdict below rests on those turns.
+
+### Live re-check list
+
+- **First page load creates no application: PASS.** The gateway had 12 applications before the load (22:56:37Z). After the load it still had 12, and the founder had 0 `application_founders` rows (22:57:17Z). The only POST was a read. The draft was created at 22:57:24Z, on the first tick.
+- **"From 1 to 4" makes no disagreement link: PASS.** It became one statement, `3520d2da` (pilots = 4, all words), with no link.
+- **CAC unknown is stored as a statement, with no leave-open event: PASS.** It is `dc616a24` (`application.note` TEXT "We don't know our CAC yet."). Zero events at t10. Investor Q reports "No CAC figure … 'We don't know our CAC yet.'"
+- **"Nobody pays yet" settles revenue: PASS.** `9cae8d81` is a revenue ZERO and `9de4ce92` is a paying_customers ZERO, both at t6. Q never asked for revenue or its period again. The t27 question was about conversion.
+- **An undated 600 vs 1,500 stays a visible disagreement: FAIL until the founder raised it again.**
+  - At t16, "Back to users: about 1,500 weekly active users" was read as **CORRECTS** `97042ca6` (1,500 supersedes 600, `d036b462`), although no correction words were used. Q replied that this "clears up the earlier figure".
+  - The disagreement exists only because the founder restated 600 at t34. That created a new statement, `911cb743`, and DISAGREES `c3487431`.
+  - The original 600 is listed under "Earlier answers, corrected".
+- **Leave-open: FAIL.** "Leave the stage open for now; let Kilima judge" (t30), "Please leave that disagreement open" (t32) and "Leave it open for now" (t36) each wrote nothing (NO_STATEMENTS, empty `not_recorded`).
+  - **Cause, confirmed in `application_turns.intent`:** Q's turns t31, t33 and t37 are intent `QUESTION_FOR_Q`. `interviewer.ts` (~854–861) sets `discardedByIntent`. Then `statement-plan.ts` (~1157, `for (const action of input.discard ? [] : actions)`) drops the `disagreementActions` together with the facts.
+  - On the earlier prompt (`1e9fd48e`), the same phrases were intent ANSWER or UNKNOWN_OR_SKIP and were recorded.
+  - Every reading at `reading_version` 3 so far has produced no LEFT_OPEN from a bare leave-open.
+  - The only event in this run, LEFT_OPEN on `c3487431`, came at t44. That turn was intent CORRECTION, because it also carried new words.
+- **A repeated leave-open keeps Q's correct sentence: partial.**
+  - t45 "I'll leave those figures open" is true, matching the t44 event.
+  - t31, t33 and t37 said "I haven't marked those two answers as left open yet". That was true to state, but each time the founder's request was lost.
+  - **t39 is a false success claim.** Q said "I'll leave the weekly-active figures open for Kilima; what would you like to know…?", and no event exists. The claim shares a sentence that ends in "?", so the `CLAIMS_LEFT_OPEN` guard (`statement-plan.ts` ~1365–1402), which skips questions, let it through.
+- **Resume: PASS.**
+  - **No answer POST on load:** 5 server-action POSTs. The first was `{reopenOnly:true}`; the other 4 carried only the session credential.
+  - **Counts unchanged:** statements 36, links 5, events 0, turns 37 and selection revision 2, both before and after the load.
+  - **Stored answers shown:** the page opened straight into the interview with the full transcript and no role step.
+  - **Documents:** both ticked documents were restored. Review lists "Documents you ticked: Schemaora Systems investor deck (fictional), Schemaora Systems product brief (fictional)". The dossier has `documents` = 2 and `documentsTotal` 2 (`K-01-resume.png`, `K-review-full.png`).
+- **Stage header: FAIL (P3).** The inbox "Company and founder" block and dossier `company.stage` show only "Series A", beside "answers disagree". Review lists both stage statements.
+- **Old applications: PASS.**
+  - Coverisk (`c4cf20bd`) no longer shows "600 vs Not known". Its Conflicting answers list only the two left-open WAU pairs.
+  - Quilla (`1e9fd48e`) shows no "1 vs 4 partner schools" contradiction: only stage and WAU, both left open. The synthesis calls it growth (`I-04-Coverisk.png`, `I-04-Quilla.png`).
+
+### Invariants
+
+1. **PASS.** All 26 PERSON turns have a reading (19 READ, 7 NO_STATEMENTS). Every TURN statement has words and a source turn. The NO_STATEMENTS readings are leave-open and conversational turns.
+2. **FAIL (narrow).**
+   - Raise: one CORRECTS, `c4b368ad` (t20 USD 400,000 corrects form `8a57f0be`).
+   - Stage: CORRECTS `a9ac65f5` is the founder's own "not seed".
+   - No form re-save happened after resume (FORM total 10).
+   - **But** CORRECTS `97042ca6` superseded the 600 WAU without any correction from the founder (see 3).
+3. **FAIL.**
+   - The undated 1,500 silently corrected 600 at t16. The disagreement exists only after the founder's t34 restatement.
+   - The stage DISAGREES `91025060` stays visible on every surface. It is OPEN, not left open, against the founder's two requests.
+4. **PASS (note).** Revenue, CAC, raise, team and pilots were not asked again. At t43 Q asked about the stage again. The stage was OPEN in state, but only because the founder's leave-open was dropped. At t11 Q asked "how many customers or users are live" after users were given.
+5. **FAIL.** The stage leave-open (t30, t32) and the WAU leave-open (t36) were never recorded, and Q came back to the stage at t43.
+6. **PASS.** Same application, all 53 turns and 26 readings kept. No writes on load, no role step, documents restored and submitted (2), no interview claim left.
+7. **FAIL.**
+   - t39 claims "I'll leave the weekly-active figures open" with no LEFT_OPEN event.
+   - Other claims match records: t45 matches LEFT_OPEN on `c3487431`, t21 "the raise is four hundred thousand" matches `c4b368ad`, and t15 "Series A, not seed" matches `a9ac65f5`.
+8. **FAIL (narrow; values agree).**
+   - These agree: USD 400,000 (corrected from 350,000), WAU 1,500 vs 600 left open, the stage dispute, zero revenue and the 2 documents. They match across review, dossier, inbox, Sent page ("Stage we invest at: Your answers disagree"), the frozen qualification (STAGE UNRESOLVED / STAGE_DISPUTED, MAY_APPLY), the inbox row ("Needs your judgement: answers disagree") and investor Q (`I-03-investor-q.png`). Investor Q also gives the 350k→400k correction and "CAC not known".
+   - These disagree:
+     - The stage state is "open, not yet settled" on review, dossier and inbox, while the synthesis says the founder "explicitly leaves the … disagreement open".
+     - The synthesis says "the form says Series A", but the form said Seed.
+     - The stage header shows one value.
+     - "Still leave it open for Kilima." is in the Founder's note.
+     - The inbox summary repeats "Founder stated" without separators.
+
+### Defects, ranked
+
+1. **P1 (invariants 3, 5, 7, 8):** a bare leave-open is classified `QUESTION_FOR_Q`, and `discardedByIntent` then drops its `disagreementActions`. Fix in `packages/gateq-intake/src/application/statement-plan.ts` ~1157: never discard disagreement actions by intent. Also fix `interviewer.ts` ~854–861, and possibly the prompt v8 intent rule (`packages/q-core/src/prompts/tasks/gateq-interviewer.v8.ts`), which says a leave-open is "never a statement, never a note".
+2. **P1 (invariants 2, 3):** an undated restatement of a metric ("about 1,500 weekly active users", with no "actually" and no date) is read as CORRECTS, and the earlier figure is hidden. A CORRECTS should require correction language from the founder. Otherwise the second figure should be NEW, and `relatable` code detection should link the pair as DISAGREES. Fix in the prompt v8 CORRECTS rule, plus a write-path check in `statement-plan.ts` that an undated, unmarked restatement cannot correct.
+3. **P2 (invariant 7):** a left-open claim joined to a question in one sentence escapes the reply guard (`CLAIMS_LEFT_OPEN` skips sentences ending in "?"; `statement-plan.ts` ~1365–1402). The guard should split clauses on ";" or "—", or test the claim regardless of the trailing "?".
+4. **P3:**
+   - The stage header shows one value during a dispute (`company.stage` and the inbox company block; `dossierStageWords` is not applied there).
+   - Leave-open words go into `application.note`.
+   - "We haven't sized the market" is stored as an `application.note` UNKNOWN, so Market shows as "Missing", not "Unknown".
+   - The same acquisition line is stored twice (t46 COUNT and TEXT; duplicated on review).
+   - The synthesis attributes Series A to the form.
