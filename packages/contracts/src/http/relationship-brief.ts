@@ -3,6 +3,7 @@ import { z } from "zod";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import {
+  DiligenceRequestAboutSchema,
   RelationshipMilestoneDtoSchema,
   RelationshipStateV2Schema,
   RELATIONSHIP_NEXT_STEPS,
@@ -193,6 +194,41 @@ export const RelationshipBriefSchema = z
         )
         .max(50),
       answeredCount: z.number().int().min(0),
+      /**
+       * Addendum 14 Nov 2026 (slice 5): the requests answered so far, each
+       * with when, how (a document shared, or the founder's answers with
+       * each answer's evidence status) and the uncertainty it was asked to
+       * resolve. Additive; older briefs carry none.
+       */
+      answered: z
+        .array(
+          z
+            .object({
+              id: UuidSchema,
+              title: z.string().max(200),
+              /** A shared document's title; null: answered by answers. */
+              document: z.string().max(300).nullable(),
+              fulfilledAt: UtcTimestampSchema.nullable(),
+              answers: z
+                .array(
+                  z
+                    .object({
+                      answeredAt: UtcTimestampSchema,
+                      evidenceStatus: z.enum([
+                        "SELF_REPORTED",
+                        "DOCUMENT_SUPPORTED",
+                      ]),
+                    })
+                    .strict(),
+                )
+                .max(5)
+                .default([]),
+              about: DiligenceRequestAboutSchema.nullable().default(null),
+            })
+            .strict(),
+        )
+        .max(50)
+        .optional(),
     }),
     /** Documents shared into the relationship, as this side may see them. */
     documents: source({

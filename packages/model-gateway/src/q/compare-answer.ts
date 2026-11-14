@@ -1,6 +1,6 @@
 import type { ModelOutputSpec } from "@capital-q/contracts";
 import {
-  CompanyAnalystV34ResultSchema,
+  CompanyAnalystV35ResultSchema,
   type CompanyAnalystV33Result,
 } from "@capital-q/q-core";
 import { z } from "zod";
@@ -130,7 +130,7 @@ export const NARROWED_ANALYST_SCHEMA: z.ZodType<CompanyAnalystV33Result> =
       value !== null && typeof value === "object" && !Array.isArray(value)
         ? { recommendation: null, ...(value as Record<string, unknown>) }
         : value,
-    CompanyAnalystV34ResultSchema,
+    CompanyAnalystV35ResultSchema,
   );
 
 /** The comparison's writer's schema (see NARROWED_ANALYST_SCHEMA). */

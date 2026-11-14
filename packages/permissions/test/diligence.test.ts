@@ -112,6 +112,7 @@ function world(options: { readonly diligence?: boolean } = {}) {
         title: string;
         note: string | null;
         userId: string;
+        about?: { statement: string; standing: string | null } | null;
       },
     ) => {
       const id = `00000000-0000-4000-8000-00000000040${String(requestRows.length)}`;
@@ -125,6 +126,7 @@ function world(options: { readonly diligence?: boolean } = {}) {
         createdAt: new Date().toISOString(),
         fulfilment: null,
         decline: null,
+        about: input.about ?? null,
       });
       return Promise.resolve({ id, created: true });
     },
@@ -499,6 +501,58 @@ describe("diligence: requests", () => {
         { status: "FULFILLED", fulfilledBy: { title: "Management accounts" } },
       ]);
     }
+  });
+});
+
+// Addendum 14 Nov 2026 (slice 5): what a request was asked to resolve.
+describe("diligence: a request names the uncertainty it resolves", () => {
+  it("is kept with the request and read back to both sides, with when it was fulfilled", async () => {
+    const w = world();
+    const about = {
+      statement: "October MRR rests on the founder's word only.",
+      standing: "FOUNDER_CONFIRMED" as const,
+    };
+    const asked = await w.service.request({
+      actor: investorOne,
+      relationshipId: R1,
+      title: "October bank statements",
+      idempotencyKey: "diligence-key-about",
+      about,
+    });
+    const requestId = asked.outcome === "OK" ? asked.value.requestId : "";
+    await w.service.share({
+      actor: founder,
+      relationshipId: R1,
+      documentId: DOC,
+      requestId,
+    });
+    for (const who of [founder, investorOne]) {
+      const view = await w.service.view({ actor: who, relationshipId: R1 });
+      expect(view?.requests).toMatchObject([{ status: "FULFILLED", about }]);
+      expect(typeof view?.requests[0]?.fulfilledAt).toBe("string");
+    }
+  });
+
+  it("a standing outside the closed list names nothing; a request without one names nothing", async () => {
+    const w = world();
+    await w.service.request({
+      actor: investorOne,
+      relationshipId: R1,
+      title: "Cap table",
+      idempotencyKey: "diligence-key-kyb",
+      about: { statement: "Identity", standing: "KYB_VERIFIED" },
+    });
+    await w.service.request({
+      actor: investorOne,
+      relationshipId: R1,
+      title: "Pitch deck",
+      idempotencyKey: "diligence-key-none",
+    });
+    const view = await w.service.view({
+      actor: investorOne,
+      relationshipId: R1,
+    });
+    expect(view?.requests.map((r) => r.about)).toEqual([null, null]);
   });
 });
 

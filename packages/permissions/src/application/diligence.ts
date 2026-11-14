@@ -6,7 +6,11 @@ import {
   occurredNow,
   type MaterialActionAuditWriter,
 } from "@capital-q/audit";
-import type { CorrelationId } from "@capital-q/contracts";
+import {
+  DiligenceRequestAboutSchema,
+  type CorrelationId,
+  type DiligenceRequestAbout,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import {
   RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
@@ -129,6 +133,13 @@ export type DiligenceView = {
       readonly documentId: string;
       readonly title: string | null;
     } | null;
+    /** When it was fulfilled; null: not (yet). */
+    readonly fulfilledAt: string | null;
+    /**
+     * The uncertainty it was asked to resolve and its standing then
+     * (addendum 14 Nov 2026); null: none named.
+     */
+    readonly about: DiligenceRequestAbout | null;
     /** The questions this request carried, with answers; null: none. */
     readonly questions: readonly DiligenceRequestQuestion[] | null;
   }[];
@@ -176,6 +187,27 @@ export function questionsByRequest(
     out.set(record.sentRef, set);
   }
   return out;
+}
+
+/**
+ * What a request was asked to resolve, kept only in its closed shape: a
+ * statement of at most 400 characters and a standing from the closed list
+ * (never from KYB). Anything else names nothing.
+ */
+function aboutOf(
+  about:
+    | { readonly statement: string; readonly standing: string | null }
+    | null
+    | undefined,
+): DiligenceRequestAbout | null {
+  if (about === null || about === undefined) return null;
+  // One line: control characters never reach the row (its check refuses
+  // them), so they are spaces here.
+  const parsed = DiligenceRequestAboutSchema.safeParse({
+    ...about,
+    statement: about.statement.replace(/\p{Cc}+/gu, " "),
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 export type DiligenceRefusal =
@@ -451,6 +483,8 @@ export function createDiligenceService(dependencies: {
                   documentId: row.fulfilment.documentId,
                   title: titles.get(row.fulfilment.documentId)?.title ?? null,
                 },
+          fulfilledAt: row.fulfilment?.at ?? null,
+          about: aboutOf(row.about),
           questions: carried.get(row.id) ?? null,
         })),
       };
@@ -495,6 +529,14 @@ export function createDiligenceService(dependencies: {
       readonly note?: string | null | undefined;
       readonly idempotencyKey: string;
       readonly correlationId?: CorrelationId | undefined;
+      /**
+       * The uncertainty it resolves (addendum 14 Nov 2026); null: none.
+       * Input, checked here against the closed shape (aboutOf).
+       */
+      readonly about?:
+        | { readonly statement: string; readonly standing: string | null }
+        | null
+        | undefined;
     }): Promise<DiligenceOutcome<{ readonly requestId: string }>> => {
       const party = await partyOf(command.actor, command.relationshipId);
       if (party === null) return refused("NOT_FOUND");
@@ -515,6 +557,7 @@ export function createDiligenceService(dependencies: {
           title,
           note,
           idempotencyKey: command.idempotencyKey,
+          about: aboutOf(command.about),
         });
         if (inserted.created) {
           await appender.append(tx, {

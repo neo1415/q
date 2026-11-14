@@ -79,6 +79,7 @@ export type {
   OwnDocumentsPort,
   QToolPorts,
   ResearchReadingsPort,
+  DiligenceFollowUp,
   ResearchReadingsSourceInput,
   PitchMomentPort,
   CompanyPitchTranscript,

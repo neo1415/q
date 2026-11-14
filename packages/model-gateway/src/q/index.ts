@@ -9,6 +9,8 @@ import {
 
 import { z } from "zod";
 
+import { GetRelationshipOutputSchema } from "@capital-q/q-tools";
+
 import { carriesScreenMove, withoutUnaskedMoves } from "./unasked-moves.js";
 import {
   asksForComparison,
@@ -47,6 +49,7 @@ import {
   QSetLanguageIntentSchema,
   QDocumentToolResultSchema,
   QMessageIdSchema,
+  UncertaintyStandingSchema,
   type ModelBudget,
   type ModelFailureClass,
   type ModelMessage,
@@ -97,7 +100,7 @@ import {
   type AuthorisedFact,
   type PublicSourceLike,
   type CompanyAnalystV30Result,
-  CompanyAnalystV34ResultSchema,
+  CompanyAnalystV35ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -799,6 +802,43 @@ import {
   OFFER_UNRECORDED_NOTE,
   OFFER_UNRECORDED_REFUSAL,
 } from "./offer-binding.js";
+export {
+  checkedLine,
+  chooseVehicle,
+  decideUncertaintyOffer,
+  publicStandingOf,
+  publicCheckOf,
+  publicWebSeenOf,
+  reassessmentNote,
+  stepLineWithoutOffer,
+  uncertaintiesOf,
+  withResolves,
+  UNAVAILABLE_CODE_SAYS_GUIDANCE,
+  UNCERTAINTY_VEHICLES,
+  type PublicCheck,
+  type PublicWebSeen,
+  type RelationshipStanding,
+  type UncertaintyAbout,
+  type UncertaintyOfferDecision,
+  type VehicleChoice,
+} from "./uncertainty.js";
+import {
+  checkedLine,
+  chooseVehicle,
+  decideUncertaintyOffer,
+  publicCheckOf,
+  publicWebSeenOf,
+  reassessmentNote,
+  reportsGap,
+  stepLineWithoutOffer,
+  uncertaintiesOf,
+  withResolves,
+  UNAVAILABLE_CODE_SAYS_GUIDANCE,
+  UNCERTAINTY_VEHICLES,
+  type PublicWebSeen,
+  type RelationshipStanding,
+  type UncertaintyAbout,
+} from "./uncertainty.js";
 
 /** Q room R5: any tool result that carries the calendar connect card. */
 const CalendarConnectCarrierSchema = z
@@ -1479,11 +1519,11 @@ const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
  */
 /**
  * The schema the analyst's answer is checked against: the one the prompt in
- * use writes to (COMPANY_ANALYST v34, schema v34). Pinned by a test, because a lag here
+ * use writes to (COMPANY_ANALYST v35, schema v35). Pinned by a test, because a lag here
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
-export const ANALYST_RESULT_SCHEMA = CompanyAnalystV34ResultSchema;
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV35ResultSchema;
 
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
@@ -1502,6 +1542,9 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   // "nothing" value (no rename asked; no status line), never the answer.
   "displayName",
   "proposalStatus",
+  // v35 (addendum 14 Nov): malformed uncertainties lose the list (and so
+  // any uncertainty offer), never the answer.
+  "uncertainties",
 ];
 
 /**
@@ -3443,6 +3486,58 @@ export function createModelGatewayQAnswer(
    * them: the destination would be re-guessed ("the pending approvals"
    * became account settings). Bounded.
    */
+  /**
+   * Addendum 14 Nov 2026 (uncertainty.ts). Per run, bounded like the rest:
+   * what the public web returned (slice 0), whether code says what was
+   * checked (a turn about a named company or person not theirs), whether an
+   * on-request data-room title was in view (slice 4), and what a taken
+   * uncertainty offer resolves (slice 5).
+   */
+  const publicWebByRun = new Map<string, PublicWebSeen[]>();
+  const codeSaysCheckedRuns = new Set<string>();
+  const onRequestSeenRuns = new Set<string>();
+  const offerAboutByRun = new Map<string, UncertaintyAbout>();
+  const boundedRunState = (): void => {
+    for (const store of [
+      publicWebByRun,
+      codeSaysCheckedRuns,
+      onRequestSeenRuns,
+      offerAboutByRun,
+    ]) {
+      if (store.size > 256) {
+        const [oldest] = store.keys();
+        if (oldest !== undefined) store.delete(oldest);
+      }
+    }
+  };
+  /** A research result seen in a run; re-worded when code says the absence. */
+  const notePublicWeb = (
+    runId: string,
+    name: string,
+    outcome: QToolCallOutcome,
+  ): QToolCallOutcome => {
+    if (name !== PUBLIC_WEB_TOOL) return outcome;
+    const seen = publicWebSeenOf(outcome);
+    publicWebByRun.set(runId, [...(publicWebByRun.get(runId) ?? []), seen]);
+    boundedRunState();
+    if (
+      codeSaysCheckedRuns.has(runId) &&
+      seen.status === "PROVIDER_UNAVAILABLE" &&
+      outcome.result.ok
+    ) {
+      return {
+        ...outcome,
+        result: {
+          ...outcome.result,
+          data: {
+            ...(outcome.result.data as Record<string, unknown>),
+            guidance: UNAVAILABLE_CODE_SAYS_GUIDANCE,
+          },
+        },
+      };
+    }
+    return outcome;
+  };
   const unmovedRuns = new Set<string>();
   const markUnmoved = (runId: string): void => {
     unmovedRuns.add(runId);
@@ -3524,10 +3619,16 @@ export function createModelGatewayQAnswer(
       if (discover?.kind === "REFUSE") {
         return notAsked(asked.callId, discover.safeMessage);
       }
-      const proposal =
+      const chosen =
         discover?.kind === "SET"
           ? { ...asked, arguments: discover.arguments }
           : asked;
+      // Slice 5: a yes to an uncertainty offer carries what it resolves
+      // onto the vehicle's call, from the offer's record.
+      const proposal = {
+        ...chosen,
+        arguments: withResolves(chosen, offerAboutByRun.get(toolContext.runId)),
+      };
       // C3: a yes to an offer code holds no record of acts on nothing --
       // what was offered would be a guess. Their approval of a change
       // already waiting is theirs, not an offer, and still goes through.
@@ -3554,7 +3655,11 @@ export function createModelGatewayQAnswer(
         return aboutThemOnly(
           proposal,
           toolContext.runId,
-          { ...readBefore, callId: proposal.callId, latencyMs: 0 },
+          notePublicWeb(toolContext.runId, proposal.name, {
+            ...readBefore,
+            callId: proposal.callId,
+            latencyMs: 0,
+          }),
           toolContext.conversation?.latestUserText ?? "",
         );
       }
@@ -3571,7 +3676,7 @@ export function createModelGatewayQAnswer(
         return aboutThemOnly(
           proposal,
           toolContext.runId,
-          kept,
+          notePublicWeb(toolContext.runId, proposal.name, kept),
           toolContext.conversation?.latestUserText ?? "",
         );
       }
@@ -3604,6 +3709,14 @@ export function createModelGatewayQAnswer(
       runFits.note(toolContext.runId, outcome);
       runActions.note(toolContext.runId, proposal.name, outcome);
       if (
+        outcome.result.ok &&
+        (outcome.result.data as { readonly status?: unknown } | null)
+          ?.status === "ON_REQUEST"
+      ) {
+        onRequestSeenRuns.add(toolContext.runId);
+        boundedRunState();
+      }
+      if (
         outcome.status === "SUCCEEDED" &&
         outcome.result.ok &&
         outcome.classification === "READ_ONLY"
@@ -3633,7 +3746,7 @@ export function createModelGatewayQAnswer(
       return aboutThemOnly(
         proposal,
         toolContext.runId,
-        outcome,
+        notePublicWeb(toolContext.runId, proposal.name, outcome),
         toolContext.conversation?.latestUserText ?? "",
       );
     },
@@ -5440,6 +5553,59 @@ export function createModelGatewayQAnswer(
       }
     };
     /**
+     * Addendum 14 Nov 2026 (slice 6): on an investor's turn about a company
+     * (on screen, or named this turn), the diligence requests they linked
+     * to an uncertainty about it, with what came back, as code's own note.
+     * Read through get_relationship as the person (its own authorize step
+     * and the diligence service's party check): only their own requests
+     * and what was shared with them, never a founder-private record.
+     */
+    const followUpRead = async (): Promise<void> => {
+      if (ownInvestor === null || !prefetchTools.has("get_relationship")) {
+        return;
+      }
+      const onScreen =
+        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
+      const ids = [...(onScreen === null ? [] : [onScreen]), ...namedIds]
+        .filter((id, index, all) => all.indexOf(id) === index)
+        .slice(0, 2);
+      await Promise.all(
+        ids.map(async (companyId, index) => {
+          const outcome = await tools
+            .execute(
+              {
+                callId: "q-follow-ups-" + String(index),
+                name: "get_relationship",
+                arguments: { companyId },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          if (outcome === null || !outcome.result.ok) return;
+          const read = GetRelationshipOutputSchema.safeParse(
+            outcome.result.data,
+          );
+          if (!read.success) return;
+          const followUps = read.data.diligence?.followUps ?? [];
+          if (read.data.yourSide !== "INVESTOR" || followUps.length === 0) {
+            return;
+          }
+          const note = reassessmentNote({
+            company: read.data.counterpart.name ?? "the company",
+            followUps,
+          });
+          if (note === null) return;
+          namedCompanies.push({
+            scope: "RELATIONSHIP_CONTEXT",
+            statement: note.slice(0, 7_000),
+            truthClass: "VERIFIED",
+            evidenceStatus: "PLATFORM_VERIFIED",
+            source: "Capital Q diligence requests and what came back",
+          });
+        }),
+      );
+    };
+    /**
      * Owner QA I7 (cheque-fit-fact.ts): "does my cheque fit X's round?"
      * reads X's computed fit -- the company on screen, or the one the turn
      * names -- so the cheque row and its dated FX estimate are the answer.
@@ -5774,7 +5940,10 @@ export function createModelGatewayQAnswer(
           timed("day", phased("day", dayRead)),
           timed("arrival", phased("arrival", arrivalRead)),
         ]);
-        await timed("cheque", chequeRead());
+        await Promise.all([
+          timed("cheque", chequeRead()),
+          timed("followUps", followUpRead()),
+        ]);
         prepareMs["wide"] = Date.now() - wideStarted;
         return {
           namedCompanies,
@@ -6118,6 +6287,24 @@ export function createModelGatewayQAnswer(
        */
       let leadLines: string | undefined = request.leadLines;
       if (request.offerTakenUnrecorded === true) markUnmoved(request.runId);
+      // Addendum 14 Nov 2026: a yes to an uncertainty offer carries what it
+      // resolves onto its request (slice 5); a turn about a named company
+      // or person not theirs says what was checked (slice 0).
+      if (request.offerTaken?.about !== undefined) {
+        const standing = UncertaintyStandingSchema.safeParse(
+          request.offerTaken.about.standing,
+        );
+        if (standing.success) {
+          offerAboutByRun.set(request.runId, {
+            statement: request.offerTaken.about.statement,
+            standing: standing.data,
+          });
+        }
+      }
+      if (request.aboutNamedOther === true) {
+        codeSaysCheckedRuns.add(request.runId);
+      }
+      boundedRunState();
       const took = (phase: string): void => {
         const now = Date.now();
         phases[phase] = now - mark;
@@ -11481,7 +11668,7 @@ export function createModelGatewayQAnswer(
         // C3: the offer the answer closes with is bound to a tool this
         // run holds, or it is not said: Q never offers what it cannot then
         // do, and a yes binds to the record, never to the words.
-        const offerBinding = bindOffer(analyst.offer, {
+        let offerBinding = bindOffer(analyst.offer, {
           holdsTool: (name) => classificationOf(name) !== undefined,
           documents: dependencies.artifacts !== undefined,
         });
@@ -11491,11 +11678,175 @@ export function createModelGatewayQAnswer(
             "an offer no tool of this run can carry out was not said",
           );
         }
+        /**
+         * Addendum 14 Nov 2026 (slices 3-4): an offer to resolve an
+         * uncertainty stands only for a material one, through the vehicle
+         * the relationship allows; with no route, the plain step is said
+         * instead. Read from the analyst's fields and the relationship
+         * tool's own state, never from the words.
+         */
+        const uncertainties = uncertaintiesOf(analyst);
+        const offerRemoved: string[] =
+          offerBinding.kind === "UNBOUND" ? [offerBinding.said] : [];
+        const uncertaintyLines: string[] = [];
+        const investorTurn = ownInvestorOrganisationIn(plan) !== null;
+        /** The one company this run read in full, if exactly one. */
+        const subjectCompany = (): {
+          readonly companyId: string;
+          readonly name: string | null;
+        } | null => {
+          const known = runCompanies.read(request.runId);
+          const ids = [...known.profiles.keys()];
+          const only = ids.length === 1 ? ids[0] : undefined;
+          if (only === undefined) return null;
+          return {
+            companyId: only,
+            name:
+              known.companyNames.get(only) ?? known.profiles.get(only) ?? null,
+          };
+        };
+        /** Their side's standing with it: read already, or read now. */
+        const standingWith = async (
+          companyId: string,
+        ): Promise<RelationshipStanding | undefined> => {
+          const key = `COMPANY:${companyId}`;
+          if (
+            !runCompanies.read(request.runId).relationships.has(key) &&
+            classificationOf("get_relationship") !== undefined
+          ) {
+            await callTool(
+              {
+                callId: "q-uncertainty-relationship",
+                name: "get_relationship",
+                arguments: { companyId },
+              },
+              toolContext,
+            ).catch(() => null);
+          }
+          const read = runCompanies.read(request.runId).relationships.get(key);
+          if (read === undefined) return undefined;
+          return read.relationship === null
+            ? {
+                yourSide: read.yourSide ?? null,
+                state: null,
+                milestones: [],
+              }
+            : {
+                yourSide: read.yourSide ?? null,
+                state: read.relationship.state,
+                milestones: read.relationship.milestones,
+              };
+        };
+        const vehicleFor = async (subject: {
+          readonly companyId: string;
+          readonly name: string | null;
+        }) => {
+          const standing = await standingWith(subject.companyId);
+          return standing === undefined
+            ? null
+            : chooseVehicle({
+                standing,
+                onRequestTitle: onRequestSeenRuns.has(request.runId),
+                holds: (name) => classificationOf(name) !== undefined,
+                company: subject.name,
+              });
+        };
+        if (
+          offerBinding.kind === "BOUND" &&
+          UNCERTAINTY_VEHICLES.has(offerBinding.offer.action)
+        ) {
+          const bound = offerBinding.offer;
+          const subject = subjectCompany();
+          const offerAbout = (
+            analyst.offer as { readonly about?: unknown } | null
+          )?.about;
+          const decision = decideUncertaintyOffer({
+            action: bound.action,
+            about: typeof offerAbout === "string" ? offerAbout : null,
+            uncertainties,
+            vehicle: subject === null ? null : await vehicleFor(subject),
+            company: subject?.name ?? null,
+          });
+          logger?.info(
+            {
+              qRunId: request.runId,
+              action: bound.action,
+              decision: decision.kind,
+            },
+            "an offer to resolve an uncertainty was held against its materiality and route",
+          );
+          switch (decision.kind) {
+            case "KEEP":
+              offerBinding = {
+                kind: "BOUND",
+                offer: { ...bound, about: decision.about },
+              };
+              break;
+            case "REBIND":
+              offerRemoved.push(bound.said);
+              uncertaintyLines.push(decision.said);
+              offerBinding = {
+                kind: "BOUND",
+                offer: {
+                  action: decision.tool,
+                  request: bound.request,
+                  said: decision.said,
+                  about: decision.about,
+                },
+              };
+              break;
+            case "NO_ROUTE":
+              offerRemoved.push(bound.said);
+              if (decision.line !== null) uncertaintyLines.push(decision.line);
+              offerBinding = { kind: "NONE" };
+              break;
+            case "DROP":
+              offerRemoved.push(bound.said);
+              offerBinding = { kind: "NONE" };
+              break;
+            case "PASS":
+              break;
+          }
+        } else if (
+          investorTurn &&
+          offerBinding.kind !== "BOUND" &&
+          uncertainties.some(
+            (one) =>
+              one.material &&
+              one.resolveBy.some(
+                (way) => way === "ASK_FOUNDER" || way === "REQUEST_DOCUMENT",
+              ),
+          )
+        ) {
+          const subject = subjectCompany();
+          const step =
+            subject === null
+              ? null
+              : stepLineWithoutOffer({
+                  uncertainties,
+                  vehicle: await vehicleFor(subject),
+                });
+          if (step !== null) uncertaintyLines.push(step);
+        }
+        // Slice 0: on a turn about someone not theirs, what was checked.
+        if (codeSaysCheckedRuns.has(request.runId)) {
+          const line = checkedLine({
+            check: publicCheckOf({
+              seen: publicWebByRun.get(request.runId) ?? [],
+              dropped: toolCalls.some(
+                (call) =>
+                  call.providerName === PUBLIC_WEB_TOOL &&
+                  call.failureCode === "OVER_BUDGET",
+              ),
+            }),
+            subject: request.namedOther?.name ?? null,
+            reportsGap: reportsGap(analyst),
+          });
+          if (line !== null) uncertaintyLines.unshift(line);
+        }
         const spoken = withoutActionTalk(
           analyst.answer,
-          offerBinding.kind === "UNBOUND"
-            ? [...analyst.actionTalk, offerBinding.said]
-            : analyst.actionTalk,
+          [...analyst.actionTalk, ...offerRemoved],
           requestedChangeValues(analyst, latest.content),
         );
         if (spoken.removed > 0) {
@@ -11978,6 +12329,9 @@ export function createModelGatewayQAnswer(
                   : [request.closingLines]),
                 ...actedLines,
                 ...(figureCardLine === null ? [] : [figureCardLine]),
+                // Addendum 14 Nov: what was checked, the relationship step,
+                // or code's own offer through the authorised vehicle.
+                ...uncertaintyLines,
                 // The status of earlier changes is not an answer to this
                 // request, and is not said in its place.
                 ...(statusLine === null || couldNot !== null

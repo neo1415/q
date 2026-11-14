@@ -17,7 +17,7 @@ import {
 describe("COMPANY_ANALYST v33: a stated figure is also returned as structure", () => {
   it("is active on schema v33, keeps v32 published, and differs only by its listed changes", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(34);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(35);
     expect(registry.get("COMPANY_ANALYST", 32)?.definition.status).toBe(
       "DEPRECATED",
     );

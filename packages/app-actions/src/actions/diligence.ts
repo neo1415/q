@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  DiligenceRequestAboutSchema,
   DiligenceRequestResultDtoSchema,
   DiligenceRevokeResultDtoSchema,
   DiligenceShareResultDtoSchema,
@@ -25,7 +26,10 @@ import {
   defineAppAction,
   readyToSendLine,
   defineAppActionFamily,
+  refusal,
   type AnyAppAction,
+  type AppActionContext,
+  type AppActionRefusal,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
@@ -215,6 +219,7 @@ const REQUEST = defineAppAction<
       note: input.input.note ?? null,
       idempotencyKey: input.idempotencyKey,
       correlationId: context.correlationId,
+      about: input.input.about ?? null,
     }),
   targets: (input) => [
     { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
@@ -413,8 +418,41 @@ const DiligenceTool = z
       .max(1000)
       .optional()
       .describe("REQUEST: an optional note."),
+    resolves: DiligenceRequestAboutSchema.optional().describe(
+      "REQUEST: the uncertainty this document would resolve, exactly as you stated it, and its standing now; omit when none.",
+    ),
   })
   .strict();
+
+/** Said when a document request cannot be asked yet (prepare time). */
+export const DILIGENCE_REQUEST_NOT_OPEN =
+  "Diligence hasn't started with them, so a document request can't go yet. Questions can go in your connected chat, or you can ask for a document once diligence starts.";
+export const DILIGENCE_REQUEST_INVESTOR_ONLY =
+  "Only the investor's side asks for diligence documents.";
+export const DILIGENCE_REQUEST_NO_RELATIONSHIP =
+  "There's no relationship with them on Capital Q yet: express interest first, and you can ask for documents once diligence starts.";
+
+/**
+ * Whether the investor may ask this relationship for a document right now:
+ * a party on the investor's side, with diligence open (started, not
+ * passed). Read through the diligence service's own per-party view, as the
+ * actor. Null: they may; otherwise the refusal said before any card.
+ */
+async function requestRefusal(
+  context: AppActionContext,
+  ports: AppActionPorts,
+  relationshipId: string,
+): Promise<AppActionRefusal | null> {
+  const view = await ports.diligence
+    ?.view({ actor: context.actor, relationshipId })
+    .catch(() => null);
+  if (view === null || view === undefined) {
+    return refusal(DILIGENCE_REQUEST_NO_RELATIONSHIP);
+  }
+  if (view.side !== "INVESTOR") return refusal(DILIGENCE_REQUEST_INVESTOR_ONLY);
+  if (!view.open) return refusal(DILIGENCE_REQUEST_NOT_OPEN);
+  return null;
+}
 
 const DILIGENCE_FAMILY: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof DiligenceTool>
@@ -450,20 +488,28 @@ const DILIGENCE_FAMILY: readonly AnyAppAction[] = defineAppActionFamily<
                 operation: "SHARE",
                 input: { relationshipId, input: { documentId: tool.document } },
               };
-        case "REQUEST":
-          return tool.title === undefined
-            ? null
-            : {
-                operation: "REQUEST",
-                input: {
-                  relationshipId,
-                  idempotencyKey: context.idempotencyKey,
-                  input: {
-                    title: tool.title,
-                    ...(tool.note === undefined ? {} : { note: tool.note }),
-                  },
-                },
-              };
+        case "REQUEST": {
+          if (tool.title === undefined) return null;
+          // Audit 14 Nov, slice 4: refused before the card, never after
+          // approval. Only the investor's side asks, and only once
+          // diligence has started; the same checks the service makes.
+          const refused = await requestRefusal(context, ports, relationshipId);
+          if (refused !== null) return refused;
+          return {
+            operation: "REQUEST",
+            input: {
+              relationshipId,
+              idempotencyKey: context.idempotencyKey,
+              input: {
+                title: tool.title,
+                ...(tool.note === undefined ? {} : { note: tool.note }),
+                ...(tool.resolves === undefined
+                  ? {}
+                  : { about: tool.resolves }),
+              },
+            },
+          };
+        }
         case "REVOKE":
         case "FULFIL": {
           if (tool.document === undefined) return null;

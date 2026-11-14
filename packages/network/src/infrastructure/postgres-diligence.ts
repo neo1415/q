@@ -25,6 +25,18 @@ export type DiligenceRequestRecord = {
     readonly note: string | null;
     readonly at: string;
   } | null;
+  /**
+   * The uncertainty this request was asked to resolve (addendum 14 Nov
+   * 2026, slice 5): Q's statement or a claim key, and its standing when
+   * asked. Absent or null: none named (every request from the page).
+   */
+  readonly about?: DiligenceRequestAbout | null | undefined;
+};
+
+/** What a request was asked to resolve; the standing never comes from KYB. */
+export type DiligenceRequestAbout = {
+  readonly statement: string;
+  readonly standing: string | null;
 };
 
 type Row = {
@@ -40,6 +52,8 @@ type Row = {
   fulfilled_at: Date | null;
   decline_note: string | null;
   declined_at: Date | null;
+  about: string | null;
+  about_standing: string | null;
 };
 
 const toRecord = (row: Row): DiligenceRequestRecord => ({
@@ -64,6 +78,10 @@ const toRecord = (row: Row): DiligenceRequestRecord => ({
     row.declined_at === null
       ? null
       : { note: row.decline_note, at: row.declined_at.toISOString() },
+  about:
+    row.about === null
+      ? null
+      : { statement: row.about, standing: row.about_standing },
 });
 
 export function createPostgresDiligenceRequests() {
@@ -71,7 +89,7 @@ export function createPostgresDiligenceRequests() {
     select q.id, q.relationship_id, q.requested_by_user_id,
            nullif(btrim(coalesce(u.display_name,
                   concat_ws(' ', u.given_name, u.family_name))), '') as requested_by_name,
-           q.title, q.note,
+           q.title, q.note, q.about, q.about_standing,
            q.created_at, f.document_id, f.disclosure_policy_id,
            f.created_at as fulfilled_at,
            d.note as decline_note, d.created_at as declined_at
@@ -90,13 +108,17 @@ export function createPostgresDiligenceRequests() {
         readonly title: string;
         readonly note: string | null;
         readonly idempotencyKey: string;
+        readonly about?: DiligenceRequestAbout | null | undefined;
       },
     ): Promise<{ readonly id: string; readonly created: boolean }> => {
+      const about = input.about ?? null;
       const made = await tx.sql<{ id: string }[]>`
         insert into network.diligence_requests
-          (tenant_id, relationship_id, requested_by_user_id, title, note, idempotency_key)
+          (tenant_id, relationship_id, requested_by_user_id, title, note, idempotency_key,
+           about, about_standing)
         values (${input.tenantId}, ${input.relationshipId}, ${input.userId},
-                ${input.title}, ${input.note}, ${input.idempotencyKey})
+                ${input.title}, ${input.note}, ${input.idempotencyKey},
+                ${about?.statement ?? null}, ${about?.standing ?? null})
         on conflict (requested_by_user_id, idempotency_key) do nothing
         returning id`;
       const id = made[0]?.id;

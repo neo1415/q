@@ -247,7 +247,9 @@ export class RunRead extends Map<string, string> {
   readonly profiles = new Map<string, string>();
   readonly relationships = new Map<
     string,
-    Pick<GetRelationshipOutput, "counterpart" | "relationship" | "source">
+    Pick<GetRelationshipOutput, "counterpart" | "relationship" | "source"> &
+      // Which side the reader is on (the uncertainty vehicle reads it).
+      Partial<Pick<GetRelationshipOutput, "yourSide">>
   >();
   readonly investors = new Map<string, ReadInvestor>();
   /** Subject id (company or investor) -> ISO country, where published. */
@@ -521,6 +523,7 @@ export function createRunCompanies(limit = 200) {
             counterpart: relationship.data.counterpart,
             relationship: relationship.data.relationship,
             source: relationship.data.source,
+            yourSide: relationship.data.yourSide,
           },
         );
       }

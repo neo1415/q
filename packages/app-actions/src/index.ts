@@ -63,6 +63,12 @@ export {
   type DeckRecord,
 } from "./actions/deck.js";
 export { APP_ACTIONS, PERSON_ACTIONS } from "./registry.js";
+// Addendum 14 Nov 2026: what a refused document request says (prepare time).
+export {
+  DILIGENCE_REQUEST_INVESTOR_ONLY,
+  DILIGENCE_REQUEST_NO_RELATIONSHIP,
+  DILIGENCE_REQUEST_NOT_OPEN,
+} from "./actions/diligence.js";
 export {
   COMPANY_FIGURE_ACTION_TYPE,
   documentFigureCardInput,

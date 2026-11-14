@@ -224,6 +224,50 @@ export const GetRelationshipOutputSchema = z
         openRequests: z.array(z.string().max(200)).max(50),
         answeredRequests: z.array(z.string().max(200)).max(50),
         sharedDocuments: z.array(z.string().max(300)).max(50),
+        /**
+         * Addendum 14 Nov 2026: requests that named the uncertainty they
+         * resolve, with what came back. Absent: none or not composed.
+         */
+        followUps: z
+          .array(
+            z
+              .object({
+                title: z.string().max(200),
+                about: z
+                  .object({
+                    statement: z.string().max(400),
+                    standing: z.string().max(40).nullable(),
+                  })
+                  .strict(),
+                status: z.enum(["OPEN", "FULFILLED", "DECLINED"]),
+                requestedAt: z.string().max(40),
+                fulfilledAt: z.string().max(40).nullable(),
+                document: z
+                  .object({
+                    title: z.string().max(300).nullable(),
+                    summary: z.string().max(600).nullable(),
+                  })
+                  .strict()
+                  .nullable(),
+                answers: z
+                  .array(
+                    z
+                      .object({
+                        answeredAt: z.string().max(40),
+                        evidenceStatus: z.enum([
+                          "SELF_REPORTED",
+                          "DOCUMENT_SUPPORTED",
+                        ]),
+                      })
+                      .strict(),
+                  )
+                  .max(5),
+                declineNote: z.string().max(1000).nullable(),
+              })
+              .strict(),
+          )
+          .max(50)
+          .optional(),
       })
       .strict()
       .optional(),
@@ -444,6 +488,34 @@ function createGetRelationshipTool(
                 openRequests: [...diligence.openRequests],
                 answeredRequests: [...diligence.answeredRequests],
                 sharedDocuments: [...diligence.sharedDocuments],
+                ...(diligence.followUps === undefined ||
+                diligence.followUps.length === 0
+                  ? {}
+                  : {
+                      followUps: diligence.followUps.slice(-50).map((f) => ({
+                        title: f.title.slice(0, 200),
+                        about: {
+                          statement: f.about.statement.slice(0, 400),
+                          standing: f.about.standing,
+                        },
+                        status: f.status,
+                        requestedAt: f.requestedAt,
+                        fulfilledAt: f.fulfilledAt,
+                        document:
+                          f.document === null
+                            ? null
+                            : {
+                                title: f.document.title?.slice(0, 300) ?? null,
+                                summary:
+                                  f.document.summary?.slice(0, 600) ?? null,
+                              },
+                        answers: f.answers.slice(0, 5).map((a) => ({
+                          answeredAt: a.answeredAt,
+                          evidenceStatus: a.evidenceStatus,
+                        })),
+                        declineNote: f.declineNote?.slice(0, 1000) ?? null,
+                      })),
+                    }),
               },
             }),
         truthClass: "VERIFIED",

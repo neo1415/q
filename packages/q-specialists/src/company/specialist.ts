@@ -28,7 +28,7 @@ import {
   createSentenceCutter,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV34ResultSchema,
+  CompanyAnalystV35ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -902,8 +902,9 @@ export function createCompanyIntelligenceSpecialist(
             // proposalStatus were refused the same way by v12's schema.
             // v22: the optional visual (RECOVERY, workstream E); v26: PICTURE; v30: offer;
             // v33: statedFigures (a figure their own company reached); v34:
-            // no count ceiling on the evidence lists (decision 97).
-            schema: CompanyAnalystV34ResultSchema,
+            // no count ceiling on the evidence lists (decision 97); v35:
+            // uncertainties[] and the offer's about (addendum 14 Nov).
+            schema: CompanyAnalystV35ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",

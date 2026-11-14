@@ -1185,6 +1185,16 @@ export {
   COMPANY_ANALYST_V33_SCHEMA_VERSION,
   CompanyAnalystV33ResultSchema,
   COMPANY_ANALYST_V34_SCHEMA_VERSION,
+  COMPANY_ANALYST_V35_SCHEMA_VERSION,
+  CompanyAnalystV35ResultSchema,
+  type CompanyAnalystV35Result,
+  ModelUncertaintySchema,
+  type ModelUncertainty,
+  ModelOfferV35Schema,
+  type ModelOfferV35,
+  UNCERTAINTY_MATTERS_FOR,
+  UNCERTAINTY_RESOLVE_BY,
+  UNCERTAINTY_GUIDANCE,
   CompanyAnalystV34ResultSchema,
   type CompanyAnalystV34Result,
   STATED_FIGURE_READING_GUIDANCE,
@@ -2346,3 +2356,4 @@ export {
   V33_CHANGES,
 } from "./prompts/tasks/company-analyst.v33.js";
 export { COMPANY_ANALYST_V34 } from "./prompts/tasks/company-analyst.v34.js";
+export { COMPANY_ANALYST_V35 } from "./prompts/tasks/company-analyst.v35.js";

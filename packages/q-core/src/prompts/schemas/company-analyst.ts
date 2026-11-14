@@ -4,6 +4,7 @@ import {
   COMPANY_EDITABLE_FIELDS,
   QCapabilitySchema,
   QConfidenceLevelSchema,
+  UNCERTAINTY_STANDINGS,
 } from "@capital-q/contracts";
 
 import { ModelSentenceGesturesEnumSchema } from "../../speech/gesture.js";
@@ -680,6 +681,86 @@ export type CompanyAnalystV34Result = z.infer<
   typeof CompanyAnalystV34ResultSchema
 >;
 export const COMPANY_ANALYST_V34_SCHEMA_VERSION = 34;
+
+/**
+ * v35 (owner addendum "resolving investor uncertainty", 14 Nov 2026; audit
+ * slice 3): labelling a public claim unverified is never where analysis
+ * ends. Each uncertainty the answer carries is named as structure: what is
+ * uncertain, where it stands (decision 92: a source reporting it,
+ * independent sources agreeing or disagreeing, the founder confirming it,
+ * a document supporting it, independent verification -- never derived from
+ * KYB or identity checks), whether it is material, what it matters for and
+ * how it could be resolved. Code reads these fields, never the prose: an
+ * offer to resolve one (C3) is kept only for a material uncertainty, through
+ * the vehicle the relationship allows (model-gateway uncertainty.ts).
+ *
+ * Additive on v34; the template is v34's word for word (the meaning is in
+ * the field descriptions, as v30's offer and v33's statedFigures).
+ */
+export const UNCERTAINTY_MATTERS_FOR = [
+  "THESIS",
+  "VALUATION",
+  "FIT",
+  "RISK",
+  "DILIGENCE",
+] as const;
+export const UNCERTAINTY_RESOLVE_BY = [
+  "RESEARCH",
+  "FILINGS",
+  "CORROBORATION",
+  "ASK_FOUNDER",
+  "REQUEST_DOCUMENT",
+  "EXAMINE_EVIDENCE",
+] as const;
+export const ANALYST_UNCERTAINTY_STATEMENT_MAX = 400;
+export const UNCERTAINTY_GUIDANCE =
+  "What remains uncertain in your answer about a company, one item each, after the substantive answer (never instead of it): statement says what is uncertain in plain words; standing is where it stands now: REPORTED (a source says it), CORROBORATED (independent sources agree; still not verified), CONTRADICTED (sources or records disagree), FOUNDER_CONFIRMED (the founder confirmed it; not independently verified), DOCUMENT_SUPPORTED (a document they can see supports it), INDEPENDENTLY_VERIFIED (only when a record says so); identity or company checks never verify a figure. material is true only when it could change their thesis, valuation, fit, risk or diligence; mattersFor names which; resolveBy is how it could be settled (RESEARCH, FILINGS, CORROBORATION, ASK_FOUNDER, REQUEST_DOCUMENT, EXAMINE_EVIDENCE). Say each standing once in the answer, never as repeated disclaimers. Offer a next step only for a material one. Else empty.";
+export const ModelUncertaintySchema = z
+  .object({
+    statement: z.string().trim().min(1).max(ANALYST_UNCERTAINTY_STATEMENT_MAX),
+    standing: z.enum(UNCERTAINTY_STANDINGS),
+    material: z.boolean(),
+    mattersFor: z.array(z.enum(UNCERTAINTY_MATTERS_FOR)).max(5).default([]),
+    resolveBy: z.array(z.enum(UNCERTAINTY_RESOLVE_BY)).max(6).default([]),
+  })
+  .strict();
+export type ModelUncertainty = z.infer<typeof ModelUncertaintySchema>;
+
+/** v35's offer: v30's, plus the uncertainty it would resolve, if any. */
+export const OFFER_ABOUT_GUIDANCE =
+  "When the offer would resolve one of your uncertainties: that uncertainty's statement, exactly as in uncertainties. Else null.";
+export const ModelOfferV35Schema = z
+  .object({
+    said: z.string().trim().min(1).max(ANALYST_OFFER_MAX_LENGTH),
+    action: z.string().trim().min(1).max(120),
+    request: z.string().trim().min(1).max(ANALYST_OFFER_MAX_LENGTH),
+    about: z
+      .string()
+      .trim()
+      .min(1)
+      .max(ANALYST_UNCERTAINTY_STATEMENT_MAX)
+      .nullable()
+      .default(null)
+      .describe(OFFER_ABOUT_GUIDANCE),
+  })
+  .strict()
+  .describe(OFFER_GUIDANCE);
+export type ModelOfferV35 = z.infer<typeof ModelOfferV35Schema>;
+
+export const CompanyAnalystV35ResultSchema =
+  CompanyAnalystV34ResultSchema.extend({
+    offer: ModelOfferV35Schema.nullable().default(null),
+    // Independent items, like the evidence lists (decision 97): no count
+    // ceiling; the gateway drops a malformed item, never the list.
+    uncertainties: z
+      .array(ModelUncertaintySchema)
+      .default([])
+      .describe(UNCERTAINTY_GUIDANCE),
+  }).strict();
+export type CompanyAnalystV35Result = z.infer<
+  typeof CompanyAnalystV35ResultSchema
+>;
+export const COMPANY_ANALYST_V35_SCHEMA_VERSION = 35;
 
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";

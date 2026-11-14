@@ -1,6 +1,7 @@
 import type { ActorContext } from "@capital-q/security";
 
 import type {
+  BriefAnsweredRequest,
   BriefDiligenceRead,
   BriefMeetingRead,
   BriefThreadMessage,
@@ -21,12 +22,62 @@ type DiligenceViewRead = {
     readonly title: string;
     readonly viewedAt?: string | null | undefined;
   }[];
-  readonly requests: readonly {
-    readonly requestId: string;
-    readonly title: string;
-    readonly status: "OPEN" | "FULFILLED" | "DECLINED";
-  }[];
+  readonly requests: readonly DiligenceRequestRead[];
 };
+
+/** A request as the diligence view gives it; the newer fields optional. */
+type DiligenceRequestRead = {
+  readonly requestId: string;
+  readonly title: string;
+  readonly status: "OPEN" | "FULFILLED" | "DECLINED";
+  readonly fulfilledAt?: string | null | undefined;
+  readonly fulfilledBy?: { readonly title: string | null } | null | undefined;
+  readonly about?: BriefAnsweredRequest["about"] | undefined;
+  readonly questions?:
+    | readonly {
+        readonly answer: {
+          readonly answeredAt: string;
+          readonly evidenceStatus: "SELF_REPORTED" | "DOCUMENT_SUPPORTED";
+        } | null;
+      }[]
+    | null
+    | undefined;
+};
+
+/**
+ * Addendum 14 Nov 2026 (slice 5): a request is answered when a document
+ * fulfilled it or when any question it carried has the founder's answer.
+ * Each keeps its date, each answer's evidence status, and what it was
+ * asked to resolve.
+ */
+function answeredOf(
+  requests: readonly DiligenceRequestRead[],
+): readonly BriefAnsweredRequest[] {
+  return requests.flatMap((r) => {
+    const answers = (r.questions ?? []).flatMap((q) =>
+      q.answer === null
+        ? []
+        : [
+            {
+              answeredAt: q.answer.answeredAt,
+              evidenceStatus: q.answer.evidenceStatus,
+            },
+          ],
+    );
+    if (r.status !== "FULFILLED" && answers.length === 0) return [];
+    return [
+      {
+        id: r.requestId,
+        title: r.title,
+        document:
+          r.status === "FULFILLED" ? (r.fulfilledBy?.title ?? null) : null,
+        fulfilledAt: r.fulfilledAt ?? null,
+        answers,
+        about: r.about ?? null,
+      },
+    ];
+  });
+}
 
 function diligenceRead(
   view: DiligenceViewRead | null,
@@ -37,6 +88,7 @@ function diligenceRead(
       .filter((r) => r.status === "OPEN")
       .map((r) => ({ id: r.requestId, title: r.title })),
     answeredCount: view.requests.filter((r) => r.status === "FULFILLED").length,
+    answered: answeredOf(view.requests),
     sharedDocuments: view.shares.map((s) => ({
       id: s.documentId,
       title: s.title,
@@ -92,11 +144,7 @@ export function createRelationshipBriefSources(services: {
             readonly title: string;
             readonly viewedAt?: string | null | undefined;
           }[];
-          readonly requests: readonly {
-            readonly requestId: string;
-            readonly title: string;
-            readonly status: "OPEN" | "FULFILLED" | "DECLINED";
-          }[];
+          readonly requests: readonly DiligenceRequestRead[];
         } | null>;
       }
     | undefined;

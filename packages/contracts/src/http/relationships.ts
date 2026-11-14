@@ -752,6 +752,40 @@ export const NETWORK_DILIGENCE_DOWNLOAD_PATH =
 export const diligencePath = (relationshipId: string, rest = "") =>
   `/v1/network/relationships/${encodeURIComponent(relationshipId)}/diligence${rest}`;
 
+/**
+ * Resolving investor uncertainty (owner addendum, 14 Nov 2026). Where an
+ * uncertainty about a company stands, as Q states it: a source reporting a
+ * claim (REPORTED), independent sources agreeing (CORROBORATED) or
+ * disagreeing (CONTRADICTED), the founder confirming it (FOUNDER_CONFIRMED),
+ * a document supporting it (DOCUMENT_SUPPORTED), or independent
+ * verification (INDEPENDENTLY_VERIFIED). Decision 92: these stay distinct
+ * and apart from the truth, evidence and lifecycle axes (ADR-001); KYB or
+ * identity verification never sets any of them.
+ */
+export const UNCERTAINTY_STANDINGS = [
+  "REPORTED",
+  "CORROBORATED",
+  "CONTRADICTED",
+  "FOUNDER_CONFIRMED",
+  "DOCUMENT_SUPPORTED",
+  "INDEPENDENTLY_VERIFIED",
+] as const;
+export const UncertaintyStandingSchema = z.enum(UNCERTAINTY_STANDINGS);
+export type UncertaintyStanding = z.infer<typeof UncertaintyStandingSchema>;
+
+/**
+ * What a diligence request was asked to resolve (slice 5): Q's statement of
+ * the uncertainty (or a claim key) and its standing when asked. Additive:
+ * a request from the relationship page names none.
+ */
+export const DiligenceRequestAboutSchema = z
+  .object({
+    statement: z.string().trim().min(1).max(400),
+    standing: UncertaintyStandingSchema.nullable(),
+  })
+  .strict();
+export type DiligenceRequestAbout = z.infer<typeof DiligenceRequestAboutSchema>;
+
 export const DiligenceDtoSchema = z
   .object({
     relationshipId: UuidSchema,
@@ -799,6 +833,10 @@ export const DiligenceDtoSchema = z
               })
               .strict()
               .nullable(),
+            /** When it was fulfilled; null: not (yet). Additive (14 Nov). */
+            fulfilledAt: UtcTimestampSchema.nullable().optional(),
+            /** The uncertainty it was asked to resolve; null: none named. */
+            about: DiligenceRequestAboutSchema.nullable().optional(),
             /**
              * When the request carried the investor's questions: each one
              * with the founder's answer (their claim, USER_CLAIM), so the
@@ -852,6 +890,8 @@ export const RequestDiligenceDocumentRequestSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
     note: z.string().trim().min(1).max(1000).nullable().optional(),
+    /** The uncertainty it resolves; absent or null: none named. */
+    about: DiligenceRequestAboutSchema.nullable().optional(),
   })
   .strict();
 export type RequestDiligenceDocumentRequest = z.infer<

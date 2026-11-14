@@ -697,6 +697,13 @@ export type QRecordedOffer = {
   readonly action: string;
   readonly request: string;
   readonly said: string;
+  /**
+   * Addendum 14 Nov 2026: the material uncertainty the offer would resolve
+   * (Q's statement and its standing then), carried onto the diligence
+   * request a yes prepares. Absent: none.
+   */
+  readonly about?:
+    { readonly statement: string; readonly standing: string } | undefined;
 };
 
 export type QAnswerPort = {

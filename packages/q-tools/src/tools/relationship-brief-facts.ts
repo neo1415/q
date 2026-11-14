@@ -42,6 +42,52 @@ function meetingLine(meeting: RelationshipBriefMeeting): string {
     : `A call was booked for ${when} (now past; whether it was held is not recorded).`;
 }
 
+const EVIDENCE_WORDS: Readonly<
+  Record<"SELF_REPORTED" | "DOCUMENT_SUPPORTED", string>
+> = {
+  SELF_REPORTED: "self-reported",
+  DOCUMENT_SUPPORTED: "document-supported",
+};
+
+/**
+ * Addendum 14 Nov 2026 (slice 5): an answered diligence request, said with
+ * its date and how it was answered: a document shared (what it shows is
+ * not judged here), or the founder's answers, each the founder's claim
+ * with its evidence status. What it was asked to resolve, when named.
+ */
+function answeredLine(
+  answered: NonNullable<
+    Extract<RelationshipBrief["obligations"], { status: "OK" }>["answered"]
+  >[number],
+): string {
+  const how: string[] = [];
+  if (answered.document !== null || answered.fulfilledAt !== null) {
+    how.push(
+      `${answered.document === null ? "a document" : `"${answered.document.slice(0, 100)}"`} was shared for it${answered.fulfilledAt === null ? "" : ` on ${at(answered.fulfilledAt)}`} (a shared document; not verification)`,
+    );
+  }
+  if (answered.answers.length > 0) {
+    const statuses = [
+      ...new Set(answered.answers.map((a) => EVIDENCE_WORDS[a.evidenceStatus])),
+    ].join(" and ");
+    const latest = answered.answers
+      .map((a) => a.answeredAt)
+      .toSorted()
+      .at(-1);
+    how.push(
+      `${String(answered.answers.length)} answer(s) from the founder${latest === undefined ? "" : `, latest on ${at(latest)}`} (the founder's claim, ${statuses})`,
+    );
+  }
+  const about =
+    answered.about === null
+      ? ""
+      : ` It was asked about: "${answered.about.statement.slice(0, 120)}"${answered.about.standing === null ? "" : ` (then ${answered.about.standing})`}.`;
+  return `Answered diligence request "${answered.title.slice(0, 80)}": ${how.join("; ")}.${about}`.slice(
+    0,
+    400,
+  );
+}
+
 export function briefFacts(brief: RelationshipBrief): readonly string[] {
   const them = brief.counterparty.name ?? "the other side";
   const facts: string[] = [];
@@ -138,6 +184,9 @@ export function briefFacts(brief: RelationshipBrief): readonly string[] {
           .slice(0, 5)
           .join("; ")}.`,
       );
+    }
+    for (const answered of (brief.obligations.answered ?? []).slice(-5)) {
+      facts.push(answeredLine(answered));
     }
   } else {
     facts.push("Diligence requests could not be read right now; unknown.");

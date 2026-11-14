@@ -263,6 +263,12 @@ export type RelationshipIntelligencePort = {
         readonly openRequests: readonly string[];
         readonly answeredRequests: readonly string[];
         readonly sharedDocuments: readonly string[];
+        /**
+         * Addendum 14 Nov 2026 (slice 6): the requests that named the
+         * uncertainty they were asked to resolve, with what came back.
+         * Absent: not composed.
+         */
+        readonly followUps?: readonly DiligenceFollowUp[] | undefined;
       } | null>)
     | undefined;
   /**
@@ -599,6 +605,35 @@ export type ResearchReadingsPort = {
     readonly subject: { readonly companyId: string; readonly name: string };
     readonly sources: readonly ResearchReadingsSourceInput[];
   }) => Promise<unknown>;
+};
+
+/**
+ * One diligence request linked to an uncertainty (addendum 14 Nov 2026):
+ * what was asked and why, its standing then, and what came back -- a
+ * document shared (with Q's labelled summary of it, never fact), the
+ * founder's answers (their claim, with each answer's evidence status), or
+ * a decline. Read as the actor through the diligence service's own party
+ * check: only what this relationship's own side may see.
+ */
+export type DiligenceFollowUp = {
+  readonly title: string;
+  readonly about: {
+    readonly statement: string;
+    readonly standing: string | null;
+  };
+  readonly status: "OPEN" | "FULFILLED" | "DECLINED";
+  readonly requestedAt: string;
+  readonly fulfilledAt: string | null;
+  readonly document: {
+    readonly title: string | null;
+    /** Q's one-line summary of the shared version; null: not read yet. */
+    readonly summary: string | null;
+  } | null;
+  readonly answers: readonly {
+    readonly answeredAt: string;
+    readonly evidenceStatus: "SELF_REPORTED" | "DOCUMENT_SUPPORTED";
+  }[];
+  readonly declineNote: string | null;
 };
 
 export type QToolPorts = {

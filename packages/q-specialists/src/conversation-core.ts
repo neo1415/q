@@ -41,6 +41,9 @@ export type CoreOffer = {
   readonly action: string;
   readonly request: string;
   readonly said: string;
+  /** Addendum 14 Nov 2026: the uncertainty it resolves; absent: none. */
+  readonly about?:
+    { readonly statement: string; readonly standing: string } | undefined;
 };
 
 /** Where the snapshot is kept; q-api composes it over the conversation row. */
@@ -86,6 +89,12 @@ const SnapshotSchema = z.object({
       action: z.string().min(1).max(120),
       request: z.string().min(1).max(400),
       said: z.string().min(1).max(400),
+      about: z
+        .object({
+          statement: z.string().min(1).max(400),
+          standing: z.string().min(1).max(40),
+        })
+        .optional(),
     })
     .nullable()
     .optional(),

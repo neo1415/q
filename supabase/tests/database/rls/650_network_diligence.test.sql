@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(12);
+select plan(15);
 
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values
   ('00000000-0000-4000-8000-0000000065c1', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), 'Diligence Co A', 'diligence-co-a');
@@ -58,6 +58,18 @@ select throws_ok(
   $$ insert into network.diligence_fulfilments (request_id, tenant_id, disclosure_policy_id, document_id, fulfilled_by_user_id)
      values ('00000000-0000-4000-8000-0000000065a1', pg_temp.rls_id('tenant_a'), gen_random_uuid(), gen_random_uuid(), pg_temp.rls_id('user_a')) $$,
   '23503', null, 'a fulfilment names a real share (disclosure policy)');
+
+-- Resolving investor uncertainty (14 Nov 2026): what a request was about.
+select has_column('network', 'diligence_requests', 'about',
+  'a request may name the uncertainty it resolves');
+select throws_ok(
+  $$ insert into network.diligence_requests (tenant_id, relationship_id, requested_by_user_id, title, idempotency_key, about, about_standing)
+     values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000006501', pg_temp.rls_id('user_b'), 'Bank statements', 'diligence-req-0005', 'October MRR', 'KYB_VERIFIED') $$,
+  '23514', null, 'a standing is one of the closed list (never KYB)');
+select throws_ok(
+  $$ insert into network.diligence_requests (tenant_id, relationship_id, requested_by_user_id, title, idempotency_key, about_standing)
+     values (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000006501', pg_temp.rls_id('user_b'), 'Bank statements', 'diligence-req-0006', 'REPORTED') $$,
+  '23514', null, 'a standing needs the statement it is about');
 
 select pg_temp.act_as_user_a();
 select throws_ok($$ select * from network.diligence_requests $$, '42501', null,

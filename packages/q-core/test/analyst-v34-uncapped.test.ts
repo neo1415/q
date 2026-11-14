@@ -28,9 +28,9 @@ describe("COMPANY_ANALYST v34: no count ceiling on the evidence lists", () => {
     missingEvidence: Array.from({ length: n }, (_, i) => statement(i)),
   });
 
-  it("is active, on v33's template", () => {
+  it("was active until v35, on v33's template", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(34);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(35);
     expect(COMPANY_ANALYST_V34.template).toBe(COMPANY_ANALYST_V33.template);
     expect(COMPANY_ANALYST_V34.output).toMatchObject({
       kind: "STRUCTURED",

@@ -289,6 +289,7 @@ function coreOfferOf(offer: RecordedOffer | undefined): CoreOffer | null {
     action: offer.action,
     request: offer.request,
     said: offer.said,
+    ...(offer.about === undefined ? {} : { about: offer.about }),
   };
 }
 
@@ -9073,6 +9074,9 @@ export function createSpecialistQAnswer(
               action: offeredAction.action,
               request: offeredAction.request,
               said: offeredAction.said,
+              ...(offeredAction.about === undefined
+                ? {}
+                : { about: offeredAction.about }),
             },
           }),
       // Only a name the reader was given counts (ADR 0040 parity). A taken
@@ -9232,6 +9236,9 @@ export function createSpecialistQAnswer(
         action: outcome.offer.action,
         request: outcome.offer.request,
         said: outcome.offer.said,
+        ...(outcome.offer.about === undefined
+          ? {}
+          : { about: outcome.offer.about }),
       });
     } else if (offers.get(conversationId)?.kind === "ACTION") {
       offers.delete(conversationId);

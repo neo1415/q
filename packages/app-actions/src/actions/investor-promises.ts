@@ -5,6 +5,7 @@ import {
   ASSUMPTION_QUESTION_MAX_LENGTH,
   ASSUMPTION_QUESTIONS_SEND_MAX,
   DILIGENCE_QUESTIONS_PATH,
+  DiligenceRequestAboutSchema,
   diligenceQuestionsText,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
@@ -116,6 +117,9 @@ const SendTool = z
       .describe(
         "For each question in order, the company_assumptions id it came from (null for their own question).",
       ),
+    resolves: DiligenceRequestAboutSchema.optional().describe(
+      "The uncertainty these questions would resolve, exactly as you stated it, and its standing now; omit when none.",
+    ),
   })
   .strict();
 
@@ -143,6 +147,9 @@ async function sendQuestions(
     note: body,
     idempotencyKey: input.idempotencyKey,
     correlationId: context.correlationId,
+    // Kept on the diligence request they go as (addendum 14 Nov, slice 5);
+    // a chat message carries no link.
+    about: input.input.resolves ?? null,
   });
   if (asked.outcome === "OK") {
     return {
@@ -280,6 +287,7 @@ const SEND_QUESTIONS = defineAppAction<
         idempotencyKey: context.idempotencyKey,
         input: {
           questions: tool.questions,
+          ...(tool.resolves === undefined ? {} : { resolves: tool.resolves }),
           ...(tool.about === undefined
             ? {}
             : {

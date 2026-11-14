@@ -328,6 +328,7 @@ import {
   RESEARCH_CLAIMS_ORCHESTRATION_VERSION,
 } from "./composition/research-claim-cards.js";
 import { createResearchReadings } from "./composition/research-readings.js";
+import { diligenceFollowUps } from "./composition/diligence-follow-ups.js";
 import { createModelClaimProposer } from "@capital-q/model-gateway/extraction";
 import { DocumentVersionIdSchema } from "@capital-q/evidence/contracts";
 import { createWorkRuntime } from "./composition/work/runtime.js";
@@ -3692,6 +3693,9 @@ const qTools = createQTools({
             .filter((r) => r.status === "FULFILLED")
             .map((r) => r.title),
           sharedDocuments: view.shares.map((s) => s.title.slice(0, 300)),
+          // Addendum 14 Nov 2026 (slice 6): requests linked to an
+          // uncertainty, with what came back, for the re-assessment note.
+          followUps: diligenceFollowUps(view),
         };
       },
     },

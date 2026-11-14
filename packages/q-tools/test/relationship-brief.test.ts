@@ -293,3 +293,61 @@ describe("get_relationship carries the brief", () => {
     expect(reads).toEqual([]);
   });
 });
+
+// Addendum 14 Nov 2026 (slice 5): answered requests, with dates, how they
+// were answered (each answer's evidence status) and what they resolve.
+describe("briefFacts: answered diligence requests", () => {
+  it("lists a fulfilled request and an answered one with dates, evidence status and what each was asked about", () => {
+    const facts = briefFacts(
+      tensorGateBrief({
+        obligations: {
+          status: "OK",
+          openRequests: [],
+          answeredCount: 1,
+          answered: [
+            {
+              id: "88888888-0000-4000-8000-0000000000e1",
+              title: "October bank statements",
+              document: "Bank statement Oct 2026.pdf",
+              fulfilledAt: "2026-11-15T08:30:00.000Z",
+              answers: [],
+              about: {
+                statement: "October MRR rests on the founder's word only.",
+                standing: "FOUNDER_CONFIRMED",
+              },
+            },
+            {
+              id: "88888888-0000-4000-8000-0000000000e2",
+              title: "Questions about churn",
+              document: null,
+              fulfilledAt: null,
+              answers: [
+                {
+                  answeredAt: "2026-11-16T09:00:00.000Z",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+              about: null,
+            },
+          ],
+        },
+      }),
+    ).join("\n");
+    expect(facts).toContain(
+      'Answered diligence request "October bank statements": "Bank statement Oct 2026.pdf" was shared for it on 2026-11-15 08:30 UTC (a shared document; not verification).',
+    );
+    expect(facts).toContain(
+      'It was asked about: "October MRR rests on the founder\'s word only." (then FOUNDER_CONFIRMED).',
+    );
+    expect(facts).toContain(
+      'Answered diligence request "Questions about churn": 1 answer(s) from the founder, latest on 2026-11-16 09:00 UTC (the founder\'s claim, self-reported).',
+    );
+    expect(facts).not.toMatch(/\bverified\b/iu);
+  });
+
+  it("an older brief with no answered list says nothing new", () => {
+    expect(briefFacts(tensorGateBrief()).join("\n")).not.toContain(
+      "Answered diligence request",
+    );
+  });
+});

@@ -242,6 +242,7 @@ export {
 
 export {
   createPostgresDiligenceRequests,
+  type DiligenceRequestAbout,
   type DiligenceRequestRecord,
   type DiligenceRequestRepository,
 } from "./infrastructure/postgres-diligence.js";

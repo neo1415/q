@@ -7,6 +7,7 @@ import {
   type RelationshipBriefHistoryEntry,
   type RelationshipBriefMeeting,
   type RelationshipBriefMessage,
+  type UncertaintyStanding,
 } from "@capital-q/contracts";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import type { ActorContext } from "@capital-q/security";
@@ -74,12 +75,30 @@ export type BriefMeetingRead = {
   readonly organisedByYou: boolean;
 };
 
+/** One answered diligence request, as the brief lists it. */
+export type BriefAnsweredRequest = {
+  readonly id: string;
+  readonly title: string;
+  readonly document: string | null;
+  readonly fulfilledAt: string | null;
+  readonly answers: readonly {
+    readonly answeredAt: string;
+    readonly evidenceStatus: "SELF_REPORTED" | "DOCUMENT_SUPPORTED";
+  }[];
+  readonly about: {
+    readonly statement: string;
+    readonly standing: UncertaintyStanding | null;
+  } | null;
+};
+
 export type BriefDiligenceRead = {
   readonly openRequests: readonly {
     readonly id: string;
     readonly title: string;
   }[];
   readonly answeredCount: number;
+  /** Answered requests (addendum 14 Nov); absent: not read. */
+  readonly answered?: readonly BriefAnsweredRequest[] | undefined;
   readonly sharedDocuments: readonly {
     readonly id: string;
     readonly title: string;
@@ -475,6 +494,20 @@ function assembleBrief(input: {
               .slice(0, 50)
               .map((r) => ({ id: r.id, title: r.title.slice(0, 200) })),
             answeredCount: area?.answeredCount ?? 0,
+            answered: (area?.answered ?? []).slice(0, 50).map((r) => ({
+              id: r.id,
+              title: r.title.slice(0, 200),
+              document: r.document === null ? null : r.document.slice(0, 300),
+              fulfilledAt:
+                r.fulfilledAt === null
+                  ? null
+                  : UtcTimestampSchema.parse(r.fulfilledAt),
+              answers: r.answers.slice(0, 5).map((answer) => ({
+                answeredAt: UtcTimestampSchema.parse(answer.answeredAt),
+                evidenceStatus: answer.evidenceStatus,
+              })),
+              about: r.about,
+            })),
           }
         : diligence,
     documents:

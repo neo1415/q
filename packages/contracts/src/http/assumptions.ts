@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { DiligenceRequestAboutSchema } from "./relationships.js";
 import {
   EvidenceStatusSchema,
   TruthClassSchema,
@@ -163,6 +164,11 @@ export const SendDiligenceQuestionsRequestSchema = z
       )
       .max(ASSUMPTION_QUESTIONS_SEND_MAX)
       .optional(),
+    /**
+     * The uncertainty these questions resolve (addendum 14 Nov 2026,
+     * slice 5), kept on the diligence request they go as. Absent: none.
+     */
+    resolves: DiligenceRequestAboutSchema.nullable().optional(),
   })
   .strict();
 export type SendDiligenceQuestionsRequest = z.infer<
