@@ -463,6 +463,8 @@ describe("Relationship Brief against local PostgreSQL", () => {
       expect(brief.obligations).toEqual({
         status: "OK",
         openRequests: [],
+        // Addendum 14 Nov 2026 (slice 5): answered requests are listed too.
+        answered: [],
         answeredCount: 0,
       });
       expect(brief.sourceVersions.brief).toBe("relationship-brief.v1");
