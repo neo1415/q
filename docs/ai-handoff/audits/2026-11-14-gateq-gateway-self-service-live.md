@@ -53,3 +53,17 @@
 
 - One Q turn: 5 `ai_ops.model_usage` rows for Njeri since 17:14Z, **$0.0590** in total.
 - Budget reservation `b20953b7` (ceiling $0.15) was recorded with `test-budget.mjs record b20953b7 0.059 …`.
+
+## Panel fixes live 14 Nov (06910b145)
+
+Re-check of `2fbe7065c` on production `06910b145`, same account and browser settings (deviceScaleFactor 1). No Q turns and no model calls. Save was not pressed, so the appearance is unchanged. Script: `b67live/s6.cjs`, screenshots `shots/pf-*.png` (scratchpad, not durable).
+
+| Check                          | Verdict  | Evidence                                                                                                                                                                                                   |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Preview link ≥44px          | **PASS** | "Preview your public gateway" is 189.8×44 on desktop (1440×900) and on phone (390×844). Document scroll width equals the viewport on both.                                                                 |
+| 2a. No "Saving…" while pausing | **PASS** | Panel buttons sampled every 50–250 ms from the click: only `["Pause gateway","Save"]` then `["Reopen gateway","Save"]`. Save never read "Saving…". Same on reopen. (Pause/reopen run at 390px.)            |
+| 2b. New paused copy            | **PASS** | While paused the panel reads "While paused, your link shows founders that the page isn't available, and nobody can apply. Your rules and applications are kept." Status "Paused", which survived a reload. |
+| 2c. Public page while paused   | **PASS** | `/g/gq_7aekqs9vfk8kvavm8k7tcacryn` and `/embed` both return HTTP 404 with "This page isn't here…", matching the new copy. The P3 product question (a dedicated paused notice) stays open.                  |
+| 3. Reopen                      | **PASS** | "Your gateway is open again."; status "Open to applications". The page and embed return 200 with "Apply to Kilima Angel Network (fictional)". **The gateway was left open.**                               |
+
+No page errors, console errors or 5xx responses were recorded. Defects 2 and 3 above are fixed live; defect 1 remains a product call.
