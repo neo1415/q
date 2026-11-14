@@ -1,6 +1,7 @@
 import { classifyStoryTrigger } from "@capital-q/q-pitch";
 import type { InterviewAgent } from "./interview-agent.js";
 import { dispatchTurn, nextUnansweredStep } from "./onboarding-conductor.js";
+import { withScopeLead } from "./scope-lead.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -1501,10 +1502,15 @@ export function createVoiceTurnHandler(
             if (cards.length > 0) shownCards.set(binding, cards);
             if (facts !== null) {
               answerGiven = true;
-              yield await fromFacts(binding, facts, askedWords, speaker, {
-                correlationId,
-                signal,
-              });
+              // D5 (audit 14 Nov): Q's scope ("leaving out the ones I've
+              // already shown") is said before the ranking, never dropped.
+              yield await fromFacts(
+                binding,
+                text === undefined ? facts : withScopeLead(facts, text),
+                askedWords,
+                speaker,
+                { correlationId, signal },
+              );
             } else if (!streamedDeltas && text !== undefined) {
               answerGiven = true;
               yield bounded(speakable(text));

@@ -7,7 +7,16 @@ import type { LiveMove } from "./move";
  * a turn needs the backend it emits `session.delegation.created`, which
  * carries an id and nothing else (OpenAI live-delegation guide). This
  * bridge rebuilds the request from the transcript it has kept, asks Q
- * Brain once per delegation id, and hands back only what Q verified:
+ * Brain once per delegation id, and hands back only what Q verified.
+ *
+ * Owner 14 Nov 2026 ("the voice is doing its own thing and Q is doing its
+ * own thing"): with `routing`, code -- not the voice model -- decides who
+ * answers a finished utterance, as the duplex line does
+ * (duplex/routing.ts): everything but closed-set small talk goes to Q,
+ * whether or not the voice delegates it. Q's words are said verbatim, and
+ * while Q works the voice says at most one code-chosen holding line.
+ *
+ * Rules:
  *
  * - one delegation id → one Q run, whatever the provider repeats;
  * - an interruption never starts or cancels a run (the voice yielding the
@@ -53,6 +62,17 @@ export type DelegationOutcome = {
    * delegation asked again (without `early`) returns the rest.
    */
   readonly partial?: boolean | undefined;
+};
+
+/**
+ * Code routes the person's turns (owner 14 Nov 2026). Absent: the voice
+ * holds the call itself (the onboarding interview, a rehearsal persona).
+ */
+export type LiveRouting = {
+  /** The one small-talk classifier (contracts: isQVoiceSmallTalk). */
+  readonly isSmallTalk: (text: string) => boolean;
+  /** Q leads this call (the guided welcome): small talk is Q's too. */
+  readonly guided?: boolean | undefined;
 };
 
 export type DelegationRequest = {
@@ -120,6 +140,16 @@ export type LiveBridgeDependencies = {
    */
   readonly beforeSpeak?:
     ((outcome: DelegationOutcome) => Promise<string | null>) | undefined;
+  /**
+   * Who answers a finished utterance, read when it finishes (the line's
+   * mode is known only once it opened). Null or absent: the voice decides.
+   */
+  readonly routing?: (() => LiveRouting | null) | undefined;
+  /**
+   * How long their words must be quiet before code reads the utterance as
+   * finished and routes it, if the voice has not delegated it by then.
+   */
+  readonly routeAfterMs?: number | undefined;
 };
 
 export type DelegationStatus =
@@ -134,8 +164,11 @@ export type DelegationStatus =
 
 export type DelegationRecord = {
   readonly id: string;
-  /** The provider's delegation id; null for the app's own (the opening). */
-  readonly providerId: string | null;
+  /**
+   * The provider's delegation id; null for the app's own (the opening, a
+   * typed or code-routed turn) until the voice delegates the same words.
+   */
+  providerId: string | null;
   request: string;
   status: DelegationStatus;
   readonly createdAt: number;
@@ -232,6 +265,41 @@ export function heardRequest(text: string): boolean {
 /** What the voice is told when nothing usable was heard. */
 export const UNHEARD_COMMENTARY =
   "Their words did not reach the backend clearly, so nothing was asked. If you understood them, say back in a few words what you think they want and ask them to confirm; if you did not, ask them naturally to say it again. Do not say anything failed or went wrong.";
+
+/**
+ * Q's words, for the voice to say exactly (owner 14 Nov 2026: "say exactly
+ * this, add nothing"). GPT-Live has no exact-text speech call: commentary
+ * with this instruction is the strongest it offers (the Q Pitch narration
+ * uses the same). q-api's live broker sends the same for Q's answers.
+ */
+export function sayExactly(words: string): string {
+  return `Say exactly the following words aloud, as yourself, in their order, and nothing else: no lead-in, no summary, no opinion, no question or offer of your own, nothing before or after them. Words: ${words}`;
+}
+
+/**
+ * The one holding line while a real Q run works (owner 14 Nov 2026): code
+ * chooses it, it claims nothing about the result, and it asks nothing.
+ */
+export const HOLDING_LINE = "Working on it.";
+export const HOLDING_CONTENT = `Say only this short line aloud, once, in the language you are speaking with them, and nothing else: "${HOLDING_LINE}" Ask nothing, and say nothing about what the answer will be.`;
+
+/** What the voice says when Q's run did not come back. */
+export const NOT_FINISHED_LINE =
+  "I couldn't get that done just now. Want me to try it again?";
+
+/**
+ * Sent when code hands their words to Q: the voice neither answers them
+ * nor fills the wait with questions of its own.
+ */
+export const ROUTED_NOTE =
+  "Capital Q has handed their last words to Q's backend. Do not answer them yourself and do not ask them anything; say nothing until you are told what to say.";
+
+/** Quiet this long after their words: an utterance the voice did not delegate is routed by code. */
+export const ROUTE_AFTER_MS = 1_500;
+/** A voice delegation this soon after code routed the same words joins that run. */
+const JOIN_WITHIN_MS = 15_000;
+/** The id of a turn code routed to Q (its own record, like typed_N). */
+const ROUTED_PREFIX = "heard_";
 const OPENING_ID = "opening";
 const TRANSCRIPT_KEPT = 60;
 
@@ -253,6 +321,9 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const timers = deps.timers ?? defaultTimers;
   const settleMs = deps.settleMs ?? 400;
   const progressAfterMs = deps.progressAfterMs ?? 5_000;
+  const routeAfterMs = deps.routeAfterMs ?? ROUTE_AFTER_MS;
+  let routeTimer: unknown = null;
+  let routedCount = 0;
   // The transcript as the provider streamed it, both sides, in turns. A
   // turn changes side when the other side's delta arrives.
   const transcript: { role: "user" | "q"; text: string }[] = [];
@@ -374,13 +445,10 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     const progress = timers.setTimeout(() => {
       if (record.status !== "RUNNING" || progressed) return;
       progressed = true;
-      // One spoken line, in the voice's own words, about what is coming;
-      // never the result, never repeated.
-      send(
-        "session.commentary.append",
-        record.providerId,
-        `Q's backend is still working on: "${record.request}". Say once, in a few natural, specific words, what you are getting for them (for example "pulling your best mandate fits now"), then keep the conversation going. Do not guess the result, do not apologise, and do not say this again.`,
-      );
+      // D6 (audit 14 Nov): "keep the conversation going" made the voice
+      // ad-lib questions on nearly every turn. One code-chosen line, sent
+      // only while this run is still running; never the result or a question.
+      send("session.commentary.append", record.providerId, HOLDING_CONTENT);
     }, progressAfterMs);
     const finish = async (outcome: DelegationOutcome) => {
       timers.clearTimeout(progress);
@@ -398,8 +466,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     const failed = () => {
       timers.clearTimeout(progress);
       settle(record, {
-        commentary:
-          "Q's backend could not complete that request. Say so plainly and offer to try again; do not invent an answer.",
+        commentary: sayExactly(NOT_FINISHED_LINE),
         failed: true,
       });
     };
@@ -464,7 +531,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       send(
         "session.thinking.append",
         record.providerId,
-        `Nothing came back for "${record.request}". Their earlier request is still being worked on: if they are waiting, tell them it is on its way; do not say you can't do it.`,
+        `Nothing came back for "${record.request}". Their earlier request is still being worked on: say nothing about this one.`,
       );
       changed();
       return;
@@ -474,7 +541,6 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     // still work or came back empty (the founder's nudges must never cost
     // them the answer they waited for).
     const superseded = newer.some((id) => statusOf(id) === "SPOKEN");
-    const newerPending = !superseded && newer.length > 0;
     if (outcome.commentary === null || outcome.commentary.length === 0) {
       record.status = superseded ? "SUPERSEDED" : "SPOKEN";
       changed();
@@ -491,15 +557,99 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       );
     } else {
       record.status = outcome.failed === true ? "FAILED" : "SPOKEN";
+      // Q's words as Q gave them, even while a newer request still works:
+      // a wrapper of the voice's own would be words Q never said.
+      send("session.commentary.append", record.providerId, outcome.commentary);
+    }
+    changed();
+  };
+
+  /** Provider ids answered by a code-routed run (see joinRouted). */
+  const joined = new Set<string>();
+  const unaskedWords = () =>
+    transcript
+      .slice(askedUpTo)
+      .filter((turn) => turn.role === "user")
+      .map((turn) => spokenWords(turn.text))
+      .join(" ")
+      .trim();
+
+  const joinRouted = (providerId: string): boolean => {
+    if (heardRequest(unaskedWords())) return false;
+    const last = order[order.length - 1];
+    const record = last === undefined ? undefined : delegations.get(last);
+    if (
+      record === undefined ||
+      !record.id.startsWith(ROUTED_PREFIX) ||
+      record.providerId !== null ||
+      deps.now() - record.createdAt > JOIN_WITHIN_MS
+    )
+      return false;
+    joined.add(providerId);
+    if (record.status === "RUNNING" || record.status === "WAITING_FOR_WORDS") {
+      record.providerId = providerId;
+    } else {
+      // Already said: the provider's delegation is closed quietly.
       send(
-        "session.commentary.append",
-        record.providerId,
-        newerPending
-          ? `This answers their earlier request "${record.request}"; if they have since asked for something different, say it briefly. ${outcome.commentary}`
-          : outcome.commentary,
+        "session.thinking.append",
+        providerId,
+        "Q's backend already answered this and you have said its answer. Say nothing more about it.",
       );
     }
     changed();
+    return true;
+  };
+
+  /**
+   * Owner 14 Nov 2026: who answers a finished utterance is code's choice
+   * (duplex/routing.ts), not the voice's. Small talk stays with the voice;
+   * every other utterance ("go ahead", "I'm waiting", "still there?"
+   * included) becomes a Q run, whether or not the voice delegates it.
+   */
+  const routeHeard = () => {
+    routeTimer = null;
+    const routing = deps.routing?.() ?? null;
+    if (routing === null) return;
+    // The voice delegated and its words are being read: that run has them.
+    for (const record of delegations.values()) {
+      if (record.status === "WAITING_FOR_WORDS") return;
+    }
+    const words = unaskedWords();
+    if (!heardRequest(words)) return;
+    const firstUser = transcript.findIndex(
+      (turn, index) => index >= askedUpTo && turn.role === "user",
+    );
+    const qBefore = transcript
+      .slice(0, firstUser < 0 ? transcript.length : firstUser)
+      .findLast((turn) => turn.role === "q");
+    // Q's last words asked them something ("want me to re-run it?"): a
+    // bare "yes" answers Q, never the voice alone (duplex: answeringQ).
+    const answeringQ =
+      qBefore !== undefined && /\?["'”’)]*$/u.test(qBefore.text.trim());
+    const newestSpoken = order
+      .map((id) => delegations.get(id))
+      .findLast((record) => record?.status === "SPOKEN");
+    const awaitingApproval = newestSpoken?.approvalPending === true;
+    if (
+      routing.guided !== true &&
+      !answeringQ &&
+      !awaitingApproval &&
+      routing.isSmallTalk(words)
+    )
+      return;
+    routedCount += 1;
+    const id = `${ROUTED_PREFIX}${String(routedCount)}`;
+    const record: DelegationRecord = {
+      id,
+      providerId: null,
+      request: "",
+      status: "WAITING_FOR_WORDS",
+      createdAt: deps.now(),
+    };
+    delegations.set(id, record);
+    order.push(id);
+    send("session.thinking.append", null, ROUTED_NOTE);
+    run(record);
   };
 
   const onDelegation = (event: LiveServerEvent) => {
@@ -510,7 +660,10 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     if (delegation?.target !== undefined && delegation.target !== "client")
       return;
     // One id, one run: a repeat of a known id is ignored.
-    if (delegations.has(id)) return;
+    if (delegations.has(id) || joined.has(id)) return;
+    // Code already handed these words to Q: the voice's delegation joins
+    // that run (its answer goes back under this id), never a second run.
+    if (joinRouted(id)) return;
     const record: DelegationRecord = {
       id,
       providerId: id,
@@ -552,6 +705,10 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
             typeof event["delta"] === "string" ? event["delta"] : "";
           lastInputAt = deps.now();
           append("user", delta);
+          if (deps.routing !== undefined && delta.length > 0) {
+            if (routeTimer !== null) timers.clearTimeout(routeTimer);
+            routeTimer = timers.setTimeout(routeHeard, routeAfterMs);
+          }
           return;
         }
         case "session.output_transcript.delta": {

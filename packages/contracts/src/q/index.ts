@@ -351,6 +351,7 @@ export {
   QVoiceDuplexAttachSchema,
   type QVoiceDuplexAttach,
   isQVoiceCardReply,
+  isQVoiceSmallTalk,
   Q_VOICE_CARD_PATH,
   qVoiceCardPath,
   QVoiceCardUpdateSchema,

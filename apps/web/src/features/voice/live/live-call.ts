@@ -1,5 +1,6 @@
 import {
   Q_VOICE_LIVE_TRIAL_SPENT,
+  isQVoiceSmallTalk,
   type QVoiceLiveTrial,
 } from "@capital-q/contracts";
 
@@ -38,6 +39,9 @@ import {
  * Framework-free: the product voice line (`provider/live-session.ts`) and
  * the developer preview both drive it.
  */
+
+/** How the Q API said this line's turns are routed (see the bridge). */
+type LiveRoutingMode = "EVERY_TURN" | "ALL_BUT_SMALL_TALK";
 
 export type LiveCallStats = {
   /** As the provider's session-create response (201) named it. */
@@ -499,6 +503,9 @@ export async function startLiveCall(
   let token = options.attach?.sessionToken ?? null;
   let maxSessionMs = 20 * 60_000;
   let idleMs = 3 * 60_000;
+  // Owner 14 Nov 2026: the Q API says whether code routes this line's
+  // turns (absent: the voice holds the call, as on the interview).
+  let routing: LiveRoutingMode | null = null;
   let connection: Connection | null = null;
   let ended = false;
   let lastSpeechAt = performance.now();
@@ -584,6 +591,13 @@ export async function startLiveCall(
     onChange: update,
     opening: options.opening,
     beforeSpeak: (outcome) => noteForMove(outcome.move),
+    routing: () =>
+      routing === null
+        ? null
+        : {
+            isSmallTalk: isQVoiceSmallTalk,
+            guided: routing === "EVERY_TURN",
+          },
   });
 
   // C's fast path: the person's utterance, streamed, then final.
@@ -935,6 +949,7 @@ export async function startLiveCall(
       idleMs?: number;
       context?: string | null;
       trial?: QVoiceLiveTrial;
+      routing?: LiveRoutingMode;
     }>(
       doFetch,
       "open",
@@ -954,6 +969,10 @@ export async function startLiveCall(
     maxSessionMs = opened.maxSessionMs;
     idleMs = opened.idleMs ?? idleMs;
     background = opened.context ?? background;
+    routing =
+      opened.routing === "EVERY_TURN" || opened.routing === "ALL_BUT_SMALL_TALK"
+        ? opened.routing
+        : null;
     stats = { ...stats, createdModel: opened.model };
     if (opened.trial !== undefined) {
       trialCall = true;

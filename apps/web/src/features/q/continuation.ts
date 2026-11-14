@@ -3,14 +3,17 @@ import type { QTurn } from "./conversation";
 /**
  * What Q says first when voice opens on a conversation already under way
  * (owner 2026-11-06): it carries on from this thread, never the arrival's
- * "welcome, N things are waiting". Deterministic and instant, from the
- * thread the page already holds -- the person's last words and what Q
- * answered -- so it never waits on a read. The line itself goes to the
- * same conversation (same id), so the voice has the whole Chat history.
+ * "welcome, N things are waiting". Instant, so it never waits on a read.
+ * The line goes to the same conversation (same id), so Q has the whole
+ * Chat history behind it.
  *
- * The server composes no opening on a resumed line (voice/routes.ts); a
- * model-written opener from the conversation's own state would be a
- * q-api change, proposed separately.
+ * D9 (audit 14 Nov 2026): the line used to quote the person's last
+ * transcribed words back ("You'd asked 'Hey-ky'", "We were on 'I'm not
+ * sure yet. Let's just have'"), a raw fragment that said nothing about what
+ * was waiting. It now quotes nothing: it offers to carry on and stops.
+ * What there is to carry on with is Q's to say: their answer ends a
+ * question, so the voice line routes even a bare "yes" to Q, which answers
+ * from the conversation and the account's own state.
  */
 
 type ThreadLine = {
@@ -28,64 +31,16 @@ export function threadOfTurns(turns: readonly QTurn[]): readonly ThreadLine[] {
   );
 }
 
-const QUOTED_AT_MOST = 90;
-const NUMBER_WORDS = [
-  "none",
-  "one",
-  "two",
-  "three",
-  "four",
-  "five",
-  "six",
-  "seven",
-  "eight",
-  "nine",
-  "ten",
-] as const;
-
-/** Their words, short enough to say back: whole words, no end stop. */
-function quoted(text: string): string {
-  const plain = text
-    .replace(/\s+/gu, " ")
-    .trim()
-    .replace(/[.!?\s]+$/u, "");
-  if (plain.length <= QUOTED_AT_MOST) return plain;
-  const cut = plain.slice(0, QUOTED_AT_MOST);
-  const space = cut.lastIndexOf(" ");
-  return `${(space > 40 ? cut.slice(0, space) : cut).trimEnd()}…`;
-}
-
-/** How many cards an answer laid out (discovery, comparison). */
-function cardsIn(turn: Extract<QTurn, { kind: "Q" }> | undefined): number {
-  if (turn === undefined) return 0;
-  let count = 0;
-  for (const block of turn.blocks) {
-    if (block.kind === "ANSWER_CARDS") count += block.cards.length;
-    else if (block.kind === "COMPARISON_CARDS") count += block.items.length;
-  }
-  return count;
-}
+/** Q's opening on a resumed line: no content of its own (see above). */
+export const CONTINUATION_LINE =
+  "Shall we carry on from where we were, or is there something else?";
 
 /**
  * Q's first words on a voice line opened mid-conversation, or null with
  * nothing said yet (then the arrival greeting is the right opening).
  */
 export function continuationLine(lines: readonly ThreadLine[]): string | null {
-  if (lines.length === 0) return null;
-  const at = lines.findLastIndex((line) => line.role === "person");
-  if (at < 0) {
-    // Only Q has spoken (an opener nobody answered): carry on from it.
-    return "Shall we carry on from where we were, or is there something else?";
-  }
-  const asked = quoted(lines[at]?.text ?? "");
-  const answer = lines.slice(at + 1).findLast((line) => line.role === "q");
-  if (answer === undefined) {
-    return `You'd asked “${asked}”. Want me to carry on with that, or something else?`;
-  }
-  const cards = cardsIn(answer.turn);
-  if (cards > 0) {
-    const count = NUMBER_WORDS[cards] ?? String(cards);
-    return `You'd asked “${asked}”, and I found ${count}. Want me to go through ${cards === 1 ? "it" : "them"}, or something else?`;
-  }
-  return `We were on “${asked}”. Want to pick up from there, or something else?`;
+  return lines.some((line) => line.text.trim().length > 0)
+    ? CONTINUATION_LINE
+    : null;
 }

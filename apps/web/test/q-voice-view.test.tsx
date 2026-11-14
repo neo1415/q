@@ -489,8 +489,12 @@ describe("one conversation under both views (owner 2026-11-06)", () => {
       (
         talk.mock.calls[0] as unknown as [{ greeting?: string }] | undefined
       )?.[0]?.greeting ?? "";
-    expect(greeting).toContain("Find me founders raising in fintech");
-    expect(greeting).toContain("I found five");
+    // D9 (audit 14 Nov): it carries on, quoting no fragment back; what
+    // to carry on with is Q's to say once they answer.
+    expect(greeting).toBe(
+      "Shall we carry on from where we were, or is there something else?",
+    );
+    expect(greeting).not.toContain("Find me founders raising in fintech");
     expect(greeting).not.toContain("Welcome back");
     expect(greeting).not.toMatch(/things? (are )?waiting/u);
   });

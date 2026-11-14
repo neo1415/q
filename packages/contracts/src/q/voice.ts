@@ -907,6 +907,141 @@ function cardWords(transcript: string): readonly string[] {
 }
 
 /**
+ * VOICE-BRAIN (founder live 2026-10-08; owner 14 Nov 2026 for GPT-Live):
+ * the only turns a voice model may answer without Q. Deterministic and
+ * deliberately narrow: an utterance made entirely of greeting,
+ * acknowledgement, thanks, farewell or filler words. Everything else goes
+ * to Q. Shared by the duplex line (q-api) and the GPT-Live bridge (web),
+ * so both lines route a turn the same way.
+ */
+/** Words that, on their own, carry no request (English; any case). */
+const SMALLTALK_WORDS = new Set([
+  // greetings and address
+  "hi",
+  "hello",
+  "hey",
+  "hiya",
+  "there",
+  "q",
+  "good",
+  "morning",
+  "afternoon",
+  "evening",
+  "yo",
+  // acknowledgements and continuers
+  "ok",
+  "okay",
+  "k",
+  "yeah",
+  "yes",
+  "yep",
+  "yup",
+  "ya",
+  "sure",
+  "right",
+  "alright",
+  "all",
+  "mm",
+  "mmm",
+  "hmm",
+  "mhm",
+  "uh",
+  "huh",
+  "um",
+  "er",
+  "ah",
+  "oh",
+  "wow",
+  "cool",
+  "great",
+  "nice",
+  "perfect",
+  "awesome",
+  "lovely",
+  "fine",
+  "fair",
+  "enough",
+  "sounds",
+  "really",
+  "indeed",
+  "exactly",
+  "true",
+  "of",
+  "course",
+  "no",
+  "nope",
+  "nah",
+  "so",
+  "and",
+  "well",
+  "i",
+  // thanks and farewells
+  "thanks",
+  "thank",
+  "you",
+  "cheers",
+  "appreciate",
+  "bye",
+  "goodbye",
+  "later",
+  "talk",
+  "soon",
+  "take",
+  "care",
+  // "I'm good, you?"
+  "i'm",
+  "im",
+  "too",
+  "also",
+]);
+
+/**
+ * Phrases that are trivial only as a whole: "can", "see" or "it" alone
+ * belong to real questions ("can you see it?", "open it").
+ */
+const SMALLTALK_PHRASES = [
+  "how are you doing",
+  "how are you",
+  "how's it going",
+  "hows it going",
+  "how is it going",
+  "are you there",
+  "you there",
+  "still with me",
+  "got it",
+  "i see",
+  "can you hear me",
+  "you hear me",
+  "not bad",
+  "that makes sense",
+  "makes sense",
+  "that's great",
+  "that's fine",
+  "that's good",
+  "that's right",
+  "thats great",
+  "thats right",
+] as const;
+
+/** At most this many words for small talk; anything longer is Q's. */
+const SMALLTALK_MAX_WORDS = 7;
+
+/** True when the whole utterance is greeting/acknowledgement/filler. */
+export function isQVoiceSmallTalk(transcript: string): boolean {
+  const said = cardWords(transcript);
+  if (said.length === 0) return true;
+  if (said.length > SMALLTALK_MAX_WORDS) return false;
+  let rest = ` ${said.join(" ")} `;
+  for (const phrase of SMALLTALK_PHRASES)
+    rest = rest.split(` ${phrase} `).join(" ");
+  return rest
+    .trim()
+    .split(" ")
+    .filter((w) => w.length > 0)
+    .every((w) => SMALLTALK_WORDS.has(w));
+}
+
+/**
  * RECOVERY A3 (C-03/B-01, founder live 2026-10-08): with a card in focus,
  * only a reply about the card is the card's. "Find anything that needs my
  * attention" (6 words) went to the voice model and decide_card because
