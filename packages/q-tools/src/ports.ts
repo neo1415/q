@@ -559,6 +559,48 @@ export type CompanyPitchTranscript = {
  * outbound query is composed from allowed words, never forwarded. It is
  * optional; without a configured provider the research tools do not exist.
  */
+/**
+ * Decisions 92-96: figures public pages report about a company, read once
+ * and selectively after a research turn (never inside it), offered to the
+ * next answer as cited, dated, attributed readings. Derived from public page
+ * text alone: no founder-private claim can reach them.
+ */
+export type ResearchReadingsSourceInput = {
+  readonly url: string;
+  readonly domain: string;
+  readonly title: string | null;
+  readonly publishedAt: string | null;
+  readonly retrievedAt: string;
+  readonly excerpt: string;
+  readonly extracted: boolean;
+  readonly isSubjectWebsite: boolean;
+  readonly subjectMatch: "MATCH" | "POSSIBLE" | "NONE" | null;
+  readonly evidenceSourceId: string | null;
+  readonly evidenceItemId: string | null;
+};
+export type ResearchReadingsPort = {
+  /** Readings already made of these pages; never a model call. */
+  readonly readingsFor: (input: {
+    readonly actor: ActorContext;
+    readonly subject: { readonly companyId: string; readonly name: string };
+    readonly sources: readonly ResearchReadingsSourceInput[];
+  }) => Promise<{
+    readonly standing: string;
+    readonly lines: readonly string[];
+    /** Independent pages that agree or differ, by URL (never verification). */
+    readonly pairs: readonly {
+      readonly kind: "CORROBORATES" | "CONTRADICTS";
+      readonly urls: readonly [string, string];
+    }[];
+  } | null>;
+  /** After the turn, not awaited: reads what is new, relevant and unread. */
+  readonly afterResearch: (input: {
+    readonly actor: ActorContext;
+    readonly subject: { readonly companyId: string; readonly name: string };
+    readonly sources: readonly ResearchReadingsSourceInput[];
+  }) => Promise<unknown>;
+};
+
 export type QToolPorts = {
   // BILLING block (ADR 0034): the plan gate and "what does my plan include".
   // Absent: nothing is gated and there is no plan tool.
@@ -621,6 +663,8 @@ export type QToolPorts = {
    */
   readonly investorSectorFocus?: InvestorSectorFocusPort | undefined;
   readonly research?: PublicWebResearchService | undefined;
+  /** Decisions 92-96: kept public readings; absent: none are offered. */
+  readonly researchReadings?: ResearchReadingsPort | undefined;
   /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
   readonly people?: PersonLookup | undefined;
   /**

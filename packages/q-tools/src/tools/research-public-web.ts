@@ -8,6 +8,7 @@ import {
   COMPARISON_BASES,
   COMPARISON_RELATIONSHIPS,
   ENTITY_RESOLUTIONS,
+  independenceKeys,
   PUBLIC_WEB_FRESHNESS,
   RESEARCH_BOUNDS,
   RESEARCH_CATEGORIES_MAX,
@@ -209,6 +210,10 @@ const ComparisonNoteSchema = z
  * every ambiguous search failed as INVALID_TOOL_OUTPUT).
  */
 export const RESEARCH_GUIDANCE_MAX = 2_000;
+/** The per-source cross-check's shape version. */
+export const RESEARCH_CROSS_CHECK_VERSION = "research-crosscheck-v1" as const;
+/** Reading lines offered to one answer. */
+export const PUBLIC_READING_LINES_MAX = 24;
 
 export const ResearchPublicWebOutputSchema = z
   .object({
@@ -242,6 +247,46 @@ export const ResearchPublicWebOutputSchema = z
       })
       .strict()
       .nullable(),
+    /**
+     * Capital Q's own readings of figures these pages report (decisions
+     * 92-96): trusted lines with source, date, corroboration and
+     * contradiction, made earlier from the pages' text. Null: none yet.
+     */
+    publicReadings: z
+      .object({
+        standing: z.string().max(800),
+        lines: z.array(z.string().max(1_400)).max(PUBLIC_READING_LINES_MAX),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+    /**
+     * Audit 14 Nov, slice 2: each source's standing among the others, in
+     * code. `publisher` is its independence key (one publisher, or one
+     * syndicated story, counts once); corroboratedBy / contradicts name the
+     * source indexes of independent pages whose readings of the same
+     * figure agree or differ. Agreement is corroboration, never
+     * verification. Versioned: a reader checks `version`.
+     */
+    crossCheck: z
+      .object({
+        version: z.literal(RESEARCH_CROSS_CHECK_VERSION),
+        sources: z
+          .array(
+            z
+              .object({
+                sourceIndex: z.number().int().min(1),
+                publisher: z.string().max(253),
+                corroboratedBy: z.array(z.number().int().min(1)).max(8),
+                contradicts: z.array(z.number().int().min(1)).max(8),
+              })
+              .strict(),
+          )
+          .max(RESEARCH_BOUNDS.maxExtractCount),
+        independentVerification: z.literal(false),
+      })
+      .strict()
+      .optional(),
     /** Public web material is unverified until Capital Q's evidence rules say otherwise. */
     truthClass: z.literal("UNKNOWN"),
     guidance: z.string().max(RESEARCH_GUIDANCE_MAX),
@@ -485,6 +530,96 @@ export function createResearchPublicWebTool(
               : GUIDANCE,
         };
       }
+      // A page that never names whom the search was about is not a
+      // source on them (production 2026-10-23: "Why might the top one
+      // pass on us?" was answered with Wikipedia's "Mountain pass"): it
+      // never reaches the answer, its words or its Sources.
+      const about = outcome.sources.filter(
+        (source) => source.subjectMatch !== "NONE",
+      );
+      // Decisions 92-96: readings already made of these pages, and a
+      // selective reading of new ones after the turn (never inside it).
+      let publicReadings: {
+        readonly standing: string;
+        readonly lines: readonly string[];
+        readonly pairs: readonly {
+          readonly kind: "CORROBORATES" | "CONTRADICTS";
+          readonly urls: readonly [string, string];
+        }[];
+      } | null = null;
+      const readingsPort = ports.researchReadings;
+      if (readingsPort !== undefined && grant.subject?.kind === "COMPANY") {
+        const readingInput = {
+          actor: context.actor,
+          subject: {
+            companyId: grant.subject.companyId,
+            name: grant.subject.name,
+          },
+          sources: about.map((source) => ({
+            url: source.url,
+            domain: source.domain,
+            title: source.title,
+            publishedAt: source.publishedAt,
+            retrievedAt: source.retrievedAt,
+            excerpt: source.excerpt,
+            extracted: source.extracted,
+            isSubjectWebsite: source.isSubjectWebsite,
+            subjectMatch: source.subjectMatch,
+            evidenceSourceId: source.evidenceSourceId,
+            evidenceItemId: source.evidenceItemId,
+          })),
+        };
+        publicReadings = await readingsPort
+          .readingsFor(readingInput)
+          .catch(() => null);
+        void readingsPort.afterResearch(readingInput).catch(() => undefined);
+      }
+      // Independence for every source (syndicated copies count once), and
+      // agreement or difference between independent readings, by code.
+      const publishers = independenceKeys(
+        about.map((source) => ({
+          source: source.index,
+          domain: source.domain,
+          title: source.title,
+        })),
+      );
+      const indexOf = new Map(
+        about.map((source) => [source.url, source.index]),
+      );
+      const crossCheck = {
+        version: RESEARCH_CROSS_CHECK_VERSION,
+        sources: about.map((source) => {
+          const others = (kind: "CORROBORATES" | "CONTRADICTS") =>
+            [
+              ...new Set(
+                (publicReadings?.pairs ?? [])
+                  .filter((pair) => pair.kind === kind)
+                  .flatMap((pair) =>
+                    pair.urls[0] === source.url
+                      ? [pair.urls[1]]
+                      : pair.urls[1] === source.url
+                        ? [pair.urls[0]]
+                        : [],
+                  )
+                  .map((url) => indexOf.get(url))
+                  .filter(
+                    (index): index is number =>
+                      index !== undefined && index !== source.index,
+                  ),
+              ),
+            ].slice(0, 8);
+          return {
+            sourceIndex: source.index,
+            publisher: (publishers.get(source.index) ?? source.domain).slice(
+              0,
+              253,
+            ),
+            corroboratedBy: others("CORROBORATES"),
+            contradicts: others("CONTRADICTS"),
+          };
+        }),
+        independentVerification: false as const,
+      };
       return {
         status: "OK",
         message: null,
@@ -494,30 +629,34 @@ export function createResearchPublicWebTool(
           status: outcome.entityResolution.status,
           candidates: [...outcome.entityResolution.candidates],
         },
-        // A page that never names whom the search was about is not a
-        // source on them (production 2026-10-23: "Why might the top one
-        // pass on us?" was answered with Wikipedia's "Mountain pass"): it
-        // never reaches the answer, its words or its Sources.
-        sources: outcome.sources
-          .filter((source) => source.subjectMatch !== "NONE")
-          .map((source) => ({
-            index: source.index,
-            url: source.url,
-            domain: source.domain,
-            title: source.title,
-            publishedAt: source.publishedAt,
-            retrievedAt: source.retrievedAt,
-            temporal: source.temporal,
-            excerpt: source.excerpt,
-            extracted: source.extracted,
-            isSubjectWebsite: source.isSubjectWebsite,
-            mentionedCountries: [...source.mentionedCountries],
-            instructionRiskSignals: source.instructionRisk.length,
-            recordedAsEvidence: source.evidenceSourceId !== null,
-            subjectMatch: source.subjectMatch,
-          })),
+        sources: about.map((source) => ({
+          index: source.index,
+          url: source.url,
+          domain: source.domain,
+          title: source.title,
+          publishedAt: source.publishedAt,
+          retrievedAt: source.retrievedAt,
+          temporal: source.temporal,
+          excerpt: source.excerpt,
+          extracted: source.extracted,
+          isSubjectWebsite: source.isSubjectWebsite,
+          mentionedCountries: [...source.mentionedCountries],
+          instructionRiskSignals: source.instructionRisk.length,
+          recordedAsEvidence: source.evidenceSourceId !== null,
+          subjectMatch: source.subjectMatch,
+        })),
         comparison: outcome.comparison.map((note) => ({ ...note })),
         budget: { ...outcome.budget },
+        crossCheck,
+        publicReadings:
+          publicReadings === null
+            ? null
+            : {
+                standing: publicReadings.standing,
+                lines: publicReadings.lines
+                  .slice(0, PUBLIC_READING_LINES_MAX)
+                  .map((line) => line.slice(0, 1_400)),
+              },
         truthClass: "UNKNOWN",
         guidance: `${GUIDANCE}${
           outcome.entityResolution.status === "AMBIGUOUS"

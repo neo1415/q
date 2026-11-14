@@ -29,7 +29,9 @@ describe("claim check: invented claims", () => {
   it("rewrites an invented ARR to an honest unknown, never to zero", () => {
     const out = check("Northwind's ARR is $4.8M, growing fast.");
     expect(out.ungrounded).toEqual(["MONEY"]);
-    expect(out.text).toBe("I don't have a sourced figure for ARR yet.");
+    expect(out.text).toBe(
+      "Neither Capital Q's records nor the sources I read give a figure for ARR yet.",
+    );
     expect(out.text).not.toMatch(/\b0\b|no ARR|zero/iu);
   });
 
@@ -334,7 +336,7 @@ describe("claim check: extraction and the whole answer", () => {
       corpus,
     );
     expect(out.text).toBe(
-      "Revenue was $1.2M.\n\n- Burn is $85k a month. I don't have a sourced figure for ARR yet.",
+      "Revenue was $1.2M.\n\n- Burn is $85k a month. Neither Capital Q's records nor the sources I read give a figure for ARR yet.",
     );
     expect(out.ungrounded).toEqual(["MONEY", "NAME"]);
   });

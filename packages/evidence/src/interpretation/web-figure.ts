@@ -12,6 +12,10 @@ import { EvidenceSourceNotFoundError } from "../domain/errors.js";
 import { documentFigureProposals } from "./document-figure.js";
 import { excerptIsPresent } from "./policy.js";
 import {
+  RESEARCH_READING_EVIDENCE_TYPE,
+  ResearchReadingSchema,
+} from "./research-reading.js";
+import {
   STATED_FIGURE_METRICS,
   statedFigureClashes,
   statedFigureStructuredValue,
@@ -64,6 +68,12 @@ export const WebFigureSourceSchema = z
     publishedOn: z.iso.date().nullable(),
     /** When Capital Q fetched it. */
     retrievedAt: z.iso.datetime({ offset: true }),
+    /**
+     * The kept research reading (public_web.reading item) this figure was
+     * proposed from, when there is one: linked to the founder's claim, so
+     * the third party's report stays its provenance.
+     */
+    readingItemId: z.string().uuid().optional(),
   })
   .strict();
 export type WebFigureSource = z.infer<typeof WebFigureSourceSchema>;
@@ -185,6 +195,32 @@ export async function recordWebFigure(
   ) {
     throw new EvidenceSourceNotFoundError();
   }
+  // The kept reading it came from, checked like the excerpt: this source's
+  // reading of this metric and value, or nothing is recorded.
+  let readingItemId: string | null = null;
+  if (web.readingItemId !== undefined) {
+    const reading = await evidence.getEvidenceItem({
+      actor,
+      evidenceItemId: EvidenceItemIdSchema.parse(web.readingItemId),
+    });
+    const kept = ResearchReadingSchema.safeParse(
+      reading.structuredValue?.["reading"],
+    );
+    if (
+      reading.sourceId !== source.id ||
+      reading.evidenceType !== RESEARCH_READING_EVIDENCE_TYPE ||
+      !kept.success ||
+      kept.data.metric !== figure.metric ||
+      !excerptIsPresent(kept.data.quote, figure.said)
+    ) {
+      throw new EvidenceSourceNotFoundError();
+    }
+    readingItemId = reading.id;
+  }
+  const reportedBy =
+    source.metadata?.["subjectWebsite"] === true
+      ? "COMPANY_OWN_SITE"
+      : "THIRD_PARTY";
   const metric = STATED_FIGURE_METRICS[figure.metric];
   const { same, clashes } = await statedFigureClashes(
     evidence,
@@ -211,7 +247,7 @@ export async function recordWebFigure(
       subject: { subjectType: "COMPANY", subjectId: companyId },
       claimType: metric.claimType,
       claimKey: metric.claimKey,
-      statement: `The company's ${statedFigureWords(figure)}, as reported by the public source "${title}" (${domainOf(web.url)}) and confirmed by the founder.`,
+      statement: `The company's ${statedFigureWords(figure)}: first reported by the public source "${title}" (${domainOf(web.url)}${published === null ? "" : `, ${published}`}), then confirmed by the founder.`,
       structuredValue,
       // The founder's confirmation makes it their claim. The page neither
       // verifies it nor raises its standing (ADR 0009 §6, §8).
@@ -237,6 +273,13 @@ export async function recordWebFigure(
         retrievedAt: source.retrievedAt ?? web.retrievedAt,
         ...(published === null ? {} : { publishedOn: published }),
         excerptItemId: excerpt.id,
+        ...(readingItemId === null ? {} : { readingItemId }),
+        // Both provenances (decision 93): who first reported it, and that
+        // the founder then confirmed it. The page's words are never
+        // presented as the founder's original statement.
+        reportedBy,
+        confirmedBy: "FOUNDER",
+        confirmedByUserId: actor.userId,
       },
       locator: { kind: "statement" },
       validFrom,
@@ -253,6 +296,17 @@ export async function recordWebFigure(
       relationship: "SUPPORTS",
     },
   });
+  if (readingItemId !== null) {
+    await evidence.linkClaimEvidence({
+      actor,
+      correlationId,
+      input: {
+        claimId: claim.id,
+        evidenceItemId: EvidenceItemIdSchema.parse(readingItemId),
+        relationship: "SUPPORTS",
+      },
+    });
+  }
   // Both readings stay CURRENT; neither is chosen.
   for (const clash of clashes) {
     await evidence.linkClaimEvidence({

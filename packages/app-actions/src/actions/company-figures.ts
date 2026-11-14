@@ -157,7 +157,7 @@ const DOCUMENT_NOTE =
   "Kept as your company's own figure, supported by that document, private to your company: investors don't see it. If it's wrong, dismiss this card and tell me the right figure.";
 
 const WEB_NOTE =
-  "If you confirm it, it's kept as your company's own figure (self-reported), with this page as its source, private to your company: investors don't see it. A public article is not verification. If it's wrong or out of date, dismiss this card.";
+  "If you confirm it, it's kept as your company's own figure, confirmed by you, with this page kept as where it was first reported. It stays private to your company: investors don't see it. A public article is not verification. If it's wrong or out of date, dismiss this card.";
 
 function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
   const what = statedFigureWords(input.figure);
@@ -169,7 +169,7 @@ function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
     return `Your ${what} was already recorded, so nothing changed.${conflict}`;
   }
   if (input.web !== undefined) {
-    return `Recorded your ${what} as your company's own figure (self-reported), with "${input.web.title}" kept as its source. It's private to your company; investors don't see it.${conflict}`;
+    return `Recorded your ${what} as your company's own figure, confirmed by you; "${input.web.title}" is kept as where it was first reported. It's private to your company; investors don't see it.${conflict}`;
   }
   return input.document === undefined
     ? `Recorded your ${what} as your own statement (self-reported). It's private to your company; investors don't see it.${conflict}`

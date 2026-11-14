@@ -324,8 +324,10 @@ import {
 } from "./composition/document-claim-cards.js";
 import {
   createResearchClaimCards,
+  type KeptReading,
   RESEARCH_CLAIMS_ORCHESTRATION_VERSION,
 } from "./composition/research-claim-cards.js";
+import { createResearchReadings } from "./composition/research-readings.js";
 import { createModelClaimProposer } from "@capital-q/model-gateway/extraction";
 import { DocumentVersionIdSchema } from "@capital-q/evidence/contracts";
 import { createWorkRuntime } from "./composition/work/runtime.js";
@@ -1432,17 +1434,17 @@ logger.info(
 // surfaced, and what a founder's Q reads about their own company is
 // recorded as the company's evidence. The same module composes the
 // conversational statement recorder over the Knowledge Write Gate.
-// A8: bound below, once the research-claims job exists (research is
-// composed first because everything else reads through its Evidence owner).
-const publicExcerpts: {
+// Decisions 92-96: adoption cards are bound below, once the research-claims
+// job exists (research is composed first because everything else reads
+// through its Evidence owner).
+const keptReadings: {
   listener?: (
     actor: ActorContext,
-    excerpt: { readonly sourceId: string; readonly itemId: string },
-  ) => void;
+    companyId: string,
+    kept: readonly KeptReading[],
+  ) => Promise<unknown>;
 } = {};
 const researchComposition = composeResearch({
-  onPublicExcerpt: (actor, excerpt) =>
-    publicExcerpts.listener?.(actor, excerpt),
   sql: database.sql,
   transactions: database.transactions,
   authorization,
@@ -1453,6 +1455,25 @@ const researchComposition = composeResearch({
   logger,
   // A planned job's page reads: nobody waits on its turn (2026-10-28).
   plannedExtractBudgetMs: plannedExtractBudgetMs(process.env),
+});
+// Decisions 92-96: figures public pages report about a company, read once
+// and selectively after a research turn (relevance, content hash, batches,
+// an hourly bound; never a call per page, never inside the turn), and
+// offered to the next answer as cited readings. Off unless switched on.
+const researchReadings = createResearchReadings({
+  proposer: createModelClaimProposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+    // Only public page text is in the passage: research's registered
+    // sensitivity for a public page (ADR 0009 §6), never lowered further.
+    sensitivity: { sensitivityFor: () => Promise.resolve("INTERNAL") },
+  }),
+  enabled: process.env.CQ_RESEARCH_FIGURE_CARDS === "on",
+  evidence: researchComposition.evidence,
+  onKept: (actor, companyId, kept) =>
+    keptReadings.listener?.(actor, companyId, kept) ?? Promise.resolve(),
+  logger,
 });
 // Rehearsing with a researched external entity (W4): the asker's own
 // researched record and newest brief, or a prepared public seed.
@@ -3610,7 +3631,7 @@ const qTools = createQTools({
     investorSectorFocus: investorSectorFocusPort,
     ...(researchComposition.research === undefined
       ? {}
-      : { research: researchComposition.research }),
+      : { research: researchComposition.research, researchReadings }),
     ...(researchComposition.profiles === undefined
       ? {}
       : { profiles: researchComposition.profiles }),
@@ -7835,8 +7856,6 @@ const documentClaimCards = createDocumentClaimCards({
 // founder's own company becomes a proposed figure on their card; it is
 // their claim only once they confirm it. Runs after the turn, never in it.
 const researchClaimCards = createResearchClaimCards({
-  evidence: researchComposition.evidence,
-  proposer: claimProposer,
   cardInput: (actor, proposal) =>
     webFigureCardInput(appActionPorts, actor, proposal),
   propose: documentClaimCardProposer({
@@ -7845,13 +7864,10 @@ const researchClaimCards = createResearchClaimCards({
     actions: qActions,
     orchestrationVersion: RESEARCH_CLAIMS_ORCHESTRATION_VERSION,
   }),
-  // Decision 96: off unless switched on; never a paid read of every page.
-  enabled: process.env.CQ_RESEARCH_FIGURE_CARDS === "on",
   logger,
 });
-publicExcerpts.listener = (actor, excerpt) => {
-  void researchClaimCards.onExcerptRecorded(actor, excerpt);
-};
+keptReadings.listener = (actor, companyId, kept) =>
+  researchClaimCards.fromReadings(actor, companyId, kept);
 void createWorkWakeListener({
   listen: (channel, onNotify, onListen) =>
     database.listen(channel, onNotify, onListen),
