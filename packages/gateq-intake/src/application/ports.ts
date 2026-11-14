@@ -3,6 +3,14 @@ import type { TransactionContext } from "@capital-q/database";
 import type { GatewayPolicy, QualificationResult } from "@capital-q/gateq";
 
 import type {
+  ApplicationStatement,
+  ApplicationStatementView,
+  DisagreementEvent,
+  StatementLink,
+  TurnReading,
+} from "../contracts/statements.js";
+import type { StatementContext } from "./statement-plan.js";
+import type {
   Application,
   ApplicationDimension,
   ApplicationFact,
@@ -147,6 +155,11 @@ export type ApplicationSubmissionRepository = {
 
 /** One line of the interview, as stored. */
 export type StoredTurn = {
+  /**
+   * `application_turns.id`: what a statement names as its source turn.
+   * Optional only for stores written before statements (slice 2).
+   */
+  readonly id?: string | undefined;
   readonly seq: number;
   /** Server-owned complete dependencies; absent historical rows fail closed. */
   readonly disclosureLineage?: DisclosureLineage | undefined;
@@ -395,4 +408,36 @@ export type TaxonomyResolutionPort = {
       readonly unambiguous: boolean;
     }[]
   >;
+};
+
+/**
+ * GateQ atomic statements (design 2026-11-14, slice 2): append-only rows
+ * behind one port. Every write happens inside the turn's own transaction,
+ * so a turn's statements, links, disagreement events and readings commit
+ * with Q's reply or not at all.
+ */
+export type ApplicationStatementRepository = {
+  /** Everything on record for one application, and which turns were read. */
+  readonly listFor: (applicationId: ApplicationId) => Promise<
+    StatementContext & {
+      /** PERSON turns that have a reading (READ, NO_STATEMENTS or REJECTED). */
+      readonly readTurnIds: readonly string[];
+    }
+  >;
+  /** The deterministic view over everything on record. */
+  readonly viewFor: (
+    applicationId: ApplicationId,
+  ) => Promise<ApplicationStatementView>;
+  readonly appendInTransaction: (
+    tx: TransactionContext,
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly tenantId: string;
+      /** In the order they were said: a link's ends exist before it. */
+      readonly statements: readonly ApplicationStatement[];
+      readonly links: readonly StatementLink[];
+      readonly events: readonly DisagreementEvent[];
+      readonly readings: readonly TurnReading[];
+    },
+  ) => Promise<void>;
 };

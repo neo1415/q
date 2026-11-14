@@ -100,10 +100,25 @@ export {
 } from "./readiness-lead-copy.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
+export { GATEQ_INTERVIEWER_V7 } from "./prompts/tasks/gateq-interviewer.v7.js";
 export {
   GATEQ_INTERVIEWER_SCHEMA_NAME,
   GATEQ_INTERVIEWER_SCHEMA_VERSION,
+  GATEQ_INTERVIEWER_SCHEMA_VERSION_V2,
   GATEQ_INTERVIEWER_UNTRUSTED,
+  GATEQ_INTERVIEWER_UNTRUSTED_V7,
+  GATEQ_STATEMENT_OPS,
+  GATEQ_STATEMENT_QUANTITIES,
+  GateQDisagreementActionSchema,
+  GateQInterviewerResultV2Schema,
+  GateQInterviewerVariablesV7Schema,
+  GateQStatementOpSchema,
+  GateQStatementValueSchema,
+  type GateQDisagreementAction,
+  type GateQInterviewerResultV2,
+  type GateQInterviewerVariablesV7,
+  type GateQStatementOp,
+  type GateQStatementValue,
   GATEQ_TURN_INTENTS,
   GateQDimensionSchema,
   GateQInterviewerResultSchema,

@@ -16,6 +16,7 @@ import {
 } from "./interviewer.js";
 import { transcriptDto, type IntakeService } from "./intake-service.js";
 import type {
+  ApplicationStatementRepository,
   ApplicationSessionRepository,
   ApplicationTurnRepository,
   BoundPolicyPort,
@@ -51,6 +52,13 @@ import type {
 
 /** How much of the conversation the interviewer is shown. */
 const RECENT_TURNS = 8;
+
+/**
+ * How many unread earlier messages one turn reads (live D8: a founder's
+ * first message never got a reply and was never read into facts). The
+ * newest are read first; any older stay unread, and findable as such.
+ */
+const UNREAD_TURNS = 4;
 
 /** Q turn intents that mean the conversation left the application. */
 const TANGENT_INTENTS: ReadonlySet<string> = new Set([
@@ -94,6 +102,11 @@ export type ConversationDependencies = {
    * before (no history, single-slot idempotency).
    */
   readonly turns?: ApplicationTurnRepository | undefined;
+  /**
+   * GateQ atomic statements (slice 2). Present with a transcript, each
+   * turn is read into statements against the record; absent, legacy facts.
+   */
+  readonly statements?: ApplicationStatementRepository | undefined;
   readonly logger?: Logger | undefined;
   /** Monotonic milliseconds, for turn latency. Test seam. */
   readonly now?: (() => number) | undefined;
@@ -193,6 +206,7 @@ export function createConversationService(
     investorEmphasisFor,
     turnMemory,
     turns,
+    statements,
     logger,
   } = dependencies;
   const now = dependencies.now ?? (() => performance.now());
@@ -308,7 +322,7 @@ export function createConversationService(
       return resultFor(input.token, completed.q.text, true, policy);
     }
     try {
-      const [qualification, facts, stored, cached, emphasisRead] =
+      const [qualification, facts, stored, cached, emphasisRead, record] =
         await Promise.all([
           intake.qualification(input.token),
           intake.factsFor(input.token),
@@ -322,6 +336,9 @@ export function createConversationService(
                 tenantId: guest.application.tenantId,
                 gatewayId: guest.application.gatewayId,
               }).catch(() => []),
+          statements === undefined || turns === undefined || opening
+            ? null
+            : statements.listFor(applicationId),
         ]);
       // The interviewer gets this turn as the utterance, not twice.
       const prior = stored.filter(
@@ -330,9 +347,68 @@ export function createConversationService(
       );
       const history = historyFrom(prior);
 
-      const emphasis = cached !== null ? [] : emphasisRead;
+      // The statement record this turn is read against: the PERSON turn
+      // being answered, every earlier one nobody read (no reading and no
+      // reply: the D8 orphan), and what Q asked about, by turn.
+      const statementContext = (() => {
+        if (record === null) return undefined;
+        const current = stored.find(
+          (turn) =>
+            turn.role === "PERSON" && turn.clientTurnId === input.clientTurnId,
+        );
+        if (current?.id === undefined) return undefined;
+        const read = new Set(record.readTurnIds);
+        const answered = new Set(
+          stored.filter((t) => t.role === "Q").map((t) => t.clientTurnId),
+        );
+        const unread = prior
+          .filter(
+            (turn) =>
+              turn.role === "PERSON" &&
+              turn.id !== undefined &&
+              !read.has(turn.id) &&
+              !answered.has(turn.clientTurnId),
+          )
+          .slice(-UNREAD_TURNS)
+          .map((turn) => ({ id: turn.id ?? "", text: turn.text }));
+        const turnSeq = new Map<string, number>();
+        for (const turn of stored)
+          if (turn.id !== undefined) turnSeq.set(turn.id, turn.seq);
+        return {
+          applicationId,
+          context: {
+            statements: record.statements,
+            links: record.links,
+            events: record.events,
+          },
+          currentTurnId: current.id,
+          // A retried turn recovered as unread by a later one is already
+          // read: it is answered, never read twice.
+          currentRead: read.has(current.id),
+          unread,
+          asks: stored.flatMap((turn) =>
+            turn.role === "Q" && turn.askingDimension !== null
+              ? [{ dimension: turn.askingDimension, seq: turn.seq }]
+              : [],
+          ),
+          turnSeq,
+        };
+      })();
+
+      // A checkpoint is the paid reply and its planned rows. One that no
+      // longer parses is asked again rather than wedging the turn for good.
+      const checkpoint =
+        cached === null ? null : InterviewTurnOutcomeSchema.safeParse(cached);
+      if (checkpoint !== null && !checkpoint.success)
+        logger?.warn(
+          { correlationId: input.correlationId },
+          "gateq checkpointed reply no longer valid; asking again",
+        );
+      const reusable =
+        checkpoint !== null && checkpoint.success ? checkpoint.data : null;
+      const emphasis = reusable !== null ? [] : emphasisRead;
       const outcome =
-        cached === null
+        reusable === null
           ? await interviewer.turn({
               stage: "APPLICATION",
               channel: input.channel ?? "text",
@@ -344,6 +420,9 @@ export function createConversationService(
                 facts,
                 // See openingFor: no authorised document-text port for a guest.
                 documentProposals: [],
+                ...(statementContext === undefined
+                  ? {}
+                  : { statements: statementContext }),
               },
               utterance: input.message,
               recentTurns: history.recentTurns,
@@ -362,7 +441,7 @@ export function createConversationService(
               // the same id if this runs out (their words are kept).
               signal: AbortSignal.timeout(40_000),
             })
-          : InterviewTurnOutcomeSchema.parse(cached);
+          : reusable;
       // Stamped from what the model was actually given, never from its
       // output: no document text (documentProposals is empty for a guest),
       // the current facts and every stored turn including this utterance.
@@ -375,7 +454,7 @@ export function createConversationService(
       });
       const latencyMs = Math.max(0, Math.round(now() - receivedAt));
       if (turns !== undefined && claimId !== null) {
-        if (cached === null)
+        if (reusable === null)
           await turns.checkpointOutcome(applicationId, claimId, outcome);
         await intake.completeTurn({
           disclosureLineage: lineage,
@@ -386,6 +465,9 @@ export function createConversationService(
           asking: outcome.asking,
           intent: outcome.intent,
           facts: opening ? [] : outcome.facts,
+          ...(opening || outcome.statementPlan === undefined
+            ? {}
+            : { statementPlan: outcome.statementPlan }),
           sourceTurnSeq: stored.find(
             (turn) =>
               turn.role === "PERSON" &&

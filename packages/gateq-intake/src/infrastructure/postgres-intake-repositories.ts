@@ -23,9 +23,20 @@ import {
   type ApplicationFact,
   type ApplicationSession,
 } from "../contracts/index.js";
+import {
+  ApplicationStatementSchema,
+  DisagreementEventSchema,
+  StatementLinkSchema,
+  type ApplicationStatement,
+  type DisagreementEvent,
+  type StatementLink,
+  type StatementValue,
+} from "../contracts/statements.js";
+import { projectView } from "../application/statement-view.js";
 import type {
   ApplicationContactRepository,
   ApplicationDocumentRepository,
+  ApplicationStatementRepository,
   ApplicationFactRepository,
   ApplicationRepository,
   ApplicationSessionRepository,
@@ -437,6 +448,7 @@ export function createPostgresApplicationDocumentRepository(options: {
 }
 
 const TurnRow = z.object({
+  id: z.string().uuid().optional(),
   seq: z.number().int(),
   role: z.enum(["PERSON", "Q"]),
   text: z.string(),
@@ -454,6 +466,7 @@ function toTurn(row: unknown): StoredTurn {
   // not something to ask about again; it reads as none.
   const asking = ApplicationDimensionSchema.safeParse(r.asking_dimension);
   return {
+    ...(r.id === undefined ? {} : { id: r.id }),
     seq: r.seq,
     role: r.role,
     text: r.text,
@@ -575,14 +588,14 @@ export function createPostgresApplicationTurnRepository(options: {
       const rows =
         limit === undefined
           ? await sql`
-              select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
+              select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
                 from gateq.application_turns
                where application_id = ${applicationId}
                order by seq asc
                limit 400`
           : await sql`
               select * from (
-                select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
+                select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
                   from gateq.application_turns
                  where application_id = ${applicationId}
                  order by seq desc
@@ -593,7 +606,7 @@ export function createPostgresApplicationTurnRepository(options: {
 
     findExchange: async (applicationId, clientTurnId) => {
       const rows = await sql`
-        select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
+        select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
           from gateq.application_turns
          where application_id = ${applicationId}
            and client_turn_id = ${clientTurnId}`;
@@ -845,5 +858,170 @@ export function createPostgresApplicationContactRepository(options: {
     },
 
     save: (input) => saveWith(sql, input),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GateQ atomic statements (design 2026-11-14, slice 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The table keeps `value_kind` beside a kind-less `value`; the contract
+ * carries one discriminated value. These functions are the only place the
+ * two shapes meet.
+ */
+function storedValue(value: StatementValue): {
+  readonly kind: StatementValue["kind"];
+  readonly body: Record<string, unknown>;
+} {
+  const { kind, ...body } = value;
+  return { kind, body };
+}
+
+function toStatement(row: Record<string, unknown>): ApplicationStatement {
+  const body = decodeJsonbString(row["value"]);
+  return ApplicationStatementSchema.parse({
+    id: row["id"],
+    applicationId: row["application_id"],
+    dimension: row["dimension"],
+    quantity: row["quantity"] ?? null,
+    value: {
+      ...(typeof body === "object" && body !== null ? body : {}),
+      kind: row["value_kind"],
+    },
+    asOf: row["as_of"] ?? null,
+    words: row["words"],
+    provenance: row["provenance"],
+    origin: row["origin"],
+    sourceTurnId: row["source_turn_id"] ?? null,
+    backfillKey: row["backfill_key"] ?? null,
+    statedAt: iso(row["stated_at"]),
+    recordedAt: iso(row["recorded_at"]),
+  });
+}
+
+function toLink(row: Record<string, unknown>): StatementLink {
+  return StatementLinkSchema.parse({
+    id: row["id"],
+    applicationId: row["application_id"],
+    kind: row["kind"],
+    fromStatementId: row["from_statement_id"],
+    toStatementId: row["to_statement_id"],
+    origin: row["origin"],
+    sourceTurnId: row["source_turn_id"] ?? null,
+    createdAt: iso(row["created_at"]),
+  });
+}
+
+function toEvent(row: Record<string, unknown>): DisagreementEvent {
+  return DisagreementEventSchema.parse({
+    id: row["id"],
+    applicationId: row["application_id"],
+    linkId: row["link_id"],
+    state: row["state"],
+    resolvedByStatementId: row["resolved_by_statement_id"] ?? null,
+    sourceTurnId: row["source_turn_id"] ?? null,
+    recordedAt: iso(row["recorded_at"]),
+  });
+}
+
+export function createPostgresApplicationStatementRepository(options: {
+  readonly sql: DatabaseExecutor;
+}): ApplicationStatementRepository {
+  const { sql } = options;
+  const listFor: ApplicationStatementRepository["listFor"] = async (
+    applicationId,
+  ) => {
+    // Four reads of one application's append-only rows, bounded by the
+    // interview itself (a turn writes at most a few dozen).
+    const [statements, links, events, readings] = await Promise.all([
+      sql`
+        select id, application_id, dimension, quantity, value_kind, value,
+               as_of::text as as_of, words, provenance, origin, source_turn_id,
+               backfill_key, stated_at, recorded_at
+          from gateq.application_statements
+         where application_id = ${applicationId}
+         order by stated_at asc, id asc`,
+      sql`
+        select id, application_id, kind, from_statement_id, to_statement_id,
+               origin, source_turn_id, created_at
+          from gateq.application_statement_links
+         where application_id = ${applicationId}
+         order by created_at asc, id asc`,
+      sql`
+        select id, application_id, link_id, state, resolved_by_statement_id,
+               source_turn_id, recorded_at
+          from gateq.application_disagreement_events
+         where application_id = ${applicationId}
+         order by recorded_at asc, id asc`,
+      sql`
+        select turn_id from gateq.application_turn_readings
+         where application_id = ${applicationId}`,
+    ]);
+    return {
+      statements: statements.map((row) => toStatement(row)),
+      links: links.map((row) => toLink(row)),
+      events: events.map((row) => toEvent(row)),
+      readTurnIds: readings.map((row) => String(row["turn_id"])),
+    };
+  };
+  return {
+    listFor,
+    viewFor: async (applicationId) => {
+      const rows = await listFor(applicationId);
+      return projectView(rows.statements, rows.links, rows.events);
+    },
+
+    appendInTransaction: async (tx, input) => {
+      for (const statement of input.statements) {
+        const { kind, body } = storedValue(statement.value);
+        await tx.sql`
+          insert into gateq.application_statements (
+            id, application_id, tenant_id, dimension, quantity, value_kind, value,
+            as_of, words, provenance, origin, source_turn_id, backfill_key,
+            stated_at, recorded_at
+          ) values (
+            ${statement.id}, ${input.applicationId}, ${input.tenantId},
+            ${statement.dimension}, ${statement.quantity}, ${kind},
+            ${jsonbParam(tx.sql, body)}, ${statement.asOf}::date, ${statement.words},
+            ${statement.provenance}, ${statement.origin}, ${statement.sourceTurnId},
+            ${statement.backfillKey}, ${statement.statedAt}, ${statement.recordedAt}
+          )`;
+      }
+      for (const link of input.links) {
+        await tx.sql`
+          insert into gateq.application_statement_links (
+            id, application_id, tenant_id, kind, from_statement_id,
+            to_statement_id, origin, source_turn_id, created_at
+          ) values (
+            ${link.id}, ${input.applicationId}, ${input.tenantId}, ${link.kind},
+            ${link.fromStatementId}, ${link.toStatementId}, ${link.origin},
+            ${link.sourceTurnId}, ${link.createdAt}
+          )`;
+      }
+      for (const event of input.events) {
+        await tx.sql`
+          insert into gateq.application_disagreement_events (
+            id, application_id, tenant_id, link_id, state,
+            resolved_by_statement_id, source_turn_id, recorded_at
+          ) values (
+            ${event.id}, ${input.applicationId}, ${input.tenantId}, ${event.linkId},
+            ${event.state}, ${event.resolvedByStatementId}, ${event.sourceTurnId},
+            ${event.recordedAt}
+          )`;
+      }
+      for (const reading of input.readings) {
+        await tx.sql`
+          insert into gateq.application_turn_readings (
+            id, application_id, tenant_id, turn_id, outcome,
+            recorded_statement_ids, not_recorded, reading_version, recorded_at
+          ) values (
+            ${reading.id}, ${input.applicationId}, ${input.tenantId}, ${reading.turnId},
+            ${reading.outcome}, ${[...reading.recordedStatementIds]}::uuid[],
+            ${jsonbParam(tx.sql, reading.notRecorded)}, ${reading.readingVersion},
+            ${reading.recordedAt}
+          )`;
+      }
+    },
   };
 }

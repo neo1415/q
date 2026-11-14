@@ -18,12 +18,14 @@ import {
   languageInfo,
   supportedLanguageOf,
   writtenLanguageNote,
-  GateQInterviewerResultSchema,
+  GATEQ_STATEMENT_QUANTITIES,
+  GateQInterviewerResultV2Schema,
   GateQTurnIntentSchema,
   orEmptyCase,
   PROMPT_EMPTY_CASES,
-  type GateQInterviewerResult,
+  type GateQInterviewerResultV2,
   type GateQInterviewerVariables,
+  type GateQStatementOp,
   type GateQTurnIntent,
   type PromptRegistry,
   type QPersonalityCode,
@@ -40,6 +42,7 @@ import {
 } from "../contracts/index.js";
 import {
   contradictionsForInterview,
+  figureContradictions,
   questionNeedsFor,
   type QuestionNeed,
 } from "./question-needs.js";
@@ -55,6 +58,21 @@ import {
 import { normaliseProposedFact } from "./normalise-fact.js";
 import { readBackLine, readBacksIn, type NotRecorded } from "./not-recorded.js";
 import { affirmsReadBack, amountStatedIn } from "./stated-amount.js";
+import {
+  asksSince,
+  handlesFor,
+  legacyCarry,
+  planReading,
+  renderDisagreements,
+  renderKnownStatements,
+  replyHeldToReading,
+  StatementPlanSchema,
+  type AskLog,
+  type StatementContext,
+  type StatementPlan,
+} from "./statement-plan.js";
+import { projectView } from "./statement-view.js";
+import type { ApplicationId } from "../contracts/index.js";
 
 /**
  * Q interviewing a GateQ applicant (CQ-GATE-002 §4, §5, §36, §39).
@@ -89,6 +107,60 @@ import { affirmsReadBack, amountStatedIn } from "./stated-amount.js";
  */
 
 export type InterviewChannel = "voice" | "text";
+
+/** A legacy fact proposal as NEW statement(s), linked to nothing. */
+function statementsOfFact(
+  fact: GateQInterviewerResultV2["facts"][number],
+  utterance: string,
+): GateQStatementOp[] {
+  const words = (text: string) =>
+    (text.trim().length > 0 ? text : utterance).slice(0, 600) || "(said)";
+  const base = {
+    op: "NEW" as const,
+    target: null,
+    turn: null,
+    dimension: fact.dimension,
+    quantity: null,
+    asOf: null,
+    provenance: fact.provenance,
+  };
+  const value = fact.value;
+  switch (value.kind) {
+    case "TEXT":
+      return [{ ...base, value, words: words(value.text) }];
+    case "CODE":
+      return [{ ...base, value, words: words(utterance) }];
+    case "AMOUNT":
+      return [
+        {
+          ...base,
+          value: {
+            kind: "MONEY",
+            amount: value.amount,
+            currency: value.currency,
+          },
+          words: words(utterance),
+        },
+      ];
+    case "PHRASES":
+      return value.phrases.map((phrase) => ({
+        ...base,
+        value: { kind: "TEXT" as const, text: phrase.slice(0, 2000) },
+        words: words(phrase),
+      }));
+    case "NONE":
+      return [
+        {
+          ...base,
+          value: { kind: "UNKNOWN", declined: false },
+          provenance: "UNKNOWN",
+          words: words(utterance),
+        },
+      ];
+    case "ZERO":
+      return [{ ...base, value: { kind: "ZERO" }, words: words(utterance) }];
+  }
+}
 
 /**
  * The reply around a read-back: without its closing question (the read-back
@@ -183,6 +255,12 @@ export type InterviewTurnInput = {
           readonly dimension: ApplicationDimension;
           readonly summary: string;
         }[];
+        /**
+         * Atomic statements (design 2026-11-14, slice 2). Present, with
+         * prompt v7 or later, the turn is read into statements against
+         * this record; absent, it is read into legacy facts as before.
+         */
+        readonly statements?: StatementTurnContext | undefined;
       }
     | undefined;
   /** What the person just said. Empty for the opening line. */
@@ -213,6 +291,22 @@ export type InterviewTurnInput = {
   readonly signal?: AbortSignal | undefined;
 };
 
+/** What the statement reading of a turn is given besides the model's output. */
+export type StatementTurnContext = {
+  readonly applicationId: ApplicationId;
+  readonly context: StatementContext;
+  /** The PERSON turn being answered; null where there is no transcript. */
+  readonly currentTurnId: string | null;
+  /** The PERSON turn was already read (recovered by a later turn). */
+  readonly currentRead?: boolean | undefined;
+  /** Earlier PERSON turns nobody read (live D8), oldest first. */
+  readonly unread: readonly { readonly id: string; readonly text: string }[];
+  /** Every Q question about a dimension, by the seq of the Q turn. */
+  readonly asks: AskLog["asks"];
+  /** `application_turns.id` -> seq, for when a statement was said. */
+  readonly turnSeq: ReadonlyMap<string, number>;
+};
+
 export type InterviewTurnOutcome = {
   readonly reply: string;
   readonly intent: GateQTurnIntent;
@@ -229,6 +323,12 @@ export type InterviewTurnOutcome = {
   readonly questionForQ: string | null;
   /** Advisory. GATE-001 decides whether submission is possible. */
   readonly readyToReview: boolean;
+  /**
+   * Every statement row this turn writes, with its ids, checkpointed with
+   * the reply so a retry writes the same rows (slice 2). Absent on the
+   * legacy path.
+   */
+  readonly statementPlan?: StatementPlan | undefined;
 };
 
 /** Persisted output is revalidated before replay, never treated as authority. */
@@ -241,6 +341,7 @@ export const InterviewTurnOutcomeSchema = z
     asking: ApplicationDimensionSchema.nullable(),
     questionForQ: z.string().nullable(),
     readyToReview: z.boolean(),
+    statementPlan: StatementPlanSchema.optional(),
   })
   .transform((outcome) => {
     // Reuse the paid reply from an older checkpoint without reinstating a
@@ -281,6 +382,8 @@ export type InterviewerDependencies = {
   readonly registry?: PromptRegistry | undefined;
   readonly personality?: QPersonalityCode | undefined;
   readonly logger?: Logger | undefined;
+  /** When statements are said; a test seam. */
+  readonly now?: (() => Date) | undefined;
 };
 
 export type GateQInterviewer = {
@@ -490,6 +593,7 @@ export function createGateQInterviewer(
   dependencies: InterviewerDependencies,
 ): GateQInterviewer {
   const { gateway, logger } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
   const registry = dependencies.registry ?? createDefaultPromptRegistry();
   const personality = personalityOf(dependencies.personality ?? "UPBEAT");
 
@@ -527,6 +631,39 @@ export function createGateQInterviewer(
   return {
     turn: async (input) => {
       const application = input.application;
+      const promptVersion =
+        registry.getActive("GATEQ_INTERVIEWER").definition.version;
+      // The statement record this turn is read against, with the legacy
+      // facts no statement accounts for carried in (not yet written).
+      const statementState = (() => {
+        const turnContext = application?.statements;
+        if (application === undefined || turnContext === undefined) return null;
+        if (promptVersion < 7) return null;
+        const carried = legacyCarry({
+          applicationId: turnContext.applicationId,
+          context: turnContext.context,
+          legacyFacts: application.facts,
+        });
+        const all = [...turnContext.context.statements, ...carried];
+        const view = projectView(
+          all,
+          turnContext.context.links,
+          turnContext.context.events,
+        );
+        const sourceOf = new Map(all.map((s) => [s.id, s.sourceTurnId]));
+        const log: AskLog = {
+          asks: turnContext.asks,
+          seqOf: (id) => {
+            const turnId = sourceOf.get(id as never) ?? null;
+            return turnId === null ? 0 : (turnContext.turnSeq.get(turnId) ?? 0);
+          },
+        };
+        const handles = handlesFor(
+          view,
+          turnContext.unread.map((turn) => turn.id),
+        );
+        return { turnContext, carried, view, log, handles };
+      })();
       const needs =
         application === undefined
           ? []
@@ -536,11 +673,45 @@ export function createGateQInterviewer(
               facts: application.facts,
               askedCounts: input.askedCounts,
               emphasis: input.emphasis,
+              ...(statementState === null
+                ? {}
+                : {
+                    view: statementState.view,
+                    asksSince: (dimension: ApplicationDimension) => {
+                      const entry = statementState.view.dimensions.find(
+                        (d) => d.dimension === dimension,
+                      );
+                      if (entry === undefined || entry.items.length === 0)
+                        return 0;
+                      // An open disagreement counts from when it opened;
+                      // an unknown from the latest thing said.
+                      const open = entry.disagreements.filter(
+                        (d) => d.active && d.state === "OPEN",
+                      );
+                      const since =
+                        open.length > 0
+                          ? Math.max(
+                              ...open.map((d) =>
+                                statementState.log.seqOf(d.newerStatementId),
+                              ),
+                            )
+                          : Math.max(
+                              ...entry.items.map((item) =>
+                                statementState.log.seqOf(item.statementId),
+                              ),
+                            );
+                      return asksSince(statementState.log, dimension, since);
+                    },
+                  }),
             });
 
       // The renderer supplies the charter-level four; this is the rest.
       const variables: Omit<
-        GateQInterviewerVariables & { readonly recordableDimensions?: string },
+        GateQInterviewerVariables & {
+          readonly recordableDimensions?: string;
+          readonly statementQuantities?: string;
+          readonly unreadMessages?: string;
+        },
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -553,7 +724,12 @@ export function createGateQInterviewer(
         knownFacts:
           application === undefined
             ? "(no application yet)"
-            : renderFacts(application.facts),
+            : statementState !== null
+              ? renderKnownStatements(
+                  statementState.view,
+                  statementState.handles,
+                )
+              : renderFacts(application.facts),
         questionNeeds: renderNeeds(
           needs,
           input.variationSeed ?? application?.facts[0]?.applicationId ?? "",
@@ -561,8 +737,21 @@ export function createGateQInterviewer(
         ),
         // Historical injected registries retain their original variable schema.
         // Only v3 receives the independent server-owned recording inventory.
-        ...(registry.getActive("GATEQ_INTERVIEWER").definition.version >= 3
+        ...(promptVersion >= 3
           ? { recordableDimensions: APPLICATION_DIMENSIONS.join("\n") }
+          : {}),
+        ...(promptVersion >= 7
+          ? {
+              statementQuantities: GATEQ_STATEMENT_QUANTITIES.join(", "),
+              unreadMessages:
+                statementState === null ||
+                statementState.turnContext.unread.length === 0
+                  ? "(none)"
+                  : statementState.turnContext.unread
+                      .map((turn, index) => `T${index + 1}: ${turn.text}`)
+                      .join("\n")
+                      .slice(0, 6000),
+            }
           : {}),
         documentProposals:
           application === undefined ||
@@ -574,7 +763,20 @@ export function createGateQInterviewer(
         contradictions:
           application === undefined
             ? "(none)"
-            : contradictionsForInterview(application.facts, input.askedCounts)
+            : (statementState !== null
+                ? [
+                    ...renderDisagreements(
+                      statementState.handles,
+                      statementState.view,
+                      statementState.log,
+                    ),
+                    ...figureContradictions(application.facts),
+                  ]
+                : contradictionsForInterview(
+                    application.facts,
+                    input.askedCounts,
+                  )
+              )
                 .join("\n")
                 .slice(0, 2000) || "(none)",
         askedAlready:
@@ -608,9 +810,9 @@ export function createGateQInterviewer(
         variables,
       });
 
-      let result: GateQInterviewerResult;
+      let result: GateQInterviewerResultV2;
       try {
-        const response = await gateway.execute<GateQInterviewerResult>(
+        const response = await gateway.execute<GateQInterviewerResultV2>(
           {
             taskClass: "NORMAL_DIALOGUE",
             // A stranger's application is their own commercial material,
@@ -622,7 +824,7 @@ export function createGateQInterviewer(
             attribution: { ...input.attribution, purpose: "ONBOARDING" },
           },
           {
-            schema: GateQInterviewerResultSchema,
+            schema: GateQInterviewerResultV2Schema,
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
@@ -630,7 +832,7 @@ export function createGateQInterviewer(
         if (response.output.kind !== "STRUCTURED") {
           throw new InterviewUnavailableError(true);
         }
-        result = GateQInterviewerResultSchema.parse(
+        result = GateQInterviewerResultV2Schema.parse(
           (response.output as { readonly value: unknown }).value,
         );
       } catch (error: unknown) {
@@ -700,6 +902,94 @@ export function createGateQInterviewer(
         if (result.readBackConfirmed === false) return false;
         return affirmsReadBack(amount, lastQ, input.utterance);
       };
+      // Slice 2: the turn is read into atomic statements. Every row it
+      // writes is decided here, with its id, and checkpointed with the
+      // reply; the legacy facts are re-projected from the statements.
+      if (statementState !== null) {
+        const { turnContext } = statementState;
+        const agreedReadBacks =
+          result.intent === "SABOTAGE"
+            ? []
+            : readBacksIn(lastQ ?? "").filter((back) => agreedTo(back.amount));
+        const planned = planReading({
+          applicationId: turnContext.applicationId,
+          context: turnContext.context,
+          carried: statementState.carried,
+          legacyFacts: application?.facts ?? [],
+          handles: statementState.handles,
+          current: { id: turnContext.currentTurnId, text: input.utterance },
+          currentRead: turnContext.currentRead === true,
+          unread: turnContext.unread,
+          // A reading that wrote legacy facts and no statements (an
+          // older prompt, a model that ignored v7) still loses nothing:
+          // each fact is read as a NEW statement, linked to nothing.
+          statements:
+            result.statements.length > 0 ||
+            result.disagreementActions.length > 0
+              ? result.statements
+              : result.facts.flatMap((fact) =>
+                  statementsOfFact(fact, input.utterance),
+                ),
+          actions: result.disagreementActions,
+          discard: discardedByIntent,
+          agreedTo,
+          agreedReadBacks,
+          now: now(),
+        });
+        // Legacy readings (facts) from a v7 model are not read: v7 writes
+        // statements, and a facts list beside them would be a second truth.
+        const englishTurn = interviewLanguageOf(input) === null;
+        const readBackLineText = englishTurn
+          ? readBackLine(planned.readBacks) ||
+            (planned.narrowTo === null
+              ? ""
+              : `Which country in ${planned.narrowTo} is the company based in?`)
+          : "";
+        const askingDimension =
+          readBackLineText.length > 0
+            ? (planned.readBacks[0]?.dimension ?? "company.country")
+            : result.asking !== null && DIMENSIONS.has(result.asking)
+              ? (result.asking as ApplicationDimension)
+              : null;
+        const composed =
+          readBackLineText.length === 0
+            ? result.reply
+            : `${aroundReadBack(
+                result.reply,
+                planned.readBacks.map((item) => item.amount),
+              )} ${readBackLineText}`
+                .trim()
+                .slice(0, 4_000);
+        logger?.debug(
+          {
+            correlationId: input.attribution.correlationId,
+            stage: input.stage,
+            intent: result.intent,
+            statements: planned.recordedCount,
+            links: planned.plan.links.length,
+            events: planned.plan.events.length,
+            unread: turnContext.unread.length,
+            rejected: planned.rejected,
+            incomplete: planned.incomplete.length,
+          },
+          "gateq interview turn read into statements",
+        );
+        return {
+          // Invariant 7: "noted" only when the reading recorded something.
+          reply: replyHeldToReading(composed, planned.recordedCount),
+          intent: result.intent,
+          facts: planned.plan.legacyFacts,
+          rejectedFacts: planned.rejected,
+          ...(planned.readBacks.length === 0
+            ? {}
+            : { notRecorded: planned.readBacks }),
+          asking: askingDimension,
+          questionForQ: result.questionForQ,
+          readyToReview: result.readyToReview,
+          statementPlan: planned.plan,
+        };
+      }
+
       // Live D10 (2026-11-14, Routeix): a turn-level conflict on traction
       // paired "600 weekly active" with every later traction line ("6 to 18
       // operators", "willingness to pay not tested"), so one disagreement

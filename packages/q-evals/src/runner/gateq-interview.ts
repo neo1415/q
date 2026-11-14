@@ -640,6 +640,9 @@ export type GateQInterviewObservation = {
  * graders and for a person to read. It is never written to a baseline: a
  * sentence belongs to the turn that produced it, not to a comparison.
  */
+/** The scenario application, for the statement reading. */
+const APPLICATION_ID = "a0000000-0000-4000-8000-0000000000e7";
+
 export async function driveGateQInterview(
   world: QEvalWorld,
   evalCase: QEvalCase,
@@ -673,6 +676,16 @@ export async function driveGateQInterview(
         // scenario but one, which is what makes a claim to have read
         // something false on the rest.
         documentProposals: (setup.documentProposals ?? []) as never,
+        // Atomic statements (slice 2): read against an empty record, as a
+        // first turn is; the legacy facts are their projection.
+        statements: {
+          applicationId: APPLICATION_ID as never,
+          context: { statements: [], links: [], events: [] },
+          currentTurnId: null,
+          unread: [],
+          asks: [],
+          turnSeq: new Map(),
+        },
       },
       utterance: setup.utterance,
       recentTurns: [],
