@@ -757,6 +757,32 @@ describe("recordAgreed", () => {
     expect(w.activity.recorded).toHaveLength(1);
   });
 
+  it("with a no-invite note (a proposal accepted without a calendar), every party is told plainly, once", async () => {
+    const w = world();
+    const note =
+      "No calendar invite was sent: no Google Calendar is connected.";
+    const result = await w.service.recordAgreed({
+      ...AGREED,
+      noInviteNote: note,
+    });
+    expect(result.outcome).toBe("OK");
+    if (result.outcome !== "OK") return;
+    await w.service.recordAgreed({ ...AGREED, noInviteNote: note });
+    const scheduled = w.store.notifications.filter(
+      (n) => n.kind === "MEETING_SCHEDULED",
+    );
+    // The attendee (other side) and the organiser (the accepting person).
+    expect(scheduled.map((n) => n.userId).sort()).toEqual(
+      [FOUNDER.userId, INVESTOR.userId].sort(),
+    );
+    for (const notice of scheduled) expect(notice.body).toContain(note);
+    expect(
+      w.store.notifications.filter((n) => n.kind === "MEETING_PREP_READY"),
+    ).toHaveLength(2);
+    expect(w.activity.recorded).toHaveLength(1);
+    expect(w.investorCalendar.inserted).toHaveLength(0);
+  });
+
   it("refuses an unconnected relationship, a stranger and a time in the past, and falls back to UTC for an unknown zone", async () => {
     expect(
       (await world({ connected: false }).service.recordAgreed(AGREED)).outcome,

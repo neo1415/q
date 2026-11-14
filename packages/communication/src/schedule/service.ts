@@ -300,6 +300,13 @@ export type ScheduleService = {
     readonly idempotencyKey: string;
     readonly qActionId?: string | undefined;
     readonly correlationId: string;
+    /**
+     * Set when the caller sends NO calendar invite (a proposal accepted
+     * without a connected calendar): the plain words that say so, carried
+     * by every party's "new call" notice, the organiser's included. Absent:
+     * the caller sends the invite itself (errands email an .ics).
+     */
+    readonly noInviteNote?: string | undefined;
   }) => Promise<
     ScheduleOutcome<{
       readonly meeting: MeetingView;
@@ -598,6 +605,7 @@ export function createScheduleService(
     meetLink: string | null,
     actor: ActorContext,
     correlationId: string,
+    noInviteNote?: string,
   ): Promise<void> {
     await transactions.run(async (tx) => {
       await store.markMeetingScheduled(tx, record.id, meetLink);
@@ -630,11 +638,32 @@ export function createScheduleService(
           kind: "MEETING_SCHEDULED",
           title: `New call: ${record.purpose}`.slice(0, 200),
           // The link in the notice itself (founder report 2026-10-02).
-          body: meetLink === null ? null : `Meet link: ${meetLink}`,
+          body:
+            meetLink !== null
+              ? `Meet link: ${meetLink}`
+              : (noInviteNote?.slice(0, 1000) ?? null),
           linkPath: null,
           reminderId: null,
           meetingId: record.id,
           dedupeKey: `meeting-scheduled:${record.id}`,
+        });
+      }
+      // No invite went out: the organiser hears it too, in the same plain
+      // words, rather than assuming a calendar has it.
+      if (noInviteNote !== undefined && meetLink === null) {
+        await store.notify(tx, {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          kind: "MEETING_SCHEDULED",
+          title: `Booked: ${record.purpose}`.slice(0, 200),
+          body: `${bookedAt(record.startsAt, record.timeZone)} · ${noInviteNote}`.slice(
+            0,
+            1000,
+          ),
+          linkPath: null,
+          reminderId: null,
+          meetingId: record.id,
+          dedupeKey: `meeting-booked:${record.id}`,
         });
       }
       // REHEARSE (founder direction 2026-10-01): every Capital Q person
@@ -1059,7 +1088,13 @@ export function createScheduleService(
         }));
       const organiser = { name: self.name, email: self.email };
       if (record.status !== "SCHEDULED" && record.status !== "CANCELLED") {
-        await finalise(record, null, actor, input.correlationId);
+        await finalise(
+          record,
+          null,
+          actor,
+          input.correlationId,
+          input.noInviteNote,
+        );
         logger?.info({ meetingId: record.id }, "agreed meeting recorded");
       }
       const fresh = (await store.findMeeting(record.id)) ?? record;

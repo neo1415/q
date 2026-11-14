@@ -1,6 +1,8 @@
+import type { ActorContext } from "@capital-q/security";
 import { describe, expect, it } from "vitest";
 
 import {
+  createMeetingProposalPort,
   createProposalService,
   PROPOSAL_TRANSITIONS,
   transitionProposal,
@@ -9,6 +11,7 @@ import {
   type ProposalRecord,
   type ProposalState,
   type ProposalStore,
+  type ScheduleService,
   type TimeOption,
 } from "../src/index.js";
 
@@ -566,5 +569,295 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
     const results = [a, b].map((r) => (r.outcome === "OK" ? "OK" : r.reason));
     expect(results.filter((r) => r === "OK")).toHaveLength(1);
     expect(s.booked.length).toBeLessThanOrEqual(1);
+  });
+});
+
+/**
+ * B1/B2 (2026-11-14): the composed port. Acceptance without a calendar
+ * still records the meeting (the honest no-invite record); a proposal and a
+ * counter each tell the other side, once.
+ */
+describe("the meeting proposal port: no-calendar acceptance and notices", () => {
+  const actorOf = (userId: string): ActorContext =>
+    ({
+      userId,
+      tenantId: TENANT,
+      organisationId: "00000000-0000-4000-8000-0000000000c1",
+      membershipId: "00000000-0000-4000-8000-0000000000e1",
+      actorType: "HUMAN",
+    }) as ActorContext;
+
+  type Booked = Awaited<ReturnType<ScheduleService["schedule"]>>;
+  type Agreed = Awaited<ReturnType<ScheduleService["recordAgreed"]>>;
+  const view = (id: string, startsAt: Date, meetLink: string | null) => ({
+    id,
+    relationshipId: REL,
+    purpose: "Intro call",
+    startsAt: startsAt.toISOString(),
+    endsAt: new Date(startsAt.getTime() + 30 * 60_000).toISOString(),
+    timeZone: "Europe/London",
+    status: "SCHEDULED" as const,
+    organisedByYou: true,
+    organiserName: "Investor",
+    meetLink,
+    attendees: [],
+    hasBrief: false,
+  });
+
+  function composed(calendar: "CONNECTED" | "NONE" | "REVOKED") {
+    const mem = memoryStore();
+    const calendarBookings = new Map<string, string>();
+    const agreed = new Map<
+      string,
+      { meetingId: string; actorUserId: string; note: string | undefined }
+    >();
+    // The notifications table: one row per (side told, dedupe key).
+    const notices = new Map<string, { title: string; body: string | null }>();
+    const port = createMeetingProposalPort({
+      transactions: {
+        run: () => Promise.reject(new Error("no database in this test")),
+      },
+      store: mem.store,
+      parties,
+      counterpartNotices: {
+        notify: (input) => {
+          const told = input.actingSide === "INVESTOR" ? "FOUNDER" : "INVESTOR";
+          const key = `${told}:${input.kind.toLowerCase()}:${input.key}`;
+          if (notices.has(key)) return Promise.resolve(0);
+          notices.set(key, { title: input.title, body: input.body });
+          return Promise.resolve(1);
+        },
+      },
+      schedule: {
+        schedule: (input): Promise<Booked> => {
+          if (calendar !== "CONNECTED") {
+            return Promise.resolve({
+              outcome: "REFUSED",
+              code:
+                calendar === "REVOKED"
+                  ? "CALENDAR_REVOKED"
+                  : "CALENDAR_NOT_CONNECTED",
+            });
+          }
+          const id =
+            calendarBookings.get(input.idempotencyKey) ??
+            `calendar-${String(calendarBookings.size + 1)}`;
+          calendarBookings.set(input.idempotencyKey, id);
+          return Promise.resolve({
+            outcome: "OK",
+            meeting: view(id, input.startsAt, "https://meet.google.com/abc"),
+            alreadyScheduled: false,
+          });
+        },
+        recordAgreed: (input): Promise<Agreed> => {
+          if (input.actor.actorType !== "HUMAN") {
+            return Promise.resolve({ outcome: "REFUSED", code: "NOT_A_PARTY" });
+          }
+          const existing = agreed.get(input.idempotencyKey);
+          const meetingId =
+            existing?.meetingId ?? `agreed-${String(agreed.size + 1)}`;
+          agreed.set(input.idempotencyKey, {
+            meetingId,
+            actorUserId: input.actor.userId,
+            note: input.noInviteNote,
+          });
+          return Promise.resolve({
+            outcome: "OK",
+            meeting: view(meetingId, input.startsAt, null),
+            alreadyScheduled: existing !== undefined,
+            organiser: { name: "Investor", email: "i@example.invalid" },
+            invitees: [],
+          });
+        },
+      },
+    });
+    const as = (userId: string) =>
+      port.forActor(
+        actorOf(userId),
+        "cor_00000000-0000-4000-8000-000000000001",
+      );
+    return { ...mem, port, as, calendarBookings, agreed, notices };
+  }
+
+  // Far enough ahead that the service's real clock still sees them ahead.
+  const ahead = (days: number): TimeOption => {
+    const start = new Date(Date.now() + days * 24 * 3_600_000);
+    start.setUTCHours(10, 0, 0, 0);
+    return {
+      startsAt: start.toISOString(),
+      endsAt: new Date(start.getTime() + 30 * 60_000).toISOString(),
+      timeZone: "Europe/London",
+    };
+  };
+
+  async function proposedVia(c: ReturnType<typeof composed>) {
+    const out = await c.as(FOUNDER).propose({
+      actorUserId: FOUNDER,
+      relationshipId: REL,
+      purpose: "Intro call",
+      options: [ahead(3), ahead(4)],
+      idempotencyKey: "founder-propose-1",
+    });
+    if (out.outcome !== "OK") throw new Error("proposal refused");
+    return out.proposal;
+  }
+
+  it("accepting without a calendar records the meeting as the accepting investor, with an honest no-invite note", async () => {
+    const c = composed("NONE");
+    const p = await proposedVia(c);
+    const out = await c.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: p.id,
+      action: "ACCEPT",
+      optionIndex: 0,
+      idempotencyKey: "investor-accept-1",
+    });
+    expect(out).toMatchObject({
+      outcome: "OK",
+      confirmed: true,
+      booked: true,
+      calendarInvite: false,
+    });
+    expect(c.proposals.get(p.id)).toMatchObject({
+      state: "CONFIRMED",
+      meetingId: "agreed-1",
+    });
+    expect(c.calendarBookings.size).toBe(0);
+    const records = [...c.agreed.values()];
+    expect(records).toHaveLength(1);
+    expect(records[0]?.meetingId).toBe("agreed-1");
+    expect(records[0]?.actorUserId).toBe(INVESTOR);
+    expect(records[0]?.note).toContain(
+      "No calendar invite was sent: no Google Calendar is connected.",
+    );
+    expect(records[0]?.note).toContain("connect Google Calendar in Settings");
+    // A retry under the same key: one meeting, no second record.
+    const again = await c.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: p.id,
+      action: "ACCEPT",
+      optionIndex: 0,
+      idempotencyKey: "investor-accept-1",
+    });
+    expect(again).toMatchObject({ outcome: "OK", booked: true });
+    expect(c.agreed.size).toBe(1);
+    expect(c.proposals.get(p.id)?.meetingId).toBe("agreed-1");
+  });
+
+  it("a revoked calendar says reconnect", async () => {
+    const c = composed("REVOKED");
+    const p = await proposedVia(c);
+    await c.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: p.id,
+      action: "ACCEPT",
+      optionIndex: 1,
+      idempotencyKey: "investor-accept-1",
+    });
+    expect([...c.agreed.values()][0]?.note).toContain(
+      "reconnect Google Calendar in Settings",
+    );
+  });
+
+  it("with a calendar connected, the calendar booking is used and nothing is recorded without it", async () => {
+    const c = composed("CONNECTED");
+    const p = await proposedVia(c);
+    const out = await c.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: p.id,
+      action: "ACCEPT",
+      optionIndex: 0,
+      idempotencyKey: "investor-accept-1",
+    });
+    expect(out).toMatchObject({
+      outcome: "OK",
+      booked: true,
+      calendarInvite: true,
+    });
+    expect(c.proposals.get(p.id)?.meetingId).toBe("calendar-1");
+    expect(c.agreed.size).toBe(0);
+  });
+
+  it("a proposal tells the investor once, and a counter tells the founder once, however often retried", async () => {
+    const c = composed("NONE");
+    const p = await proposedVia(c);
+    // A retried proposal: the same key, the same notice.
+    await proposedVia(c);
+    expect([...c.notices.keys()]).toEqual([
+      `INVESTOR:time_proposed:proposal:${p.id}:r1`,
+    ]);
+    const counter = {
+      actorUserId: INVESTOR,
+      proposalId: p.id,
+      action: "COUNTER" as const,
+      options: [ahead(6)],
+      idempotencyKey: "investor-counter-1",
+    };
+    await c.as(INVESTOR).respond(counter);
+    await c.as(INVESTOR).respond(counter);
+    expect([...c.notices.keys()]).toEqual([
+      `INVESTOR:time_proposed:proposal:${p.id}:r1`,
+      `FOUNDER:time_proposed:proposal:${p.id}:r1:counter`,
+    ]);
+    const told = c.notices.get(
+      `FOUNDER:time_proposed:proposal:${p.id}:r1:counter`,
+    );
+    expect(told?.title).toBe("{actor} suggested other times for the call");
+    expect(told?.body).toContain(ahead(6).startsAt);
+    // The founder re-proposes: a new revision, a new notice for the investor.
+    await c.as(FOUNDER).respond({
+      actorUserId: FOUNDER,
+      proposalId: p.id,
+      action: "REPROPOSE",
+      options: [ahead(7)],
+      idempotencyKey: "founder-repropose-1",
+    });
+    expect(c.notices.has(`INVESTOR:time_proposed:proposal:${p.id}:r2`)).toBe(
+      true,
+    );
+    expect(c.notices.size).toBe(3);
+  });
+
+  it("a non-party or another relationship is refused: nothing recorded, nobody told", async () => {
+    const c = composed("NONE");
+    expect(
+      await c.as(OUTSIDER).propose({
+        actorUserId: OUTSIDER,
+        relationshipId: REL,
+        purpose: "Intro call",
+        options: [ahead(3)],
+        idempotencyKey: "outsider-1",
+      }),
+    ).toEqual({ outcome: "REFUSED", reason: "NOT_A_PARTY" });
+    expect(
+      await c.as(FOUNDER).propose({
+        actorUserId: FOUNDER,
+        relationshipId: "00000000-0000-4000-8000-00000000d999",
+        purpose: "Intro call",
+        options: [ahead(3)],
+        idempotencyKey: "other-tenant-1",
+      }),
+    ).toEqual({ outcome: "REFUSED", reason: "NOT_A_PARTY" });
+    const p = await proposedVia(c);
+    expect(
+      await c.as(OUTSIDER).respond({
+        actorUserId: OUTSIDER,
+        proposalId: p.id,
+        action: "ACCEPT",
+        optionIndex: 0,
+        idempotencyKey: "outsider-accept",
+      }),
+    ).toEqual({ outcome: "REFUSED", reason: "NOT_A_PARTY" });
+    expect(
+      await c.as(OBSERVER).respond({
+        actorUserId: OBSERVER,
+        proposalId: p.id,
+        action: "ACCEPT",
+        optionIndex: 0,
+        idempotencyKey: "observer-accept",
+      }),
+    ).toEqual({ outcome: "REFUSED", reason: "NOT_AUTHORISED" });
+    expect(c.agreed.size).toBe(0);
+    expect(c.notices.size).toBe(1);
   });
 });

@@ -207,7 +207,26 @@ export type ProposalBooking = (input: {
   readonly proposal: ProposalRecord;
   readonly option: TimeOption;
   readonly idempotencyKey: string;
-}) => Promise<{ readonly meetingId: string } | null>;
+}) => Promise<{
+  readonly meetingId: string;
+  /**
+   * Whether a calendar invite went to both sides. False: the meeting is
+   * recorded on Capital Q only (no calendar connected), and both sides were
+   * told so plainly. Absent: not known (an older booking).
+   */
+  readonly calendarInvite?: boolean;
+} | null>;
+
+/**
+ * Tells the other side that times are on the table: the founder's
+ * proposal (or re-proposal) to the investor, the investor's counter to the
+ * founder. Idempotent per proposal and revision (the notice's dedupe key),
+ * so a retried call never tells them twice.
+ */
+export type ProposalNotify = (input: {
+  readonly proposal: ProposalRecord;
+  readonly kind: "PROPOSED" | "COUNTERPROPOSED";
+}) => Promise<void>;
 
 export type ProposalRefusal =
   | "NOT_A_PARTY"
@@ -233,6 +252,11 @@ export type ProposalOutcome =
        */
       readonly confirmed: boolean;
       readonly booked: boolean;
+      /**
+       * Set when THIS call booked it: true, a calendar invite went out;
+       * false, recorded without one (both sides told). Absent: unknown.
+       */
+      readonly calendarInvite?: boolean;
     }
   | { readonly outcome: "REFUSED"; readonly reason: ProposalRefusal };
 
@@ -243,6 +267,7 @@ export type ProposalServiceDependencies = {
   readonly store: ProposalStore;
   readonly parties: ProposalParties;
   readonly book: ProposalBooking;
+  readonly notify?: ProposalNotify | undefined;
   readonly now?: () => Date;
   readonly newId?: () => string;
   readonly logger?: {
@@ -319,13 +344,28 @@ export function createProposalService(
   dependencies: ProposalServiceDependencies,
 ): ProposalService {
   const { store, parties, book, logger } = dependencies;
+
+  /** Never fails the step it follows: the transition is already recorded. */
+  async function tell(
+    proposal: ProposalRecord,
+    kind: "PROPOSED" | "COUNTERPROPOSED",
+  ): Promise<void> {
+    await dependencies.notify?.({ proposal, kind }).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, proposalId: proposal.id },
+        "meeting time proposal notice not sent",
+      );
+    });
+  }
   const now = dependencies.now ?? (() => new Date());
   const newId = dependencies.newId ?? (() => randomUUID());
 
   /** Books after the acceptance is recorded; a failure leaves it CONFIRMED and retryable. */
-  async function bookAccepted(
-    proposal: ProposalRecord,
-  ): Promise<{ proposal: ProposalRecord; booked: boolean }> {
+  async function bookAccepted(proposal: ProposalRecord): Promise<{
+    proposal: ProposalRecord;
+    booked: boolean;
+    calendarInvite?: boolean;
+  }> {
     if (proposal.meetingId !== null) return { proposal, booked: true };
     const list =
       proposal.acceptedFrom === "COUNTER_OPTIONS"
@@ -345,6 +385,9 @@ export function createProposalService(
       return {
         proposal: { ...proposal, meetingId: booked.meetingId },
         booked: true,
+        ...(booked.calendarInvite === undefined
+          ? {}
+          : { calendarInvite: booked.calendarInvite }),
       };
     } catch (error: unknown) {
       logger?.warn(
@@ -373,6 +416,11 @@ export function createProposalService(
         input.idempotencyKey,
       );
       if (existing !== null) {
+        // A retry re-tells (deduplicated), in case the first call stopped
+        // between recording and telling.
+        if (existing.state === "INVESTOR_REVIEW") {
+          await tell(existing, "PROPOSED");
+        }
         return {
           outcome: "OK",
           proposal: existing,
@@ -430,13 +478,20 @@ export function createProposalService(
       if (replay !== null) {
         if (replay.actorUserId !== input.actorUserId)
           return refused("CONFLICT");
-        const booked = await bookAccepted(current);
+        if (current.state === "COUNTERPROPOSED") {
+          await tell(current, "COUNTERPROPOSED");
+        }
+        const booked =
+          current.state === "CONFIRMED"
+            ? await bookAccepted(current)
+            : { proposal: current, booked: false };
         return {
           outcome: "OK",
           proposal: booked.proposal,
           recorded: false,
           confirmed: current.state === "CONFIRMED",
           booked: booked.booked && current.state === "CONFIRMED",
+          ...withInvite(booked),
         };
       }
       const result = transition(current.state, party.side, input.action);
@@ -524,6 +579,9 @@ export function createProposalService(
         "meeting time proposal moved",
       );
       if (after.state === "PROPOSED") return sendForReview(after);
+      if (after.state === "COUNTERPROPOSED") {
+        await tell(after, "COUNTERPROPOSED");
+      }
       if (after.state !== "CONFIRMED") {
         return {
           outcome: "OK",
@@ -540,6 +598,7 @@ export function createProposalService(
         recorded: true,
         confirmed: true,
         booked: booked.booked,
+        ...withInvite(booked),
       };
     },
 
@@ -559,6 +618,7 @@ export function createProposalService(
         recorded: false,
         confirmed: true,
         booked: booked.booked,
+        ...withInvite(booked),
       };
     },
 
@@ -598,6 +658,7 @@ export function createProposalService(
     });
     if (!applied) return refused("CONFLICT");
     const after = (await store.find(record.id)) ?? record;
+    await tell(after, "PROPOSED");
     return {
       outcome: "OK",
       proposal: after,
@@ -606,4 +667,12 @@ export function createProposalService(
       booked: false,
     };
   }
+}
+
+function withInvite(booked: { readonly calendarInvite?: boolean }): {
+  readonly calendarInvite?: boolean;
+} {
+  return booked.calendarInvite === undefined
+    ? {}
+    : { calendarInvite: booked.calendarInvite };
 }
