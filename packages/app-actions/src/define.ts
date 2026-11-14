@@ -186,6 +186,13 @@ export type AppActionTool<In, ToolIn> = {
    */
   readonly offeredOnOwnTurns?: boolean | undefined;
   /**
+   * A rare setting (a GateQ gateway's colour, pausing it): offered only
+   * when the turn names it -- then on any purpose its scopes allow -- and
+   * never in an offer that does not, so it never pushes a purpose's own
+   * tool past the model's bound. Absent: false.
+   */
+  readonly offeredWhenNamed?: boolean | undefined;
+  /**
    * How a person asks for it, for the parity eval (scripts/evals/q-parity):
    * two phrasings, `{name}` standing for the record it names. The eval adds
    * a misheard variant of the name itself.

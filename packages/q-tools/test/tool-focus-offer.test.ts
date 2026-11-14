@@ -152,6 +152,34 @@ describe("tools offered by what the turn is about", () => {
     }
   });
 
+  it("a rare setting offered only when named (GateQ gateway) is reached by naming it, never crowding an unnamed offer", () => {
+    for (const tool of ["set_gateway_appearance", "set_gateway_open"]) {
+      const definition = registry
+        .list()
+        .find((r) => r.definition.providerName === tool)?.definition;
+      expect(definition?.offeredWhenNamed, tool).toBe(true);
+      // "make my gateway teal", "pause my gateway": the turn names it.
+      const named = worstCase("ACTION_PREPARATION", {
+        areas: [],
+        tools: [tool],
+      });
+      expect(names(registry.eligible(named)), tool).toContain(tool);
+      expect(registry.offeredByProviderName(named, tool), tool).toBeDefined();
+      // Unnamed, by purpose or by area, it is neither offered nor executes.
+      for (const unnamed of [
+        worstCase("ACTION_PREPARATION"),
+        worstCase("ACTION_PREPARATION", { areas: ["SETTINGS"], tools: [] }),
+        worstCase("GENERAL_QUESTION"),
+      ]) {
+        expect(names(registry.eligible(unnamed)), tool).not.toContain(tool);
+        expect(
+          registry.offeredByProviderName(unnamed, tool),
+          tool,
+        ).toBeUndefined();
+      }
+    }
+  });
+
   it("an app action off this purpose executes only when the turn named it", () => {
     const outcome = "relationship_outcome";
     expect(

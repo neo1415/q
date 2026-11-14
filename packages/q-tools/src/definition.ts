@@ -120,7 +120,10 @@ export type QToolDefinition<I, O, G> = {
    * work board, owner 2026-10-24: "save that plan to my board" planned as
    * a records question never saw my_board; offered by area it would push
    * a read out of every records turn). Named tools lead the offer, so the
-   * tool bound never cuts it. Its authorize step still decides. Absent:
+   * tool bound never cuts it. Its authorize step still decides. On a
+   * declared app action (already in reach whenever named), it also keeps
+   * the action out of every offer that does not name it, so a rare
+   * setting never pushes a purpose's own tool past the bound. Absent:
    * false.
    */
   readonly offeredWhenNamed?: boolean | undefined;

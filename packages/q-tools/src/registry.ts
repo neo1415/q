@@ -376,6 +376,11 @@ export function createQToolRegistry(
       if (named.has(name)) {
         return forPurpose || app || record.definition.offeredWhenNamed === true;
       }
+      // A declared app action offered only when named (a rare setting, such
+      // as a GateQ gateway's colour): named, it is in reach on any purpose
+      // its scopes allow (above), so its purposes never put it in an
+      // unnamed offer, by purpose or by area.
+      if (app && record.definition.offeredWhenNamed === true) return false;
       // A question to Q: the change-preparing tools are not shown (each
       // schema is paid on every round); use_capability, in the core,
       // loads one the moment the answer needs it.

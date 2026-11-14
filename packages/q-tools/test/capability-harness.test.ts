@@ -405,6 +405,23 @@ function setup() {
   return { ...trapped, registry, executor, byName };
 }
 
+/**
+ * The turn that reaches it: a tool offered only when named (a declared
+ * app action such as set_gateway_open) is reached by a turn naming it,
+ * so the walk names it; any other tool is reached unnamed.
+ */
+function reaching(
+  definition: {
+    readonly providerName: string;
+    readonly offeredWhenNamed?: boolean | undefined;
+  },
+  context: ReturnType<typeof contextFor>,
+): ReturnType<typeof contextFor> {
+  return definition.offeredWhenNamed === true
+    ? { ...context, focus: { areas: [], tools: [definition.providerName] } }
+    : context;
+}
+
 const call = (name: string, args: unknown) => ({
   callId: "call_harness",
   name,
@@ -430,9 +447,9 @@ describe("every tool capability stands on the executor's floor", () => {
       ).toBeDefined();
       if (definition === undefined) return;
       const offered = definition.supportedPurposes.some((purpose) => {
-        const context = contextFor(
-          actorA,
-          planOffering(definition, actorA, purpose),
+        const context = reaching(
+          definition,
+          contextFor(actorA, planOffering(definition, actorA, purpose)),
         );
         return (
           registry.offeredByProviderName(context, providerName) !== undefined
@@ -448,7 +465,10 @@ describe("every tool capability stands on the executor's floor", () => {
       const { executor, byName, touched } = setup();
       const definition = byName.get(providerName);
       if (definition === undefined) return;
-      const context = contextFor(actorA, planOffering(definition));
+      const context = reaching(
+        definition,
+        contextFor(actorA, planOffering(definition)),
+      );
       const outcome = await executor.execute(
         call(providerName, "not an object"),
         context,
@@ -472,7 +492,10 @@ describe("every tool capability stands on the executor's floor", () => {
       const { executor, byName, touched } = setup();
       const definition = byName.get(providerName);
       if (definition === undefined) return;
-      const context = contextFor(actorA, planOffering(definition, actorB));
+      const context = reaching(
+        definition,
+        contextFor(actorA, planOffering(definition, actorB)),
+      );
       const outcome = await executor.execute(
         call(providerName, validInput(definition)),
         context,
@@ -494,10 +517,9 @@ describe("every tool capability stands on the executor's floor", () => {
       if (!definition.input.safeParse(input).success) return;
       const controller = new AbortController();
       controller.abort();
-      const context = contextFor(
-        actorA,
-        planOffering(definition),
-        controller.signal,
+      const context = reaching(
+        definition,
+        contextFor(actorA, planOffering(definition), controller.signal),
       );
       const outcome = await executor.execute(
         call(providerName, input),
@@ -513,7 +535,10 @@ describe("every tool capability stands on the executor's floor", () => {
       if (definition === undefined) return;
       const input = validInput(definition);
       if (!definition.input.safeParse(input).success) return;
-      const context = contextFor(actorA, planOffering(definition));
+      const context = reaching(
+        definition,
+        contextFor(actorA, planOffering(definition)),
+      );
       const outcome = await executor.execute(
         call(providerName, input),
         context,

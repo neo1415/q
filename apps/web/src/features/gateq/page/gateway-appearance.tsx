@@ -137,6 +137,7 @@ export function GatewayAppearancePanel({
       )}
 
       <form
+        data-q-editing
         className="flex flex-col gap-2.5"
         onSubmit={(event) => {
           event.preventDefault();

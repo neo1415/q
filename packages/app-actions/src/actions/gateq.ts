@@ -231,6 +231,9 @@ const SET_APPEARANCE = defineAppAction<
   tool: {
     name: "set_gateway_appearance",
     purposes: [...ADMIN_PURPOSES],
+    // A rare admin setting: reached when the turn names it, never crowding
+    // an unfocused offer.
+    offeredWhenNamed: true,
     description:
       "Prepares, for their approval, their GateQ gateway's accent colour (#rrggbb, or null for Capital Q's) and, if they name them, the only websites allowed to embed it. Capital Q keeps the colour readable.",
     input: z
@@ -358,6 +361,9 @@ const SET_STATUS = defineAppAction<
   tool: {
     name: "set_gateway_open",
     purposes: [...ADMIN_PURPOSES],
+    // A rare admin setting: reached when the turn names it, never crowding
+    // an unfocused offer.
+    offeredWhenNamed: true,
     description:
       "Prepares, for their approval, pausing their GateQ gateway (open: false) or reopening it (open: true).",
     input: z

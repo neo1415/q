@@ -425,6 +425,9 @@ function toolFor(
     ...(declared.offeredOnOwnTurns === true && ownOrganisationTool(declared)
       ? { offeredOnOwnTurns: true }
       : {}),
+    // A rare setting ("make my gateway teal"): offered only when the turn
+    // names it, never in an unnamed offer.
+    ...(declared.offeredWhenNamed === true ? { offeredWhenNamed: true } : {}),
     // Offered where it can apply (a founder's conversation, not an
     // investor organisation's tool); authorize still requires their own.
     requiredScopeKinds: [...(declared.scopes ?? ["OWN_Q_CONVERSATION"])],
