@@ -221,7 +221,10 @@ export function statementWorld() {
   let now = START;
   const policy = policyOf();
   const applications = new Map<string, Application>();
-  const sessions = new Map<string, ApplicationSession & { tokenHash: string }>();
+  const sessions = new Map<
+    string,
+    ApplicationSession & { tokenHash: string }
+  >();
   let factRows: ApplicationFact[] = [];
   let turnRows: (StoredTurn & { applicationId: string; id: string })[] = [];
   let statementRows: (ApplicationStatement & { tenantId: string })[] = [];
@@ -269,16 +272,22 @@ export function statementWorld() {
 
   const live = (applicationId: string) => {
     const claim = claims.get(applicationId);
-    return claim !== undefined && claim.id !== null && claim.expiresAt > now.getTime()
+    return claim !== undefined &&
+      claim.id !== null &&
+      claim.expiresAt > now.getTime()
       ? claim
       : undefined;
   };
-  const appendTurn = (input: Parameters<ApplicationTurnRepository["append"]>[0]) => {
+  const appendTurn = (
+    input: Parameters<ApplicationTurnRepository["append"]>[0],
+  ) => {
     const application = applications.get(input.applicationId);
     if (application === undefined) throw new IntakeRefusedError("NOT_FOUND");
     if (application.status === "SUBMITTED")
       throw new IntakeRefusedError("ALREADY_SUBMITTED");
-    const mine = turnRows.filter((r) => r.applicationId === input.applicationId);
+    const mine = turnRows.filter(
+      (r) => r.applicationId === input.applicationId,
+    );
     const existing = mine.find(
       (r) => r.clientTurnId === input.clientTurnId && r.role === input.role,
     );
@@ -302,7 +311,14 @@ export function statementWorld() {
     claimExchange: (input) =>
       transactions.run(async () => {
         const prior = claims.get(input.applicationId);
-        if (turnRows.some((r) => r.applicationId === input.applicationId && r.clientTurnId === input.clientTurnId && r.role === "Q"))
+        if (
+          turnRows.some(
+            (r) =>
+              r.applicationId === input.applicationId &&
+              r.clientTurnId === input.clientTurnId &&
+              r.role === "Q",
+          )
+        )
           return null;
         if (live(input.applicationId) !== undefined)
           throw new IntakeRefusedError("REPLY_IN_PROGRESS");
@@ -360,16 +376,20 @@ export function statementWorld() {
     },
     findExchange: (applicationId, clientTurnId) => {
       const rows = turnRows.filter(
-        (r) => r.applicationId === applicationId && r.clientTurnId === clientTurnId,
+        (r) =>
+          r.applicationId === applicationId && r.clientTurnId === clientTurnId,
       );
       return Promise.resolve({
         person: rows.find((r) => r.role === "PERSON") ?? null,
         q: rows.find((r) => r.role === "Q") ?? null,
       });
     },
-    append: (input) => transactions.run(() => Promise.resolve(appendTurn(input))),
+    append: (input) =>
+      transactions.run(() => Promise.resolve(appendTurn(input))),
     countFor: (applicationId) =>
-      Promise.resolve(turnRows.filter((r) => r.applicationId === applicationId).length),
+      Promise.resolve(
+        turnRows.filter((r) => r.applicationId === applicationId).length,
+      ),
   };
 
   const refuse = (message: string): never => {
@@ -378,7 +398,10 @@ export function statementWorld() {
   const isPersonTurn = (turnId: string | null, applicationId: string) =>
     turnId === null ||
     turnRows.some(
-      (t) => t.id === turnId && t.applicationId === applicationId && t.role === "PERSON",
+      (t) =>
+        t.id === turnId &&
+        t.applicationId === applicationId &&
+        t.role === "PERSON",
     );
   const statementsRepo: ApplicationStatementRepository = {
     listFor: (applicationId) =>
@@ -402,40 +425,66 @@ export function statementWorld() {
         refuse("tenant");
       if (application?.status === "SUBMITTED") refuse("submitted");
       const statedAt = (id: string) =>
-        statementRows.find((s) => s.id === id)?.statedAt ?? refuse(`no statement ${id}`);
+        statementRows.find((s) => s.id === id)?.statedAt ??
+        refuse(`no statement ${id}`);
       for (const s of input.statements) {
-        if (statementRows.some((r) => r.id === s.id)) refuse("duplicate statement id");
-        if (s.backfillKey !== null && statementRows.some((r) => r.backfillKey === s.backfillKey))
+        if (statementRows.some((r) => r.id === s.id))
+          refuse("duplicate statement id");
+        if (
+          s.backfillKey !== null &&
+          statementRows.some((r) => r.backfillKey === s.backfillKey)
+        )
           refuse("backfill key");
-        if (s.origin === "TURN" && s.sourceTurnId === null) refuse("turn origin");
-        if (!isPersonTurn(s.sourceTurnId, input.applicationId)) refuse("source turn");
+        if (s.origin === "TURN" && s.sourceTurnId === null)
+          refuse("turn origin");
+        if (!isPersonTurn(s.sourceTurnId, input.applicationId))
+          refuse("source turn");
         statementRows.push({ ...s, tenantId: input.tenantId });
       }
       for (const l of input.links) {
         if (l.fromStatementId === l.toStatementId) refuse("self link");
-        if (!(Date.parse(statedAt(l.toStatementId)) < Date.parse(statedAt(l.fromStatementId))))
+        if (
+          !(
+            Date.parse(statedAt(l.toStatementId)) <
+            Date.parse(statedAt(l.fromStatementId))
+          )
+        )
           refuse("a link points from a newer statement to an older one");
-        if (linkRows.some((r) => r.kind === l.kind && r.fromStatementId === l.fromStatementId && r.toStatementId === l.toStatementId))
+        if (
+          linkRows.some(
+            (r) =>
+              r.kind === l.kind &&
+              r.fromStatementId === l.fromStatementId &&
+              r.toStatementId === l.toStatementId,
+          )
+        )
           refuse("link once");
-        if (l.origin === "MODEL_READING" && l.sourceTurnId === null) refuse("reading turn");
+        if (l.origin === "MODEL_READING" && l.sourceTurnId === null)
+          refuse("reading turn");
         linkRows.push(l);
       }
       for (const e of input.events) {
         const link = linkRows.find((l) => l.id === e.linkId);
-        if (link === undefined || link.kind !== "DISAGREES") refuse("event link");
+        if (link === undefined || link.kind !== "DISAGREES")
+          refuse("event link");
         if (e.resolvedByStatementId !== null && link !== undefined) {
           const ends = [link.fromStatementId, link.toStatementId];
           if (
             !ends.includes(e.resolvedByStatementId) &&
-            !(Date.parse(statedAt(e.resolvedByStatementId)) > Date.parse(statedAt(link.fromStatementId)))
+            !(
+              Date.parse(statedAt(e.resolvedByStatementId)) >
+              Date.parse(statedAt(link.fromStatementId))
+            )
           )
             refuse("resolution");
         }
         eventRows.push(e);
       }
       for (const r of input.readings) {
-        if (readingRows.some((x) => x.turnId === r.turnId)) refuse("a turn is read once");
-        if (!isPersonTurn(r.turnId, input.applicationId)) refuse("reading turn");
+        if (readingRows.some((x) => x.turnId === r.turnId))
+          refuse("a turn is read once");
+        if (!isPersonTurn(r.turnId, input.applicationId))
+          refuse("reading turn");
         for (const id of r.recordedStatementIds)
           if (statementRows.find((s) => s.id === id)?.sourceTurnId !== r.turnId)
             refuse("a reading lists only statements read from its turn");
@@ -490,7 +539,9 @@ export function statementWorld() {
         findByTokenHash: (tokenHash) => {
           const row = sessions.get(tokenHash);
           return Promise.resolve(
-            row === undefined ? null : { session: row, storedHash: row.tokenHash },
+            row === undefined
+              ? null
+              : { session: row, storedHash: row.tokenHash },
           );
         },
         touch: () => Promise.resolve(),
@@ -501,10 +552,15 @@ export function statementWorld() {
       facts: {
         currentFor: (applicationId) =>
           Promise.resolve(
-            factRows.filter((f) => f.applicationId === applicationId && f.supersededAt === null),
+            factRows.filter(
+              (f) =>
+                f.applicationId === applicationId && f.supersededAt === null,
+            ),
           ),
         historyFor: (applicationId) =>
-          Promise.resolve(factRows.filter((f) => f.applicationId === applicationId)),
+          Promise.resolve(
+            factRows.filter((f) => f.applicationId === applicationId),
+          ),
         record: (_tx, input) => {
           const written: ApplicationFact[] = [];
           for (const proposed of input.facts) {
@@ -533,7 +589,8 @@ export function statementWorld() {
       },
       submissions: {
         findForApplication: () => Promise.resolve(null),
-        record: (_tx, input) => Promise.resolve({ submittedAt: input.submittedAt }),
+        record: (_tx, input) =>
+          Promise.resolve({ submittedAt: input.submittedAt }),
       },
       documents: {
         attach: () => Promise.resolve(),
@@ -542,7 +599,9 @@ export function statementWorld() {
       },
       policies: {
         policyByVersionId: (query) =>
-          Promise.resolve(query.gatewayVersionId === policy.version.id ? policy : null),
+          Promise.resolve(
+            query.gatewayVersionId === policy.version.id ? policy : null,
+          ),
         currentPolicyByPublicId: (publicId) =>
           Promise.resolve(publicId === PUBLIC_ID ? policy : null),
       },
@@ -586,7 +645,9 @@ export function statementWorld() {
       }),
       policies: {
         policyByVersionId: (query) =>
-          Promise.resolve(query.gatewayVersionId === policy.version.id ? policy : null),
+          Promise.resolve(
+            query.gatewayVersionId === policy.version.id ? policy : null,
+          ),
         currentPolicyByPublicId: () => Promise.resolve(policy),
       },
       publicGatewayFor: () => Promise.resolve(PUBLIC_GATEWAY),

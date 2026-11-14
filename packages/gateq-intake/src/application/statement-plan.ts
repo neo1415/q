@@ -446,11 +446,16 @@ function shapeValue(
       const currency = currencyCodeIn(context.said);
       return {
         ok: true,
-        values: [currency === null ? { kind: "ZERO" } : { kind: "ZERO", currency }],
+        values: [
+          currency === null ? { kind: "ZERO" } : { kind: "ZERO", currency },
+        ],
       };
     }
     case "MONEY": {
-      if (CODE_DIMENSIONS.has(dimension) || dimension === "company.sector_phrases")
+      if (
+        CODE_DIMENSIONS.has(dimension) ||
+        dimension === "company.sector_phrases"
+      )
         return { ok: false, region: null };
       const currency =
         value.currency ??
@@ -459,7 +464,9 @@ function shapeValue(
       const money = moneyOf(value.amount, currency);
       if (money?.kind === "ZERO" && NO_ZERO.has(dimension))
         return { ok: false, region: null };
-      return money === null ? { ok: false, region: null } : { ok: true, values: [money] };
+      return money === null
+        ? { ok: false, region: null }
+        : { ok: true, values: [money] };
     }
     case "COUNT":
       if (CODE_DIMENSIONS.has(dimension) || dimension === "raise.amount")
@@ -472,7 +479,10 @@ function shapeValue(
     case "PERCENT":
       if (CODE_DIMENSIONS.has(dimension) || dimension === "raise.amount")
         return { ok: false, region: null };
-      return { ok: true, values: [{ kind: "PERCENT", percent: value.percent }] };
+      return {
+        ok: true,
+        values: [{ kind: "PERCENT", percent: value.percent }],
+      };
     case "TEXT":
     case "CODE": {
       const words = value.kind === "TEXT" ? value.text : value.code;
@@ -575,7 +585,8 @@ function latestInstant(context: StatementContext): number {
   let latest = 0;
   for (const s of context.statements)
     latest = Math.max(latest, Date.parse(s.statedAt));
-  for (const l of context.links) latest = Math.max(latest, Date.parse(l.createdAt));
+  for (const l of context.links)
+    latest = Math.max(latest, Date.parse(l.createdAt));
   for (const e of context.events)
     latest = Math.max(latest, Date.parse(e.recordedAt));
   return latest;
@@ -620,7 +631,11 @@ export function planReading(input: PlanInput): PlanOutcome {
       : [...input.unread, input.current];
   const perTurn = new Map<
     string,
-    { recorded: ApplicationStatementId[]; notRecorded: StatementNotRecorded[]; proposed: number }
+    {
+      recorded: ApplicationStatementId[];
+      notRecorded: StatementNotRecorded[];
+      proposed: number;
+    }
   >();
   const turnKey = (turn: PlanTurn) => turn.id ?? "current";
   for (const turn of turnsRead)
@@ -744,7 +759,11 @@ export function planReading(input: PlanInput): PlanOutcome {
       // statements, so the projection stands in with a placeholder id.
       if (turn.id !== null) {
         rejected += 1;
-        note(turn, { dimension, words: words.slice(0, 600), reason: "INVALID_VALUE" });
+        note(turn, {
+          dimension,
+          words: words.slice(0, 600),
+          reason: "INVALID_VALUE",
+        });
         return;
       }
     }
@@ -843,7 +862,11 @@ export function planReading(input: PlanInput): PlanOutcome {
     if (slot !== undefined) slot.proposed += 1;
     if (!DIMENSIONS.has(op.dimension)) {
       rejected += 1;
-      note(turn, { dimension: null, words: op.words.slice(0, 600), reason: "OUT_OF_SCOPE" });
+      note(turn, {
+        dimension: null,
+        words: op.words.slice(0, 600),
+        reason: "OUT_OF_SCOPE",
+      });
       continue;
     }
     const dimension = op.dimension as ApplicationDimension;
@@ -854,7 +877,11 @@ export function planReading(input: PlanInput): PlanOutcome {
     if (!shaped.ok) {
       if (shaped.region !== null) narrowTo = shaped.region;
       rejected += 1;
-      note(turn, { dimension, words: op.words.slice(0, 600), reason: "INVALID_VALUE" });
+      note(turn, {
+        dimension,
+        words: op.words.slice(0, 600),
+        reason: "INVALID_VALUE",
+      });
       continue;
     }
     // An amount must be one they said, or agreed to when Q said it back.
@@ -874,14 +901,19 @@ export function planReading(input: PlanInput): PlanOutcome {
           amount: workedOut.amount,
           currency: workedOut.currency,
         });
-      note(turn, { dimension, words: op.words.slice(0, 600), reason: "AMOUNT_READ_BACK" });
+      note(turn, {
+        dimension,
+        words: op.words.slice(0, 600),
+        reason: "AMOUNT_READ_BACK",
+      });
       continue;
     }
     // The statement it corrects or disagrees with, by handle only.
     let target: ApplicationStatementId | null = null;
     if (op.op !== "NEW") {
       const handle = handleOf(input.handles.statements, op.target);
-      const item = handle === null ? undefined : input.handles.statements.get(handle);
+      const item =
+        handle === null ? undefined : input.handles.statements.get(handle);
       if (item === undefined) {
         // Never guessed: kept as a new statement, and the miss reported.
         note(turn, {
@@ -907,9 +939,15 @@ export function planReading(input: PlanInput): PlanOutcome {
           turn: null,
           dimension: back.dimension,
           quantity: QUANTITY_OF[back.dimension] ?? null,
-          value: { kind: "MONEY", amount: back.amount, currency: back.currency },
+          value: {
+            kind: "MONEY",
+            amount: back.amount,
+            currency: back.currency,
+          },
           asOf: null,
-          words: input.current.text.slice(0, 600) || `${back.amount} ${back.currency}`,
+          words:
+            input.current.text.slice(0, 600) ||
+            `${back.amount} ${back.currency}`,
           provenance: "APPLICANT_PROVIDED",
         },
         input.current,
@@ -950,9 +988,12 @@ export function planReading(input: PlanInput): PlanOutcome {
     if (action.action === "RESOLVE") {
       const keepHandle = handleOf(input.handles.statements, action.keep);
       const keep =
-        keepHandle === null ? undefined : input.handles.statements.get(keepHandle);
+        keepHandle === null
+          ? undefined
+          : input.handles.statements.get(keepHandle);
       const newer = byId.get(disagreement.newerStatementId);
-      const keepStatement = keep === undefined ? undefined : byId.get(keep.statementId);
+      const keepStatement =
+        keep === undefined ? undefined : byId.get(keep.statementId);
       const valid =
         keepStatement !== undefined &&
         newer !== undefined &&
@@ -962,7 +1003,11 @@ export function planReading(input: PlanInput): PlanOutcome {
       if (!valid || keepStatement === undefined) {
         note(input.current, {
           dimension: null,
-          words: `RESOLVE ${action.disagreement} keep ${action.keep ?? "(none)"}`.slice(0, 600),
+          words:
+            `RESOLVE ${action.disagreement} keep ${action.keep ?? "(none)"}`.slice(
+              0,
+              600,
+            ),
           reason: "UNKNOWN_HANDLE",
         });
         continue;
@@ -991,7 +1036,10 @@ export function planReading(input: PlanInput): PlanOutcome {
       sourceTurnId: input.current.id as ApplicationTurnId | null,
       recordedAt: tick(),
     });
-    for (const end of [disagreement.olderStatementId, disagreement.newerStatementId]) {
+    for (const end of [
+      disagreement.olderStatementId,
+      disagreement.newerStatementId,
+    ]) {
       const dimension = byId.get(end)?.dimension;
       if (dimension !== undefined) touched.add(dimension);
     }
@@ -1090,7 +1138,8 @@ const sentencesOf = (text: string): readonly string[] =>
  */
 export function claimsRecording(text: string): boolean {
   return sentencesOf(text).some(
-    (sentence) => !sentence.trim().endsWith("?") && CLAIMS_RECORDED.test(sentence),
+    (sentence) =>
+      !sentence.trim().endsWith("?") && CLAIMS_RECORDED.test(sentence),
   );
 }
 

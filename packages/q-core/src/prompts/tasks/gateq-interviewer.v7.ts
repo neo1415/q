@@ -24,12 +24,7 @@ import { GATEQ_INTERVIEWER_V6 } from "./gateq-interviewer.v6.js";
  * issued, and decides from the statements, never from prose, what is
  * settled, open or still to ask.
  */
-const cut = (
-  text: string,
-  from: string,
-  to: string,
-  by: string,
-): string => {
+const cut = (text: string, from: string, to: string, by: string): string => {
   const start = text.indexOf(from);
   const end = text.indexOf(to, start);
   if (start < 0 || end < 0)

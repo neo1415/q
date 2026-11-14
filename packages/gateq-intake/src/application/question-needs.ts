@@ -146,7 +146,8 @@ export function questionNeedsFor(input: {
    * With `view`: how many Q questions about the dimension came after what
    * decides it now (the open disagreement, or the latest statement).
    */
-  readonly asksSince?: ((dimension: ApplicationDimension) => number) | undefined;
+  readonly asksSince?:
+    ((dimension: ApplicationDimension) => number) | undefined;
 }): readonly QuestionNeed[] {
   const limit = input.limit ?? 6;
   const statusOf = (dimension: ApplicationDimension) =>

@@ -421,8 +421,8 @@ export type GateQDisagreementAction = z.infer<
   typeof GateQDisagreementActionSchema
 >;
 
-export const GateQInterviewerResultV2Schema = GateQInterviewerResultSchema.extend(
-  {
+export const GateQInterviewerResultV2Schema =
+  GateQInterviewerResultSchema.extend({
     /**
      * Every statement this turn (and any unread earlier message) made. One
      * malformed statement is dropped and counted, never the whole reading.
@@ -435,8 +435,7 @@ export const GateQInterviewerResultV2Schema = GateQInterviewerResultSchema.exten
       .array(GateQDisagreementActionSchema.nullable().catch(null))
       .max(8)
       .default([]),
-  },
-).strict();
+  }).strict();
 export type GateQInterviewerResultV2 = z.infer<
   typeof GateQInterviewerResultV2Schema
 >;

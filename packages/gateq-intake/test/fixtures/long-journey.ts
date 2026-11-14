@@ -1,6 +1,10 @@
 import type { GateQStatementOp } from "@capital-q/q-core";
 
-import { reading, type PromptSeen, type Script } from "../support/statement-world.js";
+import {
+  reading,
+  type PromptSeen,
+  type Script,
+} from "../support/statement-world.js";
 
 /**
  * The long journey (design 2026-11-14 §7): thirty-four scripted founder
@@ -58,14 +62,32 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "Ledgerly, got it. What stage are you at?",
         asking: "company.stage",
         statements: [
-          st({ dimension: "company.name", value: { kind: "TEXT", text: "Ledgerly" }, words: "We're Ledgerly" }),
-          st({ dimension: "company.description", value: { kind: "TEXT", text: "a payments API for informal retailers" }, words: "a payments API for informal retailers" }),
-          st({ dimension: "company.country", value: { kind: "CODE", code: "NG" }, words: "based in Lagos, Nigeria" }),
+          st({
+            dimension: "company.name",
+            value: { kind: "TEXT", text: "Ledgerly" },
+            words: "We're Ledgerly",
+          }),
+          st({
+            dimension: "company.description",
+            value: {
+              kind: "TEXT",
+              text: "a payments API for informal retailers",
+            },
+            words: "a payments API for informal retailers",
+          }),
+          st({
+            dimension: "company.country",
+            value: { kind: "CODE", code: "NG" },
+            words: "based in Lagos, Nigeria",
+          }),
         ],
       }),
     records: [
       { words: "We're Ledgerly", dimension: "company.name" },
-      { words: "a payments API for informal retailers", dimension: "company.description" },
+      {
+        words: "a payments API for informal retailers",
+        dimension: "company.description",
+      },
       { words: "based in Lagos, Nigeria", dimension: "company.country" },
     ],
   },
@@ -76,7 +98,13 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Seed, nice. How many retailers use it each week?",
         asking: "claims.traction",
-        statements: [st({ dimension: "company.stage", value: { kind: "CODE", code: "seed" }, words: "We're at seed" })],
+        statements: [
+          st({
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "seed" },
+            words: "We're at seed",
+          }),
+        ],
       }),
     records: [{ words: "We're at seed", dimension: "company.stage" }],
   },
@@ -98,7 +126,12 @@ export const JOURNEY: readonly JourneyTurn[] = [
           }),
         ],
       }),
-    records: [{ words: "About 600 weekly active retailers as of 1 November", dimension: "claims.traction" }],
+    records: [
+      {
+        words: "About 600 weekly active retailers as of 1 November",
+        dimension: "claims.traction",
+      },
+    ],
   },
   {
     id: "turn-0004",
@@ -108,10 +141,22 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "Tripling operators in a quarter. Does anybody pay yet?",
         asking: "claims.revenue",
         statements: [
-          st({ dimension: "claims.traction", value: { kind: "TEXT", text: "We went from 6 to 18 operators this quarter" }, words: "We went from 6 to 18 operators this quarter" }),
+          st({
+            dimension: "claims.traction",
+            value: {
+              kind: "TEXT",
+              text: "We went from 6 to 18 operators this quarter",
+            },
+            words: "We went from 6 to 18 operators this quarter",
+          }),
         ],
       }),
-    records: [{ words: "We went from 6 to 18 operators this quarter", dimension: "claims.traction" }],
+    records: [
+      {
+        words: "We went from 6 to 18 operators this quarter",
+        dimension: "claims.traction",
+      },
+    ],
   },
   {
     id: "turn-0005",
@@ -120,7 +165,14 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Understood. How much are you raising?",
         asking: "raise.amount",
-        statements: [st({ dimension: "claims.revenue", quantity: "revenue", value: { kind: "ZERO" }, words: "Nobody pays yet" })],
+        statements: [
+          st({
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet",
+          }),
+        ],
       }),
     records: [{ words: "Nobody pays yet", dimension: "claims.revenue" }],
   },
@@ -132,8 +184,17 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "One and a half million. What problem does Ledgerly solve?",
         asking: "company.problem",
         statements: [
-          st({ dimension: "raise.amount", quantity: "raise_amount", value: { kind: "MONEY", amount: "1500000", currency: "USD" }, words: "We're raising $1,500,000" }),
-          st({ dimension: "raise.currency", value: { kind: "CODE", code: "USD" }, words: "in US dollars" }),
+          st({
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "1500000", currency: "USD" },
+            words: "We're raising $1,500,000",
+          }),
+          st({
+            dimension: "raise.currency",
+            value: { kind: "CODE", code: "USD" },
+            words: "in US dollars",
+          }),
         ],
       }),
     records: [
@@ -149,10 +210,22 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "That's a painful one. Who is on the team?",
         asking: "company.team",
         statements: [
-          st({ dimension: "company.problem", value: { kind: "TEXT", text: "Retailers can't reconcile mobile money payments" }, words: "Retailers can't reconcile mobile money payments" }),
+          st({
+            dimension: "company.problem",
+            value: {
+              kind: "TEXT",
+              text: "Retailers can't reconcile mobile money payments",
+            },
+            words: "Retailers can't reconcile mobile money payments",
+          }),
         ],
       }),
-    records: [{ words: "Retailers can't reconcile mobile money payments", dimension: "company.problem" }],
+    records: [
+      {
+        words: "Retailers can't reconcile mobile money payments",
+        dimension: "company.problem",
+      },
+    ],
   },
   {
     // A real correction: only the 600 gives way; the operators line stays.
@@ -176,7 +249,12 @@ export const JOURNEY: readonly JourneyTurn[] = [
           }),
         ],
       }),
-    records: [{ words: "about 1,500 weekly active as of 1 November", dimension: "claims.traction" }],
+    records: [
+      {
+        words: "about 1,500 weekly active as of 1 November",
+        dimension: "claims.traction",
+      },
+    ],
   },
   {
     // Small talk records nothing, whatever the model read into it.
@@ -187,7 +265,13 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "No problem at all. Who is on the team?",
         intent: "SMALL_TALK",
         asking: "company.team",
-        statements: [st({ dimension: "company.team", value: { kind: "TEXT", text: "busy" }, words: "busy day" })],
+        statements: [
+          st({
+            dimension: "company.team",
+            value: { kind: "TEXT", text: "busy" },
+            words: "busy day",
+          }),
+        ],
       }),
   },
   {
@@ -197,9 +281,20 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "A small, technical team. What is the market like?",
         asking: "company.market",
-        statements: [st({ dimension: "company.team", value: { kind: "TEXT", text: "three engineers and me" }, words: "Our team is three engineers and me" })],
+        statements: [
+          st({
+            dimension: "company.team",
+            value: { kind: "TEXT", text: "three engineers and me" },
+            words: "Our team is three engineers and me",
+          }),
+        ],
       }),
-    records: [{ words: "Our team is three engineers and me", dimension: "company.team" }],
+    records: [
+      {
+        words: "Our team is three engineers and me",
+        dimension: "company.team",
+      },
+    ],
   },
   {
     id: "turn-0011",
@@ -208,9 +303,23 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Fair. How big is the market?",
         asking: "company.market",
-        statements: [st({ dimension: "claims.traction", value: { kind: "TEXT", text: "Willingness to pay is not tested yet" }, words: "Willingness to pay is not tested yet" })],
+        statements: [
+          st({
+            dimension: "claims.traction",
+            value: {
+              kind: "TEXT",
+              text: "Willingness to pay is not tested yet",
+            },
+            words: "Willingness to pay is not tested yet",
+          }),
+        ],
       }),
-    records: [{ words: "Willingness to pay is not tested yet", dimension: "claims.traction" }],
+    records: [
+      {
+        words: "Willingness to pay is not tested yet",
+        dimension: "claims.traction",
+      },
+    ],
   },
   {
     // UNKNOWN is a real answer and asked at most once more.
@@ -221,9 +330,21 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "That's fine. Who are your customers?",
         intent: "UNKNOWN_OR_SKIP",
         asking: "company.market",
-        statements: [st({ dimension: "company.market", provenance: "UNKNOWN", value: { kind: "UNKNOWN", declined: false }, words: "I don't know the market size yet" })],
+        statements: [
+          st({
+            dimension: "company.market",
+            provenance: "UNKNOWN",
+            value: { kind: "UNKNOWN", declined: false },
+            words: "I don't know the market size yet",
+          }),
+        ],
       }),
-    records: [{ words: "I don't know the market size yet", dimension: "company.market" }],
+    records: [
+      {
+        words: "I don't know the market size yet",
+        dimension: "company.market",
+      },
+    ],
   },
   {
     // Read as NEW by the model; code finds the disagreement (same quantity
@@ -244,7 +365,12 @@ export const JOURNEY: readonly JourneyTurn[] = [
           }),
         ],
       }),
-    records: [{ words: "1,450 weekly active as of 1 November", dimension: "claims.traction" }],
+    records: [
+      {
+        words: "1,450 weekly active as of 1 November",
+        dimension: "claims.traction",
+      },
+    ],
   },
   {
     id: "turn-0014",
@@ -264,10 +390,16 @@ export const JOURNEY: readonly JourneyTurn[] = [
           }),
         ],
         disagreementActions: [
-          { disagreement: p.disagreement("claims.traction"), action: "LEAVE_OPEN", keep: null },
+          {
+            disagreement: p.disagreement("claims.traction"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
         ],
       }),
-    records: [{ words: "I'm not sure which is right", dimension: "claims.traction" }],
+    records: [
+      { words: "I'm not sure which is right", dimension: "claims.traction" },
+    ],
   },
   {
     id: "turn-0015",
@@ -277,9 +409,20 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Welcome back. What will the money go on?",
         asking: "raise.use_of_funds",
-        statements: [st({ dimension: "company.customers", value: { kind: "TEXT", text: "small retailers and wholesalers" }, words: "Customers are small retailers and wholesalers" })],
+        statements: [
+          st({
+            dimension: "company.customers",
+            value: { kind: "TEXT", text: "small retailers and wholesalers" },
+            words: "Customers are small retailers and wholesalers",
+          }),
+        ],
       }),
-    records: [{ words: "Customers are small retailers and wholesalers", dimension: "company.customers" }],
+    records: [
+      {
+        words: "Customers are small retailers and wholesalers",
+        dimension: "company.customers",
+      },
+    ],
   },
   {
     id: "turn-0016",
@@ -288,9 +431,23 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Clear. How do you make money?",
         asking: "company.business_model",
-        statements: [st({ dimension: "raise.use_of_funds", value: { kind: "TEXT", text: "Hiring two engineers and a sales lead" }, words: "Hiring two engineers and a sales lead" })],
+        statements: [
+          st({
+            dimension: "raise.use_of_funds",
+            value: {
+              kind: "TEXT",
+              text: "Hiring two engineers and a sales lead",
+            },
+            words: "Hiring two engineers and a sales lead",
+          }),
+        ],
       }),
-    records: [{ words: "Hiring two engineers and a sales lead", dimension: "raise.use_of_funds" }],
+    records: [
+      {
+        words: "Hiring two engineers and a sales lead",
+        dimension: "raise.use_of_funds",
+      },
+    ],
   },
   {
     // Invariant 7: the model says "Noted" and recorded nothing.
@@ -309,9 +466,20 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "One percent of flow. Anything to add on the team?",
         asking: "company.team",
-        statements: [st({ dimension: "company.business_model", value: { kind: "TEXT", text: "We charge 1% per transaction" }, words: "We charge 1% per transaction" })],
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: { kind: "TEXT", text: "We charge 1% per transaction" },
+            words: "We charge 1% per transaction",
+          }),
+        ],
       }),
-    records: [{ words: "We charge 1% per transaction", dimension: "company.business_model" }],
+    records: [
+      {
+        words: "We charge 1% per transaction",
+        dimension: "company.business_model",
+      },
+    ],
   },
   {
     // A handle the server never issued: kept as NEW, never guessed.
@@ -323,10 +491,21 @@ export const JOURNEY: readonly JourneyTurn[] = [
         intent: "CORRECTION",
         asking: "raise.amount",
         statements: [
-          st({ op: "CORRECTS", target: "S99", dimension: "company.team", value: { kind: "TEXT", text: "four engineers now" }, words: "the team is four engineers now, not three" }),
+          st({
+            op: "CORRECTS",
+            target: "S99",
+            dimension: "company.team",
+            value: { kind: "TEXT", text: "four engineers now" },
+            words: "the team is four engineers now, not three",
+          }),
         ],
       }),
-    records: [{ words: "the team is four engineers now, not three", dimension: "company.team" }],
+    records: [
+      {
+        words: "the team is four engineers now, not three",
+        dimension: "company.team",
+      },
+    ],
   },
   {
     // Decision 91: a qualifying fact in genuine disagreement.
@@ -359,10 +538,23 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "Two million shops is a big base. So which raise is it?",
         asking: "raise.amount",
         statements: [
-          st({ dimension: "company.market", value: { kind: "TEXT", text: "every informal retailer in West Africa, about 2 million shops" }, words: "every informal retailer in West Africa, about 2 million shops" }),
+          st({
+            dimension: "company.market",
+            value: {
+              kind: "TEXT",
+              text: "every informal retailer in West Africa, about 2 million shops",
+            },
+            words:
+              "every informal retailer in West Africa, about 2 million shops",
+          }),
         ],
       }),
-    records: [{ words: "every informal retailer in West Africa, about 2 million shops", dimension: "company.market" }],
+    records: [
+      {
+        words: "every informal retailer in West Africa, about 2 million shops",
+        dimension: "company.market",
+      },
+    ],
   },
   {
     // The correction that settles the raise.
@@ -384,7 +576,12 @@ export const JOURNEY: readonly JourneyTurn[] = [
           }),
         ],
       }),
-    records: [{ words: "we're raising $2,000,000; the 1.5 was last year's plan", dimension: "raise.amount" }],
+    records: [
+      {
+        words: "we're raising $2,000,000; the 1.5 was last year's plan",
+        dimension: "raise.amount",
+      },
+    ],
   },
   {
     // A topic change: a question for Q records nothing.
@@ -392,7 +589,8 @@ export const JOURNEY: readonly JourneyTurn[] = [
     say: "Can I ask what Acme looks for in a company?",
     script: () =>
       reading({
-        reply: "They ask where you are, your stage and your raise, and read it themselves. What's your website?",
+        reply:
+          "They ask where you are, your stage and your raise, and read it themselves. What's your website?",
         intent: "QUESTION_FOR_Q",
         questionForQ: "what Acme looks for",
         asking: "company.website",
@@ -405,9 +603,20 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Thanks. Who am I talking to?",
         asking: "contact.name",
-        statements: [st({ dimension: "company.website", value: { kind: "TEXT", text: "ledgerly.example" }, words: "Our website is ledgerly.example" })],
+        statements: [
+          st({
+            dimension: "company.website",
+            value: { kind: "TEXT", text: "ledgerly.example" },
+            words: "Our website is ledgerly.example",
+          }),
+        ],
       }),
-    records: [{ words: "Our website is ledgerly.example", dimension: "company.website" }],
+    records: [
+      {
+        words: "Our website is ledgerly.example",
+        dimension: "company.website",
+      },
+    ],
   },
   {
     id: "turn-0025",
@@ -417,8 +626,16 @@ export const JOURNEY: readonly JourneyTurn[] = [
         reply: "Good to meet you, Ada. How many wallets are live?",
         asking: "claims.traction",
         statements: [
-          st({ dimension: "contact.name", value: { kind: "TEXT", text: "Ada Obi" }, words: "I'm Ada Obi" }),
-          st({ dimension: "contact.role", value: { kind: "TEXT", text: "CEO" }, words: "the CEO" }),
+          st({
+            dimension: "contact.name",
+            value: { kind: "TEXT", text: "Ada Obi" },
+            words: "I'm Ada Obi",
+          }),
+          st({
+            dimension: "contact.role",
+            value: { kind: "TEXT", text: "CEO" },
+            words: "the CEO",
+          }),
         ],
       }),
     records: [
@@ -434,9 +651,18 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "2,300 wallets. Any partnerships?",
         asking: null,
-        statements: [st({ dimension: "claims.traction", quantity: "wallets", value: { kind: "COUNT", count: "2300" }, words: "We now have 2,300 wallets" })],
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "wallets",
+            value: { kind: "COUNT", count: "2300" },
+            words: "We now have 2,300 wallets",
+          }),
+        ],
       }),
-    records: [{ words: "We now have 2,300 wallets", dimension: "claims.traction" }],
+    records: [
+      { words: "We now have 2,300 wallets", dimension: "claims.traction" },
+    ],
   },
   {
     // The model fails and the founder moves on: an orphan PERSON turn.
@@ -452,16 +678,34 @@ export const JOURNEY: readonly JourneyTurn[] = [
       if (!p.unread().some((line) => line.includes("signed a pilot")))
         throw new Error("the orphaned turn was not offered for reading");
       return reading({
-        reply: "A distributor pilot and 20% a month. Do you have a lead investor?",
+        reply:
+          "A distributor pilot and 20% a month. Do you have a lead investor?",
         asking: "raise.lead_status",
         statements: [
-          st({ turn: "T1", dimension: "claims.traction", value: { kind: "TEXT", text: "signed a pilot with a large distributor" }, words: "We also signed a pilot with a large distributor" }),
-          st({ dimension: "claims.traction", quantity: "growth_rate_monthly", value: { kind: "PERCENT", percent: "20" }, words: "our monthly growth is 20%" }),
+          st({
+            turn: "T1",
+            dimension: "claims.traction",
+            value: {
+              kind: "TEXT",
+              text: "signed a pilot with a large distributor",
+            },
+            words: "We also signed a pilot with a large distributor",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "growth_rate_monthly",
+            value: { kind: "PERCENT", percent: "20" },
+            words: "our monthly growth is 20%",
+          }),
         ],
       });
     },
     records: [
-      { words: "We also signed a pilot with a large distributor", dimension: "claims.traction", saidIn: "turn-0027" },
+      {
+        words: "We also signed a pilot with a large distributor",
+        dimension: "claims.traction",
+        saidIn: "turn-0027",
+      },
       { words: "our monthly growth is 20%", dimension: "claims.traction" },
     ],
   },
@@ -472,9 +716,20 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Understood. What instrument?",
         asking: "raise.instrument",
-        statements: [st({ dimension: "raise.lead_status", value: { kind: "TEXT", text: "no lead investor yet" }, words: "We don't have a lead investor yet" })],
+        statements: [
+          st({
+            dimension: "raise.lead_status",
+            value: { kind: "TEXT", text: "no lead investor yet" },
+            words: "We don't have a lead investor yet",
+          }),
+        ],
       }),
-    records: [{ words: "We don't have a lead investor yet", dimension: "raise.lead_status" }],
+    records: [
+      {
+        words: "We don't have a lead investor yet",
+        dimension: "raise.lead_status",
+      },
+    ],
   },
   {
     id: "turn-0030",
@@ -483,7 +738,13 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "A SAFE. Which sector would you put yourselves in?",
         asking: "company.sector_phrases",
-        statements: [st({ dimension: "raise.instrument", value: { kind: "TEXT", text: "SAFE" }, words: "It's a SAFE" })],
+        statements: [
+          st({
+            dimension: "raise.instrument",
+            value: { kind: "TEXT", text: "SAFE" },
+            words: "It's a SAFE",
+          }),
+        ],
       }),
     records: [{ words: "It's a SAFE", dimension: "raise.instrument" }],
   },
@@ -495,7 +756,14 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Still pre-revenue, understood. Which sector?",
         asking: "company.sector_phrases",
-        statements: [st({ dimension: "claims.revenue", quantity: "revenue", value: { kind: "ZERO" }, words: "revenue is still zero" })],
+        statements: [
+          st({
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            words: "revenue is still zero",
+          }),
+        ],
       }),
   },
   {
@@ -505,7 +773,13 @@ export const JOURNEY: readonly JourneyTurn[] = [
       reading({
         reply: "Lagos, yes. Which sector?",
         asking: "company.sector_phrases",
-        statements: [st({ dimension: "company.country", value: { kind: "CODE", code: "NG" }, words: "We're in Nigeria" })],
+        statements: [
+          st({
+            dimension: "company.country",
+            value: { kind: "CODE", code: "NG" },
+            words: "We're in Nigeria",
+          }),
+        ],
       }),
   },
   {
@@ -513,12 +787,22 @@ export const JOURNEY: readonly JourneyTurn[] = [
     say: "Sector: fintech, payments infrastructure.",
     script: () =>
       reading({
-        reply: "Fintech and payments infrastructure. Anything else before you submit?",
+        reply:
+          "Fintech and payments infrastructure. Anything else before you submit?",
         asking: null,
-        statements: [st({ dimension: "company.sector_phrases", value: { kind: "TEXT", text: "fintech, payments infrastructure" }, words: "fintech, payments infrastructure" })],
+        statements: [
+          st({
+            dimension: "company.sector_phrases",
+            value: { kind: "TEXT", text: "fintech, payments infrastructure" },
+            words: "fintech, payments infrastructure",
+          }),
+        ],
       }),
     records: [
-      { words: "fintech, payments infrastructure", dimension: "company.sector_phrases" },
+      {
+        words: "fintech, payments infrastructure",
+        dimension: "company.sector_phrases",
+      },
     ],
   },
   {

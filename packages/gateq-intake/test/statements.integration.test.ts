@@ -69,11 +69,16 @@ async function world(tx: TransactionContext) {
   const personTurn = randomUUID();
   await sql`insert into gateq.application_turns (id, application_id, tenant_id, seq, role, text, client_turn_id)
     values (${personTurn}, ${application}, ${tenant}, 1, 'PERSON', 'About 600 weekly active; actually 1,500.', 'turn-int-0001')`;
-  return { tenant, application: ApplicationIdSchema.parse(application), personTurn };
+  return {
+    tenant,
+    application: ApplicationIdSchema.parse(application),
+    personTurn,
+  };
 }
 
 function rows(applicationId: string, turnId: string) {
-  const at = (ms: number) => new Date(Date.UTC(2026, 10, 14, 10, 0, 0, ms)).toISOString();
+  const at = (ms: number) =>
+    new Date(Date.UTC(2026, 10, 14, 10, 0, 0, ms)).toISOString();
   const s = (id: string, count: string, ms: number): ApplicationStatement => ({
     id: id as ApplicationStatement["id"],
     applicationId: applicationId as ApplicationStatement["applicationId"],
@@ -120,7 +125,12 @@ function rows(applicationId: string, turnId: string) {
     readingVersion: 2,
     recordedAt: at(5),
   };
-  return { statements: [older, newer], links: [link], events: [event], readings: [reading] };
+  return {
+    statements: [older, newer],
+    links: [link],
+    events: [event],
+    readings: [reading],
+  };
 }
 
 describe("gateq statements against local Supabase Postgres", () => {
@@ -140,7 +150,11 @@ describe("gateq statements against local Supabase Postgres", () => {
     await db.close();
   });
 
-  const count = async (tx: TransactionContext, table: string, applicationId: string) => {
+  const count = async (
+    tx: TransactionContext,
+    table: string,
+    applicationId: string,
+  ) => {
     const [row] = await tx.sql<{ n: number }[]>`
       select (case ${table}
         when 'application_statements' then (select count(*) from gateq.application_statements where application_id = ${applicationId})
@@ -157,7 +171,9 @@ describe("gateq statements against local Supabase Postgres", () => {
     await db.transactions
       .run(async (tx) => {
         const { tenant, application, personTurn } = await world(tx);
-        const statements = createPostgresApplicationStatementRepository({ sql: tx.sql });
+        const statements = createPostgresApplicationStatementRepository({
+          sql: tx.sql,
+        });
         const facts = createPostgresApplicationFactRepository({ sql: tx.sql });
         const planned = rows(application, personTurn);
         const tables = [
@@ -172,28 +188,52 @@ describe("gateq statements against local Supabase Postgres", () => {
         // projection are in; the Q turn insert fails. The turn's own
         // transaction is a savepoint here, inside the rolled-back world.
         await tx.sql`savepoint turn_write`;
-        await statements.appendInTransaction(tx, { applicationId: application, tenantId: tenant, ...planned });
+        await statements.appendInTransaction(tx, {
+          applicationId: application,
+          tenantId: tenant,
+          ...planned,
+        });
         await facts.record(tx, {
           applicationId: application,
           tenantId: tenant,
-          facts: [{ dimension: "claims.traction", value: { kind: "TEXT", text: "600 weekly active\n1500 weekly active" }, provenance: "APPLICANT_PROVIDED" }],
+          facts: [
+            {
+              dimension: "claims.traction",
+              value: {
+                kind: "TEXT",
+                text: "600 weekly active\n1500 weekly active",
+              },
+              provenance: "APPLICANT_PROVIDED",
+            },
+          ],
           at: new Date().toISOString(),
         });
         expect(await count(tx, "application_statements", application)).toBe(2);
         await tx.sql`rollback to savepoint turn_write`;
-        for (const table of tables) expect(await count(tx, table, application), table).toBe(0);
+        for (const table of tables)
+          expect(await count(tx, table, application), table).toBe(0);
 
         // The retry writes the same checkpointed rows.
-        await statements.appendInTransaction(tx, { applicationId: application, tenantId: tenant, ...planned });
+        await statements.appendInTransaction(tx, {
+          applicationId: application,
+          tenantId: tenant,
+          ...planned,
+        });
         const back = await statements.listFor(application);
-        expect(back.statements.map((s) => s.id)).toEqual(planned.statements.map((s) => s.id));
-        expect(back.statements[1]?.value).toEqual({ kind: "COUNT", count: "1500" });
+        expect(back.statements.map((s) => s.id)).toEqual(
+          planned.statements.map((s) => s.id),
+        );
+        expect(back.statements[1]?.value).toEqual({
+          kind: "COUNT",
+          count: "1500",
+        });
         expect(back.statements[0]?.asOf).toBe("2026-11-01");
         expect(back.readTurnIds).toEqual([personTurn]);
         const view = projectView(back.statements, back.links, back.events);
-        expect(view.dimensions.find((d) => d.dimension === "claims.traction")?.status).toBe(
-          "DISAGREEMENT_LEFT_OPEN",
-        );
+        expect(
+          view.dimensions.find((d) => d.dimension === "claims.traction")
+            ?.status,
+        ).toBe("DISAGREEMENT_LEFT_OPEN");
         // Append-only: a second reading of the turn is refused.
         await tx.sql`savepoint again`;
         await expect(
@@ -203,7 +243,10 @@ describe("gateq statements against local Supabase Postgres", () => {
             statements: [],
             links: [],
             events: [],
-            readings: planned.readings.map((r) => ({ ...r, id: randomUUID() as TurnReading["id"] })),
+            readings: planned.readings.map((r) => ({
+              ...r,
+              id: randomUUID() as TurnReading["id"],
+            })),
           }),
         ).rejects.toThrow();
         await tx.sql`rollback to savepoint again`;

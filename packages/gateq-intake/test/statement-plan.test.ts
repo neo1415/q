@@ -21,7 +21,10 @@ async function begun() {
   const services = world.services();
   const { token } = await services.intake.start({ gatewayPublicId: GATEWAY });
   world.scripts.push(() => reading({ reply: "Hello. What are you building?" }));
-  await services.conversation.openingFor({ token, correlationId: randomUUID() });
+  await services.conversation.openingFor({
+    token,
+    correlationId: randomUUID(),
+  });
   const say = (clientTurnId: string, message: string) =>
     services.conversation.turn({
       token,
@@ -54,7 +57,9 @@ describe("an application begun before statements", () => {
     world.advance(60_000);
     world.scripts.push((prompt) => {
       // The carried fact has a handle Q can name.
-      expect(prompt.statement("600 weekly active retailers")).toMatch(/^S\d+$/u);
+      expect(prompt.statement("600 weekly active retailers")).toMatch(
+        /^S\d+$/u,
+      );
       return reading({
         reply: "Eighteen operators, nice.",
         statements: [
@@ -92,7 +97,9 @@ describe("an orphaned turn sent again after a later one read it", () => {
   it("is answered without being read twice", async () => {
     const { world, say } = await begun();
     world.scripts.push(() => "FAIL");
-    await expect(say("turn-orphan-1", "We have 18 operators.")).rejects.toThrow();
+    await expect(
+      say("turn-orphan-1", "We have 18 operators."),
+    ).rejects.toThrow();
     world.advance(60_000);
     world.scripts.push((prompt) => {
       expect(prompt.unread()).toEqual(["T1: We have 18 operators."]);
@@ -141,9 +148,13 @@ describe("an orphaned turn sent again after a later one read it", () => {
     const orphan = store.turnRows.find(
       (t) => t.clientTurnId === "turn-orphan-1" && t.role === "PERSON",
     );
-    expect(store.readingRows.filter((r) => r.turnId === orphan?.id)).toHaveLength(1);
     expect(
-      store.turnRows.some((t) => t.clientTurnId === "turn-orphan-1" && t.role === "Q"),
+      store.readingRows.filter((r) => r.turnId === orphan?.id),
+    ).toHaveLength(1);
+    expect(
+      store.turnRows.some(
+        (t) => t.clientTurnId === "turn-orphan-1" && t.role === "Q",
+      ),
     ).toBe(true);
   });
 });

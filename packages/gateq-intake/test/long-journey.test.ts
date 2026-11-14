@@ -47,7 +47,9 @@ const ASKED_AS_MISSING = new Set([
 function personTurnId(world: World, clientTurnId: string): string {
   const row = world
     .store()
-    .turnRows.find((t) => t.clientTurnId === clientTurnId && t.role === "PERSON");
+    .turnRows.find(
+      (t) => t.clientTurnId === clientTurnId && t.role === "PERSON",
+    );
   if (row === undefined) throw new Error(`no PERSON turn ${clientTurnId}`);
   return row.id;
 }
@@ -74,7 +76,10 @@ function assertInvariants(input: {
   //    and each one this turn should record names the turn that said it
   //    and is in that turn's reading.
   for (const id of input.beforeIds)
-    expect(store.statementRows.some((s) => s.id === id), `lost ${id}`).toBe(true);
+    expect(
+      store.statementRows.some((s) => s.id === id),
+      `lost ${id}`,
+    ).toBe(true);
   for (const statement of store.statementRows) {
     // A journey begun on statements carries nothing in from legacy facts:
     // every statement is one the founder said in a turn.
@@ -88,7 +93,8 @@ function assertInvariants(input: {
   for (const expected of turn.records ?? []) {
     const source = personTurnId(world, expected.saidIn ?? turn.id);
     const found = store.statementRows.find(
-      (s) => s.words.includes(expected.words) && s.dimension === expected.dimension,
+      (s) =>
+        s.words.includes(expected.words) && s.dimension === expected.dimension,
     );
     expect(found, `recorded: ${expected.words}`).toBeDefined();
     expect(found?.sourceTurnId).toBe(source);
@@ -117,7 +123,10 @@ function assertInvariants(input: {
           [link.fromStatementId, link.toStatementId].includes(item.statementId)
         );
       });
-      expect(corrected || resolved, `${item.words} hidden only by its own correction`).toBe(true);
+      expect(
+        corrected || resolved,
+        `${item.words} hidden only by its own correction`,
+      ).toBe(true);
     }
 
   // 3. A contradiction stays visible until it is explicitly settled.
@@ -150,22 +159,31 @@ function assertInvariants(input: {
     const prompt = world.prompts.at(-1);
     if (prompt === undefined) throw new Error("no prompt");
     for (const need of prompt.needs()) {
-      const status = statusOf(before, need.dimension) as DimensionStatus | undefined;
+      const status = statusOf(before, need.dimension) as
+        DimensionStatus | undefined;
       if (status === undefined) continue;
-      const followUp = status === "SETTLED" && need.reason === "needs_specifics";
+      const followUp =
+        status === "SETTLED" && need.reason === "needs_specifics";
       expect(
         NEVER_ASKED_AGAIN.has(status) && !followUp,
         `${need.dimension} (${status}) is not asked again`,
       ).toBe(false);
       if (status !== "UNANSWERED")
-        expect(ASKED_AS_MISSING.has(need.reason), `${need.dimension} is not unanswered`).toBe(false);
+        expect(
+          ASKED_AS_MISSING.has(need.reason),
+          `${need.dimension} is not unanswered`,
+        ).toBe(false);
     }
     for (const entry of before.dimensions)
       if (entry.status === "DISAGREEMENT_LEFT_OPEN")
         expect(
-          prompt.contradictions().some(
-            (line) => line.includes(` ${entry.dimension}:`) && line.endsWith("(left open by them)"),
-          ),
+          prompt
+            .contradictions()
+            .some(
+              (line) =>
+                line.includes(` ${entry.dimension}:`) &&
+                line.endsWith("(left open by them)"),
+            ),
         ).toBe(true);
   }
   for (const entry of after.dimensions) {
@@ -181,7 +199,9 @@ function assertInvariants(input: {
   }
 
   // 6. Nothing is left holding the interview.
-  const q = store.turnRows.find((t) => t.clientTurnId === turn.id && t.role === "Q");
+  const q = store.turnRows.find(
+    (t) => t.clientTurnId === turn.id && t.role === "Q",
+  );
   expect(q, "Q answered").toBeDefined();
 
   // 7. Q claims something was recorded only when the reading says so.
@@ -203,7 +223,8 @@ function assertInvariants(input: {
     );
     const readings = store.readingRows.filter((r) => r.turnId === person.id);
     expect(readings.length).toBeLessThanOrEqual(1);
-    if (answered) expect(readings.length, `${person.clientTurnId} read`).toBe(1);
+    if (answered)
+      expect(readings.length, `${person.clientTurnId} read`).toBe(1);
   }
   return after;
 }
@@ -212,11 +233,15 @@ describe("the long journey: 34 turns, invariants 1-7 after every turn", () => {
   it("keeps every statement, its history and its disagreements, and never claims what was not recorded", async () => {
     const world = statementWorld();
     let { intake, conversation } = world.services();
-    const started = await intake.start({ gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99" });
+    const started = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
     const token = started.token;
     const applicationId = (await intake.authorise(token)).application.id;
 
-    world.scripts.push(() => reading({ reply: "Hello, I'm Q. What are you building?" }));
+    world.scripts.push(() =>
+      reading({ reply: "Hello, I'm Q. What are you building?" }),
+    );
     await conversation.openingFor({ token, correlationId: randomUUID() });
 
     const send = (turn: JourneyTurn) =>
@@ -230,7 +255,8 @@ describe("the long journey: 34 turns, invariants 1-7 after every turn", () => {
     let before = viewOf(world);
     for (const turn of JOURNEY) {
       world.advance(60_000);
-      if (turn.resumeBefore === true) ({ intake, conversation } = world.services());
+      if (turn.resumeBefore === true)
+        ({ intake, conversation } = world.services());
       const store = world.store();
       const snapshot = {
         beforeIds: new Set(store.statementRows.map((s) => s.id)),
@@ -245,10 +271,18 @@ describe("the long journey: 34 turns, invariants 1-7 after every turn", () => {
         expect(failure).toBeInstanceOf(InterviewUnavailableError);
         // 6. A failed reply holds nothing: no claim, nothing written, and
         //    the founder's words are kept.
-        expect(await world.turns.pendingFor(applicationId as never)).toBe(false);
-        expect(world.store().statementRows.length).toBe(snapshot.beforeIds.size);
+        expect(await world.turns.pendingFor(applicationId as never)).toBe(
+          false,
+        );
+        expect(world.store().statementRows.length).toBe(
+          snapshot.beforeIds.size,
+        );
         expect(
-          world.store().turnRows.some((t) => t.clientTurnId === turn.id && t.role === "PERSON"),
+          world
+            .store()
+            .turnRows.some(
+              (t) => t.clientTurnId === turn.id && t.role === "PERSON",
+            ),
         ).toBe(true);
         if (turn.retryWith === undefined) continue;
         world.scripts.push(turn.retryWith);
@@ -269,12 +303,17 @@ describe("the long journey: 34 turns, invariants 1-7 after every turn", () => {
     }
 
     // Retried turn 21 is one PERSON row and one Q row.
-    const t21 = world.store().turnRows.filter((t) => t.clientTurnId === "turn-0021");
+    const t21 = world
+      .store()
+      .turnRows.filter((t) => t.clientTurnId === "turn-0021");
     expect(t21.map((t) => t.role).sort()).toEqual(["PERSON", "Q"]);
     // Every PERSON turn now has a reading: the orphan was recovered.
     const store = world.store();
     for (const person of store.turnRows.filter((t) => t.role === "PERSON"))
-      expect(store.readingRows.some((r) => r.turnId === person.id), person.clientTurnId).toBe(true);
+      expect(
+        store.readingRows.some((r) => r.turnId === person.id),
+        person.clientTurnId,
+      ).toBe(true);
     // Final state, as the legacy readers see it.
     const traction = store.factRows.find(
       (f) => f.dimension === "claims.traction" && f.supersededAt === null,
@@ -305,7 +344,9 @@ async function checksAfter(
   const { world, intake, token, view } = context;
   const store = world.store();
   const readingOf = (clientTurnId: string) =>
-    store.readingRows.find((r) => r.turnId === personTurnId(world, clientTurnId));
+    store.readingRows.find(
+      (r) => r.turnId === personTurnId(world, clientTurnId),
+    );
   const traction = dimensionView(view, "claims.traction");
   switch (id) {
     case "turn-0005":
@@ -323,7 +364,9 @@ async function checksAfter(
     }
     case "turn-0009":
       expect(readingOf("turn-0009")?.outcome).toBe("NO_STATEMENTS");
-      expect(store.statementRows.some((s) => s.words === "busy day")).toBe(false);
+      expect(store.statementRows.some((s) => s.words === "busy day")).toBe(
+        false,
+      );
       break;
     case "turn-0012":
       expect(statusOf(view, "company.market")).toBe("UNKNOWN");
@@ -347,7 +390,9 @@ async function checksAfter(
       expect(store.eventRows.at(-1)?.state).toBe("LEFT_OPEN");
       break;
     case "turn-0017": {
-      const q = store.turnRows.find((t) => t.clientTurnId === id && t.role === "Q");
+      const q = store.turnRows.find(
+        (t) => t.clientTurnId === id && t.role === "Q",
+      );
       expect(q?.text.startsWith(NOT_RECORDED_LINE)).toBe(true);
       expect(q?.text).not.toContain("Noted");
       expect(readingOf(id)?.outcome).toBe("NO_STATEMENTS");
@@ -357,9 +402,15 @@ async function checksAfter(
       // S99 was never issued: kept as a new statement, linked to nothing.
       const reading19 = readingOf(id);
       expect(reading19?.outcome).toBe("READ");
-      expect(reading19?.notRecorded.map((n) => n.reason)).toEqual(["UNKNOWN_HANDLE"]);
-      const four = store.statementRows.find((s) => s.words.includes("four engineers"));
-      expect(store.linkRows.some((l) => l.fromStatementId === four?.id)).toBe(false);
+      expect(reading19?.notRecorded.map((n) => n.reason)).toEqual([
+        "UNKNOWN_HANDLE",
+      ]);
+      const four = store.statementRows.find((s) =>
+        s.words.includes("four engineers"),
+      );
+      expect(store.linkRows.some((l) => l.fromStatementId === four?.id)).toBe(
+        false,
+      );
       expect(dimensionView(view, "company.team").items).toHaveLength(2);
       break;
     }
@@ -385,7 +436,11 @@ async function checksAfter(
       const raise = store.factRows.find(
         (f) => f.dimension === "raise.amount" && f.supersededAt === null,
       );
-      expect(raise?.value).toEqual({ kind: "AMOUNT", amount: "2000000", currency: "USD" });
+      expect(raise?.value).toEqual({
+        kind: "AMOUNT",
+        amount: "2000000",
+        currency: "USD",
+      });
       expect(dimensionView(view, "raise.amount").superseded).toHaveLength(1);
       break;
     }
@@ -411,7 +466,8 @@ async function checksAfter(
       break;
     case "turn-0033": {
       const phrases = store.factRows.find(
-        (f) => f.dimension === "company.sector_phrases" && f.supersededAt === null,
+        (f) =>
+          f.dimension === "company.sector_phrases" && f.supersededAt === null,
       );
       expect(phrases?.value).toEqual({
         kind: "PHRASES",
@@ -428,15 +484,25 @@ describe("a failure between the statements and Q's reply", () => {
   it("leaves no row behind, and the retry writes the checkpointed rows once without asking the model again", async () => {
     const world = statementWorld();
     const { intake, conversation } = world.services();
-    const { token } = await intake.start({ gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99" });
-    world.scripts.push(() => reading({ reply: "Hello. What are you building?" }));
+    const { token } = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    world.scripts.push(() =>
+      reading({ reply: "Hello. What are you building?" }),
+    );
     await conversation.openingFor({ token, correlationId: randomUUID() });
     const first = JOURNEY[0];
-    if (first === undefined || first.script === "FAIL") throw new Error("fixture");
+    if (first === undefined || first.script === "FAIL")
+      throw new Error("fixture");
 
     world.scripts.push(first.script);
     world.faults.push({ at: "BEFORE_Q_TURN", remaining: 1 });
-    const message = { token, message: first.say, clientTurnId: first.id, correlationId: randomUUID() };
+    const message = {
+      token,
+      message: first.say,
+      clientTurnId: first.id,
+      correlationId: randomUUID(),
+    };
     await expect(conversation.turn(message)).rejects.toThrow("injected");
     const failed = world.store();
     expect(failed.statementRows).toHaveLength(0);
@@ -451,10 +517,11 @@ describe("a failure between the statements and Q's reply", () => {
     expect(done.statementRows).toHaveLength(3);
     expect(done.readingRows).toHaveLength(1);
     expect(done.readingRows[0]?.recordedStatementIds).toHaveLength(3);
-    expect(done.factRows.filter((f) => f.supersededAt === null).map((f) => f.dimension).sort()).toEqual([
-      "company.country",
-      "company.description",
-      "company.name",
-    ]);
+    expect(
+      done.factRows
+        .filter((f) => f.supersededAt === null)
+        .map((f) => f.dimension)
+        .sort(),
+    ).toEqual(["company.country", "company.description", "company.name"]);
   });
 });

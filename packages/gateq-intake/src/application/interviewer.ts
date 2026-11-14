@@ -134,7 +134,11 @@ function statementsOfFact(
       return [
         {
           ...base,
-          value: { kind: "MONEY", amount: value.amount, currency: value.currency },
+          value: {
+            kind: "MONEY",
+            amount: value.amount,
+            currency: value.currency,
+          },
           words: words(utterance),
         },
       ];
@@ -721,7 +725,10 @@ export function createGateQInterviewer(
           application === undefined
             ? "(no application yet)"
             : statementState !== null
-              ? renderKnownStatements(statementState.view, statementState.handles)
+              ? renderKnownStatements(
+                  statementState.view,
+                  statementState.handles,
+                )
               : renderFacts(application.facts),
         questionNeeds: renderNeeds(
           needs,
@@ -920,7 +927,9 @@ export function createGateQInterviewer(
             result.statements.length > 0 ||
             result.disagreementActions.length > 0
               ? result.statements
-              : result.facts.flatMap((fact) => statementsOfFact(fact, input.utterance)),
+              : result.facts.flatMap((fact) =>
+                  statementsOfFact(fact, input.utterance),
+                ),
           actions: result.disagreementActions,
           discard: discardedByIntent,
           agreedTo,
