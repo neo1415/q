@@ -34,6 +34,7 @@ import {
   type DimensionDisagreement,
   type DimensionViewItem,
   type DisagreementEvent,
+  type DisagreementState,
   type StatementLink,
   type StatementNotRecorded,
   type StatementQuantity,
@@ -47,7 +48,8 @@ import { amountStatedIn } from "./stated-amount.js";
 import {
   legacyFactsFrom,
   projectView,
-  samePeriod,
+  quantityFitting,
+  relatable,
   SINGLE_VALUED_DIMENSIONS,
   valuesConflict,
   type LegacyIncompleteness,
@@ -436,6 +438,13 @@ const SHAPED: ReadonlySet<ApplicationDimension> = new Set([
 ]);
 
 const DIMENSIONS = new Set<string>(APPLICATION_DIMENSIONS);
+/** A stated zero of any of these is a stated zero of revenue. */
+const REVENUE_ZERO_QUANTITIES: ReadonlySet<string> = new Set([
+  "paying_customers",
+  "revenue",
+  "mrr",
+  "arr",
+]);
 const NUMERIC_KINDS = new Set(["MONEY", "COUNT", "PERCENT", "ZERO", "UNKNOWN"]);
 
 type Shaped =
@@ -613,9 +622,10 @@ export type PlanOutcome = {
   /** New statements recorded from what they just said and the unread turns. */
   readonly recordedCount: number;
   /**
-   * Disagreements that stand LEFT_OPEN after this turn because of it (an
-   * event written now, or one already left open that it named). Q may say
-   * it is leaving something unresolved only when this is above zero.
+   * Disagreements a "left open" sentence may truthfully be about after this
+   * turn: an event written now, one already left open that it named, or,
+   * when no OPEN disagreement stands, every standing LEFT_OPEN one. Q may
+   * say it is leaving something unresolved only when this is above zero.
    */
   readonly leftOpenCount: number;
   readonly incomplete: readonly LegacyIncompleteness[];
@@ -763,8 +773,13 @@ export function planReading(input: PlanInput): PlanOutcome {
     target: ApplicationStatementId | null,
   ) => {
     const unknown = value.kind === "UNKNOWN";
-    const quantity: StatementQuantity | null = NUMERIC_KINDS.has(value.kind)
-      ? (op.quantity ?? QUANTITY_OF[dimension] ?? null)
+    // The quantity it names only when its value fits it (a share is not a
+    // number of users): the relation rule reads the same fit.
+    const quantity = NUMERIC_KINDS.has(value.kind)
+      ? (quantityFitting(
+          value.kind,
+          op.quantity ?? QUANTITY_OF[dimension] ?? null,
+        ) as StatementQuantity | null)
       : null;
     // A model never mints document support: only a value already on
     // record with it keeps it (the confirmation path is the Evidence one).
@@ -840,22 +855,34 @@ export function planReading(input: PlanInput): PlanOutcome {
     perTurn.get(turnKey(turn))?.recorded.push(statement.id);
 
     if (target !== null && (op.op === "CORRECTS" || op.op === "DISAGREES")) {
-      link(op.op, statement.id, target, "MODEL_READING", turn.id);
-      const targetDimension = byId.get(target)?.dimension;
-      if (targetDimension !== undefined) touched.add(targetDimension);
-      return;
+      const targetStatement = byId.get(target);
+      // The reader's DISAGREES S<n> is a relation like any other: it
+      // stands only under the relation rule (the same metric, period and
+      // a held value on both sides). Failing it, the statement is kept as
+      // said, linked to nothing, never forced onto another metric.
+      if (
+        op.op === "CORRECTS" ||
+        (targetStatement !== undefined &&
+          relatable(targetStatement, statement, { explicit: true }))
+      ) {
+        link(op.op, statement.id, target, "MODEL_READING", turn.id);
+        if (targetStatement !== undefined)
+          touched.add(targetStatement.dimension);
+        return;
+      }
     }
-    // Code-detected disagreement: a number on the same dimension and
-    // quantity, for what may be the same period, that differs from one on
-    // record, with no link. An unknown date is never assumed to be another
-    // period (live 2026-11-14: undated 600 and 1,500 weekly active stood
-    // side by side with no disagreement).
+    // Code-detected disagreement: a number about the same metric, for what
+    // may be the same period, said in another turn, that differs from one
+    // on record, with no link (the relation rule, `relatable`). An unknown
+    // date is never assumed to be another period (live 2026-11-14: undated
+    // 600 and 1,500 weekly active stood side by side with no disagreement);
+    // two figures from one turn are a change said once, never a
+    // disagreement (live 06910b145: "from 1 partner school to 4").
     for (const other of held) {
       if (
         other.id === statement.id ||
-        other.quantity === null ||
-        other.quantity !== statement.quantity ||
-        !samePeriod(other.asOf, statement.asOf) ||
+        statement.quantity === null ||
+        !relatable(other, statement) ||
         !valuesConflict(other.value, statement.value)
       )
         continue;
@@ -870,15 +897,13 @@ export function planReading(input: PlanInput): PlanOutcome {
       statement.value.kind !== "UNKNOWN"
     ) {
       const latest = held
-        .filter((s) => s.id !== statement.id && s.value.kind !== "UNKNOWN")
+        .filter((s) => s.id !== statement.id && relatable(s, statement))
         .at(-1);
       if (
         latest !== undefined &&
         canonical(latest.value) !== canonical(statement.value) &&
         !(
-          latest.quantity !== null &&
-          latest.quantity === statement.quantity &&
-          samePeriod(latest.asOf, statement.asOf) &&
+          statement.quantity !== null &&
           valuesConflict(latest.value, statement.value)
         )
       )
@@ -886,29 +911,37 @@ export function planReading(input: PlanInput): PlanOutcome {
     }
   };
 
-  // "Leave it open" said while a disagreement on the dimension is open is
-  // a LEAVE_OPEN on that disagreement, never an "I don't know" statement
-  // (live 2026-11-14): read from the structured op (an UNKNOWN, not
-  // declined, on a dimension with an OPEN disagreement), never from words.
+  // "Leave it open" said while a disagreement about the same thing stands
+  // is a LEAVE_OPEN on that disagreement, never an "I don't know"
+  // statement (live 2026-11-14): read from the structured op (an UNKNOWN,
+  // not declined), never from words.
   const implicitActions: GateQDisagreementAction[] = [];
-  // Every standing disagreement on the dimension, OPEN or already LEFT_OPEN
-  // (naming one already left open is true to say, and writes nothing), or
-  // the ones the op's own target stands in.
-  const standingOn = (dimension: string, target: string | null) => {
+  // The standing disagreements (OPEN, or already LEFT_OPEN: naming one
+  // already left open is true to say and writes nothing) the UNKNOWN is
+  // about: the one its own S<n> target stands in, or one whose two sides
+  // are about the same dimension AND the same metric as the UNKNOWN. A
+  // dimension alone is not "the same thing" (live 06910b145: "We don't
+  // know our CAC yet" was swallowed into the 1-vs-4 partner schools pair,
+  // both on traction).
+  const standingOn = (op: GateQStatementOp) => {
+    const handle = handleOf(input.handles.statements, op.target);
     const targetId =
-      target === null
+      handle === null
         ? null
-        : (() => {
-            const handle = handleOf(input.handles.statements, target);
-            return handle === null
-              ? null
-              : (input.handles.statements.get(handle)?.statementId ?? null);
-          })();
+        : (input.handles.statements.get(handle)?.statementId ?? null);
+    const quantity = op.quantity ?? null;
     return [...input.handles.disagreements].filter(([, d]) => {
       if (!d.active || d.state === "RESOLVED") return false;
-      return [d.olderStatementId, d.newerStatementId].some(
-        (id) => id === targetId || byId.get(id)?.dimension === dimension,
-      );
+      const ends = [d.olderStatementId, d.newerStatementId];
+      if (targetId !== null) return ends.includes(targetId);
+      return ends.every((id) => {
+        const end = byId.get(id);
+        return (
+          end !== undefined &&
+          end.dimension === op.dimension &&
+          quantityFitting(end.value.kind, end.quantity) === quantity
+        );
+      });
     });
   };
 
@@ -925,7 +958,7 @@ export function planReading(input: PlanInput): PlanOutcome {
       op.op !== "CORRECTS" &&
       op.value.kind === "UNKNOWN" &&
       op.value.declined !== true
-        ? standingOn(op.dimension, op.target)
+        ? standingOn(op)
         : [];
     if (standing.length > 0) {
       for (const [handle] of standing)
@@ -1056,6 +1089,54 @@ export function planReading(input: PlanInput): PlanOutcome {
       );
     }
 
+  // A stated zero of paying customers is a stated zero of revenue: the
+  // same words, the same turn, recorded where revenue is read, so "settled"
+  // is one fact for the asking plan and every reader (live 06910b145:
+  // "Nobody pays yet" was read only as paying customers = 0, and revenue
+  // was asked five more times). Only when revenue holds nothing yet: an
+  // amount on record is never contradicted by code.
+  if (
+    !input.discard &&
+    !heldOn("claims.revenue").some((s) => s.value.kind !== "UNKNOWN")
+  ) {
+    const zero = newStatements.find(
+      (s) =>
+        s.value.kind === "ZERO" &&
+        s.dimension !== "claims.revenue" &&
+        s.quantity !== null &&
+        REVENUE_ZERO_QUANTITIES.has(s.quantity),
+    );
+    if (zero !== undefined) {
+      const turn = [input.current, ...input.unread].find(
+        (t) => t.id === zero.sourceTurnId,
+      );
+      if (turn !== undefined)
+        add(
+          {
+            op: "NEW",
+            target: null,
+            turn: null,
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            asOf: zero.asOf,
+            words: zero.words.slice(0, 600),
+            provenance:
+              zero.provenance === "UNKNOWN"
+                ? "APPLICANT_PROVIDED"
+                : zero.provenance === "DOCUMENT_SUPPORTED"
+                  ? "APPLICANT_PROVIDED"
+                  : zero.provenance,
+          },
+          turn,
+          { kind: "ZERO" },
+          "claims.revenue",
+          zero.words,
+          null,
+        );
+    }
+  }
+
   // What they said about a disagreement on record.
   const corrected = new Set(
     links.filter((l) => l.kind === "CORRECTS").map((l) => l.toStatementId),
@@ -1173,6 +1254,23 @@ export function planReading(input: PlanInput): PlanOutcome {
     ...events,
   ]);
   const projected = legacyFactsFrom(view);
+  // "Left open" is a claim about recorded state, not only about this
+  // turn's writes: once the turn is applied, if every disagreement still
+  // standing is LEFT_OPEN, a sentence saying they are left open cannot be
+  // about anything else, and it is true (live 06910b145 t39/t41: Q's true
+  // "I'll leave those open" was replaced by "I haven't marked those two
+  // answers as left open yet", though they had been since t18). With any
+  // OPEN one standing, only this turn's own events or named handles count.
+  const standingAfter = new Map<string, DisagreementState>();
+  for (const entry of view.dimensions)
+    for (const d of entry.disagreements)
+      if (d.active && d.state !== "RESOLVED") standingAfter.set(d.key, d.state);
+  if (
+    leftOpen === 0 &&
+    [...standingAfter.values()].some((state) => state === "LEFT_OPEN") &&
+    ![...standingAfter.values()].some((state) => state === "OPEN")
+  )
+    leftOpen = [...standingAfter.values()].length;
   const legacyFacts: NewApplicationFact[] = [];
   for (const dimension of APPLICATION_DIMENSIONS) {
     if (!touched.has(dimension)) continue;

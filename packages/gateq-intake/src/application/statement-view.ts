@@ -45,6 +45,9 @@ import {
  *     to be a different period (live 2026-11-14: an undated 600 and 1,500
  *     weekly active stood side by side, unflagged), so it is a candidate
  *     for the same one, flagged for the founder to settle or leave open.
+ *     Two figures from one turn are never a disagreement (a change or a
+ *     range said once), and a value that does not fit its quantity (a
+ *     share read as a number of users) names none (`relatable`).
  */
 
 export class StatementViewIntegrityError extends Error {
@@ -98,6 +101,97 @@ const isHeld = (value: StatementValue) => value.kind !== "UNKNOWN";
  */
 export function samePeriod(a: string | null, b: string | null): boolean {
   return a === null || b === null || a === b;
+}
+
+/** Quantities that are rates: only a PERCENT (or a zero) is about one. */
+const RATE_QUANTITIES: ReadonlySet<string> = new Set([
+  "growth_rate_monthly",
+  "churn_rate_monthly",
+  "retention_rate",
+  "gross_margin",
+]);
+/** Quantities that are money: only MONEY (or a zero) is about one. */
+const MONEY_QUANTITIES: ReadonlySet<string> = new Set([
+  "revenue",
+  "mrr",
+  "arr",
+  "gmv",
+  "burn_monthly",
+  "raise_amount",
+  "pre_money_valuation",
+]);
+
+/**
+ * The metric a statement is really about: its quantity key when the value
+ * fits it, otherwise none. "40 percent of students are girls" read as
+ * `users` is a share, not a number of users, so it names no quantity and
+ * is never compared with "2,300 students" (live 2026-11-14, 06910b145).
+ */
+export function quantityFitting(
+  kind: StatementValue["kind"],
+  quantity: string | null,
+): string | null {
+  if (quantity === null) return null;
+  switch (kind) {
+    case "ZERO":
+    case "UNKNOWN":
+      return quantity;
+    case "PERCENT":
+      return RATE_QUANTITIES.has(quantity) ? quantity : null;
+    case "MONEY":
+      return MONEY_QUANTITIES.has(quantity) ? quantity : null;
+    case "COUNT":
+      return RATE_QUANTITIES.has(quantity) || MONEY_QUANTITIES.has(quantity)
+        ? null
+        : quantity;
+    case "TEXT":
+    case "CODE":
+      return null;
+  }
+}
+
+type Relatable = Pick<
+  ApplicationStatement,
+  "dimension" | "quantity" | "value" | "asOf" | "sourceTurnId"
+>;
+
+/**
+ * THE relation rule (root cause 2026-11-14, audits/…-gateq-root-cause.md):
+ * whether two statements can stand in a relation at all (disagree, or be
+ * the pair a leave-open is about). Every place that relates statements,
+ * the write path, the projector and the leave-open target, asks this and
+ * nothing else. Three live runs failed because each place asked "same
+ * dimension?" with its own extra heuristic, and a dimension such as
+ * traction holds weekly active users, CAC and partner schools at once.
+ *
+ *   1. Both hold a value: an unknown is never an end (unknown stays unknown).
+ *   2. Same dimension, and the same metric: two numbers name the same
+ *      quantity their values fit. One side naming no quantity relates only
+ *      when the reader said so explicitly (`explicit`).
+ *   3. A comparable period: equal known dates, or a date not given.
+ *   4. Different utterances: two statements from one turn never relate
+ *      ("from 1 partner school to 4" is a change said once, not a
+ *      contradiction).
+ */
+export function relatable(
+  a: Relatable,
+  b: Relatable,
+  options: { readonly explicit?: boolean } = {},
+): boolean {
+  if (!isHeld(a.value) || !isHeld(b.value)) return false;
+  if (a.dimension !== b.dimension) return false;
+  if (
+    a.sourceTurnId !== null &&
+    b.sourceTurnId !== null &&
+    a.sourceTurnId === b.sourceTurnId
+  )
+    return false;
+  if (!samePeriod(a.asOf, b.asOf)) return false;
+  const qa = quantityFitting(a.value.kind, a.quantity);
+  const qb = quantityFitting(b.value.kind, b.quantity);
+  if (qa !== null && qb !== null) return qa === qb;
+  if (qa === null && qb === null) return true;
+  return options.explicit === true;
 }
 
 /**
@@ -296,10 +390,19 @@ export function projectView(
     // Unknown stays unknown: a "not known" (a leave-open read as an
     // UNKNOWN, live 2026-11-14: 600 vs "Not known") never contradicts a
     // held value, so a link naming one decides nothing, whoever wrote it.
-    const bothHeld = [link.fromStatementId, link.toStatementId].every((id) => {
-      const end = byId.get(id);
-      return end !== undefined && isHeld(end.value);
-    });
+    //
+    // The same relation rule as every writer (`relatable`): a stored link
+    // that fails it decides nothing, whoever wrote it and whenever. So a
+    // link written before the rule (live 06910b145: "from 1 partner school
+    // to 4" split and linked within one turn) reads correctly without
+    // rewriting a row. A reader's own explicit link may name one side with
+    // no quantity; code's own detection may not.
+    const from = byId.get(link.fromStatementId);
+    const to = byId.get(link.toStatementId);
+    const bothHeld =
+      from !== undefined &&
+      to !== undefined &&
+      relatable(from, to, { explicit: link.origin !== "CODE_DETECTED" });
     return {
       key: link.id,
       linkId: link.id,
@@ -325,14 +428,13 @@ export function projectView(
     .sort(byStated);
   for (let i = 0; i < current.length; i += 1) {
     const older = current[i];
-    if (older === undefined || older.quantity === null) continue;
+    if (older === undefined) continue;
     for (let j = i + 1; j < current.length; j += 1) {
       const newer = current[j];
       if (
         newer === undefined ||
-        newer.dimension !== older.dimension ||
-        newer.quantity !== older.quantity ||
-        !samePeriod(newer.asOf, older.asOf) ||
+        quantityFitting(older.value.kind, older.quantity) === null ||
+        !relatable(older, newer) ||
         related.has(`${newer.id}|${older.id}`) ||
         !conflicts(older.value, newer.value)
       )
