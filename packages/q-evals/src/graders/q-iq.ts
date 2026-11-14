@@ -156,8 +156,11 @@ function containsTerm(text: string, term: string): boolean {
   return text.toLowerCase().includes(term.toLowerCase());
 }
 
+// 14 Nov 2026 (55d53c7b5, decision 94): absence is scoped to Capital Q's
+// records and the sources read: "Neither Capital Q's records nor the sources
+// I read give a figure for runway yet." says unknown as plainly.
 const UNKNOWN_MARKER =
-  /\b(?:(?:don't|do not|doesn't|does not|didn't|did not|can't|cannot|couldn't|isn't|is not|aren't|are not|wasn't|haven't|hasn't|have not|has not)\b[^.?!]{0,60}\b(?:know|have|hold|say|state|show|include|mention|record|list|disclose|find|see|tell|confirm|in|available|recorded|stated|listed|given|provided|reported|disclosed|known|on file|on record)|not\s+(?:in|stated|recorded|available|disclosed|provided|given|reported|shown|included|listed|known|specified|mentioned|on record|on file)|no\s+(?:data|record|figure|number|information|evidence|mention|cfo|reliable|basis|way)|no\s+[a-z$-]+\s+(?:data|record|figure|number)s?|unknown|unclear|missing|unavailable|not something i)\b/i;
+  /\b(?:(?:don't|do not|doesn't|does not|didn't|did not|can't|cannot|couldn't|isn't|is not|aren't|are not|wasn't|haven't|hasn't|have not|has not)\b[^.?!]{0,60}\b(?:know|have|hold|say|state|show|include|mention|record|list|disclose|find|see|tell|confirm|in|available|recorded|stated|listed|given|provided|reported|disclosed|known|on file|on record)|not\s+(?:in|stated|recorded|available|disclosed|provided|given|reported|shown|included|listed|known|specified|mentioned|on record|on file)|no\s+(?:data|record|figure|number|information|evidence|mention|cfo|reliable|basis|way)|no\s+[a-z$-]+\s+(?:data|record|figure|number)s?|neither\b[^.?!]{0,80}\bnor\b[^.?!]{0,80}\b(?:give|gives|have|has|show|shows|state|states|hold|holds|record|records)|unknown|unclear|missing|unavailable|not something i)\b/i;
 
 /**
  * Live UNK-076 #2 (7a41ff4): "There isn't a defensible number to give:
