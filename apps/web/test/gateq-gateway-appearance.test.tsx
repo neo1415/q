@@ -103,10 +103,7 @@ describe("B6/B7: the investor brands, places and pauses their own gateway", () =
     expect(
       screen.getByLabelText("Colour as hex").getAttribute("aria-invalid"),
     ).toBe("true");
-    expect(
-      (screen.getByRole("button", { name: "Save" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
     expect(appearanceAction).not.toHaveBeenCalled();
   });
 

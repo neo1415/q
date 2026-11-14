@@ -142,7 +142,7 @@ function world() {
     },
     transactions: {
       run: <T>(work: (tx: never) => Promise<T>) => work({ sql: null } as never),
-    } as never,
+    },
     audit: {
       record: (_tx, input) => {
         audited.push({
