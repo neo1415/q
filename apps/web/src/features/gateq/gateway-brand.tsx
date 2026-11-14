@@ -1,6 +1,9 @@
 import type { PublicGatewayDto } from "@capital-q/contracts";
 
-import { brandPalette, brandStyleSheet } from "@/features/brand-theme/brand-colour";
+import {
+  brandPalette,
+  brandStyleSheet,
+} from "@/features/brand-theme/brand-colour";
 
 /**
  * B6: the public gateway in the investing organisation's colours.
@@ -34,7 +37,9 @@ export function GatewayAccentStyle({
 }) {
   const css = gatewayAccentCss(hex);
   if (css === null) return null;
-  return <style data-cq-gateway-brand dangerouslySetInnerHTML={{ __html: css }} />;
+  return (
+    <style data-cq-gateway-brand dangerouslySetInnerHTML={{ __html: css }} />
+  );
 }
 
 /**

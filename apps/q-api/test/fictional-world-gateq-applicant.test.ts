@@ -40,7 +40,14 @@ describe("GateQ applicant plan", () => {
   });
 
   it("refuses a run id that could change the address", () => {
-    for (const id of ["", "abc", "AB12", "a@b.com", "x".repeat(25), "a b c d"]) {
+    for (const id of [
+      "",
+      "abc",
+      "AB12",
+      "a@b.com",
+      "x".repeat(25),
+      "a b c d",
+    ]) {
       expect(() => assertRunId(id)).toThrow();
     }
     expect(() => applicantPlan("ev@il.com")).toThrow();

@@ -18,8 +18,7 @@ import type { FictionalCompany } from "./types.js";
 export const RUN_ID = /^[a-z0-9]{4,24}$/u;
 
 /** Only ever an account on the reserved fictional domain. */
-export const FICTIONAL_EMAIL =
-  /^[a-z0-9._+-]+@fictional\.capitalq\.local$/u;
+export const FICTIONAL_EMAIL = /^[a-z0-9._+-]+@fictional\.capitalq\.local$/u;
 
 export function assertRunId(runId: string): string {
   if (!RUN_ID.test(runId)) {
