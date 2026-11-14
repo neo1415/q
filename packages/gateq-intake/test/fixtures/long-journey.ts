@@ -397,9 +397,9 @@ export const JOURNEY: readonly JourneyTurn[] = [
           },
         ],
       }),
-    records: [
-      { words: "I'm not sure which is right", dimension: "claims.traction" },
-    ],
+    // Slice 3 (live 2026-11-14): "not sure, leave it open" with a
+    // disagreement open on the dimension is the LEAVE_OPEN itself, never an
+    // "I don't know" statement beside the two figures.
   },
   {
     id: "turn-0015",

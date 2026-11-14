@@ -1375,7 +1375,9 @@ function Dossier({
                             ? t("Meets")
                             : rule.standing === "DOES_NOT_MEET"
                               ? t("Doesn't meet")
-                              : t("Needs clarification")}
+                              : rule.standing === "UNRESOLVED"
+                                ? t("Needs your judgement: answers disagree")
+                                : t("Needs clarification")}
                         </span>
                       </div>
                     ))

@@ -25,7 +25,12 @@ export type FounderApplication = {
   readonly rules: readonly {
     readonly label: string;
     readonly required: boolean;
-    readonly standing: "MEETS" | "DOES_NOT_MEET" | "NOT_ANSWERED";
+    readonly standing:
+      | "MEETS"
+      | "DOES_NOT_MEET"
+      | "NOT_ANSWERED"
+      /** Decision 91: their own answers disagree; one verdict everywhere. */
+      | "UNRESOLVED";
   }[];
   /** The investor's published reply promise for it; null: none made. */
   readonly replyBy: string | null;
@@ -336,7 +341,9 @@ export function founderRules(
           ? "MEETS"
           : c.status === "NO_MATCH"
             ? "DOES_NOT_MEET"
-            : "NOT_ANSWERED",
+            : c.status === "UNRESOLVED"
+              ? "UNRESOLVED"
+              : "NOT_ANSWERED",
     }));
 }
 

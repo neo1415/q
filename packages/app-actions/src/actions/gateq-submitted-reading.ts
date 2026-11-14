@@ -1,12 +1,51 @@
-import type { GateqDossierV1 } from "@capital-q/contracts";
+import {
+  GATEQ_SOURCE_KIND_WORDS,
+  gateqStatementsInWords,
+  type GateqDossierV1,
+  type GateqStatementViewV1,
+} from "@capital-q/contracts";
+
+/**
+ * Slice 3: a v2 dossier's findings, from its statement view through the one
+ * shared formatter. Each line names its statement id, its own source (the
+ * interview, the form, a document, the company profile) and any
+ * disagreement's state, so Q never calls a form answer or a document "said
+ * in the interview", and never picks one of two disagreeing answers.
+ */
+function statementReadingLines(
+  view: GateqStatementViewV1,
+  findings: GateqDossierV1["dimensions"],
+): string[] {
+  const axes = new Map(
+    findings.flatMap((group) =>
+      group.facts.map((fact) => [fact.sourceFactId, fact] as const),
+    ),
+  );
+  return gateqStatementsInWords(view).map((line) => {
+    const sources = line.sourceKinds
+      .map((kind) => GATEQ_SOURCE_KIND_WORDS[kind])
+      .join(" / ");
+    const turns = line.sourceTurnSeqs
+      .map((seq) => (seq === null ? "not recorded" : String(seq)))
+      .join(",");
+    if (line.kind === "STATEMENT") {
+      const id = line.statementIds[0] ?? "";
+      const fact = axes.get(id);
+      return `${line.label}: ${line.summaries[0] ?? ""} [source=${line.sourceKinds[0] ?? ""} (${sources}); disagreement=${line.disagreementState ?? "none"}; truth=${fact?.truthClass ?? "UNKNOWN"}; evidence=${fact?.evidenceStatus ?? "NO_EVIDENCE"}; sourceFactId=${id}; sourceTurnSeq=${turns}]${fact?.derivation === undefined ? "" : ` (${fact.derivation})`}`;
+    }
+    if (line.kind === "DISAGREEMENT")
+      return `DISAGREEMENT (${line.disagreementState ?? "OPEN"}; both kept, neither picked): ${line.text} [sourceFactId=${line.statementIds.join(", sourceFactId=")}; sourceTurnSeq=${turns}]`;
+    return `HISTORY (superseded, not current): ${line.text} [sourceFactId=${line.statementIds[0] ?? ""}; sourceTurnSeq=${turns}]`;
+  });
+}
 
 /** Reads the authorized frozen dossier, without fetching or upgrading evidence. */
 export function submittedReading(
   dossier:
-    | Pick<
+    | (Pick<
         GateqDossierV1,
         "dimensions" | "unknowns" | "declined" | "missing" | "contradictions"
-      >
+      > & { readonly statements?: GateqStatementViewV1 | undefined })
     | null
     | undefined,
 ): string {
@@ -17,16 +56,22 @@ export function submittedReading(
   ];
   let remaining = 12_000;
   let omitted = 0;
-  for (const group of dossier.dimensions) {
-    for (const fact of group.facts) {
-      const line = `${fact.label}: ${fact.summary} [truth=${fact.truthClass}; evidence=${fact.evidenceStatus}; provenance=${fact.provenance}; sourceFactId=${fact.sourceFactId}; sourceTurnSeq=${fact.sourceTurnSeq ?? "not recorded"}]${fact.derivation === undefined ? "" : ` (${fact.derivation})`}`;
-      if (line.length > remaining) {
-        omitted++;
-        continue;
-      }
-      lines.push(line);
-      remaining -= line.length;
+  const findingLines =
+    dossier.statements === undefined
+      ? dossier.dimensions.flatMap((group) =>
+          group.facts.map(
+            (fact) =>
+              `${fact.label}: ${fact.summary} [truth=${fact.truthClass}; evidence=${fact.evidenceStatus}; provenance=${fact.provenance}; sourceFactId=${fact.sourceFactId}; sourceTurnSeq=${fact.sourceTurnSeq ?? "not recorded"}]${fact.derivation === undefined ? "" : ` (${fact.derivation})`}`,
+          ),
+        )
+      : statementReadingLines(dossier.statements, dossier.dimensions);
+  for (const line of findingLines) {
+    if (line.length > remaining) {
+      omitted++;
+      continue;
     }
+    lines.push(line);
+    remaining -= line.length;
   }
   for (const [label, gaps] of [
     ["Unknown", dossier.unknowns],

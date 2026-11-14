@@ -120,6 +120,8 @@ export type ApplicantTurnResult = {
   readonly access: "MAY_APPLY" | "MAY_NOT_APPLY" | "NEEDS_INFORMATION";
   readonly unmet: readonly string[];
   readonly stillNeeded: readonly string[];
+  /** Decision 91: rules whose fact their own answers disagree on. */
+  readonly unresolved?: readonly string[];
   /** The currency a size rule is set in, when the founder's differed. */
   readonly askCurrency?: string;
 };

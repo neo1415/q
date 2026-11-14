@@ -148,7 +148,7 @@ export type ApplicationSubmissionRepository = {
        * version, written at insert and never again. Absent: a v1 row.
        */
       readonly dossier?: unknown;
-      readonly snapshotVersion?: 1 | 2 | undefined;
+      readonly snapshotVersion?: 1 | 2 | 3 | undefined;
     },
   ) => Promise<{ readonly submittedAt: string }>;
 };
@@ -424,6 +424,18 @@ export type ApplicationStatementRepository = {
       readonly readTurnIds: readonly string[];
     }
   >;
+  /**
+   * Slice 3: the same read inside a transaction, so the submission's
+   * frozen dossier is built from exactly what the transaction sees.
+   */
+  readonly listInTransaction?:
+    | ((
+        tx: TransactionContext,
+        applicationId: ApplicationId,
+      ) => Promise<
+        StatementContext & { readonly readTurnIds: readonly string[] }
+      >)
+    | undefined;
   /** The deterministic view over everything on record. */
   readonly viewFor: (
     applicationId: ApplicationId,

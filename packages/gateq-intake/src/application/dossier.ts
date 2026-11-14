@@ -1,10 +1,17 @@
 import {
   GATEQ_DOSSIER_DOCUMENTS_MAX,
   GATEQ_DOSSIER_SCHEMA_VERSION,
+  GATEQ_DOSSIER_V2_SCHEMA_VERSION,
   GateqDossierV1Schema,
+  GateqDossierV2Schema,
+  gateqStandingDisagreements,
+  gateqStatementsInWords,
   type ApplicationContactDto,
   type GateqCoverageV1,
+  type GateqDossierFact,
   type GateqDossierV1,
+  type GateqDossierV2,
+  type GateqStatementViewV1,
 } from "@capital-q/contracts";
 import type { QualificationResult } from "@capital-q/gateq";
 
@@ -229,6 +236,68 @@ export function buildDossier(input: {
 }
 
 /**
+ * The dossier frozen from the statement view (slice 3; snapshot v3). The
+ * company block, qualification, documents and diligence questions are
+ * built as in v1; the findings are every current statement of the view,
+ * each with its own id, source and disagreement state, and the whole view
+ * travels with it: what was corrected stays as history and every
+ * disagreement keeps both values and their sources. `coverage` must be
+ * the view's own (coverageFromView), so the gaps and contradictions are
+ * the same ones founder review showed.
+ */
+export function buildDossierV2(
+  input: Parameters<typeof buildDossier>[0] & {
+    readonly view: GateqStatementViewV1;
+  },
+): GateqDossierV2 {
+  const base = buildDossier(input);
+  const lines = gateqStatementsInWords(input.view);
+  const statement = new Map(
+    input.view.dimensions.flatMap((d) =>
+      d.statements.map((s) => [s.statementId, s] as const),
+    ),
+  );
+  const dimensions = INVESTMENT_DIMENSIONS.map((entry) => ({
+    group: entry.group,
+    label: entry.label,
+    facts: lines.flatMap((line) => {
+      if (
+        line.kind !== "STATEMENT" ||
+        !(entry.dimensions as readonly string[]).includes(line.dimension)
+      )
+        return [];
+      const said = statement.get(line.statementIds[0] ?? "");
+      // Unknown and declined are reported as gaps, never as findings.
+      if (said === undefined || said.valueKind === "UNKNOWN") return [];
+      return [
+        {
+          dimension: line.dimension,
+          label: line.label,
+          summary: said.summary,
+          provenance: said.provenance,
+          // v2: the source record a finding reads is the statement itself.
+          sourceFactId: said.statementId,
+          sourceTurnSeq: said.sourceTurnSeq,
+          truthClass: truthClassOf(said.provenance),
+          evidenceStatus: evidenceStatusOf(said.provenance),
+          statementId: said.statementId,
+          sourceKind: said.sourceKind,
+          backfilled: said.backfilled,
+          disagreementState: line.disagreementState,
+        },
+      ];
+    }),
+  }));
+  return GateqDossierV2Schema.parse({
+    ...base,
+    schemaVersion: GATEQ_DOSSIER_V2_SCHEMA_VERSION,
+    dimensions,
+    contradictionsTotal: gateqStandingDisagreements(lines).length,
+    statements: input.view,
+  });
+}
+
+/**
  * A heard amount the person never said is Q's inference, not their claim
  * (lead decision 2026-10-15). Applied when the dossier is built and again
  * when a frozen one is read, so a submission made before the write-side
@@ -237,7 +306,11 @@ export function buildDossier(input: {
  * from the form, or a turn that was not kept, is left as recorded.
  */
 export function withDerivedAmountsMarked<
-  D extends Pick<GateqDossierV1, "dimensions">,
+  D extends {
+    readonly dimensions: readonly {
+      readonly facts: readonly GateqDossierFact[];
+    }[];
+  },
 >(
   dossier: D,
   turns: readonly {

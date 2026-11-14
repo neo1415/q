@@ -18,6 +18,7 @@ import {
 
 import { coverageAction } from "../apply-actions";
 import { FitGlyph } from "../fit-glyph";
+import { statementRowsOf, type DossierStatementRow } from "../page/inbox-model";
 import {
   maySubmit,
   MISSING_REASON_WORDS,
@@ -191,6 +192,8 @@ export function ReviewStep({
         </h2>
         {c.answered.length === 0 ? (
           <p className="cq-body-sm gq-t2">{t("Nothing answered yet.")}</p>
+        ) : coverage.statements !== undefined ? (
+          <ReviewStatements rows={statementRowsOf(coverage.statements)} />
         ) : (
           <ul className="gq-hair">
             {c.answered.map((fact) => (
@@ -378,5 +381,72 @@ export function ReviewStep({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Slice 3: what they told the investor, statement by statement from the
+ * statement view (the same rows the investor's dossier shows): each kept
+ * answer with where it came from, a stated zero as "Zero …", an answer in
+ * disagreement marked with its state (both are listed under "Answers that
+ * disagree"), and what they corrected as history, never erased.
+ */
+function ReviewStatements({
+  rows,
+}: {
+  readonly rows: readonly DossierStatementRow[];
+}) {
+  const t = useT();
+  const current = rows.filter((row) => row.kind === "STATEMENT");
+  const history = rows.filter((row) => row.kind === "HISTORY");
+  return (
+    <>
+      <ul className="gq-hair" data-testid="gq-review-statements">
+        {current.map((row) => (
+          <li
+            key={row.key}
+            className="flex flex-col gap-0.5 py-2"
+            data-statement={row.statementIds.join(" ")}
+            data-source={row.sourceKinds.join(" ")}
+            data-disagreement={row.disagreementState ?? "NONE"}
+          >
+            <span className="flex flex-wrap items-baseline gap-2">
+              <b className="font-medium">{t(row.label)}</b>
+              <span className="gq-prefill">{t(row.sourceWords[0] ?? "")}</span>
+              {row.stateWords === null ? null : (
+                <span className="gq-status">
+                  {t("Answers disagree")} · {t(row.stateWords)}
+                </span>
+              )}
+            </span>
+            <span className="cq-body-sm gq-t2">
+              {t(row.summaries[0] ?? "")}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {history.length === 0 ? null : (
+        <details className="mt-2">
+          <summary className="cq-body-sm min-h-11 cursor-pointer">
+            {t("Earlier answers, corrected")} ({history.length})
+          </summary>
+          <ul className="gq-hair">
+            {history.map((row) => (
+              <li
+                key={row.key}
+                className="cq-body-sm gq-t2 py-1.5"
+                data-statement={row.statementIds.join(" ")}
+                data-source={row.sourceKinds.join(" ")}
+              >
+                {t(row.label)}: {t(row.summaries[0] ?? "")}{" "}
+                <span className="cq-caption gq-t3">
+                  ({t(row.sourceWords[0] ?? "")})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
   );
 }

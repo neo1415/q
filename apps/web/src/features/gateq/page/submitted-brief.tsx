@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type {
-  GateqDossierV1,
+  GateqDossier,
   GateqSynthesis,
   ApplicationTranscriptTurnDto,
 } from "@capital-q/contracts";
@@ -10,6 +10,8 @@ import { QControl } from "@/features/q/control/q-control";
 
 import { FitGlyph } from "../fit-glyph";
 import { ApplicationAsks } from "./application-asks";
+import { StatementsSection } from "./inbox-dossier";
+import { dossierStatementRows } from "./inbox-model";
 import { summaryWords } from "./summary-words";
 import { useT } from "@/features/i18n/language";
 
@@ -18,7 +20,8 @@ const STATUS = {
   NO_MATCH: "Doesn't meet",
   UNKNOWN: "Needs clarification",
   NOT_APPLICABLE: "Not applicable",
-  UNRESOLVED: "Two answers to review",
+  // Decision 91: the investor's judgement, never "needs clarification".
+  UNRESOLVED: "Needs your judgement: answers disagree",
 } as const;
 const PROVENANCE = {
   APPLICANT_PROVIDED: "Applicant provided",
@@ -53,7 +56,7 @@ const OUTCOME = {
   QUALIFIED: "Meets the published mandate",
   NOT_QUALIFIED: "Outside the published mandate",
   INSUFFICIENT_INFORMATION: "More information needed for mandate qualification",
-  UNRESOLVED: "Two answers to review for mandate qualification",
+  UNRESOLVED: "Needs your judgement: answers disagree",
 } as const;
 
 function dateWords(value: string): string {
@@ -97,7 +100,7 @@ export function SubmittedBrief({
   synthesis = null,
   synthesisState = "PENDING",
 }: {
-  readonly dossier: GateqDossierV1;
+  readonly dossier: GateqDossier;
   readonly synthesis?: GateqSynthesis | null | undefined;
   /** UNAVAILABLE: every bounded attempt failed; say so, never "not ready". */
   readonly synthesisState?: "READY" | "PENDING" | "UNAVAILABLE" | undefined;
@@ -110,6 +113,8 @@ export function SubmittedBrief({
     ),
   );
   const website = websiteHref(dossier.company.website);
+  // Slice 3: a v2 dossier is read from its statement view, as every reader.
+  const statementRows = dossierStatementRows(dossier);
   const contact = dossier.contact;
   const hasSupportedClaims = dossier.dimensions.some((group) =>
     group.facts.some((fact) => fact.evidenceStatus === "DOCUMENT_SUPPORTED"),
@@ -276,7 +281,9 @@ export function SubmittedBrief({
             "Claims, estimates and their recorded evidence are shown separately.",
           )}
         </p>
-        {dossier.dimensions.length === 0 ? (
+        {statementRows !== null ? (
+          <StatementsSection rows={statementRows} />
+        ) : dossier.dimensions.length === 0 ? (
           <p className="cq-body-sm gq-t2">
             {t("No investment-dimension claims were recorded.")}
           </p>
@@ -290,7 +297,7 @@ export function SubmittedBrief({
                 ) : null}
                 <ul className="gq-hair">
                   {group.facts.map((fact) => (
-                    <li key={fact.dimension} className="py-3">
+                    <li key={fact.sourceFactId} className="py-3">
                       <h6 className="cq-body-sm font-medium">
                         {t(fact.label)}
                       </h6>

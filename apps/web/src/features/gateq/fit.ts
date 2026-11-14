@@ -16,7 +16,7 @@ import type {
  */
 export type FitVerdict = "FITS" | "PARTIAL" | "NOT_A_FIT";
 
-export type CriterionStanding = "MET" | "NOT_MET" | "UNKNOWN";
+export type CriterionStanding = "MET" | "NOT_MET" | "UNKNOWN" | "UNRESOLVED";
 
 export type CriterionLine = {
   readonly label: string;
@@ -26,7 +26,10 @@ export type CriterionLine = {
 
 export function criterionLines(
   gateway: Pick<PublicGatewayDto, "criteria">,
-  application: Pick<ApplicationSummaryDto, "unmet" | "stillNeeded"> | null,
+  application: Pick<
+    ApplicationSummaryDto,
+    "unmet" | "stillNeeded" | "unresolved"
+  > | null,
 ): readonly CriterionLine[] {
   return gateway.criteria.map((criterion) => ({
     label: criterion.label,
@@ -34,9 +37,11 @@ export function criterionLines(
     standing:
       application === null || application.stillNeeded.includes(criterion.label)
         ? "UNKNOWN"
-        : application.unmet.includes(criterion.label)
-          ? "NOT_MET"
-          : "MET",
+        : (application.unresolved ?? []).includes(criterion.label)
+          ? "UNRESOLVED"
+          : application.unmet.includes(criterion.label)
+            ? "NOT_MET"
+            : "MET",
   }));
 }
 

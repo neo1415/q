@@ -1,6 +1,8 @@
+import { useState } from "react";
+
 import type {
   ApplicationTranscriptTurnDto,
-  GateqDossierV1,
+  GateqDossier,
 } from "@capital-q/contracts";
 import {
   ChevronDown,
@@ -11,6 +13,9 @@ import {
 
 import { FitGlyph } from "../fit-glyph";
 import {
+  compactStatementRows,
+  dossierStatementRows,
+  type DossierStatementRow,
   CRITERION_STATUS_GLYPH,
   CRITERION_STATUS_WORDS,
   DILIGENCE_BASIS_WORDS,
@@ -46,9 +51,10 @@ const CHANNEL_WORDS = { EMAIL: "email", PHONE: "phone" } as const;
 export function DossierSection({
   dossier,
 }: {
-  readonly dossier: GateqDossierV1;
+  readonly dossier: GateqDossier;
 }) {
   const t = useT();
+  const statementRows = dossierStatementRows(dossier);
 
   const company = dossier.company;
   const contact = dossier.contact;
@@ -187,7 +193,11 @@ export function DossierSection({
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
+      {statementRows === null ? null : (
+        <StatementsSection rows={statementRows} />
+      )}
+
+      <div className="flex flex-col gap-3" hidden={statementRows !== null}>
         <h4 className="cq-label">{t("What the founder told you")}</h4>
         {dossier.dimensions.length === 0 ? (
           <p className="cq-body-sm gq-t2">{t("No facts recorded.")}</p>
@@ -237,13 +247,15 @@ export function DossierSection({
         <div className="flex flex-col gap-1.5">
           <h4 className="cq-label">{t("Open questions")}</h4>
           <ul className="gq-hair">
-            {dossier.contradictions.map((line) => (
-              <li key={`c-${line}`} className="flex items-start gap-2 py-2">
-                <FitGlyph kind="part" />
-                <span className="flex-1 text-sm">{t(line)}</span>
-                <span className="gq-status">{t("Answers disagree")}</span>
-              </li>
-            ))}
+            {statementRows !== null
+              ? null
+              : dossier.contradictions.map((line) => (
+                  <li key={`c-${line}`} className="flex items-start gap-2 py-2">
+                    <FitGlyph kind="part" />
+                    <span className="flex-1 text-sm">{t(line)}</span>
+                    <span className="gq-status">{t("Answers disagree")}</span>
+                  </li>
+                ))}
             {dossier.missing.map((gap) => (
               <li
                 key={`m-${gap.dimension}`}
@@ -333,6 +345,89 @@ export function DossierSection({
         </p>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Slice 3: a v2 dossier's statements, as every reader shows them (the one
+ * shared formatter): each with its source, every disagreement with both
+ * values, their sources and its state, and what was corrected as history.
+ * Compact by default; "Show all" shows everything, and what is not shown
+ * is counted, never hidden.
+ */
+export function StatementsSection({
+  rows,
+}: {
+  readonly rows: readonly DossierStatementRow[];
+}) {
+  const t = useT();
+  const [showAll, setShowAll] = useState(false);
+  const { rows: shown, hidden } = compactStatementRows(rows, showAll);
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="gq-statements">
+      <h4 className="cq-label">{t("What the founder told you")}</h4>
+      {rows.length === 0 ? (
+        <p className="cq-body-sm gq-t2">{t("No facts recorded.")}</p>
+      ) : (
+        <ul className="gq-hair">
+          {shown.map((row) => (
+            <li
+              key={row.key}
+              className="flex flex-col gap-0.5 py-2"
+              data-kind={row.kind}
+              data-statement={row.statementIds.join(" ")}
+              data-source={row.sourceKinds.join(" ")}
+              data-disagreement={row.disagreementState ?? "NONE"}
+            >
+              <span className="flex flex-wrap items-baseline gap-2">
+                {row.kind === "DISAGREEMENT" ? <FitGlyph kind="part" /> : null}
+                <b className="font-medium">{t(row.label)}</b>
+                {row.kind === "HISTORY" ? (
+                  <span className="gq-prefill">{t("Earlier, corrected")}</span>
+                ) : null}
+                {row.kind === "DISAGREEMENT" ? (
+                  <span className="gq-status">{t("Answers disagree")}</span>
+                ) : null}
+                {row.stateWords === null ? null : (
+                  <span className="gq-prefill">{t(row.stateWords)}</span>
+                )}
+              </span>
+              {row.summaries.map((summary, index) => (
+                <span
+                  key={`${row.key}-${String(index)}`}
+                  className="cq-body-sm gq-t2"
+                >
+                  {t(summaryWords(summary))}{" "}
+                  <span className="cq-caption gq-t3">
+                    ({t(row.sourceWords[index] ?? "")}
+                    {row.sourceTurnSeqs[index] === null ||
+                    row.sourceTurnSeqs[index] === undefined
+                      ? ""
+                      : `, ${t("Interview turn")} ${String(row.sourceTurnSeqs[index])}`}
+                    )
+                  </span>
+                </span>
+              ))}
+            </li>
+          ))}
+        </ul>
+      )}
+      {hidden === 0 && !showAll ? null : (
+        <button
+          type="button"
+          className="cq-body-sm self-start underline underline-offset-4"
+          aria-expanded={showAll}
+          onClick={() => setShowAll((open) => !open)}
+        >
+          {showAll ? t("Show less") : t(`Show all (${String(hidden)} more)`)}
+        </button>
+      )}
+      <p className="cq-caption gq-t3">
+        {t(
+          "The founder's claims and documents. Capital Q hasn't verified them.",
+        )}
+      </p>
+    </div>
   );
 }
 

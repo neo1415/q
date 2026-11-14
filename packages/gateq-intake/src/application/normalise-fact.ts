@@ -207,9 +207,21 @@ export function stageCodeIn(words: string): string | null {
   if (/^pre_?seed$/u.test(slug)) return "pre_seed";
   // Series C and later are one stage on the gateway (STAGE_WORDS).
   if (/^series_[c-z](?:_|$)/u.test(slug)) return "series_c_plus";
-  const code = /^[a-z][a-z0-9_]{0,63}$/u.exec(slug.slice(0, 64))?.[0];
-  return code ?? null;
+  if (slug === "preseed") return "pre_seed";
+  // The closed company_stage vocabulary only (live 2026-11-14: a sentence
+  // slugged into "our_lead_angel_calls_us_seed_though..." was stored as a
+  // stage code). Anything else is not a stage code.
+  return STAGE_CODES.has(slug) ? slug : null;
 }
+
+/** The taxonomy's company_stage vocabulary. */
+export const STAGE_CODES: ReadonlySet<string> = new Set([
+  "pre_seed",
+  "seed",
+  "series_a",
+  "series_b",
+  "series_c_plus",
+]);
 
 /** Free text into the taxonomy resolver's phrases: split at list marks. */
 function phrasesIn(words: string): readonly string[] {

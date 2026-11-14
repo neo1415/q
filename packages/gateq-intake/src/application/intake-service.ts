@@ -15,6 +15,7 @@ import {
   type ApplicationCoverageDto,
   type ApplicationTranscriptTurnDto,
   type GateqContactChannel,
+  type GateqStatementViewV1,
 } from "@capital-q/contracts";
 
 import type {
@@ -38,7 +39,12 @@ import {
   type SessionToken,
 } from "../contracts/index.js";
 import { applicationProjection } from "../domain/projection.js";
-import type { StatementPlan } from "./statement-plan.js";
+import { formStatementPlan, type StatementPlan } from "./statement-plan.js";
+import {
+  coverageFromView,
+  effectiveStatementView,
+  statementViewDto,
+} from "./statement-words.js";
 import { disputedFactsFor, legacyFactsFrom } from "./statement-view.js";
 import {
   generateApplicationReference,
@@ -48,7 +54,11 @@ import {
   SESSION_LIFETIME_MS,
 } from "../domain/session-credential.js";
 import { coverageFor } from "./coverage.js";
-import { buildDossier, withDerivedAmountsMarked } from "./dossier.js";
+import {
+  buildDossier,
+  buildDossierV2,
+  withDerivedAmountsMarked,
+} from "./dossier.js";
 import {
   projectSelectedDisclosure,
   type DisclosureDocumentIdentity,
@@ -255,6 +265,11 @@ export type IntakeService = {
      * a caller must never claim text-only it cannot prove.
      */
     readonly disclosureLineage?: DisclosureLineage | undefined;
+    /**
+     * Slice 3: FORM when these are the form's own answers, which are then
+     * also written as FORM statements so every reader labels them so.
+     */
+    readonly origin?: "FORM" | undefined;
   }) => Promise<ApplicationView>;
   readonly attachDocument: (input: {
     readonly token: string;
@@ -482,6 +497,79 @@ export function createIntakeService(
     return { contact: null, required, confirmed: false };
   };
 
+  /**
+   * Slice 3: the one statement view every reader uses, in words; undefined
+   * in a composition without statements. With a selected-document
+   * disclosure, only the statements of the turns and legacy facts that
+   * disclosure keeps are in it (the Context Firewall holds for the view as
+   * it does for the facts).
+   */
+  const statementViewOf = async (
+    application: Application,
+    options: {
+      readonly tx?: TransactionContext | undefined;
+      readonly legacyFacts?: readonly ApplicationFact[] | undefined;
+      readonly disclosed?:
+        | {
+            readonly turns: readonly StoredTurn[];
+            readonly withheldFactIds: ReadonlySet<string>;
+          }
+        | undefined;
+    } = {},
+  ): Promise<GateqStatementViewV1 | undefined> => {
+    if (statements === undefined) return undefined;
+    const context =
+      options.tx !== undefined && statements.listInTransaction !== undefined
+        ? await statements.listInTransaction(options.tx, application.id)
+        : await statements.listFor(application.id);
+    const legacy =
+      options.legacyFacts ?? (await facts.currentFor(application.id));
+    let scoped: Pick<typeof context, "statements" | "links" | "events"> =
+      context;
+    const disclosed = options.disclosed;
+    if (disclosed !== undefined) {
+      const kept = new Set(
+        disclosed.turns.flatMap((turn) =>
+          turn.id === undefined ? [] : [turn.id],
+        ),
+      );
+      const keep = context.statements.filter(
+        (s) =>
+          (s.sourceTurnId === null || kept.has(s.sourceTurnId)) &&
+          !(
+            s.backfillKey !== null &&
+            disclosed.withheldFactIds.has(s.backfillKey.split(":")[1] ?? "")
+          ),
+      );
+      const ids = new Set<string>(keep.map((s) => s.id));
+      const links = context.links.filter(
+        (l) => ids.has(l.fromStatementId) && ids.has(l.toStatementId),
+      );
+      const linkIds = new Set<string>(links.map((l) => l.id));
+      scoped = {
+        statements: keep,
+        links,
+        events: context.events.filter(
+          (e) =>
+            linkIds.has(e.linkId) &&
+            (e.resolvedByStatementId === null ||
+              ids.has(e.resolvedByStatementId)),
+        ),
+      };
+    }
+    const { view, carriedTurnSeqs } = effectiveStatementView({
+      applicationId: application.id,
+      context: scoped,
+      legacyFacts: legacy,
+    });
+    const seqs = new Map<string, number>(carriedTurnSeqs);
+    for (const turn of turns === undefined
+      ? []
+      : await turns.listFor(application.id))
+      if (turn.id !== undefined) seqs.set(turn.id, turn.seq);
+    return statementViewDto(view, seqs);
+  };
+
   const policyFor = async (application: Application) => {
     const policy = await policies.policyByVersionId({
       gatewayId: application.gatewayId,
@@ -681,6 +769,29 @@ export function createIntakeService(
         // nothing (live D8).
         if (turns !== undefined && (await turns.pendingFor(application.id)))
           throw new IntakeRefusedError("REPLY_IN_PROGRESS");
+        if (statements !== undefined && input.origin === "FORM") {
+          // The form's answers as FORM statements, written first and in
+          // the same transaction as the legacy facts they project to.
+          const plan = formStatementPlan({
+            applicationId: application.id,
+            context:
+              statements.listInTransaction === undefined
+                ? await statements.listFor(application.id)
+                : await statements.listInTransaction(tx, application.id),
+            legacyFacts: await facts.currentFor(application.id),
+            proposed,
+            at,
+          });
+          if (plan.statements.length > 0)
+            await statements.appendInTransaction(tx, {
+              applicationId: application.id,
+              tenantId: application.tenantId,
+              statements: plan.statements,
+              links: plan.links,
+              events: [],
+              readings: [],
+            });
+        }
         await facts.record(tx, {
           applicationId: application.id,
           tenantId: application.tenantId,
@@ -872,7 +983,12 @@ export function createIntakeService(
         // Read under the application lock and build deterministically.
         // Selected Evidence identities and the received snapshot commit together.
         let v2:
-          { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
+          | {
+              readonly snapshot: unknown;
+              readonly dossier: unknown;
+              readonly snapshotVersion: 2 | 3;
+            }
+          | undefined;
         if (turns !== undefined) {
           const policy = await policyFor(application);
           const current =
@@ -885,11 +1001,39 @@ export function createIntakeService(
             budget -= turn.text.length;
             return budget >= 0;
           });
-          const coverage = coverageFor({
-            policy,
-            qualification,
-            facts: current,
+          // Slice 3: the statement view, read inside this transaction, is
+          // what the dossier, the snapshot and its coverage are built from.
+          const allCurrent = await facts.currentFor(application.id);
+          const statementView = await statementViewOf(application, {
+            tx,
+            legacyFacts: current,
+            ...(projected === undefined
+              ? {}
+              : {
+                  disclosed: {
+                    turns: projected.turns,
+                    withheldFactIds: new Set(
+                      allCurrent
+                        .filter(
+                          (fact) =>
+                            !projected.facts.some(
+                              (kept) => kept.id === fact.id,
+                            ),
+                        )
+                        .map((fact) => fact.id as string),
+                    ),
+                  },
+                }),
           });
+          const coverage =
+            statementView === undefined
+              ? coverageFor({ policy, qualification, facts: current })
+              : coverageFromView({
+                  policy,
+                  qualification,
+                  facts: current,
+                  view: statementView,
+                });
           const contact =
             standing.contact === null ? null : contactDto(standing.contact);
           const titles =
@@ -924,15 +1068,17 @@ export function createIntakeService(
                 ? {}
                 : { disclosedDocuments: frozen.documents }),
               ...(sharedDocuments.length === 0 ? {} : { sharedDocuments }),
-              snapshotVersion: 2,
+              ...(statementView === undefined
+                ? { snapshotVersion: 2 }
+                : { snapshotVersion: 3, statements: statementView }),
               contact,
               transcript: kept,
               transcriptTruncated: kept.length < transcript.length,
               coverage,
             },
             // A heard amount the person never said is Q's inference.
-            dossier: withDerivedAmountsMarked(
-              buildDossier({
+            dossier: (() => {
+              const common = {
                 reference: application.publicReference,
                 declaredName: application.declaredName,
                 submittedAt,
@@ -949,9 +1095,16 @@ export function createIntakeService(
                   ),
                 })),
                 turnCount: transcript.length,
-              }),
-              transcript,
-            ),
+              };
+              // A heard amount the person never said is Q's inference.
+              return statementView === undefined
+                ? withDerivedAmountsMarked(buildDossier(common), transcript)
+                : withDerivedAmountsMarked(
+                    buildDossierV2({ ...common, view: statementView }),
+                    transcript,
+                  );
+            })(),
+            snapshotVersion: statementView === undefined ? 2 : 3,
           };
         }
 
@@ -968,7 +1121,7 @@ export function createIntakeService(
             submittedAt,
             ...(v2 === undefined
               ? {}
-              : { dossier: v2.dossier, snapshotVersion: 2 as const }),
+              : { dossier: v2.dossier, snapshotVersion: v2.snapshotVersion }),
           });
           await applications.setStatus(
             tx,
@@ -1137,13 +1290,28 @@ export function createIntakeService(
       const qualification = await qualificationFor(application);
       const current = await facts.currentFor(application.id);
       const standing = await contactStanding(application);
+      // Slice 3: founder review reads the statement view, the same one the
+      // dossier is frozen from at Submit.
+      const statementView = await statementViewOf(application, {
+        legacyFacts: current,
+      });
       return ApplicationCoverageDtoSchema.parse({
-        coverage: coverageFor({
-          policy,
-          qualification,
-          facts: current,
-          includeSources: dependencies.coverageSources === true,
-        }),
+        coverage:
+          statementView === undefined
+            ? coverageFor({
+                policy,
+                qualification,
+                facts: current,
+                includeSources: dependencies.coverageSources === true,
+              })
+            : coverageFromView({
+                policy,
+                qualification,
+                facts: current,
+                view: statementView,
+                includeSources: dependencies.coverageSources === true,
+              }),
+        ...(statementView === undefined ? {} : { statements: statementView }),
         contact: {
           required: standing.required,
           confirmed: standing.confirmed,

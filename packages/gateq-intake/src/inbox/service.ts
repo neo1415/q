@@ -4,7 +4,8 @@ import {
   ApplicationTranscriptTurnDtoSchema,
   GATEQ_INBOX_VIEWS,
   GATEQ_TRANSCRIPT_MAX_TURNS,
-  GateqDossierV1Schema,
+  GATEQ_UNRESOLVED_WORDS,
+  GateqDossierSchema,
   GateqSynthesisSchema,
   GateqPassReasonSchema,
   type GateqInboxDetailDto,
@@ -384,7 +385,9 @@ export function createInboxService(dependencies: {
       // Only an authorised member of the receiving organisation reaches
       // here, and only for a submitted application (the row is a
       // submission). Older submissions carry neither: null, never a guess.
-      const dossier = GateqDossierV1Schema.safeParse(row.dossier ?? null);
+      // Every frozen version is read as it was frozen: v1 rows are never
+      // rewritten, v2 carries the statement view (slice 3).
+      const dossier = GateqDossierSchema.safeParse(row.dossier ?? null);
       const transcript = readTranscript(row.snapshot);
       const contact =
         dossier.success && dossier.data.contact !== null
@@ -406,7 +409,11 @@ export function createInboxService(dependencies: {
                 ? ("MEETS" as const)
                 : c.status === "NO_MATCH"
                   ? ("DOES_NOT_MEET" as const)
-                  : ("NOT_ANSWERED" as const),
+                  : // Decision 91: answers in disagreement are the
+                    // investor's judgement, never "not answered".
+                    c.status === "UNRESOLVED"
+                    ? ("UNRESOLVED" as const)
+                    : ("NOT_ANSWERED" as const),
           })),
         answers,
         note: profile.note,
@@ -985,7 +992,9 @@ export function createInboxService(dependencies: {
                 ? "Meets"
                 : c.status === "NO_MATCH"
                   ? "Doesn't meet"
-                  : "Needs clarification",
+                  : c.status === "UNRESOLVED"
+                    ? GATEQ_UNRESOLVED_WORDS
+                    : "Needs clarification",
           })),
         shared,
         omitted,

@@ -330,7 +330,7 @@ describe("projectView: the rules", () => {
     expect(reopened.status).toBe("DISAGREEMENT_OPEN");
   });
 
-  it("code detects a disagreement only on the same quantity and the same known date", () => {
+  it("code detects a disagreement on the same quantity for what may be the same period", () => {
     const view = projectView(
       [
         statement(1, "claims.traction", count(600), {
@@ -349,7 +349,8 @@ describe("projectView: the rules", () => {
           quantity: "weekly_active_users",
           asOf: "2026-11-01",
         }),
-        // Unknown dates are never assumed equal.
+        // Live 2026-11-14: unknown dates are never assumed to be different
+        // periods, so undated figures that differ are a disagreement.
         statement(4, "claims.traction", count(10), {
           minute: 4,
           quantity: "pilots",
@@ -357,6 +358,17 @@ describe("projectView: the rules", () => {
         statement(5, "claims.traction", count(12), {
           minute: 5,
           quantity: "pilots",
+        }),
+        // Two different known dates are two periods: no disagreement.
+        statement(6, "claims.traction", count(20), {
+          minute: 6,
+          quantity: "employees",
+          asOf: "2026-10-01",
+        }),
+        statement(7, "claims.traction", count(25), {
+          minute: 7,
+          quantity: "employees",
+          asOf: "2026-11-01",
         }),
       ],
       [],
@@ -366,6 +378,7 @@ describe("projectView: the rules", () => {
     expect(traction.disagreements.map((d) => d.key)).toEqual([
       `code:${uuid(1)}:${uuid(2)}`,
       `code:${uuid(1)}:${uuid(3)}`,
+      `code:${uuid(4)}:${uuid(5)}`,
     ]);
     expect(
       traction.disagreements.every((d) => d.origin === "CODE_DETECTED"),
@@ -889,7 +902,13 @@ describe("legacyFactsFrom and qualification: owner decision 91", () => {
       read.criteria.find((c) => c.dimension === "RAISE_SIZE")?.status,
     ).toBe("UNRESOLVED");
     expect(fitBandOf(read)).toBe("PARTIAL");
-    expect(rulesOf(read)).toEqual({ met: 1, total: 2, unknown: 1 });
+    expect(rulesOf(read)).toEqual({
+      met: 1,
+      total: 2,
+      unknown: 1,
+      // Decision 91: labelled apart from rules not answered.
+      unresolved: 1,
+    });
   });
 
   it("a disagreement the founder left open is still unresolved", () => {

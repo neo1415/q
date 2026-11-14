@@ -1,10 +1,18 @@
-import type {
-  GateqFitBand,
-  GateqInboxDto,
-  GateqInboxItemDto,
-  GateqInboxView,
-  GateqPassReason,
-  GateqDossierV1,
+import {
+  GATEQ_DISAGREEMENT_STATE_WORDS,
+  GATEQ_SOURCE_KIND_WORDS,
+  GATEQ_UNRESOLVED_WORDS,
+  gateqStatementsInWords,
+  type GateqDisagreementState,
+  type GateqDossier,
+  type GateqDossierV1,
+  type GateqFitBand,
+  type GateqInboxDto,
+  type GateqInboxItemDto,
+  type GateqInboxView,
+  type GateqPassReason,
+  type GateqStatementLine,
+  type GateqStatementViewV1,
 } from "@capital-q/contracts";
 
 /**
@@ -305,8 +313,9 @@ export const CRITERION_STATUS_WORDS: Readonly<
   NO_MATCH: "Doesn't meet",
   UNKNOWN: "Unknown",
   NOT_APPLICABLE: "Not applicable",
-  // Decision 91: the founder gave two answers; both are shown for review.
-  UNRESOLVED: "Two answers to review",
+  // Decision 91: the founder gave two answers; both are shown, and the
+  // call is the investor's, never "not answered" or "needs clarification".
+  UNRESOLVED: GATEQ_UNRESOLVED_WORDS,
 };
 
 export const CRITERION_STATUS_GLYPH: Readonly<
@@ -329,7 +338,7 @@ export const OUTCOME_WORDS: Readonly<
   QUALIFIED: "Qualifies under your published rules",
   NOT_QUALIFIED: "Doesn't qualify under your published rules",
   INSUFFICIENT_INFORMATION: "Not enough information to decide",
-  UNRESOLVED: "Two answers to review before deciding",
+  UNRESOLVED: GATEQ_UNRESOLVED_WORDS,
 };
 
 export const DILIGENCE_BASIS_WORDS: Readonly<
@@ -455,6 +464,10 @@ export function paneWhy(item: GateqInboxItemDto): string {
     case "NO":
       return "Doesn't qualify under your published rules: a required rule isn't met.";
     case "UNKNOWN": {
+      // Decision 91: a rule the founder's own answers disagree on is the
+      // investor's judgement, labelled apart from rules not answered.
+      const disputed = item.rules.unresolved ?? 0;
+      if (disputed > 0) return `${GATEQ_UNRESOLVED_WORDS}.`;
       const n = item.rules.unknown;
       return n === 0
         ? "Not enough information to decide."
@@ -552,7 +565,7 @@ const SUMMARY_ROWS: readonly {
  */
 export function onePageSummary(
   item: Pick<GateqInboxItemDto, "companyName" | "raise">,
-  dossier: GateqDossierV1 | null | undefined,
+  dossier: GateqDossier | null | undefined,
 ): readonly SummaryRow[] {
   const rows: SummaryRow[] = [
     { label: "Company", value: dossier?.company.name ?? item.companyName },
@@ -595,7 +608,7 @@ export function onePageSummary(
 
 /** The dossier's own diligence questions, a few, in the order it holds them. */
 export function openQuestions(
-  dossier: GateqDossierV1 | null | undefined,
+  dossier: GateqDossier | null | undefined,
   max = 3,
 ): readonly string[] {
   return (dossier?.diligenceQuestions ?? [])
@@ -630,4 +643,74 @@ export function draftAsk(input: {
       ? "Could you tell us a little more about your traction and your round?"
       : input.questions.map((question) => `- ${question}`).join("\n");
   return `${hello} thank you for applying to ${input.fund}. Before we go further, could you help us with a few questions?\n${asks}`;
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3: the dossier's statements, from the one statement view
+// ---------------------------------------------------------------------------
+
+/** Statement lines shown before "Show all" (standing disagreements always). */
+export const STATEMENT_ROWS_COMPACT = 12;
+
+export type DossierStatementRow = GateqStatementLine & {
+  readonly key: string;
+  /** Each side's source, in words, in the order of `summaries`. */
+  readonly sourceWords: readonly string[];
+  readonly stateWords: string | null;
+};
+
+/**
+ * A v2 dossier's statements as rows, through the shared formatter: every
+ * current statement with its source, each disagreement with both values
+ * and their sources and its state, and what was corrected, as history.
+ * Null for a v1 dossier, which is read as it was frozen.
+ */
+export function dossierStatementRows(
+  dossier: GateqDossier | null | undefined,
+): readonly DossierStatementRow[] | null {
+  if (dossier?.schemaVersion !== "gateq-dossier.v2") return null;
+  return statementRowsOf(dossier.statements);
+}
+
+/** Any statement view as rows: founder review and the dossier alike. */
+export function statementRowsOf(
+  view: GateqStatementViewV1,
+): readonly DossierStatementRow[] {
+  return gateqStatementsInWords(view).map((line) => ({
+    ...line,
+    key: `${line.kind}:${line.statementIds.join("+")}`,
+    sourceWords: line.sourceKinds.map(
+      (kind, index) =>
+        `${GATEQ_SOURCE_KIND_WORDS[kind]}${line.backfilled && index === 0 ? ", carried from earlier records" : ""}`,
+    ),
+    stateWords: stateWords(line.disagreementState),
+  }));
+}
+
+function stateWords(state: GateqDisagreementState | null): string | null {
+  return state === null ? null : GATEQ_DISAGREEMENT_STATE_WORDS[state];
+}
+
+/**
+ * GateqSynthesisV2's compact default, for statements: every standing
+ * disagreement and the first statements; history and the rest behind
+ * "Show all", with the count of what is not shown (decision 97).
+ */
+export function compactStatementRows(
+  rows: readonly DossierStatementRow[],
+  showAll: boolean,
+): {
+  readonly rows: readonly DossierStatementRow[];
+  readonly hidden: number;
+} {
+  if (showAll) return { rows, hidden: 0 };
+  let statements = 0;
+  const shown = rows.filter((row) => {
+    if (row.kind === "DISAGREEMENT")
+      return row.disagreementState !== "RESOLVED";
+    if (row.kind !== "STATEMENT") return false;
+    statements += 1;
+    return statements <= STATEMENT_ROWS_COMPACT;
+  });
+  return { rows: shown, hidden: rows.length - shown.length };
 }

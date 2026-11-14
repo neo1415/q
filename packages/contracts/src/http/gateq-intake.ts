@@ -239,6 +239,12 @@ export const ApplicationSummaryDtoSchema = z
     /** Published criteria nobody can answer yet, by label. */
     stillNeeded: z.array(z.string().max(120)).max(32),
     /**
+     * Decision 91: published criteria whose fact the applicant's own
+     * answers disagree on, by label. Neither met nor unanswered; may still
+     * apply. Optional for an older API (read: none).
+     */
+    unresolved: z.array(z.string().max(120)).max(32).optional(),
+    /**
      * The currency a round or cheque rule is set in, only when the amount
      * given was in another one (the rule then stays unanswered: no rate is
      * invented). A currency code, never a size.
@@ -756,6 +762,12 @@ export const GateqCoverageV1Schema = z
     access: AccessSchema,
     unmet: z.array(z.string().max(120)).max(32),
     stillNeeded: z.array(z.string().max(120)).max(32),
+    /**
+     * Decision 91: published criteria whose fact the applicant's own
+     * answers disagree on, by label. Neither met nor unanswered; may still
+     * apply. Optional for an older API (read: none).
+     */
+    unresolved: z.array(z.string().max(120)).max(32).optional(),
     answered: z.array(GateqCoverageAnsweredSchema).max(64),
     unknown: z.array(GateqCoverageGapSchema).max(64),
     declined: z.array(GateqCoverageGapSchema).max(64),
@@ -764,6 +776,145 @@ export const GateqCoverageV1Schema = z
   })
   .strict();
 export type GateqCoverageV1 = z.infer<typeof GateqCoverageV1Schema>;
+
+// ---------------------------------------------------------------------------
+// GateQ atomic statements, slice 3: the one statement view every reader uses
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a statement came from, as every reader labels it. COMPANY_PROFILE
+ * is never part of an application: it is the company's own Capital Q
+ * profile, named as such wherever Q or an investor reads it beside one.
+ */
+export const GATEQ_STATEMENT_SOURCE_KINDS = [
+  "APPLICATION_STATEMENT",
+  "FORM",
+  "DOCUMENT",
+  "COMPANY_PROFILE",
+] as const;
+export const GateqStatementSourceKindSchema = z.enum(
+  GATEQ_STATEMENT_SOURCE_KINDS,
+);
+export type GateqStatementSourceKind = z.infer<
+  typeof GateqStatementSourceKindSchema
+>;
+
+export const GATEQ_DISAGREEMENT_STATES = [
+  "OPEN",
+  "LEFT_OPEN",
+  "RESOLVED",
+] as const;
+export const GateqDisagreementStateSchema = z.enum(GATEQ_DISAGREEMENT_STATES);
+export type GateqDisagreementState = z.infer<
+  typeof GateqDisagreementStateSchema
+>;
+
+export const GATEQ_STATEMENT_VIEW_VERSION = "gateq-statement-view.v1" as const;
+
+/** One statement, in words: what was said, once, and where it came from. */
+export const GateqStatementWordsSchema = z
+  .object({
+    statementId: z.string().uuid(),
+    sourceKind: GateqStatementSourceKindSchema,
+    /** Recovered from a record kept before statements existed; said so. */
+    backfilled: z.boolean(),
+    valueKind: z.enum([
+      "TEXT",
+      "CODE",
+      "MONEY",
+      "COUNT",
+      "PERCENT",
+      "ZERO",
+      "UNKNOWN",
+    ]),
+    /** True for an UNKNOWN the founder chose not to give. */
+    declined: z.boolean(),
+    /** The value in plain words ("Zero revenue", "USD 2,000,000"). */
+    summary: z.string().min(1).max(2000),
+    /** The founder's own words. */
+    words: z.string().min(1).max(2000),
+    quantity: z.string().max(64).nullable(),
+    asOf: z.string().max(10).nullable(),
+    provenance: GateqFactProvenanceSchema,
+    /** The transcript turn it was said in; null for the form or a record. */
+    sourceTurnSeq: z.number().int().min(1).nullable(),
+    statedAt: z.string().max(40),
+  })
+  .strict();
+export type GateqStatementWords = z.infer<typeof GateqStatementWordsSchema>;
+
+export const GateqSupersededWordsSchema = GateqStatementWordsSchema.extend({
+  supersededBy: z.string().uuid(),
+  via: z.enum(["CORRECTION", "RESOLUTION"]),
+}).strict();
+export type GateqSupersededWords = z.infer<typeof GateqSupersededWordsSchema>;
+
+export const GateqDisagreementWordsSchema = z
+  .object({
+    key: z.string().min(1).max(120),
+    olderStatementId: z.string().uuid(),
+    newerStatementId: z.string().uuid(),
+    state: GateqDisagreementStateSchema,
+    resolvedByStatementId: z.string().uuid().nullable(),
+    /** False once a side is corrected away or it is resolved: history. */
+    active: z.boolean(),
+  })
+  .strict();
+export type GateqDisagreementWords = z.infer<
+  typeof GateqDisagreementWordsSchema
+>;
+
+export const GATEQ_DIMENSION_STATUSES = [
+  "SETTLED",
+  "ZERO",
+  "UNKNOWN",
+  "DECLINED",
+  "DISAGREEMENT_OPEN",
+  "DISAGREEMENT_LEFT_OPEN",
+  "UNANSWERED",
+] as const;
+
+/** Bounded by the statement store: an interview writes at most hundreds. */
+export const GATEQ_STATEMENTS_PER_DIMENSION_MAX = 400;
+
+export const GateqDimensionStatementsSchema = z
+  .object({
+    dimension: z.string().max(64),
+    label: z.string().max(80),
+    /** The investment group it is read under; null for contact and note. */
+    group: GateqInvestmentGroupSchema.nullable(),
+    status: z.enum(GATEQ_DIMENSION_STATUSES),
+    /** Every current statement, oldest first. */
+    statements: z
+      .array(GateqStatementWordsSchema)
+      .max(GATEQ_STATEMENTS_PER_DIMENSION_MAX),
+    /** Corrected or resolved away: kept as history, never erased. */
+    superseded: z
+      .array(GateqSupersededWordsSchema)
+      .max(GATEQ_STATEMENTS_PER_DIMENSION_MAX),
+    disagreements: z
+      .array(GateqDisagreementWordsSchema)
+      .max(GATEQ_STATEMENTS_PER_DIMENSION_MAX),
+  })
+  .strict();
+export type GateqDimensionStatements = z.infer<
+  typeof GateqDimensionStatementsSchema
+>;
+
+/**
+ * The deterministic statement view of one application (design 2026-11-14,
+ * slice 3), as founder review, the frozen dossier, the investor inbox,
+ * synthesis and the investor's Q all read it. Values are put into words by
+ * one server formatter, and `gateqStatementsInWords` turns the view into
+ * the same lines for every reader.
+ */
+export const GateqStatementViewV1Schema = z
+  .object({
+    version: z.literal(GATEQ_STATEMENT_VIEW_VERSION),
+    dimensions: z.array(GateqDimensionStatementsSchema).max(32),
+  })
+  .strict();
+export type GateqStatementViewV1 = z.infer<typeof GateqStatementViewV1Schema>;
 
 /** The applicant's coverage view, with what still stands before Submit. */
 export const ApplicationCoverageDtoSchema = z
@@ -780,11 +931,47 @@ export const ApplicationCoverageDtoSchema = z
       .strict(),
     documentCount: z.number().int().min(0),
     transcriptTurns: z.number().int().min(0),
+    /**
+     * Slice 3: every statement, kept, corrected and in disagreement, from
+     * the one statement view. Optional so an older API still parses.
+     */
+    statements: GateqStatementViewV1Schema.optional(),
   })
   .strict();
 export type ApplicationCoverageDto = z.infer<
   typeof ApplicationCoverageDtoSchema
 >;
+
+/** One finding in a frozen dossier, on ADR-001's separate axes. */
+export const GateqDossierFactSchema = z
+  .object({
+    dimension: z.string().max(64),
+    label: z.string().max(80),
+    summary: z.string().max(2000),
+    provenance: GateqFactProvenanceSchema,
+    /** Lineage: the recorded application fact this reads. */
+    sourceFactId: z.string().uuid(),
+    /**
+     * Lineage: the transcript turn (seq) it was heard in;
+     * null for the form, a document or an older fact.
+     */
+    sourceTurnSeq: z.number().int().min(1).nullable(),
+    /**
+     * Q_INFERENCE: a value Q derived (e.g. multiplied) from
+     * what was said, never the person's own words; it then
+     * carries its `derivation` (ADR-001 truth axis).
+     */
+    truthClass: z.enum(["USER_CLAIM", "ESTIMATE", "UNKNOWN", "Q_INFERENCE"]),
+    evidenceStatus: z.enum([
+      "NO_EVIDENCE",
+      "SELF_REPORTED",
+      "DOCUMENT_SUPPORTED",
+    ]),
+    /** How a Q_INFERENCE was reached, with the words it came from. */
+    derivation: z.string().max(600).optional(),
+  })
+  .strict();
+export type GateqDossierFact = z.infer<typeof GateqDossierFactSchema>;
 
 export const GATEQ_DOSSIER_SCHEMA_VERSION = "gateq-dossier.v1" as const;
 
@@ -856,43 +1043,7 @@ export const GateqDossierV1Schema = z
           .object({
             group: GateqInvestmentGroupSchema,
             label: z.string().max(80),
-            facts: z
-              .array(
-                z
-                  .object({
-                    dimension: z.string().max(64),
-                    label: z.string().max(80),
-                    summary: z.string().max(2000),
-                    provenance: GateqFactProvenanceSchema,
-                    /** Lineage: the recorded application fact this reads. */
-                    sourceFactId: z.string().uuid(),
-                    /**
-                     * Lineage: the transcript turn (seq) it was heard in;
-                     * null for the form, a document or an older fact.
-                     */
-                    sourceTurnSeq: z.number().int().min(1).nullable(),
-                    /**
-                     * Q_INFERENCE: a value Q derived (e.g. multiplied) from
-                     * what was said, never the person's own words; it then
-                     * carries its `derivation` (ADR-001 truth axis).
-                     */
-                    truthClass: z.enum([
-                      "USER_CLAIM",
-                      "ESTIMATE",
-                      "UNKNOWN",
-                      "Q_INFERENCE",
-                    ]),
-                    evidenceStatus: z.enum([
-                      "NO_EVIDENCE",
-                      "SELF_REPORTED",
-                      "DOCUMENT_SUPPORTED",
-                    ]),
-                    /** How a Q_INFERENCE was reached, with the words it came from. */
-                    derivation: z.string().max(600).optional(),
-                  })
-                  .strict(),
-              )
-              .max(32),
+            facts: z.array(GateqDossierFactSchema).max(32),
           })
           .strict(),
       )
@@ -935,3 +1086,55 @@ export const GateqDossierV1Schema = z
   })
   .strict();
 export type GateqDossierV1 = z.infer<typeof GateqDossierV1Schema>;
+
+export const GATEQ_DOSSIER_V2_SCHEMA_VERSION = "gateq-dossier.v2" as const;
+
+/**
+ * A v2 finding: one current statement of the statement view. `sourceFactId`
+ * keeps its v1 meaning of "the source record this finding reads", which in
+ * v2 is the statement itself (so it equals `statementId`), so every reader
+ * and every citation of v1 reads v2 unchanged.
+ */
+export const GateqDossierV2FactSchema = GateqDossierFactSchema.extend({
+  statementId: z.string().uuid(),
+  sourceKind: GateqStatementSourceKindSchema,
+  backfilled: z.boolean(),
+  /** The state of a disagreement it is part of; null when none stands. */
+  disagreementState: GateqDisagreementStateSchema.nullable(),
+}).strict();
+export type GateqDossierV2Fact = z.infer<typeof GateqDossierV2FactSchema>;
+
+/**
+ * The frozen dossier built from the statement view (slice 3; submission
+ * snapshot v3). Every current statement is a finding with its source, the
+ * full view travels with it (superseded history and disagreements with
+ * their state), and nothing is joined text. Frozen v1 rows are never
+ * rewritten: readers accept both through `GateqDossierSchema`.
+ */
+export const GateqDossierV2Schema = GateqDossierV1Schema.extend({
+  schemaVersion: z.literal(GATEQ_DOSSIER_V2_SCHEMA_VERSION),
+  dimensions: z
+    .array(
+      z
+        .object({
+          group: GateqInvestmentGroupSchema,
+          label: z.string().max(80),
+          facts: z
+            .array(GateqDossierV2FactSchema)
+            .max(GATEQ_STATEMENTS_PER_DIMENSION_MAX),
+        })
+        .strict(),
+    )
+    .max(GATEQ_INVESTMENT_GROUPS.length),
+  /** Decision 97: more disagreements than the 16 lines above, counted. */
+  contradictionsTotal: z.number().int().min(0),
+  statements: GateqStatementViewV1Schema,
+}).strict();
+export type GateqDossierV2 = z.infer<typeof GateqDossierV2Schema>;
+
+/** Every frozen dossier version a reader accepts. */
+export const GateqDossierSchema = z.discriminatedUnion("schemaVersion", [
+  GateqDossierV1Schema,
+  GateqDossierV2Schema,
+]);
+export type GateqDossier = z.infer<typeof GateqDossierSchema>;

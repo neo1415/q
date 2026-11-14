@@ -2,10 +2,20 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  ApplicationTranscriptTurnDtoSchema,
+  GateqDossierSchema,
+  gateqReadingSources,
+  gateqStatementIdentities,
+  gateqStatementsInWords,
+} from "@capital-q/contracts";
+
 import type { ApplicationStatementView } from "../src/contracts/statements.js";
+import { synthesisParts } from "../src/application/dossier-synthesis.js";
 import { InterviewUnavailableError } from "../src/application/interviewer.js";
 import {
   claimsRecording,
+  NOT_LEFT_OPEN_LINE,
   NOT_RECORDED_LINE,
 } from "../src/application/statement-plan.js";
 import {
@@ -324,6 +334,340 @@ describe("the long journey: 34 turns, invariants 1-7 after every turn", () => {
     }
     const qualification = await intake.qualification(token);
     expect(qualification.outcome).toBe("QUALIFIED");
+
+    await assertReadersAgree({ world, intake, token, applicationId });
+  });
+});
+
+/** One reader's (statement ids, sources, disagreement state) keys. */
+function synthesisIdentities(findings: readonly string[]): string[] {
+  const keys = new Set<string>();
+  for (const line of findings) {
+    const history =
+      /^sourceFactId=([0-9a-f-]{36}) \| .*\(earlier, superseded; history only\): .*\[source=([A-Z_]+); disagreement=none;/u.exec(
+        line,
+      );
+    if (history !== null) {
+      keys.add(`HISTORY:${history[1] ?? ""}:${history[2] ?? ""}:NONE`);
+      continue;
+    }
+    const statement =
+      /^sourceFactId=([0-9a-f-]{36}) \| [^[]*\[source=([A-Z_]+); disagreement=([A-Za-z_]+);/u.exec(
+        line,
+      );
+    if (statement !== null) {
+      keys.add(
+        `STATEMENT:${statement[1] ?? ""}:${statement[2] ?? ""}:${statement[3] === "none" ? "NONE" : (statement[3] ?? "")}`,
+      );
+      continue;
+    }
+    const disagreement =
+      /^sourceFactId=([0-9a-f-]{36}) and sourceFactId=([0-9a-f-]{36}) \| [^[]*\[source=([A-Z_+]+); disagreement=([A-Z_]+);/u.exec(
+        line,
+      );
+    if (disagreement !== null) {
+      keys.add(
+        `DISAGREEMENT:${disagreement[1] ?? ""}+${disagreement[2] ?? ""}:${disagreement[3] ?? ""}:${disagreement[4] ?? ""}`,
+      );
+      continue;
+    }
+  }
+  return [...keys].sort();
+}
+
+/**
+ * Invariant 8: founder review, the frozen dossier, the investor inbox,
+ * Q's synthesis and the investor's Q agree on the facts and their sources:
+ * the same (statement id, source kind, disagreement state) sets, read
+ * through each surface's own path.
+ */
+async function assertReadersAgree(input: {
+  readonly world: World;
+  readonly intake: ReturnType<World["services"]>["intake"];
+  readonly token: string;
+  readonly applicationId: string;
+}): Promise<void> {
+  const { world, intake, token } = input;
+  // Founder review, before Submit.
+  const review = await intake.coverage(token);
+  if (review.statements === undefined) throw new Error("no statement view");
+  const reviewLines = gateqStatementsInWords(review.statements);
+  const reviewKeys = gateqStatementIdentities(reviewLines);
+  expect(reviewKeys.length).toBeGreaterThan(10);
+  // Every statement on record (investment dimensions) is in the view.
+  const recorded = world
+    .store()
+    .statementRows.filter(
+      (s) =>
+        !s.dimension.startsWith("contact.") &&
+        s.dimension !== "application.note",
+    )
+    .map((s) => s.id);
+  const shown = new Set(
+    reviewLines
+      .filter((l) => l.kind !== "DISAGREEMENT")
+      .flatMap((l) => l.statementIds),
+  );
+  for (const id of recorded) expect(shown.has(id), id).toBe(true);
+  // A stated zero reads "Zero …"; the left-open traction pair is in
+  // review with both values and its state.
+  expect(
+    reviewLines.find(
+      (l) => l.kind === "STATEMENT" && l.dimension === "claims.revenue",
+    )?.summaries[0],
+  ).toMatch(/^Zero /u);
+  const leftOpen = reviewLines.filter(
+    (l) => l.kind === "DISAGREEMENT" && l.disagreementState === "LEFT_OPEN",
+  );
+  expect(leftOpen.length).toBeGreaterThan(0);
+  expect(review.coverage.contradictions.join("\n")).toContain(
+    "left open by the founder",
+  );
+
+  // Submit: dossier v2 and snapshot v3, built from the view.
+  await intake.submit({ token, clientRequestId: "journey-submit-0001" });
+  const frozen = world.submitted().at(-1);
+  expect(frozen?.snapshotVersion).toBe(3);
+  const dossier = GateqDossierSchema.parse(frozen?.dossier);
+  if (dossier.schemaVersion !== "gateq-dossier.v2")
+    throw new Error("expected a v2 dossier");
+  const dossierKeys = gateqStatementIdentities(
+    gateqStatementsInWords(dossier.statements),
+  );
+  expect(dossierKeys).toEqual(reviewKeys);
+  // Its findings are exactly the held current statements, with sources.
+  const findings = dossier.dimensions.flatMap((g) => g.facts);
+  const heldLines = gateqStatementsInWords(dossier.statements).filter(
+    (l) =>
+      l.kind === "STATEMENT" &&
+      dossier.statements.dimensions
+        .flatMap((d) => d.statements)
+        .find((s) => s.statementId === l.statementIds[0])?.valueKind !==
+        "UNKNOWN",
+  );
+  expect(
+    findings
+      .map(
+        (f) =>
+          `${f.statementId}:${f.sourceKind}:${f.disagreementState ?? "NONE"}`,
+      )
+      .sort(),
+  ).toEqual(
+    heldLines
+      .map(
+        (l) =>
+          `${l.statementIds[0] ?? ""}:${l.sourceKinds[0] ?? ""}:${l.disagreementState ?? "NONE"}`,
+      )
+      .sort(),
+  );
+
+  // The investor inbox reads the frozen row as stored JSON.
+  const inboxDossier = GateqDossierSchema.parse(
+    JSON.parse(JSON.stringify(frozen?.dossier)),
+  );
+  if (inboxDossier.schemaVersion !== "gateq-dossier.v2")
+    throw new Error("expected a v2 dossier in the inbox");
+  expect(
+    gateqStatementIdentities(gateqStatementsInWords(inboxDossier.statements)),
+  ).toEqual(reviewKeys);
+
+  // Q's synthesis context: every part's findings.
+  const transcript = ApplicationTranscriptTurnDtoSchema.array().parse(
+    (frozen?.snapshot as { transcript?: unknown }).transcript ?? [],
+  );
+  const plan = synthesisParts({ dossier, transcript });
+  const synthesisKeys = synthesisIdentities([
+    ...new Set(plan.parts.flatMap((p) => p.findings.split("\n"))),
+  ]);
+  expect(synthesisKeys).toEqual(reviewKeys);
+  // Everything it was shown is citable by the id it was shown with.
+  for (const key of reviewKeys)
+    for (const id of key.split(":")[1]?.split("+") ?? [])
+      expect(
+        plan.parts.some((p) => p.factIds.has(id)),
+        id,
+      ).toBe(true);
+
+  // The investor's Q: each source carries its own kind.
+  const sources = gateqReadingSources(dossier)
+    .map((s) => `STATEMENT:${s.factId}:${s.sourceKind}`)
+    .sort();
+  expect(sources).toEqual(
+    reviewKeys
+      .filter((k) => k.startsWith("STATEMENT:"))
+      .map((k) => k.split(":").slice(0, 3).join(":"))
+      .sort(),
+  );
+}
+
+describe("live 2026-11-14 (sustained certification): undated figures and leaving it open", () => {
+  it("links undated 600 and 1,500 weekly active, records leave-open as an event, never claims it otherwise and never re-asks", async () => {
+    const world = statementWorld();
+    const { intake, conversation } = world.services();
+    const { token } = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    const applicationId = (await intake.authorise(token)).application.id;
+    world.scripts.push(() =>
+      reading({ reply: "Hello, I'm Q. What are you building?" }),
+    );
+    await conversation.openingFor({ token, correlationId: randomUUID() });
+    const send = (id: string, message: string) =>
+      conversation.turn({
+        token,
+        message,
+        clientTurnId: id,
+        correlationId: randomUUID(),
+      });
+    const weekly = (count: string, words: string) => ({
+      op: "NEW" as const,
+      target: null,
+      turn: null,
+      dimension: "claims.traction",
+      quantity: "weekly_active_users" as const,
+      value: { kind: "COUNT" as const, count },
+      asOf: null,
+      words,
+      provenance: "APPLICANT_PROVIDED" as const,
+    });
+
+    world.advance(60_000);
+    world.scripts.push(() =>
+      reading({
+        reply: "Thanks. What else?",
+        statements: [weekly("600", "about 600 weekly active")],
+      }),
+    );
+    await send("live-0001", "We have about 600 weekly active.");
+
+    world.advance(60_000);
+    world.scripts.push(() =>
+      reading({
+        reply: "Thanks. What else?",
+        statements: [weekly("1500", "1,500 weekly active on the dashboard")],
+      }),
+    );
+    await send("live-0002", "The dashboard says 1,500 weekly active.");
+    let store = world.store();
+    const link = store.linkRows.find((l) => l.kind === "DISAGREES");
+    expect(link?.origin).toBe("CODE_DETECTED");
+    let view = viewOf(world);
+    expect(statusOf(view, "claims.traction")).toBe("DISAGREEMENT_OPEN");
+
+    // A reply claiming it is left open, before anything was: removed.
+    world.advance(60_000);
+    world.scripts.push(() =>
+      reading({
+        reply:
+          "I'll leave the two dashboard figures unresolved. Who are your customers?",
+      }),
+    );
+    await send("live-0003", "Small shops.");
+    store = world.store();
+    const falseClaim = store.turnRows.find(
+      (t) => t.clientTurnId === "live-0003" && t.role === "Q",
+    );
+    expect(falseClaim?.text).not.toContain("unresolved");
+    expect(falseClaim?.text.startsWith(NOT_LEFT_OPEN_LINE)).toBe(true);
+    expect(store.eventRows).toHaveLength(0);
+
+    // "Leave it open for now", read as an UNKNOWN on the dimension: the
+    // LEFT_OPEN event, no UNKNOWN statement, and the claim stands.
+    world.advance(60_000);
+    world.scripts.push(() =>
+      reading({
+        reply: "I'll leave the two dashboard figures unresolved.",
+        intent: "UNKNOWN_OR_SKIP",
+        statements: [
+          {
+            ...weekly("1", "leave it open for now"),
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+          },
+        ],
+      }),
+    );
+    const before = world.store().statementRows.length;
+    await send("live-0004", "Leave it open for now.");
+    store = world.store();
+    expect(store.statementRows).toHaveLength(before);
+    expect(store.eventRows.map((e) => e.state)).toEqual(["LEFT_OPEN"]);
+    expect(store.eventRows[0]?.linkId).toBe(link?.id);
+    const kept = store.turnRows.find(
+      (t) => t.clientTurnId === "live-0004" && t.role === "Q",
+    );
+    expect(kept?.text).toContain("unresolved");
+    view = viewOf(world);
+    expect(statusOf(view, "claims.traction")).toBe("DISAGREEMENT_LEFT_OPEN");
+
+    // Never asked again.
+    world.advance(60_000);
+    world.scripts.push(() => reading({ reply: "What is the raise?" }));
+    await send("live-0005", "What next?");
+    const prompt = world.prompts.at(-1);
+    expect(
+      prompt?.needs().some((need) => need.dimension === "claims.traction"),
+    ).toBe(false);
+    expect(
+      prompt
+        ?.contradictions()
+        .some((line) => line.endsWith("(left open by them)")),
+    ).toBe(true);
+    expect(await world.turns.pendingFor(applicationId as never)).toBe(false);
+  });
+});
+
+describe("the form's answers are FORM statements", () => {
+  it("labels form answers FORM, a later form edit corrects them as history, and every reader agrees", async () => {
+    const world = statementWorld();
+    const { intake } = world.services();
+    const { token } = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    await intake.recordFacts({
+      token,
+      origin: "FORM",
+      facts: [
+        {
+          dimension: "company.name",
+          value: { kind: "TEXT", text: "Formly" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+        {
+          dimension: "claims.traction",
+          value: { kind: "TEXT", text: "40 shops" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+      ],
+    });
+    world.advance(60_000);
+    await intake.recordFacts({
+      token,
+      origin: "FORM",
+      facts: [
+        {
+          dimension: "claims.traction",
+          value: { kind: "TEXT", text: "55 shops" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+      ],
+    });
+    const store = world.store();
+    expect(store.statementRows.map((s) => s.origin)).toEqual([
+      "FORM",
+      "FORM",
+      "FORM",
+    ]);
+    const review = await intake.coverage(token);
+    if (review.statements === undefined) throw new Error("no view");
+    const lines = gateqStatementsInWords(review.statements);
+    const traction = lines.filter((l) => l.dimension === "claims.traction");
+    expect(
+      traction.map((l) => [l.kind, l.summaries[0], l.sourceKinds[0]]),
+    ).toEqual([
+      ["STATEMENT", "55 shops", "FORM"],
+      ["HISTORY", "40 shops", "FORM"],
+    ]);
   });
 });
 

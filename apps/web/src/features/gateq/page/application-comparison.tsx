@@ -179,7 +179,9 @@ function ComparisonTable({
                           ? t("Meets")
                           : rule.standing === "DOES_NOT_MEET"
                             ? t("Doesn't meet")
-                            : t("Needs clarification")}{" "}
+                            : rule.standing === "UNRESOLVED"
+                              ? t("Needs your judgement: answers disagree")
+                              : t("Needs clarification")}{" "}
                         · {rule.required ? t("Required") : t("Preferred")}
                       </li>
                     ))
@@ -192,7 +194,8 @@ function ComparisonTable({
                             NO_MATCH: "Doesn't meet",
                             UNKNOWN: "Needs clarification",
                             NOT_APPLICABLE: "Not applicable",
-                            UNRESOLVED: "Two answers to review",
+                            UNRESOLVED:
+                              "Needs your judgement: answers disagree",
                           }[rule.status],
                         )}{" "}
                         ·{" "}

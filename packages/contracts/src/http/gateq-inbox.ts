@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   ApplicationTranscriptTurnDtoSchema,
   GATEQ_TRANSCRIPT_MAX_TURNS,
-  GateqDossierV1Schema,
+  GateqDossierSchema,
 } from "./gateq-intake.js";
 
 /**
@@ -226,6 +226,11 @@ export const GateqInboxItemDtoSchema = z
         met: z.number().int().min(0),
         total: z.number().int().min(0),
         unknown: z.number().int().min(0),
+        /**
+         * Decision 91: of `unknown`, the rules whose fact the founder's own
+         * answers disagree on. Optional for an older API (read: 0).
+         */
+        unresolved: z.number().int().min(0).optional(),
       })
       .strict(),
     starred: z.boolean(),
@@ -274,6 +279,12 @@ export const GateqRuleStandingSchema = z.enum([
   "MEETS",
   "DOES_NOT_MEET",
   "NOT_ANSWERED",
+  /**
+   * Decision 91: the founder's own answers on the rule's fact disagree.
+   * Neither unanswered nor a miss: the investor's judgement, with both
+   * values in the dossier.
+   */
+  "UNRESOLVED",
 ]);
 
 /** Current company assessment, separate from the immutable submitted dossier. */
@@ -358,7 +369,7 @@ export const GateqInboxDetailDtoSchema = z
      * Null for a submission made before dossiers existed. Optional on the
      * wire so an older API and a newer client still agree.
      */
-    dossier: GateqDossierV1Schema.nullable().optional(),
+    dossier: GateqDossierSchema.nullable().optional(),
     /**
      * The interview transcript exactly as submitted (snapshot v2). Null
      * when the submission carried none (v1, or a form-only application).

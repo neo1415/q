@@ -219,6 +219,8 @@ const STANDING_WORDS: Readonly<Record<CriterionLine["standing"], string>> = {
   MET: "matches",
   NOT_MET: "doesn't match",
   UNKNOWN: "not known yet",
+  // Decision 91: never "matches" while their own answers disagree.
+  UNRESOLVED: "your answers disagree",
 };
 
 function StandingIcon({

@@ -431,7 +431,7 @@ describe("reading the inbox (F4)", () => {
       ["Sunline", "FITS"],
     ]);
     expect(inbox.items.find((i) => i.companyName === "Harvest")?.rules).toEqual(
-      { met: 2, total: 3, unknown: 1 },
+      { met: 2, total: 3, unknown: 1, unresolved: 0 },
     );
     expect(inbox.counts.FITS).toBe(1);
     expect(inbox.counts.NOT_A_FIT).toBe(1);

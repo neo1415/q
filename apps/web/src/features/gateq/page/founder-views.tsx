@@ -277,14 +277,17 @@ const STOOD_WORDS = {
   DOES_NOT_MEET_REQUIRED: "Not met, required",
   DOES_NOT_MEET_PREFERRED: "Not met, preferred",
   NOT_ANSWERED: "Not answered",
+  // Decision 91: both of their answers went; never "Met".
+  UNRESOLVED: "Your answers disagree",
 } as const;
 
 /** How one published rule stood when it was sent, in words. */
 export function stoodWords(rule: {
   readonly required: boolean;
-  readonly standing: "MEETS" | "DOES_NOT_MEET" | "NOT_ANSWERED";
+  readonly standing: "MEETS" | "DOES_NOT_MEET" | "NOT_ANSWERED" | "UNRESOLVED";
 }): string {
   if (rule.standing === "MEETS") return STOOD_WORDS.MEETS;
+  if (rule.standing === "UNRESOLVED") return STOOD_WORDS.UNRESOLVED;
   if (rule.standing === "NOT_ANSWERED") return STOOD_WORDS.NOT_ANSWERED;
   return rule.required
     ? STOOD_WORDS.DOES_NOT_MEET_REQUIRED
@@ -327,7 +330,8 @@ function FounderApplicationDetail({
                     <span className="gq-tick">
                       <Check {...icon} size={12} strokeWidth={2.4} />
                     </span>
-                  ) : rule.standing === "NOT_ANSWERED" ? (
+                  ) : rule.standing === "NOT_ANSWERED" ||
+                    rule.standing === "UNRESOLVED" ? (
                     <span className="gq-unk-ic">
                       <CircleHelp {...icon} />
                     </span>

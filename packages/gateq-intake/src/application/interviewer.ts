@@ -976,7 +976,11 @@ export function createGateQInterviewer(
         );
         return {
           // Invariant 7: "noted" only when the reading recorded something.
-          reply: replyHeldToReading(composed, planned.recordedCount),
+          reply: replyHeldToReading(
+            composed,
+            planned.recordedCount,
+            planned.leftOpenCount,
+          ),
           intent: result.intent,
           facts: planned.plan.legacyFacts,
           rejectedFacts: planned.rejected,

@@ -1,8 +1,9 @@
 import {
   GATEQ_SYNTHESIS_TEXT_MAX,
-  GateqDossierV1Schema,
+  GateqDossierSchema,
   type ApplicationTranscriptTurnDto,
-  type GateqDossierV1,
+  type GateqDossier,
+  gateqStatementsInWords,
   type GateqSynthesisPointV2,
   type GateqSynthesisV2,
 } from "@capital-q/contracts";
@@ -147,23 +148,83 @@ const CRITERION_TOPICS: readonly (readonly [RegExp, readonly string[]])[] = [
 ];
 
 type FactLine = {
-  readonly id: string;
-  readonly turnSeq: number | null;
+  /** What a point resting on this line cites (two for a disagreement). */
+  readonly ids: readonly string[];
+  readonly turnSeqs: readonly number[];
   readonly line: string;
 };
 
+/**
+ * Slice 3: a v2 dossier's findings from its statement view, through the
+ * one shared formatter: every current statement by id with its source and
+ * disagreement state, then each disagreement with both values and their
+ * sources, then what was corrected away, as history. Every id is citable.
+ */
+function statementLines(dossier: GateqDossier): FactLine[] | null {
+  if (dossier.schemaVersion !== "gateq-dossier.v2") return null;
+  const groupLabel = new Map(
+    dossier.dimensions.map((group) => [group.group as string, group.label]),
+  );
+  const finding = new Map(
+    dossier.dimensions.flatMap((group) =>
+      group.facts.map((fact) => [fact.statementId, fact] as const),
+    ),
+  );
+  const lines = gateqStatementsInWords(dossier.statements);
+  const seqs = (line: (typeof lines)[number]) =>
+    line.sourceTurnSeqs.flatMap((seq) => (seq === null ? [] : [seq]));
+  const where = (line: (typeof lines)[number]) =>
+    `${line.group === null ? "" : `${groupLabel.get(line.group) ?? line.group} / `}${line.label}`;
+  const ordered = [
+    ...lines.filter((line) => line.kind === "STATEMENT"),
+    ...lines.filter((line) => line.kind === "DISAGREEMENT"),
+    ...lines.filter((line) => line.kind === "HISTORY"),
+  ];
+  return ordered.map((line) => {
+    const turns = seqs(line).join(",") || "form";
+    const source = line.sourceKinds.join("+");
+    const state = line.disagreementState ?? "none";
+    if (line.kind === "STATEMENT") {
+      const id = line.statementIds[0] ?? "";
+      const fact = finding.get(id);
+      const axes =
+        fact === undefined
+          ? "truth=UNKNOWN; evidence=NO_EVIDENCE"
+          : `truth=${fact.truthClass}; evidence=${fact.evidenceStatus}`;
+      return {
+        ids: [id],
+        turnSeqs: seqs(line),
+        line: `sourceFactId=${id} | ${where(line)}: ${line.summaries[0] ?? ""} [source=${source}; disagreement=${state}; ${axes}; turn=${turns}]${fact?.derivation === undefined ? "" : ` (${fact.derivation})`}`,
+      };
+    }
+    if (line.kind === "DISAGREEMENT")
+      return {
+        ids: [...line.statementIds],
+        turnSeqs: seqs(line),
+        line: `sourceFactId=${line.statementIds.join(" and sourceFactId=")} | ${where(line)}: the founder's answers disagree [source=${source}; disagreement=${state}; turn=${turns}]: ${line.text}`,
+      };
+    return {
+      ids: [...line.statementIds],
+      turnSeqs: seqs(line),
+      line: `sourceFactId=${line.statementIds[0] ?? ""} | ${where(line)} (earlier, superseded; history only): ${line.summaries[0] ?? ""} [source=${source}; disagreement=none; turn=${turns}]`,
+    };
+  });
+}
+
 /** Every frozen fact as a line with its id, then code's summary lines. */
 function findingLines(input: {
-  readonly dossier: GateqDossierV1;
+  readonly dossier: GateqDossier;
   readonly transcript: readonly ApplicationTranscriptTurnDto[];
 }): { readonly facts: readonly FactLine[]; readonly summary: string[] } {
   const dossier = withDerivedAmountsMarked(input.dossier, input.transcript);
-  const facts: FactLine[] = [];
-  for (const group of dossier.dimensions) {
+  const facts: FactLine[] = statementLines(dossier) ?? [];
+  for (const group of dossier.schemaVersion === "gateq-dossier.v2"
+    ? []
+    : dossier.dimensions) {
     for (const fact of group.facts) {
       facts.push({
-        id: fact.sourceFactId,
-        turnSeq: fact.sourceTurnSeq,
+        ids: [fact.sourceFactId],
+        turnSeqs: fact.sourceTurnSeq === null ? [] : [fact.sourceTurnSeq],
         line: `sourceFactId=${fact.sourceFactId} | ${group.label} / ${fact.label}: ${fact.summary} [truth=${fact.truthClass}; evidence=${fact.evidenceStatus}; turn=${fact.sourceTurnSeq ?? "form"}]${fact.derivation === undefined ? "" : ` (${fact.derivation})`}`,
       });
     }
@@ -172,18 +233,19 @@ function findingLines(input: {
   // with bare labels, a location mismatch was cited to the stage, sector
   // and raise facts). The frozen dossier keeps only the investor's label,
   // so the topic is read from it; a label naming no topic cites nothing.
-  const factOf = new Map(
-    dossier.dimensions.flatMap((group) =>
-      group.facts.map((fact) => [fact.dimension, fact.sourceFactId] as const),
-    ),
-  );
+  // Every finding on the dimension: two answers in disagreement are both
+  // what the rule was checked against (decision 91).
+  const factOf = new Map<string, string[]>();
+  for (const group of dossier.dimensions)
+    for (const fact of group.facts)
+      factOf.set(fact.dimension, [
+        ...(factOf.get(fact.dimension) ?? []),
+        fact.sourceFactId,
+      ]);
   const checked = (label: string): string => {
     const ids = CRITERION_TOPICS.filter(([pattern]) => pattern.test(label))
       .flatMap(([, dimensions]) => dimensions)
-      .flatMap((dimension) => {
-        const id = factOf.get(dimension);
-        return id === undefined ? [] : [id];
-      });
+      .flatMap((dimension) => factOf.get(dimension) ?? []);
     return ids.length === 0
       ? ""
       : ` (checked against sourceFactId=${[...new Set(ids)].join(", sourceFactId=")})`;
@@ -313,7 +375,7 @@ function chunk<T>(
  */
 export function synthesisParts(
   input: {
-    readonly dossier: GateqDossierV1;
+    readonly dossier: GateqDossier;
     readonly transcript: readonly ApplicationTranscriptTurnDto[];
   },
   budgets: Pick<
@@ -340,11 +402,7 @@ export function synthesisParts(
   const findingsOf = (group: readonly FactLine[]) =>
     [...group.map((fact) => fact.line), ...summary].join("\n").trim();
   for (const group of factChunks) {
-    const cited = [
-      ...new Set(
-        group.flatMap((fact) => (fact.turnSeq === null ? [] : [fact.turnSeq])),
-      ),
-    ];
+    const cited = [...new Set(group.flatMap((fact) => fact.turnSeqs))];
     const shown = chooseTurns(turns, cited, budgets.transcriptChars);
     for (const turn of shown) read.add(turn.seq);
     parts.push({
@@ -355,7 +413,7 @@ export function synthesisParts(
         shown.map((turn) => turn.seq),
         false,
       ),
-      factIds: new Set(group.map((fact) => fact.id)),
+      factIds: new Set(group.flatMap((fact) => fact.ids)),
       turnSeqs: new Set(shown.map((turn) => turn.seq)),
     });
   }
@@ -376,7 +434,7 @@ export function synthesisParts(
         piece.map((turn) => turn.seq),
         true,
       ),
-      factIds: new Set(first.map((fact) => fact.id)),
+      factIds: new Set(first.flatMap((fact) => fact.ids)),
       turnSeqs: new Set(piece.map((turn) => turn.seq)),
     });
   }
@@ -388,7 +446,7 @@ export function synthesisParts(
  * the findings, the transcript and what may be cited.
  */
 export function synthesisContext(input: {
-  readonly dossier: GateqDossierV1;
+  readonly dossier: GateqDossier;
   readonly transcript: readonly ApplicationTranscriptTurnDto[];
 }): SynthesisPart {
   const plan = synthesisParts(input);
@@ -572,7 +630,7 @@ export function createDossierSynthesis(deps: {
   /** Every part, continued while Q has more, within the call budget. */
   const read = async (
     item: PendingSynthesis,
-    dossier: GateqDossierV1,
+    dossier: GateqDossier,
   ): Promise<GateqSynthesisV2 | null> => {
     const plan = synthesisParts(
       { dossier, transcript: item.transcript },
@@ -698,7 +756,7 @@ export function createDossierSynthesis(deps: {
   };
 
   const one = async (item: PendingSynthesis): Promise<"READY" | "FAILED"> => {
-    const dossier = GateqDossierV1Schema.safeParse(item.dossier);
+    const dossier = GateqDossierSchema.safeParse(item.dossier);
     if (!dossier.success) return "FAILED";
     if (
       !(await deps.store.claim({
