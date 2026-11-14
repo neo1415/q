@@ -764,3 +764,18 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - Live: GateQ sustained re-certification 4/8 ($0.115); investor uncertainty 3–6: scenario 3 FAIL (no offer; explicit yes refused DECLARED_NOT_OFFERED), 5 PARTIAL, 4 and 6 not run ($0.224); gateway self-service PASS ($0.059).
 - Next batch on the integration branch, not gated: `2e1fb1d33` meetings B1/B2, `2fbe7065c` gateway panel, `4dd353859` GateQ resume/left-open (no migrations); the uncertainty-offer fix (D5–D8) is in progress.
 - Test spend today: about $1.56 of $5 (shared ledger `scripts/handoff/live/test-budget.mjs`).
+
+## Batch deployed — `78f8d72d5` (14 Nov, 23:45 Lagos)
+
+- Gate: `ci-local PASS sha=78f8d72d5` (1677 s, all six lanes). Rollback point `06910b145`.
+- Migrations applied before the deploy (hosted 302): `20261231580000_gateq_gateway_brand_from_website` (logo assets, SVG allowed after sanitising), `20261231590000_gateq_application_document_selections`; RLS on both new tables confirmed.
+- Contents:
+  - GateQ one relation rule (`715f55bbc`, restored in `1ebe465ea` after `12aec5edd` reverted it from a stale base);
+  - investor-uncertainty vehicle rule (`0c9e627a1`);
+  - contextual "What I checked" (`939ad92d0`);
+  - GateQ brand from website, with SVG (`995b1a0f9`, `12aec5edd`);
+  - meeting times and notices (`0694fa3a2`);
+  - document selection across resume (`fc68b217a`);
+  - pre-gate (`scripts/pre-gate.sh`).
+- Gate failures in this batch and their shared cause: checks the pre-gate did not yet cover (an app's own typecheck, repository-scan tests, a killed tsc reported as PASS, failing tests not named). Each is now a pre-gate step.
+- Live checks in progress: GateQ sustained (8 invariants), meetings over HTTP; then investor uncertainty, branding on real sites.
