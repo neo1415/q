@@ -3,6 +3,7 @@ import type { ProfileMaterialPort } from "./tools/profile-material.js";
 import type { OnboardingTranscriptPort } from "./tools/onboarding-transcript.js";
 import type { PreferenceLearningPort } from "./tools/preference-learning.js";
 import type { AttentionPort } from "./tools/attention.js";
+import type { AccountDigestGateqPort } from "./tools/account-digest.js";
 import type {
   AddBoardItemRequest,
   BoardItem,
@@ -838,6 +839,12 @@ export type QToolPorts = {
    * requests, what Q did). Absent members leave their source unread.
    */
   readonly attention?: AttentionPort | undefined;
+  /**
+   * Owner 14 Nov 2026: GateQ's part of the account digest (a founder's own
+   * applications, an investor's inbox counts), composed by the app over
+   * GateQ's own reads. Absent: the digest holds no GateQ section.
+   */
+  readonly gateqDigest?: AccountDigestGateqPort | undefined;
 };
 
 /**

@@ -110,6 +110,10 @@ import {
   type AttentionRoutesDependencies,
 } from "./http/q-attention.js";
 import {
+  registerAccountDigestRoutes,
+  type AccountDigestRoutesDependencies,
+} from "./http/q-account-digest.js";
+import {
   registerDailyRoutes,
   type DailyRoutesDependencies,
 } from "./http/daily.js";
@@ -249,6 +253,10 @@ export type QApiModules = {
     | undefined;
   /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
   readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
+  /** Owner 14 Nov 2026: the account digest every Q turn reads. */
+  readonly accountDigest?:
+    | AccountDigestRoutesDependencies["accountDigest"]
+    | undefined;
   /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
   readonly arrivalSnapshots?:
     ArrivalSnapshotRoutesDependencies["snapshots"] | undefined;
@@ -604,6 +612,13 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       attention: modules.attention,
+    });
+  }
+  if (modules.accountDigest !== undefined && security.resolver !== undefined) {
+    registerAccountDigestRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      accountDigest: modules.accountDigest,
     });
   }
   // W1: what Q told them on arrival, as one canonical snapshot.

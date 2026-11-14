@@ -1384,6 +1384,8 @@ export {
 export * from "./turn.js";
 export * from "./ui-act.js";
 export * from "./attention.js";
+// Owner 14 Nov 2026: the account digest every Q turn reads.
+export * from "./account-digest.js";
 export * from "./agent-capability.js";
 export * from "./workforce-reasoning.js";
 // Situation-first planning (2026-10-28): the situation dossier and the plan.

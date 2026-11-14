@@ -69,6 +69,14 @@ export type FitSweepAsk = {
    * it never adds a company to what the tools are asked to read.
    */
   readonly exclude?: readonly string[] | undefined;
+  /**
+   * CANDIDATES only (TURN_READER v88, owner live 14 Nov 2026, run
+   * bba40261, D1): they asked for companies other than those they are
+   * already in contact with. The sweep leaves every one of their own
+   * relationships out of the same deterministic ranking -- it never adds
+   * them, as the plain CANDIDATES set does -- and says how many it left out.
+   */
+  readonly excludeRelationships?: boolean | undefined;
 };
 
 const COUNT_WORDS: Readonly<Record<string, number>> = {
@@ -198,6 +206,8 @@ export function fitSweepAskOfReading(
     readonly previous?: boolean | undefined;
     /** v56: they want companies other than those already shown. */
     readonly excludeShown?: boolean | undefined;
+    /** v88: and other than those they are already in contact with. */
+    readonly excludeRelationships?: boolean | undefined;
   },
   previous: readonly string[] = [],
   named: readonly string[] = [],
@@ -218,6 +228,20 @@ export function fitSweepAskOfReading(
     question.count === null
       ? null
       : Math.min(Math.max(question.count, 1), FIT_SWEEP_CARDS_MAX);
+  // v88 (D1): "leaving out companies I'm already in contact with" is their
+  // own candidates without their relationships -- never "rank them", and
+  // never the relationships set the words' cue would pick.
+  if (question.excludeRelationships === true) {
+    const pastShown = question.excludeShown === true && shown.length > 0;
+    return {
+      scope: "CANDIDATES",
+      place: placeOf(words),
+      fitAsked: true,
+      count,
+      ...(pastShown ? { exclude: [...new Set(shown)] } : {}),
+      excludeRelationships: true,
+    };
+  }
   // v56: "three new ones" after a list is the next best of their own
   // candidates, never the same companies again and never "rank them".
   if (question.excludeShown === true && shown.length > 0) {
@@ -283,6 +307,11 @@ export type FitSweepResult = {
   readonly considered: number;
   /** v56: how many already-shown companies the ranking left out. */
   readonly excluded: number;
+  /**
+   * v88: their own relationships the ranking left out (they asked for
+   * companies they are not in contact with); empty when not asked.
+   */
+  readonly excludedRelationships: readonly string[];
   readonly calls: readonly QToolCallOutcome[];
 };
 
@@ -375,6 +404,13 @@ export async function runFitSweep(input: {
   const excluded = new Set(
     ask.scope === "CANDIDATES" ? (ask.exclude ?? []) : [],
   );
+  // v88 (D1): their relationships are left out, not added.
+  const withoutRelationships =
+    ask.scope === "CANDIDATES" && ask.excludeRelationships === true;
+  const relationshipIds = new Set(
+    withoutRelationships ? own.relationships.map((row) => row.id) : [],
+  );
+  for (const id of relationshipIds) excluded.add(id);
   // Each company with where it came from, said beside its fit.
   const wanted = new Map<string, FitCandidateSource>();
   const add = (
@@ -454,7 +490,12 @@ export async function runFitSweep(input: {
     );
   const byId = new Map<string, RunFit>();
   const leftOut = new Set<string>();
+  const leftOutRelationships = new Set<string>();
   for (const fit of [...top, ...named]) {
+    if (relationshipIds.has(fit.companyId)) {
+      leftOutRelationships.add(fit.companyId);
+      continue;
+    }
     if (excluded.has(fit.companyId)) {
       leftOut.add(fit.companyId);
       continue;
@@ -476,6 +517,7 @@ export async function runFitSweep(input: {
     fits: ranked,
     considered: ask.scope === "CANDIDATES" ? all.length : wanted.size,
     excluded: leftOut.size,
+    excludedRelationships: [...leftOutRelationships],
     calls,
   };
 }

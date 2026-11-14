@@ -6,7 +6,7 @@ import {
   TURN_READER_V78,
   TurnReaderV75ResultSchema,
   TurnReaderV78ResultSchema,
-  TurnReaderV87ResultSchema,
+  TurnReaderV88ResultSchema,
   V77_REFERENCES,
   V78_WHAT_WAS_ASKED,
 } from "../src/index.js";
@@ -26,9 +26,9 @@ describe("TURN_READER v78", () => {
   it("is v77 kept whole plus one WHAT WAS ASKED rule (v79 is active, on its schema)", () => {
     const active =
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
-    expect(active.version).toBe(87);
+    expect(active.version).toBe(88);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV87ResultSchema,
+      TurnReaderV88ResultSchema,
     );
     expect(
       TURN_READER_V78.template.replace(

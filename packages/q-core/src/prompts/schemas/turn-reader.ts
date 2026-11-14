@@ -1553,3 +1553,24 @@ export const TurnReaderV87ResultSchema = TurnReaderV86ResultSchema.extend({
     .catch(null),
 }).strict();
 export type TurnReaderV87Result = z.infer<typeof TurnReaderV87ResultSchema>;
+
+/**
+ * v88 (owner live 14 Nov 2026, run bba40261, audit D1): "the strongest fits,
+ * leaving out companies I'm already in contact with" came back as the plain
+ * mandate ranking, three of them companies they were in touch with -- one
+ * that Q itself had said they owe a reply. The reading now says, by meaning
+ * and in any language, that they want companies other than those they are
+ * already in contact with (`question.excludeRelationships`), beside v56's
+ * `excludeShown`. Which companies those are stays code's: their own
+ * relationships, read as them. Lenient: a malformed value reads as false
+ * and never costs the reading.
+ */
+export const TURN_READER_V88_SCHEMA_VERSION = 88;
+export const TurnQuestionV88Schema = TurnQuestionV58Schema.extend({
+  excludeRelationships: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnQuestionV88 = z.infer<typeof TurnQuestionV88Schema>;
+export const TurnReaderV88ResultSchema = TurnReaderV87ResultSchema.extend({
+  question: TurnQuestionV88Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV88Result = z.infer<typeof TurnReaderV88ResultSchema>;

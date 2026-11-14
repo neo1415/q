@@ -295,6 +295,8 @@ export type QIntelligenceDependencies = {
    * situation header every model step is told.
    */
   readonly situationOf?: ModelGatewayQAnswerDependencies["situationOf"];
+  /** Owner 14 Nov 2026: the account digest every turn reads first. */
+  readonly accountDigestOf?: ModelGatewayQAnswerDependencies["accountDigestOf"];
   /**
    * What exists on the person's own account, by kind (ADR 0040: QA's read
    * registry composes it). Absent: no index.
@@ -555,6 +557,9 @@ export function composeQIntelligence(
     ...(dependencies.situationOf === undefined
       ? {}
       : { situationOf: dependencies.situationOf }),
+    ...(dependencies.accountDigestOf === undefined
+      ? {}
+      : { accountDigestOf: dependencies.accountDigestOf }),
     ...(dependencies.ownIndex === undefined
       ? {}
       : { ownIndex: dependencies.ownIndex }),

@@ -51,6 +51,10 @@ import {
   createReadAttentionTool,
   type AttentionReader,
 } from "./tools/attention.js";
+import {
+  createAccountDigestReader,
+  type AccountDigestReader,
+} from "./tools/account-digest.js";
 import { createAppActionTools } from "./tools/app-actions.js";
 import { createOwnSettingsTools } from "./tools/own-settings.js";
 import { createResultsTools } from "./tools/results.js";
@@ -356,6 +360,11 @@ export type QToolsComposition = {
    */
   readonly attention: AttentionReader;
   /**
+   * Owner 14 Nov 2026: the account digest every Q turn reads, and the
+   * resume opening's route: the same reads, one assembly.
+   */
+  readonly accountDigest: AccountDigestReader;
+  /**
    * Batch 14: the runs whose tools committed a write, for the run's
    * completed event (`dataChanged`).
    */
@@ -376,6 +385,7 @@ export function createQTools(options: {
     registry,
     port: createQToolExecutor({ registry, logger: options.logger, writes }),
     attention: createAttentionReader(options.ports),
+    accountDigest: createAccountDigestReader(options.ports),
     writes,
   };
 }

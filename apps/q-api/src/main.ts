@@ -79,12 +79,14 @@ import {
 } from "@capital-q/companies";
 import {
   createGateqInbox,
+  createPostgresApplicationFounders,
   gateqSynthesisMaxAttempts,
   createStartupAlerts,
   gateqInboxActionsPort,
   ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
+import { createAccountDigestGateq } from "./composition/account-digest-gateq.js";
 import { createSpreadsheetPort } from "./composition/spreadsheets.js";
 import { createOwnFinancialsRead } from "./composition/own-financials.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
@@ -3611,6 +3613,12 @@ const qTools = createQTools({
     // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
     // new matches and Q's activity, for "what needs me".
     attention: createAttentionSources({ sql: database.sql }),
+    // Owner 14 Nov 2026: GateQ's part of the account digest, through
+    // GateQ's own reads (a founder's GateQ page, an investor's inbox).
+    gateqDigest: createAccountDigestGateq({
+      founders: createPostgresApplicationFounders({ sql: database.sql }),
+      inbox: gateqInbox,
+    }),
     // ADMIN block
     results: {
       read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
@@ -5585,6 +5593,8 @@ const qIntelligence = composeQIntelligence({
     };
   },
   situationOf: situationOfActor,
+  // Owner 14 Nov 2026: what is happening in their account, every turn.
+  accountDigestOf: (actor) => qTools.accountDigest(actor),
   askerOf: async ({ tenantId, userId, firstAnswer }) => {
     const rows = await database.sql<
       {
@@ -8759,6 +8769,8 @@ const { app, logger: appLogger } = createApp(
     },
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
+    // Owner 14 Nov 2026: the account digest, for the resume opening.
+    accountDigest: qTools.accountDigest,
     arrivalSnapshots,
     // DAILY block
     daily: dailyReader,
