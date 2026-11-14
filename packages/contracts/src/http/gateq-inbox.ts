@@ -35,6 +35,84 @@ export const GateqSynthesisV1Schema = z
 export type GateqSynthesisV1 = z.infer<typeof GateqSynthesisV1Schema>;
 
 /**
+ * v2 (owner decision 97, 2026-11-14): the same cited reading with no count
+ * ceiling. Every point Q wrote and could cite is stored, most important
+ * first, with every citation it made; v1 kept the first nine points, four
+ * citations each, and cut their text. Nothing is lost silently: `complete`
+ * says whether the whole submission was read and every point written, and
+ * `incomplete` and `coverage` say what was not. The investor's view shows a
+ * compact default and expands to all of them.
+ */
+export const GATEQ_SYNTHESIS_TEXT_MAX = 4_000;
+/** A citation list can name every fact or turn of a submission, never more. */
+const CITATIONS_MAX = 1_000;
+export const GateqSynthesisPointV2Schema = z
+  .object({
+    kind: z.enum(["STRENGTH", "RISK", "QUESTION"]),
+    /** Q's own ranking, for the compact default view: HIGH first. */
+    importance: z.enum(["HIGH", "MEDIUM", "LOW"]),
+    text: z.string().min(1).max(GATEQ_SYNTHESIS_TEXT_MAX),
+    /** True when Q wrote more than the stored bound and the text was clipped. */
+    textClipped: z.boolean(),
+    factIds: z.array(z.string().uuid()).max(CITATIONS_MAX),
+    turnSeqs: z.array(z.number().int().min(1)).max(CITATIONS_MAX),
+  })
+  .strict();
+export type GateqSynthesisPointV2 = z.infer<typeof GateqSynthesisPointV2Schema>;
+
+export const GATEQ_SYNTHESIS_INCOMPLETE_REASONS = [
+  /** Q still had points to write when the reading's call budget was spent. */
+  "OUTPUT_BUDGET",
+  /** One part of the submission could not be read (a failed batch). */
+  "PART_FAILED",
+] as const;
+
+export const GateqSynthesisV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    generatedAt: z.string().datetime({ offset: true }),
+    truthClass: z.literal("Q_INFERENCE"),
+    takeaway: z.string().min(1).max(GATEQ_SYNTHESIS_TEXT_MAX),
+    /** Every cited point, most important first. No count ceiling. */
+    points: z.array(GateqSynthesisPointV2Schema),
+    /** True only when every part was read and Q said it had nothing more. */
+    complete: z.boolean(),
+    /** Why it is not complete; null exactly when it is. */
+    incomplete: z
+      .object({
+        reason: z.enum(GATEQ_SYNTHESIS_INCOMPLETE_REASONS),
+        /** Plain words for the investor. */
+        detail: z.string().min(1).max(600),
+      })
+      .strict()
+      .nullable(),
+    /** Points Q wrote that cited nothing in the submission: not evidence, not kept. */
+    uncitedDropped: z.number().int().min(0),
+    /** What Q read: every fact, and how many of the interview's turns. */
+    coverage: z
+      .object({
+        facts: z.number().int().min(0),
+        turns: z.number().int().min(0),
+        turnsRead: z.number().int().min(0),
+        /** Model calls the reading took (parts and continuations). */
+        calls: z.number().int().min(1),
+      })
+      .strict(),
+  })
+  .strict()
+  .refine((value) => value.complete === (value.incomplete === null), {
+    message: "complete exactly when nothing is reported incomplete",
+  });
+export type GateqSynthesisV2 = z.infer<typeof GateqSynthesisV2Schema>;
+
+/** Every stored reading a reader must accept: v1 rows stay readable as written. */
+export const GateqSynthesisSchema = z.union([
+  GateqSynthesisV2Schema,
+  GateqSynthesisV1Schema,
+]);
+export type GateqSynthesis = z.infer<typeof GateqSynthesisSchema>;
+
+/**
  * F4 (2026-10-06): an investor organisation's GateQ inbox, modelled on a
  * mail client. Every founder who applied through its gate, what the engine
  * made of them against the gate's rules, and what the organisation does
@@ -295,7 +373,7 @@ export const GateqInboxDetailDtoSchema = z
      * 2026-10-15). Recorded after submission and never part of what the
      * founder sent; null until it is ready or when it could not be made.
      */
-    synthesis: GateqSynthesisV1Schema.nullable().optional(),
+    synthesis: GateqSynthesisSchema.nullable().optional(),
     /**
      * READY with a synthesis; PENDING while the bounded job may still make
      * one; UNAVAILABLE once it will not (every attempt failed, or nothing

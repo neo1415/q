@@ -641,6 +641,8 @@ export type ApplicationTranscriptTurnDto = z.infer<
 >;
 
 export const GATEQ_TRANSCRIPT_MAX_TURNS = 400;
+/** Documents a frozen dossier lists by name; any beyond are counted (documentsTotal). */
+export const GATEQ_DOSSIER_DOCUMENTS_MAX = 200;
 export const ApplicationTranscriptDtoSchema = z
   .object({
     turns: z
@@ -878,7 +880,13 @@ export const GateqDossierV1Schema = z
           .object({ documentId: z.string().uuid(), title: z.string().max(200) })
           .strict(),
       )
-      .max(20),
+      .max(GATEQ_DOSSIER_DOCUMENTS_MAX),
+    /**
+     * Decision 97: how many documents were shared at submission. Above the
+     * frozen list's length, the rest are named as a count, never hidden.
+     * Absent on dossiers frozen before 2026-11-14.
+     */
+    documentsTotal: z.number().int().min(0).optional(),
     diligenceQuestions: z
       .array(
         z
@@ -889,7 +897,11 @@ export const GateqDossierV1Schema = z
           })
           .strict(),
       )
-      .max(80),
+      // Every gap and contradiction above yields at most one question
+      // (16 + 3 x 64 = 208): the bound holds them all.
+      .max(256),
+    /** Decision 97: questions derived at submission. Absent before 2026-11-14. */
+    diligenceQuestionsTotal: z.number().int().min(0).optional(),
     transcript: z.object({ turnCount: z.number().int().min(0) }).strict(),
     /** Nonbinding Q reading, added later. Always null in v1. */
     synthesis: z.null(),

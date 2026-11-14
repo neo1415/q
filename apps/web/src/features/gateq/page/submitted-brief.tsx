@@ -1,6 +1,8 @@
+import { useState } from "react";
+
 import type {
   GateqDossierV1,
-  GateqSynthesisV1,
+  GateqSynthesis,
   ApplicationTranscriptTurnDto,
 } from "@capital-q/contracts";
 
@@ -94,7 +96,7 @@ export function SubmittedBrief({
   synthesisState = "PENDING",
 }: {
   readonly dossier: GateqDossierV1;
-  readonly synthesis?: GateqSynthesisV1 | null | undefined;
+  readonly synthesis?: GateqSynthesis | null | undefined;
   /** UNAVAILABLE: every bounded attempt failed; say so, never "not ready". */
   readonly synthesisState?: "READY" | "PENDING" | "UNAVAILABLE" | undefined;
 }) {
@@ -428,45 +430,94 @@ export function SubmittedBrief({
               : t("Q's reading of this submission isn't ready yet.")}
           </p>
         ) : (
-          <section
-            className="mt-4 flex flex-col gap-2"
-            aria-label={t("Q's reading")}
-          >
-            <h5 className="cq-label">{t("Q's reading")}</h5>
-            <p className="cq-caption gq-t2">
-              {t(
-                "Q's inference from this submission only. Not verified, not a score and not a decision.",
-              )}
-            </p>
-            <p className="cq-body-sm">{t(synthesis.takeaway)}</p>
-            {synthesis.points.length === 0 ? null : (
-              <ul className="gq-hair">
-                {synthesis.points.map((point, index) => (
-                  <li key={index} className="flex flex-col gap-0.5 py-2">
-                    <span className="cq-caption gq-t2">
-                      {t(POINT[point.kind])}
-                    </span>
-                    <span className="cq-body-sm">{point.text}</span>
-                    <span className="cq-caption gq-t3">
-                      {t("From:")}{" "}
-                      {t(
-                        [
-                          ...point.factIds.map(
-                            (id) => factLabels.get(id) ?? "a recorded fact",
-                          ),
-                          ...point.turnSeqs.map(
-                            (seq) => `interview turn ${String(seq)}`,
-                          ),
-                        ].join(", "),
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <SynthesisReading synthesis={synthesis} factLabels={factLabels} />
         )}
       </section>
+    </section>
+  );
+}
+
+/** Points shown before "Show all": a compact default, never a storage limit. */
+export const SYNTHESIS_POINTS_SHOWN = 9;
+
+/**
+ * Q's reading (v1 or v2). Every stored point is reachable: the most
+ * important are shown first and the rest expand in place. A reading that
+ * did not cover the whole submission says so, with what it did read.
+ */
+function SynthesisReading({
+  synthesis,
+  factLabels,
+}: {
+  readonly synthesis: GateqSynthesis;
+  readonly factLabels: ReadonlyMap<string, string>;
+}) {
+  const t = useT();
+  const [all, setAll] = useState(false);
+  const points = synthesis.points;
+  const shown = all ? points : points.slice(0, SYNTHESIS_POINTS_SHOWN);
+  const v2 = synthesis.schemaVersion === 2 ? synthesis : null;
+  return (
+    <section className="mt-4 flex flex-col gap-2" aria-label={t("Q's reading")}>
+      <h5 className="cq-label">{t("Q's reading")}</h5>
+      <p className="cq-caption gq-t2">
+        {t(
+          "Q's inference from this submission only. Not verified, not a score and not a decision.",
+        )}
+      </p>
+      <p className="cq-body-sm">{t(synthesis.takeaway)}</p>
+      {v2 === null || v2.complete ? null : (
+        <p className="cq-caption gq-t2" data-testid="gq-synthesis-incomplete">
+          {t(
+            `Incomplete reading: ${v2.incomplete?.detail ?? "Q could not read everything."} Q read ${String(v2.coverage.turnsRead)} of ${String(v2.coverage.turns)} interview turns and all ${String(v2.coverage.facts)} recorded facts.`,
+          )}
+        </p>
+      )}
+      {shown.length === 0 ? null : (
+        <ul className="gq-hair">
+          {shown.map((point, index) => (
+            <li key={index} className="flex flex-col gap-0.5 py-2">
+              <span className="cq-caption gq-t2">{t(POINT[point.kind])}</span>
+              <span className="cq-body-sm">
+                {point.text}
+                {"textClipped" in point && point.textClipped ? "…" : null}
+              </span>
+              <span className="cq-caption gq-t3">
+                {t("From:")}{" "}
+                {t(
+                  [
+                    ...point.factIds.map(
+                      (id) => factLabels.get(id) ?? "a recorded fact",
+                    ),
+                    ...point.turnSeqs.map(
+                      (seq) => `interview turn ${String(seq)}`,
+                    ),
+                  ].join(", "),
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {points.length > SYNTHESIS_POINTS_SHOWN ? (
+        <button
+          type="button"
+          className="cq-body-sm self-start underline underline-offset-4 min-h-11"
+          aria-expanded={all}
+          onClick={() => setAll((open) => !open)}
+        >
+          {all
+            ? t(`Show the first ${String(SYNTHESIS_POINTS_SHOWN)}`)
+            : t(`Show all ${String(points.length)} points`)}
+        </button>
+      ) : null}
+      {v2 === null || v2.uncitedDropped === 0 ? null : (
+        <p className="cq-caption gq-t3">
+          {t(
+            `${String(v2.uncitedDropped)} further point${v2.uncitedDropped === 1 ? "" : "s"} cited nothing in the submission and ${v2.uncitedDropped === 1 ? "is" : "are"} not shown.`,
+          )}
+        </p>
+      )}
     </section>
   );
 }

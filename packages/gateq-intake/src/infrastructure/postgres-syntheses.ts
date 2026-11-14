@@ -1,6 +1,6 @@
 import {
   ApplicationTranscriptTurnDtoSchema,
-  type GateqSynthesisV1,
+  type GateqSynthesisV2,
 } from "@capital-q/contracts";
 import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
@@ -88,7 +88,7 @@ export function createPostgresSynthesisStore(deps: {
 
     ready: async (input: {
       readonly applicationId: string;
-      readonly synthesis: GateqSynthesisV1;
+      readonly synthesis: GateqSynthesisV2;
       readonly promptVersion: string;
     }) => {
       await sql`

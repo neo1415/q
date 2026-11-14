@@ -333,6 +333,7 @@ import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-ext
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V3 } from "./tasks/founder-onboarding-extraction.v3.js";
 import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
+import { GATEQ_DOSSIER_SYNTHESIS_V2 } from "./tasks/gateq-dossier-synthesis.v2.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
 import { GATEQ_INTERVIEWER_V3 } from "./tasks/gateq-interviewer.v3.js";
@@ -979,7 +980,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...NAVIGATION_DECISION_V10, status: "DEPRECATED" },
     NAVIGATION_DECISION_V11,
     BRIEFING_COMMAND_V1,
-    GATEQ_DOSSIER_SYNTHESIS_V1,
+    { ...GATEQ_DOSSIER_SYNTHESIS_V1, status: "DEPRECATED" },
+    // Owner decision 97: no point ceiling, parts and continuations.
+    GATEQ_DOSSIER_SYNTHESIS_V2,
   ];
 
 /** The production registry: the source-controlled definitions above. */

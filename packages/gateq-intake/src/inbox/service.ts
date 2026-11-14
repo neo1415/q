@@ -5,7 +5,7 @@ import {
   GATEQ_INBOX_VIEWS,
   GATEQ_TRANSCRIPT_MAX_TURNS,
   GateqDossierV1Schema,
-  GateqSynthesisV1Schema,
+  GateqSynthesisSchema,
   GateqPassReasonSchema,
   type GateqInboxDetailDto,
   type GateqInboxDto,
@@ -451,10 +451,10 @@ export function createInboxService(dependencies: {
           : null,
         transcript,
         // Q's reading of the same frozen submission; never a guess when absent.
-        synthesis: GateqSynthesisV1Schema.safeParse(row.synthesis).data ?? null,
+        synthesis: GateqSynthesisSchema.safeParse(row.synthesis).data ?? null,
         // Honest about a reading that will not come: every bounded attempt
         // failed, or there is no frozen dossier for Q to read.
-        synthesisState: GateqSynthesisV1Schema.safeParse(row.synthesis).success
+        synthesisState: GateqSynthesisSchema.safeParse(row.synthesis).success
           ? "READY"
           : row.synthesisState === "UNAVAILABLE" || !dossier.success
             ? "UNAVAILABLE"

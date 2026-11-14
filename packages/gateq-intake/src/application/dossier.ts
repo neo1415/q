@@ -1,4 +1,5 @@
 import {
+  GATEQ_DOSSIER_DOCUMENTS_MAX,
   GATEQ_DOSSIER_SCHEMA_VERSION,
   GateqDossierV1Schema,
   type ApplicationContactDto,
@@ -216,8 +217,12 @@ export function buildDossier(input: {
     declined: input.coverage.declined,
     missing: input.coverage.missing,
     contradictions: input.coverage.contradictions,
-    documents: input.documents.slice(0, 20),
-    diligenceQuestions: diligenceQuestions.slice(0, 80),
+    // Decision 97: the counts travel with the lists, so a reader can say
+    // "and N more" instead of hiding them.
+    documents: input.documents.slice(0, GATEQ_DOSSIER_DOCUMENTS_MAX),
+    documentsTotal: input.documents.length,
+    diligenceQuestions: diligenceQuestions.slice(0, 256),
+    diligenceQuestionsTotal: diligenceQuestions.length,
     transcript: { turnCount: input.turnCount },
     synthesis: null,
   });

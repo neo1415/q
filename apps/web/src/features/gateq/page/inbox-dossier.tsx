@@ -299,6 +299,11 @@ export function DossierSection({
             ))}
           </ul>
         )}
+        <MoreThanListed
+          listed={dossier.documents.length}
+          total={dossier.documentsTotal}
+          noun="document"
+        />
       </div>
 
       {dossier.diligenceQuestions.length === 0 ? null : (
@@ -314,6 +319,11 @@ export function DossierSection({
               </li>
             ))}
           </ol>
+          <MoreThanListed
+            listed={dossier.diligenceQuestions.length}
+            total={dossier.diligenceQuestionsTotal}
+            noun="question"
+          />
         </div>
       )}
 
@@ -365,5 +375,30 @@ export function TranscriptSection({
         )}
       </details>
     </section>
+  );
+}
+
+/**
+ * Decision 97: a frozen list shorter than what was submitted says how many
+ * more there were, never hides them. Older dossiers carry no count.
+ */
+function MoreThanListed({
+  listed,
+  total,
+  noun,
+}: {
+  readonly listed: number;
+  readonly total: number | undefined;
+  readonly noun: string;
+}) {
+  const t = useT();
+  if (total === undefined || total <= listed) return null;
+  const more = total - listed;
+  return (
+    <p className="cq-caption gq-t2" data-testid="gq-more-than-listed">
+      {t(
+        `${String(more)} more ${noun}${more === 1 ? "" : "s"} in this submission ${more === 1 ? "is" : "are"} not listed here (${String(total)} in all).`,
+      )}
+    </p>
   );
 }
