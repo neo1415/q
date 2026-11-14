@@ -244,3 +244,54 @@ Run 03:09–03:42 UTC on production, fictional accounts only, no product code ch
 - 3 internal investor Q turns about Routeix.
 
 No messages, replies or video. The gate now has 7 applications.
+
+## Re-check 14 Nov (faa48e867)
+
+Run 06:21–06:31 UTC on production, fictional accounts only, one Chromium at a time, no product code changed. This re-checks fix commit `a047ddf63`. Screenshots: `/tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/gq4/shots/`.
+
+**Founders:**
+
+- Layerum Hub, `founder.fb0339.baraka-abdi@…`, application `cdcf286b…`, which was wedged before this fix.
+- Tillra, `founder.fb0047.baraka-odhiambo@…` (KE, pre-seed, no earlier Kilima application), used for the "don't know" control.
+
+| Item                           | Result                                                   | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D8: wedged application unlocks | **PASS**                                                 | Opening the page as Layerum gave form saves (5 × POST 200) and a working "Continue to interview", with no "That's a lot in a short time" (`L-02-interview.png`). The orphaned turn seq 2 still has no Q reply. The next founder turn (seq 3, 06:23:23) got a Q reply 3 s later (seq 4). 16 turns ran, then SUBMITTED 06:26:24 (`ga_3y5bd5t4977c5r8eq9actv047f`). Synthesis READY at `attempts=1`. No refusal text appeared, and api logs for 06:20–06:30 show no TOO_MANY / REPLY_IN_PROGRESS / InterviewUnavailable |
+| D9: stated zero                | **PASS**                                                 | "Nobody pays yet" (seq 3) became `claims.revenue` `52e5ba1a` = TEXT "0". At seq 7 it was AMOUNT USD 0 (`d078666c`), then TEXT "Nothing billed: nobody pays yet." The current value is `91ac5e0d` = TEXT "0" (seq 9). No revenue fact for Layerum was ever NONE. Review shows "Revenue: You said 0", not "You don't know yet" (`L-review-full.png`)                                                                                                                                                                   |
+| D9: control                    | **PASS**                                                 | Tillra said "We don't know our revenue yet". That became `claims.revenue` `3b7f1899` = `{"kind":"NONE"}`, and the review shows "Revenue: You don't know yet" (`T-review.png`)                                                                                                                                                                                                                                                                                                                                        |
+| D10: one disagreement pair     | **FAIL (new variant: 0 pairs, earlier statements lost)** | See D11 below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Re-ask: disagreement           | **PASS**                                                 | After "leave it open" (seq 9), Q said "I'll leave the weekly-active figures unresolved". It did not raise weekly active again in the 3 later turns                                                                                                                                                                                                                                                                                                                                                                   |
+| Re-ask: counts                 | **PASS**                                                 | Q did not ask again for the platform count (4) or the team size                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Re-ask: revenue                | **FAIL (Low)**                                           | After "Nobody pays yet" (seq 3), Q asked "what did you bill over the last twelve months?" (seq 6)                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+**D11. Medium: a "now" figure replaces all of traction, and the disagreement pair is lost.**
+
+How traction changed:
+
+- Seq 3 stored "2,300 wallets opened" and "600 weekly active".
+- Seq 5 accumulated "grew from 1 platform to 4 since March" (`cbabef96`).
+- Seq 7, "about 1,500 weekly active now", superseded that whole fact with only "About 1,500 weekly active now." (`37b5ba88`, provenance ESTIMATED). The reading must have marked it as a correction, because `addedStatement` was bypassed.
+
+Effects:
+
+- 0 facts carry `unreconciled`.
+- The founder review and the investor one-page summary show no "Answers disagree" section. The disagreement survives only as prose: the traction text, and the risk in Q's reading.
+- 2,300 wallets and the 1→4 platform growth are gone from review, the summary and the evidence view (`I-01-inbox.png`).
+
+This conflicts with the invariant that contradictions coexist until reconciled. Q's own reply asked "which figure should I use", so it treated the statement as a disagreement while the store treated it as a correction.
+
+Fix direction: a correction should replace only the statement it corrects, not the accumulated text. When the reading flags both a conflict and a correction for one quantity, keep the pair.
+
+**Other new defects (Low):**
+
+- "The main risk is the licence renewal timing with the central bank" was stored as `company.problem` (`6d66aaf4`). Review and the investor brief show it under Problem.
+- The orphaned turn seq 2 (problem/solution) was never read into facts. Q later asked "what problem are your platform partners trying to solve?"
+- Revenue shows as a bare "0" with no currency in review and in the summary, even though AMOUNT USD 0 was briefly held.
+- The answer box's accessible name alternates between "Your message" (placeholder "Say hello") on a resumed interview and "Your answer".
+
+**Records created (production, fictional):**
+
+- Layerum `cdcf286b…` is now SUBMITTED, with 16 turns, 2 documents and synthesis READY.
+- Tillra draft `f4681f2a-e748-44de-9b3d-71a9eddc35de` (`ga_0xeeghd6nztx52z2fmmswfwhwy`): IN_PROGRESS, 3 turns, not submitted.
+
+No investor Q turns, messages, replies or video. The gate now has 8 applications.
