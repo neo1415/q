@@ -140,3 +140,70 @@ To check it, query `gateq.application_facts` for `dimension='claims.traction'` o
 | B10                     | Reply through Capital Q's own sender after approval; SUPPRESSED row verified          |
 | B11 (prefill)           | LIVE, except Full name                                                                |
 | B12                     | Allowance display seen only; plan gate not tested                                     |
+
+## Re-check 14 Nov (985db1796)
+
+Run 01:40–01:52 UTC on production, fictional accounts only, one Chromium at a time, no product code changed. Screenshots: `/tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/gq2/shots/`.
+
+**Founder substitution:** the three named founders cannot apply to this gate, because its required "Where the company is based" rule is Kenya-only. Ajopot is NG, Brightkloof is ZA and Lukas Hughes is GB. For Ajopot, "Continue to interview" is disabled with "only takes companies that meet 'Where the company is based'" (`A-04-blocked-required-rule.png`). The run used `founder.fb0008.zawadi-odhiambo@fictional.capitalq.local` instead: Branchari, KE, pre-seed, with 0 prior applications.
+
+| Item                                     | Result                 | Evidence                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1 synthesis                             | **PASS**               | `application_syntheses` for `3ec9713b…` is READY with `attempts=3` (updated 01:36:19). The investor sees "Q's reading" with strengths, risks and turn citations, and no "isn't ready yet" (`I-D1-inbox.png`, `I-D1-reading.png`). The new Branchari synthesis was READY at `attempts=1` within 20 s. |
+| D5 already applied                       | **PASS**               | Kazikit sees "You applied on 13 November 2026 … nothing to fill in again here" with "See your application" (`/gateq?tab=applications`), and 0 inputs (`K-D5-gateway.png`). `gateq.applications` on the gate: 3 before, 3 after.                                                                      |
+| D3 contradiction surfaced                | **PASS**               | After "about 1,500 weekly active now", Q asked: "was that a correction from the six hundred you mentioned earlier?"                                                                                                                                                                                  |
+| D3 revenue confirmed once                | **PASS**               | "Yes, zero revenue so far. Of our pilots, three asked about pricing." was accepted the first time. `claims.revenue` (USD 0, seq 6) was written once, and "three asked about pricing" was kept.                                                                                                       |
+| D3 minor                                 | Note                   | Q replied "let's leave weekly active unresolved", then asked "Which export should we treat as authoritative?" in the same turn, so the founder was asked twice.                                                                                                                                      |
+| D2 traction keeps both statements        | **FAIL (new variant)** | See D2b below.                                                                                                                                                                                                                                                                                       |
+| D2 investor view shows the contradiction | **PARTIAL**            | Q's reading shows it: "Risk: weekly-active usage is unresolved: … 600 and about 1,500 … from different exports". The deterministic evidence view has no traction row, only "Revenue USD 0", and there is no "answers that disagree" section.                                                         |
+| D4 Q cites sources                       | **FAIL**               | See D4b below.                                                                                                                                                                                                                                                                                       |
+| Full name prefilled                      | **PASS**               | `gq-c-name` = "Zawadi Odhiambo".                                                                                                                                                                                                                                                                     |
+| No document pre-ticked                   | **PASS**               | All checkboxes were unticked for Ajopot (8) and Branchari (4).                                                                                                                                                                                                                                       |
+| After Submit                             | **PASS**               | The page shows "Sent… Thank you" and "Nothing is sent until you press Submit" is gone (`B-sent.png`).                                                                                                                                                                                                |
+| Inbox qualification line                 | **PASS**               | Kazikit: "Meets every required rule of your gate; 1 preferred rule isn't met". Branchari: "Meets every rule of your gate", and all 5 rules are met.                                                                                                                                                  |
+| B6 branding                              | **PASS**               | The header reads "K Kilima Angel Network (fictional) … Powered by Capital Q". It shows an initial and no photo. `--cq-accent` is `#8a6a12`, the default bronze; `platform_ops.brand_themes` has 0 rows for tenant `a27357f9…`.                                                                       |
+
+### Defect details
+
+**D2b. High: an "I don't know" answer wipes the accumulated traction fact.**
+
+What worked:
+
+- Up to seq 8, `claims.traction` accumulated correctly. Fact `ac5e46d4…` holds all three statements: 1,900/600, pricing, and 1,500. Its `unreconciled` field holds `[{earlier: 600…, later: 1,500…}]`.
+
+What went wrong:
+
+- The founder's "not sure which is right" (seq 10) and "I don't know yet" (seq 12) each superseded that fact with `{"kind":"NONE"}` and provenance UNKNOWN.
+- Seq 14 (team plus "willingness to pay is not tested yet") produced NONE again. The current fact `da859ec1…` is NONE.
+
+Effects:
+
+- Review shows "Traction: You don't know yet".
+- The investor's one-page summary shows "Traction USD 0", which is the revenue value under the Traction label.
+- Q tells the investor "the application says traction is unknown".
+
+Fix direction: an unknown or "not sure" answer must not supersede a non-empty fact. At most, it marks the fact unreconciled.
+
+**D4b. High: Q says no documents were attached.**
+
+- **What Q said:** both investor answers said "No company documents were attached or reviewed" and "no attached documents were supplied or reviewed".
+- **What was attached:** `gateq.application_documents` has 2 rows for `bf389feb…`. The deck has 9 pages and the brief has 1 page in `evidence.document_pages`.
+- **Likely cause:** `evidence.gateq_application_document_disclosures` has 0 rows for every application, so Q's document path finds nothing.
+- **What improved:** profile facts are now named as the profile ("the company profile says the raise is USD 125,000 while the application says USD 300,000"; "the profile describes a four-person team…").
+
+**Other new defects:**
+
+- **Low:** the Branchari description is two texts joined together: "…regulatory reporting. cloud core banking for Kenyan…". The second starts lower-case. It appears in review, the inbox and the brief.
+- **Low:** the one-page summary "Market" shows "five SACCOs in Nakuru and Eldoret", which is the customers answer.
+- **Low:** Ajopot's gateway lists two documents titled "acceptance-note" (Company profile), which look like test leftovers.
+- **Low/by design?** A first page view by a signed-in founder still creates an IN_PROGRESS draft. Ajopot's `283a5502…` was created, and Ajopot can never submit it.
+
+### Records created (production, fictional)
+
+| What                  | Value                                                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branchari application | `bf389feb-962e-410b-9804-71295185926b` (`ga_3dv7fbvwvawyme0w21nn3smhpr`), SUBMITTED 01:48:51 UTC. 2 documents, synthesis READY. Interview: 8 founder turns |
+| Ajopot draft          | `283a5502-bd58-4479-8b59-fe20eaba6666`, IN_PROGRESS, created by the page view alone                                                                        |
+| Investor Q turns      | 2 internal Q questions about Branchari                                                                                                                     |
+
+No messages or replies were sent, and no video was used. The gate now has 5 applications.
