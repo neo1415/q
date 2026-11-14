@@ -116,6 +116,7 @@ import {
   quietlyNoted,
   inTurnLanguage,
   streamedPiece,
+  ANALYST_OFFER_DOCUMENT,
 } from "@capital-q/q-core";
 import {
   buildShownSheet,
@@ -2210,6 +2211,15 @@ export const TURN_UNREAD_REPLY =
  */
 export const TURN_UNREACHABLE_REPLY =
   "I can't reach my reasoning service right now, so I haven't started anything on that yet. It's a temporary fault on my side, not in your message, and your message is kept here. I check again about every 30 seconds, so send it again in a minute or two and I'll take it from there.";
+
+/**
+ * Live 14 Nov 2026 (run b58ece1a): the answer came back malformed
+ * (INVALID_MODEL_OUTPUT) and the person was told Q could not reach its
+ * reasoning service, which had answered. What is true: the answer was
+ * unusable, and nothing was prepared or sent on it.
+ */
+export const MALFORMED_ANSWER_LINE =
+  "That answer came back malformed on my side, so nothing was prepared or sent. Ask again and I'll redo it.";
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).
@@ -8166,7 +8176,16 @@ export function createSpecialistQAnswer(
     // asked for "from what you can find publicly" may be read as a
     // research request as much as a tool request; either way it is a
     // request for the document, and the document is what they get.
-    const tool = readerToolOf(read, latest.content, inWorkspace(request));
+    // Live 14 Nov 2026 (runs b58ece1a, 28635630): a yes to Q's recorded
+    // action offer runs that offer's tool and nothing the reader names
+    // afresh on the yes turn: no hand, no reader-named or routed action.
+    // (A document offer still takes the document path below.)
+    const keptToOffer =
+      offeredAction !== null &&
+      offeredAction.action !== ANALYST_OFFER_DOCUMENT;
+    const tool = keptToOffer
+      ? null
+      : readerToolOf(read, latest.content, inWorkspace(request));
     // A piece Q writes for them as a document (Q_REPORT) is answered
     // first and filed after; any other document asked with it is made
     // then too, in the same follow-up.
@@ -8378,6 +8397,7 @@ export function createSpecialistQAnswer(
       );
     }
     const readerNamed =
+      !keptToOffer &&
       read !== null &&
       read.kind === "TOOL_REQUEST" &&
       read.confidence !== "LOW" &&
@@ -8388,6 +8408,7 @@ export function createSpecialistQAnswer(
         : null;
     // The reader's own app action, only when it is a declared one.
     const readerAppAction = (() => {
+      if (keptToOffer) return null;
       const own = appActionOf(read);
       return own !== null && appTools.has(own.tool) ? own : null;
     })();
@@ -8414,6 +8435,7 @@ export function createSpecialistQAnswer(
           : null;
       };
     const routed =
+      !keptToOffer &&
       dependencies.appActionRouter !== undefined &&
       dependencies.appActions !== undefined &&
       read !== null &&
@@ -8659,6 +8681,7 @@ export function createSpecialistQAnswer(
       read.handOver !== undefined &&
       read.handOver !== null &&
       tool === null &&
+      !keptToOffer &&
       !writingDocument &&
       !askedForWork
     ) {
@@ -8789,13 +8812,19 @@ export function createSpecialistQAnswer(
         ));
     // What the turn is about narrows the tool offer (lead 2026-10-02);
     // "yes" to Q's own offer keeps the previous turn's focus.
+    // A yes to a recorded action offer is focused on that offer's tool
+    // alone, never on one the reader names afresh (live 28635630).
     const named = [
-      ...(read?.askedAction !== undefined &&
+      ...(keptToOffer ? [offeredAction.action] : []),
+      ...(!keptToOffer &&
+      read?.askedAction !== undefined &&
       read.askedAction !== null &&
       actions.some((action) => action.name === read.askedAction)
         ? [read.askedAction]
         : []),
-      ...(appActionOf(read) === null ? [] : [appActionOf(read)?.tool ?? ""]),
+      ...(keptToOffer || appActionOf(read) === null
+        ? []
+        : [appActionOf(read)?.tool ?? ""]),
       // What the router named, so a code-run miss still offers it.
       ...(routed === null ? [] : [routed]),
       // What a declared action's refusal named for the answer to take.
@@ -9084,7 +9113,9 @@ export function createSpecialistQAnswer(
       // approval rules decide what happens, never this turn's words.
       ...(offeredAction !== null && offeredTool !== undefined
         ? { askedAction: offeredAction.action }
-        : redirectedTo !== null
+        : keptToOffer
+          ? {}
+          : redirectedTo !== null
           ? { askedAction: redirectedTo }
           : read?.askedAction === undefined ||
               read.askedAction === null ||
@@ -9240,10 +9271,22 @@ export function createSpecialistQAnswer(
           ? {}
           : { about: outcome.offer.about }),
       });
-    } else if (offers.get(conversationId)?.kind === "ACTION") {
+    } else if (
+      // Live 14 Nov 2026 (run b58ece1a): a turn that failed (malformed
+      // output, a provider fault) answered nothing, stored no Q turn and
+      // superseded nothing, so the standing offer stays and the person's
+      // repeated yes still binds to it. Only a completed answer that
+      // closed without an offer (a decline, another question) ends it.
+      outcome.kind === "ANSWERED" &&
+      offers.get(conversationId)?.kind === "ACTION"
+    ) {
       offers.delete(conversationId);
     }
-    if (outcome.kind === "FAILED") {
+    if (outcome.kind === "FAILED" && outcome.cause === "MALFORMED_OUTPUT") {
+      // The reasoning service answered; its answer was malformed. Not an
+      // outage: said as what happened, and not counted toward stopping.
+      notices.set(request.runId, MALFORMED_ANSWER_LINE);
+    } else if (outcome.kind === "FAILED") {
       const operation = operationOf(outcome.diagnosticCode);
       if (operation !== null) {
         const noted = noteAnswerFailure(state, operation);

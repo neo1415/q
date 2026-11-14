@@ -4887,4 +4887,47 @@ describe("C3: an offer is a record a yes binds to", () => {
     expect(conversation).toContain("AN OFFER CAPITAL Q HAS NO RECORD OF");
     expect(conversation).toContain("that offer was not recorded");
   });
+
+  it("live 28635630: on a yes, an acting tool other than the bound one is refused; the bound one runs", async () => {
+    const OTHER_OFFERED: QOfferedTool = {
+      ...FOLLOW_UP_OFFERED,
+      toolName: "relationship.email.propose",
+      definition: {
+        ...FOLLOW_UP_OFFERED.definition,
+        name: "propose_email",
+        description: "Drafts an email, for their approval.",
+      },
+    };
+    const tools = toolPort([FOLLOW_UP_OFFERED, OTHER_OFFERED], prepared);
+    const { seam, request, alpha } = build({
+      said: "yes",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "e1", name: "propose_email", arguments: {} }],
+        },
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "f1", name: "draft_follow_up", arguments: {} }],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("It's ready for you to check.")),
+        },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      offerTaken: {
+        action: "draft_follow_up",
+        request: "Draft a follow-up note to Savanna Seed about the call.",
+        said: OFFER_LINE,
+      },
+    });
+    expect(tools.executed.map((p) => p.name)).toEqual(["draft_follow_up"]);
+    expect(JSON.stringify(alpha.calls)).toContain(
+      "Only that acts this turn: call draft_follow_up",
+    );
+  });
 });

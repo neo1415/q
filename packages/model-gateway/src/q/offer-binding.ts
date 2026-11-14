@@ -83,6 +83,18 @@ export function offerTakenNote(offer: QRecordedOffer): string {
 export const OFFER_UNRECORDED_NOTE =
   "THEIR YES ANSWERS AN OFFER CAPITAL Q HAS NO RECORD OF: do not draft, send, book, change or prepare anything on it this turn, and do not guess what it was. If it only asked for information, answer it from what you can read; otherwise say in one sentence that you did not keep exactly what you offered, and ask what they would like you to do.";
 
+/**
+ * Said to the model when, on a yes to a recorded offer, it reaches for an
+ * acting tool other than the one the offer bound (live 14 Nov 2026, run
+ * 28635630): the yes is to that offer, so nothing else acts this turn.
+ */
+export function offerBoundRefusal(tool: string): string {
+  if (tool === ANALYST_OFFER_DOCUMENT) {
+    return "They said yes to the document your last answer offered. Write it by setting artifactRequest; nothing else is prepared or sent this turn.";
+  }
+  return `They said yes to the offer your last answer made, which is done with ${tool}. Only that acts this turn: call ${tool} for exactly what was offered, or, if it cannot be done, say so plainly. Nothing else is prepared or sent.`;
+}
+
 /** Said to the model when it tries to act on an unrecorded offer. */
 export const OFFER_UNRECORDED_REFUSAL =
   "They said yes to something your last answer offered, but that offer was not recorded, so nothing is prepared, sent or changed on it this turn. Say so in one sentence and ask what they would like you to do.";
