@@ -859,6 +859,22 @@ export function createIntakeService(
                 : await documentTitles
                     .titles(documentIds)
                     .catch(() => new Map<string, string>());
+          // Live D4b: the founder's library documents they ticked are
+          // pinned to the version they sent, in the frozen row itself.
+          const sharedDocuments =
+            frozen !== undefined ||
+            documentIds.length === 0 ||
+            documentTitles?.versions === undefined
+              ? []
+              : await documentTitles
+                  .versions(documentIds)
+                  .catch((error: unknown) => {
+                    logger?.warn(
+                      { err: error, applicationId: application.id },
+                      "gateq shared document versions unavailable at submit",
+                    );
+                    return [];
+                  });
           v2 = {
             snapshot: {
               ...snapshot,
@@ -866,6 +882,7 @@ export function createIntakeService(
               ...(frozen === undefined
                 ? {}
                 : { disclosedDocuments: frozen.documents }),
+              ...(sharedDocuments.length === 0 ? {} : { sharedDocuments }),
               snapshotVersion: 2,
               contact,
               transcript: kept,

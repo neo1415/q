@@ -330,6 +330,22 @@ export type DocumentTitlesPort = {
   readonly titles: (
     documentIds: readonly string[],
   ) => Promise<ReadonlyMap<string, string>>;
+  /**
+   * Live D4b: the version of each shared library document current now,
+   * read at Submit and frozen into the submission as `sharedDocuments`, so
+   * the investor's Q reads exactly what was sent. A document with no
+   * current version is left out. Absent: nothing is pinned, and readers
+   * take the version current at the submission instant instead.
+   */
+  readonly versions?:
+    | ((documentIds: readonly string[]) => Promise<
+        readonly {
+          readonly documentId: string;
+          readonly versionId: string;
+          readonly sha256: string;
+        }[]
+      >)
+    | undefined;
 };
 
 export type ApplicationDocumentRepository = {

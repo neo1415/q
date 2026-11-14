@@ -77,6 +77,28 @@ export function statementsOf(value: TextValue): readonly string[] {
 }
 
 /**
+ * An accumulated text as a person reads it: each statement a sentence,
+ * starting with a capital and ending with a stop, joined with a space
+ * (live 2026-11-14: "…regulatory reporting. cloud core banking for…" read
+ * as two texts glued together). Display only; the stored words, one
+ * statement per line, are never changed. A single statement is returned
+ * as it was said.
+ */
+export function statementsInWords(text: string): string {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length < 2) return text.trim();
+  return lines
+    .map((line) => {
+      const capital = line.charAt(0).toLocaleUpperCase("en") + line.slice(1);
+      return /[.!?…:;]$/u.test(capital) ? capital : `${capital}.`;
+    })
+    .join(" ");
+}
+
+/**
  * The provenance of the statements together: an estimate stays an
  * estimate, and a combined text is never document-supported (no document
  * said the whole of it; only the Evidence confirmation path mints that).

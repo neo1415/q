@@ -44,6 +44,25 @@ export function sharedDocumentsPort(options: {
          where id = any(${documentIds as string[]}::uuid[])`;
       return new Map(rows.map((row) => [row.id, row.title]));
     },
+    // Live D4b: the version each shared document holds at Submit, pinned
+    // into the frozen submission for the investor's Q.
+    versions: async (documentIds) => {
+      if (documentIds.length === 0) return [];
+      const rows = await sql<
+        { document_id: string; version_id: string; sha256: string }[]
+      >`
+        select d.id as document_id, v.id as version_id, v.sha256
+          from evidence.documents d
+          join evidence.document_versions v
+            on v.id = d.current_version_id and v.tenant_id = d.tenant_id
+         where d.id = any(${documentIds as string[]}::uuid[])
+         order by d.id`;
+      return rows.map((row) => ({
+        documentId: row.document_id,
+        versionId: row.version_id,
+        sha256: row.sha256,
+      }));
+    },
     file: async (documentId) => {
       const rows = await sql<
         {

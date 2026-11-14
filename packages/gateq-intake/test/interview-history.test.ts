@@ -18,6 +18,9 @@ import {
   type InterviewTurnInput,
 } from "../src/application/interviewer.js";
 import { contradictionsIn } from "../src/application/question-needs.js";
+import { factSummary } from "../src/application/coverage.js";
+import { statementsInWords } from "../src/application/fact-history.js";
+import { profileOf } from "../src/inbox/domain.js";
 
 /**
  * The live run of 2026-11-13 (Kilima Angel Network <- Kazikit, application
@@ -352,5 +355,207 @@ describe("a yes with more said is a yes (live D3)", () => {
       { role: "q", text: "What will Kazikit charge for?" },
     ]);
     expect(t.facts).toEqual([]);
+  });
+});
+
+/**
+ * Live D2b (re-check 2026-11-14 on 985db1796, Kilima Angel Network <-
+ * Branchari, application bf389feb, fictional parties). The rows below are
+ * the production facts as they stood after turn 8 and the founder's words
+ * at turns 10, 12 and 14, read by SQL from `gateq.application_facts` and
+ * `gateq.application_turns`. Each later turn was read as traction NONE
+ * (provenance UNKNOWN; turn 10 under the CORRECTION intent) and each
+ * replaced the accumulated fact with an empty one.
+ */
+const BRANCHARI_TRACTION_8 = {
+  kind: "TEXT" as const,
+  text: [
+    "running pilots with five SACCOs in Nakuru and Eldoret",
+    "Across the five pilots the member app has 1,900 sign-ups and 600 weekly active.",
+    "Of the five pilots, three asked about pricing.",
+    "About 1,500 weekly active now on the member app.",
+  ].join("\n"),
+  unreconciled: [
+    {
+      earlier:
+        "Across the five pilots the member app has 1,900 sign-ups and 600 weekly active.",
+      later: "About 1,500 weekly active now on the member app.",
+    },
+  ],
+};
+const BRANCHARI_10 =
+  "I'd need to check our dashboard; the two numbers came from different exports and I'm not sure which is right.";
+const BRANCHARI_Q_11 =
+  "Fair enough—let’s leave weekly active unresolved until you’ve checked the dashboard. Which export should we treat as authoritative: the one showing six hundred weekly active, or the one showing about one thousand five hundred?";
+const BRANCHARI_12 = "I don't know yet.";
+const BRANCHARI_14 =
+  "Three people: I'm Zawadi Odhiambo, CEO, I spent eight years in SACCO operations; our CTO built lending systems at a Nairobi bank; and one engineer. Willingness to pay is not tested yet; that is what the paid conversions in this round will prove.";
+const BRANCHARI_TEAM_14 =
+  "Three people: Zawadi Odhiambo is CEO and spent eight years in SACCO operations; the CTO built lending systems at a Nairobi bank; and there is one engineer.";
+
+const unknownTraction = (correction: boolean) => ({
+  dimension: "claims.traction" as const,
+  value: { kind: "NONE" as const },
+  provenance: "UNKNOWN" as const,
+  correction,
+});
+
+function branchariAfterTurn8() {
+  const s = store();
+  s.record(
+    [
+      {
+        dimension: "claims.revenue",
+        value: { kind: "AMOUNT", amount: "0", currency: "USD" },
+        provenance: "APPLICANT_PROVIDED",
+      },
+    ],
+    6,
+  );
+  s.record(
+    [
+      {
+        dimension: "claims.traction",
+        value: BRANCHARI_TRACTION_8,
+        provenance: "ESTIMATED",
+      },
+    ],
+    8,
+  );
+  return s;
+}
+
+describe("an unsure or unknown answer never empties what they said (live D2b)", () => {
+  it.each([true, false])(
+    "replays Branchari turns 10, 12 and 14 (turn 10 read as a correction: %s)",
+    async (turn10Correction) => {
+      const s = branchariAfterTurn8();
+
+      const t10 = await say(s.current(), BRANCHARI_10, {
+        intent: "CORRECTION",
+        facts: [unknownTraction(turn10Correction)],
+      });
+      s.record(t10.facts, 10);
+      expect(t10.facts).toEqual([]);
+
+      const t12 = await say(
+        s.current(),
+        BRANCHARI_12,
+        { intent: "UNKNOWN_OR_SKIP", facts: [unknownTraction(false)] },
+        [
+          { role: "person", text: BRANCHARI_10 },
+          { role: "q", text: BRANCHARI_Q_11 },
+        ],
+      );
+      s.record(t12.facts, 12);
+      expect(t12.facts).toEqual([]);
+
+      const t14 = await say(s.current(), BRANCHARI_14, {
+        facts: [
+          {
+            dimension: "company.team",
+            value: { kind: "TEXT", text: BRANCHARI_TEAM_14 },
+            provenance: "APPLICANT_PROVIDED",
+            correction: false,
+          },
+          unknownTraction(false),
+        ],
+      });
+      s.record(t14.facts, 14);
+      // The team answer is recorded; the unknown traction reading is not.
+      expect(t14.facts.map((f) => f.dimension)).toEqual(["company.team"]);
+
+      const now = s.current().find((f) => f.dimension === "claims.traction");
+      // The very fact held after turn 8, untouched: same row, same words,
+      // the 600 against 1,500 still unreconciled, no empty successor.
+      expect(now?.sourceTurnSeq).toBe(8);
+      expect(now?.value).toEqual(BRANCHARI_TRACTION_8);
+      expect(now?.provenance).toBe("ESTIMATED");
+      expect(
+        s.rows.filter((r) => r.dimension === "claims.traction"),
+      ).toHaveLength(1);
+      const flagged = contradictionsIn(s.current());
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0]).toContain("600");
+      expect(flagged[0]).toContain("1,500");
+    },
+  );
+
+  it("an explicit correction that states a value still replaces", async () => {
+    const s = branchariAfterTurn8();
+    const settled = await say(
+      s.current(),
+      "I checked: 1,500 weekly active is right.",
+      {
+        intent: "CORRECTION",
+        facts: [
+          {
+            ...traction("About 1,500 weekly active on the member app."),
+            correction: true,
+          },
+        ],
+      },
+    );
+    s.record(settled.facts, 18);
+    const now = s.current().find((f) => f.dimension === "claims.traction");
+    expect(now?.value).toEqual({
+      kind: "TEXT",
+      text: "About 1,500 weekly active on the member app.",
+    });
+    expect(contradictionsIn(s.current())).toEqual([]);
+    // History keeps the accumulated statements.
+    expect(
+      s.rows.filter((r) => r.dimension === "claims.traction"),
+    ).toHaveLength(2);
+  });
+
+  it("an unknown answer with nothing on record is still recorded as unknown", async () => {
+    const s = store();
+    const t = await say(s.current(), BRANCHARI_12, {
+      intent: "UNKNOWN_OR_SKIP",
+      facts: [unknownTraction(false)],
+    });
+    expect(t.facts).toEqual([
+      {
+        dimension: "claims.traction",
+        value: { kind: "NONE" },
+        provenance: "UNKNOWN",
+      },
+    ]);
+  });
+});
+
+describe("an accumulated text reads as sentences (live 2026-11-14)", () => {
+  // Branchari's description as production holds it: two statements.
+  const stored =
+    "Core banking software for microfinance banks and credit unions in Kenya: Branchari licenses a cloud core with digital channels and regulatory reporting.\ncloud core banking for Kenyan microfinance banks and SACCOs; loan origination; repayments over M-Pesa; member app so borrowers can see balances and repay";
+  const words =
+    "Core banking software for microfinance banks and credit unions in Kenya: Branchari licenses a cloud core with digital channels and regulatory reporting. Cloud core banking for Kenyan microfinance banks and SACCOs; loan origination; repayments over M-Pesa; member app so borrowers can see balances and repay.";
+
+  it("capitalises and stops each statement in review, dossier and brief", () => {
+    expect(statementsInWords(stored)).toBe(words);
+    expect(
+      factSummary("company.description", { kind: "TEXT", text: stored }),
+    ).toBe(words);
+    expect(
+      profileOf({
+        declaredName: "Branchari",
+        reference: "ga_x",
+        facts: [
+          {
+            dimension: "company.description",
+            value: { kind: "TEXT", text: stored },
+            provenance: "APPLICANT_PROVIDED",
+          },
+        ],
+        documentIds: [],
+      }).oneLiner,
+    ).toBe(words);
+  });
+
+  it("keeps a single statement exactly as said", () => {
+    expect(statementsInWords("lower-case, no stop")).toBe(
+      "lower-case, no stop",
+    );
   });
 });

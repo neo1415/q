@@ -658,6 +658,15 @@ function world(
     documentTitles: {
       titles: (ids) =>
         Promise.resolve(new Map(ids.map((id) => [id, "Pitch deck"]))),
+      // Live D4b: the version each shared document holds at Submit.
+      versions: (ids) =>
+        Promise.resolve(
+          ids.map((id) => ({
+            documentId: id,
+            versionId: `version-of-${id}`,
+            sha256: "a".repeat(64),
+          })),
+        ),
     },
     contactCodeMailer: (input) => {
       mailed.push({ to: input.to, code: input.code });
@@ -1492,6 +1501,14 @@ describe("submission v2", () => {
       snapshotVersion: 2,
       reference,
       documentIds: [documentId],
+      // Live D4b: the investor's Q reads the version that was sent.
+      sharedDocuments: [
+        {
+          documentId,
+          versionId: `version-of-${documentId}`,
+          sha256: "a".repeat(64),
+        },
+      ],
       contact: { email: "ada@example.test", emailConfirmed: true },
       transcript: [
         { seq: 1, role: "PERSON", text: "We sell to banks." },

@@ -521,19 +521,29 @@ export type SummaryRow = {
   readonly value: string | null;
 };
 
-const SUMMARY_GROUPS: readonly (readonly [
-  GateqDossierV1["dimensions"][number]["group"],
-  string,
-])[] = [
-  ["FUNDRAISING", "Round"],
-  ["TRACTION", "Traction"],
-  ["MARKET", "Market"],
+/**
+ * Each row reads the dimensions it names, never a whole group (live
+ * 2026-11-14, Branchari): with traction unknown, the "Traction" row showed
+ * the revenue figure because both sit in the traction group, and "Market"
+ * showed the customers answer. Revenue and customers have rows of their
+ * own; a row whose dimensions they did not cover is "Not covered".
+ */
+const SUMMARY_ROWS: readonly {
+  readonly label: string;
+  readonly dimensions: readonly string[] | "FUNDRAISING";
+}[] = [
+  { label: "Round", dimensions: "FUNDRAISING" },
+  { label: "Traction", dimensions: ["claims.traction"] },
+  { label: "Revenue", dimensions: ["claims.revenue"] },
+  { label: "Customers", dimensions: ["company.customers"] },
+  { label: "Market", dimensions: ["company.market"] },
 ];
 
 /**
- * The dossier's one-page summary: the company, then the round, traction
- * and market as the founder sent them, each with where it came from. A
- * group they did not cover is "Not covered", never an empty zero.
+ * The dossier's one-page summary: the company, then the round, traction,
+ * revenue, customers and market as the founder sent them, each with where
+ * it came from. A row they did not cover is "Not covered", never an empty
+ * zero and never another dimension's answer.
  */
 export function onePageSummary(
   item: Pick<GateqInboxItemDto, "companyName" | "raise">,
@@ -542,19 +552,27 @@ export function onePageSummary(
   const rows: SummaryRow[] = [
     { label: "Company", value: dossier?.company.name ?? item.companyName },
   ];
-  for (const [group, label] of SUMMARY_GROUPS) {
-    const facts =
-      dossier?.dimensions
-        .filter((dimension) => dimension.group === group)
-        .flatMap((dimension) => dimension.facts)
-        .filter((fact) => fact.truthClass !== "UNKNOWN") ?? [];
+  const all: readonly (DossierFact & { readonly group: string })[] =
+    dossier?.dimensions.flatMap((dimension) =>
+      dimension.facts.map((fact) => ({ ...fact, group: dimension.group })),
+    ) ?? [];
+  for (const row of SUMMARY_ROWS) {
+    const facts = all.filter(
+      (fact) =>
+        fact.truthClass !== "UNKNOWN" &&
+        (row.dimensions === "FUNDRAISING"
+          ? fact.group === "FUNDRAISING"
+          : row.dimensions.includes(fact.dimension)),
+    );
     // An older submission has no dossier: its raise is still their claim.
     const legacyRaise =
-      group === "FUNDRAISING" && facts.length === 0 && item.raise !== null
+      row.dimensions === "FUNDRAISING" &&
+      facts.length === 0 &&
+      item.raise !== null
         ? `${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}. Founder stated`
         : null;
     rows.push({
-      label,
+      label: row.label,
       value:
         facts.length === 0
           ? legacyRaise

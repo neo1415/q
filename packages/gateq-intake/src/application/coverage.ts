@@ -4,6 +4,8 @@ import type {
 } from "@capital-q/contracts";
 import type { GatewayPolicy, QualificationResult } from "@capital-q/gateq";
 
+import { statementsInWords } from "./fact-history.js";
+
 import type {
   ApplicationDimension,
   ApplicationFact,
@@ -145,7 +147,7 @@ export function factSummary(
 ): string {
   switch (value.kind) {
     case "TEXT":
-      return value.text;
+      return statementsInWords(value.text);
     case "AMOUNT":
       return amountWords(value.amount, value.currency);
     case "PHRASES":

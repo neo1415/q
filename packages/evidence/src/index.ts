@@ -345,4 +345,5 @@ export {
   type GateQApplicationDocumentFreeze,
   type GateQReadyApplicationDocument,
   type GateQFrozenApplicationDocument,
+  type GateQSharedSubmittedDocument,
 } from "./application/gateq-application-document-port.js";

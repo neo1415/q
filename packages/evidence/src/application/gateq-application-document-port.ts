@@ -129,7 +129,58 @@ export type GateQApplicationDocumentPort = {
   readonly frozenDocuments: (
     input: GateQApplicationDocumentRef,
   ) => Promise<readonly GateQFrozenApplicationDocument[]>;
+  /**
+   * Live D4b (2026-11-14): the founder's own library documents they ticked
+   * and sent with a SUBMITTED application (`gateq.application_documents`,
+   * named in the frozen submission's `documentIds`), read at the version
+   * they sent: the one pinned in the submission's `sharedDocuments` when
+   * Submit recorded it, else the latest version uploaded at or before the
+   * submission (versions are immutable, so that is the version that was
+   * current when they pressed Submit). These documents belong to the
+   * founder's organisation, so they can never be rows of the
+   * application-owned disclosure table above (its foreign keys and trigger
+   * require an application-owned document in the application's tenant).
+   * Root must authorise the investor's gateway and the application before
+   * calling; a document not both attached to this application and named
+   * in its frozen submission is never read.
+   */
+  readonly sharedSubmittedDocuments: (
+    input: GateQApplicationDocumentRef & {
+      readonly maxCharsPerDocument?: number | undefined;
+    },
+  ) => Promise<readonly GateQSharedSubmittedDocument[]>;
 };
+
+/** One shared library document of a submission; `reading` null: not readable. */
+export type GateQSharedSubmittedDocument = {
+  readonly documentId: string;
+  readonly title: string;
+  readonly reading: GateQReadyApplicationDocument | null;
+};
+
+const SharedPinSchema = z
+  .object({
+    documentId: DocumentIdSchema,
+    versionId: DocumentVersionIdSchema,
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .passthrough();
+const SharedVersionRow = z.object({
+  document_id: DocumentIdSchema,
+  document_tenant_id: z.string().uuid(),
+  title: z.string(),
+  version_id: DocumentVersionIdSchema,
+  original_filename: z.string(),
+  mime_type: z.string(),
+  sha256: z.string(),
+  size_bytes: z.coerce.number(),
+  malware_scan_status: z.string(),
+  processing_status: z.string(),
+  text_extraction_status: z.string(),
+  extraction_id: z.string().uuid().nullable(),
+  page_count: z.number().int().nullable(),
+  instruction_risk_signals: z.number().int().nullable(),
+});
 
 const RefSchema = z
   .object({ tenantId: TenantIdSchema, applicationId: z.string().uuid() })
@@ -258,7 +309,8 @@ export function createGateQApplicationDocumentPort(deps: {
         and v.processing_status='COMPLETED' and v.text_extraction_status='COMPLETED' and v.malware_scan_status='CLEAN'`;
   };
   const withExcerpts = async (
-    ref: GateQApplicationDocumentRef,
+    /** The tenant that owns the documents' pages. */
+    pagesTenantId: string,
     rows: readonly unknown[],
     budget: number,
   ): Promise<readonly GateQReadyApplicationDocument[]> => {
@@ -279,7 +331,7 @@ export function createGateQApplicationDocumentPort(deps: {
           .parse(
             await deps.sql`
               select page_number,left(text,${budget}) as text,char_length(text) as full_length
-              from evidence.document_pages where tenant_id=${ref.tenantId} and document_version_id=${r.version_id}
+              from evidence.document_pages where tenant_id=${pagesTenantId} and document_version_id=${r.version_id}
               and extraction_id=${r.extraction_id} order by page_number limit ${MAX_PAGES + 1}`,
           );
         let remaining = budget;
@@ -328,7 +380,7 @@ export function createGateQApplicationDocumentPort(deps: {
       const rows = (await readyRows(deps.sql, ref)).map((row) =>
         ReadyRow.parse(row),
       );
-      return withExcerpts(ref, rows, budget);
+      return withExcerpts(ref.tenantId, rows, budget);
     },
 
     freezeForSubmission: async (tx, input) => {
@@ -417,7 +469,7 @@ export function createGateQApplicationDocumentPort(deps: {
         .min(1)
         .max(MAX_CHARS)
         .parse(input.maxCharsPerDocument ?? DEFAULT_CHARS);
-      return (await withExcerpts(ref, rows, budget))[0] ?? null;
+      return (await withExcerpts(ref.tenantId, rows, budget))[0] ?? null;
     },
     frozenDocumentObject: async (input) => {
       const rows = await submittedVersion(input);
@@ -445,6 +497,98 @@ export function createGateQApplicationDocumentPort(deps: {
         applicationId: input.applicationId,
       });
       return (await frozenFor(deps.sql, ref, true)).map(frozen);
+    },
+
+    sharedSubmittedDocuments: async (input) => {
+      const ref = RefSchema.parse({
+        tenantId: input.tenantId,
+        applicationId: input.applicationId,
+      });
+      const budget = z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_CHARS)
+        .parse(input.maxCharsPerDocument ?? DEFAULT_CHARS);
+      const submissions = await deps.sql`
+        select s.submitted_at,s.snapshot->'sharedDocuments' as pins
+        from gateq.application_submissions s
+        join gateq.applications a on a.id=s.application_id and a.tenant_id=s.tenant_id
+        where s.tenant_id=${ref.tenantId} and s.application_id=${ref.applicationId} and a.status='SUBMITTED'`;
+      if (submissions.length !== 1) return [];
+      const submission = z
+        .object({ submitted_at: z.coerce.date(), pins: z.unknown() })
+        .parse(submissions[0]);
+      const pins = new Map(
+        (Array.isArray(submission.pins) ? submission.pins : []).flatMap(
+          (pin: unknown) => {
+            const parsed = SharedPinSchema.safeParse(pin);
+            return parsed.success
+              ? [[parsed.data.documentId, parsed.data] as const]
+              : [];
+          },
+        ),
+      );
+      // Context Firewall: only what the founder attached to THIS
+      // application and what its frozen submission names.
+      const attached = z
+        .array(z.object({ document_id: DocumentIdSchema }))
+        .parse(
+          await deps.sql`
+            select ad.document_id
+            from gateq.application_documents ad
+            join gateq.application_submissions s on s.application_id=ad.application_id and s.tenant_id=ad.tenant_id
+            where ad.tenant_id=${ref.tenantId} and ad.application_id=${ref.applicationId}
+              and coalesce(s.snapshot->'documentIds','[]'::jsonb) @> jsonb_build_array(ad.document_id::text)
+            order by ad.attached_at,ad.document_id limit ${maxDocuments}`,
+        );
+      const out: GateQSharedSubmittedDocument[] = [];
+      for (const { document_id: documentId } of attached) {
+        const pin = pins.get(documentId) ?? null;
+        const rows = await deps.sql`
+          select d.id as document_id,d.tenant_id as document_tenant_id,d.title,v.id as version_id,v.original_filename,v.mime_type,v.sha256,v.size_bytes,
+            v.malware_scan_status,v.processing_status,v.text_extraction_status,x.id as extraction_id,x.page_count,x.instruction_risk_signals
+          from evidence.documents d
+          join evidence.document_versions v on v.document_id=d.id and v.tenant_id=d.tenant_id
+          left join lateral (select id,page_count,instruction_risk_signals from evidence.document_extractions e
+            where e.document_version_id=v.id and e.tenant_id=d.tenant_id order by e.created_at desc limit 1) x on true
+          where d.id=${documentId} and d.owner_kind<>'GATEQ_APPLICATION' and d.status='ACTIVE' and d.custody_cleanup_started_at is null
+            and (case when ${pin?.versionId ?? null}::uuid is null then v.uploaded_at<=${submission.submitted_at}
+                      else v.id=${pin?.versionId ?? null}::uuid end)
+          order by v.version_number desc limit 1`;
+        const row =
+          rows.length === 1 ? SharedVersionRow.parse(rows[0]) : undefined;
+        const readable =
+          row !== undefined &&
+          row.extraction_id !== null &&
+          (pin === null || row.sha256 === pin.sha256) &&
+          row.processing_status === "COMPLETED" &&
+          row.text_extraction_status === "COMPLETED" &&
+          // Text, never bytes, under the interim scan policy (ADR 0042):
+          // a version a scan flagged is never read.
+          (row.malware_scan_status === "CLEAN" ||
+            row.malware_scan_status === "NOT_SCANNED");
+        if (row === undefined || !readable) {
+          out.push({
+            documentId,
+            title: row?.title ?? "Shared document",
+            reading: null,
+          });
+          continue;
+        }
+        const [reading] = await withExcerpts(
+          row.document_tenant_id,
+          [
+            {
+              ...row,
+              instruction_risk_signals: row.instruction_risk_signals ?? 0,
+            },
+          ],
+          budget,
+        );
+        out.push({ documentId, title: row.title, reading: reading ?? null });
+      }
+      return out;
     },
   };
 }

@@ -7,6 +7,8 @@ import type {
 } from "@capital-q/contracts";
 import { countryName as canonicalCountryName } from "@capital-q/taxonomy/countries";
 
+import { statementsInWords } from "../application/fact-history.js";
+
 /**
  * F4: the investor's GateQ inbox, as pure functions over what was
  * submitted. Nothing here decides fit: the band is the engine's outcome
@@ -207,7 +209,7 @@ export function profileOf(submitted: Submitted) {
   );
   const text = (dimension: string): string | null => {
     const value = current.get(dimension);
-    return value?.kind === "TEXT" ? value.text : null;
+    return value?.kind === "TEXT" ? statementsInWords(value.text) : null;
   };
   const code = (dimension: string): string | null => {
     const value = current.get(dimension);

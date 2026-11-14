@@ -249,6 +249,8 @@ describe("gateq-2's saved views and dossier words (pure)", () => {
       "Company",
       "Round",
       "Traction",
+      "Revenue",
+      "Customers",
       "Market",
     ]);
     expect(rows[1]?.value).toBe("$1,500,000. Founder stated");
@@ -263,6 +265,58 @@ describe("gateq-2's saved views and dossier words (pure)", () => {
     ).toMatch(/^Hi Ada,[\s\S]*- What is retention/);
     expect(model.monogram("Tessellate Labs")).toBe("TL");
     expect(model.monogram("quillwork")).toBe("QU");
+  });
+});
+
+describe("the one-page summary reads each row's own dimension (live 2026-11-14)", () => {
+  const fact = (
+    dimension: string,
+    summary: string,
+    truthClass: "USER_CLAIM" | "UNKNOWN" = "USER_CLAIM",
+  ) => ({
+    dimension,
+    label: dimension,
+    summary,
+    provenance: "APPLICANT_PROVIDED" as const,
+    sourceFactId: "00000000-0000-4000-8000-000000000001",
+    sourceTurnSeq: 4,
+    truthClass,
+    evidenceStatus: "SELF_REPORTED" as const,
+  });
+  // Branchari's frozen dossier as it was: traction unknown, revenue USD 0
+  // in the same group, the customers answer and no market answer.
+  const dossier = {
+    company: { name: "Branchari" },
+    dimensions: [
+      {
+        group: "MARKET",
+        label: "Customers and market",
+        facts: [fact("company.customers", "five SACCOs in Nakuru and Eldoret")],
+      },
+      {
+        group: "TRACTION",
+        label: "Traction and revenue",
+        facts: [fact("claims.revenue", "USD 0")],
+      },
+      {
+        group: "FUNDRAISING",
+        label: "Fundraising",
+        facts: [fact("raise.amount", "USD 300,000")],
+      },
+    ],
+  } as unknown as Parameters<typeof model.onePageSummary>[1];
+
+  it("never shows revenue as traction nor the customers answer as the market", () => {
+    const rows = new Map(
+      model
+        .onePageSummary({ companyName: "Branchari", raise: null }, dossier)
+        .map((row) => [row.label, row.value] as const),
+    );
+    expect(rows.get("Traction")).toBeNull();
+    expect(rows.get("Revenue")).toMatch(/^USD 0\./);
+    expect(rows.get("Customers")).toMatch(/^five SACCOs in Nakuru/);
+    expect(rows.get("Market")).toBeNull();
+    expect(rows.get("Round")).toMatch(/^USD 300,000\./);
   });
 });
 

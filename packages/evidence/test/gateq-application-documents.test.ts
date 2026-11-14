@@ -748,3 +748,227 @@ describe("the GateQ intake document port", () => {
     expect(calls[0]?.values).toContain(false);
   });
 });
+
+/**
+ * Live D4b (2026-11-14, application bf389feb): a signed-in founder sent a
+ * deck (9 pages) and a product brief (1 page) from their own library;
+ * `evidence.gateq_application_document_disclosures` holds only
+ * application-owned uploads, so Q read nothing and said nothing was
+ * attached. The founder's library documents are read from what the
+ * submission froze, at the version they sent, and nothing else.
+ */
+describe("the founder's own documents sent with a submission (live D4b)", () => {
+  const founderTenant = randomUUID();
+  const otherTenant = TenantIdSchema.parse(randomUUID());
+  const deckId = randomUUID();
+  const briefId = randomUUID();
+  const unticked = randomUUID();
+  const deckVersion = randomUUID();
+  const briefVersion = randomUUID();
+  const sha = (c: string) => c.repeat(64);
+  const submittedAt = new Date("2026-11-14T01:48:51.000Z");
+
+  type Fixture = {
+    readonly pins: unknown;
+    readonly attached: readonly string[];
+    /** documentId -> version row, or absent */
+    readonly versions: Record<string, Record<string, unknown> | undefined>;
+  };
+  const handler =
+    (fixture: Fixture): Handler =>
+    (query, values) => {
+      if (
+        query.includes(
+          "from gateq.application_submissions s join gateq.applications",
+        )
+      )
+        return values[0] === tenantId && values[1] === applicationId
+          ? [{ submitted_at: submittedAt, pins: fixture.pins }]
+          : [];
+      if (query.includes("from gateq.application_documents ad"))
+        return values[0] === tenantId && values[1] === applicationId
+          ? fixture.attached.map((document_id) => ({ document_id }))
+          : [];
+      if (
+        query.includes(
+          "from evidence.documents d join evidence.document_versions v on v.document_id=d.id",
+        )
+      ) {
+        const row = fixture.versions[values[0] as string];
+        return row === undefined ? [] : [row];
+      }
+      if (query.includes("from evidence.document_pages"))
+        return [
+          {
+            page_number: 1,
+            text: `page text of ${String(values[2])}`,
+            full_length: 30,
+          },
+        ];
+      throw new Error(`unexpected query: ${query}`);
+    };
+  const versionRow = (
+    documentId: string,
+    versionId: string,
+    title: string,
+    pages: number,
+    extra: Record<string, unknown> = {},
+  ) => ({
+    document_id: documentId,
+    document_tenant_id: founderTenant,
+    title,
+    version_id: versionId,
+    original_filename: `${title}.pdf`,
+    mime_type: "application/pdf",
+    sha256: sha(versionId === deckVersion ? "a" : "b"),
+    size_bytes: 1000,
+    malware_scan_status: "NOT_SCANNED",
+    processing_status: "COMPLETED",
+    text_extraction_status: "COMPLETED",
+    extraction_id: randomUUID(),
+    page_count: pages,
+    instruction_risk_signals: 0,
+    ...extra,
+  });
+  const branchari: Fixture = {
+    pins: [
+      { documentId: deckId, versionId: deckVersion, sha256: sha("a") },
+      { documentId: briefId, versionId: briefVersion, sha256: sha("b") },
+    ],
+    attached: [deckId, briefId],
+    versions: {
+      [deckId]: versionRow(deckId, deckVersion, "Branchari investor deck", 9),
+      [briefId]: versionRow(
+        briefId,
+        briefVersion,
+        "Branchari product brief",
+        1,
+      ),
+    },
+  };
+
+  it("reads both sent documents at their pinned versions, from the founder's tenant", async () => {
+    const { sql, calls } = recordingSql(handler(branchari));
+    const port = createGateQApplicationDocumentPort({ sql });
+    const shared = await port.sharedSubmittedDocuments({
+      tenantId,
+      applicationId,
+    });
+    expect(shared.map((d) => [d.title, d.reading?.pageCount])).toEqual([
+      ["Branchari investor deck", 9],
+      ["Branchari product brief", 1],
+    ]);
+    expect(shared[0]?.reading?.versionId).toBe(deckVersion);
+    expect(shared[0]?.reading?.excerpts[0]?.text).toContain(deckVersion);
+    // The pinned version is the one asked for, never "whatever is current".
+    const versionReads = calls.filter((c) =>
+      c.query.includes(
+        "join evidence.document_versions v on v.document_id=d.id",
+      ),
+    );
+    expect(versionReads.map((c) => c.values[0])).toEqual([deckId, briefId]);
+    expect(versionReads[0]?.values).toContain(deckVersion);
+    // Pages are read in the document owner's tenant.
+    const pageReads = calls.filter((c) => c.query.includes("document_pages"));
+    expect(pageReads.length).toBe(2);
+    expect(pageReads.every((c) => c.values[1] === founderTenant)).toBe(true);
+    // Only documents attached to this application and named in its frozen
+    // submission are listed, scoped by the application's own tenant.
+    const listed = calls.find((c) =>
+      c.query.includes("from gateq.application_documents ad"),
+    );
+    expect(listed?.query).toContain(
+      "coalesce(s.snapshot->'documentIds','[]'::jsonb) @> jsonb_build_array(ad.document_id::text)",
+    );
+    expect(listed?.query).toContain("ad.tenant_id=? and ad.application_id=?");
+    expect(listed?.values.slice(0, 2)).toEqual([tenantId, applicationId]);
+  });
+
+  it("an unticked library document is never read", async () => {
+    const { sql, calls } = recordingSql(
+      handler({
+        ...branchari,
+        versions: {
+          ...branchari.versions,
+          [unticked]: versionRow(unticked, randomUUID(), "Cap table", 2),
+        },
+      }),
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    const shared = await port.sharedSubmittedDocuments({
+      tenantId,
+      applicationId,
+    });
+    expect(shared.map((d) => d.documentId)).not.toContain(unticked);
+    expect(calls.some((c) => c.values.includes(unticked))).toBe(false);
+  });
+
+  it("another tenant asking for the same application reads nothing", async () => {
+    const { sql, calls } = recordingSql(handler(branchari));
+    const port = createGateQApplicationDocumentPort({ sql });
+    expect(
+      await port.sharedSubmittedDocuments({
+        tenantId: otherTenant,
+        applicationId,
+      }),
+    ).toEqual([]);
+    expect(calls.some((c) => c.query.includes("evidence.documents"))).toBe(
+      false,
+    );
+  });
+
+  it("an unpinned (older) submission reads the version current at the submission instant", async () => {
+    const { sql, calls } = recordingSql(handler({ ...branchari, pins: null }));
+    const port = createGateQApplicationDocumentPort({ sql });
+    const shared = await port.sharedSubmittedDocuments({
+      tenantId,
+      applicationId,
+    });
+    expect(shared).toHaveLength(2);
+    const read = calls.find((c) => c.query.includes("v.uploaded_at<=?"));
+    expect(
+      read?.values.some(
+        (v) => v instanceof Date && v.getTime() === submittedAt.getTime(),
+      ),
+    ).toBe(true);
+    expect(read?.values).toContain(null);
+  });
+
+  it("says which sent document could not be read instead of dropping it", async () => {
+    const { sql } = recordingSql(
+      handler({
+        ...branchari,
+        versions: {
+          [deckId]: versionRow(
+            deckId,
+            deckVersion,
+            "Branchari investor deck",
+            9,
+            {
+              text_extraction_status: "FAILED",
+            },
+          ),
+          [briefId]: versionRow(
+            briefId,
+            briefVersion,
+            "Branchari product brief",
+            1,
+            {
+              sha256: sha("c"),
+            },
+          ),
+        },
+      }),
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    const shared = await port.sharedSubmittedDocuments({
+      tenantId,
+      applicationId,
+    });
+    // Not processed, and a hash that is not the one sent: neither is read.
+    expect(shared.map((d) => [d.title, d.reading])).toEqual([
+      ["Branchari investor deck", null],
+      ["Branchari product brief", null],
+    ]);
+  });
+});

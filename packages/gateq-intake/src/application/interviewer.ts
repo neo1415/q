@@ -761,6 +761,18 @@ export function createGateQInterviewer(
           });
           continue;
         }
+        // Unknown never erases what they told us (live D2b, 2026-11-14,
+        // application bf389feb): "I'm not sure which is right", "I don't
+        // know yet" and "willingness to pay is not tested yet" were each
+        // read as traction NONE, and each replaced a fact holding three
+        // statements and an unreconciled 600 against 1,500 with nothing.
+        // A NONE value states no value, so it is never a correction, even
+        // when the turn's reading calls the turn one: the held statements
+        // stay, an unreconciled pair stays unreconciled until the founder
+        // says which is right, and their words stay on the transcript. Only
+        // a correction that states a value replaces (below).
+        if (normalised.value.kind === "NONE" && held(dimension) !== undefined)
+          continue;
         // The same contact detail again ("I'm Laura" with "Laura Mensah"
         // on record) is already held: nothing to write, nothing refused.
         if (sameContact(normalised, held(dimension))) continue;

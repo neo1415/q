@@ -1,6 +1,8 @@
 import type { TransactionContext } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
+import type { DocumentTitlesPort } from "../application/ports.js";
+
 /**
  * What the GateQ inbox (F4) borrows from around it. The app composes these:
  * GateQ owns the gateway and who may see or act on it; Identity owns the
@@ -244,6 +246,8 @@ export type SharedDocumentPort = {
   readonly titles: (
     documentIds: readonly string[],
   ) => Promise<ReadonlyMap<string, string>>;
+  /** The same read Submit pins shared versions with (DocumentTitlesPort). */
+  readonly versions?: DocumentTitlesPort["versions"];
   readonly file: (documentId: string) => Promise<{
     readonly title: string;
     readonly fileName: string;
