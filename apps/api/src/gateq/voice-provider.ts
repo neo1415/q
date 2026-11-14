@@ -11,9 +11,11 @@ import { isEnglish, languageChannels } from "@capital-q/q-core/language";
  * Deepgram key never leaves this server; the guest credential never
  * reaches the provider.
  *
- * Slice 1 speaks in the provider's own voice (Aura-2); Q's ElevenLabs
- * voice relay lives in q-api behind a signed-in binding and is a later
- * slice for guests.
+ * An optional fallback only (owner directive 2026-11-14): composed when
+ * CQ_GATEQ_VOICE_PROVIDER=deepgram is set explicitly. By default Q's own
+ * ElevenLabs Speech Engine carries the interview
+ * (voice-providers/elevenlabs.ts). This one speaks in the provider's own
+ * voice (Aura-2).
  */
 
 const GRANT_URL = "https://api.deepgram.com/v1/auth/grant";

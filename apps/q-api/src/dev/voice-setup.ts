@@ -18,13 +18,16 @@
  *   --female <voiceId>  --male <voiceId>   override the voice ids (defaults below)
  *   --classic                             turbo v2 without inline audio tags
  *   --dry-run                               print the plan, touch nothing
+ *   --gateq-ws-url <wss://<api-host>/v1/gateq/voice/ws>
+ *       instead: create or update GateQ's interviewer engine (Q's female
+ *       voice, the same tuning) and record ELEVENLABS_GATEQ_SPEECH_ENGINE_ID
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadQApiConfig } from "@capital-q/config/q-api";
-import { Q_VOICE_WS_PATH } from "@capital-q/contracts";
+import { GATEQ_VOICE_WS_PATH, Q_VOICE_WS_PATH } from "@capital-q/contracts";
 
 import {
   createSpeechEngineAdmin,
@@ -73,6 +76,8 @@ const ENGINE_NAMES = {
 
 type Args = {
   wsUrl: string | undefined;
+  /** GateQ's interviewer engine: wss://<api-host>/v1/gateq/voice/ws. */
+  gateqWsUrl: string | undefined;
   female: string;
   male: string;
   dryRun: boolean;
@@ -83,6 +88,7 @@ type Args = {
 function parseArgs(argv: readonly string[]): Args {
   const args: Args = {
     wsUrl: undefined,
+    gateqWsUrl: undefined,
     female: DEFAULT_VOICE_IDS.FEMALE,
     male: DEFAULT_VOICE_IDS.MALE,
     dryRun: false,
@@ -102,6 +108,10 @@ function parseArgs(argv: readonly string[]): Args {
         break;
       case "--male":
         args.male = value ?? args.male;
+        index += 1;
+        break;
+      case "--gateq-ws-url":
+        args.gateqWsUrl = value;
         index += 1;
         break;
       case "--dry-run":
@@ -175,6 +185,55 @@ if (key === undefined) {
   );
   process.exit(2);
 }
+// GateQ's voice interview (owner directive 2026-11-14): one more Speech
+// Engine in Q's own voice, dialling back to the application API's GateQ
+// route. Recorded as ELEVENLABS_GATEQ_SPEECH_ENGINE_ID for the api service.
+if (args.gateqWsUrl !== undefined) {
+  let gateqUrl: URL | undefined;
+  try {
+    gateqUrl = new URL(args.gateqWsUrl);
+  } catch {
+    gateqUrl = undefined;
+  }
+  if (
+    gateqUrl?.protocol !== "wss:" ||
+    gateqUrl.pathname !== GATEQ_VOICE_WS_PATH
+  ) {
+    console.error(
+      `[dev] --gateq-ws-url must be a wss:// URL whose path is ${GATEQ_VOICE_WS_PATH}.`,
+    );
+    process.exit(2);
+  }
+  const existingGateq =
+    process.env["ELEVENLABS_GATEQ_SPEECH_ENGINE_ID"]?.trim() || undefined;
+  console.log(
+    `[dev] GateQ interviewer: ${existingGateq === undefined ? "create" : `update ${existingGateq}`} → voice ${args.female}, ws url ${gateqUrl.toString()}`,
+  );
+  if (args.dryRun) {
+    console.log("[dev] dry run: nothing changed.");
+    process.exit(0);
+  }
+  const gateqId = await createSpeechEngineAdmin({
+    apiKey: key.reveal(),
+  }).upsert(
+    {
+      voice: "FEMALE",
+      name: "Capital Q — GateQ interviewer (Q voice)",
+      voiceId: args.female,
+      existingId: existingGateq,
+    },
+    {
+      wsUrl: gateqUrl.toString(),
+      tuning: args.classic ? CLASSIC_VOICE_TUNING : VOICE_TUNING,
+    },
+  );
+  recordEnv(envFile, { ELEVENLABS_GATEQ_SPEECH_ENGINE_ID: gateqId });
+  console.log(
+    `[dev] GateQ interviewer: ${gateqId} (set ELEVENLABS_GATEQ_SPEECH_ENGINE_ID on the api service)`,
+  );
+  process.exit(0);
+}
+
 const wsUrl = validWsUrl(args.wsUrl);
 const existing = config.voice.speechEngines;
 if (wsUrl === undefined && existing === undefined) {

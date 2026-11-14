@@ -6,6 +6,7 @@ import {
   GATEQ_APPLY_VOICE_PATH,
   GATEQ_VOICE_BRIDGE_PATH,
   GateqVoiceStateDtoSchema,
+  type GateqVoiceStateDto,
 } from "@capital-q/contracts";
 import {
   createGateqVoiceInterview,
@@ -165,6 +166,13 @@ async function open(app: ReturnType<typeof build>["app"], token = TOKEN) {
   return { response, state: GateqVoiceStateDtoSchema.parse(response.json()) };
 }
 
+/** The Deepgram fallback's agent settings (these tests compose Deepgram explicitly). */
+function agentOf(
+  line: GateqVoiceStateDto["line"],
+): Readonly<Record<string, unknown>> {
+  return line?.provider === "deepgram" ? line.agent : {};
+}
+
 function bearerOf(agent: Record<string, unknown>): string {
   const header = JSON.stringify(agent).match(/Bearer ([A-Za-z0-9_-]+)/u);
   return header?.[1] ?? "";
@@ -221,7 +229,7 @@ describe("GateQ voice: the applicant's session by guest credential", () => {
     expect(body).not.toContain(PROVIDER_KEY);
     expect(body).not.toContain(TOKEN);
     // The think endpoint is this API's bridge under the line's own bearer.
-    const agent = state.line?.agent ?? {};
+    const agent = agentOf(state.line);
     expect(JSON.stringify(agent)).toContain(
       `https://api.example.test${GATEQ_VOICE_BRIDGE_PATH}/chat/completions`,
     );
@@ -355,7 +363,7 @@ describe("GateQ voice: the speech provider's bridge", () => {
   it("each heard line is the canonical turn with channel voice, streamed back as Q's reply", async () => {
     const { app, turn } = build();
     const { state } = await open(app);
-    const bearer = bearerOf(state.line?.agent ?? {});
+    const bearer = bearerOf(agentOf(state.line));
     const response = await think(app, bearer, ["We sell to banks."]);
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toContain("text/event-stream");
@@ -373,9 +381,7 @@ describe("GateQ voice: the speech provider's bridge", () => {
   it("a failed turn is a spoken retry, not a broken stream", async () => {
     const { app } = build();
     const { state } = await open(app);
-    const response = await think(app, bearerOf(state.line?.agent ?? {}), [
-      "boom",
-    ]);
+    const response = await think(app, bearerOf(agentOf(state.line)), ["boom"]);
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain(GATEQ_VOICE_RETRY_LINE);
   });
@@ -389,7 +395,7 @@ describe("GateQ voice: the speech provider's bridge", () => {
       headers: auth(TOKEN),
       payload: { continueByTyping: true },
     });
-    const response = await think(app, bearerOf(state.line?.agent ?? {}), [
+    const response = await think(app, bearerOf(agentOf(state.line)), [
       "One more thing",
     ]);
     expect(response.body).toContain("carry on by typing");

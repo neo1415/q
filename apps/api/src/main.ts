@@ -43,7 +43,12 @@ import {
   tavusKeysFrom,
 } from "@capital-q/integrations";
 import { createTavusGateqVideoProvider } from "./gateq/video-provider.js";
+import { createHash } from "node:crypto";
+import type { Server as HttpServer } from "node:http";
 import { createDeepgramGateqVoiceProvider } from "./gateq/voice-provider.js";
+import { createElevenLabsGateqVoice } from "./gateq/voice-providers/elevenlabs.js";
+import { selectGateqVoiceProvider } from "./gateq/voice-providers/select.js";
+import { createGateqDialBackHandlers } from "./gateq/voice-dial-back.js";
 import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
 import { loadWebPushConfig } from "@capital-q/config/web-push";
 import {
@@ -57,6 +62,7 @@ import {
 import {
   GATEQ_VIDEO_BRIDGE_PATH,
   GATEQ_VOICE_BRIDGE_PATH,
+  GATEQ_VOICE_WS_PATH,
   GATEQ_VIDEO_EVENTS_PATH,
   CorrelationIdSchema,
   type AdminUsageDto,
@@ -974,10 +980,22 @@ function composeGateqVideo(apply: {
 }
 
 /**
+ * The GateQ voice line's dial-back channel, attached to the HTTP server
+ * once it listens (the Speech Engine connects to it). Set by
+ * composeGateqVoice only when ElevenLabs carries the interview.
+ */
+let attachGateqVoiceChannel: ((server: HttpServer) => void) | undefined;
+
+/**
  * Directive 2026-11-14 item 4: the GateQ voice-only interview. Off unless
- * CQ_GATEQ_VOICE_INTERVIEW=1, a Deepgram key, this API's public URL and a
- * 32-byte seal key are all configured; otherwise the service answers "not
- * offered" and typing is the interview. Limits come from CQ_GATEQ_VOICE_*.
+ * CQ_GATEQ_VOICE_INTERVIEW=1, a speech provider and a 32-byte seal key are
+ * configured; otherwise the service answers "not offered" and typing is
+ * the interview. Limits come from CQ_GATEQ_VOICE_*.
+ *
+ * Owner directive 2026-11-14 (reuse the existing voice providers): Q's
+ * ElevenLabs Speech Engine carries it by default (ELEVENLABS_API_KEY, the
+ * key q-api already holds, and ELEVENLABS_GATEQ_SPEECH_ENGINE_ID); the
+ * Deepgram agent only when CQ_GATEQ_VOICE_PROVIDER=deepgram says so.
  */
 function composeGateqVoice(apply: {
   readonly intake: Parameters<typeof createGateqVoiceInterview>[0]["intake"];
@@ -985,12 +1003,11 @@ function composeGateqVoice(apply: {
     typeof createGateqVoiceInterview
   >[0]["conversation"];
 }) {
-  const config = gateqVoiceConfigFrom(process.env);
-  const apiKey = process.env["DEEPGRAM_API_KEY"]?.trim() ?? "";
-  const publicBaseUrl = (process.env["API_PUBLIC_URL"]?.trim() ?? "").replace(
-    /\/+$/u,
-    "",
-  );
+  const voiceConfig = gateqVoiceConfigFrom(process.env);
+  const choice = selectGateqVoiceProvider(process.env);
+  const voiceLogger = createLogger(apiServiceIdentity(config), {
+    level: config.observability.logLevel,
+  });
   // Its own seal key when given, else the video interview's: the sealed
   // guest credential is bound to this purpose either way.
   const sealKey =
@@ -1003,13 +1020,44 @@ function composeGateqVoice(apply: {
       return null;
     }
   })();
-  const provider =
-    config.enabled && apiKey !== "" && publicBaseUrl !== "" && cipher !== null
-      ? createDeepgramGateqVoiceProvider({ apiKey, publicBaseUrl })
+  // Dial-back line bearers are derived under a secret of their own,
+  // separated from the seal key by purpose; never sent anywhere.
+  const lineSecret =
+    sealKey === ""
+      ? undefined
+      : createHash("sha256")
+          .update(`gateq-voice-line-secret.v1:${sealKey}`)
+          .digest("base64url");
+  const usable = voiceConfig.enabled && cipher !== null;
+  const elevenLabs =
+    usable && choice.kind === "elevenlabs"
+      ? createElevenLabsGateqVoice({
+          apiKey: choice.apiKey,
+          speechEngineId: choice.speechEngineId,
+        })
       : null;
+  const provider =
+    elevenLabs !== null
+      ? elevenLabs.provider
+      : usable && choice.kind === "deepgram"
+        ? createDeepgramGateqVoiceProvider({
+            apiKey: choice.apiKey,
+            publicBaseUrl: choice.publicBaseUrl,
+          })
+        : null;
+  if (voiceConfig.enabled)
+    voiceLogger.info(
+      {
+        gateqVoiceProvider: provider === null ? "none" : choice.kind,
+        ...(choice.kind === "none" ? { missing: choice.missing } : {}),
+        sealKey: cipher === null ? "missing" : "configured",
+      },
+      "gateq voice interview provider",
+    );
   const BOUND = "gateq-voice.v1";
   const interview = createGateqVoiceInterview({
-    config,
+    config: voiceConfig,
+    lineSecret,
     store: createPostgresGateqVoiceSessions({
       sql: database.sql,
       transactions: database.transactions,
@@ -1035,6 +1083,18 @@ function composeGateqVoice(apply: {
     setInterval(() => {
       void interview.sweep().catch(() => undefined);
     }, 30_000).unref();
+  }
+  if (elevenLabs !== null) {
+    const handlers = createGateqDialBackHandlers({
+      voice: interview,
+      logger: voiceLogger,
+    });
+    attachGateqVoiceChannel = (server) => {
+      const channel = elevenLabs.attach(server, GATEQ_VOICE_WS_PATH, handlers);
+      server.once("close", () => {
+        void channel.close().catch(() => undefined);
+      });
+    };
   }
   return interview;
 }
@@ -3732,6 +3792,8 @@ await app.listen({
   port: config.network.port,
   host: config.network.host,
 });
+// The GateQ voice line's Speech Engine dials back on this server.
+attachGateqVoiceChannel?.(app.server);
 
 // Safe startup metadata only. The configuration object is never logged.
 logger.info(

@@ -482,6 +482,12 @@ export const GATEQ_APPLY_VOICE_PATH = "/v1/gateq/apply/voice" as const;
 export const GATEQ_APPLY_VOICE_END_PATH = "/v1/gateq/apply/voice/end" as const;
 /** The provider appends `/chat/completions` (an OpenAI-shaped think call). */
 export const GATEQ_VOICE_BRIDGE_PATH = "/v1/gateq/voice/bridge" as const;
+/**
+ * Where Q's ElevenLabs Speech Engine for GateQ dials back: a WebSocket
+ * verified as the provider's on every upgrade. The engine resource's
+ * `wsUrl` is this API's public origin plus this path.
+ */
+export const GATEQ_VOICE_WS_PATH = "/v1/gateq/voice/ws" as const;
 export const GATEQ_VOICE_UNAVAILABLE_REASONS = [
   "NOT_OFFERED",
   "SUBMITTED",
@@ -516,18 +522,36 @@ export const GateqVoiceSessionDtoSchema = z
   .strict();
 export type GateqVoiceSessionDto = z.infer<typeof GateqVoiceSessionDtoSchema>;
 /**
- * The browser's one-time line credential: a short-lived speech-provider
- * token (never a provider API key) and the agent settings this server
- * composed, whose think endpoint is the bridge under this line's bearer.
- * Only on the POST that opened the line; never on a GET.
+ * The browser's one-time line credential (v2, owner directive 2026-11-14
+ * "GateQ voice reuses the existing voice providers"). Only on the POST
+ * that opened the line; never on a GET; never a provider API key.
+ *
+ * - `elevenlabs` (the default): a short-lived WebRTC conversation token
+ *   for Q's own ElevenLabs Speech Engine voice. The engine dials this API
+ *   back with nothing but its conversation id, and every reply is the
+ *   canonical interviewer's. `firstMessage` is Q's opening as the server
+ *   composed it (already in the transcript).
+ * - `deepgram` (optional fallback, only when explicitly configured): a
+ *   short-lived agent token and the agent settings this server composed,
+ *   whose think endpoint is the bridge under this line's bearer.
  */
-export const GateqVoiceLineDtoSchema = z
-  .object({
-    provider: z.literal("deepgram"),
-    token: z.string().min(1).max(8192),
-    agent: z.record(z.string(), z.unknown()),
-  })
-  .strict();
+export const GATEQ_VOICE_LINE_PROVIDERS = ["elevenlabs", "deepgram"] as const;
+export const GateqVoiceLineDtoSchema = z.discriminatedUnion("provider", [
+  z
+    .object({
+      provider: z.literal("elevenlabs"),
+      token: z.string().min(1).max(8192),
+      firstMessage: z.string().max(1000),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("deepgram"),
+      token: z.string().min(1).max(8192),
+      agent: z.record(z.string(), z.unknown()),
+    })
+    .strict(),
+]);
 export type GateqVoiceLineDto = z.infer<typeof GateqVoiceLineDtoSchema>;
 export const GateqVoiceStateDtoSchema = z
   .object({

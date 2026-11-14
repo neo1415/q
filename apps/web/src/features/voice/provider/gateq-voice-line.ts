@@ -5,18 +5,59 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { GateqVoiceLineDto } from "@capital-q/contracts";
 import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 
+import type { VoiceState, VoiceTranscriptLine } from "../session";
 import type { AgentSocket } from "./agent-socket";
+import {
+  ELEVENLABS_PLAIN_ERRORS,
+  useElevenLabsSpeechLine,
+} from "./elevenlabs-session";
 import type { PcmPlayer } from "./pcm-player";
 
 /**
- * The GateQ voice-only line in the browser: the same microphone, socket
- * and speaker the standard Q voice line uses (deepgram-session.ts), and
- * nothing of its signed-in extras (page cards, navigation, the swarm). The
- * line credential comes from the GateQ API under the applicant's guest
- * credential; every "think" the agent makes goes to the GateQ bridge, so
- * each reply is the canonical interviewer's and each heard line is a turn
- * in the same interview. Nothing is decided or stored here.
+ * The GateQ voice-only line in the browser, on the transports Q's own
+ * voice already uses and nothing of their signed-in extras (page cards,
+ * navigation, the swarm). The line credential comes from the GateQ API
+ * under the applicant's guest credential; nothing is decided or stored
+ * here, and each reply is the canonical interviewer's.
+ *
+ * - `elevenlabs` (owner directive 2026-11-14, the default): Q's own
+ *   ElevenLabs voice session (elevenlabs-session.ts), opened with a
+ *   one-conversation WebRTC token. The provider handles echo, turn-taking
+ *   and barge-in; the server answers every heard line.
+ * - `deepgram` (optional fallback): the standard line's microphone, agent
+ *   socket and speaker (deepgram-session.ts), whose every "think" goes to
+ *   the GateQ bridge.
  */
+
+/** Q's ElevenLabs session states, as the GateQ line names them. */
+function lineStateOf(state: VoiceState): GateqVoiceLineState {
+  switch (state) {
+    case "IDLE":
+      return "ENDED";
+    case "CONNECTING":
+      return "CONNECTING";
+    case "THINKING":
+      return "THINKING";
+    case "Q_SPEAKING":
+      return "Q_SPEAKING";
+    case "ERROR":
+      return "FAILED";
+    case "LISTENING":
+    case "USER_SPEAKING":
+    case "INTERRUPTED":
+      return "LISTENING";
+  }
+}
+
+function captionsOf(
+  lines: readonly VoiceTranscriptLine[],
+): readonly GateqVoiceCaption[] {
+  return lines.map((line) => ({
+    id: line.id,
+    from: line.role === "user" ? "YOU" : "Q",
+    text: line.text,
+  }));
+}
 
 export type GateqVoiceLineState =
   | "IDLE"
@@ -67,6 +108,21 @@ export function useGateqVoiceLine(events: {
   useEffect(() => {
     eventsRef.current = events;
   });
+  /** Which transport the open line uses; null before the first start. */
+  const [mode, setMode] = useState<"deepgram" | "elevenlabs" | null>(null);
+  const modeRef = useRef<"deepgram" | "elevenlabs" | null>(null);
+  const elevenFailedRef = useRef(false);
+  const eleven = useElevenLabsSpeechLine({
+    onError: (message) => {
+      if (modeRef.current !== "elevenlabs") return;
+      elevenFailedRef.current = true;
+      eventsRef.current.onProblem?.(
+        message === ELEVENLABS_PLAIN_ERRORS.microphone
+          ? "microphone"
+          : "connection",
+      );
+    },
+  });
 
   const release = useCallback((live: Live | null) => {
     if (live === null) return;
@@ -83,12 +139,18 @@ export function useGateqVoiceLine(events: {
     }
   }, []);
 
+  const elevenClient = eleven.client;
+  const elevenOpen = eleven.open;
   const stop = useCallback(() => {
+    if (modeRef.current === "elevenlabs") {
+      void elevenClient.end();
+      return;
+    }
     const live = liveRef.current;
     liveRef.current = null;
     release(live);
     setState((current) => (current === "FAILED" ? current : "ENDED"));
-  }, [release]);
+  }, [release, elevenClient]);
 
   useEffect(
     () => () => {
@@ -103,6 +165,17 @@ export function useGateqVoiceLine(events: {
       release(liveRef.current);
       liveRef.current = null;
       setCaptions([]);
+      if (line.provider === "elevenlabs") {
+        modeRef.current = "elevenlabs";
+        setMode("elevenlabs");
+        elevenFailedRef.current = false;
+        // The microphone is asked for only now, after the person pressed
+        // Start; the session reports its own problems through onError.
+        await elevenOpen(line.token, line.firstMessage);
+        return !elevenFailedRef.current;
+      }
+      modeRef.current = "deepgram";
+      setMode("deepgram");
       setState("CONNECTING");
       let AgentMicrophone: typeof AgentMicrophoneClass;
       let SocketClass: typeof AgentSocket;
@@ -197,16 +270,32 @@ export function useGateqVoiceLine(events: {
       }
       return liveRef.current === live;
     },
-    [release],
+    [release, elevenOpen],
   );
 
-  const setMuted = useCallback((next: boolean) => {
-    const live = liveRef.current;
-    if (live === null) return;
-    if (next) live.microphone.mute();
-    else live.microphone.unmute();
-    setMutedState(next);
-  }, []);
+  const setMuted = useCallback(
+    (next: boolean) => {
+      if (modeRef.current === "elevenlabs") {
+        elevenClient.setMuted(next);
+        return;
+      }
+      const live = liveRef.current;
+      if (live === null) return;
+      if (next) live.microphone.mute();
+      else live.microphone.unmute();
+      setMutedState(next);
+    },
+    [elevenClient],
+  );
 
+  if (mode === "elevenlabs")
+    return {
+      state: lineStateOf(elevenClient.state),
+      captions: captionsOf(elevenClient.transcript),
+      muted: elevenClient.muted,
+      start,
+      stop,
+      setMuted,
+    };
   return { state, captions, muted, start, stop, setMuted };
 }

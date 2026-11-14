@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { IntakeRefusedError } from "../src/contracts/index.js";
 import {
   createGateqVoiceInterview,
+  dialBackBearer,
   effectiveVoiceSeconds,
   GATEQ_VOICE_DEFAULTS,
   gateqVoiceConfigFrom,
@@ -32,8 +33,10 @@ function memoryStore(clock: () => number) {
     (input: { applicationId: string; tenantId: string }) =>
     (r: GateqVoiceSessionRow) =>
       r.applicationId === input.applicationId && r.tenantId === input.tenantId;
+  const reserved: Parameters<GateqVoiceSessionStore["reserve"]>[0][] = [];
   const store: GateqVoiceSessionStore = {
     reserve: (input) => {
+      reserved.push(input);
       const i = rows.findIndex((r) => mine(input)(r) && live(r));
       const open = rows[i];
       if (open !== undefined) {
@@ -90,37 +93,58 @@ function memoryStore(clock: () => number) {
         ),
       ),
   };
-  return { store, rows };
+  return { store, rows, reserved };
 }
 
 function world(
   config: Partial<GateqVoiceConfig> = {},
-  options: { provider?: "none" | "failing" } = {},
+  options: {
+    provider?: "none" | "failing" | "elevenlabs" | "elevenlabs-failing";
+    lineSecret?: string;
+  } = {},
 ) {
   let now = Date.parse("2026-11-14T09:00:00Z");
   const clock = () => now;
-  const { store, rows } = memoryStore(clock);
+  const { store, rows, reserved } = memoryStore(clock);
   const bearers: string[] = [];
+  const issued: string[] = [];
+  const dialBack = {
+    kind: "DIAL_BACK" as const,
+    name: "elevenlabs" as const,
+    issueLine: vi.fn(() => {
+      if (options.provider === "elevenlabs-failing")
+        return Promise.reject(new Error("provider 503"));
+      const id = `conv_${String(issued.length + 1)}`;
+      issued.push(id);
+      return Promise.resolve({
+        providerConversationId: id,
+        token: `el-webrtc-${id}`,
+      });
+    }),
+  };
   const provider =
     options.provider === "none"
       ? null
-      : {
-          openLine: vi.fn(
-            (input: {
-              greeting: string;
-              bridge: { path: string; bearer: string };
-            }) => {
-              if (options.provider === "failing")
-                return Promise.reject(new Error("provider 503"));
-              bearers.push(input.bridge.bearer);
-              return Promise.resolve({
-                provider: "deepgram" as const,
-                token: `dg-${String(bearers.length)}`,
-                agent: { greeting: input.greeting },
-              });
-            },
-          ),
-        };
+      : options.provider === "elevenlabs" ||
+          options.provider === "elevenlabs-failing"
+        ? dialBack
+        : {
+            openLine: vi.fn(
+              (input: {
+                greeting: string;
+                bridge: { path: string; bearer: string };
+              }) => {
+                if (options.provider === "failing")
+                  return Promise.reject(new Error("provider 503"));
+                bearers.push(input.bridge.bearer);
+                return Promise.resolve({
+                  provider: "deepgram" as const,
+                  token: `dg-${String(bearers.length)}`,
+                  agent: { greeting: input.greeting },
+                });
+              },
+            ),
+          };
   const apps: Record<string, { id: string; tenantId: string; status: string }> =
     {
       [TOKEN]: { id: APP, tenantId: TENANT, status: "IN_PROGRESS" },
@@ -158,11 +182,16 @@ function world(
     intake,
     conversation,
     bridgePath: "/v1/gateq/voice/bridge",
+    lineSecret:
+      options.lineSecret ?? "line-secret-for-tests-000000000000000000",
     now: clock,
   });
   return {
     voice,
     rows,
+    reserved,
+    issued,
+    dialBack,
     bearers,
     provider,
     conversation,
@@ -393,8 +422,143 @@ describe("lines, reconnects and failure", () => {
       }),
     ).toEqual({ kind: "REPLY", reply: "" });
     expect(w.conversation.turn).not.toHaveBeenCalled();
-    expect(JSON.stringify(w.provider?.openLine.mock.calls)).not.toContain(
+    expect(
+      JSON.stringify(
+        w.provider !== null && "openLine" in w.provider
+          ? w.provider.openLine.mock.calls
+          : [],
+      ),
+    ).not.toContain(TOKEN);
+  });
+});
+
+describe("ElevenLabs (dial-back): Q's own voice, the canonical interviewer", () => {
+  it("issues a one-conversation token, records ELEVENLABS, and hands back Q's server-composed opening", async () => {
+    const w = world({}, { provider: "elevenlabs" });
+    const opened = await w.voice.start({ token: TOKEN, correlationId: "c1" });
+    expect(opened.line).toEqual({
+      provider: "elevenlabs",
+      token: "el-webrtc-conv_1",
+      firstMessage: "What does the company do?",
+    });
+    // The bearer is derived, never handed out, and never the guest credential.
+    expect(JSON.stringify(opened)).not.toContain(TOKEN);
+    expect(JSON.stringify(w.dialBack.issueLine.mock.calls)).not.toContain(
       TOKEN,
     );
+    expect(w.rows[0]?.bridgeTokenHash).toBe(
+      sha(dialBackBearer("line-secret-for-tests-000000000000000000", "conv_1")),
+    );
+    expect(w.reserved[0]?.provider).toBe("ELEVENLABS");
+  });
+
+  it("each heard line is the same canonical turn, channel voice, under the applicant's own credential", async () => {
+    const w = world({}, { provider: "elevenlabs" });
+    await w.voice.start({ token: TOKEN, correlationId: "c1" });
+    expect(await w.voice.dialBackOpened("conv_1")).toBe(true);
+    const first = await w.voice.dialBackTurn({
+      providerConversationId: "conv_1",
+      utterance: "We sell payroll software to clinics.",
+      utteranceIndex: 1,
+      correlationId: "c2",
+    });
+    expect(first).toEqual({
+      kind: "REPLY",
+      reply: "Heard: We sell payroll software to clinics.",
+    });
+    const call = w.conversation.turn.mock.calls[0]?.[0];
+    expect(call?.token).toBe(TOKEN);
+    expect(call?.channel).toBe("voice");
+    // A re-sent transcript names the same line: the same turn id.
+    await w.voice.dialBackTurn({
+      providerConversationId: "conv_1",
+      utterance: "We sell payroll software to clinics.",
+      utteranceIndex: 1,
+      correlationId: "c3",
+    });
+    expect(w.conversation.turn.mock.calls[1]?.[0].clientTurnId).toBe(
+      call?.clientTurnId,
+    );
+  });
+
+  it("another application's conversation reaches only its own application; an unknown one reaches nothing", async () => {
+    const w = world({}, { provider: "elevenlabs" });
+    await w.voice.start({ token: TOKEN, correlationId: "c1" });
+    await w.voice.start({ token: OTHER_TOKEN, correlationId: "c2" });
+    await w.voice.dialBackTurn({
+      providerConversationId: "conv_2",
+      utterance: "Our own line.",
+      utteranceIndex: 1,
+      correlationId: "c3",
+    });
+    expect(w.conversation.turn.mock.calls[0]?.[0].token).toBe(OTHER_TOKEN);
+    for (const id of ["conv_9", "", "../conv_1", "x".repeat(200)]) {
+      expect(await w.voice.dialBackOpened(id)).toBe(false);
+      expect(
+        await w.voice.dialBackTurn({
+          providerConversationId: id,
+          utterance: "hello",
+          utteranceIndex: 1,
+          correlationId: "c4",
+        }),
+      ).toEqual({ kind: "UNKNOWN_SESSION" });
+    }
+    expect(w.conversation.turn).toHaveBeenCalledTimes(1);
+  });
+
+  it("another server secret derives no line: a conversation id alone is not a credential", async () => {
+    const w = world({}, { provider: "elevenlabs", lineSecret: "a".repeat(40) });
+    await w.voice.start({ token: TOKEN, correlationId: "c1" });
+    expect(
+      await w.voice.bridgeTurn({
+        bearer: dialBackBearer("b".repeat(40), "conv_1"),
+        utterance: "hi",
+        utteranceId: "1",
+        correlationId: "c2",
+      }),
+    ).toEqual({ kind: "UNKNOWN_SESSION" });
+  });
+
+  it("is not offered without a line secret; a provider failure spends no allowance", async () => {
+    const unset = world({}, { provider: "elevenlabs", lineSecret: "short" });
+    expect((await unset.voice.availability(TOKEN)).reason).toBe("NOT_OFFERED");
+    const failing = world({}, { provider: "elevenlabs-failing" });
+    await expect(
+      failing.voice.start({ token: TOKEN, correlationId: "c1" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(failing.rows).toHaveLength(0);
+    expect((await failing.voice.availability(TOKEN)).remaining).toBe(3);
+  });
+
+  it("past the end the dial-back line is closed and no further turn is taken", async () => {
+    const w = world({}, { provider: "elevenlabs" });
+    await w.voice.start({ token: TOKEN, correlationId: "c1" });
+    await w.voice.dialBackTurn({
+      providerConversationId: "conv_1",
+      utterance: "Spoken line.",
+      utteranceIndex: 1,
+      correlationId: "c2",
+    });
+    w.advance(181_000);
+    expect(await w.voice.dialBackOpened("conv_1")).toBe(false);
+    expect(
+      await w.voice.dialBackTurn({
+        providerConversationId: "conv_1",
+        utterance: "Too late.",
+        utteranceIndex: 2,
+        correlationId: "c3",
+      }),
+    ).toEqual({ kind: "CLOSED" });
+    expect(w.conversation.turn).toHaveBeenCalledTimes(1);
+  });
+
+  it("a reconnect is a new conversation on the same session and clock; the old conversation stops", async () => {
+    const w = world({}, { provider: "elevenlabs" });
+    const first = await w.voice.start({ token: TOKEN, correlationId: "c1" });
+    const again = await w.voice.start({ token: TOKEN, correlationId: "c2" });
+    expect(again.session.id).toBe(first.session.id);
+    expect(again.session.endsAt).toBe(first.session.endsAt);
+    expect(await w.voice.dialBackOpened("conv_1")).toBe(false);
+    expect(await w.voice.dialBackOpened("conv_2")).toBe(true);
   });
 });

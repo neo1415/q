@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 
 import type {
   ApplicantTurnResult,
@@ -120,6 +120,8 @@ export type GateqVoiceSessionStore = {
     readonly applicationId: string;
     readonly bridgeTokenHash: string;
     readonly guestCredentialSealed: string;
+    /** Recorded on a new row; absent is the slice-1 default, DEEPGRAM. */
+    readonly provider?: GateqVoiceProviderCode | undefined;
     readonly maxSeconds: number;
     readonly perApplication: number;
     readonly concurrency: number;
@@ -150,11 +152,22 @@ export type GateqVoiceSessionStore = {
 };
 
 /**
- * The speech provider adapter: never a raw SDK or key in domain code. It
- * mints one short-lived browser token and composes the agent settings
- * whose think endpoint is the bridge under this line's bearer.
+ * The speech provider adapter (v2, owner directive 2026-11-14 "GateQ
+ * voice reuses the existing voice providers"): never a raw SDK or key in
+ * domain code, and never a brain. Two shapes, by how the provider reaches
+ * the canonical interviewer:
+ *
+ * - DIAL_BACK (ElevenLabs Speech Engine, Q's own voice; the default): the
+ *   provider issues one short-lived browser credential for one
+ *   conversation and later dials this server back with nothing but that
+ *   conversation's id. The line bearer is derived from the id under a
+ *   server secret, so the line survives a restart and needs no new column.
+ * - THINK_ENDPOINT (Deepgram Voice Agent; an optional fallback, only when
+ *   explicitly configured): the provider calls the bridge URL under this
+ *   line's bearer with every heard line.
  */
-export type GateqVoiceProvider = {
+export type GateqThinkEndpointVoiceProvider = {
+  readonly kind?: "THINK_ENDPOINT" | undefined;
   readonly openLine: (input: {
     readonly sessionId: string;
     /** Q's opening (or the question it last asked, on a resume). */
@@ -167,6 +180,24 @@ export type GateqVoiceProvider = {
     readonly agent: Readonly<Record<string, unknown>>;
   }>;
 };
+
+export type GateqDialBackVoiceProvider = {
+  readonly kind: "DIAL_BACK";
+  readonly name: "elevenlabs";
+  /** One browser credential for one new provider conversation; never a key. */
+  readonly issueLine: (input: {
+    readonly locale?: string | undefined;
+  }) => Promise<{
+    readonly providerConversationId: string;
+    readonly token: string;
+  }>;
+};
+
+export type GateqVoiceProvider =
+  GateqThinkEndpointVoiceProvider | GateqDialBackVoiceProvider;
+
+/** Which provider a session's row records. */
+export type GateqVoiceProviderCode = "DEEPGRAM" | "ELEVENLABS";
 
 export type GateqVoiceSealer = {
   readonly seal: (plain: string) => string;
@@ -196,14 +227,43 @@ export type GateqVoiceSessionView = {
   readonly endedReason: GateqVoiceEndedReason | null;
 };
 
-export type GateqVoiceLine = {
-  readonly provider: "deepgram";
-  readonly token: string;
-  readonly agent: Readonly<Record<string, unknown>>;
-};
+export type GateqVoiceLine =
+  | {
+      readonly provider: "elevenlabs";
+      readonly token: string;
+      /** Q's opening as this server composed it; the provider speaks it first. */
+      readonly firstMessage: string;
+    }
+  | {
+      readonly provider: "deepgram";
+      readonly token: string;
+      readonly agent: Readonly<Record<string, unknown>>;
+    };
 
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+
+/** Conversation ids are the provider's; bounded before they touch a hash. */
+const PROVIDER_CONVERSATION_ID = /^[A-Za-z0-9_-]{1,128}$/u;
+
+/**
+ * The line bearer of a dial-back conversation: HMAC of the provider's
+ * conversation id under a server secret. Never sent to the browser or the
+ * provider; only its SHA-256 is stored, as for every line.
+ */
+export function dialBackBearer(
+  lineSecret: string,
+  providerConversationId: string,
+): string {
+  return createHmac("sha256", lineSecret)
+    .update(`gateq-voice-line.v1:${providerConversationId}`)
+    .digest("base64url");
+}
+
+export type BridgeTurnResult =
+  | { readonly kind: "REPLY"; readonly reply: string }
+  | { readonly kind: "CLOSED" }
+  | { readonly kind: "UNKNOWN_SESSION" };
 
 /** What the bridge speaks when a turn failed: the line was not recorded. */
 export const GATEQ_VOICE_RETRY_LINE =
@@ -220,10 +280,23 @@ export function createGateqVoiceInterview(deps: {
   readonly intake: Pick<IntakeService, "authorise" | "assertInterviewReady">;
   readonly conversation: Pick<ConversationService, "turn" | "openingFor">;
   readonly bridgePath: string;
+  /**
+   * The server secret dial-back line bearers are derived under (at least
+   * 32 characters). Without one a dial-back provider is not offered.
+   */
+  readonly lineSecret?: string | undefined;
   readonly now?: (() => number) | undefined;
 }) {
   const now = deps.now ?? (() => Date.now());
-  const offered = deps.config.enabled && deps.provider !== null;
+  const lineSecret =
+    deps.lineSecret !== undefined && deps.lineSecret.length >= 32
+      ? deps.lineSecret
+      : null;
+  const provider =
+    deps.provider?.kind === "DIAL_BACK" && lineSecret === null
+      ? null
+      : deps.provider;
+  const offered = deps.config.enabled && provider !== null;
   const view = (row: GateqVoiceSessionRow): GateqVoiceSessionView => ({
     id: row.id,
     status:
@@ -269,6 +342,45 @@ export function createGateqVoiceInterview(deps: {
       : { available: true, reason: null, remaining };
   };
 
+  /**
+   * One heard line from the provider. The bearer proves the line; the
+   * applicant's own sealed credential authorises the canonical turn, so
+   * the bridge can never reach wider than that application. The line's
+   * bearer and the provider's utterance index make a redelivered line the
+   * same turn, and a reconnected line a new one.
+   */
+  const bridgeTurn = async (input: {
+    readonly bearer: string;
+    readonly utterance: string;
+    readonly utteranceId: string;
+    readonly correlationId: string;
+  }): Promise<BridgeTurnResult> => {
+    if (input.bearer.length < 32) return { kind: "UNKNOWN_SESSION" };
+    const hash = sha256(input.bearer);
+    const row = await deps.store.byBridgeTokenHash(hash);
+    if (row === null) return { kind: "UNKNOWN_SESSION" };
+    if (row.status !== "LIVE" || Date.parse(row.endsAt) <= now())
+      return { kind: "CLOSED" };
+    const text = input.utterance.trim().slice(0, 4000);
+    if (text === "") return { kind: "REPLY", reply: "" };
+    const id = sha256(`${row.id}:${hash}:${input.utteranceId}`).slice(0, 40);
+    const result: ApplicantTurnResult = await deps.conversation.turn({
+      token: deps.sealer.open(row.guestCredentialSealed),
+      message: text,
+      clientTurnId: `voice-${id}`,
+      channel: "voice",
+      correlationId: input.correlationId,
+    });
+    return { kind: "REPLY", reply: result.reply };
+  };
+
+  const dialBackBearerOf = (providerConversationId: string): string | null =>
+    lineSecret === null ||
+    provider?.kind !== "DIAL_BACK" ||
+    !PROVIDER_CONVERSATION_ID.test(providerConversationId)
+      ? null
+      : dialBackBearer(lineSecret, providerConversationId);
+
   return {
     perApplication: deps.config.perApplication,
     availability,
@@ -292,7 +404,6 @@ export function createGateqVoiceInterview(deps: {
       readonly session: GateqVoiceSessionView;
       readonly line: GateqVoiceLine;
     }> => {
-      const provider = deps.provider;
       const guest = await deps.intake.authorise(input.token);
       if (!deps.config.enabled || provider === null)
         throw new GateqVoiceRefusedError("DISABLED");
@@ -300,12 +411,37 @@ export function createGateqVoiceInterview(deps: {
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       // Contact confirmation and recovery rules are the typed interview's.
       await deps.intake.assertInterviewReady(input.token);
-      const bearer = randomBytes(32).toString("base64url");
+      // A dial-back provider issues its conversation first: the line bearer
+      // is derived from that conversation's id. An issued credential nobody
+      // connects with costs nothing, and a failure here spends no allowance.
+      let issued: {
+        readonly providerConversationId: string;
+        readonly token: string;
+      } | null = null;
+      if (provider.kind === "DIAL_BACK") {
+        try {
+          issued = await provider.issueLine(
+            input.locale === undefined ? {} : { locale: input.locale },
+          );
+        } catch {
+          throw new GateqVoiceRefusedError("PROVIDER_UNAVAILABLE");
+        }
+        if (
+          !PROVIDER_CONVERSATION_ID.test(issued.providerConversationId) ||
+          issued.token.length === 0
+        )
+          throw new GateqVoiceRefusedError("PROVIDER_UNAVAILABLE");
+      }
+      const bearer =
+        issued !== null && lineSecret !== null
+          ? dialBackBearer(lineSecret, issued.providerConversationId)
+          : randomBytes(32).toString("base64url");
       const reserved = await deps.store.reserve({
         id: randomUUID(),
         ...keyOf(guest),
         bridgeTokenHash: sha256(bearer),
         guestCredentialSealed: deps.sealer.seal(input.token),
+        provider: provider.kind === "DIAL_BACK" ? "ELEVENLABS" : "DEEPGRAM",
         maxSeconds: effectiveVoiceSeconds(deps.config),
         perApplication: deps.config.perApplication,
         concurrency: deps.config.concurrency,
@@ -324,6 +460,17 @@ export function createGateqVoiceInterview(deps: {
           correlationId: input.correlationId,
           ...(input.locale === undefined ? {} : { locale: input.locale }),
         });
+        if (issued !== null)
+          return {
+            session: view(row),
+            line: {
+              provider: "elevenlabs",
+              token: issued.token,
+              firstMessage: greeting.slice(0, 1000),
+            },
+          };
+        if (provider.kind === "DIAL_BACK")
+          throw new GateqVoiceRefusedError("PROVIDER_UNAVAILABLE");
         const line = await provider.openLine({
           sessionId: row.id,
           greeting,
@@ -372,40 +519,43 @@ export function createGateqVoiceInterview(deps: {
       bearer.length >= 32 &&
       (await deps.store.byBridgeTokenHash(sha256(bearer))) !== null,
 
+    bridgeTurn,
+
     /**
-     * One heard line from the provider. The bearer proves the line; the
-     * applicant's own sealed credential authorises the canonical turn, so
-     * the bridge can never reach wider than that application. The line's
-     * bearer and the provider's utterance index make a redelivered line
-     * the same turn, and a reconnected line a new one.
+     * A dial-back provider connected for a conversation: whether it names
+     * a live line this server issued. Anything else is closed unanswered.
      */
-    bridgeTurn: async (input: {
-      readonly bearer: string;
+    dialBackOpened: async (
+      providerConversationId: string,
+    ): Promise<boolean> => {
+      const bearer = dialBackBearerOf(providerConversationId);
+      if (bearer === null) return false;
+      const row = await deps.store.byBridgeTokenHash(sha256(bearer));
+      return (
+        row !== null && row.status === "LIVE" && Date.parse(row.endsAt) > now()
+      );
+    },
+
+    /**
+     * One heard line from a dial-back provider, by its conversation id:
+     * the SAME bridge turn as the think endpoint's, under the derived
+     * bearer. `utteranceIndex` is the line's place among the person's
+     * lines in the conversation, so a re-sent transcript is the same turn.
+     */
+    dialBackTurn: async (input: {
+      readonly providerConversationId: string;
       readonly utterance: string;
-      readonly utteranceId: string;
+      readonly utteranceIndex: number;
       readonly correlationId: string;
-    }): Promise<
-      | { readonly kind: "REPLY"; readonly reply: string }
-      | { readonly kind: "CLOSED" }
-      | { readonly kind: "UNKNOWN_SESSION" }
-    > => {
-      if (input.bearer.length < 32) return { kind: "UNKNOWN_SESSION" };
-      const hash = sha256(input.bearer);
-      const row = await deps.store.byBridgeTokenHash(hash);
-      if (row === null) return { kind: "UNKNOWN_SESSION" };
-      if (row.status !== "LIVE" || Date.parse(row.endsAt) <= now())
-        return { kind: "CLOSED" };
-      const text = input.utterance.trim().slice(0, 4000);
-      if (text === "") return { kind: "REPLY", reply: "" };
-      const id = sha256(`${row.id}:${hash}:${input.utteranceId}`).slice(0, 40);
-      const result: ApplicantTurnResult = await deps.conversation.turn({
-        token: deps.sealer.open(row.guestCredentialSealed),
-        message: text,
-        clientTurnId: `voice-${id}`,
-        channel: "voice",
+    }): Promise<BridgeTurnResult> => {
+      const bearer = dialBackBearerOf(input.providerConversationId);
+      if (bearer === null) return { kind: "UNKNOWN_SESSION" };
+      return bridgeTurn({
+        bearer,
+        utterance: input.utterance,
+        utteranceId: `dial-${String(input.utteranceIndex)}`,
         correlationId: input.correlationId,
       });
-      return { kind: "REPLY", reply: result.reply };
     },
 
     /** Ends sessions past their end; safe to run on every replica. */

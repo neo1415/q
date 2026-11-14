@@ -32,14 +32,6 @@ import {
  * name transports and codes, not what a person can do.
  */
 
-const PLAIN_ERRORS = {
-  microphone:
-    "I can't hear you: the microphone isn't available. You can keep typing.",
-  connection:
-    "The voice connection dropped. You can keep typing, or try again.",
-  generic: "Voice paused. You can keep typing, or try again.",
-} as const;
-
 function newId(): string {
   return crypto.randomUUID();
 }
@@ -58,6 +50,36 @@ function level(data: Uint8Array): number {
 export function useElevenLabsVoiceSession(
   events: VoiceSessionEvents = {},
 ): VoiceSessionClient {
+  return useElevenLabsCore(events).client;
+}
+
+/**
+ * The same session for GateQ's voice interview (owner directive
+ * 2026-11-14: reuse the existing voice providers): opened with the
+ * one-conversation token the GateQ API issued under the applicant's guest
+ * credential, and Q's opening as the server composed it. Every reply
+ * still comes from the server over the Speech Engine channel.
+ */
+export function useElevenLabsSpeechLine(events: VoiceSessionEvents = {}): {
+  readonly client: VoiceSessionClient;
+  readonly open: (token: string, firstMessage?: string) => Promise<void>;
+} {
+  return useElevenLabsCore(events);
+}
+
+/** The plain sentences this transport reports, so callers can tell them apart. */
+export const ELEVENLABS_PLAIN_ERRORS = {
+  microphone:
+    "I can't hear you: the microphone isn't available. You can keep typing.",
+  connection:
+    "The voice connection dropped. You can keep typing, or try again.",
+  generic: "Voice paused. You can keep typing, or try again.",
+} as const;
+
+function useElevenLabsCore(events: VoiceSessionEvents): {
+  readonly client: VoiceSessionClient;
+  readonly open: (token: string, firstMessage?: string) => Promise<void>;
+} {
   const [state, setState] = useState<VoiceState>("IDLE");
   const [connected, setConnected] = useState(false);
   const [transcript, setTranscript] = useState<readonly VoiceTranscriptLine[]>(
@@ -98,8 +120,8 @@ export function useElevenLabsVoiceSession(
     eventsRef.current.onLine?.(line);
   }, []);
 
-  const start = useCallback(
-    async ({ credential, firstMessage }: VoiceSessionStart) => {
+  const open = useCallback(
+    async (token: string, firstMessage?: string) => {
       setTranscript([]);
       lastLineRef.current = null;
       setState("CONNECTING");
@@ -107,7 +129,7 @@ export function useElevenLabsVoiceSession(
         await probeMicrophone();
       } catch {
         setState("ERROR");
-        eventsRef.current.onError?.(PLAIN_ERRORS.microphone);
+        eventsRef.current.onError?.(ELEVENLABS_PLAIN_ERRORS.microphone);
         return;
       }
       try {
@@ -120,7 +142,7 @@ export function useElevenLabsVoiceSession(
           loadWire(),
         ]);
         const conversation = await Conversation.startSession({
-          conversationToken: credential.token,
+          conversationToken: token,
           connectionType: "webrtc",
           textOnly: false,
           ...(firstMessage === undefined
@@ -141,7 +163,7 @@ export function useElevenLabsVoiceSession(
             setConnected(false);
             setState(reason === "ended" ? "IDLE" : "ERROR");
             if (reason !== "ended") {
-              eventsRef.current.onError?.(PLAIN_ERRORS.connection);
+              eventsRef.current.onError?.(ELEVENLABS_PLAIN_ERRORS.connection);
             }
             eventsRef.current.onEnded?.(reason);
           },
@@ -152,8 +174,8 @@ export function useElevenLabsVoiceSession(
               /microphone|getUserMedia|permission|NotAllowed|NotFound/i.test(
                 message,
               )
-                ? PLAIN_ERRORS.microphone
-                : PLAIN_ERRORS.generic,
+                ? ELEVENLABS_PLAIN_ERRORS.microphone
+                : ELEVENLABS_PLAIN_ERRORS.generic,
             );
           },
           onModeChange: ({ mode }) => {
@@ -194,10 +216,15 @@ export function useElevenLabsVoiceSession(
         conversation.setMicMuted(muted);
       } catch {
         setState("ERROR");
-        eventsRef.current.onError?.(PLAIN_ERRORS.generic);
+        eventsRef.current.onError?.(ELEVENLABS_PLAIN_ERRORS.generic);
       }
     },
     [addLine, muted],
+  );
+  const start = useCallback(
+    ({ credential, firstMessage }: VoiceSessionStart) =>
+      open(credential.token, firstMessage),
+    [open],
   );
 
   const end = useCallback(async () => {
@@ -250,7 +277,7 @@ export function useElevenLabsVoiceSession(
       : level(conversation.getOutputByteFrequencyData());
   }, []);
 
-  return useMemo(
+  const client = useMemo(
     () => ({
       state,
       connected,
@@ -278,6 +305,7 @@ export function useElevenLabsVoiceSession(
       outputLevel,
     ],
   );
+  return useMemo(() => ({ client, open }), [client, open]);
 }
 
 /**

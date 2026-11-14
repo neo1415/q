@@ -170,7 +170,10 @@ export function registerGateqVoiceRoutes(
         unavailableReason: null,
         perApplication: voice.perApplication,
         remaining: after?.remaining ?? 0,
-        line: { ...opened.line, agent: { ...opened.line.agent } },
+        line:
+          opened.line.provider === "deepgram"
+            ? { ...opened.line, agent: { ...opened.line.agent } }
+            : { ...opened.line },
       });
     } catch (error: unknown) {
       return refused(error, request, reply);

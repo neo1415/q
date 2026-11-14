@@ -96,9 +96,10 @@ export function createPostgresGateqVoiceSessions(deps: {
         const created = await tx.sql`
           insert into gateq.application_voice_sessions
             (id, tenant_id, application_id, bridge_token_hash, guest_credential_sealed,
-             max_seconds, created_at, ends_at)
+             provider, max_seconds, created_at, ends_at)
           values (${input.id}, ${input.tenantId}, ${input.applicationId}, ${input.bridgeTokenHash},
-                  ${input.guestCredentialSealed}, ${input.maxSeconds}, now(),
+                  ${input.guestCredentialSealed}, ${input.provider ?? "DEEPGRAM"},
+                  ${input.maxSeconds}, now(),
                   now() + make_interval(secs => ${input.maxSeconds}))
           returning *`;
         return { kind: "CREATED" as const, row: toRow(created[0]) };

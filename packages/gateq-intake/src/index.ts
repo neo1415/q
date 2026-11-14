@@ -269,7 +269,12 @@ export { createPostgresGateqVideoSessions } from "./video/postgres-video-session
 // Directive 2026-11-14 item 4: the GateQ voice-only interview session.
 export {
   createGateqVoiceInterview,
+  dialBackBearer,
   effectiveVoiceSeconds,
+  type BridgeTurnResult,
+  type GateqDialBackVoiceProvider,
+  type GateqThinkEndpointVoiceProvider,
+  type GateqVoiceProviderCode,
   GATEQ_VOICE_CLOSED_LINE,
   GATEQ_VOICE_DEFAULTS,
   GATEQ_VOICE_RETRY_LINE,

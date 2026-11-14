@@ -378,6 +378,9 @@ export default tseslint.config(
     files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
     ignores: [
       "apps/q-api/src/voice/providers/**",
+      // GateQ's voice interview reuses Q's Speech Engine (owner directive
+      // 2026-11-14); its adapter is the api's only speech SDK importer.
+      "apps/api/src/gateq/voice-providers/**",
       "apps/web/src/features/voice/provider/**",
     ],
     rules: {

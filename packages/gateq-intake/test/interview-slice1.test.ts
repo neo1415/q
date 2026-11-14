@@ -2443,7 +2443,11 @@ describe("voice-only interview (directive 2026-11-14 item 4): one canonical inte
     });
     const opened = await voice.start({ token, correlationId: "c2" });
     // Q opens the line with the question it last asked: nothing re-asked.
-    expect(opened.line.agent["greeting"]).toBe("Who are your customers?");
+    expect(
+      opened.line.provider === "deepgram"
+        ? opened.line.agent["greeting"]
+        : opened.line.firstMessage,
+    ).toBe("Who are your customers?");
     w.script.push({
       reply: "Thanks. How many paying customers?",
       facts: [

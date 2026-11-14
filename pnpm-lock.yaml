@@ -170,6 +170,9 @@ importers:
       '@capital-q/verification':
         specifier: workspace:*
         version: link:../../packages/verification
+      '@elevenlabs/elevenlabs-js':
+        specifier: 2.68.0
+        version: 2.68.0
       fastify:
         specifier: ^5.12.1
         version: 5.12.1
