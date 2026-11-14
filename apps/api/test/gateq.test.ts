@@ -96,6 +96,14 @@ function buildApp(options: {
   readonly accent?: string | null;
   readonly embedOrigins?: readonly string[];
   readonly gatewayAdmin?: GateqGatewayAdminPort;
+  readonly publicBrand?: {
+    readonly displayName: string | null;
+    readonly logo: {
+      readonly assetId: string;
+      readonly kind: "LOGO" | "ICON";
+    } | null;
+  };
+  readonly publicLogo?: Uint8Array;
   readonly editDenied?: boolean;
   readonly extractions?: PolicyExtractionRecord[];
 }): {
@@ -210,6 +218,20 @@ function buildApp(options: {
     ...(options.gatewayAdmin === undefined
       ? {}
       : { gateqGatewayAdmin: options.gatewayAdmin }),
+    ...(options.publicBrand === undefined
+      ? {}
+      : {
+          gateqPublicBrand: () => Promise.resolve(options.publicBrand ?? null),
+        }),
+    ...(options.publicLogo === undefined
+      ? {}
+      : {
+          gateqPublicLogo: () =>
+            Promise.resolve({
+              contentType: "image/png" as const,
+              bytes: options.publicLogo ?? new Uint8Array(),
+            }),
+        }),
   });
   return { app, publicLookups, imageLookups, accentLookups };
 }
@@ -232,6 +254,29 @@ describe("B6/B7: the gateway's own appearance and status (declared actions)", ()
                 accentHex: input.accentHex,
                 embedOrigins: input.embedOrigins,
                 updatedAt: "2026-11-14T12:00:00.000Z",
+                displayName: input.displayName ?? null,
+                logo: null,
+              },
+            },
+      );
+    },
+    suggestBrand: (_actor, gatewayId) => {
+      calls.push({ suggest: gatewayId });
+      return Promise.resolve(
+        refuse
+          ? { ok: false }
+          : {
+              ok: true,
+              value: {
+                gatewayId,
+                websiteUrl: "https://kilima.example",
+                canonicalName: "Kilima Angels",
+                sourceUrl: "https://kilima.example/",
+                investorOrganisationId: "6a0c1f5e-0000-4000-8000-0000000000aa",
+                profileVersion: 2,
+                name: { status: "NOT_FOUND", reason: "NO_NAME" },
+                logo: { status: "NOT_FOUND", reason: "NO_LOGO" },
+                colours: { status: "FOUND", primary: "#0f766e" },
               },
             },
       );
@@ -313,6 +358,45 @@ describe("B6/B7: the gateway's own appearance and status (declared actions)", ()
       expect(bad.statusCode).toBe(422);
     }
     expect(calls).toHaveLength(0);
+  });
+
+  it("brand from website: an admin's suggestion; a refusal is one 404; a URL in the request is refused before the service", async () => {
+    const suggestUrl = `/v1/gateq/gateways/${GATEWAY.id}/brand-suggestion`;
+    calls.length = 0;
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      gatewayAdmin: admin(false),
+    });
+    const ok = await app.inject({
+      method: "POST",
+      url: suggestUrl,
+      payload: {},
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({
+      websiteUrl: "https://kilima.example",
+      colours: { status: "FOUND", primary: "#0f766e" },
+      logo: { status: "NOT_FOUND", reason: "NO_LOGO" },
+    });
+    // The website is the record's: a URL from the request never reaches it.
+    const withUrl = await app.inject({
+      method: "POST",
+      url: suggestUrl,
+      payload: { websiteUrl: "http://169.254.169.254/" },
+    });
+    expect(withUrl.statusCode).toBe(422);
+    expect(calls).toEqual([{ suggest: GATEWAY.id }]);
+
+    const refused = buildApp({
+      principal: PRINCIPAL,
+      gatewayAdmin: admin(true),
+    });
+    const response = await refused.app.inject({
+      method: "POST",
+      url: suggestUrl,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(404);
   });
 
   it("requires a signed-in actor", async () => {
@@ -465,6 +549,52 @@ describe("the public route", () => {
         "title",
       ].sort(),
     );
+  });
+
+  it("brand from website: carries the chosen name and logo reference, and serves only PNG or JPEG logo bytes", async () => {
+    const PNG = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1,
+    ]);
+    const { app } = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      publicBrand: {
+        displayName: "Kilima Angel Network",
+        logo: { assetId: "3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f", kind: "LOGO" },
+      },
+      publicLogo: PNG,
+    });
+    const body = (
+      await app.inject({ method: "GET", url: url(PUBLIC_ID) })
+    ).json<Record<string, unknown>>();
+    expect(body["gatewayDisplayName"]).toBe("Kilima Angel Network");
+    expect(body["gatewayLogo"]).toEqual({
+      assetId: "3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+      kind: "LOGO",
+    });
+    const logo = await app.inject({
+      method: "GET",
+      url: `${url(PUBLIC_ID)}/logo`,
+    });
+    expect(logo.statusCode).toBe(200);
+    expect(logo.headers["content-type"]).toBe("image/png");
+    expect(logo.headers["x-content-type-options"]).toBe("nosniff");
+    expect(new Uint8Array(logo.rawPayload)).toEqual(PNG);
+    // A malformed id is the one 404.
+    expect(
+      (await app.inject({ method: "GET", url: `${url("x")}/logo` })).statusCode,
+    ).toBe(404);
+
+    // Bytes that are not PNG or JPEG are never served, whatever is stored.
+    const svg = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      publicLogo: new TextEncoder().encode("<svg onload=alert(1)>"),
+    });
+    expect(
+      (await svg.app.inject({ method: "GET", url: `${url(PUBLIC_ID)}/logo` }))
+        .statusCode,
+    ).toBe(404);
   });
 
   it("B7: carries the organisation's own embed sites when it listed any", async () => {

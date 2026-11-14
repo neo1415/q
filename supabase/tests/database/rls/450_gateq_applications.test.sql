@@ -17,7 +17,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(25);
+select plan(29);
 
 -- Fixtures ------------------------------------------------------------------------
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
@@ -166,6 +166,40 @@ select is((select count(*)::int from information_schema.columns
               and column_name in ('storage_key', 'content', 'extracted_text', 'bytes')), 0,
   'GateQ stores no bytes, no storage key and no extracted text: Evidence owns the document');
 
+-- Brand from website (20261231580000): a logo kept by Capital Q, append-only,
+-- and an appearance may only point at its own gateway's logo.
+insert into gateq.gateway_logo_assets
+  (id, gateway_id, tenant_id, kind, content_type, bytes, sha256, source_url, created_by_user_id)
+values
+  ('00000000-0000-4000-8000-00000000cc71', '00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'),
+   'LOGO', 'image/png', '\x89504e470d0a1a0a00'::bytea, repeat('c', 64), 'https://application.example/logo.png',
+   pg_temp.rls_id('user_b'));
+
+select throws_ok($$
+  update gateq.gateway_logo_assets set kind = 'ICON' where id = '00000000-0000-4000-8000-00000000cc71'
+$$, '23001', null, 'a stored gateway logo is never rewritten');
+
+select throws_ok($$
+  insert into gateq.gateway_logo_assets
+    (gateway_id, tenant_id, kind, content_type, bytes, sha256, source_url, created_by_user_id)
+  values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 'LOGO', 'image/svg+xml',
+          '\x3c7376673e00000000'::bytea, repeat('d', 64), 'https://application.example/logo.svg', pg_temp.rls_id('user_b'))
+$$, '23514', null, 'only PNG or JPEG is kept: an unsanitised SVG is never served from our storage');
+
+select lives_ok($$
+  insert into gateq.gateway_appearances
+    (gateway_id, tenant_id, revision, display_name, logo_asset_id, created_by_user_id)
+  values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 1, 'Application Capital',
+          '00000000-0000-4000-8000-00000000cc71', pg_temp.rls_id('user_b'))
+$$, 'an appearance revision names its own gateway''s logo and display name');
+
+select throws_ok($$
+  insert into gateq.gateway_appearances
+    (gateway_id, tenant_id, revision, logo_asset_id, created_by_user_id)
+  values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 2,
+          '00000000-0000-4000-8000-0000000000ff', pg_temp.rls_id('user_b'))
+$$, '23503', null, 'a logo that is not this gateway''s is refused by the database');
+
 -- The exact set, not a count: a new gateq table must be added here on purpose.
 -- Gateway (3), application (8: incl. the interview transcript and the
 -- applicant contact, GateQ slice 1), mandate-reading provenance (P7), the founder
@@ -174,14 +208,15 @@ select is((select count(*)::int from information_schema.columns
 -- session (C3, migration 20261226100000), the voice-only interview session
 -- (20261231530000) and the atomic statements, links, disagreement events and
 -- turn readings (20261231540000) belong to the application set; the
--- gateway's appearance revisions (20261231570000) to the gateway set.
+-- gateway's appearance revisions (20261231570000) and its logo assets
+-- (20261231580000) to the gateway set.
 select is(
   array(select table_name::text from information_schema.tables
          where table_schema = 'gateq' order by 1),
   array['application_contacts', 'application_disagreement_events', 'application_documents', 'application_facts', 'application_founders',
         'application_sessions', 'application_statement_links', 'application_statements', 'application_submissions', 'application_syntheses',
         'application_turn_readings', 'application_turns', 'application_video_sessions', 'application_voice_sessions', 'applications',
-        'contact_verification_limits', 'gateway_appearances', 'gateway_criteria', 'gateway_versions', 'gateways',
+        'contact_verification_limits', 'gateway_appearances', 'gateway_criteria', 'gateway_logo_assets', 'gateway_versions', 'gateways',
         'guest_throttle_buckets', 'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
         'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
         'pass_reasons', 'policy_extractions', 'startup_alerts']::text[],

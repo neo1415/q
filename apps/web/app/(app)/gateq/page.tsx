@@ -236,6 +236,7 @@ export default async function GateqPage({ searchParams }: Props) {
                 open={gateway?.status === "ACTIVE"}
                 previewHref={`/g/${gateway?.publicId ?? ""}`}
                 appearance={appearance}
+                organisationName={published?.organisationDisplayName ?? null}
               />
             }
             editor={

@@ -84,12 +84,20 @@ export {
 export {
   createGatewayAdminService,
   gatewayAdminActionsPort,
+  GatewayBrandUnavailableError,
+  type GatewayBrandSources,
+  type GatewayLogoAssetRepository,
+  type GatewayLogoRef,
+  type GatewayWebsiteReading,
   type GatewayAdminDependencies,
   type GatewayAdminResult,
   type GatewayAdminService,
   type GatewayAppearance,
   type GatewayAppearanceRepository,
 } from "./application/appearance.js";
-export { createPostgresGatewayAppearanceRepository } from "./infrastructure/postgres-gateway-appearance-repository.js";
+export {
+  createPostgresGatewayAppearanceRepository,
+  createPostgresGatewayLogoAssetRepository,
+} from "./infrastructure/postgres-gateway-appearance-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/gateq" as const;

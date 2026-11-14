@@ -411,6 +411,9 @@ export type ApiModules = {
   readonly gateqPublicAccent?: GateQRoutesDependencies["publicAccent"];
   /** B7: the sites allowed to frame the public gateway's embed. */
   readonly gateqPublicEmbedOrigins?: GateQRoutesDependencies["publicEmbedOrigins"];
+  /** Brand from website: the open gateway's chosen name, logo and logo bytes. */
+  readonly gateqPublicBrand?: GateQRoutesDependencies["publicBrand"];
+  readonly gateqPublicLogo?: GateQRoutesDependencies["publicLogo"];
   /** B6/B7: reading a gateway's appearance for its settings. */
   readonly gateqGatewayAppearance?: GateQRoutesDependencies["gatewayAppearance"];
   /** B6/B7: the gateway's administration as the declared actions reach it. */
@@ -1077,6 +1080,8 @@ export function createApp(
       publicImages: modules.gateqPublicImages,
       publicAccent: modules.gateqPublicAccent,
       publicEmbedOrigins: modules.gateqPublicEmbedOrigins,
+      publicBrand: modules.gateqPublicBrand,
+      publicLogo: modules.gateqPublicLogo,
       gatewayAppearance: modules.gateqGatewayAppearance,
     });
   }

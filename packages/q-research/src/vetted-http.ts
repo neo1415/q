@@ -188,6 +188,31 @@ export const nodeTransport: Transport = (input) =>
     request.end();
   });
 
+/**
+ * Why a vetted fetch refused, precise enough to tell a person what went
+ * wrong with their website without showing them a stack trace.
+ */
+export type VettedRefusal =
+  | "INVALID_URL"
+  | "BLOCKED_ADDRESS"
+  | "OFF_SITE_REDIRECT"
+  | "DNS_FAILED"
+  | "TIMEOUT"
+  | "UNREACHABLE"
+  | "HTTP_ERROR"
+  | "TOO_LARGE"
+  | "TOO_MANY_REDIRECTS";
+
+export type VettedFetchResult =
+  | { readonly ok: true; readonly response: VettedResponse }
+  | { readonly ok: false; readonly reason: VettedRefusal };
+
+type GetOptions = {
+  readonly accept: string;
+  readonly maxBytes: number;
+  readonly sameSite?: ((url: URL) => boolean) | undefined;
+};
+
 export type VettedHttp = {
   /**
    * GET a public URL, following at most `redirects` redirects, each one
@@ -196,12 +221,16 @@ export type VettedHttp = {
    */
   readonly get: (
     url: string,
-    options: {
-      readonly accept: string;
-      readonly maxBytes: number;
-      readonly sameSite?: ((url: URL) => boolean) | undefined;
-    },
+    options: GetOptions,
   ) => Promise<VettedResponse | null>;
+};
+
+/** The same client, saying why it refused (GateQ brand from website). */
+export type VettedHttpWithReasons = VettedHttp & {
+  readonly fetch: (
+    url: string,
+    options: GetOptions,
+  ) => Promise<VettedFetchResult>;
 };
 
 export function createVettedHttp(
@@ -213,76 +242,100 @@ export function createVettedHttp(
     readonly timeoutMs?: number | undefined;
     readonly redirects?: number | undefined;
   } = {},
-): VettedHttp {
+): VettedHttpWithReasons {
   const resolve = dependencies.resolve ?? systemResolver;
   const transport = dependencies.transport ?? nodeTransport;
   const allowed = dependencies.isAllowed ?? isPublicAddress;
   const timeoutMs = dependencies.timeoutMs ?? 6_000;
   const redirects = dependencies.redirects ?? 2;
 
-  return {
-    get: async (start, options) => {
-      let current = start;
-      for (let hop = 0; hop <= redirects; hop += 1) {
-        const verdict = judgePublicUrl(current);
-        if (!verdict.ok) return null;
-        const url = new URL(verdict.url);
-        if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-        if (options.sameSite !== undefined && !options.sameSite(url)) {
-          return null;
-        }
-        const host = url.hostname.replace(/^\[|\]$/g, "");
-        let addresses: Awaited<ReturnType<Resolver>>;
+  const refuse = (reason: VettedRefusal): VettedFetchResult => ({
+    ok: false,
+    reason,
+  });
+
+  const fetchVetted = async (
+    start: string,
+    options: GetOptions,
+  ): Promise<VettedFetchResult> => {
+    let current = start;
+    for (let hop = 0; hop <= redirects; hop += 1) {
+      const verdict = judgePublicUrl(current);
+      if (!verdict.ok)
+        return refuse(hop === 0 ? "INVALID_URL" : "BLOCKED_ADDRESS");
+      const url = new URL(verdict.url);
+      if (url.protocol !== "https:" && url.protocol !== "http:") {
+        return refuse("INVALID_URL");
+      }
+      if (options.sameSite !== undefined && !options.sameSite(url)) {
+        return refuse(hop === 0 ? "INVALID_URL" : "OFF_SITE_REDIRECT");
+      }
+      const host = url.hostname.replace(/^\[|\]$/g, "");
+      let addresses: Awaited<ReturnType<Resolver>>;
+      try {
+        addresses =
+          isIP(host) === 0
+            ? await resolve(host)
+            : [{ address: host, family: isIP(host) === 6 ? 6 : 4 }];
+      } catch {
+        return refuse("DNS_FAILED");
+      }
+      if (addresses.length === 0) return refuse("DNS_FAILED");
+      // Every address must be public: a name with one private answer
+      // is a rebinding attempt waiting for the right moment.
+      if (!addresses.every((entry) => allowed(entry.address))) {
+        return refuse("BLOCKED_ADDRESS");
+      }
+      const chosen = addresses[0];
+      if (chosen === undefined) return refuse("DNS_FAILED");
+      let response: Awaited<ReturnType<Transport>>;
+      try {
+        response = await transport({
+          url,
+          address: chosen.address,
+          family: chosen.family,
+          accept: options.accept,
+          maxBytes: options.maxBytes,
+          timeoutMs,
+        });
+      } catch (error: unknown) {
+        return refuse(
+          error instanceof Error && /timed? ?out/iu.test(error.message)
+            ? "TIMEOUT"
+            : "UNREACHABLE",
+        );
+      }
+      if (response.status >= 300 && response.status < 400) {
+        if (response.location === null) return refuse("HTTP_ERROR");
         try {
-          addresses =
-            isIP(host) === 0
-              ? await resolve(host)
-              : [{ address: host, family: isIP(host) === 6 ? 6 : 4 }];
+          current = new URL(response.location, url).href;
         } catch {
-          return null;
+          return refuse("HTTP_ERROR");
         }
-        // Every address must be public: a name with one private answer
-        // is a rebinding attempt waiting for the right moment.
-        if (
-          addresses.length === 0 ||
-          !addresses.every((entry) => allowed(entry.address))
-        ) {
-          return null;
-        }
-        const chosen = addresses[0];
-        if (chosen === undefined) return null;
-        let response: Awaited<ReturnType<Transport>>;
-        try {
-          response = await transport({
-            url,
-            address: chosen.address,
-            family: chosen.family,
-            accept: options.accept,
-            maxBytes: options.maxBytes,
-            timeoutMs,
-          });
-        } catch {
-          return null;
-        }
-        if (response.status >= 300 && response.status < 400) {
-          if (response.location === null) return null;
-          try {
-            current = new URL(response.location, url).href;
-          } catch {
-            return null;
-          }
-          continue;
-        }
-        if (response.status < 200 || response.status >= 300) return null;
-        if (response.body === null) return null;
-        return {
+        continue;
+      }
+      if (response.status < 200 || response.status >= 300) {
+        return refuse("HTTP_ERROR");
+      }
+      if (response.body === null) return refuse("TOO_LARGE");
+      return {
+        ok: true,
+        response: {
           url: url.href,
           status: response.status,
           contentType: response.contentType,
           body: response.body,
-        };
-      }
-      return null;
+        },
+      };
+    }
+    return refuse("TOO_MANY_REDIRECTS");
+  };
+
+  return {
+    fetch: fetchVetted,
+    get: async (start, options) => {
+      const result = await fetchVetted(start, options);
+      return result.ok ? result.response : null;
     },
   };
 }

@@ -39,6 +39,7 @@ import {
   GATEQ_GATEWAY_PATH,
   GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
   GatewayAppearanceDtoSchema,
+  GatewayBrandSuggestionDtoSchema,
   GatewayDtoSchema,
   type GatewayAppearanceRequest,
   GatewayPolicyDtoSchema,
@@ -127,6 +128,20 @@ export function setGatewayAppearance(
     path("/v1/gateq/gateways/:gatewayId/appearance", { gatewayId }),
     GatewayAppearanceDtoSchema,
     { body: input },
+  );
+}
+
+/**
+ * Brand from website: what the organisation's canonical website says about
+ * its name, logo and colours (an admin). Nothing public changes.
+ */
+export function suggestGatewayBrand(session: ApiSession, gatewayId: string) {
+  return call(
+    session,
+    "POST",
+    path("/v1/gateq/gateways/:gatewayId/brand-suggestion", { gatewayId }),
+    GatewayBrandSuggestionDtoSchema,
+    { body: {} },
   );
 }
 

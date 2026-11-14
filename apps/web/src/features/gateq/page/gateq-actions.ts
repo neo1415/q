@@ -16,6 +16,8 @@ import {
   setGateqReplyPromise,
   setGatewayAppearance,
   setGatewayStatus,
+  suggestGatewayBrand,
+  updateInvestorOrganisation,
   starGateqApplications,
   discoverCompanies,
   confirmClaimCode,
@@ -38,10 +40,12 @@ import {
   normaliseEmbedOrigin,
   parseStartupDescription,
   StartupAlertRequestSchema,
+  UpdateInvestorOrganisationRequestSchema,
   type ClaimableCompanyDto,
   type CompanyClaimResultDto,
   type GateqInboxDetailDto,
   type GatewayAppearanceDto,
+  type GatewayBrandSuggestionDto,
   type GatewayDto,
 } from "@capital-q/contracts";
 
@@ -231,7 +235,14 @@ export async function replyPromiseAction(
  */
 export async function appearanceAction(
   gatewayId: string,
-  input: { readonly accentHex: string | null; readonly sites: string },
+  input: {
+    readonly accentHex: string | null;
+    readonly sites: string;
+    /** Omitted: unchanged. Null: the canonical name. */
+    readonly displayName?: string | null | undefined;
+    /** Omitted: unchanged. Null: no logo. */
+    readonly logoAssetId?: string | null | undefined;
+  },
 ): Promise<Done<GatewayAppearanceDto>> {
   if (!Id.safeParse(gatewayId).success) return { ok: false, message: FAILED };
   const typed = input.sites
@@ -250,11 +261,18 @@ export async function appearanceAction(
   const parsed = GatewayAppearanceRequestSchema.safeParse({
     accentHex: input.accentHex,
     embedOrigins: [...new Set(usable)],
+    ...(input.displayName === undefined
+      ? {}
+      : { displayName: input.displayName }),
+    ...(input.logoAssetId === undefined
+      ? {}
+      : { logoAssetId: input.logoAssetId }),
   });
   if (!parsed.success) {
     return {
       ok: false,
-      message: "Use a colour like #0f766e and at most 10 websites.",
+      message:
+        "Use a colour like #0f766e, a name of at most 120 characters and at most 10 websites.",
     };
   }
   const done = await withSession((s) =>
@@ -265,6 +283,62 @@ export async function appearanceAction(
     : {
         ok: false,
         message: "Only an admin of your firm can change your gateway.",
+      };
+}
+
+/**
+ * Brand from website: what the website on the organisation's profile says
+ * about its name, logo and colours. Nothing public changes.
+ */
+export async function brandSuggestionAction(
+  gatewayId: string,
+): Promise<Done<GatewayBrandSuggestionDto>> {
+  if (!Id.safeParse(gatewayId).success) return { ok: false, message: FAILED };
+  const done = await withSession((s) => suggestGatewayBrand(s, gatewayId));
+  return done.ok
+    ? done
+    : {
+        ok: false,
+        message: "Only an admin of your firm can brand your gateway.",
+      };
+}
+
+/**
+ * Brand from website, when the profile has no website yet: the address is
+ * saved to the organisation's canonical profile through its own update
+ * (investor.profile.update, at the version just read), so the reading
+ * that follows still only ever reads the record's website.
+ */
+export async function saveProfileWebsiteAction(input: {
+  readonly investorOrganisationId: string;
+  readonly expectedVersion: number;
+  readonly website: string;
+}): Promise<Done<null>> {
+  const typed = input.website.trim();
+  const withScheme = /^https?:\/\//iu.test(typed) ? typed : `https://${typed}`;
+  const parsed = UpdateInvestorOrganisationRequestSchema.safeParse({
+    expectedVersion: input.expectedVersion,
+    websiteUrl: withScheme,
+  });
+  if (
+    typed.length === 0 ||
+    !Id.safeParse(input.investorOrganisationId).success ||
+    !parsed.success
+  ) {
+    return {
+      ok: false,
+      message: "Use a website address like example.com.",
+    };
+  }
+  const done = await withSession((s) =>
+    updateInvestorOrganisation(s, input.investorOrganisationId, parsed.data),
+  );
+  return done.ok
+    ? { ok: true, value: null }
+    : {
+        ok: false,
+        message:
+          "Your firm's profile couldn't be updated. Only its admins can change it.",
       };
 }
 

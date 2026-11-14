@@ -43,8 +43,11 @@ import {
   GATEQ_GATEWAY_VERSION_PATH,
   GATEQ_GATEWAY_VERSIONS_PATH,
   GATEQ_GATEWAYS_PATH,
+  GATEQ_PUBLIC_GATEWAY_LOGO_PATH,
   GATEQ_PUBLIC_GATEWAY_PATH,
+  GatewayDisplayNameSchema,
   GatewayDraftRequestSchema,
+  GatewayLogoRefSchema,
   GatewayAppearanceDtoSchema,
   GatewayDtoSchema,
   GatewayPolicyDtoSchema,
@@ -230,6 +233,26 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
    */
   readonly publicEmbedOrigins?:
     ((publicId: GatewayPublicId) => Promise<readonly string[]>) | undefined;
+  /**
+   * Brand from website: the name and logo the organisation's admins chose
+   * for their open gateway. Absent: the canonical name and no logo.
+   */
+  readonly publicBrand?:
+    | ((publicId: GatewayPublicId) => Promise<{
+        readonly displayName: string | null;
+        readonly logo: {
+          readonly assetId: string;
+          readonly kind: "LOGO" | "ICON";
+        } | null;
+      } | null>)
+    | undefined;
+  /** The open gateway's saved logo bytes (Capital Q's storage), or null. */
+  readonly publicLogo?:
+    | ((publicId: GatewayPublicId) => Promise<{
+        readonly contentType: "image/png" | "image/jpeg";
+        readonly bytes: Uint8Array;
+      } | null>)
+    | undefined;
   /**
    * B6/B7: the gateway's own appearance for its settings (investor.gateway.view
    * to read; whether this viewer may change it comes back with it). Changes
@@ -935,10 +958,20 @@ export function registerGateQRoutes(
         : await dependencies
             .publicEmbedOrigins(publicId.data)
             .catch((): readonly string[] => []);
+    const brand =
+      dependencies.publicBrand === undefined
+        ? null
+        : await dependencies.publicBrand(publicId.data).catch(() => null);
+    // Only well-formed values travel; anything else is dropped rather than
+    // failing the page.
+    const displayName = GatewayDisplayNameSchema.safeParse(brand?.displayName);
+    const logo = GatewayLogoRefSchema.safeParse(brand?.logo);
     // Briefly cacheable, well inside the signed URLs' own lifetime.
     void reply.header("Cache-Control", "public, max-age=60");
     return PublicGatewayDtoSchema.parse({
       ...projection,
+      ...(displayName.success ? { gatewayDisplayName: displayName.data } : {}),
+      ...(logo.success ? { gatewayLogo: logo.data } : {}),
       ...(replyWithinDays === null ? {} : { replyWithinDays }),
       ...(accentHex === null ? {} : { organisationAccentHex: accentHex }),
       ...(embedOrigins.length === 0 ? {} : { embedOrigins: [...embedOrigins] }),
@@ -950,4 +983,45 @@ export function registerGateQRoutes(
           }),
     });
   });
+
+  // Brand from website: the gateway's logo, from Capital Q's own storage
+  // (never the organisation's site). The same one 404 for a malformed,
+  // unknown, paused or logo-less gateway. Re-checked as PNG or JPEG by its
+  // bytes, served with nosniff and a sandboxing policy, so it can only
+  // ever be drawn as an image.
+  if (dependencies.publicLogo !== undefined) {
+    const readLogo = dependencies.publicLogo;
+    app.get(GATEQ_PUBLIC_GATEWAY_LOGO_PATH, async (request, reply) => {
+      const publicId = GatewayPublicIdSchema.safeParse(
+        (request.params as { publicId?: string }).publicId,
+      );
+      if (!publicId.success) {
+        reply.callNotFound();
+        return undefined;
+      }
+      const logo = await readLogo(publicId.data).catch(() => null);
+      const bytes = logo?.bytes;
+      const isPng =
+        bytes !== undefined &&
+        bytes[0] === 0x89 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x4e &&
+        bytes[3] === 0x47;
+      const isJpeg =
+        bytes !== undefined &&
+        bytes[0] === 0xff &&
+        bytes[1] === 0xd8 &&
+        bytes[2] === 0xff;
+      if (logo === null || !(isPng || isJpeg)) {
+        reply.callNotFound();
+        return undefined;
+      }
+      void reply
+        .header("Content-Type", isPng ? "image/png" : "image/jpeg")
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Content-Security-Policy", "default-src 'none'; sandbox")
+        .header("Cache-Control", "public, max-age=300");
+      return reply.send(Buffer.from(logo.bytes));
+    });
+  }
 }

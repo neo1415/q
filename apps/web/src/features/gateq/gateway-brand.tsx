@@ -43,9 +43,33 @@ export function GatewayAccentStyle({
 }
 
 /**
- * The organisation's mark for the gateway's bar: its public card photo
- * when it shows one to the public, else its initial. Decorative next to
- * the name, so the image carries no text alternative of its own.
+ * The gateway's mark as an image: the logo (or labelled site icon) its
+ * admins chose, from Capital Q's storage through the page's own logo
+ * route, else the public card photo. Null: show the initial.
+ */
+export function gatewayMarkImage(
+  gateway: Pick<PublicGatewayDto, "organisationPhotoUrl"> &
+    Partial<Pick<PublicGatewayDto, "publicId" | "gatewayLogo">>,
+): { readonly src: string; readonly kind: "LOGO" | "ICON" | "PHOTO" } | null {
+  const logo = gateway.gatewayLogo ?? null;
+  if (logo !== null && gateway.publicId !== undefined) {
+    return {
+      src: `/g/${encodeURIComponent(gateway.publicId)}/logo?v=${logo.assetId}`,
+      kind: logo.kind,
+    };
+  }
+  return gateway.organisationPhotoUrl
+    ? { src: gateway.organisationPhotoUrl, kind: "PHOTO" }
+    : null;
+}
+
+/**
+ * The organisation's mark for the gateway's bar: the logo its admins chose
+ * (Capital Q's stored copy, never hot-linked from their site), else its
+ * public card photo when it shows one to the public, else its initial.
+ * Decorative next to the name, so the image carries no text alternative
+ * of its own. The name is the one the admins chose for the gateway, else
+ * the canonical record's.
  */
 export function GatewayBrandMark({
   gateway,
@@ -53,20 +77,44 @@ export function GatewayBrandMark({
   readonly gateway: Pick<
     PublicGatewayDto,
     "organisationDisplayName" | "organisationPhotoUrl"
-  >;
+  > &
+    Partial<
+      Pick<PublicGatewayDto, "publicId" | "gatewayDisplayName" | "gatewayLogo">
+    >;
 }) {
-  const name = gateway.organisationDisplayName;
+  const name = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
+  const mark = gatewayMarkImage(gateway);
+  if (mark !== null && mark.kind === "LOGO") {
+    // A full logo keeps its own shape: never cropped into a circle.
+    return (
+      <span className="flex min-w-0 items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={mark.src}
+          alt=""
+          className="h-8 max-w-40 flex-none object-contain sm:h-9"
+          data-testid="gateway-brand-logo"
+          data-logo-kind="LOGO"
+        />
+        <span className="truncate text-lg font-semibold tracking-tight text-(--cq-text-primary)">
+          {name}
+        </span>
+      </span>
+    );
+  }
+  const photo = mark?.src ?? null;
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span
         aria-hidden="true"
         className="grid size-8 flex-none place-items-center overflow-hidden rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-strong) text-sm font-semibold text-(--cq-text-primary) sm:size-9"
       >
-        {gateway.organisationPhotoUrl ? (
-          // Signed URL from the API; the organisation's own public card image.
+        {photo ? (
+          // Signed URL from the API (the organisation's own public card
+          // image), or the site icon its admins chose, from our storage.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={gateway.organisationPhotoUrl}
+            src={photo}
             alt=""
             className="size-full object-cover"
             data-testid="gateway-brand-logo"

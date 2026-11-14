@@ -28,6 +28,7 @@ import {
   submitApplicationAction,
 } from "../apply-actions";
 import { FitGlyph, type GlyphKind } from "../fit-glyph";
+import { gatewayMarkImage } from "../gateway-brand";
 import "../gateq.css";
 import "../gateq-v2.css";
 import { shareMaterialsAction } from "../materials-actions";
@@ -797,6 +798,8 @@ function GateCard({
   const t = useT();
 
   const fund = gateway.organisationDisplayName;
+  // Brand from website: the logo and name the investor's admins chose.
+  const mark = gatewayMarkImage(gateway);
   return (
     <aside
       className="gq-card gq-gatecard"
@@ -805,18 +808,29 @@ function GateCard({
       <div className="flex items-center gap-3">
         <span
           className="gq-logo"
-          style={{ width: 44, height: 44, borderRadius: "50%" }}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: mark?.kind === "LOGO" ? 8 : "50%",
+          }}
         >
-          {gateway.organisationPhotoUrl ? (
-            // Signed URL from the API; the investor's own public card image.
+          {mark !== null ? (
+            // Signed URL from the API (the investor's own public card
+            // image), or the logo Capital Q keeps for this gateway.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={gateway.organisationPhotoUrl} alt="" />
+            <img
+              src={mark.src}
+              alt=""
+              style={
+                mark.kind === "LOGO" ? { objectFit: "contain" } : undefined
+              }
+            />
           ) : (
             t(fund.slice(0, 1).toUpperCase())
           )}
         </span>
         <div className="min-w-0">
-          <p className="cq-title-sm">{fund}</p>
+          <p className="cq-title-sm">{gateway.gatewayDisplayName ?? fund}</p>
           <p className="cq-caption gq-t2">
             {gateway.replyWithinDays
               ? t(`Replies within ${gateway.replyWithinDays} working days`)

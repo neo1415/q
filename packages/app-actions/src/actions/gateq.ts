@@ -3,16 +3,20 @@ import { z } from "zod";
 import {
   GATEQ_EMBED_ORIGINS_MAX,
   GATEQ_GATEWAY_APPEARANCE_PATH,
+  GATEQ_GATEWAY_BRAND_SUGGESTION_PATH,
   GATEQ_GATEWAY_POLICY_EXTRACTIONS_PATH,
   GATEQ_GATEWAY_STATUS_PATH,
   GatewayAppearanceDtoSchema,
   GatewayAppearanceRequestSchema,
+  GatewayBrandSuggestionDtoSchema,
+  GatewayBrandSuggestionRequestSchema,
   GatewayDtoSchema,
   GatewayStatusRequestSchema,
   normaliseEmbedOrigin,
   PolicyExtractionDtoSchema,
   PolicyExtractionRequestSchema,
   UuidSchema,
+  type GatewayBrandSuggestionDto,
   type PolicyExtractionDto,
   type QSubjectRef,
 } from "@capital-q/contracts";
@@ -111,6 +115,11 @@ type Appearance = {
   readonly accentHex: string | null;
   readonly embedOrigins: readonly string[];
   readonly updatedAt: string | null;
+  readonly displayName: string | null;
+  readonly logo: {
+    readonly assetId: string;
+    readonly kind: "LOGO" | "ICON";
+  } | null;
 };
 
 type GatewayRow = {
@@ -138,8 +147,15 @@ export type GateqGatewayAdminPort = {
     input: {
       readonly accentHex: string | null;
       readonly embedOrigins: readonly string[];
+      readonly displayName?: string | null | undefined;
+      readonly logoAssetId?: string | null | undefined;
     },
   ) => Promise<AdminResult<Appearance>>;
+  /** Brand from website: reads only the website on their canonical record. */
+  readonly suggestBrand: (
+    actor: ActorContext,
+    gatewayId: string,
+  ) => Promise<AdminResult<GatewayBrandSuggestionDto>>;
   readonly setStatus: (
     actor: ActorContext,
     gatewayId: string,
@@ -185,13 +201,17 @@ const hexOf = (said: string): string | null => {
 const SET_APPEARANCE = defineAppAction<
   AppearInput,
   AdminResult<Appearance>,
-  { accentColour: string | null; embedSites?: string[] | undefined }
+  {
+    accentColour?: string | null | undefined;
+    embedSites?: string[] | undefined;
+    fromWebsite?: boolean | undefined;
+  }
 >({
   name: "gateway.appearance.set",
   short: "brand my gateway",
   area: "gateway",
   classification: "CONSEQUENTIAL",
-  does: "Sets their GateQ gateway's accent colour and the websites allowed to embed it; the public page and embed change at once.",
+  does: "Sets their GateQ gateway's accent colour, logo and shown name, and the websites allowed to embed it; the public page and embed change at once.",
   input: Appear,
   output: z.custom<AdminResult<Appearance>>(),
   authorize: serviceDecides,
@@ -200,14 +220,20 @@ const SET_APPEARANCE = defineAppAction<
   targets: targetsOf,
   supersedes: true,
   card: (input) => ({
-    summary:
+    summary: `${
       input.input.accentHex === null
         ? "Use Capital Q's colour on your gateway"
-        : `Brand your gateway ${input.input.accentHex}`,
-    preview:
+        : `Brand your gateway ${input.input.accentHex}`
+    }${typeof input.input.logoAssetId === "string" ? ", with the logo from your website" : ""}`,
+    preview: [
       input.input.embedOrigins.length === 0
         ? "Any website may embed it."
         : `Only these websites may embed it: ${input.input.embedOrigins.join(", ")}.`,
+      ...(typeof input.input.displayName === "string"
+        ? [`Shown as ${input.input.displayName}.`]
+        : []),
+      ...(input.input.logoAssetId === null ? ["No logo."] : []),
+    ].join(" "),
   }),
   done: (out) => (out.ok ? "Your gateway's look is updated." : NOT_THEIRS),
   succeeded: (out) => out.ok,
@@ -235,14 +261,23 @@ const SET_APPEARANCE = defineAppAction<
     // an unfocused offer.
     offeredWhenNamed: true,
     description:
-      "Prepares, for their approval, their GateQ gateway's accent colour (#rrggbb, or null for Capital Q's) and, if they name them, the only websites allowed to embed it. Capital Q keeps the colour readable.",
+      "Prepares, for their approval, their GateQ gateway's accent colour (#rrggbb, or null for Capital Q's) and, if they name them, the only websites allowed to embed it. fromWebsite: true brands it from the website on their firm's profile (its logo and colour, read by Capital Q, never invented). Capital Q keeps the colour readable.",
     input: z
       .object({
         accentColour: z
           .string()
           .max(9)
           .nullable()
-          .describe("A hex colour such as #0f766e, or null for Capital Q's."),
+          .optional()
+          .describe(
+            "A hex colour such as #0f766e, or null for Capital Q's. Omit to keep the current one (or the website's, with fromWebsite).",
+          ),
+        fromWebsite: z
+          .boolean()
+          .optional()
+          .describe(
+            "true when they ask to brand the gateway from their website: its logo and colour, from the website on their profile.",
+          ),
         embedSites: z
           .array(z.string().max(300))
           .max(GATEQ_EMBED_ORIGINS_MAX)
@@ -263,15 +298,45 @@ const SET_APPEARANCE = defineAppAction<
     toCanonical: async (tool, context, ports) => {
       const own = await admin(ports).ownGateway(context.actor);
       if (own === null) return refusal("You don't have a GateQ gateway yet.");
-      const accentHex =
-        tool.accentColour === null ? null : hexOf(tool.accentColour);
-      if (tool.accentColour !== null && accentHex === null) {
-        return refusal("That isn't a colour I can use. Try one like #0f766e.");
+      const current = await admin(ports).appearance(context.actor, own.id);
+      if (!current.ok) return refusal(NOT_THEIRS);
+      let accentHex = current.value.accentHex;
+      let logoAssetId: string | undefined;
+      if (tool.fromWebsite === true) {
+        const suggested = await admin(ports).suggestBrand(
+          context.actor,
+          own.id,
+        );
+        if (!suggested.ok) return refusal(NOT_THEIRS);
+        const found = suggested.value;
+        if (found.websiteUrl === null) {
+          return refusal(
+            "Your firm's profile has no website yet. Add it on the Gate tab or your profile, then ask again.",
+          );
+        }
+        if (found.colours.status === "FOUND") accentHex = found.colours.primary;
+        // Only a real logo on Q's path: a site icon is the admin's own
+        // choice on the Gate tab, where it is labelled as an icon.
+        if (found.logo.status === "FOUND" && found.logo.kind === "LOGO") {
+          logoAssetId = found.logo.assetId;
+        }
+        if (found.colours.status !== "FOUND" && logoAssetId === undefined) {
+          return refusal(
+            `I couldn't find a logo or brand colour on ${found.websiteUrl}. You can set them on the Gate tab.`,
+          );
+        }
+      }
+      if (tool.accentColour !== undefined) {
+        accentHex =
+          tool.accentColour === null ? null : hexOf(tool.accentColour);
+        if (tool.accentColour !== null && accentHex === null) {
+          return refusal(
+            "That isn't a colour I can use. Try one like #0f766e.",
+          );
+        }
       }
       let embedOrigins: string[];
       if (tool.embedSites === undefined) {
-        const current = await admin(ports).appearance(context.actor, own.id);
-        if (!current.ok) return refusal(NOT_THEIRS);
         embedOrigins = [...current.value.embedOrigins];
       } else {
         const origins = tool.embedSites.map(normaliseEmbedOrigin);
@@ -290,10 +355,62 @@ const SET_APPEARANCE = defineAppAction<
         ...(context.actor.organisationId === undefined
           ? {}
           : { organisationId: context.actor.organisationId }),
-        input: { accentHex, embedOrigins },
+        input: {
+          accentHex,
+          embedOrigins,
+          ...(logoAssetId === undefined ? {} : { logoAssetId }),
+        },
       };
     },
   },
+});
+
+const Suggest = z
+  .object({ gatewayId: UuidSchema, input: GatewayBrandSuggestionRequestSchema })
+  .strict();
+
+/**
+ * Brand from website (owner 2026-11-14): the Gate tab's "Brand from
+ * website". Reads only the website on their organisation's canonical
+ * record (the service reads it; the request carries no URL), keeps any
+ * logo it finds in Capital Q's storage, and suggests name, logo and
+ * colours for the admin to correct. Nothing public changes: saving is
+ * gateway.appearance.set, which Q reaches with fromWebsite.
+ */
+const SUGGEST_BRAND = defineAppAction<
+  z.infer<typeof Suggest>,
+  AdminResult<GatewayBrandSuggestionDto>
+>({
+  name: "gateway.brand.suggest",
+  short: "brand gateway from website",
+  area: "gateway",
+  classification: "READ",
+  does: "Reads their organisation's own website (the one on its profile) for its name, logo and colours, and suggests them for their GateQ gateway; nothing changes until they save.",
+  input: Suggest,
+  output: z.custom<AdminResult<GatewayBrandSuggestionDto>>(),
+  authorize: serviceDecides,
+  run: (ports, context, input) =>
+    admin(ports).suggestBrand(context.actor, input.gatewayId),
+  targets: () => [],
+  card: () => ({
+    summary: "Brand your gateway from your website",
+    preview: "",
+  }),
+  done: (out) =>
+    out.ok ? "Here is what your website says about your brand." : NOT_THEIRS,
+  succeeded: (out) => out.ok,
+  http: {
+    method: "POST",
+    path: GATEQ_GATEWAY_BRAND_SUGGESTION_PATH,
+    fromRequest: (params, body) => ({
+      gatewayId: params["gatewayId"],
+      input: body ?? {},
+    }),
+    respond: (out) =>
+      out.ok ? GatewayBrandSuggestionDtoSchema.parse(out.value) : null,
+    notFound: (out) => !out.ok,
+  },
+  viaTool: "set_gateway_appearance",
 });
 
 const Status = z
@@ -394,5 +511,6 @@ const SET_STATUS = defineAppAction<
 export const GATEQ_ACTIONS: readonly AnyAppAction[] = [
   READ_MANDATE,
   SET_APPEARANCE,
+  SUGGEST_BRAND,
   SET_STATUS,
 ];
