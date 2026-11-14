@@ -38,6 +38,7 @@ import {
   type NewApplicationFact,
   type SessionToken,
 } from "../contracts/index.js";
+import { answersFromView } from "../domain/form-answers.js";
 import { applicationProjection } from "../domain/projection.js";
 import { formStatementPlan, type StatementPlan } from "./statement-plan.js";
 import {
@@ -769,6 +770,10 @@ export function createIntakeService(
         // nothing (live D8).
         if (turns !== undefined && (await turns.pendingFor(application.id)))
           throw new IntakeRefusedError("REPLY_IN_PROGRESS");
+        // The legacy facts this save records: every proposed one, or, for
+        // the form with statements, only the projections of what it
+        // actually changed (an unchanged field writes nothing at all).
+        let recorded: readonly NewApplicationFact[] = proposed;
         if (statements !== undefined && input.origin === "FORM") {
           // The form's answers as FORM statements, written first and in
           // the same transaction as the legacy facts they project to.
@@ -791,16 +796,18 @@ export function createIntakeService(
               events: [],
               readings: [],
             });
+          recorded = plan.legacyFacts;
         }
-        await facts.record(tx, {
-          applicationId: application.id,
-          tenantId: application.tenantId,
-          facts: proposed,
-          at,
-          sourceTurnSeq: input.sourceTurnSeq,
-          disclosureLineage: input.disclosureLineage,
-        });
-        const name = proposed.find((fact) => fact.dimension === "company.name");
+        if (recorded.length > 0)
+          await facts.record(tx, {
+            applicationId: application.id,
+            tenantId: application.tenantId,
+            facts: recorded,
+            at,
+            sourceTurnSeq: input.sourceTurnSeq,
+            disclosureLineage: input.disclosureLineage,
+          });
+        const name = recorded.find((fact) => fact.dimension === "company.name");
         if (name !== undefined && name.value.kind === "TEXT") {
           await applications.setDeclaredName(
             tx,
@@ -1295,7 +1302,19 @@ export function createIntakeService(
       const statementView = await statementViewOf(application, {
         legacyFacts: current,
       });
+      // The founder's own answers as they stand, for a resumed form.
+      const answers =
+        statements === undefined
+          ? undefined
+          : answersFromView(
+              effectiveStatementView({
+                applicationId: application.id,
+                context: await statements.listFor(application.id),
+                legacyFacts: current,
+              }).view,
+            );
       return ApplicationCoverageDtoSchema.parse({
+        ...(answers === undefined ? {} : { answers }),
         coverage:
           statementView === undefined
             ? coverageFor({

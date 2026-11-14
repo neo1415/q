@@ -48,6 +48,7 @@ import {
   legacyFactsFrom,
   projectView,
   samePeriod,
+  SINGLE_VALUED_DIMENSIONS,
   valuesConflict,
   type LegacyIncompleteness,
 } from "./statement-view.js";
@@ -710,6 +711,15 @@ export function planReading(input: PlanInput): PlanOutcome {
     turnId: string | null,
   ): StatementLink | null => {
     if (from === to) return null;
+    // Unknown stays unknown: an UNKNOWN end never forms a disagreement
+    // (live 2026-11-14: "leave it open" stored as 600 vs "Not known").
+    if (kind === "DISAGREES") {
+      const ends = [from, to].map(
+        (id) => byId.get(id) ?? newStatements.find((s) => s.id === id),
+      );
+      if (ends.some((end) => end === undefined || end.value.kind === "UNKNOWN"))
+        return null;
+    }
     if (
       links.some(
         (l) =>
@@ -881,27 +891,44 @@ export function planReading(input: PlanInput): PlanOutcome {
   // (live 2026-11-14): read from the structured op (an UNKNOWN, not
   // declined, on a dimension with an OPEN disagreement), never from words.
   const implicitActions: GateQDisagreementAction[] = [];
-  const openOn = (dimension: string) =>
-    [...input.handles.disagreements].filter(([, d]) => {
-      if (!d.active || d.state !== "OPEN") return false;
+  // Every standing disagreement on the dimension, OPEN or already LEFT_OPEN
+  // (naming one already left open is true to say, and writes nothing), or
+  // the ones the op's own target stands in.
+  const standingOn = (dimension: string, target: string | null) => {
+    const targetId =
+      target === null
+        ? null
+        : (() => {
+            const handle = handleOf(input.handles.statements, target);
+            return handle === null
+              ? null
+              : (input.handles.statements.get(handle)?.statementId ?? null);
+          })();
+    return [...input.handles.disagreements].filter(([, d]) => {
+      if (!d.active || d.state === "RESOLVED") return false;
       return [d.olderStatementId, d.newerStatementId].some(
-        (id) => byId.get(id)?.dimension === dimension,
+        (id) => id === targetId || byId.get(id)?.dimension === dimension,
       );
     });
+  };
 
   for (const op of ops) {
     if (op === null) {
       rejected += 1;
       continue;
     }
-    if (
+    // A left-open intent is an event on the disagreement, never a value
+    // statement, whichever op the reading chose (NEW or DISAGREES S<n>;
+    // live 2026-11-14 turns 18 and 38).
+    const standing =
       op.turn === null &&
-      op.op === "NEW" &&
+      op.op !== "CORRECTS" &&
       op.value.kind === "UNKNOWN" &&
-      op.value.declined !== true &&
-      openOn(op.dimension).length > 0
-    ) {
-      for (const [handle] of openOn(op.dimension))
+      op.value.declined !== true
+        ? standingOn(op.dimension, op.target)
+        : [];
+    if (standing.length > 0) {
+      for (const [handle] of standing)
         implicitActions.push({
           disagreement: handle,
           action: "LEAVE_OPEN",
@@ -1290,14 +1317,26 @@ export const PLAN_QUANTITIES = StatementQuantitySchema.options;
 // ---------------------------------------------------------------------------
 
 /**
- * The rows the form's answers write beside the legacy facts, so every
- * reader labels a form answer FORM, never "said in the application"
- * (invariant 8). A form field holds the whole answer, so a new form answer
- * CORRECTS everything current on its dimension, which the projector then
- * hides as history (an unknown never hides a held value). Legacy facts on
- * a touched dimension that no statement accounts for are carried first,
- * with their deterministic ids, so the correction has something to name.
- * Pure: nothing is written here.
+ * The rows a form save writes (slice 3, fixed after live 2026-11-14).
+ *
+ * A form save is an explicit founder action on the fields it carries, and
+ * it may only change what the founder changed:
+ *
+ *   - unchanged is nothing: a field whose value is already what the form
+ *     last said, or already a current answer with no different form answer
+ *     beside it, writes no statement, no link and no legacy fact (live: 35
+ *     "earlier answers, corrected" from re-saving identical values);
+ *   - a changed field CORRECTS only earlier form answers (and legacy
+ *     records carried in) on its dimension. It never supersedes an
+ *     interview statement: on a single-answer dimension a different value
+ *     DISAGREES with each interview answer instead, so a disagreement the
+ *     founder left open stays standing and the qualification stays
+ *     UNRESOLVED (decision 91; live: a profile-prefilled series_b form
+ *     erased the left-open Series A / seed disagreement);
+ *   - an unknown never disagrees with anything (unknown stays unknown).
+ *
+ * Legacy facts are re-projected from the statements for the dimensions it
+ * wrote, as a turn's plan does. Pure: nothing is written here.
  */
 export function formStatementPlan(input: {
   readonly applicationId: ApplicationId;
@@ -1308,46 +1347,51 @@ export function formStatementPlan(input: {
 }): {
   readonly statements: readonly ApplicationStatement[];
   readonly links: readonly StatementLink[];
+  /** The legacy facts to record: projections, plus any the shape refuses. */
+  readonly legacyFacts: readonly NewApplicationFact[];
 } {
-  const touched = new Set(input.proposed.map((fact) => fact.dimension));
-  const carried = legacyCarry(input).filter((s) => touched.has(s.dimension));
-  const view = projectView(
-    [...input.context.statements, ...carried],
-    input.context.links,
-    input.context.events,
+  const proposedDimensions = new Set(input.proposed.map((f) => f.dimension));
+  const carriedAll = legacyCarry(input).filter((s) =>
+    proposedDimensions.has(s.dimension),
   );
+  const existing = [...input.context.statements, ...carriedAll];
+  const byId = new Map(existing.map((s) => [s.id as string, s] as const));
+  const view = projectView(existing, input.context.links, input.context.events);
   // Strictly after everything it corrects: a link points newer to older.
   let clock = Math.max(
     Date.parse(input.at),
-    ...[...input.context.statements, ...carried].map(
-      (s) => Date.parse(s.statedAt) + 1,
-    ),
+    ...existing.map((s) => Date.parse(s.statedAt) + 1),
   );
-  const statements: ApplicationStatement[] = [...carried];
+  const written = new Set<ApplicationDimension>();
+  const statements: ApplicationStatement[] = [];
   const links: StatementLink[] = [];
+  const legacyFacts: NewApplicationFact[] = [];
+  const formLike = (origin: ApplicationStatement["origin"]) =>
+    origin === "FORM" || origin === "BACKFILL";
+
   for (const fact of input.proposed) {
+    const dimension = fact.dimension;
     const current =
-      view.dimensions.find((d) => d.dimension === fact.dimension)?.items ?? [];
-    const values = carriedValues({
+      view.dimensions.find((d) => d.dimension === dimension)?.items ?? [];
+    const shaped: ApplicationStatement[] = [];
+    let refused = false;
+    for (const carry of carriedValues({
       id: randomUUID() as ApplicationFact["id"],
       applicationId: input.applicationId,
-      dimension: fact.dimension,
+      dimension,
       value: fact.value,
       provenance: fact.provenance,
       recordedAt: input.at,
       supersededAt: null,
-    });
-    for (const carry of values) {
-      const statedAt = new Date(clock).toISOString();
-      clock += 1;
+    })) {
       const unknown = carry.value.kind === "UNKNOWN";
       const parsed = ApplicationStatementSchema.safeParse({
         id: randomUUID(),
         applicationId: input.applicationId,
-        dimension: fact.dimension,
+        dimension,
         quantity:
           carry.value.kind === "MONEY" || carry.value.kind === "ZERO"
-            ? (QUANTITY_OF[fact.dimension] ?? null)
+            ? (QUANTITY_OF[dimension] ?? null)
             : null,
         value: carry.value,
         asOf: null,
@@ -1360,27 +1404,108 @@ export function formStatementPlan(input: {
         origin: "FORM",
         sourceTurnId: null,
         backfillKey: null,
+        statedAt: input.at,
+        recordedAt: input.at,
+      });
+      if (parsed.success) shaped.push(parsed.data);
+      else refused = true;
+    }
+    // A value the bounded shape refuses stays in the legacy fact alone;
+    // the reader's view carries that fact in, flagged.
+    if (refused) {
+      legacyFacts.push(fact);
+      continue;
+    }
+    const said = new Set(shaped.map((s) => canonical(s.value)));
+    const currentValues = new Set(current.map((i) => canonical(i.value)));
+    const formCurrent = current.filter((i) => formLike(i.origin));
+    const lastForm = existing
+      .filter((s) => s.dimension === dimension && s.origin === "FORM")
+      .sort((a, b) =>
+        a.statedAt === b.statedAt
+          ? a.id.localeCompare(b.id)
+          : a.statedAt.localeCompare(b.statedAt),
+      )
+      .at(-1);
+    const unchanged =
+      // Already a current answer, with no different form answer beside it.
+      ([...said].every((v) => currentValues.has(v)) &&
+        formCurrent.every((i) => said.has(canonical(i.value)))) ||
+      // What the form last said, even if the interview has since moved on:
+      // sending it again is not the founder changing it.
+      (shaped.length === 1 &&
+        lastForm !== undefined &&
+        said.has(canonical(lastForm.value)));
+    if (unchanged) continue;
+
+    const singleAnswer =
+      (QUALIFYING_DIMENSIONS.includes(dimension) &&
+        dimension !== "company.sector_phrases") ||
+      SINGLE_VALUED_DIMENSIONS.has(dimension);
+    for (const shapedStatement of shaped) {
+      const statedAt = new Date(clock).toISOString();
+      clock += 1;
+      const statement: ApplicationStatement = {
+        ...shapedStatement,
         statedAt,
         recordedAt: statedAt,
-      });
-      // A value the bounded shape refuses stays in the legacy fact alone;
-      // the reader's view carries that fact in, flagged.
-      if (!parsed.success) continue;
-      statements.push(parsed.data);
-      for (const item of current)
+      };
+      statements.push(statement);
+      written.add(dimension);
+      for (const item of current) {
+        const target = byId.get(item.statementId);
+        if (target === undefined) continue;
+        let kind: StatementLink["kind"] | null = null;
+        if (formLike(target.origin)) kind = "CORRECTS";
+        else if (
+          singleAnswer &&
+          statement.value.kind !== "UNKNOWN" &&
+          target.value.kind !== "UNKNOWN" &&
+          canonical(statement.value) !== canonical(target.value)
+        )
+          kind = "DISAGREES";
+        if (kind === null) continue;
         links.push(
           StatementLinkSchema.parse({
             id: randomUUID(),
             applicationId: input.applicationId,
-            kind: "CORRECTS",
-            fromStatementId: parsed.data.id,
-            toStatementId: item.statementId,
+            kind,
+            fromStatementId: statement.id,
+            toStatementId: target.id,
             origin: "CODE_DETECTED",
             sourceTurnId: null,
             createdAt: statedAt,
           }),
         );
+      }
     }
   }
-  return { statements, links };
+
+  const carried = carriedAll.filter((s) => written.has(s.dimension));
+  const after = projectView(
+    [...input.context.statements, ...carried, ...statements],
+    [...input.context.links, ...links],
+    input.context.events,
+  );
+  const projected = legacyFactsFrom(after).facts;
+  for (const dimension of written) {
+    const fact = projected.find((f) => f.dimension === dimension);
+    if (fact === undefined) continue;
+    const legacy = input.legacyFacts.find(
+      (f) => f.dimension === dimension && f.supersededAt === null,
+    );
+    if (
+      legacy !== undefined &&
+      sameJson(legacy.value, fact.value) &&
+      legacy.provenance === fact.provenance
+    )
+      continue;
+    const parsed = NewApplicationFactSchema.safeParse({
+      dimension,
+      value: fact.value,
+      provenance: fact.provenance,
+    });
+    if (parsed.success) legacyFacts.push(parsed.data);
+  }
+  return { statements: [...carried, ...statements], links, legacyFacts };
 }

@@ -936,6 +936,12 @@ export const ApplicationCoverageDtoSchema = z
      * the one statement view. Optional so an older API still parses.
      */
     statements: GateqStatementViewV1Schema.optional(),
+    /**
+     * The application's own answers as they stand, in the form's shape, so
+     * a resumed form shows them rather than a blank or prefilled form whose
+     * save would overwrite them (live 2026-11-14). Optional: older APIs.
+     */
+    answers: ApplicationAnswersRequestSchema.optional(),
   })
   .strict();
 export type ApplicationCoverageDto = z.infer<

@@ -293,6 +293,13 @@ export function projectView(
     // stands; it stays in the view as history but decides nothing.
     const bothVisible =
       visible(link.fromStatementId) && visible(link.toStatementId);
+    // Unknown stays unknown: a "not known" (a leave-open read as an
+    // UNKNOWN, live 2026-11-14: 600 vs "Not known") never contradicts a
+    // held value, so a link naming one decides nothing, whoever wrote it.
+    const bothHeld = [link.fromStatementId, link.toStatementId].every((id) => {
+      const end = byId.get(id);
+      return end !== undefined && isHeld(end.value);
+    });
     return {
       key: link.id,
       linkId: link.id,
@@ -301,7 +308,7 @@ export function projectView(
       newerStatementId: link.fromStatementId,
       state: state.state,
       resolvedByStatementId: state.resolvedBy,
-      active: state.state !== "RESOLVED" && bothVisible,
+      active: state.state !== "RESOLVED" && bothVisible && bothHeld,
     };
   });
 
