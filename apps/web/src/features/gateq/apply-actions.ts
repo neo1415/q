@@ -15,6 +15,9 @@ import {
   getApplicationVideo,
   startApplicationVideo,
   endApplicationVideo,
+  getApplicationVoice,
+  startApplicationVoice,
+  endApplicationVoice,
   resumeApplication,
   saveApplicationAnswers,
   startApplication,
@@ -24,6 +27,7 @@ import {
 import type {
   ApplicationSummaryDto,
   GateqVideoStateDto,
+  GateqVoiceStateDto,
 } from "@capital-q/contracts";
 import {
   GATEQ_REPLY_FAILED_DETAIL,
@@ -515,5 +519,81 @@ export async function endVideoAction(
     };
   } catch (error: unknown) {
     return videoFailure(error);
+  }
+}
+
+/**
+ * The GateQ voice-only interview, by the applicant's own credential. The
+ * line credential (a short-lived speech token and the agent settings) is
+ * for this browser only. Every failure is a plain message; typing always
+ * remains the interview.
+ */
+export type VoiceResult =
+  | { readonly ok: true; readonly state: GateqVoiceStateDto }
+  | { readonly ok: false; readonly message: string };
+
+const voiceFailure = (error: unknown): VoiceResult => {
+  const failed = failure(error);
+  return {
+    ok: false,
+    message: failed.ok
+      ? "Voice isn't available right now. You can continue by typing."
+      : failed.message,
+  };
+};
+
+export async function voiceStateAction(
+  sessionToken: string,
+): Promise<VoiceResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return { ok: true, state: await getApplicationVoice(url, token.data) };
+  } catch (error: unknown) {
+    return voiceFailure(error);
+  }
+}
+
+export async function startVoiceAction(
+  sessionToken: string,
+  deviceLanguage?: string,
+): Promise<VoiceResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  const standing = await resolveQStanding().catch(() => null);
+  const locale = effectiveLocale(standing?.language, deviceLanguage);
+  try {
+    return {
+      ok: true,
+      state: await startApplicationVoice(url, token.data, locale),
+    };
+  } catch (error: unknown) {
+    return voiceFailure(error);
+  }
+}
+
+export async function endVoiceAction(
+  sessionToken: string,
+  continueByTyping: boolean,
+): Promise<VoiceResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return {
+      ok: true,
+      state: await endApplicationVoice(
+        url,
+        token.data,
+        continueByTyping === true,
+      ),
+    };
+  } catch (error: unknown) {
+    return voiceFailure(error);
   }
 }

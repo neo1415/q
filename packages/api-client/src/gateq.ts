@@ -19,6 +19,9 @@ import {
   GATEQ_APPLY_VIDEO_END_PATH,
   GATEQ_APPLY_VIDEO_PATH,
   GateqVideoStateDtoSchema,
+  GATEQ_APPLY_VOICE_END_PATH,
+  GATEQ_APPLY_VOICE_PATH,
+  GateqVoiceStateDtoSchema,
   GATEQ_APPLY_SESSION_PATH,
   type ApplicationContactRequest,
   ApplicationAnswersResponseSchema,
@@ -344,6 +347,43 @@ export function endApplicationVideo(
     "POST",
     GATEQ_APPLY_VIDEO_END_PATH,
     GateqVideoStateDtoSchema,
+    { body: { continueByTyping } },
+  );
+}
+/** The applicant's voice-only interview state (offered? open session?). */
+export function getApplicationVoice(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_VOICE_PATH,
+    GateqVoiceStateDtoSchema,
+  );
+}
+/** Open a voice line (or reopen the same session with a fresh line). */
+export function startApplicationVoice(
+  baseUrl: string,
+  sessionToken: string,
+  locale?: string,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_VOICE_PATH,
+    GateqVoiceStateDtoSchema,
+    { body: locale === undefined ? {} : { locale } },
+  );
+}
+/** End it; the same interview carries on by typing. */
+export function endApplicationVoice(
+  baseUrl: string,
+  sessionToken: string,
+  continueByTyping: boolean,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_VOICE_END_PATH,
+    GateqVoiceStateDtoSchema,
     { body: { continueByTyping } },
   );
 }

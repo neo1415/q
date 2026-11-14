@@ -41,6 +41,11 @@ const video = {
   start: vi.fn<Action>(),
   end: vi.fn<Action>(),
 };
+const voice = {
+  state: vi.fn<Action>(),
+  start: vi.fn<Action>(),
+  end: vi.fn<Action>(),
+};
 /** Every server call, in order, by name: the flow's order is the assertion. */
 const order: string[] = [];
 const tracked =
@@ -66,6 +71,10 @@ vi.mock("../src/features/gateq/apply-actions", () => ({
   videoStateAction: (...args: unknown[]) => video.state(...args),
   startVideoAction: (...args: unknown[]) => video.start(...args),
   endVideoAction: (...args: unknown[]) => video.end(...args),
+  // Voice only, untracked for the same reason.
+  voiceStateAction: (...args: unknown[]) => voice.state(...args),
+  startVoiceAction: (...args: unknown[]) => voice.start(...args),
+  endVoiceAction: (...args: unknown[]) => voice.end(...args),
 }));
 vi.mock("../src/features/gateq/materials-actions", () => ({
   shareMaterialsAction: tracked("share"),
@@ -182,6 +191,18 @@ beforeEach(() => {
   order.length = 0;
   for (const fn of Object.values(calls)) fn.mockReset();
   for (const fn of Object.values(video)) fn.mockReset();
+  for (const fn of Object.values(voice)) fn.mockReset();
+  // By default voice is not offered either.
+  voice.state.mockResolvedValue({
+    ok: true,
+    state: {
+      available: false,
+      session: null,
+      unavailableReason: "NOT_OFFERED",
+      perApplication: 3,
+      remaining: 0,
+    },
+  });
   // By default video is not offered, so the typed interview is the step.
   video.state.mockResolvedValue({
     ok: true,
@@ -1220,6 +1241,107 @@ describe("the interview step, video first", () => {
     expect(
       screen.getByRole("button", { name: "Continue by typing instead" }),
     ).toBeTruthy();
+  });
+});
+
+describe("the interview step, voice only", () => {
+  const ref = { current: null };
+  const step = () =>
+    render(
+      <InterviewStep
+        headingRef={ref}
+        fund="Sahel Capital"
+        companyName="Kora Health"
+        sessionToken={TOKEN}
+        onFinish={() => undefined}
+      />,
+    );
+  const offered = {
+    ok: true,
+    state: {
+      available: true,
+      session: null,
+      unavailableReason: null,
+      perApplication: 3,
+      remaining: 3,
+    },
+  };
+
+  it("offers Talk with Q beside typing, by the guest credential, and asks for consent before anything starts", async () => {
+    voice.state.mockResolvedValue(offered);
+    calls.open.mockResolvedValue({ ok: true, turns: [] });
+    step();
+    await flush();
+    expect(voice.state).toHaveBeenCalledWith(TOKEN);
+    // Typing stays available beside the offer.
+    expect(screen.getByLabelText("Your message")).toBeTruthy();
+    expect(
+      screen.getByText("3 voice sessions left for this application."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Talk with Q" }));
+    expect(voice.start).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Tick the box above to start talking with Q."),
+    ).toBeTruthy();
+    expect(document.activeElement?.getAttribute("type")).toBe("checkbox");
+  });
+
+  it("says plainly when the voice line is refused and keeps typing", async () => {
+    voice.state.mockResolvedValue(offered);
+    voice.start.mockResolvedValue({
+      ok: false,
+      message:
+        "The voice line isn't available right now. You can continue by typing.",
+    });
+    calls.open.mockResolvedValue({ ok: true, turns: [] });
+    step();
+    await flush();
+    fireEvent.click(screen.getByRole("checkbox"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Talk with Q" }));
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    });
+    expect(voice.start).toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "The voice line isn't available right now. You can continue by typing.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Your message")).toBeTruthy();
+  });
+
+  it("says why when this application's voice sessions are used, and offers nothing when voice is off", async () => {
+    voice.state.mockResolvedValue({
+      ok: true,
+      state: {
+        available: false,
+        session: null,
+        unavailableReason: "APPLICATION_SESSIONS_USED",
+        perApplication: 3,
+        remaining: 0,
+      },
+    });
+    calls.open.mockResolvedValue({ ok: true, turns: [] });
+    const first = step();
+    await flush();
+    expect(
+      screen.getByText(/used this application's voice sessions/),
+    ).toBeTruthy();
+    first.unmount();
+    voice.state.mockResolvedValue({
+      ok: true,
+      state: {
+        available: false,
+        session: null,
+        unavailableReason: "NOT_OFFERED",
+        perApplication: 3,
+        remaining: 0,
+      },
+    });
+    step();
+    await flush();
+    expect(screen.queryByRole("button", { name: "Talk with Q" })).toBeNull();
+    expect(screen.queryByText(/voice sessions/)).toBeNull();
   });
 });
 

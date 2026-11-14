@@ -1210,4 +1210,46 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "Use my Capital Q mandate": "استخدم تفويضي في Capital Q",
   "Filled in from your Capital Q mandate. Change anything, then let Q draft the rules; nothing is published until you do it.":
     "مُلئ من تفويضك في Capital Q. غيّر ما تشاء، ثم دع Q يصوغ القواعد؛ لا يُنشر شيء حتى تنشره أنت.",
+  // Voice-only interview (directive 2026-11-14 item 4)
+  "Voice interview with Q": "مقابلة صوتية مع Q",
+  "Your microphone is muted.": "الميكروفون مكتوم.",
+  "End and continue by typing": "أنهِ وتابع بالكتابة",
+  "Rather talk than type?": "تفضّل التحدث بدل الكتابة؟",
+  "Talk with Q by voice only, no camera. Q asks, you answer out loud; every answer goes into this same interview for you to review.":
+    "تحدّث مع Q بالصوت فقط، دون كاميرا. يسأل Q وتجيب بصوت عالٍ؛ تدخل كل إجابة في هذه المقابلة نفسها لتراجعها.",
+  "Opening the voice line…": "جارٍ فتح الخط الصوتي…",
+  "Tick the box above to start talking with Q.":
+    "ضع علامة في المربع أعلاه لتبدأ التحدث مع Q.",
+  "Connecting…": "جارٍ الاتصال…",
+  "Listening.": "أستمع.",
+  "Q is thinking.": "Q يفكّر.",
+  "Q is speaking.": "Q يتحدث.",
+  "The voice line is closed.": "الخط الصوتي مغلق.",
+  "You've used this application's voice sessions. Carry on by typing; everything you said is kept.":
+    "استخدمت الجلسات الصوتية لهذا الطلب. تابع بالكتابة؛ كل ما قلته محفوظ.",
+  "Voice isn't available right now. You can continue by typing.":
+    "الصوت غير متاح الآن. يمكنك المتابعة بالكتابة.",
+  "Voice interviews aren't switched on. You can continue by typing.":
+    "المقابلات الصوتية غير مفعّلة. يمكنك المتابعة بالكتابة.",
+  "This application's voice sessions are used up. You can continue by typing.":
+    "استُنفدت الجلسات الصوتية لهذا الطلب. يمكنك المتابعة بالكتابة.",
+  "Voice interviews are busy right now. You can continue by typing.":
+    "المقابلات الصوتية مشغولة الآن. يمكنك المتابعة بالكتابة.",
+  "The voice line isn't available right now. You can continue by typing.":
+    "الخط الصوتي غير متاح الآن. يمكنك المتابعة بالكتابة.",
+  "Q can't hear you: the microphone isn't available. Check the browser's permission, or carry on by typing.":
+    "لا يستطيع Q سماعك: الميكروفون غير متاح. تحقّق من إذن المتصفح، أو تابع بالكتابة.",
+  "The voice line dropped. Everything you said is saved; you can carry on by typing.":
+    "انقطع الخط الصوتي. كل ما قلته محفوظ؛ يمكنك المتابعة بالكتابة.",
+  "That's the time for this voice session. Everything you said is saved; carry on by typing.":
+    "انتهى وقت هذه الجلسة الصوتية. كل ما قلته محفوظ؛ تابع بالكتابة.",
+  "One voice session left for this application.":
+    "بقيت جلسة صوتية واحدة لهذا الطلب.",
+  "{n} voice sessions left for this application.":
+    "بقيت {n} جلسات صوتية لهذا الطلب.",
+  "This voice session ends at {time}.": "تنتهي هذه الجلسة الصوتية في {time}.",
+  "Q is an AI interviewer. What you say is transcribed into this application; nothing reaches {fund} until you review and submit.":
+    "Q مُحاور بالذكاء الاصطناعي. يُدوَّن ما تقوله في هذا الطلب؛ ولا يصل شيء إلى {fund} حتى تراجع وتقدّم.",
+  "I understand Q is an AI interviewer, my microphone is used only while the voice line is open, and what I say is transcribed into this application. Nothing reaches {fund} until I review and submit.":
+    "أفهم أن Q مُحاور بالذكاء الاصطناعي، وأن الميكروفون يُستخدم فقط أثناء فتح الخط الصوتي، وأن ما أقوله يُدوَّن في هذا الطلب. لا يصل شيء إلى {fund} حتى أراجع وأقدّم.",
 };

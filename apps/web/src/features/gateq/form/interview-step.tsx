@@ -28,6 +28,7 @@ import {
   transcriptAction,
 } from "../apply-actions";
 import { GateqVideoEntry } from "../gateq-video-entry";
+import { GateqVoiceEntry } from "../gateq-voice-entry";
 import { readRecovery, amendRecovery } from "./session-recovery";
 import {
   latestQuestion,
@@ -52,6 +53,12 @@ import { useT } from "@/features/i18n/language";
  * step. Typing is the fallback when video is not offered, is refused or
  * the cap is reached, or the person prefers it; both feed the same
  * canonical interview, so the transcript below is the one record.
+ *
+ * Voice only (directive 2026-11-14 item 4): beside typing, "Talk with Q"
+ * when the server offers it. Spoken answers are turns in the same
+ * interview; while the line is open the composer steps aside, and when it
+ * closes (by choice, at the time limit or on a failure) the transcript is
+ * read back and typing carries on.
  *
  * Nothing here submits. Finishing goes to the review, where Submit is.
  */
@@ -122,6 +129,7 @@ export function InterviewStep({
   const [chose, setChose] = useState(false);
   const [videoNote, setVideoNote] = useState<string | null>(null);
   const [roomOpen, setRoomOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [coverage, setCoverage] = useState<ApplicationCoverageDto | null>(null);
 
   // The room shows the same "what we have / still needed" as the review.
@@ -348,6 +356,22 @@ export function InterviewStep({
         </p>
       ) : null}
 
+      {mode === "text" && sessionToken !== null && preview === undefined ? (
+        <GateqVoiceEntry
+          token={sessionToken}
+          fund={fund}
+          onLiveChange={setVoiceOpen}
+          onEnded={async () => {
+            // The bridge kept every spoken turn; read them back for typing.
+            const transcript = await transcriptAction(sessionToken).catch(
+              () => null,
+            );
+            if (transcript?.ok === true)
+              setLines(linesFromTranscript(transcript.turns));
+          }}
+        />
+      ) : null}
+
       {mode === "text" && loaded && lines.length === 0 ? (
         <p className="cq-body-sm gq-t2">
           {t(
@@ -384,7 +408,7 @@ export function InterviewStep({
         </div>
       )}
 
-      {mode === "video" ? null : (
+      {mode === "video" || voiceOpen ? null : (
         <div className="flex flex-col gap-2">
           {question === null ? null : (
             <p className="cq-caption gq-t2" id="gq-latest-question">
@@ -421,7 +445,7 @@ export function InterviewStep({
         </div>
       )}
 
-      {roomOpen ? null : (
+      {roomOpen || voiceOpen ? null : (
         <div className="gq-formbar">
           <Button
             variant="quiet"

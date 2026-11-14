@@ -43,6 +43,7 @@ import {
   tavusKeysFrom,
 } from "@capital-q/integrations";
 import { createTavusGateqVideoProvider } from "./gateq/video-provider.js";
+import { createDeepgramGateqVoiceProvider } from "./gateq/voice-provider.js";
 import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
 import { loadWebPushConfig } from "@capital-q/config/web-push";
 import {
@@ -55,6 +56,7 @@ import {
 } from "@capital-q/database";
 import {
   GATEQ_VIDEO_BRIDGE_PATH,
+  GATEQ_VOICE_BRIDGE_PATH,
   GATEQ_VIDEO_EVENTS_PATH,
   CorrelationIdSchema,
   type AdminUsageDto,
@@ -238,6 +240,9 @@ import {
   gateqSynthesisMaxAttempts,
   createPostgresGateqVideoSessions,
   gateqVideoConfigFrom,
+  createGateqVoiceInterview,
+  createPostgresGateqVoiceSessions,
+  gateqVoiceConfigFrom,
 } from "@capital-q/gateq-intake";
 import {
   createDailySpendCap,
@@ -959,6 +964,72 @@ function composeGateqVideo(apply: {
   });
   // Rooms past their deadline are ended even after a restart; the
   // provider's own max_call_duration is the backstop behind this.
+  if (provider !== null) {
+    setInterval(() => {
+      void interview.sweep().catch(() => undefined);
+    }, 30_000).unref();
+  }
+  return interview;
+}
+
+/**
+ * Directive 2026-11-14 item 4: the GateQ voice-only interview. Off unless
+ * CQ_GATEQ_VOICE_INTERVIEW=1, a Deepgram key, this API's public URL and a
+ * 32-byte seal key are all configured; otherwise the service answers "not
+ * offered" and typing is the interview. Limits come from CQ_GATEQ_VOICE_*.
+ */
+function composeGateqVoice(apply: {
+  readonly intake: Parameters<typeof createGateqVoiceInterview>[0]["intake"];
+  readonly conversation: Parameters<
+    typeof createGateqVoiceInterview
+  >[0]["conversation"];
+}) {
+  const config = gateqVoiceConfigFrom(process.env);
+  const apiKey = process.env["DEEPGRAM_API_KEY"]?.trim() ?? "";
+  const publicBaseUrl = (process.env["API_PUBLIC_URL"]?.trim() ?? "").replace(
+    /\/+$/u,
+    "",
+  );
+  // Its own seal key when given, else the video interview's: the sealed
+  // guest credential is bound to this purpose either way.
+  const sealKey =
+    process.env["CQ_GATEQ_VOICE_SEAL_KEY"]?.trim() ||
+    (process.env["CQ_GATEQ_VIDEO_SEAL_KEY"]?.trim() ?? "");
+  const cipher = (() => {
+    try {
+      return sealKey === "" ? null : createTokenCipher(sealKey);
+    } catch {
+      return null;
+    }
+  })();
+  const provider =
+    config.enabled && apiKey !== "" && publicBaseUrl !== "" && cipher !== null
+      ? createDeepgramGateqVoiceProvider({ apiKey, publicBaseUrl })
+      : null;
+  const BOUND = "gateq-voice.v1";
+  const interview = createGateqVoiceInterview({
+    config,
+    store: createPostgresGateqVoiceSessions({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
+    provider,
+    sealer: {
+      seal: (plain) => {
+        if (cipher === null) throw new Error("gateq voice seal key missing");
+        return cipher.encrypt(new SecretToken(plain), BOUND).toString("base64");
+      },
+      open: (sealed) => {
+        if (cipher === null) throw new Error("gateq voice seal key missing");
+        return cipher.decrypt(Buffer.from(sealed, "base64"), BOUND).reveal();
+      },
+    },
+    intake: apply.intake,
+    conversation: apply.conversation,
+    bridgePath: GATEQ_VOICE_BRIDGE_PATH,
+  });
+  // Sessions past their end are closed even after a restart; the bridge
+  // already refuses every line after the end.
   if (provider !== null) {
     setInterval(() => {
       void interview.sweep().catch(() => undefined);
@@ -3236,6 +3307,10 @@ const { app, logger } = createApp(config, security, {
     gateqApply === undefined
       ? undefined
       : { video: composeGateqVideo(gateqApply) },
+  gateqVoice:
+    gateqApply === undefined
+      ? undefined
+      : { voice: composeGateqVoice(gateqApply) },
   gateqApply,
   // Live D5 (2026-11-13): every visit by a signed-in founder made a new
   // draft. Their own unsent draft at the gateway is reopened instead; a new
