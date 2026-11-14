@@ -339,7 +339,13 @@ export function actionClaims(sentence: string): readonly ActionClaim[] {
   const line = plainQuotes(sentence).trim();
   if (line.startsWith(">")) return [];
   const plain = withoutQuoted(line);
-  if (EARLIER.test(plain)) return [];
+  // A RECORDED claim is about now ("I'm keeping both"), even beside an
+  // earlier figure ("the earlier $120k ... I'm keeping both").
+  if (EARLIER.test(plain)) {
+    return RECORDED_CLAIMS.some((pattern) => pattern.test(plain))
+      ? [{ kind: "SAVE", verb: RECORDED_VERB }]
+      : [];
+  }
   const found: ActionClaim[] = [];
   for (const { entry, pattern } of PATTERNS) {
     const match = pattern.exec(plain);

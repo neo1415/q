@@ -49,7 +49,10 @@ function founderPlan(actor = actorA): PermittedContextPlan {
 }
 
 function world(
-  options: { readonly recorded?: boolean; readonly recordedAmount?: string } = {},
+  options: {
+    readonly recorded?: boolean;
+    readonly recordedAmount?: string;
+  } = {},
 ) {
   const prepared: { actionType: string; payload: unknown }[] = [];
   const writes: string[] = [];
@@ -273,7 +276,9 @@ describe("a figure a founder tells Q becomes a card, never a record", () => {
     expect(writes).toEqual([]);
     // The tool says, by meaning, that a correction is prepared the same way.
     const tool = action?.tool;
-    expect(tool?.description).toMatch(/A correction .* is prepared the same way/u);
+    expect(tool?.description).toMatch(
+      /A correction .* is prepared the same way/u,
+    );
     expect(tool?.description).toMatch(/recorded, corrected, kept or on file/u);
   });
 

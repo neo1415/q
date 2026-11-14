@@ -10,11 +10,7 @@ import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 
 import { ArrivalBriefing } from "./arrival-briefing";
 import { useArrivalStatus } from "./arrival-store";
-import {
-  useClearBottom,
-  useOpenedPlacement,
-  useOverPane,
-} from "./over-pane";
+import { useClearBottom, useOpenedPlacement, useOverPane } from "./over-pane";
 import { useT } from "@/features/i18n/language";
 
 /** The Q page gives the briefing itself; everywhere else, the dock does. */
