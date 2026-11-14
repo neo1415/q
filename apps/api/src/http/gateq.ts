@@ -188,6 +188,8 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
         readonly actor: ActorContext;
         readonly gatewayPublicId: string;
         readonly mode: "conversation" | "form";
+        /** Reopen their own draft only; refuse rather than create one. */
+        readonly reopenOnly?: boolean | undefined;
       }) => Promise<unknown>)
     | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
@@ -665,6 +667,7 @@ export function registerGateQRoutes(
             actor: getActorContext(request),
             gatewayPublicId: input.gatewayPublicId,
             mode: input.mode ?? "conversation",
+            reopenOnly: input.reopenOnly === true,
           });
           void reply.code(201).header("Cache-Control", "no-store");
           return StartApplicationResponseSchema.parse(started);

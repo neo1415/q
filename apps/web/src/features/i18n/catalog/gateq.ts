@@ -886,6 +886,9 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "This submission records {n} interview turns. The transcript is unavailable in this response.":
     "يسجّل هذا التقديم {n} أدوار للمقابلة. النص غير متاح في هذه الاستجابة.",
   "No documents": "لا توجد مستندات",
+  "No documents ticked yet": "لم تحدد أي مستندات بعد",
+  "Choose documents to share": "اختر المستندات للمشاركة",
+  "Stage: {list} (answers disagree)": "المرحلة: {list} (الإجابات متعارضة)",
   "No documents submitted": "لم تُقدَّم مستندات",
   "No documents with the dossier.": "لا توجد مستندات مع الملف.",
   "No documents were attached to this submission.":

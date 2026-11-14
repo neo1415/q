@@ -55,6 +55,8 @@ export function ReviewStep({
   onSubmit,
   onContact,
   onInterview,
+  documentsAvailable = 0,
+  onDocuments,
   preview,
 }: {
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
@@ -69,6 +71,14 @@ export function ReviewStep({
   readonly onSubmit: () => void;
   readonly onContact: () => void;
   readonly onInterview: () => void;
+  /**
+   * How many of their own documents a signed-in founder could tick. A
+   * resumed application in another browser holds no ticks (they are kept
+   * only until Send), so Review says so and offers the choice back,
+   * rather than sending nothing silently (live 06910b145: 0 of 2 sent).
+   */
+  readonly documentsAvailable?: number;
+  readonly onDocuments?: (() => void) | undefined;
   readonly preview?: ApplicationCoverageDto | undefined;
 }) {
   const t = useT();
@@ -350,7 +360,25 @@ export function ReviewStep({
                   ? t(
                       `${coverage.documentCount} document${coverage.documentCount === 1 ? "" : "s"} you shared`,
                     )
-                  : t("No documents")}
+                  : documentsAvailable > 0
+                    ? t("No documents ticked yet")
+                    : t("No documents")}
+              {sharedDocuments.length === 0 &&
+              coverage.documentCount === 0 &&
+              documentsAvailable > 0 &&
+              !submissionStarted &&
+              onDocuments !== undefined ? (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="underline underline-offset-4"
+                    onClick={onDocuments}
+                  >
+                    {t("Choose documents to share")}
+                  </button>
+                </>
+              ) : null}
             </span>
           </li>
           <li className="cq-body-sm flex items-start gap-2">
