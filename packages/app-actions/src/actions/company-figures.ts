@@ -12,6 +12,7 @@ import {
   statedFigureClashes,
   statedFigureAmountWords,
   statedFigureDateWords,
+  statedFigurePeriod,
   StatedFigureSchema,
   statedFigureWords,
   type StatedFigure,
@@ -108,30 +109,8 @@ const RecordTool = z
   .strict();
 type RecordToolInput = z.infer<typeof RecordTool>;
 
-/** A month's figure is dated its last day (the demo figures' convention). */
-function asOfOf(period: string | null): {
-  readonly asOf: string | null;
-  readonly starts: string | null;
-} {
-  if (period === null) return { asOf: null, starts: null };
-  const match = PERIOD.exec(period);
-  if (match === null) return { asOf: null, starts: null };
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  if (match[3] !== undefined) {
-    const day = Number(match[3]);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    // 31 February is no date at all.
-    if (date.getUTCMonth() !== month - 1) return { asOf: null, starts: null };
-    return { asOf: period, starts: period };
-  }
-  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const mm = String(month).padStart(2, "0");
-  return {
-    asOf: `${String(year)}-${mm}-${String(last).padStart(2, "0")}`,
-    starts: `${String(year)}-${mm}-01`,
-  };
-}
+/** A month's figure is dated its last day (one rule for every figure path). */
+const asOfOf = statedFigurePeriod;
 
 function valueOf(
   tool: RecordToolInput,

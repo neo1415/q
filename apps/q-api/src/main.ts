@@ -319,6 +319,7 @@ import { createDocumentReadyFollowUp } from "./composition/document-ready-follow
 import {
   createDocumentClaimCards,
   documentClaimCardProposer,
+  documentClaimReadings,
   documentClaimTarget,
 } from "./composition/document-claim-cards.js";
 import { createModelClaimProposer } from "@capital-q/model-gateway/extraction";
@@ -7781,6 +7782,7 @@ const documentClaimCards = createDocumentClaimCards({
       DocumentVersionIdSchema.parse(target.documentVersionId),
     ),
   evidence: researchComposition.evidence,
+  readings: documentClaimReadings(database.sql),
   proposer: createModelClaimProposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -7812,6 +7814,14 @@ void createWorkWakeListener({
   listen: (channel, onNotify, onListen) =>
     database.listen(channel, onNotify, onListen),
   channel: Q_DOCUMENT_READY_WAKE_CHANNEL,
+  // A8 D3: a deck whose reading for figures did not finish (or was marked
+  // before the job kept its own record) is read again, bounded, when this
+  // listener (re)connects -- after a deploy, and after any missed wake.
+  catchUp: () => {
+    void documentClaimCards.retryPending().catch((error: unknown) => {
+      logger.warn({ err: error }, "document figures catch-up failed");
+    });
+  },
   targets: [
     {
       name: "document-ready",

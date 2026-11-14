@@ -223,6 +223,38 @@ export function statedFigureAmountWords(value: StatedFigureValue): string {
   return String(value.value).replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
 }
 
+const STATED_PERIOD = /^(\d{4})-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/u;
+
+/**
+ * A stated period as the figure's date. A month (YYYY-MM) is dated its last
+ * day, the convention every figure path uses ("in October" said in
+ * conversation, "Oct 2026" read from a deck); a day (YYYY-MM-DD) is itself.
+ * Nothing else is a date: anything unreadable, or a day no calendar has
+ * (31 February), is null, never a guess. `starts` is the period's first day.
+ */
+export function statedFigurePeriod(period: string | null): {
+  readonly asOf: string | null;
+  readonly starts: string | null;
+} {
+  if (period === null) return { asOf: null, starts: null };
+  const match = STATED_PERIOD.exec(period);
+  if (match === null) return { asOf: null, starts: null };
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (match[3] !== undefined) {
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCMonth() !== month - 1) return { asOf: null, starts: null };
+    return { asOf: period, starts: period };
+  }
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const mm = String(month).padStart(2, "0");
+  return {
+    asOf: `${String(year)}-${mm}-${String(last).padStart(2, "0")}`,
+    starts: `${String(year)}-${mm}-01`,
+  };
+}
+
 /** "for October 2026" (a month's last day), "on 3 October 2026", or "undated". */
 export function statedFigureDateWords(asOf: string | null): string {
   if (asOf === null) return "undated";
