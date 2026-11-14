@@ -688,6 +688,77 @@ describe("scenario 3 end to end: the uncertainty is resolved through one code-ow
     expect(turn.ran.filter((a) => "resolves" in a.arguments)).toEqual([]);
   });
 
+  it("D11 (run a2094aa5): the answer read Kazikit's relationship and said the stage; code does not say it again", async () => {
+    const STAGE =
+      "Diligence has not begun because Kazikit has not yet accepted your interest.";
+    const turn = conversation({
+      readings: [QUESTION_ABOUT("Kazikit")],
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "k",
+              name: "get_company",
+              arguments: { companyId: KAZIKIT },
+            },
+            {
+              callId: "r",
+              name: "get_relationship",
+              arguments: { companyId: KAZIKIT },
+            },
+          ],
+        },
+        analystAnswer(
+          `Kazikit's revenue is not solidly evidenced. ${STAGE}`,
+          [
+            {
+              statement: "Kazikit's revenue figure is self-reported.",
+              standing: "REPORTED",
+              material: true,
+              mattersFor: ["VALUATION"],
+              resolveBy: ["REQUEST_DOCUMENT"],
+            },
+          ],
+        ),
+      ],
+    });
+    const first = await turn.say("How solid are Kazikit's revenue figures?");
+    expect(first.text).toContain(STAGE);
+    expect(first.text).not.toContain("waiting for them to accept");
+    expect(turn.ran).toEqual([]);
+  });
+
+  it("D13 with no open item: a chat message the model prepares on a turn that asked for the diligence request does not go", async () => {
+    const turn = conversation({
+      readings: [REQUEST_THAT(false)],
+      script: [
+        readsOf(AJOPOT),
+        CHAT_CALL,
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "d",
+              name: "diligence_documents",
+              arguments: {
+                operation: "REQUEST",
+                relationship: "Ajopot",
+                title: "Definition of active users and a cohort table",
+              },
+            },
+          ],
+        },
+        analystAnswer("It's ready for your approval on the card.", []),
+      ],
+    });
+    await turn.say("Yes, please request that from Ajopot.");
+    expect(turn.executed.map((p) => p.name)).not.toContain(
+      "propose_chat_message",
+    );
+    expect(turn.executed.map((p) => p.name)).toContain("diligence_documents");
+  });
+
   it("outsider (no relationship), negative: no offer, nothing recorded, nothing prepared", async () => {
     const turn = conversation({
       readings: [QUESTION_ABOUT("Outsider Labs"), REQUEST_THAT(false)],
