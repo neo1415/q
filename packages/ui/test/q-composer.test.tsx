@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { act, type ReactElement } from "react";
 import { hydrateRoot } from "react-dom/client";
@@ -10,6 +10,13 @@ import {
   Q_COMPOSER_PLACEHOLDER,
   QComposer,
 } from "../src/patterns/q-composer.js";
+
+// The node test project shares module graphs between files (isolate: false),
+// so Testing Library's automatic cleanup is not guaranteed to register;
+// the gate on 4f3f71fed found another file's DOM in these queries.
+afterEach(() => {
+  cleanup();
+});
 
 describe("QComposer, pill (the Q home, client 2026-11-05)", () => {
   it("puts attach first and swaps the round Q for Send once there is text", async () => {

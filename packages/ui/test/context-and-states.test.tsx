@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   AccessUnavailable,
@@ -15,6 +15,13 @@ import {
 } from "../src/patterns/context-indicator.js";
 import { QStateIndicator, qStateLabel } from "../src/patterns/q-state.js";
 import { CONTEXT_SCOPES, Q_STATES } from "../src/tokens/index.js";
+
+// The node test project shares module graphs between files (isolate: false),
+// so Testing Library's automatic cleanup is not guaranteed to register;
+// the gate on 4f3f71fed found another file's DOM in these queries.
+afterEach(() => {
+  cleanup();
+});
 
 describe("ContextIndicator", () => {
   it("renders a distinct human label for every canonical scope and for unset", () => {

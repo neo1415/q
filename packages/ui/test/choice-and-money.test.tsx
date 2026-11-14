@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ChoiceList, MultiChoiceList } from "../src/components/choice-list.js";
 import {
@@ -11,6 +11,13 @@ import {
   sanitiseAmount,
   type MoneyValue,
 } from "../src/components/money-input.js";
+
+// The node test project shares module graphs between files (isolate: false),
+// so Testing Library's automatic cleanup is not guaranteed to register;
+// the gate on 4f3f71fed found another file's DOM in these queries.
+afterEach(() => {
+  cleanup();
+});
 
 const OPTIONS = [
   { value: "a", label: "Option A" },
