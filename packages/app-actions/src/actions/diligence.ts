@@ -424,9 +424,49 @@ const DiligenceTool = z
   })
   .strict();
 
-/** Said when a document request cannot be asked yet (prepare time). */
+/**
+ * Said when a document request cannot be asked yet (prepare time), by the
+ * relationship's actual stage (D8, live 14 Nov 2026, run dea2efd9: at
+ * INTEREST_EXPRESSED the line offered "your connected chat" before the
+ * pair was connected). Each names only what that stage allows.
+ */
 export const DILIGENCE_REQUEST_NOT_OPEN =
   "Diligence hasn't started with them, so a document request can't go yet. Questions can go in your connected chat, or you can ask for a document once diligence starts.";
+export const DILIGENCE_REQUEST_NOT_CONNECTED =
+  "Diligence hasn't started with them, so a document request can't go yet. Your interest is waiting for them to accept; once they do, you can message them, and you can ask for documents once diligence starts.";
+export const DILIGENCE_REQUEST_NO_INTEREST =
+  "Diligence hasn't started with them, so a document request can't go yet. The next step is to express interest; once they accept, you can message them, and you can ask for documents once diligence starts.";
+export const DILIGENCE_REQUEST_DECLINED =
+  "They declined to connect, so a document request can't go to them through Capital Q.";
+export const DILIGENCE_REQUEST_PASSED =
+  "You passed on them, so a document request can't go unless the relationship is resumed.";
+export const DILIGENCE_REQUEST_PAUSED =
+  "Your relationship with them is paused, so a document request can't go until you resume it.";
+export const DILIGENCE_REQUEST_NOT_STARTED =
+  "Diligence hasn't started with them, so a document request can't go yet; you can ask for documents once it starts.";
+
+/** The not-open line for the relationship's stage (absent: not read). */
+export function diligenceNotOpenLine(stage: string | undefined): string {
+  switch (stage) {
+    case "CONNECTED":
+    case "MEETING_HELD":
+      return DILIGENCE_REQUEST_NOT_OPEN;
+    case "INTEREST_EXPRESSED":
+      return DILIGENCE_REQUEST_NOT_CONNECTED;
+    case "DISCOVERED":
+      return DILIGENCE_REQUEST_NO_INTEREST;
+    case "DECLINED":
+      return DILIGENCE_REQUEST_DECLINED;
+    case "PASSED":
+      return DILIGENCE_REQUEST_PASSED;
+    case "PAUSED":
+      return DILIGENCE_REQUEST_PAUSED;
+    case undefined:
+    default:
+      // Unknown or not read: nothing about what else can go is claimed.
+      return DILIGENCE_REQUEST_NOT_STARTED;
+  }
+}
 export const DILIGENCE_REQUEST_INVESTOR_ONLY =
   "Only the investor's side asks for diligence documents.";
 export const DILIGENCE_REQUEST_NO_RELATIONSHIP =
@@ -450,7 +490,7 @@ async function requestRefusal(
     return refusal(DILIGENCE_REQUEST_NO_RELATIONSHIP);
   }
   if (view.side !== "INVESTOR") return refusal(DILIGENCE_REQUEST_INVESTOR_ONLY);
-  if (!view.open) return refusal(DILIGENCE_REQUEST_NOT_OPEN);
+  if (!view.open) return refusal(diligenceNotOpenLine(view.stage));
   return null;
 }
 

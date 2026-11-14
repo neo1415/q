@@ -103,6 +103,12 @@ export type DiligenceView = {
   readonly side: "INVESTOR" | "COMPANY";
   /** Diligence has started and the investor has not passed. */
   readonly open: boolean;
+  /**
+   * The relationship's projected state, for the party's own wording of
+   * what it allows (D8, 14 Nov 2026). Internal: not part of the HTTP DTO.
+   * Absent: not read.
+   */
+  readonly stage?: string | undefined;
   readonly shares: readonly {
     readonly policyId: string;
     readonly documentId: string;
@@ -276,6 +282,7 @@ export function createDiligenceService(dependencies: {
         projection.milestones.some(
           (milestone) => milestone.state === "IN_DILIGENCE",
         ),
+      stage: projection.state,
     };
   }
   type Party = NonNullable<Awaited<ReturnType<typeof partyOf>>>;
@@ -443,6 +450,7 @@ export function createDiligenceService(dependencies: {
         relationshipId: party.relationshipId,
         side: party.side,
         open: party.open,
+        stage: party.stage,
         shares: policies.flatMap((policy) => {
           const document = titles.get(policy.resource.id);
           return document === undefined

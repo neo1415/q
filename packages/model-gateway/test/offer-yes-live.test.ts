@@ -4,8 +4,11 @@ import {
   answerSaysPublicCheck,
   checkedLine,
   chooseVehicle,
+  codeUncertaintyOffer,
   decideUncertaintyOffer,
+  materialUncertaintyFor,
   offerBoundRefusal,
+  OFFER_UNRECORDED_NOTE,
   offerTakenNote,
   uncertaintiesOf,
   withResolves,
@@ -177,5 +180,194 @@ describe("D3: the public-search absence is said once", () => {
     expect(answerSaysPublicCheck("Public reports put MRR at USD 42,000.")).toBe(
       false,
     );
+  });
+});
+
+/**
+ * Live re-check 14 Nov 2026 (production d2ce8c91e), conversation 46bcc0db,
+ * Ajopot x Savanna Seed (IN_DILIGENCE). Run 8039bfd5 named a material
+ * uncertainty and its resolveBy, offered nothing, and told the investor to
+ * "ask Ajopot"; "Yes, please prepare that request to Ajopot" (c5fbdd3f)
+ * then became a clarification, and "Yes." (b6e565fb) bound to nothing.
+ */
+describe("D5: a material uncertainty with an open route is offered, bound", () => {
+  const COHORT =
+    "Whether 18,700 of 52,000 registered users are active depends on a definition and period Ajopot has not given; a reconciled six-month cohort table would settle it.";
+  const live = uncertaintiesOf({
+    uncertainties: [
+      {
+        statement: COHORT,
+        standing: "REPORTED",
+        material: true,
+        mattersFor: ["THESIS", "VALUATION"],
+        resolveBy: ["REQUEST_DOCUMENT", "ASK_FOUNDER"],
+      },
+      {
+        statement: "Their office address is not on record.",
+        standing: "REPORTED",
+        material: false,
+        mattersFor: [],
+        resolveBy: ["ASK_FOUNDER"],
+      },
+    ],
+  });
+  const vehicle = chooseVehicle({
+    standing: IN_DILIGENCE,
+    onRequestTitle: false,
+    holds: (tool) => tool === "diligence_documents",
+    company: "Ajopot",
+  });
+
+  it("no offer of the answer's own: code offers the diligence request, carrying `about`", () => {
+    const offer = codeUncertaintyOffer({
+      uncertainties: live,
+      vehicle,
+      company: "Ajopot",
+    });
+    expect(offer).toMatchObject({
+      action: "diligence_documents",
+      about: { statement: COHORT, standing: "REPORTED" },
+    });
+    expect(offer?.said).toContain("Ajopot");
+    expect(offer?.said).toContain("for your approval");
+    // A yes then prepares exactly that, with `about` from the record.
+    if (offer !== null) {
+      expect(offerTakenNote(offer)).toContain("with diligence_documents");
+      expect(
+        withResolves(
+          {
+            name: "diligence_documents",
+            arguments: { operation: "REQUEST", relationship: "Ajopot" },
+          },
+          offer.about,
+        ),
+      ).toMatchObject({ resolves: offer.about });
+    }
+  });
+
+  it("never offered when the run cannot take the route, nothing material goes through the founder, or it is verified", () => {
+    const noTool = chooseVehicle({
+      standing: IN_DILIGENCE,
+      onRequestTitle: false,
+      holds: () => false,
+      company: "Ajopot",
+    });
+    expect(
+      codeUncertaintyOffer({
+        uncertainties: live,
+        vehicle: noTool,
+        company: "Ajopot",
+      }),
+    ).toBeNull();
+    expect(
+      codeUncertaintyOffer({
+        uncertainties: live.filter((one) => !one.material),
+        vehicle,
+        company: "Ajopot",
+      }),
+    ).toBeNull();
+    expect(
+      codeUncertaintyOffer({
+        uncertainties: uncertaintiesOf({
+          uncertainties: [
+            {
+              statement: COHORT,
+              standing: "INDEPENDENTLY_VERIFIED",
+              material: true,
+              mattersFor: ["THESIS"],
+              resolveBy: ["REQUEST_DOCUMENT"],
+            },
+          ],
+        }),
+        vehicle,
+        company: "Ajopot",
+      }),
+    ).toBeNull();
+    // Before the pair is connected there is no route: no offer at all.
+    expect(
+      codeUncertaintyOffer({
+        uncertainties: live,
+        vehicle: chooseVehicle({
+          standing: {
+            yourSide: "INVESTOR",
+            state: "INTEREST_EXPRESSED",
+            milestones: [{ state: "INTEREST_EXPRESSED" }],
+          },
+          onRequestTitle: false,
+          holds: () => true,
+          company: "Kazikit",
+        }),
+        company: "Kazikit",
+      }),
+    ).toBeNull();
+  });
+
+  it("an offer whose `about` restates the item in other words still finds it (not dropped as not material)", () => {
+    expect(
+      materialUncertaintyFor(
+        live,
+        "a reconciled six-month cohort table would settle it",
+      )?.statement,
+    ).toBe(COHORT);
+    expect(
+      decideUncertaintyOffer({
+        action: "diligence_documents",
+        about: "Active users: definition and period not given",
+        uncertainties: live,
+        vehicle,
+        company: "Ajopot",
+      }).kind,
+    ).toBe("KEEP");
+  });
+});
+
+describe("D6: Q's own offer to draft the request is kept, so the yes binds", () => {
+  it("a vehicle offer on a turn whose answer names no uncertainty stands when the route is open", () => {
+    expect(
+      decideUncertaintyOffer({
+        action: "diligence_documents",
+        about: null,
+        uncertainties: [],
+        vehicle: { kind: "VEHICLE", tool: "diligence_documents" },
+        company: "Ajopot",
+      }),
+    ).toEqual({ kind: "PASS" });
+    // The company unknown to code: kept; its tool's prepare-time check
+    // still refuses before any card.
+    expect(
+      decideUncertaintyOffer({
+        action: "diligence_documents",
+        about: null,
+        uncertainties: [],
+        vehicle: null,
+        company: null,
+      }).kind,
+    ).toBe("PASS");
+  });
+
+  it("an ineligible route is never offered: re-bound to the one the stage allows, or not said", () => {
+    expect(
+      decideUncertaintyOffer({
+        action: "diligence_documents",
+        about: null,
+        uncertainties: [],
+        vehicle: { kind: "VEHICLE", tool: "send_questions_to_founder" },
+        company: "Maji Loop",
+      }),
+    ).toMatchObject({ kind: "REBIND", tool: "send_questions_to_founder" });
+    expect(
+      decideUncertaintyOffer({
+        action: "diligence_documents",
+        about: null,
+        uncertainties: [],
+        vehicle: { kind: "NONE", line: "Express interest first." },
+        company: "Kazikit",
+      }),
+    ).toEqual({ kind: "NO_ROUTE", line: "Express interest first." });
+  });
+
+  it("the unrecorded-yes note asks its clarifying question as a recorded offer", () => {
+    expect(OFFER_UNRECORDED_NOTE).toContain("record it in offer");
+    expect(OFFER_UNRECORDED_NOTE).toContain("do not draft, send, book");
   });
 });

@@ -81,7 +81,7 @@ export function offerTakenNote(offer: QRecordedOffer): string {
  * so plainly instead of guessing what was offered.
  */
 export const OFFER_UNRECORDED_NOTE =
-  "THEIR YES ANSWERS AN OFFER CAPITAL Q HAS NO RECORD OF: do not draft, send, book, change or prepare anything on it this turn, and do not guess what it was. If it only asked for information, answer it from what you can read; otherwise say in one sentence that you did not keep exactly what you offered, and ask what they would like you to do.";
+  "THEIR YES ANSWERS AN OFFER CAPITAL Q HAS NO RECORD OF: do not draft, send, book, change or prepare anything on it this turn, and do not guess what it was. If it only asked for information, answer it from what you can read; otherwise say in one sentence that you did not keep exactly what you offered, and ask what they would like you to do. When the conversation shows what they want done and one of your tools does it, ask it as your one offer and record it in offer with that tool's exact name, so their next yes prepares exactly that for their approval.";
 
 /**
  * Said to the model when, on a yes to a recorded offer, it reaches for an

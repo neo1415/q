@@ -7,7 +7,10 @@ import {
   APP_ACTIONS,
   DILIGENCE_REQUEST_INVESTOR_ONLY,
   DILIGENCE_REQUEST_NO_RELATIONSHIP,
+  DILIGENCE_REQUEST_NOT_CONNECTED,
   DILIGENCE_REQUEST_NOT_OPEN,
+  DILIGENCE_REQUEST_NOT_STARTED,
+  diligenceNotOpenLine,
   type AppActionPorts,
 } from "../src/index.js";
 
@@ -54,6 +57,7 @@ const questionsTool = (() => {
 type View = {
   readonly side: "INVESTOR" | "COMPANY";
   readonly open: boolean;
+  readonly stage?: string;
 } | null;
 
 function portsWith(view: View): {
@@ -72,6 +76,7 @@ function portsWith(view: View): {
                 relationshipId: RELATIONSHIP,
                 side: view.side,
                 open: view.open,
+                ...(view.stage === undefined ? {} : { stage: view.stage }),
                 shares: [],
                 requests: [],
               },
@@ -113,10 +118,39 @@ describe("diligence_documents REQUEST at prepare time (slice 4)", () => {
   });
 
   it("before diligence: refused before any card, saying what can go instead", async () => {
-    const { ports } = portsWith({ side: "INVESTOR", open: false });
+    const { ports } = portsWith({
+      side: "INVESTOR",
+      open: false,
+      stage: "CONNECTED",
+    });
     expect(await tool.toCanonical(said, context, ports)).toEqual({
       refused: DILIGENCE_REQUEST_NOT_OPEN,
     });
+  });
+
+  it("D8 (live dea2efd9, Kazikit at INTEREST_EXPRESSED): no connected chat is offered before the pair is connected", async () => {
+    const { ports } = portsWith({
+      side: "INVESTOR",
+      open: false,
+      stage: "INTEREST_EXPRESSED",
+    });
+    const refused = await tool.toCanonical(said, context, ports);
+    expect(refused).toEqual({ refused: DILIGENCE_REQUEST_NOT_CONNECTED });
+    expect(DILIGENCE_REQUEST_NOT_CONNECTED).not.toMatch(/connected chat/iu);
+    expect(DILIGENCE_REQUEST_NOT_CONNECTED).toMatch(
+      /waiting for them to accept/u,
+    );
+    // Each stage names only what it allows; an unread stage claims nothing.
+    for (const stage of ["DISCOVERED", "DECLINED", "PASSED", "PAUSED"]) {
+      expect(diligenceNotOpenLine(stage), stage).not.toMatch(
+        /connected chat/iu,
+      );
+    }
+    expect(diligenceNotOpenLine("MEETING_HELD")).toBe(
+      DILIGENCE_REQUEST_NOT_OPEN,
+    );
+    expect(diligenceNotOpenLine(undefined)).toBe(DILIGENCE_REQUEST_NOT_STARTED);
+    expect(DILIGENCE_REQUEST_NOT_STARTED).not.toMatch(/chat|message/iu);
   });
 
   it("the company's side never asks itself for documents", async () => {

@@ -52,6 +52,7 @@ import type {
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
+  asksForAnAnswer,
   asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
@@ -297,6 +298,7 @@ function seam(options: {
   const closings: (string | undefined)[] = [];
   const unrecordedOffers: boolean[] = [];
   const offersTaken: QAnswerRequest["offerTaken"][] = [];
+  const turnKinds: (string | undefined)[] = [];
   let warmed = 0;
   let investigated = 0;
   const probes: unknown[] = [];
@@ -330,6 +332,7 @@ function seam(options: {
         closings.push(req.closingLines);
         unrecordedOffers.push(req.offerTakenUnrecorded === true);
         offersTaken.push(req.offerTaken);
+        turnKinds.push(req.turnKind);
         focuses.push(req.toolFocus);
         namedOthers.push(req.aboutNamedOther);
         compares.push(req.compare);
@@ -500,6 +503,7 @@ function seam(options: {
     closings,
     unrecordedOffers,
     offersTaken,
+    turnKinds,
     investigated: () => investigated,
     unread,
     capabilities,
@@ -8929,5 +8933,158 @@ describe("live 14 Nov: the yes runs the bound offer; a failed turn keeps it", ()
     const turn = request();
     await answer.answer(turn);
     expect(answer.failureNotice?.(turn.runId)).toMatch(/reasoning service/iu);
+  });
+});
+
+/**
+ * Live re-check 14 Nov 2026 (production d2ce8c91e; audit
+ * docs/ai-handoff/audits/2026-11-14-investor-uncertainty-live.md),
+ * investor.savanna-seed. Fixtures only: no model, no network.
+ */
+describe("investor uncertainty live re-check: D6 and D7", () => {
+  const NOT_CONNECTED =
+    "Diligence hasn't started with them, so a document request can't go yet. Your interest is waiting for them to accept; once they do, you can message them, and you can ask for documents once diligence starts.";
+  const diligenceAsk = (extra: Record<string, unknown>) =>
+    ({
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      askedAction: "diligence_documents",
+      ...extra,
+    }) as unknown as TurnReaderResult;
+
+  it("D6 (run c5fbdd3f): 'Yes, please prepare that request to Ajopot' with no offer recorded is a request in its own right, not a guessed yes", async () => {
+    const run = seam({
+      said: "Yes, please prepare that request to Ajopot.",
+      earlier: [
+        {
+          role: "Q",
+          content:
+            "The 18,700 active users is company-reported; a reconciled cohort table would settle it. You could ask Ajopot for it.",
+        },
+      ],
+      reading: diligenceAsk({ acceptsOffer: true, appAction: null }),
+      outcomes: [],
+      offeredTools: ["diligence_documents"],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.unrecordedOffers).toEqual([false]);
+    expect(run.askedActions).toEqual(["diligence_documents"]);
+  });
+
+  it("D6: a bare yes to an offer code holds no record of still acts on nothing; an action this run cannot take never unlocks it", async () => {
+    const bare = seam({
+      said: "Yes.",
+      reading: {
+        kind: "ANSWER",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        acceptsOffer: true,
+        tool: null,
+        handOver: null,
+        askedAction: "diligence_documents",
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+      offeredTools: ["diligence_documents"],
+    });
+    await bare.answer.answer(request());
+    expect(bare.unrecordedOffers).toEqual([true]);
+    const ineligible = seam({
+      said: "Yes, please prepare that request to Ajopot.",
+      reading: diligenceAsk({ acceptsOffer: true, appAction: null }),
+      outcomes: [],
+      offeredTools: [],
+    });
+    await ineligible.answer.answer(request());
+    expect(ineligible.unrecordedOffers).toEqual([true]);
+  });
+
+  it("D7 (run dea2efd9, Kazikit at INTEREST_EXPRESSED): the answer comes first and the stage limit closes it", async () => {
+    const ran: TurnAppAction[] = [];
+    const run = seam({
+      said: "How solid are Kazikit's revenue figures? Please prepare a request for their bank statements.",
+      reading: diligenceAsk({
+        answerKind: "ANALYSIS",
+        parts: [
+          { ask: "How solid are Kazikit's revenue figures?", kind: "ANALYSIS" },
+          { ask: "Prepare a request for their bank statements.", kind: "CHAT" },
+        ],
+        appAction: {
+          tool: "diligence_documents",
+          arguments: {
+            relationship: "Kazikit",
+            operation: "REQUEST",
+            title: "Bank statements",
+          },
+        },
+      }),
+      outcomes: [],
+      offeredTools: ["diligence_documents"],
+      appActions: {
+        tools: new Set(["diligence_documents"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve(NOT_CONNECTED);
+        },
+      },
+    });
+    await run.answer.answer(request());
+    // Refused once, at prepare time; never retried with re-read arguments.
+    expect(ran).toHaveLength(1);
+    // The question is answered in full, as a question ...
+    expect(run.delegated()).toBe(1);
+    expect(run.turnKinds).toEqual(["QUESTION_TO_Q"]);
+    expect(run.askedActions).toEqual([undefined]);
+    // ... and the refused action is not offered again: its words close it.
+    expect(run.closings).toEqual([NOT_CONNECTED]);
+    expect(
+      (run.focuses[0] as { tools?: readonly string[] } | undefined)?.tools ??
+        [],
+    ).not.toContain("diligence_documents");
+    expect(run.stored.map((m) => m.content)).not.toContain(NOT_CONNECTED);
+  });
+
+  it("D7: a request that asks for no answer of its own still gets the action's words as the reply (unchanged)", async () => {
+    const run = seam({
+      said: "Ask Kazikit for their bank statements.",
+      reading: diligenceAsk({
+        appAction: {
+          tool: "diligence_documents",
+          arguments: {
+            relationship: "Kazikit",
+            operation: "REQUEST",
+            title: "Bank statements",
+          },
+        },
+      }),
+      outcomes: [],
+      offeredTools: ["diligence_documents"],
+      appActions: {
+        tools: new Set(["diligence_documents"]),
+        run: () => Promise.resolve(NOT_CONNECTED),
+      },
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    expect(run.stored.map((m) => m.content)).toEqual([NOT_CONNECTED]);
+  });
+
+  it("asksForAnAnswer reads the reading's structure only", () => {
+    expect(asksForAnAnswer(null)).toBe(false);
+    expect(asksForAnAnswer({ answerKind: "CHAT", parts: [] })).toBe(false);
+    expect(asksForAnAnswer({ answerKind: "ANALYSIS" })).toBe(true);
+    expect(
+      asksForAnAnswer({
+        answerKind: null,
+        parts: [{ kind: "CHAT" }, { kind: "LOOKUP" }],
+      }),
+    ).toBe(true);
   });
 });
