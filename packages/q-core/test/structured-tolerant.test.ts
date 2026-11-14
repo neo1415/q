@@ -5,7 +5,10 @@ import {
   AnalysisCritiqueResultV3Schema,
   AnalysisDocumentResultSchema,
   AnalysisDocumentResultV3Schema,
+  AnalysisCritiqueResultV4Schema,
+  AnalysisDocumentResultV4Schema,
   createDefaultPromptRegistry,
+  independentLines,
   JobPlanResultV9Schema,
   JobPlanResultV10Schema,
   normalisePlanV10,
@@ -20,6 +23,54 @@ import {
  * of slip below were refused whole before; now they cost nothing or only
  * their own part, and code still clips what it stores.
  */
+describe("an extra or malformed list item never empties the list (decision 97)", () => {
+  const draft = (gaps: unknown) => ({
+    title: "Memo",
+    summary: "Summary.",
+    sections: [
+      { heading: "A", body: "a" },
+      { heading: "B", body: "b" },
+      { heading: "C", body: "c" },
+    ],
+    topRecommendations: ["Do it."],
+    gaps,
+  });
+  const gaps31 = Array.from({ length: 31 }, (_, i) => `Gap ${String(i + 1)}`);
+
+  it("v3 emptied all 31 gaps for the 31st (the defect)", () => {
+    expect(AnalysisDocumentResultV3Schema.parse(draft(gaps31)).gaps).toEqual(
+      [],
+    );
+  });
+
+  it("v4 keeps all 31 gaps, and one malformed gap costs only itself, counted", () => {
+    expect(
+      AnalysisDocumentResultV4Schema.parse(draft(gaps31)).gaps,
+    ).toHaveLength(31);
+    const mixed = AnalysisDocumentResultV4Schema.parse(
+      draft([...gaps31, 42, { x: 1 }]),
+    ).gaps;
+    const { kept, dropped } = independentLines(mixed);
+    expect(kept).toHaveLength(31);
+    expect(dropped).toBe(2);
+  });
+
+  it("v4 critique keeps nine strengths (v3 emptied them for the ninth)", () => {
+    const critique = {
+      passes: true,
+      score: 80,
+      issues: [],
+      strengths: Array.from({ length: 9 }, (_, i) => `S${String(i)}`),
+    };
+    expect(AnalysisCritiqueResultV3Schema.parse(critique).strengths).toEqual(
+      [],
+    );
+    expect(
+      AnalysisCritiqueResultV4Schema.parse(critique).strengths,
+    ).toHaveLength(9);
+  });
+});
+
 describe("tolerant deep-work results", () => {
   it("are the active versions", () => {
     const registry = createDefaultPromptRegistry();

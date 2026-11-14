@@ -802,13 +802,26 @@ export type ModelGatewayResultMetadata = z.infer<
   typeof ModelGatewayResultMetadataSchema
 >;
 
+/**
+ * Decision 97: an answer the provider stopped at its output-token ceiling
+ * is marked, never passed on as if whole. TEXT is the words written before
+ * the stop; STRUCTURED is the finished part of the object (the gateway's
+ * cut-off salvage), so a caller can report it or continue it.
+ */
+export type ModelOutputIncomplete = "MAX_OUTPUT_TOKENS";
+
 export type ModelGatewayOutput<T> =
-  | { readonly kind: "TEXT"; readonly text: string }
+  | {
+      readonly kind: "TEXT";
+      readonly text: string;
+      readonly incomplete?: ModelOutputIncomplete | undefined;
+    }
   | {
       readonly kind: "STRUCTURED";
       readonly value: T;
       /** Paths dropped on acceptance (DROP lists, lenient fields); never values. */
       readonly dropped?: readonly string[] | undefined;
+      readonly incomplete?: ModelOutputIncomplete | undefined;
     }
   | {
       /** The model proposed tool calls, each naming a tool the request offered. */

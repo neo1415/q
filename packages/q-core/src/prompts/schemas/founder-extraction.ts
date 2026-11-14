@@ -292,3 +292,27 @@ export type FounderExtractionV2Result = z.infer<
 
 export const FOUNDER_EXTRACTION_V2_SCHEMA_NAME = "FounderExtractionResult";
 export const FOUNDER_EXTRACTION_V2_SCHEMA_VERSION = 2;
+
+/**
+ * v3 (decision 97, 2026-11-14): no count ceiling on conflicts, ambiguous
+ * readings or opinions. v2 bounded conflicts at 8, and the gateway's DROP
+ * kept the first eight: a ninth disagreement in a deck was never shown to
+ * the founder. Contradictions coexist until reconciled; none is dropped.
+ * Candidates stay bounded by the fact keys and questions by product rule.
+ */
+export const FOUNDER_EXTRACTION_V3_SCHEMA_VERSION = 3;
+export const FounderExtractionV3ResultSchema =
+  FounderExtractionV2ResultSchema.extend({
+    ambiguous: z
+      .array(
+        z
+          .object({ key: FounderFactKeySchema, question: ModelStatementSchema })
+          .strict(),
+      )
+      .default([]),
+    conflicts: z.array(FounderConflictCandidateSchema).default([]),
+    opinions: z.array(ModelStatementSchema).default([]),
+  }).strict();
+export type FounderExtractionV3Result = z.infer<
+  typeof FounderExtractionV3ResultSchema
+>;

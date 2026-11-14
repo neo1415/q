@@ -177,6 +177,20 @@ export type ClaimExtractionResultV2 = z.infer<
   typeof ClaimExtractionResultV2Schema
 >;
 
+/**
+ * v3 (decision 97, 2026-11-14): no count ceiling on claims. With v2's
+ * bound of 20, the gateway's DROP kept a passage's first 20 claims and
+ * lost the rest without a trace. Every claim is still checked on its own.
+ */
+export const CLAIM_EXTRACTION_V3_SCHEMA_VERSION = 3;
+export const ClaimExtractionResultV3Schema =
+  ClaimExtractionResultV2Schema.extend({
+    claims: z.array(ProposedClaimV2Schema),
+  }).strict();
+export type ClaimExtractionResultV3 = z.infer<
+  typeof ClaimExtractionResultV3Schema
+>;
+
 export const ClaimExtractionVariablesSchema = z
   .object({
     ...TaskFrameSchema,

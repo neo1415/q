@@ -357,10 +357,36 @@ type ProposeStandInInput = z.output<typeof ProposeStandInInputSchema>;
 
 // --- follow, answer, stop -----------------------------------------------------
 
-/** Jobs reported per read, and the bounds each one is clipped to. */
-const JOB_RESULTS_MAX = 3;
-const FINDINGS_MAX = 8;
-const QUESTIONS_MAX = 5;
+/**
+ * Page sizes of one read, never limits on what can be read (decision 97):
+ * every list says how many there are in all, and `nextFrom` asks for the
+ * next page of one job's findings and questions.
+ */
+export const Q_WORK_JOBS_PAGE = 3;
+export const Q_WORK_FINDINGS_PAGE = 8;
+export const Q_WORK_QUESTIONS_PAGE = 5;
+
+const WorkListInputSchema = z
+  .object({
+    jobId: z
+      .string()
+      .max(80)
+      .optional()
+      .describe(
+        "Read one job only (its jobId from an earlier read), to page through its findings and questions.",
+      ),
+    from: z
+      .number()
+      .int()
+      .min(0)
+      .max(100_000)
+      .optional()
+      .describe(
+        "With jobId: the first finding and question to return -- the previous read's nextFrom for that job.",
+      ),
+  })
+  .strict();
+type WorkListInput = z.output<typeof WorkListInputSchema>;
 
 const WorkJobResultSchema = z
   .object({
@@ -383,7 +409,9 @@ const WorkJobResultSchema = z
               })
               .strict(),
           )
-          .max(FINDINGS_MAX),
+          .max(Q_WORK_FINDINGS_PAGE),
+        /** The reviewer's findings in all, whatever this page shows. */
+        findingsTotal: z.number().int().min(0),
         fromVersion: z.number().int().nullable(),
         toVersion: z.number().int().nullable(),
         revisionNote: z.string().max(1_500).nullable(),
@@ -393,11 +421,19 @@ const WorkJobResultSchema = z
       .nullable(),
     diligence: z
       .object({
-        questions: z.array(z.string().max(600)).max(QUESTIONS_MAX),
+        questions: z.array(z.string().max(600)).max(Q_WORK_QUESTIONS_PAGE),
+        /** The diligence questions in all, whatever this page shows. */
+        questionsTotal: z.number().int().min(0),
         filedForApproval: z.boolean(),
       })
       .strict()
       .nullable(),
+    /** The first finding and question this page shows. */
+    from: z.number().int().min(0),
+    /** True when this page does not hold every finding and question. */
+    truncated: z.boolean(),
+    /** Pass as `from` with this jobId for the next page; null when none is left. */
+    nextFrom: z.number().int().min(0).nullable(),
     /** The situation plan this job produced, as it stands now. */
     plan: z
       .object({
@@ -469,8 +505,14 @@ const WorkListOutputSchema = z
           .strict(),
       )
       .max(10),
+    /** Errands in all; above errands.length, the rest were not shown. */
+    errandsTotal: z.number().int().min(0),
+    /** Instructions, outreach and stand-ins in all. */
+    itemsTotal: z.number().int().min(0),
     /** Jobs Q's team did, with the reviewer's changes and diligence questions. */
-    jobs: z.array(WorkJobResultSchema).max(JOB_RESULTS_MAX).optional(),
+    jobs: z.array(WorkJobResultSchema).max(Q_WORK_JOBS_PAGE).optional(),
+    /** Recent jobs read in all (the latest ten); `jobs` shows the first page. */
+    jobsTotal: z.number().int().min(0).optional(),
   })
   .strict();
 type WorkListOutput = z.infer<typeof WorkListOutputSchema>;
@@ -731,9 +773,38 @@ type ProposeStandingInstructionInput = z.output<
 const cut = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
-/** The persisted result, bounded; the questions' own words kept intact up to the bound. */
-function jobView(job: QWorkJobResult): z.infer<typeof WorkJobResultSchema> {
+/**
+ * One page of the persisted result: findings and questions from `from`,
+ * with how many there are in all and where the next page starts, so Q
+ * can read every one of them (decision 97: v3 kept the first eight
+ * findings and five questions with no sign that more existed).
+ */
+export function jobView(
+  job: QWorkJobResult,
+  from = 0,
+): z.infer<typeof WorkJobResultSchema> {
+  const findingsTotal = job.review?.findings.length ?? 0;
+  const questionsTotal = job.diligence?.questions.length ?? 0;
+  const more =
+    findingsTotal > from + Q_WORK_FINDINGS_PAGE ||
+    questionsTotal > from + Q_WORK_QUESTIONS_PAGE;
+  // The next page starts where the shorter page ended, so neither list
+  // skips an item: a list already read in full simply returns nothing.
+  const nextFrom = more
+    ? from +
+      Math.min(
+        findingsTotal > from + Q_WORK_FINDINGS_PAGE
+          ? Q_WORK_FINDINGS_PAGE
+          : Number.POSITIVE_INFINITY,
+        questionsTotal > from + Q_WORK_QUESTIONS_PAGE
+          ? Q_WORK_QUESTIONS_PAGE
+          : Number.POSITIVE_INFINITY,
+      )
+    : null;
   return {
+    from,
+    truncated: from > 0 || more,
+    nextFrom,
     jobId: job.jobId,
     goal: cut(job.goal, 300),
     state: cut(job.state, 40),
@@ -749,12 +820,13 @@ function jobView(job: QWorkJobResult): z.infer<typeof WorkJobResultSchema> {
                 ? null
                 : cut(job.review.documentTitle, 200),
             findings: job.review.findings
-              .slice(0, FINDINGS_MAX)
+              .slice(from, from + Q_WORK_FINDINGS_PAGE)
               .map((finding) => ({
                 kind: cut(finding.kind, 40),
                 section: cut(finding.section, 200),
                 problem: cut(finding.problem, 500),
               })),
+            findingsTotal,
             fromVersion: job.review.fromVersion,
             toVersion: job.review.toVersion,
             revisionNote:
@@ -773,8 +845,9 @@ function jobView(job: QWorkJobResult): z.infer<typeof WorkJobResultSchema> {
         ? null
         : {
             questions: job.diligence.questions
-              .slice(0, QUESTIONS_MAX)
+              .slice(from, from + Q_WORK_QUESTIONS_PAGE)
               .map((question) => cut(question, 600)),
+            questionsTotal,
             filedForApproval: job.diligence.filedForApproval,
           },
     ...(job.plan == null
@@ -1048,22 +1121,24 @@ export function createQWorkTools(
       },
     }),
 
-    defineQTool<Record<string, never>, WorkListOutput, null>({
+    defineQTool<WorkListInput, WorkListOutput, null>({
       ...OWN,
       id: LIST_Q_WORK,
       // v2: the latest jobs of Q's team, with the reviewer's changes and
       // the diligence questions as persisted (`jobs`).
       // v3 (wf): each job's plan progress and next actions (`progress`).
-      version: 3,
+      // v4 (decision 97): totals on every list, and `jobId` + `from` to
+      // page through one job's findings and questions (`nextFrom`).
+      version: 4,
       core: true,
       providerName: "list_q_work",
       description:
-        "Reads what Q is working on for them, as it really stands: each standing instruction, outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), each errand on one relationship with its last step, and the latest jobs of Q's team (jobs): what the reviewer found in the memo and changed in its revision (findings, revisionNote, sectionsChanged), the founder diligence questions, word for word, and each plan's progress (done of total, open steps, what was found, what is next). Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', 'what did the reviewer change', 'what were the diligence questions', or before answering or stopping work. Say only what this returns; a null review or diligence means it was not recorded, so say it is unknown.",
+        "Reads what Q is working on for them, as it really stands: each standing instruction, outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), each errand on one relationship with its last step, and the latest jobs of Q's team (jobs): what the reviewer found in the memo and changed in its revision (findings, revisionNote, sectionsChanged), the founder diligence questions, word for word, and each plan's progress (done of total, open steps, what was found, what is next). Each list has a total; when a job is truncated, call again with its jobId and from=nextFrom. Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', 'what did the reviewer change', 'what were the diligence questions', or before answering or stopping work. Say only what this returns; a null review or diligence is unknown.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       approval: "NONE",
       visibleStage: null,
-      input: z.object({}).strict(),
+      input: WorkListInputSchema,
       output: WorkListOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
@@ -1071,20 +1146,31 @@ export function createQWorkTools(
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),
-      execute: async (_input, context) => {
+      execute: async (input, context) => {
         const items = await port.list(context.actor);
         const errands = (await port.errands?.(context.actor)) ?? [];
         // A job read that fails leaves the rest of the report standing.
-        const jobs =
+        const found =
           port.jobResults === undefined
             ? undefined
             : await port
                 .jobResults(context.actor, { runId: context.runId })
-                .then((found) => found.slice(0, JOB_RESULTS_MAX).map(jobView))
                 .catch(() => undefined);
+        const jobs =
+          found === undefined
+            ? undefined
+            : input.jobId === undefined
+              ? found.slice(0, Q_WORK_JOBS_PAGE).map((job) => jobView(job))
+              : found
+                  .filter((job) => job.jobId === input.jobId)
+                  .map((job) => jobView(job, input.from ?? 0));
         return {
-          ...(jobs === undefined ? {} : { jobs }),
+          ...(jobs === undefined || found === undefined
+            ? {}
+            : { jobs, jobsTotal: found.length }),
           errands: errands.slice(0, 10).map((errand) => ({ ...errand })),
+          errandsTotal: errands.length,
+          itemsTotal: items.length,
           items: items.slice(0, 20).map((item) => ({
             delegationId: item.id,
             kind: item.kind,

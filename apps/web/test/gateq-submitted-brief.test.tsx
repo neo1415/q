@@ -570,6 +570,42 @@ describe("the submitted investor brief", () => {
       within(reading).getByText("From: Revenue, interview turn 2"),
     ).toBeTruthy();
   });
+  it("shows a v2 reading's first nine points, expands to all twelve, and says when it is incomplete (decision 97)", () => {
+    render(
+      <SubmittedBrief
+        dossier={dossier}
+        synthesis={{
+          schemaVersion: 2,
+          generatedAt: "2026-11-14T10:00:00.000Z",
+          truthClass: "Q_INFERENCE",
+          takeaway: "Early, founder-reported traction.",
+          points: Array.from({ length: 12 }, (_, i) => ({
+            kind: "RISK" as const,
+            importance: "MEDIUM" as const,
+            text: `Point ${String(i + 1)}`,
+            textClipped: false,
+            factIds: [id(501)],
+            turnSeqs: [],
+          })),
+          complete: false,
+          incomplete: {
+            reason: "OUTPUT_BUDGET",
+            detail: "Q read 200 of the interview's 300 turns.",
+          },
+          uncitedDropped: 0,
+          coverage: { facts: 3, turns: 300, turnsRead: 200, calls: 8 },
+        }}
+      />,
+    );
+    const reading = screen.getByRole("region", { name: "Q's reading" });
+    expect(within(reading).queryByText("Point 9")).toBeTruthy();
+    expect(within(reading).queryByText("Point 10")).toBeNull();
+    expect(within(reading).getByTestId("gq-synthesis-incomplete")).toBeTruthy();
+    fireEvent.click(
+      within(reading).getByRole("button", { name: "Show all 12 points" }),
+    );
+    expect(within(reading).queryByText("Point 12")).toBeTruthy();
+  });
   it("distinguishes a missing transcript response from a snapshot with no interview", () => {
     render(<SubmittedTranscript turns={undefined} recordedTurnCount={3} />);
     expect(

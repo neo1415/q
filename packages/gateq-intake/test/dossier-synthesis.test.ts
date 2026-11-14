@@ -1,20 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  GateqSynthesisV1Schema,
+  GateqSynthesisSchema,
+  GateqSynthesisV2Schema,
   type GateqDossierV1,
-  type GateqSynthesisV1,
+  type GateqSynthesisV2,
 } from "@capital-q/contracts";
 
 import { acceptStructuredOutput } from "@capital-q/model-gateway";
-import { GateqDossierSynthesisResultSchema } from "@capital-q/q-core";
+import {
+  GateqDossierSynthesisResultSchema,
+  GateqDossierSynthesisResultV2Schema,
+} from "@capital-q/q-core";
 
 import {
-  citedSynthesis,
+  citedPoints,
   createDossierSynthesis,
   gateqSynthesisMaxAttempts,
   gateqSynthesisRetryDelaySeconds,
   synthesisContext,
+  synthesisParts,
   type PendingSynthesis,
   type SynthesisStore,
 } from "../src/application/dossier-synthesis.js";
@@ -115,6 +120,94 @@ describe("what Q reads", () => {
     // A computed figure reaches the model as Q's inference, not a claim.
     expect(context.findings).toMatch(/360000 USD \[truth=Q_INFERENCE/u);
   });
+
+  describe("a long interview (decision 97: the latest corrections are never lost)", () => {
+    // 300 turns of ~300 characters: far over one call's transcript budget.
+    const long = Array.from({ length: 300 }, (_, i) => ({
+      seq: i + 1,
+      role: i % 2 === 0 ? ("Q" as const) : ("PERSON" as const),
+      text:
+        i === 299
+          ? "Correction: revenue is USD 120,000, not 360,000."
+          : `Turn ${String(i + 1)} ${"filler ".repeat(40)}`,
+      at: "2026-10-15T20:01:00Z",
+    }));
+
+    it("shows the latest turn, and the turns facts cite, in the first part", () => {
+      const context = synthesisContext({ dossier, transcript: long });
+      expect(context.transcript).toContain(
+        "Correction: revenue is USD 120,000",
+      );
+      // turn 6 is where both facts were heard, and turn 5 asked for it.
+      expect(context.turnSeqs.has(6)).toBe(true);
+      expect(context.turnSeqs.has(5)).toBe(true);
+      // The model is told, in code's words, what it is not shown.
+      expect(context.coverage).toMatch(/The interview has 300 turns/u);
+      expect(context.coverage).toMatch(/turns are NOT shown here/u);
+    });
+
+    it("plans every turn into some part: nothing is left unread by design", () => {
+      const plan = synthesisParts({ dossier, transcript: long });
+      expect(plan.parts.length).toBeGreaterThan(1);
+      const read = new Set(plan.parts.flatMap((part) => [...part.turnSeqs]));
+      expect(read.size).toBe(300);
+      // Every part can still cite the facts.
+      for (const part of plan.parts)
+        expect(part.factIds.has(FACT_TRACTION)).toBe(true);
+    });
+
+    it("reads the later parts and records coverage on the reading", async () => {
+      const recorded: GateqSynthesisV2[] = [];
+      let calls = 0;
+      const execute = vi.fn(() =>
+        Promise.resolve({
+          output: {
+            kind: "STRUCTURED",
+            value: {
+              takeaway: "Early.",
+              points: [
+                {
+                  kind: "RISK",
+                  text: `Point ${String((calls += 1))}`,
+                  factIds: [FACT_TRACTION],
+                  turnSeqs: [],
+                },
+              ],
+            },
+          },
+        }),
+      );
+      const job = createDossierSynthesis({
+        gateway: { execute } as never,
+        store: {
+          pending: () =>
+            Promise.resolve([
+              {
+                applicationId: "9ac8e432-4108-4492-9ea5-eb9e1faaba20",
+                tenantId: "3965fb62-6225-48f2-8daf-480a8c6cb05b",
+                investorName: "Savanna Seed Partners",
+                dossier,
+                transcript: long,
+              },
+            ]),
+          claim: () => Promise.resolve(true),
+          ready: (input) => {
+            recorded.push(input.synthesis);
+            return Promise.resolve();
+          },
+        },
+      });
+      expect(await job.sweep(1)).toEqual({ ready: 1, failed: 0 });
+      const parts = synthesisParts({ dossier, transcript: long }).parts.length;
+      expect(execute).toHaveBeenCalledTimes(parts);
+      expect(recorded[0]?.coverage).toMatchObject({
+        turns: 300,
+        turnsRead: 300,
+        calls: parts,
+      });
+      expect(recorded[0]?.complete).toBe(true);
+    });
+  });
 });
 
 describe("the mandate check names the facts it read (live check 2026-10-16)", () => {
@@ -187,12 +280,13 @@ describe("the mandate check names the facts it read (live check 2026-10-16)", ()
 
 describe("what survives", () => {
   it("keeps only points that cite a real fact or turn, all as Q's inference", () => {
-    const out = citedSynthesis(
-      {
+    const out = citedPoints(
+      GateqDossierSynthesisResultV2Schema.parse({
         takeaway: "Early, founder-reported traction in regulated AI.",
         points: [
           {
             kind: "STRENGTH",
+            importance: "HIGH",
             text: "Two paying design partners",
             factIds: [FACT_TRACTION, "not-a-fact"],
             turnSeqs: [6, 99],
@@ -204,20 +298,83 @@ describe("what survives", () => {
             turnSeqs: [42],
           },
         ],
-      },
+      }),
       synthesisContext({ dossier, transcript }),
-      "2026-10-15T20:05:00.000Z",
     );
-    expect(out.truthClass).toBe("Q_INFERENCE");
+    expect(out.uncited).toBe(1);
     expect(out.points).toEqual([
       {
         kind: "STRENGTH",
+        importance: "HIGH",
         text: "Two paying design partners",
+        textClipped: false,
         factIds: [FACT_TRACTION],
         turnSeqs: [6],
       },
     ]);
-    expect(GateqSynthesisV1Schema.safeParse(out).success).toBe(true);
+  });
+
+  it("keeps every citation a point made, not the first four", () => {
+    const facts = Array.from(
+      { length: 6 },
+      (_, i) => `6b1f0e5e-0000-4000-8000-00000000010${String(i)}`,
+    );
+    const out = citedPoints(
+      GateqDossierSynthesisResultV2Schema.parse({
+        points: [
+          {
+            kind: "RISK",
+            text: "Spread across many facts",
+            factIds: facts,
+            turnSeqs: [1, 2, 3, 4, 5, 6],
+          },
+        ],
+      }),
+      { factIds: new Set(facts), turnSeqs: new Set([1, 2, 3, 4, 5, 6]) },
+    );
+    expect(out.points[0]?.factIds).toHaveLength(6);
+    expect(out.points[0]?.turnSeqs).toHaveLength(6);
+  });
+});
+
+describe("stored readings: v1 rows stay readable beside v2", () => {
+  it("accepts a v1 reading as written and a v2 reading with more than nine points", () => {
+    expect(
+      GateqSynthesisSchema.safeParse({
+        schemaVersion: 1,
+        generatedAt: "2026-10-15T20:05:00.000Z",
+        truthClass: "Q_INFERENCE",
+        takeaway: "Old reading",
+        points: [
+          { kind: "RISK", text: "x", factIds: [FACT_REVENUE], turnSeqs: [] },
+        ],
+      }).success,
+    ).toBe(true);
+    const v2: GateqSynthesisV2 = {
+      schemaVersion: 2,
+      generatedAt: "2026-11-14T10:00:00.000Z",
+      truthClass: "Q_INFERENCE",
+      takeaway: "New reading",
+      points: Array.from({ length: 12 }, (_, i) => ({
+        kind: "RISK" as const,
+        importance: "MEDIUM" as const,
+        text: `Point ${String(i + 1)}`,
+        textClipped: false,
+        factIds: [FACT_REVENUE],
+        turnSeqs: [],
+      })),
+      complete: true,
+      incomplete: null,
+      uncitedDropped: 0,
+      coverage: { facts: 2, turns: 2, turnsRead: 2, calls: 1 },
+    };
+    const parsed = GateqSynthesisSchema.safeParse(v2);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.points).toHaveLength(12);
+    // complete and incomplete never disagree.
+    expect(
+      GateqSynthesisV2Schema.safeParse({ ...v2, complete: false }).success,
+    ).toBe(false);
   });
 });
 
@@ -230,7 +387,7 @@ describe("the job", () => {
     transcript,
   };
   const store = (claimed: boolean) => {
-    const recorded: GateqSynthesisV1[] = [];
+    const recorded: GateqSynthesisV2[] = [];
     const s: SynthesisStore = {
       pending: vi.fn(() => Promise.resolve([pending])),
       claim: vi.fn(() => Promise.resolve(claimed)),
@@ -278,6 +435,105 @@ describe("the job", () => {
       "laura.private@example.test",
     );
     expect(recorded[0]?.points[0]?.turnSeqs).toEqual([6]);
+    expect(recorded[0]?.complete).toBe(true);
+    expect(GateqSynthesisV2Schema.safeParse(recorded[0]).success).toBe(true);
+  });
+
+  it("stores all twelve points Q wrote, most important first (v1 kept nine)", async () => {
+    const { s, recorded } = store(true);
+    const g = gateway({
+      takeaway: "Founder-reported early traction.",
+      points: Array.from({ length: 12 }, (_, i) => ({
+        kind: "RISK",
+        importance: i === 11 ? "HIGH" : "LOW",
+        text: `Point ${String(i + 1)}`,
+        factIds: [FACT_TRACTION],
+        turnSeqs: [],
+      })),
+    });
+    const job = createDossierSynthesis({ gateway: g as never, store: s });
+    expect(await job.sweep(1)).toEqual({ ready: 1, failed: 0 });
+    const reading = recorded[0];
+    expect(reading?.points).toHaveLength(12);
+    expect(reading?.points[0]?.text).toBe("Point 12");
+    expect(reading?.complete).toBe(true);
+  });
+
+  it("continues an answer that ran out of room, and never repeats a point", async () => {
+    const { s, recorded } = store(true);
+    const point = (n: number) => ({
+      kind: "RISK",
+      text: `Point ${String(n)}`,
+      factIds: [FACT_TRACTION],
+      turnSeqs: [],
+    });
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({
+        finish: "MAX_OUTPUT_TOKENS",
+        output: {
+          kind: "STRUCTURED",
+          value: { takeaway: "Early.", points: [point(1), point(2)] },
+          dropped: ["(cut-off):kept_2_items"],
+        },
+      })
+      .mockResolvedValueOnce({
+        finish: "COMPLETE",
+        output: {
+          kind: "STRUCTURED",
+          value: { takeaway: "", points: [point(2), point(3)], more: false },
+        },
+      });
+    const job = createDossierSynthesis({
+      gateway: { execute } as never,
+      store: s,
+    });
+    expect(await job.sweep(1)).toEqual({ ready: 1, failed: 0 });
+    expect(execute).toHaveBeenCalledTimes(2);
+    // The continuation is told what was already written.
+    expect(JSON.stringify(execute.mock.calls[1])).toContain("Point 1");
+    expect(recorded[0]?.points.map((p) => p.text)).toEqual([
+      "Point 1",
+      "Point 2",
+      "Point 3",
+    ]);
+    expect(recorded[0]?.complete).toBe(true);
+    expect(recorded[0]?.coverage.calls).toBe(2);
+  });
+
+  it("records an incomplete reading when the call budget ends with more to write", async () => {
+    const { s, recorded } = store(true);
+    let n = 0;
+    const execute = vi.fn(() => {
+      n += 1;
+      return Promise.resolve({
+        output: {
+          kind: "STRUCTURED",
+          value: {
+            takeaway: "Early.",
+            points: [
+              {
+                kind: "RISK",
+                text: `Point ${String(n)}`,
+                factIds: [FACT_TRACTION],
+                turnSeqs: [],
+              },
+            ],
+            more: true,
+          },
+        },
+      });
+    });
+    const job = createDossierSynthesis({
+      gateway: { execute } as never,
+      store: s,
+      budgets: { findingsChars: 32_000, transcriptChars: 32_000, calls: 3 },
+    });
+    expect(await job.sweep(1)).toEqual({ ready: 1, failed: 0 });
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(recorded[0]?.points).toHaveLength(3);
+    expect(recorded[0]?.complete).toBe(false);
+    expect(recorded[0]?.incomplete?.reason).toBe("OUTPUT_BUDGET");
   });
 
   it("never calls the model for a reading another attempt holds", async () => {
@@ -340,15 +596,15 @@ describe("a reading that overflows its bounds (live D1, application 3ec9713b)", 
     expect(refused.refusals?.some((r) => r.startsWith("points"))).toBe(true);
   });
 
-  it("is kept, cut to its first nine points, with the job's options", async () => {
+  it("is kept whole by v2: all eleven points, with the job's options", async () => {
     const accepted = acceptStructuredOutput(
       answer,
-      GateqDossierSynthesisResultSchema,
+      GateqDossierSynthesisResultV2Schema,
       { invalidListItems: "DROP" },
     );
     expect(accepted.ok).toBe(true);
     if (!accepted.ok) return;
-    expect(accepted.value.points).toHaveLength(9);
+    expect(accepted.value.points).toHaveLength(11);
     expect(accepted.value.points[0]?.text).toBe("Point 1");
 
     // The job asks the gateway for exactly that.
@@ -389,7 +645,7 @@ describe("a reading that overflows its bounds (live D1, application 3ec9713b)", 
 describe("bounded retry", () => {
   it("fails, is tried again later, and then records the reading", async () => {
     let attempts = 0;
-    const recorded: GateqSynthesisV1[] = [];
+    const recorded: GateqSynthesisV2[] = [];
     const s: SynthesisStore = {
       pending: () =>
         Promise.resolve(

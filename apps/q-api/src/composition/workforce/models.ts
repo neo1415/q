@@ -20,8 +20,9 @@ import {
   DraftReviewResultV2Schema,
   JobPlanResultV10Schema,
   normalisePlanV10,
-  AnalysisCritiqueResultV3Schema,
-  AnalysisDocumentResultV3Schema,
+  AnalysisCritiqueResultV4Schema,
+  AnalysisDocumentResultV4Schema,
+  independentLines,
   ResearchFactsResultV3Schema,
   ResearchPlanResultV4Schema,
   ResearchBriefResultSchema,
@@ -36,8 +37,8 @@ import {
   type ResearchPlanVariablesV5,
   type ResearchBriefResult,
   type ResearchBriefVariables,
-  type AnalysisCritiqueResultV3,
-  type AnalysisDocumentResultV3,
+  type AnalysisCritiqueResultV4,
+  type AnalysisDocumentResultV4,
   type ResearchFactsResultV3,
   type ResearchPlanResultV4,
   SubstanceCritiqueResultSchema,
@@ -744,14 +745,14 @@ export function createWorkforceModels(dependencies: {
       };
     },
     writeAnalysis: async (who, trace, variables) => {
-      const result = await priced<AnalysisWriteInput, AnalysisDocumentResultV3>(
+      const result = await priced<AnalysisWriteInput, AnalysisDocumentResultV4>(
         {
           task: "ANALYSIS_WRITE",
           taskClass: "EVIDENCE_SYNTHESIS",
           who,
           trace,
           variables,
-          schema: AnalysisDocumentResultV3Schema,
+          schema: AnalysisDocumentResultV4Schema,
           budget: ANALYSIS_WRITE_BUDGET,
           environmentNotes:
             "You are writing a document for the person's own team. A second analyst reviews it before it is filed; nothing is sent to anyone.",
@@ -777,21 +778,25 @@ export function createWorkforceModels(dependencies: {
           topRecommendations: draft.topRecommendations
             .slice(0, 3)
             .map((one) => prose(one, 300)),
-          gaps: draft.gaps.slice(0, 12).map((gap) => prose(gap, 300)),
+          gaps: keptLines(
+            draft.gaps,
+            "gap the analyst listed",
+            "gaps the analyst listed",
+          ),
         },
       };
     },
     critiqueAnalysis: async (who, trace, variables) => {
       const result = await priced<
         AnalysisCritiqueInput,
-        AnalysisCritiqueResultV3
+        AnalysisCritiqueResultV4
       >({
         task: "ANALYSIS_CRITIQUE",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: AnalysisCritiqueResultV3Schema,
+        schema: AnalysisCritiqueResultV4Schema,
         budget: ANALYSIS_CRITIQUE_BUDGET,
         environmentNotes:
           "You are reviewing, not writing. Code decides from your verdict whether the document is revised again.",
@@ -811,9 +816,11 @@ export function createWorkforceModels(dependencies: {
             problem: prose(issue.problem, 400),
             fix: prose(issue.fix, 400),
           })),
-          strengths: verdict.strengths
-            .slice(0, 3)
-            .map((one) => prose(one, 300)),
+          strengths: keptLines(
+            verdict.strengths,
+            "strength the reviewer listed",
+            "strengths the reviewer listed",
+          ),
         },
       };
     },
@@ -900,4 +907,24 @@ export function prose(text: string, max: number): string {
   const cut = text.slice(0, max - 1);
   const space = cut.lastIndexOf(" ");
   return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/**
+ * Every usable item of an independent list (decision 97: no count cut),
+ * each within its stored bound; items the model wrote that were not
+ * usable text are named as a count in the list itself, so the filed
+ * result says something was lost instead of hiding it.
+ */
+export function keptLines(
+  lines: readonly string[],
+  one: string,
+  many: string,
+): string[] {
+  const { kept, dropped } = independentLines(lines);
+  const out = kept.map((line) => prose(line, 300));
+  if (dropped > 0)
+    out.push(
+      `Q could not read ${String(dropped)} further ${dropped === 1 ? one : many}.`,
+    );
+  return out;
 }

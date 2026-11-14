@@ -92,13 +92,17 @@ export {
 } from "./application/dossier.js";
 export { amountStatedIn, amountsIn } from "./application/stated-amount.js";
 export {
-  citedSynthesis,
+  citedPoints,
   createDossierSynthesis,
   GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT,
   GATEQ_SYNTHESIS_PROMPT_VERSION,
   gateqSynthesisMaxAttempts,
   gateqSynthesisRetryDelaySeconds,
   synthesisContext,
+  synthesisParts,
+  GATEQ_SYNTHESIS_BUDGETS,
+  type SynthesisBudgets,
+  type SynthesisPart,
   type DossierSynthesis,
   type PendingSynthesis,
   type SynthesisStore,

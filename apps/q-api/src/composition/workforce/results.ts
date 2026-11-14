@@ -9,9 +9,13 @@ import { progressOf } from "./progress.js";
 import type { AgentWorkQueue, WorkRow } from "./queue.js";
 import type { Owner, WorkforceStore } from "./store.js";
 
-/** Jobs considered per read, and jobs reported in full. */
+/**
+ * Jobs considered per read, all reported: list_q_work shows the first page
+ * and says how many there are, so Q can ask for any of them by jobId
+ * (decision 97; a cut here made an older job unreachable).
+ */
 const JOBS_SCANNED = 10;
-const JOBS_REPORTED = 3;
+const JOBS_REPORTED = JOBS_SCANNED;
 
 /** A critique step's persisted verdict (jobs.ts writes `outputs.review`). */
 export const ReviewOutputSchema = z.object({

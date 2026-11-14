@@ -28,7 +28,7 @@ import {
   createSentenceCutter,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV33ResultSchema,
+  CompanyAnalystV34ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -287,7 +287,9 @@ async function recordUserStatements(
   }
   const companyId = request.company.companyId;
   const recorded: string[] = [];
-  for (const statement of statements.slice(0, 5)) {
+  // Every statement the person made is recorded (decision 97: v33 kept
+  // five; a sixth was a founder's fact lost).
+  for (const statement of statements) {
     // Same closed namespace as the conversational seam: a key the model
     // invented is not a category of understanding Capital Q has.
     if (!isRecordableKnowledgeKey(statement.knowledgeKey)) {
@@ -899,8 +901,9 @@ export function createCompanyIntelligenceSpecialist(
             // Kept at the active version: v14's gestures and v15's
             // proposalStatus were refused the same way by v12's schema.
             // v22: the optional visual (RECOVERY, workstream E); v26: PICTURE; v30: offer;
-            // v33: statedFigures (a figure their own company reached).
-            schema: CompanyAnalystV33ResultSchema,
+            // v33: statedFigures (a figure their own company reached); v34:
+            // no count ceiling on the evidence lists (decision 97).
+            schema: CompanyAnalystV34ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",

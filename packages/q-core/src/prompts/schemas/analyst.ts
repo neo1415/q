@@ -444,6 +444,50 @@ export type AnalysisCritiqueResultV3 = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
+// Decision 97 (2026-11-14): v3's `gaps .max(30).catch([])` and `strengths
+// .max(8).catch([])` replaced the WHOLE list with nothing when the model
+// wrote one more item (or one malformed one): a 31st gap emptied the gaps.
+// Each item now stands alone: an item that is not usable text reads as ""
+// (code drops it and counts the drop on the result), and there is no count
+// ceiling -- the output budget bounds the answer, code bounds what it
+// files. Only a field that is not a list at all still reads as empty.
+//
+// These are the ACCEPTANCE schemas the workforce validates with; the prompts
+// sent (ANALYSIS_WRITE v7, ANALYSIS_CRITIQUE v3) are unchanged, because a
+// new prompt version changes the request the research-acceptance golden
+// recordings are keyed by and they cannot be re-recorded without paid
+// calls. Publishing prompt versions with these schemas is the follow-up.
+// ---------------------------------------------------------------------------
+
+/** Independent lines: one bad item costs that item, never the list. */
+export const IndependentLinesSchema = z
+  .array(z.string().trim().catch(""))
+  .catch([]);
+
+/** What survives of independent lines, and how many items were dropped. */
+export function independentLines(lines: readonly string[]): {
+  readonly kept: string[];
+  readonly dropped: number;
+} {
+  const kept = lines.filter((line) => line.length > 0);
+  return { kept, dropped: lines.length - kept.length };
+}
+
+export const ANALYSIS_WRITE_V4_SCHEMA_VERSION = 4;
+export const AnalysisDocumentResultV4Schema =
+  AnalysisDocumentResultV3Schema.extend({ gaps: IndependentLinesSchema });
+export type AnalysisDocumentResultV4 = z.infer<
+  typeof AnalysisDocumentResultV4Schema
+>;
+
+export const ANALYSIS_CRITIQUE_V4_SCHEMA_VERSION = 4;
+export const AnalysisCritiqueResultV4Schema =
+  AnalysisCritiqueResultV3Schema.extend({ strengths: IndependentLinesSchema });
+export type AnalysisCritiqueResultV4 = z.infer<
+  typeof AnalysisCritiqueResultV4Schema
+>;
+
+// ---------------------------------------------------------------------------
 // Situation-first research (owner 2026-10-29): every Q capability starts
 // from everything Q knows about the account. A research BRIEF first decides,
 // from the person's situation dossier (the one planning reads, with F<n>

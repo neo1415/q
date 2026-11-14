@@ -653,6 +653,12 @@ export function createModelGateway(
                     ...((accepted.dropped?.length ?? 0) > 0
                       ? { dropped: accepted.dropped }
                       : {}),
+                    // Decision 97: a value accepted from an answer the
+                    // provider stopped at its ceiling is marked, never
+                    // passed on as whole.
+                    ...(result.finish === "MAX_OUTPUT_TOKENS"
+                      ? { incomplete: "MAX_OUTPUT_TOKENS" as const }
+                      : {}),
                   },
                 ),
               };
@@ -669,7 +675,13 @@ export function createModelGateway(
                 result.finish,
                 cost,
                 result.providerReference,
-                { kind: "TEXT", text: result.text },
+                {
+                  kind: "TEXT",
+                  text: result.text,
+                  ...(result.finish === "MAX_OUTPUT_TOKENS"
+                    ? { incomplete: "MAX_OUTPUT_TOKENS" as const }
+                    : {}),
+                },
               ),
             };
           }

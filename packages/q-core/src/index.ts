@@ -660,11 +660,20 @@ export {
 } from "./prompts/schemas/decision-reader.js";
 export { MEMORY_EXTRACTOR_V1 } from "./prompts/tasks/memory-extractor.v1.js";
 export { MEMORY_EXTRACTOR_V2 } from "./prompts/tasks/memory-extractor.v2.js";
+// Decision 97: extraction lists with no count ceiling.
+export {
+  CLAIM_EXTRACTION_V3,
+  FOUNDER_ONBOARDING_EXTRACTION_V4,
+  MEMORY_EXTRACTOR_V3,
+} from "./prompts/tasks/extraction-lists.v1.js";
 export {
   MEMORY_EXTRACT_TYPES_V2,
   MEMORY_EXTRACTOR_V2_SCHEMA_VERSION,
   MemoryExtractItemV2Schema,
   MemoryExtractorResultV2Schema,
+  MemoryExtractorResultV3Schema,
+  MEMORY_EXTRACTOR_V3_SCHEMA_VERSION,
+  type MemoryExtractorResultV3,
   type MemoryExtractItemV2,
   type MemoryExtractorResultV2,
   MEMORY_EXTRACT_TYPES,
@@ -1072,12 +1081,18 @@ export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-
 export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
 export { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./prompts/tasks/gateq-dossier-synthesis.v1.js";
+export { GATEQ_DOSSIER_SYNTHESIS_V2 } from "./prompts/tasks/gateq-dossier-synthesis.v2.js";
 export {
   GATEQ_DOSSIER_SYNTHESIS_SCHEMA_NAME,
   GATEQ_DOSSIER_SYNTHESIS_SCHEMA_VERSION,
+  GATEQ_DOSSIER_SYNTHESIS_V2_SCHEMA_VERSION,
   GateqDossierSynthesisResultSchema,
+  GateqDossierSynthesisResultV2Schema,
+  GateqDossierSynthesisV2VariablesSchema,
   GateqDossierSynthesisVariablesSchema,
   type GateqDossierSynthesisResult,
+  type GateqDossierSynthesisResultV2,
+  type GateqDossierSynthesisV2Variables,
   type GateqDossierSynthesisVariables,
 } from "./prompts/schemas/gateq-dossier-synthesis.js";
 export { FIT_Q_VIEW_V1 } from "./prompts/tasks/fit-q-view.v1.js";
@@ -1154,6 +1169,9 @@ export {
   type ModelOffer,
   COMPANY_ANALYST_V33_SCHEMA_VERSION,
   CompanyAnalystV33ResultSchema,
+  COMPANY_ANALYST_V34_SCHEMA_VERSION,
+  CompanyAnalystV34ResultSchema,
+  type CompanyAnalystV34Result,
   STATED_FIGURE_READING_GUIDANCE,
   StatedFigureReadingSchema,
   type CompanyAnalystV33Result,
@@ -1224,6 +1242,9 @@ export {
   ClaimAssertionKindSchema,
   ClaimExtractionResultSchema,
   ClaimExtractionResultV2Schema,
+  ClaimExtractionResultV3Schema,
+  CLAIM_EXTRACTION_V3_SCHEMA_VERSION,
+  type ClaimExtractionResultV3,
   ClaimExtractionVariablesSchema,
   ClaimLocatorHintSchema,
   ClaimProposedValueSchema,
@@ -1243,6 +1264,9 @@ export {
   FounderCandidateFactSchema,
   FounderExtractionResultSchema,
   FounderExtractionV2ResultSchema,
+  FounderExtractionV3ResultSchema,
+  FOUNDER_EXTRACTION_V3_SCHEMA_VERSION,
+  type FounderExtractionV3Result,
   FounderExtractionV2VariablesSchema,
   FounderExtractionVariablesSchema,
   FounderFactKeySchema,
@@ -2306,3 +2330,4 @@ export {
   V33_ALLOWED_ROOT_KEYS,
   V33_CHANGES,
 } from "./prompts/tasks/company-analyst.v33.js";
+export { COMPANY_ANALYST_V34 } from "./prompts/tasks/company-analyst.v34.js";

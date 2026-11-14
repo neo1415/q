@@ -16,7 +16,8 @@ describe("FOUNDER_ONBOARDING_EXTRACTION v3", () => {
 
   it("is the active version, v2 retained but deprecated with the same output schema", () => {
     expect(registry.getActive("FOUNDER_ONBOARDING_EXTRACTION").versionId).toBe(
-      "founder-onboarding-extraction/v3",
+      // Decision 97: v4 is v3's template on a schema with no conflict cap.
+      "founder-onboarding-extraction/v4",
     );
     expect(
       registry.get("FOUNDER_ONBOARDING_EXTRACTION", 2)?.definition.status,

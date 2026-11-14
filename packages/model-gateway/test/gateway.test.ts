@@ -830,6 +830,34 @@ describe("structured output", () => {
         (result.output as { dropped?: readonly string[] }).dropped?.[0],
       ).toBe("(cut-off):kept_12_items");
       expect(logLines.join("\n")).toContain("(cut-off):kept_12_items");
+      // Decision 97: the kept part is marked incomplete, never passed on as whole.
+      expect((result.output as { incomplete?: string }).incomplete).toBe(
+        "MAX_OUTPUT_TOKENS",
+      );
+    });
+
+    it("marks text stopped at the output ceiling as incomplete (decision 97)", async () => {
+      const { gateway } = build({
+        beta: [
+          {
+            kind: "TEXT",
+            text: "The answer began",
+            finish: "MAX_OUTPUT_TOKENS",
+          },
+        ],
+      });
+      const result = await gateway.execute(
+        request({ taskClass: "FAST_CLASSIFICATION" }),
+      );
+      expect(result.output).toMatchObject({
+        kind: "TEXT",
+        incomplete: "MAX_OUTPUT_TOKENS",
+      });
+      const whole = build({ beta: [{ kind: "TEXT", text: "Whole." }] });
+      const done = await whole.gateway.execute(
+        request({ taskClass: "FAST_CLASSIFICATION" }),
+      );
+      expect(done.output).not.toHaveProperty("incomplete");
     });
 
     it("is not done for a caller that did not ask, nor for an answer that was not cut off", async () => {

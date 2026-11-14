@@ -11,7 +11,7 @@ import {
 } from "@capital-q/evidence";
 import type { Logger } from "@capital-q/observability";
 import {
-  ClaimExtractionResultV2Schema,
+  ClaimExtractionResultV3Schema,
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
@@ -109,7 +109,7 @@ export function createModelClaimProposer(
         },
       };
       const options = {
-        schema: ClaimExtractionResultV2Schema,
+        schema: ClaimExtractionResultV3Schema,
         // Each claim is an independent reading: one the schema refuses (a
         // malformed date, a key off the list) is dropped and reported, and
         // the others are kept (A8 live 2026-11-14: three month-dated
