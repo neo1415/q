@@ -650,3 +650,26 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Before applying, the production constraint's 27 kinds were compared with the new list: identical, plus INTEREST_ACCEPTED. After applying it holds 28.
   - Applied before the deploy.
 - **Deploy:** rollback point `3293f344e`.
+
+## A8 figure card reaches founders — `a07ea25cb` (14 Nov, 01:20 Lagos)
+
+- **Container restart (~23:40 UTC):**
+  - Stopped the gate on `0973778f4`, the GateQ live run and the branding worker.
+  - The live run was resumed; it re-checked by SQL and created nothing twice.
+  - The branding worker was re-created.
+  - The gate was re-run on the head `a07ea25cb`, which contains `0973778f4`.
+- **Gate:** `ci-local PASS sha=a07ea25cb at=2026-11-14T00:08:54Z took=1502s`. Rollback point `7e3e22153`; four services SUCCESS.
+- **Live** (`founder.maji-loop`, `steps-fig.json`):
+
+  | #   | Turn                                                                 | Result                                                                                                                                                                                                                            |
+  | --- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 1   | "Good news: we hit $120k MRR in October."                            | **PASS**: approval card ("Kept as your own statement (self-reported), private to your company: investors don't see it") with Approve / Change it / Keep it with me / Drop; 61 s turn                                              |
+  | 2   | Approve                                                              | **PASS**: one `evidence.claims` row `financial.mrr`, USER_CLAIM / SELF_REPORTED / CURRENT, `organisation_private`, `valid_from` 2026-10-31                                                                                        |
+  | 3   | "Actually October MRR was $110k."                                    | **DEFECT**: no card, and nothing written (correct without approval). Q said "You've corrected … to $110k. The earlier $120k figure remains on record as a conflicting … statement", which implies a recording that never happened |
+  | 4   | "Ya tenemos 42 clientes de pago."                                    | **PASS**: approval card (not approved)                                                                                                                                                                                            |
+  | 5   | Investor `savanna-seed`: "What was Maji Loop's MRR in October 2026?" | **PASS (firewall)**: "I don't have Maji Loop's October 2026 MRR on record"                                                                                                                                                        |
+
+- **Open:** the correction turn must prepare a card (or say plainly that nothing is recorded yet), never imply a record. The card turns took about 61 s.
+- **GateQ branding and fictional applicant seed** (`75e712fcf`, pushed, not gated):
+  - The public gateway shows the investor organisation's name, photo and an AA-safe accent. The accent is the tenant's own brand theme, and today no tenant has one, so setting one needs operator SQL.
+  - New seed: `scripts/seed-fictional-world.mjs --gateq-applicant`. It needs `CQ_SEED_SUPABASE_SECRET_KEY` and runs only on an operator machine; it was not run here.
