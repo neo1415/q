@@ -3356,6 +3356,8 @@ const { app, logger } = createApp(config, security, {
   proposals: createMeetingProposalPort({
     transactions: database.transactions,
     schedule,
+    // B2 (2026-11-14): the other side is told of a proposal or a counter.
+    counterpartNotices: createCounterpartNotices(database.sql),
   }),
   // AUTO block (ADR 0030): Web Push; the key is public, the private half
   // stays with the workers that send.

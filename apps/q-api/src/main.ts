@@ -3274,6 +3274,8 @@ const appActionPorts: OwnReadPorts = {
   proposals: createMeetingProposalPort({
     transactions: database.transactions,
     schedule,
+    // B2 (2026-11-14): the other side is told of a proposal or a counter.
+    counterpartNotices: createCounterpartNotices(database.sql),
   }),
   // Recovery D6: "Stop this job", shared by Q and the Work screen.
   workforceJobs: workforceJobStopPort(agentWorkQueue, workforceStore),

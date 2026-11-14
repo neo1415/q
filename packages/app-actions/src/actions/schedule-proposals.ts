@@ -502,9 +502,13 @@ const ACCEPT = defineAppAction<
   done: (out) =>
     out.outcome !== "OK"
       ? REFUSALS[out.reason].detail
-      : out.booked
-        ? "Accepted and booked. Both sides have the invite."
-        : "Accepted. The call isn't booked yet; I'll say once it is.",
+      : !out.booked
+        ? "Accepted. The call isn't booked yet; I'll say once it is."
+        : out.calendarInvite === true
+          ? "Accepted and booked. Both sides have the calendar invite."
+          : out.calendarInvite === false
+            ? "Accepted and booked on Capital Q. No calendar invite was sent because no Google Calendar is connected; both sides were told. Connect Google Calendar in Settings to add a Meet link, or share a video link in the chat."
+            : "Accepted and booked.",
   http: respondHttp(MEETING_PROPOSAL_ACCEPT_PATH, true),
   tool: {
     name: "accept_meeting_time",
