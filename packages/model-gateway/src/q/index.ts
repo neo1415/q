@@ -793,6 +793,7 @@ export {
   offerTakenNote,
   OFFER_UNRECORDED_NOTE,
   OFFER_UNRECORDED_REFUSAL,
+  offerBoundRefusal,
   type OfferBinding,
 } from "./offer-binding.js";
 import {
@@ -801,8 +802,10 @@ import {
   offerTakenNote,
   OFFER_UNRECORDED_NOTE,
   OFFER_UNRECORDED_REFUSAL,
+  offerBoundRefusal,
 } from "./offer-binding.js";
 export {
+  answerSaysPublicCheck,
   checkedLine,
   chooseVehicle,
   decideUncertaintyOffer,
@@ -815,6 +818,7 @@ export {
   withResolves,
   UNAVAILABLE_CODE_SAYS_GUIDANCE,
   UNCERTAINTY_VEHICLES,
+  MESSAGE_TO_COMPANY_TOOLS,
   type PublicCheck,
   type PublicWebSeen,
   type RelationshipStanding,
@@ -823,6 +827,7 @@ export {
   type VehicleChoice,
 } from "./uncertainty.js";
 import {
+  answerSaysPublicCheck,
   checkedLine,
   chooseVehicle,
   decideUncertaintyOffer,
@@ -835,6 +840,7 @@ import {
   withResolves,
   UNAVAILABLE_CODE_SAYS_GUIDANCE,
   UNCERTAINTY_VEHICLES,
+  MESSAGE_TO_COMPANY_TOOLS,
   type PublicWebSeen,
   type RelationshipStanding,
   type UncertaintyAbout,
@@ -3497,12 +3503,19 @@ export function createModelGatewayQAnswer(
   const codeSaysCheckedRuns = new Set<string>();
   const onRequestSeenRuns = new Set<string>();
   const offerAboutByRun = new Map<string, UncertaintyAbout>();
+  /**
+   * Live 14 Nov 2026 (run 28635630): on a yes to a recorded offer, the
+   * tool that acts is the one the offer bound, never one the model picks
+   * again on the yes turn. Per run, the bound tool's name.
+   */
+  const offerToolByRun = new Map<string, string>();
   const boundedRunState = (): void => {
     for (const store of [
       publicWebByRun,
       codeSaysCheckedRuns,
       onRequestSeenRuns,
       offerAboutByRun,
+      offerToolByRun,
     ]) {
       if (store.size > 256) {
         const [oldest] = store.keys();
@@ -3642,6 +3655,24 @@ export function createModelGatewayQAnswer(
           "q acted on nothing: the offer taken was not recorded",
         );
         return notAsked(proposal.callId, OFFER_UNRECORDED_REFUSAL);
+      }
+      // A yes to a recorded offer acts only through the tool the offer
+      // bound (live 28635630). Code's own follow-on calls (`q-` ids, e.g.
+      // the chat message in place of an email no mailbox can send) and
+      // the person's decision on a change already waiting still go.
+      const boundTool = offerToolByRun.get(toolContext.runId);
+      if (
+        boundTool !== undefined &&
+        proposal.name !== boundTool &&
+        !proposal.callId.startsWith("q-") &&
+        actingByRun.get(toolContext.runId)?.has(proposal.name) === true &&
+        !PENDING_DECISION_TOOLS.has(proposal.name)
+      ) {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: proposal.name, boundTool },
+          "q kept to the offer taken: another acting tool was refused",
+        );
+        return notAsked(proposal.callId, offerBoundRefusal(boundTool));
       }
       const isRead =
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
@@ -6290,6 +6321,9 @@ export function createModelGatewayQAnswer(
       // Addendum 14 Nov 2026: a yes to an uncertainty offer carries what it
       // resolves onto its request (slice 5); a turn about a named company
       // or person not theirs says what was checked (slice 0).
+      if (request.offerTaken !== undefined) {
+        offerToolByRun.set(request.runId, request.offerTaken.action);
+      }
       if (request.offerTaken?.about !== undefined) {
         const standing = UncertaintyStandingSchema.safeParse(
           request.offerTaken.about.standing,
@@ -11753,7 +11787,11 @@ export function createModelGatewayQAnswer(
         };
         if (
           offerBinding.kind === "BOUND" &&
-          UNCERTAINTY_VEHICLES.has(offerBinding.offer.action)
+          (UNCERTAINTY_VEHICLES.has(offerBinding.offer.action) ||
+            // Live ec736742: an investor's message offer for a material
+            // uncertainty is held to the same route (uncertainty.ts).
+            (investorTurn &&
+              MESSAGE_TO_COMPANY_TOOLS.has(offerBinding.offer.action)))
         ) {
           const bound = offerBinding.offer;
           const subject = subjectCompany();
@@ -11842,7 +11880,11 @@ export function createModelGatewayQAnswer(
             subject: request.namedOther?.name ?? null,
             reportsGap: reportsGap(analyst),
           });
-          if (line !== null) uncertaintyLines.unshift(line);
+          // D3 (live 76234bfc): said once -- not again when the answer
+          // already says the public web was not looked at this turn.
+          if (line !== null && !answerSaysPublicCheck(analyst.answer)) {
+            uncertaintyLines.unshift(line);
+          }
         }
         const spoken = withoutActionTalk(
           analyst.answer,
@@ -13069,6 +13111,18 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
           return {
             kind: "FAILED",
             diagnosticCode: diagnosticCodeFor(error.failureClass),
+            // The service answered; its answer was malformed. Said as
+            // such, never as an unreachable service (live b58ece1a) --
+            // and only when no acting tool went through this run, since
+            // the line says nothing was prepared or sent.
+            ...(error.failureClass === "INVALID_MODEL_OUTPUT" &&
+            !toolCalls.some(
+              (call) =>
+                call.status === "SUCCEEDED" &&
+                actingByRun.get(request.runId)?.has(call.providerName) === true,
+            )
+              ? { cause: "MALFORMED_OUTPUT" as const }
+              : {}),
           };
         }
         throw error;

@@ -55,6 +55,7 @@ import {
   asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
+  MALFORMED_ANSWER_LINE,
   OFFER_NOT_AVAILABLE_LINE,
   planStartWords,
   storedPlanOffer,
@@ -8784,5 +8785,149 @@ describe("C3: the action offer survives a restart in the conversation core", () 
     expect(
       readCoreSnapshot({ ...base, offer: { ...offer, action: "" } }),
     ).toBeNull();
+  });
+});
+
+/**
+ * Live 14 Nov 2026 (production b6f3d7fbb, Ajopot x Savanna Seed,
+ * IN_DILIGENCE; docs/ai-handoff/audits/2026-11-14-investor-uncertainty-live.md).
+ * Run ec736742 offered a focused diligence request; the gateway re-binds
+ * that offer to diligence_documents with `about` (model-gateway
+ * offer-yes-live tests). Here: the yes (run 28635630) runs exactly the
+ * bound tool, never the action the reader names afresh; a failed turn
+ * between the offer and the yes (run b58ece1a, INVALID_MODEL_OUTPUT) keeps
+ * the offer and is said honestly. Readings and outcomes are fixtures.
+ */
+describe("live 14 Nov: the yes runs the bound offer; a failed turn keeps it", () => {
+  const ABOUT = {
+    statement:
+      "18,700 of 52,000 registered users are active; definition and period not established.",
+    standing: "REPORTED" as const,
+  };
+  const BOUND = {
+    action: "diligence_documents",
+    request:
+      "Ask Ajopot for a monthly active-user cohort table reconciled to the partner bank.",
+    said: "Want me to ask Ajopot for a document that would settle this? I'll prepare the request for your approval.",
+    about: ABOUT,
+  };
+  // The live yes was read as a tool request naming another action.
+  const yesNamingAnother = {
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: true,
+    acceptsOffer: true,
+    askedAction: "send_questions_to_founder",
+    replyTo: { kind: "Q_QUESTION", card: null },
+    tool: null,
+    handOver: null,
+  } as unknown as TurnReaderResult;
+  const tools = [
+    "diligence_documents",
+    "send_questions_to_founder",
+    "propose_email",
+    "get_company",
+  ];
+  const offered: QAnswerOutcome = {
+    kind: "ANSWERED",
+    messageId: "m1",
+    modelPolicyVersion: "p",
+    promptBundleVersion: "b",
+    offer: BOUND,
+  };
+  const malformed: QAnswerOutcome = {
+    kind: "FAILED",
+    diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE",
+    cause: "MALFORMED_OUTPUT",
+  };
+
+  it("ec736742 -> yes 28635630: the bound diligence_documents with `about`, never the reader's action", async () => {
+    let reading: TurnReaderResult = advice;
+    const run = seam({
+      said: "Is the 18,700 active-user figure solid?",
+      earlier: [
+        { role: "Q", content: `It is company-reported. ${BOUND.said}` },
+      ],
+      reading: () => reading,
+      offeredTools: tools,
+      outcomes: [offered],
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    (run.message as { content: string }).content = "yes";
+    reading = yesNamingAnother;
+    await run.answer.answer(request());
+    expect(run.offersTaken[1]).toEqual(BOUND);
+    expect(run.offersTaken[1]?.about).toEqual(ABOUT);
+    expect(run.askedActions[1]).not.toBe("send_questions_to_founder");
+    expect(JSON.stringify(run.focuses[1])).toContain("diligence_documents");
+    expect(JSON.stringify(run.focuses[1])).not.toContain(
+      "send_questions_to_founder",
+    );
+  });
+
+  it("a failed turn between the offer and the yes keeps the offer; the repeated yes binds", async () => {
+    let reading: TurnReaderResult = advice;
+    const run = seam({
+      said: "Is the 18,700 active-user figure solid?",
+      earlier: [
+        { role: "Q", content: `It is company-reported. ${BOUND.said}` },
+      ],
+      reading: () => reading,
+      offeredTools: tools,
+      outcomes: [offered, malformed],
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    (run.message as { content: string }).content = "yes";
+    reading = yesNamingAnother;
+    const failedTurn = request();
+    await run.answer.answer(failedTurn);
+    // b58ece1a: said as what happened, never "can't reach" the service.
+    expect(run.answer.failureNotice?.(failedTurn.runId)).toBe(
+      MALFORMED_ANSWER_LINE,
+    );
+    expect(MALFORMED_ANSWER_LINE).not.toMatch(/reach/iu);
+    await run.answer.answer(request());
+    expect(run.offersTaken[2]).toEqual(BOUND);
+    expect(run.unrecordedOffers[2]).toBe(false);
+  });
+
+  it("a completed answer with no offer still ends the standing offer", async () => {
+    let reading: TurnReaderResult = advice;
+    const run = seam({
+      said: "Is the figure solid?",
+      earlier: [{ role: "Q", content: `Reported. ${BOUND.said}` }],
+      reading: () => reading,
+      offeredTools: tools,
+      outcomes: [
+        offered,
+        {
+          kind: "ANSWERED",
+          messageId: "m2",
+          modelPolicyVersion: "p",
+          promptBundleVersion: "b",
+        },
+      ],
+    });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    await run.answer.answer({ ...request(), runId: run.message.runId });
+    (run.message as { content: string }).content = "yes";
+    reading = yesNamingAnother;
+    await run.answer.answer(request());
+    expect(run.offersTaken[2]).toBeUndefined();
+  });
+
+  it("a provider outage still names the reasoning service (unchanged)", async () => {
+    const { answer } = seam({
+      said: "What do you think?",
+      reading: advice,
+      outcomes: [
+        { kind: "FAILED", diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE" },
+      ],
+    });
+    const turn = request();
+    await answer.answer(turn);
+    expect(answer.failureNotice?.(turn.runId)).toMatch(/reasoning service/iu);
   });
 });

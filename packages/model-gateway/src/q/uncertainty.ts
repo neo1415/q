@@ -139,6 +139,29 @@ export function checkedLine(input: {
   }
 }
 
+/** A public-web noun: where the turn would have looked. */
+const PUBLIC_PLACE =
+  /\b(?:public(?:ly)?\s+(?:sources?|web|search(?:es)?|information|reports?|pages?)|web\s+search(?:es)?|the\s+(?:public\s+)?web|online\s+sources?|internet)\b/iu;
+/** That the public web was not looked at this turn. */
+const NOT_LOOKED =
+  /\b(?:unavailable|not\s+available|(?:was|were|is|are)n['’]?t\s+(?:read|checked|searched|available|reachable|run)|(?:was|were|is|are)\s+not\s+(?:read|checked|searched|available|reachable|run)|could(?:\s+not|n['’]t)\s+(?:be\s+)?(?:read|checked|searched|reach(?:ed)?|run|access(?:ed)?)|did(?:\s+not|n['’]t)\s+(?:read|check|search|run)|not\s+(?:read|checked|searched)\s+this\s+turn)\b/iu;
+
+/**
+ * Live 14 Nov 2026 (run 76234bfc, defect D3): the answer said the public
+ * search was unavailable and code's closing line said it again, despite
+ * the tool guidance. Q's own drafted answer (never the person's words) is
+ * checked, sentence by sentence, for one that already says the public web
+ * was not looked at this turn; when one does, code's line is not added, so
+ * the absence is said once. The answer's sentence stands as written.
+ */
+export function answerSaysPublicCheck(answer: string): boolean {
+  return answer
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .some(
+      (sentence) => PUBLIC_PLACE.test(sentence) && NOT_LOOKED.test(sentence),
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Slice 3: the analyst's uncertainties, read as structure
 // ---------------------------------------------------------------------------
@@ -230,6 +253,20 @@ export const UNCERTAINTY_VEHICLES: ReadonlySet<string> = new Set([
   DILIGENCE_DOCUMENTS_TOOL,
   DATA_ROOM_REQUEST_TOOL,
   SEND_QUESTIONS_TOOL,
+]);
+
+/**
+ * Live 14 Nov 2026 (run ec736742, Ajopot x Savanna Seed, IN_DILIGENCE): the
+ * analyst offered "a focused diligence request" and named propose_email as
+ * its tool. An email is not an uncertainty vehicle, so the offer passed
+ * untouched, the yes drafted an email, the missing mailbox turned it into a
+ * chat message, and `about` never reached a request. A message to the
+ * company offered to settle a material uncertainty is that uncertainty's
+ * offer: it goes through the route the relationship allows.
+ */
+export const MESSAGE_TO_COMPANY_TOOLS: ReadonlySet<string> = new Set([
+  "propose_email",
+  "propose_chat_message",
 ]);
 
 /** The ways of settling an uncertainty that go through the founder. */
@@ -345,7 +382,9 @@ export function vehicleOfferSentence(
  * The analyst's offer, held against the uncertainty it resolves and the
  * relationship's route:
  *
- * - an offer whose tool is not an uncertainty vehicle passes untouched;
+ * - an offer whose tool is not an uncertainty vehicle passes untouched,
+ *   except a message to the company offered for a material uncertainty a
+ *   vehicle can carry: re-bound to that vehicle (live run ec736742);
  * - one with no material uncertainty behind it is not said (a minor
  *   uncertainty needs no action offer);
  * - one whose tool is the authorised vehicle stands, carrying `about`;
@@ -382,8 +421,34 @@ export function decideUncertaintyOffer(input: {
   readonly vehicle: VehicleChoice | null;
   readonly company: string | null;
 }): UncertaintyOfferDecision {
-  if (!UNCERTAINTY_VEHICLES.has(input.action)) return { kind: "PASS" };
+  const vehicleOffer = UNCERTAINTY_VEHICLES.has(input.action);
+  if (!vehicleOffer && !MESSAGE_TO_COMPANY_TOOLS.has(input.action)) {
+    return { kind: "PASS" };
+  }
   const backing = materialUncertaintyFor(input.uncertainties, input.about);
+  if (!vehicleOffer) {
+    // A message offer stays a message unless it is offered to settle a
+    // material, still-open uncertainty that goes through the founder and
+    // a vehicle the relationship allows can carry: then it is that
+    // vehicle's offer, said in code's words, carrying `about`. With no
+    // vehicle (or the company unknown) it is still a message, and its own
+    // authorize step decides whether it may go.
+    if (
+      backing === null ||
+      backing.standing === "INDEPENDENTLY_VERIFIED" ||
+      !backing.resolveBy.some((way) => THROUGH_FOUNDER.has(way)) ||
+      input.vehicle === null ||
+      input.vehicle.kind !== "VEHICLE"
+    ) {
+      return { kind: "PASS" };
+    }
+    return {
+      kind: "REBIND",
+      tool: input.vehicle.tool,
+      said: vehicleOfferSentence(input.vehicle.tool, input.company),
+      about: { statement: backing.statement, standing: backing.standing },
+    };
+  }
   // Nothing to resolve: a material uncertainty, still open. An item the
   // answer called independently verified is not asked about again.
   if (backing === null || backing.standing === "INDEPENDENTLY_VERIFIED") {

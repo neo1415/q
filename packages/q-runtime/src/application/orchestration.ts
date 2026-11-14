@@ -684,6 +684,14 @@ export type QAnswerOutcome =
        */
       readonly kind: "FAILED";
       readonly diagnosticCode: QFailureDiagnosticCode;
+      /**
+       * Live 14 Nov 2026 (run b58ece1a): the model answered, but its answer
+       * came back malformed (refused at its structure). The run record
+       * keeps the coarse diagnostic code (the stored vocabulary is fixed);
+       * this lets Q say what happened instead of "can't reach" a service
+       * that answered. Absent for every other failure.
+       */
+      readonly cause?: "MALFORMED_OUTPUT" | undefined;
     };
 
 /**
