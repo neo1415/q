@@ -32,14 +32,14 @@ Continues `audits/2026-11-13-founder-investor-journey.md` (row A11). This map co
 
 ## Live scenarios (fictional accounts only)
 
-| #   | Scenario                                                                                                   | Pair                    | Model calls (approx.) |
-| --- | ---------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------- |
-| S1  | Errand meeting: Q books, founder picks a slot, meeting row with MEETING_SCHEDULED and PREP_READY           | Savanna Seed × Watchly  | ~5                    |
-| S2  | Proposal → counter → accept (after B1: a meeting row is recorded)                                          | Watchly → Savanna       | 0–4                   |
-| S3  | Meeting held → diligence (the day after S1's slot)                                                         | Savanna × Watchly       | ~2                    |
-| S4  | Document request → fulfil; a second request → decline; data-room on-request ask and approval               | Savanna × Ajopot        | ~8                    |
-| S5  | Founder declines a fresh interest (no notice); investor passes with a reason, then resumes                  | new fictional company   | ~4                    |
-| S6  | Commitment and deal terms (consequential: owner go-ahead or a fresh fictional pair)                        | Savanna × Ajopot        | ~6                    |
+| #   | Scenario                                                                                         | Pair                   | Model calls (approx.) |
+| --- | ------------------------------------------------------------------------------------------------ | ---------------------- | --------------------- |
+| S1  | Errand meeting: Q books, founder picks a slot, meeting row with MEETING_SCHEDULED and PREP_READY | Savanna Seed × Watchly | ~5                    |
+| S2  | Proposal → counter → accept (after B1: a meeting row is recorded)                                | Watchly → Savanna      | 0–4                   |
+| S3  | Meeting held → diligence (the day after S1's slot)                                               | Savanna × Watchly      | ~2                    |
+| S4  | Document request → fulfil; a second request → decline; data-room on-request ask and approval     | Savanna × Ajopot       | ~8                    |
+| S5  | Founder declines a fresh interest (no notice); investor passes with a reason, then resumes       | new fictional company  | ~4                    |
+| S6  | Commitment and deal terms (consequential: owner go-ahead or a fresh fictional pair)              | Savanna × Ajopot       | ~6                    |
 
 ## Blockers
 
