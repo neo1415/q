@@ -8,13 +8,16 @@ import {
 import type { DiligenceFollowUp } from "@capital-q/q-tools";
 
 import {
+  askedAboutPublic,
   checkedLine,
+  checkedLineNeedOf,
   chooseVehicle,
   decideUncertaintyOffer,
   publicCheckOf,
   publicStandingOf,
   publicWebSeenOf,
   reassessmentNote,
+  saidEarlier,
   stepLineWithoutOffer,
   uncertaintiesOf,
   withResolves,
@@ -116,13 +119,14 @@ describe("scenario 1: a public claim with no company-held figure (and the live g
     const seen = publicWebSeenOf(webOutput("PROVIDER_UNAVAILABLE", []));
     const check = publicCheckOf({ seen: [seen], dropped: false });
     expect(check).toBe("UNAVAILABLE");
+    // The MRR answer lacked the figure (missingEvidence): said.
     const line = checkedLine({
       check,
       subject: "Maji Loop",
-      reportsGap: true,
+      need: { askedPublic: false, cannotAnswer: false, lacksEvidence: true },
     });
     expect(line).toContain("Capital Q's records you can see on Maji Loop");
-    expect(line).toContain("Public sources weren't read this turn");
+    expect(line).toContain("public web search was unavailable this turn");
     // Missing from Capital Q's records is never "nothing is known".
     expect(line).not.toMatch(
       /no information|nothing (?:is )?known|isn't on record/iu,
@@ -131,14 +135,14 @@ describe("scenario 1: a public claim with no company-held figure (and the live g
     expect(line).not.toContain(PRIVATE_MRR);
   });
 
-  it("says it even when the answer reported no gap: the turn was meant to search", () => {
+  it("owner directive 14 Nov (point 4): an answer the records settled, not asked about public sources, carries no operational line", () => {
     expect(
       checkedLine({
         check: "UNAVAILABLE",
         subject: "Maji Loop",
-        reportsGap: false,
+        need: { askedPublic: false, cannotAnswer: false, lacksEvidence: false },
       }),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
   it("a search over its time budget is unavailable, not empty", () => {
@@ -152,21 +156,34 @@ describe("scenario 1: a public claim with no company-held figure (and the live g
     });
     expect(check).toBe("READ");
     expect(
-      checkedLine({ check, subject: "Maji Loop", reportsGap: true }),
+      checkedLine({
+        check,
+        subject: "Maji Loop",
+        need: { askedPublic: true, cannotAnswer: true, lacksEvidence: true },
+      }),
     ).toBeNull();
   });
 
-  it("the search ran and found no page about them: said only where the answer's own fields report a gap", () => {
+  it("the search ran and found no page about them: said only when they asked about public sources", () => {
     const check = publicCheckOf({
       seen: [publicWebSeenOf(webOutput("OK", ["NONE"]))],
       dropped: false,
     });
     expect(check).toBe("NOTHING_FOUND");
     expect(
-      checkedLine({ check, subject: "Maji Loop", reportsGap: true }),
+      checkedLine({
+        check,
+        subject: "Maji Loop",
+        need: { askedPublic: true, cannotAnswer: false, lacksEvidence: false },
+      }),
     ).toContain("found no page about Maji Loop");
+    // It looked: no absence is implied by silence, so none is said unasked.
     expect(
-      checkedLine({ check, subject: "Maji Loop", reportsGap: false }),
+      checkedLine({
+        check,
+        subject: "Maji Loop",
+        need: { askedPublic: false, cannotAnswer: true, lacksEvidence: true },
+      }),
     ).toBeNull();
   });
 
@@ -599,10 +616,78 @@ describe("Context Firewall negatives", () => {
       const line = checkedLine({
         check,
         subject: "Maji Loop",
-        reportsGap: true,
+        need: { askedPublic: true, cannotAnswer: true, lacksEvidence: true },
       });
       expect(line).toContain("records you can see");
       expect(line).not.toContain(PRIVATE_MRR);
     }
+  });
+});
+
+describe("owner directive 14 Nov 2026 (point 4): when what was checked is said", () => {
+  it("asked about public sources is read from the reader's structure only", () => {
+    expect(askedAboutPublic({ asksForWeb: true })).toBe(true);
+    expect(askedAboutPublic({ turnKind: "RESEARCH_REQUEST" })).toBe(true);
+    expect(askedAboutPublic({ questionKind: "PUBLIC_FACTS" })).toBe(true);
+    expect(
+      askedAboutPublic({ turnKind: "QUESTION_TO_Q", questionKind: "FIT" }),
+    ).toBe(false);
+  });
+
+  it("uncertainties alone never call for the line; missing evidence and an answer it cannot give do", () => {
+    const uncertain = {
+      answer: "x",
+      uncertainties: [
+        {
+          statement: "MRR is company-stated.",
+          standing: "REPORTED",
+          material: true,
+          mattersFor: ["VALUATION"],
+          resolveBy: ["ASK_FOUNDER"],
+        },
+      ],
+    };
+    expect(checkedLineNeedOf(uncertain, {})).toEqual({
+      askedPublic: false,
+      cannotAnswer: false,
+      lacksEvidence: false,
+    });
+    expect(
+      checkedLineNeedOf(
+        { insufficientEvidence: true, missingEvidence: ["MRR"] },
+        { asksForWeb: true },
+      ),
+    ).toEqual({ askedPublic: true, cannotAnswer: true, lacksEvidence: true });
+  });
+
+  it("not searched: said when they asked, or when the answer could not be given at all", () => {
+    const none = {
+      askedPublic: false,
+      cannotAnswer: false,
+      lacksEvidence: true,
+    };
+    expect(
+      checkedLine({ check: "NOT_RUN", subject: "Maji Loop", need: none }),
+    ).toBeNull();
+    expect(
+      checkedLine({
+        check: "NOT_RUN",
+        subject: "Maji Loop",
+        need: { ...none, cannotAnswer: true },
+      }),
+    ).toBe(
+      "What I checked: Capital Q's records you can see on Maji Loop. I haven't searched public sources this turn.",
+    );
+  });
+
+  it("said once in a conversation: code's own earlier sentence, whitespace aside", () => {
+    const line = "What I checked: Capital Q's records you can see on X.";
+    expect(
+      saidEarlier(line, [
+        `Answer.\n\nWhat I checked: Capital Q's records you can see\non X.`,
+      ]),
+    ).toBe(true);
+    expect(saidEarlier(line, ["What did you check on X?"])).toBe(false);
+    expect(saidEarlier(line, [])).toBe(false);
   });
 });

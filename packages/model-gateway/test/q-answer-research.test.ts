@@ -3810,3 +3810,247 @@ describe("URGENT 2026-11-06 (3547127f2): a web discovery with research EXPLICIT 
     expect(answer).toContain("**Owo Rails**");
   });
 });
+
+/**
+ * Owner directive 14 Nov 2026 (point 4): Q is an analyst, not a compliance
+ * workflow. "What I checked" is said only where it changes how the answer
+ * reads: they asked about public sources or public facts, or the answer
+ * lacks something public sources were meant to supply and were not read.
+ * Decided from the reader's structured reading and the answer's own
+ * fields, never from words.
+ */
+describe("what was checked: said where it matters, not on every answer (owner directive 14 Nov 2026)", () => {
+  const CHECKED = "What I checked";
+
+  function unavailable(proposal: QToolProposal): QToolCallOutcome {
+    return {
+      callId: proposal.callId,
+      toolName: "public_web.search",
+      toolVersion: 1,
+      classification: "READ_ONLY",
+      status: "SUCCEEDED",
+      failureCode: null,
+      sensitivity: "PUBLIC",
+      result: {
+        ok: true,
+        data: {
+          status: "PROVIDER_UNAVAILABLE",
+          query: "zino aviation",
+          sources: [],
+          comparison: [],
+          truthClass: "UNKNOWN",
+        },
+      },
+      latencyMs: 3,
+    };
+  }
+
+  async function answer(options: {
+    readonly said: string;
+    readonly analyst: { readonly answer: string } & Record<string, unknown>;
+    readonly search: "UNAVAILABLE" | "MATCH" | "NONE";
+    readonly reading?: Partial<QAnswerRequest>;
+    readonly earlierQ?: string;
+  }) {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      p.name === "get_company"
+        ? {
+            callId: p.callId,
+            toolName: "company.get",
+            toolVersion: 1,
+            classification: "READ_ONLY",
+            status: "SUCCEEDED",
+            failureCode: null,
+            sensitivity: "PUBLIC",
+            result: {
+              ok: true,
+              data: {
+                canonicalName: "Zino Aviation",
+                summary:
+                  "Zino Aviation flies cargo in Lagos. Founder and CEO: Ada Obi. Capital Q holds its profile and deck.",
+              },
+            },
+            latencyMs: 2,
+          }
+        : options.search === "MATCH"
+          ? withMatch(
+              researchOutcome(p, "Zino Aviation flies cargo in Lagos."),
+              "MATCH",
+            )
+          : unavailable(p),
+    );
+    const { seam, request, messages, answerBlocks } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            options.search === "MATCH"
+              ? {
+                  callId: "r1",
+                  name: "research_public_web",
+                  arguments: { query: "Zino Aviation" },
+                }
+              : {
+                  callId: "g1",
+                  name: "get_company",
+                  arguments: { companyId: COMPANY },
+                },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(options.analyst.answer, options.analyst),
+        },
+      ],
+      tools: tools.port,
+      userText: options.said,
+      subjects: [],
+      ...(options.earlierQ === undefined ? {} : { earlierQ: options.earlierQ }),
+      read: {
+        ...(options.search !== "UNAVAILABLE"
+          ? {}
+          : {
+              research: Promise.resolve({
+                mode: "EXPLICIT" as const,
+                announceSourceChange: false,
+              }),
+            }),
+        turnKind: "QUESTION_TO_Q",
+      },
+    });
+    const result = await seam.answer({
+      ...request,
+      ...ABOUT_ZINO,
+      ...options.reading,
+    });
+    expect(result.kind).toBe("ANSWERED");
+    return {
+      content:
+        messages.filter((message) => message.role === "Q").at(-1)?.content ??
+        "",
+      blocks: answerBlocks as { readonly kind: string }[],
+      searched: tools.executed.some(
+        (one) => one.proposal.name === "research_public_web",
+      ),
+    };
+  }
+
+  it("(i) an ordinary records answer carries no closing disclosure, even with a minor gap and an uncertainty, when the web was not searched", async () => {
+    const turn = await answer({
+      said: "How is Zino Aviation's revenue trending?",
+      search: "NONE",
+      analyst: {
+        answer:
+          "Zino Aviation flies cargo in Lagos, by its own account on Capital Q.",
+        missingEvidence: ["audited accounts"],
+        uncertainties: [
+          {
+            statement: "The quarterly revenue is company-stated.",
+            standing: "REPORTED",
+            material: false,
+            mattersFor: [],
+            resolveBy: [],
+          },
+        ],
+      },
+    });
+    expect(turn.searched).toBe(false);
+    expect(turn.content).toContain("flies cargo in Lagos");
+    expect(turn.content).not.toContain(CHECKED);
+    expect(turn.content).not.toMatch(/ask and I'll look|look again later/iu);
+  });
+
+  it("(i) a records answer with nothing missing carries no line even when the web search was unavailable", async () => {
+    const turn = await answer({
+      said: "Who leads Zino Aviation?",
+      search: "UNAVAILABLE",
+      analyst: { answer: "Zino Aviation is led by its CEO, Ada Obi." },
+    });
+    expect(turn.searched).toBe(true);
+    expect(turn.content).toContain("Ada Obi");
+    expect(turn.content).not.toContain(CHECKED);
+  });
+
+  it("(i) where pages were read, sources travel as source cards, not as a closing line", async () => {
+    const turn = await answer({
+      said: "What does Zino Aviation do?",
+      search: "MATCH",
+      analyst: {
+        answer: "Zino Aviation flies cargo in Lagos (source S1).",
+        missingEvidence: ["revenue"],
+      },
+    });
+    expect(turn.content).not.toContain(CHECKED);
+    expect(turn.blocks.some((block) => block.kind === "PUBLIC_SOURCE")).toBe(
+      true,
+    );
+  });
+
+  it("(ii) asked whether anything public exists, with search unavailable: the concise honest line, never 'nothing exists'", async () => {
+    const turn = await answer({
+      said: "Is there anything public on Zino Aviation? What did you check?",
+      search: "UNAVAILABLE",
+      reading: { asksForWeb: true },
+      analyst: {
+        answer: "Capital Q's records hold Zino Aviation's profile and deck.",
+      },
+    });
+    expect(turn.content).toContain(
+      "What I checked: Capital Q's records you can see on Zino Aviation. The public web search was unavailable this turn, so anything published about Zino Aviation isn't reflected here.",
+    );
+    expect(turn.content).not.toMatch(
+      /no public presence|nothing (?:was )?found|look again later/iu,
+    );
+    // Said once.
+    expect(turn.content.split(CHECKED)).toHaveLength(2);
+  });
+
+  it("(iii) a public-facts question with search unavailable gets the line, even when the answer reports no gap", async () => {
+    const turn = await answer({
+      said: "What has the press said about Zino Aviation's funding?",
+      search: "UNAVAILABLE",
+      reading: { questionKind: "PUBLIC_FACTS" },
+      analyst: {
+        answer: "Capital Q's records show a seed round they report as open.",
+      },
+    });
+    expect(turn.content).toContain(CHECKED);
+    expect(turn.content).toContain("public web search was unavailable");
+  });
+
+  it("research absence honesty: an answer that lacks the figure while the search could not run still says public sources were not read", async () => {
+    const turn = await answer({
+      said: "What was Zino Aviation's MRR in October?",
+      search: "UNAVAILABLE",
+      analyst: {
+        answer: "October MRR for Zino Aviation isn't in Capital Q's records.",
+        missingEvidence: ["October MRR"],
+      },
+    });
+    expect(turn.content).toContain("public web search was unavailable");
+  });
+
+  it("said once in a conversation: not repeated on the next unasked answer, repeated when they ask about public sources", async () => {
+    const LINE =
+      "What I checked: Capital Q's records you can see on Zino Aviation. The public web search was unavailable this turn, so anything published about Zino Aviation isn't reflected here.";
+    const analyst = {
+      answer: "October MRR for Zino Aviation isn't in Capital Q's records.",
+      missingEvidence: ["October MRR"],
+    };
+    const quiet = await answer({
+      said: "And Zino Aviation's September MRR?",
+      search: "UNAVAILABLE",
+      earlierQ: `Their deck says USD 40k.\n\n${LINE}`,
+      analyst,
+    });
+    expect(quiet.content).not.toContain(CHECKED);
+    const asked = await answer({
+      said: "Anything public on Zino Aviation?",
+      search: "UNAVAILABLE",
+      earlierQ: `Their deck says USD 40k.\n\n${LINE}`,
+      reading: { asksForWeb: true },
+      analyst,
+    });
+    expect(asked.content).toContain(LINE);
+  });
+});
