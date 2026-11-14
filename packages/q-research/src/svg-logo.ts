@@ -398,6 +398,11 @@ export function sanitiseInlineSvg(
 export type InlineSvgLogo = {
   readonly svg: Element;
   readonly byId: ReadonlyMap<string, Element>;
+  /**
+   * What the logo is called for people who cannot see it: the svg's
+   * aria-label or <title>, else its home link's aria-label or title.
+   */
+  readonly label: string | null;
 };
 
 const normalise = (text: string) =>
@@ -484,11 +489,27 @@ export function findInlineSvgLogo(
     /logo/iu.test(label) ||
     (name.length >= 2 && normalise(label).includes(name));
 
+  const spokenName = (svg: Element, home: Element | null) => {
+    const title = svg.childNodes.find(
+      (c): c is Element => isElement(c) && c.tagName === "title",
+    );
+    const titleText =
+      title?.childNodes.map((c) => (isText(c) ? c.value : "")).join("") ?? "";
+    const said = [
+      attr(svg, "aria-label"),
+      titleText,
+      home === null ? null : attr(home, "aria-label"),
+      home === null ? null : attr(home, "title"),
+    ].find((value) => value !== null && value.trim().length > 0);
+    return said?.trim() ?? null;
+  };
+
   let fallback: InlineSvgLogo | null = null;
   for (const svg of svgs) {
     let inHeader = false;
     let inFooter = false;
     let homeLink = false;
+    let home: Element | null = null;
     const labels = [labelOf(svg)];
     let hops = 0;
     for (
@@ -510,6 +531,7 @@ export function findInlineSvgLogo(
       }
       if (tag === "a" && isHome(attr(node, "href"))) {
         homeLink = true;
+        home ??= node;
         labels.push(labelOf(node));
       } else if (hops <= 3) {
         labels.push(labelOf(node));
@@ -517,9 +539,10 @@ export function findInlineSvgLogo(
     }
     if (inFooter) continue;
     const named = labelled(labels.join(" "));
-    if (homeLink && inHeader) return { svg, byId };
+    const label = spokenName(svg, home);
+    if (homeLink && inHeader) return { svg, byId, label };
     if (fallback === null && ((homeLink && named) || (inHeader && named))) {
-      fallback = { svg, byId };
+      fallback = { svg, byId, label };
     }
   }
   return fallback;
