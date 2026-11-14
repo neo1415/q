@@ -3459,7 +3459,7 @@ const { app, logger } = createApp(config, security, {
   gateqAccountStart:
     gateqApply === undefined
       ? undefined
-      : async ({ actor, gatewayPublicId, mode }) => {
+      : async ({ actor, gatewayPublicId, mode, reopenOnly }) => {
           if (
             !(await gateqApply.throttle.charge({
               sessionId: `start:${gatewayPublicId}`,
@@ -3469,6 +3469,9 @@ const { app, logger } = createApp(config, security, {
             throw new IntakeRefusedError("TOO_MANY_REQUESTS");
           }
           const draft = await gateqFounders.draftAt(actor, gatewayPublicId);
+          // A page load only reopens: no draft is made until they act.
+          if (draft === null && reopenOnly === true)
+            throw new IntakeRefusedError("NOT_FOUND");
           const reopened =
             draft === null
               ? null

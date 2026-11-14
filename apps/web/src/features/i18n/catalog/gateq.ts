@@ -967,6 +967,9 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "No documents": "لا توجد مستندات",
   "Your document choice is only in this browser for now. Tick it again to retry.":
     "اختيارك للمستندات محفوظ في هذا المتصفح فقط حاليًا. حدّده مرة أخرى لإعادة المحاولة.",
+  "No documents ticked yet": "لم تحدد أي مستندات بعد",
+  "Choose documents to share": "اختر المستندات للمشاركة",
+  "Stage: {list} (answers disagree)": "المرحلة: {list} (الإجابات متعارضة)",
   "No documents submitted": "لم تُقدَّم مستندات",
   "No documents with the dossier.": "لا توجد مستندات مع الملف.",
   "No documents were attached to this submission.":

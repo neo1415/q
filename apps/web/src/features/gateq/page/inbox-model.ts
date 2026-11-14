@@ -672,6 +672,43 @@ export function dossierStatementRows(
   return statementRowsOf(dossier.statements);
 }
 
+/**
+ * The company header's stage. While the founder's answers on the stage
+ * disagree (OPEN or left open), every current answer is shown, never one
+ * picked (live 06910b145: the header said "Series A" beside "answers
+ * disagree"). Otherwise the frozen company stage, as submitted.
+ */
+export function dossierStageWords(dossier: GateqDossier): string | null {
+  return stageWordsOf(
+    dossier.company.stage,
+    dossier.schemaVersion === "gateq-dossier.v2" ? dossier.statements : null,
+  );
+}
+
+/** The same, from the frozen stage and the statement view it was built from. */
+export function stageWordsOf(
+  frozenStage: string | null,
+  view: GateqStatementViewV1 | null,
+): string | null {
+  const stage = view?.dimensions.find((d) => d.dimension === "company.stage");
+  if (
+    stage === undefined ||
+    (stage.status !== "DISAGREEMENT_OPEN" &&
+      stage.status !== "DISAGREEMENT_LEFT_OPEN")
+  )
+    return frozenStage;
+  const answers = [
+    ...new Set(
+      stage.statements
+        .filter((s) => s.valueKind !== "UNKNOWN")
+        .map((s) => s.summary),
+    ),
+  ];
+  return answers.length < 2
+    ? frozenStage
+    : `Stage: ${answers.join(" or ")} (answers disagree)`;
+}
+
 /** Any statement view as rows: founder review and the dossier alike. */
 export function statementRowsOf(
   view: GateqStatementViewV1,

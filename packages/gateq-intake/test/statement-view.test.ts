@@ -42,6 +42,9 @@ import {
 
 const APPLICATION = "00000000-0000-4000-8000-000000000a01";
 const TURN = "00000000-0000-4000-8000-0000000000f1";
+/** The turn a statement was said in: one per minute, as in a conversation. */
+const turnAt = (minute: number) =>
+  `00000000-0000-4000-8000-0000000f${String(minute).padStart(4, "0")}`;
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`;
 const at = (minute: number) =>
@@ -76,7 +79,7 @@ function statement(
           ? "ESTIMATED"
           : "APPLICANT_PROVIDED",
     origin,
-    sourceTurnId: origin === "FORM" ? null : TURN,
+    sourceTurnId: origin === "TURN" ? turnAt(options.minute) : null,
     backfillKey: origin === "BACKFILL" ? `fact:${n}` : null,
     statedAt: at(options.minute),
     recordedAt: at(options.minute),
