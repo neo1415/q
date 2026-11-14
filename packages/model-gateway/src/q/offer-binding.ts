@@ -98,3 +98,14 @@ export function offerBoundRefusal(tool: string): string {
 /** Said to the model when it tries to act on an unrecorded offer. */
 export const OFFER_UNRECORDED_REFUSAL =
   "They said yes to something your last answer offered, but that offer was not recorded, so nothing is prepared, sent or changed on it this turn. Say so in one sentence and ask what they would like you to do.";
+
+/**
+ * Trusted, when code closes the answer with its own line (a plan offer, or
+ * a declared action's own words such as a stage limit). Live 06910b145
+ * (D11, run 3771cb50, Kazikit at INTEREST_EXPRESSED): the answer said the
+ * request "could not be sent because Kazikit has not accepted your
+ * interest" and code's line then said why again. Said once, by code.
+ */
+export function closingLineNote(line: string): string {
+  return `CAPITAL Q CLOSES THIS ANSWER WITH ITS OWN LINE, word for word: ${quoted(line, 400)}. Answer what they asked and stop: do not say any of that line yourself -- not whether something can or cannot be done or sent, not why, and not what to do instead -- and end with no offer or question of your own.`;
+}

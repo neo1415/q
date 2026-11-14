@@ -192,6 +192,45 @@ describe("profile material tools", () => {
     });
   });
 
+  it("D10 (live 06910b145): a room not open yet is said as not open, never as empty", async () => {
+    const lockedView: DataRoomView = {
+      viewer: "INVESTOR",
+      companyId: COMPANY_B_NETWORK,
+      access: "LOCKED",
+      locked: { reason: "INTEREST_PENDING", outline: null },
+      folders: [],
+      documents: [],
+    };
+    const tool = createReadCompanyDataRoomTool({
+      ...port(),
+      dataRoom: () => Promise.resolve(lockedView),
+    });
+    const plan = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_B_NETWORK,
+        sensitivity: "CONFIDENTIAL",
+      },
+    ]);
+    const context = contextFor(actorA, plan);
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK },
+      context,
+    );
+    if (decision.outcome !== "ALLOW") throw new Error("allowed");
+    const read = (await tool.execute(
+      { companyId: COMPANY_B_NETWORK },
+      context,
+      decision.grant,
+    )) as { documents?: unknown; locked?: string };
+    // No list at all: an empty one read as "the data room has no documents".
+    expect(read.documents).toBeUndefined();
+    expect(read.locked).toContain(
+      "opens once the founders accept your interest",
+    );
+    expect(read.locked).toContain("not an empty data room");
+  });
+
   it("coaches only the person's own deck", async () => {
     const tool = createCoachMyDeckTool(port());
     const own = planFor(actorB, "OWN_COMPANY_QUESTION", [

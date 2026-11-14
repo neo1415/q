@@ -8,6 +8,7 @@ import {
   decideUncertaintyOffer,
   materialUncertaintyFor,
   offerBoundRefusal,
+  offerDecisionTrace,
   OFFER_UNRECORDED_NOTE,
   offerTakenNote,
   uncertaintiesOf,
@@ -369,5 +370,203 @@ describe("D6: Q's own offer to draft the request is kept, so the yes binds", () 
   it("the unrecorded-yes note asks its clarifying question as a recorded offer", () => {
     expect(OFFER_UNRECORDED_NOTE).toContain("record it in offer");
     expect(OFFER_UNRECORDED_NOTE).toContain("do not draft, send, book");
+  });
+});
+
+/**
+ * Root cause (docs/ai-handoff/audits/2026-11-14-uncertainty-offer-root-
+ * cause.md), live re-check 14 Nov 2026 on 06910b145: run d2da404e, Ajopot
+ * (IN_DILIGENCE, diligence_started). The answer ("I wouldn't rely on it for
+ * an investment decision until Ajopot defines "active"…") closed with the
+ * model's own "Want me to draft the information request to Ajopot?" naming
+ * propose_chat_message; the decision was PASS and the yes (48d43754)
+ * prepared a chat message. The answer carried more than one material item
+ * (what "active" means; whether the count reconciles) and the offer's
+ * `about` named neither exactly, so nothing backed the offer.
+ */
+describe("root cause: which item an offer to the company settles is code's reading, not the model's tool", () => {
+  const DEFINITION =
+    'Ajopot has not defined "active" or the period behind 18,700 of 52,000 registered users.';
+  const RECONCILED =
+    "The active count has not been reconciled to partner-bank or transaction records.";
+  const LIVE = uncertaintiesOf({
+    uncertainties: [
+      {
+        statement: DEFINITION,
+        standing: "REPORTED",
+        material: true,
+        mattersFor: ["THESIS", "VALUATION"],
+        resolveBy: ["ASK_FOUNDER", "REQUEST_DOCUMENT"],
+      },
+      {
+        statement: RECONCILED,
+        standing: "REPORTED",
+        material: true,
+        mattersFor: ["DILIGENCE"],
+        resolveBy: ["REQUEST_DOCUMENT", "CORROBORATION"],
+      },
+    ],
+  });
+  const inDiligence = chooseVehicle({
+    standing: IN_DILIGENCE,
+    onRequestTitle: false,
+    holds: (tool) => tool === "diligence_documents",
+    company: "Ajopot",
+  });
+  const MODEL_OFFER = {
+    action: "propose_chat_message",
+    uncertainties: LIVE,
+    vehicle: inDiligence,
+    company: "Ajopot",
+  } as const;
+
+  it("06910b145: a message offer with two material items and `about` null is re-bound to diligence_documents, carrying the first", () => {
+    expect(materialUncertaintyFor(LIVE, null)).toBeNull();
+    expect(
+      decideUncertaintyOffer({ ...MODEL_OFFER, about: null }),
+    ).toMatchObject({
+      kind: "REBIND",
+      tool: "diligence_documents",
+      about: { statement: DEFINITION, standing: "REPORTED" },
+    });
+  });
+
+  it("an `about` in other words that names neither item still settles through the founder", () => {
+    expect(
+      decideUncertaintyOffer({
+        ...MODEL_OFFER,
+        about: "How Ajopot counts its users",
+      }),
+    ).toMatchObject({ kind: "REBIND", tool: "diligence_documents" });
+  });
+
+  it("an `about` naming the second item exactly carries that item", () => {
+    expect(
+      decideUncertaintyOffer({ ...MODEL_OFFER, about: RECONCILED }),
+    ).toMatchObject({ kind: "REBIND", about: { statement: RECONCILED } });
+  });
+
+  it("the same answer offered through the vehicle itself is kept (not dropped as not material)", () => {
+    expect(
+      decideUncertaintyOffer({
+        ...MODEL_OFFER,
+        action: "diligence_documents",
+        about: null,
+      }),
+    ).toMatchObject({ kind: "KEEP", about: { statement: DEFINITION } });
+  });
+
+  it("explicit request: a message offered in reply to 'please prepare that request' goes by the route", () => {
+    expect(
+      decideUncertaintyOffer({
+        action: "propose_chat_message",
+        about: null,
+        uncertainties: [],
+        vehicle: inDiligence,
+        company: "Ajopot",
+        askedVehicle: true,
+      }),
+    ).toMatchObject({ kind: "REBIND", tool: "diligence_documents" });
+  });
+
+  it("an ordinary message (nothing asked of the company) stays a message", () => {
+    expect(
+      decideUncertaintyOffer({
+        action: "propose_chat_message",
+        about: null,
+        uncertainties: [],
+        vehicle: inDiligence,
+        company: "Ajopot",
+      }),
+    ).toEqual({ kind: "PASS" });
+  });
+
+  it("negative: at INTEREST_EXPRESSED there is no diligence vehicle; the offer goes and the step is said", () => {
+    const kazikit = chooseVehicle({
+      standing: {
+        yourSide: "INVESTOR",
+        state: "INTEREST_EXPRESSED",
+        milestones: [{ state: "INTEREST_EXPRESSED" }],
+      },
+      onRequestTitle: false,
+      holds: () => true,
+      company: "Kazikit",
+    });
+    const decision = decideUncertaintyOffer({
+      ...MODEL_OFFER,
+      about: null,
+      vehicle: kazikit,
+      company: "Kazikit",
+    });
+    expect(decision.kind).toBe("NO_ROUTE");
+    expect(JSON.stringify(decision)).not.toContain("diligence_documents");
+  });
+
+  it("negative: an outsider (nothing on record) gets no vehicle and no offer", () => {
+    const outsider = chooseVehicle({
+      standing: { yourSide: "INVESTOR", state: null, milestones: [] },
+      onRequestTitle: false,
+      holds: () => true,
+      company: "Ajopot",
+    });
+    expect(outsider.kind).toBe("NONE");
+    expect(
+      decideUncertaintyOffer({
+        ...MODEL_OFFER,
+        about: null,
+        vehicle: outsider,
+      }).kind,
+    ).toBe("NO_ROUTE");
+    expect(
+      codeUncertaintyOffer({
+        uncertainties: LIVE,
+        vehicle: outsider,
+        company: "Ajopot",
+      }),
+    ).toBeNull();
+    // The founder's own side never gets an investor's vehicle.
+    expect(
+      chooseVehicle({
+        standing: { ...IN_DILIGENCE, yourSide: "COMPANY" },
+        onRequestTitle: false,
+        holds: () => true,
+        company: "Ajopot",
+      }),
+    ).toEqual({ kind: "NONE", line: null });
+  });
+
+  it("the decision log says which predicate decided", () => {
+    expect(
+      offerDecisionTrace({
+        about: null,
+        uncertainties: LIVE,
+        vehicle: inDiligence,
+        standing: IN_DILIGENCE,
+        subjectKnown: true,
+      }),
+    ).toEqual({
+      uncertainties: 2,
+      material: 2,
+      backing: "FIRST_FOUNDER_RESOLVABLE",
+      offerAbout: false,
+      subject: "KNOWN",
+      state: "IN_DILIGENCE",
+      diligenceOpen: true,
+      vehicle: "diligence_documents",
+    });
+    expect(
+      offerDecisionTrace({
+        about: null,
+        uncertainties: [],
+        vehicle: null,
+        standing: undefined,
+        subjectKnown: false,
+      }),
+    ).toMatchObject({
+      backing: "NONE",
+      subject: "UNKNOWN",
+      vehicle: "UNKNOWN_COMPANY",
+      diligenceOpen: null,
+    });
   });
 });

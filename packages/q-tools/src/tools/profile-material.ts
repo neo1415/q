@@ -227,9 +227,22 @@ export function createReadCompanyDeckTool(
   });
 }
 
+/**
+ * D10 (live 06910b145, run 3771cb50): before acceptance Q said Kazikit's
+ * "data room shows no documents" while it held three network-visible
+ * entries. What a closed room holds is unseen, not absent.
+ */
+export const DATA_ROOM_NOT_OPEN_YET =
+  " Until then what it holds can't be seen from here: that is not an empty data room, so never say it has no documents.";
+
 const DataRoomOutputSchema = z
   .object({
     viewer: z.enum(["INVESTOR", "OWNER"]),
+    /**
+     * Absent when the room is not open to them yet (`locked`): an empty
+     * list read as "the data room has no documents" (live 06910b145, D10:
+     * Kazikit's three network-visible entries were called none).
+     */
     documents: z
       .array(
         z
@@ -241,7 +254,8 @@ const DataRoomOutputSchema = z
           })
           .strict(),
       )
-      .max(500),
+      .max(500)
+      .optional(),
     openRequests: z.number().int().min(0),
     /**
      * Investor only, when not connected yet: what to tell them instead of
@@ -295,14 +309,16 @@ export function createReadCompanyDataRoomTool(
       const folder = new Map(view.folders.map((f) => [f.code, f.label]));
       if (view.viewer === "INVESTOR" && view.access === "LOCKED") {
         const outline = view.locked?.outline ?? null;
+        // D10: not open is not empty. No document list goes out at all,
+        // and the line says the room is unseen, never that it holds none.
         return Promise.resolve({
           viewer: "INVESTOR" as const,
-          documents: [],
           openRequests: 0,
           locked: [
             view.locked?.reason === "INTEREST_PENDING"
               ? "Their data room opens once the founders accept your interest; you can ask for documents then."
               : DATA_ROOM_CONNECT_FIRST,
+            DATA_ROOM_NOT_OPEN_YET,
             outline === null || outline.length === 0
               ? ""
               : ` Folders they list: ${outline.map((f) => `${f.label} (${String(f.documents)})`).join(", ")}.`,

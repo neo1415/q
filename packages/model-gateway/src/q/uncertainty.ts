@@ -338,6 +338,101 @@ export function materialUncertaintyFor(
   return material.length === 1 ? (material[0] ?? null) : null;
 }
 
+const throughFounder = (one: ModelUncertainty): boolean =>
+  one.resolveBy.some((way) => THROUGH_FOUNDER.has(way));
+
+const hasMaterial = (uncertainties: readonly ModelUncertainty[]): boolean =>
+  uncertainties.some((one) => one.material);
+
+/** The answer's first material, still-open item the founder can settle. */
+function firstFounderResolvable(
+  uncertainties: readonly ModelUncertainty[],
+): ModelUncertainty | null {
+  return (
+    uncertainties.find(
+      (one) =>
+        one.material &&
+        one.standing !== "INDEPENDENTLY_VERIFIED" &&
+        throughFounder(one),
+    ) ?? null
+  );
+}
+
+/**
+ * The item an offer to the company would settle (root cause, audit
+ * 2026-11-14-uncertainty-offer-root-cause.md): the one its `about` names,
+ * else the answer's first material open item settled through the founder.
+ * Code's own offer (D5) has always read it this way; the model's offer
+ * read "exactly one material item, or an `about` matching one", so an
+ * answer listing two material items (definition and period of "active")
+ * with `about` null or reworded backed nothing, and the offer passed as a
+ * plain message (live 06910b145, run d2da404e).
+ */
+export function offerBacking(
+  uncertainties: readonly ModelUncertainty[],
+  about: string | null,
+): ModelUncertainty | null {
+  return (
+    materialUncertaintyFor(uncertainties, about) ??
+    firstFounderResolvable(uncertainties)
+  );
+}
+
+/**
+ * Why an offer was held as it was, for the decision log line: which item
+ * backs it and what the route was, so a live run says which predicate
+ * decided (06910b145 logged only "PASS"). Structured fields only.
+ */
+export function offerDecisionTrace(input: {
+  readonly about: string | null;
+  readonly uncertainties: readonly ModelUncertainty[];
+  readonly vehicle: VehicleChoice | null;
+  readonly standing: RelationshipStanding | undefined;
+  readonly subjectKnown: boolean;
+}): {
+  readonly uncertainties: number;
+  readonly material: number;
+  readonly backing:
+    | "NONE"
+    | "NAMED"
+    | "FIRST_FOUNDER_RESOLVABLE"
+    | "VERIFIED"
+    | "NOT_THROUGH_FOUNDER";
+  readonly offerAbout: boolean;
+  readonly subject: "KNOWN" | "UNKNOWN";
+  readonly state: string | null;
+  readonly diligenceOpen: boolean | null;
+  readonly vehicle: string;
+} {
+  const named = materialUncertaintyFor(input.uncertainties, input.about);
+  const backing = offerBacking(input.uncertainties, input.about);
+  const standing = input.standing ?? null;
+  return {
+    uncertainties: input.uncertainties.length,
+    material: input.uncertainties.filter((one) => one.material).length,
+    backing:
+      backing === null
+        ? "NONE"
+        : backing.standing === "INDEPENDENTLY_VERIFIED"
+          ? "VERIFIED"
+          : !throughFounder(backing)
+            ? "NOT_THROUGH_FOUNDER"
+            : named === null
+              ? "FIRST_FOUNDER_RESOLVABLE"
+              : "NAMED",
+    offerAbout: input.about !== null,
+    subject: input.subjectKnown ? "KNOWN" : "UNKNOWN",
+    state: standing?.state ?? null,
+    diligenceOpen: standing === null ? null : diligenceOpen(standing),
+    vehicle:
+      input.vehicle === null
+        ? "UNKNOWN_COMPANY"
+        : input.vehicle.kind === "VEHICLE"
+          ? input.vehicle.tool
+          : "NONE",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Slice 4: the vehicle the relationship allows
 // ---------------------------------------------------------------------------
@@ -481,8 +576,11 @@ export function vehicleOfferSentence(
  * relationship's route:
  *
  * - an offer whose tool is not an uncertainty vehicle passes untouched,
- *   except a message to the company offered for a material uncertainty a
- *   vehicle can carry: re-bound to that vehicle (live run ec736742);
+ *   except a message to the company that asks it for information (a
+ *   material open item settled through the founder backs it, its `about`
+ *   says so, or they asked for the request): re-bound to the vehicle the
+ *   stage allows (live runs ec736742, d2da404e), or, before the pair is
+ *   connected, not said and the step said instead;
  * - one with no material uncertainty behind it is not said (a minor
  *   uncertainty needs no action offer);
  * - one whose tool is the authorised vehicle stands, carrying `about`;
@@ -521,6 +619,12 @@ export function decideUncertaintyOffer(input: {
   /** The vehicle chosen for the turn's company; null: company unknown. */
   readonly vehicle: VehicleChoice | null;
   readonly company: string | null;
+  /**
+   * The turn reader read this turn as asking for one of the vehicles
+   * (askedAction): "Yes, please prepare that request to Ajopot" (live
+   * c5fbdd3f). A message offered in reply is an offer of what they asked.
+   */
+  readonly askedVehicle?: boolean | undefined;
 }): UncertaintyOfferDecision {
   const vehicleOffer = UNCERTAINTY_VEHICLES.has(input.action);
   if (!vehicleOffer && !MESSAGE_TO_COMPANY_TOOLS.has(input.action)) {
@@ -545,7 +649,7 @@ export function decideUncertaintyOffer(input: {
           said: vehicleOfferSentence(input.vehicle.tool, input.company),
         };
   }
-  const backing = materialUncertaintyFor(input.uncertainties, input.about);
+  const backing = offerBacking(input.uncertainties, input.about);
   if (!vehicleOffer) {
     // A message offer stays a message unless it is offered to settle a
     // material, still-open uncertainty that goes through the founder and
@@ -553,20 +657,40 @@ export function decideUncertaintyOffer(input: {
     // vehicle's offer, said in code's words, carrying `about`. With no
     // vehicle (or the company unknown) it is still a message, and its own
     // authorize step decides whether it may go.
-    if (
-      backing === null ||
-      backing.standing === "INDEPENDENTLY_VERIFIED" ||
-      !backing.resolveBy.some((way) => THROUGH_FOUNDER.has(way)) ||
-      input.vehicle === null ||
-      input.vehicle.kind !== "VEHICLE"
-    ) {
-      return { kind: "PASS" };
+    //
+    // Whether it asks the company for information is read from structure:
+    // a material open item settled through the founder backs it; or the
+    // offer's own `about` says it resolves one though no material item
+    // stands behind it; or they asked for the request itself (askedVehicle).
+    // Then code, not the model's tool name, chooses how it goes.
+    const seeksInformation =
+      backing === null
+        ? (input.about !== null && !hasMaterial(input.uncertainties)) ||
+          input.askedVehicle === true
+        : backing.standing !== "INDEPENDENTLY_VERIFIED" &&
+          throughFounder(backing);
+    if (!seeksInformation || input.vehicle === null) return { kind: "PASS" };
+    if (input.vehicle.kind === "NONE") {
+      // Before the pair is connected (or after a pass or pause) nothing can
+      // be asked of them; the step is said instead. Connected with no route
+      // tool (line null): an ordinary message, its own authorize step decides.
+      return input.vehicle.line === null
+        ? { kind: "PASS" }
+        : { kind: "NO_ROUTE", line: input.vehicle.line };
     }
     return {
       kind: "REBIND",
       tool: input.vehicle.tool,
       said: vehicleOfferSentence(input.vehicle.tool, input.company),
-      about: { statement: backing.statement, standing: backing.standing },
+      // Nothing unproven is recorded as what it resolves.
+      ...(backing === null
+        ? {}
+        : {
+            about: {
+              statement: backing.statement,
+              standing: backing.standing,
+            },
+          }),
     };
   }
   // Nothing to resolve: a material uncertainty, still open. An item the
@@ -634,13 +758,8 @@ export function codeUncertaintyOffer(input: {
   readonly about: UncertaintyAbout;
 } | null {
   if (input.vehicle === null || input.vehicle.kind !== "VEHICLE") return null;
-  const backing = input.uncertainties.find(
-    (one) =>
-      one.material &&
-      one.standing !== "INDEPENDENTLY_VERIFIED" &&
-      one.resolveBy.some((way) => THROUGH_FOUNDER.has(way)),
-  );
-  if (backing === undefined) return null;
+  const backing = firstFounderResolvable(input.uncertainties);
+  if (backing === null) return null;
   const tool = input.vehicle.tool;
   return {
     action: tool,
