@@ -97,7 +97,7 @@ import {
   type AuthorisedFact,
   type PublicSourceLike,
   type CompanyAnalystV30Result,
-  CompanyAnalystV30ResultSchema,
+  CompanyAnalystV33ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -254,6 +254,7 @@ import {
   restatesVerdict,
 } from "./compare-answer.js";
 import { outputSplitOf } from "./output-split.js";
+import { STATED_FIGURE_TOOL, statedFigureCard } from "./stated-figure-card.js";
 import {
   EXTRAS_ELSEWHERE_NOTE,
   TABLE_IS_THE_COMPARISON,
@@ -1476,11 +1477,11 @@ const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
  */
 /**
  * The schema the analyst's answer is checked against: the one the prompt in
- * use writes to (COMPANY_ANALYST v30, schema v30). Pinned by a test, because a lag here
+ * use writes to (COMPANY_ANALYST v33, schema v33). Pinned by a test, because a lag here
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
-export const ANALYST_RESULT_SCHEMA = CompanyAnalystV30ResultSchema;
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV33ResultSchema;
 
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
@@ -11409,6 +11410,69 @@ export function createModelGatewayQAnswer(
         // follows records statements, notes changes and stores the answer.
         if (gate !== null) await gate.ready();
         took("answer");
+        // A8 (live 14 Nov, 4d5ab3ac2): a figure of their own company the
+        // run read (statedFigures) and did not prepare is prepared here,
+        // through the run's own tool port and so the figure action's own
+        // authorize step and checks: the card is the approval, nothing is
+        // recorded before it (stated-figure-card.ts). No model call.
+        const figureCard = statedFigureCard({
+          readings:
+            "statedFigures" in analyst ? analyst.statedFigures : undefined,
+          offered: offeredByName.has(STATED_FIGURE_TOOL),
+          modelCalled: toolCalls.some(
+            (call) => call.providerName === STATED_FIGURE_TOOL,
+          ),
+          theirWords: [latest.content],
+        });
+        // The card's own line, said after the model's words: the model wrote
+        // without knowing code would prepare it.
+        let figureCardLine: string | null = null;
+        if (figureCard.kind === "PREPARE") {
+          const outcome = await callTool(
+            {
+              callId: `stated-figure-${request.runId}`,
+              name: STATED_FIGURE_TOOL,
+              arguments: figureCard.arguments,
+            },
+            toolContext,
+          );
+          toolCalls.push({
+            toolName: outcome.toolName,
+            providerName: STATED_FIGURE_TOOL,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          const prepared =
+            outcome.result.ok &&
+            (outcome.result.data as { readonly status?: unknown } | null)
+              ?.status === "PREPARED";
+          if (prepared) {
+            preparedByTool = true;
+            const line = preparedLineOf(outcome.result.data);
+            if (line !== null && !preparedLines.includes(line)) {
+              preparedLines.push(line);
+            }
+            figureCardLine = line;
+            const own = ownRecordOf(outcome.result.data);
+            if (own !== null) ownRecordsOnly = (ownRecordsOnly ?? true) && own;
+          }
+          logger?.info(
+            {
+              qRunId: request.runId,
+              metric: figureCard.arguments.metric,
+              status: outcome.status,
+              failureCode: outcome.failureCode,
+              prepared,
+            },
+            "a figure the run read was prepared for their approval by code",
+          );
+        } else if (figureCard.reason !== "NOT_OFFERED") {
+          logger?.info(
+            { qRunId: request.runId, reason: figureCard.reason },
+            "no figure card from the run's reading",
+          );
+        }
         // What the analyst said about acting is Capital Q's to say, from
         // the action it actually holds (CQ-QX-007): the sentences the
         // model itself named as such are removed before anything else.
@@ -11911,6 +11975,7 @@ export function createModelGatewayQAnswer(
                   ? []
                   : [request.closingLines]),
                 ...actedLines,
+                ...(figureCardLine === null ? [] : [figureCardLine]),
                 // The status of earlier changes is not an answer to this
                 // request, and is not said in its place.
                 ...(statusLine === null || couldNot !== null

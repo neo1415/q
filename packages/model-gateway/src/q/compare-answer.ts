@@ -1,7 +1,7 @@
 import type { ModelOutputSpec } from "@capital-q/contracts";
 import {
-  CompanyAnalystV30ResultSchema,
-  type CompanyAnalystV30Result,
+  CompanyAnalystV33ResultSchema,
+  type CompanyAnalystV33Result,
 } from "@capital-q/q-core";
 import { z } from "zod";
 
@@ -124,13 +124,13 @@ export function compareAnswerOutput(output: ModelOutputSpec): ModelOutputSpec {
  * Only `recommendation` has no default of its own; every other field left
  * out takes its schema's empty value.
  */
-export const NARROWED_ANALYST_SCHEMA: z.ZodType<CompanyAnalystV30Result> =
+export const NARROWED_ANALYST_SCHEMA: z.ZodType<CompanyAnalystV33Result> =
   z.preprocess(
     (value) =>
       value !== null && typeof value === "object" && !Array.isArray(value)
         ? { recommendation: null, ...(value as Record<string, unknown>) }
         : value,
-    CompanyAnalystV30ResultSchema,
+    CompanyAnalystV33ResultSchema,
   );
 
 /** The comparison's writer's schema (see NARROWED_ANALYST_SCHEMA). */

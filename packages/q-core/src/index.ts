@@ -1152,6 +1152,12 @@ export {
   OFFER_GUIDANCE,
   type CompanyAnalystV30Result,
   type ModelOffer,
+  COMPANY_ANALYST_V33_SCHEMA_VERSION,
+  CompanyAnalystV33ResultSchema,
+  STATED_FIGURE_READING_GUIDANCE,
+  StatedFigureReadingSchema,
+  type CompanyAnalystV33Result,
+  type StatedFigureReading,
   ArtifactRequestV3Schema,
   ARTIFACT_REQUEST_TYPES_V3,
   type CompanyAnalystV19Result,
@@ -2289,3 +2295,8 @@ export {
   COMPANY_ANALYST_V32,
   V32_CHANGES,
 } from "./prompts/tasks/company-analyst.v32.js";
+export {
+  COMPANY_ANALYST_V33,
+  V33_ALLOWED_ROOT_KEYS,
+  V33_CHANGES,
+} from "./prompts/tasks/company-analyst.v33.js";

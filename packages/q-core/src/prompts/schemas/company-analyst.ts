@@ -597,6 +597,51 @@ export type CompanyAnalystV30Result = z.infer<
 >;
 export const COMPANY_ANALYST_V30_SCHEMA_VERSION = 30;
 
+/**
+ * v33 (A8, live 14 Nov 2026, founder.maji-loop on 4d5ab3ac2): "Actually
+ * October MRR was $110k." was put in userStatements only, never in a tool
+ * call, and that statement was dropped for its key and its month
+ * ("2026-10"), so nothing could reach the approval card. The figure is now
+ * also read as structure of its own: which of the figure action's closed
+ * metrics, the number, its currency as stated, and the month or day. A
+ * reading here is never a fact and never written: Capital Q prepares the
+ * figure action's own card from it (its authorize step, its check of the
+ * quote against their words, currency never assumed, no future date), and
+ * nothing is recorded until they approve that card. Its own list, so a
+ * malformed userStatement never costs the figure, and the reverse.
+ */
+export const STATED_FIGURE_READING_GUIDANCE =
+  "A figure their own company has reached, stated in THIS message (also a correction of one): metric is MRR, ARR, REVENUE, BURN, CASH, RUNWAY, GROSS_MARGIN, CUSTOMERS, USERS or CHURN; amount a plain number (120000 for $120k); currency the ISO code as they stated it, null when they named none or it is not money; period YYYY-MM for a month, YYYY-MM-DD for a day, null when they gave no time; quote their words that state it, exactly. Never a target, forecast, another company's figure or one you read. Else empty.";
+export const StatedFigureReadingSchema = z
+  .object({
+    metric: z.string().regex(/^[A-Z][A-Z_]{1,31}$/u),
+    amount: z.number().finite().min(0).max(1e15),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/u)
+      .nullable(),
+    period: z
+      .string()
+      .regex(/^\d{4}-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/u)
+      .nullable(),
+    quote: z.string().trim().min(3).max(400),
+  })
+  .strict();
+export type StatedFigureReading = z.infer<typeof StatedFigureReadingSchema>;
+
+export const CompanyAnalystV33ResultSchema =
+  CompanyAnalystV30ResultSchema.extend({
+    statedFigures: z
+      .array(StatedFigureReadingSchema)
+      .max(3)
+      .default([])
+      .describe(STATED_FIGURE_READING_GUIDANCE),
+  }).strict();
+export type CompanyAnalystV33Result = z.infer<
+  typeof CompanyAnalystV33ResultSchema
+>;
+export const COMPANY_ANALYST_V33_SCHEMA_VERSION = 33;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

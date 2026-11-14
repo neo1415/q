@@ -15,9 +15,9 @@ import {
  * recorded, corrected or kept before approval. Same output schema.
  */
 describe("COMPANY_ANALYST v32: a corrected figure is proposed, never said corrected", () => {
-  it("is active on v31's schema, keeps v31 published, and differs only by its listed changes", () => {
+  it("was active on v31's schema, keeps v31 published, and differs only by its listed changes", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(32);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(33);
     expect(registry.get("COMPANY_ANALYST", 31)?.definition.status).toBe(
       "DEPRECATED",
     );
