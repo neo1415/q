@@ -80,7 +80,8 @@ import {
  * ids; `completeTurn` writes it in one transaction with Q's reply.
  */
 
-export const STATEMENT_READING_VERSION = 2;
+/** 3: read under the one relation rule and prompt v8 (root cause 2026-11-14). */
+export const STATEMENT_READING_VERSION = 3;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
