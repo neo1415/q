@@ -285,6 +285,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
       "PUT GATEQ_GATEWAY_VERSION_PATH",
       "POST GATEQ_GATEWAY_PUBLISH_PATH",
       "POST GATEQ_GATEWAY_QUALIFY_PATH",
+      "GET GATEQ_GATEWAY_APPEARANCE_PATH",
     ].map((route) => [
       `api/http/gateq.ts ${route}`,
       exempt(

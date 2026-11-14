@@ -289,6 +289,13 @@ describe("the action registry", () => {
       ["q.work.job.stop", "stop_q_job", "INSTANT"],
       // P7: GateQ rules drafted from a mandate, confirmed on the Gateway page.
       ["gateway.policy.read_mandate", "offer.gateway_mandate", "INSTANT"],
+      // B6/B7: the gateway's look, embed sites, paused or open, on a card.
+      [
+        "gateway.appearance.set",
+        "set_gateway_appearance",
+        "CONSEQUENTIAL",
+      ],
+      ["gateway.status.set", "set_gateway_open", "CONSEQUENTIAL"],
       // Overnight A3/A5: the data room and Q's reading of the deck.
       ["data_room.document.level.set", "set_data_room_level", "CONSEQUENTIAL"],
       ["data_room.access.request", "request_data_room_access", "CONSEQUENTIAL"],

@@ -26,6 +26,8 @@ import {
   type AuthenticatedPrincipal,
 } from "@capital-q/security";
 
+import type { GateqGatewayAdminPort } from "@capital-q/app-actions";
+
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
 import { mandateVocabularyFrom } from "../src/gateq/mandate-vocabulary.js";
 
@@ -92,6 +94,8 @@ function buildApp(options: {
   readonly created?: Gateway | Error;
   readonly images?: { photo: string | null; cover: string | null };
   readonly accent?: string | null;
+  readonly embedOrigins?: readonly string[];
+  readonly gatewayAdmin?: GateqGatewayAdminPort;
   readonly editDenied?: boolean;
   readonly extractions?: PolicyExtractionRecord[];
 }): {
@@ -197,9 +201,117 @@ function buildApp(options: {
             return Promise.resolve(options.accent ?? null);
           },
         }),
+    ...(options.embedOrigins === undefined
+      ? {}
+      : {
+          gateqPublicEmbedOrigins: () =>
+            Promise.resolve(options.embedOrigins ?? []),
+        }),
+    ...(options.gatewayAdmin === undefined
+      ? {}
+      : { gateqGatewayAdmin: options.gatewayAdmin }),
   });
   return { app, publicLookups, imageLookups, accentLookups };
 }
+
+describe("B6/B7: the gateway's own appearance and status (declared actions)", () => {
+  const calls: unknown[] = [];
+  const admin = (refuse: boolean): GateqGatewayAdminPort => ({
+    ownGateway: () => Promise.resolve({ id: GATEWAY.id, status: "ACTIVE" }),
+    appearance: () => Promise.resolve({ ok: false }),
+    setAppearance: (_actor, gatewayId, input) => {
+      calls.push({ gatewayId, input });
+      return Promise.resolve(
+        refuse
+          ? { ok: false }
+          : {
+              ok: true,
+              value: {
+                gatewayId,
+                revision: 3,
+                accentHex: input.accentHex,
+                embedOrigins: input.embedOrigins,
+                updatedAt: "2026-11-14T12:00:00.000Z",
+              },
+            },
+      );
+    },
+    setStatus: (_actor, _gatewayId, status) =>
+      Promise.resolve(
+        refuse
+          ? { ok: false }
+          : {
+              ok: true,
+              value: {
+                id: GATEWAY.id,
+                publicId: GATEWAY.publicId,
+                name: GATEWAY.name,
+                status,
+                createdAt: GATEWAY.createdAt,
+              },
+            },
+      ),
+  });
+  const appearanceUrl = `/v1/gateq/gateways/${GATEWAY.id}/appearance`;
+
+  it("an admin's new colour and embed sites come back as the saved revision", async () => {
+    const { app } = buildApp({ principal: PRINCIPAL, gatewayAdmin: admin(false) });
+    const response = await app.inject({
+      method: "PUT",
+      url: appearanceUrl,
+      payload: {
+        accentHex: "#0f766e",
+        embedOrigins: ["https://kilima.example"],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      gatewayId: GATEWAY.id,
+      revision: 3,
+      accentHex: "#0f766e",
+      embedOrigins: ["https://kilima.example"],
+    });
+  });
+
+  it("another tenant's gateway or a non-admin is one 404; a bad colour or origin never reaches the service", async () => {
+    const refused = buildApp({ principal: PRINCIPAL, gatewayAdmin: admin(true) });
+    const response = await refused.app.inject({
+      method: "PUT",
+      url: appearanceUrl,
+      payload: { accentHex: "#0f766e", embedOrigins: [] },
+    });
+    expect(response.statusCode).toBe(404);
+    const status = await refused.app.inject({
+      method: "PUT",
+      url: `/v1/gateq/gateways/${GATEWAY.id}/status`,
+      payload: { status: "DISABLED" },
+    });
+    expect(status.statusCode).toBe(404);
+
+    calls.length = 0;
+    const { app } = buildApp({ principal: PRINCIPAL, gatewayAdmin: admin(false) });
+    for (const payload of [
+      { accentHex: "red", embedOrigins: [] },
+      { accentHex: "#0F766E", embedOrigins: [] },
+      { accentHex: null, embedOrigins: ["https://a.example/path"] },
+      { accentHex: null, embedOrigins: ["https://a.example 'unsafe-eval'"] },
+    ]) {
+      const bad = await app.inject({ method: "PUT", url: appearanceUrl, payload });
+      expect(bad.statusCode).toBe(400);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("requires a signed-in actor", async () => {
+    const { app } = buildApp({ principal: null, gatewayAdmin: admin(false) });
+    const response = await app.inject({
+      method: "PUT",
+      url: appearanceUrl,
+      payload: { accentHex: "#0f766e", embedOrigins: [] },
+    });
+    expect(response.statusCode).toBe(401);
+  });
+});
 
 describe("the configuration routes", () => {
   it("require an authenticated actor", async () => {
@@ -340,6 +452,28 @@ describe("the public route", () => {
         "title",
       ].sort(),
     );
+  });
+
+  it("B7: carries the organisation's own embed sites when it listed any", async () => {
+    const { app } = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      embedOrigins: ["https://kilima.example"],
+    });
+    const body = (
+      await app.inject({ method: "GET", url: url(PUBLIC_ID) })
+    ).json<Record<string, unknown>>();
+    expect(body["embedOrigins"]).toEqual(["https://kilima.example"]);
+    const none = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      embedOrigins: [],
+    });
+    expect(
+      (
+        await none.app.inject({ method: "GET", url: url(PUBLIC_ID) })
+      ).json<Record<string, unknown>>(),
+    ).not.toHaveProperty("embedOrigins");
   });
 
   it("B6: no theme of its own, or a value that is not a colour, is no accent", async () => {

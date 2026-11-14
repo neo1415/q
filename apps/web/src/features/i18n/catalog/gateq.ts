@@ -11,6 +11,36 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "What should we ask next?": "ماذا يجب أن نسأل بعد ذلك؟",
   "What is still unverified?": "ما الذي لم يُتحقق منه بعد؟",
   "Fit versus quality": "الملاءمة مقابل الجودة",
+  // B6/B7: the investor's own gateway look, embed sites, paused or open
+  "Open to applications": "مفتوحة لاستقبال الطلبات",
+  "Pause gateway": "إيقاف البوابة مؤقتًا",
+  "Reopen gateway": "إعادة فتح البوابة",
+  "Preview your public gateway": "معاينة بوابتك العامة",
+  "While paused, founders who open your link are told it isn't taking applications. Your rules and applications are kept.":
+    "أثناء الإيقاف، يُبلَّغ المؤسسون الذين يفتحون رابطك بأنها لا تستقبل طلبات. تبقى قواعدك وطلباتك محفوظة.",
+  "Accent colour": "اللون المميِّز",
+  "Colour as hex": "اللون بصيغة سداسية عشرية",
+  "Use Capital Q's colour": "استخدم لون Capital Q",
+  "Capital Q keeps your hue and adjusts the shade so buttons and links stay readable (WCAG AA) in light and dark.":
+    "يحافظ Capital Q على درجة لونك ويضبط الدرجة لتبقى الأزرار والروابط مقروءة (WCAG AA) في الوضعين الفاتح والداكن.",
+  "Link text": "نص الرابط",
+  "Websites that may embed your gateway": "المواقع التي يمكنها تضمين بوابتك",
+  "One per line, up to 10. Leave empty to let any website embed it.":
+    "موقع في كل سطر، حتى 10. اتركه فارغًا ليتمكن أي موقع من تضمينها.",
+  "Only admins of your firm can change how your gateway looks.":
+    "لا يمكن إلا لمسؤولي شركتك تغيير مظهر بوابتك.",
+  "Saved. Your public gateway shows it now.":
+    "تم الحفظ. تظهر التغييرات الآن على بوابتك العامة.",
+  "Use a colour like #0f766e.": "استخدم لونًا مثل ‎#0f766e.",
+  "Your gateway is open again.": "بوابتك مفتوحة من جديد.",
+  "Your gateway is paused. Its page and embed no longer take applications.":
+    "تم إيقاف بوابتك مؤقتًا. لم تعد صفحتها وتضمينها يستقبلان الطلبات.",
+  "Only an admin of your firm can change your gateway.":
+    "لا يمكن إلا لمسؤول في شركتك تغيير بوابتك.",
+  "Use website addresses like example.com or https://example.com, one per line.":
+    "استخدم عناوين مواقع مثل example.com أو https://example.com، عنوانًا في كل سطر.",
+  "Use a colour like #0f766e and at most 10 websites.":
+    "استخدم لونًا مثل ‎#0f766e وعشرة مواقع على الأكثر.",
   // Chrome and tabs
   Applications: "الطلبات",
   "Find my startup": "ابحث عن شركتي الناشئة",
