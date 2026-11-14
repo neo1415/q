@@ -92,7 +92,13 @@ describe("ChatDraftEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit message" }));
     await screen.findByLabelText("Message");
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    await screen.findByText("That approval has already been decided.");
+    // The refusal arrives through an async server action and a transition;
+    // under a loaded machine the default 1 s wait timed out (14 Nov pre-gate).
+    await screen.findByText(
+      "That approval has already been decided.",
+      undefined,
+      { timeout: 5000 },
+    );
     expect(onRevised).not.toHaveBeenCalled();
   });
 });
