@@ -1057,14 +1057,12 @@ describe("a founder's Connection Request by name (action parity 2026-10-02)", ()
  * open is unseen, never empty: no diligence area before it starts.
  */
 describe("get_relationship: the diligence area only once diligence started (D10)", () => {
-  const event = (
-    sequence: number,
-    eventType: string,
-  ): ProjectableEvent => ({
+  const event = (sequence: number, eventType: string): ProjectableEvent => ({
     sequence,
     eventType,
     occurredAt: new Date(Date.UTC(2026, 9, sequence)).toISOString(),
-    visibilityScope: sequence === 1 ? "investor_private" : "relationship_shared",
+    visibilityScope:
+      sequence === 1 ? "investor_private" : "relationship_shared",
   });
   const read = async (history: readonly ProjectableEvent[]) => {
     const { port } = fakeRelationships(history);

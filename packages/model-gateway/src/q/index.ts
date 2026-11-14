@@ -2226,8 +2226,7 @@ export function uncertaintyOfferTurn(request: {
   readonly turnKind?: string | undefined;
   readonly questionKind?: string | undefined;
   readonly aboutNamedOther?: boolean | undefined;
-  readonly namedOther?:
-    { readonly kind: string } | null | undefined;
+  readonly namedOther?: { readonly kind: string } | null | undefined;
 }): boolean {
   if (nextStepTurn(request)) return true;
   if (request.turnKind !== undefined && NO_OFFER_TURNS.has(request.turnKind)) {
@@ -11972,16 +11971,6 @@ export function createModelGatewayQAnswer(
             holds: (name) => classificationOf(name) !== undefined,
             company: subject.name,
           });
-        /**
-         * D11 (live 78f8d72d5, run a2094aa5): the answer read the
-         * relationship itself, so it already says where the pair stands;
-         * code's step line then said the stage a second time. Read before
-         * code's own relationship read below adds it.
-         */
-        const answerSawStage = (companyId: string): boolean =>
-          runCompanies
-            .read(request.runId)
-            .relationships.has(`COMPANY:${companyId}`);
         /** Whom an offer to resolve the item goes to (D13, D14). */
         const counterpartyOf = (subject: {
           readonly companyId: string;
@@ -12005,8 +11994,6 @@ export function createModelGatewayQAnswer(
             analyst.offer as { readonly about?: unknown } | null
           )?.about;
           const about = typeof offerAbout === "string" ? offerAbout : null;
-          const sawStage =
-            subject !== null && answerSawStage(subject.companyId);
           const standing =
             subject === null
               ? undefined
@@ -12081,7 +12068,6 @@ export function createModelGatewayQAnswer(
               if (
                 decision.line !== null &&
                 request.closingLines === undefined &&
-                !sawStage &&
                 !saidEarlier(decision.line, earlierAnswers)
               ) {
                 uncertaintyLines.push(decision.line);
@@ -12109,8 +12095,6 @@ export function createModelGatewayQAnswer(
           )
         ) {
           const subject = subjectCompany();
-          const sawStage =
-            subject !== null && answerSawStage(subject.companyId);
           const standing =
             subject === null
               ? undefined
@@ -12129,9 +12113,7 @@ export function createModelGatewayQAnswer(
           // limit), on a turn that wants no next step, or beside a change
           // this turn prepared.
           const own =
-            request.closingLines === undefined &&
-            offerTurn &&
-            !preparedByTool
+            request.closingLines === undefined && offerTurn && !preparedByTool
               ? codeUncertaintyOffer({
                   uncertainties,
                   vehicle,
@@ -12177,11 +12159,7 @@ export function createModelGatewayQAnswer(
           }
           if (own === null && request.closingLines === undefined) {
             const step = stepLineWithoutOffer({ uncertainties, vehicle });
-            if (
-              step !== null &&
-              !sawStage &&
-              !saidEarlier(step, earlierAnswers)
-            ) {
+            if (step !== null && !saidEarlier(step, earlierAnswers)) {
               uncertaintyLines.push(step);
             }
           }

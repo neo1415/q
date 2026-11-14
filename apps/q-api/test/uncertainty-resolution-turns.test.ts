@@ -688,47 +688,6 @@ describe("scenario 3 end to end: the uncertainty is resolved through one code-ow
     expect(turn.ran.filter((a) => "resolves" in a.arguments)).toEqual([]);
   });
 
-  it("D11 (run a2094aa5): the answer read Kazikit's relationship and said the stage; code does not say it again", async () => {
-    const STAGE =
-      "Diligence has not begun because Kazikit has not yet accepted your interest.";
-    const turn = conversation({
-      readings: [QUESTION_ABOUT("Kazikit")],
-      script: [
-        {
-          kind: "TOOL_CALLS",
-          calls: [
-            {
-              callId: "k",
-              name: "get_company",
-              arguments: { companyId: KAZIKIT },
-            },
-            {
-              callId: "r",
-              name: "get_relationship",
-              arguments: { companyId: KAZIKIT },
-            },
-          ],
-        },
-        analystAnswer(
-          `Kazikit's revenue is not solidly evidenced. ${STAGE}`,
-          [
-            {
-              statement: "Kazikit's revenue figure is self-reported.",
-              standing: "REPORTED",
-              material: true,
-              mattersFor: ["VALUATION"],
-              resolveBy: ["REQUEST_DOCUMENT"],
-            },
-          ],
-        ),
-      ],
-    });
-    const first = await turn.say("How solid are Kazikit's revenue figures?");
-    expect(first.text).toContain(STAGE);
-    expect(first.text).not.toContain("waiting for them to accept");
-    expect(turn.ran).toEqual([]);
-  });
-
   it("D13 with no open item: a chat message the model prepares on a turn that asked for the diligence request does not go", async () => {
     const turn = conversation({
       readings: [REQUEST_THAT(false)],
@@ -804,8 +763,7 @@ describe("scenario 3 end to end: the uncertainty is resolved through one code-ow
     expect(
       turn.ran.filter(
         (a) =>
-          (a.arguments as { relationship?: unknown }).relationship ===
-          "Ajopot",
+          (a.arguments as { relationship?: unknown }).relationship === "Ajopot",
       ),
     ).toEqual([]);
   });
