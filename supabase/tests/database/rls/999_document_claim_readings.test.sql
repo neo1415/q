@@ -19,7 +19,10 @@ insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug
 insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, created_by_user_id) values
   ('00000000-0000-4000-8000-00000000a8d1', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-00000000a8c1', pg_temp.rls_id('org_a'), 'PITCH_DECK', 'Deck', pg_temp.rls_id('user_a'));
 insert into evidence.document_versions (id, tenant_id, document_id, version_number, storage_bucket, storage_key, original_filename, mime_type, size_bytes, sha256, uploaded_by_user_id) values
-  ('00000000-0000-4000-8000-00000000a8f1', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-00000000a8d1', 1, 'cq-documents-private', 'raw/tenant-a/000000000000000000000000000000a8', 'deck.pdf', 'application/pdf', 2048, repeat('a', 64), pg_temp.rls_id('user_a'));
+  ('00000000-0000-4000-8000-00000000a8f1', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-00000000a8d1', 1, 'cq-documents-private', 'raw/tenant-a/000000000000000000000000000000a8', 'deck.pdf', 'application/pdf', 2048, repeat('a', 64), pg_temp.rls_id('user_a')),
+  -- A second version with no reading yet, so the cross-tenant case below
+  -- meets the tenant foreign key, not the one-reading-per-version key.
+  ('00000000-0000-4000-8000-00000000a8f2', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-00000000a8d1', 2, 'cq-documents-private', 'raw/tenant-a/000000000000000000000000000000a9', 'deck-2.pdf', 'application/pdf', 2048, repeat('b', 64), pg_temp.rls_id('user_a'));
 
 select lives_ok(
   $$ insert into evidence.document_claim_readings (document_version_id, tenant_id, status)
@@ -31,7 +34,7 @@ select throws_ok(
   '23505', null, 'one reading per version');
 select throws_ok(
   $$ insert into evidence.document_claim_readings (document_version_id, tenant_id, status)
-     values ('00000000-0000-4000-8000-00000000a8f1', pg_temp.rls_id('tenant_b'), 'READING') $$,
+     values ('00000000-0000-4000-8000-00000000a8f2', pg_temp.rls_id('tenant_b'), 'READING') $$,
   '23503', null, 'a reading cannot name a version in another tenant');
 select throws_ok(
   $$ update evidence.document_claim_readings set status = 'COMPLETED', error_code = 'SCHEMA_REFUSED'
