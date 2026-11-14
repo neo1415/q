@@ -316,6 +316,13 @@ import { createInstructionMaterialReader } from "./composition/instructions/mate
 import { createIntroducedReader } from "./composition/instructions/introduced.js";
 import { MANDATE_LABELS } from "./composition/mandate-labels.js";
 import { createDocumentReadyFollowUp } from "./composition/document-ready-follow-up.js";
+import {
+  createDocumentClaimCards,
+  documentClaimCardProposer,
+  documentClaimTarget,
+} from "./composition/document-claim-cards.js";
+import { createModelClaimProposer } from "@capital-q/model-gateway/extraction";
+import { DocumentVersionIdSchema } from "@capital-q/evidence/contracts";
 import { createWorkRuntime } from "./composition/work/runtime.js";
 import { createPostgresWorkStore } from "./composition/work/store.js";
 import {
@@ -447,6 +454,7 @@ import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
 import { researchProviderConfigStatus } from "@capital-q/config/research-providers";
 import { speechProviderConfigStatus } from "@capital-q/config/speech-providers";
 import {
+  ModelSensitivitySchema,
   QActionProposalIdSchema,
   Q_WORK_WAKE_CHANNEL,
   Q_INSTRUCTION_WAKE_CHANNEL,
@@ -593,6 +601,7 @@ import {
   createInvestorAnswerRecorder,
   createKnowledgeQueryService,
   createMemoryService,
+  createPostgresChunkRepository,
   createPostgresKnowledgeRepository,
   createPostgresMemoryRepository,
   createPostgresPreferenceLearningConsent,
@@ -652,6 +661,7 @@ import {
 } from "./composition/app-actions.js";
 import {
   APP_ACTIONS,
+  documentFigureCardInput,
   ownIndex,
   type OwnReadPorts,
   type EtiquetteGuidePort,
@@ -3214,6 +3224,8 @@ const appActionPorts: OwnReadPorts = {
   // A8: a figure a founder tells Q, recorded on their approval through
   // Evidence (which authorises, audits and emits).
   companyFigures: researchComposition.evidence,
+  // A8: a figure read from their own document, kept on their approval.
+  documentFigures: researchComposition.evidence,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
   // F3: "Find my startup": claim requests and saved startup searches.
@@ -7756,6 +7768,46 @@ const documentReadyFollowUp = createDocumentReadyFollowUp({
   },
   logger,
 });
+// A8: a founder's own deck, once read, becomes proposed figures on cards
+// in their own conversation; each is their claim only once confirmed.
+const documentChunks = createPostgresChunkRepository();
+const documentClaimCards = createDocumentClaimCards({
+  target: documentClaimTarget(database.sql),
+  actorFor: planOwnerActor,
+  chunks: (target) =>
+    documentChunks.listActiveByVersion(
+      database.sql,
+      TenantIdSchema.parse(target.tenantId),
+      DocumentVersionIdSchema.parse(target.documentVersionId),
+    ),
+  evidence: researchComposition.evidence,
+  proposer: createModelClaimProposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+    // The source's own sensitivity, as registered from the document's.
+    sensitivity: {
+      sensitivityFor: async ({ sourceId }) => {
+        const row = (
+          await database.sql<{ sensitivity_class: string }[]>`
+            select sensitivity_class from evidence.sources
+             where id = ${sourceId} limit 1`
+        )[0];
+        return ModelSensitivitySchema.parse(
+          row?.sensitivity_class ?? "RESTRICTED",
+        );
+      },
+    },
+  }),
+  cardInput: (actor, proposal) =>
+    documentFigureCardInput(appActionPorts, actor, proposal),
+  propose: documentClaimCardProposer({
+    runtime: qRuntime,
+    orchestration: orchestrationRuntime,
+    actions: qActions,
+  }),
+  logger,
+});
 void createWorkWakeListener({
   listen: (channel, onNotify, onListen) =>
     database.listen(channel, onNotify, onListen),
@@ -7764,6 +7816,13 @@ void createWorkWakeListener({
     {
       name: "document-ready",
       wake: (documentId) => documentReadyFollowUp.onDocumentReady(documentId),
+    },
+    {
+      name: "document-claims",
+      wake: async (documentId) => {
+        const outcome = await documentClaimCards.onDocumentReady(documentId);
+        return outcome.kind === "PROPOSED" ? outcome.cards : 0;
+      },
     },
   ],
   logger,
