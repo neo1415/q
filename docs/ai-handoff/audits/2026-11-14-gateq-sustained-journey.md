@@ -161,3 +161,58 @@ No settled item was asked again: team, revenue, CAC, raise, problem, pricing. Us
    - "1 platform to 4" is stored as `customers` = 4, which caused a re-ask.
    - Paraphrased words are stored at t30.
    - The first "Leave it open for now" (t18) was not applied to the existing link `e6a9844a`.
+
+## Re-certification 14 Nov (06910b145)
+
+- **Production:** `06910b145` (includes GateQ fix `4dd353859`: P1a, P1b, P2a, P2b).
+- **Founder:** `founder.fb0128.baraka-kipchoge@fictional.capitalq.local`, Quilla, KE, profile stage `series_b` (fresh, no prior GateQ application). **Investor:** `investor.kilima-angels.njeri-kamau@fictional.capitalq.local`.
+- **Window:** 18:27:29–18:37:40Z. **Cost:** 34 model calls, **$0.1155** (ai_ops.model_usage), recorded against reservation `56b5d15e`.
+- **Records created:** application `1e9fd48e-0ad1-4233-87c4-d5e909423b2f` (created on first page load 18:27:47Z; SUBMITTED 18:34:25Z, ref `ga_0kfbp0rxgzjzrt6fq08bf828yp`); 49 turns (24 PERSON), 24 readings (19 READ, 5 NO_STATEMENTS), 40 statements (10 FORM, 30 TURN), 5 links, 3 disagreement events; submission `1a0d3276` (dossier `gateq-dossier.v2`, snapshot v3); synthesis READY (`GATEQ_DOSSIER_SYNTHESIS@v2`, 16 points, complete, 49/49 turns read, uncitedDropped 0); 1 investor Q turn.
+- **Evidence:** `/tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/gq8/` (`shots/J-*`, `K-*`, `I-*`; `sub.json`, `review.txt`, `inbox.txt`, `st1.txt`). Not durable.
+- **Journey:** same script, adapted to the company (exam-prep edtech): form Seed / Software / USD 350,000 / deck and product brief ticked; 2,300 students and 600 WAU; nobody pays; 1→4 partner schools; CAC unknown; team; Series A topic change; "about 1,500 weekly active now"; "Leave it open for now"; use of funds; 350k→400k; market unknown; KICD approval risk; pricing; lead angel says seed → "Leave the stage open for now"; revenue zero; two dashboards → "Leave it open for now"; **browser closed; new context signed in and resumed**; 5 more turns; review; submit; investor inbox; one investor Q turn.
+
+### Live re-check list
+
+- **Resume, no writes on load: PASS.** The new context made 4 server-action POSTs on load, none carrying answers (start + progress reads). Statement count stayed 35, links 5, events 3 (checked before and after load). No FORM statement was written after 18:28Z; the FORM total is 10 at submission. The page opened straight into the interview with all 39 turns, and no role step (`K-01-resume.png`).
+- **Form shows stored answers: PASS, with a defect.** No path back to the form after resume (only the interview and review). The review showed stored answers: stage disagreement, USD 400,000, Kenya, Software. **But the 2 documents ticked before the break were dropped:** the review says "No documents" and dossier `documents: []`. `answersFromRecord` does not restore `materials`, and the reopened draft is seeded from the profile (`materials: []`).
+- **Stage: PASS.** CORRECTS `24179a6e` (t14 Series A corrects the form's seed, since the founder said "not seed"). DISAGREES `6568347a` (t30 "seed by revenue … Series A by age" vs Series A) is LEFT_OPEN at t32 and stays LEFT_OPEN through resume and submit. The frozen qualification is STAGE UNRESOLVED / STAGE_DISPUTED, `unresolved` = [stage], MAY_APPLY.
+  - Investor inbox row and mandate panel: "Needs your judgement: answers disagree".
+  - Founder gateway panel and Sent page: "Stage we invest at: Your answers disagree".
+  - The synthesis says the stage is unresolved.
+- **WAU "Leave it open for now": PASS.** DISAGREES `c1dbb4d6` (1,500 vs 600) is LEFT_OPEN at t18. t18 is NO_STATEMENTS. There is no UNKNOWN WAU statement (the only UNKNOWN is the market, t24) and no false disagreement against "Not known".
+- **No growing "Earlier answers, corrected": PASS.** The review shows "(2)": the form's seed and USD 350,000. No form re-save happened, because no page path offers one after resume.
+- **Investor Q: PASS** (`I-02`, one turn). It gives WAU 600 vs about 1,500 as unresolved, with the two dashboards; stage Series A vs "seed by revenue…" as unresolved; and "the earlier form recorded Seed, but that was superseded". It says the raise was **corrected from USD 350,000 to USD 400,000**. This agrees with the review, dossier and inbox.
+- **Old application c4cf20bd, link `d942b2e1`: NOT FIXED ON ANY LIVE SURFACE.** The link is still stored (DISAGREES, UNKNOWN→COUNT, no events). The projector code now treats it as inactive, but the investor inbox renders the frozen v2 dossier. It still shows "Traction: answers disagree (open, not yet settled): '600 weekly active' and 'Not known'" in Conflicting answers and in diligence questions (`I-04-coverisk.png`). There is no re-projection or backfill of frozen submissions.
+
+### Invariants
+
+1. **FAIL.** 24/24 PERSON turns are read, and all 30 TURN statements are referenced by a reading. But t10 "We don't know our CAC yet" wrote **no statement**. The reading's UNKNOWN on `claims.traction` was converted to a LEAVE_OPEN on the unrelated 1-vs-4 partner-schools disagreement `88759f2c` (event at t10). So CAC unknown survives only in the transcript and the synthesis.
+2. **PASS.** One raise CORRECTS, `2c436b22` (t22 USD 400,000 corrects form 350,000). The stage CORRECTS `24179a6e` is the founder's own "not seed". No other statement was superseded. The form never rewrote an interview statement.
+3. **PASS** for stage and WAU: both stay visible as left open on every surface. **Defect:** a false contradiction. "we went from 1 partner school to 4 since March" (t8) was split into pilots=1 and pilots=4 and CODE_DETECTED as DISAGREES `88759f2c`. It shows on review, dossier (`contradictionsTotal` 3) and inbox as "answers disagree" between identical words.
+4. **FAIL.** "Nobody pays yet" (t6) was read only as `paying_customers` = 0. Q then asked for revenue five times (t23 "What did you bill…", t25, t27, t29, t33). After "Revenue is zero today… as I said" (t34), Q asked for that zero's period (t35). t11 re-asked the false 1-vs-4 contradiction.
+5. **PASS (note).** After LEFT_OPEN on the stage (t32), it was never asked again. At t37 Q asked "Which dashboard should I use?", but only after the founder reopened the WAU topic himself.
+6. **PASS (with defect).** Resume in a new context kept the application, all turns and readings, and every statement. It wrote nothing on load, showed no role step and no blank form, and no interview claim was left. **Defect:** the ticked documents were lost on resume, so the submission went with 0 of 2.
+7. **PASS.** Each success claim has a matching record:
+   - t19 "I'll leave those two weekly-active figures open" matches LEFT_OPEN `c1dbb4d6` (t18).
+   - t33 "leave the stage unresolved" matches `6568347a` (t32).
+   - t15 and t23 "correcting" match CORRECTS `24179a6e` and `2c436b22`.
+   - **Defect (false negative):** at t39 and t41 Q said "I haven't marked those two answers as left open yet", though `c1dbb4d6` was LEFT_OPEN since t18. The repeat "Leave it open" was read as an `application.note` TEXT statement (t38, t40), and `replyHeldToReading` counts only this turn's LEFT_OPENs.
+8. **FAIL (narrow; the P2a items now agree).** Stage, WAU and raise agree, with statement ids and turn sources, across review, dossier, inbox, Sent page, qualification, synthesis and investor Q. Remaining disagreements:
+   - **1→4 partner schools:** a contradiction on review, dossier and inbox, but growth in the synthesis.
+   - **CAC unknown:** only in the synthesis.
+   - **Stage header:** dossier `company.stage` and the inbox "Company" block show the single value "Series A", beside "answers disagree".
+   - **Founder's note:** includes "Leave it open for now." and "Still leave it open for Kilima." as note text.
+
+### Defects, ranked
+
+1. **P1 (invariants 1, 3):** the implicit LEAVE_OPEN matches any standing disagreement on the same dimension, ignoring `quantity`. An unrelated UNKNOWN on `claims.traction` (CAC) is swallowed into a LEAVE_OPEN on another quantity's disagreement. Fix in `packages/gateq-intake/src/application/statement-plan.ts`, `standingOn` (~897–912): match dimension and quantity, or require the op's target.
+2. **P1 (invariants 3, 4, 8):** a range in one sentence ("from 1 to 4") becomes two same-turn, same-quantity statements, and code detection links them as DISAGREES. Code detection should skip statements from the same source turn and words (`statement-plan.ts` ~870–885). The reading should keep only the current value, or tag the earlier one as `as_of`.
+3. **P2 (invariant 6):** resume on a new device drops the document selection, so the submission went with 0 of 2 documents with no warning. Materials are client-only. Fix in `apps/web/src/features/gateq/form/form-model.ts` `answersFromRecord` and `gateq-form.tsx` reopen (`initialAnswers` from the profile): persist or restore `materials` from the record.
+4. **P2 (invariant 4):** zero paying customers does not settle revenue, so revenue is re-asked five times, then a zero's period is asked. Coverage or next-question logic should treat `paying_customers` ZERO plus "nobody pays" as revenue ZERO, or not ask for a period of a zero.
+5. **P2 (invariant 7, false negative):** a repeated "leave it open" on an already LEFT_OPEN disagreement is read as a note. `replyHeldToReading` (`statement-plan.ts` ~1286) then replaces Q's true sentence with `NOT_LEFT_OPEN_LINE`. It should count standing LEFT_OPEN disagreements named by the reply, not only this turn's events.
+6. **P2 (invariant 8):** frozen pre-fix submissions are not re-projected. `c4cf20bd` still shows the false "600 vs Not known" OPEN contradiction to the investor.
+7. **P3:**
+   - Dossier `company.stage` and the inbox header show one stage value during a disagreement.
+   - Leave-open phrases are stored in `application.note`.
+   - "40 percent of signed-up students are girls" is stored as a `users` PERCENT.
+   - First page load creates an IN_PROGRESS application before the founder acts (`startFormAction` on entry).
