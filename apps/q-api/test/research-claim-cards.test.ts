@@ -60,13 +60,13 @@ const sourceRow = {
   createdAt: "2026-11-14T09:00:00.000Z",
 } as unknown as EvidenceSource;
 
-const itemRow = (extracted = true) =>
+const itemRow = (extracted = true, summary = PAGE) =>
   ({
     id: ITEM,
     sourceId: SOURCE,
     subjectType: "COMPANY",
     subjectId: COMPANY,
-    summary: PAGE,
+    summary,
     structuredValue: { kind: "public_web_excerpt", extracted },
   }) as unknown as EvidenceItem;
 
@@ -85,6 +85,8 @@ function harness(
     source?: EvidenceSource | Error;
     extracted?: boolean;
     blocked?: boolean;
+    enabled?: boolean;
+    page?: () => string;
   } = {},
 ) {
   const passages: ExtractionPassage[] = [];
@@ -121,7 +123,9 @@ function harness(
           ? Promise.reject(source)
           : Promise.resolve(source),
       getEvidenceItem: () =>
-        Promise.resolve(itemRow(options.extracted ?? true)),
+        Promise.resolve(
+          itemRow(options.extracted ?? true, options.page?.() ?? PAGE),
+        ),
     },
     proposer,
     cardInput: (_actor, proposal) =>
@@ -131,6 +135,7 @@ function harness(
       return Promise.resolve({ conversationId: "conv-1" });
     },
     today: () => "2026-11-14",
+    enabled: options.enabled ?? true,
   };
   return { job: createResearchClaimCards(dependencies), passages, cards };
 }
@@ -235,10 +240,34 @@ describe("figures from a public page about the founder's own company", () => {
   });
 
   it("is bounded per hour", async () => {
-    const { job, passages } = harness();
+    // Different content each time: the hourly bound, not the hash, stops it.
+    let n = 0;
+    const { job, passages } = harness({
+      page: () => `${PAGE} (${String((n += 1))})`,
+    });
     for (let i = 0; i < READINGS_PER_HOUR + 2; i += 1) {
       await job.onExcerptRecorded(founder, ref);
     }
     expect(passages).toHaveLength(READINGS_PER_HOUR);
+  });
+});
+
+describe("decision 96: no paid extraction on every fetched page", () => {
+  it("reads nothing unless the deployment switches the reading on", async () => {
+    const { job, passages, cards } = harness({ enabled: false });
+    expect(await job.onExcerptRecorded(founder, ref)).toEqual({
+      kind: "NOT_ELIGIBLE",
+    });
+    expect(passages).toHaveLength(0);
+    expect(cards).toHaveLength(0);
+  });
+
+  it("never sends the same page content for extraction twice", async () => {
+    const { job, passages } = harness();
+    await job.onExcerptRecorded(founder, ref);
+    expect(await job.onExcerptRecorded(founder, ref)).toEqual({
+      kind: "NOT_ELIGIBLE",
+    });
+    expect(passages).toHaveLength(1);
   });
 });

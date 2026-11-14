@@ -7845,6 +7845,8 @@ const researchClaimCards = createResearchClaimCards({
     actions: qActions,
     orchestrationVersion: RESEARCH_CLAIMS_ORCHESTRATION_VERSION,
   }),
+  // Decision 96: off unless switched on; never a paid read of every page.
+  enabled: process.env.CQ_RESEARCH_FIGURE_CARDS === "on",
   logger,
 });
 publicExcerpts.listener = (actor, excerpt) => {

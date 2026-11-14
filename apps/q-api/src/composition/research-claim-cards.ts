@@ -11,6 +11,8 @@ import {
   type StatedFigure,
   type WebFigureSource,
 } from "@capital-q/evidence";
+import { createHash } from "node:crypto";
+
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
@@ -89,10 +91,23 @@ export type ResearchClaimCardsDependencies = {
     card: DocumentClaimCard,
     conversationId: string | null,
   ) => Promise<{ readonly conversationId: string | null }>;
+  /**
+   * Decision 96: no paid extraction runs automatically on every fetched
+   * page. The automatic reading is off unless the deployment switches it
+   * on (CQ_RESEARCH_FIGURE_CARDS=on); off, a recorded excerpt is never read.
+   */
+  readonly enabled?: boolean | undefined;
   readonly today?: (() => string) | undefined;
   readonly now?: (() => number) | undefined;
   readonly logger?: Logger | undefined;
 };
+
+/** Content already read in this process (decision 96: never read twice). */
+const READ_CONTENT_MAX = 2_000;
+
+function contentHash(text: string): string {
+  return createHash("sha256").update(text.normalize("NFC")).digest("hex");
+}
 
 function domainOf(url: string): string | null {
   try {
@@ -110,6 +125,7 @@ export function createResearchClaimCards(
     dependencies.today ?? (() => new Date().toISOString().slice(0, 10));
   const now = dependencies.now ?? (() => Date.now());
   const inFlight = new Set<string>();
+  const readContent = new Set<string>();
   let window = { start: 0, readings: 0 };
 
   const withinBudget = (): boolean => {
@@ -126,6 +142,7 @@ export function createResearchClaimCards(
   ): Promise<ResearchClaimOutcome> {
     // Cards are filed in a person's own conversation: never for a service.
     if (actor.actorType !== "HUMAN") return { kind: "NOT_ELIGIBLE" };
+    if (dependencies.enabled !== true) return { kind: "NOT_ELIGIBLE" };
     const source = await evidence.getEvidenceSource({
       actor,
       sourceId: EvidenceSourceIdSchema.parse(ref.sourceId),
@@ -147,7 +164,13 @@ export function createResearchClaimCards(
     if (item.sourceId !== source.id || stored?.["extracted"] !== true) {
       return { kind: "NOT_ELIGIBLE" };
     }
+    // The same page content (another excerpt of it, a repeat search) is
+    // never sent for extraction a second time.
+    const hash = `${source.subjectId}:${contentHash(item.summary)}`;
+    if (readContent.has(hash)) return { kind: "NOT_ELIGIBLE" };
     if (!withinBudget()) return { kind: "BUSY" };
+    if (readContent.size >= READ_CONTENT_MAX) readContent.clear();
+    readContent.add(hash);
 
     const url = source.sourceUrl;
     const title = (source.title ?? domainOf(url) ?? "a public page").slice(
