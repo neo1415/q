@@ -52,8 +52,12 @@ for ((i = 0; i < ${#lint[@]}; i += 4)); do
 done
 
 step "root typecheck (includes tests)"
-node --max-old-space-size=7168 node_modules/typescript/bin/tsc --noEmit -p tsconfig.json | tail -20 || true
-[ "${PIPESTATUS[0]}" -eq 0 ] || bad "root tsc"
+# Status is captured directly: under pipefail, `cmd | tail || true` resets
+# PIPESTATUS, which once let an OOM-killed tsc report PASS (14 Nov).
+tsc_out=$(node --max-old-space-size=7168 node_modules/typescript/bin/tsc --noEmit -p tsconfig.json 2>&1)
+tsc_status=$?
+printf '%s\n' "$tsc_out" | tail -20
+[ "$tsc_status" -eq 0 ] || bad "root tsc (exit $tsc_status)"
 
 step "tests related to changed source"
 src=()
@@ -61,8 +65,10 @@ for f in "${changed[@]}"; do case "$f" in apps/*|packages/*) case "$f" in *.ts|*
 if [ ${#src[@]} -gt 0 ]; then
   # Bounded workers and heap: an unbounded related run OOMed on the shared
   # 4-vCPU machine (14 Nov). Same tests, same assertions, fewer at once.
-  NODE_OPTIONS=--max-old-space-size=6144 npx vitest related --run --maxWorkers=2 "${src[@]}" 2>&1 | tail -8
-  [ "${PIPESTATUS[0]}" -eq 0 ] || bad "vitest related"
+  vt_out=$(NODE_OPTIONS=--max-old-space-size=6144 npx vitest related --run --maxWorkers=2 "${src[@]}" 2>&1)
+  vt_status=$?
+  printf '%s\n' "$vt_out" | tail -8
+  [ "$vt_status" -eq 0 ] || bad "vitest related (exit $vt_status)"
 fi
 
 echo
