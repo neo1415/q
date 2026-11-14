@@ -43,6 +43,31 @@ function pairs(source: string): { task: string; schema: string }[] {
 }
 
 const registry = core.createDefaultPromptRegistry();
+
+/**
+ * Decision 97 (d14b726f9): an ACCEPTANCE schema that widens exactly one
+ * list of the active output schema to independent lines, so one bad item
+ * costs that item and never the list. The prompt's own version is unchanged
+ * (a new version would re-key the recorded research-acceptance replays), so
+ * the call validates with a strict superset of what the model is asked for.
+ * The test below proves the superset structurally; anything else is drift.
+ */
+const ACCEPTANCE_SUPERSETS: Readonly<
+  Record<string, { readonly schema: string; readonly widened: string }>
+> = {
+  ANALYSIS_WRITE: { schema: "AnalysisDocumentResultV4Schema", widened: "gaps" },
+  ANALYSIS_CRITIQUE: {
+    schema: "AnalysisCritiqueResultV4Schema",
+    widened: "strengths",
+  },
+};
+
+function shapeOf(schema: unknown): Record<string, unknown> | null {
+  const shape = (schema as { shape?: unknown } | null)?.shape;
+  return shape !== null && typeof shape === "object"
+    ? (shape as Record<string, unknown>)
+    : null;
+}
 const exported = core as unknown as Record<string, unknown>;
 
 describe("every model call validates against its prompt's own schema", () => {
@@ -70,6 +95,7 @@ describe("every model call validates against its prompt's own schema", () => {
         return [];
       }
       if (output.kind !== "STRUCTURED") return [];
+      if (ACCEPTANCE_SUPERSETS[call.task]?.schema === call.schema) return [];
       return output.schema === schema
         ? []
         : [
@@ -77,5 +103,26 @@ describe("every model call validates against its prompt's own schema", () => {
           ];
     });
     expect(drift).toEqual([]);
+  });
+
+  it("an acceptance schema widens exactly its one named list of the active schema", () => {
+    for (const [task, accept] of Object.entries(ACCEPTANCE_SUPERSETS)) {
+      const output = registry.getActive(task as core.PromptId).definition
+        .output;
+      expect(output.kind).toBe("STRUCTURED");
+      if (output.kind !== "STRUCTURED") continue;
+      const active = shapeOf(output.schema);
+      const widened = shapeOf(exported[accept.schema]);
+      expect(active, task).not.toBeNull();
+      expect(widened, accept.schema).not.toBeNull();
+      if (active === null || widened === null) continue;
+      expect(Object.keys(widened).sort()).toEqual(Object.keys(active).sort());
+      for (const key of Object.keys(active)) {
+        if (key === accept.widened) continue;
+        // Every other field is the very same schema: nothing else changed.
+        expect(widened[key], `${task}.${key}`).toBe(active[key]);
+      }
+      expect(widened[accept.widened]).not.toBe(active[accept.widened]);
+    }
   });
 });
