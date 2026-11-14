@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   clearBottom,
+  openedPlacement,
   overlaps,
+  useOpenedPlacement,
   useOverPane,
 } from "../src/features/briefing/over-pane";
 import { useDockAvoid } from "../src/features/q-dock/dock-avoid";
@@ -109,6 +111,79 @@ describe("floating boxes and content panes", () => {
     ).toBe(768 - (620 - 8));
     // Nothing under it: no lift.
     expect(clearBottom(button, [box(0, 690, 400, 740)], 768)).toBeNull();
+  });
+
+  /**
+   * D4 remainder (live 14 Nov, /company/interest at 390x844): the OPENED
+   * briefing (y 518-748) covered Accept/Decline (y 551-595) and no scroll
+   * cleared it. Opened, it now rises above the registered controls.
+   */
+  it("D4: the opened briefing rises above an interest's Accept/Decline at 390px", () => {
+    const opened = box(16, 518, 374, 748);
+    const decision = box(16, 551, 374, 595);
+    const placed = openedPlacement(opened, [decision], 844);
+    expect(placed).not.toBeNull();
+    if (placed === null) return;
+    const top = 844 - placed.bottom - (placed.maxHeight ?? 230);
+    const moved = box(16, top, 374, 844 - placed.bottom);
+    expect(overlaps(moved, decision)).toBe(false);
+    expect(top).toBeGreaterThanOrEqual(8);
+    // Clear already: left where it is.
+    expect(openedPlacement(opened, [box(16, 100, 374, 140)], 844)).toBeNull();
+    // Little room above the control: it keeps the top edge and scrolls inside.
+    const high = openedPlacement(opened, [box(16, 180, 374, 600)], 844);
+    expect(high).toEqual({ bottom: 844 - (180 - 8), maxHeight: 180 - 8 - 8 });
+    // Never shrunk below a readable height.
+    expect(
+      openedPlacement(opened, [box(16, 60, 374, 600)], 844)?.maxHeight,
+    ).toBe(96);
+  });
+
+  function OpenedProbe({ at }: { readonly at: ReturnType<typeof box> }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const placed = useOpenedPlacement(ref, true, null);
+    return (
+      <div
+        data-testid="briefing"
+        data-bottom={placed === null ? "" : String(placed.bottom)}
+        ref={(element) => {
+          ref.current = element;
+          if (element !== null) {
+            element.getBoundingClientRect = () => ({
+              ...at,
+              x: at.left,
+              y: at.top,
+              width: at.right - at.left,
+              height: at.bottom - at.top,
+              toJSON: () => at,
+            });
+          }
+        }}
+      />
+    );
+  }
+
+  it("D4: rendered at 390x844, the opened briefing's placement leaves the registered controls uncovered", () => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    Object.assign(window, { innerWidth: 390, innerHeight: 844 });
+    try {
+      const decision = box(16, 551, 374, 595);
+      render(
+        <>
+          <Registered rect={decision} />
+          <OpenedProbe at={box(16, 518, 374, 748)} />
+        </>,
+      );
+      const bottom = Number(
+        screen.getByTestId("briefing").getAttribute("data-bottom"),
+      );
+      expect(bottom).toBeGreaterThan(0);
+      const placedBox = box(16, 844 - bottom - 230, 374, 844 - bottom);
+      expect(overlaps(placedBox, decision)).toBe(false);
+    } finally {
+      Object.assign(window, { innerWidth: width, innerHeight: height });
+    }
   });
 
   it("says a box is over a marked pane, and clear of everything else", () => {

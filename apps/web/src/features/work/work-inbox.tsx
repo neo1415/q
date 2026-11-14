@@ -1101,7 +1101,7 @@ export function ApprovalDetail({
       setStatus(null);
       const result = await rejectQApprovalAction(approvalId).catch(() => null);
       if (result?.ok === true) {
-        toast(t("Dismissed. Nothing was sent."));
+        toast(t("Dropped. Nothing was sent."));
         (onDismissed ?? onFinished)();
       } else setStatus("That didn't go through. Try again.");
     });
@@ -1294,15 +1294,19 @@ export function ApprovalDetail({
               {editing ? t("Editing") : t("Edit")}
             </button>
           ) : null}
+          {/* Live 14 Nov: a pending "Message Watchly" draft read as having
+              only Approve and Edit; the decline was a faint "Dismiss". It is
+              the chat card's Drop, through the same approval-board reject. */}
           {phase === "done" ? null : (
             <button
               type="button"
-              className={workButton("quiet")}
+              className={workButton("secondary")}
               disabled={pending}
               onClick={dismiss}
               data-work-dismiss
+              data-work-drop
             >
-              {t("Dismiss")}
+              {t("Drop")}
             </button>
           )}
           <span className="flex-1" data-spacer />

@@ -85,6 +85,7 @@ export const WORK_DESIGN_AR: Readonly<Record<string, string>> = {
   "Ask Q about it": "اسأل Q عنه",
   "Asked Q. Its answer is in the Q panel.": "سُئل Q. جوابه في لوحة Q.",
   "Dismissed. Nothing was sent.": "رُفض. لم يُرسل شيء.",
+  "Dropped. Nothing was sent.": "تم التخلي عنه. لم يُرسل شيء.",
   "Sent. It went exactly as you approved it.":
     "أُرسل. ذهب تماماً كما وافقت عليه.",
   "Approved. Q is doing it now.": "تمت الموافقة. Q ينفّذه الآن.",

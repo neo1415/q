@@ -262,7 +262,7 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
     fireEvent.click(screen.getByRole("button", { name: /Kazikit/ }));
     fireEvent.click(screen.getByRole("button", { name: "Prepare it" }));
     await settle();
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    fireEvent.click(screen.getByRole("button", { name: "Drop" }));
     await settle();
     expect(reject).toHaveBeenCalledWith(APPROVAL);
     expect(dismiss).toHaveBeenCalledWith(stalled.key);
@@ -301,8 +301,42 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
       within(detail as HTMLElement).getByRole("button", { name: "Approve" }),
     ).toBeTruthy();
     expect(
-      within(detail as HTMLElement).getByRole("button", { name: "Dismiss" }),
+      within(detail as HTMLElement).getByRole("button", { name: "Drop" }),
     ).toBeTruthy();
+  });
+
+  it("live 14 Nov: a pending Q draft opened on Work can be dropped, through the approval board", async () => {
+    read.mockResolvedValue({ ok: true, value: view("Hi Watchly team") });
+    reject.mockResolvedValue({ ok: true, value: null });
+    render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[
+          QPendingApprovalSchema.parse({
+            approvalId: APPROVAL,
+            runId: RUN,
+            conversationId: null,
+            summary: "Message Watchly",
+            requestedAt: "2026-10-04T09:00:00Z",
+            expiresAt: "2026-10-05T09:00:00Z",
+          }),
+        ]}
+        work={[]}
+        done={null}
+      />,
+    );
+    await settle();
+    const detail = document.querySelector("[data-work-detail]");
+    expect(detail).not.toBeNull();
+    const scope = within(detail as HTMLElement);
+    expect(scope.getByText("Hi Watchly team")).toBeTruthy();
+    // Yes, and no: both are on the card, beside each other.
+    expect(scope.getByRole("button", { name: /^Approve/u })).toBeTruthy();
+    fireEvent.click(scope.getByRole("button", { name: "Drop" }));
+    await settle();
+    // The same reject the chat card's Drop uses; nothing is approved.
+    expect(reject).toHaveBeenCalledWith(APPROVAL);
+    expect(approve).not.toHaveBeenCalled();
   });
 
   it("shows the picture of who an approval names, and initials when there is none", () => {

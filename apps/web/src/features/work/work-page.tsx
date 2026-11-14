@@ -34,6 +34,7 @@ import {
   approveQApprovalAction,
   askQAction,
   readQApprovalAction,
+  rejectQApprovalAction,
 } from "@/features/q/actions";
 import { ChatDraftEditor } from "@/features/integrations/chat-draft-editor";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
@@ -515,6 +516,18 @@ function ApprovalPlan({
       }
     });
 
+  // The chat card's Drop (live 14 Nov): the same approval-board reject, so
+  // a card can be declined here, not only approved or left waiting.
+  const drop = () =>
+    startTransition(async () => {
+      setMessage(null);
+      const result = await rejectQApprovalAction(approvalId).catch(() => null);
+      if (result?.ok === true) {
+        setMessage("Dropped. Nothing was sent.");
+        onDone(false);
+      } else setMessage("That didn't go through. Try again.");
+    });
+
   if (failed) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
@@ -618,6 +631,16 @@ function ApprovalPlan({
             {t("Edit")}
           </Link>
         )}
+        {canDecide ? (
+          <Button
+            variant="secondary"
+            disabled={pending}
+            onClick={drop}
+            data-approval-drop
+          >
+            {t("Drop")}
+          </Button>
+        ) : null}
         {hideNotNow ? null : (
           <Button
             variant="quiet"
