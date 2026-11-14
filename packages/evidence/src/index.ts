@@ -188,6 +188,15 @@ export {
   type DocumentFigureSource,
 } from "./interpretation/document-figure.js";
 export {
+  recordWebFigure,
+  webFigureProposals,
+  WebFigureSourceSchema,
+  webFigureWords,
+  type WebFigureEvidence,
+  type WebFigurePage,
+  type WebFigureSource,
+} from "./interpretation/web-figure.js";
+export {
   createClaimInterpretationService,
   type ClaimInterpretationDependencies,
   type ClaimInterpretationService,
