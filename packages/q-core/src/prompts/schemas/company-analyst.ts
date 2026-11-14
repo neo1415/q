@@ -670,6 +670,11 @@ export const CompanyAnalystV34ResultSchema =
     coverage: z.array(CompanyDimensionCoverageSchema).default([]),
     materialChanges: z.array(CompanyMaterialChangeSchema).default([]),
     profileUpdates: z.array(ProfileUpdateSchema).default([]),
+    // What the person stated, and the sentences the model named as talk
+    // about acting: a sixth statement was a founder's fact lost, and a
+    // seventh action sentence would have reached the person unremoved.
+    userStatements: z.array(UserStatementSchema).default([]),
+    actionTalk: z.array(ModelStatementSchema).default([]),
   }).strict();
 export type CompanyAnalystV34Result = z.infer<
   typeof CompanyAnalystV34ResultSchema

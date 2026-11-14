@@ -287,7 +287,9 @@ async function recordUserStatements(
   }
   const companyId = request.company.companyId;
   const recorded: string[] = [];
-  for (const statement of statements.slice(0, 5)) {
+  // Every statement the person made is recorded (decision 97: v33 kept
+  // five; a sixth was a founder's fact lost).
+  for (const statement of statements) {
     // Same closed namespace as the conversational seam: a key the model
     // invented is not a category of understanding Capital Q has.
     if (!isRecordableKnowledgeKey(statement.knowledgeKey)) {

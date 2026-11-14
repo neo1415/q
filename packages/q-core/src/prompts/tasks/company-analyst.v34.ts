@@ -13,8 +13,8 @@ import { COMPANY_ANALYST_V33 } from "./company-analyst.v33.js";
  * word, with output schema v34, which has no count ceiling on the evidence
  * lists (findings, missing evidence, contradictions, assumptions,
  * wouldChangeIf, company findings, coverage, material changes, profile
- * updates). v33's bounds let the gateway keep a list's first items and
- * lose the rest silently.
+ * updates, the person's own statements and action talk). v33's bounds let
+ * the gateway keep a list's first items and lose the rest silently.
  */
 export const COMPANY_ANALYST_V34: PromptDefinition<
   CompanyAnalystV5Variables,

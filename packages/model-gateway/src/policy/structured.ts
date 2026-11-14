@@ -422,7 +422,8 @@ export function acceptStructuredOutput<T>(
         bound >= 0
       ) {
         cuts.set(listed, bound);
-        dropped.push(`${describe(issue)}:cut`);
+        // How many were cut, so a caller can record it (decision 97).
+        dropped.push(`${describe(issue)}:cut_${String(listed.length - bound)}`);
         continue;
       }
       const element = containingElement(working, issue.path);
