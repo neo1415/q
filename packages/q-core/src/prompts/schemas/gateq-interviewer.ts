@@ -121,6 +121,12 @@ export const GateQProposedFactSchema = z
      * including another statement about the same dimension.
      */
     disagreesWith: z.string().max(300).nullable().optional(),
+    /**
+     * v6 (live D11): with `correction`, the earlier words this replaces,
+     * quoted, so only that statement gives way and every other statement
+     * on the dimension stays. Null when it corrects nothing.
+     */
+    corrects: z.string().max(300).nullable().optional(),
   })
   .strict();
 export type GateQProposedFact = z.infer<typeof GateQProposedFactSchema>;

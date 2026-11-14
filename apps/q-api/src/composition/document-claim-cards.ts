@@ -647,7 +647,7 @@ export function documentClaimReadings(
 }
 
 /**
- * Files one card in the founder's own Q conversation, as them: a run
+ * Files one card in the founder's own Q conversation, in Q's voice: a run
  * begun under its own orchestration version (never resumed by the
  * conversational engine), its one proposal through the Approval Engine.
  * The run's idempotency key makes a repeated wake propose nothing new.
@@ -674,6 +674,10 @@ export function documentClaimCardProposer(dependencies: {
       },
       idempotencyKey: card.key.slice(0, 255),
       correlationId,
+      // Q read the deck and is proposing the figure; the founder typed
+      // nothing. The card's line is Q's own, never shown as their words
+      // (live 2026-11-14: "You: From your document: MRR of USD 42,000…").
+      openedBy: "Q",
     });
     if (!created.created) {
       return { conversationId: created.conversation.id };

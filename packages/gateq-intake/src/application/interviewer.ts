@@ -48,6 +48,8 @@ import { regionIn } from "./cities.js";
 import {
   ACCUMULATING_DIMENSIONS,
   addedStatement,
+  correctedStatement,
+  holdsWords,
   asStatement,
 } from "./fact-history.js";
 import { normaliseProposedFact } from "./normalise-fact.js";
@@ -808,17 +810,62 @@ export function createGateQInterviewer(
           before === undefined ? null : asStatement(before.value);
         const saidText = asStatement(normalised.value);
         if (
-          !candidate.correction &&
           ACCUMULATING_DIMENSIONS.has(dimension) &&
           before !== undefined &&
           heldText !== null &&
           saidText !== null
         ) {
+          // Live D11 (2026-11-14, Layerum): "about 1,500 weekly active now"
+          // was read as a correction AND as disagreeing with "600 weekly
+          // active" (Q asked "which figure should I use?"), and the
+          // correction path replaced all of traction with that one line.
+          // When the reading is unsure whether it corrects or disagrees
+          // (it flags a disagreement on this dimension), both are kept as
+          // a pair until the founder settles it. A plain correction
+          // replaces only the statement it corrects (fact-history.ts).
+          const marked = conflictFor(candidate);
+          const turnConflict = result.conflicts.find(
+            (conflict) => conflict.dimension === dimension,
+          );
+          const corrects =
+            typeof candidate.corrects === "string" &&
+            candidate.corrects.trim().length > 0
+              ? candidate.corrects
+              : null;
+          const unsure =
+            candidate.correction &&
+            (marked !== null || turnConflict !== undefined);
+          if (candidate.correction && !unsure) {
+            const corrected = correctedStatement({
+              held: { value: heldText, provenance: before.provenance },
+              statement: saidText.text,
+              provenance: normalised.provenance,
+              corrects,
+            });
+            if (corrected === null) continue;
+            const fact = { ...normalised, ...corrected };
+            if (sameTurn === undefined) {
+              writtenNow.set(dimension, facts.length);
+              facts.push(fact);
+            } else facts[sameTurn] = fact;
+            continue;
+          }
+          // Unsure: the earlier words are the ones the reading quotes, and
+          // only words really on record pair (a pair with the wrong
+          // statement is the D10 defect again).
+          const unsureEarlier =
+            [marked?.earlier ?? null, corrects, turnConflict?.earlier ?? null]
+              .filter((quote): quote is string => quote !== null)
+              .find((quote) => holdsWords(heldText, quote)) ?? null;
           const added = addedStatement({
             held: { value: heldText, provenance: before.provenance },
             statement: saidText.text,
             provenance: normalised.provenance,
-            conflict: conflictFor(candidate),
+            conflict: unsure
+              ? unsureEarlier === null
+                ? null
+                : { earlier: unsureEarlier }
+              : marked,
           });
           if (added === null) continue;
           const fact = { ...normalised, ...added };

@@ -140,6 +140,16 @@ const GROUP_OF = new Map<ApplicationDimension, GateqInvestmentGroup>(
   ),
 );
 
+/** A stated nothing, as the interview stores it (normalise-fact.ts). */
+export const isStatedZero = (text: string): boolean =>
+  /^0+(?:\.0+)?$/u.test(text.trim());
+
+const ZERO_WORDS: Readonly<Partial<Record<ApplicationDimension, string>>> = {
+  "claims.revenue": "Zero revenue",
+  "claims.traction": "None yet",
+  "company.customers": "No customers yet",
+};
+
 /** A stored value in words, for a person. Never the stored shape. */
 export function factSummary(
   dimension: ApplicationDimension,
@@ -147,8 +157,14 @@ export function factSummary(
 ): string {
   switch (value.kind) {
     case "TEXT":
+      // A stated zero is kept as said ("0") when they named no currency;
+      // read alone it looks like a missing value (live 2026-11-14, Layerum
+      // review "Revenue: You said 0").
+      if (isStatedZero(value.text)) return ZERO_WORDS[dimension] ?? "None";
       return statementsInWords(value.text);
     case "AMOUNT":
+      if (dimension === "claims.revenue" && isStatedZero(value.amount))
+        return `Zero revenue (${value.currency})`;
       return amountWords(value.amount, value.currency);
     case "PHRASES":
       return value.phrases.join(", ");

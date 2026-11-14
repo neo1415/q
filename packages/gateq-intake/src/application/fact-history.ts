@@ -108,24 +108,69 @@ function weaker(a: FactProvenance, b: FactProvenance): FactProvenance {
   return "APPLICANT_PROVIDED";
 }
 
+/** Where some quoted words sit in a held text: a line, or one clause of it. */
+type Unit = { readonly line: number; readonly clause: number | null };
+
+/**
+ * Clauses of one statement line. A sentence of theirs read as phrases is
+ * stored joined with "; " (asStatement), so "2,300 wallets opened; 600
+ * weekly active" is two things they said, and either can be disagreed
+ * with or corrected without the other.
+ */
+const clausesOf = (line: string): readonly string[] =>
+  line
+    .split(/;\s+/u)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+
+/**
+ * The unit of the held text that holds the quoted words, or null when they
+ * are not there (a quote that is not in the held value is not trusted).
+ */
+function locate(lines: readonly string[], quoted: string | null): Unit | null {
+  if (quoted === null) return null;
+  const wanted = squash(quoted).toLowerCase();
+  if (wanted.length === 0) return null;
+  for (const [line, text] of lines.entries()) {
+    if (!squash(text).toLowerCase().includes(wanted)) continue;
+    const clauses = clausesOf(text);
+    const holding = clauses.flatMap((clause, index) =>
+      squash(clause).toLowerCase().includes(wanted) ? [index] : [],
+    );
+    const only = holding.length === 1 ? holding[0] : undefined;
+    return {
+      line,
+      clause: clauses.length > 1 && only !== undefined ? only : null,
+    };
+  }
+  return null;
+}
+
+const unitText = (lines: readonly string[], unit: Unit): string => {
+  const line = lines[unit.line] ?? "";
+  return unit.clause === null ? line : (clausesOf(line)[unit.clause] ?? line);
+};
+
+/** True when the quoted words are among the statements held. */
+export function holdsWords(held: TextValue, quoted: string | null): boolean {
+  return locate(statementsOf(held), quoted) !== null;
+}
+
 /**
  * The earlier words the model says this statement disagrees with, checked
- * against what was really recorded: a quote that is not in the held value
- * is not trusted, and the held value's latest statement stands for it.
+ * against what was really recorded: the one clause or statement that holds
+ * them (live D11: "600 weekly active", not the "2,300 wallets opened" said
+ * in the same sentence). A quote that is not in the held value is not
+ * trusted, and the held value's latest statement stands for it.
  */
 function earlierQuote(held: TextValue, quoted: string | null): string {
   const statements = statementsOf(held);
   const latest = statements.at(-1) ?? held.text;
-  if (quoted !== null) {
-    const wanted = squash(quoted).toLowerCase();
-    if (wanted.length > 0) {
-      const found = statements.find((s) =>
-        squash(s).toLowerCase().includes(wanted),
-      );
-      if (found !== undefined) return found.slice(0, QUOTE_MAX);
-    }
-  }
-  return latest.slice(0, QUOTE_MAX);
+  const unit = locate(statements, quoted);
+  return (unit === null ? latest : unitText(statements, unit)).slice(
+    0,
+    QUOTE_MAX,
+  );
 }
 
 const bytes = (value: unknown) =>
@@ -162,9 +207,21 @@ export function addedStatement(input: {
       later: statement.slice(0, QUOTE_MAX),
     });
   }
-  const kept = unreconciled.slice(-UNRECONCILED_MAX);
+  return {
+    value: bounded([...earlier, statement], unreconciled),
+    provenance: weaker(input.held.provenance, input.provenance),
+  };
+}
 
-  const lines = [...earlier, statement];
+/**
+ * Statements as one stored value within the column's bound: the oldest are
+ * left to the dimension's history rows (never deleted there).
+ */
+function bounded(
+  lines: readonly string[],
+  unreconciled: TextValue["unreconciled"],
+): TextValue {
+  const kept = (unreconciled ?? []).slice(-UNRECONCILED_MAX);
   const build = (from: number): TextValue => ({
     kind: "TEXT",
     text: lines.slice(from).join("\n").slice(-TEXT_CHARS_MAX),
@@ -180,9 +237,83 @@ export function addedStatement(input: {
     from += 1;
     value = build(from);
   }
+  return value;
+}
+
+/**
+ * The value to record when a founder corrects something in a narrative
+ * dimension: the correction replaces only the statement it corrects, and
+ * every other statement they made there stays (live D11, 2026-11-14,
+ * Layerum cdcf286b: "about 1,500 weekly active now", read as a correction,
+ * replaced "2,300 wallets opened", "600 weekly active" and "grew from 1
+ * platform to 4 since March" with that one line).
+ *
+ * Which statement it corrects is the reading's, never a word match: the
+ * earlier words it quotes (`corrects`). Without a quote, a held value with
+ * one disagreement still open is settled by it (both of that pair's
+ * statements give way), and a held value of one statement is that
+ * statement. Otherwise nothing it corrects can be named, so nothing is
+ * removed: the correction is added beside the rest. Removed words stay on
+ * the dimension's history rows, and on the transcript.
+ */
+export function correctedStatement(input: {
+  readonly held: {
+    readonly value: TextValue;
+    readonly provenance: FactProvenance;
+  };
+  readonly statement: string;
+  readonly provenance: FactProvenance;
+  /** Q's reading: the earlier words this correction replaces (or null). */
+  readonly corrects: string | null;
+}): { readonly value: TextValue; readonly provenance: FactProvenance } | null {
+  const statement = input.statement.trim();
+  if (statement.length === 0) return null;
+  const lines = statementsOf(input.held.value);
+  const pairs = input.held.value.unreconciled ?? [];
+
+  const targets: Unit[] = [];
+  const named = locate(lines, input.corrects);
+  if (named !== null) targets.push(named);
+  else if (pairs.length === 1 && pairs[0] !== undefined) {
+    for (const side of [pairs[0].earlier, pairs[0].later]) {
+      const unit = locate(lines, side);
+      if (unit !== null) targets.push(unit);
+    }
+  } else if (lines.length === 1) targets.push({ line: 0, clause: null });
+
+  const removed = targets.map((unit) => squash(unitText(lines, unit)));
+  const gone = (words: string) => {
+    const said = squash(words).toLowerCase();
+    return removed.some((r) => {
+      const was = r.toLowerCase();
+      return was.includes(said) || said.includes(was);
+    });
+  };
+  const kept: string[] = [];
+  for (const [index, line] of lines.entries()) {
+    const here = targets.filter((unit) => unit.line === index);
+    if (here.length === 0) {
+      kept.push(line);
+      continue;
+    }
+    if (here.some((unit) => unit.clause === null)) continue;
+    const drop = new Set(here.map((unit) => unit.clause));
+    const rest = clausesOf(line).filter((_, clause) => !drop.has(clause));
+    if (rest.length > 0) kept.push(rest.join("; "));
+  }
+  if (!kept.some((s) => squash(s) === squash(statement))) kept.push(statement);
+  // A pair one of whose statements was corrected is settled by it.
+  const open = pairs.filter(
+    (pair) => removed.length === 0 || !(gone(pair.earlier) || gone(pair.later)),
+  );
+  const value = bounded(kept, open);
+  if (JSON.stringify(value) === JSON.stringify(input.held.value)) return null;
   return {
     value,
-    provenance: weaker(input.held.provenance, input.provenance),
+    provenance:
+      kept.length === 1
+        ? input.provenance
+        : weaker(input.held.provenance, input.provenance),
   };
 }
 

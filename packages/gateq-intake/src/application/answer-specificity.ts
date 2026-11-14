@@ -25,6 +25,8 @@ const NUMBER_WORDS =
 /** Saying there is nothing yet is a specific answer, not a vague one. */
 const NOTHING_YET =
   /\b(pre[- ]?revenue|no (revenue|customers|users|sales)( yet)?|not (yet )?(generating|making) revenue)\b/iu;
+/** The stored shape of a stated zero (normalise-fact.ts). */
+const STATED_ZERO = /^0+(?:\.0+)?$/u;
 const PERIOD =
   /\b(per|a|each|every|last|this|over the|in the) (day|week|month|quarter|year)\b|\b(daily|weekly|monthly|quarterly|yearly|annual(ly|i[sz]ed)?|mrr|arr|gmv|run[- ]?rate|ytd|to date|so far|since|fy\s?\d{2,4}|q[1-4]|20\d\d|mo|yr)\b/iu;
 
@@ -103,6 +105,10 @@ export function missingSpecifics(
   for (const fact of current) {
     const text = textOf(fact.value);
     if (text === null) return null;
+    // A stated zero is complete: there is no amount or period to ask for
+    // (live 2026-11-14, Layerum: "Nobody pays yet", then "what did you
+    // bill over the last twelve months?").
+    if (STATED_ZERO.test(text.trim())) return null;
     const gap = rule(text);
     if (gap === null) return null;
     missing ??= gap;

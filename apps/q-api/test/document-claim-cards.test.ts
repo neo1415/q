@@ -10,6 +10,7 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
   createDocumentClaimCards,
+  documentClaimCardProposer,
   DOCUMENT_CLAIMS_REFERENCE_PREFIX,
   READING_ATTEMPTS_MAX,
   type DocumentClaimCard,
@@ -486,5 +487,54 @@ describe("figures proposed from a founder's deck", () => {
       kind: "NOT_ELIGIBLE",
     });
     expect([passages, cards]).toEqual([[], []]);
+  });
+});
+
+describe("a deck figure card is Q's line, never the founder's (live 2026-11-14)", () => {
+  it("opens its run as Q, so the message is not the person's, and still proposes the card", async () => {
+    const commands: Record<string, unknown>[] = [];
+    const proposals: Record<string, unknown>[] = [];
+    const propose = documentClaimCardProposer({
+      runtime: {
+        createRun: ((command: Record<string, unknown>) => {
+          commands.push(command);
+          return Promise.resolve({
+            created: true,
+            run: {
+              id: "11000000-0000-4000-8000-000000000001",
+              tenantId: founder.tenantId,
+              actorUserId: founder.userId,
+            },
+            conversation: { id: "12000000-0000-4000-8000-000000000001" },
+          });
+        }) as never,
+      },
+      orchestration: {
+        begin: () => Promise.resolve(undefined as never),
+        advanceThrough: () => Promise.resolve(undefined as never),
+        fail: () => Promise.resolve(undefined as never),
+      },
+      actions: {
+        propose: (input: Record<string, unknown>) => {
+          proposals.push(input);
+          return Promise.resolve(undefined as never);
+        },
+      },
+    });
+    const card: DocumentClaimCard = {
+      payload: { metric: "MRR", amount: "42000", currency: "USD" },
+      words: "From your document: MRR of USD 42,000 (Seed deck, page 3).",
+      key: "doc-claims:v1:card-1",
+    };
+    const filed = await propose(founder, card, null);
+    expect(filed.conversationId).toBe("12000000-0000-4000-8000-000000000001");
+    // Q's own line: create-run stores an opened-by-Q run's message with
+    // role Q, never USER.
+    expect(commands[0]?.["openedBy"]).toBe("Q");
+    expect(commands[0]?.["quiet"]).toBeUndefined();
+    // The card is still proposed for the founder's approval.
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]?.["payload"]).toEqual(card.payload);
+    expect(proposals[0]?.["actor"]).toBe(founder);
   });
 });

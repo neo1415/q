@@ -507,9 +507,15 @@ describe("an unsure or unknown answer never empties what they said (live D2b)", 
     );
     s.record(settled.facts, 18);
     const now = s.current().find((f) => f.dimension === "claims.traction");
+    // Live D11: the correction settles the pair it answers (both of its
+    // statements give way); what else they said stays.
     expect(now?.value).toEqual({
       kind: "TEXT",
-      text: "About 1,500 weekly active on the member app.",
+      text: [
+        "running pilots with five SACCOs in Nakuru and Eldoret",
+        "Of the five pilots, three asked about pricing.",
+        "About 1,500 weekly active on the member app.",
+      ].join("\n"),
     });
     expect(contradictionsIn(s.current())).toEqual([]);
     // History keeps the accumulated statements.
@@ -695,5 +701,206 @@ describe("live D10: only the statement that disagrees is paired (Routeix)", () =
     expect(needs.map((need) => need.dimension)).not.toContain(
       "company.customers",
     );
+  });
+});
+
+describe("live D11: a correction replaces only what it corrects (Layerum cdcf286b)", () => {
+  // The founder's turns, seq 3, 5, 7 and 9, as production holds them
+  // (fictional applicant), with the readings the live model gave.
+  const SEQ_3 =
+    "Nobody pays yet: the pilots are free for six months. Across the pilots, merchants on our partner platforms have 2,300 wallets opened, 600 weekly active.";
+  const SEQ_5 =
+    "Four partner platforms are live: two school-fee platforms and two merchant POS apps. We grew from 1 platform to 4 since March.";
+  const SEQ_7 =
+    "As I said, nothing billed: nobody pays yet. Pricing will be 1% per payout with a USD 200 monthly platform fee. Also, about 1,500 weekly active now.";
+  const SEQ_9 =
+    "I'm not sure which weekly-active figure is right: the 600 and the 1,500 come from two different exports. Please leave it open for now. Zero revenue covers everything since we started in January.";
+  const Q_8 =
+    "I also heard weekly active is now about one thousand five hundred, rather than six hundred; which figure should I use, and what period does the zero revenue cover?";
+  const WALLETS =
+    "Across the pilots, merchants on our partner platforms have 2,300 wallets opened";
+  const GROWTH = "We grew from 1 platform to 4 since March.";
+  const NOW = "About 1,500 weekly active now.";
+  const OPEN =
+    "The 600 and 1,500 weekly-active figures come from two different exports; which is right is unresolved for now.";
+
+  const zeroRevenue = {
+    dimension: "claims.revenue",
+    value: { kind: "ZERO" as const },
+    provenance: "APPLICANT_PROVIDED" as const,
+    correction: false,
+  };
+
+  async function throughSeq5() {
+    const s = store();
+    s.record(
+      (
+        await say(s.current(), SEQ_3, {
+          facts: [
+            {
+              dimension: "claims.traction",
+              value: {
+                kind: "PHRASES",
+                phrases: [WALLETS, "600 weekly active"],
+              },
+              provenance: "APPLICANT_PROVIDED",
+              correction: false,
+            },
+            zeroRevenue,
+          ],
+        })
+      ).facts,
+      3,
+    );
+    s.record(
+      (
+        await say(s.current(), SEQ_5, {
+          facts: [
+            {
+              dimension: "company.customers",
+              value: {
+                kind: "TEXT",
+                text: "Four partner platforms are live: two school-fee platforms and two merchant POS apps.",
+              },
+              provenance: "APPLICANT_PROVIDED",
+              correction: false,
+            },
+            traction(GROWTH),
+          ],
+        })
+      ).facts,
+      5,
+    );
+    return s;
+  }
+  const tractionNow = (s: ReturnType<typeof store>) => {
+    const now = s.current().find((f) => f.dimension === "claims.traction");
+    if (now?.value.kind !== "TEXT") throw new Error("traction lost");
+    return now.value;
+  };
+
+  it("the live reading (a correction Q asks about) keeps every statement and one pair", async () => {
+    const s = await throughSeq5();
+    // Live: correction true, and a disagreement on traction (Q asked
+    // "which figure should I use?").
+    s.record(
+      (
+        await say(s.current(), SEQ_7, {
+          intent: "CORRECTION",
+          facts: [{ ...traction(NOW, "ESTIMATED"), correction: true }],
+          conflicts: [
+            { dimension: "claims.traction", earlier: "600 weekly active" },
+          ],
+        })
+      ).facts,
+      7,
+    );
+    const value = tractionNow(s);
+    for (const said of [WALLETS, "600 weekly active", GROWTH, NOW])
+      expect(value.text).toContain(said);
+    expect(value.unreconciled).toEqual([
+      { earlier: "600 weekly active", later: NOW },
+    ]);
+    expect(contradictionsIn(s.current())).toHaveLength(1);
+
+    // Seq 9: "leave it open" adds its summary and settles nothing.
+    s.record(
+      (
+        await say(s.current(), SEQ_9, { facts: [traction(OPEN)] }, [
+          { role: "person", text: SEQ_7 },
+          { role: "q", text: Q_8 },
+        ])
+      ).facts,
+      9,
+    );
+    const after = tractionNow(s);
+    for (const said of [WALLETS, "600 weekly active", GROWTH, NOW, OPEN])
+      expect(after.text).toContain(said);
+    expect(after.unreconciled).toHaveLength(1);
+  });
+
+  it("a correction marked as also disagreeing is a pair, not a replacement", async () => {
+    const s = await throughSeq5();
+    const t = await say(s.current(), SEQ_7, {
+      intent: "CORRECTION",
+      facts: [
+        {
+          ...traction(NOW, "ESTIMATED"),
+          correction: true,
+          disagreesWith: "600 weekly active",
+        },
+      ],
+    });
+    const value = t.facts[0]?.value;
+    if (value?.kind !== "TEXT") throw new Error("expected text");
+    expect(value.text).toContain(WALLETS);
+    expect(value.text).toContain(GROWTH);
+    expect(value.unreconciled).toEqual([
+      { earlier: "600 weekly active", later: NOW },
+    ]);
+  });
+
+  it("a settled correction replaces only the statement it quotes; history keeps the rest", async () => {
+    const s = await throughSeq5();
+    s.record(
+      (
+        await say(s.current(), "Sorry, 600 was wrong: it's 1,500 weekly.", {
+          intent: "CORRECTION",
+          facts: [
+            {
+              ...traction(NOW),
+              correction: true,
+              corrects: "600 weekly active",
+            },
+          ],
+        })
+      ).facts,
+      7,
+    );
+    const value = tractionNow(s);
+    expect(value.text.split("\n")).toEqual([WALLETS, GROWTH, NOW]);
+    expect(value.unreconciled ?? []).toEqual([]);
+    const history = s.rows.filter((r) => r.dimension === "claims.traction");
+    expect(history).toHaveLength(3);
+    expect(JSON.stringify(history[1]?.value)).toContain("600 weekly active");
+  });
+
+  it("a correction that names nothing on record removes nothing", async () => {
+    const s = await throughSeq5();
+    const t = await say(s.current(), SEQ_7, {
+      intent: "CORRECTION",
+      facts: [{ ...traction(NOW), correction: true, corrects: "9,999 users" }],
+    });
+    const value = t.facts[0]?.value;
+    if (value?.kind !== "TEXT") throw new Error("expected text");
+    for (const said of [WALLETS, "600 weekly active", GROWTH, NOW])
+      expect(value.text).toContain(said);
+  });
+
+  it("a stated zero reads as zero revenue and is not asked about again", async () => {
+    const s = await throughSeq5();
+    const revenue = s.current().find((f) => f.dimension === "claims.revenue");
+    expect(revenue?.value).toEqual({ kind: "TEXT", text: "0" });
+    expect(factSummary("claims.revenue", { kind: "TEXT", text: "0" })).toBe(
+      "Zero revenue",
+    );
+    expect(
+      factSummary("claims.revenue", {
+        kind: "AMOUNT",
+        amount: "0",
+        currency: "USD",
+      }),
+    ).toBe("Zero revenue (USD)");
+    const needs = questionNeedsFor({
+      policy: { criteria: [] } as unknown as GatewayPolicy,
+      qualification: {
+        criteria: [],
+        unknowns: [],
+        principalMismatches: [],
+      } as unknown as QualificationResult,
+      facts: s.current(),
+      limit: 20,
+    });
+    expect(needs.map((need) => need.dimension)).not.toContain("claims.revenue");
   });
 });
