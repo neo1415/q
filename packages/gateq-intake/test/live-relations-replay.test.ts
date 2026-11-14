@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
+import {
+  GateqDossierSchema,
+  gateqDossierAsReadNow,
+  gateqStandingDisagreements,
+  gateqStatementIdentities,
+  gateqStatementsInWords,
+} from "@capital-q/contracts";
 import type { GateQStatementOp } from "@capital-q/q-core";
 
 import type {
@@ -96,6 +103,44 @@ const TURNS: readonly Turn[] = [
             dimension: "company.stage",
             value: { kind: "CODE", code: "seed" },
             words: "We're at seed",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "r-02a",
+    run: "1f9e33016",
+    say: "We're raising USD 350,000.",
+    script: () =>
+      reading({
+        reply: "USD 350,000. How many students use it?",
+        statements: [
+          st({
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "350000", currency: "USD" },
+            words: "raising USD 350,000",
+          }),
+        ],
+      }),
+  },
+  {
+    // Every run: the one real correction, which must hide only its target.
+    id: "r-02b",
+    run: "1f9e33016",
+    say: "Actually we're raising $400k, not $350k.",
+    script: (prompt) =>
+      reading({
+        reply: "USD 400,000, then.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: prompt.statement("raising USD 350,000"),
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "400000", currency: "USD" },
+            words: "we're raising $400k, not $350k",
           }),
         ],
       }),
@@ -657,6 +702,79 @@ describe("live relation replay: the failing turns of three GateQ runs", () => {
     expect(lines.some((l) => /600/u.test(l) && /1,500/u.test(l))).toBe(true);
     expect(lines.some((l) => /\b1\b.*\b4\b/u.test(l))).toBe(false);
     expect(lines.some((l) => /Not known/u.test(l))).toBe(false);
+
+    // A submission frozen before the rule (live c4cf20bd, 1e9fd48e) is read
+    // under it: the same record with a pre-fix same-turn "1 vs 4 schools"
+    // disagreement shows exactly what this one shows, and a dossier that
+    // already obeys the rule is returned as it is.
+    await intake.submit({ token, clientRequestId: "replay-submit-0001" });
+    const frozen = GateqDossierSchema.parse(
+      JSON.parse(JSON.stringify(world.submitted().at(-1)?.dossier)),
+    );
+    if (frozen.schemaVersion !== "gateq-dossier.v2")
+      throw new Error("expected a v2 dossier");
+    expect(gateqDossierAsReadNow(frozen)).toBe(frozen);
+    const one = byWords(world, "We went from 1 partner school");
+    const four = byWords(world, "to 4 since March");
+    const statements = {
+      ...frozen.statements,
+      dimensions: frozen.statements.dimensions.map((d) =>
+        d.dimension !== "claims.traction"
+          ? d
+          : {
+              ...d,
+              status: "DISAGREEMENT_OPEN" as const,
+              disagreements: [
+                ...d.disagreements,
+                {
+                  key: randomUUID(),
+                  olderStatementId: one.id,
+                  newerStatementId: four.id,
+                  state: "OPEN" as const,
+                  resolvedByStatementId: null,
+                  active: true,
+                },
+              ],
+            },
+      ),
+    };
+    const falseLines = gateqStandingDisagreements(
+      gateqStatementsInWords(statements),
+    )
+      .map((l) => l.text.slice(0, 300))
+      .filter((l) => !frozen.contradictions.includes(l));
+    expect(falseLines).toHaveLength(1);
+    const preFix = {
+      ...frozen,
+      statements,
+      contradictions: [...frozen.contradictions, ...falseLines],
+      contradictionsTotal: frozen.contradictionsTotal + 1,
+      diligenceQuestions: [
+        ...frozen.diligenceQuestions,
+        {
+          dimension: null,
+          basis: "CONTRADICTION" as const,
+          question: `Please reconcile: ${falseLines[0] ?? ""}.`.slice(0, 400),
+        },
+      ],
+    };
+    const read = gateqDossierAsReadNow(preFix);
+    expect(read.contradictions).toEqual(frozen.contradictions);
+    expect(read.contradictionsTotal).toBe(frozen.contradictionsTotal);
+    expect(read.diligenceQuestions).toEqual(frozen.diligenceQuestions);
+    expect(
+      gateqStatementIdentities(gateqStatementsInWords(read.statements)),
+    ).toEqual(
+      gateqStatementIdentities(gateqStatementsInWords(frozen.statements)),
+    );
+    expect(
+      read.statements.dimensions.find((d) => d.dimension === "claims.traction")
+        ?.status,
+    ).toBe(
+      frozen.statements.dimensions.find(
+        (d) => d.dimension === "claims.traction",
+      )?.status,
+    );
   });
 });
 

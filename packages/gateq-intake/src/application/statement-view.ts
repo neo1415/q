@@ -1,3 +1,4 @@
+import { gateqQuantityFitting, gateqRelatable } from "@capital-q/contracts";
 import type { QualificationDisputedFact } from "@capital-q/gateq";
 
 import {
@@ -103,51 +104,19 @@ export function samePeriod(a: string | null, b: string | null): boolean {
   return a === null || b === null || a === b;
 }
 
-/** Quantities that are rates: only a PERCENT (or a zero) is about one. */
-const RATE_QUANTITIES: ReadonlySet<string> = new Set([
-  "growth_rate_monthly",
-  "churn_rate_monthly",
-  "retention_rate",
-  "gross_margin",
-]);
-/** Quantities that are money: only MONEY (or a zero) is about one. */
-const MONEY_QUANTITIES: ReadonlySet<string> = new Set([
-  "revenue",
-  "mrr",
-  "arr",
-  "gmv",
-  "burn_monthly",
-  "raise_amount",
-  "pre_money_valuation",
-]);
-
 /**
  * The metric a statement is really about: its quantity key when the value
  * fits it, otherwise none. "40 percent of students are girls" read as
  * `users` is a share, not a number of users, so it names no quantity and
  * is never compared with "2,300 students" (live 2026-11-14, 06910b145).
+ * The rule itself lives in the contracts, so frozen dossiers are read by it
+ * too.
  */
 export function quantityFitting(
   kind: StatementValue["kind"],
   quantity: string | null,
 ): string | null {
-  if (quantity === null) return null;
-  switch (kind) {
-    case "ZERO":
-    case "UNKNOWN":
-      return quantity;
-    case "PERCENT":
-      return RATE_QUANTITIES.has(quantity) ? quantity : null;
-    case "MONEY":
-      return MONEY_QUANTITIES.has(quantity) ? quantity : null;
-    case "COUNT":
-      return RATE_QUANTITIES.has(quantity) || MONEY_QUANTITIES.has(quantity)
-        ? null
-        : quantity;
-    case "TEXT":
-    case "CODE":
-      return null;
-  }
+  return gateqQuantityFitting(kind, quantity);
 }
 
 type Relatable = Pick<
@@ -156,13 +125,14 @@ type Relatable = Pick<
 >;
 
 /**
- * THE relation rule (root cause 2026-11-14, audits/…-gateq-root-cause.md):
- * whether two statements can stand in a relation at all (disagree, or be
- * the pair a leave-open is about). Every place that relates statements,
- * the write path, the projector and the leave-open target, asks this and
- * nothing else. Three live runs failed because each place asked "same
- * dimension?" with its own extra heuristic, and a dimension such as
- * traction holds weekly active users, CAC and partner schools at once.
+ * THE relation rule (root cause 2026-11-14, audits/…-gateq-root-cause.md),
+ * `gateqRelatable` over two stored statements: whether they can stand in a
+ * relation at all (disagree, or be the pair a leave-open is about). Every
+ * place that relates statements, the write path, the projector and the
+ * leave-open target, asks this and nothing else. Three live runs failed
+ * because each place asked "same dimension?" with its own extra
+ * heuristic, and a dimension such as traction holds weekly active users,
+ * CAC and partner schools at once.
  *
  *   1. Both hold a value: an unknown is never an end (unknown stays unknown).
  *   2. Same dimension, and the same metric: two numbers name the same
@@ -178,20 +148,14 @@ export function relatable(
   b: Relatable,
   options: { readonly explicit?: boolean } = {},
 ): boolean {
-  if (!isHeld(a.value) || !isHeld(b.value)) return false;
-  if (a.dimension !== b.dimension) return false;
-  if (
-    a.sourceTurnId !== null &&
-    b.sourceTurnId !== null &&
-    a.sourceTurnId === b.sourceTurnId
-  )
-    return false;
-  if (!samePeriod(a.asOf, b.asOf)) return false;
-  const qa = quantityFitting(a.value.kind, a.quantity);
-  const qb = quantityFitting(b.value.kind, b.quantity);
-  if (qa !== null && qb !== null) return qa === qb;
-  if (qa === null && qb === null) return true;
-  return options.explicit === true;
+  const end = (s: Relatable) => ({
+    dimension: s.dimension,
+    quantity: s.quantity,
+    valueKind: s.value.kind,
+    asOf: s.asOf,
+    sourceTurn: s.sourceTurnId,
+  });
+  return gateqRelatable(end(a), end(b), options);
 }
 
 /**
