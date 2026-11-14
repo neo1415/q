@@ -31,7 +31,10 @@ describe("TURN_READER v88", () => {
     );
     expect(TURN_READER_V88.variables).toEqual(TURN_READER_V87.variables);
     expect(
-      TURN_READER_V88.template.replace(`\n${V88_FIT_EXCLUDE_RELATIONSHIPS}`, ""),
+      TURN_READER_V88.template.replace(
+        `\n${V88_FIT_EXCLUDE_RELATIONSHIPS}`,
+        "",
+      ),
     ).toBe(TURN_READER_V87.template);
     expect(TURN_READER_V88.template).toContain(
       `${V87_NAVIGATION_TAB}\n${V88_FIT_EXCLUDE_RELATIONSHIPS}`,

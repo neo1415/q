@@ -255,8 +255,7 @@ export type QApiModules = {
   readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
   /** Owner 14 Nov 2026: the account digest every Q turn reads. */
   readonly accountDigest?:
-    | AccountDigestRoutesDependencies["accountDigest"]
-    | undefined;
+    AccountDigestRoutesDependencies["accountDigest"] | undefined;
   /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
   readonly arrivalSnapshots?:
     ArrivalSnapshotRoutesDependencies["snapshots"] | undefined;

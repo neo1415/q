@@ -146,37 +146,57 @@ function digestOf(overrides: Partial<QAccountDigest> = {}): QAccountDigest {
 }
 
 describe("the account digest block every turn is told", () => {
-  const block = accountDigestBlock({ digest: digestOf(), now: NOW, timeZone: ZONE });
+  const block = accountDigestBlock({
+    digest: digestOf(),
+    now: NOW,
+    timeZone: ZONE,
+  });
 
   it("answers 'who should I follow up with' from the digest: the reply they owe first", () => {
     const tensor = block.indexOf("Tensorgate (company");
     const ledger = block.indexOf("Ledgerline (company");
     expect(tensor).toBeGreaterThan(0);
     expect(ledger).toBeGreaterThan(tensor);
-    expect(block).toMatch(/Tensorgate \(company, connected since [^)]*; you owe them a reply \(they wrote 13 Nov\)/u);
+    expect(block).toMatch(
+      /Tensorgate \(company, connected since [^)]*; you owe them a reply \(they wrote 13 Nov\)/u,
+    );
     expect(block).toMatch(/Ledgerline [^[]*awaiting their reply/u);
     // Ids Q can cite and act on.
     expect(block).toContain(`[relationship ${ID(102)}]`);
   });
 
   it("answers 'what's waiting for me' from the digest", () => {
-    expect(block).toContain("Waiting on them (2): Tensorgate is waiting for your reply");
-    expect(block).toContain(`Send the diligence request to Clinicrest [approval ${ID(201)}]`);
+    expect(block).toContain(
+      "Waiting on them (2): Tensorgate is waiting for your reply",
+    );
+    expect(block).toContain(
+      `Send the diligence request to Clinicrest [approval ${ID(201)}]`,
+    );
     expect(block).toContain("their gateway Savanna Seed: 4 unread");
     expect(block).toContain("2 need their judgement");
   });
 
   it("answers 'any meetings tomorrow' from the digest, labelled in their own time", () => {
-    expect(block).toMatch(/Sun 15 Nov, 10:00 \(tomorrow, Africa\/Lagos\): Intro call with Ada Obi \(brief ready\)/u);
+    expect(block).toMatch(
+      /Sun 15 Nov, 10:00 \(tomorrow, Africa\/Lagos\): Intro call with Ada Obi \(brief ready\)/u,
+    );
     // Unknown zone: said in UTC, never passed off as theirs.
-    const utc = accountDigestBlock({ digest: digestOf(), now: NOW, timeZone: null });
+    const utc = accountDigestBlock({
+      digest: digestOf(),
+      now: NOW,
+      timeZone: null,
+    });
     expect(utc).toMatch(/Sun 15 Nov, 09:00 \(tomorrow, UTC\)/u);
   });
 
   it("says Q's work, requests and recent events, and never 'none' for an unread section", () => {
-    expect(block).toContain("Reach three seed fintechs in Lagos (active, 2 open)");
+    expect(block).toContain(
+      "Reach three seed fintechs in Lagos (active, 2 open)",
+    );
     expect(block).toContain("you asked Clinicrest: 1 open, 2 answered");
-    expect(block).toContain("Recent (last 3 days): 13 Nov: Tensorgate wrote to you");
+    expect(block).toContain(
+      "Recent (last 3 days): 13 Nov: Tensorgate wrote to you",
+    );
     const unread = accountDigestBlock({
       digest: digestOf({ meetings: [], unread: ["MEETINGS"] }),
       now: NOW,
@@ -218,7 +238,9 @@ describe("the account digest block every turn is told", () => {
       now: NOW,
       timeZone: ZONE,
     });
-    expect(situation.length).toBeLessThanOrEqual(SITUATION_WITH_ACCOUNT_MAX_CHARS);
+    expect(situation.length).toBeLessThanOrEqual(
+      SITUATION_WITH_ACCOUNT_MAX_CHARS,
+    );
   });
 
   it("is the same for a typed and a spoken turn, and is never cut from the notes", () => {
@@ -229,16 +251,33 @@ describe("the account digest block every turn is told", () => {
       timeZone: ZONE,
     });
     const typed = environmentNoteParts([], [], [], { situation });
-    const spoken = environmentNoteParts([], [], [], { situation, spoken: true });
-    const digestPart = accountDigestBlock({ digest: digestOf(), now: NOW, timeZone: ZONE });
+    const spoken = environmentNoteParts([], [], [], {
+      situation,
+      spoken: true,
+    });
+    const digestPart = accountDigestBlock({
+      digest: digestOf(),
+      now: NOW,
+      timeZone: ZONE,
+    });
     expect(typed.turn).toContain(digestPart);
     expect(spoken.turn).toContain(digestPart);
-    expect(situationWithAccount({ header: "H", digest: null, now: NOW, timeZone: ZONE })).toBe("H");
+    expect(
+      situationWithAccount({
+        header: "H",
+        digest: null,
+        now: NOW,
+        timeZone: ZONE,
+      }),
+    ).toBe("H");
   });
 });
 
 describe("the code check behind a stated exclusion (D1)", () => {
-  const card = (n: number, name: string): QAnswerCardsBlock["cards"][number] => ({
+  const card = (
+    n: number,
+    name: string,
+  ): QAnswerCardsBlock["cards"][number] => ({
     key: `c${String(n)}`,
     name,
     line: null,
@@ -257,7 +296,7 @@ describe("the code check behind a stated exclusion (D1)", () => {
     title: "Fit against your mandate",
     cards: [card(2, "Tensorgate"), card(9, "Kora"), card(1, "Ledgerline")],
     followUps: [],
-  } as QAnswerCardsBlock;
+  };
 
   it("drops the companies they are in touch with and says so", () => {
     const inTouch = relationshipCounterparts(digestOf());
@@ -271,7 +310,10 @@ describe("the code check behind a stated exclusion (D1)", () => {
   });
 
   it("removes a card set left empty and leaves other blocks alone", () => {
-    const only = { ...block, cards: [card(2, "Tensorgate")] } as QAnswerCardsBlock;
+    const only = {
+      ...block,
+      cards: [card(2, "Tensorgate")],
+    } as QAnswerCardsBlock;
     const checked = withoutExcludedCompanies([only], new Set([ID(2)]));
     expect(checked.blocks).toEqual([]);
     expect(withoutExcludedCompanies([block], new Set()).dropped).toEqual([]);
@@ -368,7 +410,9 @@ describe("bba40261 replay: fits leaving out the companies they are in touch with
     expect(ids).not.toContain(ID(1)); // Tensorgate, who is owed a reply
     expect(ids.some((id) => RELATIONSHIPS.includes(id))).toBe(false);
     expect(ids).toHaveLength(7);
-    expect([...result.excludedRelationships].sort()).toEqual([...RELATIONSHIPS].sort());
+    expect([...result.excludedRelationships].sort()).toEqual(
+      [...RELATIONSHIPS].sort(),
+    );
     const block = fitSweepCardsBlock(result.fits, "Fit against your mandate");
     if (block === null) throw new Error("no block");
     const said = fitSweepSummary({
@@ -381,12 +425,22 @@ describe("bba40261 replay: fits leaving out the companies they are in touch with
     expect(said).not.toMatch(/Tensorgate|Ledgerline|Clinicrest/u);
     // And the final check finds nothing left to drop.
     expect(
-      withoutExcludedCompanies([block], relationshipCounterparts(digestOf({ relationshipCounterpartIds: RELATIONSHIPS }))).dropped,
+      withoutExcludedCompanies(
+        [block],
+        relationshipCounterparts(
+          digestOf({ relationshipCounterpartIds: RELATIONSHIPS }),
+        ),
+      ).dropped,
     ).toEqual([]);
   });
 
   it("without the reading's exclusion, the plain ranking still adds their relationships (unchanged)", async () => {
-    const ask = fitSweepAskOfReading({ text: "strongest fits", count: null }, [], [], []);
+    const ask = fitSweepAskOfReading(
+      { text: "strongest fits", count: null },
+      [],
+      [],
+      [],
+    );
     expect(ask.excludeRelationships).toBeUndefined();
     const result = await runFitSweep({
       ask,

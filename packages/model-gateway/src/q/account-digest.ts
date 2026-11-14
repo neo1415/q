@@ -133,7 +133,10 @@ function relationshipLine(
         ? `awaiting their reply${row.lastMessageAt === null ? "" : ` (you wrote ${localDay(row.lastMessageAt, timeZone)})`}`
         : null;
   const step = NEXT_STEP_WORDS[row.nextStep] ?? null;
-  const said = [owed, owed === null || row.nextStep !== "AWAIT_ANSWER" ? step : null]
+  const said = [
+    owed,
+    owed === null || row.nextStep !== "AWAIT_ANSWER" ? step : null,
+  ]
     .filter((part): part is string => part !== null)
     .join("; ");
   return `${plain(row.counterpart.name, 80)} (${row.counterpart.kind === "COMPANY" ? "company" : "investor"}, ${STAGE_WORDS[row.stage]} since ${localDay(row.stageSince, timeZone)}${said.length === 0 ? "" : `; ${said}`}) [relationship ${row.relationshipId}]`;

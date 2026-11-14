@@ -84,15 +84,13 @@ describe("the account digest for the resume opening", () => {
   it("reads the Q API's digest, and a failure is null, never an empty digest", async () => {
     const ok = createQApiAccountDigestReader(
       { baseUrl: "https://q.example.test", accessToken: "t" },
-      (() =>
-        Promise.resolve(
-          new Response(JSON.stringify(digest), { status: 200 }),
-        )) as typeof fetch,
+      () =>
+        Promise.resolve(new Response(JSON.stringify(digest), { status: 200 })),
     );
     expect(await ok()).toEqual(digest);
     const failed = createQApiAccountDigestReader(
       { baseUrl: "https://q.example.test", accessToken: "t" },
-      (() => Promise.resolve(new Response("", { status: 500 }))) as typeof fetch,
+      () => Promise.resolve(new Response("", { status: 500 })),
     );
     expect(await failed()).toBeNull();
     expect(await createQApiAccountDigestReader(null)()).toBeNull();

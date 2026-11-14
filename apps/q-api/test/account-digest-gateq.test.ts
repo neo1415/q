@@ -41,11 +41,16 @@ function item(n: number, extra: Partial<GateqInboxItemDto>): GateqInboxItemDto {
     daysLeft: null,
     submittedAt: "2026-11-10T09:00:00.000Z",
     ...extra,
-  } as GateqInboxItemDto;
+  };
 }
 
 const inbox = {
-  gateway: { id: U(1), name: "Savanna Seed", publicId: "savanna", replyWithinDays: 5 },
+  gateway: {
+    id: U(1),
+    name: "Savanna Seed",
+    publicId: "savanna",
+    replyWithinDays: 5,
+  },
   viewer: { userId: U(2), canDecide: true, solo: false },
   view: "INBOX",
   counts: {

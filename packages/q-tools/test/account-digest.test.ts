@@ -107,9 +107,11 @@ const BY_ACTOR: Record<string, OwnRelationships> = {
 };
 
 /** Ports that answer for the actor asked, and record who asked. */
-function tenantPorts(
-  overrides: Partial<AccountDigestPorts> = {},
-): { ports: AccountDigestPorts; asked: ActorContext[]; reads: Record<string, number> } {
+function tenantPorts(overrides: Partial<AccountDigestPorts> = {}): {
+  ports: AccountDigestPorts;
+  asked: ActorContext[];
+  reads: Record<string, number>;
+} {
   const asked: ActorContext[] = [];
   const reads: Record<string, number> = {};
   const seen = (name: string, actor: ActorContext) => {
@@ -158,7 +160,7 @@ function tenantPorts(
             : [],
         );
       },
-    } as QToolPorts["approvalInbox"],
+    },
     schedule: {
       upcoming: (actor: ActorContext) => {
         seen("schedule", actor);
@@ -268,7 +270,11 @@ describe("the account digest, per role", () => {
     ]);
     expect(digest.relationships[0]?.owed).toBe("YOU_OWE_REPLY");
     expect(digest.relationships[1]?.owed).toBe("AWAITING_THEM");
-    expect(digest.byStage).toEqual({ CONNECTED: 2, IN_DILIGENCE: 1, PASSED: 1 });
+    expect(digest.byStage).toEqual({
+      CONNECTED: 2,
+      IN_DILIGENCE: 1,
+      PASSED: 1,
+    });
     expect(digest.relationshipCounterpartIds).toEqual([
       U(202),
       U(203),
@@ -281,7 +287,9 @@ describe("the account digest, per role", () => {
     );
     // Fourteen days ahead only.
     expect(digest.meetings.map((m) => m.purpose)).toEqual(["Intro call"]);
-    expect(digest.work.map((w) => w.goal)).toEqual(["Reach three seed fintechs"]);
+    expect(digest.work.map((w) => w.goal)).toEqual([
+      "Reach three seed fintechs",
+    ]);
     expect(digest.requests).toEqual([
       {
         relationshipId: U(104),
@@ -383,7 +391,9 @@ describe("the account digest's bounds", () => {
     const digest = await createAccountDigestReader(ports)(actorB, { now: NOW });
     expect(digest.relationships).toHaveLength(ACCOUNT_DIGEST_RELATIONSHIPS_MAX);
     expect(digest.relationshipsTotal).toBe(150);
-    expect(digest.meetings.length).toBeLessThanOrEqual(ACCOUNT_DIGEST_MEETINGS_MAX);
+    expect(digest.meetings.length).toBeLessThanOrEqual(
+      ACCOUNT_DIGEST_MEETINGS_MAX,
+    );
     expect(JSON.stringify(digest).length).toBeLessThan(40_000);
   });
 

@@ -64,8 +64,7 @@ export type AccountDigestGateqPort = {
     | undefined;
   /** An investor's own gateway inbox, counted; null: no gateway. */
   readonly investorInbox?:
-    | ((actor: ActorContext) => Promise<AccountDigestInbox | null>)
-    | undefined;
+    ((actor: ActorContext) => Promise<AccountDigestInbox | null>) | undefined;
 };
 
 export type AccountDigestPorts = {
@@ -168,8 +167,7 @@ export function relationshipOrder(
       ? 9
       : row.owed === "YOU_OWE_REPLY"
         ? 0
-        : (ACTION_RANK[row.nextStep] ??
-          (row.owed === "AWAITING_THEM" ? 6 : 7));
+        : (ACTION_RANK[row.nextStep] ?? (row.owed === "AWAITING_THEM" ? 6 : 7));
   return (
     rank(a) - rank(b) ||
     Date.parse(b.lastMessageAt ?? b.stageSince) -
@@ -283,7 +281,10 @@ export function recentEvents(
     if (done.length > 0 && at !== null) {
       events.push({
         at,
-        text: clip(`Q for you since ${activity.since.slice(0, 10)}: ${done.join(", ")}`, 200),
+        text: clip(
+          `Q for you since ${activity.since.slice(0, 10)}: ${done.join(", ")}`,
+          200,
+        ),
         relationshipId: null,
       });
     }
@@ -357,9 +358,10 @@ export function digestWork(
   }
   for (const errand of errands) {
     if (!/^[0-9a-f-]{36}$/iu.test(errand.errandId)) continue;
-    const running = !/^(DONE|STOPPED|FAILED|CANCELLED|EXPIRED|COMPLETED)$/iu.test(
-      errand.status,
-    );
+    const running =
+      !/^(DONE|STOPPED|FAILED|CANCELLED|EXPIRED|COMPLETED)$/iu.test(
+        errand.status,
+      );
     if (!running) continue;
     rows.push({
       id: errand.errandId,
@@ -412,7 +414,8 @@ export function createAccountDigestReader(
     const scheduleOnce =
       upcoming === undefined ? null : once(() => upcoming(actor));
     const workList = ports.work?.list;
-    const workOnce = workList === undefined ? null : once(() => workList(actor));
+    const workOnce =
+      workList === undefined ? null : once(() => workList(actor));
     const pending = ports.approvalInbox?.pending;
     const approvalsOnce =
       pending === undefined ? null : once(() => pending(actor));
@@ -424,7 +427,10 @@ export function createAccountDigestReader(
             relationships:
               relationshipsOnce === null
                 ? ports.relationships
-                : { ...ports.relationships, ownRelationships: relationshipsOnce },
+                : {
+                    ...ports.relationships,
+                    ownRelationships: relationshipsOnce,
+                  },
           }),
       ...(ports.approvalInbox === undefined || approvalsOnce === null
         ? {}
@@ -440,7 +446,10 @@ export function createAccountDigestReader(
       ...(ports.attention === undefined ? {} : { attention: ports.attention }),
     });
     /** A source with no port composed: unread, never empty. */
-    const notComposed = <T>(name: AccountDigestSection, value: T): Promise<T> => {
+    const notComposed = <T>(
+      name: AccountDigestSection,
+      value: T,
+    ): Promise<T> => {
       unread.add(name);
       return Promise.resolve(value);
     };

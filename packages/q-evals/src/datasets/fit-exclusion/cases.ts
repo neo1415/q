@@ -19,7 +19,10 @@ export type FitExclusionCase = {
   };
 };
 
-const FIT: FitExclusionCase["expected"]["kinds"] = ["FIT", "DISCOVER_COMPANIES"];
+const FIT: FitExclusionCase["expected"]["kinds"] = [
+  "FIT",
+  "DISCOVER_COMPANIES",
+];
 
 export const FIT_EXCLUSION_CASES: readonly FitExclusionCase[] = [
   {

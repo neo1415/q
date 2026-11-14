@@ -55,7 +55,10 @@ export type AccountDigestSection = z.infer<typeof AccountDigestSectionSchema>;
  * AWAITING_THEM -- the person wrote last, or asked, and waits for them;
  * null -- nothing owed, or the thread could not be read (never guessed).
  */
-export const AccountDigestOwedSchema = z.enum(["YOU_OWE_REPLY", "AWAITING_THEM"]);
+export const AccountDigestOwedSchema = z.enum([
+  "YOU_OWE_REPLY",
+  "AWAITING_THEM",
+]);
 export type AccountDigestOwed = z.infer<typeof AccountDigestOwedSchema>;
 
 export const AccountDigestRelationshipSchema = z
@@ -199,9 +202,13 @@ export const QAccountDigestSchema = z
     relationshipCounterpartIds: z.array(UuidSchema).max(200),
     waiting: z.array(QAttentionItemSchema).max(ACCOUNT_DIGEST_WAITING_MAX),
     waitingTotal: z.number().int().min(0),
-    meetings: z.array(AccountDigestMeetingSchema).max(ACCOUNT_DIGEST_MEETINGS_MAX),
+    meetings: z
+      .array(AccountDigestMeetingSchema)
+      .max(ACCOUNT_DIGEST_MEETINGS_MAX),
     work: z.array(AccountDigestWorkSchema).max(ACCOUNT_DIGEST_WORK_MAX),
-    requests: z.array(AccountDigestRequestSchema).max(ACCOUNT_DIGEST_REQUESTS_MAX),
+    requests: z
+      .array(AccountDigestRequestSchema)
+      .max(ACCOUNT_DIGEST_REQUESTS_MAX),
     gateq: AccountDigestGateqSchema.nullable(),
     recent: z.array(AccountDigestEventSchema).max(ACCOUNT_DIGEST_RECENT_MAX),
     unread: z.array(AccountDigestSectionSchema),

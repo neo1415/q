@@ -2508,7 +2508,10 @@ export function environmentNoteParts(
   ];
   // The situation carries the account digest beside it (owner 14 Nov
   // 2026); both are bounded where they are built and never cut here.
-  const situation = options.situation?.slice(0, SITUATION_WITH_ACCOUNT_MAX_CHARS);
+  const situation = options.situation?.slice(
+    0,
+    SITUATION_WITH_ACCOUNT_MAX_CHARS,
+  );
   const turnNotes = (
     researchNote: string | null,
     capabilities: boolean,
@@ -5059,14 +5062,14 @@ export function createModelGatewayQAnswer(
                 shownInConversation,
               )
             : request.fitQuestion?.excludeShown === true &&
-            shownInConversation.length > 0
-            ? fitSweepAskOfReading(
-                request.fitQuestion,
-                shownBefore,
-                namedComparison,
-                shownInConversation,
-              )
-            : (fitSweepAsk(latest.content, shownBefore, namedComparison) ??
+                shownInConversation.length > 0
+              ? fitSweepAskOfReading(
+                  request.fitQuestion,
+                  shownBefore,
+                  namedComparison,
+                  shownInConversation,
+                )
+              : (fitSweepAsk(latest.content, shownBefore, namedComparison) ??
                 (request.fitQuestion === undefined
                   ? null
                   : fitSweepAskOfReading(
@@ -8651,7 +8654,9 @@ export function createModelGatewayQAnswer(
             () => null,
           );
           const own = ownSetOf(
-            standing !== null && standing.result.ok ? standing.result.data : null,
+            standing !== null && standing.result.ok
+              ? standing.result.data
+              : null,
           );
           const inTouch = new Set([
             ...relationshipCounterparts(await accountDigest),

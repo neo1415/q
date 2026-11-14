@@ -14,7 +14,9 @@ describe("the fit-exclusion dataset and grader", () => {
     const cases = FIT_EXCLUSION_CASES;
     expect(new Set(cases.map((one) => one.id)).size).toBe(cases.length);
     expect(cases.some((one) => one.id.startsWith("live-"))).toBe(true);
-    expect(cases.filter((one) => one.modality === "VOICE").length).toBeGreaterThanOrEqual(1);
+    expect(
+      cases.filter((one) => one.modality === "VOICE").length,
+    ).toBeGreaterThanOrEqual(1);
     expect(
       cases.filter((one) => /spanish|french/u.test(one.id)).length,
     ).toBeGreaterThanOrEqual(2);
@@ -30,9 +32,9 @@ describe("the fit-exclusion dataset and grader", () => {
         question: { kind: "FIT", excludeRelationships: true },
       }),
     ).toBe(true);
-    expect(
-      gradeFitExclusion(expected, { question: { kind: "FIT" } }),
-    ).toBe("excludeRelationships false");
+    expect(gradeFitExclusion(expected, { question: { kind: "FIT" } })).toBe(
+      "excludeRelationships false",
+    );
     expect(
       gradeFitExclusion(expected, {
         question: { kind: "ADVICE", excludeRelationships: true },
