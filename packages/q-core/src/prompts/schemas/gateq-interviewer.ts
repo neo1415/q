@@ -114,6 +114,13 @@ export const GateQProposedFactSchema = z
     ]),
     /** True when this replaces something they said earlier. */
     correction: z.boolean().default(false),
+    /**
+     * v5 (live D10): this statement gives a different figure for the same
+     * quantity as earlier words on record, and they did not say it
+     * replaces them; those earlier words, quoted. Null for anything else,
+     * including another statement about the same dimension.
+     */
+    disagreesWith: z.string().max(300).nullable().optional(),
   })
   .strict();
 export type GateQProposedFact = z.infer<typeof GateQProposedFactSchema>;

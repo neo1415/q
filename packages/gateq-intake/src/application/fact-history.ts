@@ -204,7 +204,14 @@ const labelOf = (dimension: string) => {
 export function unreconciledStatements(
   facts: readonly ApplicationFact[],
 ): readonly string[] {
-  const out: string[] = [];
+  return unreconciledPairs(facts).map((pair) => pair.line);
+}
+
+/** The same lines, each with the dimension it is about. */
+export function unreconciledPairs(
+  facts: readonly ApplicationFact[],
+): readonly { readonly dimension: string; readonly line: string }[] {
+  const out: { dimension: string; line: string }[] = [];
   for (const fact of facts) {
     if (fact.supersededAt !== null || fact.value.kind !== "TEXT") continue;
     for (const pair of fact.value.unreconciled ?? []) {
@@ -215,12 +222,13 @@ export function unreconciledStatements(
         40,
         Math.floor((CONTRADICTION_MAX - frame.length) / 2),
       );
-      out.push(
-        `${labelOf(fact.dimension)}: the founder said "${clip(pair.earlier, each)}" and later "${clip(pair.later, each)}"; not yet reconciled`.slice(
+      out.push({
+        dimension: fact.dimension,
+        line: `${labelOf(fact.dimension)}: the founder said "${clip(pair.earlier, each)}" and later "${clip(pair.later, each)}"; not yet reconciled`.slice(
           0,
           CONTRADICTION_MAX,
         ),
-      );
+      });
     }
   }
   return out;
