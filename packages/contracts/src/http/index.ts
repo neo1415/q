@@ -1068,6 +1068,7 @@ export {
   ApplicationTranscriptDtoSchema,
   type ApplicationTranscriptDto,
   GATEQ_TRANSCRIPT_MAX_TURNS,
+  GATEQ_DOSSIER_DOCUMENTS_MAX,
   GATEQ_INVESTMENT_GROUPS,
   GateqInvestmentGroupSchema,
   type GateqInvestmentGroup,
