@@ -9,10 +9,16 @@
 --
 -- A logo found on the site is kept here, in Capital Q's own storage, and
 -- the public gateway serves these bytes: it is never hot-linked from the
--- organisation's site. PNG or JPEG only (checked by magic bytes before the
+-- organisation's site. PNG or JPEG (checked by magic bytes before the
 -- insert), at most 512 KB, the same bound as the documents' brand kit
--- logo. ICON: the site's favicon or touch icon, which the admin chose
--- knowing it is not a full logo; a logo is never invented.
+-- logo; or SVG, which most company sites use for their logo, kept only as
+-- markup rebuilt from a strict allow-list (no script, handlers,
+-- foreignObject or outside references; q-research svg-logo), at most
+-- 256 KB, re-checked each time it is served and only ever drawn through
+-- <img> under a sandboxing CSP. The checks below are a last line: an SVG
+-- must start the way the sanitiser writes one and carry no <script.
+-- ICON: the site's favicon or touch icon, which the admin chose knowing
+-- it is not a full logo; a logo is never invented.
 --
 -- Append-only like the appearance revisions: an asset is history and is
 -- never rewritten. Server-only like every gateq table: RLS on, no policy,
@@ -23,7 +29,7 @@ create table gateq.gateway_logo_assets (
   gateway_id          uuid not null references gateq.gateways (id) on delete restrict,
   tenant_id           uuid not null references identity.tenants (id) on delete restrict,
   kind                text not null check (kind in ('LOGO', 'ICON')),
-  content_type        text not null check (content_type in ('image/png', 'image/jpeg')),
+  content_type        text not null check (content_type in ('image/png', 'image/jpeg', 'image/svg+xml')),
   bytes               bytea not null check (octet_length(bytes) between 8 and 524288),
   sha256              text not null check (sha256 ~ '^[0-9a-f]{64}$'),
   -- Where on the organisation's own site it was found (provenance).
@@ -34,7 +40,18 @@ create table gateq.gateway_logo_assets (
   -- only point at its own gateway's logo.
   unique (id, gateway_id),
   -- One row per image per gateway: reading the site again reuses it.
-  unique (gateway_id, sha256, kind)
+  unique (gateway_id, sha256, kind),
+  -- An SVG: at most 256 KB, opening '<svg xmlns="http://www.w3.org/2000/svg"'
+  -- exactly as the sanitiser writes it, and never containing '<script'.
+  constraint gateway_logo_assets_svg_sanitised check (
+    content_type <> 'image/svg+xml'
+    or (
+      octet_length(bytes) <= 262144
+      and substring(bytes from 1 for 39)
+        = '\x3c73766720786d6c6e733d22687474703a2f2f7777772e77332e6f72672f323030302f73766722'::bytea
+      and position('\x3c736372697074'::bytea in bytes) = 0
+    )
+  )
 );
 
 comment on table gateq.gateway_logo_assets is

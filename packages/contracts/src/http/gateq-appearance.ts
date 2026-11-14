@@ -38,6 +38,15 @@ export const GATEQ_GATEWAY_BRAND_SUGGESTION_PATH =
 /** The gateway's saved logo bytes, for an open gateway (anonymous). */
 export const GATEQ_PUBLIC_GATEWAY_LOGO_PATH =
   "/v1/gateq/public/:publicId/logo" as const;
+/**
+ * The policy an SVG logo is served with (API and the web's /g/:id/logo):
+ * nothing loads, no script runs, inline presentation styles still apply.
+ * It is drawn only through <img> as well, where SVG never runs script.
+ */
+export const GATEQ_SVG_LOGO_CSP =
+  "default-src 'none'; style-src 'unsafe-inline'; sandbox" as const;
+/** An SVG logo is kept at most this size, after sanitising. */
+export const GATEQ_SVG_LOGO_MAX_BYTES = 256 * 1024;
 
 export const GATEQ_EMBED_ORIGINS_MAX = 10;
 
@@ -140,6 +149,7 @@ export const GatewayBrandReasonSchema = z.enum([
   "NO_NAME",
   "NO_LOGO",
   "UNSUPPORTED_LOGO_FORMAT",
+  "LOGO_TOO_LARGE",
   "NO_COLOURS",
 ]);
 export type GatewayBrandReason = z.infer<typeof GatewayBrandReasonSchema>;
@@ -148,11 +158,14 @@ const NotFound = z
   .object({ status: z.literal("NOT_FOUND"), reason: GatewayBrandReasonSchema })
   .strict();
 
-/** A PNG or JPEG preview of the stored logo (at most 512 KB raw). */
+/**
+ * A preview of the stored logo: PNG or JPEG (at most 512 KB raw) or the
+ * sanitised SVG (at most 256 KB), drawn only through <img>.
+ */
 const LogoPreviewDataUrl = z
   .string()
   .max(720_000)
-  .regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/u);
+  .regex(/^data:image\/(png|jpeg|svg\+xml);base64,[A-Za-z0-9+/=]+$/u);
 
 export const GatewayBrandSuggestionDtoSchema = z
   .object({

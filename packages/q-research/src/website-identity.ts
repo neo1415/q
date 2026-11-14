@@ -7,6 +7,12 @@ import {
 
 import { normaliseWebAddress } from "./domain/url-safety.js";
 import {
+  findInlineSvgLogo,
+  sanitiseInlineSvg,
+  sanitiseSvgLogo,
+  type SvgLogoResult,
+} from "./svg-logo.js";
+import {
   createVettedHttp,
   type VettedHttpWithReasons,
   type VettedRefusal,
@@ -28,8 +34,11 @@ import {
  *     logo, og:logo, a schema.org "logo", an og:image whose file is a
  *     logo). A favicon, apple-touch icon or manifest icon is an ICON and
  *     is reported as one, never as a logo.
- *   - only PNG or JPEG by magic bytes, at most 512 KB, is kept (an SVG is
- *     not sanitised here, so it is reported as an unsupported format).
+ *   - PNG or JPEG by magic bytes (at most 512 KB), or an SVG rebuilt from
+ *     a strict allow-list (at most 256 KB, see svg-logo.ts): an
+ *     image/svg+xml file on the same site, or the inline <svg> in the
+ *     header's home link or labelled as the logo or with the site's name.
+ *     The site's own SVG bytes are never kept as they came.
  *   - every field is FOUND or NOT_FOUND with the precise reason.
  */
 
@@ -39,6 +48,7 @@ export type WebsiteIdentityReason =
   | "NO_NAME"
   | "NO_LOGO"
   | "UNSUPPORTED_LOGO_FORMAT"
+  | "LOGO_TOO_LARGE"
   | "NO_COLOURS";
 
 export type WebsiteIdentityField<T> =
@@ -47,6 +57,9 @@ export type WebsiteIdentityField<T> =
 
 export type WebsiteNameSource =
   "OG_SITE_NAME" | "MANIFEST" | "APPLICATION_NAME" | "TITLE";
+
+export type WebsiteLogoContentType =
+  "image/png" | "image/jpeg" | "image/svg+xml";
 
 export type WebsiteIdentityReading = {
   /** The page actually read (after redirects); null when none was. */
@@ -58,7 +71,7 @@ export type WebsiteIdentityReading = {
   readonly logo: WebsiteIdentityField<{
     readonly kind: "LOGO" | "ICON";
     readonly bytes: Uint8Array;
-    readonly contentType: "image/png" | "image/jpeg";
+    readonly contentType: WebsiteLogoContentType;
     readonly sourceUrl: string;
   }>;
   readonly colours: WebsiteIdentityField<{
@@ -78,7 +91,7 @@ const ACCEPT_HTML = "text/html;q=1,*/*;q=0.1";
 const ACCEPT_CSS = "text/css;q=1,*/*;q=0.1";
 const ACCEPT_JSON =
   "application/manifest+json,application/json;q=0.9,*/*;q=0.1";
-const ACCEPT_IMAGE = "image/png,image/jpeg;q=0.9,*/*;q=0.1";
+const ACCEPT_IMAGE = "image/png,image/svg+xml,image/jpeg;q=0.9,*/*;q=0.1";
 
 function attribute(tag: string, name: string): string | null {
   const match = new RegExp(
@@ -291,6 +304,32 @@ export function readManifest(
   };
 }
 
+/** The name part of a title ("Stripe | Payments" is Stripe). */
+function siteNameOfTitle(title: string | null): string | null {
+  if (title === null) return null;
+  const first = title.split(/\s[|\u2013\u2014:\u00b7-]\s/u)[0]?.trim() ?? "";
+  return first.length > 0 ? first : null;
+}
+
+/**
+ * An SVG answer: served as image/svg+xml, or an .svg file that is not a
+ * web page (some servers label SVG generically). Its markup is still
+ * rebuilt from the allow-list before anything is kept.
+ */
+function isSvgResponse(response: {
+  readonly contentType: string;
+  readonly url: string;
+}): boolean {
+  const type = response.contentType.toLowerCase();
+  if (type.includes("image/svg+xml")) return true;
+  if (type.includes("html")) return false;
+  try {
+    return /\.svg$/iu.test(new URL(response.url).pathname);
+  } catch {
+    return false;
+  }
+}
+
 const notFound = (reason: WebsiteIdentityReason) =>
   ({ status: "NOT_FOUND", reason }) as const;
 
@@ -374,6 +413,48 @@ export function createWebsiteIdentityReader(
               ? { value: markup.title, from: "TITLE" as const }
               : null;
 
+    let logo: WebsiteIdentityReading["logo"] | null = null;
+    let sawLogoInOtherFormat = false;
+    let sawLogoTooLarge = false;
+    const svgFound = (
+      result: SvgLogoResult,
+      kind: "LOGO" | "ICON",
+      sourceUrl: string,
+    ): WebsiteIdentityReading["logo"] | null => {
+      if (result.ok) {
+        return {
+          status: "FOUND",
+          kind,
+          bytes: result.bytes,
+          contentType: "image/svg+xml",
+          sourceUrl,
+        };
+      }
+      if (kind === "LOGO") {
+        if (result.reason === "TOO_LARGE") sawLogoTooLarge = true;
+        else sawLogoInOtherFormat = true;
+      }
+      return null;
+    };
+
+    // The inline <svg> in the header's home link is the site's own logo,
+    // stated where it matters most; it needs no further fetch.
+    const inline = findInlineSvgLogo(
+      pageUrl,
+      html,
+      markup.ogSiteName ??
+        manifest?.name ??
+        markup.applicationName ??
+        siteNameOfTitle(markup.title),
+    );
+    if (inline !== null) {
+      logo = svgFound(
+        sanitiseInlineSvg(inline.svg, inline.byId),
+        "LOGO",
+        pageUrl,
+      );
+    }
+
     // A logo the site names as one first; an icon only when there is none.
     const candidates: Candidate[] = [
       ...markup.logos,
@@ -381,21 +462,35 @@ export function createWebsiteIdentityReader(
       ...(manifest?.icons ?? []).map((url) => ({ url, kind: "ICON" as const })),
       ...markup.icons.slice(2),
     ];
-    let logo: WebsiteIdentityReading["logo"] | null = null;
-    let sawLogoInOtherFormat = false;
     let tries = 0;
     const seen = new Set<string>();
-    for (const candidate of candidates) {
+    for (const candidate of logo === null ? candidates : []) {
       if (tries >= IMAGE_TRIES) break;
       if (seen.has(candidate.url)) continue;
       seen.add(candidate.url);
       tries += 1;
       const fetched = await get(candidate.url, ACCEPT_IMAGE, IMAGE_MAX);
-      if (!fetched.ok) continue;
+      if (!fetched.ok) {
+        if (fetched.reason === "TOO_LARGE" && candidate.kind === "LOGO") {
+          sawLogoTooLarge = true;
+        }
+        continue;
+      }
       const read = readLogo(fetched.response.body);
       if (read === null) {
-        // An SVG or WebP logo is not drawn from our storage until it can
-        // be sanitised; it is named as such, not as "no logo".
+        if (isSvgResponse(fetched.response)) {
+          const found = svgFound(
+            sanitiseSvgLogo(fetched.response.body),
+            candidate.kind,
+            fetched.response.url,
+          );
+          if (found !== null) {
+            logo = found;
+            break;
+          }
+          continue;
+        }
+        // A WebP, GIF or unreadable logo is named as such, not "no logo".
         if (candidate.kind === "LOGO") sawLogoInOtherFormat = true;
         continue;
       }
@@ -417,7 +512,13 @@ export function createWebsiteIdentityReader(
           : { status: "FOUND", ...nameFound },
       logo:
         logo ??
-        notFound(sawLogoInOtherFormat ? "UNSUPPORTED_LOGO_FORMAT" : "NO_LOGO"),
+        notFound(
+          sawLogoTooLarge
+            ? "LOGO_TOO_LARGE"
+            : sawLogoInOtherFormat
+              ? "UNSUPPORTED_LOGO_FORMAT"
+              : "NO_LOGO",
+        ),
       colours:
         primary === undefined
           ? notFound("NO_COLOURS")

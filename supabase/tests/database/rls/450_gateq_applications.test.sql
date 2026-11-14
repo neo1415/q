@@ -17,7 +17,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(29);
+select plan(32);
 
 -- Fixtures ------------------------------------------------------------------------
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
@@ -184,7 +184,32 @@ select throws_ok($$
     (gateway_id, tenant_id, kind, content_type, bytes, sha256, source_url, created_by_user_id)
   values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 'LOGO', 'image/svg+xml',
           '\x3c7376673e00000000'::bytea, repeat('d', 64), 'https://application.example/logo.svg', pg_temp.rls_id('user_b'))
-$$, '23514', null, 'only PNG or JPEG is kept: an unsanitised SVG is never served from our storage');
+$$, '23514', null, 'an SVG not in the sanitiser''s form is never kept');
+
+select lives_ok($$
+  insert into gateq.gateway_logo_assets
+    (gateway_id, tenant_id, kind, content_type, bytes, sha256, source_url, created_by_user_id)
+  values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 'LOGO', 'image/svg+xml',
+          '\x3c73766720786d6c6e733d22687474703a2f2f7777772e77332e6f72672f323030302f737667222076696577426f783d2230203020312031223e3c7061746820643d224d302030683176317a222f3e3c2f7376673e'::bytea,
+          repeat('e', 64), 'https://application.example/logo.svg', pg_temp.rls_id('user_b'))
+$$, 'a sanitised SVG logo is kept');
+
+select throws_ok($$
+  insert into gateq.gateway_logo_assets
+    (gateway_id, tenant_id, kind, content_type, bytes, sha256, source_url, created_by_user_id)
+  values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 'LOGO', 'image/svg+xml',
+          '\x3c73766720786d6c6e733d22687474703a2f2f7777772e77332e6f72672f323030302f737667223e3c7363726970743e3c2f7376673e'::bytea,
+          repeat('f', 64), 'https://application.example/logo.svg', pg_temp.rls_id('user_b'))
+$$, '23514', null, 'an SVG carrying <script is never kept');
+
+select throws_ok($$
+  insert into gateq.gateway_logo_assets
+    (gateway_id, tenant_id, kind, content_type, bytes, sha256, source_url, created_by_user_id)
+  values ('00000000-0000-4000-8000-00000000cc11', pg_temp.rls_id('tenant_b'), 'LOGO', 'image/svg+xml',
+          '\x3c73766720786d6c6e733d22687474703a2f2f7777772e77332e6f72672f323030302f73766722'::bytea
+            || decode(repeat('20', 262144), 'hex'),
+          repeat('0', 64), 'https://application.example/logo.svg', pg_temp.rls_id('user_b'))
+$$, '23514', null, 'an SVG over 256 KB is never kept');
 
 select lives_ok($$
   insert into gateq.gateway_appearances

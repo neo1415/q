@@ -104,6 +104,7 @@ function buildApp(options: {
     } | null;
   };
   readonly publicLogo?: Uint8Array;
+  readonly publicLogoType?: "image/png" | "image/jpeg" | "image/svg+xml";
   readonly editDenied?: boolean;
   readonly extractions?: PolicyExtractionRecord[];
 }): {
@@ -228,7 +229,7 @@ function buildApp(options: {
       : {
           gateqPublicLogo: () =>
             Promise.resolve({
-              contentType: "image/png" as const,
+              contentType: options.publicLogoType ?? "image/png",
               bytes: options.publicLogo ?? new Uint8Array(),
             }),
         }),
@@ -595,6 +596,48 @@ describe("the public route", () => {
       (await svg.app.inject({ method: "GET", url: `${url(PUBLIC_ID)}/logo` }))
         .statusCode,
     ).toBe(404);
+  });
+
+  it("brand from website: serves a sanitised SVG logo as image/svg+xml under a sandboxing policy, and nothing else as SVG", async () => {
+    const SANITISED = new TextEncoder().encode(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10z" fill="#0F766E"/></svg>',
+    );
+    const { app } = buildApp({
+      principal: null,
+      publicGateway: PUBLIC_PROJECTION,
+      publicLogo: SANITISED,
+      publicLogoType: "image/svg+xml",
+    });
+    const logo = await app.inject({
+      method: "GET",
+      url: `${url(PUBLIC_ID)}/logo`,
+    });
+    expect(logo.statusCode).toBe(200);
+    expect(logo.headers["content-type"]).toBe("image/svg+xml");
+    expect(logo.headers["x-content-type-options"]).toBe("nosniff");
+    expect(logo.headers["content-security-policy"]).toBe(
+      "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    );
+    expect(new Uint8Array(logo.rawPayload)).toEqual(SANITISED);
+
+    // Stored bytes that are not exactly the sanitiser's output (here: a
+    // handler and a script slipped in) are never served.
+    for (const tampered of [
+      '<svg xmlns="http://www.w3.org/2000/svg" onload="x()"><path d="M0 0z"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script><path d="M0 0z"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject/><path d="M0 0z"/></svg>',
+    ]) {
+      const bad = buildApp({
+        principal: null,
+        publicGateway: PUBLIC_PROJECTION,
+        publicLogo: new TextEncoder().encode(tampered),
+        publicLogoType: "image/svg+xml",
+      });
+      expect(
+        (await bad.app.inject({ method: "GET", url: `${url(PUBLIC_ID)}/logo` }))
+          .statusCode,
+      ).toBe(404);
+    }
   });
 
   it("B7: carries the organisation's own embed sites when it listed any", async () => {

@@ -93,6 +93,7 @@ export {
   type GatewayAdminResult,
   type GatewayAdminService,
   type GatewayAppearance,
+  type GatewayLogoContentType,
   type GatewayAppearanceRepository,
 } from "./application/appearance.js";
 export {

@@ -160,7 +160,7 @@ describe("brand from website: the organisation's own site, honestly read", () =>
     expect(reading.logo).toMatchObject({ status: "FOUND", kind: "LOGO" });
   });
 
-  it("an SVG logo is not kept: UNSUPPORTED_LOGO_FORMAT, not 'no logo', and never served", async () => {
+  it("an SVG that draws nothing is not kept: UNSUPPORTED_LOGO_FORMAT, not 'no logo'", async () => {
     const { read } = world({
       [HOME]: { body: `<img src="/logo.svg" alt="Kilima logo">` },
       "https://kilima.example/logo.svg": { type: "image/svg+xml", body: SVG },
@@ -170,6 +170,146 @@ describe("brand from website: the organisation's own site, honestly read", () =>
       status: "NOT_FOUND",
       reason: "UNSUPPORTED_LOGO_FORMAT",
     });
+  });
+
+  it("<img src=logo.svg> on the same site: a LOGO, kept as rebuilt SVG", async () => {
+    const { read } = world({
+      [HOME]: { body: `<img src="/logo.svg" alt="Kilima logo">` },
+      "https://kilima.example/logo.svg": {
+        type: "image/svg+xml",
+        body: `<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10" onload="alert(1)"><script>alert(1)</script><path d="M0 0h10v10z" fill="#0F766E"/></svg>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toMatchObject({
+      status: "FOUND",
+      kind: "LOGO",
+      contentType: "image/svg+xml",
+      sourceUrl: "https://kilima.example/logo.svg",
+    });
+    if (reading.logo.status !== "FOUND") throw new Error("expected a logo");
+    expect(new TextDecoder().decode(reading.logo.bytes)).toBe(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10z" fill="#0F766E"/></svg>',
+    );
+  });
+
+  it("the inline <svg> in the header's home link is the LOGO, with no further fetch", async () => {
+    const { read, fetched } = world({
+      [HOME]: {
+        body: `<html><head><title>Kilima | Angels</title></head><body>
+          <header><a href="/" aria-label="Kilima home">
+            <svg viewBox="0 0 60 20" class="wordmark"><title>Kilima</title>
+              <path d="M0 0h60v20H0z" fill="currentColor"/></svg></a></header>
+          <section class="customers"><svg class="logo customer-logo"><path d="M1 1h2v2z"/></svg></section>
+          <footer><a href="/"><svg class="logo"><path d="M0 0h1v1z"/></svg></a></footer>
+          </body></html>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toMatchObject({
+      status: "FOUND",
+      kind: "LOGO",
+      contentType: "image/svg+xml",
+      sourceUrl: HOME,
+    });
+    if (reading.logo.status !== "FOUND") throw new Error("expected a logo");
+    const svg = new TextDecoder().decode(reading.logo.bytes);
+    expect(svg).toContain('viewBox="0 0 60 20"');
+    expect(svg).toContain('d="M0 0h60v20H0z"');
+    expect(fetched.some((url) => url.includes("favicon"))).toBe(false);
+  });
+
+  it("an inline header svg labelled with the site's name, outside a home link, is the LOGO", async () => {
+    const { read } = world({
+      [HOME]: {
+        body: `<meta property="og:site_name" content="Kilima">
+          <div role="banner"><div class="brand"><svg aria-label="Kilima"><rect width="4" height="4"/></svg></div>
+          <nav><svg class="menu-icon"><path d="M0 0h1v1z"/></svg></nav></div>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toMatchObject({ status: "FOUND", kind: "LOGO" });
+    if (reading.logo.status !== "FOUND") throw new Error("expected a logo");
+    expect(new TextDecoder().decode(reading.logo.bytes)).toContain("<rect");
+  });
+
+  it("an unlabelled svg outside the header, or one only in the footer, is not a logo", async () => {
+    const { read } = world({
+      [HOME]: {
+        body: `<main><svg class="chart"><path d="M0 0h1v1z"/></svg></main>
+          <footer><a href="/"><svg class="logo"><path d="M0 0h1v1z"/></svg></a></footer>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toEqual({ status: "NOT_FOUND", reason: "NO_LOGO" });
+  });
+
+  it("a malicious SVG logo is rebuilt without script, handlers, foreignObject or outside references", async () => {
+    const { read } = world({
+      [HOME]: { body: `<img src="/logo.svg" alt="logo">` },
+      "https://kilima.example/logo.svg": {
+        type: "image/svg+xml",
+        body: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" onload="steal()">
+          <script>steal()</script>
+          <foreignObject><iframe src="https://evil.example"></iframe></foreignObject>
+          <use xlink:href="http://evil.example/s.svg#a"/><use href="#ok"/>
+          <path id="ok" d="M0 0h1v1z" onclick="x()" fill="url(https://evil.example/p)" style="background:url(//evil.example)"/>
+          <image href="data:image/png;base64,AAAA"/><a href="javascript:x()"><path d="M1 1h1v1z"/></a>
+          <style>@import url(https://evil.example/s.css);</style>
+        </svg>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toMatchObject({ status: "FOUND", kind: "LOGO" });
+    if (reading.logo.status !== "FOUND") throw new Error("expected a logo");
+    const svg = new TextDecoder().decode(reading.logo.bytes);
+    expect(svg).not.toMatch(
+      /script|onload|onclick|foreignObject|iframe|evil|javascript|data:|@import|<image|<a[ >]|style=/iu,
+    );
+    expect(svg).toContain('<use href="#ok"/>');
+  });
+
+  it("an SVG logo larger than 256 KB once rebuilt is refused: LOGO_TOO_LARGE", async () => {
+    const path = `<path d="${"M0 0h1v1z ".repeat(12)}"/>`;
+    const huge = `<svg viewBox="0 0 1 1">${path.repeat(2_500)}</svg>`;
+    const { read } = world({
+      [HOME]: { body: `<img src="/logo.svg" alt="Kilima logo">` },
+      "https://kilima.example/logo.svg": { type: "image/svg+xml", body: huge },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toEqual({
+      status: "NOT_FOUND",
+      reason: "LOGO_TOO_LARGE",
+    });
+  });
+
+  it("favicon.svg alone stays an ICON, never a logo", async () => {
+    const { read } = world({
+      [HOME]: {
+        body: `<link rel="icon" type="image/svg+xml" href="/favicon.svg">`,
+      },
+      "https://kilima.example/favicon.svg": {
+        type: "image/svg+xml",
+        body: `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="8"/></svg>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toMatchObject({
+      status: "FOUND",
+      kind: "ICON",
+      contentType: "image/svg+xml",
+    });
+  });
+
+  it("an SVG on another site is not fetched as the logo", async () => {
+    const { read, fetched } = world({
+      [HOME]: {
+        body: `<img src="https://cdn.other.example/logo.svg" alt="logo">`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.logo).toEqual({ status: "NOT_FOUND", reason: "NO_LOGO" });
+    expect(fetched).not.toContain("https://cdn.other.example/logo.svg");
   });
 
   it("unreachable or slow: the precise reason on every field", async () => {
