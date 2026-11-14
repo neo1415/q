@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   createMeetingProposalPort,
   createProposalService,
+  createScheduleService,
   meetingTimeLabel,
   PROPOSAL_TRANSITIONS,
   transitionProposal,
+  type ChatParty,
   type ProposalEvent,
   type ProposalParties,
   type ProposalRecord,
@@ -16,6 +18,14 @@ import {
   type TimeOption,
 } from "../src/index.js";
 import { timesOf } from "../src/schedule/proposal-port.js";
+import {
+  createFakeAppEmail,
+  createFakeCalendar,
+  createInMemoryScheduleStore,
+  createRecordingMeetingActivity,
+  createStaticMeetingDirectory,
+  inlineScheduleTransactions,
+} from "../src/testing/index.js";
 
 /**
  * A meeting time is a proposal the investor accepts (live bug 2026-10-09).
@@ -954,5 +964,330 @@ describe("the meeting proposal port: no-calendar acceptance and notices", () => 
     ).toEqual({ outcome: "REFUSED", reason: "NOT_AUTHORISED" });
     expect(c.agreed.size).toBe(0);
     expect(c.notices.size).toBe(1);
+  });
+});
+
+/**
+ * Live audit 2026-11-14 D7: accepting a "move" proposal moves the meeting it
+ * names (one row, the new time, `meeting_rescheduled`), never books a second
+ * one; a cancelled, past or foreign meeting is refused. D8: each side's
+ * decline notice names the step that is theirs. The real schedule service
+ * over its in-memory store, composed with the proposal port.
+ */
+describe("a move proposal moves the meeting (D7) and decline wording (D8)", () => {
+  const COMPANY_TENANT = "00000000-0000-4000-8000-0000000000a1";
+  const INVESTOR_TENANT = "00000000-0000-4000-8000-0000000000a2";
+  const actorOf = (userId: string): ActorContext =>
+    ({
+      userId,
+      tenantId: userId === FOUNDER ? COMPANY_TENANT : INVESTOR_TENANT,
+      organisationId: "00000000-0000-4000-8000-0000000000c1",
+      membershipId: "00000000-0000-4000-8000-0000000000e1",
+      actorType: "HUMAN",
+    }) as ActorContext;
+
+  const ahead = (days: number, hour = 10): TimeOption => {
+    const start = new Date(Date.now() + days * 24 * 3_600_000);
+    start.setUTCHours(hour, 0, 0, 0);
+    return {
+      startsAt: start.toISOString(),
+      endsAt: new Date(start.getTime() + 30 * 60_000).toISOString(),
+      timeZone: "Africa/Lagos",
+    };
+  };
+
+  function world(calendar: "CONNECTED" | "NONE") {
+    const scheduleStore = createInMemoryScheduleStore();
+    const activity = createRecordingMeetingActivity();
+    const investorCalendar = createFakeCalendar("ben@vc.example.invalid");
+    let ids = 0;
+    const schedule = createScheduleService({
+      store: scheduleStore,
+      transactions: inlineScheduleTransactions,
+      parties: (a, relationshipId) => {
+        if (relationshipId !== REL) return Promise.resolve(null);
+        const party: ChatParty | null =
+          a.userId === INVESTOR
+            ? { side: "INVESTOR", connected: true }
+            : a.userId === FOUNDER
+              ? { side: "COMPANY", connected: true }
+              : null;
+        return Promise.resolve(party);
+      },
+      directory: createStaticMeetingDirectory({
+        relationshipTenant: COMPANY_TENANT,
+        people: {
+          COMPANY: [
+            {
+              userId: FOUNDER,
+              tenantId: COMPANY_TENANT,
+              name: "Ada",
+              email: "ada@co.example.invalid",
+            },
+          ],
+          INVESTOR_ORGANISATION: [
+            {
+              userId: INVESTOR,
+              tenantId: INVESTOR_TENANT,
+              name: "Ben",
+              email: "ben@vc.example.invalid",
+            },
+          ],
+        },
+        persons: {
+          [INVESTOR]: { name: "Ben", email: "ben@vc.example.invalid" },
+          [FOUNDER]: { name: "Ada", email: "ada@co.example.invalid" },
+        },
+      }),
+      calendars: (userId) =>
+        Promise.resolve(
+          calendar === "CONNECTED" && userId === INVESTOR
+            ? investorCalendar
+            : null,
+        ),
+      calendarState: () =>
+        Promise.resolve(
+          calendar === "CONNECTED" ? "CONNECTED" : "NOT_CONNECTED",
+        ),
+      activity,
+      email: createFakeAppEmail(),
+      newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, "0")}`,
+    });
+    const mem = memoryStore();
+    const notices: { title: string; body: string | null }[] = [];
+    const port = createMeetingProposalPort({
+      transactions: {
+        run: () => Promise.reject(new Error("no database in this test")),
+      },
+      store: mem.store,
+      parties,
+      schedule,
+      counterpartNotices: {
+        notify: (input) => {
+          notices.push({ title: input.title, body: input.body });
+          return Promise.resolve(1);
+        },
+      },
+    });
+    const as = (userId: string) =>
+      port.forActor(
+        actorOf(userId),
+        "cor_00000000-0000-4000-8000-000000000009",
+      );
+    return {
+      schedule,
+      scheduleStore,
+      activity,
+      investorCalendar,
+      mem,
+      as,
+      notices,
+    };
+  }
+
+  /** A booked call: proposed by the founder, accepted by the investor. */
+  async function booked(w: ReturnType<typeof world>) {
+    const first = await w.as(FOUNDER).propose({
+      actorUserId: FOUNDER,
+      relationshipId: REL,
+      purpose: "Intro call",
+      options: [ahead(3)],
+      idempotencyKey: "founder-first",
+    });
+    if (first.outcome !== "OK") throw new Error("first proposal refused");
+    const accepted = await w.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: first.proposal.id,
+      action: "ACCEPT",
+      optionIndex: 0,
+      idempotencyKey: "investor-first",
+    });
+    if (accepted.outcome !== "OK" || accepted.proposal.meetingId === null)
+      throw new Error("first call not booked");
+    return accepted.proposal.meetingId;
+  }
+
+  async function proposeMove(
+    w: ReturnType<typeof world>,
+    meetingId: string,
+    key = "founder-move",
+  ) {
+    return w.as(FOUNDER).propose({
+      actorUserId: FOUNDER,
+      relationshipId: REL,
+      purpose: "Intro call",
+      options: [ahead(5, 14)],
+      rescheduleOfMeetingId: meetingId,
+      idempotencyKey: key,
+    });
+  }
+
+  const moveNotices = (w: ReturnType<typeof world>) =>
+    w.scheduleStore.notifications.filter((n) =>
+      n.title.startsWith("Call moved:"),
+    );
+
+  it("accepting a move (no calendar) moves the one meeting, records meeting_rescheduled once and tells the other side once, even on retry", async () => {
+    const w = world("NONE");
+    const meetingId = await booked(w);
+    const move = await proposeMove(w, meetingId);
+    if (move.outcome !== "OK") throw new Error("move refused");
+    // The original stays as booked until the move is accepted.
+    expect(
+      w.scheduleStore.meetings.find((m) => m.id === meetingId)?.startsAt,
+    ).toEqual(new Date(ahead(3).startsAt));
+
+    const accept = {
+      actorUserId: INVESTOR,
+      proposalId: move.proposal.id,
+      action: "ACCEPT" as const,
+      optionIndex: 0,
+      idempotencyKey: "investor-move",
+    };
+    const out = await w.as(INVESTOR).respond(accept);
+    expect(out).toMatchObject({
+      outcome: "OK",
+      confirmed: true,
+      booked: true,
+      calendarInvite: false,
+      proposal: { meetingId },
+    });
+    // Retried: the same move, nothing new.
+    const again = await w.as(INVESTOR).respond(accept);
+    expect(again).toMatchObject({ outcome: "OK", recorded: false });
+    expect(
+      await w.as(INVESTOR).completeBooking({
+        actorUserId: INVESTOR,
+        proposalId: move.proposal.id,
+      }),
+    ).toMatchObject({ outcome: "OK", booked: true });
+
+    expect(w.scheduleStore.meetings).toHaveLength(1);
+    const row = w.scheduleStore.meetings[0];
+    expect(row?.id).toBe(meetingId);
+    expect(row?.status).toBe("SCHEDULED");
+    expect(row?.startsAt).toEqual(new Date(ahead(5, 14).startsAt));
+    expect(w.activity.recorded.map((r) => r.eventType)).toEqual([
+      "meeting_scheduled",
+      "meeting_rescheduled",
+    ]);
+    // One "Call moved" to the founder side; the investor moved it.
+    expect(moveNotices(w).map((n) => n.userId)).toEqual([FOUNDER]);
+    expect(w.investorCalendar.moved).toHaveLength(0);
+  });
+
+  it("with a calendar, the organiser's event moves (no second event)", async () => {
+    const w = world("CONNECTED");
+    const meetingId = await booked(w);
+    const move = await proposeMove(w, meetingId);
+    if (move.outcome !== "OK") throw new Error("move refused");
+    const out = await w.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: move.proposal.id,
+      action: "ACCEPT",
+      optionIndex: 0,
+      idempotencyKey: "investor-move",
+    });
+    expect(out).toMatchObject({
+      outcome: "OK",
+      booked: true,
+      calendarInvite: true,
+      proposal: { meetingId },
+    });
+    expect(w.investorCalendar.inserted).toHaveLength(1);
+    expect(w.investorCalendar.moved).toHaveLength(1);
+    expect(w.scheduleStore.meetings).toHaveLength(1);
+  });
+
+  it("refuses a move of a cancelled meeting, when proposed and before an acceptance is recorded", async () => {
+    const w = world("NONE");
+    const meetingId = await booked(w);
+    const move = await proposeMove(w, meetingId);
+    if (move.outcome !== "OK") throw new Error("move refused");
+    await w.schedule.cancel({
+      actor: actorOf(INVESTOR),
+      meetingId,
+      correlationId: "cor_x",
+    });
+    expect(
+      await w.as(INVESTOR).respond({
+        actorUserId: INVESTOR,
+        proposalId: move.proposal.id,
+        action: "ACCEPT",
+        optionIndex: 0,
+        idempotencyKey: "investor-move",
+      }),
+    ).toEqual({ outcome: "REFUSED", reason: "MEETING_NOT_MOVABLE" });
+    expect(w.mem.proposals.get(move.proposal.id)?.state).toBe(
+      "INVESTOR_REVIEW",
+    );
+    expect(await proposeMove(w, meetingId, "founder-move-2")).toEqual({
+      outcome: "REFUSED",
+      reason: "MEETING_NOT_MOVABLE",
+    });
+    expect(w.scheduleStore.meetings).toHaveLength(1);
+    expect(
+      w.activity.recorded.filter((r) => r.eventType === "meeting_rescheduled"),
+    ).toHaveLength(0);
+  });
+
+  it("refuses a move of a meeting that is not on this relationship or does not exist", async () => {
+    const w = world("NONE");
+    expect(
+      await proposeMove(w, "00000000-0000-4000-8000-00000000ffff"),
+    ).toEqual({ outcome: "REFUSED", reason: "MEETING_NOT_MOVABLE" });
+    expect(w.mem.proposals.size).toBe(0);
+  });
+
+  it("D8: the founder hears they can propose again; the investor hears the founder may suggest new times", async () => {
+    const w = world("NONE");
+    const first = await w.as(FOUNDER).propose({
+      actorUserId: FOUNDER,
+      relationshipId: REL,
+      purpose: "Intro call",
+      options: [ahead(3)],
+      idempotencyKey: "founder-a",
+    });
+    if (first.outcome !== "OK") throw new Error("refused");
+    await w.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: first.proposal.id,
+      action: "DECLINE",
+      idempotencyKey: "investor-decline",
+    });
+    const second = await w.as(FOUNDER).propose({
+      actorUserId: FOUNDER,
+      relationshipId: REL,
+      purpose: "Intro call",
+      options: [ahead(4)],
+      idempotencyKey: "founder-b",
+    });
+    if (second.outcome !== "OK") throw new Error("refused");
+    await w.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: second.proposal.id,
+      action: "COUNTER",
+      options: [ahead(6)],
+      idempotencyKey: "investor-counter",
+    });
+    await w.as(FOUNDER).respond({
+      actorUserId: FOUNDER,
+      proposalId: second.proposal.id,
+      action: "DECLINE_COUNTER",
+      idempotencyKey: "founder-decline-counter",
+    });
+    const toFounder = w.notices.find((n) =>
+      n.title.includes("declined the proposed call times"),
+    );
+    const toInvestor = w.notices.find((n) =>
+      n.title.includes("declined the times you suggested"),
+    );
+    expect(toFounder?.body).toContain(
+      "You can propose other times on the relationship page.",
+    );
+    expect(toInvestor?.body).toContain(
+      "They may suggest new times, or you can message them on the relationship page.",
+    );
+    expect(toInvestor?.body).not.toContain("You can propose");
   });
 });

@@ -349,6 +349,48 @@ export type ScheduleService = {
       readonly alreadyDone: boolean;
     }>
   >;
+  /**
+   * Live audit 2026-11-14 D7: a move both sides agreed through a meeting
+   * time proposal (the founder proposed it with `rescheduleOfMeetingId`, an
+   * authorised person on the other side accepted). The same move as
+   * `reschedule` -- the record, `meeting_rescheduled`, the reminder, and
+   * for a time agreed without a calendar one "Call moved" notice to each
+   * other person on the call -- but the acting person is the one who
+   * recorded the acceptance, a party to the relationship, not necessarily
+   * the organiser. A calendar event is moved at the organiser's calendar
+   * only when the organiser is that person or proposed the move
+   * themselves; otherwise NOT_ORGANISER. Only a SCHEDULED, not yet started
+   * meeting on this relationship moves. Idempotent by the new time.
+   */
+  readonly moveAgreed: (input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly meetingId: string;
+    readonly proposedByUserId: string;
+    readonly startsAt: Date;
+    readonly durationMinutes?: number | undefined;
+    readonly correlationId: string;
+  }) => Promise<
+    ScheduleOutcome<{
+      readonly meeting: MeetingView;
+      readonly alreadyDone: boolean;
+      /** Whether the organiser's calendar event moved (false: none exists). */
+      readonly calendarUpdated: boolean;
+    }>
+  >;
+  /**
+   * Whether `moveAgreed` would accept this meeting now, without moving it:
+   * checked when a move is proposed (`proposedByUserId` null: whoever
+   * accepts is not known yet, so the organiser rule waits) and before an
+   * acceptance is recorded, so a move of a cancelled, past or foreign
+   * meeting is refused instead of confirmed and left unbooked.
+   */
+  readonly agreedMoveRefusal: (input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly meetingId: string;
+    readonly proposedByUserId: string | null;
+  }) => Promise<ScheduleRefusal | null>;
   readonly cancel: (input: {
     readonly actor: ActorContext;
     readonly meetingId: string;
@@ -805,6 +847,186 @@ export function createScheduleService(
     // Still a party to the relationship, as themselves, today.
     if ((await partyOf(actor, record.relationshipId)) === null) return null;
     return record;
+  }
+
+  /**
+   * D7: the meeting an agreed move (a confirmed meeting time proposal)
+   * applies to, or why not. `proposedByUserId` null: checked when the move
+   * is proposed, before anyone has accepted, so the organiser rule waits.
+   */
+  async function agreedMeeting(input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly meetingId: string;
+    readonly proposedByUserId: string | null;
+  }): Promise<
+    | { readonly refusal: null; readonly record: MeetingRecord }
+    | { readonly refusal: ScheduleRefusal }
+  > {
+    if (input.actor.actorType !== "HUMAN" || !UUID.test(input.meetingId)) {
+      return { refusal: "NOT_FOUND" };
+    }
+    if ((await partyOf(input.actor, input.relationshipId)) === null) {
+      return { refusal: "NOT_A_PARTY" };
+    }
+    const record = await store.findMeeting(input.meetingId);
+    // Only a meeting on this very relationship: a proposal never reaches
+    // another relationship's call.
+    if (
+      record === null ||
+      record.relationshipId !== input.relationshipId ||
+      record.origin === "JOINED"
+    ) {
+      return { refusal: "NOT_FOUND" };
+    }
+    if (record.status === "CANCELLED") return { refusal: "CANCELLED" };
+    if (record.status !== "SCHEDULED") return { refusal: "NOT_FOUND" };
+    // A call that has started or passed is not moved; propose a new one.
+    if (record.startsAt.getTime() <= now().getTime()) {
+      return { refusal: "INVALID_TIME" };
+    }
+    // The organiser's calendar event moves only on the organiser's own
+    // word: they accepted, or the move is their own proposal.
+    if (
+      input.proposedByUserId !== null &&
+      hasCalendarEvent(record) &&
+      record.organiserUserId !== input.actor.userId &&
+      record.organiserUserId !== input.proposedByUserId
+    ) {
+      return { refusal: "NOT_ORGANISER" };
+    }
+    return { refusal: null, record };
+  }
+
+  /**
+   * Moves a SCHEDULED meeting the caller is entitled to move: its calendar
+   * event (at the organiser's calendar) when it has one, the record, the
+   * relationship event and the reminder; a time agreed without a calendar
+   * tells each other person on the call once per new time.
+   */
+  async function moveRecord(
+    record: MeetingRecord,
+    input: {
+      readonly actor: ActorContext;
+      readonly startsAt: Date;
+      readonly durationMinutes?: number | undefined;
+      readonly correlationId: string;
+    },
+  ): Promise<
+    ScheduleOutcome<{
+      readonly meeting: MeetingView;
+      readonly alreadyDone: boolean;
+      readonly calendarUpdated: boolean;
+    }>
+  > {
+    if (input.startsAt.getTime() < now().getTime()) {
+      return refusal("INVALID_TIME");
+    }
+    const minutes =
+      input.durationMinutes ??
+      Math.round(
+        (record.endsAt.getTime() - record.startsAt.getTime()) / 60_000,
+      );
+    const endsAt = new Date(input.startsAt.getTime() + minutes * 60_000);
+    if (
+      record.startsAt.getTime() === input.startsAt.getTime() &&
+      record.endsAt.getTime() === endsAt.getTime()
+    ) {
+      return {
+        outcome: "OK",
+        meeting: viewFor(record, input.actor.userId),
+        alreadyDone: true,
+        calendarUpdated: false,
+      };
+    }
+    // A time agreed without a calendar has no event to move (D6): the
+    // record moves and the people on the call are told, nothing at Google.
+    const withCalendar = hasCalendarEvent(record);
+    if (withCalendar) {
+      // The event lives at the organiser's calendar (for `reschedule`
+      // the organiser is the actor; `moveAgreed` checked their word).
+      const organiser = record.organiserUserId;
+      const calendar = await calendars(organiser).catch(() => null);
+      if (calendar === null) {
+        return refusal(await missingCalendar(organiser));
+      }
+      try {
+        await calendar.move(record.googleEventId, {
+          start: input.startsAt,
+          end: endsAt,
+          timeZone: record.timeZone,
+        });
+      } catch (error: unknown) {
+        return failed(error);
+      }
+    }
+    const zoneOf = withCalendar ? null : await zonesOf(record);
+    await transactions.run(async (tx) => {
+      if (
+        !(await store.moveMeeting(tx, record.id, {
+          startsAt: input.startsAt,
+          endsAt,
+        }))
+      ) {
+        return;
+      }
+      // No calendar update reaches them, so the app says it: once per
+      // new time, in each person's own zone, to everyone on the call but
+      // the person who moved it (the organiser, too, when an accepted
+      // proposal moved it).
+      if (zoneOf !== null) {
+        for (const participant of record.participants) {
+          if (participant.userId === input.actor.userId) continue;
+          await store.notify(tx, {
+            tenantId: participant.participantTenantId,
+            userId: participant.userId,
+            kind: "MEETING_SCHEDULED",
+            title: `Call moved: ${record.purpose}`.slice(0, 200),
+            body: `Now ${meetingTimeLabel(input.startsAt, zoneOf(participant.userId))}. No calendar invite was sent; the time is agreed on Capital Q.`.slice(
+              0,
+              1000,
+            ),
+            linkPath: null,
+            reminderId: null,
+            meetingId: record.id,
+            dedupeKey:
+              `meeting-moved:${record.id}:${input.startsAt.toISOString()}`.slice(
+                0,
+                200,
+              ),
+          });
+        }
+      }
+      await activity.record(tx, {
+        relationshipId: record.relationshipId,
+        eventType: "meeting_rescheduled",
+        meetingId: record.id,
+        actorUserId: input.actor.userId,
+        correlationId: input.correlationId,
+      });
+      await store.upsertMeetingReminder(tx, {
+        meetingId: record.id,
+        // The organiser's reminder, whoever moved the call.
+        tenantId: record.organiserTenantId,
+        ownerUserId: record.organiserUserId,
+        relationshipId: record.relationshipId,
+        title:
+          `Call in ${String(MEETING_REMINDER_MINUTES)} minutes: ${record.purpose}`.slice(
+            0,
+            200,
+          ),
+        dueAt: new Date(
+          input.startsAt.getTime() - MEETING_REMINDER_MINUTES * 60_000,
+        ),
+      });
+    });
+    const fresh = (await store.findMeeting(record.id)) ?? record;
+    return {
+      outcome: "OK",
+      meeting: viewFor(fresh, input.actor.userId),
+      alreadyDone: false,
+      calendarUpdated: withCalendar,
+    };
   }
 
   return {
@@ -1277,107 +1499,22 @@ export function createScheduleService(
       if (record.origin === "JOINED") return refusal("NOT_FOUND");
       if (record.status === "CANCELLED") return refusal("CANCELLED");
       if (record.status !== "SCHEDULED") return refusal("NOT_FOUND");
-      if (input.startsAt.getTime() < now().getTime()) {
-        return refusal("INVALID_TIME");
-      }
-      const minutes =
-        input.durationMinutes ??
-        Math.round(
-          (record.endsAt.getTime() - record.startsAt.getTime()) / 60_000,
-        );
-      const endsAt = new Date(input.startsAt.getTime() + minutes * 60_000);
-      if (
-        record.startsAt.getTime() === input.startsAt.getTime() &&
-        record.endsAt.getTime() === endsAt.getTime()
-      ) {
-        return {
-          outcome: "OK",
-          meeting: viewFor(record, input.actor.userId),
-          alreadyDone: true,
-        };
-      }
-      // A time agreed without a calendar has no event to move (D6): the
-      // record moves and the people on the call are told, nothing at Google.
-      const withCalendar = hasCalendarEvent(record);
-      if (withCalendar) {
-        const calendar = await calendars(input.actor.userId).catch(() => null);
-        if (calendar === null) {
-          return refusal(await missingCalendar(input.actor.userId));
-        }
-        try {
-          await calendar.move(record.googleEventId, {
-            start: input.startsAt,
-            end: endsAt,
-            timeZone: record.timeZone,
-          });
-        } catch (error: unknown) {
-          return failed(error);
-        }
-      }
-      const zoneOf = withCalendar ? null : await zonesOf(record);
-      await transactions.run(async (tx) => {
-        if (
-          !(await store.moveMeeting(tx, record.id, {
-            startsAt: input.startsAt,
-            endsAt,
-          }))
-        ) {
-          return;
-        }
-        // No calendar update reaches them, so the app says it: once per
-        // new time, in each person's own zone.
-        if (zoneOf !== null) {
-          for (const participant of record.participants) {
-            if (participant.role !== "ATTENDEE") continue;
-            await store.notify(tx, {
-              tenantId: participant.participantTenantId,
-              userId: participant.userId,
-              kind: "MEETING_SCHEDULED",
-              title: `Call moved: ${record.purpose}`.slice(0, 200),
-              body: `Now ${meetingTimeLabel(input.startsAt, zoneOf(participant.userId))}. No calendar invite was sent; the time is agreed on Capital Q.`.slice(
-                0,
-                1000,
-              ),
-              linkPath: null,
-              reminderId: null,
-              meetingId: record.id,
-              dedupeKey:
-                `meeting-moved:${record.id}:${input.startsAt.toISOString()}`.slice(
-                  0,
-                  200,
-                ),
-            });
-          }
-        }
-        await activity.record(tx, {
-          relationshipId: record.relationshipId,
-          eventType: "meeting_rescheduled",
-          meetingId: record.id,
-          actorUserId: input.actor.userId,
-          correlationId: input.correlationId,
-        });
-        await store.upsertMeetingReminder(tx, {
-          meetingId: record.id,
-          tenantId: input.actor.tenantId,
-          ownerUserId: input.actor.userId,
-          relationshipId: record.relationshipId,
-          title:
-            `Call in ${String(MEETING_REMINDER_MINUTES)} minutes: ${record.purpose}`.slice(
-              0,
-              200,
-            ),
-          dueAt: new Date(
-            input.startsAt.getTime() - MEETING_REMINDER_MINUTES * 60_000,
-          ),
-        });
-      });
-      const fresh = (await store.findMeeting(record.id)) ?? record;
+      const moved = await moveRecord(record, input);
+      if (moved.outcome !== "OK") return moved;
       return {
         outcome: "OK",
-        meeting: viewFor(fresh, input.actor.userId),
-        alreadyDone: false,
+        meeting: moved.meeting,
+        alreadyDone: moved.alreadyDone,
       };
     },
+
+    moveAgreed: async (input) => {
+      const checked = await agreedMeeting(input);
+      if (checked.refusal !== null) return refusal(checked.refusal);
+      return moveRecord(checked.record, input);
+    },
+
+    agreedMoveRefusal: async (input) => (await agreedMeeting(input)).refusal,
 
     cancel: async (input) => {
       const record = await ownedMeeting(input.actor, input.meetingId);
