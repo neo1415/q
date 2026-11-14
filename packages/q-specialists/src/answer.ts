@@ -8557,6 +8557,8 @@ export function createSpecialistQAnswer(
      * refusal names, when this run offers it, is the one asked for.
      */
     let redirectedTo: string | null = null;
+    /** D7: the action's own words, said after the answer instead of it. */
+    let limitAfterAnswer: string | null = null;
     if (
       dependencies.appActions !== undefined &&
       appAction !== null &&
@@ -8569,7 +8571,19 @@ export function createSpecialistQAnswer(
         .run(request, appAction)
         .catch(() => null);
       const said = forThePerson(ran);
-      if (said !== null) {
+      if (said !== null && typeof said === "string" && asksForAnAnswer(read)) {
+        // D7 (live 14 Nov 2026, run dea2efd9, Kazikit at INTEREST
+        // EXPRESSED): the document request was refused at prepare time and
+        // its line was the whole reply, though the turn also asked how
+        // solid their figures are. The reading asks for an answer too, so
+        // the answer comes first, within what they may see, and the
+        // action's own words close it.
+        limitAfterAnswer = said;
+        logger?.info(
+          { qRunId: request.runId, tool: appAction.tool },
+          "a declared action's words close the answer the turn also asked for",
+        );
+      } else if (said !== null) {
         return saidByAction(request, conversationId, appAction, said);
       }
       if (ran !== null && isRedirect(ran)) {
@@ -8616,6 +8630,7 @@ export function createSpecialistQAnswer(
       // tool's own schema, and the same tool runs with them.
       if (
         redirectedTo === null &&
+        limitAfterAnswer === null &&
         appActionOf(read) !== null &&
         dependencies.appActionArguments !== undefined &&
         offeredNames.has(appAction.tool)
@@ -8815,13 +8830,16 @@ export function createSpecialistQAnswer(
     // alone, never on one the reader names afresh (live 28635630).
     const named = [
       ...(keptToOffer ? [offeredAction.action] : []),
+      // D7: an action already refused this turn is not offered again;
+      // its own words close the answer.
       ...(!keptToOffer &&
+      limitAfterAnswer === null &&
       read?.askedAction !== undefined &&
       read.askedAction !== null &&
       actions.some((action) => action.name === read.askedAction)
         ? [read.askedAction]
         : []),
-      ...(keptToOffer || appActionOf(read) === null
+      ...(keptToOffer || limitAfterAnswer !== null || appActionOf(read) === null
         ? []
         : [appActionOf(read)?.tool ?? ""]),
       // What the router named, so a code-run miss still offers it.
@@ -8902,7 +8920,9 @@ export function createSpecialistQAnswer(
       ...(read === null
         ? {}
         : {
-            turnKind: read.kind,
+            // D7: answered as the question it also was; the refused
+            // action is not a request still to be done this turn.
+            turnKind: limitAfterAnswer === null ? read.kind : "QUESTION_TO_Q",
             aboutNamedOther: read.aboutNamedOther,
             namedOther: read.namedOther ?? null,
           }),
@@ -9088,10 +9108,24 @@ export function createSpecialistQAnswer(
         : { leadLinesSaid: { answerMessageId: leadAnswerId } }),
       // Only beside code's own priorities: the offer closes that answer.
       ...(readinessLead === null || planOffer === null
-        ? {}
+        ? limitAfterAnswer === null
+          ? {}
+          : { closingLines: limitAfterAnswer }
         : { closingLines: planOffer }),
       // A yes to an offer code did not record: no screen move is guessed.
-      ...(confident && read?.acceptsOffer === true && offerTaken === null
+      // D6 (live 14 Nov 2026, run c5fbdd3f): "Yes, please prepare that
+      // request to Ajopot" names its own action. A request the reader read
+      // as one, for an action this run may take, is not a guess at an
+      // offer: it is asked for in its own right, and that action's own
+      // authorize step and approval card decide it.
+      ...(confident &&
+      read?.acceptsOffer === true &&
+      offerTaken === null &&
+      !(
+        read.kind === "TOOL_REQUEST" &&
+        typeof read.askedAction === "string" &&
+        offeredNames.has(read.askedAction)
+      )
         ? { offerTakenUnrecorded: true as const }
         : {}),
       // C3: the recorded offer they took up, for the answer to do exactly.
@@ -9112,7 +9146,7 @@ export function createSpecialistQAnswer(
       // approval rules decide what happens, never this turn's words.
       ...(offeredAction !== null && offeredTool !== undefined
         ? { askedAction: offeredAction.action }
-        : keptToOffer
+        : keptToOffer || limitAfterAnswer !== null
           ? {}
           : redirectedTo !== null
             ? { askedAction: redirectedTo }
@@ -9970,6 +10004,34 @@ const WORK_PRODUCT_KINDS: ReadonlySet<string> = new Set([
   "COMPARISON",
   "DOCUMENT",
 ]);
+
+/** Answer kinds that ask Q for an answer of its own, not only an action. */
+const ANSWER_ASKING_KINDS: ReadonlySet<string> = new Set([
+  "LOOKUP",
+  "FOLLOW_UP",
+  "ANALYSIS",
+  "COMPARISON",
+]);
+
+/**
+ * D7 (live 14 Nov 2026, run dea2efd9): the turn asks Q for an answer as
+ * well as (or instead of) an action -- read from the reader's answerKind
+ * and parts (v78), never from the words. No reading, or an older one: no.
+ */
+export function asksForAnAnswer(
+  read: {
+    readonly answerKind?: string | null | undefined;
+    readonly parts?: readonly { readonly kind: string }[] | undefined;
+  } | null,
+): boolean {
+  if (read === null) return false;
+  return (
+    (read.answerKind !== undefined &&
+      read.answerKind !== null &&
+      ANSWER_ASKING_KINDS.has(read.answerKind)) ||
+    (read.parts ?? []).some((part) => ANSWER_ASKING_KINDS.has(part.kind))
+  );
+}
 
 /**
  * The reading splits the turn into two or more parts that each ask Q for

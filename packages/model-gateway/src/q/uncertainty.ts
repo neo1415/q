@@ -224,9 +224,17 @@ const sameWords = (a: string, b: string): boolean =>
   a.replace(/\s+/gu, " ").trim().toLowerCase() ===
   b.replace(/\s+/gu, " ").trim().toLowerCase();
 
+const normalised = (text: string): string =>
+  text
+    .replace(/[\s.;:,]+$/u, "")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLowerCase();
+
 /**
  * The material uncertainty an offer would resolve: the one its `about`
- * names exactly, or -- when it names none -- the only material one. Null:
+ * names (exactly, else the one statement holding the other), or the only
+ * material one. Null:
  * no material uncertainty backs the offer, so no uncertainty offer stands.
  */
 export function materialUncertaintyFor(
@@ -235,7 +243,21 @@ export function materialUncertaintyFor(
 ): ModelUncertainty | null {
   const material = uncertainties.filter((one) => one.material);
   if (about !== null) {
-    return material.find((one) => sameWords(one.statement, about)) ?? null;
+    const exact = material.find((one) => sameWords(one.statement, about));
+    if (exact !== undefined) return exact;
+    // Defect D5 (live 14 Nov 2026, run 8039bfd5: a material uncertainty
+    // and no offer): an `about` restating the item in other words matched
+    // nothing exactly, so the offer went as "not material" while a
+    // material one stood. One statement holding the other is the same
+    // item; failing that, the only material one backs it.
+    const wanted = normalised(about);
+    const held = material.filter(
+      (one) =>
+        wanted.length > 0 &&
+        (normalised(one.statement).includes(wanted) ||
+          wanted.includes(normalised(one.statement))),
+    );
+    if (held.length === 1) return held[0] ?? null;
   }
   return material.length === 1 ? (material[0] ?? null) : null;
 }
@@ -390,7 +412,9 @@ export function vehicleOfferSentence(
  * - one whose tool is the authorised vehicle stands, carrying `about`;
  * - one naming another vehicle is re-bound to the authorised one, said in
  *   code's own sentence (the model's sentence goes);
- * - with no route, the offer goes and the plain line says the step.
+ * - with no route, the offer goes and the plain line says the step;
+ * - a vehicle offered on a turn whose answer names no uncertainty at all
+ *   is an offer of what they asked for: only its route is held (D6).
  */
 export type UncertaintyOfferDecision =
   | { readonly kind: "PASS" }
@@ -403,7 +427,8 @@ export type UncertaintyOfferDecision =
       readonly kind: "REBIND";
       readonly tool: string;
       readonly said: string;
-      readonly about: UncertaintyAbout;
+      /** Absent: the answer named no uncertainty (an offer they asked for). */
+      readonly about?: UncertaintyAbout | undefined;
     }
   | { readonly kind: "NO_ROUTE"; readonly line: string | null };
 
@@ -424,6 +449,25 @@ export function decideUncertaintyOffer(input: {
   const vehicleOffer = UNCERTAINTY_VEHICLES.has(input.action);
   if (!vehicleOffer && !MESSAGE_TO_COMPANY_TOOLS.has(input.action)) {
     return { kind: "PASS" };
+  }
+  if (vehicleOffer && input.uncertainties.length === 0) {
+    // Defect D6 (live 14 Nov 2026, runs c5fbdd3f, b6e565fb): asked to
+    // prepare the request, Q offered to draft it on a turn whose answer
+    // named no uncertainty (the question was the turn before), and an
+    // offer with nothing material behind it was not kept, so the yes bound
+    // to nothing. With nothing to weigh it is an offer of what they asked
+    // for, not an uncertainty offer: only its route is held.
+    if (input.vehicle === null) return { kind: "PASS" };
+    if (input.vehicle.kind === "NONE") {
+      return { kind: "NO_ROUTE", line: input.vehicle.line };
+    }
+    return input.vehicle.tool === input.action
+      ? { kind: "PASS" }
+      : {
+          kind: "REBIND",
+          tool: input.vehicle.tool,
+          said: vehicleOfferSentence(input.vehicle.tool, input.company),
+        };
   }
   const backing = materialUncertaintyFor(input.uncertainties, input.about);
   if (!vehicleOffer) {
@@ -472,6 +516,62 @@ export function decideUncertaintyOffer(input: {
         said: vehicleOfferSentence(input.vehicle.tool, input.company),
         about,
       };
+}
+
+/** What code's own offer through a vehicle asks of the company. */
+function vehicleRequest(
+  tool: string,
+  company: string | null,
+  statement: string,
+): string {
+  const them = company ?? "the company";
+  const what =
+    tool === DILIGENCE_DOCUMENTS_TOOL
+      ? `Ask ${them} for a document that would settle this`
+      : tool === DATA_ROOM_REQUEST_TOOL
+        ? `Ask ${them} for the on-request data-room document that would settle this`
+        : `Put this question to ${them}`;
+  return `${what}: ${statement.replace(/\s+/gu, " ").trim()}`.slice(0, 300);
+}
+
+/**
+ * Defect D5 (live 14 Nov 2026, run 8039bfd5, Ajopot x Savanna Seed, IN
+ * DILIGENCE): the answer named a material uncertainty and what would settle
+ * it ("a reconciled six-month cohort table") but closed with no recorded
+ * offer -- a question is shown no change-preparing tool, so the model had
+ * none to name -- and told them to "ask Ajopot" with nothing a yes could
+ * bind to. When the answer's own fields name a material, still-open
+ * uncertainty settled through the founder, and the relationship's route is
+ * a tool this run may use, code makes that one offer, in its own words,
+ * bound to that tool and carrying `about`. Null: nothing material, settled
+ * elsewhere, or no route (the step line says so instead). The tool's own
+ * authorize step and approval card still decide on the yes.
+ */
+export function codeUncertaintyOffer(input: {
+  readonly uncertainties: readonly ModelUncertainty[];
+  readonly vehicle: VehicleChoice | null;
+  readonly company: string | null;
+}): {
+  readonly action: string;
+  readonly request: string;
+  readonly said: string;
+  readonly about: UncertaintyAbout;
+} | null {
+  if (input.vehicle === null || input.vehicle.kind !== "VEHICLE") return null;
+  const backing = input.uncertainties.find(
+    (one) =>
+      one.material &&
+      one.standing !== "INDEPENDENTLY_VERIFIED" &&
+      one.resolveBy.some((way) => THROUGH_FOUNDER.has(way)),
+  );
+  if (backing === undefined) return null;
+  const tool = input.vehicle.tool;
+  return {
+    action: tool,
+    request: vehicleRequest(tool, input.company, backing.statement),
+    said: vehicleOfferSentence(tool, input.company),
+    about: { statement: backing.statement, standing: backing.standing },
+  };
 }
 
 /**

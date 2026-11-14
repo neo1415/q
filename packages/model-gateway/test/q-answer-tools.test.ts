@@ -4931,3 +4931,159 @@ describe("C3: an offer is a record a yes binds to", () => {
     );
   });
 });
+
+/**
+ * Live re-check 14 Nov 2026 (production d2ce8c91e), D5: run 8039bfd5,
+ * investor.savanna-seed on /home, Ajopot (IN_DILIGENCE). The answer named a
+ * material uncertainty and how it would be settled, closed with no offer,
+ * and nothing was recorded (open threads empty). Fixtures only.
+ */
+describe("D5: a material uncertainty in diligence closes with a recorded offer", () => {
+  const AJOPOT = "a1a1a1a1-0000-4000-8000-00000000a10f";
+  const RELATIONSHIP_TOOL: QOfferedTool = {
+    toolName: "relationship.get",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    definition: {
+      name: "get_relationship",
+      description: "Reads their relationship with a company.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const DILIGENCE_TOOL: QOfferedTool = {
+    toolName: "app.diligence.request",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "diligence_documents",
+      description: "Prepares a diligence document request for approval.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const COHORT =
+    "Whether 18,700 of 52,000 registered users are active depends on a definition and period Ajopot has not given.";
+  const relationshipRead = (stage: string) => (proposal: QToolProposal) => ({
+    ...succeeded(proposal, {
+      yourSide: "INVESTOR",
+      counterpart: { kind: "COMPANY", id: AJOPOT, name: "Ajopot" },
+      relationship: {
+        state: stage,
+        stateSince: "2026-11-01T10:00:00.000Z",
+        milestones: [
+          { state: "INTEREST_EXPRESSED", at: "2026-10-20T10:00:00.000Z" },
+          ...(stage === "IN_DILIGENCE"
+            ? [
+                { state: "CONNECTED", at: "2026-10-22T10:00:00.000Z" },
+                { state: "IN_DILIGENCE", at: "2026-11-01T10:00:00.000Z" },
+              ]
+            : []),
+        ],
+        nextStep: "NONE",
+      },
+      truthClass: "VERIFIED",
+      source: "Capital Q relationship history",
+    }),
+    toolName: "relationship.get",
+  });
+  const answerWith = (offer: unknown) =>
+    JSON.stringify({
+      ...analystResult(
+        "The 18,700 active users is a directional signal, not decision-grade traction evidence: it is Ajopot's own count, with no definition or period.",
+      ),
+      uncertainties: [
+        {
+          statement: COHORT,
+          standing: "REPORTED",
+          material: true,
+          mattersFor: ["THESIS", "VALUATION"],
+          resolveBy: ["REQUEST_DOCUMENT", "ASK_FOUNDER"],
+        },
+      ],
+      offer,
+    });
+  const run = (stage: string, offer: unknown) => {
+    const executed: string[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([RELATIONSHIP_TOOL]),
+      available: () => Promise.resolve([RELATIONSHIP_TOOL, DILIGENCE_TOOL]),
+      execute: (proposal) => {
+        executed.push(proposal.name);
+        return Promise.resolve(relationshipRead(stage)(proposal));
+      },
+    };
+    const built = build({
+      said: "How solid is Ajopot's 18,700 active users figure?",
+      investor: true,
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "r",
+              name: "get_relationship",
+              arguments: { companyId: AJOPOT },
+            },
+          ],
+        },
+        { kind: "TEXT", text: answerWith(offer) },
+      ],
+      tools,
+    });
+    return { ...built, executed };
+  };
+  const saidOf = (completed: unknown[]): string =>
+    (completed.at(-1) as { message: { text: string } }).message.text;
+
+  it("no offer of the answer's own: code offers the diligence request and records it, carrying `about`", async () => {
+    const { seam, request, completed, executed } = run("IN_DILIGENCE", null);
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+    });
+    expect(outcome).toMatchObject({
+      kind: "ANSWERED",
+      offer: {
+        action: "diligence_documents",
+        about: { statement: COHORT, standing: "REPORTED" },
+      },
+    });
+    const offered = outcome.kind === "ANSWERED" ? outcome.offer : undefined;
+    expect(saidOf(completed)).toContain(offered?.said ?? "<none>");
+    // The answer comes first; recording the offer executes nothing.
+    expect(saidOf(completed).indexOf("directional signal")).toBeLessThan(
+      saidOf(completed).indexOf(offered?.said ?? "<none>"),
+    );
+    expect(executed).toEqual(["get_relationship"]);
+  });
+
+  it("an offer naming a tool the run does not hold is replaced by the bound route, not left as words", async () => {
+    const UNHELD = "Want me to message Ajopot for the cohort table?";
+    const { seam, request, completed } = run("IN_DILIGENCE", {
+      said: UNHELD,
+      action: "schedule_call",
+      request: "Ask Ajopot for the cohort table.",
+      about: COHORT,
+    });
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+    });
+    expect(outcome).toMatchObject({
+      kind: "ANSWERED",
+      offer: { action: "diligence_documents" },
+    });
+    expect(saidOf(completed)).not.toContain(UNHELD);
+  });
+
+  it("before the pair is connected no offer is made; the step is said instead", async () => {
+    const { seam, request, completed } = run("INTEREST_EXPRESSED", null);
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+    });
+    expect(outcome.kind === "ANSWERED" ? outcome.offer : null).toBeUndefined();
+    expect(saidOf(completed)).toContain("waiting for them to accept");
+  });
+});

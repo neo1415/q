@@ -355,7 +355,9 @@ export function registerNetworkInterestRoutes(
           throw new InterestNotFoundError();
         }
         void reply.header("Cache-Control", "no-store");
-        return DiligenceDtoSchema.parse(view);
+        // The stage is for the party's own action wording, not the page.
+        const { stage: _stage, ...page } = view;
+        return DiligenceDtoSchema.parse(page);
       },
     );
     app.get(

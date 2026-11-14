@@ -808,7 +808,9 @@ export {
   answerSaysPublicCheck,
   checkedLine,
   chooseVehicle,
+  codeUncertaintyOffer,
   decideUncertaintyOffer,
+  materialUncertaintyFor,
   publicStandingOf,
   publicCheckOf,
   publicWebSeenOf,
@@ -830,6 +832,7 @@ import {
   answerSaysPublicCheck,
   checkedLine,
   chooseVehicle,
+  codeUncertaintyOffer,
   decideUncertaintyOffer,
   publicCheckOf,
   publicWebSeenOf,
@@ -11732,7 +11735,23 @@ export function createModelGatewayQAnswer(
           const known = runCompanies.read(request.runId);
           const ids = [...known.profiles.keys()];
           const only = ids.length === 1 ? ids[0] : undefined;
-          if (only === undefined) return null;
+          if (only === undefined) {
+            // D5: on a relationship page the run may read the relationship
+            // and not the profile; the one company relationship it read is
+            // then whom the turn is about. Several, or none: unknown.
+            const related = [...known.relationships.values()].filter(
+              (read) => read.counterpart.kind === "COMPANY",
+            );
+            const one = ids.length === 0 ? related[0] : undefined;
+            if (related.length !== 1 || one === undefined) return null;
+            return {
+              companyId: one.counterpart.id,
+              name:
+                known.companyNames.get(one.counterpart.id) ??
+                one.counterpart.name ??
+                null,
+            };
+          }
           return {
             companyId: only,
             name:
@@ -11835,7 +11854,14 @@ export function createModelGatewayQAnswer(
               break;
             case "NO_ROUTE":
               offerRemoved.push(bound.said);
-              if (decision.line !== null) uncertaintyLines.push(decision.line);
+              // Said once: not beside code's own closing line (D7's stage
+              // limit already says what the relationship allows).
+              if (
+                decision.line !== null &&
+                request.closingLines === undefined
+              ) {
+                uncertaintyLines.push(decision.line);
+              }
               offerBinding = { kind: "NONE" };
               break;
             case "DROP":
@@ -11845,7 +11871,9 @@ export function createModelGatewayQAnswer(
             case "PASS":
               break;
           }
-        } else if (
+        }
+        if (
+          uncertaintyLines.length === 0 &&
           investorTurn &&
           offerBinding.kind !== "BOUND" &&
           uncertainties.some(
@@ -11857,14 +11885,34 @@ export function createModelGatewayQAnswer(
           )
         ) {
           const subject = subjectCompany();
-          const step =
-            subject === null
-              ? null
-              : stepLineWithoutOffer({
+          const vehicle = subject === null ? null : await vehicleFor(subject);
+          // D5 (live run 8039bfd5): a material uncertainty the founder can
+          // settle, a route this run may use, and no offer of the answer's
+          // own: code offers that route, bound and carrying `about`. Not
+          // where code already closes the answer (a plan offer, a stage
+          // limit), on a turn that wants no next step, or beside a change
+          // this turn prepared.
+          const own =
+            request.closingLines === undefined &&
+            nextStepTurn(request) &&
+            !preparedByTool
+              ? codeUncertaintyOffer({
                   uncertainties,
-                  vehicle: await vehicleFor(subject),
-                });
-          if (step !== null) uncertaintyLines.push(step);
+                  vehicle,
+                  company: subject?.name ?? null,
+                })
+              : null;
+          if (own !== null) {
+            uncertaintyLines.push(own.said);
+            offerBinding = { kind: "BOUND", offer: own };
+            logger?.info(
+              { qRunId: request.runId, action: own.action },
+              "a material uncertainty with an open route: code made the offer",
+            );
+          } else if (request.closingLines === undefined) {
+            const step = stepLineWithoutOffer({ uncertainties, vehicle });
+            if (step !== null) uncertaintyLines.push(step);
+          }
         }
         // Slice 0: on a turn about someone not theirs, what was checked.
         if (codeSaysCheckedRuns.has(request.runId)) {
