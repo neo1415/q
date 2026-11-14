@@ -185,6 +185,7 @@ export function GatewayBrandFromWebsite({
       {noWebsite ? (
         <form
           className="flex flex-col gap-2"
+          data-q-editing
           onSubmit={(event) => {
             event.preventDefault();
             saveWebsite();

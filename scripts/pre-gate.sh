@@ -71,6 +71,19 @@ for app in $(printf '%s\n' "${changed[@]}" | grep -oE '^apps/[^/]+' | sort -u); 
   fi
 done
 
+step "repository-scan tests (not reachable by vitest related)"
+# These read the source tree rather than importing it, so a changed file never
+# makes them "related" (an unmarked form reached the gate, 14 Nov).
+scan_tests=$(grep -rlE "readdirSync|globSync|fast-glob" apps/*/test packages/*/test 2>/dev/null | grep -E "\.test\.tsx?$" | sort -u)
+if [ -n "$scan_tests" ]; then
+  # shellcheck disable=SC2086
+  sc_out=$(NODE_OPTIONS=--max-old-space-size=6144 npx vitest run --maxWorkers=2 $scan_tests 2>&1)
+  sc_status=$?
+  printf '%s\n' "$sc_out" | grep -E '^ FAIL ' | sort -u
+  printf '%s\n' "$sc_out" | tail -4
+  [ "$sc_status" -eq 0 ] || bad "repository-scan tests (exit $sc_status)"
+fi
+
 step "tests related to changed source"
 src=()
 for f in "${changed[@]}"; do case "$f" in apps/*|packages/*) case "$f" in *.ts|*.tsx) [ -f "$f" ] && src+=("$f");; esac;; esac; done
