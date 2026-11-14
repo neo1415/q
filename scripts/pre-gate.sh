@@ -59,7 +59,9 @@ step "tests related to changed source"
 src=()
 for f in "${changed[@]}"; do case "$f" in apps/*|packages/*) case "$f" in *.ts|*.tsx) [ -f "$f" ] && src+=("$f");; esac;; esac; done
 if [ ${#src[@]} -gt 0 ]; then
-  npx vitest related --run "${src[@]}" 2>&1 | tail -8
+  # Bounded workers and heap: an unbounded related run OOMed on the shared
+  # 4-vCPU machine (14 Nov). Same tests, same assertions, fewer at once.
+  NODE_OPTIONS=--max-old-space-size=6144 npx vitest related --run --maxWorkers=2 "${src[@]}" 2>&1 | tail -8
   [ "${PIPESTATUS[0]}" -eq 0 ] || bad "vitest related"
 fi
 
