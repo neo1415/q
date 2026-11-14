@@ -42,13 +42,21 @@ const actorOf = (
     actorType: "HUMAN",
   });
 
-const ADMIN_A = actorOf(TENANT_A, ORG_A, "b0000000-0000-4000-8000-00000000000a");
+const ADMIN_A = actorOf(
+  TENANT_A,
+  ORG_A,
+  "b0000000-0000-4000-8000-00000000000a",
+);
 const MEMBER_A = actorOf(
   TENANT_A,
   ORG_A,
   "b0000000-0000-4000-8000-00000000000c",
 );
-const ADMIN_B = actorOf(TENANT_B, ORG_B, "b0000000-0000-4000-8000-00000000000b");
+const ADMIN_B = actorOf(
+  TENANT_B,
+  ORG_B,
+  "b0000000-0000-4000-8000-00000000000b",
+);
 
 class Denied extends Error {
   constructor(message: string) {

@@ -147,9 +147,7 @@ export default async function GateqPage({ searchParams }: Props) {
   // B6/B7: a paused gateway is still theirs to see and reopen; an open one
   // wins when there are several.
   const gateway =
-    gateways?.find((item) => item.status === "ACTIVE") ??
-    gateways?.[0] ??
-    null;
+    gateways?.find((item) => item.status === "ACTIVE") ?? gateways?.[0] ?? null;
   const origin = appOrigin();
   const link = gateway === null ? "" : `${origin}/g/${gateway.publicId}`;
 
@@ -197,15 +195,15 @@ export default async function GateqPage({ searchParams }: Props) {
   if (tab === "gate") {
     const [policy, published, inbox, fromMandate, appearance] =
       await Promise.all([
-      getGatewayPolicy(session, gatewayId).catch(
-        (): GatewayPolicyDto | null => null,
-      ),
-      publicGateway(gateway?.publicId ?? ""),
-      getGateqInbox(session, gatewayId, "INBOX").catch(() => null),
-      // B2: their active mandate, read as them, for the rules editor.
-      activeMandateDraft(session, context.investorOrganisationId),
-      getGatewayAppearance(session, gatewayId).catch(() => null),
-    ]);
+        getGatewayPolicy(session, gatewayId).catch(
+          (): GatewayPolicyDto | null => null,
+        ),
+        publicGateway(gateway?.publicId ?? ""),
+        getGateqInbox(session, gatewayId, "INBOX").catch(() => null),
+        // B2: their active mandate, read as them, for the rules editor.
+        activeMandateDraft(session, context.investorOrganisationId),
+        getGatewayAppearance(session, gatewayId).catch(() => null),
+      ]);
     const snippet = `<script src="${origin}/gateq.js" data-gate="${gateway?.publicId ?? ""}" async></script>`;
     const publishedPolicy =
       policy?.version.status === "PUBLISHED" ? policy : null;

@@ -255,7 +255,10 @@ describe("B6/B7: the gateway's own appearance and status (declared actions)", ()
   const appearanceUrl = `/v1/gateq/gateways/${GATEWAY.id}/appearance`;
 
   it("an admin's new colour and embed sites come back as the saved revision", async () => {
-    const { app } = buildApp({ principal: PRINCIPAL, gatewayAdmin: admin(false) });
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      gatewayAdmin: admin(false),
+    });
     const response = await app.inject({
       method: "PUT",
       url: appearanceUrl,
@@ -274,7 +277,10 @@ describe("B6/B7: the gateway's own appearance and status (declared actions)", ()
   });
 
   it("another tenant's gateway or a non-admin is one 404; a bad colour or origin never reaches the service", async () => {
-    const refused = buildApp({ principal: PRINCIPAL, gatewayAdmin: admin(true) });
+    const refused = buildApp({
+      principal: PRINCIPAL,
+      gatewayAdmin: admin(true),
+    });
     const response = await refused.app.inject({
       method: "PUT",
       url: appearanceUrl,
@@ -289,15 +295,22 @@ describe("B6/B7: the gateway's own appearance and status (declared actions)", ()
     expect(status.statusCode).toBe(404);
 
     calls.length = 0;
-    const { app } = buildApp({ principal: PRINCIPAL, gatewayAdmin: admin(false) });
+    const { app } = buildApp({
+      principal: PRINCIPAL,
+      gatewayAdmin: admin(false),
+    });
     for (const payload of [
       { accentHex: "red", embedOrigins: [] },
       { accentHex: "#0F766E", embedOrigins: [] },
       { accentHex: null, embedOrigins: ["https://a.example/path"] },
       { accentHex: null, embedOrigins: ["https://a.example 'unsafe-eval'"] },
     ]) {
-      const bad = await app.inject({ method: "PUT", url: appearanceUrl, payload });
-      expect(bad.statusCode).toBe(400);
+      const bad = await app.inject({
+        method: "PUT",
+        url: appearanceUrl,
+        payload,
+      });
+      expect(bad.statusCode).toBe(422);
     }
     expect(calls).toHaveLength(0);
   });
@@ -470,9 +483,9 @@ describe("the public route", () => {
       embedOrigins: [],
     });
     expect(
-      (
-        await none.app.inject({ method: "GET", url: url(PUBLIC_ID) })
-      ).json<Record<string, unknown>>(),
+      (await none.app.inject({ method: "GET", url: url(PUBLIC_ID) })).json<
+        Record<string, unknown>
+      >(),
     ).not.toHaveProperty("embedOrigins");
   });
 

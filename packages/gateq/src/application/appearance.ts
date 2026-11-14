@@ -6,7 +6,10 @@ import {
   type MaterialActionAuditWriter,
 } from "@capital-q/audit";
 import { GatewayAppearanceRequestSchema } from "@capital-q/contracts";
-import type { TransactionContext, TransactionManager } from "@capital-q/database";
+import type {
+  TransactionContext,
+  TransactionManager,
+} from "@capital-q/database";
 import {
   ResourceScopeSchema,
   type ActorContext,
@@ -222,7 +225,9 @@ export function createGatewayAdminService(
           tx,
           actor,
           gateway,
-          status === "ACTIVE" ? "gateq.gateway.reopened" : "gateq.gateway.paused",
+          status === "ACTIVE"
+            ? "gateq.gateway.reopened"
+            : "gateq.gateway.paused",
           { statusBefore: gateway.status, statusAfter: changed.status },
         );
         return changed;
@@ -243,8 +248,7 @@ const isRefusal = (error: unknown): boolean =>
   (error instanceof Error && error.name === "AuthorizationDeniedError");
 
 export type GatewayAdminResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false };
+  { readonly ok: true; readonly value: T } | { readonly ok: false };
 
 /**
  * The gateway's administration as the declared app actions reach it (ADR
@@ -306,7 +310,9 @@ export function gatewayAdminActionsPort(dependencies: {
       const id = idOf(gatewayId);
       return id === null
         ? Promise.resolve({ ok: false } as const)
-        : refusing(() => dependencies.admin.appearance({ actor, gatewayId: id }));
+        : refusing(() =>
+            dependencies.admin.appearance({ actor, gatewayId: id }),
+          );
     },
     setAppearance: (
       actor: ActorContext,

@@ -229,8 +229,7 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
    * for an open gateway. Absent or empty: any site, as before.
    */
   readonly publicEmbedOrigins?:
-    | ((publicId: GatewayPublicId) => Promise<readonly string[]>)
-    | undefined;
+    ((publicId: GatewayPublicId) => Promise<readonly string[]>) | undefined;
   /**
    * B6/B7: the gateway's own appearance for its settings (investor.gateway.view
    * to read; whether this viewer may change it comes back with it). Changes
@@ -942,9 +941,7 @@ export function registerGateQRoutes(
       ...projection,
       ...(replyWithinDays === null ? {} : { replyWithinDays }),
       ...(accentHex === null ? {} : { organisationAccentHex: accentHex }),
-      ...(embedOrigins.length === 0
-        ? {}
-        : { embedOrigins: [...embedOrigins] }),
+      ...(embedOrigins.length === 0 ? {} : { embedOrigins: [...embedOrigins] }),
       ...(images === null
         ? {}
         : {

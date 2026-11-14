@@ -14,6 +14,7 @@ import {
   PolicyExtractionRequestSchema,
   UuidSchema,
   type PolicyExtractionDto,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -102,8 +103,7 @@ const READ_MANDATE = defineAppAction<z.infer<typeof Read>, PolicyExtractionDto>(
 // ---------------------------------------------------------------------------
 
 type AdminResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false };
+  { readonly ok: true; readonly value: T } | { readonly ok: false };
 
 type Appearance = {
   readonly gatewayId: string;
@@ -154,8 +154,25 @@ const ADMIN_PURPOSES = ["ACTION_PREPARATION", "GENERAL_QUESTION"] as const;
 
 const NOT_THEIRS = "Only an admin of your firm can change your gateway.";
 
+/**
+ * The organisation Q acts for, set only by Q's own path from the actor, so
+ * the approval card names what it touches. Never authority: the service
+ * reads the gateway's organisation off its row.
+ */
+const ForOrganisation = { organisationId: UuidSchema.optional() };
+const targetsOf = (input: {
+  readonly organisationId?: string | undefined;
+}): readonly QSubjectRef[] =>
+  input.organisationId === undefined
+    ? []
+    : [{ kind: "ORGANISATION", organisationId: input.organisationId }];
+
 const Appear = z
-  .object({ gatewayId: UuidSchema, input: GatewayAppearanceRequestSchema })
+  .object({
+    gatewayId: UuidSchema,
+    ...ForOrganisation,
+    input: GatewayAppearanceRequestSchema,
+  })
   .strict();
 type AppearInput = z.infer<typeof Appear>;
 
@@ -180,7 +197,7 @@ const SET_APPEARANCE = defineAppAction<
   authorize: serviceDecides,
   run: (ports, context, input) =>
     admin(ports).setAppearance(context.actor, input.gatewayId, input.input),
-  targets: () => [],
+  targets: targetsOf,
   supersedes: true,
   card: (input) => ({
     summary:
@@ -265,13 +282,23 @@ const SET_APPEARANCE = defineAppAction<
         }
         embedOrigins = [...new Set(usable)];
       }
-      return { gatewayId: own.id, input: { accentHex, embedOrigins } };
+      return {
+        gatewayId: own.id,
+        ...(context.actor.organisationId === undefined
+          ? {}
+          : { organisationId: context.actor.organisationId }),
+        input: { accentHex, embedOrigins },
+      };
     },
   },
 });
 
 const Status = z
-  .object({ gatewayId: UuidSchema, input: GatewayStatusRequestSchema })
+  .object({
+    gatewayId: UuidSchema,
+    ...ForOrganisation,
+    input: GatewayStatusRequestSchema,
+  })
   .strict();
 
 const SET_STATUS = defineAppAction<
@@ -289,7 +316,7 @@ const SET_STATUS = defineAppAction<
   authorize: serviceDecides,
   run: (ports, context, input) =>
     admin(ports).setStatus(context.actor, input.gatewayId, input.input.status),
-  targets: () => [],
+  targets: targetsOf,
   supersedes: true,
   card: (input) =>
     input.input.status === "ACTIVE"
@@ -349,6 +376,9 @@ const SET_STATUS = defineAppAction<
         ? refusal("You don't have a GateQ gateway yet.")
         : {
             gatewayId: own.id,
+            ...(context.actor.organisationId === undefined
+              ? {}
+              : { organisationId: context.actor.organisationId }),
             input: { status: tool.open ? "ACTIVE" : "DISABLED" },
           };
     },

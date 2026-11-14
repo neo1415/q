@@ -28,9 +28,8 @@ vi.mock("../src/features/gateq/page/gateq-actions", () => ({
     gatewayStatusAction(...args) as unknown,
 }));
 
-const { GatewayAppearancePanel } = await import(
-  "@/features/gateq/page/gateway-appearance"
-);
+const { GatewayAppearancePanel } =
+  await import("@/features/gateq/page/gateway-appearance");
 
 afterEach(() => {
   cleanup();
@@ -122,8 +121,13 @@ describe("B6/B7: the investor brands, places and pauses their own gateway", () =
     );
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Pause gateway" })).toBeNull();
+    expect(screen.getByLabelText("Colour as hex").matches(":disabled")).toBe(
+      true,
+    );
     expect(
-      (screen.getByLabelText("Colour as hex") as HTMLInputElement).disabled,
+      screen
+        .getByLabelText("Websites that may embed your gateway")
+        .matches(":disabled"),
     ).toBe(true);
     expect(
       screen.getByText(
