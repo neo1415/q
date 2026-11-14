@@ -97,6 +97,11 @@ const REFUSALS: Readonly<
     code: "RESOURCE_CONFLICT",
     detail: "Someone just changed this. Look at it again.",
   },
+  MEETING_NOT_MOVABLE: {
+    code: "RESOURCE_CONFLICT",
+    detail:
+      "That call can't be moved: it was cancelled, has already started, or its organiser has to move it. Propose a new call instead.",
+  },
 };
 
 type Listed =
@@ -279,7 +284,11 @@ const PROPOSE = defineAppAction<
       names?.counterpart == null
         ? "Propose call times"
         : `Propose call times to ${names.counterpart}`,
-    preview: `${input.input.purpose}\n${input.input.options.map(when).join("\n")}\nNothing is booked until they accept one.`,
+    preview: `${input.input.purpose}\n${input.input.options.map(when).join("\n")}\n${
+      input.input.rescheduleOfMeetingId == null
+        ? "Nothing is booked until they accept one."
+        : "This moves the call already booked; it stays as booked until they accept one."
+    }`,
   }),
   succeeded: (out) => out.outcome === "OK",
   done: (out) =>
@@ -515,12 +524,18 @@ const ACCEPT = defineAppAction<
     out.outcome !== "OK"
       ? REFUSALS[out.reason].detail
       : !out.booked
-        ? "Accepted. The call isn't booked yet; I'll say once it is."
-        : out.calendarInvite === true
-          ? "Accepted and booked. Both sides have the calendar invite."
-          : out.calendarInvite === false
-            ? "Accepted and booked on Capital Q. No calendar invite was sent because no Google Calendar is connected; both sides were told. Connect Google Calendar in Settings to add a Meet link, or share a video link in the chat."
-            : "Accepted and booked.",
+        ? out.proposal.rescheduleOfMeetingId !== null
+          ? "Accepted. The call hasn't moved yet; it stays at its old time until it does."
+          : "Accepted. The call isn't booked yet; I'll say once it is."
+        : out.proposal.rescheduleOfMeetingId !== null
+          ? out.calendarInvite === true
+            ? "Accepted. The call is moved to that time, and the calendar invite is updated."
+            : "Accepted. The call is moved to that time on Capital Q; the other side was told."
+          : out.calendarInvite === true
+            ? "Accepted and booked. Both sides have the calendar invite."
+            : out.calendarInvite === false
+              ? "Accepted and booked on Capital Q. No calendar invite was sent because no Google Calendar is connected; both sides were told. Connect Google Calendar in Settings to add a Meet link, or share a video link in the chat."
+              : "Accepted and booked.",
   http: respondHttp(MEETING_PROPOSAL_ACCEPT_PATH, true),
   tool: {
     name: "accept_meeting_time",

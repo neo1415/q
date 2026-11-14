@@ -16,7 +16,10 @@ import { randomUUID } from "node:crypto";
  * an actor is derived from membership by the `parties` port, never taken
  * from the request. A reschedule is the same negotiation with
  * `rescheduleOfMeetingId`: the existing meeting stays valid until the
- * replacement is CONFIRMED.
+ * replacement is CONFIRMED, and then THAT meeting moves -- no second
+ * meeting is booked (live audit 2026-11-14 D7). A move of a meeting that is
+ * cancelled, past or on another relationship is refused when proposed and
+ * again before an acceptance is recorded.
  */
 
 export type ProposalState =
@@ -204,6 +207,10 @@ export type ProposalParties = (input: {
  * Never called before the acceptance is recorded.
  */
 export type ProposalBooking = (input: {
+  /**
+   * With `rescheduleOfMeetingId`: move that meeting to `option` (the same
+   * meeting id comes back), never book another.
+   */
   readonly proposal: ProposalRecord;
   readonly option: TimeOption;
   readonly idempotencyKey: string;
@@ -243,7 +250,22 @@ export type ProposalRefusal =
   | "INVALID_OPTION_INDEX"
   | "NOT_FOUND"
   | "TOO_MANY_REVISIONS"
-  | "CONFLICT";
+  | "CONFLICT"
+  /** D7: the meeting a move names is cancelled, past, or not this relationship's. */
+  | "MEETING_NOT_MOVABLE";
+
+/**
+ * D7: whether the meeting a move proposal names can be moved now on this
+ * relationship. `proposedByUserId` null when the move is being proposed
+ * (who accepts is not known yet); the proposer when an acceptance is
+ * about to be recorded by `actorUserId`.
+ */
+export type ProposalMoveCheck = (input: {
+  readonly actorUserId: string;
+  readonly relationshipId: string;
+  readonly meetingId: string;
+  readonly proposedByUserId: string | null;
+}) => Promise<boolean>;
 
 export type ProposalOutcome =
   | {
@@ -274,6 +296,8 @@ export type ProposalServiceDependencies = {
   readonly parties: ProposalParties;
   readonly book: ProposalBooking;
   readonly notify?: ProposalNotify | undefined;
+  /** D7: checked for a move; absent, a move is not checked (tests only). */
+  readonly movable?: ProposalMoveCheck | undefined;
   readonly now?: () => Date;
   readonly newId?: () => string;
   readonly logger?: {
@@ -435,6 +459,19 @@ export function createProposalService(
           booked: existing.meetingId !== null,
         };
       }
+      const moveOf = input.rescheduleOfMeetingId ?? null;
+      if (
+        moveOf !== null &&
+        dependencies.movable !== undefined &&
+        !(await dependencies.movable({
+          actorUserId: input.actorUserId,
+          relationshipId: input.relationshipId,
+          meetingId: moveOf,
+          proposedByUserId: null,
+        }))
+      ) {
+        return refused("MEETING_NOT_MOVABLE");
+      }
       const id = newId();
       const record: ProposalRecord = {
         id,
@@ -449,7 +486,7 @@ export function createProposalService(
         acceptedOption: null,
         acceptedByUserId: null,
         acceptedAt: null,
-        rescheduleOfMeetingId: input.rescheduleOfMeetingId ?? null,
+        rescheduleOfMeetingId: moveOf,
         meetingId: null,
         revision: 1,
         idempotencyKey: input.idempotencyKey,
@@ -541,6 +578,21 @@ export function createProposalService(
       }
       if (input.action === "REPROPOSE" && current.revision >= MAX_REVISIONS) {
         return refused("TOO_MANY_REVISIONS");
+      }
+      // A move is confirmed only while its meeting can still move, so an
+      // acceptance is never recorded for a move that cannot happen.
+      if (
+        accepting &&
+        current.rescheduleOfMeetingId !== null &&
+        dependencies.movable !== undefined &&
+        !(await dependencies.movable({
+          actorUserId: input.actorUserId,
+          relationshipId: current.relationshipId,
+          meetingId: current.rescheduleOfMeetingId,
+          proposedByUserId: current.proposedByUserId,
+        }))
+      ) {
+        return refused("MEETING_NOT_MOVABLE");
       }
       const patch: ProposalPatch = accepting
         ? {

@@ -30,6 +30,13 @@ import { meetingTimeLabel } from "./when.js";
  * same honest no-invite record errands write: no Meet link, and every
  * party told plainly that no calendar invite was sent and how to get one.
  * Any other failure leaves the proposal CONFIRMED and retryable.
+ *
+ * A proposal that moves an existing meeting (`rescheduleOfMeetingId`, live
+ * audit 2026-11-14 D7) books nothing new: on acceptance THAT meeting moves
+ * through the schedule service's own move (`moveAgreed`, the path Q's
+ * `meeting.reschedule` uses, calendar-free for a time agreed without one),
+ * as the accepting person. Without that path a move is refused, never
+ * booked as a second meeting.
  */
 export type MeetingProposalPort = {
   readonly party: ProposalParties;
@@ -42,7 +49,9 @@ export type MeetingProposalPort = {
 export function createMeetingProposalPort(options: {
   readonly transactions: TransactionManager;
   readonly schedule: Pick<ScheduleService, "schedule"> &
-    Partial<Pick<ScheduleService, "recordAgreed">>;
+    Partial<
+      Pick<ScheduleService, "recordAgreed" | "moveAgreed" | "agreedMoveRefusal">
+    >;
   /** The other side hears that times were proposed or countered. */
   readonly counterpartNotices?: Pick<CounterpartNotices, "notify"> | undefined;
   readonly logger?: {
@@ -69,11 +78,53 @@ export function createMeetingProposalPort(options: {
         ...(options.counterpartNotices === undefined
           ? {}
           : { notify: noticesFor(options.counterpartNotices) }),
+        movable: async (input) => {
+          const check = options.schedule.agreedMoveRefusal;
+          if (check === undefined || options.schedule.moveAgreed === undefined)
+            return false;
+          const refusal = await check({
+            actor,
+            relationshipId: input.relationshipId,
+            meetingId: input.meetingId,
+            proposedByUserId: input.proposedByUserId,
+          });
+          if (refusal !== null) {
+            options.logger?.info(
+              { meetingId: input.meetingId, refusal },
+              "meeting move proposal refused",
+            );
+          }
+          return refusal === null;
+        },
         book: async ({ proposal, option, idempotencyKey }) => {
           const minutes = Math.round(
             (Date.parse(option.endsAt) - Date.parse(option.startsAt)) / 60_000,
           );
           const durationMinutes = Math.min(180, Math.max(15, minutes));
+          if (proposal.rescheduleOfMeetingId !== null) {
+            const move = options.schedule.moveAgreed;
+            if (move === undefined) return null;
+            // Idempotent by the new time: a retried booking is the same move.
+            const moved = await move({
+              actor,
+              relationshipId: proposal.relationshipId,
+              meetingId: proposal.rescheduleOfMeetingId,
+              proposedByUserId: proposal.proposedByUserId,
+              startsAt: new Date(option.startsAt),
+              durationMinutes,
+              correlationId,
+            });
+            options.logger?.info(
+              { proposalId: proposal.id, outcome: moved.outcome },
+              "accepted meeting move applied",
+            );
+            return moved.outcome === "OK"
+              ? {
+                  meetingId: moved.meeting.id,
+                  calendarInvite: moved.calendarUpdated,
+                }
+              : null;
+          }
           const booked = await options.schedule.schedule({
             actor,
             relationshipId: proposal.relationshipId,
@@ -166,8 +217,13 @@ function noticesFor(
       const declined = investorDeclined
         ? proposal.options
         : (proposal.counterOptions ?? []);
+      // D8: only the company side proposes, so each side reads the step
+      // that is actually theirs.
+      const next = investorDeclined
+        ? "You can propose other times on the relationship page."
+        : "They may suggest new times, or you can message them on the relationship page.";
       const body = (zone?: string) =>
-        `${proposal.purpose}\n${timesOf(declined, zone)}\nNothing is booked. You can propose other times on the relationship page.`;
+        `${proposal.purpose}\n${timesOf(declined, zone)}\nNothing is booked. ${next}`;
       await notices.notify({
         relationshipId: proposal.relationshipId,
         actingSide: investorDeclined ? "INVESTOR" : "COMPANY",
