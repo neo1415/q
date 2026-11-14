@@ -267,6 +267,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // G3: the provider's room events (joined, left, ended), signed by a
   // per-session token in the path; the room's clock, not a person.
   "api/http/gateq-video.ts POST `${GATEQ_VIDEO_EVENTS_PATH}/:token`": WEBHOOK,
+  // Directive 2026-11-14 item 4: the applicant's voice-only interview
+  // (guest credential) and the speech provider's think bridge (per-line
+  // bearer), no signed-in actor.
+  "api/http/gateq-voice.ts GET GATEQ_APPLY_VOICE_PATH": PUBLIC,
+  "api/http/gateq-voice.ts POST GATEQ_APPLY_VOICE_PATH": PUBLIC,
+  "api/http/gateq-voice.ts POST GATEQ_APPLY_VOICE_END_PATH": PUBLIC,
+  "api/http/gateq-voice.ts POST `${GATEQ_VOICE_BRIDGE_PATH}/chat/completions`":
+    WEBHOOK,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
@@ -1408,6 +1416,11 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-video.ts POST GATEQ_VIDEO_BRIDGE_PATH",
   // G3: the provider's room events (a per-session path token, not a person).
   "api/http/gateq-video.ts POST `${GATEQ_VIDEO_EVENTS_PATH}/:token`",
+  // The voice-only interview's start/end (guest credential only) and the
+  // speech provider's think bridge (a per-line bearer, not a person).
+  "api/http/gateq-voice.ts POST GATEQ_APPLY_VOICE_PATH",
+  "api/http/gateq-voice.ts POST GATEQ_APPLY_VOICE_END_PATH",
+  "api/http/gateq-voice.ts POST `${GATEQ_VOICE_BRIDGE_PATH}/chat/completions`",
   // Q's opening question for a form-started interview, under the same
   // guest credential. Pending the lead's decision.
   "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH",

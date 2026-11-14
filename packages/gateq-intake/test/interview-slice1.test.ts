@@ -34,6 +34,11 @@ import {
   type NewApplicationFact,
 } from "../src/contracts/index.js";
 import { createConversationService } from "../src/application/conversation-service.js";
+import {
+  createGateqVoiceInterview,
+  GATEQ_VOICE_DEFAULTS,
+  type GateqVoiceSessionRow,
+} from "../src/voice/voice-interview.js";
 import { coverageFor } from "../src/application/coverage.js";
 import { APPLICANT_TEXT_LINEAGE } from "../src/application/disclosure-projection.js";
 import {
@@ -2368,5 +2373,133 @@ describe("explicit document-informed submission", () => {
       }),
     ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
     expect(w.submissions).toHaveLength(0);
+  });
+});
+
+describe("voice-only interview (directive 2026-11-14 item 4): one canonical interview", () => {
+  it("a spoken line through the voice bridge is the same turn path as a typed one, and typing after it keeps every turn", async () => {
+    const w = world({ coverageSources: true });
+    const { token } = await readyToSubmit(w);
+    // A typed turn first.
+    w.script.push({ reply: "Who are your customers?", facts: [] });
+    await w.conversation.turn({
+      token,
+      message: "Hello.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    // Then the applicant talks: a fake speech adapter, an in-memory store.
+    const rows: GateqVoiceSessionRow[] = [];
+    const bearers: string[] = [];
+    const voice = createGateqVoiceInterview({
+      config: { ...GATEQ_VOICE_DEFAULTS, enabled: true },
+      provider: {
+        openLine: (input) => {
+          bearers.push(input.bridge.bearer);
+          return Promise.resolve({
+            provider: "deepgram" as const,
+            token: "short-lived",
+            agent: { greeting: input.greeting },
+          });
+        },
+      },
+      sealer: { seal: (p) => `sealed:${p}`, open: (s) => s.slice(7) },
+      intake: w.intake,
+      conversation: w.conversation,
+      bridgePath: "/v1/gateq/voice/bridge",
+      store: {
+        reserve: (input) => {
+          const row: GateqVoiceSessionRow = {
+            id: input.id,
+            tenantId: input.tenantId,
+            applicationId: input.applicationId,
+            status: "LIVE",
+            endedReason: null,
+            guestCredentialSealed: input.guestCredentialSealed,
+            bridgeTokenHash: input.bridgeTokenHash,
+            maxSeconds: input.maxSeconds,
+            createdAt: new Date().toISOString(),
+            endsAt: new Date(
+              Date.now() + input.maxSeconds * 1000,
+            ).toISOString(),
+          };
+          rows.push(row);
+          return Promise.resolve({ kind: "CREATED" as const, row });
+        },
+        end: (input) => {
+          const i = rows.findIndex((r) => r.id === input.id);
+          const row = rows[i];
+          if (row === undefined) return Promise.resolve(null);
+          rows[i] = { ...row, status: "ENDED", endedReason: input.reason };
+          return Promise.resolve(rows[i] ?? null);
+        },
+        openForApplication: () =>
+          Promise.resolve(rows.find((r) => r.status === "LIVE") ?? null),
+        countForApplication: () => Promise.resolve(rows.length),
+        byBridgeTokenHash: (hash) =>
+          Promise.resolve(rows.find((r) => r.bridgeTokenHash === hash) ?? null),
+        expired: () => Promise.resolve([]),
+      },
+    });
+    const opened = await voice.start({ token, correlationId: "c2" });
+    // Q opens the line with the question it last asked: nothing re-asked.
+    expect(opened.line.agent["greeting"]).toBe("Who are your customers?");
+    w.script.push({
+      reply: "Thanks. How many paying customers?",
+      facts: [
+        fact("company.customers", { kind: "TEXT", text: "Tier-2 banks" }),
+      ],
+    });
+    const spoken = await voice.bridgeTurn({
+      bearer: bearers[0] ?? "",
+      utterance: "Our customers are tier-2 banks.",
+      utteranceId: "user-1",
+      correlationId: "c3",
+    });
+    expect(spoken).toEqual({
+      kind: "REPLY",
+      reply: "Thanks. How many paying customers?",
+    });
+    // Redelivered by the provider: the same turn, never a second one.
+    const again = await voice.bridgeTurn({
+      bearer: bearers[0] ?? "",
+      utterance: "Our customers are tier-2 banks.",
+      utteranceId: "user-1",
+      correlationId: "c4",
+    });
+    expect(again).toEqual(spoken);
+    const voiceTurns = w.turnRows.filter(
+      (t) => t.role === "PERSON" && t.clientTurnId.startsWith("voice-"),
+    );
+    expect(voiceTurns).toHaveLength(1);
+    // The fact heard by voice is in the same coverage, with its turn.
+    const coverage = await w.intake.coverage(token);
+    expect(
+      coverage.coverage.answered.find(
+        (a) => a.dimension === "company.customers",
+      )?.sourceTurnSeq,
+    ).toBe(voiceTurns[0]?.seq);
+    // Fallback: the line ends, typing carries on in the same interview.
+    await voice.end({ token, continueByTyping: true });
+    w.script.push({ reply: "Noted.", facts: [] });
+    await w.conversation.turn({
+      token,
+      message: "About forty.",
+      clientTurnId: "turn-000002",
+      correlationId: "c5",
+    });
+    const transcript = await w.conversation.transcript(token);
+    expect(
+      transcript.filter((t) => t.role === "PERSON").map((t) => t.text),
+    ).toEqual(["Hello.", "Our customers are tier-2 banks.", "About forty."]);
+    // The ended line's bearer is closed: nothing more is heard on it.
+    expect(
+      await voice.bridgeTurn({
+        bearer: bearers[0] ?? "",
+        utterance: "One more thing.",
+        utteranceId: "user-2",
+        correlationId: "c6",
+      }),
+    ).toEqual({ kind: "CLOSED" });
   });
 });
