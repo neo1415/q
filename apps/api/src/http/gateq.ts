@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
   ApplicationContactAccountRequestSchema,
@@ -11,6 +11,10 @@ import {
   ApplicationSummaryDtoSchema,
   GATEQ_GATEWAY_APPLICATIONS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
+  GATEQ_APPLY_MATERIALS_SELECTION_PATH,
+  GATEQ_APPLY_SESSION_HEADER,
+  ApplicationMaterialsSelectionRequestSchema,
+  ApplicationMaterialsSelectionDtoSchema,
   COMPANY_CLAIMABLE_PATH,
   FounderApplicationListDtoSchema,
   GATEQ_INVESTOR_GATES_PATH,
@@ -102,6 +106,7 @@ import { sendEntitlementRequired } from "./billing.js";
 import {
   MaterialNotSharableError,
   type ApplicationMaterials,
+  type ApplicationMaterialSelection,
 } from "../gateq/application-materials.js";
 
 /**
@@ -173,6 +178,8 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
     ((publicId: GatewayPublicId) => Promise<number | null>) | undefined;
   /** F1: a signed-in founder sharing their own documents with an application. */
   readonly materials?: ApplicationMaterials | undefined;
+  /** The founder's draft ticks, restored on resume; shares nothing. */
+  readonly materialSelection?: ApplicationMaterialSelection | undefined;
   /**
    * GateQ slice 1: a signed-in founder's contact for an application. The
    * account's own email (resolved on the server from the actor, never the
@@ -670,6 +677,61 @@ export function registerGateQRoutes(
             return undefined;
           }
           throw error;
+        }
+      },
+    );
+  }
+
+  const materialSelection = dependencies.materialSelection;
+  if (materialSelection !== undefined) {
+    // A wrong credential, another person's application or a document that
+    // is not theirs: one 404, as for the share itself.
+    const hidden = (error: unknown, reply: FastifyReply) => {
+      if (
+        error instanceof IntakeRefusedError ||
+        error instanceof MaterialNotSharableError
+      ) {
+        reply.callNotFound();
+        return undefined;
+      }
+      throw error;
+    };
+    app.get(
+      GATEQ_APPLY_MATERIALS_SELECTION_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const header = request.headers[GATEQ_APPLY_SESSION_HEADER];
+        try {
+          const held = await materialSelection.read({
+            actor: getActorContext(request),
+            sessionToken: typeof header === "string" ? header : "",
+          });
+          void reply.header("Cache-Control", "no-store");
+          return ApplicationMaterialsSelectionDtoSchema.parse(held);
+        } catch (error: unknown) {
+          return hidden(error, reply);
+        }
+      },
+    );
+    app.put(
+      GATEQ_APPLY_MATERIALS_SELECTION_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = parseContract(
+          ApplicationMaterialsSelectionRequestSchema,
+          request.body,
+          "The request is not valid.",
+        );
+        try {
+          const saved = await materialSelection.write({
+            actor: getActorContext(request),
+            sessionToken: input.sessionToken,
+            documentIds: input.documentIds,
+          });
+          void reply.header("Cache-Control", "no-store");
+          return ApplicationMaterialsSelectionDtoSchema.parse(saved);
+        } catch (error: unknown) {
+          return hidden(error, reply);
         }
       },
     );

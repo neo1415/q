@@ -31,7 +31,11 @@ import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import { gatewayMarkImage } from "../gateway-brand";
 import "../gateq.css";
 import "../gateq-v2.css";
-import { shareMaterialsAction } from "../materials-actions";
+import {
+  readMaterialsSelectionAction,
+  saveMaterialsSelectionAction,
+  shareMaterialsAction,
+} from "../materials-actions";
 import {
   readRecovery,
   saveRecovery,
@@ -207,6 +211,7 @@ export function GateQForm({
   const reopenOnEntry = useRef(
     prefill !== null && !needsCompany && gateway.acceptingApplications,
   );
+  const signedIn = useRef(!anonymous);
 
   useEffect(() => {
     if (preview !== undefined) return;
@@ -258,6 +263,13 @@ export function GateQForm({
       const onRecord = progress.coverage.answers;
       if (onRecord !== undefined)
         setAnswers(answersFromRecord(restored.answers, onRecord));
+      // Live 2026-11-14: the founder's ticks are kept on the server, so a
+      // new browser restores them too. Restoring shares nothing; Send does.
+      if (signedIn.current && progress.application.submittedAt === null) {
+        const ticked = await readMaterialsSelectionAction(resumedToken);
+        if (ticked !== null)
+          setAnswers((current) => ({ ...current, materials: ticked }));
+      }
       const details = ApplicationContactDtoSchema.safeParse(
         Reflect.get(progress.coverage.contact, "details"),
       );
@@ -328,6 +340,26 @@ export function GateQForm({
     setAnswers((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
     setTouched(true);
+    if (field === "materials") keepSelection(value as readonly string[]);
+  };
+
+  // The founder's own tick or untick is kept on the server (whole list, in
+  // order), so a resume elsewhere restores it. It shares nothing: Review
+  // lists the ticks and Send is the consent (ADR 0067 §5).
+  const selectionQueue = useRef<Promise<void>>(Promise.resolve());
+  const keepSelection = (documentIds: readonly string[]) => {
+    if (anonymous || preview !== undefined) return;
+    selectionQueue.current = selectionQueue.current.then(async () => {
+      const credential = await ensureToken();
+      if (credential === null) return;
+      const kept = await formRequest(() =>
+        saveMaterialsSelectionAction(credential, documentIds),
+      );
+      if (!kept.ok)
+        setProblem(
+          "Your document choice is only in this browser for now. Tick it again to retry.",
+        );
+    });
   };
 
   const ensureToken = async (): Promise<string | null> => {

@@ -133,6 +133,7 @@ export {
 export type {
   ApplicationContactRepository,
   ApplicationDocumentRepository,
+  ApplicationDocumentSelectionStore,
   ApplicationFactRepository,
   ApplicationRepository,
   ApplicationSessionRepository,
@@ -163,6 +164,7 @@ export {
 export {
   createPostgresApplicationContactRepository,
   createPostgresApplicationDocumentRepository,
+  createPostgresApplicationDocumentSelectionStore,
   createPostgresApplicationFactRepository,
   createPostgresApplicationRepository,
   createPostgresApplicationSessionRepository,

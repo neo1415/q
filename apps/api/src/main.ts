@@ -23,6 +23,7 @@ import {
 } from "@capital-q/companies";
 import {
   createApplicationMaterials,
+  createApplicationMaterialSelection,
   createApplicationRelationshipJoin,
 } from "./gateq/application-materials.js";
 import { sharedDocumentsPort } from "./gateq/inbox.js";
@@ -224,6 +225,7 @@ import {
   createIntakeService,
   createPostgresGuestThrottle,
   createPostgresApplicationDocumentRepository,
+  createPostgresApplicationDocumentSelectionStore,
   createPostgresApplicationFactRepository,
   createPostgresApplicationRepository,
   createPostgresApplicationSessionRepository,
@@ -3647,6 +3649,25 @@ const { app, logger } = createApp(config, security, {
               "gateq application relationship link failed; repaired on next read",
             );
           },
+        }),
+  // The founder's draft ticks, restored on resume; Send still shares.
+  gateqMaterialSelection:
+    gateqApply === undefined
+      ? undefined
+      : createApplicationMaterialSelection({
+          authoriseGuest: (token) => gateqApply.intake.authorise(token),
+          ownDocument: (actor, documentId) => {
+            const id = DocumentIdSchema.safeParse(documentId);
+            return id.success
+              ? evidence
+                  .getDocument({ actor, documentId: id.data })
+                  .then(() => true)
+                  .catch(() => false)
+              : Promise.resolve(false);
+          },
+          store: createPostgresApplicationDocumentSelectionStore({
+            sql: database.sql,
+          }),
         }),
   // F27: the founder's own unlinked applications are repaired on read.
   gateqUnicornPotential: createGateqUnicornReader({

@@ -163,6 +163,32 @@ export const ShareApplicationMaterialsResponseSchema = z
   .object({ attached: z.number().int().min(0).max(10) })
   .strict();
 
+/**
+ * A signed-in founder's draft document ticks, kept on the server so a resume
+ * in another browser restores them. A draft shares nothing: the documents
+ * reach the investor only through the materials share at Send (ADR 0067 §5).
+ * PUT replaces the whole list (the same list again changes nothing); GET
+ * carries the application credential in GATEQ_APPLY_SESSION_HEADER, because
+ * the bearer is the founder's own sign-in.
+ */
+export const GATEQ_APPLY_MATERIALS_SELECTION_PATH =
+  "/v1/gateq/apply/materials/selection" as const;
+export const GATEQ_APPLY_SESSION_HEADER = "x-gateq-session" as const;
+export const ApplicationMaterialsSelectionRequestSchema =
+  ShareApplicationMaterialsRequestSchema;
+export type ApplicationMaterialsSelectionRequest = z.infer<
+  typeof ApplicationMaterialsSelectionRequestSchema
+>;
+export const ApplicationMaterialsSelectionDtoSchema = z
+  .object({
+    /** Null: nothing ticked or unticked here yet by this founder. */
+    documentIds: z.array(z.string().uuid()).max(10).nullable(),
+  })
+  .strict();
+export type ApplicationMaterialsSelectionDto = z.infer<
+  typeof ApplicationMaterialsSelectionDtoSchema
+>;
+
 export const SubmitApplicationRequestSchema = z
   .object({ clientRequestId: z.string().min(8).max(128) })
   .strict();

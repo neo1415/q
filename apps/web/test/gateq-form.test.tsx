@@ -42,6 +42,14 @@ const video = {
   start: vi.fn<Action>(),
   end: vi.fn<Action>(),
 };
+/**
+ * The founder's draft ticks as the server holds them: the only thing a new
+ * browser shares with the old one. Untracked, like video and voice.
+ */
+const selection = {
+  read: vi.fn<Action>(),
+  save: vi.fn<Action>(),
+};
 const voice = {
   state: vi.fn<Action>(),
   start: vi.fn<Action>(),
@@ -80,6 +88,8 @@ vi.mock("../src/features/gateq/apply-actions", () => ({
 vi.mock("../src/features/gateq/materials-actions", () => ({
   shareMaterialsAction: tracked("share"),
   saveAccountContactAction: tracked("accountContact"),
+  readMaterialsSelectionAction: (...args: unknown[]) => selection.read(...args),
+  saveMaterialsSelectionAction: (...args: unknown[]) => selection.save(...args),
 }));
 
 const model = await import("../src/features/gateq/form/form-model");
@@ -193,6 +203,9 @@ beforeEach(() => {
   for (const fn of Object.values(calls)) fn.mockReset();
   for (const fn of Object.values(video)) fn.mockReset();
   for (const fn of Object.values(voice)) fn.mockReset();
+  for (const fn of Object.values(selection)) fn.mockReset();
+  selection.read.mockResolvedValue(null);
+  selection.save.mockResolvedValue({ ok: true });
   // By default voice is not offered either.
   voice.state.mockResolvedValue({
     ok: true,
@@ -927,6 +940,116 @@ describe("the form, driven like a founder", () => {
     await press("Submit to Sahel Capital");
     expect(calls.share).toHaveBeenCalledWith(TOKEN, [deck]);
     expect(calls.submit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("live 14 Nov: ticked documents survive a resume in a new browser", () => {
+  const DECK = "00000000-0000-4000-8000-0000000000d1";
+  const ACCOUNTS = "00000000-0000-4000-8000-0000000000d2";
+  const PROFILE = {
+    companyName: "Kora Health",
+    oneLiner: "Gets clinics paid",
+    stageCode: "seed",
+    country: "NG",
+    contactName: "Amara Okafor",
+    contactEmail: "amara@kora.ng",
+  } as const;
+  const MATERIALS = [
+    { id: DECK, name: "Pitch deck v3", detail: "Pitch deck" },
+    { id: ACCOUNTS, name: "Management accounts", detail: "Financials" },
+  ];
+  const freshDraft = () =>
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application: summary({}),
+      transcript: { turns: [] },
+      coverage: {
+        ...coverageDto({}, { required: true, confirmed: false }),
+        transcriptTurns: 0,
+      },
+    });
+  const box = (name: RegExp) =>
+    screen.getByRole<HTMLInputElement>("checkbox", { name });
+
+  it("keeps each tick and untick on the server, restores them elsewhere, and still shares only at Send", async () => {
+    // The server's copy: written by the save, read by the next browser.
+    let held: readonly string[] | null = null;
+    selection.save.mockImplementation((_token, ids) => {
+      held = ids as readonly string[];
+      return Promise.resolve({ ok: true });
+    });
+    selection.read.mockImplementation(() => Promise.resolve(held));
+    freshDraft();
+    render(
+      <GateQForm gateway={GATEWAY} prefill={PROFILE} materials={MATERIALS} />,
+    );
+    await flush();
+    fireEvent.click(box(/Pitch deck v3/));
+    await flush();
+    fireEvent.click(box(/Management accounts/));
+    await flush();
+    fireEvent.click(box(/Management accounts/));
+    await flush();
+    // In order, the whole list each time; the untick is kept too.
+    expect(selection.save.mock.calls).toEqual([
+      [TOKEN, [DECK]],
+      [TOKEN, [DECK, ACCOUNTS]],
+      [TOKEN, [DECK]],
+    ]);
+    // A draft shares nothing.
+    expect(calls.share).not.toHaveBeenCalled();
+
+    // A new browser: nothing local, past the questions on the server.
+    cleanup();
+    sessionStorage.clear();
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application: summary({ access: "MAY_APPLY" }),
+      transcript: { turns: [] },
+      coverage: {
+        ...coverageDto({}, { required: true, confirmed: true }),
+        contact: {
+          required: true,
+          confirmed: true,
+          details: contactDto({ confirmedVia: "ACCOUNT" }),
+        },
+        transcriptTurns: 4,
+      },
+    });
+    render(
+      <GateQForm gateway={GATEWAY} prefill={PROFILE} materials={MATERIALS} />,
+    );
+    await flush();
+    expect(selection.read).toHaveBeenLastCalledWith(TOKEN);
+    await press("Skip to review");
+    await flush();
+    // Review lists exactly what was ticked; Send is still the consent.
+    expect(
+      screen.getByText(/Documents you ticked: Pitch deck v3$/),
+    ).toBeTruthy();
+    expect(calls.share).not.toHaveBeenCalled();
+    await press("Submit to Sahel Capital");
+    expect(calls.share).toHaveBeenCalledWith(TOKEN, [DECK]);
+    expect(calls.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it("says plainly when a tick could not be kept", async () => {
+    selection.save.mockResolvedValue({ ok: false });
+    freshDraft();
+    render(
+      <GateQForm gateway={GATEWAY} prefill={PROFILE} materials={MATERIALS} />,
+    );
+    await flush();
+    fireEvent.click(box(/Pitch deck v3/));
+    await flush();
+    expect(screen.getByText(/only in this browser for now/)).toBeTruthy();
+  });
+
+  it("an anonymous applicant has no ticks to keep and reads none", async () => {
+    render(<GateQForm gateway={GATEWAY} />);
+    await flush();
+    expect(selection.read).not.toHaveBeenCalled();
+    expect(selection.save).not.toHaveBeenCalled();
   });
 });
 

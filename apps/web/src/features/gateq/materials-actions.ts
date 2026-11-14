@@ -3,7 +3,9 @@
 import { z } from "zod";
 
 import {
+  getApplicationMaterialsSelection,
   saveAccountApplicationContact,
+  saveApplicationMaterialsSelection,
   shareApplicationMaterials,
 } from "@capital-q/api-client";
 import {
@@ -39,6 +41,41 @@ export async function shareMaterialsAction(
     return { ok: true };
   } catch {
     return { ok: false, message: "Your documents couldn't be shared." };
+  }
+}
+
+/**
+ * The founder's ticks, kept on the server as they make them so a resume in
+ * another browser restores them. This shares nothing: the documents go only
+ * when the founder reviews the list and presses Send (shareMaterialsAction).
+ */
+export async function saveMaterialsSelectionAction(
+  sessionToken: string,
+  documentIds: readonly string[],
+): Promise<{ readonly ok: boolean }> {
+  const parsed = Input.safeParse({ sessionToken, documentIds });
+  const session = await apiSession();
+  if (!parsed.success || session === null) return { ok: false };
+  try {
+    await saveApplicationMaterialsSelection(session, parsed.data);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** The founder's saved ticks for this application; null when none. */
+export async function readMaterialsSelectionAction(
+  sessionToken: string,
+): Promise<readonly string[] | null> {
+  const parsed = Input.shape.sessionToken.safeParse(sessionToken);
+  const session = await apiSession();
+  if (!parsed.success || session === null) return null;
+  try {
+    return (await getApplicationMaterialsSelection(session, parsed.data))
+      .documentIds;
+  } catch {
+    return null;
   }
 }
 

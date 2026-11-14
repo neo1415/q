@@ -17,7 +17,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(32);
+select plan(37);
 
 -- Fixtures ------------------------------------------------------------------------
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
@@ -225,6 +225,41 @@ select throws_ok($$
           '00000000-0000-4000-8000-0000000000ff', pg_temp.rls_id('user_b'))
 $$, '23503', null, 'a logo that is not this gateway''s is refused by the database');
 
+-- Draft document selection (20261231590000): a signed-in founder's ticks,
+-- kept for resume across browsers. It shares nothing (Send writes
+-- application_documents) and is frozen once the application is submitted.
+insert into gateq.applications (id, tenant_id, gateway_id, gateway_version_id, public_reference) values
+  ('00000000-0000-4000-8000-00000000cc32', pg_temp.rls_id('tenant_b'), '00000000-0000-4000-8000-00000000cc11',
+   '00000000-0000-4000-8000-00000000cc21', 'ga_223456789abcdefghjkmnpqrs0');
+
+select is((select relrowsecurity from pg_class where oid = 'gateq.application_document_selections'::regclass), true,
+  'row level security is on for the draft selection');
+
+select lives_ok($$
+  insert into gateq.application_document_selections (application_id, tenant_id, selected_by_user_id, document_ids)
+  values ('00000000-0000-4000-8000-00000000cc32', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'),
+          array['00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000d2']::uuid[])
+$$, 'a draft application keeps its founder''s ticked documents');
+
+select throws_ok($$
+  update gateq.application_document_selections
+     set document_ids = array(select gen_random_uuid() from generate_series(1, 11))
+   where application_id = '00000000-0000-4000-8000-00000000cc32'
+$$, '23514', null, 'no more than ten documents are ever selected');
+
+select throws_ok($$
+  insert into gateq.application_document_selections (application_id, tenant_id, selected_by_user_id, document_ids)
+  values ('00000000-0000-4000-8000-00000000cc32', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_b'), '{}'::uuid[])
+$$, '23514', null, 'a selection belongs to its application''s own tenant');
+
+update gateq.applications set status = 'SUBMITTED', submitted_at = now()
+ where id = '00000000-0000-4000-8000-00000000cc32';
+
+select throws_ok($$
+  update gateq.application_document_selections set document_ids = '{}'::uuid[], revision = revision + 1
+   where application_id = '00000000-0000-4000-8000-00000000cc32'
+$$, '23001', null, 'once submitted, the draft selection is frozen');
+
 -- The exact set, not a count: a new gateq table must be added here on purpose.
 -- Gateway (3), application (8: incl. the interview transcript and the
 -- applicant contact, GateQ slice 1), mandate-reading provenance (P7), the founder
@@ -234,11 +269,12 @@ $$, '23503', null, 'a logo that is not this gateway''s is refused by the databas
 -- (20261231530000) and the atomic statements, links, disagreement events and
 -- turn readings (20261231540000) belong to the application set; the
 -- gateway's appearance revisions (20261231570000) and its logo assets
--- (20261231580000) to the gateway set.
+-- (20261231580000) to the gateway set; the draft document selection
+-- (20261231590000) to the application set.
 select is(
   array(select table_name::text from information_schema.tables
          where table_schema = 'gateq' order by 1),
-  array['application_contacts', 'application_disagreement_events', 'application_documents', 'application_facts', 'application_founders',
+  array['application_contacts', 'application_disagreement_events', 'application_document_selections', 'application_documents', 'application_facts', 'application_founders',
         'application_sessions', 'application_statement_links', 'application_statements', 'application_submissions', 'application_syntheses',
         'application_turn_readings', 'application_turns', 'application_video_sessions', 'application_voice_sessions', 'applications',
         'contact_verification_limits', 'gateway_appearances', 'gateway_criteria', 'gateway_logo_assets', 'gateway_versions', 'gateways',

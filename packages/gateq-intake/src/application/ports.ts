@@ -376,6 +376,32 @@ export type ApplicationDocumentRepository = {
   ) => Promise<readonly string[]>;
 };
 
+/**
+ * A signed-in founder's draft tick list for one application (migration
+ * 20261231590000). It shares nothing: disclosure is Send, which attaches
+ * through ApplicationDocumentRepository. Read and written only as the
+ * founder who ticked.
+ */
+export type ApplicationDocumentSelectionStore = {
+  readonly read: (input: {
+    readonly applicationId: string;
+    readonly tenantId: string;
+  }) => Promise<{
+    readonly selectedByUserId: string;
+    readonly documentIds: readonly string[];
+  } | null>;
+  /**
+   * Replaces the whole list; the same list again is a no-op. False when
+   * another person's selection is already held for this application.
+   */
+  readonly write: (input: {
+    readonly applicationId: string;
+    readonly tenantId: string;
+    readonly userId: string;
+    readonly documentIds: readonly string[];
+  }) => Promise<boolean>;
+};
+
 /** The published policy an application is bound to, read by its frozen id. */
 export type BoundPolicyPort = {
   readonly policyByVersionId: (input: {

@@ -383,6 +383,8 @@ export type ApiModules = {
   /** CRM record: GateQ applications linked to one canonical relationship. */
   readonly gateqRelationshipApplications?: NetworkInterestRoutesDependencies["gateqApplications"];
   readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
+  readonly gateqMaterialSelection?:
+    GateQRoutesDependencies["materialSelection"] | undefined;
   /** Live D5: a signed-in founder's start reopens their own draft. */
   readonly gateqAccountStart?: GateQRoutesDependencies["accountStart"];
   /** GateQ slice 1: a signed-in founder's application contact. */
@@ -1066,6 +1068,7 @@ export function createApp(
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
       materials: modules.gateqMaterials,
+      materialSelection: modules.gateqMaterialSelection,
       applicationContact: modules.gateqApplicationContact,
       accountStart: modules.gateqAccountStart,
       inboxService: modules.gateqInboxService,

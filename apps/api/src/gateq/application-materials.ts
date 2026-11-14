@@ -89,6 +89,108 @@ export type ApplicationMaterials = ReturnType<
 >;
 
 /**
+ * The founder's ticks before Send, kept on the server so a resume in a new
+ * browser or on another device restores them (live defect 2026-11-14).
+ *
+ * A draft selection shares nothing. ADR 0067 §5 is unchanged: the founder
+ * reviews the list and consents at Send, and only `share` above attaches a
+ * document to the application the investor reads. This never attaches.
+ *
+ * Read and written only as the signed-in founder who ticked, by the
+ * application's guest credential; each document must be their
+ * organisation's own (the same Evidence read as `share`). A document that is
+ * no longer theirs is dropped on read rather than shown.
+ */
+export type ApplicationMaterialSelectionDependencies = {
+  /** The credential's application, or a refusal (throws). */
+  readonly authoriseGuest: (token: string) => Promise<{
+    readonly application: {
+      readonly id: string;
+      readonly tenantId: string;
+      readonly status: string;
+    };
+  }>;
+  readonly ownDocument: ApplicationMaterialsDependencies["ownDocument"];
+  readonly store: {
+    readonly read: (input: {
+      readonly applicationId: string;
+      readonly tenantId: string;
+    }) => Promise<{
+      readonly selectedByUserId: string;
+      readonly documentIds: readonly string[];
+    } | null>;
+    readonly write: (input: {
+      readonly applicationId: string;
+      readonly tenantId: string;
+      readonly userId: string;
+      readonly documentIds: readonly string[];
+    }) => Promise<boolean>;
+  };
+};
+
+export function createApplicationMaterialSelection(
+  dependencies: ApplicationMaterialSelectionDependencies,
+) {
+  const owned = async (
+    actor: ActorContext,
+    documentIds: readonly string[],
+  ): Promise<readonly string[]> => {
+    const kept: string[] = [];
+    for (const documentId of documentIds) {
+      if (await dependencies.ownDocument(actor, documentId))
+        kept.push(documentId);
+    }
+    return kept;
+  };
+  return {
+    /** Null: this founder has not ticked or unticked anything here yet. */
+    read: async (input: {
+      readonly actor: ActorContext;
+      readonly sessionToken: string;
+    }): Promise<{ readonly documentIds: readonly string[] | null }> => {
+      const { application } = await dependencies.authoriseGuest(
+        input.sessionToken,
+      );
+      const held = await dependencies.store.read({
+        applicationId: application.id,
+        tenantId: application.tenantId,
+      });
+      // Another person's ticks are not this founder's to see.
+      if (held === null || held.selectedByUserId !== input.actor.userId)
+        return { documentIds: null };
+      return { documentIds: await owned(input.actor, held.documentIds) };
+    },
+    write: async (input: {
+      readonly actor: ActorContext;
+      readonly sessionToken: string;
+      readonly documentIds: readonly string[];
+    }): Promise<{ readonly documentIds: readonly string[] }> => {
+      const { application } = await dependencies.authoriseGuest(
+        input.sessionToken,
+      );
+      // Sent: what was shared is fixed, and the draft is frozen with it.
+      if (application.status === "SUBMITTED")
+        throw new MaterialNotSharableError();
+      const unique = [...new Set(input.documentIds)];
+      if ((await owned(input.actor, unique)).length !== unique.length)
+        throw new MaterialNotSharableError();
+      const written = await dependencies.store.write({
+        applicationId: application.id,
+        tenantId: application.tenantId,
+        userId: input.actor.userId,
+        documentIds: unique,
+      });
+      if (!written) throw new MaterialNotSharableError();
+      return { documentIds: unique };
+    },
+  };
+}
+
+export type ApplicationMaterialSelection = ReturnType<
+  typeof createApplicationMaterialSelection
+>;
+
+/**
  * F27: the scope of the `discovered` origin event when a founder's GateQ
  * application creates the pair. The founder is the one acting, so their
  * side's own scope; Network's registry never lets discovery itself be

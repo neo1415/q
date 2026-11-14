@@ -38,6 +38,7 @@ import type { BackfillStore } from "../application/statement-backfill.js";
 import type {
   ApplicationContactRepository,
   ApplicationDocumentRepository,
+  ApplicationDocumentSelectionStore,
   ApplicationStatementRepository,
   ApplicationFactRepository,
   ApplicationRepository,
@@ -445,6 +446,59 @@ export function createPostgresApplicationDocumentRepository(options: {
          where application_id = ${applicationId}
          order by attached_at asc`;
       return rows.map((row) => (row as { document_id: string }).document_id);
+    },
+  };
+}
+
+const SelectionRow = z.object({
+  selected_by_user_id: z.string().uuid(),
+  document_ids: z.array(z.string().uuid()),
+});
+
+/**
+ * The founder's draft tick list (20261231590000). Whole-list writes, so a
+ * retried tick is the same row; the open-application trigger freezes it at
+ * Send. Never read by an investor path.
+ */
+export function createPostgresApplicationDocumentSelectionStore(options: {
+  readonly sql: DatabaseExecutor;
+}): ApplicationDocumentSelectionStore {
+  const { sql } = options;
+  const read: ApplicationDocumentSelectionStore["read"] = async (input) => {
+    const rows = await sql`
+      select selected_by_user_id, document_ids::text[] as document_ids
+        from gateq.application_document_selections
+       where application_id = ${input.applicationId}
+         and tenant_id = ${input.tenantId}`;
+    const row = rows[0];
+    if (row === undefined) return null;
+    const parsed = SelectionRow.parse(row);
+    return {
+      selectedByUserId: parsed.selected_by_user_id,
+      documentIds: parsed.document_ids,
+    };
+  };
+  return {
+    read,
+    write: async (input) => {
+      // Only the founder who holds the row changes it, and only when the
+      // list differs (the revision counts real changes, not retries).
+      await sql`
+        insert into gateq.application_document_selections as s (
+          application_id, tenant_id, selected_by_user_id, document_ids
+        ) values (
+          ${input.applicationId}, ${input.tenantId}, ${input.userId},
+          ${[...input.documentIds]}::uuid[]
+        )
+        on conflict (application_id) do update
+           set document_ids = excluded.document_ids,
+               revision = s.revision + 1,
+               updated_at = now()
+         where s.selected_by_user_id = excluded.selected_by_user_id
+           and s.tenant_id = excluded.tenant_id
+           and s.document_ids is distinct from excluded.document_ids`;
+      const held = await read(input);
+      return held !== null && held.selectedByUserId === input.userId;
     },
   };
 }

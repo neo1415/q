@@ -27,6 +27,9 @@ import {
   ApplicationAnswersResponseSchema,
   GATEQ_APPLY_ANSWERS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
+  GATEQ_APPLY_MATERIALS_SELECTION_PATH,
+  GATEQ_APPLY_SESSION_HEADER,
+  ApplicationMaterialsSelectionDtoSchema,
   ShareApplicationMaterialsResponseSchema,
   type ApplicationAnswersRequest,
   GATEQ_APPLY_ACCOUNT_START_PATH,
@@ -321,6 +324,37 @@ export function shareApplicationMaterials(
     "POST",
     GATEQ_APPLY_MATERIALS_PATH,
     ShareApplicationMaterialsResponseSchema,
+    { body: input },
+  );
+}
+
+/** The signed-in founder's draft ticks for an application (null: none yet). */
+export function getApplicationMaterialsSelection(
+  session: ApiSession,
+  sessionToken: string,
+) {
+  return call(
+    session,
+    "GET",
+    GATEQ_APPLY_MATERIALS_SELECTION_PATH,
+    ApplicationMaterialsSelectionDtoSchema,
+    { headers: { [GATEQ_APPLY_SESSION_HEADER]: sessionToken } },
+  );
+}
+
+/** Replaces the draft ticks; shares nothing (Send does, after review). */
+export function saveApplicationMaterialsSelection(
+  session: ApiSession,
+  input: {
+    readonly sessionToken: string;
+    readonly documentIds: readonly string[];
+  },
+) {
+  return call(
+    session,
+    "PUT",
+    GATEQ_APPLY_MATERIALS_SELECTION_PATH,
+    ApplicationMaterialsSelectionDtoSchema,
     { body: input },
   );
 }

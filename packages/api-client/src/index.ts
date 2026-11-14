@@ -387,6 +387,8 @@ export {
   setGatewayStatus,
   saveApplicationAnswers,
   shareApplicationMaterials,
+  getApplicationMaterialsSelection,
+  saveApplicationMaterialsSelection,
   startApplication,
   submitApplication,
 } from "./gateq.js";

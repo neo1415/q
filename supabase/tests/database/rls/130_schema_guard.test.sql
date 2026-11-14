@@ -334,6 +334,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('gateq', 'application_contacts', 'INTERNAL_SERVER_ONLY', '{}'),
   -- GateQ atomic statements (migration 20261231540000): server-only; suite 956.
   ('gateq', 'application_disagreement_events', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_document_selections', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_documents', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_facts', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_founders', 'INTERNAL_SERVER_ONLY', '{}'),

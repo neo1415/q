@@ -6046,6 +6046,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Your details",
   "Your details couldn't be saved.",
   "Your device asks for reduced motion, so Q stays calm.",
+  "Your document choice is only in this browser for now. Tick it again to retry.",
   "Your documents",
   "Your documents couldn't be shared.",
   "Your documents didn't load",
