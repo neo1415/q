@@ -1,3 +1,5 @@
+import type { PermittedContextPlan, QSubjectRef } from "@capital-q/contracts";
+
 import type { QSpecialistTurnReading } from "../contracts.js";
 
 /**
@@ -31,4 +33,46 @@ export function readsAsAboutSubjectCompany(
   if (reading === null || reading.aboutNamedOther) return false;
   if (reading.kind === "CORRECTION") return true;
   return reading.kind === "QUESTION_TO_Q" && reading.questionKind === "ADVICE";
+}
+
+/**
+ * A8 (live 14 Nov 2026, founder.maji-loop on 5f4603b05): whether a founder
+ * is correcting something about THEIR OWN company, so the turn goes to the
+ * answer path that holds `propose_company_figure`, not to this specialist.
+ *
+ * "Actually October MRR was $110k." was read as a CORRECTION and answered
+ * here, a path with no tools: no approval card could be prepared, and the
+ * reply said both figures were being kept, which nothing had recorded. A
+ * correction from the company's own side changes what is on record, and
+ * the only way anything reaches the record is an approval card (Prepare ->
+ * Approval). The analysis of the corrected fact is still read there,
+ * through the same records, by the tools.
+ *
+ * Decided from the turn reader's kind (a model reading, never words) and
+ * from the Context Firewall's plan, never from the request: the subject
+ * company must be the one the plan holds under its owner's label
+ * (`organisation_private` COMPANY_PROFILE -- a disclosed company profile
+ * never carries it), so an investor's correction about a company stays
+ * on this path, as before.
+ */
+export function correctsOwnCompany(
+  reading: Pick<QSpecialistTurnReading, "kind" | "aboutNamedOther"> | null,
+  subjects: readonly QSubjectRef[],
+  plan: Pick<PermittedContextPlan, "scopes">,
+): boolean {
+  if (reading === null || reading.aboutNamedOther) return false;
+  if (reading.kind !== "CORRECTION") return false;
+  const companies = subjects.filter(
+    (subject): subject is Extract<QSubjectRef, { kind: "COMPANY" }> =>
+      subject.kind === "COMPANY",
+  );
+  if (companies.length !== 1) return false;
+  const companyId = companies[0]?.companyId;
+  return plan.scopes.some(
+    (scope) =>
+      scope.kind === "COMPANY_PROFILE" &&
+      scope.contextLabel === "organisation_private" &&
+      scope.subject?.kind === "COMPANY" &&
+      scope.subject.companyId === companyId,
+  );
 }

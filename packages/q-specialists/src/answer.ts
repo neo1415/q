@@ -140,6 +140,8 @@ import {
   reshownBlocks,
   shownTurnOf,
   withoutStatusTalk,
+  actionClaims,
+  checkPromises,
   TURN_READER_RECENT_TURNS_MAX,
   priorListings,
   type QPageMovePort,
@@ -257,6 +259,7 @@ import {
   type ResolvedReference,
 } from "./conversation-entities.js";
 import { bindReferences, boundCompanyIds } from "./reference-binding.js";
+import { correctsOwnCompany } from "./company/about-company.js";
 
 /** B6: a reference in the turn, bound to records, with its note. */
 /**
@@ -8771,7 +8774,18 @@ export function createSpecialistQAnswer(
         : null;
     const ownRecords =
       readinessLead !== null ||
-      (!writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS");
+      (!writingDocument && read?.question?.kind === "THEIR_OWN_RECORDS") ||
+      // A8 (live 14 Nov): a founder's correction about their own company
+      // changes what is on record, and only an approval card does that;
+      // the tool path holds propose_company_figure, the analysis does not.
+      (!writingDocument &&
+        correctsOwnCompany(
+          read === null
+            ? null
+            : { kind: read.kind, aboutNamedOther: read.aboutNamedOther },
+          request.subjects,
+          request.plan,
+        ));
     // What the turn is about narrows the tool offer (lead 2026-10-02);
     // "yes" to Q's own offer keeps the previous turn's focus.
     const named = [
@@ -9362,6 +9376,9 @@ export function createSpecialistQAnswer(
         ? undefined
         : (sentence: string): void => {
             if (withoutStatusTalk(sentence).removed > 0) return;
+            // A8: nor one claiming Q did something (recorded, corrected,
+            // "keeping both"): the stored answer's promise check decides.
+            if (actionClaims(sentence).length > 0) return;
             // A sentence the guard would touch is not streamed at all: the
             // stored answer decides what replaces it.
             const checked = withoutRecommendationClaims(sentence);
@@ -9503,8 +9520,29 @@ export function createSpecialistQAnswer(
 
 ${line}`;
     })();
+    /*
+     * A8 (live 14 Nov, founder.maji-loop on 5f4603b05): this path holds no
+     * tools, yet its answer said "I'm keeping both figures visible" after a
+     * correction nothing had recorded. The gateway's promise check runs on
+     * the tool path only, so the same check runs here over the model's
+     * words: what backs a claim is what code did in this run -- a statement
+     * recorded through the Write Gate (said by quietlyNoted below) or the
+     * document prepared -- and nothing else. Code's own lines are added
+     * after, unchecked.
+     */
+    const promised = checkPromises(guarded.text, {
+      actions: [],
+      writingDocument: prepared !== null,
+      remembering: result.recordedStatements.length > 0,
+    });
+    if (promised.unbacked.length > 0) {
+      logger?.warn(
+        { qRunId: request.runId, unbacked: promised.unbacked },
+        "unbacked action claims replaced in a specialist answer",
+      );
+    }
     const content =
-      `${guarded.text}${provenance}${acknowledgement}${documentNote}`
+      `${promised.text}${provenance}${acknowledgement}${documentNote}`
         .slice(0, ANSWER_LIMIT_CHARS)
         .trim();
     // An answer that was nothing but talk about acting (CQ-QX-007) had

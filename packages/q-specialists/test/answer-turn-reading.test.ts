@@ -3334,6 +3334,103 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
   });
 });
 
+/**
+ * A8 (live 14 Nov 2026 on 5f4603b05, founder.maji-loop, an approved claim
+ * "MRR USD 120,000 for October 2026" on record): "Actually October MRR was
+ * $110k." was read as a CORRECTION and answered by the company analysis, a
+ * path with no tools, so no approval card could be prepared. A founder's
+ * correction about their own company goes to the path that holds
+ * propose_company_figure; an investor's stays where it was.
+ */
+describe("A8: a founder's correction about their own company reaches the tool path", () => {
+  const correction = {
+    kind: "CORRECTION",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+  } as unknown as TurnReaderResult;
+  /** The subject company, under the label the firewall gives its own side. */
+  const withCompany = (
+    label: "organisation_private" | "network_visible" | null,
+  ): QAnswerRequest => {
+    const base = request();
+    const subject = { kind: "COMPANY" as const, companyId: COMPANY };
+    return {
+      ...base,
+      subjects: [subject],
+      plan: PermittedContextPlanSchema.parse({
+        ...base.plan,
+        subjects: [subject],
+        scopes:
+          label === null
+            ? []
+            : [
+                {
+                  kind: "COMPANY_PROFILE",
+                  subject,
+                  contextLabel: label,
+                  sensitivity: "CONFIDENTIAL",
+                  layer: "STRUCTURED_STATE",
+                  factCategories: [],
+                  projection: "FULL",
+                  rights: {
+                    canUseForReasoning: true,
+                    canDiscloseExistence: true,
+                    canQuote: true,
+                    canProvideLink: true,
+                  },
+                  filter: { tenantId: TENANT, companyId: COMPANY },
+                  isEvidence: true,
+                },
+              ],
+      }),
+    };
+  };
+
+  it("the live correction from the founder's own side is answered by the tool path, not the analysis", async () => {
+    const run = seam({
+      said: "Actually October MRR was $110k.",
+      reading: correction,
+      outcomes: [],
+      specialistSupports: true,
+    });
+    await run.answer.answer(withCompany("organisation_private"));
+    expect(run.delegated()).toBe(1);
+    expect(run.investigated()).toBe(0);
+  });
+
+  it("an investor's correction about a company they see stays with the analysis", async () => {
+    for (const label of ["network_visible", null] as const) {
+      const run = seam({
+        said: "Actually their October MRR was $110k.",
+        reading: correction,
+        outcomes: [],
+        specialistSupports: true,
+      });
+      await run.answer
+        .answer({ ...withCompany(label), askerSide: "INVESTOR" })
+        .catch(() => undefined);
+      expect(run.investigated()).toBe(1);
+      expect(run.delegated()).toBe(0);
+    }
+  });
+
+  it("other kinds from the founder are routed as before: advice still goes to the analysis", async () => {
+    const run = seam({
+      said: "How strong is my company's traction?",
+      reading: advice,
+      outcomes: [],
+      specialistSupports: true,
+    });
+    await run.answer
+      .answer(withCompany("organisation_private"))
+      .catch(() => undefined);
+    expect(run.investigated()).toBe(1);
+  });
+});
+
 describe("a typed yes to a waiting change (founder fixture #1)", () => {
   const waiting = (approved: string[]): PendingDecisionPort => ({
     proposals: () =>
