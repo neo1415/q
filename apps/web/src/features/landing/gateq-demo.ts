@@ -260,6 +260,7 @@ export const STATUS_WORDS: Readonly<Record<CriterionStatus, string>> = {
   MATCH: "Matched",
   NO_MATCH: "Not matched",
   UNKNOWN: "Unknown",
+  UNRESOLVED: "Two answers",
 };
 
 /** Each engine reason, in a sentence. Every code has one (tested). */
@@ -286,6 +287,12 @@ export const REASON_COPY: Readonly<Record<CriterionReasonCode, string>> = {
     "You didn't give a round size, so this can't be checked yet.",
   RAISE_CURRENCY_DIFFERS:
     "Your round is in a different currency. GateQ never converts, so this stays unknown.",
+  GEOGRAPHY_DISPUTED:
+    "You gave two different countries, so the investor sees both and decides.",
+  STAGE_DISPUTED:
+    "You gave two different stages, so the investor sees both and decides.",
+  RAISE_DISPUTED:
+    "You gave two different round sizes, so the investor sees both and decides.",
   CHEQUE_FITS_RAISE: "Their minimum cheque fits inside your round.",
   CHEQUE_EXCEEDS_RAISE: "Their minimum cheque is larger than your whole round.",
   CHEQUE_CURRENCY_DIFFERS:
@@ -310,5 +317,9 @@ export const OUTCOME_COPY: Readonly<
   INSUFFICIENT_INFORMATION: {
     title: "Nothing rules you out yet",
     body: "Some requirements are unknown because you didn't answer them. Unknown is not a no: it means the question is still open.",
+  },
+  UNRESOLVED: {
+    title: "Two answers to check",
+    body: "You gave two different answers to something a requirement depends on. You can still apply: the investor sees both and decides.",
   },
 };

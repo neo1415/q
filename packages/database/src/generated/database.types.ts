@@ -2480,6 +2480,68 @@ export type Database = {
   }
   gateq: {
     Tables: {
+      application_disagreement_events: {
+        Row: {
+          application_id: string
+          id: string
+          link_id: string
+          recorded_at: string
+          resolved_by_statement_id: string | null
+          source_turn_id: string | null
+          state: string
+          tenant_id: string
+        }
+        Insert: {
+          application_id: string
+          id?: string
+          link_id: string
+          recorded_at?: string
+          resolved_by_statement_id?: string | null
+          source_turn_id?: string | null
+          state: string
+          tenant_id: string
+        }
+        Update: {
+          application_id?: string
+          id?: string
+          link_id?: string
+          recorded_at?: string
+          resolved_by_statement_id?: string | null
+          source_turn_id?: string | null
+          state?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_disagreement_events_application"
+            columns: ["application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_disagreement_events_link"
+            columns: ["link_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_statement_links"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_disagreement_events_resolved_by"
+            columns: ["resolved_by_statement_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_statements"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_disagreement_events_source_turn"
+            columns: ["source_turn_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_turns"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+        ]
+      }
       application_documents: {
         Row: {
           application_id: string
@@ -2610,6 +2672,140 @@ export type Database = {
           },
         ]
       }
+      application_statement_links: {
+        Row: {
+          application_id: string
+          created_at: string
+          from_statement_id: string
+          id: string
+          kind: string
+          origin: string
+          source_turn_id: string | null
+          tenant_id: string
+          to_statement_id: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          from_statement_id: string
+          id?: string
+          kind: string
+          origin: string
+          source_turn_id?: string | null
+          tenant_id: string
+          to_statement_id: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          from_statement_id?: string
+          id?: string
+          kind?: string
+          origin?: string
+          source_turn_id?: string | null
+          tenant_id?: string
+          to_statement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_statement_links_application"
+            columns: ["application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_statement_links_from"
+            columns: ["from_statement_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_statements"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_statement_links_source_turn"
+            columns: ["source_turn_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_turns"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_statement_links_to"
+            columns: ["to_statement_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_statements"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+        ]
+      }
+      application_statements: {
+        Row: {
+          application_id: string
+          as_of: string | null
+          backfill_key: string | null
+          dimension: string
+          id: string
+          origin: string
+          provenance: string
+          quantity: string | null
+          recorded_at: string
+          source_turn_id: string | null
+          stated_at: string
+          tenant_id: string
+          value: Json
+          value_kind: string
+          words: string
+        }
+        Insert: {
+          application_id: string
+          as_of?: string | null
+          backfill_key?: string | null
+          dimension: string
+          id?: string
+          origin: string
+          provenance: string
+          quantity?: string | null
+          recorded_at?: string
+          source_turn_id?: string | null
+          stated_at?: string
+          tenant_id: string
+          value: Json
+          value_kind: string
+          words: string
+        }
+        Update: {
+          application_id?: string
+          as_of?: string | null
+          backfill_key?: string | null
+          dimension?: string
+          id?: string
+          origin?: string
+          provenance?: string
+          quantity?: string | null
+          recorded_at?: string
+          source_turn_id?: string | null
+          stated_at?: string
+          tenant_id?: string
+          value?: Json
+          value_kind?: string
+          words?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_statements_application"
+            columns: ["application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_statements_source_turn"
+            columns: ["source_turn_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_turns"
+            referencedColumns: ["id", "application_id", "tenant_id"]
+          },
+        ]
+      }
       application_submissions: {
         Row: {
           application_id: string
@@ -2655,6 +2851,57 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "gateway_versions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      application_turn_readings: {
+        Row: {
+          application_id: string
+          id: string
+          not_recorded: Json
+          outcome: string
+          reading_version: number
+          recorded_at: string
+          recorded_statement_ids: string[]
+          tenant_id: string
+          turn_id: string
+        }
+        Insert: {
+          application_id: string
+          id?: string
+          not_recorded?: Json
+          outcome: string
+          reading_version: number
+          recorded_at?: string
+          recorded_statement_ids?: string[]
+          tenant_id: string
+          turn_id: string
+        }
+        Update: {
+          application_id?: string
+          id?: string
+          not_recorded?: Json
+          outcome?: string
+          reading_version?: number
+          recorded_at?: string
+          recorded_statement_ids?: string[]
+          tenant_id?: string
+          turn_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_turn_readings_application"
+            columns: ["application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "application_turn_readings_turn"
+            columns: ["turn_id", "application_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "application_turns"
+            referencedColumns: ["id", "application_id", "tenant_id"]
           },
         ]
       }

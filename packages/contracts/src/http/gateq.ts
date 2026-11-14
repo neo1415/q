@@ -195,7 +195,8 @@ export const QualificationCriterionDtoSchema = z
     label: z.string(),
     requiredness: CriterionRequirednessDtoSchema,
     dimension: CriterionTypeDtoSchema,
-    status: z.enum(["MATCH", "NO_MATCH", "UNKNOWN"]),
+    // UNRESOLVED (decision 91): the applicant's own values disagree.
+    status: z.enum(["MATCH", "NO_MATCH", "UNKNOWN", "UNRESOLVED"]),
     reasonCode: z.string().max(64),
     observed: z.string().max(64).nullable(),
   })
@@ -206,7 +207,12 @@ export const QualificationResultDtoSchema = z
     gatewayId: UuidSchema,
     gatewayVersionNumber: z.number().int().min(1),
     inboundMode: GatewayInboundModeDtoSchema,
-    outcome: z.enum(["QUALIFIED", "NOT_QUALIFIED", "INSUFFICIENT_INFORMATION"]),
+    outcome: z.enum([
+      "QUALIFIED",
+      "NOT_QUALIFIED",
+      "INSUFFICIENT_INFORMATION",
+      "UNRESOLVED",
+    ]),
     access: z.enum(["MAY_APPLY", "MAY_NOT_APPLY", "NEEDS_INFORMATION"]),
     accessReasonCode: z.string().max(64),
     criteria: z.array(QualificationCriterionDtoSchema).max(64),

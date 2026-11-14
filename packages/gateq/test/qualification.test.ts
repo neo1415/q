@@ -559,6 +559,8 @@ describe("what qualification is not", () => {
         "principalMismatches",
         "qualificationPolicyVersion",
         "unknowns",
+        // Result v2 (decision 91): required rules on disputed facts.
+        "unresolved",
       ].sort(),
     );
   });

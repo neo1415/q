@@ -21,6 +21,21 @@
  */
 
 export * from "./contracts/index.js";
+// Atomic statements (slice 1). Exported here, not from contracts/index.ts,
+// because statements.ts imports that module.
+export * from "./contracts/statements.js";
+export {
+  dimensionView,
+  disputedFactsFor,
+  legacyFactsFrom,
+  mayAsk,
+  NEVER_ASKED_AGAIN,
+  projectView,
+  questionStatus,
+  StatementViewIntegrityError,
+  type LegacyFact,
+  type LegacyIncompleteness,
+} from "./application/statement-view.js";
 
 export {
   applicationProjection,

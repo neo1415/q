@@ -9,6 +9,7 @@ import {
   type CriterionStatus,
   type GatewayCriterion,
   type GatewayPolicy,
+  type QualificationDisputedFact,
   type QualificationOutcome,
   type QualificationResult,
 } from "../contracts/index.js";
@@ -132,10 +133,25 @@ function exclusionVerdict(
       };
 }
 
+/** Decision 91: a fact the subject gave two disagreeing values for. */
+function isDisputed(
+  projection: QualificationSubjectProjection,
+  fact: QualificationDisputedFact,
+): boolean {
+  return projection.disputed?.includes(fact) === true;
+}
+
+const RAISE_DISPUTED: Verdict = {
+  status: "UNRESOLVED",
+  reasonCode: "RAISE_DISPUTED",
+  observed: null,
+};
+
 function raiseVerdict(
   config: Extract<CriterionConfig, { type: "RAISE_SIZE" }>,
   projection: QualificationSubjectProjection,
 ): Verdict {
+  if (isDisputed(projection, "RAISE")) return RAISE_DISPUTED;
   const raise = projection.raise;
   if (raise === null) {
     return {
@@ -198,6 +214,7 @@ function chequeVerdict(
   config: Extract<CriterionConfig, { type: "CHEQUE_COMPATIBILITY" }>,
   projection: QualificationSubjectProjection,
 ): Verdict {
+  if (isDisputed(projection, "RAISE")) return RAISE_DISPUTED;
   const raise = projection.raise;
   if (raise === null) {
     return {
@@ -238,6 +255,12 @@ function verdictFor(
     case "EXCLUDED_TAXONOMY":
       return exclusionVerdict(config, projection);
     case "GEOGRAPHY": {
+      if (isDisputed(projection, "HEADQUARTERS_COUNTRY"))
+        return {
+          status: "UNRESOLVED",
+          reasonCode: "GEOGRAPHY_DISPUTED",
+          observed: null,
+        };
       const country = projection.headquartersCountry;
       if (country === null) {
         return {
@@ -259,6 +282,12 @@ function verdictFor(
           };
     }
     case "STAGE": {
+      if (isDisputed(projection, "CURRENT_STAGE"))
+        return {
+          status: "UNRESOLVED",
+          reasonCode: "STAGE_DISPUTED",
+          observed: null,
+        };
       const stage = projection.currentStageCode;
       if (stage === null) {
         return {
@@ -352,12 +381,22 @@ export function qualify(input: QualifyInput): QualificationResult {
     .filter((c) => c.status === "UNKNOWN")
     .map((c) => c.criterionId);
 
+  const unresolved = required
+    .filter((c) => c.status === "UNRESOLVED")
+    .map((c) => c.criterionId);
+
+  // Decision 91: a disputed rule never outranks what is established. A
+  // clean required mismatch still refuses and a missing answer is still
+  // asked for; only when neither applies does the dispute decide, and then
+  // as a review flag that lets the applicant through, never a refusal.
   const outcome: QualificationOutcome =
     principalMismatches.length > 0
       ? "NOT_QUALIFIED"
       : unknowns.length > 0
         ? "INSUFFICIENT_INFORMATION"
-        : "QUALIFIED";
+        : unresolved.length > 0
+          ? "UNRESOLVED"
+          : "QUALIFIED";
 
   const mode = policy.version.inboundMode;
   let access: AccessDecision;
@@ -379,6 +418,11 @@ export function qualify(input: QualifyInput): QualificationResult {
     // told Capital Q yet, and GATE-002's interview is where it gets asked.
     access = "NEEDS_INFORMATION";
     accessReasonCode = "REQUIRED_INFORMATION_MISSING";
+  } else if (outcome === "UNRESOLVED") {
+    // Never blocks submission (decision 91): the investor sees both values
+    // and judges for themselves.
+    access = "MAY_APPLY";
+    accessReasonCode = "REQUIRED_CRITERIA_UNRESOLVED";
   } else {
     access = "MAY_APPLY";
     accessReasonCode = "REQUIRED_CRITERIA_SATISFIED";
@@ -397,6 +441,7 @@ export function qualify(input: QualifyInput): QualificationResult {
     criteria,
     principalMismatches,
     unknowns,
+    unresolved,
     evaluatedAt,
   };
 }

@@ -123,11 +123,18 @@ export type CriterionRead = {
   readonly label: string;
   readonly dimension: string;
   readonly required: boolean;
-  readonly status: "MATCH" | "NO_MATCH" | "UNKNOWN" | "NOT_APPLICABLE";
+  readonly status:
+    | "MATCH"
+    | "NO_MATCH"
+    | "UNKNOWN"
+    | "NOT_APPLICABLE"
+    /** Decision 91: the applicant's own values disagree; needs review. */
+    | "UNRESOLVED";
 };
 
 export type QualificationRead = {
-  readonly outcome: "QUALIFIED" | "NOT_QUALIFIED" | "INSUFFICIENT_INFORMATION";
+  readonly outcome:
+    "QUALIFIED" | "NOT_QUALIFIED" | "INSUFFICIENT_INFORMATION" | "UNRESOLVED";
   readonly criteria: readonly CriterionRead[];
 };
 
@@ -138,7 +145,9 @@ export function readQualification(qualification: unknown): QualificationRead {
   return {
     // An outcome we cannot read is not a fit: it is "not enough to say".
     outcome:
-      outcome === "QUALIFIED" || outcome === "NOT_QUALIFIED"
+      outcome === "QUALIFIED" ||
+      outcome === "NOT_QUALIFIED" ||
+      outcome === "UNRESOLVED"
         ? outcome
         : "INSUFFICIENT_INFORMATION",
     criteria: criteria.flatMap((c): CriterionRead[] => {
@@ -152,7 +161,8 @@ export function readQualification(qualification: unknown): QualificationRead {
           status:
             status === "MATCH" ||
             status === "NO_MATCH" ||
-            status === "NOT_APPLICABLE"
+            status === "NOT_APPLICABLE" ||
+            status === "UNRESOLVED"
               ? status
               : "UNKNOWN",
         },
@@ -172,7 +182,11 @@ export function rulesOf(read: QualificationRead) {
   return {
     met: counted.filter((c) => c.status === "MATCH").length,
     total: counted.length,
-    unknown: counted.filter((c) => c.status === "UNKNOWN").length,
+    // A disputed rule (decision 91) is neither met nor missed: it is
+    // counted with the rules still open, never as a miss.
+    unknown: counted.filter(
+      (c) => c.status === "UNKNOWN" || c.status === "UNRESOLVED",
+    ).length,
   };
 }
 

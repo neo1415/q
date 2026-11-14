@@ -29,6 +29,9 @@ const STANDING: Readonly<Record<CriterionStatus, GateCriterionStanding>> = {
   MATCH: "MET",
   NO_MATCH: "NOT_MET",
   UNKNOWN: "UNKNOWN",
+  // A canonical company carries no disputed facts today; were one to, a
+  // founder is told it is not settled, never that it was not met.
+  UNRESOLVED: "UNKNOWN",
 };
 
 export type InvestorGateFits = {

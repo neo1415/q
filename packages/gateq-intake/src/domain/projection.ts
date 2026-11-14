@@ -1,4 +1,7 @@
-import type { QualificationSubjectProjection } from "@capital-q/gateq";
+import type {
+  QualificationDisputedFact,
+  QualificationSubjectProjection,
+} from "@capital-q/gateq";
 
 import {
   QUALIFYING_DIMENSIONS,
@@ -51,6 +54,13 @@ export function applicationProjection(input: {
   readonly facts: readonly ApplicationFact[];
   /** Confirmed canonical classifications; phrases alone are not one. */
   readonly classifications: readonly ResolvedClassification[];
+  /**
+   * Decision 91: facts the applicant gave genuinely disagreeing values
+   * for (statement-view `disputedFactsFor`). The engine reads each as
+   * UNRESOLVED. Absent or empty adds nothing, so today's callers are
+   * unchanged.
+   */
+  readonly disputed?: readonly QualificationDisputedFact[];
 }): QualificationSubjectProjection {
   const current = new Map(
     input.facts
@@ -92,5 +102,8 @@ export function applicationProjection(input: {
       amount?.value.kind === "AMOUNT"
         ? { amount: amount.value.amount, currency: amount.value.currency }
         : null,
+    ...(input.disputed === undefined || input.disputed.length === 0
+      ? {}
+      : { disputed: [...input.disputed] }),
   };
 }

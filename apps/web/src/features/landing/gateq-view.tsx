@@ -70,11 +70,14 @@ const WORD: Readonly<Record<CriterionStatus, string>> = {
   MATCH: "Matched",
   UNKNOWN: "Unknown",
   NO_MATCH: "Outside policy",
+  UNRESOLVED: "Two answers",
 };
 const DATA_S: Readonly<Record<CriterionStatus, string>> = {
   MATCH: "match",
   UNKNOWN: "unknown",
   NO_MATCH: "miss",
+  // Styled as unknown: not settled, and never a miss.
+  UNRESOLVED: "unknown",
 };
 
 export const GATE_START = {

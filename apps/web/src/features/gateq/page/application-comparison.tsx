@@ -192,6 +192,7 @@ function ComparisonTable({
                             NO_MATCH: "Doesn't meet",
                             UNKNOWN: "Needs clarification",
                             NOT_APPLICABLE: "Not applicable",
+                            UNRESOLVED: "Two answers to review",
                           }[rule.status],
                         )}{" "}
                         ·{" "}

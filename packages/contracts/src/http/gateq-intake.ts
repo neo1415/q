@@ -800,6 +800,8 @@ export const GateqDossierV1Schema = z
           "QUALIFIED",
           "NOT_QUALIFIED",
           "INSUFFICIENT_INFORMATION",
+          // Decision 91: a required rule's fact is disputed; may still apply.
+          "UNRESOLVED",
         ]),
         access: AccessSchema,
         /** The published labels and their status; never the configuration. */
@@ -814,6 +816,7 @@ export const GateqDossierV1Schema = z
                   "NO_MATCH",
                   "UNKNOWN",
                   "NOT_APPLICABLE",
+                  "UNRESOLVED",
                 ]),
               })
               .strict(),

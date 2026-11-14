@@ -16,6 +16,7 @@ const STATUS = {
   NO_MATCH: "Doesn't meet",
   UNKNOWN: "Needs clarification",
   NOT_APPLICABLE: "Not applicable",
+  UNRESOLVED: "Two answers to review",
 } as const;
 const PROVENANCE = {
   APPLICANT_PROVIDED: "Applicant provided",
@@ -50,6 +51,7 @@ const OUTCOME = {
   QUALIFIED: "Meets the published mandate",
   NOT_QUALIFIED: "Outside the published mandate",
   INSUFFICIENT_INFORMATION: "More information needed for mandate qualification",
+  UNRESOLVED: "Two answers to review for mandate qualification",
 } as const;
 
 function dateWords(value: string): string {

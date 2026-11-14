@@ -95,7 +95,19 @@ export type CriterionRequiredness = z.infer<typeof CriterionRequirednessSchema>;
  * Capital Q does not know a company's revenue, the honest statement is that
  * nobody has said — not that the company fails. Absence is never zero.
  */
-export const CRITERION_STATUSES = ["MATCH", "NO_MATCH", "UNKNOWN"] as const;
+export const CRITERION_STATUSES = [
+  "MATCH",
+  "NO_MATCH",
+  "UNKNOWN",
+  /**
+   * Owner decision 91 (2026-11-14): the applicant gave two values for the
+   * fact this rule reads and they genuinely disagree. Never the latest
+   * value, never a NO_MATCH: the rule needs review. It never disqualifies,
+   * never blocks submission and never hides the application; both values
+   * stay visible with their sources until an explicit correction.
+   */
+  "UNRESOLVED",
+] as const;
 export const CriterionStatusSchema = z.enum(CRITERION_STATUSES);
 export type CriterionStatus = z.infer<typeof CriterionStatusSchema>;
 
@@ -410,6 +422,18 @@ export const QualificationSubjectSchema = z.discriminatedUnion("kind", [
 ]);
 export type QualificationSubject = z.infer<typeof QualificationSubjectSchema>;
 
+export const QUALIFICATION_DISPUTED_FACTS = [
+  "HEADQUARTERS_COUNTRY",
+  "CURRENT_STAGE",
+  "RAISE",
+] as const;
+export const QualificationDisputedFactSchema = z.enum(
+  QUALIFICATION_DISPUTED_FACTS,
+);
+export type QualificationDisputedFact = z.infer<
+  typeof QualificationDisputedFactSchema
+>;
+
 export const QualificationSubjectProjectionSchema = z
   .object({
     subject: QualificationSubjectSchema,
@@ -441,6 +465,12 @@ export const QualificationSubjectProjectionSchema = z
       })
       .strict()
       .nullable(),
+    /**
+     * Decision 91 (projection v2, optional so v1 projections still parse):
+     * facts the subject gave genuinely disagreeing values for. A disputed
+     * fact is judged UNRESOLVED, whatever value its field holds.
+     */
+    disputed: z.array(QualificationDisputedFactSchema).max(3).optional(),
   })
   .strict();
 export type QualificationSubjectProjection = z.infer<
@@ -478,6 +508,10 @@ export const CRITERION_REASON_CODES = [
   "RAISE_ABOVE_BAND",
   "RAISE_NOT_DECLARED",
   "RAISE_CURRENCY_DIFFERS",
+  /** Decision 91: the applicant's own values for this fact disagree. */
+  "GEOGRAPHY_DISPUTED",
+  "STAGE_DISPUTED",
+  "RAISE_DISPUTED",
   "CHEQUE_FITS_RAISE",
   "CHEQUE_EXCEEDS_RAISE",
   "CHEQUE_CURRENCY_DIFFERS",
@@ -525,6 +559,12 @@ export const QUALIFICATION_OUTCOMES = [
   "QUALIFIED",
   "NOT_QUALIFIED",
   "INSUFFICIENT_INFORMATION",
+  /**
+   * Decision 91 (result v2): nothing required failed or is missing, but a
+   * required rule reads a fact the applicant gave two disagreeing values
+   * for. Needs review by the investor; the applicant may still apply.
+   */
+  "UNRESOLVED",
 ] as const;
 export const QualificationOutcomeSchema = z.enum(QUALIFICATION_OUTCOMES);
 export type QualificationOutcome = z.infer<typeof QualificationOutcomeSchema>;
@@ -544,6 +584,8 @@ export const ACCESS_REASON_CODES = [
   "REQUIRED_CRITERIA_SATISFIED",
   "REQUIRED_CRITERIA_NOT_SATISFIED",
   "REQUIRED_INFORMATION_MISSING",
+  /** Decision 91: may apply; a required rule needs the investor's review. */
+  "REQUIRED_CRITERIA_UNRESOLVED",
   "GATEWAY_DISABLED",
   "GATEWAY_NOT_PUBLISHED",
 ] as const;
@@ -568,6 +610,11 @@ export const QualificationResultSchema = z
     principalMismatches: z.array(GatewayCriterionIdSchema).max(64),
     /** Required criteria nobody could answer, by criterion id. */
     unknowns: z.array(GatewayCriterionIdSchema).max(64),
+    /**
+     * Result v2 (decision 91): required criteria whose fact is disputed, by
+     * criterion id. Absent on results stored before v2, which read as none.
+     */
+    unresolved: z.array(GatewayCriterionIdSchema).max(64).optional(),
     evaluatedAt: z.string().datetime({ offset: true }),
   })
   .strict();

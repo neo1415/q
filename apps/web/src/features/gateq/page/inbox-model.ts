@@ -305,6 +305,8 @@ export const CRITERION_STATUS_WORDS: Readonly<
   NO_MATCH: "Doesn't meet",
   UNKNOWN: "Unknown",
   NOT_APPLICABLE: "Not applicable",
+  // Decision 91: the founder gave two answers; both are shown for review.
+  UNRESOLVED: "Two answers to review",
 };
 
 export const CRITERION_STATUS_GLYPH: Readonly<
@@ -317,6 +319,8 @@ export const CRITERION_STATUS_GLYPH: Readonly<
   NO_MATCH: "no",
   UNKNOWN: "unk",
   NOT_APPLICABLE: "unk",
+  // Never a miss: not settled.
+  UNRESOLVED: "unk",
 };
 
 export const OUTCOME_WORDS: Readonly<
@@ -325,6 +329,7 @@ export const OUTCOME_WORDS: Readonly<
   QUALIFIED: "Qualifies under your published rules",
   NOT_QUALIFIED: "Doesn't qualify under your published rules",
   INSUFFICIENT_INFORMATION: "Not enough information to decide",
+  UNRESOLVED: "Two answers to review before deciding",
 };
 
 export const DILIGENCE_BASIS_WORDS: Readonly<

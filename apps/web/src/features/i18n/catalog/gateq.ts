@@ -729,6 +729,11 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "What's still open, listed as open": "ما زال مفتوحاً، مُدرجاً كمفتوح",
   "Open questions": "أسئلة مفتوحة",
   "Needs clarification": "يحتاج إلى توضيح",
+  // Decision 91: a rule whose fact the founder gave two answers for.
+  "Two answers to review": "إجابتان للمراجعة",
+  "Two answers to review before deciding": "إجابتان للمراجعة قبل اتخاذ القرار",
+  "Two answers to review for mandate qualification":
+    "إجابتان للمراجعة للتأهيل وفق التفويض",
   "To clarify": "للتوضيح",
   "To ask": "للسؤال",
   "Questions for diligence": "أسئلة للعناية الواجبة",

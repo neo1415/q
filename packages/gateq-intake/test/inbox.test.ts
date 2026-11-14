@@ -121,6 +121,8 @@ function harness(
     readonly v2?: { readonly dossier: unknown; readonly transcript: unknown };
     readonly descriptionPhrases?: readonly string[];
     readonly synthesisState?: InboxRow["synthesisState"];
+    /** Replaces Harvest's frozen qualification (decision 91 cases). */
+    readonly partialQualification?: unknown;
   } = {},
 ) {
   const emailEvents: GateqEmailEvent[] = [];
@@ -143,11 +145,13 @@ function harness(
         gateway: GATEWAY,
         at: "2026-10-01T09:00:00.000Z",
         snapshot: snapshot("Harvest"),
-        qualification: qualification("INSUFFICIENT_INFORMATION", [
-          "MATCH",
-          "MATCH",
-          "UNKNOWN",
-        ]),
+        qualification:
+          options.partialQualification ??
+          qualification("INSUFFICIENT_INFORMATION", [
+            "MATCH",
+            "MATCH",
+            "UNKNOWN",
+          ]),
       },
     ],
     [
@@ -434,6 +438,24 @@ describe("reading the inbox (F4)", () => {
     expect(inbox.viewer).toMatchObject({ canDecide: true, solo: false });
     // Never another gateway's application.
     expect(inbox.items.some((i) => i.companyName === "Elsewhere")).toBe(false);
+  });
+
+  it("still lists an application whose required rule is UNRESOLVED (decision 91), never as a miss", async () => {
+    const { service } = harness({
+      partialQualification: qualification("UNRESOLVED", [
+        "MATCH",
+        "MATCH",
+        "UNRESOLVED",
+      ]),
+    });
+    const inbox = GateqInboxDtoSchema.parse(
+      await service.list(actor(ADMIN), GATEWAY, "INBOX"),
+    );
+    expect(inbox.items).toHaveLength(3);
+    expect(inbox.items.find((i) => i.companyName === "Harvest")).toMatchObject({
+      fit: "PARTIAL",
+      rules: { met: 2, total: 3, unknown: 1 },
+    });
   });
 
   it("refuses another firm's gateway exactly as one that does not exist", async () => {
