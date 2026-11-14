@@ -270,6 +270,82 @@ describe("what survives validation", () => {
     ).toEqual({ kind: "TEXT", text: long });
   });
 
+  describe("live D9: a stated zero is a value, never unknown", () => {
+    const revenue = (
+      value: GateQInterviewerResult["facts"][number]["value"],
+      provenance: GateQInterviewerResult["facts"][number]["provenance"],
+    ): GateQInterviewerResult => ({
+      ...RESULT,
+      facts: [
+        { dimension: "claims.revenue", value, provenance, correction: false },
+      ],
+    });
+
+    it.each(["Nobody pays yet.", "Revenue so far is zero."])(
+      "records %s as a zero, without a read-back",
+      async (utterance) => {
+        const { service } = interviewer(
+          revenue({ kind: "ZERO" }, "APPLICANT_PROVIDED"),
+        );
+        const outcome = await service.turn(turn({ utterance }));
+        expect(outcome.facts).toEqual([
+          {
+            dimension: "claims.revenue",
+            value: { kind: "TEXT", text: "0" },
+            provenance: "APPLICANT_PROVIDED",
+          },
+        ]);
+        expect(outcome.notRecorded).toBeUndefined();
+        expect(outcome.reply).toBe(RESULT.reply);
+      },
+    );
+
+    it("takes money's shape when they named the currency", async () => {
+      const { service } = interviewer(revenue({ kind: "ZERO" }, "UNKNOWN"));
+      const outcome = await service.turn(
+        turn({ utterance: "Zero dollars of revenue so far." }),
+      );
+      expect(outcome.facts).toEqual([
+        {
+          dimension: "claims.revenue",
+          value: { kind: "AMOUNT", amount: "0", currency: "USD" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+      ]);
+      expect(outcome.notRecorded).toBeUndefined();
+    });
+
+    it("keeps not knowing as unknown", async () => {
+      const { service } = interviewer(revenue({ kind: "NONE" }, "UNKNOWN"));
+      const outcome = await service.turn(
+        turn({ utterance: "We don't know our revenue yet." }),
+      );
+      expect(outcome.facts).toEqual([
+        {
+          dimension: "claims.revenue",
+          value: { kind: "NONE" },
+          provenance: "UNKNOWN",
+        },
+      ]);
+    });
+
+    it("never turns a qualifying dimension into a zero", async () => {
+      const { service } = interviewer({
+        ...RESULT,
+        facts: [
+          {
+            dimension: "raise.amount",
+            value: { kind: "ZERO" },
+            provenance: "APPLICANT_PROVIDED",
+            correction: false,
+          },
+        ],
+      });
+      const outcome = await service.turn(turn({ utterance: "Nothing." }));
+      expect(outcome.facts).toEqual([]);
+    });
+  });
+
   it("saves an amount said in words", async () => {
     const { service } = interviewer({
       ...RESULT,

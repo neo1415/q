@@ -14,6 +14,9 @@ import {
   GATEQ_APPLY_TRANSCRIPT_PATH,
   GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_NOT_READY_DETAIL,
+  GATEQ_REPLY_FAILED_DETAIL,
+  GATEQ_REPLY_IN_PROGRESS_DETAIL,
+  GATEQ_APPLY_TURN_PATH,
   type ApplicationContactResponse,
   type ApplicationCoverageDto,
 } from "@capital-q/contracts";
@@ -21,6 +24,7 @@ import {
   createGuestThrottle,
   GATEQ_GUEST_QUOTAS,
   IntakeRefusedError,
+  InterviewUnavailableError,
   type ApplicantTurnResult,
   type ContactDetails,
   type ConversationService,
@@ -117,6 +121,8 @@ function build(
     readonly contactUnconfirmed?: boolean;
     readonly notReady?: boolean;
     readonly alreadyApplied?: boolean;
+    readonly replyPending?: boolean;
+    readonly replyFailed?: boolean;
   } = {},
 ) {
   const recorded = {
@@ -176,6 +182,9 @@ function build(
       if (options.notReady === true) {
         throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
       }
+      if (options.replyPending === true) {
+        throw new IntakeRefusedError("REPLY_IN_PROGRESS");
+      }
       if (options.alreadyApplied === true) {
         throw new IntakeRefusedError("ALREADY_APPLIED");
       }
@@ -200,7 +209,14 @@ function build(
       }
       return Promise.resolve("What does Rails sell, and to whom?");
     },
-    turn: () => Promise.reject(new Error("not used")),
+    turn: (input) => {
+      if (input.token !== TOKEN) deny();
+      if (options.replyPending === true)
+        return Promise.reject(new IntakeRefusedError("REPLY_IN_PROGRESS"));
+      if (options.replyFailed === true)
+        return Promise.reject(new InterviewUnavailableError(true));
+      return Promise.reject(new Error("not used"));
+    },
     summary: (token) => {
       if (token !== TOKEN) deny();
       return Promise.resolve(RESULT);
@@ -367,6 +383,42 @@ describe("the applicant contact over HTTP (GateQ slice 1)", () => {
     });
     expect(response.statusCode).toBe(409);
     expect(response.json<{ code: string }>().code).toBe("RESOURCE_CONFLICT");
+  });
+
+  it("live D8: says Q is still answering, never a spent allowance", async () => {
+    const { app } = build({ replyPending: true });
+    for (const [url, payload] of [
+      [GATEQ_APPLY_SUBMIT_PATH, { clientRequestId: "req-000000000001" }],
+      [
+        GATEQ_APPLY_TURN_PATH,
+        { message: "Hello again", clientTurnId: "turn-00000002" },
+      ],
+    ] as const) {
+      const response = await app.inject({
+        method: "POST",
+        url,
+        headers: bearer(TOKEN),
+        payload,
+      });
+      expect(response.statusCode).toBe(409);
+      const body = response.json<{ code: string; detail: string }>();
+      expect(body.code).toBe("RESOURCE_CONFLICT");
+      expect(body.detail).toBe(GATEQ_REPLY_IN_PROGRESS_DETAIL);
+    }
+  });
+
+  it("live D8: a failed reply says so and asks for the message again", async () => {
+    const { app } = build({ replyFailed: true });
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_TURN_PATH,
+      headers: bearer(TOKEN),
+      payload: { message: "Hello again", clientTurnId: "turn-00000002" },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json<{ detail: string }>().detail).toBe(
+      GATEQ_REPLY_FAILED_DETAIL,
+    );
   });
 
   it("refuses a not-ready Submit with an honest 409, not a vanished 404", async () => {

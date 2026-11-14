@@ -747,8 +747,10 @@ export function createGateQInterviewer(
         // it back. One Q worked out ("two pay $180,000 each" read as revenue
         // 360000) is not recorded as their claim yet: Q says it back as a
         // question and their yes records it next turn.
+        // A zero the reading heard stated is no worked-out figure (D9).
         if (
           normalised.value.kind === "AMOUNT" &&
+          candidate.value.kind !== "ZERO" &&
           !amountStatedIn(normalised.value.amount, input.utterance) &&
           !agreedTo(normalised.value.amount)
         ) {

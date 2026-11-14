@@ -33,7 +33,9 @@ type ProposedValue =
       readonly currency: string;
     }
   | { readonly kind: "PHRASES"; readonly phrases: readonly string[] }
-  | { readonly kind: "NONE"; readonly declined?: true | undefined };
+  | { readonly kind: "NONE"; readonly declined?: true | undefined }
+  /** The reading says they stated there is none of it (live D9). */
+  | { readonly kind: "ZERO" };
 
 export type NormaliseContext = {
   /** What the applicant just said: an amount's currency may be in it. */
@@ -53,9 +55,22 @@ function wordsOf(value: ProposedValue): string | null {
     case "AMOUNT":
       return `${value.amount} ${value.currency}`;
     case "NONE":
+    case "ZERO":
       return null;
   }
 }
+
+/**
+ * Dimensions whose shape has no place for a stated nothing: a country,
+ * a stage, a sector or a raise is never "zero".
+ */
+const NO_ZERO: ReadonlySet<string> = new Set([
+  "company.country",
+  "company.stage",
+  "company.sector_phrases",
+  "raise.amount",
+  "raise.currency",
+]);
 
 /**
  * Everyday names and ISO alpha-3 codes the canonical country list does not
@@ -244,6 +259,25 @@ export function normaliseProposedFact(
   context: NormaliseContext,
 ): NewApplicationFact | null {
   const { dimension, provenance } = proposal;
+  // A stated zero is a value, never unknown (live D9). Revenue takes
+  // money's shape when they named the currency in this turn; otherwise the
+  // figure stands as said. The reading decided it was a zero, not a word.
+  if (proposal.value.kind === "ZERO") {
+    if (NO_ZERO.has(dimension)) return null;
+    const currency =
+      dimension === "claims.revenue"
+        ? currencyCodeIn(context.utterance)
+        : null;
+    const parsed = NewApplicationFactSchema.safeParse({
+      dimension,
+      value:
+        currency === null
+          ? { kind: "TEXT", text: "0" }
+          : { kind: "AMOUNT", amount: "0", currency },
+      provenance: provenance === "UNKNOWN" ? "APPLICANT_PROVIDED" : provenance,
+    });
+    return parsed.success ? parsed.data : null;
+  }
   let value: unknown = proposal.value;
   const words = wordsOf(proposal.value);
   if (proposal.value.kind !== "NONE" && words !== null) {

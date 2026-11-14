@@ -75,7 +75,24 @@ export const GateQProposedValueSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
   /** They were asked and do not know. A real answer, not an absence. */
-  z.object({ kind: z.literal("NONE") }).strict(),
+  z
+    .object({ kind: z.literal("NONE") })
+    .strict()
+    .describe(
+      "They do not know or would rather not say. Never for a stated nothing.",
+    ),
+  /**
+   * Live D9 (2026-11-14): "Nobody pays yet" and "Revenue so far is zero"
+   * were read as NONE, so a stated zero became "you don't know yet". A
+   * stated nothing is a value, and the reading says so here; the platform
+   * puts it into the dimension's shape (USD 0 when they named a currency).
+   */
+  z
+    .object({ kind: z.literal("ZERO") })
+    .strict()
+    .describe(
+      "They stated there is none of it: no revenue, nobody pays, no customers yet. A real value, never unknown.",
+    ),
 ]);
 export type GateQProposedValue = z.infer<typeof GateQProposedValueSchema>;
 
