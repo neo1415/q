@@ -685,3 +685,14 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - **Live A8:** "Actually October MRR was $110k." (`founder.maji-loop`) **still FAILS**. The reading was CORRECTION, and the turn was answered by the company-intelligence specialist, which holds no tools and has no guard. There was no card, and the reply said "I'm keeping both figures visible". Still only one `financial.mrr` claim: nothing was written. A fix is in progress: route by the reading to the tool path, plus the guard on the specialist path.
   - Opened-briefing clearance and Drop on Work are covered by tests; a live check is pending.
 - **Matrix table repaired** (`459ef21e1`): earlier notes had split rows. Every row is one line with four cells again.
+
+## GateQ D2b/D4b and the A8 correction route deployed — `41c920519`, `4d5ab3ac2` (14 Nov, 04:55 Lagos)
+
+- **`41c920519`:**
+  - `ci-local PASS sha=41c920519 at=2026-11-14T02:49:10Z took=1734s`.
+  - Live (Routeix → Kilima; see the audit's "Re-check 14 Nov (41c920519)"): D2b PASS, D4b PASS.
+  - New defects, fix in progress: D8 HIGH (a failed reply locks the application behind a false rate-limit message), D9 MEDIUM (a stated zero is stored as unknown), D10 LOW, plus a repeated question.
+- **`4d5ab3ac2`:**
+  - `ci-local PASS sha=4d5ab3ac2 at=2026-11-14T03:17:51Z took=1375s`. Deploy held until the live GateQ run finished; rollback point `41c920519`.
+  - **Live A8 correction** (`founder.maji-loop`): the turn now reaches the tool path (DEEP_ANALYSIS, 125 tools), and the reply is honest: "You told me … $110k. I haven't saved that yet." Still only one `financial.mrr` claim.
+  - **Still no card:** the model again put the figure in `userStatements` (an element was dropped) instead of calling the tool. Fix in progress: code prepares the card from a valid structured statement of the founder's own figure; no word rules.
