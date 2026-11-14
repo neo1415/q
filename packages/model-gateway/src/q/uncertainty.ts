@@ -818,6 +818,141 @@ export function withResolves(
 }
 
 // ---------------------------------------------------------------------------
+// One code-owned resolution flow (live 14 Nov 2026, D12-D14)
+// ---------------------------------------------------------------------------
+
+/**
+ * The open item an offer to resolve an uncertainty records, as code keeps
+ * it on the conversation (q-runtime QOpenResolution). Structured only.
+ */
+export type OpenResolutionItem = {
+  readonly runId: string;
+  readonly action: string;
+  readonly counterparty: {
+    readonly kind: "COMPANY";
+    readonly id: string;
+    readonly name: string | null;
+  };
+  readonly about: { readonly statement: string; readonly standing: string };
+  readonly title: string;
+};
+
+const TITLE_MAX = 200;
+
+/**
+ * The document title code suggests for a request that would settle the
+ * item: the statement itself, as the founder's checklist will read it
+ * beside "what it's about". Never longer than the request contract allows.
+ */
+export function resolutionTitleOf(statement: string): string {
+  const one = statement.replace(/\s+/gu, " ").trim();
+  const title = `Evidence that settles: ${one}`;
+  if (title.length <= TITLE_MAX) return title;
+  const cut = title.slice(0, TITLE_MAX - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${space > 40 ? cut.slice(0, space) : cut}…`;
+}
+
+/**
+ * The item a recorded offer opens (D12): only an offer through a vehicle
+ * that carries what it resolves and whom it goes to. Null otherwise.
+ */
+export function openResolutionOf(
+  runId: string,
+  offer: {
+    readonly action: string;
+    readonly about?:
+      { readonly statement: string; readonly standing: string } | undefined;
+    readonly counterparty?: OpenResolutionItem["counterparty"] | undefined;
+  },
+): OpenResolutionItem | null {
+  if (!UNCERTAINTY_VEHICLES.has(offer.action)) return null;
+  if (offer.about === undefined || offer.counterparty === undefined) {
+    return null;
+  }
+  return {
+    runId,
+    action: offer.action,
+    counterparty: offer.counterparty,
+    about: offer.about,
+    title: resolutionTitleOf(offer.about.statement),
+  };
+}
+
+const nameKeyOf = (name: string | null | undefined): string =>
+  (name ?? "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+
+/**
+ * Whether a name they or the model used is the item's counterparty: the
+ * same name or id, or no name at all (the item is then whom it is about).
+ */
+export function sameCounterparty(
+  item: OpenResolutionItem,
+  name: string | null | undefined,
+): boolean {
+  const wanted = nameKeyOf(name);
+  if (wanted.length === 0) return true;
+  if (wanted === nameKeyOf(item.counterparty.id)) return true;
+  return wanted === nameKeyOf(item.counterparty.name);
+}
+
+/**
+ * The vehicle's inputs, from the item (D13: "Yes, please request that from
+ * Ajopot" left the argument reader nothing to read). Only the diligence
+ * request is filled by code; the other vehicles stay with the answer.
+ * A title they gave this turn wins over code's suggestion. Null: this
+ * vehicle is not one code fills.
+ */
+export function resolutionArguments(
+  item: OpenResolutionItem,
+  given?: Readonly<Record<string, unknown>> | null,
+): Readonly<Record<string, unknown>> | null {
+  if (item.action !== DILIGENCE_DOCUMENTS_TOOL) return null;
+  const givenTitle = given?.["title"];
+  const givenNote = given?.["note"];
+  return {
+    operation: "REQUEST",
+    relationship: item.counterparty.name ?? item.counterparty.id,
+    title:
+      typeof givenTitle === "string" && givenTitle.trim().length > 0
+        ? givenTitle
+        : item.title,
+    ...(typeof givenNote === "string" && givenNote.trim().length > 0
+      ? { note: givenNote }
+      : {}),
+    resolves: item.about,
+  };
+}
+
+/**
+ * D14: a diligence request toward the item's counterparty, made without
+ * naming what it resolves (an explicit ask, or the model's own call),
+ * carries the item's `about`. Any other call is returned unchanged.
+ */
+export function withOpenResolution(
+  call: { readonly name: string; readonly arguments: unknown },
+  item: OpenResolutionItem | null | undefined,
+): unknown {
+  if (item === null || item === undefined) return call.arguments;
+  if (call.name !== DILIGENCE_DOCUMENTS_TOOL) return call.arguments;
+  const args =
+    call.arguments !== null && typeof call.arguments === "object"
+      ? (call.arguments as Record<string, unknown>)
+      : null;
+  if (args === null || args["operation"] !== "REQUEST") return call.arguments;
+  if (args["resolves"] !== undefined) return call.arguments;
+  const to = args["relationship"];
+  if (typeof to === "string" && !sameCounterparty(item, to)) {
+    return call.arguments;
+  }
+  return { ...args, resolves: item.about };
+}
+
+// ---------------------------------------------------------------------------
 // Slice 6: the re-assessment note
 // ---------------------------------------------------------------------------
 

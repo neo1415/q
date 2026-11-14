@@ -558,6 +558,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly offerTaken?: QRecordedOffer | undefined;
   /**
+   * Live 14 Nov 2026 (D14): the conversation's open resolution item, if
+   * one stands. A document request the answer prepares toward that same
+   * counterparty carries what it resolves from here. Grants nothing.
+   */
+  readonly openResolution?: QOpenResolution | undefined;
+  /**
    * U4/F8 (QA 24 Oct 2026): a screen move their words also asked for ("open
    * the data room and tell me what's missing"), carried by the answer to
    * the question so the move is made and the question still answered.
@@ -712,6 +718,39 @@ export type QRecordedOffer = {
    */
   readonly about?:
     { readonly statement: string; readonly standing: string } | undefined;
+  /**
+   * Live 14 Nov 2026 (D12-D14): the company the uncertainty is about, as
+   * code resolved it for the turn (the reader's named company, read by the
+   * run). Absent: not resolved. It is whom the request goes to.
+   */
+  readonly counterparty?: QResolutionCounterparty | undefined;
+};
+
+/** The company an open resolution item is about (code's resolution). */
+export type QResolutionCounterparty = {
+  readonly kind: "COMPANY";
+  readonly id: string;
+  readonly name: string | null;
+};
+
+/**
+ * Live 14 Nov 2026 (scenario 3, D12-D14): a material uncertainty about a
+ * counterparty that the founder can settle, with the route the stage
+ * allows, recorded by code when Q offered to resolve it. Any later turn
+ * that takes it up or asks for it resolves to this item: the vehicle's
+ * inputs (whom, what it resolves, a suggested title) come from here, never
+ * from re-reading the words. Grants nothing: the vehicle still runs its
+ * own authorize step and its approval binds to the exact payload.
+ */
+export type QOpenResolution = {
+  /** The run whose answer recorded it. */
+  readonly runId: string;
+  /** The vehicle the stage allowed (e.g. diligence_documents). */
+  readonly action: string;
+  readonly counterparty: QResolutionCounterparty;
+  readonly about: { readonly statement: string; readonly standing: string };
+  /** A document title code suggests from the statement. */
+  readonly title: string;
 };
 
 export type QAnswerPort = {

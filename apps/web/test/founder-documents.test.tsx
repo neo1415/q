@@ -116,6 +116,35 @@ describe("the Requested tab", () => {
     ).toBeTruthy();
   });
 
+  it("D14: a request that names the uncertainty it resolves says what it's about and where it stood", () => {
+    const inbox = fixtures.reviewInbox();
+    const statement =
+      'Ajopot has not defined "active" or the period behind 18,700 of 52,000 registered users.';
+    render(
+      <RequestsInbox
+        companyId={fixtures.REVIEW_COMPANY}
+        initial={{
+          ...inbox,
+          items: inbox.items.map((item) =>
+            item.kind === "DOCUMENT_REQUEST" &&
+            item.itemId === fixtures.REQUEST_ACCOUNTS
+              ? { ...item, about: { statement, standing: "REPORTED" } }
+              : item,
+          ),
+        }}
+        documents={documents}
+      />,
+    );
+    const about = document.querySelectorAll("[data-request-about]");
+    // Only the request that named one; the others carry none.
+    expect(about).toHaveLength(1);
+    expect(about[0]?.textContent).toContain("What it's about:");
+    expect(about[0]?.textContent).toContain(statement);
+    expect(about[0]?.textContent).toContain(
+      "Since they asked: reported, not yet supported by a document.",
+    );
+  });
+
   it("opens a notification's item, focused", () => {
     // jsdom has no layout; the scroll itself is the browser check's.
     Element.prototype.scrollIntoView = vi.fn();

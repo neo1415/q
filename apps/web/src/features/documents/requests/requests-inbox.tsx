@@ -33,6 +33,7 @@ import {
   inboxFilterOf,
   initials,
   shortDate,
+  standingWhenAsked,
   waitingWords,
   type InboxFilter,
 } from "./requests-model";
@@ -275,6 +276,21 @@ function DocumentRequestCard({
         <p className="cq-body-sm border-s-2 border-(--cq-border) ps-3 text-(--cq-text-secondary)">
           “{item.note}”
         </p>
+      )}
+      {item.about === null || item.about === undefined ? null : (
+        <div className="cq-body-sm flex flex-col gap-1" data-request-about>
+          <p>
+            <span className="text-(--cq-text-secondary)">
+              {t("What it's about:")}
+            </span>{" "}
+            {item.about.statement}
+          </p>
+          {item.about.standing === null ? null : (
+            <p className="text-(--cq-text-secondary)">
+              {t(standingWhenAsked(item.about.standing))}
+            </p>
+          )}
+        </div>
       )}
 
       {item.status === "SHARED" ? (

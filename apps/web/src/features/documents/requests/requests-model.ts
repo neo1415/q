@@ -10,6 +10,30 @@ import {
  * Requested tab's pure parts, tested without a browser.
  */
 
+/**
+ * Live 14 Nov 2026 (D14): where the uncertainty a request resolves stood
+ * when the investor asked, in the founder's words. Q's reading then, never
+ * a verdict on the company; independent verification is its own state.
+ */
+export function standingWhenAsked(standing: string): string {
+  switch (standing) {
+    case "REPORTED":
+      return "Since they asked: reported, not yet supported by a document.";
+    case "CORROBORATED":
+      return "Since they asked: other sources agree, but it is not verified.";
+    case "CONTRADICTED":
+      return "Since they asked: sources or records disagree on it.";
+    case "FOUNDER_CONFIRMED":
+      return "Since they asked: confirmed by you, not independently verified.";
+    case "DOCUMENT_SUPPORTED":
+      return "Since they asked: a document supports it.";
+    case "INDEPENDENTLY_VERIFIED":
+      return "Since they asked: independently verified.";
+    default:
+      return "Since they asked: not settled yet.";
+  }
+}
+
 export function documentsTabOf(raw: unknown): DocumentsTab {
   return typeof raw === "string" &&
     (DOCUMENTS_TABS as readonly string[]).includes(raw)

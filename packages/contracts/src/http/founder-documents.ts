@@ -10,6 +10,7 @@ import {
   DataRoomLevelSchema,
   type DataRoomLevel,
 } from "./data-room.js";
+import { DiligenceRequestAboutSchema } from "./relationships.js";
 
 /**
  * Founder documents (2026-10-08; design docs/design/2026-10-08/founder-docs).
@@ -171,6 +172,12 @@ export const DocumentRequestItemSchema = z
       .object({ documentId: UuidSchema, folderCode: DataRoomCodeSchema })
       .strict()
       .nullable(),
+    /**
+     * Live 14 Nov 2026 (D14): the uncertainty a diligence request was asked
+     * to resolve, and where it stood when they asked; null or absent: none
+     * named. Additive.
+     */
+    about: DiligenceRequestAboutSchema.nullable().optional(),
   })
   .strict();
 export type DocumentRequestItem = z.infer<typeof DocumentRequestItemSchema>;

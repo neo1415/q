@@ -23,6 +23,7 @@ import {
   type RequestSource,
   type UtcTimestamp,
   inboxItemOpen,
+  DiligenceRequestAboutSchema,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import {
@@ -549,6 +550,12 @@ export function createFounderRequestsService(
               },
         accessEndsAt: null,
         dataRoom: inRoom(request.fulfilment?.documentId),
+        // D14: what it was asked to resolve, for the founder's view.
+        about:
+          request.about === null || request.about === undefined
+            ? null
+            : (DiligenceRequestAboutSchema.safeParse(request.about).data ??
+              null),
       }));
     return [...fromRoom, ...fromDiligence];
   };

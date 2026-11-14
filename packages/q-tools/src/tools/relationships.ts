@@ -450,8 +450,19 @@ function createGetRelationshipTool(
       }
     },
     execute: async (_input, context, grant) => {
+      // D10 (live 78f8d72d5, run a2094aa5, Kazikit at INTEREST_EXPRESSED):
+      // before diligence starts there is no diligence area, and its empty
+      // lists were read as "their data room has no documents or open
+      // requests". What has not opened is unseen, never empty: the area is
+      // read only once diligence started (the schema's own rule).
+      const diligenceStarted =
+        grant.status?.milestones.some(
+          (milestone) => milestone.state === "IN_DILIGENCE",
+        ) === true;
       const diligence =
-        grant.status === null || relationships.diligence === undefined
+        grant.status === null ||
+        !diligenceStarted ||
+        relationships.diligence === undefined
           ? null
           : await relationships
               .diligence(context.actor, grant.status.relationshipId)
