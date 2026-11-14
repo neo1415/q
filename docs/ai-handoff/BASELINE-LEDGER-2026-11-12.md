@@ -673,3 +673,15 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **GateQ branding and fictional applicant seed** (`75e712fcf`, pushed, not gated):
   - The public gateway shows the investor organisation's name, photo and an AA-safe accent. The accent is the tenant's own brand theme, and today no tenant has one, so setting one needs operator SQL.
   - New seed: `scripts/seed-fictional-world.mjs --gateq-applicant`. It needs `CQ_SEED_SUPABASE_SECRET_KEY` and runs only on an operator machine; it was not run here.
+
+## GateQ fixes and small fixes deployed — `985db1796`, `5f4603b05` (14 Nov, 03:20 Lagos)
+
+- **`985db1796`** (GateQ D1–D5, gateway name branding, applicant seed):
+  - The first gate on `9654a0c0f` FAILED on two stale tests: the new route was not classified, and a form test still expected a pre-ticked deck. Both were fixed in `985db1796`.
+  - `ci-local PASS sha=985db1796 at=2026-11-14T01:31:21Z took=1862s`.
+  - Live re-check: see `audits/2026-11-14-gateq-live-journey.md`, "Re-check 14 Nov (985db1796)". D1, D5, B6 name and the low items PASS. D2b and D4b are HIGH; a fix is in progress.
+- **`5f4603b05`** (A8 correction card plus recorded-claim guard, opened briefing clear, Drop on Work):
+  - `ci-local PASS sha=5f4603b05 at=2026-11-14T02:08:59Z took=1684s`. Rollback point `985db1796`; four services SUCCESS.
+  - **Live A8:** "Actually October MRR was $110k." (`founder.maji-loop`) **still FAILS**. The reading was CORRECTION, and the turn was answered by the company-intelligence specialist, which holds no tools and has no guard. There was no card, and the reply said "I'm keeping both figures visible". Still only one `financial.mrr` claim: nothing was written. A fix is in progress: route by the reading to the tool path, plus the guard on the specialist path.
+  - Opened-briefing clearance and Drop on Work are covered by tests; a live check is pending.
+- **Matrix table repaired** (`459ef21e1`): earlier notes had split rows. Every row is one line with four cells again.
