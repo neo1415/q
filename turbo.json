@@ -3,10 +3,16 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      // The heap size a caller sets (ci-local exports 8 GB) must reach the
+      // task; strict mode drops it, leaving Node's ~2 GB default.
+      "passThroughEnv": ["NODE_OPTIONS"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      // Gate on fd1ad528c: apps/web's tsc needs ~2.5 GB and ran out of heap
+      // at the ~2 GB default because strict mode dropped NODE_OPTIONS.
+      "passThroughEnv": ["NODE_OPTIONS"]
     },
     "dev": {
       "cache": false,
