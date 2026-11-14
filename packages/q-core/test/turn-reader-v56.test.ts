@@ -78,7 +78,7 @@ describe("TURN_READER v56: a FIT question for companies not shown yet", () => {
         actionGroups: "",
       },
     });
-    expect(rendered.bundle.task).toMatch(/\/v87$/u);
+    expect(rendered.bundle.task).toMatch(/\/v88$/u);
     expect(JSON.stringify(rendered.output)).toContain("excludeShown");
   });
 });

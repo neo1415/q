@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_DIGEST_MEETINGS_MAX,
   ACCOUNT_DIGEST_RELATIONSHIPS_MAX,
+  Q_ATTENTION_SOURCES,
   QAccountDigestSchema,
   type QWorkDto,
 } from "@capital-q/contracts";
@@ -201,6 +202,15 @@ function tenantPorts(
         return Promise.resolve(actor.userId === actorB.userId ? [work()] : []);
       },
     } as unknown as QToolPorts["work"],
+    // The app's own attention sources (held drafts, notices, ...): none.
+    attention: {
+      sources: Object.fromEntries(
+        Q_ATTENTION_SOURCES.map((source) => [
+          source,
+          [() => Promise.resolve([])],
+        ]),
+      ),
+    },
     gateqDigest: {
       founderApplications: (actor) => {
         seen("gateq-founder", actor);

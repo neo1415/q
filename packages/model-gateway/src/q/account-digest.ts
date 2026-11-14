@@ -295,9 +295,14 @@ export function withoutExcludedCompanies(
     return { blocks, dropped: [] };
   }
   const dropped: string[] = [];
-  const kept = blocks.flatMap((block) => {
-    if (block.kind !== "ANSWER_CARDS") return [block];
-    const cards = (block as QAnswerCardsBlock).cards.filter((card) => {
+  const kept: NonNullable<QResponseMessage["blocks"]>[number][] = [];
+  for (const block of blocks) {
+    if (block.kind !== "ANSWER_CARDS") {
+      kept.push(block);
+      continue;
+    }
+    const cardsBlock: QAnswerCardsBlock = block;
+    const cards = cardsBlock.cards.filter((card) => {
       const subject = card.subject;
       const out =
         subject !== null &&
@@ -306,9 +311,9 @@ export function withoutExcludedCompanies(
       if (out) dropped.push(card.name);
       return !out;
     });
-    if (cards.length === block.cards.length) return [block];
-    return cards.length === 0 ? [] : [{ ...block, cards }];
-  });
+    if (cards.length === cardsBlock.cards.length) kept.push(block);
+    else if (cards.length > 0) kept.push({ ...cardsBlock, cards });
+  }
   return { blocks: kept, dropped: [...new Set(dropped)] };
 }
 

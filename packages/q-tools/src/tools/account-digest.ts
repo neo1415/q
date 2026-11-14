@@ -416,16 +416,15 @@ export function createAccountDigestReader(
     const pending = ports.approvalInbox?.pending;
     const approvalsOnce =
       pending === undefined ? null : once(() => pending(actor));
+    // The attention report over the same once-per-digest reads.
     const attention: AttentionReader = createAttentionReader({
-      ...(ports.relationships === undefined || relationshipsOnce === null
-        ? ports.relationships === undefined
-          ? {}
-          : { relationships: ports.relationships }
+      ...(ports.relationships === undefined
+        ? {}
         : {
-            relationships: {
-              ...ports.relationships,
-              ownRelationships: () => relationshipsOnce(),
-            },
+            relationships:
+              relationshipsOnce === null
+                ? ports.relationships
+                : { ...ports.relationships, ownRelationships: relationshipsOnce },
           }),
       ...(ports.approvalInbox === undefined || approvalsOnce === null
         ? {}
@@ -440,10 +439,16 @@ export function createAccountDigestReader(
         : { work: { ...ports.work, list: workOnce } }),
       ...(ports.attention === undefined ? {} : { attention: ports.attention }),
     });
+    /** A source with no port composed: unread, never empty. */
+    const notComposed = <T>(name: AccountDigestSection, value: T): Promise<T> => {
+      unread.add(name);
+      return Promise.resolve(value);
+    };
+    const errandsOf = ports.work?.errands;
 
     const [own, report, schedule, work, errands, gateq] = await Promise.all([
       relationshipsOnce === null
-        ? (unread.add("RELATIONSHIPS"), Promise.resolve(null))
+        ? notComposed<OwnRelationships | null>("RELATIONSHIPS", null)
         : section("RELATIONSHIPS", relationshipsOnce, null),
       section<QAttentionReport | null>(
         "WAITING",
@@ -451,18 +456,14 @@ export function createAccountDigestReader(
         null,
       ),
       scheduleOnce === null
-        ? (unread.add("MEETINGS"), Promise.resolve(null))
+        ? notComposed<Upcoming | null>("MEETINGS", null)
         : section<Upcoming | null>("MEETINGS", scheduleOnce, null),
       workOnce === null
-        ? (unread.add("WORK"), Promise.resolve([] as WorkItems))
+        ? notComposed<WorkItems>("WORK", [])
         : section<WorkItems>("WORK", workOnce, []),
-      ports.work?.errands === undefined
-        ? Promise.resolve([] as Errands)
-        : section<Errands>(
-            "WORK",
-            () => ports.work?.errands?.(actor) ?? Promise.resolve([]),
-            [],
-          ),
+      errandsOf === undefined
+        ? Promise.resolve<Errands>([])
+        : section<Errands>("WORK", () => errandsOf(actor), []),
       readGateq(ports.gateqDigest, actor, section),
     ]);
     // A report with sources it could not check is not the whole picture.

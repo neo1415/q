@@ -87,7 +87,7 @@ describe("TURN_READER v76", () => {
       },
     });
     const text = rendered.messages.map((m) => m.content).join("\n");
-    expect(rendered.bundle.task).toMatch(/\/v87$/u);
+    expect(rendered.bundle.task).toMatch(/\/v88$/u);
     const state = text.indexOf("Ngozi Eze");
     expect(state).toBeGreaterThan(0);
     expect(state).toBeLessThan(text.indexOf("Who is Silo Credit's CFO?"));
