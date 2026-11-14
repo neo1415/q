@@ -855,10 +855,14 @@ describe("the form, driven like a founder", () => {
       screen.getByLabelText<HTMLInputElement>("Best way to reach you").value,
     ).toBe("amara@kora.ng");
     expect(screen.getByText(/Filled in from your profile/)).toBeTruthy();
-    expect(
-      screen.getByRole<HTMLInputElement>("checkbox", { name: /Pitch deck v3/ })
-        .checked,
-    ).toBe(true);
+    // Journey audit 14 Nov (#7): nothing is pre-ticked; a document goes
+    // only when the founder ticks it.
+    const deckBox = screen.getByRole<HTMLInputElement>("checkbox", {
+      name: /Pitch deck v3/,
+    });
+    expect(deckBox.checked).toBe(false);
+    fireEvent.click(deckBox);
+    expect(deckBox.checked).toBe(true);
     expect(
       screen.getByRole<HTMLInputElement>("checkbox", {
         name: /Management accounts/,

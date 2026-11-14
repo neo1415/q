@@ -288,6 +288,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH": exempt(
     "the founder ticking their own documents in the GateQ form, at the moment they press Send; consent belongs on that screen",
   ),
+  "api/http/gateq.ts POST GATEQ_APPLY_ACCOUNT_START_PATH": exempt(
+    "a signed-in founder starting, or reopening their own unsent, GateQ application on the gateway screen; it returns the guest credential the form then uses, which no Q session holds",
+  ),
   "api/http/gateq.ts POST GATEQ_APPLY_CONTACT_ACCOUNT_PATH": exempt(
     "a signed-in founder confirming their own contact on the GateQ application screen; it carries the applicant's guest credential, which no Q session holds",
   ),
@@ -1395,6 +1398,9 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_PATH",
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH",
   "api/http/gateq.ts POST GATEQ_APPLY_CONTACT_ACCOUNT_PATH",
+  // Journey audit 14 Nov (D5): the signed-in twin of the applicant's start,
+  // reopening their own unsent draft (guest credential returned).
+  "api/http/gateq.ts POST GATEQ_APPLY_ACCOUNT_START_PATH",
   // C3: the applicant's video interview start/end (guest credential only)
   // and the provider's bridge (a per-session bearer, not a person).
   "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_PATH",
