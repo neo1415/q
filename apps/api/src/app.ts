@@ -409,6 +409,12 @@ export type ApiModules = {
   readonly gateqPublicImages?: GateQRoutesDependencies["publicImages"];
   /** B6: the organisation's own brand colour for the public gateway page. */
   readonly gateqPublicAccent?: GateQRoutesDependencies["publicAccent"];
+  /** B7: the sites allowed to frame the public gateway's embed. */
+  readonly gateqPublicEmbedOrigins?: GateQRoutesDependencies["publicEmbedOrigins"];
+  /** B6/B7: reading a gateway's appearance for its settings. */
+  readonly gateqGatewayAppearance?: GateQRoutesDependencies["gatewayAppearance"];
+  /** B6/B7: the gateway's administration as the declared actions reach it. */
+  readonly gateqGatewayAdmin?: AppActionPorts["gateqGatewayAdmin"];
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
   readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
   /** C3: the GateQ video interview session and its provider bridge. */
@@ -829,6 +835,9 @@ export function createApp(
       ...(modules.gateqInboxActions === undefined
         ? {}
         : { gateqInbox: modules.gateqInboxActions }),
+      ...(modules.gateqGatewayAdmin === undefined
+        ? {}
+        : { gateqGatewayAdmin: modules.gateqGatewayAdmin }),
       ...(modules.companyClaims === undefined
         ? {}
         : { companyClaims: modules.companyClaims }),
@@ -1067,6 +1076,8 @@ export function createApp(
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,
       publicAccent: modules.gateqPublicAccent,
+      publicEmbedOrigins: modules.gateqPublicEmbedOrigins,
+      gatewayAppearance: modules.gateqGatewayAppearance,
     });
   }
 

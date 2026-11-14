@@ -64,8 +64,11 @@ import {
 import {
   createInvestorGateFits,
   createGateQService,
+  createGatewayAdminService,
+  createPostgresGatewayAppearanceRepository,
   createPostgresGatewayPolicyPort,
   createPostgresGatewayRepository,
+  gatewayAdminActionsPort,
   createPostgresGatewayVersionRepository,
 } from "@capital-q/gateq";
 import {
@@ -3093,6 +3096,22 @@ const gateqForInbox = createGateQService({
   transactions: database.transactions,
   audit: createPostgresMaterialActionAuditWriter(),
 });
+// B6/B7: Q prepares the gateway's look and open/paused state on a card;
+// the same service as the Gateway screen's routes, as the same person.
+const gateqGatewayAdmin = gatewayAdminActionsPort({
+  admin: createGatewayAdminService({
+    gateways: createPostgresGatewayRepository({ sql: database.sql }),
+    appearances: createPostgresGatewayAppearanceRepository({
+      sql: database.sql,
+    }),
+    authorization,
+    transactions: database.transactions,
+    audit: createPostgresMaterialActionAuditWriter(),
+  }),
+  listGateways: (command) => gateqForInbox.listGateways(command),
+  ownInvestorOrganisationId: (actor) =>
+    runtimeDependencies.ownInvestorOrganisation(actor),
+});
 const gateqInbox = gateqInboxActionsPort(
   createGateqInbox({
     sql: database.sql,
@@ -3268,6 +3287,8 @@ const appActionPorts: OwnReadPorts = {
   webFigures: researchComposition.evidence,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
+  // B6/B7: their gateway's look, embed sites, paused or open.
+  gateqGatewayAdmin,
   // F3: "Find my startup": claim requests and saved startup searches.
   companyClaims: createCompanyClaims({ sql: database.sql }),
   startupAlerts: createStartupAlerts({ sql: database.sql }),

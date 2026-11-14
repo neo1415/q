@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import {
+  getGatewayAppearance,
   getGatewayPolicy,
   getGateqInbox,
   getInvestorMandate,
@@ -38,6 +39,7 @@ import {
   GateView,
 } from "@/features/gateq/page/investor-views";
 import { PolicyEditor } from "@/features/gateq/policy-editor";
+import { GatewayAppearancePanel } from "@/features/gateq/page/gateway-appearance";
 import { publicGateway } from "@/features/gateq/public-gateway";
 import { appOrigin } from "@/features/q-card/public-card-data";
 import { qrSvg } from "@/features/q-card/qr";
@@ -142,7 +144,12 @@ export default async function GateqPage({ searchParams }: Props) {
   const gateways = await listGateways(session, context.investorOrganisationId)
     .then((result) => result.gateways)
     .catch(() => null);
-  const gateway = gateways?.find((item) => item.status === "ACTIVE") ?? null;
+  // B6/B7: a paused gateway is still theirs to see and reopen; an open one
+  // wins when there are several.
+  const gateway =
+    gateways?.find((item) => item.status === "ACTIVE") ??
+    gateways?.[0] ??
+    null;
   const origin = appOrigin();
   const link = gateway === null ? "" : `${origin}/g/${gateway.publicId}`;
 
@@ -188,7 +195,8 @@ export default async function GateqPage({ searchParams }: Props) {
   const gatewayId = gateway?.id ?? "";
 
   if (tab === "gate") {
-    const [policy, published, inbox, fromMandate] = await Promise.all([
+    const [policy, published, inbox, fromMandate, appearance] =
+      await Promise.all([
       getGatewayPolicy(session, gatewayId).catch(
         (): GatewayPolicyDto | null => null,
       ),
@@ -196,6 +204,7 @@ export default async function GateqPage({ searchParams }: Props) {
       getGateqInbox(session, gatewayId, "INBOX").catch(() => null),
       // B2: their active mandate, read as them, for the rules editor.
       activeMandateDraft(session, context.investorOrganisationId),
+      getGatewayAppearance(session, gatewayId).catch(() => null),
     ]);
     const snippet = `<script src="${origin}/gateq.js" data-gate="${gateway?.publicId ?? ""}" async></script>`;
     const publishedPolicy =
@@ -223,6 +232,14 @@ export default async function GateqPage({ searchParams }: Props) {
               null
             }
             canDecide={inbox?.viewer.canDecide ?? false}
+            appearance={
+              <GatewayAppearancePanel
+                gatewayId={gatewayId}
+                open={gateway?.status === "ACTIVE"}
+                previewHref={`/g/${gateway?.publicId ?? ""}`}
+                appearance={appearance}
+              />
+            }
             editor={
               <PolicyEditor
                 hasRules={(publishedPolicy?.criteria.length ?? 0) > 0}

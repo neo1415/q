@@ -59,7 +59,10 @@ import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 
 import type { DeckAudiencePort } from "./actions/deck.js";
 import type { DocumentChangePort } from "./actions/document-manage.js";
-import type { GateQPolicyExtractionPort } from "./actions/gateq.js";
+import type {
+  GateQPolicyExtractionPort,
+  GateqGatewayAdminPort,
+} from "./actions/gateq.js";
 import type { GateqInboxPort } from "./actions/gateq-inbox.js";
 import type {
   CompanyClaimsPort,
@@ -89,6 +92,8 @@ export type AppActionPorts = {
   readonly workforceJobs?: WorkforceJobPort | undefined;
   /** P7: an investor's mandate read into DRAFT gateway rules. */
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
+  /** B6/B7: their gateway's look, embed sites and open/paused state. */
+  readonly gateqGatewayAdmin?: GateqGatewayAdminPort | undefined;
   /** F4: an investor organisation's GateQ inbox (gateq-intake's inbox service). */
   readonly gateqInbox?: GateqInboxPort | undefined;
   /** F3: a claim to own, or a request to join, a canonical company. */

@@ -1584,6 +1584,7 @@ export * from "./team.js";
 // Organisation administration: capabilities, activity, member summaries.
 export * from "./organisation-admin.js";
 export * from "./gateq-inbox.js";
+export * from "./gateq-appearance.js";
 export * from "./gateq-find.js";
 // Deal close (2026-10-08): terms, signature, close and stage reports.
 export * from "./deal-close.js";

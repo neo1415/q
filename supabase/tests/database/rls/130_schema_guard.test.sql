@@ -349,6 +349,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('gateq', 'applications', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'contact_verification_limits', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'guest_throttle_buckets', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'gateway_appearances', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'gateway_criteria', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'gateway_versions', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'gateways', 'INTERNAL_SERVER_ONLY', '{}'),

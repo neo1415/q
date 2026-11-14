@@ -211,7 +211,10 @@ import {
   createPolicyExtractionService,
   createPostgresPolicyExtractionRepository,
   createPostgresGatewayPolicyPort,
+  createGatewayAdminService,
+  createPostgresGatewayAppearanceRepository,
   createPostgresGatewayRepository,
+  gatewayAdminActionsPort,
   createPostgresGatewayVersionRepository,
 } from "@capital-q/gateq";
 import {
@@ -704,6 +707,15 @@ const gateq = createGateQService({
       sql: database.sql,
     }),
   }),
+  authorization,
+  transactions: database.transactions,
+  audit,
+});
+// B6/B7: the organisation's own gateway look, embed sites and open/paused
+// state, under GateQ's own authority (investor.gateway.publish to change).
+const gateqAdmin = createGatewayAdminService({
+  gateways: gateqGateways,
+  appearances: createPostgresGatewayAppearanceRepository({ sql: database.sql }),
   authorization,
   transactions: database.transactions,
   audit,
@@ -3369,12 +3381,30 @@ const { app, logger } = createApp(config, security, {
   // B6: the public gateway's accent is the owning tenant's OWN brand
   // colour, never the platform default and nothing else from the theme
   // row. Only a published, active gateway reaches here.
+  // B6 (14 Nov, self-service): the gateway's own colour, set by the
+  // organisation's admins, wins over the tenant theme.
   gateqPublicAccent: async (publicId) => {
     const gateway = await gateqGateways.findByPublicId(publicId);
     if (gateway === null) return null;
+    const own = await gateqAdmin.publicAppearance(publicId);
+    if (own?.accentHex != null) return own.accentHex;
     const theme = await brandThemes.tenantOwn(gateway.tenantId);
     return theme?.primaryHex ?? null;
   },
+  // B7: the sites the organisation allows to frame its embed.
+  gateqPublicEmbedOrigins: async (publicId) =>
+    (await gateqAdmin.publicAppearance(publicId))?.embedOrigins ?? [],
+  gateqGatewayAppearance: (command) => gateqAdmin.appearance(command),
+  gateqGatewayAdmin: gatewayAdminActionsPort({
+    admin: gateqAdmin,
+    listGateways: (command) => gateq.listGateways(command),
+    ownInvestorOrganisationId: async (actor) =>
+      (
+        await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+          actor,
+        )
+      )?.investorOrganisationId ?? null,
+  }),
   gateqVideo:
     gateqApply === undefined
       ? undefined

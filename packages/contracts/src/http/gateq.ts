@@ -3,6 +3,10 @@ import { z } from "zod";
 import { UuidSchema } from "../common/ids.js";
 
 import { BrandHexSchema } from "./brand-theme.js";
+import {
+  GATEQ_EMBED_ORIGINS_MAX,
+  GatewayEmbedOriginSchema,
+} from "./gateq-appearance.js";
 
 /**
  * `/v1/gateq` — an investor organisation's inbound gateway (CQ-GATE-001).
@@ -273,6 +277,15 @@ export const PublicGatewayDtoSchema = z
      * accent tokens from it; absent or null: Capital Q's accent.
      */
     organisationAccentHex: BrandHexSchema.nullable().optional(),
+    /**
+     * B7: the sites the organisation allows to frame its embed (origins
+     * only). Absent or empty: any site may, as before. Sites that embed a
+     * public gateway are public places, so listing them discloses nothing.
+     */
+    embedOrigins: z
+      .array(GatewayEmbedOriginSchema)
+      .max(GATEQ_EMBED_ORIGINS_MAX)
+      .optional(),
   })
   .strict();
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;

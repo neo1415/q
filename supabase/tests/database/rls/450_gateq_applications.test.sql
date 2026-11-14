@@ -173,14 +173,15 @@ select is((select count(*)::int from information_schema.columns
 -- per-user state, pass reasons) and startup alerts; the native video interview
 -- session (C3, migration 20261226100000), the voice-only interview session
 -- (20261231530000) and the atomic statements, links, disagreement events and
--- turn readings (20261231540000) belong to the application set.
+-- turn readings (20261231540000) belong to the application set; the
+-- gateway's appearance revisions (20261231570000) to the gateway set.
 select is(
   array(select table_name::text from information_schema.tables
          where table_schema = 'gateq' order by 1),
   array['application_contacts', 'application_disagreement_events', 'application_documents', 'application_facts', 'application_founders',
         'application_sessions', 'application_statement_links', 'application_statements', 'application_submissions', 'application_syntheses',
         'application_turn_readings', 'application_turns', 'application_video_sessions', 'application_voice_sessions', 'applications',
-        'contact_verification_limits', 'gateway_criteria', 'gateway_versions', 'gateways',
+        'contact_verification_limits', 'gateway_appearances', 'gateway_criteria', 'gateway_versions', 'gateways',
         'guest_throttle_buckets', 'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
         'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
         'pass_reasons', 'policy_extractions', 'startup_alerts']::text[],

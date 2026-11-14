@@ -14,6 +14,8 @@ import {
   requestCompanyClaim,
   saveStartupAlert,
   setGateqReplyPromise,
+  setGatewayAppearance,
+  setGatewayStatus,
   starGateqApplications,
   discoverCompanies,
   confirmClaimCode,
@@ -31,11 +33,16 @@ import {
   GateqInboxReplyRequestSchema,
   GateqInboxSettingsRequestSchema,
   GateqInboxStarRequestSchema,
+  GatewayAppearanceRequestSchema,
+  GatewayStatusRequestSchema,
+  normaliseEmbedOrigin,
   parseStartupDescription,
   StartupAlertRequestSchema,
   type ClaimableCompanyDto,
   type CompanyClaimResultDto,
   type GateqInboxDetailDto,
+  type GatewayAppearanceDto,
+  type GatewayDto,
 } from "@capital-q/contracts";
 
 import { apiSession } from "@/features/q/context";
@@ -215,6 +222,69 @@ export async function replyPromiseAction(
   return withSession(
     async (s) => (await setGateqReplyPromise(s, gatewayId, parsed.data), null),
   );
+}
+
+/**
+ * B6/B7: the gateway's accent colour and the sites allowed to embed it, as
+ * typed on the Gateway page ("example.com" becomes https://example.com).
+ * The API decides whether this person may (an admin of the organisation).
+ */
+export async function appearanceAction(
+  gatewayId: string,
+  input: { readonly accentHex: string | null; readonly sites: string },
+): Promise<Done<GatewayAppearanceDto>> {
+  if (!Id.safeParse(gatewayId).success) return { ok: false, message: FAILED };
+  const typed = input.sites
+    .split(/[\s,]+/u)
+    .map((site) => site.trim())
+    .filter((site) => site.length > 0);
+  const origins = typed.map(normaliseEmbedOrigin);
+  const usable = origins.filter((origin): origin is string => origin !== null);
+  if (usable.length !== origins.length) {
+    return {
+      ok: false,
+      message:
+        "Use website addresses like example.com or https://example.com, one per line.",
+    };
+  }
+  const parsed = GatewayAppearanceRequestSchema.safeParse({
+    accentHex: input.accentHex,
+    embedOrigins: [...new Set(usable)],
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Use a colour like #0f766e and at most 10 websites.",
+    };
+  }
+  const done = await withSession((s) =>
+    setGatewayAppearance(s, gatewayId, parsed.data),
+  );
+  return done.ok
+    ? done
+    : {
+        ok: false,
+        message: "Only an admin of your firm can change your gateway.",
+      };
+}
+
+/** Pause or reopen the gateway (an admin; the API decides). */
+export async function gatewayStatusAction(
+  gatewayId: string,
+  input: unknown,
+): Promise<Done<GatewayDto>> {
+  const parsed = GatewayStatusRequestSchema.safeParse(input);
+  if (!Id.safeParse(gatewayId).success || !parsed.success)
+    return { ok: false, message: FAILED };
+  const done = await withSession((s) =>
+    setGatewayStatus(s, gatewayId, parsed.data.status),
+  );
+  return done.ok
+    ? done
+    : {
+        ok: false,
+        message: "Only an admin of your firm can change your gateway.",
+      };
 }
 
 export async function searchClaimableAction(

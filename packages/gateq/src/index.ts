@@ -81,4 +81,15 @@ export {
   createPostgresGatewayVersionRepository,
 } from "./infrastructure/postgres-gateq-repository.js";
 
+export {
+  createGatewayAdminService,
+  gatewayAdminActionsPort,
+  type GatewayAdminDependencies,
+  type GatewayAdminResult,
+  type GatewayAdminService,
+  type GatewayAppearance,
+  type GatewayAppearanceRepository,
+} from "./application/appearance.js";
+export { createPostgresGatewayAppearanceRepository } from "./infrastructure/postgres-gateway-appearance-repository.js";
+
 export const PACKAGE_NAME = "@capital-q/gateq" as const;

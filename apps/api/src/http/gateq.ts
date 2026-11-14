@@ -36,6 +36,7 @@ import {
   ShareApplicationMaterialsRequestSchema,
   ShareApplicationMaterialsResponseSchema,
   GatewayApplicationListDtoSchema,
+  GATEQ_GATEWAY_APPEARANCE_PATH,
   GATEQ_GATEWAY_PATH,
   GATEQ_GATEWAY_PUBLISH_PATH,
   GATEQ_GATEWAY_QUALIFY_PATH,
@@ -44,6 +45,7 @@ import {
   GATEQ_GATEWAYS_PATH,
   GATEQ_PUBLIC_GATEWAY_PATH,
   GatewayDraftRequestSchema,
+  GatewayAppearanceDtoSchema,
   GatewayDtoSchema,
   GatewayPolicyDtoSchema,
   GatewayVersionDtoSchema,
@@ -222,6 +224,24 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
    */
   readonly publicAccent?:
     ((publicId: GatewayPublicId) => Promise<string | null>) | undefined;
+  /**
+   * B7: the sites the organisation allows to frame its embed (origins),
+   * for an open gateway. Absent or empty: any site, as before.
+   */
+  readonly publicEmbedOrigins?:
+    | ((publicId: GatewayPublicId) => Promise<readonly string[]>)
+    | undefined;
+  /**
+   * B6/B7: the gateway's own appearance for its settings (investor.gateway.view
+   * to read; whether this viewer may change it comes back with it). Changes
+   * go through the declared app actions (gateway.appearance.set).
+   */
+  readonly gatewayAppearance?:
+    | ((command: {
+        readonly actor: ActorContext;
+        readonly gatewayId: GatewayId;
+      }) => Promise<unknown>)
+    | undefined;
 };
 
 const gatewayIdOf = (request: FastifyRequest): GatewayId =>
@@ -750,6 +770,24 @@ export function registerGateQRoutes(
     },
   );
 
+  // B6/B7: the gateway's appearance for its settings. Writes are the
+  // declared app actions (gateway.appearance.set, gateway.status.set).
+  if (dependencies.gatewayAppearance !== undefined) {
+    const readAppearance = dependencies.gatewayAppearance;
+    app.get(
+      GATEQ_GATEWAY_APPEARANCE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const appearance = await readAppearance({
+          actor: getActorContext(request),
+          gatewayId: gatewayIdOf(request),
+        });
+        void reply.header("Cache-Control", "no-store");
+        return GatewayAppearanceDtoSchema.parse(appearance);
+      },
+    );
+  }
+
   app.get(
     GATEQ_GATEWAY_VERSIONS_PATH,
     { onRequest: withContext },
@@ -892,12 +930,21 @@ export function registerGateQRoutes(
       accent !== null && BrandHexSchema.safeParse(accent).success
         ? accent
         : null;
+    const embedOrigins =
+      dependencies.publicEmbedOrigins === undefined
+        ? []
+        : await dependencies
+            .publicEmbedOrigins(publicId.data)
+            .catch((): readonly string[] => []);
     // Briefly cacheable, well inside the signed URLs' own lifetime.
     void reply.header("Cache-Control", "public, max-age=60");
     return PublicGatewayDtoSchema.parse({
       ...projection,
       ...(replyWithinDays === null ? {} : { replyWithinDays }),
       ...(accentHex === null ? {} : { organisationAccentHex: accentHex }),
+      ...(embedOrigins.length === 0
+        ? {}
+        : { embedOrigins: [...embedOrigins] }),
       ...(images === null
         ? {}
         : {
