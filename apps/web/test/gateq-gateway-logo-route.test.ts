@@ -22,14 +22,12 @@ const SANITISED =
 async function serve(body: string | Uint8Array, contentType: string) {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn<typeof globalThis.fetch>()
-      .mockResolvedValue(
-        new Response(body, {
-          status: 200,
-          headers: { "content-type": contentType },
-        }),
-      ),
+    vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { "content-type": contentType },
+      }),
+    ),
   );
   return GET(new Request("https://web.example/g/gw_abcd/logo"), {
     params: Promise.resolve({ publicId: "gw_abcd" }),

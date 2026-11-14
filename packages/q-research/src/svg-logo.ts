@@ -1,5 +1,6 @@
 import {
   defaultTreeAdapter,
+  html,
   parse,
   parseFragment,
   type DefaultTreeAdapterTypes,
@@ -36,7 +37,8 @@ export const SVG_LOGO_MAX_BYTES = 256 * 1024;
 const SVG_INPUT_MAX = 1_000_000;
 const MAX_DEPTH = 48;
 const MAX_ELEMENTS = 10_000;
-const SVG_NS = "http://www.w3.org/2000/svg";
+const SVG_NS = html.NS.SVG;
+const SVG_XMLNS = "http://www.w3.org/2000/svg";
 
 const ELEMENTS: ReadonlySet<string> = new Set([
   "svg",
@@ -246,7 +248,7 @@ function rebuild(element: Element, depth: number, budget: Budget): string {
 
   const seen = new Set<string>();
   const attributes: string[] = [];
-  if (depth === 0) attributes.push(` xmlns="${SVG_NS}"`);
+  if (depth === 0) attributes.push(` xmlns="${SVG_XMLNS}"`);
   for (const attribute of element.attrs) {
     const kept = keptAttribute(element, attribute);
     if (kept === null || seen.has(kept[0])) continue;
