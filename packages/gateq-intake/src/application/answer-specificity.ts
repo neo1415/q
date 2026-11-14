@@ -24,7 +24,7 @@ const NUMBER_WORDS =
   /\b(zero|none|nil|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|dozens?|hundreds?|thousands?|millions?|billions?|trillions?|half|percent)\b/iu;
 /** Saying there is nothing yet is a specific answer, not a vague one. */
 const NOTHING_YET =
-  /\b(pre[- ]?revenue|no (revenue|customers|users|sales)( yet)?|not (yet )?(generating|making) revenue)\b/iu;
+  /\b(pre[- ]?revenue|no (revenue|customers|users|sales|paying customers)( yet)?|not (yet )?(generating|making) revenue|(?:revenue|it) is zero|zero revenue|(?:nobody|no one) (?:pays|is paying)|not charging)\b/iu;
 /** The stored shape of a stated zero (normalise-fact.ts). */
 const STATED_ZERO = /^0+(?:\.0+)?$/u;
 const PERIOD =

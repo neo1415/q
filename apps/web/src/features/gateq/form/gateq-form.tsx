@@ -219,8 +219,10 @@ export function GateQForm({
       // instead of a profile-prefilled form whose save rewrote it.
       let restored: GateqRecovery | null = remembered;
       if (restored === null && reopenOnEntry.current) {
+        // Reopen only: a page load never creates a draft (live 06910b145:
+        // an IN_PROGRESS application existed before the founder acted).
         const reopened = await formRequest(() =>
-          startFormAction(gateway.publicId),
+          startFormAction(gateway.publicId, { reopenOnly: true }),
         );
         if (reopened.ok)
           restored = {
@@ -723,6 +725,8 @@ export function GateQForm({
             onSubmit={onSubmit}
             onContact={() => setStep("contact")}
             onInterview={() => setStep("interview")}
+            documentsAvailable={anonymous ? 0 : materials.length}
+            onDocuments={() => setStep("company")}
             preview={preview?.coverage}
           />
         ) : null}

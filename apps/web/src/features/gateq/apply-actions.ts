@@ -273,19 +273,27 @@ function formFailure(
       };
 }
 
-export async function startFormAction(publicId: string): Promise<FormResult> {
+export async function startFormAction(
+  publicId: string,
+  options: { readonly reopenOnly?: boolean } = {},
+): Promise<FormResult> {
   const id = PublicId.safeParse(publicId);
   const url = base();
   if (!id.success || url === null) return { ok: false, message: "Not found." };
   if (!(await visitorMayStart())) return RATE_LIMITED;
   try {
     // Signed in: their own unsent draft here is reopened (live D5), so a
-    // visit never leaves another empty draft behind.
+    // visit never leaves another empty draft behind. `reopenOnly` (a page
+    // load) never creates one: nothing exists until the founder acts.
     const account = await apiSession();
+    if (account === null && options.reopenOnly === true)
+      return { ok: false, message: "Not found." };
     const started =
       account === null
         ? await startApplication(url, id.data, "form")
-        : await startAccountApplication(account, id.data, "form");
+        : await startAccountApplication(account, id.data, "form", {
+            reopenOnly: options.reopenOnly === true,
+          });
     return {
       ok: true,
       sessionToken: started.sessionToken,

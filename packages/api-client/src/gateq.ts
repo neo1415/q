@@ -224,6 +224,7 @@ export function startAccountApplication(
   session: ApiSession,
   gatewayPublicId: string,
   mode?: "conversation" | "form",
+  options: { readonly reopenOnly?: boolean } = {},
 ) {
   return call(
     session,
@@ -231,8 +232,11 @@ export function startAccountApplication(
     GATEQ_APPLY_ACCOUNT_START_PATH,
     StartApplicationResponseSchema,
     {
-      body:
-        mode === undefined ? { gatewayPublicId } : { gatewayPublicId, mode },
+      body: {
+        gatewayPublicId,
+        ...(mode === undefined ? {} : { mode }),
+        ...(options.reopenOnly === true ? { reopenOnly: true } : {}),
+      },
     },
   );
 }
