@@ -757,3 +757,10 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - "How much funding has Paystack raised, according to public reports?" **PASS (partial).** Cited public sources (getlatka.com 2025-04-10, pitchbook.com, undated); "Public reports differ"; labelled unverified, not confirmed.
   - "What was Maji Loop's MRR in October 2026?" **Firewall PASS**: the private USD 120,000 and 42,000 claims did not leak. **GAP**: "isn't on record" still does not say whether public sources were checked. Owner addendum slice 1 is not yet met on this path (named-company turn, no research run); assigned to the uncertainty lane.
 - **Cost note:** a live investor Q turn costs about $0.07–0.08. Future estimates use $0.10 per turn.
+
+## Live checks on `d2ce8c91e` and the next batch (14 Nov, 18:35 Lagos)
+
+- Production: `d2ce8c91e` (gate PASS 1578 s; migration `20261231570000_gateq_gateway_appearance` applied, hosted 300). Earlier today also deployed `1f9e33016`, `b6f3d7fbb` with migrations 550000 (voice sessions) and 560000 (diligence request about).
+- Live: GateQ sustained re-certification 4/8 ($0.115); investor uncertainty 3–6: scenario 3 FAIL (no offer; explicit yes refused DECLARED_NOT_OFFERED), 5 PARTIAL, 4 and 6 not run ($0.224); gateway self-service PASS ($0.059).
+- Next batch on the integration branch, not gated: `2e1fb1d33` meetings B1/B2, `2fbe7065c` gateway panel, `4dd353859` GateQ resume/left-open (no migrations); the uncertainty-offer fix (D5–D8) is in progress.
+- Test spend today: about $1.56 of $5 (shared ledger `scripts/handoff/live/test-budget.mjs`).
