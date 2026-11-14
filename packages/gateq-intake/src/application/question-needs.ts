@@ -10,6 +10,8 @@ import {
   QUANTITATIVE_DIMENSIONS,
 } from "./answer-specificity.js";
 import { unreconciledPairs, unreconciledStatements } from "./fact-history.js";
+import type { ApplicationStatementView } from "../contracts/statements.js";
+import { NEVER_ASKED_AGAIN } from "./statement-view.js";
 
 /**
  * What is worth asking next, and why (CQ-GATE-002 §22, §28).
@@ -132,13 +134,44 @@ export function questionNeedsFor(input: {
    * asked; never what qualifies.
    */
   readonly emphasis?: readonly ApplicationDimension[] | undefined;
+  /**
+   * Slice 2: the statement view. Present, what may be asked comes from
+   * each dimension's status, not from how often Q asked: SETTLED, ZERO,
+   * DECLINED and LEFT_OPEN are never asked again; an OPEN disagreement is
+   * put to them once; an UNKNOWN is asked at most once more; UNANSWERED is
+   * asked as usual. `askedCounts` stays only as a ceiling.
+   */
+  readonly view?: ApplicationStatementView | undefined;
+  /**
+   * With `view`: how many Q questions about the dimension came after what
+   * decides it now (the open disagreement, or the latest statement).
+   */
+  readonly asksSince?: ((dimension: ApplicationDimension) => number) | undefined;
 }): readonly QuestionNeed[] {
   const limit = input.limit ?? 6;
+  const statusOf = (dimension: ApplicationDimension) =>
+    input.view?.dimensions.find((d) => d.dimension === dimension)?.status;
+  /** Whether the view rules a question out, whatever its reason. */
+  const settledByView = (
+    dimension: ApplicationDimension,
+    reason: QuestionNeed["reason"],
+  ): boolean => {
+    const status = statusOf(dimension);
+    if (status === undefined) return false;
+    // A vague settled answer may still get its one figure follow-up.
+    if (status === "SETTLED" && reason === "NEEDS_SPECIFICS") return false;
+    if (NEVER_ASKED_AGAIN.has(status)) return true;
+    if (status === "DISAGREEMENT_OPEN" || status === "UNKNOWN")
+      return (input.asksSince?.(dimension) ?? 0) >= 1;
+    return false;
+  };
   const answered = new Set(
     input.facts
       .filter((fact) => fact.supersededAt === null)
       .map((fact) => fact.dimension),
   );
+  for (const entry of input.view?.dimensions ?? [])
+    if (entry.status !== "UNANSWERED") answered.add(entry.dimension);
   for (const [dimension, covers] of Object.entries(COVERED_BY)) {
     if (covers?.some((covering) => answered.has(covering))) {
       answered.add(dimension as ApplicationDimension);
@@ -169,6 +202,7 @@ export function questionNeedsFor(input: {
     if (dimension === undefined) return;
     if (seen.has(dimension)) return;
     if (parked(dimension)) return;
+    if (settledByView(dimension, reason)) return;
     if (!APPLICATION_DIMENSIONS.includes(dimension)) return;
     seen.add(dimension);
     needs.push(
@@ -183,6 +217,12 @@ export function questionNeedsFor(input: {
       (criterion) => [criterion.id, criterion] as const,
     ),
   );
+
+  // An open disagreement not yet put to them comes first: the founder is
+  // the one who knows which is right (asked once, never pressed).
+  for (const entry of input.view?.dimensions ?? [])
+    if (entry.status === "DISAGREEMENT_OPEN")
+      add(entry.dimension, "CONTRADICTION");
 
   // A required criterion nobody can answer yet is the most useful thing in
   // the conversation: it is the difference between an application that can
@@ -270,7 +310,7 @@ export function contradictionsForInterview(
   ];
 }
 
-function figureContradictions(
+export function figureContradictions(
   facts: readonly ApplicationFact[],
 ): readonly string[] {
   const out: string[] = [];

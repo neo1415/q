@@ -131,6 +131,16 @@ function canonicalDecimal(decimal: string): string {
   return negative && magnitude !== "0" ? `-${magnitude}` : magnitude;
 }
 
+/**
+ * Whether two values are numbers that disagree: the same unit (any unit
+ * against a zero) and a different exact amount. Prose, unknowns and an
+ * unknown currency never conflict. Used by the projector and by the write
+ * path's own code-detected disagreement.
+ */
+export function valuesConflict(a: StatementValue, b: StatementValue): boolean {
+  return conflicts(a, b);
+}
+
 function conflicts(a: StatementValue, b: StatementValue): boolean {
   const left = comparable(a);
   const right = comparable(b);
@@ -441,12 +451,40 @@ const CANONICAL_CODE: Partial<Record<ApplicationDimension, RegExp>> = {
   "company.stage": /^[a-z][a-z0-9_]{0,63}$/,
 };
 
+/**
+ * Dimensions that hold one answer, not an account in several sentences: the
+ * legacy fact is the latest held statement's value, never every line
+ * joined (an email of two addresses is no email). Both statements stay in
+ * the view; a disagreement still reads as prose with both (decision 91).
+ */
+export const SINGLE_VALUED_DIMENSIONS: ReadonlySet<ApplicationDimension> =
+  new Set([
+    "contact.name",
+    "contact.email",
+    "contact.role",
+    "company.name",
+    "company.website",
+    "claims.revenue",
+    "raise.instrument",
+    "raise.lead_status",
+  ]);
+
 /** A qualifying value in the shape the deterministic projection reads. */
 function qualifyingValue(
   dimension: ApplicationDimension,
   item: DimensionViewItem,
 ): FactValue {
   const value = item.value;
+  if (dimension === "claims.revenue") {
+    if (value.kind === "MONEY" && value.currency !== null)
+      return { kind: "AMOUNT", amount: value.amount, currency: value.currency };
+    if (value.kind === "ZERO")
+      return value.currency === undefined
+        ? { kind: "TEXT", text: "0" }
+        : { kind: "AMOUNT", amount: "0", currency: value.currency };
+  }
+  if (value.kind === "TEXT" && SINGLE_VALUED_DIMENSIONS.has(dimension))
+    return { kind: "TEXT", text: value.text };
   if (dimension === "raise.amount") {
     if (value.kind === "MONEY" && value.currency !== null)
       return { kind: "AMOUNT", amount: value.amount, currency: value.currency };
@@ -583,9 +621,13 @@ export function legacyFactsFrom(view: ApplicationStatementView): {
       continue;
     }
 
-    if (QUALIFYING_DIMENSIONS.includes(dimension)) {
+    if (
+      QUALIFYING_DIMENSIONS.includes(dimension) ||
+      SINGLE_VALUED_DIMENSIONS.has(dimension)
+    ) {
       const inDispute = standingDisagreements(entry).length > 0;
-      if (inDispute) disputed.push(dimension);
+      if (inDispute && QUALIFYING_DIMENSIONS.includes(dimension))
+        disputed.push(dimension);
       facts.push({
         dimension,
         value: inDispute

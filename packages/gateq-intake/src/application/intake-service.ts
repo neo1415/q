@@ -38,6 +38,8 @@ import {
   type SessionToken,
 } from "../contracts/index.js";
 import { applicationProjection } from "../domain/projection.js";
+import type { StatementPlan } from "./statement-plan.js";
+import { disputedFactsFor, legacyFactsFrom } from "./statement-view.js";
 import {
   generateApplicationReference,
   hashSessionToken,
@@ -53,6 +55,7 @@ import {
   type DisclosureLineage,
 } from "./disclosure-projection.js";
 import type {
+  ApplicationStatementRepository,
   ApplicationContactRepository,
   ApplicationDocumentRepository,
   ApplicationFactRepository,
@@ -104,6 +107,12 @@ export type IntakeDependencies = {
    * requirement, no dossier titles.
    */
   readonly turns?: ApplicationTurnRepository | undefined;
+  /**
+   * GateQ atomic statements (slice 2). Present, a turn's statements are
+   * written with its reply and a qualifying fact in genuine disagreement
+   * reads UNRESOLVED (decision 91); absent, the legacy facts alone.
+   */
+  readonly statements?: ApplicationStatementRepository | undefined;
   readonly contacts?: ApplicationContactRepository | undefined;
   readonly documentTitles?: DocumentTitlesPort | undefined;
   /** Trusted canonical Evidence port. Opt-in until durable lineage and native gates pass. */
@@ -296,6 +305,12 @@ export type IntakeService = {
     readonly latencyMs?: number | undefined;
     /** The model context this reply and its facts were produced from. */
     readonly disclosureLineage?: DisclosureLineage | undefined;
+    /**
+     * Slice 2: every statement row of the turn, decided and checkpointed
+     * before this call. Written first, in the same transaction as the
+     * legacy facts re-projected from it and Q's reply.
+     */
+    readonly statementPlan?: StatementPlan | undefined;
   }) => Promise<void>;
 };
 
@@ -313,6 +328,7 @@ export function createIntakeService(
     transactions,
     logger,
     turns,
+    statements,
     contacts,
     documentTitles,
     contactCodeMailer,
@@ -400,11 +416,20 @@ export function createIntakeService(
         : (
             await taxonomy.resolvePhrases({ phrases: phrases.value.phrases })
           ).filter((candidate) => candidate.unambiguous);
+    // Decision 91: a qualifying fact the founder's own statements disagree
+    // on is UNRESOLVED, never its latest value.
+    const disputed =
+      statements === undefined
+        ? []
+        : disputedFactsFor(
+            legacyFactsFrom(await statements.viewFor(application.id)).disputed,
+          );
     return applicationProjection({
       applicationId: application.id,
       tenantId: application.tenantId,
       facts: current,
       classifications: resolved,
+      disputed,
     });
   };
 
@@ -482,6 +507,19 @@ export function createIntakeService(
       await transactions.run(async (tx) => {
         if (!(await turns.assertClaim(tx, application.id, input.claimId)))
           throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        // Statements, links, disagreement events and turn readings first:
+        // the legacy facts below are their projection, and Q's reply after
+        // them may say "noted" only for what the readings recorded.
+        const plan = input.statementPlan;
+        if (statements !== undefined && plan !== undefined)
+          await statements.appendInTransaction(tx, {
+            applicationId: application.id,
+            tenantId: application.tenantId,
+            statements: plan.statements,
+            links: plan.links,
+            events: plan.events,
+            readings: plan.readings,
+          });
         if (proposed.length > 0) {
           await facts.record(tx, {
             applicationId: application.id,

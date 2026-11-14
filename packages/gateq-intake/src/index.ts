@@ -36,6 +36,16 @@ export {
   type LegacyFact,
   type LegacyIncompleteness,
 } from "./application/statement-view.js";
+// Atomic statements (slice 2): the write path.
+export {
+  claimsRecording,
+  NOT_RECORDED_LINE,
+  planReading,
+  STATEMENT_READING_VERSION,
+  StatementPlanSchema,
+  type StatementContext,
+  type StatementPlan,
+} from "./application/statement-plan.js";
 
 export {
   applicationProjection,
@@ -122,6 +132,7 @@ export type {
   ApplicationFactRepository,
   ApplicationRepository,
   ApplicationSessionRepository,
+  ApplicationStatementRepository,
   ApplicationSubmissionRepository,
   ApplicationTurnRepository,
   BoundPolicyPort,
@@ -147,6 +158,7 @@ export {
   createPostgresApplicationFactRepository,
   createPostgresApplicationRepository,
   createPostgresApplicationSessionRepository,
+  createPostgresApplicationStatementRepository,
   createPostgresApplicationSubmissionRepository,
   createPostgresApplicationTurnRepository,
 } from "./infrastructure/postgres-intake-repositories.js";
