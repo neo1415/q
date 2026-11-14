@@ -1719,12 +1719,6 @@ export {
   ANALYSIS_WRITE_V7,
   ANALYSIS_WRITE_PIPELINE_RULE,
 } from "./prompts/tasks/analyst-investigation.v1.js";
-// Decision 97: analyst list items stand alone.
-export {
-  ANALYSIS_CRITIQUE_STRENGTHS_RULE,
-  ANALYSIS_CRITIQUE_V4,
-  ANALYSIS_WRITE_V8,
-} from "./prompts/tasks/analyst-lists.v1.js";
 export * from "./prompts/schemas/analyst.js";
 export {
   DRAFT_CHANNELS,

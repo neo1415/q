@@ -68,7 +68,7 @@ const coverage = (value: string, dimension: string) => ({
 });
 
 describe("a readiness answer is never refused over its side fields (run 186c0788)", () => {
-  it("round 1: string questions and empty quotes are dropped, an over-long statements list keeps its first valid ones", () => {
+  it("round 1: string questions and empty quotes are dropped, and every valid statement is kept (decision 97)", () => {
     const accepted = acceptStructuredOutput(
       JSON.stringify({
         ...base,
@@ -98,13 +98,14 @@ describe("a readiness answer is never refused over its side fields (run 186c0788
       "Audited accounts are not on record yet.",
     ]);
     expect(accepted.value.clarifyingQuestions).toEqual([]);
-    // Empty quotes dropped, then the first valid ones up to the bound.
+    // Empty quotes dropped; v33 then cut the sixth valid statement (v34 keeps it).
     expect(accepted.value.userStatements.map((one) => one.quote)).toEqual([
       "we sell 1 litres a day",
       "we sell 2 litres a day",
       "we sell 3 litres a day",
       "we sell 4 litres a day",
       "we sell 5 litres a day",
+      "we sell 7 litres a day",
     ]);
   });
 

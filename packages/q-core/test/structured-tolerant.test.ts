@@ -74,9 +74,8 @@ describe("tolerant deep-work results", () => {
     // Investigation-grade research (2026-10-29) superseded these.
     expect(registry.getActive("RESEARCH_PLAN").definition.version).toBe(6);
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(4);
-    // Decision 97 (2026-11-14): list items stand alone.
-    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(8);
-    expect(registry.getActive("ANALYSIS_CRITIQUE").definition.version).toBe(4);
+    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(7);
+    expect(registry.getActive("ANALYSIS_CRITIQUE").definition.version).toBe(3);
   });
 
   it("keeps a plan with hyphenated keys and extra keys, normalising every reference", () => {

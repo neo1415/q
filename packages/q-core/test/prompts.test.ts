@@ -328,7 +328,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v33_comm.v1",
+      "q-system.v2_company-analyst.v34_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -468,7 +468,8 @@ describe("renderer", () => {
     // never said corrected or kept before approval; seven trims pay for it.
     // v33 (A8): ~7 tokens -- statedFigures as a root key and in the
     // userStatements rule; five trims pay for it.
-    expect(rendered.bundle.task).toBe("company-analyst/v33");
+    // v34 (decision 97): v33's template; only the schema's count bounds go.
+    expect(rendered.bundle.task).toBe("company-analyst/v34");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

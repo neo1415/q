@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
+  ClaimExtractionResultV2Schema,
+  ClaimExtractionResultV3Schema,
+  FounderExtractionV3ResultSchema,
+  MemoryExtractorResultV3Schema,
   COMPANY_ANALYST_V33,
   COMPANY_ANALYST_V34,
   CompanyAnalystV33ResultSchema,
@@ -40,5 +45,43 @@ describe("COMPANY_ANALYST v34: no count ceiling on the evidence lists", () => {
     expect(v33.success).toBe(false);
     expect(v34.success).toBe(true);
     expect(v34.data?.missingEvidence).toHaveLength(25);
+  });
+});
+
+describe("extraction lists with no count ceiling (decision 97)", () => {
+  const maxItems = (schema: z.ZodType, field: string): unknown => {
+    const json = z.toJSONSchema(schema, { io: "input" }) as {
+      properties: Record<string, { maxItems?: number }>;
+    };
+    return json.properties[field]?.maxItems;
+  };
+
+  it("claims, memory items and founder conflicts are active and unbounded", () => {
+    const registry = createDefaultPromptRegistry();
+    expect(registry.getActive("CLAIM_EXTRACTION").definition.version).toBe(3);
+    expect(registry.getActive("MEMORY_EXTRACTOR").definition.version).toBe(3);
+    expect(
+      registry.getActive("FOUNDER_ONBOARDING_EXTRACTION").definition.version,
+    ).toBe(4);
+    // The predecessors' bounds were 20, 12 and 8.
+    expect(maxItems(ClaimExtractionResultV2Schema, "claims")).toBe(20);
+    expect(maxItems(ClaimExtractionResultV3Schema, "claims")).toBeUndefined();
+    expect(maxItems(MemoryExtractorResultV3Schema, "items")).toBeUndefined();
+    expect(
+      maxItems(FounderExtractionV3ResultSchema, "conflicts"),
+    ).toBeUndefined();
+    for (const field of [
+      "findings",
+      "missingEvidence",
+      "contradictions",
+      "companyFindings",
+      "coverage",
+      "materialChanges",
+      "profileUpdates",
+      "userStatements",
+      "actionTalk",
+    ]) {
+      expect(maxItems(CompanyAnalystV34ResultSchema, field)).toBeUndefined();
+    }
   });
 });

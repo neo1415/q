@@ -156,6 +156,7 @@ describe("what Q reads", () => {
 
     it("reads the later parts and records coverage on the reading", async () => {
       const recorded: GateqSynthesisV2[] = [];
+      let calls = 0;
       const execute = vi.fn(() =>
         Promise.resolve({
           output: {
@@ -165,7 +166,7 @@ describe("what Q reads", () => {
               points: [
                 {
                   kind: "RISK",
-                  text: `Point ${String(execute.mock.calls.length)}`,
+                  text: `Point ${String((calls += 1))}`,
                   factIds: [FACT_TRACTION],
                   turnSeqs: [],
                 },

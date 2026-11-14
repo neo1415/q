@@ -451,6 +451,12 @@ export type AnalysisCritiqueResultV3 = z.infer<
 // (code drops it and counts the drop on the result), and there is no count
 // ceiling -- the output budget bounds the answer, code bounds what it
 // files. Only a field that is not a list at all still reads as empty.
+//
+// These are the ACCEPTANCE schemas the workforce validates with; the prompts
+// sent (ANALYSIS_WRITE v7, ANALYSIS_CRITIQUE v3) are unchanged, because a
+// new prompt version changes the request the research-acceptance golden
+// recordings are keyed by and they cannot be re-recorded without paid
+// calls. Publishing prompt versions with these schemas is the follow-up.
 // ---------------------------------------------------------------------------
 
 /** Independent lines: one bad item costs that item, never the list. */

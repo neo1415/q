@@ -63,8 +63,7 @@ describe("investigation prompts", () => {
       "DEPRECATED",
     );
     expect(registry.getActive("RESEARCH_FACTS").definition.version).toBe(4);
-    // Decision 97 (2026-11-14): list items stand alone.
-    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(8);
+    expect(registry.getActive("ANALYSIS_WRITE").definition.version).toBe(7);
     expect(registry.get("RESEARCH_FACTS", 2)?.definition.status).toBe(
       "DEPRECATED",
     );

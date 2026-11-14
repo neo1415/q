@@ -155,7 +155,7 @@ describe("figures read from a deck by the model claim proposer", () => {
       "2026-09-30",
       "2027-06-30",
     ]);
-    expect(batch.provenance.promptVersionId).toBe("claim-extraction/v2");
+    expect(batch.provenance.promptVersionId).toBe("claim-extraction/v3");
 
     const figures = documentFigureProposals({
       proposals: batch.proposals,

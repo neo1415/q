@@ -336,10 +336,6 @@ import { FOUNDER_ONBOARDING_EXTRACTION_V3 } from "./tasks/founder-onboarding-ext
 import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
 import { GATEQ_DOSSIER_SYNTHESIS_V2 } from "./tasks/gateq-dossier-synthesis.v2.js";
 import {
-  ANALYSIS_CRITIQUE_V4,
-  ANALYSIS_WRITE_V8,
-} from "./tasks/analyst-lists.v1.js";
-import {
   CLAIM_EXTRACTION_V3,
   FOUNDER_ONBOARDING_EXTRACTION_V4,
   MEMORY_EXTRACTOR_V3,
@@ -844,7 +840,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...RESEARCH_PLAN_V2, status: "DEPRECATED" },
     { ...RESEARCH_FACTS_V2, status: "DEPRECATED" },
     { ...ANALYSIS_WRITE_V3, status: "DEPRECATED" },
-    { ...ANALYSIS_CRITIQUE_V3, status: "DEPRECATED" },
+    ANALYSIS_CRITIQUE_V3,
     // Diligence audit 2026-10-28.
     { ...JOB_PLAN_V14, status: "DEPRECATED" },
     { ...RESEARCH_PLAN_V3, status: "DEPRECATED" },
@@ -863,10 +859,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Live cases C, E and F 2026-10-29.
     RESEARCH_PLAN_V6,
     RESEARCH_BRIEF_V3,
-    { ...ANALYSIS_WRITE_V7, status: "DEPRECATED" },
-    // Decision 97: list items stand alone, no count ceiling.
-    ANALYSIS_WRITE_V8,
-    ANALYSIS_CRITIQUE_V4,
+    ANALYSIS_WRITE_V7,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,
