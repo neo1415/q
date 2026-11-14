@@ -1006,7 +1006,7 @@ function checkOne(
   said.add(metric);
   return {
     check: {
-      text: `I don't have a sourced figure for ${metric} yet.`,
+      text: `Neither Capital Q's records nor the sources I read give a figure for ${metric} yet.`,
       ungrounded,
     },
     figures: [],

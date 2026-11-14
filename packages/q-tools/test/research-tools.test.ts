@@ -13,6 +13,7 @@ import {
   createDefaultQTools,
   createQToolExecutor,
   createQToolRegistry,
+  type ResearchReadingsPort,
 } from "../src/index.js";
 import {
   actorA,
@@ -869,5 +870,72 @@ describe("public_web.extract", () => {
     );
     expect(outcome.status).toBe("DENIED");
     expect(outcome.failureCode).toBe("TOOL_NOT_ELIGIBLE");
+  });
+});
+
+describe("public readings and the per-source cross-check (decisions 92-96)", () => {
+  it("offers kept readings and each source's independence; schedules a reading after the turn; never verification", async () => {
+    const calls: { kind: string; evidenceIds: (string | null)[] }[] = [];
+    const researchReadings: ResearchReadingsPort = {
+      readingsFor: (input) => {
+        calls.push({
+          kind: "readingsFor",
+          evidenceIds: input.sources.map((s) => s.evidenceSourceId),
+        });
+        const [a, b] = input.sources;
+        return Promise.resolve({
+          standing: "These are figures public pages report.",
+          lines: ["ARR: USD 2,000,000 -- reported by (a.com, 2026-11-02)"],
+          pairs:
+            a === undefined || b === undefined
+              ? []
+              : [
+                  {
+                    kind: "CORROBORATES" as const,
+                    urls: [a.url, b.url] as const,
+                  },
+                ],
+        });
+      },
+      afterResearch: (input) => {
+        calls.push({
+          kind: "afterResearch",
+          evidenceIds: input.sources.map((s) => s.evidenceSourceId),
+        });
+        return Promise.resolve();
+      },
+    };
+    const { port: p } = harness({ researchReadings });
+    const outcome = await search(
+      { query: "Beacon Analytics", companyId: COMPANY_B_NETWORK },
+      speaking(
+        contextFor(actorA, generalPlanA),
+        "What does the public web say about Beacon Analytics?",
+      ),
+      p,
+    );
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    const cross = data["crossCheck"] as {
+      version: string;
+      independentVerification: boolean;
+      sources: { sourceIndex: number; corroboratedBy: number[] }[];
+    };
+    expect(cross.version).toBe("research-crosscheck-v1");
+    expect(cross.independentVerification).toBe(false);
+    expect(cross.sources.length).toBe((data["sources"] as unknown[]).length);
+    if (cross.sources.length >= 2) {
+      expect(cross.sources[0]?.corroboratedBy).toEqual([
+        cross.sources[1]?.sourceIndex,
+      ]);
+    }
+    expect((data["publicReadings"] as { lines: string[] }).lines[0]).toContain(
+      "reported by",
+    );
+    // Not the owner's company: nothing is recorded, so no evidence id is
+    // handed over and the readings are the public pages' alone.
+    expect(calls.map((c) => c.kind)).toEqual(["readingsFor", "afterResearch"]);
+    expect(calls.every((c) => c.evidenceIds.every((id) => id === null))).toBe(
+      true,
+    );
   });
 });

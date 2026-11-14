@@ -68,7 +68,7 @@ import { createScrapingBeeResearchProvider } from "@capital-q/q-research/provide
 import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
 import { createSerperResearchProvider } from "@capital-q/q-research/providers/serper";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
-import type { ActorContext, AuthorizationService } from "@capital-q/security";
+import type { AuthorizationService } from "@capital-q/security";
 
 import { createPostgresKnownEntityStore } from "./known-entities.js";
 import { createPostgresResearchedEntityStore } from "./person-records.js";
@@ -130,17 +130,6 @@ export type ResearchCompositionDependencies = {
   readonly provider?: PublicWebResearchProvider | undefined;
   /** A planned job's page-read budget (Q_RESEARCH_PLANNED_EXTRACT_MS). */
   readonly plannedExtractBudgetMs?: number | undefined;
-  /**
-   * A8: told (after the write, never awaited) when a fetched page about the
-   * actor's own company was recorded as a new excerpt, so its figures can be
-   * proposed to the founder. Only owned-company research is ever recorded.
-   */
-  readonly onPublicExcerpt?:
-    | ((
-        actor: ActorContext,
-        excerpt: { readonly sourceId: string; readonly itemId: string },
-      ) => void)
-    | undefined;
 };
 
 const COMPANY = "COMPANY" as const;
@@ -148,7 +137,6 @@ const COMPANY = "COMPANY" as const;
 /** The Evidence owner, as the research capability needs it (§13-§15). */
 export function createResearchEvidenceRecorder(
   evidence: EvidenceService,
-  onPublicExcerpt?: ResearchCompositionDependencies["onPublicExcerpt"],
 ): ResearchEvidenceRecorder {
   return {
     listSources: async (actor, companyId) => {
@@ -218,10 +206,6 @@ export function createResearchEvidenceRecorder(
           evidenceStatus: "SELF_REPORTED",
         },
       });
-      // Only a page Capital Q fetched, never a search snippet alone.
-      if (input.structuredValue["extracted"] === true) {
-        onPublicExcerpt?.(actor, { sourceId: input.sourceId, itemId: item.id });
-      }
       return { id: item.id };
     },
   };
@@ -435,10 +419,7 @@ export function composeResearch(
       ? undefined
       : createPublicWebResearchService({
           provider,
-          evidence: createResearchEvidenceRecorder(
-            evidence,
-            dependencies.onPublicExcerpt,
-          ),
+          evidence: createResearchEvidenceRecorder(evidence),
           ...(logger === undefined ? {} : { logger }),
           ...(dependencies.plannedExtractBudgetMs === undefined
             ? {}

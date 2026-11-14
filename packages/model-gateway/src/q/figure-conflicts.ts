@@ -1,4 +1,9 @@
-import { figuresAgree, measureWords, parseFigure } from "@capital-q/q-research";
+import {
+  figuresAgree,
+  measureWords,
+  parseFigure,
+  registrableDomain,
+} from "@capital-q/q-research";
 
 import type { QResultBlock } from "@capital-q/contracts";
 
@@ -132,5 +137,103 @@ export function figureConflictBlocks(
     )}".`,
     confidence: "CONFLICTING_EVIDENCE",
     missing: ["A dated, independent source for this figure"],
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Page against page (audit 14 Nov, slice 2; decision 92)
+// ---------------------------------------------------------------------------
+
+/**
+ * Which fundraising concept a sentence states, so "seeking $5m" and "raised
+ * $1m" are never read as the same measure (decision 95). Null: none.
+ */
+function fundingConcept(sentence: string): string | null {
+  if (/\bvalu(?:ed|ation)\b/iu.test(sentence)) {
+    return /\bpre[- ]?money\b/iu.test(sentence)
+      ? "VALUATION_PRE"
+      : /\bpost[- ]?money\b/iu.test(sentence)
+        ? "VALUATION_POST"
+        : "VALUATION";
+  }
+  if (
+    /\b(?:seek(?:s|ing)?|(?:is|are) raising|looking to raise|aims? to raise|plans? to raise)\b/iu.test(
+      sentence,
+    )
+  ) {
+    return "SOUGHT";
+  }
+  if (/\b(?:commit(?:ted|ments?)|pledged?)\b/iu.test(sentence)) {
+    return "COMMITTED";
+  }
+  if (/\b(?:raised|raises|closed|secured)\b/iu.test(sentence)) {
+    return "COMPLETED";
+  }
+  return null;
+}
+
+export type PageFigureConflict = {
+  readonly first: { readonly domain: string; readonly sentence: string };
+  readonly second: { readonly domain: string; readonly sentence: string };
+};
+
+/**
+ * Figures two independent publishers give for the same measure, unit, year
+ * and fundraising concept that disagree. Both kept; neither chosen; and two
+ * pages agreeing is never treated as verification. Code, no model call.
+ */
+export function pageFigureConflicts(
+  pages: readonly ConflictPage[],
+): PageFigureConflict[] {
+  const matched = pages.filter((page) => page.subjectMatch === "MATCH");
+  const out: PageFigureConflict[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < matched.length; i += 1) {
+    for (let j = i + 1; j < matched.length; j += 1) {
+      const a = matched[i];
+      const b = matched[j];
+      if (a === undefined || b === undefined) continue;
+      // One publisher (or its subdomains) is one report, not two.
+      if (registrableDomain(a.domain) === registrableDomain(b.domain)) {
+        continue;
+      }
+      for (const sa of sentencesOf(a.excerpt ?? "")) {
+        const fa = parseFigure(sa);
+        if (fa === null) continue;
+        for (const sb of sentencesOf(b.excerpt ?? "")) {
+          const fb = parseFigure(sb);
+          if (fb === null || fb.unit !== fa.unit) continue;
+          if (figuresAgree(fa, fb)) continue;
+          if (fundingConcept(sa) !== fundingConcept(sb)) continue;
+          if (!sameYears(years(sa), years(sb))) continue;
+          if (!sameMeasure(sa, sb)) continue;
+          const key = `${sa}|${sb}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push({
+            first: { domain: a.domain, sentence: sa },
+            second: { domain: b.domain, sentence: sb },
+          });
+          if (out.length >= CONFLICTS_MAX) return out;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Each page-versus-page disagreement as an UNCERTAINTY block, in code's words. */
+export function pageFigureConflictBlocks(
+  conflicts: readonly PageFigureConflict[],
+): QResultBlock[] {
+  return conflicts.map((conflict) => ({
+    kind: "UNCERTAINTY",
+    statement: `Public reports disagree, not reconciled: a page on ${
+      conflict.first.domain
+    } says "${quote(conflict.first.sentence)}"; a page on ${
+      conflict.second.domain
+    } says "${quote(conflict.second.sentence)}".`,
+    confidence: "CONFLICTING_EVIDENCE",
+    missing: ["The company's own dated figure, or an independent source"],
   }));
 }

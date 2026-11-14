@@ -83,7 +83,7 @@ describe("groundText (workforce messages and documents)", () => {
   it("keeps the answer path's defaults unchanged", () => {
     const said = new Set<string>();
     expect(checkSentence("Our ARR is $3M.", corpus, said).text).toBe(
-      "I don't have a sourced figure for ARR yet.",
+      "Neither Capital Q's records nor the sources I read give a figure for ARR yet.",
     );
   });
 });
