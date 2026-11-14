@@ -60,6 +60,8 @@ export {
   createScheduleService,
   NOTIFICATIONS_PAGE,
   googleEventIdFor,
+  hasCalendarEvent,
+  noCalendarEventIdFor,
   JOINED_CALL_CONSENT,
   JOINED_CALL_MINUTES,
   type AppEmailPort,
@@ -80,6 +82,7 @@ export {
   SLOT_POLICY,
   type Interval,
 } from "./schedule/slots.js";
+export { meetingTimeLabel } from "./schedule/when.js";
 export {
   composePrepBrief,
   PREP_BRIEF_COMPOSER_VERSION,

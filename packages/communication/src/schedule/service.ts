@@ -8,6 +8,7 @@ import { reminderEmail } from "../email-templates.js";
 import type { ChatPartyResolver } from "../service.js";
 import { composePrepBrief, PREP_BRIEF_COMPOSER_VERSION } from "./brief.js";
 import { isKnownTimeZone, proposeSlots, type Interval } from "./slots.js";
+import { meetingTimeLabel } from "./when.js";
 import type {
   MeetingActivityWriter,
   MeetingDirectory,
@@ -466,21 +467,34 @@ const MEETING_REMINDER_MINUTES = 15;
  */
 const SAME_BOOKING_WINDOW_MS = 30 * 60_000;
 
-/** The organiser's own wording of a call's time, in its zone. */
-function bookedAt(startsAt: Date, timeZone: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone,
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).format(startsAt);
-  } catch {
-    return startsAt.toUTCString().replace(":00 GMT", " UTC");
-  }
+/**
+ * A meeting row with no calendar event behind it (a time agreed on Capital
+ * Q without a connected calendar; live audit 2026-11-14 D6). Its
+ * google_event_id column (not null, unique) holds this handle instead of a
+ * Google id: the letters n, o and l never occur in a UUID's hex, so it can
+ * never be mistaken for an event Capital Q created at Google, and it is
+ * never sent there.
+ */
+const NO_CALENDAR_EVENT_PREFIX = "nocal";
+
+export function noCalendarEventIdFor(meetingId: string): string {
+  return `${NO_CALENDAR_EVENT_PREFIX}${googleEventIdFor(meetingId)}`;
+}
+
+/**
+ * Whether a calendar event exists for this meeting at the organiser's
+ * Google Calendar. Not for a joined call (meet-47), a no-calendar row, or
+ * one recorded before the handle above existed (its key says so: the
+ * proposal path's `:no-calendar`).
+ */
+export function hasCalendarEvent(
+  record: Pick<MeetingRecord, "origin" | "googleEventId" | "idempotencyKey">,
+): boolean {
+  return (
+    record.origin !== "JOINED" &&
+    !record.googleEventId.startsWith(NO_CALENDAR_EVENT_PREFIX) &&
+    !record.idempotencyKey.endsWith(":no-calendar")
+  );
 }
 const BRIEF_LEAD_MS = 24 * 3_600_000;
 /** Re-read a missing Meet link on every tick this long after booking. */
@@ -599,6 +613,26 @@ export function createScheduleService(
     };
   }
 
+  /**
+   * Each participant's own zone for wording the call's time, where their
+   * profile names a known one; else the meeting's. Read before any
+   * transaction opens; a failed read words it in the meeting's zone.
+   */
+  async function zonesOf(
+    record: MeetingRecord,
+  ): Promise<(userId: string) => string> {
+    const known =
+      (await directory
+        .timeZones?.(record.participants.map((p) => p.userId))
+        .catch(() => null)) ?? null;
+    return (userId) => {
+      const zone = known?.get(userId);
+      return zone !== undefined && isKnownTimeZone(zone)
+        ? zone
+        : record.timeZone;
+    };
+  }
+
   /** A meeting is on: its event, its reminder, and everyone told. */
   async function finalise(
     record: MeetingRecord,
@@ -607,6 +641,11 @@ export function createScheduleService(
     correlationId: string,
     noInviteNote?: string,
   ): Promise<void> {
+    const zoneOf = await zonesOf(record);
+    // Every notice says when, in the reader's own zone, labelled (live
+    // audit 2026-11-14 D4: the attendee's no-invite notice had no time).
+    const at = (userId: string) =>
+      meetingTimeLabel(record.startsAt, zoneOf(userId));
     await transactions.run(async (tx) => {
       await store.markMeetingScheduled(tx, record.id, meetLink);
       await activity.record(tx, {
@@ -638,10 +677,13 @@ export function createScheduleService(
           kind: "MEETING_SCHEDULED",
           title: `New call: ${record.purpose}`.slice(0, 200),
           // The link in the notice itself (founder report 2026-10-02).
-          body:
-            meetLink !== null
-              ? `Meet link: ${meetLink}`
-              : (noInviteNote?.slice(0, 1000) ?? null),
+          body: [
+            at(participant.userId),
+            meetLink !== null ? `Meet link: ${meetLink}` : noInviteNote,
+          ]
+            .filter((part) => part !== undefined)
+            .join(" · ")
+            .slice(0, 1000),
           linkPath: null,
           reminderId: null,
           meetingId: record.id,
@@ -656,10 +698,7 @@ export function createScheduleService(
           userId: actor.userId,
           kind: "MEETING_SCHEDULED",
           title: `Booked: ${record.purpose}`.slice(0, 200),
-          body: `${bookedAt(record.startsAt, record.timeZone)} · ${noInviteNote}`.slice(
-            0,
-            1000,
-          ),
+          body: `${at(actor.userId)} · ${noInviteNote}`.slice(0, 1000),
           linkPath: null,
           reminderId: null,
           meetingId: record.id,
@@ -996,13 +1035,17 @@ export function createScheduleService(
       // The organiser is told too, in the app, wherever they are when the
       // approved booking lands (voiceq-63): Q's line reaches only the
       // conversation it was asked in.
+      const organiserAt = meetingTimeLabel(
+        record.startsAt,
+        (await zonesOf(record))(actor.userId),
+      );
       await transactions.run(async (tx) => {
         await store.notify(tx, {
           tenantId: actor.tenantId,
           userId: actor.userId,
           kind: "MEETING_SCHEDULED",
           title: `Booked: ${record.purpose}`.slice(0, 200),
-          body: `${bookedAt(record.startsAt, record.timeZone)}${meetLink === null ? "" : ` · Meet link: ${meetLink}`}`.slice(
+          body: `${organiserAt}${meetLink === null ? "" : ` · Meet link: ${meetLink}`}`.slice(
             0,
             1000,
           ),
@@ -1052,8 +1095,8 @@ export function createScheduleService(
           input.startsAt.getTime() + input.durationMinutes * 60_000,
         ),
         timeZone,
-        // Not a Google event: the id is only the row's own stable handle.
-        googleEventId: googleEventIdFor(meetingId),
+        // Not a Google event: a handle marked as none, never sent to Google.
+        googleEventId: noCalendarEventIdFor(meetingId),
         qActionId: input.qActionId ?? null,
         idempotencyKey: input.idempotencyKey,
         participants: [
@@ -1253,19 +1296,25 @@ export function createScheduleService(
           alreadyDone: true,
         };
       }
-      const calendar = await calendars(input.actor.userId).catch(() => null);
-      if (calendar === null) {
-        return refusal(await missingCalendar(input.actor.userId));
+      // A time agreed without a calendar has no event to move (D6): the
+      // record moves and the people on the call are told, nothing at Google.
+      const withCalendar = hasCalendarEvent(record);
+      if (withCalendar) {
+        const calendar = await calendars(input.actor.userId).catch(() => null);
+        if (calendar === null) {
+          return refusal(await missingCalendar(input.actor.userId));
+        }
+        try {
+          await calendar.move(record.googleEventId, {
+            start: input.startsAt,
+            end: endsAt,
+            timeZone: record.timeZone,
+          });
+        } catch (error: unknown) {
+          return failed(error);
+        }
       }
-      try {
-        await calendar.move(record.googleEventId, {
-          start: input.startsAt,
-          end: endsAt,
-          timeZone: record.timeZone,
-        });
-      } catch (error: unknown) {
-        return failed(error);
-      }
+      const zoneOf = withCalendar ? null : await zonesOf(record);
       await transactions.run(async (tx) => {
         if (
           !(await store.moveMeeting(tx, record.id, {
@@ -1274,6 +1323,31 @@ export function createScheduleService(
           }))
         ) {
           return;
+        }
+        // No calendar update reaches them, so the app says it: once per
+        // new time, in each person's own zone.
+        if (zoneOf !== null) {
+          for (const participant of record.participants) {
+            if (participant.role !== "ATTENDEE") continue;
+            await store.notify(tx, {
+              tenantId: participant.participantTenantId,
+              userId: participant.userId,
+              kind: "MEETING_SCHEDULED",
+              title: `Call moved: ${record.purpose}`.slice(0, 200),
+              body: `Now ${meetingTimeLabel(input.startsAt, zoneOf(participant.userId))}. No calendar invite was sent; the time is agreed on Capital Q.`.slice(
+                0,
+                1000,
+              ),
+              linkPath: null,
+              reminderId: null,
+              meetingId: record.id,
+              dedupeKey:
+                `meeting-moved:${record.id}:${input.startsAt.toISOString()}`.slice(
+                  0,
+                  200,
+                ),
+            });
+          }
         }
         await activity.record(tx, {
           relationshipId: record.relationshipId,
@@ -1311,9 +1385,10 @@ export function createScheduleService(
       if (record.status === "CANCELLED") {
         return { outcome: "OK", alreadyDone: true };
       }
-      // A joined call has no calendar event (meet-47): nothing at Google.
+      // A joined call (meet-47) or a time agreed without a calendar (D6)
+      // has no calendar event: nothing at Google.
       if (
-        record.origin !== "JOINED" &&
+        hasCalendarEvent(record) &&
         (record.status === "SCHEDULED" || record.status === "SCHEDULING")
       ) {
         const calendar = await calendars(input.actor.userId).catch(() => null);
@@ -1594,6 +1669,9 @@ export function createScheduleService(
       const waiting = await store.meetingsAwaitingLink(current, limit);
       let found = 0;
       for (const { meeting, createdAt } of waiting) {
+        // No calendar event to read a link from (D6), even if the
+        // organiser connects a calendar later.
+        if (!hasCalendarEvent(meeting)) continue;
         const age = current.getTime() - createdAt.getTime();
         // The first half hour on every tick, then about every 10 minutes.
         if (age > MEET_LINK_EAGER_MS && Math.floor(age / 60_000) % 10 !== 0) {

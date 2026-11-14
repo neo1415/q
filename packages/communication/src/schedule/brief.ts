@@ -1,4 +1,5 @@
 import type { MeetingRecord, ReminderRecord } from "./store.js";
+import { meetingTimeLabel } from "./when.js";
 
 /**
  * The meeting prep brief (BIZ-008), composed at T-24h for the organiser.
@@ -9,19 +10,8 @@ import type { MeetingRecord, ReminderRecord } from "./store.js";
  * the counterparty it was not given, and says so when it has little.
  */
 
-export const PREP_BRIEF_COMPOSER_VERSION = "prep-brief.v1";
-
-function when(instant: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(instant);
-}
+// v2 (2026-11-14): the time worded by the shared meeting-time formatter.
+export const PREP_BRIEF_COMPOSER_VERSION = "prep-brief.v2";
 
 export function composePrepBrief(input: {
   readonly meeting: MeetingRecord;
@@ -38,7 +28,7 @@ export function composePrepBrief(input: {
   const lines = [
     `Prep brief: ${meeting.purpose}`,
     "",
-    `When: ${when(meeting.startsAt, meeting.timeZone)} (${String(minutes)} minutes)`,
+    `When: ${meetingTimeLabel(meeting.startsAt, meeting.timeZone)} (${String(minutes)} minutes)`,
     `With: ${input.counterpartName}${attendees.length > 0 ? ` (${attendees.join(", ")})` : ""}`,
     meeting.meetLink === null
       ? "Link: in your calendar invite"

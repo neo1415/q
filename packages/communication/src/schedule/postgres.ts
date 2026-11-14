@@ -589,6 +589,16 @@ export function createPostgresMeetingDirectory(options: {
       };
     },
 
+    timeZones: async (userIds) => {
+      const ids = [...new Set(userIds)].slice(0, 20);
+      if (ids.length === 0) return new Map();
+      const rows = await sql<{ id: string; timezone: string }[]>`
+        select p.id, p.timezone
+          from identity.user_profiles p
+         where p.id = any(${ids}::uuid[]) and p.timezone is not null`;
+      return new Map(rows.map((row) => [row.id, row.timezone]));
+    },
+
     counterpartName: async ({ relationshipId, organiserTenantId }) =>
       (
         await sql<{ name: string }[]>`

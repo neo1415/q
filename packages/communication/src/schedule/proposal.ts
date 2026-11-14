@@ -218,14 +218,20 @@ export type ProposalBooking = (input: {
 } | null>;
 
 /**
- * Tells the other side that times are on the table: the founder's
- * proposal (or re-proposal) to the investor, the investor's counter to the
- * founder. Idempotent per proposal and revision (the notice's dedupe key),
- * so a retried call never tells them twice.
+ * Tells the other side what changed: the founder's proposal (or
+ * re-proposal) to the investor, the investor's counter to the founder, and
+ * a decline to whoever is waiting on it (the investor declining the
+ * founder's times; the founder declining the investor's counter -- live
+ * audit 2026-11-14 D3: the decline ends a negotiation the other side is
+ * still waiting on, so they hear it). Idempotent per proposal and revision
+ * (the notice's dedupe key), so a retried call never tells them twice.
  */
+export type ProposalNoticeKind =
+  "PROPOSED" | "COUNTERPROPOSED" | "DECLINED" | "COUNTER_DECLINED";
+
 export type ProposalNotify = (input: {
   readonly proposal: ProposalRecord;
-  readonly kind: "PROPOSED" | "COUNTERPROPOSED";
+  readonly kind: ProposalNoticeKind;
 }) => Promise<void>;
 
 export type ProposalRefusal =
@@ -348,7 +354,7 @@ export function createProposalService(
   /** Never fails the step it follows: the transition is already recorded. */
   async function tell(
     proposal: ProposalRecord,
-    kind: "PROPOSED" | "COUNTERPROPOSED",
+    kind: ProposalNoticeKind,
   ): Promise<void> {
     await dependencies.notify?.({ proposal, kind }).catch((error: unknown) => {
       logger?.warn(
@@ -481,6 +487,13 @@ export function createProposalService(
         if (current.state === "COUNTERPROPOSED") {
           await tell(current, "COUNTERPROPOSED");
         }
+        if (
+          current.state === "DECLINED" &&
+          (replay.eventType === "DECLINED" ||
+            replay.eventType === "COUNTER_DECLINED")
+        ) {
+          await tell(current, replay.eventType);
+        }
         const booked =
           current.state === "CONFIRMED"
             ? await bookAccepted(current)
@@ -581,6 +594,13 @@ export function createProposalService(
       if (after.state === "PROPOSED") return sendForReview(after);
       if (after.state === "COUNTERPROPOSED") {
         await tell(after, "COUNTERPROPOSED");
+      }
+      if (
+        after.state === "DECLINED" &&
+        (result.rule.event === "DECLINED" ||
+          result.rule.event === "COUNTER_DECLINED")
+      ) {
+        await tell(after, result.rule.event);
       }
       if (after.state !== "CONFIRMED") {
         return {

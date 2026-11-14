@@ -453,12 +453,23 @@ export function createStaticMeetingDirectory(input: {
     >
   >;
   readonly persons: Readonly<Record<string, { name: string; email: string }>>;
+  /** Each person's profile time zone, where set. */
+  readonly zones?: Readonly<Record<string, string>>;
 }): MeetingDirectory {
   return {
     relationshipTenant: () => Promise.resolve(input.relationshipTenant),
     counterpartPeople: ({ counterpart }) =>
       Promise.resolve(input.people[counterpart]),
     person: (userId) => Promise.resolve(input.persons[userId] ?? null),
+    timeZones: (userIds) =>
+      Promise.resolve(
+        new Map(
+          userIds.flatMap((id) => {
+            const zone = input.zones?.[id];
+            return zone === undefined ? [] : [[id, zone] as const];
+          }),
+        ),
+      ),
     counterpartName: () => Promise.resolve("Ada Ventures"),
   };
 }

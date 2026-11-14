@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   createMeetingProposalPort,
   createProposalService,
+  meetingTimeLabel,
   PROPOSAL_TRANSITIONS,
   transitionProposal,
   type ProposalEvent,
@@ -14,6 +15,7 @@ import {
   type ScheduleService,
   type TimeOption,
 } from "../src/index.js";
+import { timesOf } from "../src/schedule/proposal-port.js";
 
 /**
  * A meeting time is a proposal the investor accepts (live bug 2026-10-09).
@@ -612,7 +614,15 @@ describe("the meeting proposal port: no-calendar acceptance and notices", () => 
       { meetingId: string; actorUserId: string; note: string | undefined }
     >();
     // The notifications table: one row per (side told, dedupe key).
-    const notices = new Map<string, { title: string; body: string | null }>();
+    const notices = new Map<
+      string,
+      {
+        title: string;
+        body: string | null;
+        /** As a recipient whose profile says New York reads it. */
+        inNewYork: string | null;
+      }
+    >();
     const port = createMeetingProposalPort({
       transactions: {
         run: () => Promise.reject(new Error("no database in this test")),
@@ -624,7 +634,11 @@ describe("the meeting proposal port: no-calendar acceptance and notices", () => 
           const told = input.actingSide === "INVESTOR" ? "FOUNDER" : "INVESTOR";
           const key = `${told}:${input.kind.toLowerCase()}:${input.key}`;
           if (notices.has(key)) return Promise.resolve(0);
-          notices.set(key, { title: input.title, body: input.body });
+          notices.set(key, {
+            title: input.title,
+            body: input.body,
+            inNewYork: input.bodyInZone?.("America/New_York") ?? null,
+          });
           return Promise.resolve(1);
         },
       },
@@ -803,7 +817,15 @@ describe("the meeting proposal port: no-calendar acceptance and notices", () => 
       `FOUNDER:time_proposed:proposal:${p.id}:r1:counter`,
     );
     expect(told?.title).toBe("{actor} suggested other times for the call");
-    expect(told?.body).toContain(ahead(6).startsAt);
+    // Local time in the option's zone, labelled; never the raw instant.
+    expect(told?.body).toContain(
+      `1. ${meetingTimeLabel(ahead(6).startsAt, "Europe/London")}`,
+    );
+    expect(told?.body).not.toContain(ahead(6).startsAt);
+    // A founder whose profile names New York reads their own local time.
+    expect(told?.inNewYork).toContain(
+      `1. ${meetingTimeLabel(ahead(6).startsAt, "America/New_York")}`,
+    );
     // The founder re-proposes: a new revision, a new notice for the investor.
     await c.as(FOUNDER).respond({
       actorUserId: FOUNDER,
@@ -816,6 +838,79 @@ describe("the meeting proposal port: no-calendar acceptance and notices", () => 
       true,
     );
     expect(c.notices.size).toBe(3);
+  });
+
+  // Live audit 2026-11-14 D3: the decline action said the other side is
+  // told, and nobody was.
+  it("declining tells the side that was waiting, once per proposal and revision", async () => {
+    const c = composed("NONE");
+    const p = await proposedVia(c);
+    const counter = {
+      actorUserId: INVESTOR,
+      proposalId: p.id,
+      action: "COUNTER" as const,
+      options: [ahead(6)],
+      idempotencyKey: "investor-counter-1",
+    };
+    await c.as(INVESTOR).respond(counter);
+    const decline = {
+      actorUserId: FOUNDER,
+      proposalId: p.id,
+      action: "DECLINE_COUNTER" as const,
+      idempotencyKey: "founder-decline-1",
+    };
+    const out = await c.as(FOUNDER).respond(decline);
+    expect(out).toMatchObject({
+      outcome: "OK",
+      proposal: { state: "DECLINED" },
+    });
+    // A retry under the same key: the same notice, not a second one.
+    await c.as(FOUNDER).respond(decline);
+    const key = `INVESTOR:time_proposed:proposal:${p.id}:r1:counter-declined`;
+    expect([...c.notices.keys()].filter((k) => k.includes("declined"))).toEqual(
+      [key],
+    );
+    expect(c.notices.get(key)?.title).toBe(
+      "{actor} declined the times you suggested",
+    );
+    expect(c.notices.get(key)?.body).toContain(
+      meetingTimeLabel(ahead(6).startsAt, "Europe/London"),
+    );
+    expect(c.notices.get(key)?.body).toContain("Nothing is booked.");
+
+    // The investor declining the founder's times tells the founder.
+    const q = await (async () => {
+      const again = await c.as(FOUNDER).propose({
+        actorUserId: FOUNDER,
+        relationshipId: REL,
+        purpose: "Second call",
+        options: [ahead(8)],
+        idempotencyKey: "founder-propose-2",
+      });
+      if (again.outcome !== "OK") throw new Error("refused");
+      return again.proposal;
+    })();
+    await c.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: q.id,
+      action: "DECLINE",
+      idempotencyKey: "investor-decline-1",
+    });
+    expect(
+      c.notices.get(`FOUNDER:time_proposed:proposal:${q.id}:r1:declined`)
+        ?.title,
+    ).toBe("{actor} declined the proposed call times");
+  });
+
+  it("a recipient with a known zone reads the times in their own zone", () => {
+    const option: TimeOption = {
+      startsAt: "2026-11-17T09:00:00.000Z",
+      endsAt: "2026-11-17T09:30:00.000Z",
+      timeZone: "Africa/Lagos",
+    };
+    // The live defect: "2026-11-17T09:00:00.000Z (Africa/Lagos)".
+    expect(timesOf([option])).toBe("1. Tue 17 Nov, 10:00 West Africa Time");
+    expect(timesOf([option], "Europe/London")).toBe("1. Tue 17 Nov, 09:00 GMT");
   });
 
   it("a non-party or another relationship is refused: nothing recorded, nobody told", async () => {
