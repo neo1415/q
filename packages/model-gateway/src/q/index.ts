@@ -794,6 +794,7 @@ export {
   OFFER_UNRECORDED_NOTE,
   OFFER_UNRECORDED_REFUSAL,
   offerBoundRefusal,
+  closingLineNote,
   type OfferBinding,
 } from "./offer-binding.js";
 import {
@@ -803,6 +804,7 @@ import {
   OFFER_UNRECORDED_NOTE,
   OFFER_UNRECORDED_REFUSAL,
   offerBoundRefusal,
+  closingLineNote,
 } from "./offer-binding.js";
 export {
   answerSaysPublicCheck,
@@ -813,6 +815,8 @@ export {
   codeUncertaintyOffer,
   decideUncertaintyOffer,
   materialUncertaintyFor,
+  offerBacking,
+  offerDecisionTrace,
   publicStandingOf,
   publicCheckOf,
   publicWebSeenOf,
@@ -838,6 +842,8 @@ import {
   chooseVehicle,
   codeUncertaintyOffer,
   decideUncertaintyOffer,
+  DILIGENCE_DOCUMENTS_TOOL,
+  offerDecisionTrace,
   publicCheckOf,
   publicWebSeenOf,
   checkedLineNeedOf,
@@ -2365,6 +2371,11 @@ export function environmentNoteParts(
     /** C3: a yes to an offer code holds no record of. */
     readonly offerUnrecorded?: boolean | undefined;
     /**
+     * D11: the line code closes this answer with (request.closingLines),
+     * so the answer does not say it too.
+     */
+    readonly closingLine?: string | undefined;
+    /**
      * C1 (owner, 13 Nov): no closing offer and no "be proactive" guidance on
      * this turn -- a remark, a record lookup, a plain fact (nextStepTurn).
      */
@@ -2493,6 +2504,9 @@ export function environmentNoteParts(
       ? []
       : [offerTakenNote(options.offerTaken)]),
     ...(options.offerUnrecorded === true ? [OFFER_UNRECORDED_NOTE] : []),
+    ...(options.closingLine === undefined
+      ? []
+      : [closingLineNote(options.closingLine)]),
     ...(options.capitalQCompany === true ? [CAPITAL_Q_COMPANY_NOTE] : []),
     ...(options.attachedDocument === undefined
       ? []
@@ -7480,6 +7494,9 @@ export function createModelGatewayQAnswer(
           ...(request.offerTakenUnrecorded === true
             ? { offerUnrecorded: true }
             : {}),
+          ...(request.closingLines === undefined
+            ? {}
+            : { closingLine: request.closingLines }),
           ...(nextStepTurn(request) ? {} : { noNextStep: true }),
           ...(request.writingDocument === true
             ? {
@@ -11742,6 +11759,38 @@ export function createModelGatewayQAnswer(
           readonly name: string | null;
         } | null => {
           const known = runCompanies.read(request.runId);
+          // Root cause 14 Nov (audit 2026-11-14-uncertainty-offer-root-
+          // cause.md): whom the turn is about is the reader's own reading
+          // (namedOther) wherever this run read that company, not "the only
+          // profile it happened to read" -- a second company read alongside
+          // left the route unknown and the offer a plain message.
+          const named =
+            request.namedOther?.kind === "COMPANY"
+              ? nameKey(request.namedOther.name)
+              : "";
+          const namedId =
+            named.length === 0
+              ? undefined
+              : (known.get(named) ??
+                [...known.profiles].find(
+                  ([, name]) => nameKey(name) === named,
+                )?.[0] ??
+                [...known.relationships.values()].find(
+                  (read) =>
+                    read.counterpart.kind === "COMPANY" &&
+                    read.counterpart.name !== null &&
+                    nameKey(read.counterpart.name) === named,
+                )?.counterpart.id);
+          if (namedId !== undefined) {
+            return {
+              companyId: namedId,
+              name:
+                known.companyNames.get(namedId) ??
+                known.profiles.get(namedId) ??
+                request.namedOther?.name ??
+                null,
+            };
+          }
           const ids = [...known.profiles.keys()];
           const only = ids.length === 1 ? ids[0] : undefined;
           if (only === undefined) {
@@ -11799,19 +11848,22 @@ export function createModelGatewayQAnswer(
                 milestones: read.relationship.milestones,
               };
         };
+        const vehicleOf = (
+          subject: { readonly name: string | null },
+          standing: RelationshipStanding,
+        ) =>
+          chooseVehicle({
+            standing,
+            onRequestTitle: onRequestSeenRuns.has(request.runId),
+            holds: (name) => classificationOf(name) !== undefined,
+            company: subject.name,
+          });
         const vehicleFor = async (subject: {
           readonly companyId: string;
           readonly name: string | null;
         }) => {
           const standing = await standingWith(subject.companyId);
-          return standing === undefined
-            ? null
-            : chooseVehicle({
-                standing,
-                onRequestTitle: onRequestSeenRuns.has(request.runId),
-                holds: (name) => classificationOf(name) !== undefined,
-                company: subject.name,
-              });
+          return standing === undefined ? null : vehicleOf(subject, standing);
         };
         if (
           offerBinding.kind === "BOUND" &&
@@ -11826,18 +11878,40 @@ export function createModelGatewayQAnswer(
           const offerAbout = (
             analyst.offer as { readonly about?: unknown } | null
           )?.about;
+          const about = typeof offerAbout === "string" ? offerAbout : null;
+          const standing =
+            subject === null
+              ? undefined
+              : await standingWith(subject.companyId);
+          const vehicle =
+            subject === null || standing === undefined
+              ? null
+              : vehicleOf(subject, standing);
           const decision = decideUncertaintyOffer({
             action: bound.action,
-            about: typeof offerAbout === "string" ? offerAbout : null,
+            about,
             uncertainties,
-            vehicle: subject === null ? null : await vehicleFor(subject),
+            vehicle,
             company: subject?.name ?? null,
+            askedVehicle:
+              request.askedAction !== undefined &&
+              UNCERTAINTY_VEHICLES.has(request.askedAction),
           });
           logger?.info(
             {
               qRunId: request.runId,
               action: bound.action,
               decision: decision.kind,
+              // Which predicate decided (live 06910b145 said only PASS).
+              ...offerDecisionTrace({
+                about,
+                uncertainties,
+                vehicle,
+                standing,
+                subjectKnown: subject !== null,
+              }),
+              holdsDiligence:
+                classificationOf(DILIGENCE_DOCUMENTS_TOOL) !== undefined,
             },
             "an offer to resolve an uncertainty was held against its materiality and route",
           );
@@ -11921,7 +11995,28 @@ export function createModelGatewayQAnswer(
               { qRunId: request.runId, action: own.action },
               "a material uncertainty with an open route: code made the offer",
             );
-          } else if (request.closingLines === undefined) {
+          } else {
+            // Which predicate held the offer back, so a live run says so.
+            logger?.info(
+              {
+                qRunId: request.runId,
+                closingLines: request.closingLines !== undefined,
+                nextStep: nextStepTurn(request),
+                preparedByTool,
+                ...offerDecisionTrace({
+                  about: null,
+                  uncertainties,
+                  vehicle,
+                  standing: undefined,
+                  subjectKnown: subject !== null,
+                }),
+                holdsDiligence:
+                  classificationOf(DILIGENCE_DOCUMENTS_TOOL) !== undefined,
+              },
+              "a material uncertainty closed with no offer of code's",
+            );
+          }
+          if (own === null && request.closingLines === undefined) {
             const step = stepLineWithoutOffer({ uncertainties, vehicle });
             if (step !== null && !saidEarlier(step, earlierAnswers)) {
               uncertaintyLines.push(step);

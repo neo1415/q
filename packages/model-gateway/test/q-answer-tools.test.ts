@@ -5087,3 +5087,350 @@ describe("D5: a material uncertainty in diligence closes with a recorded offer",
     expect(saidOf(completed)).toContain("waiting for them to accept");
   });
 });
+
+/**
+ * Root cause of the three live failures of scenario 3 (audit
+ * docs/ai-handoff/audits/2026-11-14-uncertainty-offer-root-cause.md),
+ * replayed in the live shape: investor.savanna-seed on /home, Ajopot
+ * IN_DILIGENCE; the run read Ajopot and another company, the model did not
+ * read the relationship itself, the answer named two material items, and
+ * the model's offer (if any) named propose_chat_message with `about` null.
+ * Fixtures only: no model, no network.
+ */
+describe("root cause replays: the vehicle is code's, from the stage, whatever tool the model named", () => {
+  const AJOPOT = "a1a1a1a1-0000-4000-8000-00000000a10f";
+  const PEER = "b2b2b2b2-0000-4000-8000-00000000b20f";
+  const offeredTool = (
+    name: string,
+    toolName: string,
+    classification: QOfferedTool["classification"],
+  ): QOfferedTool => ({
+    toolName,
+    toolVersion: 1,
+    classification,
+    definition: {
+      name,
+      description: `${name}.`,
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  });
+  const RELATIONSHIP = offeredTool(
+    "get_relationship",
+    "relationship.get",
+    "READ_ONLY",
+  );
+  const CHAT = offeredTool(
+    "propose_chat_message",
+    "relationship.chat.propose",
+    "SIDE_EFFECT",
+  );
+  const DILIGENCE = offeredTool(
+    "diligence_documents",
+    "app.diligence.change",
+    "SIDE_EFFECT",
+  );
+  const DEFINITION =
+    'Ajopot has not defined "active" or the period behind 18,700 of 52,000 registered users.';
+  const RECONCILED =
+    "The active count has not been reconciled to partner-bank or transaction records.";
+  const LIVE_UNCERTAINTIES = [
+    {
+      statement: DEFINITION,
+      standing: "REPORTED",
+      material: true,
+      mattersFor: ["THESIS", "VALUATION"],
+      resolveBy: ["ASK_FOUNDER", "REQUEST_DOCUMENT"],
+    },
+    {
+      statement: RECONCILED,
+      standing: "REPORTED",
+      material: true,
+      mattersFor: ["DILIGENCE"],
+      resolveBy: ["REQUEST_DOCUMENT", "CORROBORATION"],
+    },
+  ];
+  const MODEL_OFFER = "Want me to draft the information request to Ajopot?";
+  const profile = (companyId: string, canonicalName: string) => ({
+    companyId,
+    canonicalName,
+    legalName: null,
+    websiteUrl: null,
+    foundedDate: null,
+    headquartersCountry: null,
+    headquartersCity: null,
+    currentStageCode: "seed",
+    shortDescription: "Declared company profile",
+    primaryDescription: null,
+    companyStatus: "active",
+    relationToYou: "SHARED",
+    truthClass: "USER_CLAIM",
+  });
+  const relationship = (stage: string) => ({
+    yourSide: "INVESTOR",
+    counterpart: { kind: "COMPANY", id: AJOPOT, name: "Ajopot" },
+    relationship: {
+      state: stage,
+      stateSince: "2026-11-01T10:00:00.000Z",
+      milestones: [
+        { state: "INTEREST_EXPRESSED", at: "2026-10-20T10:00:00.000Z" },
+        ...(stage === "IN_DILIGENCE"
+          ? [
+              { state: "CONNECTED", at: "2026-10-22T10:00:00.000Z" },
+              { state: "IN_DILIGENCE", at: "2026-11-01T10:00:00.000Z" },
+            ]
+          : []),
+      ],
+      nextStep: "NONE",
+    },
+    truthClass: "VERIFIED",
+    source: "Capital Q relationship history",
+  });
+  const answer = (offer: unknown, uncertainties: unknown[] = LIVE_UNCERTAINTIES) =>
+    JSON.stringify({
+      ...analystResult(
+        "I wouldn't rely on it for an investment decision until Ajopot defines \"active\": 18,700 of 52,000 is the company's own count.",
+      ),
+      uncertainties,
+      offer,
+    });
+  const run = (options: {
+    readonly stage: string;
+    readonly said: string;
+    readonly script: readonly FakeBehaviour[];
+    /** On a yes, the bound tool is the turn's focus, so it is offered. */
+    readonly offered?: readonly QOfferedTool[];
+  }) => {
+    const executed: QToolProposal[] = [];
+    const tools: QToolPort = {
+      // A question is shown no change-preparing tool beyond the message
+      // the model named; the diligence vehicle is in the run's plan.
+      offer: () =>
+        Promise.resolve(options.offered ?? [GET_COMPANY, RELATIONSHIP, CHAT]),
+      available: () =>
+        Promise.resolve([GET_COMPANY, RELATIONSHIP, CHAT, DILIGENCE]),
+      execute: (proposal) => {
+        executed.push(proposal);
+        const args = proposal.arguments as { companyId?: string };
+        if (proposal.name === "get_company") {
+          return Promise.resolve(
+            succeeded(
+              proposal,
+              args.companyId === PEER
+                ? profile(PEER, "Kazikit")
+                : profile(AJOPOT, "Ajopot"),
+            ),
+          );
+        }
+        if (proposal.name === "get_relationship") {
+          return Promise.resolve({
+            ...succeeded(proposal, relationship(options.stage)),
+            toolName: "relationship.get",
+          });
+        }
+        return Promise.resolve({
+          ...succeeded(proposal, {
+            status: "PREPARED",
+            line: "Ask Ajopot for a document is waiting for your approval.",
+          }),
+          toolName: "app.diligence.change",
+          classification: "SIDE_EFFECT" as const,
+        });
+      },
+    };
+    const built = build({
+      said: options.said,
+      investor: true,
+      script: options.script,
+      tools,
+    });
+    return { ...built, executed };
+  };
+  /** The live run read Ajopot and, alongside, another company. */
+  const readBoth: FakeBehaviour = {
+    kind: "TOOL_CALLS",
+    calls: [
+      { callId: "a", name: "get_company", arguments: { companyId: AJOPOT } },
+      { callId: "p", name: "get_company", arguments: { companyId: PEER } },
+    ],
+  };
+  const saidOf = (completed: unknown[]): string =>
+    (completed.at(-1) as { message: { text: string } }).message.text;
+  const NAMED = { name: "Ajopot", kind: "COMPANY" } as const;
+
+  it("06910b145 (run d2da404e): the model's message offer is bound to diligence_documents with `about`", async () => {
+    const { seam, request, completed, logLines, executed } = run({
+      stage: "IN_DILIGENCE",
+      said: "How solid is Ajopot's active users figure?",
+      script: [
+        readBoth,
+        {
+          kind: "TEXT",
+          text: answer({
+            said: MODEL_OFFER,
+            action: "propose_chat_message",
+            request: "Ask Ajopot to define active users and share a cohort table.",
+            about: null,
+          }),
+        },
+      ],
+    });
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      namedOther: NAMED,
+    });
+    expect(outcome).toMatchObject({
+      kind: "ANSWERED",
+      offer: {
+        action: "diligence_documents",
+        about: { statement: DEFINITION, standing: "REPORTED" },
+      },
+    });
+    const said = saidOf(completed);
+    expect(said).not.toContain(MODEL_OFFER);
+    expect(said).toContain("Want me to ask Ajopot for a document");
+    // The answer first; nothing is prepared or sent on the offer itself.
+    expect(said.indexOf("wouldn't rely on it")).toBeLessThan(
+      said.indexOf("Want me to ask Ajopot"),
+    );
+    expect(executed.map((p) => p.name)).not.toContain("propose_chat_message");
+    expect(executed.map((p) => p.name)).not.toContain("diligence_documents");
+    // The log says which predicate decided.
+    const decided = logLines.find((line) =>
+      line.includes("held against its materiality and route"),
+    );
+    expect(decided).toContain('"decision":"REBIND"');
+    expect(decided).toContain('"backing":"FIRST_FOUNDER_RESOLVABLE"');
+    expect(decided).toContain('"vehicle":"diligence_documents"');
+    expect(decided).toContain('"subject":"KNOWN"');
+  });
+
+  it("d2ce8c91e (run 8039bfd5): no offer of the model's own; code offers the diligence request, bound", async () => {
+    const { seam, request, completed } = run({
+      stage: "IN_DILIGENCE",
+      said: "How solid is Ajopot's active users figure?",
+      script: [readBoth, { kind: "TEXT", text: answer(null) }],
+    });
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      namedOther: NAMED,
+    });
+    expect(outcome).toMatchObject({
+      kind: "ANSWERED",
+      offer: {
+        action: "diligence_documents",
+        about: { statement: DEFINITION },
+      },
+    });
+    expect(saidOf(completed)).toContain("Want me to ask Ajopot for a document");
+  });
+
+  it("explicit 'please prepare that request' (run c5fbdd3f): a message offered back is bound to the diligence route", async () => {
+    const { seam, request } = run({
+      stage: "IN_DILIGENCE",
+      said: "Yes, please prepare that request to Ajopot.",
+      script: [
+        readBoth,
+        {
+          kind: "TEXT",
+          text: answer(
+            {
+              said: "Would you like me to draft the request to Ajopot for your approval?",
+              action: "propose_chat_message",
+              request: "Ask Ajopot for the cohort table.",
+              about: null,
+            },
+            [],
+          ),
+        },
+      ],
+    });
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      askedAction: "diligence_documents",
+      namedOther: NAMED,
+    });
+    expect(outcome).toMatchObject({
+      kind: "ANSWERED",
+      offer: { action: "diligence_documents" },
+    });
+  });
+
+  it("the yes prepares diligence_documents for approval, carrying `about` from the record", async () => {
+    const about = { statement: DEFINITION, standing: "REPORTED" as const };
+    const { seam, request, executed } = run({
+      stage: "IN_DILIGENCE",
+      said: "Yes.",
+      offered: [GET_COMPANY, RELATIONSHIP, DILIGENCE],
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "d",
+              name: "diligence_documents",
+              arguments: {
+                operation: "REQUEST",
+                relationship: "Ajopot",
+                title: "Definition of active users and a six-month cohort table",
+              },
+            },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult("It's ready for your approval on the card."),
+          ),
+        },
+      ],
+    });
+    await seam.answer({
+      ...request,
+      askedAction: "diligence_documents",
+      offerTaken: {
+        action: "diligence_documents",
+        request: "Ask Ajopot for a document that would settle this.",
+        said: "Want me to ask Ajopot for a document that would settle this?",
+        about,
+      },
+    });
+    const prepared = executed.filter((p) => p.name === "diligence_documents");
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]?.arguments).toMatchObject({
+      operation: "REQUEST",
+      resolves: about,
+    });
+    expect(executed.map((p) => p.name)).not.toContain("propose_chat_message");
+  });
+
+  it("negative: at INTEREST_EXPRESSED the message offer is not re-bound to a diligence vehicle; the step is said", async () => {
+    const { seam, request, completed } = run({
+      stage: "INTEREST_EXPRESSED",
+      said: "How solid is Ajopot's active users figure?",
+      script: [
+        readBoth,
+        {
+          kind: "TEXT",
+          text: answer({
+            said: MODEL_OFFER,
+            action: "propose_chat_message",
+            request: "Ask Ajopot to define active users.",
+            about: null,
+          }),
+        },
+      ],
+    });
+    const outcome = await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      namedOther: NAMED,
+    });
+    expect(outcome.kind === "ANSWERED" ? outcome.offer : null).toBeUndefined();
+    expect(saidOf(completed)).not.toContain(MODEL_OFFER);
+    expect(saidOf(completed)).toContain("waiting for them to accept");
+  });
+});
