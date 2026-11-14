@@ -1,4 +1,3 @@
-import { gateqQuantityFitting, gateqRelatable } from "@capital-q/contracts";
 import type { QualificationDisputedFact } from "@capital-q/gateq";
 
 import {
@@ -46,9 +45,6 @@ import {
  *     to be a different period (live 2026-11-14: an undated 600 and 1,500
  *     weekly active stood side by side, unflagged), so it is a candidate
  *     for the same one, flagged for the founder to settle or leave open.
- *     Two figures from one turn are never a disagreement (a change or a
- *     range said once), and a value that does not fit its quantity (a
- *     share read as a number of users) names none (`relatable`).
  */
 
 export class StatementViewIntegrityError extends Error {
@@ -102,60 +98,6 @@ const isHeld = (value: StatementValue) => value.kind !== "UNKNOWN";
  */
 export function samePeriod(a: string | null, b: string | null): boolean {
   return a === null || b === null || a === b;
-}
-
-/**
- * The metric a statement is really about: its quantity key when the value
- * fits it, otherwise none. "40 percent of students are girls" read as
- * `users` is a share, not a number of users, so it names no quantity and
- * is never compared with "2,300 students" (live 2026-11-14, 06910b145).
- * The rule itself lives in the contracts, so frozen dossiers are read by it
- * too.
- */
-export function quantityFitting(
-  kind: StatementValue["kind"],
-  quantity: string | null,
-): string | null {
-  return gateqQuantityFitting(kind, quantity);
-}
-
-type Relatable = Pick<
-  ApplicationStatement,
-  "dimension" | "quantity" | "value" | "asOf" | "sourceTurnId"
->;
-
-/**
- * THE relation rule (root cause 2026-11-14, audits/…-gateq-root-cause.md),
- * `gateqRelatable` over two stored statements: whether they can stand in a
- * relation at all (disagree, or be the pair a leave-open is about). Every
- * place that relates statements, the write path, the projector and the
- * leave-open target, asks this and nothing else. Three live runs failed
- * because each place asked "same dimension?" with its own extra
- * heuristic, and a dimension such as traction holds weekly active users,
- * CAC and partner schools at once.
- *
- *   1. Both hold a value: an unknown is never an end (unknown stays unknown).
- *   2. Same dimension, and the same metric: two numbers name the same
- *      quantity their values fit. One side naming no quantity relates only
- *      when the reader said so explicitly (`explicit`).
- *   3. A comparable period: equal known dates, or a date not given.
- *   4. Different utterances: two statements from one turn never relate
- *      ("from 1 partner school to 4" is a change said once, not a
- *      contradiction).
- */
-export function relatable(
-  a: Relatable,
-  b: Relatable,
-  options: { readonly explicit?: boolean } = {},
-): boolean {
-  const end = (s: Relatable) => ({
-    dimension: s.dimension,
-    quantity: s.quantity,
-    valueKind: s.value.kind,
-    asOf: s.asOf,
-    sourceTurn: s.sourceTurnId,
-  });
-  return gateqRelatable(end(a), end(b), options);
 }
 
 /**
@@ -354,19 +296,10 @@ export function projectView(
     // Unknown stays unknown: a "not known" (a leave-open read as an
     // UNKNOWN, live 2026-11-14: 600 vs "Not known") never contradicts a
     // held value, so a link naming one decides nothing, whoever wrote it.
-    //
-    // The same relation rule as every writer (`relatable`): a stored link
-    // that fails it decides nothing, whoever wrote it and whenever. So a
-    // link written before the rule (live 06910b145: "from 1 partner school
-    // to 4" split and linked within one turn) reads correctly without
-    // rewriting a row. A reader's own explicit link may name one side with
-    // no quantity; code's own detection may not.
-    const from = byId.get(link.fromStatementId);
-    const to = byId.get(link.toStatementId);
-    const bothHeld =
-      from !== undefined &&
-      to !== undefined &&
-      relatable(from, to, { explicit: link.origin !== "CODE_DETECTED" });
+    const bothHeld = [link.fromStatementId, link.toStatementId].every((id) => {
+      const end = byId.get(id);
+      return end !== undefined && isHeld(end.value);
+    });
     return {
       key: link.id,
       linkId: link.id,
@@ -392,13 +325,14 @@ export function projectView(
     .sort(byStated);
   for (let i = 0; i < current.length; i += 1) {
     const older = current[i];
-    if (older === undefined) continue;
+    if (older === undefined || older.quantity === null) continue;
     for (let j = i + 1; j < current.length; j += 1) {
       const newer = current[j];
       if (
         newer === undefined ||
-        quantityFitting(older.value.kind, older.quantity) === null ||
-        !relatable(older, newer) ||
+        newer.dimension !== older.dimension ||
+        newer.quantity !== older.quantity ||
+        !samePeriod(newer.asOf, older.asOf) ||
         related.has(`${newer.id}|${older.id}`) ||
         !conflicts(older.value, newer.value)
       )

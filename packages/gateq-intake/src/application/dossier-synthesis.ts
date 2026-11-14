@@ -1,7 +1,6 @@
 import {
   GATEQ_SYNTHESIS_TEXT_MAX,
   GateqDossierSchema,
-  gateqDossierAsReadNow,
   type ApplicationTranscriptTurnDto,
   type GateqDossier,
   gateqStatementsInWords,
@@ -767,7 +766,7 @@ export function createDossierSynthesis(deps: {
     )
       return "FAILED";
     try {
-      const synthesis = await read(item, gateqDossierAsReadNow(dossier.data));
+      const synthesis = await read(item, dossier.data);
       if (synthesis === null) {
         deps.logger?.warn(
           { applicationId: item.applicationId },

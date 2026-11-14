@@ -76,6 +76,10 @@
     "./website-identity": {
       "types": "./dist/website-identity.d.ts",
       "default": "./dist/website-identity.js"
+    },
+    "./svg-logo": {
+      "types": "./dist/svg-logo.d.ts",
+      "default": "./dist/svg-logo.js"
     }
   },
   "main": "./dist/index.js",
@@ -97,6 +101,7 @@
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",
     "@tavily/core": "0.7.11",
+    "parse5": "8.0.1",
     "zod": "4.5.4"
   },
   "devDependencies": {

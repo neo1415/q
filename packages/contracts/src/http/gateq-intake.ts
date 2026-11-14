@@ -54,13 +54,6 @@ export const StartApplicationRequestSchema = z
      * empty. Omitted, the conversation opens as before.
      */
     mode: z.enum(["conversation", "form"]).optional(),
-    /**
-     * Signed-in start only: reopen the founder's own unsent draft here, or
-     * answer 404, never create one. A page load asks this, so a visit by
-     * itself never leaves a draft behind (live 2026-11-14, 06910b145); the
-     * founder's first action starts one.
-     */
-    reopenOnly: z.boolean().optional(),
   })
   .strict();
 export type StartApplicationRequest = z.infer<

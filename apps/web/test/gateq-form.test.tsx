@@ -1015,30 +1015,6 @@ describe("live 14 Nov: entering the gateway again never saves over the applicati
     await settle(700);
     expect(calls.save).toHaveBeenCalledTimes(1);
   });
-
-  it("a page load only reopens: with no draft here, nothing is created until the founder acts (live 06910b145)", async () => {
-    // The API answers a reopen-only start with 404 when no draft exists.
-    calls.start.mockResolvedValueOnce({ ok: false, message: "Not found." });
-    render(<GateQForm gateway={GATEWAY} prefill={PROFILE} />);
-    await flush();
-    await settle(700);
-    expect(calls.start).toHaveBeenCalledTimes(1);
-    expect(calls.start).toHaveBeenCalledWith(GATEWAY.publicId, {
-      reopenOnly: true,
-    });
-    expect(calls.progress).not.toHaveBeenCalled();
-    expect(calls.save).not.toHaveBeenCalled();
-    // The profile's answers are shown, not saved.
-    expect(screen.getByLabelText<HTMLInputElement>("Company name").value).toBe(
-      "Coverisk Africa",
-    );
-    // Their first edit starts the draft (a plain start) and saves it.
-    fireEvent.click(screen.getByRole("button", { name: "Health" }));
-    await settle(700);
-    expect(calls.start).toHaveBeenCalledTimes(2);
-    expect(calls.start).toHaveBeenLastCalledWith(GATEWAY.publicId);
-    expect(calls.save).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("the interview step", () => {

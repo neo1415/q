@@ -45,6 +45,7 @@ import {
   GATEQ_GATEWAYS_PATH,
   GATEQ_PUBLIC_GATEWAY_LOGO_PATH,
   GATEQ_PUBLIC_GATEWAY_PATH,
+  GATEQ_SVG_LOGO_CSP,
   GatewayDisplayNameSchema,
   GatewayDraftRequestSchema,
   GatewayLogoRefSchema,
@@ -65,6 +66,7 @@ import {
   type GatewayPublicId,
   type Gateway,
   type GatewayId,
+  type GatewayLogoContentType,
   type GatewayPolicy,
   type GatewayVersion,
   type GatewayVersionId,
@@ -92,6 +94,7 @@ import {
   getOnboardingActor,
   requireOnboardingActorHook,
 } from "../security/onboarding-actor.js";
+import { isSanitisedSvgLogo } from "@capital-q/q-research/svg-logo";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import type { ActorContext } from "@capital-q/security";
 import type { CompanyClaims } from "@capital-q/companies";
@@ -191,8 +194,6 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
         readonly actor: ActorContext;
         readonly gatewayPublicId: string;
         readonly mode: "conversation" | "form";
-        /** Reopen their own draft only; refuse rather than create one. */
-        readonly reopenOnly?: boolean | undefined;
       }) => Promise<unknown>)
     | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
@@ -251,7 +252,7 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   /** The open gateway's saved logo bytes (Capital Q's storage), or null. */
   readonly publicLogo?:
     | ((publicId: GatewayPublicId) => Promise<{
-        readonly contentType: "image/png" | "image/jpeg";
+        readonly contentType: GatewayLogoContentType;
         readonly bytes: Uint8Array;
       } | null>)
     | undefined;
@@ -690,7 +691,6 @@ export function registerGateQRoutes(
             actor: getActorContext(request),
             gatewayPublicId: input.gatewayPublicId,
             mode: input.mode ?? "conversation",
-            reopenOnly: input.reopenOnly === true,
           });
           void reply.code(201).header("Cache-Control", "no-store");
           return StartApplicationResponseSchema.parse(started);
@@ -989,9 +989,11 @@ export function registerGateQRoutes(
 
   // Brand from website: the gateway's logo, from Capital Q's own storage
   // (never the organisation's site). The same one 404 for a malformed,
-  // unknown, paused or logo-less gateway. Re-checked as PNG or JPEG by its
-  // bytes, served with nosniff and a sandboxing policy, so it can only
-  // ever be drawn as an image.
+  // unknown, paused or logo-less gateway. Re-checked by its bytes (PNG or
+  // JPEG magic; an SVG must be exactly what the allow-list sanitiser
+  // rebuilds from it), served with nosniff and a sandboxing policy, so it
+  // can only ever be drawn as an image. The pages draw it through <img>,
+  // where an SVG runs no script in any case.
   if (dependencies.publicLogo !== undefined) {
     const readLogo = dependencies.publicLogo;
     app.get(GATEQ_PUBLIC_GATEWAY_LOGO_PATH, async (request, reply) => {
@@ -1015,14 +1017,24 @@ export function registerGateQRoutes(
         bytes[0] === 0xff &&
         bytes[1] === 0xd8 &&
         bytes[2] === 0xff;
-      if (logo === null || !(isPng || isJpeg)) {
+      const isSvg =
+        logo !== null &&
+        logo.contentType === "image/svg+xml" &&
+        isSanitisedSvgLogo(logo.bytes);
+      if (logo === null || !(isPng || isJpeg || isSvg)) {
         reply.callNotFound();
         return undefined;
       }
       void reply
-        .header("Content-Type", isPng ? "image/png" : "image/jpeg")
+        .header(
+          "Content-Type",
+          isSvg ? "image/svg+xml" : isPng ? "image/png" : "image/jpeg",
+        )
         .header("X-Content-Type-Options", "nosniff")
-        .header("Content-Security-Policy", "default-src 'none'; sandbox")
+        .header(
+          "Content-Security-Policy",
+          isSvg ? GATEQ_SVG_LOGO_CSP : "default-src 'none'; sandbox",
+        )
         .header("Cache-Control", "public, max-age=300");
       return reply.send(Buffer.from(logo.bytes));
     });

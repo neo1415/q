@@ -6,7 +6,6 @@ import {
   GATEQ_TRANSCRIPT_MAX_TURNS,
   GATEQ_UNRESOLVED_WORDS,
   GateqDossierSchema,
-  gateqDossierAsReadNow,
   GateqSynthesisSchema,
   GateqPassReasonSchema,
   type GateqInboxDetailDto,
@@ -454,14 +453,8 @@ export function createInboxService(dependencies: {
           at: message.createdAt,
         })),
         // A frozen amount Q computed reads as Q's inference, not "you said".
-        // A relation the current rule does not allow (a pre-fix "600 vs
-        // Not known") is not shown as a contradiction; the frozen row is
-        // never rewritten (root cause 2026-11-14).
         dossier: dossier.success
-          ? withDerivedAmountsMarked(
-              gateqDossierAsReadNow(dossier.data),
-              transcript ?? [],
-            )
+          ? withDerivedAmountsMarked(dossier.data, transcript ?? [])
           : null,
         transcript,
         // Q's reading of the same frozen submission; never a guess when absent.

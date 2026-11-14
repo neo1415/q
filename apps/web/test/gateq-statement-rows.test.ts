@@ -11,7 +11,6 @@ import {
   compactStatementRows,
   paneWhy,
   STATEMENT_ROWS_COMPACT,
-  stageWordsOf,
   statementRowsOf,
 } from "../src/features/gateq/page/inbox-model";
 import { ruleLines } from "../src/features/gateq/form/form-model";
@@ -158,45 +157,5 @@ describe("decision 91: one verdict on every surface", () => {
       { unmet: [], stillNeeded: [], unresolved: ["Stage"] },
     );
     expect(lines[0]?.standing).toBe("UNRESOLVED");
-  });
-});
-
-describe("the dossier header's stage (live 06910b145)", () => {
-  const stageView = (
-    status: GateqStatementViewV1["dimensions"][number]["status"],
-  ): GateqStatementViewV1 => ({
-    version: "gateq-statement-view.v1",
-    dimensions: [
-      {
-        dimension: "company.stage",
-        label: "Stage",
-        group: "COMPANY",
-        status,
-        statements: [
-          { ...said(14, "Series A"), valueKind: "CODE", quantity: null },
-          {
-            ...said(30, "seed by revenue, Series A by age"),
-            valueKind: "TEXT",
-            quantity: null,
-          },
-        ],
-        superseded: [],
-        disagreements: [],
-      },
-    ],
-  });
-
-  it("shows every answer while the stage answers disagree, never one picked", () => {
-    expect(stageWordsOf("Series A", stageView("DISAGREEMENT_LEFT_OPEN"))).toBe(
-      "Stage: Series A or seed by revenue, Series A by age (answers disagree)",
-    );
-    expect(stageWordsOf("Series A", stageView("DISAGREEMENT_OPEN"))).toContain(
-      "answers disagree",
-    );
-  });
-
-  it("shows the frozen stage otherwise, and for a v1 dossier", () => {
-    expect(stageWordsOf("Seed", stageView("SETTLED"))).toBe("Seed");
-    expect(stageWordsOf("Seed", null)).toBe("Seed");
   });
 });

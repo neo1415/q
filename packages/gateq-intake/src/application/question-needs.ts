@@ -118,14 +118,6 @@ const COVERED_BY: Readonly<
  */
 export const MAX_ASKS_PER_DIMENSION = 2;
 
-/** Statement values that are a figure: an amount, a count, a rate, a zero. */
-const FIGURE_KINDS: ReadonlySet<string> = new Set([
-  "MONEY",
-  "COUNT",
-  "PERCENT",
-  "ZERO",
-]);
-
 export function questionNeedsFor(input: {
   readonly policy: GatewayPolicy;
   readonly qualification: QualificationResult;
@@ -260,15 +252,6 @@ export function questionNeedsFor(input: {
   // on. Asked next, while the founder still has the thread, and before new
   // topics: depth on what they raised beats breadth across what they did not.
   for (const dimension of QUANTITATIVE_DIMENSIONS) {
-    // One settled predicate: with the statement view, a dimension holding
-    // a figure (an amount, a count, a rate or a stated zero) is specific,
-    // whatever its legacy text reads like. A zero has no period to ask
-    // for (live 06910b145: "Revenue is zero today", then "over what
-    // period?").
-    const figured = input.view?.dimensions
-      .find((d) => d.dimension === dimension)
-      ?.items.some((item) => FIGURE_KINDS.has(item.value.kind));
-    if (figured === true) continue;
     const missing = missingSpecifics(dimension, input.facts);
     if (missing !== null) add(dimension, "NEEDS_SPECIFICS", missing);
   }

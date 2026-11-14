@@ -154,9 +154,15 @@ export function createPostgresGatewayLogoAssetRepository(options: {
          where id = ${assetId} and gateway_id = ${gatewayId}`;
       const row = rows[0];
       if (row === undefined) return null;
+      // The table's check allows only these three; the server re-checks
+      // the bytes against the type before serving them.
       return {
         contentType:
-          row.content_type === "image/jpeg" ? "image/jpeg" : "image/png",
+          row.content_type === "image/svg+xml"
+            ? "image/svg+xml"
+            : row.content_type === "image/jpeg"
+              ? "image/jpeg"
+              : "image/png",
         bytes: new Uint8Array(row.bytes),
       };
     },

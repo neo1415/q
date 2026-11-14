@@ -57,6 +57,13 @@ export type GatewayLogoRef = {
   readonly kind: "LOGO" | "ICON";
 };
 
+/**
+ * A kept logo: PNG or JPEG by magic bytes, or SVG rebuilt from the
+ * q-research allow-list (and re-checked each time it is served).
+ */
+export type GatewayLogoContentType =
+  "image/png" | "image/jpeg" | "image/svg+xml";
+
 export type GatewayAppearance = {
   readonly gatewayId: string;
   /** 0: never set. */
@@ -81,7 +88,7 @@ export type GatewayLogoAssetRepository = {
       readonly gatewayId: string;
       readonly tenantId: string;
       readonly kind: "LOGO" | "ICON";
-      readonly contentType: "image/png" | "image/jpeg";
+      readonly contentType: GatewayLogoContentType;
       readonly bytes: Uint8Array;
       readonly sourceUrl: string;
       readonly userId: string;
@@ -96,7 +103,7 @@ export type GatewayLogoAssetRepository = {
     gatewayId: string,
     assetId: string,
   ) => Promise<{
-    readonly contentType: "image/png" | "image/jpeg";
+    readonly contentType: GatewayLogoContentType;
     readonly bytes: Uint8Array;
   } | null>;
 };
@@ -117,7 +124,7 @@ export type GatewayWebsiteReading = {
     | Found<{
         readonly kind: "LOGO" | "ICON";
         readonly bytes: Uint8Array;
-        readonly contentType: "image/png" | "image/jpeg";
+        readonly contentType: GatewayLogoContentType;
         readonly sourceUrl: string;
       }>
     | Missing;
@@ -216,7 +223,7 @@ export type GatewayAdminService = {
   }) => Promise<GatewayBrandSuggestionDto>;
   /** Anonymous: the open gateway's saved logo bytes, or null. */
   readonly publicLogo: (publicId: GatewayPublicId) => Promise<{
-    readonly contentType: "image/png" | "image/jpeg";
+    readonly contentType: GatewayLogoContentType;
     readonly bytes: Uint8Array;
   } | null>;
   readonly setStatus: (command: {

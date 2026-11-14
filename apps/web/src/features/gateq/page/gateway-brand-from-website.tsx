@@ -49,7 +49,8 @@ const REASON: Readonly<Record<GatewayBrandReason, string>> = {
   NO_NAME: "No name was found on your website.",
   NO_LOGO: "No logo was found on your website.",
   UNSUPPORTED_LOGO_FORMAT:
-    "Your website's logo isn't a PNG or JPEG, so Capital Q can't use it yet.",
+    "Your website's logo isn't a PNG, JPEG or plain SVG image Capital Q can use safely.",
+  LOGO_TOO_LARGE: "Your website's logo file is too large to keep.",
   NO_COLOURS: "No brand colour was found on your website.",
 };
 

@@ -1133,15 +1133,6 @@ export {
 } from "./gateq-statements.js";
 
 export {
-  gateqDossierAsReadNow,
-  gateqQuantityFitting,
-  gateqRelatable,
-  gateqViewUnderRelationRule,
-  type GateqRelatableEnd,
-  type GateqValueKind,
-} from "./gateq-relations.js";
-
-export {
   COMPANY_VERIFICATION_CLAIM_TYPES,
   COMPANY_VERIFICATION_REQUESTS_SEGMENT,
   COMPANY_VERIFICATION_SEGMENT,

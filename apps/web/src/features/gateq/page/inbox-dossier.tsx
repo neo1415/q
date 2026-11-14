@@ -14,7 +14,6 @@ import {
 import { FitGlyph } from "../fit-glyph";
 import {
   compactStatementRows,
-  dossierStageWords,
   dossierStatementRows,
   type DossierStatementRow,
   CRITERION_STATUS_GLYPH,
@@ -93,7 +92,7 @@ export function DossierSection({
           <p className="cq-caption gq-t2">
             {t(
               [
-                dossierStageWords(dossier),
+                company.stage,
                 company.country,
                 company.sectorPhrases.join(", ") || null,
                 company.website,
