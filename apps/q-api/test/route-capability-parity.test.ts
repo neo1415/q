@@ -294,6 +294,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     ]),
   ),
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
+  // Brand from website: the open gateway's stored logo bytes, anonymous.
+  "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_LOGO_PATH": PUBLIC,
   "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH": exempt(
     "the founder ticking their own documents in the GateQ form, at the moment they press Send; consent belongs on that screen",
   ),

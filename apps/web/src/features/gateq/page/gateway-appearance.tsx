@@ -14,6 +14,10 @@ import {
 import { useT } from "@/features/i18n/language";
 
 import { appearanceAction, gatewayStatusAction } from "./gateq-actions";
+import {
+  GatewayBrandFromWebsite,
+  type ChosenBrand,
+} from "./gateway-brand-from-website";
 
 /**
  * B6 / B7 (2026-11-14): an investor organisation's admins brand, place and
@@ -28,12 +32,15 @@ export function GatewayAppearancePanel({
   open,
   previewHref,
   appearance,
+  organisationName,
 }: {
   readonly gatewayId: string;
   readonly open: boolean;
   /** The public page's path, for a preview in a new tab. */
   readonly previewHref: string;
   readonly appearance: GatewayAppearanceDto | null;
+  /** The canonical organisation name, when known. */
+  readonly organisationName?: string | null | undefined;
 }) {
   const t = useT();
   const router = useRouter();
@@ -44,6 +51,17 @@ export function GatewayAppearancePanel({
     (appearance?.embedOrigins ?? []).join("\n"),
   );
   const [message, setMessage] = useState<string | null>(null);
+  // Brand from website: the name and logo the gateway shows. A saved logo
+  // is drawn from Capital Q's copy through the public page's logo route.
+  const [nameText, setNameText] = useState(appearance?.displayName ?? "");
+  const [logo, setLogo] = useState<ChosenBrand["logo"]>(
+    appearance?.logo == null
+      ? null
+      : {
+          ...appearance.logo,
+          src: `${previewHref}/logo?v=${appearance.logo.assetId}`,
+        },
+  );
   const [isOpen, setIsOpen] = useState(open);
   const [pending, startTransition] = useTransition();
   // Pause and save run separately so one never shows the other's progress.
@@ -63,6 +81,8 @@ export function GatewayAppearancePanel({
       const done = await appearanceAction(gatewayId, {
         accentHex: hex,
         sites,
+        displayName: nameText.trim() === "" ? null : nameText.trim(),
+        logoAssetId: logo?.assetId ?? null,
       });
       if (done.ok) {
         setSites(done.value.embedOrigins.join("\n"));
@@ -92,6 +112,15 @@ export function GatewayAppearancePanel({
       );
     });
   };
+
+  const useBrand = (chosen: ChosenBrand) => {
+    if (chosen.accentHex !== undefined) setHexText(chosen.accentHex);
+    setNameText(chosen.displayName ?? "");
+    setLogo(chosen.logo);
+  };
+
+  const shownName =
+    nameText.trim() === "" ? (organisationName ?? t("Your firm")) : nameText;
 
   const colourId = `${ids}-colour`;
   const hexId = `${ids}-hex`;
@@ -138,6 +167,45 @@ export function GatewayAppearancePanel({
         </p>
       )}
 
+      {/* The gateway's bar as founders see it: name, logo, accent. */}
+      <div
+        className="flex min-h-14 items-center gap-3 overflow-hidden rounded-(--cq-radius-md) border border-t-2 border-(--cq-border-subtle) bg-(--cq-canvas) px-3"
+        style={
+          palette === null
+            ? undefined
+            : { borderTopColor: palette.light.accent }
+        }
+        data-gateway-header-preview
+        aria-label={t("Preview of your gateway's header")}
+        role="group"
+      >
+        {logo === null ? (
+          <span className="grid size-8 flex-none place-items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-strong) text-sm font-semibold text-(--cq-text-primary)">
+            {shownName.slice(0, 1).toUpperCase()}
+          </span>
+        ) : (
+          // Capital Q's stored copy (a data URL or our logo route).
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo.src}
+            alt=""
+            className={
+              logo.kind === "LOGO"
+                ? "h-8 max-w-40 flex-none object-contain"
+                : "size-8 flex-none rounded-full object-cover"
+            }
+            data-preview-logo-kind={logo.kind}
+          />
+        )}
+        <span className="truncate text-base font-semibold text-(--cq-text-primary)">
+          {shownName}
+        </span>
+      </div>
+
+      {canChange ? (
+        <GatewayBrandFromWebsite gatewayId={gatewayId} onUse={useBrand} />
+      ) : null}
+
       <form
         data-q-editing
         className="flex flex-col gap-2.5"
@@ -146,6 +214,46 @@ export function GatewayAppearancePanel({
           save();
         }}
       >
+        <fieldset className="flex flex-col gap-2" disabled={!canChange}>
+          <label
+            htmlFor={`${ids}-name`}
+            className="cq-label text-(--cq-text-primary)"
+          >
+            {t("Name on your gateway")}
+          </label>
+          <input
+            id={`${ids}-name`}
+            className="gq-input min-h-11"
+            style={{ maxWidth: 360 }}
+            maxLength={120}
+            placeholder={organisationName ?? ""}
+            aria-describedby={`${ids}-name-hint`}
+            value={nameText}
+            onChange={(event) => setNameText(event.target.value)}
+          />
+          <p id={`${ids}-name-hint`} className="cq-caption gq-t3">
+            {t("Leave empty to show your firm's name from its profile.")}
+          </p>
+          {logo === null ? null : (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="cq-body-sm text-(--cq-text-primary)">
+                {logo.kind === "LOGO"
+                  ? t("Your website's logo is shown.")
+                  : t("Your website's icon is shown (not a full logo).")}
+              </p>
+              <Button
+                type="button"
+                variant="quiet"
+                size="compact"
+                className="min-h-11"
+                onClick={() => setLogo(null)}
+              >
+                {t("Remove logo")}
+              </Button>
+            </div>
+          )}
+        </fieldset>
+
         <fieldset className="flex flex-col gap-2" disabled={!canChange}>
           <legend className="cq-label mb-1 text-(--cq-text-primary)">
             {t("Accent colour")}

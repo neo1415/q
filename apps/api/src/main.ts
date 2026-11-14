@@ -213,6 +213,7 @@ import {
   createPostgresGatewayPolicyPort,
   createGatewayAdminService,
   createPostgresGatewayAppearanceRepository,
+  createPostgresGatewayLogoAssetRepository,
   createPostgresGatewayRepository,
   gatewayAdminActionsPort,
   createPostgresGatewayVersionRepository,
@@ -412,6 +413,7 @@ import {
   withSuspension,
 } from "./security/suspension.js";
 import { createSiteLogoFinder } from "@capital-q/q-research/site-logo";
+import { createWebsiteIdentityReader } from "@capital-q/q-research/website-identity";
 
 // Configuration is validated once here at the composition root. Invalid
 // configuration fails startup rather than surfacing as a runtime error later.
@@ -719,6 +721,30 @@ const gateqAdmin = createGatewayAdminService({
   authorization,
   transactions: database.transactions,
   audit,
+  // Brand from website (2026-11-14): only the website on the investor
+  // organisation's canonical record, read as the admin through its own
+  // service; the vetted client reads it, nothing reaches a model.
+  logos: createPostgresGatewayLogoAssetRepository({ sql: database.sql }),
+  brand: {
+    canonical: async (actor, investorOrganisationId) => {
+      const firm = await investors
+        .getInvestorOrganisation({
+          actor,
+          investorOrganisationId: InvestorOrganisationIdSchema.parse(
+            investorOrganisationId,
+          ),
+        })
+        .catch(() => null);
+      return firm === null
+        ? null
+        : {
+            displayName: firm.displayName,
+            websiteUrl: firm.websiteUrl ?? null,
+            version: firm.version,
+          };
+    },
+    readWebsite: createWebsiteIdentityReader(),
+  },
 });
 
 /**
@@ -3396,6 +3422,14 @@ const { app, logger } = createApp(config, security, {
   // B7: the sites the organisation allows to frame its embed.
   gateqPublicEmbedOrigins: async (publicId) =>
     (await gateqAdmin.publicAppearance(publicId))?.embedOrigins ?? [],
+  // Brand from website: the open gateway's chosen name and stored logo.
+  gateqPublicBrand: async (publicId) => {
+    const own = await gateqAdmin.publicAppearance(publicId);
+    return own === null
+      ? null
+      : { displayName: own.displayName, logo: own.logo };
+  },
+  gateqPublicLogo: (publicId) => gateqAdmin.publicLogo(publicId),
   gateqGatewayAppearance: (command) => gateqAdmin.appearance(command),
   gateqGatewayAdmin: gatewayAdminActionsPort({
     admin: gateqAdmin,

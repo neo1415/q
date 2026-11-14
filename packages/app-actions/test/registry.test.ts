@@ -291,6 +291,9 @@ describe("the action registry", () => {
       ["gateway.policy.read_mandate", "offer.gateway_mandate", "INSTANT"],
       // B6/B7: the gateway's look, embed sites, paused or open, on a card.
       ["gateway.appearance.set", "set_gateway_appearance", "CONSEQUENTIAL"],
+      // Brand from website: suggested on the Gate tab; Q saves it through
+      // set_gateway_appearance (fromWebsite).
+      ["gateway.brand.suggest", "via:set_gateway_appearance", "READ"],
       ["gateway.status.set", "set_gateway_open", "CONSEQUENTIAL"],
       // Overnight A3/A5: the data room and Q's reading of the deck.
       ["data_room.document.level.set", "set_data_room_level", "CONSEQUENTIAL"],

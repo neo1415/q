@@ -383,6 +383,7 @@ export {
   publishGatewayVersion,
   getGatewayAppearance,
   setGatewayAppearance,
+  suggestGatewayBrand,
   setGatewayStatus,
   saveApplicationAnswers,
   shareApplicationMaterials,

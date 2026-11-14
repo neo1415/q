@@ -19,6 +19,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
+import { createWebsiteIdentityReader } from "@capital-q/q-research/website-identity";
 import { webOriginFrom } from "./composition/web-origin.js";
 import { namedPictureOf } from "./http/q-approvals.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
@@ -66,6 +67,7 @@ import {
   createGateQService,
   createGatewayAdminService,
   createPostgresGatewayAppearanceRepository,
+  createPostgresGatewayLogoAssetRepository,
   createPostgresGatewayPolicyPort,
   createPostgresGatewayRepository,
   gatewayAdminActionsPort,
@@ -3107,6 +3109,29 @@ const gateqGatewayAdmin = gatewayAdminActionsPort({
     authorization,
     transactions: database.transactions,
     audit: createPostgresMaterialActionAuditWriter(),
+    // Brand from website: the same composition as the API's, so Q's
+    // fromWebsite reads only the website on the firm's canonical record.
+    logos: createPostgresGatewayLogoAssetRepository({ sql: database.sql }),
+    brand: {
+      canonical: async (actor, investorOrganisationId) => {
+        const firm = await investorService
+          .getInvestorOrganisation({
+            actor,
+            investorOrganisationId: InvestorOrganisationIdSchema.parse(
+              investorOrganisationId,
+            ),
+          })
+          .catch(() => null);
+        return firm === null
+          ? null
+          : {
+              displayName: firm.displayName,
+              websiteUrl: firm.websiteUrl ?? null,
+              version: firm.version,
+            };
+      },
+      readWebsite: createWebsiteIdentityReader(),
+    },
   }),
   listGateways: (command) => gateqForInbox.listGateways(command),
   ownInvestorOrganisationId: (actor) =>

@@ -16,6 +16,7 @@ import {
   X,
 } from "@capital-q/ui/icons";
 
+import { gatewayMarkImage } from "../gateway-brand";
 import { monogram } from "../page/inbox-model";
 import {
   COUNTRY_CHOICES,
@@ -69,13 +70,20 @@ export function GateHero({
 }) {
   const t = useT();
   const fund = gateway.organisationDisplayName;
+  // Brand from website: the logo the investor's admins chose, if any.
+  const mark = gatewayMarkImage(gateway);
   return (
     <div className="gqp-hero">
       <span className="gqp-logo" aria-hidden>
-        {gateway.organisationPhotoUrl ? (
-          // Signed URL from the API; the investor's own public card image.
+        {mark !== null ? (
+          // Signed URL from the API (the investor's own public card image),
+          // or the logo Capital Q keeps for this gateway.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={gateway.organisationPhotoUrl} alt="" />
+          <img
+            src={mark.src}
+            alt=""
+            style={mark.kind === "LOGO" ? { objectFit: "contain" } : undefined}
+          />
         ) : (
           monogram(fund)
         )}

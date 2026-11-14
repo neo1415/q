@@ -2176,6 +2176,9 @@ importers:
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../observability
+      '@capital-q/q-artifacts':
+        specifier: workspace:*
+        version: link:../q-artifacts
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../q-core

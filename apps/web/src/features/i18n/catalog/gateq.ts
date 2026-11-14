@@ -11,6 +11,83 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "What should we ask next?": "ماذا يجب أن نسأل بعد ذلك؟",
   "What is still unverified?": "ما الذي لم يُتحقق منه بعد؟",
   "Fit versus quality": "الملاءمة مقابل الجودة",
+  // Brand from website: name, logo and colours from their own site
+  "Preview of your gateway's header": "معاينة رأس بوابتك",
+  "Name on your gateway": "الاسم على بوابتك",
+  "Leave empty to show your firm's name from its profile.":
+    "اتركه فارغًا لعرض اسم شركتك من ملفها التعريفي.",
+  "Your website's logo is shown.": "يُعرض شعار موقعك الإلكتروني.",
+  "Your website's icon is shown (not a full logo).":
+    "تُعرض أيقونة موقعك الإلكتروني (وليست شعارًا كاملًا).",
+  "Remove logo": "إزالة الشعار",
+  "Your firm's profile has no website yet.":
+    "لا يحتوي الملف التعريفي لشركتك على موقع إلكتروني بعد.",
+  "The website on your profile isn't an address Capital Q can read.":
+    "الموقع الإلكتروني في ملفك التعريفي ليس عنوانًا يستطيع Capital Q قراءته.",
+  "Your website points to a private network address, so Capital Q didn't read it.":
+    "يشير موقعك الإلكتروني إلى عنوان شبكة خاصة، لذلك لم يقرأه Capital Q.",
+  "Your website sent Capital Q to a different site, so it stopped there.":
+    "وجّه موقعك الإلكتروني Capital Q إلى موقع آخر، فتوقف عند ذلك.",
+  "Your website's address couldn't be found.":
+    "تعذّر العثور على عنوان موقعك الإلكتروني.",
+  "Your website took too long to answer.":
+    "استغرق موقعك الإلكتروني وقتًا طويلًا للرد.",
+  "Your website couldn't be reached.": "تعذّر الوصول إلى موقعك الإلكتروني.",
+  "Your website answered with an error.": "ردّ موقعك الإلكتروني بخطأ.",
+  "Your website's page was too large to read.":
+    "صفحة موقعك الإلكتروني أكبر من أن تُقرأ.",
+  "Your website redirected too many times.":
+    "أعاد موقعك الإلكتروني التوجيه مرات كثيرة جدًا.",
+  "Your website's address didn't return a web page.":
+    "لم يُرجع عنوان موقعك الإلكتروني صفحة ويب.",
+  "No name was found on your website.": "لم يُعثر على اسم في موقعك الإلكتروني.",
+  "No logo was found on your website.":
+    "لم يُعثر على شعار في موقعك الإلكتروني.",
+  "Your website's logo isn't a PNG or JPEG, so Capital Q can't use it yet.":
+    "شعار موقعك الإلكتروني ليس بصيغة PNG أو JPEG، لذلك لا يستطيع Capital Q استخدامه بعد.",
+  "No brand colour was found on your website.":
+    "لم يُعثر على لون للعلامة التجارية في موقعك الإلكتروني.",
+  "Brand from your website": "علامتك التجارية من موقعك الإلكتروني",
+  "Capital Q reads the website on your firm's profile for its name, logo and colours. You can correct anything before you save.":
+    "يقرأ Capital Q الموقع الإلكتروني المسجّل في ملف شركتك ليستخرج الاسم والشعار والألوان. يمكنك تصحيح أي شيء قبل الحفظ.",
+  "Brand from website": "العلامة التجارية من الموقع الإلكتروني",
+  "Read your website again": "اقرأ موقعك الإلكتروني مجددًا",
+  "Your firm's profile has no website yet. Add it, and Capital Q reads it from your profile.":
+    "لا يحتوي الملف التعريفي لشركتك على موقع إلكتروني بعد. أضفه، وسيقرأه Capital Q من ملفك التعريفي.",
+  "Save to profile and read": "احفظه في الملف التعريفي واقرأه",
+  "Read from": "قُرئ من",
+  Name: "الاسم",
+  Logo: "الشعار",
+  Colour: "اللون",
+  "Your profile's name is shown:": "يُعرض اسم ملفك التعريفي:",
+  "(your profile)": "(ملفك التعريفي)",
+  "(your website)": "(موقعك الإلكتروني)",
+  "Your profile's name stays your firm's name everywhere else on Capital Q.":
+    "يبقى اسم ملفك التعريفي اسمَ شركتك في كل مكان آخر على Capital Q.",
+  "Your website uses your profile's name:":
+    "يستخدم موقعك الإلكتروني اسم ملفك التعريفي:",
+  "Your gateway shows your firm's initial instead.":
+    "تعرض بوابتك الحرف الأول من اسم شركتك بدلًا من ذلك.",
+  "Logo found on your website": "الشعار الموجود في موقعك الإلكتروني",
+  "Icon found on your website": "الأيقونة الموجودة في موقعك الإلكتروني",
+  "Only your website's icon was found, not a full logo. Use it only if it represents your firm well.":
+    "عُثر على أيقونة موقعك الإلكتروني فقط، وليس على شعار كامل. استخدمها فقط إذا كانت تمثّل شركتك جيدًا.",
+  "Use this logo": "استخدم هذا الشعار",
+  "Use this icon": "استخدم هذه الأيقونة",
+  "Your current colour stays. You can pick one above.":
+    "يبقى لونك الحالي. يمكنك اختيار لون أعلاه.",
+  "Use this colour": "استخدم هذا اللون",
+  "Use in preview": "استخدمه في المعاينة",
+  "Added to the preview. Press Save to show it on your gateway.":
+    "أُضيف إلى المعاينة. اضغط حفظ لعرضه على بوابتك.",
+  "Only an admin of your firm can brand your gateway.":
+    "يمكن لمسؤول في شركتك فقط تخصيص العلامة التجارية لبوابتك.",
+  "Use a website address like example.com.":
+    "استخدم عنوان موقع إلكتروني مثل example.com.",
+  "Your firm's profile couldn't be updated. Only its admins can change it.":
+    "تعذّر تحديث الملف التعريفي لشركتك. يمكن لمسؤوليها فقط تغييره.",
+  "Use a colour like #0f766e, a name of at most 120 characters and at most 10 websites.":
+    "استخدم لونًا مثل #0f766e، واسمًا لا يتجاوز 120 حرفًا، و10 مواقع إلكترونية كحد أقصى.",
   // B6/B7: the investor's own gateway look, embed sites, paused or open
   "Open to applications": "مفتوحة لاستقبال الطلبات",
   "Pause gateway": "إيقاف البوابة مؤقتًا",

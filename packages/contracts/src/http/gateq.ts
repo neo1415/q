@@ -5,7 +5,9 @@ import { UuidSchema } from "../common/ids.js";
 import { BrandHexSchema } from "./brand-theme.js";
 import {
   GATEQ_EMBED_ORIGINS_MAX,
+  GatewayDisplayNameSchema,
   GatewayEmbedOriginSchema,
+  GatewayLogoRefSchema,
 } from "./gateq-appearance.js";
 
 /**
@@ -286,6 +288,19 @@ export const PublicGatewayDtoSchema = z
       .array(GatewayEmbedOriginSchema)
       .max(GATEQ_EMBED_ORIGINS_MAX)
       .optional(),
+    /**
+     * Brand from website (2026-11-14): the name the organisation's admins
+     * chose to show on their gateway. Absent: the canonical record's name
+     * (organisationDisplayName), which stays the authority everywhere else.
+     */
+    gatewayDisplayName: GatewayDisplayNameSchema.nullable().optional(),
+    /**
+     * The gateway's logo, stored by Capital Q (never hot-linked): served at
+     * GATEQ_PUBLIC_GATEWAY_LOGO_PATH; the asset id makes the URL change
+     * when the logo does. ICON: the site's icon, which the admin chose
+     * knowing it is not a full logo.
+     */
+    gatewayLogo: GatewayLogoRefSchema.nullable().optional(),
   })
   .strict();
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;

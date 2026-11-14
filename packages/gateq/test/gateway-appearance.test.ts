@@ -8,6 +8,8 @@ import {
   createGatewayAdminService,
   gatewayAdminActionsPort,
   type GatewayAppearance,
+  type GatewayLogoRef,
+  type GatewayWebsiteReading,
 } from "../src/application/appearance.js";
 import { GatewayNotFoundError } from "../src/application/use-cases.js";
 import {
@@ -65,7 +67,31 @@ class Denied extends Error {
   }
 }
 
-function world() {
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+
+const FOUND_ALL: GatewayWebsiteReading = {
+  sourceUrl: "https://kilima.example/",
+  name: {
+    status: "FOUND",
+    value: "Kilima Angel Network",
+    from: "OG_SITE_NAME",
+  },
+  logo: {
+    status: "FOUND",
+    kind: "LOGO",
+    bytes: PNG,
+    contentType: "image/png",
+    sourceUrl: "https://kilima.example/logo.png",
+  },
+  colours: { status: "FOUND", primary: "#0f766e" },
+};
+
+function world(
+  options: {
+    readonly website?: string | null;
+    readonly reading?: GatewayWebsiteReading;
+  } = {},
+) {
   const gateway: Gateway = GatewaySchema.parse({
     id: randomUUID(),
     tenantId: TENANT_A,
@@ -80,6 +106,9 @@ function world() {
   });
   const rows = new Map<string, Gateway>([[gateway.id, gateway]]);
   const revisions: GatewayAppearance[] = [];
+  const assets: (GatewayLogoRef & { gatewayId: string; bytes: Uint8Array })[] =
+    [];
+  const websitesRead: string[] = [];
   const audited: { actionType: string; metadata: unknown }[] = [];
   const admins = new Map([
     [ADMIN_A.userId, ORG_A],
@@ -117,6 +146,16 @@ function world() {
           accentHex: input.accentHex,
           embedOrigins: [...input.embedOrigins],
           updatedAt: "2026-11-14T12:00:00.000Z",
+          displayName: input.displayName,
+          logo:
+            assets.find((a) => a.assetId === input.logoAssetId) === undefined
+              ? null
+              : {
+                  assetId: input.logoAssetId ?? "",
+                  kind:
+                    assets.find((a) => a.assetId === input.logoAssetId)?.kind ??
+                    "LOGO",
+                },
         };
         revisions.push(next);
         return Promise.resolve(next);
@@ -152,8 +191,59 @@ function world() {
         return Promise.resolve(randomUUID() as never);
       },
     },
+    logos: {
+      store: (_tx, input) => {
+        const asset = {
+          assetId: randomUUID(),
+          kind: input.kind,
+          gatewayId: input.gatewayId,
+          bytes: input.bytes,
+        };
+        assets.push(asset);
+        return Promise.resolve({ assetId: asset.assetId, kind: asset.kind });
+      },
+      find: (gatewayId, assetId) => {
+        const asset = assets.find(
+          (a) => a.assetId === assetId && a.gatewayId === gatewayId,
+        );
+        return Promise.resolve(
+          asset === undefined
+            ? null
+            : { assetId: asset.assetId, kind: asset.kind },
+        );
+      },
+      bytes: (gatewayId, assetId) => {
+        const asset = assets.find(
+          (a) => a.assetId === assetId && a.gatewayId === gatewayId,
+        );
+        return Promise.resolve(
+          asset === undefined
+            ? null
+            : { contentType: "image/png" as const, bytes: asset.bytes },
+        );
+      },
+    },
+    brand: {
+      canonical: (actor, investorOrganisationId) =>
+        Promise.resolve(
+          actor.tenantId === TENANT_A && investorOrganisationId === INVESTOR_A
+            ? {
+                displayName: "Kilima Angels",
+                websiteUrl:
+                  options.website === undefined
+                    ? "https://kilima.example"
+                    : options.website,
+                version: 4,
+              }
+            : null,
+        ),
+      readWebsite: (websiteUrl) => {
+        websitesRead.push(websiteUrl);
+        return Promise.resolve(options.reading ?? FOUND_ALL);
+      },
+    },
   });
-  return { admin, gateway, rows, revisions, audited };
+  return { admin, gateway, rows, revisions, audited, assets, websitesRead };
 }
 
 describe("an investor's own gateway appearance (B6/B7)", () => {
@@ -182,6 +272,10 @@ describe("an investor's own gateway appearance (B6/B7)", () => {
         accentAfter: "#b45309",
         embedOriginsBefore: "https://kilima.example",
         embedOriginsAfter: "any",
+        displayNameBefore: "canonical",
+        displayNameAfter: "canonical",
+        logoBefore: "none",
+        logoAfter: "none",
       },
     });
     const read = await w.admin.appearance({
@@ -309,5 +403,157 @@ describe("an investor's own gateway appearance (B6/B7)", () => {
       id: w.gateway.id,
       status: "DISABLED",
     });
+  });
+});
+
+describe("brand from website: the canonical website, suggested, corrected, saved", () => {
+  it("reads only the website on the canonical record, keeps the logo in our storage, and suggests every field", async () => {
+    const w = world();
+    const suggestion = await w.admin.suggestBrand({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    expect(w.websitesRead).toEqual(["https://kilima.example"]);
+    expect(suggestion).toMatchObject({
+      websiteUrl: "https://kilima.example",
+      canonicalName: "Kilima Angels",
+      profileVersion: 4,
+      name: { status: "FOUND", value: "Kilima Angel Network" },
+      logo: { status: "FOUND", kind: "LOGO" },
+      colours: { status: "FOUND", primary: "#0f766e" },
+    });
+    expect(w.assets).toHaveLength(1);
+    // Suggesting changes nothing public.
+    expect(w.revisions).toHaveLength(0);
+    if (suggestion.logo.status !== "FOUND") throw new Error("no logo");
+    expect(suggestion.logo.previewDataUrl).toMatch(/^data:image\/png;base64,/u);
+
+    const saved = await w.admin.setAppearance({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+      accentHex: "#0f766e",
+      embedOrigins: [],
+      displayName: "Kilima Angel Network",
+      logoAssetId: suggestion.logo.assetId,
+    });
+    expect(saved).toMatchObject({
+      revision: 1,
+      displayName: "Kilima Angel Network",
+      logo: { assetId: suggestion.logo.assetId, kind: "LOGO" },
+    });
+    const bytes = await w.admin.publicLogo(w.gateway.publicId);
+    expect(bytes?.contentType).toBe("image/png");
+  });
+
+  it("no website on the record: NO_WEBSITE on every field, nothing read", async () => {
+    const w = world({ website: null });
+    const suggestion = await w.admin.suggestBrand({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    expect(suggestion.websiteUrl).toBeNull();
+    for (const field of [
+      suggestion.name,
+      suggestion.logo,
+      suggestion.colours,
+    ]) {
+      expect(field).toEqual({ status: "NOT_FOUND", reason: "NO_WEBSITE" });
+    }
+    expect(w.websitesRead).toHaveLength(0);
+  });
+
+  it("an unreachable site is reported with its reason; nothing is stored", async () => {
+    const w = world({
+      reading: {
+        sourceUrl: null,
+        name: { status: "NOT_FOUND", reason: "TIMEOUT" },
+        logo: { status: "NOT_FOUND", reason: "TIMEOUT" },
+        colours: { status: "NOT_FOUND", reason: "TIMEOUT" },
+      },
+    });
+    const suggestion = await w.admin.suggestBrand({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    expect(suggestion.logo).toEqual({ status: "NOT_FOUND", reason: "TIMEOUT" });
+    expect(w.assets).toHaveLength(0);
+  });
+
+  it("a non-admin is refused, and another tenant's admin is told it does not exist", async () => {
+    const w = world();
+    await expect(
+      w.admin.suggestBrand({ actor: MEMBER_A, gatewayId: w.gateway.id }),
+    ).rejects.toThrow(Denied);
+    await expect(
+      w.admin.suggestBrand({ actor: ADMIN_B, gatewayId: w.gateway.id }),
+    ).rejects.toThrow(GatewayNotFoundError);
+    expect(w.websitesRead).toHaveLength(0);
+    expect(w.assets).toHaveLength(0);
+  });
+
+  it("a logo that is not this gateway's is refused; keeping and removing are new revisions", async () => {
+    const w = world();
+    await expect(
+      w.admin.setAppearance({
+        actor: ADMIN_A,
+        gatewayId: w.gateway.id,
+        accentHex: null,
+        embedOrigins: [],
+        logoAssetId: randomUUID(),
+      }),
+    ).rejects.toThrow(GatewayNotFoundError);
+    expect(w.revisions).toHaveLength(0);
+
+    const suggestion = await w.admin.suggestBrand({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    if (suggestion.logo.status !== "FOUND") throw new Error("no logo");
+    await w.admin.setAppearance({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+      accentHex: null,
+      embedOrigins: [],
+      logoAssetId: suggestion.logo.assetId,
+    });
+    // Omitted: unchanged (Q's accent-only change keeps the logo).
+    const kept = await w.admin.setAppearance({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+      accentHex: "#b45309",
+      embedOrigins: [],
+    });
+    expect(kept.logo?.assetId).toBe(suggestion.logo.assetId);
+    const removed = await w.admin.setAppearance({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+      accentHex: "#b45309",
+      embedOrigins: [],
+      logoAssetId: null,
+    });
+    expect(removed.logo).toBeNull();
+    // Append-only: all three revisions are kept.
+    expect(w.revisions.map((r) => r.logo?.assetId ?? null)).toEqual([
+      suggestion.logo.assetId,
+      suggestion.logo.assetId,
+      null,
+    ]);
+    expect(await w.admin.publicLogo(w.gateway.publicId)).toBeNull();
+  });
+
+  it("the actions port refuses a non-admin and another tenant alike", async () => {
+    const w = world();
+    const port = gatewayAdminActionsPort({
+      admin: w.admin,
+      listGateways: () => Promise.resolve([...w.rows.values()]),
+      ownInvestorOrganisationId: () => Promise.resolve(INVESTOR_A),
+    });
+    expect(await port.suggestBrand(MEMBER_A, w.gateway.id)).toEqual({
+      ok: false,
+    });
+    expect(await port.suggestBrand(ADMIN_B, w.gateway.id)).toEqual({
+      ok: false,
+    });
+    expect((await port.suggestBrand(ADMIN_A, w.gateway.id)).ok).toBe(true);
   });
 });

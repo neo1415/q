@@ -72,6 +72,10 @@
     "./testing": {
       "types": "./dist/providers/fake.d.ts",
       "default": "./dist/providers/fake.js"
+    },
+    "./website-identity": {
+      "types": "./dist/website-identity.d.ts",
+      "default": "./dist/website-identity.js"
     }
   },
   "main": "./dist/index.js",
@@ -88,6 +92,7 @@
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
     "@capital-q/observability": "workspace:*",
+    "@capital-q/q-artifacts": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",

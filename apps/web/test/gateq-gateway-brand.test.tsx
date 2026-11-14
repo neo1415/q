@@ -35,6 +35,30 @@ describe("B6: the public gateway in the investing organisation's brand", () => {
     expect(screen.queryByText("Capital Q")).toBeNull();
   });
 
+  it("brand from website: shows the chosen name and the logo from Capital Q's copy, never the site's URL", () => {
+    render(
+      <GatewayBrandMark
+        gateway={{
+          publicId: "gq_0123456789abcdefghjkmnpqrs",
+          organisationDisplayName: "Northwind Ventures",
+          organisationPhotoUrl: "https://storage.example/photo.webp?sig=1",
+          gatewayDisplayName: "Northwind",
+          gatewayLogo: {
+            assetId: "3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+            kind: "LOGO",
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("Northwind")).toBeTruthy();
+    const logo = screen.getByTestId("gateway-brand-logo");
+    expect(logo.getAttribute("src")).toBe(
+      "/g/gq_0123456789abcdefghjkmnpqrs/logo?v=3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+    );
+    expect(logo.getAttribute("data-logo-kind")).toBe("LOGO");
+    expect(logo.className).toContain("object-contain");
+  });
+
   it("falls back to the organisation's initial with no photo", () => {
     render(
       <GatewayBrandMark
