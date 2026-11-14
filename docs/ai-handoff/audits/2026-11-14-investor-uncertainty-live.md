@@ -29,3 +29,23 @@ Diligence pair: Ajopot × Savanna Seed, relationship `3fa64633-9902-4aef-bcf8-4b
 - No messages were sent and no diligence requests were created.
 
 Screenshots: /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/unc/{s1,s2,s3,s3b}/
+
+## Live re-check 14 Nov (d2ce8c91e): scenarios 3–6
+
+Production d2ce8c91e (includes 7fb21f2c5). Investor `investor.savanna-seed@fictional.capitalq.local` (app user d2ac720a), 17:02–17:08 UTC, four Q turns. Cost: 43 model calls, USD 0.2241 (reservation 8155cb17). Nothing approved, sent or created: no `q_runtime.actions`, no `network.diligence_requests` rows since 17:02. The old chat.message.send approval 7850ac2b was not touched.
+
+| #   | Scenario                                              | Result           | Evidence |
+| --- | ----------------------------------------------------- | ---------------- | -------- |
+| 3   | Ajopot (3fa64633, IN_DILIGENCE): offer → yes → approval card with `about` | FAIL | Conversation 46bcc0db. Turn 1, run 8039bfd5: good substance ("a directional signal, not … decision-grade traction evidence"; findings typed USER_CLAIM/SELF_REPORTED; resolveBy "a reconciled six-month cohort table … reconciled to partner-bank or transaction records"), but **no offer**: Q told the investor to "ask Ajopot" and offered nothing (`open_threads` empty). Turn 2 "Yes, please prepare that request to Ajopot.", run c5fbdd3f: a NAVIGATION_OFFER "Messages is ready to open", then "What would you like me to do with Ajopot's request? … Would you like me to draft the request to Ajopot for your approval?" Turn 3 "Yes.", run b6e565fb: "I couldn't do that from this conversation: that action isn't available to me here, so nothing was prepared or changed." (gap DECLARED_NOT_OFFERED). No action, no approval card, no `about`. |
+| 4   | Track/re-assess the item                              | NOT RUN          | No request exists to track (scenario 3 produced none); turn cap. |
+| 5   | Kazikit (0989a281, INTEREST_EXPRESSED), same ask      | PARTIAL          | Conversation 122975cb, run dea2efd9. Refused correctly and leaked nothing: "Diligence hasn't started with them, so a document request can't go yet. Questions can go in your connected chat, or you can ask for a document once diligence starts." No action, no request. But the substantive part (how solid the revenue figures are, what the investor may see) was not answered at all: the action's not-open line replaced the answer. "Connected chat" is offered at INTEREST_EXPRESSED, before CONNECTED. |
+| 6   | New evidence changes Q's assessment (addendum item 7) | NOT RUN          | Needs a fulfilled request; none could be created. |
+
+### Defects, ranked
+
+1. **D5 (high): no offer on the material uncertainty.** Run 8039bfd5 names materiality and resolveBy but makes no offer, so there is nothing for a yes to bind to and the 7fb21f2c5 re-binding never runs. Check whether the model's offer was dropped as unbound in `packages/model-gateway/src/q/offer-binding.ts` (an offer of a tool this run does not hold is "not said") and whether the home-page run's tool plan includes the diligence vehicle (`uncertainty.ts` route chooser, run tool focus in `q/index.ts`).
+2. **D6 (high): the investor's explicit request is not executed.** "Prepare that request to Ajopot" became a Messages navigation offer plus a clarification. The clarification's yes was refused as DECLARED_NOT_OFFERED (`couldNotDoLine`, `q/index.ts` ~13262): the model reached for the diligence tool but the run did not offer it. A diligence request from /home on an IN_DILIGENCE relationship should be in the plan. A CLARIFICATION_REQUEST is also not recorded as an offer, so its yes binds to nothing.
+3. **D7 (medium): a stage refusal replaces the answer.** On Kazikit, `DILIGENCE_REQUEST_NOT_OPEN` (`packages/app-actions/src/actions/diligence.ts:429`) is the whole reply; the addendum's "answer first" needs the authorised analysis followed by the refusal.
+4. **D8 (low): wrong alternative at INTEREST_EXPRESSED.** The same line points to "your connected chat" before the pair is connected. The line should name what is available at that stage.
+
+Screenshots: /tmp/claude-0/-home-user/baac2e44-f461-5146-93f5-14f30f7b1f41/scratchpad/unc/{r3,r3b,r3c,r5}/
