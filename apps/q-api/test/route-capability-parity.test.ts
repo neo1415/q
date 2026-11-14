@@ -797,6 +797,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-attention.ts GET Q_ATTENTION_PATH": cap("tool.what_needs_me"),
   "q-api/http/q-arrival-snapshot.ts GET Q_ARRIVAL_SNAPSHOT_PATH":
     cap("tool.what_needs_me"),
+  // Owner 14 Nov 2026: the account digest every Q turn already reads.
+  "q-api/http/q-account-digest.ts GET Q_ACCOUNT_DIGEST_PATH": exempt(
+    "the person's own account digest, which every Q turn is already given before it answers; read here only for the resume opening",
+  ),
   // BILLING-2 block (ADR 0036)
   "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
     "the plan-gated Readiness Blueprint (Pro), built by code from the free diagnosis Q already reads with read_my plan; the sequencing is the page's, the steps are Q's read",
