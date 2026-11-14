@@ -67,7 +67,9 @@ if [ ${#src[@]} -gt 0 ]; then
   # 4-vCPU machine (14 Nov). Same tests, same assertions, fewer at once.
   vt_out=$(NODE_OPTIONS=--max-old-space-size=6144 npx vitest related --run --maxWorkers=2 "${src[@]}" 2>&1)
   vt_status=$?
-  printf '%s\n' "$vt_out" | tail -8
+  # Name every failing test, then the summary (a bare tail hid them, 14 Nov).
+  printf '%s\n' "$vt_out" | grep -E '^ FAIL ' | sort -u
+  printf '%s\n' "$vt_out" | tail -6
   [ "$vt_status" -eq 0 ] || bad "vitest related (exit $vt_status)"
 fi
 
