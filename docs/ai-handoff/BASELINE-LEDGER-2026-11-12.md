@@ -696,3 +696,19 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - `ci-local PASS sha=4d5ab3ac2 at=2026-11-14T03:17:51Z took=1375s`. Deploy held until the live GateQ run finished; rollback point `41c920519`.
   - **Live A8 correction** (`founder.maji-loop`): the turn now reaches the tool path (DEEP_ANALYSIS, 125 tools), and the reply is honest: "You told me … $110k. I haven't saved that yet." Still only one `financial.mrr` claim.
   - **Still no card:** the model again put the figure in `userStatements` (an element was dropped) instead of calling the tool. Fix in progress: code prepares the card from a valid structured statement of the founder's own figure; no word rules.
+
+## A8 deck → proposed figure cards deployed, live FAIL — `e455f8334` (14 Nov, 05:40 Lagos)
+
+- **Gate:** `ci-local PASS sha=e455f8334 at=2026-11-14T04:22:07Z took=1422s`. Rollback point `4d5ab3ac2`; four services SUCCESS.
+- **Live** (`founder.maji-loop`; fictional 4-slide deck, uploaded twice as PITCH_DECK and CONFIDENTIAL; processing COMPLETED):
+  - The document-ready wake fired and the job ran. A once-only DOCUMENT source was registered for each version.
+  - **FAIL:** the extraction output was refused at schema: `claims.N.asOf:invalid_format`, because the schema needs YYYY-MM-DD and the prompt never says so. It was reported as `PROVIDER_UNAVAILABLE` and `DOCUMENT_CLAIMS_BLOCKED`. Result: 0 cards and 0 claims.
+  - Because the marker is registered before the call, both versions are now permanently skipped.
+  - **PASS, investor privacy:** savanna-seed's Q answered "I don't have Maji Loop's October 2026 MRR on record".
+  - **Records** (fictional, Maji Loop): 2 documents, 2 DOCUMENT sources, 1 investor conversation.
+- **Fix in progress:**
+  - date format in the prompt plus month → period-end mapping in code;
+  - a bad claim drops only itself, not the whole batch;
+  - the real refusal reason in the log and alert;
+  - the marker no longer blocks a retry after a failed call, which also re-reads the two marked versions.
+- **GateQ D8–D10 (`a047ddf63`):** gating; deploy held until the deck check finished.
