@@ -24,6 +24,7 @@ import type {
 } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type {
+  DocumentFigureEvidence,
   EvidenceService,
   StatedFigureEvidence,
 } from "@capital-q/evidence";
@@ -186,6 +187,11 @@ export type AppActionPorts = {
    * approval as their private, dated claim (the Evidence services).
    */
   readonly companyFigures?: StatedFigureEvidence | undefined;
+  /**
+   * A8: a figure read from their own document, recorded on their approval
+   * as their private claim the document supports (the Evidence services).
+   */
+  readonly documentFigures?: DocumentFigureEvidence | undefined;
   /** Q.03/Q.04: their own company's readiness, plan and follow-ups (founder-private). */
   readonly readiness?: ReadinessService | undefined;
   /** G1/G2: the person's company or firm as a team (invitations, roles). */

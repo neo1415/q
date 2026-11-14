@@ -2,6 +2,9 @@ import { z } from "zod";
 
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
+  DocumentFigureSourceSchema,
+  documentFigureWords,
+  recordDocumentFigure,
   recordStatedFigure,
   saidByThem,
   STATED_FIGURE_METRIC_CODES,
@@ -53,6 +56,12 @@ const RecordFigure = z
     figure: StatedFigureSchema,
     /** What is already recorded for that metric and date, said on the card. */
     alongside: z.array(z.string().max(120)).max(5).default([]),
+    /**
+     * A8: set only by the document-claims job (code, never the model: the
+     * tool's input has no such field), when the figure was read from their
+     * own document. `said` is then the document's own words.
+     */
+    document: DocumentFigureSourceSchema.optional(),
   })
   .strict();
 type RecordInput = z.infer<typeof RecordFigure>;
@@ -153,15 +162,21 @@ function alongsideWords(alongside: readonly string[]): string {
     : ` You already have ${alongside.join(" and ")} recorded for that date: both are kept, marked as conflicting, until you settle it.`;
 }
 
+const DOCUMENT_NOTE =
+  "Kept as your company's own figure, supported by that document, private to your company: investors don't see it. If it's wrong, dismiss this card and tell me the right figure.";
+
 function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
   const what = statedFigureWords(input.figure);
   const conflict =
     out.conflicts === 0
       ? ""
       : " A different figure is recorded for that date too: both are kept, marked as conflicting, until you settle it.";
-  return out.outcome === "ALREADY_RECORDED"
-    ? `Your ${what} was already recorded, so nothing changed.${conflict}`
-    : `Recorded your ${what} as your own statement (self-reported). It's private to your company; investors don't see it.${conflict}`;
+  if (out.outcome === "ALREADY_RECORDED") {
+    return `Your ${what} was already recorded, so nothing changed.${conflict}`;
+  }
+  return input.document === undefined
+    ? `Recorded your ${what} as your own statement (self-reported). It's private to your company; investors don't see it.${conflict}`
+    : `Recorded your ${what} as your company's figure, supported by "${input.document.title}". It's private to your company; investors don't see it.${conflict}`;
 }
 
 async function ownCompany(
@@ -193,18 +208,35 @@ const RECORD = defineAppAction<
       ? { ok: true }
       : { ok: false, reason: "Figures are recorded for your own company." },
   run: (ports, context, input) =>
-    recordStatedFigure(figures(ports), {
-      actor: context.actor,
-      companyId: input.companyId,
-      figure: input.figure,
-      idempotencyKey: context.idempotencyKey,
-      correlationId: context.correlationId,
-    }),
+    input.document === undefined
+      ? recordStatedFigure(figures(ports), {
+          actor: context.actor,
+          companyId: input.companyId,
+          figure: input.figure,
+          idempotencyKey: context.idempotencyKey,
+          correlationId: context.correlationId,
+        })
+      : recordDocumentFigure(
+          ports.documentFigures ?? portMissing("documentFigures"),
+          {
+            actor: context.actor,
+            companyId: input.companyId,
+            figure: input.figure,
+            document: input.document,
+            correlationId: context.correlationId,
+          },
+        ),
   targets: (input) => [{ kind: "COMPANY", companyId: input.companyId }],
-  card: (input) => ({
-    summary: `Record your ${statedFigureWords(input.figure)}`,
-    preview: `You said: "${input.figure.said}". ${PRIVATE_NOTE}${alongsideWords(input.alongside)}`,
-  }),
+  card: (input) =>
+    input.document === undefined
+      ? {
+          summary: `Record your ${statedFigureWords(input.figure)}`,
+          preview: `You said: "${input.figure.said}". ${PRIVATE_NOTE}${alongsideWords(input.alongside)}`,
+        }
+      : {
+          summary: `Keep your ${documentFigureWords(input.figure, input.document)}`,
+          preview: `Your document says: "${input.figure.said}". ${DOCUMENT_NOTE}${alongsideWords(input.alongside)}`,
+        },
   done: (out, input) => outcomeWords(out, input),
   tool: {
     name: "propose_company_figure",
@@ -313,3 +345,47 @@ function valueWords(stored: {
 }
 
 export const COMPANY_FIGURE_ACTIONS: readonly AnyAppAction[] = [RECORD];
+
+/** The approval type of a figure card: `app.<name>`. */
+export const COMPANY_FIGURE_ACTION_TYPE = "app.company.figure.record";
+
+/**
+ * A8: the card input for a figure read from their own document, as the
+ * document-claims job proposes it (code, after the extraction's checks).
+ * What is already recorded for that metric and date is named on the card,
+ * as in conversation. Null when it does not fit the declaration.
+ */
+export async function documentFigureCardInput(
+  ports: AppActionPorts,
+  actor: AppActionContext["actor"],
+  proposal: {
+    readonly companyId: string;
+    readonly figure: StatedFigure;
+    readonly document: z.input<typeof DocumentFigureSourceSchema>;
+  },
+): Promise<RecordInput | null> {
+  const { clashes } = await statedFigureClashes(
+    figures(ports),
+    actor,
+    proposal.companyId,
+    proposal.figure,
+  ).catch(() => ({ clashes: [] }));
+  const parsed = RecordFigure.safeParse({
+    companyId: proposal.companyId,
+    figure: proposal.figure,
+    document: proposal.document,
+    alongside: clashes.slice(0, 5).flatMap((claim) => {
+      const stored = claim.structuredValue;
+      const known = stored === null ? null : valueWords(stored);
+      return known === null
+        ? []
+        : [
+            `${known} ${statedFigureDateWords(proposal.figure.asOf)}`.slice(
+              0,
+              120,
+            ),
+          ];
+    }),
+  });
+  return parsed.success ? parsed.data : null;
+}

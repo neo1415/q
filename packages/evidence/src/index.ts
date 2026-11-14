@@ -174,6 +174,17 @@ export {
   type StatedFigureValue,
 } from "./interpretation/stated-figure.js";
 export {
+  documentFigureProposals,
+  DocumentFigureSourceSchema,
+  documentFigureWords,
+  DOCUMENT_FIGURE_CLAIM_KEYS,
+  recordDocumentFigure,
+  type DocumentFigureEvidence,
+  type DocumentFigurePassage,
+  type DocumentFigureProposal,
+  type DocumentFigureSource,
+} from "./interpretation/document-figure.js";
+export {
   createClaimInterpretationService,
   type ClaimInterpretationDependencies,
   type ClaimInterpretationService,

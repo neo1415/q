@@ -778,6 +778,59 @@ describe("claim interpretation against local PostgreSQL", () => {
     });
   });
 
+  it("records another month of the same metric as history, not a conflict (A8)", async () => {
+    await withWorld(async (world) => {
+      const deck = await seedSource(world.tx, {
+        tenantId: world.tenantA,
+        companyId: world.companyA,
+        userId: world.adminA.userId,
+      });
+      const accounts = await seedSource(world.tx, {
+        tenantId: world.tenantA,
+        companyId: world.companyA,
+        userId: world.adminA.userId,
+      });
+      const first = await world.interpretWith([arrProposal]).interpret({
+        actor: world.adminA,
+        request: {
+          passage: passageFor(deck, world.companyA, world.versionA),
+          correlationId: CORRELATION(),
+        },
+      });
+      const second = await world
+        .interpretWith([
+          {
+            ...arrProposal,
+            statement: "Annual recurring revenue is USD 2,100,000.",
+            value: { kind: "MONEY", amount: 2_100_000, currency: "USD" },
+            excerpt: "ARR: $2.1m",
+            asOf: "2026-05-31",
+          },
+        ])
+        .interpret({
+          actor: world.adminA,
+          request: {
+            passage: passageFor(
+              accounts,
+              world.companyA,
+              world.versionA,
+              "ARR: $2.1m\nManagement accounts for May.",
+            ),
+            correlationId: CORRELATION(),
+          },
+        });
+      expect(first.records[0]?.outcome).toBe("ACCEPTED");
+      expect(second.records[0]?.outcome).toBe("ACCEPTED");
+      expect(second.records[0]?.relationship).toBe("SUPPORTS");
+      expect(second.records[0]?.claimId).not.toBe(first.records[0]?.claimId);
+      const links = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from evidence.claim_evidence
+         where claim_id = ${first.records[0]?.claimId ?? ""}
+           and relationship = 'CONTRADICTS'`;
+      expect(links[0]?.n).toBe(0);
+    });
+  });
+
   it("keeps both readings when a second source disagrees, and picks neither", async () => {
     await withWorld(async (world) => {
       const deck = await seedSource(world.tx, {

@@ -1,4 +1,4 @@
-import type { ModelSensitivity } from "@capital-q/contracts";
+import type { ModelDataPosture, ModelSensitivity } from "@capital-q/contracts";
 import type {
   ClaimProposal,
   ClaimProposalBatch,
@@ -44,6 +44,8 @@ export type ModelClaimProposerDependencies = {
   readonly gateway: ModelGateway;
   readonly registry?: PromptRegistry | undefined;
   readonly logger?: Logger | undefined;
+  /** Whether the material is a real customer's (default) or invented demo data. */
+  readonly dataPosture?: ModelDataPosture | undefined;
 };
 
 /** A passage's sensitivity, as the caller resolved it from the source row. */
@@ -93,6 +95,9 @@ export function createModelClaimProposer(
       const request = {
         taskClass: rendered.taskClass,
         sensitivity: declared,
+        ...(dependencies.dataPosture === undefined
+          ? {}
+          : { dataPosture: dependencies.dataPosture }),
         messages: [...rendered.messages],
         output: rendered.output,
         budget: budgetForTaskClass(rendered.taskClass),

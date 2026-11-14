@@ -27,6 +27,7 @@ import {
   type ClaimProposalBatch,
 } from "./contracts.js";
 import { ClaimProposalBlockedError, type ClaimProposerPort } from "./ports.js";
+import { claimDate } from "./stated-figure.js";
 import {
   claimKeyAccepts,
   claimTypeFor,
@@ -299,8 +300,13 @@ export function createClaimInterpretationService(
       passage.subject,
       { claimKey: proposal.claimKey },
     );
+    // Date-aware (A8): a figure for another month is that metric's
+    // history, not a disagreement. Only a CURRENT claim for the same date
+    // (both undated counts as the same) is agreed with or contradicted.
     const current = currentClaims.find(
-      (claim) => claim.lifecycleStatus === "CURRENT",
+      (claim) =>
+        claim.lifecycleStatus === "CURRENT" &&
+        claimDate(claim) === proposal.asOf,
     );
 
     if (duplicateItem !== undefined && current !== undefined) {
