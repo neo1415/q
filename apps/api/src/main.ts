@@ -221,6 +221,7 @@ import {
   createPostgresApplicationContactRepository,
   IntakeRefusedError,
   createPostgresApplicationTurnRepository,
+  createPostgresApplicationStatementRepository,
   createPostgresSubmissionInbox,
   createGateqInbox,
   createRelationshipGateqApplications,
@@ -1048,6 +1049,15 @@ const gateqApply =
           sql: database.sql,
           transactions: database.transactions,
         });
+        // Atomic statements (design 2026-11-14, slice 2): each turn's
+        // statements are written with its reply, and the legacy facts are
+        // their projection. "0" is the one way back to legacy facts alone.
+        const applicationStatements =
+          process.env["CQ_GATEQ_STATEMENTS"] === "0"
+            ? undefined
+            : createPostgresApplicationStatementRepository({
+                sql: database.sql,
+              });
         const intake = createIntakeService({
           // C2 phase two (live 2026-10-15): every web release since C2 parses
           // the optional source fields, and a fact heard in the transcript
@@ -1079,6 +1089,7 @@ const gateqApply =
             level: config.observability.logLevel,
           }),
           turns: applicationTurns,
+          statements: applicationStatements,
           contactCodeSecret: process.env["GATEQ_CONTACT_CODE_SECRET"],
           contacts: createPostgresApplicationContactRepository({
             sql: database.sql,
@@ -1182,6 +1193,7 @@ const gateqApply =
             sql: database.sql,
           }),
           turns: applicationTurns,
+          statements: applicationStatements,
           logger: createLogger(apiServiceIdentity(config), {
             level: config.observability.logLevel,
           }),

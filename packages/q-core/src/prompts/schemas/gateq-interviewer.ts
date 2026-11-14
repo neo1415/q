@@ -277,3 +277,183 @@ export const GATEQ_INTERVIEWER_UNTRUSTED = [
   "recentTurns",
   "utterance",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Reading schema v2 (prompt v7): atomic statements (design 2026-11-14)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reading schema v2. A superset of v1, so a v1 reading still parses; prompt
+ * v7 writes `statements` and `disagreementActions` instead of `facts`.
+ */
+export const GATEQ_INTERVIEWER_SCHEMA_VERSION_V2 = 2;
+
+/**
+ * The closed metric keys a numeric statement may name. The same list as
+ * the intake contract's STATEMENT_QUANTITIES (a gateq-intake test asserts
+ * they are identical): two numbers are only compared when they name the
+ * same quantity, so "2,300 wallets" never contradicts "20% monthly growth".
+ */
+export const GATEQ_STATEMENT_QUANTITIES = [
+  "revenue",
+  "mrr",
+  "arr",
+  "gmv",
+  "paying_customers",
+  "customers",
+  "users",
+  "daily_active_users",
+  "weekly_active_users",
+  "monthly_active_users",
+  "wallets",
+  "transactions",
+  "pilots",
+  "employees",
+  "growth_rate_monthly",
+  "churn_rate_monthly",
+  "retention_rate",
+  "gross_margin",
+  "burn_monthly",
+  "runway_months",
+  "raise_amount",
+  "pre_money_valuation",
+] as const;
+
+/**
+ * One value as read. ZERO is a stated nothing ("nobody pays yet"); UNKNOWN
+ * is not knowing, and `declined` is "I'd rather not say". The platform puts
+ * each into its dimension's shape and refuses what holds nothing of it.
+ */
+export const GateQStatementValueSchema = z.discriminatedUnion("kind", [
+  z
+    .object({ kind: z.literal("TEXT"), text: z.string().min(1).max(2000) })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("CODE"),
+      code: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("MONEY"),
+      amount: z.string().regex(/^(0|[1-9][0-9]{0,15})(\.[0-9]{1,2})?$/),
+      /** Null when they named no currency: never defaulted. */
+      currency: z
+        .string()
+        .regex(/^[A-Z]{3}$/)
+        .nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("COUNT"),
+      count: z.string().regex(/^(0|[1-9][0-9]{0,15})$/),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("PERCENT"),
+      percent: z.string().regex(/^-?(0|[1-9][0-9]{0,5})(\.[0-9]{1,4})?$/),
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal("ZERO") })
+    .strict()
+    .describe("A stated nothing: no revenue, nobody pays yet. A real value."),
+  z
+    .object({
+      kind: z.literal("UNKNOWN"),
+      declined: z.boolean().default(false),
+    })
+    .strict()
+    .describe(
+      "They do not know (declined false) or would rather not say (declined true).",
+    ),
+]);
+export type GateQStatementValue = z.infer<typeof GateQStatementValueSchema>;
+
+export const GATEQ_STATEMENT_OPS = ["NEW", "CORRECTS", "DISAGREES"] as const;
+
+/**
+ * One thing they said, once. NEW stands beside everything on record;
+ * CORRECTS S<n> replaces only statement S<n>; DISAGREES S<n> keeps both
+ * until they settle it. Handles are the short names KNOWN FACTS shows;
+ * the server maps them to its own ids and never guesses one it did not
+ * issue. A slip in one statement costs that statement, never the turn.
+ */
+export const GateQStatementOpSchema = z
+  .object({
+    op: z.enum(GATEQ_STATEMENT_OPS),
+    /** S<n> from KNOWN FACTS for CORRECTS and DISAGREES; null for NEW. */
+    target: z.string().max(16).nullable().default(null),
+    /** T<n> from UNREAD MESSAGES when said there; null for WHAT THEY JUST SAID. */
+    turn: z.string().max(16).nullable().default(null),
+    dimension: GateQDimensionSchema,
+    /** The metric a number is about, from the closed list; null for prose. */
+    quantity: z.enum(GATEQ_STATEMENT_QUANTITIES).nullable().catch(null),
+    value: GateQStatementValueSchema,
+    /** The date the figure describes (YYYY-MM-DD), only when they gave one. */
+    asOf: z.string().date().nullable().catch(null),
+    /** Their exact words for this one statement. */
+    words: z.string().min(1).max(600),
+    provenance: z.enum([
+      "APPLICANT_PROVIDED",
+      "DOCUMENT_SUPPORTED",
+      "ESTIMATED",
+      "UNKNOWN",
+    ]),
+  })
+  .strict();
+export type GateQStatementOp = z.infer<typeof GateQStatementOpSchema>;
+
+/** What they said about a disagreement already on record (D<n>). */
+export const GateQDisagreementActionSchema = z
+  .object({
+    disagreement: z.string().max(16),
+    /** LEAVE_OPEN: they chose not to settle it. RESOLVE: they said which is right. */
+    action: z.enum(["LEAVE_OPEN", "RESOLVE"]),
+    /** RESOLVE only: the S<n> that is right. */
+    keep: z.string().max(16).nullable().default(null),
+  })
+  .strict();
+export type GateQDisagreementAction = z.infer<
+  typeof GateQDisagreementActionSchema
+>;
+
+export const GateQInterviewerResultV2Schema = GateQInterviewerResultSchema.extend(
+  {
+    /**
+     * Every statement this turn (and any unread earlier message) made. One
+     * malformed statement is dropped and counted, never the whole reading.
+     */
+    statements: z
+      .array(GateQStatementOpSchema.nullable().catch(null))
+      .max(24)
+      .default([]),
+    disagreementActions: z
+      .array(GateQDisagreementActionSchema.nullable().catch(null))
+      .max(8)
+      .default([]),
+  },
+).strict();
+export type GateQInterviewerResultV2 = z.infer<
+  typeof GateQInterviewerResultV2Schema
+>;
+
+/** Prompt v7's variables: v3's plus the unread messages and the quantity keys. */
+export const GateQInterviewerVariablesV7Schema =
+  GateQInterviewerVariablesSchema.extend({
+    recordableDimensions: z.string().min(1).max(2000),
+    statementQuantities: z.string().min(1).max(1000),
+    /** Earlier messages of theirs nobody read yet, as T<n>. Data only. */
+    unreadMessages: z.string().max(6000),
+  });
+export type GateQInterviewerVariablesV7 = z.infer<
+  typeof GateQInterviewerVariablesV7Schema
+>;
+
+export const GATEQ_INTERVIEWER_UNTRUSTED_V7 = [
+  ...GATEQ_INTERVIEWER_UNTRUSTED,
+  "unreadMessages",
+] as const;
