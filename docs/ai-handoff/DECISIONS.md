@@ -376,3 +376,43 @@ Core Seven remains the governing assessment framework. The new directive authori
 90. **Real demonstration companies and network-visible fictional names** (owner, 2026-11-13).
     - Capital Q, KUUZA AI and SongScribe AI stay in the marketplace as they are; their synthetic claims are not revoked.
     - MoneyHash and ekko stay network-visible, like the other fictional companies.
+91. **GateQ qualifying facts in genuine disagreement** (owner, 2026-11-14).
+    - Never silently use the latest value. The qualification is UNRESOLVED and needs review until the contradiction is clarified.
+    - This never automatically disqualifies the applicant, blocks submission or hides the opportunity from the investor.
+    - Both values are kept, with their sources and the reason for the disagreement. The founder may clarify or leave it unresolved.
+    - The investor sees the uncertainty and judges for themselves. An explicit, valid correction resolves the earlier value.
+92. **Public evidence and confidence** (owner, 2026-11-14).
+    - Q may use public research and corroboration for richer, more confident analysis when the evidence warrants it.
+    - Corroboration is not independent verification. Four things stay distinct, never collapsed:
+      - a source reporting a claim;
+      - other sources corroborating or contradicting it;
+      - the founder confirming it;
+      - an independently verified fact.
+    - Where ADR-001 and the evidence contracts cannot express a distinction, propose the smallest amendment. Never silently change the meaning of an existing truth or evidence class.
+93. **Third-party research claims** (owner, 2026-11-14).
+    - Q discovers, keeps and analyses claims from public sources without founder approval of each finding. They are cited research evidence or hypotheses, not canonical company facts.
+    - Founder approval is required only when an external figure is adopted into the company's own controlled claims.
+    - On adoption, both the original third-party provenance and the founder's confirmation are kept. A third-party assertion is never presented as originally self-reported.
+    - The Context Firewall holds throughout.
+94. **Investor access to public research** (owner, 2026-11-14).
+    - Investors may ask Q about genuinely public information on companies: reported revenue, funding, traction, market developments and contradictions.
+    - Q answers from authorised public research, with citations, dates, uncertainty and source attribution. No founder approval is needed to discuss public information.
+    - Never publish private founder claims, promote external assertions to canonical facts, or disclose protected information because related public information exists.
+95. **Fundraising figures** (owner, 2026-11-14).
+    - Extract fundraising amounts and round information where the evidence supports it.
+    - Keep these concepts distinct and never substitute one for another: funds being sought, announced commitments, completed funding, valuation, and other materially different concepts.
+    - Keep the currency, dates, source context and uncertainty.
+96. **Research efficiency** (owner, 2026-11-14).
+    - No paid model extraction runs automatically on every fetched page.
+    - Use relevance checks, existing extracted evidence, content hashes, caching, selective extraction and batching. Never make duplicate calls for content already processed.
+    - The engineering test budget ($1 per test, $5 per UTC day, via the shared ledger) never restricts customer-facing intelligence.
+97. **Capability-damaging limits are resolved, not documented** (owner, 2026-11-14).
+    - All eight B items in `audits/2026-11-14-capability-limits.md` are resolved. Specifically:
+      - complete, evidence-backed GateQ synthesis with a compact default view;
+      - the latest interview corrections are never lost to a context window;
+      - every valid founder statement and unresolved disagreement is kept;
+      - an extra valid finding never empties a list;
+      - Q Work, research and analytical outputs can be retrieved beyond their first display;
+      - question counting is replaced by knowledge, uncertainty and conversation-state tracking.
+    - Technical budgets, batch sizes, validation and rate limits stay, but never as silent limits on knowledge. Incomplete output is reported explicitly and can be continued.
+    - Raising a number is not a fix for data loss.
