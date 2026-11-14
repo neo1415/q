@@ -144,6 +144,10 @@ import {
   type GateqVideoRoutesDependencies,
 } from "./http/gateq-video.js";
 import {
+  registerGateqVoiceRoutes,
+  type GateqVoiceRoutesDependencies,
+} from "./http/gateq-voice.js";
+import {
   registerGateQRoutes,
   type GateQRoutesDependencies,
 } from "./http/gateq.js";
@@ -409,6 +413,8 @@ export type ApiModules = {
   readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
   /** C3: the GateQ video interview session and its provider bridge. */
   readonly gateqVideo?: GateqVideoRoutesDependencies | undefined;
+  /** The GateQ voice-only interview session and its speech bridge. */
+  readonly gateqVoice?: GateqVoiceRoutesDependencies | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly onboardingNudges?: OnboardingRoutesDependencies["nudges"];
@@ -1072,6 +1078,9 @@ export function createApp(
   }
   if (modules.gateqVideo !== undefined) {
     registerGateqVideoRoutes(app, modules.gateqVideo);
+  }
+  if (modules.gateqVoice !== undefined) {
+    registerGateqVoiceRoutes(app, modules.gateqVoice);
   }
 
   // Handles and the Q Card (BIZ-004): the owner's card routes and the two

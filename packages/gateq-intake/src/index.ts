@@ -235,3 +235,25 @@ export {
   type GateqVideoSessionView,
 } from "./video/video-interview.js";
 export { createPostgresGateqVideoSessions } from "./video/postgres-video-sessions.js";
+// Directive 2026-11-14 item 4: the GateQ voice-only interview session.
+export {
+  createGateqVoiceInterview,
+  effectiveVoiceSeconds,
+  GATEQ_VOICE_CLOSED_LINE,
+  GATEQ_VOICE_DEFAULTS,
+  GATEQ_VOICE_RETRY_LINE,
+  gateqVoiceConfigFrom,
+  GateqVoiceRefusedError,
+  type GateqVoiceConfig,
+  type GateqVoiceEndedReason,
+  type GateqVoiceInterview,
+  type GateqVoiceLine,
+  type GateqVoiceProvider,
+  type GateqVoiceRefusal,
+  type GateqVoiceSealer,
+  type GateqVoiceSessionRow,
+  type GateqVoiceSessionStore,
+  type GateqVoiceSessionView,
+  type GateqVoiceUnavailableReason,
+} from "./voice/voice-interview.js";
+export { createPostgresGateqVoiceSessions } from "./voice/postgres-voice-sessions.js";

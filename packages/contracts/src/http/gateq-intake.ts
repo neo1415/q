@@ -469,6 +469,83 @@ export const GateqVideoEndRequestSchema = z
   .object({ continueByTyping: z.boolean() })
   .strict();
 
+/**
+ * GateQ voice-only interview (directive 2026-11-14 item 4, slice 1): the
+ * applicant talks with Q instead of typing, by their guest credential. GET
+ * reads (offered? open session?); POST opens a line (or reopens the same
+ * session with a fresh line credential); /end ends it, the interview
+ * carrying on by typing. The bridge is the speech provider's alone, under
+ * a per-line bearer: every heard line is the SAME canonical turn with
+ * channel "voice", answered by the same interviewer.
+ */
+export const GATEQ_APPLY_VOICE_PATH = "/v1/gateq/apply/voice" as const;
+export const GATEQ_APPLY_VOICE_END_PATH = "/v1/gateq/apply/voice/end" as const;
+/** The provider appends `/chat/completions` (an OpenAI-shaped think call). */
+export const GATEQ_VOICE_BRIDGE_PATH = "/v1/gateq/voice/bridge" as const;
+export const GATEQ_VOICE_UNAVAILABLE_REASONS = [
+  "NOT_OFFERED",
+  "SUBMITTED",
+  "APPLICATION_SESSIONS_USED",
+  "BUSY",
+  "PROVIDER_UNAVAILABLE",
+] as const;
+export const GateqVoiceUnavailableReasonSchema = z.enum(
+  GATEQ_VOICE_UNAVAILABLE_REASONS,
+);
+export type GateqVoiceUnavailableReason = z.infer<
+  typeof GateqVoiceUnavailableReasonSchema
+>;
+export const GateqVoiceSessionDtoSchema = z
+  .object({
+    id: z.string().uuid(),
+    status: z.enum(["LIVE", "ENDED"]),
+    /** The hard stop: the bridge refuses every line after it. */
+    endsAt: z.string().datetime(),
+    maxSeconds: z.number().int().min(1).max(3600),
+    endedReason: z
+      .enum([
+        "APPLICANT_ENDED",
+        "CONTINUED_BY_TYPING",
+        "TIME_LIMIT",
+        "PROVIDER_FAILED",
+        "SWEPT",
+      ])
+      .nullable(),
+    disclosure: z.string().max(300),
+  })
+  .strict();
+export type GateqVoiceSessionDto = z.infer<typeof GateqVoiceSessionDtoSchema>;
+/**
+ * The browser's one-time line credential: a short-lived speech-provider
+ * token (never a provider API key) and the agent settings this server
+ * composed, whose think endpoint is the bridge under this line's bearer.
+ * Only on the POST that opened the line; never on a GET.
+ */
+export const GateqVoiceLineDtoSchema = z
+  .object({
+    provider: z.literal("deepgram"),
+    token: z.string().min(1).max(8192),
+    agent: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export type GateqVoiceLineDto = z.infer<typeof GateqVoiceLineDtoSchema>;
+export const GateqVoiceStateDtoSchema = z
+  .object({
+    /** Whether a voice interview may be started now; typing always may. */
+    available: z.boolean(),
+    session: GateqVoiceSessionDtoSchema.nullable(),
+    unavailableReason: GateqVoiceUnavailableReasonSchema.nullable(),
+    /** Voice sessions this application may have in all. */
+    perApplication: z.number().int().min(1).max(10),
+    /** Voice sessions this application has left. */
+    remaining: z.number().int().min(0).max(10),
+    line: GateqVoiceLineDtoSchema.nullable().optional(),
+  })
+  .strict();
+export type GateqVoiceStateDto = z.infer<typeof GateqVoiceStateDtoSchema>;
+export const GateqVoiceStartRequestSchema = GateqVideoStartRequestSchema;
+export const GateqVoiceEndRequestSchema = GateqVideoEndRequestSchema;
+
 export const GATEQ_CONTACT_CHANNELS = ["EMAIL", "PHONE"] as const;
 export const GateqContactChannelSchema = z.enum(GATEQ_CONTACT_CHANNELS);
 export type GateqContactChannel = z.infer<typeof GateqContactChannelSchema>;
