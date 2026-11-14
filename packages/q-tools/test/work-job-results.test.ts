@@ -85,12 +85,80 @@ function world(jobResults: QWorkIntelligencePort["jobResults"]) {
   const executor = createQToolExecutor({
     registry: createQToolRegistry(createQWorkTools(port)),
   });
-  return (actor: ActorContext, plan: PermittedContextPlan) =>
+  return (
+    actor: ActorContext,
+    plan: PermittedContextPlan,
+    args: Record<string, unknown> = {},
+  ) =>
     executor.execute(
-      { callId: "c-1", name: "list_q_work", arguments: {} },
+      { callId: "c-1", name: "list_q_work", arguments: args },
       contextFor(actor, plan),
     );
 }
+
+describe("list_q_work v4: every finding and question is reachable (decision 97)", () => {
+  const many: QWorkJobResult = {
+    ...JOB,
+    review: JOB.review === null
+      ? null
+      : {
+          ...JOB.review,
+          findings: Array.from({ length: 11 }, (_, i) => ({
+            kind: "UNSUPPORTED",
+            section: `Section ${String(i + 1)}`,
+            problem: `Problem ${String(i + 1)}`,
+          })),
+        },
+    diligence: {
+      questions: Array.from({ length: 7 }, (_, i) => `Question ${String(i + 1)}?`),
+      filedForApproval: true,
+    },
+  };
+
+  it("says how many there are and pages through them by jobId and from", async () => {
+    const read = world(() => Promise.resolve([many]));
+    const plan = ownPlan(actorA, actorA.userId);
+    const first = await read(actorA, plan);
+    expect(first.result).toMatchObject({
+      ok: true,
+      data: {
+        jobsTotal: 1,
+        jobs: [
+          {
+            truncated: true,
+            nextFrom: 5,
+            review: { findingsTotal: 11 },
+            diligence: { questionsTotal: 7 },
+          },
+        ],
+      },
+    });
+    const seenFindings = new Set<string>();
+    const seenQuestions = new Set<string>();
+    let from: number | null = 0;
+    for (let page = 0; from !== null && page < 10; page += 1) {
+      const outcome = await read(actorA, plan, { jobId: many.jobId, from });
+      const data = (
+        outcome.result as {
+          data: {
+            jobs: {
+              nextFrom: number | null;
+              review: { findings: { section: string }[] };
+              diligence: { questions: string[] };
+            }[];
+          };
+        }
+      ).data;
+      const job = data.jobs[0];
+      for (const f of job?.review.findings ?? []) seenFindings.add(f.section);
+      for (const q of job?.diligence.questions ?? []) seenQuestions.add(q);
+      from = job?.nextFrom ?? null;
+    }
+    // v3 showed 8 findings and 5 questions with no sign of the rest.
+    expect(seenFindings.size).toBe(11);
+    expect(seenQuestions.size).toBe(7);
+  });
+});
 
 describe("list_q_work: a finished job's reviewer changes and diligence questions", () => {
   it("reports the reviewer's findings, revision and the exact persisted questions", async () => {
