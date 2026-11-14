@@ -69,3 +69,16 @@ Continues the consolidated directive, the acceptance matrix, parallel execution 
    - Correct matrix rows whose notes contradict their headline status.
    - Foundations and complete journeys come before cosmetic patches.
    - Locked architecture, the Context Firewall, human approval, provenance, RLS, tenant isolation and the release gate are all preserved.
+
+## Correction, 14 Nov 2026: testing budget (replaces item 1's figures)
+
+- **Caps:** $1 estimated per live test or evaluation run, and $5 per UTC day across all paid providers. These are ceilings, not targets.
+- **Prefer free tests:** free, mocked, deterministic and local tests come first. Never repeat a paid evaluation when nothing relevant has changed.
+- **Live product checks count:** they incur Capital Q's own model routing charges.
+- **One shared ledger:** `node scripts/handoff/live/test-budget.mjs`, with ledger file `~/.cq-test-ledger.jsonl` (locked, so parallel workers cannot spend the same allowance).
+  - Run `status` before any paid test.
+  - Run `reserve <usd> <label>` before it, and expect a refusal when it would exceed a cap.
+  - Run `record <id> <actual> <outcome>` after it.
+- **Actual spend:** taken from `ai_ops.model_usage.cost_usd` for the test window, summed with a read-only query through `scripts/handoff/live/hosted-read.mjs`.
+- **When the budget is short:** defer that paid test only and continue the other work. Never fake a pass. Never print or request secrets.
+- **Product scope:** the budget never limits Q's user-facing intelligence.
