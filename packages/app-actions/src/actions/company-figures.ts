@@ -6,6 +6,7 @@ import {
   documentFigureWords,
   recordDocumentFigure,
   recordStatedFigure,
+  recordWebFigure,
   saidByThem,
   STATED_FIGURE_METRIC_CODES,
   STATED_FIGURE_METRICS,
@@ -15,6 +16,8 @@ import {
   statedFigurePeriod,
   StatedFigureSchema,
   statedFigureWords,
+  WebFigureSourceSchema,
+  webFigureWords,
   type StatedFigure,
   type StatedFigureOutcome,
   type StatedFigureValue,
@@ -63,8 +66,17 @@ const RecordFigure = z
      * own document. `said` is then the document's own words.
      */
     document: DocumentFigureSourceSchema.optional(),
+    /**
+     * A8: set only by the research-claims job (code, never the model), when
+     * the figure was read from a public page about their company. `said` is
+     * then the page's own words; the record step checks them again.
+     */
+    web: WebFigureSourceSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((input) => input.document === undefined || input.web === undefined, {
+    message: "A figure has one source.",
+  });
 type RecordInput = z.infer<typeof RecordFigure>;
 
 const PERIOD = /^(\d{4})-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/u;
@@ -144,6 +156,9 @@ function alongsideWords(alongside: readonly string[]): string {
 const DOCUMENT_NOTE =
   "Kept as your company's own figure, supported by that document, private to your company: investors don't see it. If it's wrong, dismiss this card and tell me the right figure.";
 
+const WEB_NOTE =
+  "If you confirm it, it's kept as your company's own figure (self-reported), with this page as its source, private to your company: investors don't see it. A public article is not verification. If it's wrong or out of date, dismiss this card.";
+
 function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
   const what = statedFigureWords(input.figure);
   const conflict =
@@ -152,6 +167,9 @@ function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
       : " A different figure is recorded for that date too: both are kept, marked as conflicting, until you settle it.";
   if (out.outcome === "ALREADY_RECORDED") {
     return `Your ${what} was already recorded, so nothing changed.${conflict}`;
+  }
+  if (input.web !== undefined) {
+    return `Recorded your ${what} as your company's own figure (self-reported), with "${input.web.title}" kept as its source. It's private to your company; investors don't see it.${conflict}`;
   }
   return input.document === undefined
     ? `Recorded your ${what} as your own statement (self-reported). It's private to your company; investors don't see it.${conflict}`
@@ -187,35 +205,48 @@ const RECORD = defineAppAction<
       ? { ok: true }
       : { ok: false, reason: "Figures are recorded for your own company." },
   run: (ports, context, input) =>
-    input.document === undefined
-      ? recordStatedFigure(figures(ports), {
+    input.web !== undefined
+      ? recordWebFigure(ports.webFigures ?? portMissing("webFigures"), {
           actor: context.actor,
           companyId: input.companyId,
           figure: input.figure,
-          idempotencyKey: context.idempotencyKey,
+          web: input.web,
           correlationId: context.correlationId,
         })
-      : recordDocumentFigure(
-          ports.documentFigures ?? portMissing("documentFigures"),
-          {
+      : input.document === undefined
+        ? recordStatedFigure(figures(ports), {
             actor: context.actor,
             companyId: input.companyId,
             figure: input.figure,
-            document: input.document,
+            idempotencyKey: context.idempotencyKey,
             correlationId: context.correlationId,
-          },
-        ),
+          })
+        : recordDocumentFigure(
+            ports.documentFigures ?? portMissing("documentFigures"),
+            {
+              actor: context.actor,
+              companyId: input.companyId,
+              figure: input.figure,
+              document: input.document,
+              correlationId: context.correlationId,
+            },
+          ),
   targets: (input) => [{ kind: "COMPANY", companyId: input.companyId }],
   card: (input) =>
-    input.document === undefined
+    input.web !== undefined
       ? {
-          summary: `Record your ${statedFigureWords(input.figure)}`,
-          preview: `You said: "${input.figure.said}". ${PRIVATE_NOTE}${alongsideWords(input.alongside)}`,
+          summary: `Keep your ${webFigureWords(input.figure, input.web)}`,
+          preview: `A public page (${input.web.url}) says: "${input.figure.said}". ${WEB_NOTE}${alongsideWords(input.alongside)}`,
         }
-      : {
-          summary: `Keep your ${documentFigureWords(input.figure, input.document)}`,
-          preview: `Your document says: "${input.figure.said}". ${DOCUMENT_NOTE}${alongsideWords(input.alongside)}`,
-        },
+      : input.document === undefined
+        ? {
+            summary: `Record your ${statedFigureWords(input.figure)}`,
+            preview: `You said: "${input.figure.said}". ${PRIVATE_NOTE}${alongsideWords(input.alongside)}`,
+          }
+        : {
+            summary: `Keep your ${documentFigureWords(input.figure, input.document)}`,
+            preview: `Your document says: "${input.figure.said}". ${DOCUMENT_NOTE}${alongsideWords(input.alongside)}`,
+          },
   done: (out, input) => outcomeWords(out, input),
   tool: {
     name: "propose_company_figure",
@@ -334,6 +365,55 @@ export const COMPANY_FIGURE_ACTION_TYPE = "app.company.figure.record";
  * What is already recorded for that metric and date is named on the card,
  * as in conversation. Null when it does not fit the declaration.
  */
+async function alongsideFor(
+  ports: AppActionPorts,
+  actor: AppActionContext["actor"],
+  companyId: string,
+  figure: StatedFigure,
+): Promise<string[]> {
+  const { clashes } = await statedFigureClashes(
+    figures(ports),
+    actor,
+    companyId,
+    figure,
+  ).catch(() => ({ clashes: [] }));
+  return clashes.slice(0, 5).flatMap((claim) => {
+    const stored = claim.structuredValue;
+    const known = stored === null ? null : valueWords(stored);
+    return known === null
+      ? []
+      : [`${known} ${statedFigureDateWords(figure.asOf)}`.slice(0, 120)];
+  });
+}
+
+/**
+ * A8: the card input for a figure read from a public page about their own
+ * company, as the research-claims job proposes it (code, after the quote
+ * check against the fetched page). Null when it does not fit.
+ */
+export async function webFigureCardInput(
+  ports: AppActionPorts,
+  actor: AppActionContext["actor"],
+  proposal: {
+    readonly companyId: string;
+    readonly figure: StatedFigure;
+    readonly web: z.input<typeof WebFigureSourceSchema>;
+  },
+): Promise<RecordInput | null> {
+  const parsed = RecordFigure.safeParse({
+    companyId: proposal.companyId,
+    figure: proposal.figure,
+    web: proposal.web,
+    alongside: await alongsideFor(
+      ports,
+      actor,
+      proposal.companyId,
+      proposal.figure,
+    ),
+  });
+  return parsed.success ? parsed.data : null;
+}
+
 export async function documentFigureCardInput(
   ports: AppActionPorts,
   actor: AppActionContext["actor"],

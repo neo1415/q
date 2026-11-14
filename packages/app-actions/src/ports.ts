@@ -27,6 +27,7 @@ import type {
   DocumentFigureEvidence,
   EvidenceService,
   StatedFigureEvidence,
+  WebFigureEvidence,
 } from "@capital-q/evidence";
 import type { InvestorService } from "@capital-q/investors";
 import type {
@@ -192,6 +193,12 @@ export type AppActionPorts = {
    * as their private claim the document supports (the Evidence services).
    */
   readonly documentFigures?: DocumentFigureEvidence | undefined;
+  /**
+   * A8: a figure a public page states about their own company, recorded on
+   * their approval as their private, self-reported claim with the page as
+   * provenance (the Evidence services).
+   */
+  readonly webFigures?: WebFigureEvidence | undefined;
   /** Q.03/Q.04: their own company's readiness, plan and follow-ups (founder-private). */
   readonly readiness?: ReadinessService | undefined;
   /** G1/G2: the person's company or firm as a team (invitations, roles). */

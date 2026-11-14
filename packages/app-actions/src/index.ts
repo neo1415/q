@@ -66,6 +66,7 @@ export { APP_ACTIONS, PERSON_ACTIONS } from "./registry.js";
 export {
   COMPANY_FIGURE_ACTION_TYPE,
   documentFigureCardInput,
+  webFigureCardInput,
 } from "./actions/company-figures.js";
 export { scheduleProblem } from "./actions/schedule.js";
 export {

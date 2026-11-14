@@ -659,6 +659,8 @@ export function documentClaimCardProposer(dependencies: {
     "begin" | "advanceThrough" | "fail"
   >;
   readonly actions: Pick<QActionService, "propose">;
+  /** The run's orchestration label; the research-claims job names its own. */
+  readonly orchestrationVersion?: string | undefined;
 }): DocumentClaimCardsDependencies["propose"] {
   return async (actor, card, conversationId) => {
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
@@ -685,7 +687,8 @@ export function documentClaimCardProposer(dependencies: {
     const ref = runRef(created.run);
     await dependencies.orchestration.begin(
       ref,
-      DOCUMENT_CLAIMS_ORCHESTRATION_VERSION,
+      dependencies.orchestrationVersion ??
+        DOCUMENT_CLAIMS_ORCHESTRATION_VERSION,
     );
     await dependencies.orchestration.advanceThrough(ref, [
       "CONTEXT_RESOLUTION",

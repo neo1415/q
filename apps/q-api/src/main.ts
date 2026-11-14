@@ -322,6 +322,10 @@ import {
   documentClaimReadings,
   documentClaimTarget,
 } from "./composition/document-claim-cards.js";
+import {
+  createResearchClaimCards,
+  RESEARCH_CLAIMS_ORCHESTRATION_VERSION,
+} from "./composition/research-claim-cards.js";
 import { createModelClaimProposer } from "@capital-q/model-gateway/extraction";
 import { DocumentVersionIdSchema } from "@capital-q/evidence/contracts";
 import { createWorkRuntime } from "./composition/work/runtime.js";
@@ -663,6 +667,7 @@ import {
 import {
   APP_ACTIONS,
   documentFigureCardInput,
+  webFigureCardInput,
   ownIndex,
   type OwnReadPorts,
   type EtiquetteGuidePort,
@@ -1427,7 +1432,17 @@ logger.info(
 // surfaced, and what a founder's Q reads about their own company is
 // recorded as the company's evidence. The same module composes the
 // conversational statement recorder over the Knowledge Write Gate.
+// A8: bound below, once the research-claims job exists (research is
+// composed first because everything else reads through its Evidence owner).
+const publicExcerpts: {
+  listener?: (
+    actor: ActorContext,
+    excerpt: { readonly sourceId: string; readonly itemId: string },
+  ) => void;
+} = {};
 const researchComposition = composeResearch({
+  onPublicExcerpt: (actor, excerpt) =>
+    publicExcerpts.listener?.(actor, excerpt),
   sql: database.sql,
   transactions: database.transactions,
   authorization,
@@ -3227,6 +3242,8 @@ const appActionPorts: OwnReadPorts = {
   companyFigures: researchComposition.evidence,
   // A8: a figure read from their own document, kept on their approval.
   documentFigures: researchComposition.evidence,
+  // A8: a figure a public page states about their company, kept on their approval.
+  webFigures: researchComposition.evidence,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
   // F3: "Find my startup": claim requests and saved startup searches.
@@ -7769,6 +7786,27 @@ const documentReadyFollowUp = createDocumentReadyFollowUp({
   },
   logger,
 });
+// The registered CLAIM_EXTRACTION task, at each source's own sensitivity
+// (a deck's, or a public page's INTERNAL): never relabelled to reach a
+// provider. Shared by the document and research figure jobs.
+const claimProposer = createModelClaimProposer({
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
+  logger,
+  // The source's own sensitivity, as registered from the document's.
+  sensitivity: {
+    sensitivityFor: async ({ sourceId }) => {
+      const row = (
+        await database.sql<{ sensitivity_class: string }[]>`
+          select sensitivity_class from evidence.sources
+           where id = ${sourceId} limit 1`
+      )[0];
+      return ModelSensitivitySchema.parse(
+        row?.sensitivity_class ?? "RESTRICTED",
+      );
+    },
+  },
+});
 // A8: a founder's own deck, once read, becomes proposed figures on cards
 // in their own conversation; each is their claim only once confirmed.
 const documentChunks = createPostgresChunkRepository();
@@ -7783,24 +7821,7 @@ const documentClaimCards = createDocumentClaimCards({
     ),
   evidence: researchComposition.evidence,
   readings: documentClaimReadings(database.sql),
-  proposer: createModelClaimProposer({
-    gateway: modelGateway,
-    dataPosture: demoDataPosture,
-    logger,
-    // The source's own sensitivity, as registered from the document's.
-    sensitivity: {
-      sensitivityFor: async ({ sourceId }) => {
-        const row = (
-          await database.sql<{ sensitivity_class: string }[]>`
-            select sensitivity_class from evidence.sources
-             where id = ${sourceId} limit 1`
-        )[0];
-        return ModelSensitivitySchema.parse(
-          row?.sensitivity_class ?? "RESTRICTED",
-        );
-      },
-    },
-  }),
+  proposer: claimProposer,
   cardInput: (actor, proposal) =>
     documentFigureCardInput(appActionPorts, actor, proposal),
   propose: documentClaimCardProposer({
@@ -7810,6 +7831,25 @@ const documentClaimCards = createDocumentClaimCards({
   }),
   logger,
 });
+// A8: a figure a public page (that Q's research fetched) states about a
+// founder's own company becomes a proposed figure on their card; it is
+// their claim only once they confirm it. Runs after the turn, never in it.
+const researchClaimCards = createResearchClaimCards({
+  evidence: researchComposition.evidence,
+  proposer: claimProposer,
+  cardInput: (actor, proposal) =>
+    webFigureCardInput(appActionPorts, actor, proposal),
+  propose: documentClaimCardProposer({
+    runtime: qRuntime,
+    orchestration: orchestrationRuntime,
+    actions: qActions,
+    orchestrationVersion: RESEARCH_CLAIMS_ORCHESTRATION_VERSION,
+  }),
+  logger,
+});
+publicExcerpts.listener = (actor, excerpt) => {
+  void researchClaimCards.onExcerptRecorded(actor, excerpt);
+};
 void createWorkWakeListener({
   listen: (channel, onNotify, onListen) =>
     database.listen(channel, onNotify, onListen),
