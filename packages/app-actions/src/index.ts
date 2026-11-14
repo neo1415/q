@@ -63,6 +63,10 @@ export {
   type DeckRecord,
 } from "./actions/deck.js";
 export { APP_ACTIONS, PERSON_ACTIONS } from "./registry.js";
+export {
+  COMPANY_FIGURE_ACTION_TYPE,
+  documentFigureCardInput,
+} from "./actions/company-figures.js";
 export { scheduleProblem } from "./actions/schedule.js";
 export {
   OWN_READ_KINDS,

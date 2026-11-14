@@ -163,7 +163,7 @@ const dayOf = (raw: unknown): string | null =>
   typeof raw === "string" ? (DAY.exec(raw)?.[1] ?? null) : null;
 
 /** The date a recorded figure is for: its value's own date, else the claim's. */
-function claimDate(claim: Claim): string | null {
+export function claimDate(claim: Claim): string | null {
   return dayOf(claim.structuredValue?.["asOf"]) ?? dayOf(claim.validFrom);
 }
 
