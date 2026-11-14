@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { readsAsAboutSubjectCompany } from "../src/company/about-company.js";
+import type { PermittedContextPlan } from "@capital-q/contracts";
+
+import {
+  correctsOwnCompany,
+  readsAsAboutSubjectCompany,
+} from "../src/company/about-company.js";
 import { createCompanyIntelligenceSpecialist } from "../src/company/specialist.js";
 
 /**
@@ -66,6 +71,73 @@ describe("whether a question is about the company in the conversation", () => {
         question: "how are we doing today, Q?",
         reading: reading("SMALL_TALK"),
       }),
+    ).toBe(false);
+  });
+});
+
+/**
+ * A8 (live 14 Nov 2026): a founder's correction about their own company is
+ * for the path that can prepare its approval card. Decided from the
+ * reader's kind and the firewall's plan, never from words.
+ */
+describe("whether a turn corrects the person's own company", () => {
+  const OWN = "c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0";
+  const OTHER = "c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1";
+  const subjects = [{ kind: "COMPANY" as const, companyId: OWN }];
+  const plan = (
+    companyId: string,
+    contextLabel: string,
+  ): Pick<PermittedContextPlan, "scopes"> =>
+    ({
+      scopes: [
+        {
+          kind: "COMPANY_PROFILE",
+          subject: { kind: "COMPANY", companyId },
+          contextLabel,
+        },
+      ],
+    }) as unknown as Pick<PermittedContextPlan, "scopes">;
+  const correction = { kind: "CORRECTION", aboutNamedOther: false };
+
+  it("takes a correction about the company the plan holds on its owner's side", () => {
+    expect(
+      correctsOwnCompany(
+        correction,
+        subjects,
+        plan(OWN, "organisation_private"),
+      ),
+    ).toBe(true);
+  });
+
+  it("never an investor's view, another company, another kind or someone named", () => {
+    expect(
+      correctsOwnCompany(correction, subjects, plan(OWN, "network_visible")),
+    ).toBe(false);
+    expect(
+      correctsOwnCompany(
+        correction,
+        subjects,
+        plan(OTHER, "organisation_private"),
+      ),
+    ).toBe(false);
+    for (const kind of ["ANSWER", "QUESTION_TO_Q", "SMALL_TALK"]) {
+      expect(
+        correctsOwnCompany(
+          { kind, aboutNamedOther: false },
+          subjects,
+          plan(OWN, "organisation_private"),
+        ),
+      ).toBe(false);
+    }
+    expect(
+      correctsOwnCompany(
+        { kind: "CORRECTION", aboutNamedOther: true },
+        subjects,
+        plan(OWN, "organisation_private"),
+      ),
+    ).toBe(false);
+    expect(
+      correctsOwnCompany(null, subjects, plan(OWN, "organisation_private")),
     ).toBe(false);
   });
 });

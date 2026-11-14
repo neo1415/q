@@ -74,6 +74,12 @@ function seam(
   withBus: boolean,
   said = "What are the main risks here?",
   extra: Partial<Parameters<typeof createSpecialistQAnswer>[0]> = {},
+  /** A8: the analysis' own words, in place of the default answer. */
+  analysis?: {
+    readonly synthesis: string;
+    readonly sentences: readonly string[];
+    readonly recordedStatements?: readonly string[];
+  },
 ) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -102,16 +108,21 @@ function seam(
       supports: () => true,
       investigate: (input, context) => {
         investigated.push(input);
-        context.onAnswerSentence?.("Credit performance is the first risk.");
-        context.onAnswerSentence?.("It is a 91% fit with your mandate.");
-        context.onAnswerSentence?.("I've prepared a draft for your approval.");
-        context.onAnswerSentence?.("Funding is concentrated in one lender.");
+        for (const sentence of analysis?.sentences ?? [
+          "Credit performance is the first risk.",
+          "It is a 91% fit with your mandate.",
+          "I've prepared a draft for your approval.",
+          "Funding is concentrated in one lender.",
+        ]) {
+          context.onAnswerSentence?.(sentence);
+        }
         return Promise.resolve({
           blocked: null,
           findings: [],
           synthesis:
+            analysis?.synthesis ??
             "Credit performance is the first risk. Funding is concentrated in one lender. Evidence is thin.",
-          recordedStatements: [],
+          recordedStatements: analysis?.recordedStatements ?? [],
           contradictions: [],
           gaps: [],
           uncertainties: [],
@@ -312,5 +323,74 @@ describe("a named counterpart is preferred over the company in focus", () => {
       expect(s.investigated).toHaveLength(1);
       expect(s.delegatedWith).toHaveLength(0);
     }
+  });
+});
+
+/**
+ * A8 (live 14 Nov 2026 on 5f4603b05, founder.maji-loop): this path holds
+ * no tools, yet its answer to "Actually October MRR was $110k." said "I'm
+ * keeping both figures visible" with nothing recorded. The promise check
+ * the tool path runs now runs here: a claim of recording with no write in
+ * the run is replaced by the honest line, and is never streamed.
+ */
+describe("A8: the analysis never claims a record nothing made", () => {
+  const LIVE =
+    "Understood — you told me October MRR was $110k. That conflicts with the earlier $120k figure, so I'm keeping both figures visible rather than resolving the discrepancy.";
+
+  it("rewrites the live answer honestly and streams none of the claim", async () => {
+    const s = seam(
+      true,
+      "Actually October MRR was $110k.",
+      {},
+      {
+        synthesis: LIVE,
+        sentences: [
+          "Understood — you told me October MRR was $110k.",
+          "That conflicts with the earlier $120k figure, so I'm keeping both figures visible rather than resolving the discrepancy.",
+        ],
+      },
+    );
+    await s.answer.answer(request());
+    const stored = s.stored.at(-1)?.content ?? "";
+    expect(stored).not.toMatch(/keeping both/iu);
+    expect(stored).toContain("I haven't saved that yet.");
+    expect(stored).toContain("you told me October MRR was $110k");
+    expect(s.published.map((d) => d.text).join(" ")).not.toMatch(
+      /keeping both/iu,
+    );
+  });
+
+  it("a correction claim is rewritten too; plain analysis is left alone", async () => {
+    const s = seam(
+      true,
+      "Actually October MRR was $110k.",
+      {},
+      {
+        synthesis:
+          "I've corrected October's MRR to $110k. Retention looks steady.",
+        sentences: [],
+      },
+    );
+    await s.answer.answer(request());
+    const stored = s.stored.at(-1)?.content ?? "";
+    expect(stored).not.toMatch(/corrected/iu);
+    expect(stored).toContain("Retention looks steady.");
+  });
+
+  it("a statement code did record backs a noted line", async () => {
+    const s = seam(
+      true,
+      "We have 40 customers.",
+      {},
+      {
+        synthesis: "I've noted that in your records. Retention looks steady.",
+        sentences: [],
+        recordedStatements: ["We have 40 customers"],
+      },
+    );
+    await s.answer.answer(request());
+    expect(s.stored.at(-1)?.content).toContain(
+      "I've noted that in your records.",
+    );
   });
 });
