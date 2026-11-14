@@ -328,7 +328,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v31_comm.v1",
+      "q-system.v2_company-analyst.v32_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -464,7 +464,9 @@ describe("renderer", () => {
     // v30 (C3): ~25 tokens -- the offer key and where an offer goes.
     // v31 (A8): ~25 tokens -- a stated figure of theirs is also prepared
     // with the figure tool; seven trims pay for it.
-    expect(rendered.bundle.task).toBe("company-analyst/v31");
+    // v32 (A8): ~12 tokens -- a correction is prepared the same way and
+    // never said corrected or kept before approval; seven trims pay for it.
+    expect(rendered.bundle.task).toBe("company-analyst/v32");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

@@ -15,9 +15,13 @@ import {
  * they approve it. Same output schema; every v30 rule stays.
  */
 describe("COMPANY_ANALYST v31: a stated figure is proposed, never implied recorded", () => {
-  it("is active on v30's schema, keeps v30 published, and differs only by its listed changes", () => {
+  it("was active on v30's schema (now v32), keeps v30 published, and differs only by its listed changes", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(31);
+    // v32 (A8 corrections) succeeds it on the same schema.
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(32);
+    expect(registry.get("COMPANY_ANALYST", 31)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("COMPANY_ANALYST", 30)?.definition.status).toBe(
       "DEPRECATED",
     );

@@ -48,7 +48,9 @@ function founderPlan(actor = actorA): PermittedContextPlan {
   };
 }
 
-function world(options: { readonly recorded?: boolean } = {}) {
+function world(
+  options: { readonly recorded?: boolean; readonly recordedAmount?: string } = {},
+) {
   const prepared: { actionType: string; payload: unknown }[] = [];
   const writes: string[] = [];
   const write = (name: string) => () => {
@@ -67,7 +69,7 @@ function world(options: { readonly recorded?: boolean } = {}) {
                 validFrom: "2026-10-31T00:00:00.000Z",
                 structuredValue: {
                   kind: "MONEY",
-                  amount: "110000",
+                  amount: options.recordedAmount ?? "110000",
                   currency: "USD",
                   asOf: "2026-10-31",
                 },
@@ -234,6 +236,45 @@ describe("a figure a founder tells Q becomes a card, never a record", () => {
       "both are kept, marked as conflicting",
     );
     expect(writes).toEqual([]);
+  });
+
+  it("live 14 Nov: a correction of an approved figure gets its own card naming the one on record", async () => {
+    // "$120k MRR in October" was approved; then "Actually October MRR was
+    // $110k." Q made no card and said the MRR was corrected and both kept.
+    const { executor, prepared, writes } = world({
+      recorded: true,
+      recordedAmount: "120000",
+    });
+    const outcome = await executor.execute(
+      call({
+        ...MRR,
+        amount: 110000,
+        said: "Actually October MRR was $110k.",
+      }),
+      saying(founderPlan(), "Actually October MRR was $110k."),
+    );
+    expect(outcome.result).toMatchObject({ ok: true });
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]?.payload).toMatchObject({
+      figure: {
+        metric: "MRR",
+        value: { kind: "MONEY", amount: "110000", currency: "USD" },
+        asOf: "2026-10-31",
+      },
+      alongside: ["USD 120,000 for October 2026"],
+    });
+    const action = APP_ACTIONS.find((a) => a.name === "company.figure.record");
+    const card = action?.card(prepared[0]?.payload as never);
+    expect(card?.summary).toBe(
+      "Record your MRR of USD 110,000 for October 2026",
+    );
+    expect(card?.preview).toContain("USD 120,000 for October 2026");
+    // Nothing is written, so nothing may be said corrected or kept yet.
+    expect(writes).toEqual([]);
+    // The tool says, by meaning, that a correction is prepared the same way.
+    const tool = action?.tool;
+    expect(tool?.description).toMatch(/A correction .* is prepared the same way/u);
+    expect(tool?.description).toMatch(/recorded, corrected, kept or on file/u);
   });
 
   it("an investor cannot record a figure on any company, theirs to see or not", async () => {
