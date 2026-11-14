@@ -39,7 +39,7 @@ import {
   type NewApplicationFact,
 } from "../contracts/index.js";
 import {
-  contradictionsIn,
+  contradictionsForInterview,
   questionNeedsFor,
   type QuestionNeed,
 } from "./question-needs.js";
@@ -572,7 +572,9 @@ export function createGateQInterviewer(
         contradictions:
           application === undefined
             ? "(none)"
-            : contradictionsIn(application.facts).join("\n") || "(none)",
+            : contradictionsForInterview(application.facts, input.askedCounts)
+                .join("\n")
+                .slice(0, 2000) || "(none)",
         askedAlready:
           input.askedAlready.length === 0
             ? "(nothing yet)"
@@ -696,9 +698,23 @@ export function createGateQInterviewer(
         if (result.readBackConfirmed === false) return false;
         return affirmsReadBack(amount, lastQ, input.utterance);
       };
-      const conflictOn = new Map(
-        result.conflicts.map((c) => [c.dimension, c.earlier] as const),
-      );
+      // Live D10 (2026-11-14, Routeix): a turn-level conflict on traction
+      // paired "600 weekly active" with every later traction line ("6 to 18
+      // operators", "willingness to pay not tested"), so one disagreement
+      // showed as three. The reading now marks the one statement that
+      // disagrees (`disagreesWith`), and only that statement is paired.
+      // The turn-level `conflicts` list still tells Q to ask; it never
+      // pairs a statement on its own (it cannot say which one disagrees).
+      const conflictFor = (
+        candidate: (typeof proposed)[number],
+      ): { readonly earlier: string } | null =>
+        candidate.disagreesWith === undefined ||
+        candidate.disagreesWith === null ||
+        candidate.disagreesWith.trim().length === 0
+          ? null
+          : { earlier: candidate.disagreesWith };
+      /** What this turn already wrote per dimension: two statements add up. */
+      const writtenNow = new Map<ApplicationDimension, number>();
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;
@@ -747,8 +763,10 @@ export function createGateQInterviewer(
         // it back. One Q worked out ("two pay $180,000 each" read as revenue
         // 360000) is not recorded as their claim yet: Q says it back as a
         // question and their yes records it next turn.
+        // A zero the reading heard stated is no worked-out figure (D9).
         if (
           normalised.value.kind === "AMOUNT" &&
+          candidate.value.kind !== "ZERO" &&
           !amountStatedIn(normalised.value.amount, input.utterance) &&
           !agreedTo(normalised.value.amount)
         ) {
@@ -780,7 +798,12 @@ export function createGateQInterviewer(
         // said before unless they said it replaces it (fact-history.ts):
         // "willingness to pay not tested" never erases the user numbers,
         // and two numbers that disagree are both kept and flagged.
-        const before = held(dimension);
+        // Two statements about one dimension in one turn add up too (live
+        // D10: "6 to 18 operators" was lost to "about 1,500 weekly active",
+        // both written over the same held value).
+        const sameTurn = writtenNow.get(dimension);
+        const before =
+          sameTurn === undefined ? held(dimension) : facts[sameTurn];
         const heldText =
           before === undefined ? null : asStatement(before.value);
         const saidText = asStatement(normalised.value);
@@ -795,14 +818,18 @@ export function createGateQInterviewer(
             held: { value: heldText, provenance: before.provenance },
             statement: saidText.text,
             provenance: normalised.provenance,
-            conflict: conflictOn.has(dimension)
-              ? { earlier: conflictOn.get(dimension) ?? null }
-              : null,
+            conflict: conflictFor(candidate),
           });
           if (added === null) continue;
-          facts.push({ ...normalised, ...added });
+          const fact = { ...normalised, ...added };
+          if (sameTurn === undefined) {
+            writtenNow.set(dimension, facts.length);
+            facts.push(fact);
+          } else facts[sameTurn] = fact;
           continue;
         }
+        if (ACCUMULATING_DIMENSIONS.has(dimension) && sameTurn === undefined)
+          writtenNow.set(dimension, facts.length);
         const current = input.application?.facts.find(
           (fact) =>
             fact.dimension === normalised.dimension &&

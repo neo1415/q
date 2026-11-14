@@ -9,7 +9,7 @@ import {
   missingSpecifics,
   QUANTITATIVE_DIMENSIONS,
 } from "./answer-specificity.js";
-import { unreconciledStatements } from "./fact-history.js";
+import { unreconciledPairs, unreconciledStatements } from "./fact-history.js";
 
 /**
  * What is worth asking next, and why (CQ-GATE-002 §22, §28).
@@ -144,6 +144,18 @@ export function questionNeedsFor(input: {
       answered.add(dimension as ApplicationDimension);
     }
   }
+  // Live D3 (2026-11-14, Routeix): "we went from 6 to 18 operators" was on
+  // record under traction, and Q still asked how many operators were live.
+  // Traction with its figures already says how many are using it; the
+  // customer count is not asked for again.
+  const traction = input.facts.some(
+    (fact) =>
+      fact.dimension === "claims.traction" &&
+      fact.supersededAt === null &&
+      fact.value.kind !== "NONE",
+  );
+  if (traction && missingSpecifics("claims.traction", input.facts) === null)
+    answered.add("company.customers");
   const needs: QuestionNeed[] = [];
   const seen = new Set<ApplicationDimension>();
   const parked = (dimension: ApplicationDimension): boolean =>
@@ -231,6 +243,36 @@ export function questionNeedsFor(input: {
 export function contradictionsIn(
   facts: readonly ApplicationFact[],
 ): readonly string[] {
+  // Their own statements that disagree (Q's reading of the turn flagged it):
+  // both are kept and shown, never one picked.
+  return [...figureContradictions(facts), ...unreconciledStatements(facts)];
+}
+
+/**
+ * The same, as the interviewer is shown them (live D3, 2026-11-14): Q put
+ * "600 or about 1,500 weekly active?" to the founder, heard "I'm not sure
+ * which is right", said it would leave it open, and asked it twice more.
+ * A disagreement on a dimension Q has already asked about was put to them
+ * when it was found; it is marked so, and it stays open without being
+ * pressed. Nothing is resolved here: the founder settles it, or nobody.
+ */
+export function contradictionsForInterview(
+  facts: readonly ApplicationFact[],
+  askedCounts?: ReadonlyMap<ApplicationDimension, number>,
+): readonly string[] {
+  return [
+    ...figureContradictions(facts),
+    ...unreconciledPairs(facts).map((pair) =>
+      (askedCounts?.get(pair.dimension as ApplicationDimension) ?? 0) > 0
+        ? `${pair.line} (already asked; leave it open)`
+        : pair.line,
+    ),
+  ];
+}
+
+function figureContradictions(
+  facts: readonly ApplicationFact[],
+): readonly string[] {
   const out: string[] = [];
   const raise = facts.find(
     (fact) => fact.dimension === "raise.amount" && fact.supersededAt === null,
@@ -251,8 +293,5 @@ export function contradictionsIn(
       "the stated revenue is larger than the raise; worth checking which period each figure covers",
     );
   }
-  // Their own statements that disagree (Q's reading of the turn flagged it):
-  // both are kept and shown, never one picked.
-  out.push(...unreconciledStatements(facts));
   return out;
 }

@@ -61,14 +61,38 @@ export const GateQProposedValueSchema = z.discriminatedUnion("kind", [
       currency: z.string().regex(/^[A-Z]{3}$/),
     })
     .strict(),
+  /**
+   * Phrases as read, as long as a TEXT value may be. Live D8 (2026-11-14):
+   * one sector phrase over the store's 120 characters refused the whole
+   * reading, every provider failed it, and the founder's first message
+   * never got a reply. A bound on one proposal must never cost the turn:
+   * the platform splits and trims phrases into the stored shape itself.
+   */
   z
     .object({
       kind: z.literal("PHRASES"),
-      phrases: z.array(z.string().min(1).max(120)).min(1).max(12),
+      phrases: z.array(z.string().min(1).max(2000)).min(1).max(12),
     })
     .strict(),
   /** They were asked and do not know. A real answer, not an absence. */
-  z.object({ kind: z.literal("NONE") }).strict(),
+  z
+    .object({ kind: z.literal("NONE") })
+    .strict()
+    .describe(
+      "They do not know or would rather not say. Never for a stated nothing.",
+    ),
+  /**
+   * Live D9 (2026-11-14): "Nobody pays yet" and "Revenue so far is zero"
+   * were read as NONE, so a stated zero became "you don't know yet". A
+   * stated nothing is a value, and the reading says so here; the platform
+   * puts it into the dimension's shape (USD 0 when they named a currency).
+   */
+  z
+    .object({ kind: z.literal("ZERO") })
+    .strict()
+    .describe(
+      "They stated there is none of it: no revenue, nobody pays, no customers yet. A real value, never unknown.",
+    ),
 ]);
 export type GateQProposedValue = z.infer<typeof GateQProposedValueSchema>;
 
@@ -90,6 +114,13 @@ export const GateQProposedFactSchema = z
     ]),
     /** True when this replaces something they said earlier. */
     correction: z.boolean().default(false),
+    /**
+     * v5 (live D10): this statement gives a different figure for the same
+     * quantity as earlier words on record, and they did not say it
+     * replaces them; those earlier words, quoted. Null for anything else,
+     * including another statement about the same dimension.
+     */
+    disagreesWith: z.string().max(300).nullable().optional(),
   })
   .strict();
 export type GateQProposedFact = z.infer<typeof GateQProposedFactSchema>;

@@ -26,6 +26,8 @@ import type {
   GateqVideoStateDto,
 } from "@capital-q/contracts";
 import {
+  GATEQ_REPLY_FAILED_DETAIL,
+  GATEQ_REPLY_IN_PROGRESS_DETAIL,
   GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
   ApplicationAnswersRequestSchema,
@@ -108,6 +110,26 @@ function failure(error: unknown): ApplyResult {
   if (error instanceof ApiProblemError && error.status === 429) {
     return RATE_LIMITED;
   }
+  // Live D8: Q still answering, or its reply failed, is said as it is,
+  // never as a spent allowance.
+  if (
+    error instanceof ApiProblemError &&
+    error.problem?.detail === GATEQ_REPLY_IN_PROGRESS_DETAIL
+  )
+    return {
+      ok: false,
+      message:
+        "Q is still answering your last message. Give it a moment, then carry on.",
+    };
+  if (
+    error instanceof ApiProblemError &&
+    error.problem?.detail === GATEQ_REPLY_FAILED_DETAIL
+  )
+    return {
+      ok: false,
+      message:
+        "Q couldn't answer that just now. Your message is saved; send it again.",
+    };
   return {
     ok: false,
     message:

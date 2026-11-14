@@ -233,6 +233,119 @@ describe("what survives validation", () => {
     },
   );
 
+  it("live D8: a phrase longer than the stored shape never costs the reply", async () => {
+    // Layerum 2026-11-14: one long sector phrase refused the whole reading
+    // and the founder's first message never got an answer.
+    const long =
+      "embedded finance APIs that let software platforms serving merchants in Kisumu and across Kenya launch wallets cards and payouts";
+    expect(long.length).toBeGreaterThan(120);
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          dimension: "company.sector_phrases",
+          value: { kind: "PHRASES", phrases: [long] },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+        {
+          dimension: "company.description",
+          value: { kind: "PHRASES", phrases: [long] },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(turn({ utterance: long }));
+    expect(outcome.reply).toBe(RESULT.reply);
+    const sector = outcome.facts.find(
+      (f) => f.dimension === "company.sector_phrases",
+    );
+    expect(sector?.value.kind).toBe("PHRASES");
+    if (sector?.value.kind === "PHRASES")
+      for (const phrase of sector.value.phrases)
+        expect(phrase.length).toBeLessThanOrEqual(120);
+    expect(
+      outcome.facts.find((f) => f.dimension === "company.description")?.value,
+    ).toEqual({ kind: "TEXT", text: long });
+  });
+
+  describe("live D9: a stated zero is a value, never unknown", () => {
+    const revenue = (
+      value: GateQInterviewerResult["facts"][number]["value"],
+      provenance: GateQInterviewerResult["facts"][number]["provenance"],
+    ): GateQInterviewerResult => ({
+      ...RESULT,
+      facts: [
+        { dimension: "claims.revenue", value, provenance, correction: false },
+      ],
+    });
+
+    it.each(["Nobody pays yet.", "Revenue so far is zero."])(
+      "records %s as a zero, without a read-back",
+      async (utterance) => {
+        const { service } = interviewer(
+          revenue({ kind: "ZERO" }, "APPLICANT_PROVIDED"),
+        );
+        const outcome = await service.turn(turn({ utterance }));
+        expect(outcome.facts).toEqual([
+          {
+            dimension: "claims.revenue",
+            value: { kind: "TEXT", text: "0" },
+            provenance: "APPLICANT_PROVIDED",
+          },
+        ]);
+        expect(outcome.notRecorded).toBeUndefined();
+        expect(outcome.reply).toBe(RESULT.reply);
+      },
+    );
+
+    it("takes money's shape when they named the currency", async () => {
+      const { service } = interviewer(revenue({ kind: "ZERO" }, "UNKNOWN"));
+      const outcome = await service.turn(
+        turn({ utterance: "Zero dollars of revenue so far." }),
+      );
+      expect(outcome.facts).toEqual([
+        {
+          dimension: "claims.revenue",
+          value: { kind: "AMOUNT", amount: "0", currency: "USD" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+      ]);
+      expect(outcome.notRecorded).toBeUndefined();
+    });
+
+    it("keeps not knowing as unknown", async () => {
+      const { service } = interviewer(revenue({ kind: "NONE" }, "UNKNOWN"));
+      const outcome = await service.turn(
+        turn({ utterance: "We don't know our revenue yet." }),
+      );
+      expect(outcome.facts).toEqual([
+        {
+          dimension: "claims.revenue",
+          value: { kind: "NONE" },
+          provenance: "UNKNOWN",
+        },
+      ]);
+    });
+
+    it("never turns a qualifying dimension into a zero", async () => {
+      const { service } = interviewer({
+        ...RESULT,
+        facts: [
+          {
+            dimension: "raise.amount",
+            value: { kind: "ZERO" },
+            provenance: "APPLICANT_PROVIDED",
+            correction: false,
+          },
+        ],
+      });
+      const outcome = await service.turn(turn({ utterance: "Nothing." }));
+      expect(outcome.facts).toEqual([]);
+    });
+  });
+
   it("saves an amount said in words", async () => {
     const { service } = interviewer({
       ...RESULT,

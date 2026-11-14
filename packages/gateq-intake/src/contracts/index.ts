@@ -364,6 +364,14 @@ export const INTAKE_REFUSALS = [
    * thinking their application vanished; the earlier one is never named.
    */
   "ALREADY_APPLIED",
+  /**
+   * Live D8 (2026-11-14): Q is still writing its reply to this
+   * application's last message, under a live, bounded claim. Told apart
+   * from a spent allowance, because it is not one: the applicant waits a
+   * moment, and nothing they said is lost. A claim whose run failed or
+   * expired never refuses anything.
+   */
+  "REPLY_IN_PROGRESS",
 ] as const;
 export const IntakeRefusalSchema = z.enum(INTAKE_REFUSALS);
 export type IntakeRefusal = z.infer<typeof IntakeRefusalSchema>;

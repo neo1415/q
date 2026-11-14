@@ -654,7 +654,8 @@ export function registerGateQRoutes(
           // or closed gateway is one 404; a spent allowance is a 429.
           if (
             error instanceof IntakeRefusedError &&
-            error.refusal !== "TOO_MANY_REQUESTS"
+            error.refusal !== "TOO_MANY_REQUESTS" &&
+            error.refusal !== "REPLY_IN_PROGRESS"
           ) {
             reply.callNotFound();
             return undefined;
@@ -687,7 +688,8 @@ export function registerGateQRoutes(
           // A wrong credential is the same answer as everywhere else.
           if (
             error instanceof IntakeRefusedError &&
-            error.refusal !== "TOO_MANY_REQUESTS"
+            error.refusal !== "TOO_MANY_REQUESTS" &&
+            error.refusal !== "REPLY_IN_PROGRESS"
           ) {
             reply.callNotFound();
             return undefined;

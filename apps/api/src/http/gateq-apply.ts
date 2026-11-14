@@ -148,10 +148,12 @@ export function registerGateQApplyRoutes(
     // public wording.
     // Slice 1: an unconfirmed contact is the other one. The founder can
     // fix it on the same screen, so it is a 409 the problem handler words,
-    // never a 404 that says the application is gone.
+    // never a 404 that says the application is gone. Live D8: Q still
+    // answering their last message is a 409 that says so.
     if (
       error instanceof IntakeRefusedError &&
       error.refusal !== "TOO_MANY_REQUESTS" &&
+      error.refusal !== "REPLY_IN_PROGRESS" &&
       error.refusal !== "CONTACT_NOT_CONFIRMED" &&
       !toldApart.includes(error.refusal)
     ) {

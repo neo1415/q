@@ -3,6 +3,8 @@ import {
   createProblemDetails,
   GATEQ_SUBMIT_ALREADY_APPLIED_DETAIL,
   GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+  GATEQ_REPLY_FAILED_DETAIL,
+  GATEQ_REPLY_IN_PROGRESS_DETAIL,
   GATEQ_SUBMIT_NOT_READY_DETAIL,
   PROBLEM_CONTENT_TYPE,
   problemFromUnknownError,
@@ -91,7 +93,10 @@ import {
   UnicornPotentialDiscoverDeniedError,
   SlateCursorRejectedError,
 } from "@capital-q/discovery";
-import { IntakeRefusedError } from "@capital-q/gateq-intake";
+import {
+  IntakeRefusedError,
+  InterviewUnavailableError,
+} from "@capital-q/gateq-intake";
 import {
   ClaimNotFoundError,
   ClaimRevisionConflictError,
@@ -288,6 +293,27 @@ function toProblem(
     error.refusal === "TOO_MANY_REQUESTS"
   ) {
     return createProblemDetails({ code: "RATE_LIMITED", requestId });
+  }
+  // Live D8: Q is still answering their last message. Said as it is,
+  // never as a spent allowance; nothing they said is lost.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "REPLY_IN_PROGRESS"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: GATEQ_REPLY_IN_PROGRESS_DETAIL,
+    });
+  }
+  // The interviewer could not answer this turn. Their message is stored
+  // and its claim released, so the same turn sent again is answered once.
+  if (error instanceof InterviewUnavailableError) {
+    return createProblemDetails({
+      code: "PROVIDER_UNAVAILABLE",
+      requestId,
+      detail: GATEQ_REPLY_FAILED_DETAIL,
+    });
   }
   // GateQ slice 1: Submit before the contact's email is confirmed. The
   // applicant fixes it on the same screen; nothing else is said.

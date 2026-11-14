@@ -190,10 +190,18 @@ export function createPostgresApplicationRepository(options: {
     },
 
     setStatus: async (tx, id, status, submittedAt) => {
+      // Submit refuses a live reply claim first (pendingFor, under this
+      // row's lock); what is left is one whose run failed or expired, and a
+      // submitted application holds no pending exchange (live D8).
+      const submitted = status === "SUBMITTED";
       const rows = await tx.sql`
         update gateq.applications
            set status = ${status},
                submitted_at = ${submittedAt ?? null},
+               interview_claim_id = case when ${submitted}::boolean then null else interview_claim_id end,
+               interview_claim_turn_id = case when ${submitted}::boolean then null else interview_claim_turn_id end,
+               interview_claim_expires_at = case when ${submitted}::boolean then null else interview_claim_expires_at end,
+               interview_outcome = case when ${submitted}::boolean then null else interview_outcome end,
                updated_at = now()
          where id = ${id}
         returning *`;
@@ -515,12 +523,13 @@ export function createPostgresApplicationTurnRepository(options: {
     releaseExchange: async (applicationId, claimId) => {
       await sql`update gateq.applications set interview_claim_id = null, interview_claim_expires_at = null where id = ${applicationId} and interview_claim_id = ${claimId}`;
     },
+    // Only a live claim is pending. A released claim (its run failed) or
+    // an expired one (its process died) holds nothing: live D8, a failed
+    // first reply refused every later save on the application for good.
     pendingFor: async (applicationId) => {
       const rows =
-        await sql`select interview_claim_turn_id from gateq.applications where id = ${applicationId}`;
-      return (
-        rows[0] !== undefined && rows[0]["interview_claim_turn_id"] !== null
-      );
+        await sql`select 1 from gateq.applications where id = ${applicationId} and interview_claim_id is not null and interview_claim_expires_at > clock_timestamp()`;
+      return rows.length === 1;
     },
     assertClaim: async (tx, applicationId, claimId) => {
       const rows =
@@ -541,14 +550,17 @@ export function createPostgresApplicationTurnRepository(options: {
         if (existing.some((row) => row["role"] === "Q")) return null;
         if (app["status"] === "SUBMITTED")
           throw new IntakeRefusedError("ALREADY_SUBMITTED");
-        if (
-          (app["interview_claim_turn_id"] !== null &&
-            app["interview_claim_turn_id"] !== input.clientTurnId) ||
-          (app["interview_claim_id"] !== null && app["claim_live"] === true)
-        )
-          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+        // One reply at a time, and only while its claim is live. A claim
+        // released by a failed run, or past its bound, no longer holds the
+        // application (live D8): the same turn retried reuses any reply
+        // already paid for; another turn takes over and drops that stale
+        // checkpoint, so it is never read back as this turn's answer. Two
+        // minutes bounds a run whose process died without releasing (the
+        // interviewer itself gives up at 40 seconds).
+        if (app["interview_claim_id"] !== null && app["claim_live"] === true)
+          throw new IntakeRefusedError("REPLY_IN_PROGRESS");
         const claimId = randomUUID();
-        await tx.sql`update gateq.applications set interview_claim_id = ${claimId}, interview_claim_turn_id = ${input.clientTurnId}, interview_claim_expires_at = clock_timestamp() + interval '5 minutes' where id = ${input.applicationId}`;
+        await tx.sql`update gateq.applications set interview_claim_id = ${claimId}, interview_claim_turn_id = ${input.clientTurnId}, interview_claim_expires_at = clock_timestamp() + interval '2 minutes', interview_outcome = case when interview_claim_turn_id = ${input.clientTurnId} then interview_outcome else null end where id = ${input.applicationId}`;
         // The applicant's own words depend on no document or earlier
         // turn: what they choose to say is theirs to disclose.
         if (input.recordPerson !== false)

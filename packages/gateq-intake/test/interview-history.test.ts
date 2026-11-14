@@ -17,7 +17,11 @@ import {
   createGateQInterviewer,
   type InterviewTurnInput,
 } from "../src/application/interviewer.js";
-import { contradictionsIn } from "../src/application/question-needs.js";
+import {
+  contradictionsForInterview,
+  contradictionsIn,
+  questionNeedsFor,
+} from "../src/application/question-needs.js";
 import { factSummary } from "../src/application/coverage.js";
 import { statementsInWords } from "../src/application/fact-history.js";
 import { profileOf } from "../src/inbox/domain.js";
@@ -155,8 +159,13 @@ describe("traction keeps every statement; 600 against 1,500 stands, flagged (liv
       s.current(),
       TURN_10,
       {
-        facts: [traction(TRACTION_10, "ESTIMATED")],
         // Q's reading of the turn: this disagrees with the 600 on record.
+        facts: [
+          {
+            ...traction(TRACTION_10, "ESTIMATED"),
+            disagreesWith: "around 600 use Kazikit every week",
+          },
+        ],
         conflicts: [
           {
             dimension: "claims.traction",
@@ -212,7 +221,7 @@ describe("traction keeps every statement; 600 against 1,500 stands, flagged (liv
     s.record(
       (
         await say(s.current(), TURN_10, {
-          facts: [traction(TRACTION_10)],
+          facts: [{ ...traction(TRACTION_10), disagreesWith: "600" }],
           conflicts: [{ dimension: "claims.traction", earlier: null }],
         })
       ).facts,
@@ -251,7 +260,7 @@ describe("traction keeps every statement; 600 against 1,500 stands, flagged (liv
       8,
     );
     const t10 = await say(s.current(), TURN_10, {
-      facts: [traction(TRACTION_10)],
+      facts: [{ ...traction(TRACTION_10), disagreesWith: "9,000 weekly" }],
       conflicts: [{ dimension: "claims.traction", earlier: "9,000 weekly" }],
     });
     const value = t10.facts[0]?.value;
@@ -556,6 +565,135 @@ describe("an accumulated text reads as sentences (live 2026-11-14)", () => {
   it("keeps a single statement exactly as said", () => {
     expect(statementsInWords("lower-case, no stop")).toBe(
       "lower-case, no stop",
+    );
+  });
+});
+
+/**
+ * Live re-check 2026-11-14 (Kilima <- Routeix, application f21f0ddc), the
+ * founder's words as stored (seq 4, 6, 8, 12). One weekly-active figure
+ * disagrees with another; nothing else does.
+ */
+describe("live D10: only the statement that disagrees is paired (Routeix)", () => {
+  const SEQ_4 =
+    "Nobody pays yet: the pilots are free for six months. Across the pilots the driver app has 1,900 sign-ups, 600 weekly active.";
+  const SEQ_6 =
+    "Since the pilots began in May we went from 6 to 18 operators. We have about 1,500 weekly active now on the driver app.";
+  const SEQ_8 =
+    "I'd need to check our dashboard; the two numbers came from different exports and I'm not sure which is right.";
+  const SEQ_12 =
+    "Six people: I'm Achieng Mutua, CEO, I ran a fleet of forty trucks for eight years; Amani Kipchoge leads growth; and four engineers. Willingness to pay is not tested yet; converting pilots to paid plans is what this round will prove.";
+  const T4 =
+    "The pilots are free for six months; Across the pilots the driver app has 1,900 sign-ups; 600 weekly active";
+  const GROWTH =
+    "Since the pilots began in May we went from 6 to 18 operators.";
+  const WEEKLY = "About 1,500 weekly active on the driver app.";
+  const SUMMARY =
+    "Since May, operator count grew from 6 to 18; weekly-active driver figure is unresolved because two exports showed different numbers.";
+  const WTP =
+    "Willingness to pay is not tested yet; converting pilots to paid plans is what this round will prove.";
+  const CONFLICT = [
+    { dimension: "claims.traction", earlier: "600 weekly active" },
+  ];
+
+  async function replay(marked: boolean) {
+    const s = store();
+    s.record(
+      (await say(s.current(), SEQ_4, { facts: [traction(T4)] })).facts,
+      4,
+    );
+    s.record(
+      (
+        await say(s.current(), SEQ_6, {
+          facts: [
+            traction(GROWTH),
+            marked
+              ? { ...traction(WEEKLY), disagreesWith: "600 weekly active" }
+              : traction(WEEKLY),
+          ],
+          conflicts: CONFLICT,
+        })
+      ).facts,
+      6,
+    );
+    // The live reading re-flagged the same pair on a summary line, and
+    // again on willingness to pay.
+    s.record(
+      (
+        await say(s.current(), SEQ_8, {
+          intent: "UNKNOWN_OR_SKIP",
+          facts: [traction(SUMMARY)],
+          conflicts: CONFLICT,
+        })
+      ).facts,
+      8,
+    );
+    s.record(
+      (
+        await say(s.current(), SEQ_12, {
+          facts: [traction(WTP)],
+          conflicts: CONFLICT,
+        })
+      ).facts,
+      12,
+    );
+    return s;
+  }
+
+  it("one disagreement, every statement kept", async () => {
+    const s = await replay(true);
+    const now = s.current().find((f) => f.dimension === "claims.traction");
+    if (now?.value.kind !== "TEXT") throw new Error("traction lost");
+    // "6 to 18 operators" is no longer dropped by its own turn.
+    for (const said of [T4, GROWTH, WEEKLY, SUMMARY, WTP])
+      expect(now.value.text).toContain(said);
+    expect(now.value.unreconciled).toHaveLength(1);
+    expect(now.value.unreconciled?.[0]?.later).toBe(WEEKLY);
+    expect(contradictionsIn(s.current())).toHaveLength(1);
+  });
+
+  it("a turn-level reading alone pairs nothing: it cannot say which statement disagrees", async () => {
+    const s = store();
+    s.record(
+      (await say(s.current(), SEQ_4, { facts: [traction(T4)] })).facts,
+      4,
+    );
+    const t6 = await say(s.current(), SEQ_6, {
+      facts: [traction(GROWTH), traction(WEEKLY)],
+      conflicts: CONFLICT,
+    });
+    expect(t6.facts).toHaveLength(1);
+    const value = t6.facts[0]?.value;
+    if (value?.kind !== "TEXT") throw new Error("expected text");
+    expect(value.unreconciled ?? []).toEqual([]);
+  });
+
+  it("live D3: a disagreement already put to them is marked to leave open", async () => {
+    const s = await replay(true);
+    const asked = new Map([["claims.traction", 2]] as const);
+    const lines = contradictionsForInterview(s.current(), asked);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/\(already asked; leave it open\)$/u);
+    // Not yet asked about: put to them as it stands.
+    expect(contradictionsForInterview(s.current())[0]).not.toContain(
+      "already asked",
+    );
+  });
+
+  it("live D3: never asks how many customers when traction already says", async () => {
+    const s = await replay(true);
+    const needs = questionNeedsFor({
+      policy: { criteria: [] } as unknown as GatewayPolicy,
+      qualification: {
+        criteria: [],
+        unknowns: [],
+        principalMismatches: [],
+      } as unknown as QualificationResult,
+      facts: s.current(),
+      limit: 20,
+    });
+    expect(needs.map((need) => need.dimension)).not.toContain(
+      "company.customers",
     );
   });
 });

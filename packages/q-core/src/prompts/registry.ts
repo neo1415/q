@@ -335,6 +335,7 @@ import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
 import { GATEQ_INTERVIEWER_V3 } from "./tasks/gateq-interviewer.v3.js";
 import { GATEQ_INTERVIEWER_V4 } from "./tasks/gateq-interviewer.v4.js";
+import { GATEQ_INTERVIEWER_V5 } from "./tasks/gateq-interviewer.v5.js";
 import { INTERVIEW_CONDUCTOR_V1 } from "./tasks/interview-conductor.v1.js";
 import { INTERVIEW_CONDUCTOR_V2 } from "./tasks/interview-conductor.v2.js";
 import { INTERVIEW_CONDUCTOR_V3 } from "./tasks/interview-conductor.v3.js";
@@ -895,7 +896,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...GATEQ_INTERVIEWER_V1, status: "DEPRECATED" },
     { ...GATEQ_INTERVIEWER_V2, status: "DEPRECATED" },
     { ...GATEQ_INTERVIEWER_V3, status: "DEPRECATED" },
-    GATEQ_INTERVIEWER_V4,
+    { ...GATEQ_INTERVIEWER_V4, status: "DEPRECATED" },
+    GATEQ_INTERVIEWER_V5,
     // AUTO block (ADR 0030)
     WORK_SHORTLIST_V1,
     WORK_CONVERSE_V1,
