@@ -712,3 +712,25 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - the real refusal reason in the log and alert;
   - the marker no longer blocks a retry after a failed call, which also re-reads the two marked versions.
 - **GateQ D8–D10 (`a047ddf63`):** gating; deploy held until the deck check finished.
+
+## A8 founder figures LIVE end to end — `faa48e867` (14 Nov, 07:20 Lagos)
+
+- **Gates:**
+  - `2069d674f`: FAIL from machine contention (lint stopped with no errors; an integration timeout) while two workers ran tests. A clean re-lint passed. Workers are now held idle during gates.
+  - `a45ac12d8`: FAIL, two real defects. q-specialists parsed the analyst answer with the v30 schema (it would refuse v33 `statedFigures`), and the pgTAP cross-tenant case reused a version that already had a reading. Both fixed in `faa48e867`.
+  - `faa48e867`: `ci-local PASS sha=faa48e867 at=2026-11-14T06:04:57Z took=1377s`.
+- **Migration:** `20261231520000_document_claim_readings` applied before the deploy. Hosted has 295 migrations, none missing; `relrowsecurity` is true. Rollback point `e455f8334`; four services SUCCESS.
+- **Live** (`founder.maji-loop`):
+
+  | Step                                              | Result                                                                                                                                                                                                                                            |
+  | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Re-read of the two decks marked on `e455f8334`    | **PASS**: the catch-up after the deploy left both versions COMPLETED with attempts=1 at 06:10                                                                                                                                                     |
+  | Deck → proposed cards                             | **PASS**: 4 cards, AWAITING_APPROVAL ("Keep your MRR of USD 42,000 for October 2026, from "Maji Loop deck QA 14 Nov b" (page 2)", and USD 37,500 for September from page 3, per deck). None for the June 2027 target. No claim before approval    |
+  | Drop September (deck b)                           | **PASS**: action and approval REJECTED; no claim                                                                                                                                                                                                  |
+  | Approve October (deck b, from Work)               | **PASS**: action EXECUTED. Claim `23cad797` is USER_CLAIM / DOCUMENT_SUPPORTED / CURRENT, `organisation_private`, `valid_from` 2026-10-31. Its evidence item has locator `{document, page 2, excerptHash, documentVersionId 21c9f0be…}`, SUPPORTS |
+  | Contradiction                                     | **PASS**: the earlier chat claim (USD 120,000, SELF_REPORTED) stays CURRENT and is linked CONTRADICTS to the document evidence; nothing overwritten                                                                                               |
+  | Chat correction "Actually October MRR was $110k." | **PASS**: card "Record your MRR of USD 110,000 for October 2026" (AWAITING_APPROVAL), naming both existing USD 42,000 and USD 120,000 as kept and conflicting; not approved                                                                       |
+  | Investor privacy (on `e455f8334`)                 | PASS: "I don't have Maji Loop's October 2026 MRR on record"                                                                                                                                                                                       |
+
+- **New LOW defect:** the job's proposals appear in the founder's conversation as "You: From your document: …", attributed to the founder rather than Q or the system.
+- **Still open:** GateQ D8–D10 live re-check on `faa48e867` (the Layerum draft should be unblocked).
