@@ -46,6 +46,8 @@ export function GatewayAppearancePanel({
   const [message, setMessage] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(open);
   const [pending, startTransition] = useTransition();
+  // Pause and save run separately so one never shows the other's progress.
+  const [toggling, startToggle] = useTransition();
 
   const hex = hexText.trim() === "" ? null : normaliseHex(hexText);
   const palette = hex === null ? null : brandPalette(hex);
@@ -74,7 +76,7 @@ export function GatewayAppearancePanel({
 
   const toggle = () => {
     const next = isOpen ? "DISABLED" : "ACTIVE";
-    startTransition(async () => {
+    startToggle(async () => {
       setMessage(null);
       const done = await gatewayStatusAction(gatewayId, { status: next });
       if (done.ok) {
@@ -112,7 +114,7 @@ export function GatewayAppearancePanel({
           <Button
             variant={isOpen ? "secondary" : "primary"}
             size="compact"
-            disabled={pending}
+            disabled={pending || toggling}
             onClick={toggle}
           >
             {isOpen ? t("Pause gateway") : t("Reopen gateway")}
@@ -124,14 +126,14 @@ export function GatewayAppearancePanel({
           href={previewHref}
           target="_blank"
           rel="noreferrer"
-          className="cq-body-sm self-start text-(--cq-accent) underline underline-offset-2"
+          className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-accent) underline underline-offset-2"
         >
           {t("Preview your public gateway")}
         </a>
       ) : (
         <p className="cq-caption gq-t2">
           {t(
-            "While paused, founders who open your link are told it isn't taking applications. Your rules and applications are kept.",
+            "While paused, your link shows founders that the page isn't available, and nobody can apply. Your rules and applications are kept.",
           )}
         </p>
       )}
@@ -242,7 +244,7 @@ export function GatewayAppearancePanel({
             type="submit"
             size="compact"
             className="self-start"
-            disabled={pending || invalidColour}
+            disabled={pending || toggling || invalidColour}
           >
             {pending ? t("Saving…") : t("Save")}
           </Button>

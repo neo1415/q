@@ -16,8 +16,8 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "Pause gateway": "إيقاف البوابة مؤقتًا",
   "Reopen gateway": "إعادة فتح البوابة",
   "Preview your public gateway": "معاينة بوابتك العامة",
-  "While paused, founders who open your link are told it isn't taking applications. Your rules and applications are kept.":
-    "أثناء الإيقاف، يُبلَّغ المؤسسون الذين يفتحون رابطك بأنها لا تستقبل طلبات. تبقى قواعدك وطلباتك محفوظة.",
+  "While paused, your link shows founders that the page isn't available, and nobody can apply. Your rules and applications are kept.":
+    "أثناء الإيقاف، يُظهر رابطك للمؤسسين أن الصفحة غير متاحة، ولا يمكن لأحد التقديم. تبقى قواعدك وطلباتك محفوظة.",
   "Accent colour": "اللون المميِّز",
   "Colour as hex": "اللون بصيغة سداسية عشرية",
   "Use Capital Q's colour": "استخدم لون Capital Q",

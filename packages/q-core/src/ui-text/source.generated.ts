@@ -5759,7 +5759,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Whether you can send a request couldn't be checked just now. Reload to try again.",
   "Which investor",
   "Which one?",
-  "While paused, founders who open your link are told it isn't taking applications. Your rules and applications are kept.",
+  "While paused, your link shows founders that the page isn't available, and nobody can apply. Your rules and applications are kept.",
   "Who",
   "Who acted, under whose authority, on what. Q always acts under a person's authority; admin actions show the role held.",
   "Who can apply",
