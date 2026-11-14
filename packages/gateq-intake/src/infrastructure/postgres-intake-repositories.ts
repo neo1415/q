@@ -15,6 +15,7 @@ import {
 import {
   ApplicationDimensionSchema,
   ApplicationFactSchema,
+  ApplicationIdSchema,
   ApplicationSchema,
   ApplicationSessionSchema,
   FactValueSchema,
@@ -33,6 +34,7 @@ import {
   type StatementValue,
 } from "../contracts/statements.js";
 import { projectView } from "../application/statement-view.js";
+import type { BackfillStore } from "../application/statement-backfill.js";
 import type {
   ApplicationContactRepository,
   ApplicationDocumentRepository,
@@ -928,9 +930,10 @@ function toEvent(row: Record<string, unknown>): DisagreementEvent {
 export function createPostgresApplicationStatementRepository(options: {
   readonly sql: DatabaseExecutor;
 }): ApplicationStatementRepository {
-  const { sql } = options;
-  const listFor: ApplicationStatementRepository["listFor"] = async (
-    applicationId,
+  const { sql: pool } = options;
+  const listWith = async (
+    sql: DatabaseExecutor,
+    applicationId: Parameters<ApplicationStatementRepository["listFor"]>[0],
   ) => {
     // Four reads of one application's append-only rows, bounded by the
     // interview itself (a turn writes at most a few dozen).
@@ -965,8 +968,12 @@ export function createPostgresApplicationStatementRepository(options: {
       readTurnIds: readings.map((row) => String(row["turn_id"])),
     };
   };
+  const listFor: ApplicationStatementRepository["listFor"] = (applicationId) =>
+    listWith(pool, applicationId);
   return {
     listFor,
+    listInTransaction: (tx, applicationId) =>
+      listWith(tx.sql as DatabaseExecutor, applicationId),
     viewFor: async (applicationId) => {
       const rows = await listFor(applicationId);
       return projectView(rows.statements, rows.links, rows.events);
@@ -1023,5 +1030,63 @@ export function createPostgresApplicationStatementRepository(options: {
           )`;
       }
     },
+  };
+}
+
+/**
+ * The backfill's store (slice 3): one transaction per application, under
+ * its row lock, reading and writing through the same repositories as the
+ * runtime. Used only by `scripts/gateq-backfill-statements.mjs`.
+ */
+export function createPostgresStatementBackfillStore(options: {
+  readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
+}): BackfillStore {
+  const statements = createPostgresApplicationStatementRepository({
+    sql: options.sql,
+  });
+  return {
+    applications: async () => {
+      const rows = await options.sql`
+        select distinct a.id, a.tenant_id
+          from gateq.applications a
+          join gateq.application_facts f
+            on f.application_id = a.id and f.superseded_at is null
+         order by a.id`;
+      return rows.map((row) => ({
+        id: ApplicationIdSchema.parse(row["id"]),
+        tenantId: String(row["tenant_id"]),
+      }));
+    },
+    inTransaction: (application, work) =>
+      options.transactions.run((tx) => {
+        const sql = tx.sql as DatabaseExecutor;
+        return work({
+          lockStatus: async () => {
+            const rows = await sql`
+              select status from gateq.applications
+               where id = ${application.id} for update`;
+            const status = rows[0]?.["status"];
+            return typeof status === "string" ? status : null;
+          },
+          context: () =>
+            statements.listInTransaction === undefined
+              ? statements.listFor(application.id)
+              : statements.listInTransaction(tx, application.id),
+          currentFacts: () =>
+            createPostgresApplicationFactRepository({ sql }).currentFor(
+              application.id,
+            ),
+          append: (rows) =>
+            statements.appendInTransaction(tx, {
+              applicationId: application.id,
+              tenantId: application.tenantId,
+              statements: rows,
+              links: [],
+              events: [],
+              readings: [],
+            }),
+        });
+      }),
   };
 }

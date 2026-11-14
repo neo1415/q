@@ -152,8 +152,12 @@ export {
   GATEQ_DOSSIER_SCHEMA_VERSION,
   GateqCoverageV1Schema,
   GateqDossierV1Schema,
+  GateqDossierV2Schema,
+  GateqDossierSchema,
   type GateqCoverageV1,
   type GateqDossierV1,
+  type GateqDossierV2,
+  type GateqDossier,
 } from "@capital-q/contracts";
 
 export {
@@ -165,7 +169,33 @@ export {
   createPostgresApplicationStatementRepository,
   createPostgresApplicationSubmissionRepository,
   createPostgresApplicationTurnRepository,
+  createPostgresStatementBackfillStore,
 } from "./infrastructure/postgres-intake-repositories.js";
+
+// GateQ atomic statements, slice 3: the one statement view for every
+// reader, and the backfill.
+export {
+  coverageFromView,
+  effectiveStatementView,
+  statementSummary,
+  statementViewDto,
+} from "./application/statement-words.js";
+export {
+  backfillStatementsFor,
+  runStatementBackfill,
+  type BackfillApplication,
+  type BackfillOutcome,
+  type BackfillReport,
+  type BackfillStore,
+  type BackfillTransaction,
+} from "./application/statement-backfill.js";
+export {
+  backfillStatementId,
+  claimsLeftOpen,
+  formStatementPlan,
+  NOT_LEFT_OPEN_LINE,
+} from "./application/statement-plan.js";
+export { buildDossierV2 } from "./application/dossier.js";
 
 export {
   createPostgresSubmissionInbox,

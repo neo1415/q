@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { z } from "zod";
 import type {
@@ -47,6 +47,7 @@ import { amountStatedIn } from "./stated-amount.js";
 import {
   legacyFactsFrom,
   projectView,
+  samePeriod,
   valuesConflict,
   type LegacyIncompleteness,
 } from "./statement-view.js";
@@ -153,6 +154,26 @@ function carriedValues(
 }
 
 /**
+ * The id a carried legacy fact always gets: derived from its application
+ * and backfill key, so the write path, every reader's view and the
+ * backfill script name the same statement by the same id (invariant 8),
+ * and a second carry of one fact is the same row, never a second one.
+ */
+export function backfillStatementId(
+  applicationId: string,
+  backfillKey: string,
+): ApplicationStatementId {
+  const hex = createHash("sha256")
+    .update(`gateq-backfill:${applicationId}:${backfillKey}`)
+    .digest("hex");
+  // A version-4-shaped, variant-1 UUID from the digest.
+  const variant = ((parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+  return ApplicationStatementIdSchema.parse(
+    `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`,
+  );
+}
+
+/**
  * Legacy facts no statement accounts for, as BACKFILL statements, honestly
  * flagged. A dimension recorded before statements existed, or by the form
  * since, is carried into the statements the first time a turn touches it,
@@ -170,6 +191,11 @@ export function legacyCarry(input: {
     input.context.events,
   );
   const projected = legacyFactsFrom(view).facts;
+  const keys = new Set(
+    input.context.statements.flatMap((s) =>
+      s.backfillKey === null ? [] : [s.backfillKey],
+    ),
+  );
   const carried: ApplicationStatement[] = [];
   for (const fact of input.legacyFacts) {
     if (fact.supersededAt !== null) continue;
@@ -191,8 +217,14 @@ export function legacyCarry(input: {
     const values = carriedValues(fact);
     values.forEach((carry, index) => {
       const unknown = carry.value.kind === "UNKNOWN";
+      const backfillKey =
+        values.length === 1
+          ? `legacy-fact:${fact.id}`
+          : `legacy-fact:${fact.id}:${index}`;
+      // Already carried: the statement on record is this fact.
+      if (keys.has(backfillKey)) return;
       const parsed = ApplicationStatementSchema.safeParse({
-        id: randomUUID(),
+        id: backfillStatementId(input.applicationId, backfillKey),
         applicationId: input.applicationId,
         dimension: fact.dimension,
         quantity:
@@ -209,10 +241,7 @@ export function legacyCarry(input: {
             : fact.provenance,
         origin: "BACKFILL",
         sourceTurnId: null,
-        backfillKey:
-          values.length === 1
-            ? `legacy-fact:${fact.id}`
-            : `legacy-fact:${fact.id}:${index}`,
+        backfillKey,
         statedAt: fact.recordedAt,
         recordedAt: fact.recordedAt,
       });
@@ -494,6 +523,13 @@ function shapeValue(
         { dimension, value, provenance: "APPLICANT_PROVIDED" },
         { utterance: context.said, currencyOnRecord: context.currencyOnRecord },
       );
+      // A stage outside the closed vocabulary is kept in their words as
+      // TEXT, never stored as a code the rules would read.
+      if (normalised === null && dimension === "company.stage")
+        return {
+          ok: true,
+          values: [{ kind: "TEXT", text: words.slice(0, 2000) }],
+        };
       if (normalised === null)
         return {
           ok: false,
@@ -575,6 +611,12 @@ export type PlanOutcome = {
   readonly narrowTo: string | null;
   /** New statements recorded from what they just said and the unread turns. */
   readonly recordedCount: number;
+  /**
+   * Disagreements that stand LEFT_OPEN after this turn because of it (an
+   * event written now, or one already left open that it named). Q may say
+   * it is leaving something unresolved only when this is above zero.
+   */
+  readonly leftOpenCount: number;
   readonly incomplete: readonly LegacyIncompleteness[];
 };
 
@@ -793,15 +835,17 @@ export function planReading(input: PlanInput): PlanOutcome {
       if (targetDimension !== undefined) touched.add(targetDimension);
       return;
     }
-    // Code-detected disagreement: a number on the same dimension, quantity
-    // and known date that differs from one on record, with no link.
+    // Code-detected disagreement: a number on the same dimension and
+    // quantity, for what may be the same period, that differs from one on
+    // record, with no link. An unknown date is never assumed to be another
+    // period (live 2026-11-14: undated 600 and 1,500 weekly active stood
+    // side by side with no disagreement).
     for (const other of held) {
       if (
         other.id === statement.id ||
         other.quantity === null ||
         other.quantity !== statement.quantity ||
-        other.asOf === null ||
-        other.asOf !== statement.asOf ||
+        !samePeriod(other.asOf, statement.asOf) ||
         !valuesConflict(other.value, statement.value)
       )
         continue;
@@ -824,17 +868,45 @@ export function planReading(input: PlanInput): PlanOutcome {
         !(
           latest.quantity !== null &&
           latest.quantity === statement.quantity &&
-          latest.asOf !== null &&
-          latest.asOf === statement.asOf
+          samePeriod(latest.asOf, statement.asOf) &&
+          valuesConflict(latest.value, statement.value)
         )
       )
         link("DISAGREES", statement.id, latest.id, "CODE_DETECTED", turn.id);
     }
   };
 
+  // "Leave it open" said while a disagreement on the dimension is open is
+  // a LEAVE_OPEN on that disagreement, never an "I don't know" statement
+  // (live 2026-11-14): read from the structured op (an UNKNOWN, not
+  // declined, on a dimension with an OPEN disagreement), never from words.
+  const implicitActions: GateQDisagreementAction[] = [];
+  const openOn = (dimension: string) =>
+    [...input.handles.disagreements].filter(([, d]) => {
+      if (!d.active || d.state !== "OPEN") return false;
+      return [d.olderStatementId, d.newerStatementId].some(
+        (id) => byId.get(id)?.dimension === dimension,
+      );
+    });
+
   for (const op of ops) {
     if (op === null) {
       rejected += 1;
+      continue;
+    }
+    if (
+      op.turn === null &&
+      op.op === "NEW" &&
+      op.value.kind === "UNKNOWN" &&
+      op.value.declined !== true &&
+      openOn(op.dimension).length > 0
+    ) {
+      for (const [handle] of openOn(op.dimension))
+        implicitActions.push({
+          disagreement: handle,
+          action: "LEAVE_OPEN",
+          keep: null,
+        });
       continue;
     }
     // Which turn said it. A T<n> the server did not issue is never guessed.
@@ -961,7 +1033,19 @@ export function planReading(input: PlanInput): PlanOutcome {
   const corrected = new Set(
     links.filter((l) => l.kind === "CORRECTS").map((l) => l.toStatementId),
   );
-  for (const action of input.discard ? [] : input.actions) {
+  let leftOpen = 0;
+  const actions = [...input.actions, ...implicitActions].filter(
+    (action, index, all) =>
+      action === null ||
+      all.findIndex(
+        (other) =>
+          other !== null &&
+          other.disagreement.trim().toUpperCase() ===
+            action.disagreement.trim().toUpperCase() &&
+          other.action === action.action,
+      ) === index,
+  );
+  for (const action of input.discard ? [] : actions) {
     if (action === null) {
       rejected += 1;
       continue;
@@ -1012,7 +1096,11 @@ export function planReading(input: PlanInput): PlanOutcome {
         continue;
       }
       resolvedBy = keepStatement.id;
-    } else if (disagreement.state === "LEFT_OPEN") continue;
+    } else if (disagreement.state === "LEFT_OPEN") {
+      // Already left open: true to say so, nothing new to write.
+      leftOpen += 1;
+      continue;
+    }
     // A disagreement code found with no stored link gets its link first.
     let linkId = disagreement.linkId;
     if (linkId === null) {
@@ -1035,6 +1123,7 @@ export function planReading(input: PlanInput): PlanOutcome {
       sourceTurnId: input.current.id as ApplicationTurnId | null,
       recordedAt: tick(),
     });
+    if (action.action === "LEAVE_OPEN") leftOpen += 1;
     for (const end of [
       disagreement.olderStatementId,
       disagreement.newerStatementId,
@@ -1117,6 +1206,7 @@ export function planReading(input: PlanInput): PlanOutcome {
     readBacks,
     narrowTo,
     recordedCount: newStatements.length,
+    leftOpenCount: leftOpen,
     incomplete: projected.incomplete,
   };
 }
@@ -1146,17 +1236,47 @@ export function claimsRecording(text: string): boolean {
 export const NOT_RECORDED_LINE =
   "I haven't put anything from that on your application yet.";
 
+const CLAIMS_LEFT_OPEN =
+  /\b(?:leav(?:e|ing)|left|keep(?:ing)?|mark(?:ing|ed)?|flag(?:ging|ged)?)\b[^.!?]*\b(?:unresolved|open|undecided|unsettled|as (?:it|they) (?:is|are|stand))\b/iu;
+
+/** Whether a reply claims a disagreement was left open (a statement, not a question). */
+export function claimsLeftOpen(text: string): boolean {
+  return sentencesOf(text).some(
+    (sentence) =>
+      !sentence.trim().endsWith("?") && CLAIMS_LEFT_OPEN.test(sentence),
+  );
+}
+
+/** The deterministic line when a disagreement was not left open. */
+export const NOT_LEFT_OPEN_LINE =
+  "I haven't marked those two answers as left open yet.";
+
 /**
  * The reply, held to the turn's reading: a sentence claiming something was
- * recorded stands only when the reading recorded a statement. Otherwise it
- * is removed and the deterministic line says what is true.
+ * recorded stands only when the reading recorded a statement, and one
+ * claiming a disagreement is left open only when a LEFT_OPEN stands from
+ * this turn (invariant 7). Otherwise it is removed and the deterministic
+ * line says what is true.
  */
 export function replyHeldToReading(
   reply: string,
   recordedCount: number,
+  leftOpenCount?: number,
 ): string {
-  if (recordedCount > 0 || !claimsRecording(reply)) return reply;
-  const kept = sentencesOf(reply).filter(
+  let text = reply;
+  if (
+    leftOpenCount !== undefined &&
+    leftOpenCount === 0 &&
+    claimsLeftOpen(text)
+  ) {
+    const kept = sentencesOf(text).filter(
+      (sentence) =>
+        sentence.trim().endsWith("?") || !CLAIMS_LEFT_OPEN.test(sentence),
+    );
+    text = `${NOT_LEFT_OPEN_LINE} ${kept.join("").trim()}`.trim();
+  }
+  if (recordedCount > 0 || !claimsRecording(text)) return text.slice(0, 4000);
+  const kept = sentencesOf(text).filter(
     (sentence) => !claimsRecording(sentence),
   );
   return `${NOT_RECORDED_LINE} ${kept.join("").trim()}`.trim().slice(0, 4000);
@@ -1164,3 +1284,103 @@ export function replyHeldToReading(
 
 /** The intake contract's quantity list, for the identity test with q-core. */
 export const PLAN_QUANTITIES = StatementQuantitySchema.options;
+
+// ---------------------------------------------------------------------------
+// The form (slice 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * The rows the form's answers write beside the legacy facts, so every
+ * reader labels a form answer FORM, never "said in the application"
+ * (invariant 8). A form field holds the whole answer, so a new form answer
+ * CORRECTS everything current on its dimension, which the projector then
+ * hides as history (an unknown never hides a held value). Legacy facts on
+ * a touched dimension that no statement accounts for are carried first,
+ * with their deterministic ids, so the correction has something to name.
+ * Pure: nothing is written here.
+ */
+export function formStatementPlan(input: {
+  readonly applicationId: ApplicationId;
+  readonly context: StatementContext;
+  readonly legacyFacts: readonly ApplicationFact[];
+  readonly proposed: readonly NewApplicationFact[];
+  readonly at: string;
+}): {
+  readonly statements: readonly ApplicationStatement[];
+  readonly links: readonly StatementLink[];
+} {
+  const touched = new Set(input.proposed.map((fact) => fact.dimension));
+  const carried = legacyCarry(input).filter((s) => touched.has(s.dimension));
+  const view = projectView(
+    [...input.context.statements, ...carried],
+    input.context.links,
+    input.context.events,
+  );
+  // Strictly after everything it corrects: a link points newer to older.
+  let clock = Math.max(
+    Date.parse(input.at),
+    ...[...input.context.statements, ...carried].map(
+      (s) => Date.parse(s.statedAt) + 1,
+    ),
+  );
+  const statements: ApplicationStatement[] = [...carried];
+  const links: StatementLink[] = [];
+  for (const fact of input.proposed) {
+    const current =
+      view.dimensions.find((d) => d.dimension === fact.dimension)?.items ?? [];
+    const values = carriedValues({
+      id: randomUUID() as ApplicationFact["id"],
+      applicationId: input.applicationId,
+      dimension: fact.dimension,
+      value: fact.value,
+      provenance: fact.provenance,
+      recordedAt: input.at,
+      supersededAt: null,
+    });
+    for (const carry of values) {
+      const statedAt = new Date(clock).toISOString();
+      clock += 1;
+      const unknown = carry.value.kind === "UNKNOWN";
+      const parsed = ApplicationStatementSchema.safeParse({
+        id: randomUUID(),
+        applicationId: input.applicationId,
+        dimension: fact.dimension,
+        quantity:
+          carry.value.kind === "MONEY" || carry.value.kind === "ZERO"
+            ? (QUANTITY_OF[fact.dimension] ?? null)
+            : null,
+        value: carry.value,
+        asOf: null,
+        words: carry.words.slice(0, 2000),
+        provenance: unknown
+          ? "UNKNOWN"
+          : fact.provenance === "UNKNOWN"
+            ? "APPLICANT_PROVIDED"
+            : fact.provenance,
+        origin: "FORM",
+        sourceTurnId: null,
+        backfillKey: null,
+        statedAt,
+        recordedAt: statedAt,
+      });
+      // A value the bounded shape refuses stays in the legacy fact alone;
+      // the reader's view carries that fact in, flagged.
+      if (!parsed.success) continue;
+      statements.push(parsed.data);
+      for (const item of current)
+        links.push(
+          StatementLinkSchema.parse({
+            id: randomUUID(),
+            applicationId: input.applicationId,
+            kind: "CORRECTS",
+            fromStatementId: parsed.data.id,
+            toStatementId: item.statementId,
+            origin: "CODE_DETECTED",
+            sourceTurnId: null,
+            createdAt: statedAt,
+          }),
+        );
+    }
+  }
+  return { statements, links };
+}

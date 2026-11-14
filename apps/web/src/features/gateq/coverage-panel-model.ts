@@ -1,5 +1,7 @@
 import type { ApplicationCoverageDto } from "@capital-q/contracts";
 
+import { statementRowsOf, type DossierStatementRow } from "./page/inbox-model";
+
 /**
  * The live "What we have / What's still needed" reading of an application
  * (directive C2). Built only from the server's coverage check, which reads
@@ -42,6 +44,13 @@ export type CoveragePanelModel = {
   readonly declined: readonly string[];
   readonly conflicts: readonly string[];
   readonly evidenceFollowUps: readonly string[];
+  /**
+   * Slice 3: every statement from the statement view, through the shared
+   * formatter (the same rows the investor's dossier shows): kept ones with
+   * their source, disagreements with both values and their state, and
+   * corrected ones as history. Null from an API without the view.
+   */
+  readonly statements: readonly DossierStatementRow[] | null;
   /** One polite sentence for screen readers when the picture changes. */
   readonly status: string;
 };
@@ -114,6 +123,8 @@ export function coveragePanelModel(
     declined: coverage.declined.map((item) => item.label),
     conflicts: [...coverage.contradictions],
     evidenceFollowUps,
+    statements:
+      dto.statements === undefined ? null : statementRowsOf(dto.statements),
     status: `Saved: ${parts.join(", ")}.`,
   };
 }

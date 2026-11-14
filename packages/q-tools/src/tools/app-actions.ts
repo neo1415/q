@@ -19,6 +19,7 @@ import {
 } from "@capital-q/app-actions";
 import {
   CorrelationIdSchema,
+  GateqStatementSourceKindSchema,
   Q_TASK_CLASSES,
   type CorrelationId,
   type PermittedContextPlan,
@@ -82,7 +83,9 @@ export const AppToolOutputSchema = z
             applicationId: z.string().uuid(),
             reference: z.string().min(1).max(64),
             submittedAt: z.string().datetime(),
-            dossierSchemaVersion: z.literal("gateq-dossier.v1").nullable(),
+            dossierSchemaVersion: z
+              .enum(["gateq-dossier.v1", "gateq-dossier.v2"])
+              .nullable(),
           })
           .strict(),
         text: z.string().max(14_000),
@@ -92,6 +95,7 @@ export const AppToolOutputSchema = z
               .object({
                 factId: z.string().uuid(),
                 transcriptSeq: z.number().int().min(1).nullable(),
+                sourceKind: GateqStatementSourceKindSchema,
               })
               .strict(),
           )

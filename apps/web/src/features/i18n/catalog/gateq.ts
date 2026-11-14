@@ -734,6 +734,27 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "Two answers to review before deciding": "إجابتان للمراجعة قبل اتخاذ القرار",
   "Two answers to review for mandate qualification":
     "إجابتان للمراجعة للتأهيل وفق التفويض",
+  "Needs your judgement: answers disagree": "يحتاج إلى تقديرك: الإجابات متعارضة",
+  "Needs your judgement: answers disagree.":
+    "يحتاج إلى تقديرك: الإجابات متعارضة.",
+  "Your answers disagree": "إجاباتك متعارضة",
+  "your answers disagree": "إجاباتك متعارضة",
+  // Slice 3: statements, their sources and disagreement states.
+  "Said in the application": "قيل في الطلب",
+  "Said in the application, carried from earlier records":
+    "قيل في الطلب، منقول من سجلات سابقة",
+  "Given in the form": "مُعطى في النموذج",
+  "From a shared document": "من مستند مُشارَك",
+  "From their Capital Q company profile": "من ملف شركتهم على Capital Q",
+  "Open, not yet settled": "مفتوح، لم يُحسم بعد",
+  "Left open by the founder": "تركه المؤسس مفتوحًا",
+  Resolved: "تمت تسويته",
+  "Earlier, corrected": "سابقًا، تم تصحيحه",
+  "Earlier answers, corrected": "إجابات سابقة، تم تصحيحها",
+  "Show less": "اعرض أقل",
+  "Show all ({n} more)": "اعرض الكل ({n} أخرى)",
+  "Both answers go to {fund} with their sources.":
+    "تصل الإجابتان إلى {fund} مع مصادرهما.",
   "To clarify": "للتوضيح",
   "To ask": "للسؤال",
   "Questions for diligence": "أسئلة للعناية الواجبة",

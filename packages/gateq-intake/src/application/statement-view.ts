@@ -39,9 +39,12 @@ import {
  *   - DISAGREES keeps both statements visible until a RESOLVED event; a
  *     REOPENED event brings both back.
  *   - Code finds a disagreement on its own only when two current numbers
- *     name the same dimension, quantity and as-of date and differ. Different
- *     quantities never conflict (D10), and an unknown date is never assumed
- *     to equal another unknown date.
+ *     name the same dimension and quantity, may describe the same period,
+ *     and differ. Different quantities never conflict (D10). Two different
+ *     known dates are different periods; an unknown date is never assumed
+ *     to be a different period (live 2026-11-14: an undated 600 and 1,500
+ *     weekly active stood side by side, unflagged), so it is a candidate
+ *     for the same one, flagged for the founder to settle or leave open.
  */
 
 export class StatementViewIntegrityError extends Error {
@@ -87,6 +90,15 @@ function itemOf(statement: ApplicationStatement): DimensionViewItem {
 }
 
 const isHeld = (value: StatementValue) => value.kind !== "UNKNOWN";
+
+/**
+ * Whether two figures may describe the same period: the same known date,
+ * or a date not given on either side. Only two different known dates are
+ * known to be different periods.
+ */
+export function samePeriod(a: string | null, b: string | null): boolean {
+  return a === null || b === null || a === b;
+}
 
 /**
  * A comparable number for code-detected disagreement, or null when the two
@@ -306,15 +318,14 @@ export function projectView(
     .sort(byStated);
   for (let i = 0; i < current.length; i += 1) {
     const older = current[i];
-    if (older === undefined || older.quantity === null || older.asOf === null)
-      continue;
+    if (older === undefined || older.quantity === null) continue;
     for (let j = i + 1; j < current.length; j += 1) {
       const newer = current[j];
       if (
         newer === undefined ||
         newer.dimension !== older.dimension ||
         newer.quantity !== older.quantity ||
-        newer.asOf !== older.asOf ||
+        !samePeriod(newer.asOf, older.asOf) ||
         related.has(`${newer.id}|${older.id}`) ||
         !conflicts(older.value, newer.value)
       )
@@ -448,7 +459,8 @@ const LEGACY_QUOTE_LIMIT = 300;
 const CANONICAL_CODE: Partial<Record<ApplicationDimension, RegExp>> = {
   "company.country": /^[A-Z]{2}$/,
   "raise.currency": /^[A-Z]{3}$/,
-  "company.stage": /^[a-z][a-z0-9_]{0,63}$/,
+  // The closed company_stage vocabulary: a code outside it is never read.
+  "company.stage": /^(?:pre_seed|seed|series_a|series_b|series_c_plus)$/,
 };
 
 /**

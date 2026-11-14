@@ -89,12 +89,15 @@ const GLYPH: Readonly<Record<RuleStanding, GlyphKind>> = {
   MEETS: "fit",
   DOES_NOT_MEET: "no",
   NOT_ANSWERED: "unk",
+  UNRESOLVED: "part",
 };
 
 const STANDING_WORDS: Readonly<Record<RuleStanding, string>> = {
   MEETS: "Meets",
   DOES_NOT_MEET: "Doesn't meet",
   NOT_ANSWERED: "Not answered",
+  // Decision 91: both answers go to the investor; it is not unanswered.
+  UNRESOLVED: "Your answers disagree",
 };
 
 /** For the development gallery and the screenshot checks only. */

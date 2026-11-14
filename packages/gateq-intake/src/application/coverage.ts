@@ -194,6 +194,11 @@ export function explainQualification(
   readonly unmet: readonly string[];
   readonly stillNeeded: readonly string[];
   /**
+   * Decision 91: rules whose fact the founder's own answers disagree on.
+   * One verdict on every surface: never "Meets", never "not answered".
+   */
+  readonly unresolved: readonly string[];
+  /**
    * Live 2026-11-13 (Lagos Forge Fund, fictional): a round and cheque set
    * in NGN against an amount given in USD stays unknown (no rate is ever
    * invented), and the form said only "needs cheque size". The currency
@@ -216,6 +221,9 @@ export function explainQualification(
       .map((criterion) => label(criterion.criterionId)),
     stillNeeded: qualification.criteria
       .filter((criterion) => criterion.status === "UNKNOWN")
+      .map((criterion) => label(criterion.criterionId)),
+    unresolved: qualification.criteria
+      .filter((criterion) => criterion.status === "UNRESOLVED")
       .map((criterion) => label(criterion.criterionId)),
     ...askCurrencyOf(qualification),
   };
@@ -315,6 +323,9 @@ export function coverageFor(input: {
     access: explained.access,
     unmet: [...explained.unmet],
     stillNeeded: [...explained.stillNeeded],
+    ...(explained.unresolved.length === 0
+      ? {}
+      : { unresolved: [...explained.unresolved] }),
     answered,
     unknown,
     declined,

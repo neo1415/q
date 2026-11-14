@@ -231,6 +231,15 @@ export function statementWorld() {
   let linkRows: StatementLink[] = [];
   let eventRows: DisagreementEvent[] = [];
   let readingRows: TurnReading[] = [];
+  /** What each submission froze: snapshot, dossier and version. */
+  const submittedRows: {
+    applicationId: string;
+    snapshot: unknown;
+    dossier: unknown;
+    snapshotVersion: number;
+    clientRequestId: string;
+    submittedAt: string;
+  }[] = [];
   let claims = new Map<
     string,
     { id: string | null; turnId: string; outcome: unknown; expiresAt: number }
@@ -415,6 +424,8 @@ export function statementWorld() {
           .filter((r) => r.applicationId === applicationId)
           .map((r) => r.turnId),
       }),
+    listInTransaction: (_tx, applicationId) =>
+      statementsRepo.listFor(applicationId),
     viewFor: async (applicationId) => {
       const rows = await statementsRepo.listFor(applicationId);
       return projectView(rows.statements, rows.links, rows.events);
@@ -588,9 +599,32 @@ export function statementWorld() {
         },
       },
       submissions: {
-        findForApplication: () => Promise.resolve(null),
-        record: (_tx, input) =>
-          Promise.resolve({ submittedAt: input.submittedAt }),
+        findForApplication: (applicationId) => {
+          const row = submittedRows.find(
+            (r) => r.applicationId === applicationId,
+          );
+          return Promise.resolve(
+            row === undefined
+              ? null
+              : {
+                  clientRequestId: row.clientRequestId,
+                  submittedAt: row.submittedAt,
+                },
+          );
+        },
+        record: (_tx, input) => {
+          submittedRows.push({
+            applicationId: input.applicationId,
+            snapshot: JSON.parse(JSON.stringify(input.snapshot)) as unknown,
+            dossier: JSON.parse(
+              JSON.stringify(input.dossier ?? null),
+            ) as unknown,
+            snapshotVersion: input.snapshotVersion ?? 1,
+            clientRequestId: input.clientRequestId,
+            submittedAt: input.submittedAt,
+          });
+          return Promise.resolve({ submittedAt: input.submittedAt });
+        },
       },
       documents: {
         attach: () => Promise.resolve(),
@@ -670,6 +704,7 @@ export function statementWorld() {
     faults,
     turns,
     statementsRepo,
+    submitted: () => [...submittedRows],
     store: () => ({
       factRows,
       turnRows,

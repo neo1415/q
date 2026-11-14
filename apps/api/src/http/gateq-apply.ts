@@ -123,6 +123,9 @@ export function summaryDto(result: ApplicantTurnResult): unknown {
     // Labels the investor published, never the configuration behind them.
     unmet: result.unmet,
     stillNeeded: result.stillNeeded,
+    ...(result.unresolved === undefined || result.unresolved.length === 0
+      ? {}
+      : { unresolved: [...result.unresolved] }),
     ...(result.askCurrency === undefined
       ? {}
       : { askCurrency: result.askCurrency }),
@@ -302,6 +305,8 @@ export function registerGateQApplyRoutes(
         token,
         facts: factsFromAnswers(input),
         disclosureLineage: APPLICANT_TEXT_LINEAGE,
+        // Slice 3: recorded as FORM statements too, labelled as the form.
+        origin: "FORM",
       });
       const summary = await conversation.summary(token);
       void reply.header("Cache-Control", "no-store");

@@ -449,7 +449,12 @@ export function formatMoney(amount: string, currency: string): string {
 // The investor's rules, and how the founder stands against them
 // ---------------------------------------------------------------------------
 
-export type RuleStanding = "MEETS" | "DOES_NOT_MEET" | "NOT_ANSWERED";
+export type RuleStanding =
+  | "MEETS"
+  | "DOES_NOT_MEET"
+  | "NOT_ANSWERED"
+  /** Decision 91: their own answers disagree; may still apply. */
+  | "UNRESOLVED";
 
 export type RuleLine = {
   readonly label: string;
@@ -487,7 +492,10 @@ export function ownLabel(
 
 export function ruleLines(
   gateway: Pick<PublicGatewayDto, "criteria">,
-  application: Pick<ApplicationSummaryDto, "unmet" | "stillNeeded"> | null,
+  application: Pick<
+    ApplicationSummaryDto,
+    "unmet" | "stillNeeded" | "unresolved"
+  > | null,
 ): readonly RuleLine[] {
   return gateway.criteria.map((criterion) => ({
     label: criterion.label,
@@ -498,9 +506,11 @@ export function ruleLines(
         ? null
         : application.unmet.includes(criterion.label)
           ? "DOES_NOT_MEET"
-          : application.stillNeeded.includes(criterion.label)
-            ? "NOT_ANSWERED"
-            : "MEETS",
+          : (application.unresolved ?? []).includes(criterion.label)
+            ? "UNRESOLVED"
+            : application.stillNeeded.includes(criterion.label)
+              ? "NOT_ANSWERED"
+              : "MEETS",
   }));
 }
 

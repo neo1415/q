@@ -187,6 +187,9 @@ export function rulesOf(read: QualificationRead) {
     unknown: counted.filter(
       (c) => c.status === "UNKNOWN" || c.status === "UNRESOLVED",
     ).length,
+    // Of those, the ones the founder's own answers disagree on: labelled
+    // apart so a reader never reads them as unanswered.
+    unresolved: counted.filter((c) => c.status === "UNRESOLVED").length,
   };
 }
 

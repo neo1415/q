@@ -39,12 +39,22 @@ export type AppActionReading = {
     readonly applicationId: string;
     readonly reference: string;
     readonly submittedAt: string;
-    readonly dossierSchemaVersion: "gateq-dossier.v1" | null;
+    readonly dossierSchemaVersion: "gateq-dossier.v1" | "gateq-dossier.v2" | null;
   };
   readonly text: string;
   readonly sources: readonly {
     readonly factId: string;
     readonly transcriptSeq: number | null;
+    /**
+     * Slice 3: where the fact came from (the application's interview, the
+     * form, a document, the company profile), never assumed to be "the
+     * application".
+     */
+    readonly sourceKind:
+      | "APPLICATION_STATEMENT"
+      | "FORM"
+      | "DOCUMENT"
+      | "COMPANY_PROFILE";
   }[];
 };
 

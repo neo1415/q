@@ -8,6 +8,7 @@ import {
 
 import {
   GATEQ_INBOX_ARCHIVE_PATH,
+  gateqReadingSources,
   GATEQ_INBOX_ASSIGN_PATH,
   GATEQ_INBOX_LABEL_PATH,
   GATEQ_INBOX_NOTES_PATH,
@@ -936,6 +937,8 @@ const STAND_WORDS = {
   MEETS: "meets",
   DOES_NOT_MEET: "doesn't meet",
   NOT_ANSWERED: "needs clarification",
+  // Decision 91: the founder's own answers disagree; never "not answered".
+  UNRESOLVED: "needs your judgement: the founder's answers disagree",
 } as const;
 const SUMMARISE = defineAppAction<
   z.infer<typeof SummaryIn>,
@@ -1012,12 +1015,11 @@ const SUMMARISE = defineAppAction<
         dossierSchemaVersion: out.dossier?.schemaVersion ?? null,
       },
       text,
-      sources: (out.dossier?.dimensions.flatMap((group) => group.facts) ?? [])
-        .filter((fact) => text.includes(fact.sourceFactId))
-        .map((fact) => ({
-          factId: fact.sourceFactId,
-          transcriptSeq: fact.sourceTurnSeq,
-        })),
+      // Each cited fact with its own source (slice 3): the form, the
+      // interview, a document, or the company profile, never assumed.
+      sources: (out.dossier ? gateqReadingSources(out.dossier) : []).filter(
+        (source) => text.includes(source.factId),
+      ),
     };
   },
   tool: {
