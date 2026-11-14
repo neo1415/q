@@ -128,3 +128,17 @@ export const MemoryExtractorResultV2Schema = z
 export type MemoryExtractorResultV2 = z.infer<
   typeof MemoryExtractorResultV2Schema
 >;
+
+/**
+ * v3 (decision 97, 2026-11-14): no count ceiling on items. v2's bound of
+ * 12 refused a whole conversation's reading when it held a 13th thing
+ * worth remembering, so nothing was remembered from it. Each item still
+ * passes the Write Gate on its own.
+ */
+export const MEMORY_EXTRACTOR_V3_SCHEMA_VERSION = 3;
+export const MemoryExtractorResultV3Schema = MemoryExtractorResultV2Schema.extend(
+  { items: z.array(MemoryExtractItemV2Schema).default([]) },
+).strict();
+export type MemoryExtractorResultV3 = z.infer<
+  typeof MemoryExtractorResultV3Schema
+>;

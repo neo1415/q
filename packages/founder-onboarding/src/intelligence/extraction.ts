@@ -2,7 +2,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  FounderExtractionV2ResultSchema,
+  FounderExtractionV3ResultSchema,
   renderPrompt,
   type FounderExtractionV2Result,
   type FounderExtractionV2Variables,
@@ -265,7 +265,7 @@ export function createFounderExtraction(
             },
           },
           {
-            schema: FounderExtractionV2ResultSchema,
+            schema: FounderExtractionV3ResultSchema,
             // One bad list element (live 2026-10-01: a taxonomy label over
             // 80 characters) refused the whole reading twice on luna, ~8.5 s
             // and two paid calls, before the fallback model answered. An

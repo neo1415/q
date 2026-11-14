@@ -15,7 +15,7 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  MemoryExtractorResultV2Schema,
+  MemoryExtractorResultV3Schema,
   renderPrompt,
   type MemoryExtractItemV2,
   type MemoryExtractorResultV2,
@@ -304,10 +304,10 @@ export function createMemoryLearner(
             correlationId: `cor_${runId}`,
           },
         },
-        { schema: MemoryExtractorResultV2Schema },
+        { schema: MemoryExtractorResultV3Schema },
       );
       if (response.output.kind !== "STRUCTURED") return null;
-      const parsed = MemoryExtractorResultV2Schema.safeParse(
+      const parsed = MemoryExtractorResultV3Schema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
       return parsed.success ? parsed.data : null;

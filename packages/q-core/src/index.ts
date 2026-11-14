@@ -660,11 +660,20 @@ export {
 } from "./prompts/schemas/decision-reader.js";
 export { MEMORY_EXTRACTOR_V1 } from "./prompts/tasks/memory-extractor.v1.js";
 export { MEMORY_EXTRACTOR_V2 } from "./prompts/tasks/memory-extractor.v2.js";
+// Decision 97: extraction lists with no count ceiling.
+export {
+  CLAIM_EXTRACTION_V3,
+  FOUNDER_ONBOARDING_EXTRACTION_V4,
+  MEMORY_EXTRACTOR_V3,
+} from "./prompts/tasks/extraction-lists.v1.js";
 export {
   MEMORY_EXTRACT_TYPES_V2,
   MEMORY_EXTRACTOR_V2_SCHEMA_VERSION,
   MemoryExtractItemV2Schema,
   MemoryExtractorResultV2Schema,
+  MemoryExtractorResultV3Schema,
+  MEMORY_EXTRACTOR_V3_SCHEMA_VERSION,
+  type MemoryExtractorResultV3,
   type MemoryExtractItemV2,
   type MemoryExtractorResultV2,
   MEMORY_EXTRACT_TYPES,
@@ -1160,6 +1169,9 @@ export {
   type ModelOffer,
   COMPANY_ANALYST_V33_SCHEMA_VERSION,
   CompanyAnalystV33ResultSchema,
+  COMPANY_ANALYST_V34_SCHEMA_VERSION,
+  CompanyAnalystV34ResultSchema,
+  type CompanyAnalystV34Result,
   STATED_FIGURE_READING_GUIDANCE,
   StatedFigureReadingSchema,
   type CompanyAnalystV33Result,
@@ -1230,6 +1242,9 @@ export {
   ClaimAssertionKindSchema,
   ClaimExtractionResultSchema,
   ClaimExtractionResultV2Schema,
+  ClaimExtractionResultV3Schema,
+  CLAIM_EXTRACTION_V3_SCHEMA_VERSION,
+  type ClaimExtractionResultV3,
   ClaimExtractionVariablesSchema,
   ClaimLocatorHintSchema,
   ClaimProposedValueSchema,
@@ -1249,6 +1264,9 @@ export {
   FounderCandidateFactSchema,
   FounderExtractionResultSchema,
   FounderExtractionV2ResultSchema,
+  FounderExtractionV3ResultSchema,
+  FOUNDER_EXTRACTION_V3_SCHEMA_VERSION,
+  type FounderExtractionV3Result,
   FounderExtractionV2VariablesSchema,
   FounderExtractionVariablesSchema,
   FounderFactKeySchema,
@@ -1701,6 +1719,12 @@ export {
   ANALYSIS_WRITE_V7,
   ANALYSIS_WRITE_PIPELINE_RULE,
 } from "./prompts/tasks/analyst-investigation.v1.js";
+// Decision 97: analyst list items stand alone.
+export {
+  ANALYSIS_CRITIQUE_STRENGTHS_RULE,
+  ANALYSIS_CRITIQUE_V4,
+  ANALYSIS_WRITE_V8,
+} from "./prompts/tasks/analyst-lists.v1.js";
 export * from "./prompts/schemas/analyst.js";
 export {
   DRAFT_CHANNELS,
@@ -2312,3 +2336,4 @@ export {
   V33_ALLOWED_ROOT_KEYS,
   V33_CHANGES,
 } from "./prompts/tasks/company-analyst.v33.js";
+export { COMPANY_ANALYST_V34 } from "./prompts/tasks/company-analyst.v34.js";

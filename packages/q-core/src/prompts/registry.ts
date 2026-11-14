@@ -87,6 +87,7 @@ import { COMPANY_ANALYST_V30 } from "./tasks/company-analyst.v30.js";
 import { COMPANY_ANALYST_V31 } from "./tasks/company-analyst.v31.js";
 import { COMPANY_ANALYST_V32 } from "./tasks/company-analyst.v32.js";
 import { COMPANY_ANALYST_V33 } from "./tasks/company-analyst.v33.js";
+import { COMPANY_ANALYST_V34 } from "./tasks/company-analyst.v34.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -334,6 +335,15 @@ import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-ext
 import { FOUNDER_ONBOARDING_EXTRACTION_V3 } from "./tasks/founder-onboarding-extraction.v3.js";
 import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
 import { GATEQ_DOSSIER_SYNTHESIS_V2 } from "./tasks/gateq-dossier-synthesis.v2.js";
+import {
+  ANALYSIS_CRITIQUE_V4,
+  ANALYSIS_WRITE_V8,
+} from "./tasks/analyst-lists.v1.js";
+import {
+  CLAIM_EXTRACTION_V3,
+  FOUNDER_ONBOARDING_EXTRACTION_V4,
+  MEMORY_EXTRACTOR_V3,
+} from "./tasks/extraction-lists.v1.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
 import { GATEQ_INTERVIEWER_V3 } from "./tasks/gateq-interviewer.v3.js";
@@ -536,7 +546,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     Q_SYSTEM_VOICE_V3,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
     { ...FOUNDER_ONBOARDING_EXTRACTION_V2, status: "DEPRECATED" },
-    FOUNDER_ONBOARDING_EXTRACTION_V3,
+    { ...FOUNDER_ONBOARDING_EXTRACTION_V3, status: "DEPRECATED" },
+    FOUNDER_ONBOARDING_EXTRACTION_V4,
     INTERVIEW_CONDUCTOR_V1,
     INTERVIEW_CONDUCTOR_V2,
     INTERVIEW_CONDUCTOR_V3,
@@ -651,7 +662,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // A8 live 2026-11-14: a month-dated deck refused whole; v2 states the
     // asOf shapes and accepts a month.
     { ...CLAIM_EXTRACTION_V1, status: "DEPRECATED" },
-    CLAIM_EXTRACTION_V2,
+    { ...CLAIM_EXTRACTION_V2, status: "DEPRECATED" },
+    CLAIM_EXTRACTION_V3,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     INVESTOR_MANDATE_SYNTHESIS_V2,
     INVESTOR_MANDATE_SYNTHESIS_V3,
@@ -687,7 +699,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...COMPANY_ANALYST_V30, status: "DEPRECATED" },
     { ...COMPANY_ANALYST_V31, status: "DEPRECATED" },
     { ...COMPANY_ANALYST_V32, status: "DEPRECATED" },
-    COMPANY_ANALYST_V33,
+    { ...COMPANY_ANALYST_V33, status: "DEPRECATED" },
+    // Decision 97: no count ceiling on the evidence lists.
+    COMPANY_ANALYST_V34,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,
@@ -787,7 +801,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...TURN_READER_V86, status: "DEPRECATED" },
     TURN_READER_V87,
     MEMORY_EXTRACTOR_V1,
-    MEMORY_EXTRACTOR_V2,
+    { ...MEMORY_EXTRACTOR_V2, status: "DEPRECATED" },
+    // Decision 97: extraction lists with no count ceiling.
+    MEMORY_EXTRACTOR_V3,
     MEETING_NOTES_V1,
     MEETING_NOTES_V2,
     MEETING_NOTES_V3,
@@ -828,7 +844,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...RESEARCH_PLAN_V2, status: "DEPRECATED" },
     { ...RESEARCH_FACTS_V2, status: "DEPRECATED" },
     { ...ANALYSIS_WRITE_V3, status: "DEPRECATED" },
-    ANALYSIS_CRITIQUE_V3,
+    { ...ANALYSIS_CRITIQUE_V3, status: "DEPRECATED" },
     // Diligence audit 2026-10-28.
     { ...JOB_PLAN_V14, status: "DEPRECATED" },
     { ...RESEARCH_PLAN_V3, status: "DEPRECATED" },
@@ -847,7 +863,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Live cases C, E and F 2026-10-29.
     RESEARCH_PLAN_V6,
     RESEARCH_BRIEF_V3,
-    ANALYSIS_WRITE_V7,
+    { ...ANALYSIS_WRITE_V7, status: "DEPRECATED" },
+    // Decision 97: list items stand alone, no count ceiling.
+    ANALYSIS_WRITE_V8,
+    ANALYSIS_CRITIQUE_V4,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,

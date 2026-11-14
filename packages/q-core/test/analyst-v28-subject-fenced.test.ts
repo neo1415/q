@@ -19,7 +19,7 @@ import {
 describe("COMPANY_ANALYST v28: the subject description is data", () => {
   it("is active, keeps v27's rules and output, and fences subjectDescription", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(33);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(34);
     expect(registry.get("COMPANY_ANALYST", 27)?.definition.status).toBe(
       "DEPRECATED",
     );

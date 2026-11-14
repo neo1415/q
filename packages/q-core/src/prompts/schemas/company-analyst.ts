@@ -642,6 +642,40 @@ export type CompanyAnalystV33Result = z.infer<
 >;
 export const COMPANY_ANALYST_V33_SCHEMA_VERSION = 33;
 
+/**
+ * v34 (decision 97, 2026-11-14): no count ceiling on the analyst's
+ * evidence lists. v33 bounded findings and missing evidence at 24,
+ * assumptions and wouldChangeIf at 10, coverage at 16, material changes at
+ * 12 and profile updates at 6, and the gateway's DROP kept the first items
+ * of a longer list: what the model found beyond the bound was lost without
+ * a trace. The output budget bounds one answer; a cut-off answer is
+ * reported by the gateway, never accepted silently. Bounds that are
+ * product rules stay (three clarifying questions, three stated figures).
+ */
+export const CompanyAnalystV34ResultSchema =
+  CompanyAnalystV33ResultSchema.extend({
+    findings: z.array(ModelFindingSchema).default([]),
+    missingEvidence: z.array(ModelStatementSchema).default([]),
+    contradictions: z.array(ModelStatementSchema).default([]),
+    recommendation: z
+      .object({
+        statement: ModelStatementSchema,
+        confidence: QConfidenceLevelSchema,
+        assumptions: z.array(ModelStatementSchema).default([]),
+        wouldChangeIf: z.array(ModelStatementSchema).default([]),
+      })
+      .strict()
+      .nullable(),
+    companyFindings: z.array(CompanyIntelligenceFindingSchema).default([]),
+    coverage: z.array(CompanyDimensionCoverageSchema).default([]),
+    materialChanges: z.array(CompanyMaterialChangeSchema).default([]),
+    profileUpdates: z.array(ProfileUpdateSchema).default([]),
+  }).strict();
+export type CompanyAnalystV34Result = z.infer<
+  typeof CompanyAnalystV34ResultSchema
+>;
+export const COMPANY_ANALYST_V34_SCHEMA_VERSION = 34;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

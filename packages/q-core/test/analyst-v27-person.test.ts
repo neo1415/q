@@ -16,7 +16,7 @@ import {
 describe("COMPANY_ANALYST v27: Q speaks to the person", () => {
   it("is active, keeps v26 for its runs, and adds the person line plus listed trims", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(33);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(34);
     expect(registry.get("COMPANY_ANALYST", 26)?.definition.status).toBe(
       "DEPRECATED",
     );

@@ -97,7 +97,7 @@ import {
   type AuthorisedFact,
   type PublicSourceLike,
   type CompanyAnalystV30Result,
-  CompanyAnalystV33ResultSchema,
+  CompanyAnalystV34ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -1479,11 +1479,11 @@ const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
  */
 /**
  * The schema the analyst's answer is checked against: the one the prompt in
- * use writes to (COMPANY_ANALYST v33, schema v33). Pinned by a test, because a lag here
+ * use writes to (COMPANY_ANALYST v34, schema v34). Pinned by a test, because a lag here
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
-export const ANALYST_RESULT_SCHEMA = CompanyAnalystV33ResultSchema;
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV34ResultSchema;
 
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
