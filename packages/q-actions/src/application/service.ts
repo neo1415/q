@@ -1406,12 +1406,31 @@ export function createQActionService(
     if (actor.actorType !== "HUMAN" || actor.organisationId === undefined) {
       return [];
     }
-    return repositories.approvals.listPendingForApprover(sql, {
+    const rows = await repositories.approvals.listPendingForApprover(sql, {
       tenantId: actor.tenantId,
       userId: actor.userId,
       organisationId: actor.organisationId,
       now: clock.now(),
       limit: Math.min(Math.max(query.limit ?? 20, 1), 20),
+    });
+    // D23: one listed title for every surface (the work list, the digest,
+    // Q's list), named by the action itself; the preview stays here.
+    return rows.map(({ preview, ...row }): QPendingApprovalRow => {
+      const titled = registry.get(row.actionType ?? "")?.listTitle;
+      if (titled === undefined) return row;
+      const title = (() => {
+        try {
+          return titled({
+            summary: row.summary,
+            preview: preview ?? null,
+            requestedAt: row.requestedAt,
+          }).trim();
+        } catch {
+          // A title is presentation: a failure keeps the stored summary.
+          return "";
+        }
+      })();
+      return title === "" ? row : { ...row, summary: title };
     });
   };
 

@@ -20,6 +20,7 @@ import {
 } from "@capital-q/q-core";
 
 import { withDerivedAmountsMarked } from "./dossier.js";
+import { withSettledGaps } from "./statement-words.js";
 
 /**
  * Q's reading of a submitted GateQ application (lead decision 2026-10-15).
@@ -796,7 +797,10 @@ export function createDossierSynthesis(deps: {
     )
       return "FAILED";
     try {
-      const synthesis = await read(item, gateqDossierAsReadNow(dossier.data));
+      const synthesis = await read(
+        item,
+        withSettledGaps(gateqDossierAsReadNow(dossier.data)),
+      );
       if (synthesis === null) {
         deps.logger?.warn(
           { applicationId: item.applicationId },

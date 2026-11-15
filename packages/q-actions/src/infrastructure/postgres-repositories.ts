@@ -23,7 +23,6 @@ import type {
   QActionRecord,
   QActionRepositories,
   QApprovalRecord,
-  QPendingApprovalRow,
 } from "../ports.js";
 
 /**
@@ -130,6 +129,7 @@ const PendingRow = z.object({
   run_id: QRunIdSchema,
   conversation_id: z.string().uuid().nullable(),
   summary: z.string().min(1),
+  preview: z.string().nullable().optional(),
   requested_at: Timestamp,
   expires_at: Timestamp,
   // A stored target the contract no longer reads is no target, never a
@@ -429,7 +429,7 @@ export function createPostgresQActionRepositories(): QActionRepositories {
       },
       listPendingForApprover: async (executor, input) => {
         const rows = await executor`
-          select p.id, a.run_id, r.conversation_id, a.summary,
+          select p.id, a.run_id, r.conversation_id, a.summary, a.preview,
                  p.requested_at, p.expires_at, a.target_refs, a.action_type
             from q_runtime.approvals p
             join q_runtime.actions a
@@ -446,13 +446,14 @@ export function createPostgresQActionRepositories(): QActionRepositories {
              and p.expires_at > ${input.now.toISOString()}::text::timestamptz
            order by p.requested_at desc, p.id desc
            limit ${input.limit}`;
-        return rows.map((row): QPendingApprovalRow => {
+        return rows.map((row) => {
           const r = PendingRow.parse(row);
           return {
             approvalId: r.id,
             runId: r.run_id,
             conversationId: r.conversation_id,
             summary: r.summary,
+            preview: r.preview ?? null,
             requestedAt: r.requested_at,
             expiresAt: r.expires_at,
             targets: QSubjectRefsSchema.safeParse(r.target_refs).data ?? [],

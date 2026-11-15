@@ -132,6 +132,16 @@ export function readyLine(title: string, reduced = false): string {
 }
 
 /**
+ * D23 (live 15 Nov 2026): a plan-ready notice names its plan's subject, so
+ * two plans ready at once are two items on the work list, the digest and
+ * Q's list, not one "Your plan is ready" twice.
+ */
+export function planReadyTitle(subject: string): string {
+  const name = subject.trim().replace(/[.\s]+$/u, "");
+  return name === "" ? "Your plan is ready" : `Your plan is ready: ${name}`;
+}
+
+/**
  * A document's own words as Q's chat line says them: without its source
  * ids. Live 2026-10-31 (IC memo on Ferrolith): Q's line said "…ownership
  * and S9 source-association verification" -- an id that means something
@@ -413,8 +423,12 @@ export function createWorkforceDelivery(dependencies: {
     await dependencies
       .notify(owner, {
         key: `wf:${row.job_id}:delivered`,
-        title:
-          "plan" in delivered ? "Your plan is ready" : "Q's answer is ready",
+        // D23 (live 15 Nov 2026): two notices both "Your plan is ready"
+        // read as one; each names its plan's own subject.
+        title: ("plan" in delivered
+          ? planReadyTitle(delivered.plan.block.title)
+          : "Q's answer is ready"
+        ).slice(0, 150),
         body: text.slice(0, 600),
       })
       .catch(() => undefined);

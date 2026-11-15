@@ -10,7 +10,10 @@ import {
   QUANTITATIVE_DIMENSIONS,
 } from "./answer-specificity.js";
 import { unreconciledPairs, unreconciledStatements } from "./fact-history.js";
-import type { ApplicationStatementView } from "../contracts/statements.js";
+import type {
+  ApplicationStatementView,
+  DimensionStatus,
+} from "../contracts/statements.js";
 import { NEVER_ASKED_AGAIN } from "./statement-view.js";
 
 /**
@@ -194,45 +197,108 @@ function askingState(input: QuestionNeedsInput): {
     return false;
   };
   const answered = new Set(
-    input.facts
-      .filter((fact) => fact.supersededAt === null)
-      .map((fact) => fact.dimension),
+    answeredBy(
+      input.facts,
+      (input.view?.dimensions ?? []).map((entry) => ({
+        dimension: entry.dimension,
+        status: entry.status,
+        said: entry.items.map((item) => ({
+          held: item.value.kind !== "UNKNOWN",
+          quantity: item.quantity,
+        })),
+      })),
+    ).keys(),
   );
-  for (const entry of input.view?.dimensions ?? [])
-    if (entry.status !== "UNANSWERED") answered.add(entry.dimension);
+  const parked = (dimension: ApplicationDimension): boolean =>
+    (input.askedCounts?.get(dimension) ?? 0) >= MAX_ASKS_PER_DIMENSION;
+  return { answered, parked, settledByView };
+}
+
+/** One dimension of a statement view, as the settled predicate reads it. */
+export type SettledViewEntry = {
+  readonly dimension: ApplicationDimension;
+  readonly status: DimensionStatus;
+  /** Its current statements: whether each holds a value, and its quantity. */
+  readonly said: readonly {
+    readonly held: boolean;
+    readonly quantity: string | null;
+  }[];
+};
+
+/** How a dimension came to be answered. */
+export type AnsweredBy =
+  | { readonly kind: "ITSELF" }
+  /** Another dimension's answer covers it (COVERED_BY). */
+  | { readonly kind: "COVERED"; readonly by: ApplicationDimension }
+  /** A held count of customers, on any dimension. */
+  | { readonly kind: "CUSTOMER_COUNT" }
+  /** Traction with its figures (legacy facts). */
+  | { readonly kind: "TRACTION" };
+
+/** The quantities that count customers. */
+export const CUSTOMER_COUNT_QUANTITIES: ReadonlySet<string> = new Set([
+  "customers",
+  "paying_customers",
+]);
+
+/**
+ * THE answered half of the settled predicate, over either view shape: the
+ * interview's asking (above), founder review's coverage and the dossier's
+ * gaps read this one function, so a dimension Q will not ask about is never
+ * listed as Missing (live 15 Nov 2026: Customers "Missing" beside "from 1
+ * clinic to 4", which the investor's one-page summary already read as the
+ * customers answer). A stated unknown or refusal is answered here: it is
+ * reported as such, never as Missing.
+ */
+export function answeredBy(
+  facts: readonly ApplicationFact[],
+  view: readonly SettledViewEntry[],
+): ReadonlyMap<ApplicationDimension, AnsweredBy> {
+  const answered = new Map<ApplicationDimension, AnsweredBy>();
+  for (const fact of facts)
+    if (fact.supersededAt === null)
+      answered.set(fact.dimension, { kind: "ITSELF" });
+  for (const entry of view)
+    if (entry.status !== "UNANSWERED")
+      answered.set(entry.dimension, { kind: "ITSELF" });
   for (const [dimension, covers] of Object.entries(COVERED_BY)) {
-    if (covers?.some((covering) => answered.has(covering))) {
-      answered.add(dimension as ApplicationDimension);
+    const by = covers?.find((covering) => answered.has(covering));
+    if (by !== undefined && !answered.has(dimension as ApplicationDimension)) {
+      answered.set(dimension as ApplicationDimension, { kind: "COVERED", by });
     }
   }
   // Live D3 (2026-11-14, Routeix): "we went from 6 to 18 operators" was on
   // record under traction, and Q still asked how many operators were live.
   // Traction with its figures already says how many are using it; the
   // customer count is not asked for again.
-  const traction = input.facts.some(
+  const traction = facts.some(
     (fact) =>
       fact.dimension === "claims.traction" &&
       fact.supersededAt === null &&
       fact.value.kind !== "NONE",
   );
-  if (traction && missingSpecifics("claims.traction", input.facts) === null)
-    answered.add("company.customers");
+  if (
+    traction &&
+    missingSpecifics("claims.traction", facts) === null &&
+    !answered.has("company.customers")
+  )
+    answered.set("company.customers", { kind: "TRACTION" });
   // The same from the statements: a held count (or stated zero) of
   // customers on any dimension says how many there are (live 30c99ccc5:
   // "from 1 clinic to 4" on traction, then "how many clinics today?").
-  for (const entry of input.view?.dimensions ?? [])
-    if (
-      entry.items.some(
-        (item) =>
-          item.value.kind !== "UNKNOWN" &&
-          (item.quantity === "customers" ||
-            item.quantity === "paying_customers"),
-      )
+  if (
+    !answered.has("company.customers") &&
+    view.some((entry) =>
+      entry.said.some(
+        (said) =>
+          said.held &&
+          said.quantity !== null &&
+          CUSTOMER_COUNT_QUANTITIES.has(said.quantity),
+      ),
     )
-      answered.add("company.customers");
-  const parked = (dimension: ApplicationDimension): boolean =>
-    (input.askedCounts?.get(dimension) ?? 0) >= MAX_ASKS_PER_DIMENSION;
-  return { answered, parked, settledByView };
+  )
+    answered.set("company.customers", { kind: "CUSTOMER_COUNT" });
+  return answered;
 }
 
 /**

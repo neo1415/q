@@ -288,7 +288,12 @@ export type QApprovalRepository = {
       readonly now: Date;
       readonly limit: number;
     },
-  ) => Promise<readonly QPendingApprovalRow[]>;
+  ) => Promise<
+    readonly (QPendingApprovalRow & {
+      /** For the listed title only (D23); never leaves the engine. */
+      readonly preview?: string | null | undefined;
+    })[]
+  >;
 };
 
 /** One approval waiting on its approver, with where it was asked. */

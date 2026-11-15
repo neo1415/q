@@ -4,15 +4,17 @@ import {
   gateqStatementsInWords,
   GateqStatementViewV1Schema,
   type GateqCoverageV1,
+  type GateqDossier,
   type GateqStatementViewV1,
   type GateqStatementWords,
 } from "@capital-q/contracts";
 import type { GatewayPolicy, QualificationResult } from "@capital-q/gateq";
 
-import type {
-  ApplicationDimension,
-  ApplicationFact,
-  ApplicationId,
+import {
+  APPLICATION_DIMENSIONS,
+  type ApplicationDimension,
+  type ApplicationFact,
+  type ApplicationId,
 } from "../contracts/index.js";
 import type {
   ApplicationStatementView,
@@ -30,7 +32,14 @@ import {
   groupOf,
   INVESTMENT_DIMENSIONS,
 } from "./coverage.js";
-import { questionNeedsFor, type QuestionNeed } from "./question-needs.js";
+import {
+  answeredBy,
+  CUSTOMER_COUNT_QUANTITIES,
+  questionNeedsFor,
+  type AnsweredBy,
+  type QuestionNeed,
+  type SettledViewEntry,
+} from "./question-needs.js";
 import { legacyCarry, type StatementContext } from "./statement-plan.js";
 import { projectView } from "./statement-view.js";
 import { amountWords } from "./stated-amount.js";
@@ -235,6 +244,59 @@ function applicantReason(
     : reason;
 }
 
+/** The wire view as the settled predicate (question-needs) reads it. */
+export function settledEntriesOf(
+  view: GateqStatementViewV1,
+): readonly SettledViewEntry[] {
+  return view.dimensions.flatMap((d): SettledViewEntry[] =>
+    (APPLICATION_DIMENSIONS as readonly string[]).includes(d.dimension)
+      ? [
+          {
+            dimension: d.dimension as ApplicationDimension,
+            status: d.status,
+            said: d.statements.map((s) => ({
+              held: s.valueKind !== "UNKNOWN",
+              quantity: s.quantity,
+            })),
+          },
+        ]
+      : [],
+  );
+}
+
+/**
+ * The held statements that answer a dimension it has none of its own: the
+ * customer counts said anywhere, or the covering dimension's answer. Empty
+ * when nothing held answers it, so it stays Missing.
+ */
+function answeredElsewhere(
+  view: GateqStatementViewV1,
+  by: AnsweredBy | undefined,
+): readonly GateqStatementWords[] {
+  if (by === undefined) return [];
+  const held = (s: GateqStatementWords) => s.valueKind !== "UNKNOWN";
+  switch (by.kind) {
+    case "CUSTOMER_COUNT":
+      return view.dimensions.flatMap((d) =>
+        d.statements.filter(
+          (s) =>
+            held(s) &&
+            s.quantity !== null &&
+            CUSTOMER_COUNT_QUANTITIES.has(s.quantity),
+        ),
+      );
+    case "COVERED":
+      return (
+        view.dimensions
+          .find((d) => d.dimension === by.by)
+          ?.statements.filter(held) ?? []
+      );
+    case "ITSELF":
+    case "TRACTION":
+      return [];
+  }
+}
+
 /** The line limit of the v1 coverage contract's contradictions. */
 const CONTRADICTION_LINES = 16;
 
@@ -265,6 +327,10 @@ export function coverageFromView(input: {
   const byDimension = new Map(
     input.view.dimensions.map((d) => [d.dimension, d] as const),
   );
+  // The settled predicate the interview asks by (question-needs): what Q
+  // will not ask about is never Missing here, so founder review, the
+  // dossier and the investor's one-page summary agree.
+  const settled = answeredBy([], settledEntriesOf(input.view));
   const answered: GateqCoverageV1["answered"][number][] = [];
   const unknown: GateqCoverageV1["unknown"][number][] = [];
   const declined: GateqCoverageV1["declined"][number][] = [];
@@ -278,6 +344,25 @@ export function coverageFromView(input: {
       };
       const view = byDimension.get(dimension);
       if (view === undefined || view.status === "UNANSWERED") {
+        const elsewhere = answeredElsewhere(input.view, settled.get(dimension));
+        const latest = elsewhere.at(-1);
+        if (latest !== undefined) {
+          answered.push({
+            ...base,
+            summary: elsewhere
+              .map((s) => s.summary)
+              .join("\n")
+              .slice(0, 2000),
+            provenance: latest.provenance,
+            ...(input.includeSources === true
+              ? {
+                  sourceFactId: latest.statementId,
+                  sourceTurnSeq: latest.sourceTurnSeq,
+                }
+              : {}),
+          });
+          continue;
+        }
         if (dimension !== "raise.currency")
           missing.push({
             ...base,
@@ -337,5 +422,85 @@ export function coverageFromView(input: {
     declined,
     missing,
     contradictions,
+  };
+}
+
+/**
+ * A frozen v2 dossier's gaps as the settled predicate reads its own view
+ * (live 15 Nov 2026): a dossier frozen before founder review read the
+ * predicate listed Customers as Missing beside "from 1 clinic to 4". Read
+ * now, a gap its view answers is not Missing, a stated unknown or refusal
+ * is reported as one, and the diligence question follows. The frozen row
+ * is never rewritten; a v1 dossier has no view and is left as it was.
+ */
+export function withSettledGaps<D extends GateqDossier>(dossier: D): D {
+  if (dossier.schemaVersion !== "gateq-dossier.v2") return dossier;
+  const view = dossier.statements;
+  const settled = answeredBy([], settledEntriesOf(view));
+  const statusOf = (dimension: string) =>
+    view.dimensions.find((d) => d.dimension === dimension)?.status;
+  const moved = new Map<string, "UNKNOWN" | "DECLINED" | "ANSWERED">();
+  for (const gap of dossier.missing) {
+    const status = statusOf(gap.dimension);
+    if (status === "UNKNOWN" || status === "DECLINED")
+      moved.set(gap.dimension, status);
+    else if (
+      (status !== undefined && status !== "UNANSWERED") ||
+      answeredElsewhere(
+        view,
+        settled.get(gap.dimension as ApplicationDimension),
+      ).length > 0
+    )
+      moved.set(gap.dimension, "ANSWERED");
+  }
+  if (moved.size === 0) return dossier;
+  const gapOf = (gap: (typeof dossier.missing)[number]) => ({
+    dimension: gap.dimension,
+    label: gap.label,
+    group: gap.group,
+  });
+  const listed = (
+    gaps: readonly { readonly dimension: string }[],
+    dimension: string,
+  ) => gaps.some((gap) => gap.dimension === dimension);
+  const diligenceQuestions = dossier.diligenceQuestions.flatMap((q) => {
+    const to =
+      q.basis === "MISSING" && q.dimension !== null
+        ? moved.get(q.dimension)
+        : undefined;
+    if (to === undefined) return [q];
+    return to === "ANSWERED" ? [] : [{ ...q, basis: to }];
+  });
+  return {
+    ...dossier,
+    missing: dossier.missing.filter((gap) => !moved.has(gap.dimension)),
+    unknowns: [
+      ...dossier.unknowns,
+      ...dossier.missing
+        .filter(
+          (gap) =>
+            moved.get(gap.dimension) === "UNKNOWN" &&
+            !listed(dossier.unknowns, gap.dimension),
+        )
+        .map(gapOf),
+    ],
+    declined: [
+      ...dossier.declined,
+      ...dossier.missing
+        .filter(
+          (gap) =>
+            moved.get(gap.dimension) === "DECLINED" &&
+            !listed(dossier.declined, gap.dimension),
+        )
+        .map(gapOf),
+    ],
+    diligenceQuestions,
+    ...(dossier.diligenceQuestionsTotal === undefined
+      ? {}
+      : {
+          diligenceQuestionsTotal:
+            dossier.diligenceQuestionsTotal -
+            (dossier.diligenceQuestions.length - diligenceQuestions.length),
+        }),
   };
 }

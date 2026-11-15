@@ -36,6 +36,7 @@ import {
   type TriageProposal,
 } from "./domain.js";
 import { withDerivedAmountsMarked } from "../application/dossier.js";
+import { withSettledGaps } from "../application/statement-words.js";
 import { amountWords } from "../application/stated-amount.js";
 import { buildPack, packFileName, type PackFile } from "./pack.js";
 import type {
@@ -459,7 +460,7 @@ export function createInboxService(dependencies: {
         // never rewritten (root cause 2026-11-14).
         dossier: dossier.success
           ? withDerivedAmountsMarked(
-              gateqDossierAsReadNow(dossier.data),
+              withSettledGaps(gateqDossierAsReadNow(dossier.data)),
               transcript ?? [],
             )
           : null,

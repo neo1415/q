@@ -181,6 +181,7 @@ export {
   effectiveStatementView,
   statementSummary,
   statementViewDto,
+  withSettledGaps,
 } from "./application/statement-words.js";
 export {
   backfillStatementsFor,

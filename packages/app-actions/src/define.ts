@@ -427,6 +427,42 @@ export function readyToSendLine(summary: string, text: string | null): string {
   return `${what}${quoted}. Ready to send: approve on the card, or tell me what to change.`;
 }
 
+/**
+ * D23 (live 15 Nov 2026): the title a waiting outward draft is listed
+ * under, so three cards to one person do not all read "Message Ajopot":
+ * the summary, then the draft's first words; with no words, the day it
+ * was prepared. The words are the preview's first paragraph (a shared
+ * document's note follows a blank line).
+ */
+export const LISTED_DRAFT_WORDS = 6;
+
+export function listedDraftTitle(
+  summary: string,
+  draft: string | null,
+  preparedAt: string,
+): string {
+  const what = summary.trim().replace(/[.\s]+$/u, "");
+  const words = (draft ?? "")
+    .split(/\n\s*\n/u)[0]
+    ?.trim()
+    .split(/\s+/u)
+    .filter((word) => word !== "");
+  if (words !== undefined && words.length > 0) {
+    const shown = words.slice(0, LISTED_DRAFT_WORDS).join(" ");
+    return words.length > LISTED_DRAFT_WORDS
+      ? `${what}: ${shown.replace(/[,;:.!?]+$/u, "")}…`
+      : `${what}: ${shown}`;
+  }
+  const at = new Date(preparedAt);
+  if (Number.isNaN(at.getTime())) return what;
+  const day = at.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  return `${what}, prepared ${day}`;
+}
+
 export function defineAppAction<In, Out, ToolIn = In>(
   definition: AppActionDefinition<In, Out, ToolIn>,
 ): AnyAppAction {

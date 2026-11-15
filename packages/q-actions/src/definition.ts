@@ -195,6 +195,20 @@ export type QActionDefinition<P, R> = {
    * yet" (coordinator 2026-10-23). Absent: the summary, "Not saved yet".
    */
   readonly proposed?: ((payload: P, summary: string) => string) | undefined;
+  /**
+   * D23 (live 15 Nov 2026): the title a waiting card is listed under (the
+   * work list, the digest, Q's list of what waits), from its stored
+   * summary and preview -- never the payload, which a listing never reads.
+   * Three cards all "Message Ajopot" read as duplicates; each names its
+   * own words. Absent, or blank: the summary.
+   */
+  readonly listTitle?:
+    | ((listed: {
+        readonly summary: string;
+        readonly preview: string | null;
+        readonly requestedAt: string;
+      }) => string)
+    | undefined;
 };
 
 /** Erased for the registry; per-definition types stay with the definition. */

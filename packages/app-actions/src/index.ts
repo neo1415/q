@@ -3,6 +3,7 @@ export {
   type AppActionConsequence,
   defineAppAction,
   readyToSendLine,
+  listedDraftTitle,
   defineAppActionFamily,
   isRefusal,
   refusal,
