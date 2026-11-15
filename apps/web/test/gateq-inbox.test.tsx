@@ -350,7 +350,9 @@ describe("the one-page summary reads the projection (live 30c99ccc5, Clinicly)",
   const dossier = {
     schemaVersion: "gateq-dossier.v2",
     company: { name: "Clinicly" },
-    unknowns: ["Market"],
+    unknowns: [
+      { dimension: "company.market", label: "Market", group: "MARKET" },
+    ],
     declined: [],
     dimensions: [
       {
@@ -402,8 +404,12 @@ describe("the one-page summary reads the projection (live 30c99ccc5, Clinicly)",
   it("reads a v1 dossier's stated unknowns from its own lists", () => {
     const v1 = {
       company: { name: "Clinicly" },
-      unknowns: ["Market"],
-      declined: ["Revenue"],
+      unknowns: [
+        { dimension: "company.market", label: "Market", group: "MARKET" },
+      ],
+      declined: [
+        { dimension: "claims.revenue", label: "Revenue", group: "TRACTION" },
+      ],
       dimensions: [],
     } as unknown as Parameters<typeof model.onePageSummary>[1];
     const byLabel = new Map(

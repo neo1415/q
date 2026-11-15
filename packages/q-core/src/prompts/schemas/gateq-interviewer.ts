@@ -452,6 +452,55 @@ export type GateQInterviewerVariablesV7 = z.infer<
   typeof GateQInterviewerVariablesV7Schema
 >;
 
+// ---------------------------------------------------------------------------
+// Reading schema v3 (prompt v10): what a counted number counts
+// ---------------------------------------------------------------------------
+
+export const GATEQ_INTERVIEWER_SCHEMA_VERSION_V3 = 3;
+
+/**
+ * The unit each counted metric declares: what one of it is. A count names a
+ * metric only when what it counts is that unit (live 30c99ccc5: "2,300
+ * patient records digitised" was read as `customers`, and code paired it
+ * with "4 clinics" as a disagreement). Money and rate metrics declare none.
+ */
+export const GATEQ_STATEMENT_QUANTITY_UNITS: Readonly<
+  Partial<Record<(typeof GATEQ_STATEMENT_QUANTITIES)[number], string>>
+> = {
+  paying_customers: "paying customer",
+  customers: "customer",
+  users: "user",
+  daily_active_users: "daily active user",
+  weekly_active_users: "weekly active user",
+  monthly_active_users: "monthly active user",
+  wallets: "wallet",
+  transactions: "transaction",
+  pilots: "pilot",
+  employees: "employee",
+  runway_months: "month",
+};
+
+/**
+ * v3: a statement also says what its number counts. `unit` is the listed
+ * unit when the count is that metric, otherwise the founder's own noun
+ * (singular) with no quantity. Absent on a v2 reading.
+ */
+export const GateQStatementOpV3Schema = GateQStatementOpSchema.extend({
+  unit: z.string().min(1).max(80).nullable().optional().catch(undefined),
+}).strict();
+export type GateQStatementOpV3 = z.infer<typeof GateQStatementOpV3Schema>;
+
+export const GateQInterviewerResultV3Schema =
+  GateQInterviewerResultV2Schema.extend({
+    statements: z
+      .array(GateQStatementOpV3Schema.nullable().catch(null))
+      .max(24)
+      .default([]),
+  }).strict();
+export type GateQInterviewerResultV3 = z.infer<
+  typeof GateQInterviewerResultV3Schema
+>;
+
 export const GATEQ_INTERVIEWER_UNTRUSTED_V7 = [
   ...GATEQ_INTERVIEWER_UNTRUSTED,
   "unreadMessages",

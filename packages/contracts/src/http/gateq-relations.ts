@@ -23,8 +23,8 @@ import {
  *   1. both hold a value: an unknown is never an end;
  *   2. they are on the same dimension and about the same metric: two
  *      numbers name the same quantity their values fit (a share is not a
- *      number of users); one side naming none relates only when the reader
- *      said so explicitly;
+ *      number of users); a count or share naming none never relates, and
+ *      prose naming none relates only when the reader said so explicitly;
  *   3. their periods are comparable: equal known dates, or a date not given;
  *   4. they were said in different turns: a change or range said once is
  *      not a contradiction.
@@ -100,6 +100,12 @@ export function gateqRelatable(
   if (a.asOf !== null && b.asOf !== null && a.asOf !== b.asOf) return false;
   const qa = gateqQuantityFitting(a.valueKind, a.quantity);
   const qb = gateqQuantityFitting(b.valueKind, b.quantity);
+  // A count or a share of something that is no metric on the list counts
+  // an unknown thing: it is compared with nothing, even when a reader says
+  // so (live 30c99ccc5: "2,300 patient records" and "4 clinics").
+  const unnamed = (kind: GateqValueKind, quantity: string | null) =>
+    (kind === "COUNT" || kind === "PERCENT") && quantity === null;
+  if (unnamed(a.valueKind, qa) || unnamed(b.valueKind, qb)) return false;
   if (qa !== null && qb !== null) return qa === qb;
   if (qa === null && qb === null) return true;
   return options.explicit === true;

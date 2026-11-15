@@ -595,18 +595,19 @@ export function onePageSummary(
   };
   const all: readonly SummaryFact[] =
     dossier?.dimensions.flatMap((dimension) =>
-      dimension.facts.map(
-        (fact): SummaryFact => ({ ...fact, group: dimension.group }),
-      ),
+      dimension.facts.map((fact): SummaryFact => ({
+        ...fact,
+        group: dimension.group,
+      })),
     ) ?? [];
   const view =
     dossier?.schemaVersion === "gateq-dossier.v2" ? dossier.statements : null;
   /** A row with no finding: what the founder said about it, if anything. */
   const gapOf = (
-    label: string,
     dimensions: readonly string[] | "FUNDRAISING",
   ): NonNullable<SummaryRow["gap"]> => {
-    if (view !== null && dimensions !== "FUNDRAISING") {
+    if (dimensions === "FUNDRAISING") return "NOT_COVERED";
+    if (view !== null) {
       const statuses = view.dimensions
         .filter((d) => dimensions.includes(d.dimension))
         .map((d) => d.status);
@@ -614,8 +615,13 @@ export function onePageSummary(
       if (statuses.includes("DECLINED")) return "DECLINED";
       return "NOT_COVERED";
     }
-    if (dossier?.unknowns.includes(label) === true) return "NOT_KNOWN";
-    if (dossier?.declined.includes(label) === true) return "DECLINED";
+    // A v1 dossier: its own gap lists, from the same coverage.
+    const listed = (gaps: readonly { readonly dimension: string }[]) =>
+      gaps.some((gap) => dimensions.includes(gap.dimension));
+    if (dossier !== null && dossier !== undefined) {
+      if (listed(dossier.unknowns)) return "NOT_KNOWN";
+      if (listed(dossier.declined)) return "DECLINED";
+    }
     return "NOT_COVERED";
   };
   const line = (fact: SummaryFact) =>
@@ -641,7 +647,7 @@ export function onePageSummary(
           ? {
               label: row.label,
               value: null,
-              gap: gapOf(row.label, row.dimensions),
+              gap: gapOf(row.dimensions),
             }
           : { label: row.label, value: legacyRaise, gap: null },
       );

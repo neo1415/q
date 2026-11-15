@@ -8,7 +8,7 @@ import {
   gateqStatementIdentities,
   gateqStatementsInWords,
 } from "@capital-q/contracts";
-import type { GateQStatementOp } from "@capital-q/q-core";
+import type { GateQStatementOpV3 as GateQStatementOp } from "@capital-q/q-core";
 
 import type {
   ApplicationStatement,
@@ -31,6 +31,7 @@ import {
   statementWorld,
   type Script,
 } from "./support/statement-world.js";
+import { factsFromAnswers } from "../src/domain/form-answers.js";
 
 /**
  * The live relation replay (root cause 2026-11-14,
@@ -61,7 +62,8 @@ const st = (op: Op): GateQStatementOp => ({
 type Turn = {
   readonly id: string;
   /** Which live run the turn and its reading come from. */
-  readonly run: "1f9e33016" | "d2ce8c91e" | "06910b145" | "78f8d72d5";
+  readonly run:
+    "1f9e33016" | "d2ce8c91e" | "06910b145" | "78f8d72d5" | "30c99ccc5";
   readonly say: string;
   readonly script: Script;
   readonly resumeBefore?: true;
@@ -1302,5 +1304,614 @@ describe("stored links read under the relation rule (frozen pre-fix rows)", () =
       "weekly_active_users",
     );
     expect(standing(projectView([a, b], [], []))).toHaveLength(1);
+  });
+});
+
+/**
+ * The fifth live run (30c99ccc5, application f08ea19a, Clinicly): 6/8.
+ * Replayed with the form the founder saved and, turn by turn, the reply
+ * and asking label the live model gave. Where the live reading was the
+ * defect itself, the reading is the one a careless v10 reader still could
+ * give (a count of patient records named `customers` while its own unit
+ * says "patient record"; paraphrased stage words), so code must hold:
+ *
+ *   - P2a: "2,300 patient records" never names customers, never pairs
+ *     with "1 clinic to 4";
+ *   - P3a: Q never asks the form's country (t15), "how many clinics" after
+ *     "1 to 4" (t45), or "what does it do day to day" after the
+ *     description (t31–t39);
+ *   - P3b: stored words are the founder's own span (t32), and the
+ *     dossier's company stage holds every answer while they disagree.
+ */
+const FIFTH_FORM = {
+  companyName: "Clinicly",
+  oneLiner: "A monthly primary-care teleconsultation plan",
+  stage: "seed",
+  sectors: ["Health"],
+  country: "KE",
+  raise: { amount: "350000", currency: "USD" },
+  contactName: "Zawadi Wambui",
+  contactEmail: "zawadi@example.com",
+};
+
+/** The S<n> of the nth statement KNOWN FACTS lists on a dimension. */
+function handleOn(text: string, dimension: string, nth = 0): string {
+  const lines = text.split("\n");
+  const head = lines.findIndex((l) => l.startsWith(`${dimension} (`));
+  const handles: string[] = [];
+  for (const line of lines.slice(head + 1)) {
+    const match = /^\s+(S\d+)\b/u.exec(line);
+    if (match?.[1] === undefined) break;
+    handles.push(match[1]);
+  }
+  const handle = head < 0 ? undefined : handles[nth];
+  if (handle === undefined) throw new Error(`no S<n> on ${dimension}`);
+  return handle;
+}
+
+const FIFTH: readonly Turn[] = [
+  {
+    id: "c-02",
+    run: "30c99ccc5",
+    say: "Clinicly gives private outpatient clinics in Kenya one system for bookings, patient records and insurance claims, so claims stop bouncing back for missing fields.",
+    script: () =>
+      reading({
+        reply:
+          "That's a useful distinction: one system for bookings, records and claims. What does the round buy you?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "company.description",
+            value: {
+              kind: "TEXT",
+              text: "one system for bookings, patient records and insurance claims",
+            },
+            words:
+              "Clinicly gives private outpatient clinics in Kenya one system for bookings, patient records and insurance claims",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t4: the records count was read as customers = 2,300.
+    id: "c-04",
+    run: "30c99ccc5",
+    say: "Traction so far: 2,300 patient records digitised and 600 weekly active users.",
+    script: () =>
+      reading({
+        reply:
+          "Two thousand three hundred patient records and six hundred weekly active users. What does the round buy you?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "customers",
+            unit: "patient record",
+            value: { kind: "COUNT", count: "2300" },
+            words: "2,300 patient records digitised",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "600" },
+            words: "600 weekly active users",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-06",
+    run: "30c99ccc5",
+    say: "Nobody pays yet. Clinics use it free during the pilot.",
+    script: () =>
+      reading({
+        reply:
+          "No paying clinics yet. What does the round buy you in runway and milestones?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "paying_customers",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet",
+          }),
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "Clinics use it free during the pilot.",
+            },
+            words: "Clinics use it free during the pilot.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t8: became customers = 4 and was code-linked to the 2,300.
+    id: "c-08",
+    run: "30c99ccc5",
+    say: "On growth: we went from 1 clinic to 4 since March.",
+    script: () =>
+      reading({
+        reply:
+          "Four clinics since March, up from one. What does the round buy you in runway and milestones?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "customers",
+            unit: "customer",
+            value: { kind: "COUNT", count: "4" },
+            words: "we went from 1 clinic to 4 since March",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-10",
+    run: "30c99ccc5",
+    say: "We don't know our CAC yet.",
+    script: () =>
+      reading({
+        reply: "Fair enough. How fast is usage growing month on month?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We don't know our CAC yet.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-12",
+    run: "30c99ccc5",
+    say: "Team is four: I'm Zawadi Wambui, CEO, a clinical officer who ran operations at a Nairobi hospital group for six years; our CTO Kevin Otieno built claims software at a Kenyan insurer; and two engineers.",
+    script: () =>
+      reading({
+        reply:
+          "A strong fit for the problem. What does the round buy you in runway and milestones?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "company.team",
+            value: {
+              kind: "TEXT",
+              text: "Zawadi Wambui, CEO; CTO Kevin Otieno; two engineers",
+            },
+            words:
+              "Team is four: I'm Zawadi Wambui, CEO, a clinical officer who ran operations at a Nairobi hospital group for six years",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t14/t15: the founder's own "not seed" corrects the form's seed;
+    // Q then asked the country the form gave, labelled company.stage.
+    id: "c-14",
+    run: "30c99ccc5",
+    say: "Different topic: to be precise about stage, we're really a Series A company now, not seed. We've been operating for four years.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Understood — Series A, rather than seed, and you've been operating for four years. Kilima's public description says it co-invests at pre-seed and seed; where is Clinicly based today — which country?",
+        intent: "CORRECTION",
+        asking: "company.stage",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "series_a" },
+            words: "we're really a Series A company now, not seed",
+          }),
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "We've been operating for four years.",
+            },
+            words: "We've been operating for four years.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-16",
+    run: "30c99ccc5",
+    say: "Back to users: about 1,500 weekly active users.",
+    script: () =>
+      reading({
+        reply:
+          "I have 600 weekly active users here, and now about 1,500. Which figure should I use?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "1500" },
+            words: "about 1,500 weekly active users",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-18",
+    run: "30c99ccc5",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Fair enough — I'll leave the weekly-active-user figures as they are. What problem is Clinicly solving for its customers?",
+        asking: "company.problem",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("claims.traction"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    id: "c-22",
+    run: "30c99ccc5",
+    say: "Sorry, I meant 400k, not 350k.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Understood — the raise is four hundred thousand dollars. What problem is Clinicly solving for its customers?",
+        intent: "CORRECTION",
+        asking: "company.problem",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "raise.amount"),
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "400000", currency: "USD" },
+            words: "I meant 400k, not 350k",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-24",
+    run: "30c99ccc5",
+    say: "We haven't sized the market.",
+    script: () =>
+      reading({
+        reply:
+          "Fair enough — the market isn't sized yet. How does Clinicly make money once the pilots move beyond free use?",
+        asking: "company.business_model",
+        statements: [
+          st({
+            dimension: "company.market",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We haven't sized the market.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t30/t31: "what does the product do day to day?" after turn 2
+    // had said what it does.
+    id: "c-30",
+    run: "30c99ccc5",
+    say: "We plan to charge each clinic 8,000 shillings per month once the pilot ends.",
+    script: () =>
+      reading({
+        reply:
+          "Eight thousand shillings per clinic each month once the pilot ends — clear. What does the product do day to day for a clinic using it?",
+        asking: "company.solution",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "8,000 shillings per clinic per month after the pilot",
+            },
+            words:
+              "We plan to charge each clinic 8,000 shillings per month once the pilot ends.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t32: stored as "by revenue I'd say seed" for "we're seed".
+    id: "c-32",
+    run: "30c99ccc5",
+    say: "Our lead angel calls us seed, though, and honestly by revenue we're seed; by age I'd say Series A. I'm not sure which is right.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "You've said Series A before, while your lead angel calls you seed; which stage should I use for this application?",
+        asking: "company.stage",
+        statements: [
+          st({
+            op: "DISAGREES",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "seed" },
+            words: "by revenue I'd say seed",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-34",
+    run: "30c99ccc5",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Fair enough. What does the product do day to day for a clinic using it?",
+        asking: "company.solution",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("company.stage"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    id: "c-36",
+    run: "30c99ccc5",
+    say: "Leave it open.",
+    script: () =>
+      reading({
+        reply:
+          "Fair enough. What does the product do day to day for a clinic using it?",
+        asking: "company.solution",
+      }),
+  },
+  {
+    // The browser was closed here; a new context resumed.
+    id: "c-38",
+    run: "30c99ccc5",
+    resumeBefore: true,
+    say: "Leave it open for now.",
+    script: () =>
+      reading({
+        reply:
+          "Fair enough. What does the product do day to day for a clinic using it?",
+        asking: "company.solution",
+      }),
+  },
+  {
+    id: "c-40",
+    run: "30c99ccc5",
+    say: "Day to day, the front desk books patients, nurses fill in the record, and the claim is checked and sent from the same screen.",
+    script: () =>
+      reading({
+        reply:
+          "That's clear: bookings, records, and claims in one workflow. What's the main outcome clinics get from using it?",
+        asking: "company.solution",
+        statements: [
+          st({
+            dimension: "company.solution",
+            value: {
+              kind: "TEXT",
+              text: "front desk books, nurses fill the record, the claim is checked and sent from one screen",
+            },
+            words:
+              "the front desk books patients, nurses fill in the record, and the claim is checked and sent from the same screen",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "c-44",
+    run: "30c99ccc5",
+    say: "We reach clinics through county health officers and two medical association meetups.",
+    script: () =>
+      reading({
+        reply:
+          "County health officers and two medical association meetups — a useful route into clinics. How many clinics are using Clinicly today?",
+        asking: "company.customers",
+        statements: [
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "We reach clinics through county health officers and two medical association meetups.",
+            },
+            words:
+              "We reach clinics through county health officers and two medical association meetups.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t48: "paid faster" was stored as the company description; v10
+    // reads an outcome for customers as the solution.
+    id: "c-48",
+    run: "30c99ccc5",
+    say: "Four clinics, the same four pilots. They get paid faster because fewer claims are rejected.",
+    script: () =>
+      reading({
+        reply:
+          "Four clinics and four pilots, understood. Is there anything else Kilima should know?",
+        asking: "application.note",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "pilots",
+            unit: "pilot",
+            value: { kind: "COUNT", count: "4" },
+            words: "the same four pilots",
+          }),
+          st({
+            dimension: "company.solution",
+            value: {
+              kind: "TEXT",
+              text: "They get paid faster because fewer claims are rejected.",
+            },
+            words: "They get paid faster because fewer claims are rejected.",
+          }),
+        ],
+      }),
+  },
+];
+
+const DAY_TO_DAY = /day to day/iu;
+
+function assertFifthOutcome(
+  world: World,
+  id: string,
+  view: ApplicationStatementView,
+): void {
+  const store = world.store();
+  const reply = qReply(world, id);
+  const records = () => byWords(world, "2,300 patient records digitised");
+  switch (id) {
+    case "c-04":
+      // P2a: a count whose own unit is not the metric's names no metric.
+      expect(records().quantity).toBeNull();
+      expect(byWords(world, "600 weekly active users").quantity).toBe(
+        "weekly_active_users",
+      );
+      break;
+    case "c-08": {
+      // P2a: 2,300 records and 4 clinics are never a disagreement.
+      const clinics = byWords(world, "we went from 1 clinic to 4 since March");
+      expect(clinics.quantity).toBe("customers");
+      expect(
+        store.linkRows.filter((l) => l.kind === "DISAGREES"),
+        "no disagreement after 1 clinic to 4",
+      ).toEqual([]);
+      expect(relatable(records(), clinics, { explicit: true })).toBe(false);
+      break;
+    }
+    case "c-14":
+      // P3a: the form gave Kenya; the country is never asked. The rest of
+      // Q's line stays, and the question is the picker's.
+      expect(dimensionView(view, "company.country").status).toBe("SETTLED");
+      expect(reply).not.toMatch(/which country|where is clinicly based/iu);
+      expect(reply).toContain("Understood — Series A, rather than seed");
+      expect(reply.trim().endsWith("?")).toBe(true);
+      break;
+    case "c-16":
+      expect(
+        standing(view).filter((d) =>
+          [d.olderStatementId, d.newerStatementId].includes(records().id),
+        ),
+      ).toEqual([]);
+      expect(standing(view)).toHaveLength(1);
+      break;
+    case "c-30":
+    case "c-34":
+    case "c-36":
+    case "c-38":
+      // P3a: the description (turn 2) said what it does day to day.
+      expect(reply, id).not.toMatch(DAY_TO_DAY);
+      expect(reply, id).toMatch(/^(?:Eight thousand|Fair enough)/u);
+      break;
+    case "c-32": {
+      // P3b: their own words, never the reader's paraphrase.
+      const turn = store.turnRows.find(
+        (t) => t.role === "PERSON" && t.clientTurnId === "c-32",
+      );
+      const seed = store.statementRows.find(
+        (s) => s.sourceTurnId === turn?.id && s.dimension === "company.stage",
+      );
+      expect(seed?.words).toBeDefined();
+      expect(turn?.text).toContain(seed?.words ?? "(none)");
+      expect(seed?.words).toContain("by revenue we're seed");
+      expect(dimensionView(view, "company.stage").status).toBe(
+        "DISAGREEMENT_OPEN",
+      );
+      break;
+    }
+    case "c-44":
+      // P3a: "1 clinic to 4" already says how many clinics.
+      expect(reply).not.toMatch(/how many clinics/iu);
+      break;
+    case "c-48":
+      expect(
+        dimensionView(view, "company.description").items.map((i) => i.words),
+      ).not.toContain(
+        "They get paid faster because fewer claims are rejected.",
+      );
+      break;
+  }
+  // Every stored word of a turn is a span of what that turn said.
+  for (const s of store.statementRows.filter((x) => x.origin === "TURN")) {
+    const said = store.turnRows.find((t) => t.id === s.sourceTurnId)?.text;
+    expect(said?.toLowerCase(), s.words).toContain(s.words.toLowerCase());
+  }
+}
+
+describe("live relation replay: the fifth run (30c99ccc5), metrics, asking and words", () => {
+  it("names a metric only for its unit, never re-asks what is answered, keeps their words", async () => {
+    const world = statementWorld();
+    let { intake, conversation } = world.services();
+    const { token } = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    await intake.recordFacts({
+      token,
+      origin: "FORM",
+      facts: factsFromAnswers(FIFTH_FORM),
+    });
+    world.scripts.push(() =>
+      reading({
+        reply:
+          "Kilima co-invests alongside East African founders. What are you building, and who is it for?",
+        asking: "company.description",
+      }),
+    );
+    await conversation.openingFor({ token, correlationId: randomUUID() });
+
+    let before = viewOf(world);
+    for (const turn of FIFTH) {
+      world.advance(60_000);
+      if (turn.resumeBefore === true)
+        ({ intake, conversation } = world.services());
+      const calls = world.prompts.length;
+      world.scripts.push(turn.script);
+      await conversation.turn({
+        token,
+        message: turn.say,
+        clientTurnId: turn.id,
+        correlationId: randomUUID(),
+      });
+      const after = viewOf(world);
+      assertAfterTurn(world, turn, after, before, world.prompts.length > calls);
+      assertFifthOutcome(world, turn.id, after);
+      before = after;
+    }
+
+    // "Day to day" is never asked after the description, and Q never
+    // asks the form's country.
+    const qLines = world
+      .store()
+      .turnRows.filter((t) => t.role === "Q")
+      .map((t) => t.text);
+    expect(qLines.filter((l) => DAY_TO_DAY.test(l))).toEqual([]);
+    expect(qLines.filter((l) => /which country/iu.test(l))).toEqual([]);
+
+    // Review: the WAU and stage pairs, both standing; never 2,300 vs 4.
+    const review = await intake.coverage(token);
+    const lines = review.coverage.contradictions;
+    expect(lines).toHaveLength(2);
+    expect(lines.some((l) => /600/u.test(l) && /1,500/u.test(l))).toBe(true);
+    expect(lines.some((l) => /2,300/u.test(l))).toBe(false);
+
+    // P3b: the frozen dossier's company stage holds every answer.
+    await intake.submit({ token, clientRequestId: "replay-submit-0005" });
+    const frozen = GateqDossierSchema.parse(
+      JSON.parse(JSON.stringify(world.submitted().at(-1)?.dossier)),
+    );
+    expect(frozen.company.stage).toMatch(/ or /u);
+    expect(frozen.company.stage?.toLowerCase()).toMatch(/series a/u);
+    expect(frozen.company.stage?.toLowerCase()).toMatch(/seed/u);
   });
 });

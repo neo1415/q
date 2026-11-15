@@ -9,7 +9,7 @@ import {
   type PublicGateway,
 } from "@capital-q/gateq";
 import { ModelGatewayError } from "@capital-q/model-gateway";
-import type { GateQInterviewerResultV2 } from "@capital-q/q-core";
+import type { GateQInterviewerResultV3 } from "@capital-q/q-core";
 
 import {
   IntakeRefusedError,
@@ -199,8 +199,8 @@ function seen(text: string): PromptSeen {
 
 /** A reading in schema v2, with every field the model leaves at default. */
 export function reading(
-  partial: Partial<GateQInterviewerResultV2> & { readonly reply: string },
-): GateQInterviewerResultV2 {
+  partial: Partial<GateQInterviewerResultV3> & { readonly reply: string },
+): GateQInterviewerResultV3 {
   return {
     intent: "ANSWER",
     facts: [],
@@ -215,7 +215,7 @@ export function reading(
   };
 }
 
-export type Script = (prompt: PromptSeen) => GateQInterviewerResultV2 | "FAIL";
+export type Script = (prompt: PromptSeen) => GateQInterviewerResultV3 | "FAIL";
 
 export function statementWorld() {
   let now = START;

@@ -103,10 +103,17 @@ export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
 export { GATEQ_INTERVIEWER_V7 } from "./prompts/tasks/gateq-interviewer.v7.js";
 export { GATEQ_INTERVIEWER_V8 } from "./prompts/tasks/gateq-interviewer.v8.js";
 export { GATEQ_INTERVIEWER_V9 } from "./prompts/tasks/gateq-interviewer.v9.js";
+export { GATEQ_INTERVIEWER_V10 } from "./prompts/tasks/gateq-interviewer.v10.js";
 export {
   GATEQ_INTERVIEWER_SCHEMA_NAME,
   GATEQ_INTERVIEWER_SCHEMA_VERSION,
   GATEQ_INTERVIEWER_SCHEMA_VERSION_V2,
+  GATEQ_INTERVIEWER_SCHEMA_VERSION_V3,
+  GATEQ_STATEMENT_QUANTITY_UNITS,
+  GateQInterviewerResultV3Schema,
+  GateQStatementOpV3Schema,
+  type GateQInterviewerResultV3,
+  type GateQStatementOpV3,
   GATEQ_INTERVIEWER_UNTRUSTED,
   GATEQ_INTERVIEWER_UNTRUSTED_V7,
   GATEQ_STATEMENT_OPS,
