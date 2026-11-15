@@ -1,0 +1,816 @@
+{
+  "tour_phone": {
+    "s1": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 390, 844],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 734, 390, 110],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "0",
+        "box": [77, 12, 301, 54],
+        "inView": true
+      },
+      "controlsText": "5 / 37 Back Pause Next End",
+      "captionText": "Your inbox is full.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 55,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Pause",
+          "w": 63,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Next beat",
+          "w": 53,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Captions",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 47,
+          "h": 44,
+          "hit": false
+        }
+      ],
+      "audioPaused": []
+    },
+    "s1woken": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 390, 844],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 734, 390, 110],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "0.92",
+        "box": [77, 12, 301, 54],
+        "inView": true
+      },
+      "controlsText": "5 / 37 Back Pause Next End",
+      "captionText": "Your inbox is full.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Pause",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 53,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 47,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "pause": "ok 63x44",
+    "s2": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 390, 844],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 734, 390, 110],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [65, 12, 313, 54],
+        "inView": true
+      },
+      "controlsText": "6 / 37 Back Resume Next End",
+      "captionText": "Decks.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Resume",
+          "w": 75,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 53,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 47,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "s2b": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 390, 844],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 734, 390, 110],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [65, 12, 313, 54],
+        "inView": true
+      },
+      "controlsText": "6 / 37 Back Resume Next End",
+      "captionText": "Decks.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Resume",
+          "w": 75,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 53,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 47,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "resume": "ok 75x44",
+    "s3": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 390, 844],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 734, 390, 110],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [77, 12, 301, 54],
+        "inView": true
+      },
+      "controlsText": "6 / 37 Back Pause Next End",
+      "captionText": "Introductions.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Pause",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 53,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 47,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "next": "ok 53x44",
+    "s4": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 390, 844],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 734, 390, 110],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [77, 12, 301, 54],
+        "inView": true
+      },
+      "controlsText": "7 / 37 Back Pause Next End",
+      "captionText": "Opportunity everywhere.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Pause",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 53,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 0,
+          "h": 0,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 47,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "end": "ok 47x44",
+    "s5": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": null,
+      "captions": null,
+      "controls": null,
+      "controlsText": null,
+      "captionText": "",
+      "btns": [],
+      "audioPaused": []
+    },
+    "errors": []
+  },
+  "tour_desktop": {
+    "s1": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 1440, 900],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 774, 1440, 126],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "0",
+        "box": [935, 12, 493, 54],
+        "inView": true
+      },
+      "controlsText": "5 / 37 Back Pause Next Captions Mute End",
+      "captionText": "Your inbox is full.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 63,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Pause",
+          "w": 71,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Next beat",
+          "w": 61,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Captions",
+          "w": 89,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "Mute",
+          "w": 64,
+          "h": 44,
+          "hit": false
+        },
+        {
+          "t": "End",
+          "w": 55,
+          "h": 44,
+          "hit": false
+        }
+      ],
+      "audioPaused": []
+    },
+    "s1woken": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 1440, 900],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 774, 1440, 126],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "0.92",
+        "box": [935, 12, 493, 54],
+        "inView": true
+      },
+      "controlsText": "5 / 37 Back Pause Next Captions Mute End",
+      "captionText": "Your inbox is full.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Pause",
+          "w": 71,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 61,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 89,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Mute",
+          "w": 64,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "End",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "pause": "ok 71x44",
+    "s2": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 1440, 900],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 774, 1440, 126],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [922, 12, 506, 54],
+        "inView": true
+      },
+      "controlsText": "6 / 37 Back Resume Next Captions Mute End",
+      "captionText": "Decks.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Resume",
+          "w": 83,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 61,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 89,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Mute",
+          "w": 64,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "End",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "s2b": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 1440, 900],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 774, 1440, 126],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [922, 12, 506, 54],
+        "inView": true
+      },
+      "controlsText": "6 / 37 Back Resume Next Captions Mute End",
+      "captionText": "Decks.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Resume",
+          "w": 83,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 61,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 89,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Mute",
+          "w": 64,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "End",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "resume": "ok 83x44",
+    "s3": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 1440, 900],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 774, 1440, 126],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [935, 12, 493, 54],
+        "inView": true
+      },
+      "controlsText": "6 / 37 Back Pause Next Captions Mute End",
+      "captionText": "Introductions.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Pause",
+          "w": 71,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 61,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 89,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Mute",
+          "w": 64,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "End",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "next": "ok 61x44",
+    "s4": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": {
+        "vis": "visible",
+        "disp": "grid",
+        "op": "1",
+        "box": [0, 0, 1440, 900],
+        "inView": true
+      },
+      "captions": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [0, 774, 1440, 126],
+        "inView": true
+      },
+      "controls": {
+        "vis": "visible",
+        "disp": "flex",
+        "op": "1",
+        "box": [935, 12, 493, 54],
+        "inView": true
+      },
+      "controlsText": "7 / 37 Back Pause Next Captions Mute End",
+      "captionText": "Opportunity everywhere.",
+      "btns": [
+        {
+          "t": "Previous beat",
+          "w": 63,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Pause",
+          "w": 71,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Next beat",
+          "w": 61,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Captions",
+          "w": 89,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "Mute",
+          "w": 64,
+          "h": 44,
+          "hit": true
+        },
+        {
+          "t": "End",
+          "w": 55,
+          "h": 44,
+          "hit": true
+        }
+      ],
+      "audioPaused": []
+    },
+    "end": "ok 55x44",
+    "s5": {
+      "url": "/home?qpitch=story&new=1&edition=investor&sta",
+      "stage": null,
+      "captions": null,
+      "controls": null,
+      "controlsText": null,
+      "captionText": "",
+      "btns": [],
+      "audioPaused": []
+    },
+    "errors": []
+  }
+}

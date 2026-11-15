@@ -1,0 +1,84 @@
+{
+  "compare_phone": {
+    "ids": ["Open the company", "Open the company", "Open profile"],
+    "head": "Discover Saved Saved 5 Passed Compare Comparing 3 How this is read 1 Watchly 8.7/10 · Good fit · medium confidence Investability 52 · Low confidence · based on 12 of 48 factors, developing · low confi",
+    "tray": [
+      {
+        "vis": "hidden",
+        "inert": true,
+        "box": [12, 808, 366, 64],
+        "text": "0 selectedPick one more to compare"
+      }
+    ],
+    "pickBarVisible": false,
+    "hscroll": false
+  },
+  "compare_desktop": {
+    "ids": ["Open the company", "Open the company", "Open profile"],
+    "head": "Discover Saved Saved 5 Passed Compare Comparing 3 How this is read 1 Watchly 8.7/10 · Good fit · medium confidence Investability 52 · Low confidence · based on 12 of 48 factors, developing · low confi",
+    "tray": [
+      {
+        "vis": "hidden",
+        "inert": true,
+        "box": [12, 864, 1416, 64],
+        "text": "0 selectedPick one more to compare"
+      }
+    ],
+    "pickBarVisible": false,
+    "hscroll": false
+  },
+  "discover": {
+    "pos1": "1\nof 10+",
+    "pos2": "2\nof 10+",
+    "labels": [
+      {
+        "t": "AI presenter · AI-generated",
+        "box": [636, 684, 720, 16]
+      },
+      {
+        "t": "self.__next_f.push([1,\"4b:I[917321,[\\\"/_next/static/chunks/3",
+        "box": [0, 0, 0, 0]
+      }
+    ],
+    "videos": [
+      {
+        "policy": "STARTUP_BUFFER",
+        "paused": true,
+        "fit": "cover",
+        "pos": "50% 50%",
+        "box": [620, -900, 820, 900],
+        "vw": 1080,
+        "vh": 1924
+      },
+      {
+        "policy": "ACTIVE",
+        "paused": false,
+        "fit": "cover",
+        "pos": "50% 34.7%",
+        "box": [620, 0, 820, 900],
+        "vw": 1080,
+        "vh": 1922
+      },
+      {
+        "policy": "STARTUP_BUFFER",
+        "paused": true,
+        "fit": "cover",
+        "pos": "50% 34.5%",
+        "box": [620, 900, 820, 900],
+        "vw": 1080,
+        "vh": 1918
+      },
+      {
+        "policy": "STARTUP_BUFFER",
+        "paused": true,
+        "fit": "cover",
+        "pos": "50% 34.5%",
+        "box": [620, 1800, 820, 900],
+        "vw": 1080,
+        "vh": 1918
+      }
+    ],
+    "text": "Discover For you Your companies AI presenter · AI-generated Watchly Seed · Ghana · Raising $1M Transaction fraud detection for banks and payment processors in Ghana: Watchly scores transactions in real time with models trained on regional fraud patterns. Seed, in your range +2 Profile Saved Pass Ask",
+    "errors": []
+  }
+}
