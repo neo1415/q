@@ -6208,6 +6208,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Your website's logo is shown.",
   "Your website's logo isn't a PNG, JPEG or plain SVG image Capital Q can use safely.",
   "Your website's page was too large to read.",
+  "Your website's title reads like a slogan, not a firm name, so it wasn't used.",
   "Your words for {label}",
   "Your words, sent as you",
   "Your yes",
