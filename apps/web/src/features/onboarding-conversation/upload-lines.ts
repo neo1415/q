@@ -20,7 +20,13 @@ export type UploadNote =
   | "UNCLASSIFIED"
   | "PRIVATE"
   | "FINISHED_READING"
-  | "WAITING_FOR_COMPANY";
+  | "WAITING_FOR_COMPANY"
+  /**
+   * The upload itself, kept in the thread the moment the file lands (D5,
+   * re-check 2026-11-15): a deck whose findings Q reads back by code sends
+   * Q no note, so without it the thread never showed "You shared …".
+   */
+  | "SHARED";
 
 const NOTES: Readonly<Record<UploadNote, (name: string) => string>> = {
   READ_BACK: (name) =>
@@ -37,6 +43,7 @@ const NOTES: Readonly<Record<UploadNote, (name: string) => string>> = {
     `I've finished reading ${name}. Read back what you found in it and check it with me.`,
   WAITING_FOR_COMPANY: (name) =>
     `I've added ${name}; it's here and waiting. You'll read it the moment my company exists, so ask me the company's name.`,
+  SHARED: (name) => `I've shared the file "${name}".`,
 };
 
 /** The note Q is handed about an upload, by kind. */
@@ -128,4 +135,35 @@ export function deckReadLine(
   ]
     .filter((part) => part.length > 0)
     .join(" ");
+}
+
+/**
+ * Q's follow-up when the figure cards are filed after its read-back line
+ * (live 2026-11-15: 22–24 s after it): each figure with its page, waiting
+ * on their yes below. Said by code from the cards' own words.
+ */
+export function deckFiguresLaterLine(
+  figures: readonly DeckFigureCard[],
+): string {
+  const read = figures.map((card) =>
+    clipped(card.summary.replace(/^Keep your /u, ""), 200),
+  );
+  return `I also found ${read.length === 1 ? "this figure" : "these figures"}: ${read.join("; ")}. ${read.length === 1 ? "It isn't saved until you keep it below" : "None of them is saved until you keep each one below"}.`;
+}
+
+/**
+ * One "You shared …" per file in the thread (D5): the upload is kept as
+ * its own event when the file lands, and a note Q is then handed about it
+ * ("…still being read") is the same event, not a second one.
+ */
+export function withoutRepeatedUploads<
+  T extends { readonly uploaded?: string | undefined },
+>(turns: readonly T[]): readonly T[] {
+  const shown = new Set<string>();
+  return turns.filter((turn) => {
+    if (turn.uploaded === undefined) return true;
+    if (shown.has(turn.uploaded)) return false;
+    shown.add(turn.uploaded);
+    return true;
+  });
 }

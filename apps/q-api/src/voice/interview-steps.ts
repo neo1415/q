@@ -403,6 +403,9 @@ export function optionsOf(
 export const MONEY_STEP =
   /cheque|target_amount|valuation|round_size|revenue|mrr|arr|burn|cash/i;
 
+/** Steps whose number is a calendar year ("F1.founded_year"). */
+export const YEAR_STEP = /(?:^|[._])(?:\w+_)?year$/i;
+
 /** The symbol for each currency the journey offers. Domain reference data. */
 const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
   usd: "$",
@@ -468,6 +471,11 @@ export function describeValue(
       if (!Number.isFinite(number)) return value.value;
       if (step !== undefined && MONEY_STEP.test(step.stepKey)) {
         return spokenMoney(number, currency ?? null);
+      }
+      // A year is a year, never a grouped figure (re-check 2026-11-15 D8:
+      // "Founding year: 2,024").
+      if (step !== undefined && YEAR_STEP.test(step.stepKey)) {
+        return Number.isInteger(number) ? String(number) : value.value;
       }
       // The step's own unit, so a margin reads "61%" and not "61" (live
       // 2026-10-28, founder 7982610e).

@@ -104,6 +104,10 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   Kept: "تم الاحتفاظ به",
   "Not kept": "لم يُحتفظ به",
   "You shared": "شاركتَ",
+  // D1 (re-check 2026-11-15): the deck is read; its figures are still coming.
+  "Still reading figures…": "ما زلت أقرأ الأرقام…",
+  // D9: a needed company field left blank asks for an answer or "I don't know".
+  "Fill this in, or choose I don't know.": "املأ هذا الحقل، أو اختر «لا أعرف».",
   "Leave it": "اتركه",
   "Leave the rehearsal": "غادر التدريب",
   "Let Q learn how I like to work": "دع Q يتعلم كيف أحب أن أعمل",

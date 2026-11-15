@@ -3,10 +3,12 @@
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@capital-q/ui/button";
+import { ChoiceChip } from "@capital-q/ui/chip";
 import { Input } from "@capital-q/ui/input";
 import { countryName, countryOfName } from "@capital-q/taxonomy/countries";
 
 import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
+import type { CompanyBasicsField } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
 import { useT, useUiLanguage } from "@/features/i18n/language";
 
@@ -42,6 +44,28 @@ export function CompanyBasicsStep({
     step.response?.foundedYear ?? "",
   );
   const [yearError, setYearError] = useState<string | undefined>(undefined);
+  /**
+   * D9 (re-check 2026-11-15): what they said they don't know, recorded as
+   * unknown. A blank field is never taken as that: one this journey needs
+   * asks for an answer or their "I don't know".
+   */
+  const needs = new Set(step.needsAnswer ?? []);
+  const [unknown, setUnknown] = useState<ReadonlySet<CompanyBasicsField>>(
+    () => new Set(step.response?.unknown ?? []),
+  );
+  const [cityError, setCityError] = useState<string | undefined>(undefined);
+  const notKnown = (field: CompanyBasicsField) => unknown.has(field);
+  const toggleUnknown = (field: CompanyBasicsField) => {
+    setUnknown((now) => {
+      const next = new Set(now);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
+    if (field === "countryCode") setCountryError(undefined);
+    if (field === "city") setCityError(undefined);
+    if (field === "foundedYear") setYearError(undefined);
+  };
   const language = useUiLanguage();
   // Each country in the reader's language (Arabic from the platform's
   // ICU names), the canonical English name otherwise.
@@ -77,13 +101,14 @@ export function CompanyBasicsStep({
       setError("Enter the company name to continue.");
       return;
     }
+    const countryWords = notKnown("countryCode") ? "" : countryText.trim();
     const countryCode =
-      countryText.trim().length === 0 ? undefined : countryCodeOf(countryText);
-    if (countryText.trim().length > 0 && countryCode === undefined) {
+      countryWords.length === 0 ? undefined : countryCodeOf(countryWords);
+    if (countryWords.length > 0 && countryCode === undefined) {
       setCountryError(t("Choose a country from the list."));
       return;
     }
-    const year = foundedYear.trim();
+    const year = notKnown("foundedYear") ? "" : foundedYear.trim();
     if (
       step.asksCityAndYear &&
       year.length > 0 &&
@@ -92,15 +117,33 @@ export function CompanyBasicsStep({
       setYearError(t("Enter the year, like 2021."));
       return;
     }
+    const cityNow = notKnown("city") ? "" : city.trim();
+    // A needed field left blank and not marked is asked for, never stored.
+    const unanswered = (field: CompanyBasicsField, blank: boolean) =>
+      needs.has(field) && blank && !notKnown(field);
+    const blanks = {
+      countryCode: unanswered("countryCode", countryCode === undefined),
+      city: step.asksCityAndYear === true && unanswered("city", cityNow === ""),
+      foundedYear:
+        step.asksCityAndYear === true && unanswered("foundedYear", year === ""),
+    };
+    if (blanks.countryCode)
+      setCountryError(t("Fill this in, or choose I don't know."));
+    if (blanks.city) setCityError(t("Fill this in, or choose I don't know."));
+    if (blanks.foundedYear)
+      setYearError(t("Fill this in, or choose I don't know."));
+    if (blanks.countryCode || blanks.city || blanks.foundedYear) return;
+    const marked = [...unknown].filter(
+      (field) => field === "countryCode" || step.asksCityAndYear === true,
+    );
     void actions.submit({
       kind: "company_basics",
       name: trimmed,
       ...(website.trim().length > 0 ? { website: website.trim() } : {}),
       ...(countryCode === undefined ? {} : { countryCode }),
-      ...(step.asksCityAndYear && city.trim().length > 0
-        ? { city: city.trim() }
-        : {}),
+      ...(step.asksCityAndYear && cityNow.length > 0 ? { city: cityNow } : {}),
       ...(step.asksCityAndYear && year.length > 0 ? { foundedYear: year } : {}),
+      ...(marked.length === 0 ? {} : { unknown: marked }),
     });
   }
 
@@ -171,13 +214,20 @@ export function CompanyBasicsStep({
         placeholder={t("Choose a country")}
         list="company-country-options"
         autoComplete="country-name"
-        value={countryText}
-        disabled={busy}
+        value={notKnown("countryCode") ? "" : countryText}
+        disabled={busy || notKnown("countryCode")}
         error={countryError}
         onChange={(event) => {
           setCountryText(event.target.value);
           setCountryError(undefined);
         }}
+      />
+      <NotKnownChoice
+        field="countryCode"
+        shown={needs.has("countryCode")}
+        selected={notKnown("countryCode")}
+        disabled={busy}
+        onToggle={toggleUnknown}
       />
       <datalist id="company-country-options">
         {countries.map((country) => (
@@ -190,9 +240,20 @@ export function CompanyBasicsStep({
             id="company-city"
             label={t("City")}
             autoComplete="address-level2"
-            value={city}
+            value={notKnown("city") ? "" : city}
+            disabled={busy || notKnown("city")}
+            error={cityError}
+            onChange={(event) => {
+              setCity(event.target.value);
+              setCityError(undefined);
+            }}
+          />
+          <NotKnownChoice
+            field="city"
+            shown={needs.has("city")}
+            selected={notKnown("city")}
             disabled={busy}
-            onChange={(event) => setCity(event.target.value)}
+            onToggle={toggleUnknown}
           />
           <Input
             id="company-founded-year"
@@ -200,16 +261,52 @@ export function CompanyBasicsStep({
             inputMode="numeric"
             placeholder="2021"
             maxLength={4}
-            value={foundedYear}
-            disabled={busy}
+            value={notKnown("foundedYear") ? "" : foundedYear}
+            disabled={busy || notKnown("foundedYear")}
             error={yearError}
             onChange={(event) => {
               setFoundedYear(event.target.value);
               setYearError(undefined);
             }}
           />
+          <NotKnownChoice
+            field="foundedYear"
+            shown={needs.has("foundedYear")}
+            selected={notKnown("foundedYear")}
+            disabled={busy}
+            onToggle={toggleUnknown}
+          />
         </>
       ) : null}
     </form>
+  );
+}
+
+/** Their explicit "I don't know" for one needed field (D9). */
+function NotKnownChoice({
+  field,
+  shown,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  readonly field: CompanyBasicsField;
+  readonly shown: boolean;
+  readonly selected: boolean;
+  readonly disabled: boolean;
+  readonly onToggle: (field: CompanyBasicsField) => void;
+}) {
+  const t = useT();
+  if (!shown) return null;
+  return (
+    <div className="-mt-4 flex" data-not-known={field}>
+      <ChoiceChip
+        selected={selected}
+        disabled={disabled}
+        onClick={() => onToggle(field)}
+      >
+        {t("I don't know")}
+      </ChoiceChip>
+    </div>
   );
 }

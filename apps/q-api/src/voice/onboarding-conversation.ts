@@ -43,7 +43,11 @@ import {
 } from "./list-settle.js";
 import type { HeldWritesStore } from "./held-writes.js";
 import type { InvestorResearch } from "./investor-research.js";
-import { definitionFor, toResponseValue } from "./interview-steps.js";
+import {
+  definitionFor,
+  toResponseValue,
+  YEAR_STEP,
+} from "./interview-steps.js";
 import {
   coverageProfileFor,
   createOnboardingPort,
@@ -1046,10 +1050,17 @@ export function createOnboardingConversation(dependencies: {
     // typed or spoken. A figure they stated is held like an inferred value
     // (Q says it back; their yes saves it); only their agreement to Q's own
     // read-back of it (affirms) goes straight to the record.
+    // A year is not a figure (re-check 2026-11-15 D8): "We founded it in
+    // 2024." to Q's own year question settles it, said back in Q's reply,
+    // and is never put to them again for a yes.
     const figureToReadBack = (answer: {
+      readonly stepKey: string;
       readonly value: unknown;
       readonly affirms?: boolean | undefined;
-    }): boolean => typeof answer.value === "number" && answer.affirms !== true;
+    }): boolean =>
+      typeof answer.value === "number" &&
+      answer.affirms !== true &&
+      !YEAR_STEP.test(answer.stepKey);
     // D82 (e2e run 9): a clear answer they typed saves at once in their
     // words (D77); only what waits for their yes already (an inference, a
     // restatement, a figure to read back) is played back with its topic.

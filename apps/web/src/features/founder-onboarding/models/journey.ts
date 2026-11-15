@@ -25,6 +25,7 @@ import {
   RAISING_ACTIVE_OPTIONS,
   type FounderSnapshotContext,
 } from "@capital-q/founder-onboarding/definition";
+import { isNotKnownAnswer } from "@capital-q/onboarding/response-values";
 import { ISO_COUNTRIES } from "@capital-q/taxonomy/countries";
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
 
@@ -37,6 +38,7 @@ import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import type {
+  CompanyBasicsField,
   FounderOnboardingSessionView,
   FounderSuggestionView,
   MaterialFileView,
@@ -251,6 +253,14 @@ const GROUP_BY_STEP = new Map<string, Group>(
   GROUPS.flatMap((group) => group.stepKeys.map((key) => [key, group])),
 );
 const GROUP_BY_ID = new Map(GROUPS.map((group) => [group.id, group]));
+/** The company basics that offer "I don't know", with their steps (D9). */
+const COMPANY_BASICS_FIELDS: readonly (readonly [CompanyBasicsField, string])[] =
+  [
+    ["countryCode", FOUNDER_STEPS.country],
+    ["city", FOUNDER_V10_STEPS.city],
+    ["foundedYear", FOUNDER_V10_STEPS.foundedYear],
+  ];
+
 const STEP_CONFIG = new Map(
   // v2 is the published journey. Every step v2 did not replace carries v1's
   // configuration verbatim, so reading from v2 changes nothing but F2.
@@ -691,13 +701,25 @@ function buildStep(
       const name = text(state, S.companyName);
       const website = text(state, S.website);
       const country = founderCountryOf(state.responses.get(S.country))?.iso;
-      const city = text(state, FOUNDER_V10_STEPS.city);
+      // "I don't know" on record is shown as that choice, never as a city.
+      const cityValue = state.responses.get(FOUNDER_V10_STEPS.city);
+      const city = isNotKnownAnswer(cityValue)
+        ? undefined
+        : text(state, FOUNDER_V10_STEPS.city);
       const year = state.responses.get(FOUNDER_V10_STEPS.foundedYear);
       const foundedYear = year?.type === "RANGE" ? year.value : undefined;
+      const unknown = COMPANY_BASICS_FIELDS.filter(([, stepKey]) =>
+        isNotKnownAnswer(state.responses.get(stepKey)),
+      ).map(([field]) => field);
       return {
         ...base(group, "company_basics", state),
         countries: countryChoices(state.view.session.definitionVersion),
         asksCityAndYear: hasStep(state.view, FOUNDER_V10_STEPS.city),
+        needsAnswer: COMPANY_BASICS_FIELDS.filter(([, stepKey]) =>
+          state.view.progress.eligibleSteps.some(
+            (step) => step.stepKey === stepKey && step.required,
+          ),
+        ).map(([field]) => field),
         ...(website === undefined
           ? suggestedWebsiteOf(extras.suggestions ?? [])
           : {}),
@@ -711,6 +733,7 @@ function buildStep(
                 ...(country === undefined ? {} : { countryCode: country }),
                 ...(city === undefined ? {} : { city }),
                 ...(foundedYear === undefined ? {} : { foundedYear }),
+                ...(unknown.length === 0 ? {} : { unknown }),
               },
       };
     }
@@ -1178,7 +1201,10 @@ export function planSubmissions(
   view?: {
     readonly session?: { readonly definitionVersion: number };
     readonly progress: {
-      readonly eligibleSteps: readonly { readonly stepKey: string }[];
+      readonly eligibleSteps: readonly {
+        readonly stepKey: string;
+        readonly required?: boolean;
+      }[];
     };
   },
 ): readonly Submission[] {
@@ -1212,26 +1238,65 @@ export function planSubmissions(
     case "narrative":
       return [textOrSkip(group.stepKeys[0], response.text)];
     case "company_basics":
+    {
+      // D9 (re-check 2026-11-15): blank Country and City were stored as
+      // "I don't know". Their "I don't know" is recorded as unknown; a
+      // blank field they did not mark stores nothing: an optional one is
+      // set aside, a needed one is left open (DECISIONS 78).
+      const unknown = new Set(response.unknown ?? []);
+      const blank = (
+        field: CompanyBasicsField,
+        stepKey: string,
+        answered: Submission | null,
+      ): Submission => {
+        if (unknown.has(field)) return skip(stepKey);
+        if (answered !== null) return answered;
+        const needed =
+          view?.progress.eligibleSteps.find((s) => s.stepKey === stepKey)
+            ?.required ?? config(stepKey).required;
+        return needed ? { stepKey, action: "leave" } : skip(stepKey);
+      };
+      const city = response.city?.trim() ?? "";
       return [
         submit(S.companyName, { type: "TEXT", text: response.name.trim() }),
+        // "No website yet? Leave it empty" is the screen's own offer: an
+        // empty website is their answer that there is none (DECISIONS 79).
         textOrSkip(S.website, response.website),
-        countryOrSkip(
-          response.countryCode,
-          view?.session?.definitionVersion ?? FOUNDER_DEFINITION_V8_VERSION,
+        blank(
+          "countryCode",
+          S.country,
+          response.countryCode === undefined
+            ? null
+            : countryOrSkip(
+                response.countryCode,
+                view?.session?.definitionVersion ??
+                  FOUNDER_DEFINITION_V8_VERSION,
+              ),
         ),
         // Only a journey that has them (v10 onward) is sent them.
         ...(hasStep(view, FOUNDER_V10_STEPS.city)
           ? [
-              textOrSkip(FOUNDER_V10_STEPS.city, response.city),
-              response.foundedYear === undefined
-                ? skip(FOUNDER_V10_STEPS.foundedYear)
-                : submit(FOUNDER_V10_STEPS.foundedYear, {
-                    type: "RANGE",
-                    value: response.foundedYear,
-                  }),
+              blank(
+                "city",
+                FOUNDER_V10_STEPS.city,
+                city.length === 0
+                  ? null
+                  : submit(FOUNDER_V10_STEPS.city, { type: "TEXT", text: city }),
+              ),
+              blank(
+                "foundedYear",
+                FOUNDER_V10_STEPS.foundedYear,
+                response.foundedYear === undefined
+                  ? null
+                  : submit(FOUNDER_V10_STEPS.foundedYear, {
+                      type: "RANGE",
+                      value: response.foundedYear,
+                    }),
+              ),
             ]
           : []),
       ];
+    }
     case "taxonomy_select":
       return [
         response.nodeIds.length === 0

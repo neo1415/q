@@ -88,6 +88,7 @@ import {
   suggestionResolvedEvent,
 } from "../events/index.js";
 import {
+  askedOrNextStep,
   computeActivePath,
   definitelyOffPath,
   nextIncompleteStep,
@@ -812,7 +813,33 @@ async function commitResponse(
     pathAfter.eligibleKeys,
   );
 
-  const next = nextIncompleteStep(pathAfter, states);
+  // D7 (re-check 2026-11-15): an answer saved after Q moved on (the
+  // reading lands after Q's reply) keeps the cursor on the step Q's newest
+  // line asks, rather than sending it back to the first open step. Only
+  // while that line is the newest in the thread; navigation only. Only for
+  // an answer given with Q (their words, or their yes to Q's suggestion):
+  // a form save, and the form's own moves, keep the form's order.
+  const withQ =
+    validated.channel === "CONVERSATION" ||
+    (validated.channel !== "FORM" &&
+      options.resolvingSuggestionId !== undefined);
+  const newest =
+    runtime.interviewTurns === undefined || !withQ
+      ? undefined
+      : (
+          await runtime.interviewTurns.listRecent(
+            tx.sql,
+            aggregate.session.id,
+            1,
+          )
+        ).at(-1);
+  const next = askedOrNextStep(
+    pathAfter,
+    states,
+    newest?.role === "Q" && newest.stepKey !== step.stepKey
+      ? newest.stepKey
+      : undefined,
+  );
   if (next !== null && !states.has(next.stepKey)) {
     await runtime.stepStates.upsert(tx, {
       sessionId: aggregate.session.id,

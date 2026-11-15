@@ -90,6 +90,28 @@ export function nextIncompleteStep(
   return null;
 }
 
+/**
+ * Where the cursor goes after a write (live re-check 2026-11-15 D7): the
+ * step Q's newest line asks, while it is on their path and not settled;
+ * otherwise the first eligible step not yet settled. An answer the reading
+ * saved after Q had moved on used to put the cursor back on the first open
+ * step (F1.founded_year) while Q was asking the one-line pitch.
+ */
+export function askedOrNextStep(
+  path: ActivePath,
+  states: ReadonlyMap<string, OnboardingStepState>,
+  askedStepKey: string | null | undefined,
+): OnboardingStepDefinition | null {
+  const asked =
+    askedStepKey === null || askedStepKey === undefined
+      ? undefined
+      : path.eligible.find((step) => step.stepKey === askedStepKey);
+  if (asked !== undefined && !isSettled(states.get(asked.stepKey))) {
+    return asked;
+  }
+  return nextIncompleteStep(path, states);
+}
+
 /** The nearest earlier eligible step that has been visited, or null. */
 export function previousVisitedStep(
   path: ActivePath,

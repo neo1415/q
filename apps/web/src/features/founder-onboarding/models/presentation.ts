@@ -72,6 +72,9 @@ export type MoneyResponse = z.infer<typeof MoneySchema>;
 
 const Count = z.string().regex(/^\d{1,9}$/);
 
+/** The company basics a founder may answer "I don't know" to (D9). */
+export type CompanyBasicsField = "countryCode" | "city" | "foundedYear";
+
 export const StepResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("choice"), value: z.string().min(1) }),
   z.object({ kind: z.literal("multi_choice"), values: z.array(z.string()) }),
@@ -86,6 +89,14 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
     foundedYear: z
       .string()
       .regex(/^\d{4}$/u)
+      .optional(),
+    /**
+     * Fields they said they don't know (D9, re-check 2026-11-15): recorded
+     * as unknown. A blank field they did not mark stores nothing.
+     */
+    unknown: z
+      .array(z.enum(["countryCode", "city", "foundedYear"]))
+      .max(3)
       .optional(),
   }),
   z.object({
@@ -213,6 +224,11 @@ export type StepView =
       readonly suggestedWebsite?: string | undefined;
       /** v10 onward: the city and founding year are asked on this screen. */
       readonly asksCityAndYear?: boolean | undefined;
+      /**
+       * D9: the fields this journey needs an answer to; each offers "I
+       * don't know", and a blank one is never taken as that.
+       */
+      readonly needsAnswer?: readonly CompanyBasicsField[] | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "company_basics" }> | undefined;
     })

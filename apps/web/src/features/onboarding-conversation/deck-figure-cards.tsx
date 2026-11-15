@@ -20,14 +20,32 @@ import type { DeckFigureCard } from "./upload-lines";
  */
 export function DeckFigureCards({
   cards,
+  reading = false,
 }: {
   readonly cards: readonly DeckFigureCard[];
+  /**
+   * The deck is read and its figures are still being read for (re-check
+   * 2026-11-15: the cards are filed 20 s and more after the findings).
+   * Said, never a spinner standing in for cards that may not come.
+   */
+  readonly reading?: boolean;
 }) {
   const t = useT();
   const [decided, setDecided] = useState<
     Readonly<Record<string, "KEPT" | "DROPPED" | "FAILED" | "SENDING">>
   >({});
-  if (cards.length === 0) return null;
+  if (cards.length === 0) {
+    return reading ? (
+      <li
+        data-turn="deck-figures-reading"
+        data-deck-figures-reading
+        role="status"
+        className="cq-caption text-(--cq-text-secondary)"
+      >
+        {t("Still reading figures…")}
+      </li>
+    ) : null;
+  }
   const decide = async (approvalId: string, keep: boolean) => {
     setDecided((now) => ({ ...now, [approvalId]: "SENDING" }));
     const done = keep

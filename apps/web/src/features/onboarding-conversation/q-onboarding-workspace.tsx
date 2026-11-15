@@ -57,9 +57,16 @@ import {
 } from "./thread-actions";
 import { DeckFigureCards } from "./deck-figure-cards";
 import {
+  FIGURE_WATCH_ON_OPEN_DELAYS_MS,
+  mergeFigureCards,
+  watchDeckFigures,
+} from "./deck-figure-sync";
+import {
   deckFigureCards,
+  deckFiguresLaterLine,
   deckReadLine,
   uploadEventOf,
+  withoutRepeatedUploads,
   uploadNote as uploadNoteFor,
   type DeckFigureCard,
 } from "./upload-lines";
@@ -1886,6 +1893,112 @@ export function QOnboardingWorkspace({
   const [heldUpload, setHeldUpload] = useState<string | null>(null);
   /** D1: the page-cited figures Q read from an upload, offered here. */
   const [deckFigures, setDeckFigures] = useState<readonly DeckFigureCard[]>([]);
+  /** D1: a deck's figure cards are still being read for; none in yet. */
+  const [figuresReading, setFiguresReading] = useState(false);
+  /** Cards Q has already named in a line: each is named once. */
+  const namedFigures = useRef<Set<string>>(new Set());
+  const figureWatchStopped = useRef(false);
+  useEffect(() => {
+    figureWatchStopped.current = false;
+    return () => {
+      figureWatchStopped.current = true;
+    };
+  }, []);
+  /** The person's own pending approvals; null when they could not be read. */
+  const readPendingFigures = useCallback(async () => {
+    const pending = await pendingQApprovalsAction().catch(() => null);
+    return pending !== null && pending.ok ? pending.value : null;
+  }, []);
+  /**
+   * D1 (re-check 2026-11-15): watch for the figure cards a reading files
+   * after Q's line, bounded. Fresh cards are shown at once and named in
+   * one short follow-up line a moment later (cards are filed seconds
+   * apart); cards already named or shown are never named again.
+   */
+  const watchFiguresAfter = useCallback(
+    async (
+      since: number,
+      known: readonly DeckFigureCard[],
+      said: boolean,
+      options: {
+        readonly showReading?: boolean;
+        readonly delays?: readonly number[];
+      } = {},
+    ): Promise<void> => {
+      for (const card of said ? known : []) {
+        namedFigures.current.add(card.approvalId);
+      }
+      const showReading = options.showReading ?? true;
+      if (showReading && known.length === 0) setFiguresReading(true);
+      let toName: DeckFigureCard[] = [];
+      let nameTimer: number | null = null;
+      const nameNow = () => {
+        nameTimer = null;
+        const fresh = toName.filter(
+          (card) => !namedFigures.current.has(card.approvalId),
+        );
+        toName = [];
+        if (fresh.length === 0 || figureWatchStopped.current) return;
+        for (const card of fresh) namedFigures.current.add(card.approvalId);
+        const line = deckFiguresLaterLine(fresh);
+        push("Q", line);
+        const sessionId = viewRef.current?.session.id;
+        if (sessionId !== undefined) {
+          void onboardingThreadKeepAction(sessionId, line);
+        }
+      };
+      await watchDeckFigures({
+        since,
+        known,
+        read: readPendingFigures,
+        ...(options.delays === undefined ? {} : { delays: options.delays }),
+        stopped: () => figureWatchStopped.current,
+        onCards: (fresh) => {
+          setFiguresReading(false);
+          setDeckFigures((now) => mergeFigureCards(now, fresh));
+          toName = [...toName, ...fresh];
+          nameTimer ??= window.setTimeout(nameNow, 3_000);
+        },
+      });
+      if (showReading) setFiguresReading(false);
+      if (nameTimer !== null) {
+        window.clearTimeout(nameTimer);
+        nameNow();
+      }
+    },
+    [push, readPendingFigures],
+  );
+  /**
+   * D1: the cards are the server's, so opening the page (or a reload)
+   * draws the ones still waiting from this onboarding; a deck read in the
+   * last few minutes is watched a little longer for cards still to come.
+   */
+  const figuresOpenedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const session = view?.session;
+    if (session === undefined || figuresOpenedFor.current === session.id) {
+      return;
+    }
+    figuresOpenedFor.current = session.id;
+    const since = Date.parse(session.startedAt);
+    const recent =
+      session.completedAt === null &&
+      (view?.reviewedDocumentIds?.length ?? 0) > 0 &&
+      Date.now() - Date.parse(session.lastActivityAt) < 3 * 60_000;
+    void readPendingFigures().then((pending) => {
+      if (figureWatchStopped.current) return;
+      const shown = deckFigureCards(pending ?? [], since);
+      setDeckFigures((now) => mergeFigureCards(now, shown));
+      // Restored cards were named when they were first offered.
+      for (const card of shown) namedFigures.current.add(card.approvalId);
+      if (recent) {
+        void watchFiguresAfter(since, shown, true, {
+          showReading: false,
+          delays: FIGURE_WATCH_ON_OPEN_DELAYS_MS,
+        });
+      }
+    });
+  }, [view, readPendingFigures, watchFiguresAfter]);
   /**
    * The document in flight, as the voice stage shows it (owner 2026-10-27):
    * its name, where its reading is, and what it found once it lands.
@@ -2083,6 +2196,19 @@ export function QOnboardingWorkspace({
         setUploadCard(null);
         return;
       }
+      // D5 (re-check 2026-11-15): the upload is in the thread the moment
+      // it lands, as an event, live and after a reload, whatever Q is then
+      // handed about it.
+      {
+        const shared = uploadNoteFor("SHARED", file.name);
+        push("PERSON", shared);
+        const sessionId = viewRef.current?.session.id;
+        if (sessionId !== undefined) {
+          void onboardingThreadKeepLinesAction(sessionId, [
+            { role: "PERSON", text: shared },
+          ]);
+        }
+      }
       // The upload is their answer to the journey's own upload step, as the
       // form's is (sweep D5). Awaited, in the session's write order, so Q
       // never asks for documents it holds (live recheck 2026-10-30: sent
@@ -2234,17 +2360,11 @@ export function QOnboardingWorkspace({
        * to cover: what the company does" while the deck said it.
        */
       const sayWhatWasRead = async (): Promise<void> => {
-        const pending = await pendingQApprovalsAction().catch(() => null);
-        const figures =
-          pending !== null && pending.ok
-            ? deckFigureCards(pending.value, uploadStartedAt)
-            : [];
-        setDeckFigures((now) => [
-          ...now,
-          ...figures.filter(
-            (card) => !now.some((had) => had.approvalId === card.approvalId),
-          ),
-        ]);
+        const figures = deckFigureCards(
+          (await readPendingFigures()) ?? [],
+          uploadStartedAt,
+        );
+        setDeckFigures((now) => mergeFigureCards(now, figures));
         const line = deckReadLine(
           file.name,
           findingsOf.current(documentId),
@@ -2255,6 +2375,10 @@ export function QOnboardingWorkspace({
         if (sessionId !== undefined) {
           void onboardingThreadKeepAction(sessionId, line);
         }
+        // D1 (re-check 2026-11-15): the figure cards are filed by their own
+        // job, on production 22–24 s after the findings. Watched (bounded)
+        // until they land; when they do after the line, Q names them.
+        void watchFiguresAfter(uploadStartedAt, figures, figures.length > 0);
       };
       // Typed or spoken, Q hears about it the same way (founder
       // walkthrough F2): the upload is part of the conversation, not a
@@ -2306,7 +2430,16 @@ export function QOnboardingWorkspace({
         }
       }
     },
-    [companyIdForUpload, qSubject, actions, voiceActive, push, vocabulary],
+    [
+      companyIdForUpload,
+      qSubject,
+      actions,
+      voiceActive,
+      push,
+      vocabulary,
+      readPendingFigures,
+      watchFiguresAfter,
+    ],
   );
   // F-49: the waiting file goes up once there is somewhere to file it.
   useEffect(() => {
@@ -2505,7 +2638,7 @@ export function QOnboardingWorkspace({
         <CoverageSummary coverage={coverage} />
       )}
       <ol className="flex flex-col gap-4" aria-live="polite">
-        {turns.map((turn) => (
+        {withoutRepeatedUploads(turns).map((turn) => (
           <QLine
             key={turn.id}
             id={turn.id}
@@ -2540,7 +2673,7 @@ export function QOnboardingWorkspace({
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
         {/* D1: the figures Q read from the deck, offered for their yes here. */}
-        <DeckFigureCards cards={deckFigures} />
+        <DeckFigureCards cards={deckFigures} reading={figuresReading} />
         {/* Q room W5 (R8): Q offers the deck once the upload is read. */}
         <DeckOffer
           founder={vocabulary.subject === "founder"}
