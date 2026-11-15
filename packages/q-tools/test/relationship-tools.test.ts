@@ -1049,3 +1049,68 @@ describe("a founder's Connection Request by name (action parity 2026-10-02)", ()
     expect(no.status).toBe("DENIED");
   });
 });
+
+/**
+ * D10 (live 78f8d72d5, run a2094aa5, Kazikit at INTEREST_EXPRESSED): the
+ * diligence area's empty lists went out before diligence started, and the
+ * answer said "their data room has no documents or open requests". Not
+ * open is unseen, never empty: no diligence area before it starts.
+ */
+describe("get_relationship: the diligence area only once diligence started (D10)", () => {
+  const event = (sequence: number, eventType: string): ProjectableEvent => ({
+    sequence,
+    eventType,
+    occurredAt: new Date(Date.UTC(2026, 9, sequence)).toISOString(),
+    visibilityScope:
+      sequence === 1 ? "investor_private" : "relationship_shared",
+  });
+  const read = async (history: readonly ProjectableEvent[]) => {
+    const { port } = fakeRelationships(history);
+    const asked: string[] = [];
+    const tools = executorWith({
+      ...port,
+      diligence: (_actor, relationshipId) => {
+        asked.push(relationshipId);
+        return Promise.resolve({
+          openRequests: [],
+          answeredRequests: [],
+          sharedDocuments: [],
+        });
+      },
+    });
+    const outcome = await tools.execute(
+      {
+        callId: "d10",
+        name: "get_relationship",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    if (!outcome.result.ok) throw new Error("unreachable");
+    return { data: outcome.result.data as { diligence?: unknown }, asked };
+  };
+
+  it("at INTEREST_EXPRESSED no diligence area goes out (nothing to call empty)", async () => {
+    const { data, asked } = await read([
+      event(1, "discovered"),
+      event(2, "interest_expressed"),
+    ]);
+    expect(data.diligence).toBeUndefined();
+    expect(asked).toEqual([]);
+  });
+
+  it("once diligence started, the area is read and goes out", async () => {
+    const { data, asked } = await read([
+      event(1, "discovered"),
+      event(2, "interest_expressed"),
+      event(3, "connection_accepted"),
+      event(4, "diligence_started"),
+    ]);
+    expect(data.diligence).toEqual({
+      openRequests: [],
+      answeredRequests: [],
+      sharedDocuments: [],
+    });
+    expect(asked).toHaveLength(1);
+  });
+});

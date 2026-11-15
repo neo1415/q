@@ -515,4 +515,18 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   "This file can't be shown here. Save a copy to open it.":
     "لا يمكن عرض هذا الملف هنا. احفظ نسخة لفتحه.",
   "Open the transcript": "افتح نص المحادثة",
+  // A request that names the uncertainty it resolves (D14, 14 Nov 2026)
+  "What it's about:": "موضوعه:",
+  "Since they asked: reported, not yet supported by a document.":
+    "منذ أن طلبوا: مُبلَّغ عنه، ولا يدعمه مستند بعد.",
+  "Since they asked: other sources agree, but it is not verified.":
+    "منذ أن طلبوا: تتفق مصادر أخرى، لكنه غير مُتحقَّق منه.",
+  "Since they asked: sources or records disagree on it.":
+    "منذ أن طلبوا: تختلف المصادر أو السجلات بشأنه.",
+  "Since they asked: confirmed by you, not independently verified.":
+    "منذ أن طلبوا: أكدته أنت، ولم يُتحقَّق منه بشكل مستقل.",
+  "Since they asked: a document supports it.": "منذ أن طلبوا: يدعمه مستند.",
+  "Since they asked: independently verified.":
+    "منذ أن طلبوا: تم التحقق منه بشكل مستقل.",
+  "Since they asked: not settled yet.": "منذ أن طلبوا: لم يُحسم بعد.",
 };

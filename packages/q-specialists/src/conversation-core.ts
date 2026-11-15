@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import type { QuestionSequence } from "@capital-q/q-core";
-import type { QToolFocus } from "@capital-q/q-runtime";
+import type {
+  QOpenResolution,
+  QResolutionCounterparty,
+  QToolFocus,
+} from "@capital-q/q-runtime";
 
 import type { LastAction } from "./references.js";
 
@@ -33,6 +37,13 @@ export type ConversationCoreSnapshot = {
    * it carries none.
    */
   readonly offer?: CoreOffer | null | undefined;
+  /**
+   * Live 14 Nov 2026 (D12-D14): the open resolution item -- a material
+   * uncertainty about a counterparty Q offered to resolve through the
+   * route the stage allows -- so a later "request that" binds to it after
+   * a deploy or on another instance. Optional: older snapshots carry none.
+   */
+  readonly resolution?: QOpenResolution | null | undefined;
 };
 
 /** A recorded action offer, as the core keeps it (answer.ts RecordedOffer). */
@@ -44,6 +55,8 @@ export type CoreOffer = {
   /** Addendum 14 Nov 2026: the uncertainty it resolves; absent: none. */
   readonly about?:
     { readonly statement: string; readonly standing: string } | undefined;
+  /** D13: whom the offer goes to; absent: not resolved. */
+  readonly counterparty?: QResolutionCounterparty | undefined;
 };
 
 /** Where the snapshot is kept; q-api composes it over the conversation row. */
@@ -56,6 +69,17 @@ export type ConversationCoreStore = {
 };
 
 const Text = z.string().max(4_000);
+
+const About = z.object({
+  statement: z.string().min(1).max(400),
+  standing: z.string().min(1).max(40),
+});
+
+const Counterparty = z.object({
+  kind: z.literal("COMPANY"),
+  id: z.string().min(1).max(64),
+  name: z.string().max(200).nullable(),
+});
 
 const SnapshotSchema = z.object({
   v: z.literal(1),
@@ -89,12 +113,18 @@ const SnapshotSchema = z.object({
       action: z.string().min(1).max(120),
       request: z.string().min(1).max(400),
       said: z.string().min(1).max(400),
-      about: z
-        .object({
-          statement: z.string().min(1).max(400),
-          standing: z.string().min(1).max(40),
-        })
-        .optional(),
+      about: About.optional(),
+      counterparty: Counterparty.optional(),
+    })
+    .nullable()
+    .optional(),
+  resolution: z
+    .object({
+      runId: z.string().min(1).max(120),
+      action: z.string().min(1).max(120),
+      counterparty: Counterparty,
+      about: About,
+      title: z.string().min(1).max(200),
     })
     .nullable()
     .optional(),
@@ -106,12 +136,14 @@ export function readCoreSnapshot(
 ): ConversationCoreSnapshot | null {
   const read = SnapshotSchema.safeParse(stored);
   if (!read.success) return null;
-  const { focus, unclearInARow, lastAction, sequence, offer } = read.data;
+  const { focus, unclearInARow, lastAction, sequence, offer, resolution } =
+    read.data;
   return {
     unclearInARow,
     lastAction,
     sequence,
     ...(offer === undefined || offer === null ? {} : { offer }),
+    ...(resolution === undefined || resolution === null ? {} : { resolution }),
     focus:
       focus === null
         ? null

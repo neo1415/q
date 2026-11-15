@@ -199,6 +199,8 @@ export {
   type ContextFirewallRequest,
   type QAnswerOutcome,
   type QRecordedOffer,
+  type QOpenResolution,
+  type QResolutionCounterparty,
   type QAnswerPort,
   type QPrereadInput,
   type QAnswerRequest,

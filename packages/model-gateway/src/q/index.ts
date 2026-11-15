@@ -844,9 +844,15 @@ export {
   stepLineWithoutOffer,
   uncertaintiesOf,
   withResolves,
+  openResolutionOf,
+  resolutionArguments,
+  resolutionTitleOf,
+  sameCounterparty,
+  withOpenResolution,
   UNAVAILABLE_CODE_SAYS_GUIDANCE,
   UNCERTAINTY_VEHICLES,
   MESSAGE_TO_COMPANY_TOOLS,
+  type OpenResolutionItem,
   type CheckedLineNeed,
   type PublicCheck,
   type PublicWebSeen,
@@ -871,9 +877,12 @@ import {
   stepLineWithoutOffer,
   uncertaintiesOf,
   withResolves,
+  withOpenResolution,
+  resolutionArguments,
   UNAVAILABLE_CODE_SAYS_GUIDANCE,
   UNCERTAINTY_VEHICLES,
   MESSAGE_TO_COMPANY_TOOLS,
+  type OpenResolutionItem,
   type PublicWebSeen,
   type RelationshipStanding,
   type UncertaintyAbout,
@@ -2221,6 +2230,35 @@ export function nextStepTurn(request: {
   );
 }
 
+/**
+ * D12 (live 78f8d72d5, run 5d5d7b24): "How solid is Ajopot's active users
+ * figure?" was read THEIR_OWN_RECORDS with aboutNamedOther, so nextStepTurn
+ * held back code's offer though a material uncertainty with an open route
+ * stood. What nextStepTurn protects is a lookup of the person's OWN records
+ * (or a plain public fact) being answered and left there; a question about
+ * another company the reader named is not that. Code's own offer to resolve
+ * a material uncertainty about that company may close such a turn. A
+ * progress check, a remark, a control word or an unclear transcript still
+ * gets none, and the model's own next-step note is unchanged.
+ */
+export function uncertaintyOfferTurn(request: {
+  readonly turnKind?: string | undefined;
+  readonly questionKind?: string | undefined;
+  readonly aboutNamedOther?: boolean | undefined;
+  readonly namedOther?: { readonly kind: string } | null | undefined;
+}): boolean {
+  if (nextStepTurn(request)) return true;
+  if (request.turnKind !== undefined && NO_OFFER_TURNS.has(request.turnKind)) {
+    return false;
+  }
+  return (
+    request.aboutNamedOther === true &&
+    request.namedOther?.kind === "COMPANY" &&
+    (request.questionKind === "THEIR_OWN_RECORDS" ||
+      request.questionKind === "PUBLIC_FACTS")
+  );
+}
+
 export const NEXT_STEP_NOTE =
   'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as a question ("Want me to draft the intro to Ada?"), never as a statement. Offer only what one of your tools does, and record it in offer with the exact name of that tool (an offer of what no tool does is removed); one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
 
@@ -3562,6 +3600,15 @@ export function createModelGatewayQAnswer(
    * again on the yes turn. Per run, the bound tool's name.
    */
   const offerToolByRun = new Map<string, string>();
+  /**
+   * Live 78f8d72d5 (D13, D14): the conversation's open resolution item per
+   * run, and the vehicle the turn asked for (askedAction). A document
+   * request toward the item's company carries what it resolves; a message
+   * the model prepares on a turn that asked for the vehicle goes as that
+   * vehicle (run c72a0fbe prepared a chat message instead).
+   */
+  const openResolutionByRun = new Map<string, OpenResolutionItem>();
+  const askedVehicleByRun = new Map<string, string>();
   const boundedRunState = (): void => {
     for (const store of [
       publicWebByRun,
@@ -3569,6 +3616,8 @@ export function createModelGatewayQAnswer(
       onRequestSeenRuns,
       offerAboutByRun,
       offerToolByRun,
+      openResolutionByRun,
+      askedVehicleByRun,
     ]) {
       if (store.size > 256) {
         const [oldest] = store.keys();
@@ -3664,6 +3713,48 @@ export function createModelGatewayQAnswer(
           },
         }),
     execute: async (asked, toolContext) => {
+      /**
+       * D13 (live 78f8d72d5, run c72a0fbe): the turn asked for the
+       * vehicle ("Yes, please request that from Ajopot"), its inputs were
+       * not in the words, and the model prepared a chat message to the
+       * company instead. On a turn that asked for a vehicle, a message to
+       * the company is that vehicle: filled from the open item when code
+       * can, else refused with the vehicle named. A turn that asked for a
+       * message keeps it ("message them to set up a call").
+       */
+      const resolvingCall = (
+        call: typeof asked,
+        runId: string,
+      ):
+        | { readonly kind: "CALL"; readonly call: typeof asked }
+        | { readonly kind: "REFUSE"; readonly said: string } => {
+        const vehicle = askedVehicleByRun.get(runId);
+        if (
+          vehicle === undefined ||
+          !MESSAGE_TO_COMPANY_TOOLS.has(call.name) ||
+          call.callId.startsWith("q-")
+        ) {
+          return { kind: "CALL", call };
+        }
+        const item = openResolutionByRun.get(runId);
+        const filled =
+          item !== undefined && item.action === vehicle
+            ? resolutionArguments(item)
+            : null;
+        logger?.info(
+          { qRunId: runId, tool: call.name, vehicle, filled: filled !== null },
+          "a message on a turn that asked for the vehicle went as the vehicle",
+        );
+        return filled === null
+          ? {
+              kind: "REFUSE",
+              said: `They asked for ${vehicle}, not a message. Call ${vehicle} for what they asked; if it cannot be done, say so plainly. Nothing else is prepared or sent.`,
+            }
+          : {
+              kind: "CALL",
+              call: { ...call, name: vehicle, arguments: filled },
+            };
+      };
       if (
         asked.name === "revise_my_document" &&
         reviewOnlyRuns.has(toolContext.runId)
@@ -3691,9 +3782,22 @@ export function createModelGatewayQAnswer(
           : asked;
       // Slice 5: a yes to an uncertainty offer carries what it resolves
       // onto the vehicle's call, from the offer's record.
+      const resolving = resolvingCall(chosen, toolContext.runId);
+      if (resolving.kind === "REFUSE") {
+        return notAsked(chosen.callId, resolving.said);
+      }
       const proposal = {
-        ...chosen,
-        arguments: withResolves(chosen, offerAboutByRun.get(toolContext.runId)),
+        ...resolving.call,
+        arguments: withOpenResolution(
+          {
+            name: resolving.call.name,
+            arguments: withResolves(
+              resolving.call,
+              offerAboutByRun.get(toolContext.runId),
+            ),
+          },
+          openResolutionByRun.get(toolContext.runId),
+        ),
       };
       // C3: a yes to an offer code holds no record of acts on nothing --
       // what was offered would be a guess. Their approval of a change
@@ -6418,6 +6522,15 @@ export function createModelGatewayQAnswer(
             standing: standing.data,
           });
         }
+      }
+      if (request.openResolution !== undefined) {
+        openResolutionByRun.set(request.runId, request.openResolution);
+      }
+      if (
+        request.askedAction !== undefined &&
+        UNCERTAINTY_VEHICLES.has(request.askedAction)
+      ) {
+        askedVehicleByRun.set(request.runId, request.askedAction);
       }
       if (request.aboutNamedOther === true) {
         codeSaysCheckedRuns.add(request.runId);
@@ -11984,13 +12097,15 @@ export function createModelGatewayQAnswer(
             holds: (name) => classificationOf(name) !== undefined,
             company: subject.name,
           });
-        const vehicleFor = async (subject: {
+        /** Whom an offer to resolve the item goes to (D13, D14). */
+        const counterpartyOf = (subject: {
           readonly companyId: string;
           readonly name: string | null;
-        }) => {
-          const standing = await standingWith(subject.companyId);
-          return standing === undefined ? null : vehicleOf(subject, standing);
-        };
+        }) => ({
+          kind: "COMPANY" as const,
+          id: subject.companyId,
+          name: subject.name,
+        });
         if (
           offerBinding.kind === "BOUND" &&
           (UNCERTAINTY_VEHICLES.has(offerBinding.offer.action) ||
@@ -12045,7 +12160,13 @@ export function createModelGatewayQAnswer(
             case "KEEP":
               offerBinding = {
                 kind: "BOUND",
-                offer: { ...bound, about: decision.about },
+                offer: {
+                  ...bound,
+                  about: decision.about,
+                  ...(subject === null
+                    ? {}
+                    : { counterparty: counterpartyOf(subject) }),
+                },
               };
               break;
             case "REBIND":
@@ -12058,6 +12179,9 @@ export function createModelGatewayQAnswer(
                   request: bound.request,
                   said: decision.said,
                   about: decision.about,
+                  ...(subject === null
+                    ? {}
+                    : { counterparty: counterpartyOf(subject) }),
                 },
               };
               break;
@@ -12097,7 +12221,17 @@ export function createModelGatewayQAnswer(
           )
         ) {
           const subject = subjectCompany();
-          const vehicle = subject === null ? null : await vehicleFor(subject);
+          const standing =
+            subject === null
+              ? undefined
+              : await standingWith(subject.companyId);
+          const vehicle =
+            subject === null || standing === undefined
+              ? null
+              : vehicleOf(subject, standing);
+          // D12: a question about the company the reader named is not a
+          // lookup of their own records (uncertaintyOfferTurn).
+          const offerTurn = uncertaintyOfferTurn(request);
           // D5 (live run 8039bfd5): a material uncertainty the founder can
           // settle, a route this run may use, and no offer of the answer's
           // own: code offers that route, bound and carrying `about`. Not
@@ -12105,9 +12239,7 @@ export function createModelGatewayQAnswer(
           // limit), on a turn that wants no next step, or beside a change
           // this turn prepared.
           const own =
-            request.closingLines === undefined &&
-            nextStepTurn(request) &&
-            !preparedByTool
+            request.closingLines === undefined && offerTurn && !preparedByTool
               ? codeUncertaintyOffer({
                   uncertainties,
                   vehicle,
@@ -12116,7 +12248,13 @@ export function createModelGatewayQAnswer(
               : null;
           if (own !== null) {
             uncertaintyLines.push(own.said);
-            offerBinding = { kind: "BOUND", offer: own };
+            offerBinding = {
+              kind: "BOUND",
+              offer:
+                subject === null
+                  ? own
+                  : { ...own, counterparty: counterpartyOf(subject) },
+            };
             logger?.info(
               { qRunId: request.runId, action: own.action },
               "a material uncertainty with an open route: code made the offer",
@@ -12128,12 +12266,15 @@ export function createModelGatewayQAnswer(
                 qRunId: request.runId,
                 closingLines: request.closingLines !== undefined,
                 nextStep: nextStepTurn(request),
+                offerTurn,
                 preparedByTool,
                 ...offerDecisionTrace({
                   about: null,
                   uncertainties,
                   vehicle,
-                  standing: undefined,
+                  // Live 78f8d72d5: the trace logged state and
+                  // diligenceOpen null here; the standing was read.
+                  standing,
                   subjectKnown: subject !== null,
                 }),
                 holdsDiligence:

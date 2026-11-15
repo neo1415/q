@@ -291,6 +291,9 @@ function coreOfferOf(offer: RecordedOffer | undefined): CoreOffer | null {
     request: offer.request,
     said: offer.said,
     ...(offer.about === undefined ? {} : { about: offer.about }),
+    ...(offer.counterparty === undefined
+      ? {}
+      : { counterparty: offer.counterparty }),
   };
 }
 
@@ -601,6 +604,12 @@ import {
   type QTurnReader,
   type QTurnSkim,
   type QTurnSkimmer,
+  openResolutionOf,
+  resolutionArguments,
+  sameCounterparty,
+  withOpenResolution,
+  UNCERTAINTY_VEHICLES,
+  type OpenResolutionItem,
 } from "@capital-q/model-gateway/q";
 
 /**
@@ -5153,6 +5162,27 @@ export function createSpecialistQAnswer(
       if (oldest !== undefined) offers.delete(oldest);
     }
   };
+  /**
+   * Live 14 Nov 2026 (D12-D14): the conversation's open resolution item --
+   * the material uncertainty about a counterparty Q last offered to resolve,
+   * with the route the stage allowed. Unlike the offer it outlives the next
+   * turn: "request that" or an explicit request for the vehicle later
+   * resolves to it, and code fills the request from it. Cleared once a
+   * request for it is prepared. Bounded like the rest; durable in the core.
+   */
+  const resolutions = new Map<string, OpenResolutionItem>();
+  const keepResolution = (
+    conversationId: string,
+    item: OpenResolutionItem | null,
+  ): void => {
+    resolutions.delete(conversationId);
+    if (item === null) return;
+    resolutions.set(conversationId, item);
+    if (resolutions.size > MAX_CONVERSATIONS) {
+      const oldest = resolutions.keys().next().value;
+      if (oldest !== undefined) resolutions.delete(oldest);
+    }
+  };
   /** The offer Q's last turn made, if code recorded one with it. */
   const offerOfLastTurn = (
     conversationId: string,
@@ -5210,6 +5240,10 @@ export function createSpecialistQAnswer(
     if (!offers.has(id) && offer !== null) {
       recordOffer(id, { kind: "ACTION", ...offer });
     }
+    const resolution = snapshot.resolution ?? null;
+    if (!resolutions.has(id) && resolution !== null) {
+      keepResolution(id, resolution);
+    }
   };
   const persistCore = async (runId: string): Promise<void> => {
     const scope = scopeOfRun.get(runId);
@@ -5226,6 +5260,7 @@ export function createSpecialistQAnswer(
           sequence: sequences.get(id) ?? null,
           focus: focuses.get(id) ?? null,
           offer: coreOfferOf(offers.get(id)),
+          resolution: resolutions.get(id) ?? null,
         } as const),
       )
       .catch((error: unknown) => {
@@ -8040,6 +8075,87 @@ export function createSpecialistQAnswer(
         ]);
       }
     }
+    // Live 14 Nov 2026 (78f8d72d5, D13): the open resolution item is taken
+    // up by a yes to the offer that opened it, or by a request for its
+    // vehicle toward the same company ("Yes, please request that from
+    // Ajopot", read TOOL_REQUEST with askedAction diligence_documents and
+    // nothing the argument reader could fill). Code fills the vehicle's
+    // inputs from the item -- whom, a suggested title, what it resolves --
+    // and prepares it for their approval through the action's own
+    // authorize step. The reading's structured outputs only; no words.
+    const resolution =
+      conversationId === undefined
+        ? null
+        : (resolutions.get(conversationId) ?? null);
+    const askedVehicle =
+      read?.kind === "TOOL_REQUEST"
+        ? ([read.askedAction ?? null, appActionOf(read)?.tool ?? null].find(
+            (name): name is string =>
+              name !== null && UNCERTAINTY_VEHICLES.has(name),
+          ) ?? null)
+        : null;
+    const resolutionTaken =
+      resolution !== null &&
+      confident &&
+      dependencies.appActions !== undefined &&
+      dependencies.appActions.tools.has(resolution.action) &&
+      ((offeredAction !== null &&
+        offeredAction.runId === resolution.runId &&
+        offeredAction.action === resolution.action) ||
+        (askedVehicle === resolution.action &&
+          (read?.namedOther == null ||
+            sameCounterparty(resolution, read.namedOther.name))));
+    const resolutionArgs =
+      resolutionTaken && resolution !== null
+        ? resolutionArguments(
+            resolution,
+            appActionOf(read)?.tool === resolution.action
+              ? appActionOf(read)?.arguments
+              : null,
+          )
+        : null;
+    if (
+      resolution !== null &&
+      resolutionArgs !== null &&
+      conversationId !== undefined &&
+      dependencies.appActions !== undefined
+    ) {
+      const action = { tool: resolution.action, arguments: resolutionArgs };
+      const said = forThePerson(
+        await dependencies.appActions.run(request, action).catch(() => null),
+      );
+      logger?.info(
+        {
+          qRunId: request.runId,
+          tool: resolution.action,
+          by: offeredAction === null ? "REQUEST" : "OFFER_TAKEN",
+          prepared: said !== null && typeof said === "object",
+        },
+        "the open resolution item was taken up: code filled the request",
+      );
+      if (said !== null) {
+        if (typeof said === "object" && !("asks" in said)) {
+          keepResolution(conversationId, null);
+        }
+        speculative.current?.cancel("ACTED");
+        return saidByAction(request, conversationId, action, said);
+      }
+    }
+    /**
+     * D14 (live 78f8d72d5, request 77a16cba): an explicit request for a
+     * diligence document toward the open item's company, run by code from
+     * the reader's arguments, carried no `about`; the founder saw no
+     * "since they asked". It carries the item's.
+     */
+    const withOpenItem = (action: TurnAppAction): TurnAppAction => {
+      const args = withOpenResolution(
+        { name: action.tool, arguments: action.arguments },
+        resolution,
+      );
+      return args === action.arguments
+        ? action
+        : { ...action, arguments: args as Record<string, unknown> };
+    };
     const planWords = planStartWords({
       latest: latest.content,
       taken: offeredPlan,
@@ -8568,7 +8684,7 @@ export function createSpecialistQAnswer(
       !writingDocument
     ) {
       const ran = await dependencies.appActions
-        .run(request, appAction)
+        .run(request, withOpenItem(appAction))
         .catch(() => null);
       const said = forThePerson(ran);
       if (said !== null && typeof said === "string" && asksForAnAnswer(read)) {
@@ -8655,7 +8771,10 @@ export function createSpecialistQAnswer(
         ) {
           const retried = forThePerson(
             await dependencies.appActions
-              .run(request, { tool: appAction.tool, arguments: again })
+              .run(
+                request,
+                withOpenItem({ tool: appAction.tool, arguments: again }),
+              )
               .catch(() => null),
           );
           if (retried !== null) {
@@ -9166,6 +9285,9 @@ export function createSpecialistQAnswer(
                 : { askedAction: routedAsked }
               : { askedAction: read.askedAction }),
       ...(writingDocument ? { writingDocument: true } : {}),
+      // D14: a request the answer prepares toward the open item's company
+      // carries what it resolves (model-gateway withOpenResolution).
+      ...(resolution === null ? {} : { openResolution: resolution }),
       ...(series.step === null ? {} : { questionSequence: series.step }),
       ...(toolFocus === null ? {} : { toolFocus }),
     };
@@ -9311,7 +9433,15 @@ export function createSpecialistQAnswer(
         ...(outcome.offer.about === undefined
           ? {}
           : { about: outcome.offer.about }),
+        ...(outcome.offer.counterparty === undefined
+          ? {}
+          : { counterparty: outcome.offer.counterparty }),
       });
+      // D12: an offer to resolve a material uncertainty about a company,
+      // through the route the stage allows, opens the item a later
+      // "request that" resolves to. A newer one replaces it.
+      const opened = openResolutionOf(request.runId, outcome.offer);
+      if (opened !== null) keepResolution(conversationId, opened);
     } else if (
       // Live 14 Nov 2026 (run b58ece1a): a turn that failed (malformed
       // output, a provider fault) answered nothing, stored no Q turn and
