@@ -541,6 +541,32 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
       // mandate's own words unchanged (geographies are not this tool's), and
       // the card read "(no change)". A change that changes nothing is never
       // prepared; Q is told which tool owns what was asked.
+      // Live 15 Nov (D8): "make my typical cheque $300,000" arrived as a
+      // range with only `typical`, and the approved update replaced the
+      // whole range, wiping the minimum and maximum. A partial range in the
+      // same currency keeps every part the person did not mention, so the
+      // card shows and approval binds the full range that will be stored.
+      const partialCheque =
+        filled["chequeRange"] !== undefined &&
+        filled["chequeRange"] !== null &&
+        typeof filled["chequeRange"] === "object" &&
+        (!("min" in filled["chequeRange"]) ||
+          !("max" in filled["chequeRange"]) ||
+          !("typical" in filled["chequeRange"]));
+      if (partialCheque) {
+        const current =
+          full === null || full === undefined ? null : chequeRangeOf(full);
+        if (full === null || full === undefined) {
+          return refusal(
+            "I couldn't read their current cheque range, so I can't change one part of it without risking the rest. Ask for the full range (from, typically, up to) or try again.",
+            { forModel: true },
+          );
+        }
+        const said = filled["chequeRange"] as Cheque;
+        if (current !== null && current.currency === said.currency) {
+          filled["chequeRange"] = { ...current, ...said };
+        }
+      }
       if (full !== null && full !== undefined) {
         const before = beforeOf(full, filled);
         const unchanged = Object.entries(filled).every(

@@ -171,6 +171,40 @@ describe("the mandate change card shows each field before and after (F-29)", () 
     ]);
   });
 
+  // Live 15 Nov (D8): "make my typical cheque $300,000" arrived with only
+  // `typical`; the approved update wiped the minimum and maximum. The parts
+  // not mentioned are kept, and the card shows the full range that is stored.
+  it("a change to one part of the cheque keeps the parts not mentioned", async () => {
+    const card = await cardFor({
+      chequeRange: { currency: "USD", typical: "300000" },
+    });
+    expect(card.preview).toBe(
+      "Cheque: USD from 100,000, up to 500,000 → USD from 100,000, typically 300,000, up to 500,000",
+    );
+  });
+
+  it("refuses a partial cheque change when the current range can't be read", async () => {
+    const action = family;
+    const tool = action?.tool;
+    if (action === undefined || tool === undefined) throw new Error("missing");
+    const unreadable = {
+      ownInvestorOrganisationId: () => Promise.resolve(ORG),
+      investors: {
+        listInvestorMandates: () =>
+          Promise.resolve({
+            items: [{ id: MANDATE, status: "ACTIVE", version: 22 }],
+          }),
+        getInvestorMandate: () => Promise.reject(new Error("down")),
+      },
+    } as unknown as AppActionPorts;
+    const canonical: unknown = await tool.toCanonical(
+      tool.input.parse({ chequeRange: { currency: "USD", typical: "300000" } }),
+      context,
+      unreadable,
+    );
+    expect(canonical).toMatchObject({ refused: expect.anything() });
+  });
+
   it("their own words in full, never cut, with what they replace", async () => {
     const card = await cardFor({ rawMandateText: LONG });
     expect(card.preview).toBe(
