@@ -1,5 +1,8 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  // No background daemon: it would outlive a gate run and inherit the
+  // machine heavy-work lock fd (scripts/heavy.sh), blocking later work.
+  "daemon": false,
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
