@@ -1,3 +1,4 @@
+import { createNeedsYouCurrency } from "@capital-q/app-actions";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { arrivalGreeting, isTimeZone } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -85,17 +86,30 @@ export function plainOpener(name: string | null): string {
   return `${name === null ? "Hi." : `Hi ${name}.`} ${NOTHING_WAITING_QUESTION}`;
 }
 
-/** The person's own rows only: every predicate is their user id. */
+/**
+ * The person's own rows only: every predicate is their user id. A
+ * NEEDS_YOU notice whose subject is settled (the shared "still needed"
+ * read the Needs you list and the digest use) is not counted.
+ */
 export function createOpenerFacts(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly now?: (() => Date) | undefined;
+  /** Default: the shared needs-you currency over the same sql. */
+  readonly settledUnread?:
+    ((userId: string) => Promise<ReadonlySet<string>>) | undefined;
 }): (actor: ActorContext) => Promise<OpenerFacts> {
   const { sql } = dependencies;
   const now = dependencies.now ?? (() => new Date());
+  const settledUnread =
+    dependencies.settledUnread ?? createNeedsYouCurrency({ sql }).settledUnread;
   return async (actor) => {
     const current = now();
     const soon = new Date(current.getTime() + 36 * 3_600_000);
     const dayEnd = new Date(current.getTime() + 24 * 3_600_000);
+    // A check that cannot be read leaves every notice counted, as before.
+    const settledIds = [
+      ...(await settledUnread(actor.userId).catch(() => new Set<string>())),
+    ];
     const [calls, reminders, notices, zone] = await Promise.all([
       sql<{ purpose: string; starts_at: Date }[]>`
         select m.purpose, m.starts_at
@@ -118,6 +132,7 @@ export function createOpenerFacts(dependencies: {
         select kind, count(*)::int as n, max(body) as body
           from communication.notifications
          where user_id = ${actor.userId} and read_at is null
+           and id <> all(${settledIds}::uuid[])
          group by kind`,
       sql<{ timezone: string | null }[]>`
         select timezone from identity.user_profiles
@@ -144,6 +159,7 @@ export function createOpenerFacts(dependencies: {
              (select count(*)::int from communication.notifications n
                where n.user_id = ${actor.userId} and n.read_at is null
                  and n.priority = 'NEEDS_YOU'
+                 and n.id <> all(${settledIds}::uuid[])
                  and n.dedupe_key like 'instr:' || i.id::text || ':%') as needs_you
         from q_runtime.standing_instructions i
        where i.user_id = ${actor.userId} and i.tenant_id = ${actor.tenantId}

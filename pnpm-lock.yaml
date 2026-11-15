@@ -634,6 +634,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
       '@capital-q/discovery':
         specifier: workspace:*
         version: link:../discovery
@@ -667,6 +670,9 @@ importers:
       '@capital-q/public-identity':
         specifier: workspace:*
         version: link:../public-identity
+      '@capital-q/q-actions':
+        specifier: workspace:*
+        version: link:../q-actions
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../q-runtime

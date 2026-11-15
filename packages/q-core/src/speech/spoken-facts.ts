@@ -819,6 +819,43 @@ function sentenceOf(text: string): string {
 }
 
 /**
+ * Words a title can open with that are not names: lowered after "Then" or
+ * "And". Any other opening word is kept as stored.
+ */
+const SENTENCE_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "your",
+  "you",
+  "one",
+  "two",
+  "three",
+  "some",
+  "new",
+  "there",
+  "this",
+  "these",
+  "it",
+  "nothing",
+]);
+
+/**
+ * An item's title joined after "Then"/"And". Live 15 Nov: "Shiftwell
+ * messaged you" was said "And shiftwell messaged you". A name keeps its
+ * case as stored -- the item's counterpart, or any opening word that is
+ * not an ordinary sentence word (a notice's title names its subject with
+ * no counterpart beside it); only an ordinary word is lowered.
+ */
+function joinedTitle(title: string, counterpart: string | null): string {
+  const name = counterpart?.trim() ?? "";
+  if (name.length > 0 && title.startsWith(name)) return title;
+  const first = /^\p{L}+/u.exec(title)?.[0] ?? "";
+  if (!SENTENCE_WORDS.has(first.toLowerCase())) return title;
+  return `${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+}
+
+/**
  * The spoken facts of an attention report: each item's counterpart (or
  * title) must be said; the count is what it is; unread sources are said
  * as unchecked. Deterministic; the fallback passes every check.
@@ -889,7 +926,7 @@ export function spokenFactsOfAttention(report: QAttentionReport): SpokenFacts {
       lines.push(
         lead.length === 0
           ? title
-          : `${lead}${title.charAt(0).toLowerCase()}${title.slice(1)}`,
+          : `${lead}${joinedTitle(title, item.counterpart ?? null)}`,
       );
     });
     if (more > 0) {

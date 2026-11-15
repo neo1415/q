@@ -129,5 +129,9 @@ export {
   type QRunRef,
 } from "./application/narrator.js";
 export { createPostgresQActionRepositories } from "./infrastructure/postgres-repositories.js";
+export {
+  settledApprovalCardNotices,
+  type ApprovalNoticeToCheck,
+} from "./infrastructure/approval-notice-currency.js";
 
 export const PACKAGE_NAME = "@capital-q/q-actions" as const;

@@ -455,6 +455,8 @@ export type ApiModules = {
   readonly chatSafety?: ChatRoutesDependencies["safety"] | undefined;
   /** BIZ-008: meetings, reminders, notifications. Absent: none register. */
   readonly schedule?: ScheduleRoutesDependencies["schedule"] | undefined;
+  /** O1: the shared "still needed" read for the Needs you list and count. */
+  readonly needsYou?: ScheduleRoutesDependencies["needsYou"] | undefined;
   /** D: meeting time proposals (the app actions' port). */
   readonly proposals?: MeetingProposalPort | undefined;
   /** AUTO: Web Push subscriptions and notification settings. */
@@ -1048,6 +1050,7 @@ export function createApp(
       resolver: security.resolver,
       schedule: modules.schedule,
       namedPhotos: modules.namedPhotos,
+      needsYou: modules.needsYou,
     });
   }
 

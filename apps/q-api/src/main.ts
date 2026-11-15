@@ -679,6 +679,7 @@ import {
 } from "./composition/app-actions.js";
 import {
   APP_ACTIONS,
+  createNeedsYouCurrency,
   documentFigureCardInput,
   webFigureCardInput,
   ownIndex,
@@ -3604,6 +3605,10 @@ const qBoard = createQApiBoard({
   sql: database.sql,
   transactions: database.transactions,
 });
+// Live check 15 Nov (O1): one "still needed" read for every surface that
+// says what needs the person (the digest, the attention report, the voice
+// opener here; the web's Needs you list in apps/api).
+const needsYouCurrency = createNeedsYouCurrency({ sql: database.sql });
 const qTools = createQTools({
   ports: {
     // BILLING block
@@ -3617,7 +3622,10 @@ const qTools = createQTools({
     board: qBoard,
     // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
     // new matches and Q's activity, for "what needs me".
-    attention: createAttentionSources({ sql: database.sql }),
+    attention: createAttentionSources({
+      sql: database.sql,
+      noticeChecks: needsYouCurrency.checks,
+    }),
     // Owner 14 Nov 2026: GateQ's part of the account digest, through
     // GateQ's own reads (a founder's GateQ page, an investor's inbox).
     gateqDigest: createAccountDigestGateq({
@@ -8889,7 +8897,10 @@ const { app, logger: appLogger } = createApp(
                     },
                   },
             memory: { termsFor: memoryLearner.termsFor },
-            openerFacts: createOpenerFacts({ sql: database.sql }),
+            openerFacts: createOpenerFacts({
+              sql: database.sql,
+              settledUnread: needsYouCurrency.settledUnread,
+            }),
             rehearsals: {
               opening: rehearsals.opening,
               // The person Q plays speaks in a voice of their own, never Q's.

@@ -57,6 +57,19 @@ export type ScheduleRoutesDependencies = ActorContextDependencies & {
   readonly schedule: ScheduleService;
   /** Pictures of who a notice names. Absent: notices carry none. */
   readonly namedPhotos?: NamedPhotos | undefined;
+  /**
+   * Live check 15 Nov (O1): the shared "still needed" read (app-actions
+   * createNeedsYouCurrency), the same one Q's digest and voice use. An
+   * unread NEEDS_YOU notice whose subject is settled is listed as dealt
+   * with and left out of the unread count. Absent: notices as stored.
+   */
+  readonly needsYou?:
+    | {
+        readonly settledUnread: (
+          userId: string,
+        ) => Promise<ReadonlySet<string>>;
+      }
+    | undefined;
 };
 
 function param(request: FastifyRequest, name: string): string {
@@ -214,10 +227,22 @@ export function registerScheduleRoutes(
       const before = notificationCursor(
         (request.query as Record<string, unknown> | undefined)?.["before"],
       );
-      const own = await schedule.listNotifications(
-        getActorContext(request),
-        before,
-      );
+      const actor = getActorContext(request);
+      const [own, settled] = await Promise.all([
+        schedule.listNotifications(actor, before),
+        // A check that cannot be read leaves notices as stored (shown).
+        actor.actorType !== "HUMAN" || dependencies.needsYou === undefined
+          ? Promise.resolve(new Set<string>())
+          : dependencies.needsYou
+              .settledUnread(actor.userId)
+              .catch((error: unknown) => {
+                request.log.warn(
+                  { err: error },
+                  "needs-you currency read failed: notices as stored",
+                );
+                return new Set<string>();
+              }),
+      ]);
       void reply.header("Cache-Control", "no-store");
       // A row the contract can't describe (a kind the table accepts before the
       // contract learns it) is skipped and logged, never allowed to fail the
@@ -242,7 +267,8 @@ export function registerScheduleRoutes(
           title: item.title,
           body: item.body,
           linkPath: item.linkPath,
-          read: item.readAt !== null,
+          // Settled: no longer needs them, so history (not "Needs you").
+          read: item.readAt !== null || settled.has(item.id),
           createdAt: item.createdAt.toISOString(),
           priority: item.priority ?? "UPDATE",
           named:
@@ -263,7 +289,9 @@ export function registerScheduleRoutes(
       });
       const last = own.items.at(-1);
       return NotificationListSchema.parse({
-        unread: own.unread,
+        // Every settled id is an unread notice of theirs (the read's own
+        // predicate), so the subtraction is exact.
+        unread: Math.max(0, own.unread - settled.size),
         items,
         ...(last === undefined || own.items.length < NOTIFICATIONS_PAGE
           ? {}

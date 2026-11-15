@@ -1,5 +1,6 @@
 import { createGateqUnicornReader } from "./gateq/unicorn.js";
 import type { ActorContext } from "@capital-q/security";
+import { createNeedsYouCurrency } from "@capital-q/app-actions";
 /**
  * Capital Q application API — deployable composition root (doc 23, 8; ERA-002).
  *
@@ -3379,6 +3380,9 @@ const { app, logger } = createApp(config, security, {
   chat,
   chatSafety,
   schedule,
+  // O1 (live check 15 Nov): the Needs you list and its count read the same
+  // "still needed" checks as Q's digest and voice opener.
+  needsYou: createNeedsYouCurrency({ sql: database.sql }),
   // D (2026-10-11): meeting time proposals; booking after an acceptance goes
   // through the schedule service as the accepting person.
   proposals: createMeetingProposalPort({
