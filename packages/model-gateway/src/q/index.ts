@@ -112,6 +112,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   type PromptRegistry,
   renderPrompt,
+  PromptRenderError,
   bundleVersionOf,
   isEmptyPromise,
   stripEmptyPromises,
@@ -133,6 +134,7 @@ import {
   type TurnAnswerKind,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
+import { fittedVariables } from "./prompt-variables-fit.js";
 import type { QPageMovePort } from "./navigation-decision.js";
 import { createStageClock } from "./stage-clock.js";
 import {
@@ -2486,6 +2488,12 @@ export function environmentNoteParts(
           readonly state?: AttachedDocumentState | undefined;
         }
       | undefined;
+    /**
+     * D16 (live 15 Nov 2026, run f1f8cf19): the room this turn's part may
+     * take, so the notes a caller adds to it afterwards still fit the
+     * prompt's turnNotes bound. Default: the whole bound.
+     */
+    readonly turnBudget?: number | undefined;
   } = {},
 ): QEnvironmentNoteParts {
   const factsNote =
@@ -2553,11 +2561,11 @@ export function environmentNoteParts(
   const turnNotes = (
     researchNote: string | null,
     capabilities: boolean,
-    withSituation = true,
+    situationText: string | undefined = situation,
   ) => [
     // First of this turn's own (it changes every turn, so it rides in the
     // tail, after the cached prefix).
-    ...(situation === undefined || !withSituation ? [] : [situation]),
+    ...(situationText === undefined ? [] : [situationText]),
     // This turn's critical notes lead its part: a request for a document
     // read as chat, or a series cut short, are the bugs these prevent
     // (QX-003F, B1, R35).
@@ -2622,13 +2630,22 @@ export function environmentNoteParts(
     researchNote: string | null,
     capabilities = false,
     steadyKept: number = steady.length,
-    withSituation = true,
+    situationText: string | undefined = situation,
   ): QEnvironmentNoteParts => ({
     standing: [...steady.slice(0, steadyKept), ...personal].join(" "),
-    turn: turnNotes(researchNote, capabilities, withSituation).join(" "),
+    turn: turnNotes(researchNote, capabilities, situationText).join(" "),
   });
+  const turnBudget = Math.min(
+    TURN_NOTES_MAX_CHARS,
+    options.turnBudget ?? TURN_NOTES_MAX_CHARS,
+  );
+  // Both parts together, and each within its own prompt variable's bound
+  // (environmentNotes and turnNotes are 9,400 each): a part past its bound
+  // fails the render, and the person sees only an internal error (D16).
   const fits = (parts: QEnvironmentNoteParts) =>
-    joinedNotes(parts).length <= ENVIRONMENT_NOTES_MAX_CHARS;
+    joinedNotes(parts).length <= ENVIRONMENT_NOTES_MAX_CHARS &&
+    parts.standing.length <= STANDING_NOTES_MAX_CHARS &&
+    parts.turn.length <= turnBudget;
   // The bound is on both parts together; the research guidance is the part
   // that yields first, in two steps, so a run with many subjects still
   // renders. What Q can do yields before any research guidance does.
@@ -2646,23 +2663,142 @@ export function environmentNoteParts(
     const brief = compose(briefNote, false, kept);
     if (fits(brief)) return brief;
   }
-  // Nothing fits: the rest is cut, never the situation.
-  if (situation === undefined) {
-    return {
-      standing: joinedNotes(compose(briefNote, false, 0)).slice(
+  // Then the account digest beside the situation is shortened, at a
+  // sentence and saying so (decision 97), before any of this turn's own
+  // notes yield: it is the largest and the most compressible (D16).
+  const lastResort = compose(briefNote, false, 0);
+  if (situation !== undefined) {
+    const over = lastResort.turn.length - turnBudget;
+    if (over > 0 && situation.length - over >= situationKeep(situation)) {
+      const shortened = compose(
+        briefNote,
+        false,
         0,
-        ENVIRONMENT_NOTES_MAX_CHARS,
-      ),
-      turn: "",
+        boundedNotes(situation, situation.length - over),
+      );
+      if (fits(shortened)) return shortened;
+    }
+  }
+  // Then this turn's own notes yield, from the least critical end (the
+  // reminder, the research guidance, the tools), the situation's header
+  // last of all; what was left out is said (decision 97).
+  const shortest =
+    situation === undefined
+      ? undefined
+      : boundedNotes(situation, situationKeep(situation));
+  const turnItems = turnNotes(briefNote, false, shortest);
+  const lead = shortest === undefined ? 0 : 1;
+  for (let kept = turnItems.length; kept > lead; kept -= 1) {
+    const parts = {
+      standing: lastResort.standing,
+      turn: `${turnItems.slice(0, kept).join(" ")}${
+        kept === turnItems.length && shortest === situation
+          ? ""
+          : ` ${NOTES_SHORTENED_NOTE}`
+      }`,
     };
+    if (fits(parts)) return parts;
+  }
+  // Nothing else fits: the situation alone, shortened with its marker, and
+  // the standing guidance in what room is left.
+  const turn =
+    situation === undefined
+      ? ""
+      : boundedNotes(
+          situation,
+          Math.min(turnBudget, ENVIRONMENT_NOTES_MAX_CHARS),
+        );
+  return {
+    standing: boundedNotes(
+      lastResort.standing,
+      Math.min(
+        STANDING_NOTES_MAX_CHARS,
+        Math.max(0, ENVIRONMENT_NOTES_MAX_CHARS - turn.length - 1),
+      ),
+    ),
+    turn,
+  };
+}
+
+/** Where the account digest starts inside the situation (accountDigestBlock). */
+const ACCOUNT_DIGEST_LEAD = "ACCOUNT (Capital Q, by code";
+
+/**
+ * How much of the situation is kept at least: its header and the digest's
+ * opening, so the model still knows there is an account digest.
+ */
+function situationKeep(situation: string): number {
+  const at = situation.indexOf(ACCOUNT_DIGEST_LEAD);
+  if (at < 0) return situation.length;
+  return Math.min(situation.length, at + 160 + NOTES_SHORTENED_NOTE.length + 1);
+}
+
+/**
+ * D16: this turn's notes within the prompt's bounds once every note the
+ * caller added to the turn's part is known. The part environmentNoteParts
+ * returned (`base`) is rebuilt within the room the added notes leave, so
+ * those notes (the asked parts, the named company, the early line) are
+ * kept whole; only if they alone overflow is the whole cut, with its
+ * marker. Never longer than the bounds.
+ */
+export function fittedTurnNotes(
+  final: QEnvironmentNoteParts,
+  base: QEnvironmentNoteParts,
+  rebuild: (turnBudget: number) => QEnvironmentNoteParts,
+): QEnvironmentNoteParts {
+  if (
+    final.turn.length <= TURN_NOTES_MAX_CHARS &&
+    final.standing.length <= STANDING_NOTES_MAX_CHARS
+  ) {
+    return final;
+  }
+  const at = base.turn.length === 0 ? -1 : final.turn.indexOf(base.turn);
+  if (at >= 0) {
+    const added = final.turn.length - base.turn.length;
+    const rebuilt = rebuild(Math.max(0, TURN_NOTES_MAX_CHARS - added));
+    const turn = `${final.turn.slice(0, at)}${rebuilt.turn}${final.turn.slice(
+      at + base.turn.length,
+    )}`;
+    if (
+      turn.length <= TURN_NOTES_MAX_CHARS &&
+      rebuilt.standing.length <= STANDING_NOTES_MAX_CHARS
+    ) {
+      return { standing: rebuilt.standing, turn };
+    }
   }
   return {
-    standing: joinedNotes(compose(briefNote, false, 0, false)).slice(
-      0,
-      Math.max(0, ENVIRONMENT_NOTES_MAX_CHARS - situation.length - 1),
-    ),
-    turn: situation,
+    standing: boundedNotes(final.standing, STANDING_NOTES_MAX_CHARS),
+    turn: boundedNotes(final.turn, TURN_NOTES_MAX_CHARS),
   };
+}
+
+/** The bound of COMPANY_ANALYST's environmentNotes (q-core TaskFrameSchema). */
+const STANDING_NOTES_MAX_CHARS = 9_400;
+
+/**
+ * Decision 97 (no silent truncation): said to the model when some of this
+ * turn's notes or account context could not be included for space.
+ */
+export const NOTES_SHORTENED_NOTE =
+  "[Some of Capital Q's notes for this turn were left out for space. More of their account exists than is shown: never say there is none of what is not shown.]";
+
+/**
+ * Notes within `max` characters: whole when they fit, otherwise cut at the
+ * last sentence end that leaves room for the marker, with the marker said
+ * (decision 97). Never longer than `max`.
+ */
+export function boundedNotes(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const room = max - NOTES_SHORTENED_NOTE.length - 1;
+  if (room <= 0) return NOTES_SHORTENED_NOTE.slice(0, Math.max(0, max));
+  const head = text.slice(0, room);
+  const end = Math.max(
+    head.lastIndexOf(". "),
+    head.lastIndexOf("; "),
+    head.lastIndexOf(": "),
+  );
+  const kept = (end > room / 2 ? head.slice(0, end + 1) : head).trimEnd();
+  return `${kept} ${NOTES_SHORTENED_NOTE}`;
 }
 
 /**
@@ -2671,6 +2807,9 @@ export function environmentNoteParts(
  * asking, personality) rides in the charter; this turn's own notes ride in
  * the task's tail. Together they are what environmentNotesFor returns.
  */
+/** The options environmentNoteParts takes. */
+type NoteOptions = NonNullable<Parameters<typeof environmentNoteParts>[3]>;
+
 export type QEnvironmentNoteParts = {
   readonly standing: string;
   readonly turn: string;
@@ -7668,7 +7807,7 @@ export function createModelGatewayQAnswer(
             plan.screen?.timeZone ?? null,
           ),
         });
-        let noteParts = environmentNoteParts(facts, offered, request.subjects, {
+        const noteOptions: NoteOptions = {
           situation,
           // Only when the firewall actually granted it. The plan has
           // said so all along; nothing was reading it.
@@ -7720,7 +7859,16 @@ export function createModelGatewayQAnswer(
                     intent: attachedDocumentIntent(latest.content),
                   },
                 }),
-        });
+        };
+        let noteParts = environmentNoteParts(
+          facts,
+          offered,
+          request.subjects,
+          noteOptions,
+        );
+        // D16: the notes added to this turn's part below are counted
+        // against its bound once they are all known (fittedTurnNotes).
+        const baseNoteParts = noteParts;
         // S3a (live 2026-10-15, #107): the named company read ahead of the
         // model was looked up again (company.search, company.get: two
         // NORMAL rounds, ~3.5 s) because the turn note told it to resolve
@@ -7861,6 +8009,15 @@ export function createModelGatewayQAnswer(
         // COMPANY_ANALYST v16 (prompt-cache order): this turn's notes ride in
         // the task's tail and the charter keeps only what is the same from
         // turn to turn; an earlier version still gets them all in the charter.
+        // D16 (live 15 Nov 2026, run f1f8cf19): the account digest beside
+        // the situation, the two-part note and the named-company note
+        // together passed turnNotes' bound and the render failed.
+        noteParts = fittedTurnNotes(noteParts, baseNoteParts, (turnBudget) =>
+          environmentNoteParts(facts, offered, request.subjects, {
+            ...noteOptions,
+            turnBudget,
+          }),
+        );
         const notesInTail = registry
           .getActive("COMPANY_ANALYST")
           .definition.template.includes("{{turnNotes}}");
@@ -7868,24 +8025,52 @@ export function createModelGatewayQAnswer(
           ? noteParts.standing
           : joinedNoteParts(noteParts);
         const etiquetteGuides = await etiquetteRead;
-        const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
-          task: "COMPANY_ANALYST",
-          ...(etiquetteGuides === null
-            ? {}
-            : {
-                etiquette: {
-                  guides: etiquetteGuides,
-                  purpose: "STYLE_ONLY" as const,
-                },
-              }),
-          operatingMode: operatingModeForCapability(request.capability),
-          communicationProfile: profile,
-          environmentNotes,
-          variables: {
-            ...variables,
-            turnNotes: notesInTail ? noteParts.turn : "",
-          },
-        });
+        const renderWith = (
+          taskVariables: Omit<
+            CompanyAnalystV4Variables,
+            | "operatingMode"
+            | "communicationProfile"
+            | "communicationGuidance"
+            | "environmentNotes"
+          >,
+        ) =>
+          renderPrompt<CompanyAnalystV4Variables>(registry, {
+            task: "COMPANY_ANALYST",
+            ...(etiquetteGuides === null
+              ? {}
+              : {
+                  etiquette: {
+                    guides: etiquetteGuides,
+                    purpose: "STYLE_ONLY" as const,
+                  },
+                }),
+            operatingMode: operatingModeForCapability(request.capability),
+            communicationProfile: profile,
+            environmentNotes,
+            variables: taskVariables,
+          });
+        const taskVariables = {
+          ...variables,
+          turnNotes: notesInTail ? noteParts.turn : "",
+        };
+        let rendered: ReturnType<typeof renderWith>;
+        try {
+          rendered = renderWith(taskVariables);
+        } catch (error: unknown) {
+          if (!(error instanceof PromptRenderError)) throw error;
+          // D16: a variable past its bound is shortened, saying so, and the
+          // turn is answered from what fits; never an internal error for
+          // the person. Anything else invalid still fails, loudly.
+          const fitted = fittedVariables(
+            registry.getActive("COMPANY_ANALYST").definition.variables.schema,
+            taskVariables,
+          );
+          logger?.warn(
+            { qRunId: request.runId, shortened: fitted.shortened },
+            "a prompt variable was past its bound; shortened, with a marker",
+          );
+          rendered = renderWith(fitted.variables as typeof taskVariables);
+        }
         // Counted only when the note actually reached the model: the notes
         // are bounded, and a reminder cut off was never offered.
         const nudgeOffered =
