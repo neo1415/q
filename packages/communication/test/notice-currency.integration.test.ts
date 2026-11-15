@@ -24,6 +24,8 @@ const TEST_DATABASE_URL =
 
 class Rollback extends Error {}
 
+// Sent as text and cast in SQL: a string bound straight to a jsonb
+// parameter is stored as a JSON string, not as the array.
 const OPTIONS = JSON.stringify([
   {
     startsAt: "2026-11-19T09:00:00.000Z",
@@ -99,8 +101,8 @@ describe("whether a NEEDS_YOU notice still asks, against PostgreSQL", () => {
               (id, tenant_id, relationship_id, purpose, proposed_by_user_id,
                state, options, counter_options, revision, idempotency_key)
             values (${id}, ${ids.tenantCo}, ${ids.relationship}, 'Intro call',
-                    ${founder}, ${state}, ${OPTIONS}::jsonb,
-                    ${state === "PROPOSED" ? null : OPTIONS}::jsonb,
+                    ${founder}, ${state}, ${OPTIONS}::text::jsonb,
+                    ${state === "PROPOSED" ? null : OPTIONS}::text::jsonb,
                     ${revision}, ${`currency-${id}`})`;
           return id;
         };
