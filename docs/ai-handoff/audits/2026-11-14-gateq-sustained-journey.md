@@ -406,3 +406,103 @@ No settled item was asked again: team, revenue, CAC, raise, problem, pricing. Us
    - Dossier JSON `company.stage` is still one value during a dispute (the inbox and comparison now render every answer).
    - The t32 stored words are paraphrased.
    - "They get paid faster because fewer claims are rejected" is stored as `company.description`.
+
+## Re-certification 15 Nov (318577a8e)
+
+- **Production:** `318577a8e`, which includes GateQ fix `ee113ff40`: a count names a metric only when its unit fits; one settled-for-asking predicate (`askingState` / `mayAskAbout`) checks Q's own question; stored words are a span of what was said; dossier `company.stage` holds every answer while disputed; the inbox one-page summary shows stated unknowns as "Not known" and every side of a disagreement; interviewer prompt v10, `reading_version` 5.
+- **Founder:** `founder.fb0002.otieno-wekesa@fictional.capitalq.local`, Solaix Co (pay-as-you-go solar), KE. The profile stage is Series B; the founder said Seed in the form, then Series A and "seed by revenue". The founder was fresh, with no prior GateQ application. **Investor:** `investor.kilima-angels.njeri-kamau@fictional.capitalq.local`.
+- **Window:** 06:36:44–06:49Z. **Cost:** 34 model calls, **$0.1044** (ai_ops.model_usage: interview and synthesis 27 calls and $0.0349; investor 7 calls and $0.0695). Recorded against reservation `f66832e7`.
+- **Records created:**
+  - application `24bc5d5c-b3ff-4c94-967b-67cee6af36f6`, created 06:37:17Z on Continue and SUBMITTED 06:46:47Z (ref `ga_20jfsmwyhseqt38bjcsrh8czq3`);
+  - 51 turns (25 PERSON) and 25 readings (18 READ, 7 NO_STATEMENTS), all `reading_version` 5;
+  - 35 statements (10 FORM, 25 TURN), 4 links and 2 disagreement events;
+  - submission `efc76d00` (snapshot v3, `documentsTotal` 2, `contradictionsTotal` 2);
+  - synthesis READY (`GATEQ_DOSSIER_SYNTHESIS@v2`, 17 points, complete, 51/51 turns read, uncitedDropped 0);
+  - 1 investor Q turn.
+- **Evidence (durable):** `docs/ai-handoff/evidence/2026-11-15-gateq-2/` holds:
+  - `01-founder-resume.jpg`
+  - `02-founder-review-disagreements.jpg`
+  - `03-investor-inbox-summary.jpg`
+  - `04-investor-dossier-stage-row.jpg`
+  - `05-investor-conflicts-synthesis.jpg`
+  - `06-investor-q-answer.jpg`
+
+  Scripts and raw reads are in the non-durable scratchpad `gq11/`. The driver is the fixed `drv.cjs` from `gq10` (it refuses stale command files and logs every sent line).
+
+- **Journey (25 founder turns):**
+  - Form: Seed, Climate, USD 350,000, Kenya (prefilled from the profile), deck and product brief ticked.
+  - Turns 1–8: what it does; "12,000 transactions processed and 600 weekly active users"; "Nobody pays yet"; "from 1 school to 4 since March"; "We don't know our CAC yet"; team; "really a Series A company now, not seed"; "Back to users: about 1,500 weekly users." (undated, with no correction words).
+  - Turns 9–18: bare "Leave it open."; use of funds; "Sorry, I meant 400k, not 350k."; "We haven't sized the market."; problem; risk; pricing; "lead angel calls us seed… by age I'd say Series A. I'm not sure which is right."; bare "Leave it open." twice.
+  - **Break: the browser was closed. A new context signed in and resumed.**
+  - Turns 19–25: "Leave it open for now."; day-to-day; "On weekly users, leave it open for Kilima."; acquisition; "Anything else you need from me?"; what Kilima could bring beyond capital; "That's all from me for now."
+  - Then review, submit, investor inbox and one investor Q turn.
+- **Transport incident:** at t16 the browser lost its connection (`ERR_NETWORK_CHANGED`). The server recorded t16 and Q's t17 reply. After a reload the page showed "Not sent. Your last answer needs confirmation", with Send disabled. One "Leave it open." typed at 06:42:43Z was never sent (the driver's sent log has 26 lines; 25 reached the server). "Try again" recovered Q's reply with no duplicate turn (turns stayed 17).
+
+### Live re-check list
+
+- **The form answered the country, and Q never asked it: PASS.** No Q turn has `asking_dimension` `company.country`, and no question names the country.
+- **The range is settled for asking: PASS.** "From 1 school to 4" became one statement, `0368032a` (customers = 4, all words), with no link. After it, Q never asked "how many …". The only "How many households are paying" questions were t3 and t5, before the range, and "Nobody pays yet" (t6) settled them.
+- **Nothing was asked more than twice: PASS, with garbled fragments.** Per dimension: customers t3 and t5; problem t7 and t9; use of funds t11 and t13; market t15 and t19; instrument t23 and t25; stage t33 once. After its second ask, no dimension came back. **Defect:** two replies keep a fragment of a removed question: t15 "…operating for four years. roughly in amounts? If you size the market…" and t21 "…lockout software. if any?". Both are stored in the transcript that the investor receives.
+- **An unusual-unit count makes no link: PASS.** "12,000 transactions processed" is `9a4a457a`, quantity `transactions`. No link touches it. Unlike Clinicly, it is not read as `customers`.
+- **Words are verbatim: PASS.** All 25 TURN statements' words are a substring of their source turn (0 not verbatim). The stage statement `facd72f4` keeps "Our lead angel calls us seed, though, and honestly by revenue we're seed".
+- **An undated restatement becomes DISAGREES: PASS.** The 1,500 is NEW `8a093f45`, linked by DISAGREES `0c2739a6` against 600 `b9c508be`. It is not a CORRECTS.
+- **Leave-open: PASS.**
+  - The bare t18 wrote LEFT_OPEN on `0c2739a6`.
+  - The bare t34 wrote LEFT_OPEN on stage DISAGREES `28390c65`.
+  - The repeats at t36, t38 and t42 wrote nothing (NO_STATEMENTS), with no note and no false link.
+- **Dossier stage: PASS.** Dossier `company.stage` = "Series A or Seed". The inbox "Company and founder" Stage row reads "Series A or Seed (answers disagree)" (`04`).
+- **One-page summary: PASS.**
+  - Market: "Not known".
+  - Traction shows 600 and "about 1,500 weekly users" with "Answers disagree: left open by the founder", and "And 1 more in the dossier" (`03`).
+  - Both disagreements are listed with both sides.
+  - Readability (P3): the rows run labels together with no separator ("Founder stated And 3 more…", "Estimated Answers disagree…"). The 1,500 is tagged "Estimated" there but "Said in the application" elsewhere.
+- **Guidance when nothing is left: FAIL (UX).** From t35 to t43, Q answered five turns with "What would you like to cover next?" (t35, t37, t39, t43; also at the end of t41). It never pointed the founder to "Finish and review". t45 ended with no next step at all. The close at t51 ("there's nothing else I need from you right now") also gives no review or submit step. The founder must find "Finish and review" alone.
+- **Resume: PASS.**
+  - **No answer POST on load:** 5 POSTs, the first `{reopenOnly:true}` and the other 4 carrying only the session credential.
+  - **Counts unchanged:** statements 32, links 4, events 2, turns 37 and selection rows 1, both before and after the load.
+  - **No role step:** the page opened straight into the interview with the full transcript (`01`).
+  - **Documents:** both documents were restored and submitted (`documentsTotal` 2).
+  - **No interview claim** was left after submit.
+  - **No FORM writes after 06:37:18Z** (FORM total 10).
+
+### Invariants
+
+1. **PASS.** 25/25 PERSON turns read (18 READ, 7 NO_STATEMENTS). All 25 TURN statements have verbatim words and a source turn, and every one is referenced by a reading (unreferenced 0).
+2. **PASS.** The only CORRECTS links are `2d82c791` (t22 USD 400,000 corrects form `983e3a64`, signalled) and `2582fdb0` (t14 Series A corrects the form's seed: the founder's own "not seed"). The undated 1,500 superseded nothing.
+3. **PASS.** WAU `0c2739a6` and stage `28390c65` are both LEFT_OPEN and visible on every surface until submit. There is no false contradiction: transactions, the 1→4 range and the CAC unknown form no link.
+4. **PASS (with fragments).**
+   - The form's country was never asked.
+   - No "how many" question came after the range.
+   - No dimension was asked more than twice, and settled items (revenue, CAC, team, raise, problem) were not asked again.
+   - Defect: the question fragments at t15 and t21 (see above).
+5. **PASS.** After LEFT_OPEN on WAU (t18) and on the stage (t34), Q never asked about either again, including after resume. t51 restates the stage as open without asking.
+6. **PASS.** Same application; all turns, readings and statements kept; no writes on load; no role step; documents restored and submitted (2); no claim left. A separate transport fault (t16) recovered without a duplicate turn, but it left Send disabled until "Try again" was pressed.
+7. **PASS.** Each success claim has a matching record:
+   - t15 "Series A rather than seed" matches `2582fdb0`.
+   - t23 "correcting the raise from three hundred and fifty thousand… to four hundred thousand" matches `2d82c791`.
+   - t51 "the stage question remains between Series A and seed" matches LEFT_OPEN `28390c65`.
+   - Q made no left-open claim that lacks an event.
+8. **PASS.** These agree across the review (`02`), dossier, inbox one-page summary (`03`), Company block (`04`), Conflicting answers and synthesis (`05`), list row ("Needs your judgement: answers disagree"), Sent page ("Stage we invest at: Your answers disagree"), frozen qualification (STAGE UNRESOLVED / STAGE_DISPUTED, MAY_APPLY) and investor Q (`06`):
+   - USD 400,000, corrected from 350,000;
+   - WAU 600 vs about 1,500, left open;
+   - stage Series A vs Seed, left open;
+   - zero revenue;
+   - CAC not known;
+   - market not known;
+   - 2 documents.
+
+   Minor display gaps:
+   - "1 school to 4" is held as quantity `customers` under traction, yet the review and dossier list Customers as "Missing" and the summary says "Customers: Not covered".
+   - The day-to-day answer (t40) is stored as `company.business_model`, so Solution shows "Missing".
+   - "By age I'd say Series A. I'm not sure which is right." sits in the Founder's note.
+
+### Defects, ranked
+
+1. **P2 (invariant 4, transcript quality):** when `mayAskAbout` replaces or drops Q's question, the tail of the original question is left in the stored reply: t15 "roughly in amounts?" and t21 "if any?". The cleanup should cut the whole question sentence, not just its leading clause. Investors receive these lines verbatim.
+2. **P2 (UX):** when the picker has nothing left, Q says "What would you like to cover next?" five times, or ends with no next step. It never points to "Finish and review" or submit. The end-of-interview reply should name the review step.
+3. **P3:** after a dropped connection, the reloaded page shows "Your last answer needs confirmation" with Send disabled, although the server had recorded the turn and Q's reply. "Try again" recovers without a duplicate, but a founder's typed answer was silently not sent.
+4. **P3:**
+   - The one-page summary rows lack separators, and the 1,500 is tagged "Estimated" there but "Said in the application" elsewhere.
+   - The held customers count (4 schools) shows as Customers "Missing" or "Not covered".
+   - The day-to-day answer is classed as business model, so Solution shows "Missing".
+   - Part of the stage sentence goes into the Founder's note.
