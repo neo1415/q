@@ -416,3 +416,9 @@ Core Seven remains the governing assessment framework. The new directive authori
       - question counting is replaced by knowledge, uncertainty and conversation-state tracking.
     - Technical budgets, batch sizes, validation and rate limits stay, but never as silent limits on knowledge. Incomplete output is reported explicitly and can be continued.
     - Raising a number is not a fix for data loss.
+
+98. **Contextual navigation stays intelligent and automatic** (owner, 2026-11-15).
+    - Q opens a relevant screen when doing so meaningfully advances the user's immediate task (for example the pipeline for "who should I follow up with", the work list for "what's waiting for me").
+    - Q does not navigate merely because a company, person or page is mentioned (for example "how solid is Ajopot's figure" answers in place).
+    - In ambiguous situations, with unsaved work, or when the user asked to stay, Q stays and offers navigation instead.
+    - This is consistent with the existing navigation decisions (C10 v85, navigation clarification of 14 Nov); the navigation architecture is not redesigned.
