@@ -817,6 +817,7 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   Meets: "يستوفي",
   "Doesn't meet": "لا يستوفي",
   "Not covered": "غير مشمول",
+  "Not known": "غير معروف",
   "Not applicable": "لا ينطبق",
   Required: "مطلوب",
   Preferred: "مفضّل",

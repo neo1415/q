@@ -535,9 +535,24 @@ export function submittedWords(iso: string): string {
 
 export type SummaryRow = {
   readonly label: string;
-  /** Null: not covered in what they sent; shown as such, never guessed. */
+  /** Null: no answer to show; `gap` says which kind of nothing it is. */
   readonly value: string | null;
+  /**
+   * Why there is no value: they did not cover it, they said they do not
+   * know, or they preferred not to say. Never guessed; null with a value.
+   */
+  readonly gap?: "NOT_COVERED" | "NOT_KNOWN" | "DECLINED" | null;
 };
+
+/** The words for a row with no value, as the dossier panel says them. */
+export const SUMMARY_GAP_WORDS = {
+  NOT_COVERED: "Not covered",
+  NOT_KNOWN: "Not known",
+  DECLINED: "Founder preferred not to say",
+} as const;
+
+/** Other findings shown per row, besides every side of a disagreement. */
+const SUMMARY_FACTS_PER_ROW = 2;
 
 /**
  * Each row reads the dimensions it names, never a whole group (live
@@ -560,8 +575,12 @@ const SUMMARY_ROWS: readonly {
 /**
  * The dossier's one-page summary: the company, then the round, traction,
  * revenue, customers and market as the founder sent them, each with where
- * it came from. A row they did not cover is "Not covered", never an empty
- * zero and never another dimension's answer.
+ * it came from. It reads the same projection as the dossier panel (live
+ * 30c99ccc5, Clinicly): a stated unknown is "Not known", never "Not
+ * covered", and every side of a standing disagreement is shown with its
+ * state, never cut to the first two findings (the left-open 1,500 was
+ * hidden behind "2,300 … 600"). A row they did not cover is "Not
+ * covered", never an empty zero and never another dimension's answer.
  */
 export function onePageSummary(
   item: Pick<GateqInboxItemDto, "companyName" | "raise">,
@@ -570,10 +589,37 @@ export function onePageSummary(
   const rows: SummaryRow[] = [
     { label: "Company", value: dossier?.company.name ?? item.companyName },
   ];
-  const all: readonly (DossierFact & { readonly group: string })[] =
+  type SummaryFact = DossierFact & {
+    readonly group: string;
+    readonly disagreementState?: GateqDisagreementState | null;
+  };
+  const all: readonly SummaryFact[] =
     dossier?.dimensions.flatMap((dimension) =>
-      dimension.facts.map((fact) => ({ ...fact, group: dimension.group })),
+      dimension.facts.map(
+        (fact): SummaryFact => ({ ...fact, group: dimension.group }),
+      ),
     ) ?? [];
+  const view =
+    dossier?.schemaVersion === "gateq-dossier.v2" ? dossier.statements : null;
+  /** A row with no finding: what the founder said about it, if anything. */
+  const gapOf = (
+    label: string,
+    dimensions: readonly string[] | "FUNDRAISING",
+  ): NonNullable<SummaryRow["gap"]> => {
+    if (view !== null && dimensions !== "FUNDRAISING") {
+      const statuses = view.dimensions
+        .filter((d) => dimensions.includes(d.dimension))
+        .map((d) => d.status);
+      if (statuses.includes("UNKNOWN")) return "NOT_KNOWN";
+      if (statuses.includes("DECLINED")) return "DECLINED";
+      return "NOT_COVERED";
+    }
+    if (dossier?.unknowns.includes(label) === true) return "NOT_KNOWN";
+    if (dossier?.declined.includes(label) === true) return "DECLINED";
+    return "NOT_COVERED";
+  };
+  const line = (fact: SummaryFact) =>
+    `${fact.summary.replace(/\.\s*$/, "")}. ${factProvenanceWords(fact)}`;
   for (const row of SUMMARY_ROWS) {
     const facts = all.filter(
       (fact) =>
@@ -589,19 +635,45 @@ export function onePageSummary(
       item.raise !== null
         ? `${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}. Founder stated`
         : null;
-    rows.push({
-      label: row.label,
-      value:
-        facts.length === 0
-          ? legacyRaise
-          : facts
-              .slice(0, 2)
-              .map(
-                (fact) =>
-                  `${fact.summary.replace(/\.\s*$/, "")}. ${factProvenanceWords(fact)}`,
-              )
-              .join(" "),
-    });
+    if (facts.length === 0) {
+      rows.push(
+        legacyRaise === null
+          ? {
+              label: row.label,
+              value: null,
+              gap: gapOf(row.label, row.dimensions),
+            }
+          : { label: row.label, value: legacyRaise, gap: null },
+      );
+      continue;
+    }
+    // Every side of a standing disagreement, then the rest up to the row's
+    // room, in the dossier's order; what is left is counted, never dropped.
+    const disputed = facts.filter(
+      (fact) => (fact.disagreementState ?? null) !== null,
+    );
+    const others = facts.filter((fact) => !disputed.includes(fact));
+    const shown = new Set([
+      ...disputed,
+      ...others.slice(0, SUMMARY_FACTS_PER_ROW),
+    ]);
+    const states = [
+      ...new Set(
+        disputed
+          .map((fact) => fact.disagreementState ?? null)
+          .filter((state): state is GateqDisagreementState => state !== null),
+      ),
+    ];
+    const parts = facts.filter((fact) => shown.has(fact)).map(line);
+    if (states.length > 0)
+      parts.push(
+        `Answers disagree: ${states
+          .map((state) => GATEQ_DISAGREEMENT_STATE_WORDS[state].toLowerCase())
+          .join("; ")}.`,
+      );
+    const hidden = facts.length - shown.size;
+    if (hidden > 0) parts.push(`And ${String(hidden)} more in the dossier.`);
+    rows.push({ label: row.label, value: parts.join(" "), gap: null });
   }
   return rows;
 }
