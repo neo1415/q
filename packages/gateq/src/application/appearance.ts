@@ -136,7 +136,12 @@ export type GatewayWebsiteReading = {
     | Missing;
 };
 type GatewayNameSource =
-  "OG_SITE_NAME" | "MANIFEST" | "APPLICATION_NAME" | "TITLE";
+  | "OG_SITE_NAME"
+  | "MANIFEST"
+  | "APPLICATION_NAME"
+  | "SCHEMA_ORG"
+  | "LOGO_LABEL"
+  | "TITLE";
 
 export type GatewayBrandSources = {
   /**

@@ -261,7 +261,7 @@ const SET_APPEARANCE = defineAppAction<
     // an unfocused offer.
     offeredWhenNamed: true,
     description:
-      "Prepares, for their approval, their GateQ gateway's accent colour (#rrggbb, or null for Capital Q's) and, if they name them, the only websites allowed to embed it. fromWebsite: true brands it from the website on their firm's profile (its logo and colour, read by Capital Q, never invented). Capital Q keeps the colour readable.",
+      "Prepares, for their approval, their GateQ gateway's accent colour (#rrggbb, or null for Capital Q's) and, if they name them, the only websites allowed to embed it. fromWebsite: true brands it from the website on their firm's profile (its name, logo and colour, read by Capital Q, never invented). Capital Q keeps the colour readable.",
     input: z
       .object({
         accentColour: z
@@ -276,7 +276,7 @@ const SET_APPEARANCE = defineAppAction<
           .boolean()
           .optional()
           .describe(
-            "true when they ask to brand the gateway from their website: its logo and colour, from the website on their profile.",
+            "true when they ask to brand the gateway from their website: its name, logo and colour, from the website on their profile.",
           ),
         embedSites: z
           .array(z.string().max(300))
@@ -302,6 +302,7 @@ const SET_APPEARANCE = defineAppAction<
       if (!current.ok) return refusal(NOT_THEIRS);
       let accentHex = current.value.accentHex;
       let logoAssetId: string | undefined;
+      let displayName: string | undefined;
       if (tool.fromWebsite === true) {
         const suggested = await admin(ports).suggestBrand(
           context.actor,
@@ -315,14 +316,21 @@ const SET_APPEARANCE = defineAppAction<
           );
         }
         if (found.colours.status === "FOUND") accentHex = found.colours.primary;
+        // The name the site calls itself (never a raw title), shown on the
+        // card and bound into the approved payload like the rest.
+        if (found.name.status === "FOUND") displayName = found.name.value;
         // Only a real logo on Q's path: a site icon is the admin's own
         // choice on the Gate tab, where it is labelled as an icon.
         if (found.logo.status === "FOUND" && found.logo.kind === "LOGO") {
           logoAssetId = found.logo.assetId;
         }
-        if (found.colours.status !== "FOUND" && logoAssetId === undefined) {
+        if (
+          found.colours.status !== "FOUND" &&
+          logoAssetId === undefined &&
+          displayName === undefined
+        ) {
           return refusal(
-            `I couldn't find a logo or brand colour on ${found.websiteUrl}. You can set them on the Gate tab.`,
+            `I couldn't find a name, logo or brand colour on ${found.websiteUrl}. You can set them on the Gate tab.`,
           );
         }
       }
@@ -358,6 +366,7 @@ const SET_APPEARANCE = defineAppAction<
         input: {
           accentHex,
           embedOrigins,
+          ...(displayName === undefined ? {} : { displayName }),
           ...(logoAssetId === undefined ? {} : { logoAssetId }),
         },
       };

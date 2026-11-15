@@ -147,6 +147,8 @@ export const GatewayBrandReasonSchema = z.enum([
   "TOO_MANY_REDIRECTS",
   "NOT_HTML",
   "NO_NAME",
+  /** The site states only phrases (a slogan title), never a name. */
+  "NAME_NOT_CREDIBLE",
   "NO_LOGO",
   "UNSUPPORTED_LOGO_FORMAT",
   "LOGO_TOO_LARGE",
@@ -184,10 +186,13 @@ export const GatewayBrandSuggestionDtoSchema = z
         .object({
           status: z.literal("FOUND"),
           value: GatewayDisplayNameSchema,
+          /** Which statement on the site the name came from. */
           from: z.enum([
             "OG_SITE_NAME",
             "MANIFEST",
             "APPLICATION_NAME",
+            "SCHEMA_ORG",
+            "LOGO_LABEL",
             "TITLE",
           ]),
         })

@@ -47,6 +47,8 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
     "شعار موقعك الإلكتروني ليس صورة PNG أو JPEG أو SVG بسيطة يستطيع Capital Q استخدامها بأمان.",
   "Your website's logo file is too large to keep.":
     "ملف شعار موقعك الإلكتروني أكبر من أن يُحفظ.",
+  "Your website's title reads like a slogan, not a firm name, so it wasn't used.":
+    "يبدو عنوان موقعك الإلكتروني شعارًا تسويقيًا وليس اسم شركة، لذلك لم يُستخدم.",
   "No brand colour was found on your website.":
     "لم يُعثر على لون للعلامة التجارية في موقعك الإلكتروني.",
   "Brand from your website": "علامتك التجارية من موقعك الإلكتروني",
