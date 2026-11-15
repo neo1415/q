@@ -18,11 +18,13 @@ import {
  * (`question.excludeRelationships`); code decides which those are.
  */
 describe("TURN_READER v88", () => {
-  it("is active: v87 with one LEAVE OUT THEIR OWN paragraph after NAVIGATION TAB, on v88's schema", () => {
+  it("is v87 with one LEAVE OUT THEIR OWN paragraph after NAVIGATION TAB, on v88's schema (deprecated by v89)", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
+    const active = { ...TURN_READER_V88 };
     expect(active.version).toBe(88);
-    expect(active.status).toBe("ACTIVE");
+    expect(registry.get("TURN_READER", 88)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("TURN_READER", 87)?.definition.status).toBe(
       "DEPRECATED",
     );
