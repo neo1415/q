@@ -25,7 +25,9 @@ import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 
 const PER_TEST_USD = 1;
-const PER_DAY_USD = 5;
+// Owner-granted extra allowance for one UTC day (e.g. 15 Nov: "take another 5").
+const DAY_EXTRA_USD = { "2026-11-15": 5 };
+const PER_DAY_USD = \1 + (DAY_EXTRA_USD[new Date().toISOString().slice(0, 10)] ?? 0);
 const FILE = process.env.CQ_TEST_LEDGER ?? `${homedir()}/.cq-test-ledger.jsonl`;
 const LOCK = `${FILE}.lock`;
 const today = new Date().toISOString().slice(0, 10);
@@ -69,10 +71,18 @@ function spentToday() {
       .filter((row) => row.kind === "record")
       .map((row) => [row.id, row.actualUsd]),
   );
+  // A record may name its reservation by a prefix of the id (workers often
+  // shorten it). Match by prefix so an actual cost replaces its estimate
+  // instead of the estimate being counted as if never recorded (15 Nov).
+  const actualFor = (id) => {
+    if (recorded.has(id)) return recorded.get(id);
+    for (const [recId, usd] of recorded)
+      if (recId.length >= 8 && id.startsWith(recId)) return usd;
+    return undefined;
+  };
   let total = 0;
   for (const row of all) {
-    if (row.kind === "reserve")
-      total += recorded.has(row.id) ? recorded.get(row.id) : row.estimateUsd;
+    if (row.kind === "reserve") total += actualFor(row.id) ?? row.estimateUsd;
     if (row.kind === "note") total += row.usd;
   }
   return Math.round(total * 10000) / 10000;
@@ -125,8 +135,22 @@ if (command === "status") {
     console.log(id);
   });
 } else if (command === "record") {
+  // Resolve a shortened id to its full reservation id; refuse unknown or
+  // ambiguous ids so a cost can never be recorded against nothing.
+  const matches = rows().filter(
+    (row) =>
+      row.kind === "reserve" &&
+      typeof a === "string" &&
+      a.length >= 8 &&
+      row.id.startsWith(a),
+  );
+  if (matches.length !== 1) {
+    console.error(`refused: ${matches.length} reservations match id ${a}`);
+    process.exit(2);
+  }
+  const id = matches[0].id;
   withLock(() =>
-    append({ kind: "record", id: a, actualUsd: Number(b), outcome: c ?? "" }),
+    append({ kind: "record", id, actualUsd: Number(b), outcome: c ?? "" }),
   );
   console.log("recorded");
 } else if (command === "note") {
