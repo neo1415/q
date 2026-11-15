@@ -92,3 +92,48 @@ Production `78f8d72d5` (includes the meetings fix `0694fa3a2`). HTTP API and hos
 - Meetings `0dd8ad3b` and `460c95ba`, both `CANCELLED`.
 - 6 TIME_PROPOSED-kind notices, 4 MEETING_SCHEDULED, 4 MEETING_PREP_READY, 6 MEETING_CANCELLED.
 - Relationship events: one `meeting_scheduled`, two `meeting_cancelled`.
+
+## Move re-check 15 Nov (318577a8e)
+
+Production `318577a8e` (includes the move fix `b4c18bb25`). HTTP API and hosted reads only: no browser, no Q turns. Window 06:22–06:26 UTC. Same pair, members and sign-in as above. The relationship was CONNECTED before and after. No member of either organisation has a row in `integrations.google_accounts` (checked by auth id and profile id).
+
+| #   | Step                                                                     | Verdict | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Founder proposes 18 Nov 10:00 and 19 Nov 11:00 WAT; Savanna accepts 0    | PASS    | Proposal `ecc4c7be` 201, then accept 200 `CONFIRMED`, `booked: true`, `calendarInvite: false`. Meeting M `dde03ec2-8905-4a31-ba2e-aaa905fc47ab`: `SCHEDULED`, 18 Nov 09:00Z, `google_event_id` `nocal…`, organiser Savanna.                                                                                                                                                                                                                                                                                                                                 |
+| 2   | Founder proposes a move of M (20 Nov 14:00, 24 Nov 10:00 WAT)            | PASS\*  | `POST …/meeting-proposals` with `rescheduleOfMeetingId` M: 201 `INVESTOR_REVIEW`, and `reschedule_of_meeting_id` is stored. \*The TIME_PROPOSED to Savanna does not say it is a move: title "Watchly proposed times for a call", body ends "Nothing is booked until a time is accepted." The DTO has no `rescheduleOfMeetingId` either. Only Q's card says "This moves the call…". See D10.                                                                                                                                                                 |
+| 3   | Savanna accepts option 0                                                 | PARTIAL | The move itself is correct. M is the same row, still `SCHEDULED`, now 20 Nov 13:00Z–13:45Z. One `meeting_rescheduled` event. "Call moved: … Now Fri 20 Nov, 14:00 West Africa Time. No calendar invite was sent…" went once to each of the 3 Watchly members, and nothing went to Savanna, who moved it. Still 3 meetings on the relationship (2 old cancelled plus M), so no second meeting was booked. **But the response is wrong:** 200 `CONFIRMED` with `meetingId: null` and `booked: false`, and the proposal row's `meeting_id` stays null. See D9. |
+| 4   | Accept repeated with the original key (`live-move-am-…`), then a new key | PASS    | The same key returned 200 with the same (wrong) body: still `meetingId: null`, `booked: false`. A new key got 409 "That proposal has moved on". Still 3 meetings. M's `updated_at` was unchanged. Still 1 `meeting_rescheduled`, 3 proposal events, and 0 notices after the first accept.                                                                                                                                                                                                                                                                   |
+| 5   | Propose a move of cancelled `0dd8ad3b` and of cancelled `460c95ba`       | PASS    | Both returned 409 `RESOURCE_CONFLICT`, detail "That call can't be moved: it was cancelled, has already started, or its organiser has to move it. Propose a new call instead." (the HTTP form of MEETING_NOT_MOVABLE). No proposal row was created for either.                                                                                                                                                                                                                                                                                               |
+| 6   | Founder declines a Savanna counter (proposal `98ba7050`)                 | PASS    | Savanna got exactly one "Watchly declined the times you suggested", ending "Nothing is booked. They may suggest new times, or you can message them on the relationship page." (D8 fixed).                                                                                                                                                                                                                                                                                                                                                                   |
+| 7   | Cancel M as organiser (Savanna), then replay with the same key           | PASS    | 204 and 204. M is `CANCELLED`. One `meeting_cancelled` event. One "Call cancelled: Move re-check 15 Nov: booked call" went to each of the 3 Watchly members, and nothing more on the replay.                                                                                                                                                                                                                                                                                                                                                                |
+| 8   | No model calls from this run                                             | PASS\*  | `ai_ops.model_usage`: 0 rows for the Watchly members. There were 0 rows for anyone during steps 1–5 (06:22–06:25:05). Savanna has 27 rows from 06:25:06. They come from 4 browser Q runs ("How solid is Kazikit's revenue?…", "What's waiting for me?", screens `HOME`/`COMPANY`) in the parallel live browser test signed in as Savanna, not from these HTTP calls.                                                                                                                                                                                        |
+
+### New findings
+
+- **D9 (medium): an accepted move answers `booked: false, meetingId: null`, although the meeting moved.**
+  - `bookAccepted` (`packages/communication/src/schedule/proposal.ts`) calls `store.attachMeeting(proposal.id, M)` after the move.
+  - The partial unique index `meeting_time_proposals_meeting_idx` on `meeting_id` (migration `20261222130000_communication_meeting_time_proposals.sql`) already holds M for the original proposal `ecc4c7be`. The update therefore fails, the `catch` logs "not booked yet; it stays accepted and is retried", and the response says not booked.
+  - Effects:
+    - The web client and Q's accept outcome read it as not moved; Q's text would be "The call hasn't moved yet; it stays at its old time".
+    - Every retry re-runs `moveAgreed`, which is harmless because it is idempotent by time.
+    - The proposal never links to its meeting.
+  - The unit tests use an in-memory store without the index.
+  - Possible fix: for a move, return the moved meeting without attaching it, or link it through `reschedule_of_meeting_id`. The alternative, scoping the index, would need a migration.
+- **D10 (low): the move proposal's notice does not say it is a move.**
+  - The investor reads "proposed times for a call … Nothing is booked until a time is accepted." while a call is already booked.
+  - The HTTP DTO has no `rescheduleOfMeetingId`, so the web page cannot say it either.
+  - Files: `packages/communication/src/schedule/proposal-port.ts` (`noticesFor`) and `packages/contracts/src/http/schedule.ts` (`MeetingTimeProposalDtoSchema`).
+
+### Rows left in production (fictional pair)
+
+- Proposals:
+  - `ecc4c7be` (CONFIRMED, meeting M);
+  - `77f82b39` (CONFIRMED move of M, `meeting_id` null: D9);
+  - `98ba7050` (DECLINED).
+- Meeting `dde03ec2` is `CANCELLED`; its last time was 20 Nov 13:00Z.
+- Notifications:
+  - 7 TIME_PROPOSED-kind;
+  - 7 MEETING_SCHEDULED-kind (3 "New call", 1 "Booked", 3 "Call moved");
+  - 4 "Rehearse your call";
+  - 3 MEETING_CANCELLED.
+- Relationship events: one each of `meeting_scheduled`, `meeting_rescheduled` and `meeting_cancelled`.
