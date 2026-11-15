@@ -11,6 +11,7 @@ import {
   compactStatementRows,
   paneWhy,
   STATEMENT_ROWS_COMPACT,
+  stageValueOf,
   stageWordsOf,
   statementRowsOf,
 } from "../src/features/gateq/page/inbox-model";
@@ -198,5 +199,16 @@ describe("the dossier header's stage (live 06910b145)", () => {
   it("shows the frozen stage otherwise, and for a v1 dossier", () => {
     expect(stageWordsOf("Seed", stageView("SETTLED"))).toBe("Seed");
     expect(stageWordsOf("Seed", null)).toBe("Seed");
+  });
+
+  // Live 78f8d72d5: the inbox "Company and founder" block (and the
+  // comparison's "Declared stage") showed "Series A" beside "answers
+  // disagree"; every value under a Stage label reads the projection.
+  it("gives every answer as the value under a Stage label while they disagree", () => {
+    expect(stageValueOf("Series A", stageView("DISAGREEMENT_OPEN"))).toBe(
+      "Series A or seed by revenue, Series A by age (answers disagree)",
+    );
+    expect(stageValueOf("Seed", stageView("SETTLED"))).toBe("Seed");
+    expect(stageValueOf(null, null)).toBeNull();
   });
 });

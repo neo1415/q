@@ -685,18 +685,41 @@ export function dossierStageWords(dossier: GateqDossier): string | null {
   );
 }
 
+/**
+ * The stage as a value under a "Stage" label (the inbox's "Company and
+ * founder" block, the comparison's "Declared stage"): every current answer
+ * while they disagree, else the frozen stage (live 78f8d72d5: the block
+ * said "Series A" beside "answers disagree").
+ */
+export function dossierStageValue(dossier: GateqDossier): string | null {
+  return stageValueOf(
+    dossier.company.stage,
+    dossier.schemaVersion === "gateq-dossier.v2" ? dossier.statements : null,
+  );
+}
+
 /** The same, from the frozen stage and the statement view it was built from. */
-export function stageWordsOf(
+export function stageValueOf(
   frozenStage: string | null,
   view: GateqStatementViewV1 | null,
 ): string | null {
+  const answers = disagreeingStageAnswers(view);
+  return answers === null
+    ? frozenStage
+    : `${answers.join(" or ")} (answers disagree)`;
+}
+
+/** Every current stage answer while they disagree; null otherwise. */
+function disagreeingStageAnswers(
+  view: GateqStatementViewV1 | null,
+): readonly string[] | null {
   const stage = view?.dimensions.find((d) => d.dimension === "company.stage");
   if (
     stage === undefined ||
     (stage.status !== "DISAGREEMENT_OPEN" &&
       stage.status !== "DISAGREEMENT_LEFT_OPEN")
   )
-    return frozenStage;
+    return null;
   const answers = [
     ...new Set(
       stage.statements
@@ -704,7 +727,16 @@ export function stageWordsOf(
         .map((s) => s.summary),
     ),
   ];
-  return answers.length < 2
+  return answers.length < 2 ? null : answers;
+}
+
+/** The same, from the frozen stage and the statement view it was built from. */
+export function stageWordsOf(
+  frozenStage: string | null,
+  view: GateqStatementViewV1 | null,
+): string | null {
+  const answers = disagreeingStageAnswers(view);
+  return answers === null
     ? frozenStage
     : `Stage: ${answers.join(" or ")} (answers disagree)`;
 }

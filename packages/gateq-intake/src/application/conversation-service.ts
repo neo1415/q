@@ -156,6 +156,7 @@ function historyFrom(stored: readonly StoredTurn[]): {
   readonly recentTurns: readonly {
     readonly role: "person" | "q";
     readonly text: string;
+    readonly asking: ApplicationDimension | null;
   }[];
   readonly askedAlready: readonly ApplicationDimension[];
   readonly askedCounts: ReadonlyMap<ApplicationDimension, number>;
@@ -164,6 +165,7 @@ function historyFrom(stored: readonly StoredTurn[]): {
   const recentTurns = stored.slice(-RECENT_TURNS).map((turn) => ({
     role: turn.role === "PERSON" ? ("person" as const) : ("q" as const),
     text: turn.text,
+    asking: turn.role === "Q" ? turn.askingDimension : null,
   }));
   // What Q actually asked about, in the order it first asked: not what
   // happens to be answered, which is a different list.

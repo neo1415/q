@@ -268,6 +268,8 @@ export type InterviewTurnInput = {
   readonly recentTurns: readonly {
     readonly role: "person" | "q";
     readonly text: string;
+    /** A Q line's question topic, when it asked about a dimension. */
+    readonly asking?: ApplicationDimension | null | undefined;
   }[];
   /** Consecutive turns that were not about the application. */
   readonly tangents: number;
@@ -851,6 +853,10 @@ export function createGateQInterviewer(
       // A turn that was not about the application records nothing. Doing
       // this by intent rather than by asking the model to be careful means
       // a joke cannot become an answer even if the model read one into it.
+      // The label drops values only: the founder's own action on a
+      // disagreement on record (leave it open, settle it) is applied in
+      // the statement plan whatever the label (live 78f8d72d5: three bare
+      // "leave it open" turns labelled QUESTION_FOR_Q recorded nothing).
       const conversational: readonly GateQTurnIntent[] = [
         "SMALL_TALK",
         "OFF_TOPIC",
@@ -932,6 +938,10 @@ export function createGateQInterviewer(
                 ),
           actions: result.disagreementActions,
           discard: discardedByIntent,
+          sabotage: result.intent === "SABOTAGE",
+          lastAsked:
+            [...input.recentTurns].reverse().find((turn) => turn.role === "q")
+              ?.asking ?? null,
           agreedTo,
           agreedReadBacks,
           now: now(),

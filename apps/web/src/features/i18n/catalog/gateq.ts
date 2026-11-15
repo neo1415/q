@@ -970,6 +970,7 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "No documents ticked yet": "لم تحدد أي مستندات بعد",
   "Choose documents to share": "اختر المستندات للمشاركة",
   "Stage: {list} (answers disagree)": "المرحلة: {list} (الإجابات متعارضة)",
+  "{list} (answers disagree)": "{list} (الإجابات متعارضة)",
   "No documents submitted": "لم تُقدَّم مستندات",
   "No documents with the dossier.": "لا توجد مستندات مع الملف.",
   "No documents were attached to this submission.":

@@ -6579,6 +6579,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "{label} colour picker",
   "{label} {n}",
   "{label}, at {time}",
+  "{list} (answers disagree)",
   "{list}. Pitches outside your regions follow in Discover.",
   "{name} (Q)",
   "{name} a month",

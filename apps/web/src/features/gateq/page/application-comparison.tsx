@@ -9,6 +9,7 @@ import type {
 import { Button } from "@capital-q/ui/button";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import { loadDetailAction } from "./gateq-actions";
+import { dossierStageValue } from "./inbox-model";
 import { summaryWords } from "./summary-words";
 import { useT } from "@/features/i18n/language";
 
@@ -143,7 +144,10 @@ function ComparisonTable({
             "stage",
             "Declared stage",
             (detail) =>
-              detail.dossier?.company.stage ??
+              // Every answer while they disagree, never one picked.
+              (detail.dossier == null
+                ? null
+                : dossierStageValue(detail.dossier)) ??
               detail.item.stage ??
               NOT_RECORDED,
           )}

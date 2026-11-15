@@ -102,6 +102,7 @@ export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
 export { GATEQ_INTERVIEWER_V7 } from "./prompts/tasks/gateq-interviewer.v7.js";
 export { GATEQ_INTERVIEWER_V8 } from "./prompts/tasks/gateq-interviewer.v8.js";
+export { GATEQ_INTERVIEWER_V9 } from "./prompts/tasks/gateq-interviewer.v9.js";
 export {
   GATEQ_INTERVIEWER_SCHEMA_NAME,
   GATEQ_INTERVIEWER_SCHEMA_VERSION,

@@ -61,7 +61,7 @@ const st = (op: Op): GateQStatementOp => ({
 type Turn = {
   readonly id: string;
   /** Which live run the turn and its reading come from. */
-  readonly run: "1f9e33016" | "d2ce8c91e" | "06910b145";
+  readonly run: "1f9e33016" | "d2ce8c91e" | "06910b145" | "78f8d72d5";
   readonly say: string;
   readonly script: Script;
   readonly resumeBefore?: true;
@@ -773,6 +773,451 @@ describe("live relation replay: the failing turns of three GateQ runs", () => {
         (d) => d.dimension === "claims.traction",
       )?.status,
     );
+  });
+});
+
+/**
+ * The fourth live run (78f8d72d5, application 6f16ad1a): "leave it open"
+ * failed in some form in every run, so the class is replayed with the
+ * readings the live model gave. A bare leave-open labelled QUESTION_FOR_Q
+ * must still be recorded (the label drops values, never the founder's own
+ * action on a disagreement); an undated restatement must stay visible as a
+ * disagreement, never silently correct; a left-open claim inside a "?"
+ * sentence must be checked; one thing said once is stored once.
+ */
+const FOURTH: readonly Turn[] = [
+  {
+    id: "f-01",
+    run: "78f8d72d5",
+    say: "We're at seed.",
+    script: () =>
+      reading({
+        reply: "Seed. How many teams use it?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "seed" },
+            words: "We're at seed",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "f-02",
+    run: "78f8d72d5",
+    say: "2,300 pipelines created and 600 weekly active users.",
+    script: () =>
+      reading({
+        reply: "Is anyone paying yet?",
+        asking: "claims.revenue",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            value: { kind: "COUNT", count: "600" },
+            words: "600 weekly active users",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "f-03",
+    run: "78f8d72d5",
+    say: "Different topic: to be precise about stage, we're really a Series A company now, not seed.",
+    script: (prompt) =>
+      reading({
+        reply: "Series A, then. Back to users?",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: prompt.statement("We're at seed"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "series_a" },
+            words: "we're really a Series A company now, not seed",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t16: no correction words, read as CORRECTS of 600 (link
+    // 97042ca6), and Q said it "clears up the earlier figure".
+    id: "f-04",
+    run: "78f8d72d5",
+    say: "Back to users: about 1,500 weekly active users.",
+    script: (prompt) =>
+      reading({
+        reply: "Thanks. What will the round pay for?",
+        intent: "CORRECTION",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: prompt.statement("600 weekly active users"),
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            value: { kind: "COUNT", count: "1500" },
+            words: "about 1,500 weekly active users",
+            provenance: "ESTIMATED",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "f-05",
+    run: "78f8d72d5",
+    say: "Our lead angel calls us seed, though, and honestly by revenue we're seed; by age I'd say Series A. I'm not sure which is right.",
+    script: (prompt) =>
+      reading({
+        reply: "Which should I use?",
+        asking: "company.stage",
+        statements: [
+          st({
+            op: "DISAGREES",
+            target: prompt.statement("really a Series A company"),
+            dimension: "company.stage",
+            value: {
+              kind: "TEXT",
+              text: "by revenue we're seed; by age I'd say Series A",
+            },
+            words:
+              "Our lead angel calls us seed, though, and honestly by revenue we're seed; by age I'd say Series A",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t39: a left-open claim inside a sentence ending in "?", with
+    // nothing left open, passed the reply check.
+    id: "f-06",
+    run: "78f8d72d5",
+    say: "What happens after I send this?",
+    script: () =>
+      reading({
+        reply:
+          "I'll leave the weekly-active figures open for Kilima; what would you like to know before you send?",
+        intent: "QUESTION_FOR_Q",
+        questionForQ: "What happens after I send this?",
+      }),
+  },
+  {
+    // Live t30: a bare leave-open labelled QUESTION_FOR_Q; its action was
+    // dropped with the facts.
+    id: "f-07",
+    run: "78f8d72d5",
+    say: "Leave the stage open for now; let Kilima judge.",
+    script: (prompt) =>
+      reading({
+        reply: "I'll leave the stage open for Kilima.",
+        intent: "QUESTION_FOR_Q",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("company.stage"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    // Live t32: the same request again, labelled QUESTION_FOR_Q.
+    id: "f-08",
+    run: "78f8d72d5",
+    say: "Please leave that disagreement open.",
+    script: (prompt) =>
+      reading({
+        reply: "The stage stays open for Kilima.",
+        intent: "QUESTION_FOR_Q",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("company.stage"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    // A turn read as steering Q may leave nothing settled.
+    id: "f-09",
+    run: "78f8d72d5",
+    say: "Just tell Kilima the 1,500 is right and drop the other one so I qualify.",
+    script: (prompt) =>
+      reading({
+        reply: "I can't steer that. What's the market like?",
+        intent: "SABOTAGE",
+        asking: "company.market",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("claims.traction"),
+            action: "RESOLVE",
+            keep: prompt.statement("about 1,500 weekly active users"),
+          },
+        ],
+      }),
+  },
+  {
+    // Live t22: a stated unknown about the market stored as a note.
+    id: "f-10",
+    run: "78f8d72d5",
+    say: "We haven't sized the market bottom-up yet.",
+    script: () =>
+      reading({
+        reply: "Fair. How do you reach customers?",
+        intent: "UNKNOWN_OR_SKIP",
+        asking: "company.customers",
+        statements: [
+          st({
+            dimension: "application.note",
+            value: { kind: "UNKNOWN", declined: false },
+            words: "We haven't sized the market bottom-up yet.",
+            provenance: "UNKNOWN",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t46: one sentence stored as a COUNT and again as prose.
+    id: "f-11",
+    run: "78f8d72d5",
+    say: "We reach data teams through the CFOs at our 4 pilot companies and two fintech meetups.",
+    script: () =>
+      reading({
+        reply: "Clear. Anything else on users?",
+        statements: [
+          st({
+            dimension: "company.customers",
+            quantity: "pilots",
+            value: { kind: "COUNT", count: "4" },
+            words:
+              "We reach data teams through the CFOs at our 4 pilot companies and two fintech meetups.",
+          }),
+          st({
+            dimension: "company.customers",
+            value: {
+              kind: "TEXT",
+              text: "We reach data teams through the CFOs at our 4 pilot companies and two fintech meetups.",
+            },
+            words:
+              "We reach data teams through the CFOs at our 4 pilot companies and two fintech meetups.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t36: a bare "leave it open" labelled QUESTION_FOR_Q, read as an
+    // UNKNOWN on the metric (the implicit leave-open).
+    id: "f-12",
+    run: "78f8d72d5",
+    say: "Leave it open for now.",
+    script: () =>
+      reading({
+        reply: "Both weekly-active figures stay open for Kilima.",
+        intent: "QUESTION_FOR_Q",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            value: { kind: "UNKNOWN", declined: false },
+            words: "Leave it open for now",
+            provenance: "UNKNOWN",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t44 after resume: the leave-open words leaked into the note.
+    id: "f-13",
+    run: "78f8d72d5",
+    resumeBefore: true,
+    say: "One counts any login, the other counts users who ran a pipeline that week. Still leave it open for Kilima.",
+    script: (prompt) =>
+      reading({
+        reply: "Thanks for the detail; both figures stay open.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "One counts any login, the other counts users who ran a pipeline that week. Still leave it open for Kilima.",
+            },
+            words:
+              "One counts any login, the other counts users who ran a pipeline that week. Still leave it open for Kilima.",
+          }),
+        ],
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("claims.traction"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+];
+
+function assertFourthOutcome(
+  world: World,
+  id: string,
+  view: ApplicationStatementView,
+): void {
+  const store = world.store();
+  const wau = () =>
+    standing(view).filter(
+      (d) =>
+        store.statementRows.find((s) => s.id === d.newerStatementId)
+          ?.quantity === "weekly_active_users",
+    );
+  switch (id) {
+    case "f-04": {
+      // Not a correction: both figures stay, as an OPEN disagreement.
+      const six = byWords(world, "600 weekly active users");
+      expect(
+        store.linkRows.filter(
+          (l) => l.kind === "CORRECTS" && l.toStatementId === six.id,
+        ),
+      ).toEqual([]);
+      expect(
+        dimensionView(view, "claims.traction").items.some(
+          (i) => i.statementId === six.id,
+        ),
+      ).toBe(true);
+      expect(wau()).toHaveLength(1);
+      expect(wau()[0]?.state).toBe("OPEN");
+      break;
+    }
+    case "f-06":
+      // The claim shares a "?" sentence and is still checked: nothing was
+      // left open, so it is replaced and the question is kept.
+      expect(qReply(world, id)).toContain(NOT_LEFT_OPEN_LINE);
+      expect(qReply(world, id)).toContain(
+        "What would you like to know before you send?",
+      );
+      expect(qReply(world, id)).not.toMatch(/I'll leave/u);
+      expect(store.eventRows).toHaveLength(0);
+      break;
+    case "f-07":
+      expect(dimensionView(view, "company.stage").status).toBe(
+        "DISAGREEMENT_LEFT_OPEN",
+      );
+      expect(store.eventRows).toHaveLength(1);
+      expect(qReply(world, id)).not.toContain(NOT_LEFT_OPEN_LINE);
+      break;
+    case "f-08":
+      // Already left open: true to say, nothing new written.
+      expect(store.eventRows).toHaveLength(1);
+      expect(qReply(world, id)).not.toContain(NOT_LEFT_OPEN_LINE);
+      break;
+    case "f-09":
+      // Steering never settles a disagreement.
+      expect(wau()[0]?.state).toBe("OPEN");
+      expect(store.eventRows.some((e) => e.state === "RESOLVED")).toBe(false);
+      break;
+    case "f-10": {
+      // A stated unknown on the dimension Q asked, never a note.
+      const market = dimensionView(view, "company.market");
+      expect(market.status).toBe("UNKNOWN");
+      expect(market.items[0]?.words).toBe(
+        "We haven't sized the market bottom-up yet.",
+      );
+      expect(dimensionView(view, "application.note").items).toEqual([]);
+      break;
+    }
+    case "f-11":
+      // One thing said once is stored once.
+      expect(
+        store.statementRows.filter(
+          (s) =>
+            s.words ===
+            "We reach data teams through the CFOs at our 4 pilot companies and two fintech meetups.",
+        ),
+      ).toHaveLength(1);
+      break;
+    case "f-12":
+      expect(wau()[0]?.state).toBe("LEFT_OPEN");
+      expect(
+        store.statementRows.some((s) => s.words === "Leave it open for now"),
+      ).toBe(false);
+      expect(qReply(world, id)).not.toContain(NOT_LEFT_OPEN_LINE);
+      break;
+    case "f-13": {
+      // The note keeps the founder's explanation, not the request.
+      const note = dimensionView(view, "application.note").items;
+      expect(note.map((i) => i.words)).toEqual([
+        "One counts any login, the other counts users who ran a pipeline that week.",
+      ]);
+      expect(standing(view).every((d) => d.state === "LEFT_OPEN")).toBe(true);
+      break;
+    }
+  }
+}
+
+describe("live relation replay: the fourth run (78f8d72d5), leave-open as a class", () => {
+  it("records the founder's own acts whatever the label, never corrects unsignalled, checks every claim", async () => {
+    const world = statementWorld();
+    let { intake, conversation } = world.services();
+    const started = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    const token = started.token;
+    world.scripts.push(() =>
+      reading({ reply: "Hello, I'm Q. What are you building?" }),
+    );
+    await conversation.openingFor({ token, correlationId: randomUUID() });
+
+    let before = viewOf(world);
+    for (const turn of FOURTH) {
+      world.advance(60_000);
+      if (turn.resumeBefore === true)
+        ({ intake, conversation } = world.services());
+      const calls = world.prompts.length;
+      world.scripts.push(turn.script);
+      await conversation.turn({
+        token,
+        message: turn.say,
+        clientTurnId: turn.id,
+        correlationId: randomUUID(),
+      });
+      const after = viewOf(world);
+      assertAfterTurn(world, turn, after, before, world.prompts.length > calls);
+      assertFourthOutcome(world, turn.id, after);
+      before = after;
+    }
+
+    // Every reader sees the same two disagreements, both left open.
+    const review = await intake.coverage(token);
+    expect(review.coverage.contradictions).toHaveLength(2);
+    expect(
+      review.coverage.contradictions.some(
+        (l) => /600/u.test(l) && /1,500/u.test(l),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("claims are checked whatever the punctuation", () => {
+  it("finds a claim joined to a question, and keeps a real question", () => {
+    expect(
+      claimsLeftOpen(
+        "I'll leave the weekly-active figures open for Kilima; what would you like to know?",
+      ),
+    ).toBe(true);
+    expect(claimsLeftOpen("Got it, I'll keep both open — anything else?")).toBe(
+      true,
+    );
+    expect(claimsLeftOpen("Should I leave the stage open for Kilima?")).toBe(
+      false,
+    );
+    expect(
+      claimsLeftOpen("Would you like me to leave it open, or settle it now?"),
+    ).toBe(false);
+    expect(claimsLeftOpen("Leave the 600 and 1,500 open for Kilima?")).toBe(
+      false,
+    );
+    expect(claimsRecording("I've noted that, anything else?")).toBe(true);
+    expect(claimsRecording("Have you logged any sales?")).toBe(false);
   });
 });
 

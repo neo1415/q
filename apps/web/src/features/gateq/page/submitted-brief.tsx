@@ -11,7 +11,7 @@ import { QControl } from "@/features/q/control/q-control";
 import { FitGlyph } from "../fit-glyph";
 import { ApplicationAsks } from "./application-asks";
 import { StatementsSection } from "./inbox-dossier";
-import { dossierStatementRows } from "./inbox-model";
+import { dossierStageValue, dossierStatementRows } from "./inbox-model";
 import { summaryWords } from "./summary-words";
 import { useT } from "@/features/i18n/language";
 
@@ -158,7 +158,13 @@ export function SubmittedBrief({
             {dossier.company.description ?? t("Not provided")}
           </dd>
           <dt className="gq-t2">{t("Stage")}</dt>
-          <dd>{dossier.company.stage ?? t("Unknown")}</dd>
+          <dd>
+            {(() => {
+              const stage = dossierStageValue(dossier);
+              if (stage === null) return t("Unknown");
+              return stage === dossier.company.stage ? stage : t(stage);
+            })()}
+          </dd>
           <dt className="gq-t2">{t("Country")}</dt>
           <dd>{dossier.company.country ?? t("Unknown")}</dd>
           <dt className="gq-t2">{t("Sectors")}</dt>

@@ -1194,10 +1194,22 @@ describe("what the interviewer is shown", () => {
     const last = w.seen.at(-1);
     expect(last?.utterance).toBe("Banks are our customers.");
     // The current utterance is not repeated as history.
-    expect(last?.recentTurns.at(-1)).toEqual({ role: "q", text: "Fine." });
+    expect(last?.recentTurns.at(-1)).toEqual({
+      role: "q",
+      text: "Fine.",
+      asking: null,
+    });
     expect(last?.recentTurns.at(0)).toEqual({
       role: "person",
       text: "We build payment rails.",
+      asking: null,
+    });
+    // Each Q line carries what it asked about, so a bare "not known" is
+    // read as the answer to that question.
+    expect(last?.recentTurns.at(1)).toEqual({
+      role: "q",
+      text: "Who are your customers?",
+      asking: "company.customers",
     });
     expect(last?.askedAlready).toEqual(["company.customers"]);
     expect(last?.tangents).toBe(2);

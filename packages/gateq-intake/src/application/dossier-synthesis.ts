@@ -182,9 +182,38 @@ function statementLines(dossier: GateqDossier): FactLine[] | null {
     ...lines.filter((line) => line.kind === "HISTORY"),
   ];
   return ordered.map((line) => {
-    const turns = seqs(line).join(",") || "form";
+    // "form" only for what the form said: an interview statement is never
+    // attributed to the form (live 78f8d72d5: the synthesis said "the form
+    // says Series A", which was said in interview turn 14).
+    const turns =
+      seqs(line).join(",") ||
+      (line.sourceKinds.every((kind) => kind === "FORM") ? "form" : "none");
     const source = line.sourceKinds.join("+");
     const state = line.disagreementState ?? "none";
+    // The recorded state and provenance in words, so the synthesis reads
+    // them from the record and never from the transcript (live 78f8d72d5:
+    // it said the founder "explicitly leaves" an OPEN disagreement open).
+    const gloss = ` (${[
+      line.sourceKinds
+        .map((kind, index) => {
+          const seq = line.sourceTurnSeqs[index] ?? null;
+          return kind === "FORM"
+            ? "given in the form"
+            : kind === "APPLICATION_STATEMENT"
+              ? `said in the interview${seq === null ? "" : `, turn ${String(seq)}`}`
+              : kind === "DOCUMENT"
+                ? "from a document"
+                : "from the company profile";
+        })
+        .join(" and "),
+      ...(line.disagreementState === "OPEN"
+        ? [
+            "the answers disagree and are not settled; the founder has not chosen to leave them open",
+          ]
+        : line.disagreementState === "LEFT_OPEN"
+          ? ["the founder chose to leave this disagreement open"]
+          : []),
+    ].join("; ")})`;
     if (line.kind === "STATEMENT") {
       const id = line.statementIds[0] ?? "";
       const fact = finding.get(id);
@@ -195,14 +224,14 @@ function statementLines(dossier: GateqDossier): FactLine[] | null {
       return {
         ids: [id],
         turnSeqs: seqs(line),
-        line: `sourceFactId=${id} | ${where(line)}: ${line.summaries[0] ?? ""} [source=${source}; disagreement=${state}; ${axes}; turn=${turns}]${fact?.derivation === undefined ? "" : ` (${fact.derivation})`}`,
+        line: `sourceFactId=${id} | ${where(line)}: ${line.summaries[0] ?? ""} [source=${source}; disagreement=${state}; ${axes}; turn=${turns}]${gloss}${fact?.derivation === undefined ? "" : ` (${fact.derivation})`}`,
       };
     }
     if (line.kind === "DISAGREEMENT")
       return {
         ids: [...line.statementIds],
         turnSeqs: seqs(line),
-        line: `sourceFactId=${line.statementIds.join(" and sourceFactId=")} | ${where(line)}: the founder's answers disagree [source=${source}; disagreement=${state}; turn=${turns}]: ${line.text}`,
+        line: `sourceFactId=${line.statementIds.join(" and sourceFactId=")} | ${where(line)}: the founder's answers disagree [source=${source}; disagreement=${state}; turn=${turns}]${gloss}: ${line.text}`,
       };
     return {
       ids: [...line.statementIds],

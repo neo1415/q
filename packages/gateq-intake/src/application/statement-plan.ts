@@ -46,6 +46,7 @@ import { regionIn } from "./cities.js";
 import type { NotRecorded } from "./not-recorded.js";
 import { amountStatedIn } from "./stated-amount.js";
 import {
+  dimensionView,
   legacyFactsFrom,
   projectView,
   quantityFitting,
@@ -80,8 +81,13 @@ import {
  * ids; `completeTurn` writes it in one transaction with Q's reply.
  */
 
-/** 3: read under the one relation rule and prompt v8 (root cause 2026-11-14). */
-export const STATEMENT_READING_VERSION = 3;
+/**
+ * 3: read under the one relation rule and prompt v8 (root cause 2026-11-14).
+ * 4: prompt v9; a founder's action on a disagreement is applied whatever the
+ * turn's intent label, and a CORRECTS hides a figure only when the founder
+ * signalled a correction (live 78f8d72d5).
+ */
+export const STATEMENT_READING_VERSION = 4;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
@@ -583,6 +589,69 @@ function canonical(value: StatementValue): string {
   return JSON.stringify(value);
 }
 
+/**
+ * Words with which a founder says an earlier answer was wrong or replaced.
+ * Bounded and English: a turn in another language without them is never
+ * silently corrected; its two figures stay visible as a disagreement and
+ * Q asks which is right (the fail-safe direction).
+ */
+const CORRECTION_WORDS =
+  /\b(?:actually|correct(?:ion|ed|ing)?|sorry|mistaken?|wrong|typo|i meant|meant to say|should (?:be|read|have said)|instead|rather than|scratch that|updated?|revised?)\b/iu;
+/** "not 600", "not $350k": the founder names the figure being replaced. */
+const NOT_A_FIGURE = /\bnot\s+(?:the\s+)?(?:[$€£]\s*|(?:usd|kes|ksh)\s*)?\d/iu;
+
+/**
+ * Whether a reader's CORRECTS of `target` may hide it. On a figure (both
+ * ends hold a value about the same metric and period) only when the
+ * founder signalled a correction in the words of the turn, or when the
+ * target is one side of an OPEN disagreement, which Q asked them to settle.
+ * Elsewhere (prose, a contact detail, a code they restate) the reader's
+ * explicit reference stands as it did.
+ */
+function correctionStands(
+  target: ApplicationStatement | undefined,
+  statement: Pick<
+    ApplicationStatement,
+    "dimension" | "quantity" | "value" | "asOf" | "sourceTurnId"
+  >,
+  said: string,
+  standing: Iterable<DimensionDisagreement>,
+): boolean {
+  if (target === undefined) return true;
+  const figure =
+    statement.quantity !== null &&
+    quantityFitting(target.value.kind, target.quantity) ===
+      statement.quantity &&
+    relatable(target, statement) &&
+    canonical(target.value) !== canonical(statement.value);
+  if (!figure) return true;
+  if (CORRECTION_WORDS.test(said) || NOT_A_FIGURE.test(said)) return true;
+  for (const d of standing)
+    if (
+      d.active &&
+      d.state === "OPEN" &&
+      (d.olderStatementId === target.id || d.newerStatementId === target.id)
+    )
+      return true;
+  return false;
+}
+
+/**
+ * A note without its sentences that only ask for a disagreement to be left
+ * open ("Still leave it open for Kilima.", "Please leave that open."). The
+ * remaining sentences are kept in their own words.
+ */
+const LEAVE_OPEN_REQUEST =
+  /^(?:(?:please|just|still|so|ok(?:ay)?|then|and|but|for now)[,\s]+)*(?:(?:can|could|would|will) you\s+|i'?d like you to\s+|let'?s\s+)?(?:please\s+)?(?:leave|keep)\s+(?:it|that|this|them|those|both|th(?:e|at|ose) [\w\s'-]{1,48}?)\s+(?:open|unresolved|undecided|unsettled|as (?:it is|they are))\b[^.!?]*[.!?]*$/iu;
+
+export function withoutLeaveOpenRequests(text: string): string {
+  const sentences = text.match(/[^.!?]+[.!?]*/gu) ?? [text];
+  return sentences
+    .filter((sentence) => !LEAVE_OPEN_REQUEST.test(sentence.trim()))
+    .join("")
+    .trim();
+}
+
 export type PlanTurn = {
   /** `application_turns.id`; null only where there is no transcript. */
   readonly id: string | null;
@@ -603,8 +672,21 @@ export type PlanInput = {
   readonly unread: readonly PlanTurn[];
   readonly statements: readonly (GateQStatementOp | null)[];
   readonly actions: readonly (GateQDisagreementAction | null)[];
-  /** True when the turn was not about the application: nothing is read. */
+  /**
+   * True when the reading labelled the turn not about the application
+   * (small talk, a question for Q, ...): its value statements are dropped.
+   * The label never drops the founder's own action on a disagreement on
+   * record (a leave-open or a settling): see `planReading`.
+   */
   readonly discard: boolean;
+  /**
+   * True when the turn was read as an attempt to steer Q (SABOTAGE). Such a
+   * turn may still leave a disagreement open (it hides nothing), but it
+   * never settles one.
+   */
+  readonly sabotage?: boolean | undefined;
+  /** The dimension Q's last line asked about, if any. */
+  readonly lastAsked?: ApplicationDimension | null | undefined;
   /** Whether they agreed to a figure Q read back. */
   readonly agreedTo: (amount: string) => boolean;
   /** Figures Q read back that they agreed to, recorded as said. */
@@ -754,8 +836,33 @@ export function planReading(input: PlanInput): PlanOutcome {
     return made;
   };
 
-  const ops = input.discard ? [] : input.statements;
-  if (input.discard) rejected += input.statements.length;
+  // One thing said once is one statement (live 78f8d72d5 t46: "We reach
+  // data teams through the CFOs at our 4 pilot companies…" was stored as a
+  // COUNT and again as prose in the same words, and shown twice). Within a
+  // reading, an exact repeat keeps its first copy, and prose in the same
+  // words as a figure on the same dimension is that figure's words.
+  const sameWords = (a: string, b: string) =>
+    a.trim().toLowerCase().replace(/\s+/gu, " ") ===
+    b.trim().toLowerCase().replace(/\s+/gu, " ");
+  const ops = input.statements.filter((op, index, all) => {
+    if (op === null) return true;
+    return !all.some(
+      (other, j) =>
+        other !== null &&
+        j !== index &&
+        other.turn === op.turn &&
+        other.dimension === op.dimension &&
+        sameWords(other.words, op.words) &&
+        ((j < index &&
+          other.op === op.op &&
+          other.target === op.target &&
+          (other.quantity ?? null) === (op.quantity ?? null) &&
+          JSON.stringify(other.value) === JSON.stringify(op.value)) ||
+          (op.value.kind === "TEXT" &&
+            other.value.kind !== "TEXT" &&
+            other.value.kind !== "UNKNOWN")),
+    );
+  });
 
   /** The visible held values on a dimension, plus this turn's new ones. */
   const heldOn = (dimension: ApplicationDimension) => [
@@ -794,9 +901,34 @@ export function planReading(input: PlanInput): PlanOutcome {
           ? "APPLICANT_PROVIDED"
           : op.provenance;
     const held = heldOn(dimension);
+    // A CORRECTS hides its target, so on a figure it stands only when the
+    // founder said the earlier one was wrong or replaced, or settled the
+    // pair Q asked about. A different figure for the same metric said
+    // without that is a second answer, read as NEW: the same answer again
+    // writes nothing, and a different one falls to the relation rule below
+    // and stays visible as a disagreement (live 78f8d72d5 t16: "Back to
+    // users: about 1,500 weekly active users" silently corrected 600).
+    const related =
+      target !== null &&
+      op.op === "CORRECTS" &&
+      !correctionStands(
+        byId.get(target),
+        {
+          dimension,
+          quantity,
+          value,
+          asOf: op.asOf,
+          sourceTurnId: turn.id as ApplicationTurnId | null,
+        },
+        turn.text,
+        input.handles.disagreements.values(),
+      )
+        ? null
+        : target;
+    const asNew = op.op === "NEW" || (op.op === "CORRECTS" && related === null);
     // The same answer again is already on record: nothing new to write.
     if (
-      op.op === "NEW" &&
+      asNew &&
       held.some(
         (s) =>
           canonical(s.value) === canonical(value) &&
@@ -855,8 +987,8 @@ export function planReading(input: PlanInput): PlanOutcome {
     touched.add(dimension);
     perTurn.get(turnKey(turn))?.recorded.push(statement.id);
 
-    if (target !== null && (op.op === "CORRECTS" || op.op === "DISAGREES")) {
-      const targetStatement = byId.get(target);
+    if (related !== null && (op.op === "CORRECTS" || op.op === "DISAGREES")) {
+      const targetStatement = byId.get(related);
       // The reader's DISAGREES S<n> is a relation like any other: it
       // stands only under the relation rule (the same metric, period and
       // a held value on both sides). Failing it, the statement is kept as
@@ -866,7 +998,7 @@ export function planReading(input: PlanInput): PlanOutcome {
         (targetStatement !== undefined &&
           relatable(targetStatement, statement, { explicit: true }))
       ) {
-        link(op.op, statement.id, target, "MODEL_READING", turn.id);
+        link(op.op, statement.id, related, "MODEL_READING", turn.id);
         if (targetStatement !== undefined)
           touched.add(targetStatement.dimension);
         return;
@@ -946,8 +1078,47 @@ export function planReading(input: PlanInput): PlanOutcome {
     });
   };
 
-  for (const op of ops) {
-    if (op === null) {
+  // A request to leave a disagreement open is never a founder's note (live
+  // 78f8d72d5: "Still leave it open for Kilima." in the Founder's note).
+  // While a disagreement stands, a note's sentence that only asks for that
+  // is dropped from the note; the action itself is the reading's (above
+  // and below), never inferred from these words.
+  const anyStanding = [...input.handles.disagreements.values()].some(
+    (d) => d.active && d.state !== "RESOLVED",
+  );
+  const asSaid = (op: GateQStatementOp): GateQStatementOp | null => {
+    if (
+      op.dimension === "application.note" &&
+      op.value.kind === "TEXT" &&
+      anyStanding
+    ) {
+      const words = withoutLeaveOpenRequests(op.words);
+      const text = withoutLeaveOpenRequests(op.value.text);
+      if (words.length === 0 || text.length === 0) return null;
+      return words === op.words && text === op.value.text
+        ? op
+        : { ...op, words, value: { kind: "TEXT", text } };
+    }
+    // "Not known" is about something, never about a note: said in answer
+    // to Q's question on a dimension that holds nothing yet, it is that
+    // dimension's stated unknown (live 78f8d72d5 t22: "We haven't sized
+    // the market bottom-up yet" stored as a note, so Market showed as
+    // Missing, not as a stated unknown).
+    const asked = input.lastAsked ?? null;
+    if (
+      op.dimension === "application.note" &&
+      op.value.kind === "UNKNOWN" &&
+      op.turn === null &&
+      asked !== null &&
+      asked !== "application.note" &&
+      dimensionView(baseView, asked).status === "UNANSWERED"
+    )
+      return { ...op, dimension: asked, quantity: null };
+    return op;
+  };
+
+  for (const read of ops) {
+    if (read === null) {
       rejected += 1;
       continue;
     }
@@ -955,11 +1126,11 @@ export function planReading(input: PlanInput): PlanOutcome {
     // statement, whichever op the reading chose (NEW or DISAGREES S<n>;
     // live 2026-11-14 turns 18 and 38).
     const standing =
-      op.turn === null &&
-      op.op !== "CORRECTS" &&
-      op.value.kind === "UNKNOWN" &&
-      op.value.declined !== true
-        ? standingOn(op)
+      read.turn === null &&
+      read.op !== "CORRECTS" &&
+      read.value.kind === "UNKNOWN" &&
+      read.value.declined !== true
+        ? standingOn(read)
         : [];
     if (standing.length > 0) {
       for (const [handle] of standing)
@@ -970,6 +1141,17 @@ export function planReading(input: PlanInput): PlanOutcome {
         });
       continue;
     }
+    // The intent label drops value statements only. The founder's own
+    // action on a disagreement on record (just above, and the reading's
+    // disagreementActions below) never depends on it (live 78f8d72d5:
+    // three bare "leave it open" turns labelled QUESTION_FOR_Q recorded
+    // nothing).
+    if (input.discard) {
+      rejected += 1;
+      continue;
+    }
+    const op = asSaid(read);
+    if (op === null) continue;
     // Which turn said it. A T<n> the server did not issue is never guessed.
     let turn: PlanTurn = input.current;
     if (op.turn !== null) {
@@ -1154,8 +1336,16 @@ export function planReading(input: PlanInput): PlanOutcome {
           other.action === action.action,
       ) === index,
   );
-  for (const action of input.discard ? [] : actions) {
+  // Whatever the turn's intent label: a leave-open or a settling is the
+  // founder's own act on a D<n> the server issued, checked by handle below.
+  // Only a turn read as steering Q never settles one (it may leave one open,
+  // which hides nothing).
+  for (const action of actions) {
     if (action === null) {
+      rejected += 1;
+      continue;
+    }
+    if (action.action === "RESOLVE" && input.sabotage === true) {
       rejected += 1;
       continue;
     }
@@ -1347,14 +1537,72 @@ const CLAIMS_RECORDED =
 const sentencesOf = (text: string): readonly string[] =>
   text.trim().match(/[^.!?]+[.!?]*/gu) ?? [text];
 
+/** A sentence's clauses, each with the separator that ends it. */
+const clausesOf = (sentence: string): readonly string[] =>
+  sentence.split(/(?<=[;:–—])|(?<=,)(?!\d)/u);
+
+/**
+ * How a clause of a question opens: an auxiliary or question word ("should
+ * I leave it open?"), an offer with no subject ("leave it open for
+ * Kilima?") or an alternative ("or settle it now?").
+ */
+const ASKS =
+  /^(?:or|should|shall|do|does|did|can|could|would|will|is|are|was|were|am|may|might|must|have|has|had|what|which|how|why|where|when|who|whom|whose|want|leave|keep|mark|flag|any|anything)\b/u;
+const LEADING_FILLER =
+  /^(?:(?:and|but|so|then|well|okay|ok|right|now|sure|great)\b[\s,]*)+/u;
+
+/**
+ * A sentence split into what it asserts and what it asks. A sentence that
+ * does not end in "?" asserts all of it. One that does still asserts every
+ * clause that is not itself a question (live 78f8d72d5 t39: "I'll leave the
+ * weekly-active figures open for Kilima; what would you like to know…?" was
+ * skipped whole because of its "?", and no left-open event existed).
+ */
+function partsOf(sentence: string): {
+  readonly asserted: readonly string[];
+  readonly asked: readonly string[];
+} {
+  const clauses = clausesOf(sentence);
+  if (!sentence.trim().endsWith("?")) return { asserted: clauses, asked: [] };
+  const asserted: string[] = [];
+  const asked: string[] = [];
+  for (const clause of clauses) {
+    const lead = clause
+      .trim()
+      .toLowerCase()
+      .replace(/^[^\p{L}']+/u, "")
+      .replace(LEADING_FILLER, "");
+    // A bare filler clause ("So,") asks and claims nothing.
+    if (lead.length === 0 || ASKS.test(lead)) asked.push(clause);
+    else asserted.push(clause);
+  }
+  return { asserted, asked };
+}
+
+/**
+ * A denial is not a claim: "I haven't marked those two answers as left open
+ * yet" (the deterministic line itself) says nothing was left open.
+ */
+const DENIED =
+  /\b(?:haven't|have not|hasn't|has not|won't|will not|didn't|did not|not)\s+(?:yet\s+)?(?:been\s+)?(?:leav|left|keep|mark|flag|not|record|sav|log|captur|add)\w*[^.!?,;]*/giu;
+
+const asserts = (sentence: string, claim: RegExp): boolean =>
+  claim.test(partsOf(sentence).asserted.join(" ").replace(DENIED, " "));
+
+/** The sentence without what it asserts, if it asks something. */
+function askedPartOf(sentence: string): string {
+  const asked = partsOf(sentence).asked.join("").trim();
+  const tidy = asked.replace(/^[,;:–—\s]+/u, "");
+  return `${tidy.charAt(0).toUpperCase()}${tidy.slice(1)}`;
+}
+
 /**
  * Whether a reply claims something was recorded. A question ("have you
- * logged any sales?") claims nothing, so only statements count.
+ * logged any sales?") claims nothing; a claim joined to one still does.
  */
 export function claimsRecording(text: string): boolean {
-  return sentencesOf(text).some(
-    (sentence) =>
-      !sentence.trim().endsWith("?") && CLAIMS_RECORDED.test(sentence),
+  return sentencesOf(text).some((sentence) =>
+    asserts(sentence, CLAIMS_RECORDED),
   );
 }
 
@@ -1365,11 +1613,14 @@ export const NOT_RECORDED_LINE =
 const CLAIMS_LEFT_OPEN =
   /\b(?:leav(?:e|ing)|left|keep(?:ing)?|mark(?:ing|ed)?|flag(?:ging|ged)?)\b[^.!?]*\b(?:unresolved|open|undecided|unsettled|as (?:it|they) (?:is|are|stand))\b/iu;
 
-/** Whether a reply claims a disagreement was left open (a statement, not a question). */
+/**
+ * Whether a reply claims a disagreement was left open. Every sentence is
+ * checked whatever its punctuation; only a clause that is itself a
+ * question ("shall I leave it open?") claims nothing.
+ */
 export function claimsLeftOpen(text: string): boolean {
-  return sentencesOf(text).some(
-    (sentence) =>
-      !sentence.trim().endsWith("?") && CLAIMS_LEFT_OPEN.test(sentence),
+  return sentencesOf(text).some((sentence) =>
+    asserts(sentence, CLAIMS_LEFT_OPEN),
   );
 }
 
@@ -1377,12 +1628,23 @@ export function claimsLeftOpen(text: string): boolean {
 export const NOT_LEFT_OPEN_LINE =
   "I haven't marked those two answers as left open yet.";
 
+/** The reply without the claim: sentences dropped, questions kept. */
+function withoutClaim(text: string, claim: RegExp): string {
+  return sentencesOf(text)
+    .map((sentence) =>
+      asserts(sentence, claim) ? askedPartOf(sentence) : sentence.trim(),
+    )
+    .filter((sentence) => sentence.length > 0)
+    .join(" ")
+    .trim();
+}
+
 /**
- * The reply, held to the turn's reading: a sentence claiming something was
- * recorded stands only when the reading recorded a statement, and one
- * claiming a disagreement is left open only when a LEFT_OPEN stands from
- * this turn (invariant 7). Otherwise it is removed and the deterministic
- * line says what is true.
+ * The reply, held to the turn's reading: a claim that something was
+ * recorded stands only when the reading recorded a statement, and one that
+ * a disagreement is left open only when a LEFT_OPEN stands (invariant 7).
+ * Otherwise the claim is removed, whatever sentence it shares, and the
+ * deterministic line says what is true.
  */
 export function replyHeldToReading(
   reply: string,
@@ -1394,18 +1656,13 @@ export function replyHeldToReading(
     leftOpenCount !== undefined &&
     leftOpenCount === 0 &&
     claimsLeftOpen(text)
-  ) {
-    const kept = sentencesOf(text).filter(
-      (sentence) =>
-        sentence.trim().endsWith("?") || !CLAIMS_LEFT_OPEN.test(sentence),
-    );
-    text = `${NOT_LEFT_OPEN_LINE} ${kept.join("").trim()}`.trim();
-  }
+  )
+    text =
+      `${NOT_LEFT_OPEN_LINE} ${withoutClaim(text, CLAIMS_LEFT_OPEN)}`.trim();
   if (recordedCount > 0 || !claimsRecording(text)) return text.slice(0, 4000);
-  const kept = sentencesOf(text).filter(
-    (sentence) => !claimsRecording(sentence),
-  );
-  return `${NOT_RECORDED_LINE} ${kept.join("").trim()}`.trim().slice(0, 4000);
+  return `${NOT_RECORDED_LINE} ${withoutClaim(text, CLAIMS_RECORDED)}`
+    .trim()
+    .slice(0, 4000);
 }
 
 /** The intake contract's quantity list, for the identity test with q-core. */
