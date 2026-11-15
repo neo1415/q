@@ -41,6 +41,52 @@ export const GATEQ_DISAGREEMENT_STATE_WORDS: Readonly<
  */
 export const GATEQ_UNRESOLVED_WORDS = "Needs your judgement: answers disagree";
 
+/**
+ * A metric's own label, for a stated unknown about it (live 84ac9afa7: "We
+ * don't know our CAC yet" read "Business model: Not known"). An unknown
+ * names nothing else, so without its metric the reader cannot tell what is
+ * not known; a known value already reads in the founder's words.
+ */
+export const GATEQ_METRIC_LABELS: Readonly<Record<string, string>> = {
+  revenue: "Revenue",
+  mrr: "MRR",
+  arr: "ARR",
+  gmv: "GMV",
+  paying_customers: "Paying customers",
+  customers: "Customers",
+  users: "Users",
+  daily_active_users: "Daily active users",
+  weekly_active_users: "Weekly active users",
+  monthly_active_users: "Monthly active users",
+  wallets: "Wallets",
+  transactions: "Transactions",
+  pilots: "Pilots",
+  employees: "Employees",
+  growth_rate_monthly: "Monthly growth",
+  churn_rate_monthly: "Monthly churn",
+  retention_rate: "Retention",
+  gross_margin: "Gross margin",
+  burn_monthly: "Monthly burn",
+  runway_months: "Runway",
+  raise_amount: "Raise size",
+  pre_money_valuation: "Pre-money valuation",
+  cac: "CAC",
+};
+
+/**
+ * The label a statement reads under: a stated unknown about a named metric
+ * reads under that metric ("CAC: Not known"); everything else under its
+ * dimension.
+ */
+export function gateqStatementLabel(
+  dimensionLabel: string,
+  statement: Pick<GateqStatementWords, "valueKind" | "quantity">,
+): string {
+  if (statement.valueKind !== "UNKNOWN" || statement.quantity === null)
+    return dimensionLabel;
+  return GATEQ_METRIC_LABELS[statement.quantity] ?? dimensionLabel;
+}
+
 export type GateqStatementLineKind = "STATEMENT" | "DISAGREEMENT" | "HISTORY";
 
 export type GateqStatementLine = {
@@ -104,8 +150,10 @@ export function gateqStatementsInWords(
     };
     for (const statement of dimension.statements) {
       const state = states.get(statement.statementId) ?? null;
+      const label = gateqStatementLabel(dimension.label, statement);
       lines.push({
         ...base,
+        label,
         kind: "STATEMENT",
         statementIds: [statement.statementId],
         sourceKinds: [statement.sourceKind],
@@ -113,7 +161,7 @@ export function gateqStatementsInWords(
         disagreementState: state,
         backfilled: statement.backfilled,
         summaries: [statement.summary],
-        text: `${dimension.label}: ${statement.summary} (${sourceWords(statement)}${state === null ? "" : `; answers disagree, ${GATEQ_DISAGREEMENT_STATE_WORDS[state].toLowerCase()}`})`,
+        text: `${label}: ${statement.summary} (${sourceWords(statement)}${state === null ? "" : `; answers disagree, ${GATEQ_DISAGREEMENT_STATE_WORDS[state].toLowerCase()}`})`,
       });
     }
     for (const d of dimension.disagreements) {
@@ -141,8 +189,10 @@ export function gateqStatementsInWords(
       });
     }
     for (const old of dimension.superseded) {
+      const label = gateqStatementLabel(dimension.label, old);
       lines.push({
         ...base,
+        label,
         kind: "HISTORY",
         statementIds: [old.statementId],
         sourceKinds: [old.sourceKind],
@@ -150,7 +200,7 @@ export function gateqStatementsInWords(
         disagreementState: null,
         backfilled: old.backfilled,
         summaries: [old.summary],
-        text: `${dimension.label}, earlier: ${old.summary} (${sourceWords(old)}; ${old.via === "CORRECTION" ? "corrected later" : "settled later"})`,
+        text: `${label}, earlier: ${old.summary} (${sourceWords(old)}; ${old.via === "CORRECTION" ? "corrected later" : "settled later"})`,
       });
     }
   }

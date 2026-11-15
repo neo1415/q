@@ -1130,6 +1130,8 @@ export {
   GATEQ_SOURCE_KIND_WORDS,
   GATEQ_DISAGREEMENT_STATE_WORDS,
   GATEQ_UNRESOLVED_WORDS,
+  GATEQ_METRIC_LABELS,
+  gateqStatementLabel,
   gateqStatementsInWords,
   gateqStatementIdentities,
   gateqStandingDisagreements,

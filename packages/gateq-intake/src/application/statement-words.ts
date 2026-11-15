@@ -1,6 +1,7 @@
 import {
   GATEQ_STATEMENT_VIEW_VERSION,
   gateqStandingDisagreements,
+  gateqStatementLabel,
   gateqStatementsInWords,
   GateqStatementViewV1Schema,
   type GateqCoverageV1,
@@ -371,10 +372,35 @@ export function coverageFromView(input: {
           });
         continue;
       }
+      // A stated unknown about a named metric reads under that metric
+      // ("CAC", not "Business model"; live 84ac9afa7), also beside a held
+      // answer on the same dimension, where it would otherwise not show.
+      const metricLabels = [
+        ...new Set(
+          view.statements
+            .filter((s) => s.valueKind === "UNKNOWN" && !s.declined)
+            .map((s) => gateqStatementLabel(base.label, s))
+            .filter((label) => label !== base.label),
+        ),
+      ];
+      const metricLabel =
+        metricLabels.length === 1 ? metricLabels[0] : undefined;
       if (view.status === "UNKNOWN") {
-        unknown.push(base);
+        const ownUnknowns = view.statements.every(
+          (s) => s.valueKind === "UNKNOWN" && s.quantity !== null,
+        );
+        unknown.push(
+          metricLabel !== undefined && ownUnknowns
+            ? { ...base, label: metricLabel }
+            : base,
+        );
         continue;
       }
+      if (
+        metricLabel !== undefined &&
+        (view.status === "SETTLED" || view.status === "ZERO")
+      )
+        unknown.push({ ...base, label: metricLabel });
       if (view.status === "DECLINED") {
         declined.push(base);
         continue;

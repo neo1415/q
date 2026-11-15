@@ -24,6 +24,7 @@ import {
   type SupersededItem,
   type ViewSourceKind,
 } from "../contracts/statements.js";
+import { stageCodeIn } from "./normalise-fact.js";
 
 /**
  * The deterministic view over an application's statements (design
@@ -238,6 +239,50 @@ export function metricNamedIn(words: string): string | null {
   return named.length === 1 ? (named[0]?.[0] ?? null) : null;
 }
 
+/** Every funding stage named in a sentence, in words ("Series A", "seed"). */
+const STAGE_NAMES =
+  /\b(?:pre[\s-]?seed|seed|series\s+[a-z]\b|growth[\s-]stage)/giu;
+
+/**
+ * An answer on a closed code list as its canonical code, so "the bank
+ * calls us Series A" (TEXT) and series_a (CODE) are one answer, never a
+ * disagreement (live 84ac9afa7 t38). A stage kept in their words names
+ * a code only when it names exactly one stage; a sentence naming two
+ * ("seed by the angel, Series A by the bank") stays prose. Every other
+ * value is compared as itself. Comparison only: nothing stored changes.
+ */
+export function answerKey(
+  dimension: ApplicationDimension,
+  value: StatementValue,
+): string {
+  if (value.kind === "CODE") return `CODE:${value.code}`;
+  if (value.kind === "TEXT" && dimension === "company.stage") {
+    const codes = new Set(
+      [...value.text.matchAll(STAGE_NAMES)]
+        .map((match) => stageCodeIn(match[0]))
+        .filter((code): code is string => code !== null),
+    );
+    const [only] = codes;
+    if (codes.size === 1 && only !== undefined) return `CODE:${only}`;
+  }
+  if (value.kind === "TEXT")
+    return `TEXT:${value.text.trim().toLowerCase().replace(/\s+/gu, " ")}`;
+  return JSON.stringify(value);
+}
+
+/**
+ * Two answers on a code-list dimension that are the same code once
+ * normalised: never a disagreement, whoever linked them.
+ */
+export function sameCodedAnswer(
+  a: Pick<ApplicationStatement, "dimension" | "value">,
+  b: Pick<ApplicationStatement, "dimension" | "value">,
+): boolean {
+  if (a.dimension !== b.dimension) return false;
+  if (a.value.kind !== "CODE" && b.value.kind !== "CODE") return false;
+  return answerKey(a.dimension, a.value) === answerKey(b.dimension, b.value);
+}
+
 /**
  * Whether two values are numbers that disagree: the same unit (any unit
  * against a zero) and a different exact amount. Prose, unknowns and an
@@ -443,10 +488,14 @@ export function projectView(
     // no quantity; code's own detection may not.
     const from = byId.get(link.fromStatementId);
     const to = byId.get(link.toStatementId);
+    // Two answers that are one code once normalised ("the bank calls us
+    // Series A" and series_a) never disagree: a link written before this
+    // reading (live 84ac9afa7 `19a1c0bc`) decides nothing.
     const bothHeld =
       from !== undefined &&
       to !== undefined &&
-      relatable(from, to, { explicit: link.origin !== "CODE_DETECTED" });
+      relatable(from, to, { explicit: link.origin !== "CODE_DETECTED" }) &&
+      !sameCodedAnswer(from, to);
     return {
       key: link.id,
       linkId: link.id,

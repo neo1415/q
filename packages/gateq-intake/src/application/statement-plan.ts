@@ -47,6 +47,7 @@ import { regionIn } from "./cities.js";
 import type { NotRecorded } from "./not-recorded.js";
 import { amountStatedIn, scaledAmountStatedIn } from "./stated-amount.js";
 import {
+  answerKey,
   dimensionView,
   legacyFactsFrom,
   metricNamedIn,
@@ -100,8 +101,12 @@ import {
  * 8: prompt v13; money only with a currency or money unit said, a span of
  * time is months (runway), never money; a metric named by name is that
  * metric (live 64637e8c9).
+ * 9: prompt v14; a customer-unit metric holds the founder's own noun
+ * ("weekly active shops"), a figure the reader read as nothing is kept as
+ * their note and never acknowledged as an update, and code-list answers
+ * are compared as codes (live 84ac9afa7).
  */
-export const STATEMENT_READING_VERSION = 8;
+export const STATEMENT_READING_VERSION = 9;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
@@ -148,6 +153,17 @@ const tokensOf = (text: string): ReadonlySet<string> =>
   new Set(plainText(text).match(/[\p{L}\p{N}']+/gu) ?? []);
 
 /**
+ * The figures a text holds, as digit strings ("1,300" and "1300" are one
+ * figure). Used only to flag a figure no reading took up, never to read
+ * what a figure means.
+ */
+export function figuresIn(text: string): readonly string[] {
+  return (text.match(/\d(?:[\d,]*\d)?(?:\.\d+)?/gu) ?? []).map((figure) =>
+    figure.replace(/,/gu, ""),
+  );
+}
+
+/**
  * The founder's own words for a statement: the reader's words when they
  * are a span of what was said (case, quotes and spacing aside), otherwise
  * the sentence or sentences of what was said that share most of the
@@ -185,14 +201,72 @@ const unitWords = (unit: string): readonly string[] =>
     .filter((word) => word.length > 0)
     .map((word) => (word.length > 3 ? word.replace(/s$/u, "") : word));
 
+/** Whether `short` ends `long`, word for word. */
+const endsWith = (long: readonly string[], short: readonly string[]) =>
+  short.length <= long.length &&
+  short.every((word, i) => long[long.length - short.length + i] === word);
+
+/**
+ * The count metrics whose unit is the company's customer, in whatever noun
+ * the founder uses for one ("shops", "clinics", "merchants"), and the
+ * words that make each its own metric. "weekly active" is what makes a
+ * count weekly active users; who is active is the customer unit (live
+ * 84ac9afa7: "500 weekly active shops" and "about 1,300 weekly active
+ * shops" were both kept with no metric, so they were never compared).
+ */
+const CUSTOMER_UNIT_METRICS: Readonly<Record<string, readonly string[]>> = {
+  customers: [],
+  users: [],
+  paying_customers: ["paying"],
+  daily_active_users: ["daily", "active"],
+  weekly_active_users: ["weekly", "active"],
+  monthly_active_users: ["monthly", "active"],
+};
+
+/**
+ * The company's declared customer unit: the nouns of what it said its
+ * customers are (company.customers, held prose), singular. Empty when not
+ * known.
+ */
+export function customerNounsOf(
+  statements: Iterable<Pick<ApplicationStatement, "dimension" | "value">>,
+): ReadonlySet<string> {
+  const nouns = new Set<string>();
+  for (const s of statements)
+    if (s.dimension === "company.customers" && s.value.kind === "TEXT")
+      for (const word of unitWords(s.value.text)) nouns.add(word);
+  return nouns;
+}
+
+/** Whether a unit opens with a metric's own words and names who after them. */
+const qualifiedBy = (
+  said: readonly string[],
+  qualifier: readonly string[],
+): boolean =>
+  qualifier.length > 0 &&
+  said.length > qualifier.length &&
+  qualifier.every((word, i) => said[i] === word);
+
 /**
  * Whether the reader's stated unit is the metric's declared unit (q-core
  * GATEQ_STATEMENT_QUANTITY_UNITS). A shorter or longer name of the same
  * unit fits ("user" for weekly active users, "paying customer" for
- * customers): one ends the other, word for word. Nothing else is compared;
- * a metric that declares no unit takes any.
+ * customers): one ends the other, word for word. A metric that declares
+ * no unit takes any.
+ *
+ * Metric family: a customer-unit metric (CUSTOMER_UNIT_METRICS) also
+ * holds the founder's own noun for a customer. With the metric's own words
+ * said ("weekly active shop", "paying clinic") any noun fits: the words
+ * are the metric, the noun is who. A bare noun fits only when it is the
+ * company's declared customer unit (`customerNouns`), so "4 clinics" are
+ * customers of a company that serves clinics, and "2,300 patient records"
+ * never are (live 30c99ccc5).
  */
-export function unitFits(unit: string, quantity: string): boolean {
+export function unitFits(
+  unit: string,
+  quantity: string,
+  customerNouns: ReadonlySet<string> = new Set(),
+): boolean {
   const declared = (
     GATEQ_STATEMENT_QUANTITY_UNITS as Readonly<Record<string, string>>
   )[quantity];
@@ -200,10 +274,28 @@ export function unitFits(unit: string, quantity: string): boolean {
   const said = unitWords(unit);
   const own = unitWords(declared);
   if (said.length === 0) return true;
-  const ends = (long: readonly string[], short: readonly string[]) =>
-    short.length <= long.length &&
-    short.every((word, i) => long[long.length - short.length + i] === word);
-  return ends(own, said) || ends(said, own);
+  if (endsWith(own, said) || endsWith(said, own)) return true;
+  const qualifier = CUSTOMER_UNIT_METRICS[quantity];
+  if (qualifier === undefined) return false;
+  if (qualifiedBy(said, qualifier)) return true;
+  const head = said.at(-1);
+  return (
+    qualifier.length === 0 && head !== undefined && customerNouns.has(head)
+  );
+}
+
+/**
+ * The customer-unit metric a count's own unit names when the reader gave
+ * none: only a unit that carries a metric's own words ("weekly active
+ * shop" is weekly active users), never a bare noun ("shop" counts shops,
+ * not a metric). Null when none, or more than one, fits.
+ */
+export function metricOfUnit(unit: string): string | null {
+  const said = unitWords(unit);
+  const named = Object.entries(CUSTOMER_UNIT_METRICS).filter(([, qualifier]) =>
+    qualifiedBy(said, qualifier),
+  );
+  return named.length === 1 ? (named[0]?.[0] ?? null) : null;
 }
 
 function carriedValues(
@@ -867,6 +959,12 @@ export type PlanOutcome = {
   /** New statements recorded from what they just said and the unread turns. */
   readonly recordedCount: number;
   /**
+   * Sentences of theirs holding a figure the reader read as nothing, kept
+   * as founder's notes (counted in `recordedCount`) but filed against no
+   * answer. Q may not say an answer was updated by them.
+   */
+  readonly unfiledFigures: readonly string[];
+  /**
    * Disagreements a "left open" sentence may truthfully be about after this
    * turn: an event written now, one already left open that it named, or,
    * when no OPEN disagreement stands, every standing LEFT_OPEN one. Q may
@@ -1049,14 +1147,21 @@ export function planReading(input: PlanInput): PlanOutcome {
     // reader's own `unit` (live 30c99ccc5: "2,300 patient records" read as
     // customers was paired with "4 clinics"): otherwise it is kept with no
     // metric, and a number with no metric never relates.
-    const named = op.quantity ?? QUANTITY_OF[dimension] ?? null;
+    // A metric family holds the founder's own customer noun (live
+    // 84ac9afa7: "weekly active shops"): a count whose unit carries a
+    // metric's own words names that metric even when the reader gave none.
+    const unit = typeof op.unit === "string" ? op.unit : null;
+    const named =
+      op.quantity ??
+      QUANTITY_OF[dimension] ??
+      (value.kind === "COUNT" && unit !== null ? metricOfUnit(unit) : null);
     const quantity =
       NUMERIC_KINDS.has(value.kind) &&
       !(
         value.kind === "COUNT" &&
         named !== null &&
-        typeof op.unit === "string" &&
-        !unitFits(op.unit, named)
+        unit !== null &&
+        !unitFits(unit, named, customerNounsOf(heldOn("company.customers")))
       )
         ? (quantityFitting(value.kind, named) as StatementQuantity | null)
         : null;
@@ -1203,9 +1308,12 @@ export function planReading(input: PlanInput): PlanOutcome {
       const latest = held
         .filter((s) => s.id !== statement.id && relatable(s, statement))
         .at(-1);
+      // Compared as canonical codes: "the bank calls us Series A" is the
+      // series_a on record, never a second stage (live 84ac9afa7 t38).
       if (
         latest !== undefined &&
-        canonical(latest.value) !== canonical(statement.value) &&
+        answerKey(dimension, latest.value) !==
+          answerKey(dimension, statement.value) &&
         !(
           statement.quantity !== null &&
           valuesConflict(latest.value, statement.value)
@@ -1563,6 +1671,63 @@ export function planReading(input: PlanInput): PlanOutcome {
     }
   }
 
+  // A figure they said is never silently dropped (live 84ac9afa7 t50:
+  // "Actually, CAC is about $12 per shop." got an empty reading, and Q
+  // answered "That's a useful update"). When the reader proposed nothing
+  // at all for what they just said, no action and no read-back, and the
+  // turn holds a figure that no statement on record already holds, each
+  // sentence holding one is kept in their own words as a founder's note:
+  // an unfiled figure. The digit check only flags; it never decides what
+  // the figure is about, so it is never filed against a metric here.
+  const unfiledFigures: string[] = [];
+  const currentSlot = perTurn.get(turnKey(input.current));
+  if (
+    !input.discard &&
+    input.currentRead !== true &&
+    input.current.id !== null &&
+    currentSlot !== undefined &&
+    currentSlot.proposed === 0 &&
+    input.statements.every((op) => op === null) &&
+    input.actions.every((action) => action === null) &&
+    implicitActions.length === 0 &&
+    input.agreedReadBacks.length === 0 &&
+    readBacks.length === 0
+  ) {
+    const onRecord = new Set(
+      existing.flatMap((statement) => figuresIn(statement.words)),
+    );
+    for (const sentence of input.current.text.match(/[^.!?]+[.!?]*/gu) ?? []) {
+      const figures = figuresIn(sentence);
+      if (
+        figures.length === 0 ||
+        figures.every((figure) => onRecord.has(figure))
+      )
+        continue;
+      const words = sentence.trim().slice(0, 2000);
+      if (words.length === 0) continue;
+      const before = newStatements.length;
+      add(
+        {
+          op: "NEW",
+          target: null,
+          turn: null,
+          dimension: "application.note",
+          quantity: null,
+          value: { kind: "TEXT", text: words },
+          asOf: null,
+          words,
+          provenance: "APPLICANT_PROVIDED",
+        },
+        input.current,
+        { kind: "TEXT", text: words },
+        "application.note",
+        words,
+        null,
+      );
+      if (newStatements.length > before) unfiledFigures.push(words);
+    }
+  }
+
   // What they said about a disagreement on record.
   const corrected = new Set(
     links.filter((l) => l.kind === "CORRECTS").map((l) => l.toStatementId),
@@ -1765,6 +1930,7 @@ export function planReading(input: PlanInput): PlanOutcome {
     readBacks,
     narrowTo,
     recordedCount: newStatements.length,
+    unfiledFigures,
     leftOpenCount: leftOpen,
     incomplete: projected.incomplete,
   };
@@ -1849,6 +2015,29 @@ export function claimsRecording(text: string): boolean {
   );
 }
 
+/**
+ * An acknowledgement that an answer changed ("That's a useful update",
+ * "I've updated the CAC"): true only when the turn filed a statement
+ * against an answer (live 84ac9afa7 t51 acknowledged a CAC figure that
+ * was never stored).
+ */
+const CLAIMS_UPDATE =
+  /\b(?:(?:(?:a|an|the|that|this|useful|helpful|good|great|important|welcome|key)\s+)+update\b|updated\b|(?:i've|i have|i'll|i will|i'm|i am)\s+(?:now\s+)?(?:updat|replac|chang|swap|revis|amend)\w*)/iu;
+
+/** Whether a reply acknowledges that an answer was updated. */
+export function claimsUpdate(text: string): boolean {
+  return sentencesOf(text).some((sentence) => asserts(sentence, CLAIMS_UPDATE));
+}
+
+/** What Q says of a figure kept only as their note. */
+export function unfiledFigureLine(sentences: readonly string[]): string {
+  const quoted = sentences
+    .slice(0, 2)
+    .map((sentence) => `“${sentence.slice(0, 200)}”`)
+    .join(" and ");
+  return `I've kept ${quoted} in your words as a note, but I haven't filed that figure against any answer yet.`;
+}
+
 /** The deterministic line when nothing from the turn was recorded. */
 export const NOT_RECORDED_LINE =
   "I haven't put anything from that on your application yet.";
@@ -1918,8 +2107,18 @@ export function replyHeldToReading(
   reply: string,
   recordedCount: number,
   leftOpenCount?: number,
+  unfiledFigures: readonly string[] = [],
 ): string {
   let text = reply;
+  // An update is a statement filed against an answer; a figure kept only
+  // as their note updates nothing, and Q says what it did with it.
+  const filed = recordedCount - unfiledFigures.length;
+  if (filed <= 0 && claimsUpdate(text))
+    text = withoutClaim(text, CLAIMS_UPDATE);
+  if (unfiledFigures.length > 0)
+    text = `${unfiledFigureLine(unfiledFigures)} ${text}`.trim();
+  else if (recordedCount === 0 && text !== reply)
+    text = `${NOT_RECORDED_LINE} ${text}`.trim();
   if (
     leftOpenCount !== undefined &&
     leftOpenCount === 0 &&
@@ -1928,7 +2127,10 @@ export function replyHeldToReading(
     text =
       `${NOT_LEFT_OPEN_LINE} ${withoutClaim(text, CLAIMS_LEFT_OPEN)}`.trim();
   if (recordedCount > 0 || !claimsRecording(text)) return text.slice(0, 4000);
-  return `${NOT_RECORDED_LINE} ${withoutClaim(text, CLAIMS_RECORDED)}`
+  const rest = withoutClaim(text, CLAIMS_RECORDED);
+  return (
+    rest.includes(NOT_RECORDED_LINE) ? rest : `${NOT_RECORDED_LINE} ${rest}`
+  )
     .trim()
     .slice(0, 4000);
 }

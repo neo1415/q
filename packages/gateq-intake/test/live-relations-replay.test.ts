@@ -22,9 +22,19 @@ import type {
 import {
   claimsLeftOpen,
   claimsRecording,
+  claimsUpdate,
+  figuresIn,
+  metricOfUnit,
   NOT_LEFT_OPEN_LINE,
+  unfiledFigureLine,
+  unitFits,
 } from "../src/application/statement-plan.js";
 import {
+  coverageFromView,
+  statementViewDto,
+} from "../src/application/statement-words.js";
+import {
+  answerKey,
   NEVER_ASKED_AGAIN,
   dimensionView,
   projectView,
@@ -75,7 +85,8 @@ type Turn = {
     | "30c99ccc5"
     | "318577a8e"
     | "5757518c7"
-    | "64637e8c9";
+    | "64637e8c9"
+    | "84ac9afa7";
   readonly say: string;
   readonly script: Script;
   readonly resumeBefore?: true;
@@ -4152,5 +4163,702 @@ describe("a correction settles the dispute it ends (frozen 64637e8c9 rows)", () 
     );
     expect(model.items.map((i) => i.statementId)).not.toContain(unknown.id);
     expect(model.superseded[0]?.supersededBy).toBe(figure.id);
+  });
+});
+
+/**
+ * The ninth live run (re-certification 84ac9afa7, Storeelle,
+ * audits/2026-11-14-gateq-sustained-journey.md "Re-certification 15 Nov
+ * (84ac9afa7)"; shared cause in audits/2026-11-15-gateq-metric-capture.md),
+ * in the founder's words with the live model's readings:
+ *
+ *   - P2: "500 weekly active shops" and "about 1,300 weekly active shops"
+ *     were both kept with no metric (the reader's unit was the founder's
+ *     noun, not "weekly active user"), so they were never compared, while
+ *     Q's own reply named the difference;
+ *   - P2: "Actually, CAC is about $12 per shop." was read as nothing
+ *     (not_recorded empty) and Q replied "That's a useful update.";
+ *   - P3: "the bank calls us Series A" (prose) was code-detected as
+ *     disagreeing with the Series A on record (a code): the same answer;
+ *   - P3: the CAC unknown read "Business model: Not known".
+ */
+const NINTH_FORM = {
+  companyName: "Storeelle",
+  oneLiner:
+    "Neighbourhood-shop restocking in Mombasa: shops order by app or USSD and we deliver next morning",
+  stage: "seed",
+  sectors: ["Commerce"],
+  country: "KE",
+  raise: { amount: "350000", currency: "USD" },
+  contactName: "Zawadi Kipchoge",
+  contactEmail: "zawadi@example.com",
+};
+
+/** Every D<n> CONTRADICTIONS lists on a dimension (none: empty). */
+const disagreementsSeen = (prompt: PromptSeen, dimension: string) =>
+  prompt
+    .contradictions()
+    .filter((line) => line.includes(` ${dimension}:`))
+    .flatMap((line) => /^D\d+/u.exec(line)?.[0] ?? []);
+
+const NINTH: readonly Turn[] = [
+  {
+    id: "n-02",
+    run: "84ac9afa7",
+    say: "Storeelle restocks neighbourhood shops in Mombasa: shopkeepers order by app or USSD in the evening and we deliver next morning. Shops lose half a day a week queueing at wholesalers.",
+    script: () =>
+      reading({
+        reply:
+          "Half a day a week at the wholesaler is a real cost. What traction do you have so far?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "company.description",
+            value: {
+              kind: "TEXT",
+              text: "Storeelle restocks neighbourhood shops in Mombasa",
+            },
+            words:
+              "Storeelle restocks neighbourhood shops in Mombasa: shopkeepers order by app or USSD in the evening and we deliver next morning.",
+          }),
+          st({
+            dimension: "company.problem",
+            value: {
+              kind: "TEXT",
+              text: "Shops lose half a day a week queueing at wholesalers",
+            },
+            words: "Shops lose half a day a week queueing at wholesalers.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t4: an unusual unit. The reader named the metric with the
+    // founder's own noun as its unit.
+    id: "n-04",
+    run: "84ac9afa7",
+    say: "We delivered 16,000 crates last quarter and we have 500 weekly active shops.",
+    script: () =>
+      reading({
+        reply:
+          "Sixteen thousand crates and 500 weekly active shops. How does the round split across uses, roughly in amounts?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            unit: "crate",
+            value: { kind: "COUNT", count: "16000" },
+            words: "We delivered 16,000 crates last quarter",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active shop",
+            value: { kind: "COUNT", count: "500" },
+            words: "we have 500 weekly active shops",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-06",
+    run: "84ac9afa7",
+    say: "Mostly vans and field agents, and the ordering app. It buys about 18 months.",
+    script: () =>
+      reading({
+        reply:
+          "Vans, field agents and the app, for about eighteen months. Is anyone paying yet?",
+        asking: "claims.revenue",
+        statements: [
+          st({
+            dimension: "raise.use_of_funds",
+            value: {
+              kind: "TEXT",
+              text: "vans, field agents and the ordering app",
+            },
+            words: "Mostly vans and field agents, and the ordering app.",
+          }),
+          st({
+            dimension: "raise.use_of_funds",
+            quantity: "runway_months",
+            unit: "month",
+            value: { kind: "COUNT", count: "18" },
+            words: "It buys about 18 months.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-08",
+    run: "84ac9afa7",
+    say: "Nobody pays yet. Delivery is free while we grow.",
+    script: () =>
+      reading({
+        reply: "No revenue yet. Who is on the team?",
+        asking: "company.team",
+        statements: [
+          st({
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-12",
+    run: "84ac9afa7",
+    say: "On growth: we went from 1 kiosk-chain customer to 4 since March.",
+    script: () =>
+      reading({
+        reply:
+          "From one kiosk-chain customer to four since March. How large is the market, and how did you size it?",
+        asking: "company.market",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "customers",
+            unit: "customer",
+            value: { kind: "COUNT", count: "4" },
+            words: "we went from 1 kiosk-chain customer to 4 since March",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t14: in answer to the market question, as CAC.
+    id: "n-14",
+    run: "84ac9afa7",
+    say: "We don't know our CAC yet.",
+    script: () =>
+      reading({
+        reply: "Fair enough, CAC isn't sized yet.",
+        intent: "UNKNOWN_OR_SKIP",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            quantity: "cac",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We don't know our CAC yet.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-18",
+    run: "84ac9afa7",
+    say: "Sorry, I meant 400k, not 350k.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Understood: four hundred thousand, not three hundred and fifty thousand.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "raise.amount"),
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "400000", currency: "USD" },
+            words: "Sorry, I meant 400k, not 350k.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-22",
+    run: "84ac9afa7",
+    say: "Each shop pays a 3% fee on every order once delivery stops being free.",
+    script: () =>
+      reading({
+        reply: "A three percent fee on every order.",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "each shop pays a 3% fee on every order",
+            },
+            words:
+              "Each shop pays a 3% fee on every order once delivery stops being free.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t24: corrects the form's seed.
+    id: "n-24",
+    run: "84ac9afa7",
+    say: "To be precise about stage, we're really a Series A company now, not seed.",
+    script: (prompt) =>
+      reading({
+        reply: "Series A rather than seed, understood.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "series_a" },
+            words: "we're really a Series A company now, not seed",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t26 (undated): the reader gave no metric, only the founder's
+    // noun as the unit; Q's own reply named the difference.
+    id: "n-26",
+    run: "84ac9afa7",
+    say: "Back to users: about 1,300 weekly active shops.",
+    script: () =>
+      reading({
+        reply:
+          "That's a different figure from the 500 you gave earlier. Which one is right?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            unit: "weekly active shop",
+            value: { kind: "COUNT", count: "1300" },
+            words: "about 1,300 weekly active shops",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-28",
+    run: "84ac9afa7",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply: "I'll leave those two weekly-active figures open.",
+        disagreementActions: disagreementsSeen(prompt, "claims.traction").map(
+          (handle) => ({
+            disagreement: handle,
+            action: "LEAVE_OPEN" as const,
+            keep: null,
+          }),
+        ),
+      }),
+  },
+  {
+    // Live t38: the seed is a genuine second answer; "the bank calls us
+    // Series A" is the Series A on record, said again in prose.
+    id: "n-38",
+    run: "84ac9afa7",
+    say: "Our lead angel calls us seed, the bank calls us Series A. I'm not sure which is right.",
+    script: () =>
+      reading({
+        reply:
+          "So your lead angel says seed and the bank says Series A. Which should Kilima treat as current?",
+        asking: "company.stage",
+        statements: [
+          st({
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "seed" },
+            words: "Our lead angel calls us seed",
+          }),
+          st({
+            dimension: "company.stage",
+            value: { kind: "TEXT", text: "the bank calls us Series A" },
+            words: "the bank calls us Series A",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "n-40",
+    run: "84ac9afa7",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply: "I'll leave the stage answers open.",
+        disagreementActions: disagreementsSeen(prompt, "company.stage").map(
+          (handle) => ({
+            disagreement: handle,
+            action: "LEAVE_OPEN" as const,
+            keep: null,
+          }),
+        ),
+      }),
+  },
+  {
+    // Live t50: the reader proposed nothing (not_recorded empty), and Q
+    // acknowledged it anyway.
+    id: "n-50",
+    run: "84ac9afa7",
+    say: "Actually, CAC is about $12 per shop.",
+    script: () =>
+      reading({
+        reply: "That's a useful update.",
+        intent: "CORRECTION",
+      }),
+  },
+  {
+    id: "n-52",
+    run: "84ac9afa7",
+    say: "Is there anything else you still need?",
+    script: () =>
+      reading({
+        reply: "No, I have what I need from you.",
+        intent: "QUESTION_FOR_Q",
+      }),
+  },
+  {
+    id: "n-54",
+    run: "84ac9afa7",
+    say: "That's all from me for now.",
+    script: () =>
+      reading({
+        reply: "Understood. I have what I need from you.",
+        intent: "SUBMIT_INTENT",
+      }),
+  },
+];
+
+/** The CAC reading prompt v14 asks for (live 64637e8c9 stored this shape). */
+const CAC_READ: Turn = {
+  id: "n-50",
+  run: "84ac9afa7",
+  say: "Actually, CAC is about $12 per shop.",
+  script: () =>
+    reading({
+      reply: "About twelve dollars per shop.",
+      intent: "CORRECTION",
+      statements: [
+        st({
+          dimension: "company.business_model",
+          quantity: "cac",
+          unit: "$",
+          value: { kind: "MONEY", amount: "12", currency: "USD" },
+          words: "Actually, CAC is about $12 per shop.",
+        }),
+      ],
+    }),
+};
+
+const NINTH_POLICY = { criteria: [] } as unknown as Parameters<
+  typeof coverageFromView
+>[0]["policy"];
+const NINTH_QUALIFICATION = {
+  access: "GRANTED",
+  criteria: [],
+  unknowns: [],
+} as unknown as Parameters<typeof coverageFromView>[0]["qualification"];
+
+/** The lines every reader formats, from the view as the server sends it. */
+const linesOf = (view: ApplicationStatementView) =>
+  gateqStatementsInWords(statementViewDto(view));
+
+async function replayNinth(turns: readonly Turn[]) {
+  const world = statementWorld();
+  const services = world.services();
+  const { token } = await services.intake.start({
+    gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+  });
+  await services.intake.recordFacts({
+    token,
+    origin: "FORM",
+    facts: factsFromAnswers(NINTH_FORM),
+  });
+  world.scripts.push(() =>
+    reading({
+      reply:
+        "Kilima is an operator-led angel syndicate in Nairobi. What are you building?",
+      asking: "company.description",
+    }),
+  );
+  await services.conversation.openingFor({
+    token,
+    correlationId: randomUUID(),
+  });
+  const checks: ((turn: Turn, view: ApplicationStatementView) => void)[] = [];
+  const run = async () => {
+    let before = viewOf(world);
+    for (const turn of turns) {
+      world.advance(60_000);
+      const calls = world.prompts.length;
+      world.scripts.push(turn.script);
+      await services.conversation.turn({
+        token,
+        message: turn.say,
+        clientTurnId: turn.id,
+        correlationId: randomUUID(),
+      });
+      const after = viewOf(world);
+      assertAfterTurn(world, turn, after, before, world.prompts.length > calls);
+      assertCaptured(world, turn, after);
+      for (const check of checks) check(turn, after);
+      before = after;
+    }
+  };
+  return { world, checks, run };
+}
+
+/**
+ * The metric-capture invariants after every turn (on top of the eight):
+ * a reply acknowledges an update only when the turn filed a statement
+ * against an answer; a figure they said is never read as nothing; a stage
+ * answer that is one code is never a disagreement; a stated unknown about
+ * a metric reads under that metric.
+ */
+function assertCaptured(
+  world: World,
+  turn: Turn,
+  view: ApplicationStatementView,
+): void {
+  const store = world.store();
+  const person = store.turnRows.find(
+    (t) => t.role === "PERSON" && t.clientTurnId === turn.id,
+  );
+  const r = store.readingRows.find((x) => x.turnId === person?.id);
+  const recorded = (r?.recordedStatementIds ?? []).map((id) =>
+    store.statementRows.find((s) => s.id === id),
+  );
+  const reply = qReply(world, turn.id);
+  // 7: "a useful update" stands on a filed statement, never on nothing.
+  if (claimsUpdate(reply))
+    expect(
+      recorded.some(
+        (s) => s !== undefined && s.dimension !== "application.note",
+      ),
+      `${turn.id}: "${reply}"`,
+    ).toBe(true);
+  // 1: a figure said in a turn the reader took up is on record.
+  if (person !== undefined && figuresIn(person.text).length > 0)
+    expect(r?.outcome, `${turn.id}: a figure read as nothing`).not.toBe(
+      "NO_STATEMENTS",
+    );
+  // 3: two answers that are one code never disagree, by link or detection.
+  const byId = new Map(store.statementRows.map((s) => [s.id, s] as const));
+  for (const d of standing(view)) {
+    const older = byId.get(d.olderStatementId);
+    const newer = byId.get(d.newerStatementId);
+    if (older?.dimension !== "company.stage" || newer === undefined) continue;
+    expect(
+      answerKey("company.stage", older.value),
+      `${turn.id}: "${older.words}" / "${newer.words}"`,
+    ).not.toBe(answerKey("company.stage", newer.value));
+  }
+  // 8: no surface reads a metric's unknown as the dimension's.
+  for (const line of linesOf(view))
+    if (line.kind === "STATEMENT")
+      expect(line.text, turn.id).not.toMatch(/^Business model: Not known/u);
+}
+
+describe("live replay: the ninth run (84ac9afa7), metric capture as a class", () => {
+  it("relates weekly active shops, never drops a figure or calls nothing an update, compares stage codes, labels CAC", async () => {
+    const { world, checks, run } = await replayNinth(NINTH);
+    checks.push((turn, view) => {
+      const store = world.store();
+      const reply = qReply(world, turn.id);
+      if (turn.id === "n-04") {
+        const wau = byWords(world, "we have 500 weekly active shops");
+        expect(wau.quantity).toBe("weekly_active_users");
+        // Crates are not customers: no metric, never compared.
+        expect(
+          byWords(world, "We delivered 16,000 crates last quarter").quantity,
+        ).toBeNull();
+      }
+      if (turn.id === "n-14") {
+        const cac = linesOf(view).find(
+          (line) =>
+            line.kind === "STATEMENT" &&
+            line.statementIds[0] ===
+              byWords(world, "We don't know our CAC yet.").id,
+        );
+        expect(cac?.label).toBe("CAC");
+        expect(cac?.text).toMatch(/^CAC: Not known/u);
+      }
+      if (turn.id === "n-22") {
+        // Beside the held fee, the CAC unknown is still a gap, as CAC.
+        const coverage = coverageFromView({
+          policy: NINTH_POLICY,
+          qualification: NINTH_QUALIFICATION,
+          facts: [],
+          view: statementViewDto(view),
+        });
+        expect(coverage.unknown.map((gap) => gap.label)).toContain("CAC");
+        expect(coverage.unknown.map((gap) => gap.label)).not.toContain(
+          "Business model",
+        );
+      }
+      if (turn.id === "n-26") {
+        // P2: 500 vs about 1,300 weekly active shops is one disagreement,
+        // found by code, OPEN; Q's reply names a recorded difference.
+        const newer = byWords(world, "about 1,300 weekly active shops");
+        expect(newer.quantity).toBe("weekly_active_users");
+        const wau = standing(view).filter(
+          (d) =>
+            store.statementRows.find((s) => s.id === d.newerStatementId)
+              ?.quantity === "weekly_active_users",
+        );
+        expect(wau).toHaveLength(1);
+        expect(wau[0]?.state).toBe("OPEN");
+        expect(wau[0]?.olderStatementId).toBe(
+          byWords(world, "we have 500 weekly active shops").id,
+        );
+      }
+      if (turn.id === "n-28")
+        expect(dimensionView(view, "claims.traction").status).toBe(
+          "DISAGREEMENT_LEFT_OPEN",
+        );
+      if (turn.id === "n-38") {
+        // P3: one genuine stage dispute (seed vs Series A), never the
+        // bank's "Series A" against the Series A on record.
+        const bank = byWords(world, "the bank calls us Series A");
+        expect(
+          store.linkRows.filter(
+            (l) =>
+              l.kind === "DISAGREES" &&
+              (l.fromStatementId === bank.id || l.toStatementId === bank.id),
+          ),
+        ).toEqual([]);
+        expect(
+          dimensionView(view, "company.stage").disagreements.filter(
+            (d) => d.active,
+          ),
+        ).toHaveLength(1);
+      }
+      if (turn.id === "n-50") {
+        // P2: the figure is kept in their words as a note, filed against
+        // nothing, and the reply says so instead of "a useful update".
+        expect(reply).not.toMatch(/useful update/iu);
+        expect(reply).toContain(
+          unfiledFigureLine(["Actually, CAC is about $12 per shop."]),
+        );
+        const note = byWords(world, "Actually, CAC is about $12 per shop.");
+        expect(note.dimension).toBe("application.note");
+        expect(note.quantity).toBeNull();
+        // Unknown stays unknown: the note answers no metric.
+        expect(
+          dimensionView(view, "company.business_model").items.some(
+            (i) => i.value.kind === "UNKNOWN" && i.quantity === "cac",
+          ),
+        ).toBe(true);
+      }
+    });
+    await run();
+    expect(
+      standing(viewOf(world))
+        .map((d) => d.state)
+        .sort(),
+    ).toEqual(["LEFT_OPEN", "LEFT_OPEN"]);
+  });
+
+  it("files the CAC figure as CAC when read, and it supersedes the CAC unknown", async () => {
+    const turns = NINTH.map((turn) => (turn.id === "n-50" ? CAC_READ : turn));
+    const { world, checks, run } = await replayNinth(turns);
+    checks.push((turn, view) => {
+      if (turn.id !== "n-50") return;
+      const model = dimensionView(view, "company.business_model");
+      expect(model.items.filter((i) => i.value.kind === "UNKNOWN")).toEqual([]);
+      expect(
+        model.superseded.some(
+          (s) => s.item.words === "We don't know our CAC yet.",
+        ),
+      ).toBe(true);
+      expect(
+        linesOf(view).some(
+          (line) => line.kind === "STATEMENT" && line.label === "CAC",
+        ),
+      ).toBe(false);
+      expect(qReply(world, turn.id)).not.toContain("as a note");
+    });
+    await run();
+  });
+});
+
+describe("metric families and code lists (live 84ac9afa7)", () => {
+  it("a customer-unit metric holds the founder's noun with its own words, a bare noun only as the declared customer", () => {
+    expect(unitFits("weekly active shop", "weekly_active_users")).toBe(true);
+    expect(unitFits("paying clinic", "paying_customers")).toBe(true);
+    expect(unitFits("weekly active user", "weekly_active_users")).toBe(true);
+    expect(unitFits("patient record", "customers")).toBe(false);
+    expect(unitFits("clinic", "customers")).toBe(false);
+    expect(unitFits("clinic", "customers", new Set(["clinic"]))).toBe(true);
+    expect(unitFits("patient record", "customers", new Set(["clinic"]))).toBe(
+      false,
+    );
+    expect(unitFits("monthly active shop", "weekly_active_users")).toBe(false);
+    expect(metricOfUnit("weekly active shop")).toBe("weekly_active_users");
+    expect(metricOfUnit("shop")).toBeNull();
+    expect(metricOfUnit("patient record")).toBeNull();
+    expect(metricOfUnit("crate")).toBeNull();
+  });
+
+  it("a stage in prose naming one stage is that code; naming two stays prose", () => {
+    const text = (t: string) => ({ kind: "TEXT", text: t }) as const;
+    expect(answerKey("company.stage", text("the bank calls us Series A"))).toBe(
+      answerKey("company.stage", { kind: "CODE", code: "series_a" }),
+    );
+    expect(
+      answerKey(
+        "company.stage",
+        text("seed by the angel, Series A by the bank"),
+      ),
+    ).not.toBe(answerKey("company.stage", { kind: "CODE", code: "series_a" }));
+  });
+
+  it("a frozen link between one stage said twice decides nothing (19a1c0bc)", () => {
+    const APP = "00000000-0000-4000-8000-000000000b09";
+    const row = (
+      n: number,
+      value: ApplicationStatement["value"],
+      words: string,
+    ): ApplicationStatement =>
+      ({
+        id: `00000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`,
+        applicationId: APP,
+        dimension: "company.stage",
+        quantity: null,
+        value,
+        asOf: null,
+        words,
+        provenance: "APPLICANT_PROVIDED",
+        origin: "TURN",
+        sourceTurnId: `00000000-0000-4000-8000-0000000e${String(n).padStart(4, "0")}`,
+        backfillKey: null,
+        statedAt: `2026-11-15T15:${String(n).padStart(2, "0")}:00.000Z`,
+        recordedAt: `2026-11-15T15:${String(n).padStart(2, "0")}:00.000Z`,
+      }) as ApplicationStatement;
+    const seriesA = row(24, { kind: "CODE", code: "series_a" }, "Series A");
+    const seed = row(
+      38,
+      { kind: "CODE", code: "seed" },
+      "Our lead angel calls us seed",
+    );
+    const bank = row(
+      39,
+      { kind: "TEXT", text: "the bank calls us Series A" },
+      "the bank calls us Series A",
+    );
+    const link = (
+      n: number,
+      from: ApplicationStatement,
+      to: ApplicationStatement,
+    ) =>
+      ({
+        id: `00000000-0000-4000-8000-0000000f${String(n).padStart(4, "0")}`,
+        applicationId: APP,
+        kind: "DISAGREES",
+        fromStatementId: from.id,
+        toStatementId: to.id,
+        origin: "CODE_DETECTED",
+        sourceTurnId: from.sourceTurnId,
+        createdAt: from.statedAt,
+      }) as StatementLink;
+    const view = projectView(
+      [seriesA, seed, bank],
+      [link(1, seed, seriesA), link(2, bank, seriesA)],
+      [],
+    );
+    const active = dimensionView(view, "company.stage").disagreements.filter(
+      (d) => d.active,
+    );
+    expect(active.map((d) => d.newerStatementId)).toEqual([seed.id]);
   });
 });

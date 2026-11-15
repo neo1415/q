@@ -1011,6 +1011,7 @@ export function createGateQInterviewer(
                 .slice(0, 4_000),
           planned.recordedCount,
           planned.leftOpenCount,
+          planned.unfiledFigures,
         );
         // How the reply ends is the plan's, decided here after this turn's
         // writes, never the model's: Q's question on a dimension the plan
