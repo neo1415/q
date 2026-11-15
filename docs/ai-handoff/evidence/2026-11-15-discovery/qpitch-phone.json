@@ -1,0 +1,102 @@
+{
+ "form": "phone",
+ "console": [],
+ "pageErrors": [],
+ "failed": [],
+ "audio": {
+  "capital-qweb-production.up.railway.app 200": 82,
+  "customer-yvhdyqtcx10huifu.cloudflarestream.com 200": 24
+ },
+ "samples": [
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 13
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 22
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 31
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 40
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 49
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 58
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 67
+  },
+  {
+   "url": "/home?qpitch=story&new=1&edition=in",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at?",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 76
+  },
+  {
+   "url": "/discover",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Opened Discover View",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 85
+  },
+  {
+   "url": "/relationships?view=capital",
+   "story": "Skip to content Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Opened Relationships View",
+   "controls": "",
+   "film": false,
+   "qcard": false,
+   "sec": 95
+  }
+ ],
+ "entryStatus": 200,
+ "entry": "Q Pitch Q tells the Capital Q story in its own voice. What it shows of the product uses fictional demonstration data, labelled as such. You can pause, go back, skip, start over or ask a question at any point, by voice or by typing. You can also ask Q from any page: \"Hey Q, pitch yourself\", or \"pitch yourself to investors\" or \"to founders\". Who is it for? Everyone About 7 minutes Start Investors Under 4 minutes Start Founders About 4½ minutes Start",
+ "startCount": 1,
+ "startUrl": "/home?qpitch=story&new=1&edition=investor&start=mwhij6pm",
+ "ask": {
+  "q": "What cheque range does my mandate allow?",
+  "ms": 17476,
+  "url": "/discover",
+  "reply": " Q: Your mandate allows cheques of USD 250,000 to USD 1,000,000, with USD 600,000 as the typical cheque. Sources Investor · 1 Ask Q Q Opened Discover View"
+ }
+}
