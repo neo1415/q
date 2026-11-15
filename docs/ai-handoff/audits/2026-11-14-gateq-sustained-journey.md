@@ -506,3 +506,125 @@ No settled item was asked again: team, revenue, CAC, raise, problem, pricing. Us
    - The held customers count (4 schools) shows as Customers "Missing" or "Not covered".
    - The day-to-day answer is classed as business model, so Solution shows "Missing".
    - Part of the stage sentence goes into the Founder's note.
+
+## Re-certification 15 Nov (5757518c7)
+
+- **Production:** `5757518c7`, which includes GateQ reply-quality fix `d9c0b248d`. The fix cuts question sentences whole, adds a close that points to "Finish and review", makes a reload reconcile a saved turn, uses one source-label vocabulary in the one-page summary, lets a customers count fill Customers, keeps stage words out of the note, and moves to interviewer prompt v11 (day to day is Solution) with `reading_version` 6.
+- **Founder:** `founder.fb0031.otieno-omondi@fictional.capitalq.local`, Stockum (neighbourhood-shop restocking), KE. The profile stage is Series A; the founder chose Seed in the form. The founder was fresh, with no prior GateQ application. **Investor:** `investor.kilima-angels.njeri-kamau@fictional.capitalq.local`.
+- **Window:** 09:18–09:31Z. **Cost:** 36 model calls, **$0.1051** (ai_ops.model_usage: dialogue 30 calls and $0.0434; classification 4 calls and $0.0573; synthesis $0.0038; extraction $0.0007). Recorded against reservation `62b4f04d`.
+- **Records created:**
+  - application `c1993c94-1791-4058-be62-2b857392f168`, created 09:21:57Z on Continue and SUBMITTED 09:27:49Z (ref `ga_2syf5jde3sh4cwehryg0nmyr0a`);
+  - 55 turns (27 PERSON) and 27 readings (18 READ, 9 NO_STATEMENTS), all `reading_version` 6;
+  - 36 statements (10 FORM, 26 TURN), 4 links and 2 disagreement events;
+  - submission `322a2a23` (snapshot v3, `documentsTotal` 2, `contradictionsTotal` 2);
+  - synthesis READY (`GATEQ_DOSSIER_SYNTHESIS@v2`, 15 points, complete, 55/55 turns read, uncitedDropped 0);
+  - 1 investor Q turn.
+- **Stray draft (no model calls):** `founder.fb0004.kwame-owusu` (Watcha Africa, Ghana) was tried first. Ghana fails Kilima's required location rule, so Continue was blocked, but the first form action had already created IN_PROGRESS application `7640a053` with 10 FORM statements. It was left untouched rather than edited to Kenya, which would have added post-creation FORM writes. (A first sign-in as fb0019 found the company had already applied on 14 Nov; nothing was written.)
+- **Evidence (durable):** `docs/ai-handoff/evidence/2026-11-15-gateq-3/` holds:
+  - `01-founder-resume-new-context.jpg`
+  - `02-reload-after-drop.jpg`
+  - `03-closing-turn.jpg`
+  - `04-founder-review.jpg`
+  - `05-investor-one-page-summary.jpg`
+  - `06-investor-q-answer.jpg`
+
+  Scripts and raw reads are in the non-durable scratchpad `gq12/`. The driver is `drv.cjs` from `gq11`, which refuses stale command files. The sent log (13 + 14 lines) matches the 27 PERSON turns exactly.
+
+- **Journey (27 founder turns):**
+  - Form: Seed, Commerce, USD 350,000, Kenya (from the profile), deck and product brief ticked.
+  - t2–t16: what it does; "18,000 crates delivered and 600 weekly active shops"; "Nobody pays yet"; "from 1 kiosk-chain customer to 4 since March"; "We don't know our CAC yet"; team; "really a Series A company now, not seed"; "Back to users: about 1,500 weekly active shops." (undated).
+  - t18–t24: bare "Leave it open."; use of funds; "Sorry, I meant 400k, not 350k."; "We haven't sized the market."
+  - **Drop 1 (t26, problem):** Send, then the browser closed after 700 ms. A new context signed in and reloaded.
+  - **Drop 2 (t28, risk):** in that same context, the request reached the server (`route.fetch`) and the response to the browser was aborted with `connectionreset`. Then `page.reload()`.
+  - t30–t54: pricing; "lead angel calls us seed… by age I'd say Series A. I'm not sure which is right."; "Leave it open." twice; "Leave it open for now."; day to day; "On weekly users, leave it open for Kilima."; acquisition; "Anything else you need from me?"; beyond capital; "SAFE, no lead yet"; "Is there anything else you still need?"; "That's all from me for now."
+  - Then Finish and review, submit, investor inbox and one investor Q turn.
+
+### Reply-quality checks (d9c0b248d)
+
+- **Question fragments in stored Q replies: PASS.** All 28 Q turns were scanned sentence by sentence. No sentence ending in "?" starts lowercase or is under four words, and no tail like "roughly in amounts?" or "if any?" appears.
+- **Dropped connection, then reload: PASS.**
+  - **Drop 1 (closed context):** the server saved t26 and Q's t27 reply (turns 25→27). The reloaded page showed both once and no "needs confirmation". Send was enabled on typing, and no role step appeared (`01`). The load sent 6 POSTs: the first `{reopenOnly:true}`, the rest only the session credential. Counts stayed the same.
+  - **Drop 2 (same context, server saved, response lost):** before the reload the page said "Not sent. The connection was interrupted… Try again". After `reload()` the page showed t28 and Q's t29 reply once each, with no "needs confirmation" and Send enabled (`02`). The reload sent no answer POST (5 POSTs carried only the session credential). Turns stayed at 29, with no duplicate.
+- **"That's everything I need for now", once, with open items and "Finish and review": FAIL (said twice).**
+  - t13 (after the team answer, only six founder turns in) said "That's everything I need for now. Market is not known yet. When you're ready, press Finish and review…". This close came early: problem, solution, risk and pricing had not been asked. The market unknown it names came from a misfiled CAC answer (see defects).
+  - t45 said the full close again, now with "Stage and traction each still have two answers that disagree… Market is not known yet… press Finish and review" (`03`).
+  - t47 and t53 ("No, I have what I need for now… you've left both open; the market is also unknown") and the final t55 are correct.
+  - **Cause:** `pointedToReview` (`interview-close.ts`) reads `input.recentTurns`, which is only the last 8 stored turns (`RECENT_TURNS = 8` in `conversation-service.ts`). By t45 the t13 close and every later pointer had aged out, so `closingLine` ran again.
+- **No loop after nothing is left: FAIL.** Q still ended seven replies with an open-ended question:
+  - t25 "What would you like to do next?";
+  - t35 and t37 "Which other part of the application would you like to clarify?";
+  - t39, t43 and t51 "What would you like to clarify next?";
+  - t41 "What part of that process would you like to clarify next?".
+
+  Every other reply after t13 ends with "Finish and review is ready whenever you are", so the founder always has the step. But the loop shape the fix targeted is still there. **Cause:** the `OPEN_ENDED` regex in `interview-close.ts` matches "cover / discuss / talk about / add / share / go over / tell me" and "what's next", but not "clarify", "do next" or "which other part". `interviewer.ts` (~1096) therefore keeps the reply unchanged when the model asks nothing the plan recognises.
+
+- **One-page summary separators and source labels: PASS** (`05`).
+  - Findings are separated: "18,000 crates delivered (Said in the application); 600 weekly active shops (Said in the application); …".
+  - Only two labels appear, "Said in the application" and "Given in the form". "Estimated" is absent, and the labels match the review and the dossier.
+  - Minor: the Round row reads "USD 400,000 (Said in the application); USD (Given in the form)": the currency code is shown as its own finding.
+- **Customers row filled from a count: PASS.** Summary Customers: "Zero paying customers (Said in the application); we went from 1 kiosk-chain customer to 4 since March (Said in the application)". `7ad62a51` is `claims.traction` / `customers` = 4, one statement, with no link.
+- **No stage words in the founder's note: PASS.** The note statements are the form note, "We've been operating for four years", the risk and "Beyond capital…". The founder's "I'm not sure which is right" went to a stage UNKNOWN statement (`30b67c0b`), not to the note.
+- **Day-to-day answer filed as Solution: PASS.** `011e3acc` is `company.solution` (t40). The review shows it under "Solution".
+- **Missing lists still on older coverage (known gap), as observed:**
+  - The founder review "Still open" shows Website Missing, **Customers Missing** (although the summary fills Customers) and Market "You don't know yet".
+  - Dossier `missing` = [Website, Customers]; `unknowns` = [Market].
+  - The review also lists a third Stage row, "Not known" (the stray UNKNOWN `30b67c0b`).
+
+### Invariants
+
+1. **PASS (classification defect).**
+   - 27/27 PERSON turns read (18 READ, 9 NO_STATEMENTS).
+   - All 26 TURN statements have verbatim words (0 not a substring of their turn) and a source turn, and every one is referenced by a reading (unreferenced 0).
+   - No same-turn duplicates.
+   - **Defect:** t10 "We don't know our CAC yet.", sent in answer to "How big is the market?", was stored as `company.market` UNKNOWN (`26a6a77f`) with the CAC words. No CAC statement exists. t24 "We haven't sized the market." then read as NO_STATEMENTS.
+2. **PASS.**
+   - The only CORRECTS links are `2b41a456` (t22 USD 400,000 corrects form `a6bcd6d1`, signalled) and `af21bbc8` (t14 Series A corrects the form's seed: the founder's own "not seed").
+   - The undated 1,500 superseded nothing.
+   - FORM total is 10, and the last FORM write was 09:21:57.9Z, at creation.
+3. **PASS.**
+   - The undated "about 1,500" is NEW `9c5022ed`, linked by DISAGREES `197337f9` against 600 `8714773f`. The stage pair is DISAGREES `97ec16ee` (`44be2e69` seed vs `8fe89afe` Series A).
+   - Both are LEFT_OPEN and visible on the review, dossier (`contradictions` 2; `company.stage` = "Series A or Seed"), inbox summary and Company block, synthesis and investor Q.
+   - No false contradiction: crates (unusual unit), the 1→4 range and the CAC unknown form no link.
+4. **PASS.**
+   - The form's country was never asked.
+   - No "how many" question came after the range.
+   - Use of funds was asked twice (t5, t7) before it was answered, then never again.
+   - WAU was asked once (t17) and stage once (t33). Settled items (revenue, team, raise, problem, instrument) were not asked again.
+5. **PASS.**
+   - LEFT_OPEN on WAU (t18) and on stage (t34) were never followed by a question about either, across both drops.
+   - The repeats at t36, t38 and t42 wrote nothing (NO_STATEMENTS), with no note and no false link.
+6. **PASS.**
+   - Same application across two browser contexts and one same-context reload; all turns, readings and statements kept.
+   - No writes on load and no role step on resume. The role step appeared once, on first entry, for a new founder.
+   - Documents submitted (2), no interview claim left after submit, and no duplicate turn after either drop.
+7. **PASS (one claim rests on a misfiled record).** Each claim has a matching record:
+   - t15 "Thanks for the correction" matches `af21bbc8`.
+   - t23 "correcting the raise from 350,000 dollars to 400,000 dollars" matches `2b41a456`.
+   - t47 and t53 "you've left both open" match LEFT_OPEN `197337f9` and `97ec16ee`.
+   - t13, t25 and t45 "Market is not known / isn't sized" match `26a6a77f`. That record exists, but its words are the CAC sentence (invariant 1 defect).
+8. **PASS.** These agree across the review (`04`), dossier, inbox summary (`05`), Company block ("Series A or Seed (answers disagree)"), list row ("Needs your judgement: answers disagree"), Sent page ("Stage we invest at: Your answers disagree"), frozen qualification (STAGE UNRESOLVED / STAGE_DISPUTED, MAY_APPLY), synthesis and investor Q (`06`):
+   - USD 400,000, corrected from 350,000;
+   - WAU 600 vs about 1,500, left open;
+   - stage Series A vs Seed, left open;
+   - zero revenue;
+   - market not known;
+   - SAFE with no lead;
+   - 2 documents.
+
+   Gaps:
+   - CAC appears only in the synthesis ("CAC is not known", from the transcript). Investor Q says "No CAC figure was provided" and cites market "Not known (turn 10)", which is the CAC turn.
+   - Customers is filled in the summary but "Missing" in the review and dossier (known gap).
+
+### Defects, ranked
+
+1. **P2 (UX, the d9c0b248d close):** the close is said more than once, and open-ended questions still loop.
+   - `pointedToReview` only sees `recentTurns` (the last 8 turns), so "That's everything I need for now" repeated at t45. It should check the full Q history, or a stored flag.
+   - `OPEN_ENDED` misses "clarify", "do next" and "which other part", so seven replies ended "What would you like to clarify next?" or a variant.
+2. **P2 (invariants 1, 7, 8):** a stated unknown is filed to the asked dimension even when its words name another metric.
+   - "We don't know our CAC yet." in answer to a market question became `company.market` UNKNOWN. CAC was lost, and Q told the founder "Market is not known yet" before they had said so.
+   - The premature market unknown helped trigger the early close at t13, before problem, solution, risk and pricing were asked.
+   - Fix in the reading rules: an unknown answers the asked dimension only when its words do not name a different quantity.
+3. **P3:**
+   - "I'm not sure which is right" wrote a stray stage UNKNOWN (`30b67c0b`), shown on the review as a third Stage row, "Not known".
+   - The summary Round row lists the currency code as its own finding.
+   - The review and dossier "Missing" lists still say Customers when a customers count is held (known gap).
