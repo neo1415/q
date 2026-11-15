@@ -70,7 +70,7 @@ function fitOf(i: number) {
     ID(i + 1),
     name,
     {
-      STAGE: SCORES[Math.min(i, 3)],
+      STAGE: SCORES[Math.min(i, 3)] ?? "PARTIAL",
       SECTOR: strong >= 2 ? "STRONG" : "PARTIAL",
       GEOGRAPHY: strong >= 3 ? "STRONG" : "PARTIAL",
     },
@@ -327,7 +327,7 @@ describe("D17: fits leaving out the companies they are in touch with", () => {
         questionKind: "FIT",
         fitQuestion: { text: asked, count: null, excludeShown: false },
         excludeRelationships: true,
-      } as QAnswerRequest);
+      });
       expect(alpha.calls).toHaveLength(0);
       const last = completed.at(-1) as Completed | undefined;
       if (last === undefined) throw new Error("no answer");
