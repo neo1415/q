@@ -232,8 +232,18 @@ export const MeetingTimeProposalDtoSchema = z
     confirmed: z.boolean(),
     acceptedOption: z.number().int().min(0).max(4).nullable(),
     acceptedAt: UtcTimestampSchema.nullable(),
-    /** The booked call, once the booking followed the acceptance. */
+    /**
+     * The booked call, once the booking followed the acceptance. On an
+     * accept response to a move: the moved call, once it moved (D9). A
+     * listed move names its call by `rescheduleOfMeetingId` instead.
+     */
     meetingId: UuidSchema.nullable(),
+    /**
+     * Set when the proposal moves a call already booked (additive,
+     * 2026-11-15 D10): that call stays as booked until a new time is
+     * accepted, and then it moves; no second call is booked.
+     */
+    rescheduleOfMeetingId: UuidSchema.nullable().optional(),
     revision: z.number().int().min(1).max(20),
     /**
      * Only on an accept/decline/counter response (additive, 2026-11-14):

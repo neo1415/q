@@ -281,6 +281,12 @@ export type ProposalOutcome =
       readonly confirmed: boolean;
       readonly booked: boolean;
       /**
+       * The meeting this proposal booked, or for a move the meeting it
+       * moved (D9), once known; null otherwise. A move's own record keeps
+       * `meetingId` null: it names its meeting by `rescheduleOfMeetingId`.
+       */
+      readonly meetingId: string | null;
+      /**
        * Set when THIS call booked it: true, a calendar invite went out;
        * false, recorded without one (both sides told). Absent: unknown.
        */
@@ -390,41 +396,81 @@ export function createProposalService(
   const now = dependencies.now ?? (() => new Date());
   const newId = dependencies.newId ?? (() => randomUUID());
 
-  /** Books after the acceptance is recorded; a failure leaves it CONFIRMED and retryable. */
+  /**
+   * Books after the acceptance is recorded; a failure leaves it CONFIRMED
+   * and retryable. `meetingId` is the meeting this proposal booked or moved.
+   *
+   * A move (`rescheduleOfMeetingId`, live audit 2026-11-15 D9) is linked to
+   * its meeting by that column alone: `meeting_id` is the booking link, and
+   * its unique index keeps it on the one proposal that booked the meeting,
+   * so a move never writes it. The move answers "moved" with that meeting.
+   * A booking that landed is never reported as not booked because linking
+   * it failed: the link is retried (the booking is idempotent by its key).
+   */
   async function bookAccepted(proposal: ProposalRecord): Promise<{
     proposal: ProposalRecord;
     booked: boolean;
+    meetingId: string | null;
     calendarInvite?: boolean;
   }> {
-    if (proposal.meetingId !== null) return { proposal, booked: true };
+    if (proposal.meetingId !== null) {
+      return { proposal, booked: true, meetingId: proposal.meetingId };
+    }
+    const notBooked = { proposal, booked: false, meetingId: null };
     const list =
       proposal.acceptedFrom === "COUNTER_OPTIONS"
         ? (proposal.counterOptions ?? [])
         : proposal.options;
     const option = list[proposal.acceptedOption ?? -1];
-    if (option === undefined) return { proposal, booked: false };
+    if (option === undefined) return notBooked;
+    let booked: Awaited<ReturnType<ProposalBooking>>;
     try {
-      const booked = await book({
+      booked = await book({
         proposal,
         option,
         // One booking per acceptance, however often it is retried.
         idempotencyKey: `meeting-time-proposal:${proposal.id}:booking`,
       });
-      if (booked === null) return { proposal, booked: false };
-      await store.attachMeeting(proposal.id, booked.meetingId);
-      return {
-        proposal: { ...proposal, meetingId: booked.meetingId },
-        booked: true,
-        ...(booked.calendarInvite === undefined
-          ? {}
-          : { calendarInvite: booked.calendarInvite }),
-      };
     } catch (error: unknown) {
       logger?.warn(
         { err: error, proposalId: proposal.id },
-        "accepted meeting time not booked yet; it stays accepted and is retried",
+        "accepted meeting time: the booking failed; it stays accepted and is retried",
       );
-      return { proposal, booked: false };
+      return notBooked;
+    }
+    if (booked === null) return notBooked;
+    const done = {
+      booked: true,
+      meetingId: booked.meetingId,
+      ...(booked.calendarInvite === undefined
+        ? {}
+        : { calendarInvite: booked.calendarInvite }),
+    };
+    const moveOf = proposal.rescheduleOfMeetingId;
+    if (moveOf !== null) {
+      if (booked.meetingId !== moveOf) {
+        // The booking contract says a move returns the same meeting.
+        logger?.warn(
+          { proposalId: proposal.id, moveOf, meetingId: booked.meetingId },
+          "accepted meeting move returned another meeting",
+        );
+      }
+      return { proposal, ...done };
+    }
+    try {
+      await store.attachMeeting(proposal.id, booked.meetingId);
+      return {
+        proposal: { ...proposal, meetingId: booked.meetingId },
+        ...done,
+      };
+    } catch (error: unknown) {
+      // The meeting IS booked: say so. Only the proposal's link to it is
+      // missing, and the next retry (same booking key) links it.
+      logger?.warn(
+        { err: error, proposalId: proposal.id, meetingId: booked.meetingId },
+        "accepted meeting time booked, but the proposal could not be linked to it; a retry links it",
+      );
+      return { proposal, ...done };
     }
   }
 
@@ -457,6 +503,7 @@ export function createProposalService(
           recorded: false,
           confirmed: existing.state === "CONFIRMED",
           booked: existing.meetingId !== null,
+          meetingId: existing.meetingId,
         };
       }
       const moveOf = input.rescheduleOfMeetingId ?? null;
@@ -534,13 +581,14 @@ export function createProposalService(
         const booked =
           current.state === "CONFIRMED"
             ? await bookAccepted(current)
-            : { proposal: current, booked: false };
+            : { proposal: current, booked: false, meetingId: null };
         return {
           outcome: "OK",
           proposal: booked.proposal,
           recorded: false,
           confirmed: current.state === "CONFIRMED",
           booked: booked.booked && current.state === "CONFIRMED",
+          meetingId: booked.meetingId,
           ...withInvite(booked),
         };
       }
@@ -661,6 +709,7 @@ export function createProposalService(
           recorded: true,
           confirmed: false,
           booked: false,
+          meetingId: null,
         };
       }
       const booked = await bookAccepted(after);
@@ -670,6 +719,7 @@ export function createProposalService(
         recorded: true,
         confirmed: true,
         booked: booked.booked,
+        meetingId: booked.meetingId,
         ...withInvite(booked),
       };
     },
@@ -690,6 +740,7 @@ export function createProposalService(
         recorded: false,
         confirmed: true,
         booked: booked.booked,
+        meetingId: booked.meetingId,
         ...withInvite(booked),
       };
     },
@@ -737,6 +788,7 @@ export function createProposalService(
       recorded: true,
       confirmed: false,
       booked: false,
+      meetingId: null,
     };
   }
 }

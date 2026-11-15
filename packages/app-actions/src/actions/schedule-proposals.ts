@@ -127,6 +127,7 @@ export function proposalDto(record: ProposalRecord): MeetingTimeProposalDto {
     acceptedOption: record.acceptedOption,
     acceptedAt: record.acceptedAt?.toISOString() ?? null,
     meetingId: record.meetingId,
+    rescheduleOfMeetingId: record.rescheduleOfMeetingId,
     revision: record.revision,
   });
 }
@@ -461,6 +462,9 @@ const respondHttp = <In extends { relationshipId: string }>(
     out.outcome === "OK"
       ? MeetingTimeProposalDtoSchema.parse({
           ...proposalDto(out.proposal),
+          // D9: the meeting this step booked or moved (a move's own record
+          // names it by rescheduleOfMeetingId, never meeting_id).
+          meetingId: out.meetingId,
           booked: out.booked,
           ...(out.calendarInvite === undefined
             ? {}

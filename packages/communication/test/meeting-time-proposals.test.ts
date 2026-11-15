@@ -102,6 +102,20 @@ function memoryStore() {
       return Promise.resolve(true);
     },
     attachMeeting: (id, meetingId) => {
+      // As the partial unique index meeting_time_proposals_meeting_idx
+      // does: one proposal per booked meeting (D9: the in-memory store
+      // once lacked it, so a move that wrote it passed here and failed live).
+      if (
+        [...proposals.values()].some(
+          (p) => p.id !== id && p.meetingId === meetingId,
+        )
+      ) {
+        return Promise.reject(
+          new Error(
+            'duplicate key value violates unique constraint "meeting_time_proposals_meeting_idx"',
+          ),
+        );
+      }
       const current = proposals.get(id);
       if (current !== undefined) proposals.set(id, { ...current, meetingId });
       return Promise.resolve();
@@ -1145,22 +1159,34 @@ describe("a move proposal moves the meeting (D7) and decline wording (D8)", () =
       idempotencyKey: "investor-move",
     };
     const out = await w.as(INVESTOR).respond(accept);
+    // D9: "moved", with the moved meeting; the move's own record names it
+    // by rescheduleOfMeetingId and leaves meeting_id to the original booking.
     expect(out).toMatchObject({
       outcome: "OK",
       confirmed: true,
       booked: true,
+      meetingId,
       calendarInvite: false,
-      proposal: { meetingId },
+      proposal: { meetingId: null, rescheduleOfMeetingId: meetingId },
     });
+    expect(w.mem.proposals.get(move.proposal.id)?.meetingId).toBeNull();
+    expect(
+      [...w.mem.proposals.values()].filter((p) => p.meetingId === meetingId),
+    ).toHaveLength(1);
     // Retried: the same move, nothing new.
     const again = await w.as(INVESTOR).respond(accept);
-    expect(again).toMatchObject({ outcome: "OK", recorded: false });
+    expect(again).toMatchObject({
+      outcome: "OK",
+      recorded: false,
+      booked: true,
+      meetingId,
+    });
     expect(
       await w.as(INVESTOR).completeBooking({
         actorUserId: INVESTOR,
         proposalId: move.proposal.id,
       }),
-    ).toMatchObject({ outcome: "OK", booked: true });
+    ).toMatchObject({ outcome: "OK", booked: true, meetingId });
 
     expect(w.scheduleStore.meetings).toHaveLength(1);
     const row = w.scheduleStore.meetings[0];
@@ -1192,7 +1218,8 @@ describe("a move proposal moves the meeting (D7) and decline wording (D8)", () =
       outcome: "OK",
       booked: true,
       calendarInvite: true,
-      proposal: { meetingId },
+      meetingId,
+      proposal: { meetingId: null, rescheduleOfMeetingId: meetingId },
     });
     expect(w.investorCalendar.inserted).toHaveLength(1);
     expect(w.investorCalendar.moved).toHaveLength(1);
@@ -1289,5 +1316,141 @@ describe("a move proposal moves the meeting (D7) and decline wording (D8)", () =
       "They may suggest new times, or you can message them on the relationship page.",
     );
     expect(toInvestor?.body).not.toContain("You can propose");
+  });
+
+  it("D10: a move's notice says it moves the booked call, from its time to the proposed ones", async () => {
+    const w = world("NONE");
+    const meetingId = await booked(w);
+    const move = await proposeMove(w, meetingId);
+    if (move.outcome !== "OK") throw new Error("move refused");
+    const notice = w.notices.find((n) =>
+      n.title.includes("proposed moving your call"),
+    );
+    expect(notice?.body).toContain(
+      `This moves the call booked for ${meetingTimeLabel(ahead(3).startsAt, "Africa/Lagos")}.`,
+    );
+    expect(notice?.body).toContain(
+      `Proposed new times:\n1. ${meetingTimeLabel(ahead(5, 14).startsAt, "Africa/Lagos")}`,
+    );
+    expect(notice?.body).toContain(
+      "The call stays as booked until a new time is accepted.",
+    );
+    expect(notice?.body).not.toContain("Nothing is booked");
+    // The first proposal (not a move) keeps its own wording.
+    expect(
+      w.notices.find((n) => n.title.includes("proposed times for a call"))
+        ?.body,
+    ).toContain("Nothing is booked until a time is accepted.");
+
+    // Declining a move leaves the call booked, and says so.
+    await w.as(INVESTOR).respond({
+      actorUserId: INVESTOR,
+      proposalId: move.proposal.id,
+      action: "DECLINE",
+      idempotencyKey: "investor-decline-move",
+    });
+    const declined = w.notices.find((n) =>
+      n.title.includes("declined the proposed call times"),
+    );
+    expect(declined?.body).toContain("The call stays as booked.");
+    expect(declined?.body).not.toContain("Nothing is booked");
+  });
+});
+
+describe("D9: a booking that landed is never reported as not booked", () => {
+  it("when linking the proposal to its booked meeting fails, the answer is booked with that meeting, and it is logged", async () => {
+    const mem = memoryStore();
+    const warnings: string[] = [];
+    let linkFails = true;
+    const service = createProposalService({
+      store: {
+        ...mem.store,
+        attachMeeting: (id, meetingId) =>
+          linkFails
+            ? Promise.reject(new Error("connection reset"))
+            : mem.store.attachMeeting(id, meetingId),
+      },
+      parties,
+      now: () => NOW,
+      newId: () => "00000000-0000-4000-8000-0000000e9001",
+      book: () => Promise.resolve({ meetingId: "meeting-booked" }),
+      logger: {
+        info: () => undefined,
+        warn: (_fields, message) => warnings.push(message),
+      },
+    });
+    const proposed = await service.propose({
+      actorUserId: FOUNDER,
+      relationshipId: REL,
+      purpose: "Intro call",
+      options: [slot(14)],
+      idempotencyKey: "founder-link-fails",
+    });
+    if (proposed.outcome !== "OK") throw new Error("refused");
+    const accept = {
+      actorUserId: INVESTOR,
+      proposalId: proposed.proposal.id,
+      action: "ACCEPT" as const,
+      optionIndex: 0,
+      idempotencyKey: "investor-link-fails",
+    };
+    expect(await service.respond(accept)).toMatchObject({
+      outcome: "OK",
+      confirmed: true,
+      booked: true,
+      meetingId: "meeting-booked",
+    });
+    expect(warnings).toEqual([
+      "accepted meeting time booked, but the proposal could not be linked to it; a retry links it",
+    ]);
+    // A retry links it.
+    linkFails = false;
+    await service.respond(accept);
+    expect(mem.proposals.get(proposed.proposal.id)?.meetingId).toBe(
+      "meeting-booked",
+    );
+  });
+
+  it("the in-memory store enforces one proposal per booked meeting, as the database does", async () => {
+    const mem = memoryStore();
+    const base = {
+      tenantId: TENANT,
+      relationshipId: REL,
+      purpose: "Intro call",
+      proposedByUserId: FOUNDER,
+      state: "CONFIRMED" as const,
+      options: [slot(14)],
+      counterOptions: null,
+      acceptedFrom: "OPTIONS" as const,
+      acceptedOption: 0,
+      acceptedByUserId: INVESTOR,
+      acceptedAt: NOW,
+      rescheduleOfMeetingId: null,
+      meetingId: null,
+      revision: 1,
+    };
+    const event = (proposalId: string): ProposalEvent => ({
+      proposalId,
+      tenantId: TENANT,
+      eventType: "PROPOSED",
+      fromState: null,
+      toState: "CONFIRMED",
+      actorUserId: FOUNDER,
+      actorSide: "FOUNDER",
+      optionIndex: null,
+      idempotencyKey: `k-${proposalId}`,
+    });
+    await mem.store.create(
+      { ...base, id: "p1", idempotencyKey: "k-p1" },
+      event("p1"),
+    );
+    await mem.store.create(
+      { ...base, id: "p2", idempotencyKey: "k-p2" },
+      event("p2"),
+    );
+    await mem.store.attachMeeting("p1", "m1");
+    await expect(mem.store.attachMeeting("p2", "m1")).rejects.toThrow(
+      "meeting_time_proposals_meeting_idx",
+    );
   });
 });

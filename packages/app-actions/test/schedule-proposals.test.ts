@@ -14,6 +14,7 @@ import {
   type AppActionContext,
   type AppActionPorts,
 } from "../src/index.js";
+import { proposalDto } from "../src/actions/schedule-proposals.js";
 
 /**
  * Meeting time proposals as declared actions (D, 2026-10-11): who may take
@@ -105,6 +106,15 @@ function setup() {
       return Promise.resolve(true);
     },
     attachMeeting: (id, meetingId) => {
+      // As meeting_time_proposals_meeting_idx does (D9): one proposal per
+      // booked meeting.
+      if (
+        [...proposals.values()].some(
+          (p) => p.id !== id && p.meetingId === meetingId,
+        )
+      ) {
+        return Promise.reject(new Error("meeting_time_proposals_meeting_idx"));
+      }
       const current = proposals.get(id);
       if (current !== undefined) proposals.set(id, { ...current, meetingId });
       return Promise.resolve();
@@ -402,6 +412,7 @@ describe("meeting time proposal wire and card wording", () => {
         recorded: true,
         confirmed: true,
         booked: true,
+        meetingId: "00000000-0000-4000-8000-0000000f0abc",
         calendarInvite: false,
       },
       input,
@@ -421,12 +432,45 @@ describe("meeting time proposal wire and card wording", () => {
         recorded: false,
         confirmed: true,
         booked: false,
+        meetingId: null,
       },
       input,
       {},
     );
     expect(unbooked).toMatchObject({ booked: false });
     expect(unbooked).not.toHaveProperty("calendarInvite");
+  });
+
+  it("D9/D10: an accepted move answers moved, with the moved meeting and the move field", () => {
+    const moved = "00000000-0000-4000-8000-0000000f0abd";
+    const move: ProposalRecord = {
+      ...record(null),
+      rescheduleOfMeetingId: moved,
+    };
+    const accepted = {
+      outcome: "OK" as const,
+      proposal: move,
+      recorded: true,
+      confirmed: true,
+      booked: true,
+      meetingId: moved,
+      calendarInvite: false,
+    };
+    const accept = action("schedule.proposal.accept");
+    expect(accept.http?.respond(accepted, input, {})).toMatchObject({
+      state: "CONFIRMED",
+      booked: true,
+      meetingId: moved,
+      rescheduleOfMeetingId: moved,
+    });
+    expect(accept.done(accepted, input, {})).toBe(
+      "Accepted. The call is moved to that time on Capital Q; the other side was told.",
+    );
+    // A listed move names its call by the move field.
+    expect(proposalDto(move)).toMatchObject({
+      meetingId: null,
+      rescheduleOfMeetingId: moved,
+    });
   });
 
   it("D2: a proposal card shows local time in the named zone, never a UTC instant under a zone label", () => {

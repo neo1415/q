@@ -6,6 +6,7 @@ import type { CounterpartNotices } from "../counterpart-notices.js";
 import {
   createProposalService,
   type ProposalParties,
+  type ProposalRecord,
   type ProposalService,
   type ProposalStore,
   type TimeOption,
@@ -50,7 +51,10 @@ export function createMeetingProposalPort(options: {
   readonly transactions: TransactionManager;
   readonly schedule: Pick<ScheduleService, "schedule"> &
     Partial<
-      Pick<ScheduleService, "recordAgreed" | "moveAgreed" | "agreedMoveRefusal">
+      Pick<
+        ScheduleService,
+        "recordAgreed" | "moveAgreed" | "agreedMoveRefusal" | "listMeetings"
+      >
     >;
   /** The other side hears that times were proposed or countered. */
   readonly counterpartNotices?: Pick<CounterpartNotices, "notify"> | undefined;
@@ -77,7 +81,22 @@ export function createMeetingProposalPort(options: {
         ...(options.logger === undefined ? {} : { logger: options.logger }),
         ...(options.counterpartNotices === undefined
           ? {}
-          : { notify: noticesFor(options.counterpartNotices) }),
+          : {
+              notify: noticesFor(options.counterpartNotices, async (p) => {
+                // D10: the call a move proposal moves, read as the actor
+                // (a party to the relationship) for its current time.
+                const list = options.schedule.listMeetings;
+                const moveOf = p.rescheduleOfMeetingId;
+                if (list === undefined || moveOf === null) return null;
+                const meetings = await list(actor, p.relationshipId).catch(
+                  () => null,
+                );
+                const meeting = meetings?.find((m) => m.id === moveOf);
+                return meeting === undefined
+                  ? null
+                  : { startsAt: meeting.startsAt, timeZone: meeting.timeZone };
+              }),
+            }),
         movable: async (input) => {
           const check = options.schedule.agreedMoveRefusal;
           if (check === undefined || options.schedule.moveAgreed === undefined)
@@ -207,6 +226,9 @@ export function timesOf(
  */
 function noticesFor(
   notices: Pick<CounterpartNotices, "notify">,
+  bookedTime: (
+    proposal: ProposalRecord,
+  ) => Promise<{ readonly startsAt: string; readonly timeZone: string } | null>,
 ): NonNullable<Parameters<typeof createProposalService>[0]["notify"]> {
   return async ({ proposal, kind }) => {
     const revision = `proposal:${proposal.id}:r${String(proposal.revision)}`;
@@ -222,8 +244,13 @@ function noticesFor(
       const next = investorDeclined
         ? "You can propose other times on the relationship page."
         : "They may suggest new times, or you can message them on the relationship page.";
+      // D10: a declined move leaves the booked call where it is.
+      const standing =
+        proposal.rescheduleOfMeetingId === null
+          ? "Nothing is booked."
+          : "The call stays as booked.";
       const body = (zone?: string) =>
-        `${proposal.purpose}\n${timesOf(declined, zone)}\nNothing is booked. ${next}`;
+        `${proposal.purpose}\n${timesOf(declined, zone)}\n${standing} ${next}`;
       await notices.notify({
         relationshipId: proposal.relationshipId,
         actingSide: investorDeclined ? "INVESTOR" : "COMPANY",
@@ -243,15 +270,29 @@ function noticesFor(
     const offered = countered
       ? (proposal.counterOptions ?? [])
       : proposal.options;
+    // D10: a move says it is one -- the call is booked and stays as it is
+    // until a new time is accepted -- never "nothing is booked".
+    const moving = proposal.rescheduleOfMeetingId !== null;
+    const booked = moving ? await bookedTime(proposal).catch(() => null) : null;
     const body = (zone?: string) =>
-      `${proposal.purpose}\n${timesOf(offered, zone)}\nNothing is booked until a time is accepted.`;
+      moving
+        ? `${proposal.purpose}\n${
+            booked === null
+              ? "This moves the call already booked."
+              : `This moves the call booked for ${meetingTimeLabel(booked.startsAt, zone ?? booked.timeZone)}.`
+          } ${countered ? "Other times suggested:" : "Proposed new times:"}\n${timesOf(offered, zone)}\nThe call stays as booked until a new time is accepted.`
+        : `${proposal.purpose}\n${timesOf(offered, zone)}\nNothing is booked until a time is accepted.`;
     await notices.notify({
       relationshipId: proposal.relationshipId,
       actingSide: countered ? "INVESTOR" : "COMPANY",
       kind: "TIME_PROPOSED",
-      title: countered
-        ? "{actor} suggested other times for the call"
-        : "{actor} proposed times for a call",
+      title: moving
+        ? countered
+          ? "{actor} suggested other times to move the call"
+          : "{actor} proposed moving your call"
+        : countered
+          ? "{actor} suggested other times for the call"
+          : "{actor} proposed times for a call",
       body: body(),
       bodyInZone: body,
       target: "RELATIONSHIP",
