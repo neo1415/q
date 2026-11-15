@@ -50,6 +50,16 @@ if ! flock -n 9; then
   exit 75
 fi
 echo "pid=$$ sha=$full started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$root/gate.owner"
+# The gate also holds the machine's heavy-work lock for its whole run, so
+# no worker's vitest/tsc/eslint (scripts/heavy.sh, scripts/pre-gate.sh)
+# overlaps it: the 15 Nov failures were out-of-memory kills and timeouts
+# from such overlap. Wait for a running heavy command to finish first.
+exec 8>"$root/heavy.lock"
+if ! flock -n 8; then
+  echo "ci-local: waiting for heavy work to finish ($(cat "$root/heavy.owner" 2>/dev/null || echo busy))" >&2
+  flock 8
+fi
+echo "pid=$$ cmd=ci-local sha=$sha since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$root/heavy.owner"
 # The gate runs in its own clean checkout of the commit (CI_LOCAL_INPLACE=1
 # runs here instead), so work in this tree can go on while it runs and the
 # receipt is for exactly that commit, never for files edited mid-run.
@@ -116,7 +126,7 @@ docker_up() {
   timeout 10 docker info >/dev/null 2>&1 && return 0
   # The daemon outlives the gate: it must not inherit the gate's lock
   # (fd 9), or every later gate is refused as "another gate is running".
-  (nohup dockerd >"$out/dockerd.log" 2>&1 9>&- &)
+  (nohup dockerd >"$out/dockerd.log" 2>&1 8>&- 9>&- &)
   for _ in $(seq 1 60); do
     timeout 5 docker info >/dev/null 2>&1 && return 0
     sleep 1

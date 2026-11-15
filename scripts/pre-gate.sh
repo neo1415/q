@@ -12,6 +12,16 @@
 # Usage: bash scripts/pre-gate.sh [base-ref]   (default origin/recovery/2026-09-12)
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
+# Hold the machine's heavy-work lock (scripts/heavy.sh) for the whole
+# pre-gate, so it never overlaps the release gate or another worker's run.
+lock_root="${CI_LOCAL_OUT:-/tmp/ci-local}"
+mkdir -p "$lock_root"
+exec 8>"$lock_root/heavy.lock"
+if ! flock -n 8; then
+  echo "pre-gate: waiting for the machine ($(cat "$lock_root/heavy.owner" 2>/dev/null || echo busy))" >&2
+  flock 8
+fi
+echo "pid=$$ cmd=pre-gate since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$lock_root/heavy.owner"
 export PATH=/opt/node24/bin:$PATH
 base="${1:-origin/recovery/2026-09-12}"
 git fetch -q origin "${base#origin/}" 2>/dev/null || true
