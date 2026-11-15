@@ -266,7 +266,10 @@ import {
 import { createPostgresPlanStore } from "./composition/workforce/plan-store.js";
 import { createPlans } from "./composition/workforce/plans.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
-import { createWorkforceJobResults } from "./composition/workforce/results.js";
+import {
+  createWorkforceJobResults,
+  createWorkforceTeamJobs,
+} from "./composition/workforce/results.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createHeldRetry } from "./composition/workforce/held-retry.js";
 import { createBriefingCommandReader } from "./composition/briefing-command.js";
@@ -2873,6 +2876,8 @@ const workforceJobResults = createWorkforceJobResults({
 });
 const workPort = createWorkPort({
   jobResults: workforceJobResults,
+  // O2 (live check 15 Nov): the lead Q's jobs for the account digest.
+  teamJobs: createWorkforceTeamJobs({ store: workforceStore }),
   instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
   errands: {
@@ -3752,6 +3757,19 @@ const qTools = createQTools({
           // Addendum 14 Nov 2026 (slice 6): requests linked to an
           // uncertainty, with what came back, for the re-assessment note.
           followUps: diligenceFollowUps(view),
+          // O3 (live check 15 Nov): answered requests with when, for the
+          // account digest's recent events on both sides.
+          closedRequests: view.requests.flatMap((r) => {
+            const at =
+              r.status === "FULFILLED"
+                ? r.fulfilledAt
+                : r.status === "DECLINED"
+                  ? (r.declinedAt ?? null)
+                  : null;
+            return at === null || r.status === "OPEN"
+              ? []
+              : [{ title: r.title, status: r.status, at }];
+          }),
         };
       },
     },

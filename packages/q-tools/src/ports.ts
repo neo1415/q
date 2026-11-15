@@ -270,6 +270,17 @@ export type RelationshipIntelligencePort = {
          * Absent: not composed.
          */
         readonly followUps?: readonly DiligenceFollowUp[] | undefined;
+        /**
+         * Live check 15 Nov 2026 (O3): requests answered, with when --
+         * fulfilled (a document shared) or declined. Absent: not composed.
+         */
+        readonly closedRequests?:
+          | readonly {
+              readonly title: string;
+              readonly status: "FULFILLED" | "DECLINED";
+              readonly at: string;
+            }[]
+          | undefined;
       } | null>)
     | undefined;
   /**

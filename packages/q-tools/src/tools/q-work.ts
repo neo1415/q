@@ -134,6 +134,15 @@ export type QWorkJobResult = {
 };
 
 /** What the work tools reach, composed by q-api over the work store. */
+/** One of the lead Q's jobs, as its row stands. */
+export type QWorkTeamJob = {
+  readonly jobId: string;
+  readonly goal: string;
+  /** PLANNING, RUNNING, HELD, DONE, STOPPED or FAILED. */
+  readonly status: string;
+  readonly updatedAt: string;
+};
+
 export type QWorkIntelligencePort = {
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly hasCompany: (actor: ActorContext) => Promise<boolean>;
@@ -153,6 +162,13 @@ export type QWorkIntelligencePort = {
         }[]
       >)
     | undefined;
+  /**
+   * Live check 15 Nov 2026 (O2): the lead Q's own jobs for them, as the
+   * job rows stand (newest first, bounded): no step results, no artifact
+   * reads. Owner's own only. Absent: no workforce here.
+   */
+  readonly teamJobs?:
+    ((actor: ActorContext) => Promise<readonly QWorkTeamJob[]>) | undefined;
   /**
    * Jobs Q's team did for them (plan, research, memo, critique, revision,
    * diligence), as their persisted step results say, newest first with

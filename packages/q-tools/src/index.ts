@@ -400,6 +400,7 @@ export {
   createAccountDigestReader,
   digestRelationships,
   digestWork,
+  diligenceEvents,
   owedIn,
   recentEvents,
   relationshipOrder,
@@ -548,6 +549,7 @@ export {
   STOP_Q_WORK,
   type QWorkIntelligencePort,
   type QWorkJobResult,
+  type QWorkTeamJob,
   type QWorkProposal,
 } from "./tools/q-work.js";
 // end AUTO block

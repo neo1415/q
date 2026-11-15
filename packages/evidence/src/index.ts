@@ -375,6 +375,8 @@ export {
   type DeckExtractionRow,
   type PostgresDataRoom,
 } from "./infrastructure/postgres-data-room.js";
+// Live check 15 Nov 2026 (O1): whether a data-room request notice still asks.
+export { settledDataRoomRequestNotices } from "./infrastructure/data-room-notice-currency.js";
 export {
   createGateQApplicationEvidenceService,
   GateQApplicationEvidenceScopeSchema,

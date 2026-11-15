@@ -316,3 +316,9 @@ export {
   type SnapshotTruth,
 } from "./meeting-host/snapshot.js";
 // end MEET-HOST block
+// Live check 15 Nov 2026 (O1): whether a NEEDS_YOU notice still asks.
+export {
+  settledChatNotices,
+  settledProposalNotices,
+  type NoticeToCheck,
+} from "./notice-currency.js";

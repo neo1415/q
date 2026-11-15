@@ -246,6 +246,12 @@ export {
   type DiligenceRequestRecord,
   type DiligenceRequestRepository,
 } from "./infrastructure/postgres-diligence.js";
+// Live check 15 Nov 2026 (O1): whether a NEEDS_YOU notice still asks.
+export {
+  settledDiligenceRequestNotices,
+  settledInterestNotices,
+  type NetworkNoticeToCheck,
+} from "./infrastructure/notice-currency.js";
 export {
   createPostgresDiligenceQuestions,
   type DiligenceAnswerRecord,

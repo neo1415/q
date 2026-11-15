@@ -222,9 +222,11 @@ export function recentEvents(
   own: OwnRelationships | null,
   report: QAttentionReport | null,
   now: Date,
+  /** Already windowed (diligenceEvents): requests answered either way. */
+  extra: readonly AccountDigestEvent[] = [],
 ): readonly AccountDigestEvent[] {
   const from = now.getTime() - ACCOUNT_DIGEST_RECENT_DAYS * DAY_MS;
-  const events: AccountDigestEvent[] = [];
+  const events: AccountDigestEvent[] = [...extra];
   for (const item of own?.items ?? []) {
     for (const milestone of item.milestones) {
       const at = iso(milestone.at);
@@ -332,14 +334,45 @@ type Errands = Awaited<
   ReturnType<NonNullable<QWorkIntelligencePort["errands"]>>
 >;
 
+type TeamJobs = Awaited<
+  ReturnType<NonNullable<QWorkIntelligencePort["teamJobs"]>>
+>;
+
+/** A lead-Q job still in hand: planning, running, or held for the person. */
+const JOB_UNFINISHED = new Set(["PLANNING", "RUNNING", "HELD"]);
+const RUNNING = new Set(["ACTIVE", ...JOB_UNFINISHED]);
+
 /** Q's work for them: running first, then what finished in the last days. */
 export function digestWork(
   items: WorkItems,
   errands: Errands,
   now: Date,
+  teamJobs: TeamJobs = [],
 ): readonly AccountDigestWork[] {
   const from = now.getTime() - ACCOUNT_DIGEST_RECENT_DAYS * DAY_MS;
   const rows: AccountDigestWork[] = [];
+  // Live check 15 Nov (O2): the lead Q's own jobs, unfinished ones always,
+  // finished ones (done, stopped, failed) inside the recent window.
+  for (const job of teamJobs) {
+    if (!/^[0-9a-f-]{36}$/iu.test(job.jobId)) continue;
+    const updatedAt = iso(job.updatedAt);
+    if (updatedAt === null) continue;
+    const when = Date.parse(updatedAt);
+    if (
+      !JOB_UNFINISHED.has(job.status) &&
+      (when < from || when > now.getTime())
+    ) {
+      continue;
+    }
+    rows.push({
+      id: job.jobId,
+      kind: "JOB",
+      status: clip(job.status, 20),
+      goal: clip(job.goal.trim() || "Q's work", 160),
+      open: 0,
+      updatedAt,
+    });
+  }
   for (const job of items) {
     const updatedAt = iso(job.lastStep?.at ?? job.createdAt);
     if (updatedAt === null) continue;
@@ -378,7 +411,7 @@ export function digestWork(
   return rows
     .sort(
       (a, b) =>
-        Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE") ||
+        Number(RUNNING.has(b.status)) - Number(RUNNING.has(a.status)) ||
         Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
     )
     .slice(0, ACCOUNT_DIGEST_WORK_MAX);
@@ -454,36 +487,45 @@ export function createAccountDigestReader(
       return Promise.resolve(value);
     };
     const errandsOf = ports.work?.errands;
+    const teamJobsOf = ports.work?.teamJobs;
 
-    const [own, report, schedule, work, errands, gateq] = await Promise.all([
-      relationshipsOnce === null
-        ? notComposed<OwnRelationships | null>("RELATIONSHIPS", null)
-        : section("RELATIONSHIPS", relationshipsOnce, null),
-      section<QAttentionReport | null>(
-        "WAITING",
-        () => attention(actor, { now }),
-        null,
-      ),
-      scheduleOnce === null
-        ? notComposed<Upcoming | null>("MEETINGS", null)
-        : section<Upcoming | null>("MEETINGS", scheduleOnce, null),
-      workOnce === null
-        ? notComposed<WorkItems>("WORK", [])
-        : section<WorkItems>("WORK", workOnce, []),
-      errandsOf === undefined
-        ? Promise.resolve<Errands>([])
-        : section<Errands>("WORK", () => errandsOf(actor), []),
-      readGateq(ports.gateqDigest, actor, section),
-    ]);
+    const [own, report, schedule, work, errands, teamJobs, gateq] =
+      await Promise.all([
+        relationshipsOnce === null
+          ? notComposed<OwnRelationships | null>("RELATIONSHIPS", null)
+          : section("RELATIONSHIPS", relationshipsOnce, null),
+        section<QAttentionReport | null>(
+          "WAITING",
+          () => attention(actor, { now }),
+          null,
+        ),
+        scheduleOnce === null
+          ? notComposed<Upcoming | null>("MEETINGS", null)
+          : section<Upcoming | null>("MEETINGS", scheduleOnce, null),
+        workOnce === null
+          ? notComposed<WorkItems>("WORK", [])
+          : section<WorkItems>("WORK", workOnce, []),
+        errandsOf === undefined
+          ? Promise.resolve<Errands>([])
+          : section<Errands>("WORK", () => errandsOf(actor), []),
+        teamJobsOf === undefined
+          ? Promise.resolve<TeamJobs>([])
+          : section<TeamJobs>("WORK", () => teamJobsOf(actor), []),
+        readGateq(ports.gateqDigest, actor, section),
+      ]);
     // A report with sources it could not check is not the whole picture.
     if (report !== null && report.unread.length > 0) unread.add("WAITING");
 
     const relationships = digestRelationships(own);
-    const requests = await section(
+    const diligence = await section(
       "REQUESTS",
-      () => openRequests(ports.relationships, actor, own),
-      [] as readonly AccountDigestRequest[],
+      () => openRequests(ports.relationships, actor, own, now),
+      {
+        requests: [] as readonly AccountDigestRequest[],
+        events: [] as readonly AccountDigestEvent[],
+      },
     );
+    const requests = diligence.requests;
     const digest: QAccountDigest = {
       side: own?.side ?? null,
       relationships: [...relationships.listed],
@@ -493,10 +535,10 @@ export function createAccountDigestReader(
       waiting: (report?.items ?? []).slice(0, ACCOUNT_DIGEST_WAITING_MAX),
       waitingTotal: report?.items.length ?? 0,
       meetings: schedule === null ? [] : [...upcomingMeetings(schedule, now)],
-      work: [...digestWork(work, errands, now)],
+      work: [...digestWork(work, errands, now, teamJobs)],
       requests: [...requests],
       gateq,
-      recent: [...recentEvents(own, report, now)],
+      recent: [...recentEvents(own, report, now, diligence.events)],
       unread: [...unread].sort(),
       readAt: now.toISOString(),
     };
@@ -505,14 +547,56 @@ export function createAccountDigestReader(
   };
 }
 
+type DiligenceArea = NonNullable<
+  Awaited<ReturnType<NonNullable<RelationshipIntelligencePort["diligence"]>>>
+>;
+
+/**
+ * Live check 15 Nov 2026 (O3): document requests answered in the recent
+ * window, worded for the reader's side (investors ask, companies answer).
+ */
+export function diligenceEvents(
+  side: "INVESTOR" | "COMPANY",
+  relationshipId: string,
+  counterpart: string,
+  area: Pick<DiligenceArea, "closedRequests">,
+  now: Date,
+): readonly AccountDigestEvent[] {
+  const from = now.getTime() - ACCOUNT_DIGEST_RECENT_DAYS * DAY_MS;
+  return (area.closedRequests ?? []).flatMap(
+    (request): AccountDigestEvent[] => {
+      const at = iso(request.at);
+      if (at === null) return [];
+      const when = Date.parse(at);
+      if (when < from || when > now.getTime()) return [];
+      const title = clip(request.title, 100) || "a document";
+      const text =
+        side === "INVESTOR"
+          ? request.status === "FULFILLED"
+            ? `${counterpart} answered your request for ${title}`
+            : `${counterpart} declined your request for ${title}`
+          : request.status === "FULFILLED"
+            ? `You answered ${counterpart}'s request for ${title}`
+            : `You declined ${counterpart}'s request for ${title}`;
+      return [{ at, text: clip(text, 200), relationshipId }];
+    },
+  );
+}
+
 /** Diligence requests open in their relationships, either way. */
 async function openRequests(
   relationships: RelationshipIntelligencePort | undefined,
   actor: ActorContext,
   own: OwnRelationships | null,
-): Promise<readonly AccountDigestRequest[]> {
+  now: Date,
+): Promise<{
+  readonly requests: readonly AccountDigestRequest[];
+  readonly events: readonly AccountDigestEvent[];
+}> {
   const diligence = relationships?.diligence;
-  if (diligence === undefined || own === null) return [];
+  if (diligence === undefined || own === null) {
+    return { requests: [], events: [] };
+  }
   const inDiligence = own.items
     .filter((item) => item.state === "IN_DILIGENCE")
     .slice(0, ACCOUNT_DIGEST_REQUESTS_MAX);
@@ -522,7 +606,18 @@ async function openRequests(
         [item, await diligence(actor, item.relationshipId)] as const,
     ),
   );
-  return areas.flatMap(([item, area]): AccountDigestRequest[] => {
+  const events = areas.flatMap(([item, area]) =>
+    area === null
+      ? []
+      : diligenceEvents(
+          own.side,
+          item.relationshipId,
+          clip(item.counterpart.name, 120) || "Unnamed",
+          area,
+          now,
+        ),
+  );
+  const requests = areas.flatMap(([item, area]): AccountDigestRequest[] => {
     if (area === null) return [];
     if (area.openRequests.length === 0 && area.answeredRequests.length === 0) {
       return [];
@@ -539,6 +634,7 @@ async function openRequests(
       },
     ];
   });
+  return { requests, events };
 }
 
 async function readGateq(
