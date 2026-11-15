@@ -25,6 +25,8 @@ create table gateq.gateway_versions(id uuid primary key, gateway_id uuid, tenant
 -- Keep its canonical columns, validation and immutability in this thin fixture.
 \ir ../../../../migrations/20261223160000_gateq_document_disclosure_lineage.sql
 \ir ../../../../migrations/20261224100000_gateq_fact_supersession.sql
+-- The repository reads each Q turn's close state (ready_to_close).
+\ir ../../../../migrations/20261231591000_gateq_turn_ready_to_close.sql
 insert into identity.tenants values ('00000000-0000-4000-8000-0000000000a3'), ('00000000-0000-4000-8000-0000000000b3');
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
   ('00000000-0000-4000-8000-00000000dd01', '00000000-0000-4000-8000-0000000000b3'::uuid, '00000000-0000-4000-8000-0000000000b4'::uuid, 'VC', 'Interview Capital');
