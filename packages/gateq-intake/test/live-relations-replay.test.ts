@@ -74,7 +74,8 @@ type Turn = {
     | "78f8d72d5"
     | "30c99ccc5"
     | "318577a8e"
-    | "5757518c7";
+    | "5757518c7"
+    | "64637e8c9";
   readonly say: string;
   readonly script: Script;
   readonly resumeBefore?: true;
@@ -619,10 +620,18 @@ function assertTurnOutcome(
       expect(disagreementsOn("weekly_active_users")[0]?.state).toBe("OPEN");
       break;
     case "r-08": {
-      // CAC unknown is recorded as said; the WAU pair is untouched.
+      // CAC unknown is recorded as said, as CAC (named by name though the
+      // reader gave no metric; v12's rule puts it on its own dimension,
+      // live 64637e8c9); the WAU pair is untouched.
       const cac = byWords(world, "We don't know our CAC yet");
       expect(cac.value.kind).toBe("UNKNOWN");
-      expect(traction.items.some((i) => i.statementId === cac.id)).toBe(true);
+      expect(cac.quantity).toBe("cac");
+      expect(
+        dimensionView(view, "company.business_model").items.some(
+          (i) => i.statementId === cac.id,
+        ),
+      ).toBe(true);
+      expect(traction.items.some((i) => i.statementId === cac.id)).toBe(false);
       expect(store.eventRows).toHaveLength(0);
       expect(disagreementsOn("weekly_active_users")[0]?.state).toBe("OPEN");
       break;
@@ -3371,5 +3380,777 @@ describe("live reply replay: the seventh run (5757518c7), the plan decides how a
       /^No deck is needed; your own words are enough\. \p{Lu}[^?]*\?$/u,
     );
     expect(answered?.askingDimension ?? null).not.toBeNull();
+  });
+});
+
+/**
+ * The eighth live run (64637e8c9, application a14dbecf, Dukaari Africa):
+ * the endings passed, one P1 broke invariants 1, 3 and 4. Replayed with
+ * the form the founder saved and, turn by turn, the reply, asking label
+ * and reading the live model gave:
+ *
+ *   - P1: "It buys about 18 months" was read as a raise (MONEY 18, no
+ *     currency of its own, no unit) and stored as USD 18 from the turn's
+ *     "$"; code paired it with the form's 350,000; "Yes, that's right."
+ *     to Q's read-back corrected the 18 to 350,000; "I meant 400k, not
+ *     350k" corrected the form; and 350,000 vs 400,000 stood as an open
+ *     raise dispute, re-asked at t29 and announced at the close.
+ *   - P3: the CAC unknown carried no metric (v12 still said "CAC is not on
+ *     the list"), so it showed as an unlabelled "Business model: Not
+ *     known" beside the later "$12 per shop", which never answered it.
+ *   - P3: "You can finish and review when you're ready." plus the pointer
+ *     named the review twice in one reply (t53, t59).
+ */
+const EIGHTH_FORM = {
+  companyName: "Dukaari Africa",
+  oneLiner:
+    "Neighbourhood-shop restocking in Kisumu: Dukaari takes orders by app or USSD and delivers",
+  stage: "seed",
+  sectors: ["Commerce"],
+  country: "KE",
+  raise: { amount: "350000", currency: "USD" },
+  contactName: "Kamau Chege",
+  contactEmail: "kamau@example.com",
+};
+
+/** Every S<n> KNOWN FACTS lists on a dimension, in order. */
+function handlesOn(text: string, dimension: string): readonly string[] {
+  const found: string[] = [];
+  for (let nth = 0; ; nth += 1) {
+    try {
+      found.push(handleOn(text, dimension, nth));
+    } catch {
+      return found;
+    }
+  }
+}
+
+const EIGHTH: readonly Turn[] = [
+  {
+    id: "e-02",
+    run: "64637e8c9",
+    say: "Dukaari restocks neighbourhood dukas in Kisumu: shopkeepers order by app or USSD in the evening and we deliver next morning from partner distributors. I started it after watching my aunt close her shop half a day every week to queue at a wholesaler.",
+    script: () =>
+      reading({
+        reply:
+          "Kisumu, got it. That wholesaler queue is a very concrete problem; how many neighbourhood shops are ordering from you today?",
+        asking: "company.customers",
+        statements: [
+          st({
+            dimension: "company.description",
+            value: {
+              kind: "TEXT",
+              text: "Dukaari restocks neighbourhood dukas in Kisumu",
+            },
+            words:
+              "Dukaari restocks neighbourhood dukas in Kisumu: shopkeepers order by app or USSD in the evening and we deliver next morning from partner distributors.",
+          }),
+          st({
+            dimension: "company.problem",
+            value: {
+              kind: "TEXT",
+              text: "my aunt close her shop half a day every week to queue at a wholesaler",
+            },
+            words:
+              "my aunt close her shop half a day every week to queue at a wholesaler",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-04",
+    run: "64637e8c9",
+    say: "Traction so far: 16,000 crates delivered and 500 weekly active shops.",
+    script: () =>
+      reading({
+        reply:
+          "Sixteen thousand crates delivered and 500 weekly active shops, nice. How does the round split across uses, roughly in amounts?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            unit: "crate",
+            value: { kind: "COUNT", count: "16000" },
+            words: "16,000 crates delivered",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "500" },
+            words: "500 weekly active shops",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-06",
+    run: "64637e8c9",
+    say: "Nobody pays yet. Delivery is free for the first three months.",
+    script: () =>
+      reading({
+        reply:
+          "No customers are paying yet, and delivery is free for the first three months. What does this round buy in runway and milestones?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-08",
+    run: "64637e8c9",
+    say: "On growth: we went from 1 kiosk-chain customer to 4 since March.",
+    script: () =>
+      reading({
+        reply:
+          "That's a useful growth signal: from one kiosk-chain customer to four since March. How does Dukaari make money once the free-delivery period ends?",
+        asking: "company.business_model",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "customers",
+            unit: "customer",
+            value: { kind: "COUNT", count: "4" },
+            words: "we went from 1 kiosk-chain customer to 4 since March",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t10: the raise worked out from the split (read back by code),
+    // and the 18 months read as a raise of 18, with no currency and no
+    // unit of its own.
+    id: "e-10",
+    run: "64637e8c9",
+    say: "Roughly $200k to delivery vans, $90k to field agents in Nyalenda and Manyatta, and $60k to the ordering app and USSD. It buys about 18 months.",
+    script: () =>
+      reading({
+        reply:
+          "So the raise is roughly two hundred thousand dollars for delivery vans, ninety thousand for field agents in Nyalenda and Manyatta, and sixty thousand for the ordering app and USSD—about eighteen months of runway.",
+        asking: "raise.amount",
+        statements: [
+          st({
+            dimension: "raise.use_of_funds",
+            value: {
+              kind: "TEXT",
+              text: "$200k delivery vans, $90k field agents, $60k ordering app and USSD",
+            },
+            words:
+              "Roughly $200k to delivery vans, $90k to field agents in Nyalenda and Manyatta, and $60k to the ordering app and USSD.",
+          }),
+          st({
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "350000", currency: "USD" },
+            words:
+              "Roughly $200k to delivery vans, $90k to field agents in Nyalenda and Manyatta, and $60k to the ordering app and USSD.",
+          }),
+          st({
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            unit: null,
+            value: { kind: "MONEY", amount: "18", currency: null },
+            words: "It buys about 18 months.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t12: the yes to Q's read-back, read as correcting the raise Q
+    // was last shown (live: the 18) to 350,000.
+    id: "e-12",
+    run: "64637e8c9",
+    say: "Yes, that's right.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Perfect, that settles the raise at three hundred and fifty thousand dollars. I'd like to understand the team behind Dukaari—who's building it, and what does each person lead?",
+        intent: "CORRECTION",
+        asking: "company.team",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handlesOn(prompt.text, "raise.amount").at(-1) ?? null,
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "350000", currency: "USD" },
+            words: "Yes, that's right.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-14",
+    run: "64637e8c9",
+    say: "Team is four: I'm Kamau Chege, CEO, I ran route sales for a soft-drinks distributor in Kisumu for six years; our CTO Akinyi Otieno built USSD ordering at a Kisumu bank; and two operations leads.",
+    script: () =>
+      reading({
+        reply:
+          "Four people, with strong local distribution and USSD experience—that's a useful fit for the problem. How does the company make money, and what are the unit economics?",
+        asking: "company.business_model",
+        statements: [
+          st({
+            dimension: "company.team",
+            value: {
+              kind: "TEXT",
+              text: "Kamau Chege, CEO; CTO Akinyi Otieno; two operations leads",
+            },
+            words:
+              "Team is four: I'm Kamau Chege, CEO, I ran route sales for a soft-drinks distributor in Kisumu for six years; our CTO Akinyi Otieno built USSD ordering at a Kisumu bank; and two operations leads.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-16",
+    run: "64637e8c9",
+    say: "Once the trial ends each shop pays a 3% fee on every order.",
+    script: () =>
+      reading({
+        reply:
+          "A three percent fee on every order once the trial ends—that gives me the model. What does the opportunity look like in numbers, and how did you size it?",
+        asking: "company.market",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "each shop pays a 3% fee on every order",
+            },
+            words:
+              "Once the trial ends each shop pays a 3% fee on every order.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t18: on the right dimension, but with no metric.
+    id: "e-18",
+    run: "64637e8c9",
+    say: "We don't know our CAC yet.",
+    script: () =>
+      reading({
+        reply:
+          "Fair enough—CAC isn't sized yet. Let's take the market from another angle: what are your TAM, SAM and SOM, and how did you get there?",
+        intent: "UNKNOWN_OR_SKIP",
+        asking: "company.market",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We don't know our CAC yet.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t20: read as disagreeing with the form's seed.
+    id: "e-20",
+    run: "64637e8c9",
+    say: "Different topic: to be precise about stage, we're really a Series A company now, not seed. We've been operating for four years.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "That's a material change: you're saying Series A rather than seed, and you've been operating for four years. Which stage should I treat as the current one?",
+        intent: "CORRECTION",
+        asking: "company.stage",
+        statements: [
+          st({
+            op: "DISAGREES",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "series_a" },
+            words: "we're really a Series A company now, not seed",
+          }),
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "We've been operating for four years.",
+            },
+            words: "We've been operating for four years",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-22",
+    run: "64637e8c9",
+    say: "Back to users: about 1,300 weekly active shops.",
+    script: () =>
+      reading({
+        reply:
+          "I have 1,300 weekly active shops now, rather than the 500 you mentioned earlier. Which figure is right?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "1300" },
+            words: "about 1,300 weekly active shops",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t24: both standing disagreements left open (2 events).
+    id: "e-24",
+    run: "64637e8c9",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Fair enough. What's the instrument for the three-hundred-and-fifty-thousand-dollar raise?",
+        asking: "raise.instrument",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("claims.traction"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+          {
+            disagreement: prompt.disagreement("company.stage"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    // Live t26: a signalled correction of the form's raise.
+    id: "e-26",
+    run: "64637e8c9",
+    say: "Sorry, I meant 400k, not 350k.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Understood—four hundred thousand, not three hundred and fifty. What instrument are you using for the raise?",
+        intent: "CORRECTION",
+        asking: "raise.instrument",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "raise.amount"),
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "400000", currency: "USD" },
+            words: "Sorry, I meant 400k, not 350k.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t29: the answer, then the raise asked again (the false dispute
+    // made it askable).
+    id: "e-28",
+    run: "64637e8c9",
+    say: "Before that, a question for you: what does Kilima usually look at first in an application like this?",
+    script: () =>
+      reading({
+        reply:
+          "Kilima says it asks about the stage it invests at, where the company is based, the sectors it focuses on, the round size it can join, and its cheque size. It doesn't publish an order beyond that. How much is the company raising in this round?",
+        intent: "QUESTION_FOR_Q",
+        asking: "raise.amount",
+      }),
+  },
+  {
+    id: "e-30",
+    run: "64637e8c9",
+    say: "We'd take the round as a SAFE, and we don't have a lead investor yet.",
+    script: () =>
+      reading({
+        reply:
+          "A SAFE, and no lead investor yet—got it. What's your website, if you have one?",
+        asking: "company.website",
+        statements: [
+          st({
+            dimension: "raise.instrument",
+            value: { kind: "CODE", code: "safe" },
+            words: "We'd take the round as a SAFE",
+          }),
+          st({
+            dimension: "raise.lead_status",
+            value: { kind: "CODE", code: "no_lead" },
+            words: "we don't have a lead investor yet",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-32",
+    run: "64637e8c9",
+    say: "No website yet, just a WhatsApp catalogue.",
+    script: () =>
+      reading({
+        reply: "No website yet, understood.",
+        statements: [
+          st({
+            dimension: "company.website",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "No website yet, just a WhatsApp catalogue.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-34",
+    run: "64637e8c9",
+    say: "We haven't sized the market.",
+    script: () =>
+      reading({
+        reply: "Understood.",
+        intent: "UNKNOWN_OR_SKIP",
+        statements: [
+          st({
+            dimension: "company.market",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We haven't sized the market.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t53: the model's own review sentence, then the pointer.
+    id: "e-52",
+    run: "64637e8c9",
+    say: "Anything else you need from me?",
+    script: () =>
+      reading({
+        reply:
+          "No, I have what I need from you. You can finish and review when you’re ready.",
+        intent: "QUESTION_FOR_Q",
+      }),
+  },
+  {
+    // Live t56: the CAC figure, read as business-model prose.
+    id: "e-56",
+    run: "64637e8c9",
+    say: "Actually, our CAC is about $12 per shop, from the last two months of field-agent spend.",
+    script: () =>
+      reading({
+        reply:
+          "That's useful — about twelve dollars per shop, based on the last two months of field-agent spend.",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "CAC is about $12 per shop",
+            },
+            words:
+              "Actually, our CAC is about $12 per shop, from the last two months of field-agent spend.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "e-58",
+    run: "64637e8c9",
+    say: "Is there anything else you still need?",
+    script: () =>
+      reading({
+        reply:
+          "No, I have what I need from you. You can finish and review when you’re ready.",
+        intent: "QUESTION_FOR_Q",
+      }),
+  },
+  {
+    id: "e-60",
+    run: "64637e8c9",
+    say: "That's all from me for now.",
+    script: () =>
+      reading({
+        reply:
+          "Understood. I have what I need from you, and you can finish and review when you’re ready.",
+        intent: "SUBMIT_INTENT",
+      }),
+  },
+];
+
+/** How many times a reply names the review step, in any case. */
+const reviewMentions = (text: string): number =>
+  text.toLowerCase().split("finish and review").length - 1;
+
+describe("live replay: the eighth run (64637e8c9), money only as said, a correction settles", () => {
+  it("never stores a span of time as money, settles the raise on their correction, and files CAC as CAC", async () => {
+    const world = statementWorld();
+    const services = world.services();
+    const { token } = await services.intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    await services.intake.recordFacts({
+      token,
+      origin: "FORM",
+      facts: factsFromAnswers(EIGHTH_FORM),
+    });
+    world.scripts.push(() =>
+      reading({
+        reply:
+          "Kilima is an operator-led angel syndicate in Nairobi. What are you building toward from here?",
+        asking: "company.description",
+      }),
+    );
+    await services.conversation.openingFor({
+      token,
+      correlationId: randomUUID(),
+    });
+    const { conversation } = services;
+    let before = viewOf(world);
+    for (const turn of EIGHTH) {
+      world.advance(60_000);
+      const calls = world.prompts.length;
+      world.scripts.push(turn.script);
+      await conversation.turn({
+        token,
+        message: turn.say,
+        clientTurnId: turn.id,
+        correlationId: randomUUID(),
+      });
+      const after = viewOf(world);
+      assertAfterTurn(world, turn, after, before, world.prompts.length > calls);
+      before = after;
+      const store = world.store();
+      const reply = qReply(world, turn.id);
+
+      // P1 (invariant 1): money only as said. No raise of 18 is ever
+      // stored: a span of time is never money.
+      for (const s of store.statementRows)
+        if (s.value.kind === "MONEY")
+          expect(s.value.amount, `${turn.id}: "${s.words}"`).not.toBe("18");
+      // P1 (invariant 3): the raise is never in dispute, by a stored link
+      // or by detection: the founder gave one raise and corrected it.
+      expect(
+        dimensionView(after, "raise.amount").disagreements.filter(
+          (d) => d.active && d.state !== "RESOLVED",
+        ),
+        turn.id,
+      ).toEqual([]);
+      expect(
+        store.linkRows.filter((l) => {
+          const from = store.statementRows.find(
+            (s) => s.id === l.fromStatementId,
+          );
+          return l.kind === "DISAGREES" && from?.dimension === "raise.amount";
+        }),
+        turn.id,
+      ).toEqual([]);
+      // P3: the review step is named once per reply at most.
+      expect(reviewMentions(reply), `${turn.id}: "${reply}"`).toBeLessThan(2);
+
+      if (turn.id === "e-18") {
+        const cac = byWords(world, "We don't know our CAC yet.");
+        expect(cac.dimension).toBe("company.business_model");
+        expect(cac.quantity).toBe("cac");
+      }
+      if (turn.id === "e-26") {
+        const raise = dimensionView(after, "raise.amount");
+        expect(raise.status).toBe("SETTLED");
+        expect(raise.items.map((i) => i.value)).toEqual([
+          { kind: "MONEY", amount: "400000", currency: "USD" },
+        ]);
+      }
+      // P1 (invariant 4): after the correction the raise is never asked.
+      if (turn.id === "e-28") {
+        const row = store.turnRows.find(
+          (t) => t.role === "Q" && t.clientTurnId === "e-28",
+        );
+        expect(row?.askingDimension ?? null).not.toBe("raise.amount");
+        expect(reply).not.toMatch(/how much is the company raising/iu);
+      }
+      if (turn.id === "e-56") {
+        // A later known CAC answers the stated unknown; the unknown stays
+        // in history, never as an unlabelled "Not known" beside it.
+        const model = dimensionView(after, "company.business_model");
+        expect(model.items.filter((i) => i.value.kind === "UNKNOWN")).toEqual(
+          [],
+        );
+        expect(
+          model.superseded.some(
+            (s) => s.item.words === "We don't know our CAC yet.",
+          ),
+        ).toBe(true);
+        expect(model.status).toBe("SETTLED");
+      }
+    }
+
+    // The close names what really disagrees (stage, traction), never the
+    // raise; and the raise was never asked after the correction.
+    const qRows = world.store().turnRows.filter((t) => t.role === "Q");
+    const close = qRows.find((t) => CLOSE.test(t.text));
+    expect(close?.text).toContain(
+      "Stage and traction each still have two answers that disagree",
+    );
+    const corrected =
+      qRows.find((t) => t.clientTurnId === "e-26")?.seq ??
+      Number.MAX_SAFE_INTEGER;
+    for (const row of qRows.filter((t) => t.seq > corrected))
+      expect(row.askingDimension, row.clientTurnId).not.toBe("raise.amount");
+    for (const id of ["e-52", "e-58", "e-60"])
+      expect(qReply(world, id), id).toContain(
+        "Finish and review is ready whenever you are.",
+      );
+    // Only stage and traction stand, both left open.
+    expect(
+      standing(viewOf(world))
+        .map((d) => d.state)
+        .sort(),
+    ).toEqual(["LEFT_OPEN", "LEFT_OPEN"]);
+  });
+});
+
+describe("a correction settles the dispute it ends (frozen 64637e8c9 rows)", () => {
+  const APP = "00000000-0000-4000-8000-000000000b08";
+  const turnId = (n: number) =>
+    `00000000-0000-4000-8000-0000000e${String(n).padStart(4, "0")}`;
+  const statement = (
+    n: number,
+    turn: number | null,
+    dimension: string,
+    value: ApplicationStatement["value"],
+    quantity: string | null,
+    words = `statement ${String(n)}`,
+  ): ApplicationStatement =>
+    ({
+      id: `00000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`,
+      applicationId: APP,
+      dimension,
+      quantity,
+      value,
+      asOf: null,
+      words,
+      provenance: value.kind === "UNKNOWN" ? "UNKNOWN" : "APPLICANT_PROVIDED",
+      origin: turn === null ? "FORM" : "TURN",
+      sourceTurnId: turn === null ? null : turnId(turn),
+      backfillKey: null,
+      statedAt: `2026-11-15T12:${String(n).padStart(2, "0")}:00.000Z`,
+      recordedAt: `2026-11-15T12:${String(n).padStart(2, "0")}:00.000Z`,
+    }) as ApplicationStatement;
+  const link = (
+    n: number,
+    kind: "CORRECTS" | "DISAGREES",
+    from: ApplicationStatement,
+    to: ApplicationStatement,
+    origin: "CODE_DETECTED" | "MODEL_READING",
+  ): StatementLink =>
+    ({
+      id: `00000000-0000-4000-8000-0000000f${String(n).padStart(4, "0")}`,
+      applicationId: APP,
+      kind,
+      fromStatementId: from.id,
+      toStatementId: to.id,
+      origin,
+      sourceTurnId: from.sourceTurnId,
+      createdAt: from.statedAt,
+    }) as StatementLink;
+  const usd = (amount: string): ApplicationStatement["value"] => ({
+    kind: "MONEY",
+    amount,
+    currency: "USD",
+  });
+  const raise = (n: number, turn: number | null, amount: string) =>
+    statement(n, turn, "raise.amount", usd(amount), "raise_amount");
+  const wau = (n: number, turn: number, count: string) =>
+    statement(
+      n,
+      turn,
+      "claims.traction",
+      { kind: "COUNT", count },
+      "weekly_active_users",
+    );
+
+  it("form 350k, a misread 18, their yes to 350k, then 400k correcting the form: one raise, 400k, no dispute", () => {
+    const form = raise(1, null, "350000");
+    const misread = raise(2, 10, "18");
+    const yes = raise(3, 12, "350000");
+    const fourHundred = raise(4, 26, "400000");
+    const view = projectView(
+      [form, misread, yes, fourHundred],
+      [
+        link(1, "DISAGREES", misread, form, "CODE_DETECTED"),
+        link(2, "CORRECTS", yes, misread, "MODEL_READING"),
+        link(3, "CORRECTS", fourHundred, form, "MODEL_READING"),
+      ],
+      [],
+    );
+    expect(standing(view)).toEqual([]);
+    const amount = dimensionView(view, "raise.amount");
+    expect(amount.status).toBe("SETTLED");
+    expect(amount.items.map((i) => i.statementId)).toEqual([fourHundred.id]);
+  });
+
+  it("the same figure said again after the correction still disagrees", () => {
+    const form = raise(1, null, "350000");
+    const fourHundred = raise(2, 26, "400000");
+    const again = raise(3, 30, "350000");
+    const view = projectView(
+      [form, fourHundred, again],
+      [link(1, "CORRECTS", fourHundred, form, "MODEL_READING")],
+      [],
+    );
+    expect(standing(view)).toHaveLength(1);
+  });
+
+  it("a correction back to the other side's value settles the pair", () => {
+    const a = wau(1, 4, "500");
+    const b = wau(2, 22, "1300");
+    const back = wau(3, 40, "500");
+    const view = projectView(
+      [a, b, back],
+      [
+        link(1, "DISAGREES", b, a, "CODE_DETECTED"),
+        link(2, "CORRECTS", back, b, "MODEL_READING"),
+      ],
+      [],
+    );
+    expect(standing(view)).toEqual([]);
+    expect(dimensionView(view, "claims.traction").status).toBe("SETTLED");
+  });
+
+  it("a later CAC answers the CAC unknown, also when the figure is prose naming it", () => {
+    const unknown = statement(
+      1,
+      18,
+      "company.business_model",
+      { kind: "UNKNOWN" },
+      "cac",
+      "We don't know our CAC yet.",
+    );
+    const fee = statement(
+      2,
+      16,
+      "company.business_model",
+      { kind: "TEXT", text: "3% fee on every order" },
+      null,
+      "each shop pays a 3% fee on every order",
+    );
+    const figure = statement(
+      3,
+      56,
+      "company.business_model",
+      { kind: "TEXT", text: "CAC is about $12 per shop" },
+      null,
+      "Actually, our CAC is about $12 per shop.",
+    );
+    const before = dimensionView(
+      projectView([unknown, fee], [], []),
+      "company.business_model",
+    );
+    expect(before.items.map((i) => i.statementId)).toContain(unknown.id);
+    const model = dimensionView(
+      projectView([unknown, fee, figure], [], []),
+      "company.business_model",
+    );
+    expect(model.items.map((i) => i.statementId)).not.toContain(unknown.id);
+    expect(model.superseded[0]?.supersededBy).toBe(figure.id);
   });
 });

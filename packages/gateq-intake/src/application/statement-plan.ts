@@ -45,10 +45,11 @@ import {
 import { currencyCodeIn, normaliseProposedFact } from "./normalise-fact.js";
 import { regionIn } from "./cities.js";
 import type { NotRecorded } from "./not-recorded.js";
-import { amountStatedIn } from "./stated-amount.js";
+import { amountStatedIn, scaledAmountStatedIn } from "./stated-amount.js";
 import {
   dimensionView,
   legacyFactsFrom,
+  metricNamedIn,
   projectView,
   quantityFitting,
   relatable,
@@ -96,8 +97,11 @@ import {
  * 7: prompt v12; an unknown about a named metric goes on that metric's
  * dimension, never the one Q asked about, and not knowing beside an
  * answer of the same reading is that answer's (live 5757518c7).
+ * 8: prompt v13; money only with a currency or money unit said, a span of
+ * time is months (runway), never money; a metric named by name is that
+ * metric (live 64637e8c9).
  */
-export const STATEMENT_READING_VERSION = 7;
+export const STATEMENT_READING_VERSION = 8;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
@@ -545,6 +549,50 @@ function moneyOf(
   if (/^0(\.0{1,2})?$/u.test(amount))
     return currency === null ? { kind: "ZERO" } : { kind: "ZERO", currency };
   return { kind: "MONEY", amount, currency };
+}
+
+/** Where a span of time a round buys is kept: what the money is for. */
+const RUNWAY_HOME: ApplicationDimension = "raise.use_of_funds";
+
+/**
+ * A read MONEY value as the founder said it. Money only when they put a
+ * currency or a money unit on it: a currency in their own words for it, a
+ * currency as the reader's `unit`, or, when the reader gave no unit, an
+ * amount said with a money scale ("I meant 400k, not 350k"). A unit the
+ * reader gives that is not a currency is what the number counts, never
+ * money (live 64637e8c9 t10: "It buys about 18 months" became a raise of
+ * USD 18): a span of months the round buys is runway, kept as months on
+ * what the money is for; anything else is not stored as a value. A
+ * currency is never borrowed from the rest of the turn or the record to
+ * make a bare number money.
+ */
+export function moneyAsSaid(
+  op: GateQStatementOp,
+  words: string,
+): GateQStatementOp | null {
+  // Months of runway read onto the raise are what the money buys, never
+  // its size: the raise holds only money.
+  if (
+    op.value.kind === "COUNT" &&
+    op.quantity === "runway_months" &&
+    op.dimension === "raise.amount"
+  )
+    return { ...op, op: "NEW", target: null, dimension: RUNWAY_HOME };
+  if (op.value.kind !== "MONEY") return op;
+  const unit = typeof op.unit === "string" ? op.unit.trim() : "";
+  if (currencyCodeIn(words) !== null) return op;
+  if (unit.length > 0 && currencyCodeIn(unit) !== null) return op;
+  if (unit.length === 0)
+    return scaledAmountStatedIn(op.value.amount, words) ? op : null;
+  if (!/\p{L}/u.test(unit) || !unitFits(unit, "runway_months")) return null;
+  return {
+    ...op,
+    op: "NEW",
+    target: null,
+    dimension: RUNWAY_HOME,
+    quantity: "runway_months",
+    value: { kind: "COUNT", count: op.value.amount },
+  };
 }
 
 /** The statement value(s) a read value holds in its dimension's shape. */
@@ -1257,13 +1305,22 @@ export function planReading(input: PlanInput): PlanOutcome {
       // An unknown about a metric they named is about that metric, on its
       // dimension, whatever Q asked (live 5757518c7 t10: "We don't know our
       // CAC yet." to a market question became Market not known).
-      const named = op.quantity ?? null;
+      // The reader may leave the metric out though they named it (live
+      // 64637e8c9 t18: the CAC unknown was stored with no metric, shown as
+      // an unlabelled "Business model: Not known", and the later "$12 per
+      // shop" never answered it): a metric named by name is that metric.
+      const named = op.quantity ?? metricNamedIn(op.words);
       const homes = named === null ? undefined : METRIC_DIMENSIONS[named];
-      if (
-        homes !== undefined &&
-        !homes.some((dimension) => dimension === op.dimension)
-      )
-        return { ...op, dimension: homes[0] ?? op.dimension };
+      if (homes !== undefined && named !== null) {
+        const dimension = homes.some((d) => d === op.dimension)
+          ? op.dimension
+          : (homes[0] ?? op.dimension);
+        return {
+          ...op,
+          dimension,
+          quantity: named as GateQStatementOp["quantity"],
+        };
+      }
     }
     // "Not known" is about something, never about a note: said in answer
     // to Q's question on a dimension that holds nothing yet, it is that
@@ -1318,21 +1375,21 @@ export function planReading(input: PlanInput): PlanOutcome {
       rejected += 1;
       continue;
     }
-    const op = asSaid(read);
-    if (op === null) continue;
+    const said = asSaid(read);
+    if (said === null) continue;
     // Which turn said it. A T<n> the server did not issue is never guessed.
     let turn: PlanTurn = input.current;
-    if (op.turn !== null) {
-      const handle = handleOf(input.handles.turns, op.turn);
+    if (said.turn !== null) {
+      const handle = handleOf(input.handles.turns, said.turn);
       const index = handle === null ? -1 : Number(handle.slice(1)) - 1;
       const found = index >= 0 ? input.unread[index] : undefined;
       if (found === undefined) {
         rejected += 1;
         note(input.current, {
-          dimension: DIMENSIONS.has(op.dimension)
-            ? (op.dimension as ApplicationDimension)
+          dimension: DIMENSIONS.has(said.dimension)
+            ? (said.dimension as ApplicationDimension)
             : null,
-          words: `${op.turn}: ${op.words}`.slice(0, 600),
+          words: `${said.turn}: ${said.words}`.slice(0, 600),
           reason: "UNKNOWN_HANDLE",
         });
         continue;
@@ -1342,12 +1399,26 @@ export function planReading(input: PlanInput): PlanOutcome {
     if (turn === input.current && input.currentRead === true) continue;
     const slot = perTurn.get(turnKey(turn));
     if (slot !== undefined) slot.proposed += 1;
-    if (!DIMENSIONS.has(op.dimension)) {
+    if (!DIMENSIONS.has(said.dimension)) {
       rejected += 1;
       note(turn, {
         dimension: null,
-        words: op.words.slice(0, 600),
+        words: said.words.slice(0, 600),
         reason: "OUT_OF_SCOPE",
+      });
+      continue;
+    }
+    // Money only when they put a currency or money unit on it (live
+    // 64637e8c9 t10: "It buys about 18 months" became a raise of USD 18,
+    // a code-detected disagreement with the form, and a raise dispute that
+    // outlived their correction).
+    const op = moneyAsSaid(said, ownWords(said.words, turn.text));
+    if (op === null) {
+      rejected += 1;
+      note(turn, {
+        dimension: said.dimension as ApplicationDimension,
+        words: said.words.slice(0, 600),
+        reason: "INVALID_VALUE",
       });
       continue;
     }

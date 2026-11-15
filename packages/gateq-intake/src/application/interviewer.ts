@@ -1076,13 +1076,19 @@ export function createGateQInterviewer(
             return unchanged;
           const next = planNext(modelAsking);
           if (next === null) {
-            const kept = withoutQuestions(modelComposed);
+            // The review step is named once per reply: the model's own
+            // sentence pointing to it, in any case ("You can finish and
+            // review when you're ready."), gives way to the fixed line
+            // (live 64637e8c9 t53, t59 said it twice).
+            const namesReview = (sentence: string) =>
+              sentence.toLowerCase().includes(REVIEW_CONTROL.toLowerCase());
+            const kept = replySentences(withoutQuestions(modelComposed))
+              .filter((sentence) => !namesReview(sentence))
+              .join(" ");
             const line =
               input.readyToClose !== true
                 ? closingLine(after.view)
-                : kept.includes(REVIEW_CONTROL)
-                  ? ""
-                  : REVIEW_POINTER;
+                : REVIEW_POINTER;
             return {
               reply: `${kept} ${line}`.trim().slice(0, 4_000),
               asking: null,

@@ -201,6 +201,43 @@ function canonicalDecimal(decimal: string): string {
   return negative && magnitude !== "0" ? `-${magnitude}` : magnitude;
 }
 
+/** Whether two values are the same figure: same unit, same exact amount. */
+function sameFigure(a: StatementValue, b: StatementValue): boolean {
+  const left = comparable(a);
+  const right = comparable(b);
+  return (
+    left !== null &&
+    right !== null &&
+    left.unit === right.unit &&
+    left.amount === right.amount
+  );
+}
+
+/**
+ * The metrics a founder names by their own name, as the platform lists them
+ * (the quantity keys a reader is given, and their spelled-out names). Only
+ * names that mean one metric and nothing else: "customers" or "revenue"
+ * alone name too much to be read as a metric from words.
+ */
+const METRIC_NAMES: readonly (readonly [string, RegExp])[] = [
+  ["cac", /\bcac\b|\bcustomer acquisition cost\b/iu],
+  ["mrr", /\bmrr\b|\bmonthly recurring revenue\b/iu],
+  ["arr", /\barr\b|\bannual recurring revenue\b/iu],
+  ["gmv", /\bgmv\b|\bgross merchandise value\b/iu],
+  ["gross_margin", /\bgross margins?\b/iu],
+  ["pre_money_valuation", /\bpre-?money valuation\b/iu],
+];
+
+/**
+ * The one metric their words name by name, or null when they name none or
+ * more than one. Used only where the reader named no metric for a
+ * statement that is plainly about one ("We don't know our CAC yet").
+ */
+export function metricNamedIn(words: string): string | null {
+  const named = METRIC_NAMES.filter(([, pattern]) => pattern.test(words));
+  return named.length === 1 ? (named[0]?.[0] ?? null) : null;
+}
+
 /**
  * Whether two values are numbers that disagree: the same unit (any unit
  * against a zero) and a different exact amount. Prose, unknowns and an
@@ -328,6 +365,49 @@ export function projectView(
   for (const link of sortedLinks)
     if (link.kind === "CORRECTS")
       hide(link.toStatementId, link.fromStatementId, "CORRECTION");
+  // A correction is of the figure, not only of the row it names: "I meant
+  // 400k, not 350k" also replaces every earlier answer of that same 350k
+  // for the same metric and period (live 64637e8c9: the form's 350,000 was
+  // corrected, but their earlier "yes" to 350,000 stayed current and stood
+  // against the 400,000 as a raise dispute nobody had raised). Only what
+  // was said before the correction; a different figure is never touched
+  // (D11), and the same figure said again afterwards stands.
+  for (const link of sortedLinks) {
+    if (link.kind !== "CORRECTS") continue;
+    const target = byId.get(link.toStatementId);
+    const by = byId.get(link.fromStatementId);
+    if (target === undefined || by === undefined || !isHeld(by.value)) continue;
+    const metric = quantityFitting(target.value.kind, target.quantity);
+    if (metric === null || sameFigure(target.value, by.value)) continue;
+    for (const other of byId.values())
+      if (
+        other.id !== target.id &&
+        other.id !== by.id &&
+        other.dimension === target.dimension &&
+        quantityFitting(other.value.kind, other.quantity) === metric &&
+        other.asOf === target.asOf &&
+        byStated(other, by) < 0 &&
+        sameFigure(other.value, target.value)
+      )
+        hide(other.id, by.id, "CORRECTION");
+  }
+  // Unknown stays unknown only until they know: a later figure for the
+  // same metric on the same dimension answers a stated unknown (live
+  // 64637e8c9: "We don't know our CAC yet", then "our CAC is about $12 per
+  // shop", and the review showed both). The unknown stays in history.
+  for (const unknown of byId.values()) {
+    if (unknown.value.kind !== "UNKNOWN" || unknown.quantity === null) continue;
+    const answer = [...byId.values()]
+      .filter(
+        (s) =>
+          isHeld(s.value) &&
+          s.dimension === unknown.dimension &&
+          byStated(unknown, s) < 0 &&
+          (s.quantity ?? metricNamedIn(s.words)) === unknown.quantity,
+      )
+      .sort(byStated)[0];
+    if (answer !== undefined) hide(unknown.id, answer.id, "RESOLUTION");
+  }
 
   const disagreementLinks = sortedLinks.filter((l) => l.kind === "DISAGREES");
   const linkStates = new Map<string, LinkState>();

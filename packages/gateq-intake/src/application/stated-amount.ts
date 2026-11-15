@@ -140,6 +140,26 @@ export function amountsIn(text: string): readonly number[] {
   return [...found, ...wordAmountsIn(text)];
 }
 
+/**
+ * True only when `amount` is written in `text` with a money scale on it:
+ * "400k", "1.2m", "two million". A scale is how people say money without
+ * naming the currency ("I meant 400k, not 350k"); a bare "18" is not.
+ */
+export function scaledAmountStatedIn(amount: string, text: string): boolean {
+  const target = Number(amount);
+  if (!Number.isFinite(target)) return false;
+  const near = (value: number) => Math.abs(value - target) < 0.005;
+  for (const match of text.matchAll(NUMBER)) {
+    const scale = SCALES[(match[3] ?? "").toLowerCase()];
+    if (scale === undefined) continue;
+    const whole = (match[1] ?? "").replace(/[,\u00a0\u202f ]/gu, "");
+    const fraction = match[2] ?? "";
+    const value = Number(fraction === "" ? whole : `${whole}.${fraction}`);
+    if (near(value * scale)) return true;
+  }
+  return wordAmountsIn(text).some(near);
+}
+
 /** True only when `amount` (a decimal string) is written in `text`. */
 export function amountStatedIn(amount: string, text: string): boolean {
   const target = Number(amount);
