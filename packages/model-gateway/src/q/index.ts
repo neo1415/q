@@ -358,10 +358,18 @@ import {
   type InvestorAsk,
 } from "./investor-discovery-answer.js";
 import {
+  runConditionedProspects,
   runInvestorProspects,
   withCodeFitMeasures,
   type InvestorProspectsAsk,
 } from "./investor-prospects-answer.js";
+import {
+  listConditionsOf,
+  needsConditionedLane,
+  hasAnyCondition,
+  runConditionedCompanyList,
+  type ListConditions,
+} from "./list-conditions.js";
 export { identityCardBlock } from "./person-search-answer.js";
 export {
   investorCardsBlock,
@@ -5556,6 +5564,43 @@ export function createModelGatewayQAnswer(
         context: toolContext,
         available: prefetchTools,
       }).catch(() => null);
+    // RC2 (audit 2026-11-15): a founder's investors under the conditions
+    // they stated (v89 listConditions, v88 exclusion), applied by code.
+    const conditionedProspectsFor = (
+      ask: InvestorProspectsAsk,
+      conditions: ListConditions,
+      companyId: string,
+    ) =>
+      runConditionedProspects({
+        ask,
+        conditions,
+        companyId,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+        inContact: accountDigest.then(relationshipCounterparts),
+      }).catch(() => null);
+    // RC2: an investor's companies under the conditions they stated.
+    const conditionedListFor = (input: {
+      readonly conditions: ListConditions;
+      readonly within: readonly string[] | null;
+      readonly count: number | null;
+      readonly discover: {
+        readonly sectors: readonly string[];
+        readonly countries: readonly string[];
+        readonly stages: readonly string[];
+      } | null;
+    }) =>
+      runConditionedCompanyList({
+        ...input,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+        own: (standingOf() ?? Promise.resolve(null)).then((outcome) =>
+          outcome !== null && outcome.result.ok ? outcome.result.data : null,
+        ),
+        inTouch: accountDigest.then(relationshipCounterparts),
+      }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
     // other reads; the answer is then written from it by code. Read only
@@ -6479,6 +6524,8 @@ export function createModelGatewayQAnswer(
       investorsFor,
       webDiscoveryFor,
       prospectsFor,
+      conditionedProspectsFor,
+      conditionedListFor,
       sweepForReading,
       // Owner 2026-10-23: the investor's own candidates, ranked by fit,
       // for a recommendation ask and for "rank them" over what nobody
@@ -6900,6 +6947,8 @@ export function createModelGatewayQAnswer(
         investorsFor,
         webDiscoveryFor,
         prospectsFor,
+        conditionedProspectsFor,
+        conditionedListFor,
         sweepForReading,
         sweepCandidates,
         investorAsking,
@@ -9748,6 +9797,117 @@ export function createModelGatewayQAnswer(
           };
         }
       }
+      /**
+       * RC2 (audit 2026-11-15): a ranked list with a condition the person
+       * stated -- "only the ones with actual revenue", "outside my
+       * preferred sectors", "which would be poor fits", a founder's "leave
+       * out the investors I'm already talking to" -- is answered with the
+       * condition applied by code before ranking, never the plain ranking.
+       * The conditions are the reading's (v89 listConditions, v88
+       * excludeRelationships). When no lane here can honour them, every
+       * code-composed list below stands down and the full path answers.
+       */
+      const listConditions = listConditionsOf(request);
+      const conditionedTurn =
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q") &&
+        request.aboutNamedOther !== true &&
+        (request.compare ?? null) === null &&
+        compareTable === null;
+      const founderListAsk =
+        request.investorProspects ??
+        (request.fitQuestion !== undefined && askerSideOf(request) === "FOUNDER"
+          ? {
+              text: request.fitQuestion.text,
+              count: request.fitQuestion.count,
+            }
+          : undefined);
+      const founderConditioned =
+        !investorAsking &&
+        hasAnyCondition(listConditions) &&
+        founderListAsk !== undefined &&
+        prepared.ownCompanyId !== null;
+      const investorConditioned =
+        investorAsking &&
+        needsConditionedLane(listConditions) &&
+        (request.fitQuestion !== undefined ||
+          request.discoverCompanies !== undefined);
+      let listConditionsUnhonoured = false;
+      if (
+        conditionedTurn &&
+        listConditions !== null &&
+        (founderConditioned || investorConditioned)
+      ) {
+        const conditionedStarted = Date.now();
+        const found =
+          founderConditioned &&
+          founderListAsk !== undefined &&
+          prepared.ownCompanyId !== null
+            ? await conditionedProspectsFor(
+                founderListAsk,
+                listConditions,
+                prepared.ownCompanyId,
+              )
+            : await conditionedListFor({
+                conditions: listConditions,
+                within:
+                  (request.fitQuestion?.previous === true ||
+                    request.discoverCompanies?.previous === true) &&
+                  shownBefore.length > 0
+                    ? shownBefore
+                    : null,
+                count:
+                  request.fitQuestion?.count ??
+                  request.discoverCompanies?.count ??
+                  null,
+                discover:
+                  request.discoverCompanies === undefined
+                    ? null
+                    : {
+                        sectors: request.discoverCompanies.sectors,
+                        countries: request.discoverCompanies.countries,
+                        stages: request.discoverCompanies.stages,
+                      },
+              });
+        if (found !== null) {
+          const message = await persistCodeAnswer(
+            found.text,
+            found.block === null ? [] : [found.block],
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              side: founderConditioned ? "FOUNDER" : "INVESTOR",
+              conditions: listConditions,
+              shown: Array.isArray(found.shown)
+                ? found.shown.length
+                : found.shown,
+              unknown: found.unknown,
+              excludedInContact: found.excludedInContact,
+              toolCalls: found.calls.length,
+              modelCalls: 0,
+              conditionedMs: Date.now() - conditionedStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a ranked list under the stated conditions",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+        // No lane can honour the condition: the full path answers, never
+        // the plain list that ignores it.
+        listConditionsUnhonoured = true;
+        logger?.info(
+          { qRunId: request.runId, conditions: listConditions },
+          "q could not apply the stated list conditions by code; full path answers",
+        );
+      }
       // v58 (owner 2026-10-23): which investors their own company should
       // approach -- investors already interested, then likely fits from
       // what investors publish -- found by code, never from the company
@@ -9771,6 +9931,7 @@ export function createModelGatewayQAnswer(
           : undefined);
       if (
         prospectsAsk !== undefined &&
+        !listConditionsUnhonoured &&
         prepared.ownCompanyId !== null &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
@@ -9880,6 +10041,7 @@ export function createModelGatewayQAnswer(
       const narrowingHere = rule?.narrowing === true && !rule.asked;
       if (
         catalogAsk !== undefined &&
+        !listConditionsUnhonoured &&
         request.writingDocument !== true &&
         (narrowingHere ||
           // F-114: a narrowing read as "set the Discover filters" away
@@ -9989,8 +10151,9 @@ export function createModelGatewayQAnswer(
               excludeRelationships: true,
             }
           : readFit;
-      const swept =
-        (pastShown || pastRelationships) && readSweepFit !== undefined
+      const swept = listConditionsUnhonoured
+        ? null
+        : (pastShown || pastRelationships) && readSweepFit !== undefined
           ? await sweepForReading(readSweepFit)
           : recommendAll && readSweepFit !== undefined
             ? // The reading decides: the words' sweep may have read
@@ -13436,7 +13599,11 @@ export function createModelGatewayQAnswer(
           : fitAnswerCardsBlock(fitsRead, content, {
               // Fits code read for a plain list question: cards only for
               // what the answer names.
-              namedOnly: sweep !== null && !sweep.ask.fitAsked,
+              // RC2: a condition code could not apply never comes back
+              // as the plain ranking's cards: only what the answer names.
+              namedOnly:
+                listConditionsUnhonoured ||
+                (sweep !== null && !sweep.ask.fitAsked),
             });
         if (builtCards !== null) {
           logger?.info(

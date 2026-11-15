@@ -19,7 +19,7 @@ import {
 describe("TURN_READER v56: a FIT question for companies not shown yet", () => {
   it("is v55 kept whole plus the FIT rule; both are now deprecated (v57 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(88);
+    expect(active.definition.version).toBe(89);
     expect(TURN_READER_V55.status).toBe("DEPRECATED");
     expect(TURN_READER_V56.status).toBe("DEPRECATED");
     expect(TURN_READER_V56.template).toContain(V55_SCREEN_CONTROLS);

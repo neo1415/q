@@ -509,6 +509,23 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * the list and drops any card a list still shows. Absent is false.
    */
   readonly excludeRelationships?: boolean | undefined;
+  /**
+   * TURN_READER v89 (audit 2026-11-15, RC2): the conditions they put on a
+   * ranked list of companies or investors, as the reader read them. Code
+   * applies them from the records before ranking, in the investor fit lane
+   * and the founder investor-prospects lane; a condition no lane can apply
+   * goes to the full path, never the plain list. Absent: none stated.
+   */
+  readonly listConditions?:
+    | {
+        readonly relationship: "EXCLUDE_IN_CONTACT" | "ONLY_IN_CONTACT" | null;
+        readonly revenue: "HAS_REVENUE" | "PRE_REVENUE" | null;
+        readonly sector: "INSIDE" | "OUTSIDE" | null;
+        readonly stage: "INSIDE" | "OUTSIDE" | null;
+        readonly geography: "INSIDE" | "OUTSIDE" | null;
+        readonly order: "BEST_FIRST" | "WORST_FIRST";
+      }
+    | undefined;
   readonly fitQuestion?:
     | {
         readonly text: string;
