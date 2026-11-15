@@ -71,6 +71,8 @@ import {
   type QOperatingMode,
   type QAccountDigest,
   type QResponseMessage,
+  type QSpokenForm,
+  type TurnExecutionClass,
   type QScreenContext,
   type QSubjectRef,
   type QStageAbout,
@@ -96,6 +98,8 @@ import {
 } from "./situation-header.js";
 import {
   createSentenceCutter,
+  EXECUTION_LANES,
+  spokenFormWithin,
   isRecordableKnowledgeKey,
   recordableNamespacesSentence,
   citeAuthorisedFacts,
@@ -104,7 +108,7 @@ import {
   type AuthorisedFact,
   type PublicSourceLike,
   type CompanyAnalystV30Result,
-  CompanyAnalystV35ResultSchema,
+  CompanyAnalystV36ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -341,7 +345,22 @@ import {
   createReadCache,
   type ReadCache,
 } from "./read-cache.js";
+import {
+  createConversationEvidence,
+  evidenceScopeOf,
+  type ConversationEvidence,
+} from "./conversation-evidence.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
+// RC3: conversation-scoped evidence reuse, composed with its watermark.
+export {
+  CONVERSATION_EVIDENCE_TTL_MS,
+  createConversationEvidence,
+  evidenceScopeOf,
+  accessContextKeyOf,
+  type ConversationEvidence,
+  type EvidenceScope,
+  type EvidenceWatermark,
+} from "./conversation-evidence.js";
 // The seam's read cache, for the composition that must forget a person's
 // reads when an approved action of theirs executes outside any run.
 export { createReadCache, type ReadCache } from "./read-cache.js";
@@ -1599,7 +1618,7 @@ const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
-export const ANALYST_RESULT_SCHEMA = CompanyAnalystV35ResultSchema;
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV36ResultSchema;
 
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
@@ -1621,6 +1640,8 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   // v35 (addendum 14 Nov): malformed uncertainties lose the list (and so
   // any uncertainty offer), never the answer.
   "uncertainties",
+  // v36 (RC3): a malformed spoken form is no spoken form.
+  "spoken",
 ];
 
 /**
@@ -2243,6 +2264,16 @@ const NO_OFFER_QUESTIONS: ReadonlySet<string> = new Set([
   "PUBLIC_FACTS",
   "PROGRESS",
 ]);
+
+/**
+ * RC3 (COMPANY_ANALYST v36): the analyst's spoken form, read from the
+ * parsed result as data (older readings carry none). Checked against the
+ * stored answer before it is ever handed to the voice (spokenFormWithin).
+ */
+export function analystSpokenOf(analyst: object): string | null {
+  const spoken: unknown = Reflect.get(analyst, "spoken");
+  return typeof spoken === "string" && spoken.trim().length > 0 ? spoken : null;
+}
 
 export function nextStepTurn(request: {
   readonly turnKind?: string | undefined;
@@ -3067,6 +3098,13 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly readCache?: ReadCache | undefined;
   /**
+   * RC3 (Q voice audit, 15 Nov 2026): this conversation's evidence (the
+   * account digest and the wide reads), kept per tenant, actor,
+   * conversation and access context, for a short follow-up to answer from
+   * (conversation-evidence.ts). Absent: one per seam with no watermark.
+   */
+  readonly conversationEvidence?: ConversationEvidence | undefined;
+  /**
    * Owner 2026-10-22: on typed turns a second call writes the findings and
    * cards while the first writes the answer (parallel-extras.ts). It reads
    * the whole context again, so input spend per turn roughly doubles.
@@ -3566,6 +3604,8 @@ export function createModelGatewayQAnswer(
   // tools are reads is the offer's own declaration, per run.
   const singleFlight = createSingleFlight();
   const readCache = dependencies.readCache ?? createReadCache();
+  const evidence =
+    dependencies.conversationEvidence ?? createConversationEvidence();
   /**
    * Subjects a conversation already searched the public web for and found
    * nothing about (owner 2026-10-23), keyed by tenant, conversation and the
@@ -4122,6 +4162,7 @@ export function createModelGatewayQAnswer(
         // Something of theirs changed: what was read for them is not kept,
         // in this turn or after it.
         readCache.forget(toolContext);
+        evidence.forgetPerson(toolContext.actor);
         turnReads.delete(toolContext.runId);
       }
       return aboutThemOnly(
@@ -4348,10 +4389,79 @@ export function createModelGatewayQAnswer(
     // person, beside every other read and before any lane answers. Typed
     // and spoken turns take this same path; a failed read is null (the
     // answer then says nothing of the account rather than guessing).
-    const accountDigest =
-      dependencies.accountDigestOf === undefined
-        ? Promise.resolve(null)
-        : dependencies.accountDigestOf(request.actor).catch(() => null);
+    //
+    // RC3 (Q voice audit, 15 Nov 2026): the digest read for an earlier turn
+    // of THIS conversation, by this person under this access context, may
+    // stand in for re-reading it -- only on a turn whose execution class
+    // reuses evidence, and only while fresh and unchanged (TTL, writes of
+    // theirs, the watermark). Whether it does is known once the turn is read
+    // (`settleEvidence`), so a warmed prepare holds the decision, not a read.
+    const evidenceScope = evidenceScopeOf({
+      actor: request.actor,
+      plan,
+      conversationId,
+    });
+    let digestRead: Promise<QAccountDigest | null> | undefined;
+    const readDigest = (): Promise<QAccountDigest | null> => {
+      digestRead ??= (
+        dependencies.accountDigestOf === undefined
+          ? Promise.resolve(null)
+          : dependencies.accountDigestOf(request.actor).catch(() => null)
+      ).then((digest) => {
+        if (digest !== null) {
+          evidence.keep(evidenceScope, "DIGEST", digest, {
+            runId: request.runId,
+            reads: ["account.digest"],
+          });
+        }
+        return digest;
+      });
+      return digestRead;
+    };
+    const digestHeld =
+      dependencies.accountDigestOf !== undefined &&
+      evidence.holds(evidenceScope, "DIGEST");
+    let settleDigest: (
+      executionClass: TurnExecutionClass | undefined,
+    ) => void = () => undefined;
+    const accountDigest: Promise<QAccountDigest | null> = digestHeld
+      ? new Promise<QAccountDigest | null>((resolve) => {
+          let settled = false;
+          settleDigest = (executionClass) => {
+            if (settled) return;
+            settled = true;
+            resolve(
+              executionClass !== undefined &&
+                EXECUTION_LANES[executionClass].reuseEvidence
+                ? evidence
+                    .take<QAccountDigest>(evidenceScope, "DIGEST")
+                    .then((kept) => {
+                      if (kept === null) return readDigest();
+                      logger?.info(
+                        {
+                          qRunId: request.runId,
+                          executionClass,
+                          readByRun: kept.provenance.runId,
+                          ageMs: Date.now() - kept.readAt,
+                        },
+                        "q account digest answered from this conversation's evidence",
+                      );
+                      return kept.value;
+                    })
+                    .catch(() => readDigest())
+                : readDigest(),
+            );
+          };
+          // Never held past the turn: an answer that never settles it (a
+          // code lane that returned first) reads it as before.
+          setTimeout(() => {
+            settleDigest(undefined);
+          }, 20_000).unref?.();
+        })
+      : readDigest();
+    if (request.executionClass !== undefined) {
+      settleDigest(request.executionClass);
+    }
     // Investigation milestone (12 Nov): pages this conversation's recent
     // research already read, for the follow-up to answer from and cite.
     const earlierPages = earlierResearchPages({
@@ -6377,21 +6487,31 @@ export function createModelGatewayQAnswer(
       wideRead ??= (async (): Promise<WideReads> => {
         const wideStarted = Date.now();
         const ownNamed = namedRead();
+        // RC3 item 3 (independent reads side by side): the cheque fit and
+        // the diligence follow-ups need only the companies named (namedIds),
+        // so they start as soon as the named reads land, beside the day,
+        // standing, index, setup and arrival reads -- not after all of them.
+        const named = Promise.all([
+          timed("named", ownNamed),
+          timed("named-visible", visibleNamedRead(ownNamed)),
+        ]);
+        const afterNamed = named.then(() =>
+          Promise.all([
+            timed("cheque", chequeRead()),
+            timed("followUps", followUpRead()),
+          ]),
+        );
         await Promise.all([
           timed("standing", phased("standing", standingDone)),
           timed("index", phased("index", indexDone)),
           timed("onboarding", phased("onboarding", onboardingRead)),
-          timed("named", ownNamed),
-          timed("named-visible", visibleNamedRead(ownNamed)),
+          named,
           timed("day", phased("day", dayRead)),
           timed("arrival", phased("arrival", arrivalRead)),
-        ]);
-        await Promise.all([
-          timed("cheque", chequeRead()),
-          timed("followUps", followUpRead()),
+          afterNamed,
         ]);
         prepareMs["wide"] = Date.now() - wideStarted;
-        return {
+        const reads: WideReads = {
           namedCompanies,
           capitalQAsCompany,
           namedCompanyCalls,
@@ -6404,11 +6524,63 @@ export function createModelGatewayQAnswer(
           onboardingFacts,
           arrival,
         };
+        // RC3: kept for a short follow-up of this conversation, with the
+        // reads that produced it (provenance); facts keep their own.
+        evidence.keep(evidenceScope, "WIDE", reads, {
+          runId: request.runId,
+          reads: [
+            ...namedCompanyCalls,
+            ...ownDayCalls,
+            ...(ownStandingCall === null ? [] : [ownStandingCall]),
+          ].flatMap((call) => (call.toolName === null ? [] : [call.toolName])),
+        });
+        return reads;
       })();
       return wideRead;
     };
+    /**
+     * RC3: the wide reads for a turn of this execution class. A class that
+     * reuses evidence takes this conversation's fresh, unchanged wide reads
+     * (same actor and access context) instead of reading them again; no
+     * call is reported for them, since none was made this turn. Any other
+     * class, or no such evidence, reads them as before.
+     */
+    const wideFor = async (
+      executionClass: TurnExecutionClass | undefined,
+    ): Promise<WideReads> => {
+      if (
+        wideRead === undefined &&
+        executionClass !== undefined &&
+        EXECUTION_LANES[executionClass].reuseEvidence
+      ) {
+        const kept = await evidence
+          .take<WideReads>(evidenceScope, "WIDE")
+          .catch(() => null);
+        if (kept !== null) {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              executionClass,
+              readByRun: kept.provenance.runId,
+              reads: kept.provenance.reads.length,
+              ageMs: Date.now() - kept.readAt,
+            },
+            "q wide reads answered from this conversation's evidence",
+          );
+          return {
+            ...kept.value,
+            namedCompanyCalls: [],
+            ownDayCalls: [],
+            ownStandingCall: null,
+          };
+        }
+      }
+      return wide();
+    };
     return {
       wide,
+      wideFor,
+      settleEvidence: settleDigest,
       prepareMs,
       history,
       conversationId,
@@ -6846,6 +7018,9 @@ export function createModelGatewayQAnswer(
       if (prepared === null) {
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
       }
+      // RC3: the turn is read now; a warmed prepare's evidence decision is
+      // taken from its execution class (absent: read as before).
+      prepared.settleEvidence(request.executionClass);
       const {
         history,
         conversationId,
@@ -7553,7 +7728,7 @@ export function createModelGatewayQAnswer(
         earlyWeb !== null && !earlyWeb.claimed;
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
-        : await prepared.wide();
+        : await prepared.wideFor(request.executionClass);
       // The records lane's landing, beside the web lane's (owner
       // 2026-10-23: both start with the turn; each one's time is logged).
       logger?.info(
@@ -8960,6 +9135,14 @@ export function createModelGatewayQAnswer(
          * the reply. On the live completion event only; never stored.
          */
         gestures?: QResponseMessage["gestures"],
+        /**
+         * RC3 / Phase 5: the analyst's concise spoken form of this answer,
+         * as written in the same call. Kept on the live completion event
+         * only when every figure and name in it is in what is stored
+         * (spokenFormWithin); otherwise the voice derives its words from
+         * the text as before. Never stored.
+         */
+        spokenCandidate?: string | null,
       ) => {
         // Every public page read for this answer travels with it as a
         // structured source (R23, R38): the prose stays answer-first and
@@ -9143,6 +9326,20 @@ export function createModelGatewayQAnswer(
         await stages.queue;
         // W4: the page pane's move joins the answer before it is stored.
         const blocks = await movedBlocks(request, answerBlocks);
+        const spokenForm: QSpokenForm | null = spokenFormWithin(
+          spokenCandidate,
+          content,
+        );
+        if (
+          spokenCandidate !== undefined &&
+          spokenCandidate !== null &&
+          spokenForm === null
+        ) {
+          logger?.info(
+            { qRunId: request.runId },
+            "q spoken form left out: it said what the answer does not",
+          );
+        }
         return transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
@@ -9164,6 +9361,7 @@ export function createModelGatewayQAnswer(
             ...(gestures === undefined || gestures.length === 0
               ? {}
               : { gestures: [...gestures] }),
+            ...(spokenForm === null ? {} : { spoken: spokenForm }),
           });
           if (bounded.trimmed !== "NONE") {
             logger?.warn(
@@ -10614,7 +10812,12 @@ export function createModelGatewayQAnswer(
         request.spoken !== true &&
         request.writingDocument !== true &&
         request.turnUnread !== true &&
-        compareTable === null;
+        compareTable === null &&
+        // RC3: a lane budgeted at one answer call (a short follow-up, an
+        // acknowledgement, a question about what is prepared) is written by
+        // one call, never split into a second writer.
+        (request.executionClass === undefined ||
+          EXECUTION_LANES[request.executionClass].answerModelCalls > 1);
       // Before the tools-first note, which stays last where there is one.
       const whoWritesExtras = splitExtras
         ? EXTRAS_ELSEWHERE_NOTE
@@ -13818,6 +14021,8 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
                 },
               ],
           gesturesForReply(reply, analyst.gestures),
+          // A revised document's reply is code's own words: no spoken form.
+          revisedArtifact === null ? analystSpokenOf(analyst) : null,
         );
         last = {
           result: analyst,

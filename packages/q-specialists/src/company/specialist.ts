@@ -28,7 +28,7 @@ import {
   createSentenceCutter,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV35ResultSchema,
+  CompanyAnalystV36ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -903,8 +903,9 @@ export function createCompanyIntelligenceSpecialist(
             // v22: the optional visual (RECOVERY, workstream E); v26: PICTURE; v30: offer;
             // v33: statedFigures (a figure their own company reached); v34:
             // no count ceiling on the evidence lists (decision 97); v35:
-            // uncertainties[] and the offer's about (addendum 14 Nov).
-            schema: CompanyAnalystV35ResultSchema,
+            // uncertainties[] and the offer's about (addendum 14 Nov); v36:
+            // spoken, the concise spoken form (RC3, 15 Nov).
+            schema: CompanyAnalystV36ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",

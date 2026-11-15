@@ -89,6 +89,7 @@ import { COMPANY_ANALYST_V32 } from "./tasks/company-analyst.v32.js";
 import { COMPANY_ANALYST_V33 } from "./tasks/company-analyst.v33.js";
 import { COMPANY_ANALYST_V34 } from "./tasks/company-analyst.v34.js";
 import { COMPANY_ANALYST_V35 } from "./tasks/company-analyst.v35.js";
+import { COMPANY_ANALYST_V36 } from "./tasks/company-analyst.v36.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -710,7 +711,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Decision 97: no count ceiling on the evidence lists.
     { ...COMPANY_ANALYST_V34, status: "DEPRECATED" },
     // Owner addendum (14 Nov): uncertainties[] and the offer's about.
-    COMPANY_ANALYST_V35,
+    { ...COMPANY_ANALYST_V35, status: "DEPRECATED" },
+    // RC3 (Q voice audit, 15 Nov): the concise spoken form.
+    COMPANY_ANALYST_V36,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,

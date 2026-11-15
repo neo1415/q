@@ -1,4 +1,8 @@
-import type { QNavigateDestination, QResultBlock } from "@capital-q/contracts";
+import type {
+  QNavigateDestination,
+  QResultBlock,
+  TurnExecutionClass,
+} from "@capital-q/contracts";
 import type {
   CorrelationId,
   ModelToolDefinition,
@@ -302,6 +306,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * "I'm giving you full permission…" was echoed as a noted statement).
    */
   readonly turnKind?: string | undefined;
+  /**
+   * RC3 (Q voice audit, 15 Nov 2026): the execution class code read from
+   * the turn reader's structured reading (q-core `turnExecutionClassOf`).
+   * A budget, never authority: a class that may reuse evidence reuses only
+   * this conversation's evidence for this actor and access context. Absent:
+   * unread, and the full path is taken.
+   */
+  readonly executionClass?: TurnExecutionClass | undefined;
   /**
    * What kind of question the reader read it as (ADVICE, THEIR_OWN_RECORDS,
    * ...), when it is one. "What should I do next?" is ADVICE: their own

@@ -6,6 +6,7 @@ import { QMessageIdSchema, QRunIdSchema } from "./ids.js";
 import { Q_MESSAGE_TEXT_MAX_LENGTH } from "./request.js";
 import { QSentenceGesturesSchema } from "./presence.js";
 import { QResultBlocksSchema } from "./result-block.js";
+import { QSpokenFormSchema } from "./turn-execution.js";
 
 /**
  * One turn in a Q run's history, in Capital Q's own vocabulary
@@ -83,6 +84,13 @@ export const QResponseMessageSchema = z
      * Rides the live completion event only; the message store keeps text.
      */
     gestures: QSentenceGesturesSchema.optional(),
+    /**
+     * RC3 / Phase 5: the concise spoken form of this same answer (v1), for
+     * the voice; the screen shows `text`. Additive; rides the live
+     * completion event only, like gestures. Absent: the voice derives its
+     * words from `text` as before.
+     */
+    spoken: QSpokenFormSchema.optional(),
     createdAt: UtcTimestampSchema,
   })
   .strict()

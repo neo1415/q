@@ -8,6 +8,7 @@ import {
   type QAppActionRedirect,
   type TurnAppAction,
 } from "./app-action-turn.js";
+import { executionClassOfTurn } from "./execution-reading.js";
 import {
   namesWebAddress,
   PLAIN_QUESTION_FOCUS,
@@ -119,6 +120,7 @@ import {
   inTurnLanguage,
   streamedPiece,
   ANALYST_OFFER_DOCUMENT,
+  EXECUTION_LANES,
 } from "@capital-q/q-core";
 import {
   buildShownSheet,
@@ -9115,8 +9117,23 @@ export function createSpecialistQAnswer(
         if (oldest !== undefined) focuses.delete(oldest);
       }
     }
+    // RC3 (Q voice audit, 15 Nov 2026): the lane this turn takes, from the
+    // reading's structure; a short contextual follow-up answers from this
+    // conversation's evidence instead of a full investigation.
+    const executionClass = executionClassOfTurn({
+      read,
+      history,
+      latestId: latest.id,
+      carriesDocuments:
+        (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
+    });
+    logger?.info(
+      { qRunId: request.runId, executionClass },
+      "q turn execution class",
+    );
     const finalRequest: QAnswerRequest = {
       ...request,
+      executionClass,
       // Live 2026-10-30 (founder.ledgerbridge, "What should I do today?",
       // run 2c8fd21b): code's priorities lead this answer from their own
       // records, yet the reading's EXPLICIT research started the public web
@@ -9126,11 +9143,19 @@ export function createSpecialistQAnswer(
       // forced search is not what it waits on: the model holds the research
       // tool (OFFERED) and reaches for it when the question needs it.
       // Decided by the turn's structure (the lead exists), never its words.
+      //
+      // RC3: likewise a lane that does not go to the public web by itself
+      // (a short follow-up, an acknowledgement, a question about what is
+      // prepared): the reader did not ask for the web, so code does not
+      // force a search; the model still holds the tool (OFFERED) for what
+      // the evidence cannot answer.
       research:
-        readinessLead === null
+        readinessLead === null && EXECUTION_LANES[executionClass].publicWeb
           ? research
           : research.then((directive) =>
-              directive.mode === "EXPLICIT"
+              directive.mode === "EXPLICIT" ||
+              (directive.mode === "ONLY_IF_EMPTY" &&
+                !EXECUTION_LANES[executionClass].publicWeb)
                 ? { ...directive, mode: "OFFERED" as const }
                 : directive,
             ),

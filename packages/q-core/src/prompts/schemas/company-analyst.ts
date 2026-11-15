@@ -762,6 +762,34 @@ export type CompanyAnalystV35Result = z.infer<
 >;
 export const COMPANY_ANALYST_V35_SCHEMA_VERSION = 35;
 
+/**
+ * v36 (RC3, Q voice audit 15 Nov 2026; owner directive Phase 5): one
+ * authoritative Q result with a concise spoken form. The same call that
+ * writes `answer` writes `spoken`: at most three short spoken sentences of
+ * that answer, from the same evidence, for the voice; the screen shows the
+ * full answer and its artifacts. Code keeps `spoken` only when every figure
+ * and name in it also appears in `answer` (speech/spoken-form.ts); a
+ * malformed one is no spoken form, never a lost answer. Additive: every v35
+ * answer is a valid v36 answer.
+ */
+export const SPOKEN_FORM_GUIDANCE =
+  "The answer as you would say it aloud: at most three short spoken sentences (about 60 words), the direct answer first, plain words, no lists, headings or markdown. Only facts, figures and names already in answer; never a new fact, commitment, conclusion or action. Null when answer is already that short.";
+export const CompanyAnalystV36ResultSchema =
+  CompanyAnalystV35ResultSchema.extend({
+    spoken: z
+      .string()
+      .trim()
+      .min(1)
+      .max(600)
+      .nullable()
+      .default(null)
+      .describe(SPOKEN_FORM_GUIDANCE),
+  }).strict();
+export type CompanyAnalystV36Result = z.infer<
+  typeof CompanyAnalystV36ResultSchema
+>;
+export const COMPANY_ANALYST_V36_SCHEMA_VERSION = 36;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

@@ -1513,7 +1513,12 @@ export function createVoiceTurnHandler(
               );
             } else if (!streamedDeltas && text !== undefined) {
               answerGiven = true;
-              yield bounded(speakable(text));
+              // RC3 / Phase 5: Q's concise spoken form of this same answer,
+              // written in the same call and checked by code to say nothing
+              // the text does not (spokenFormWithin); the screen keeps the
+              // full answer. Absent: the text, as before.
+              const spokenForm = event.data.message.spoken?.text;
+              yield bounded(speakable(spokenForm ?? text));
             } else if (text !== undefined) {
               // The stream carries every sentence but the last, which only
               // the completed message holds, and code's own closing lines

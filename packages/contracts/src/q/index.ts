@@ -1405,3 +1405,5 @@ export * from "./external-person.js";
 // Q Workspace W2 (2026-11-06): the site map, its digest and the generated snapshot.
 export * from "./site-map.js";
 export * from "./site-map.generated.js";
+// RC3 (Q voice audit, 15 Nov 2026): turn execution classes and the spoken form.
+export * from "./turn-execution.js";

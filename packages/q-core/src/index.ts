@@ -1206,6 +1206,10 @@ export {
   COMPANY_ANALYST_V35_SCHEMA_VERSION,
   CompanyAnalystV35ResultSchema,
   type CompanyAnalystV35Result,
+  COMPANY_ANALYST_V36_SCHEMA_VERSION,
+  CompanyAnalystV36ResultSchema,
+  type CompanyAnalystV36Result,
+  SPOKEN_FORM_GUIDANCE,
   ModelUncertaintySchema,
   type ModelUncertainty,
   ModelOfferV35Schema,
@@ -2384,3 +2388,19 @@ export {
 } from "./prompts/tasks/company-analyst.v33.js";
 export { COMPANY_ANALYST_V34 } from "./prompts/tasks/company-analyst.v34.js";
 export { COMPANY_ANALYST_V35 } from "./prompts/tasks/company-analyst.v35.js";
+export { COMPANY_ANALYST_V36 } from "./prompts/tasks/company-analyst.v36.js";
+
+// RC3 (Q voice audit, 15 Nov 2026): turn execution classes and the spoken form.
+export {
+  EXECUTION_LANES,
+  turnExecutionClassOf,
+  type ExecutionLane,
+  type ExecutionReading,
+} from "./conversation/execution-class.js";
+export {
+  figureValuesOf,
+  namesOf,
+  SPOKEN_FORM_MAX_SENTENCES,
+  spokenFormWithin,
+  spokenOnlyFacts,
+} from "./speech/spoken-form.js";

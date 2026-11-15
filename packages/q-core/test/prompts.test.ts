@@ -328,7 +328,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v35_comm.v1",
+      "q-system.v2_company-analyst.v36_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -470,7 +470,8 @@ describe("renderer", () => {
     // userStatements rule; five trims pay for it.
     // v34 (decision 97): v33's template; only the schema's count bounds go.
     // v35 (addendum 14 Nov): v34's template; uncertainties[] in the schema.
-    expect(rendered.bundle.task).toBe("company-analyst/v35");
+    // v36 (RC3, 15 Nov): v35's template; spoken in the schema.
+    expect(rendered.bundle.task).toBe("company-analyst/v36");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

@@ -18,6 +18,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
  */
 
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
+import { createEvidenceWatermark } from "./composition/evidence-watermark.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
 import { createWebsiteIdentityReader } from "@capital-q/q-research/website-identity";
 import { webOriginFrom } from "./composition/web-origin.js";
@@ -503,6 +504,7 @@ import {
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
 import {
+  createConversationEvidence,
   createReadCache,
   recalledText,
   situationHeader,
@@ -4800,6 +4802,12 @@ assertComposedActionTypes(qActionRegistry);
 // the next turn reads their changed record (live 2026-10-28: a mandate
 // re-read 7 s after its approved change still said the old cheque range).
 const qReadCache = createReadCache();
+// RC3 (Q voice audit, 15 Nov 2026): a conversation's evidence (account
+// digest, wide reads) for its short follow-ups, forgotten the same way, and
+// checked against the database's watermark before it is reused.
+const qConversationEvidence = createConversationEvidence({
+  watermark: createEvidenceWatermark(database.sql),
+});
 const qActions = createQActionService({
   sql: database.sql,
   transactions: database.transactions,
@@ -4815,6 +4823,7 @@ const qActions = createQActionService({
   logger,
   onExecuted: (actor) => {
     qReadCache.forgetPerson(actor);
+    qConversationEvidence.forgetPerson(actor);
   },
 });
 // Reminders of a still-waiting card, said after the engine's step for the
@@ -5343,6 +5352,7 @@ const qIntelligence = composeQIntelligence({
   // Batch 13: the side their membership puts them on, for every answer.
   askerSide: askerSideOfActor,
   readCache: qReadCache,
+  conversationEvidence: qConversationEvidence,
   // Situation-first planning (S5, S6): the reader's planAsk starts the plan
   // job at once (the reply carries its card); directsWork files their
   // words as direction on what runs for them.

@@ -6,7 +6,10 @@ import { createPostgresCompanyKnowledge } from "@capital-q/discovery";
 import type { ActorContext } from "@capital-q/security";
 import { createPostgresContextEpochReader } from "@capital-q/security/postgres";
 import type { ModelGateway } from "@capital-q/model-gateway";
-import type { ReadCache } from "@capital-q/model-gateway/q";
+import type {
+  ConversationEvidence,
+  ReadCache,
+} from "@capital-q/model-gateway/q";
 import {
   createModelGatewayQAnswer,
   createQNavigationDecider,
@@ -142,6 +145,8 @@ export type QIntelligenceDependencies = {
    * mandate re-read 7 s after its approved change said the old range).
    */
   readonly readCache?: ReadCache | undefined;
+  /** RC3: a conversation's evidence for its short follow-ups. */
+  readonly conversationEvidence?: ConversationEvidence | undefined;
   /**
    * Owner 2026-10-23: what a call with one named counterpart is prepared
    * from (the rehearsal's material, read as them). Absent: such a turn is
@@ -475,6 +480,9 @@ export function composeQIntelligence(
     ...(dependencies.readCache === undefined
       ? {}
       : { readCache: dependencies.readCache }),
+    ...(dependencies.conversationEvidence === undefined
+      ? {}
+      : { conversationEvidence: dependencies.conversationEvidence }),
     ...(dependencies.pictures === undefined
       ? {}
       : { pictures: dependencies.pictures }),

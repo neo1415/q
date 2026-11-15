@@ -26,9 +26,9 @@ describe("COMPANY_ANALYST v35: uncertainties as structure", () => {
     recommendation: null,
   };
 
-  it("is active on schema v35, on v34's template, with v34 deprecated", () => {
+  it("was active on schema v35 (until v36), on v34's template, with v34 deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(35);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(36);
     expect(registry.get("COMPANY_ANALYST", 34)?.definition.status).toBe(
       "DEPRECATED",
     );
