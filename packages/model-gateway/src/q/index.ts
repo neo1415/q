@@ -5282,6 +5282,9 @@ export function createModelGatewayQAnswer(
         own: (standingOf() ?? Promise.resolve(null)).then((outcome) =>
           outcome !== null && outcome.result.ok ? outcome.result.data : null,
         ),
+        // D17: whom the account digest says they are in touch with is left
+        // out too, so the answer's final check has nothing left to drop.
+        inTouch: accountDigest.then(relationshipCounterparts),
       }).catch(() => null);
     // v56: when the reader read "companies other than those shown", its
     // reading decides over the words' sweep, which would rank the same
@@ -5328,18 +5331,24 @@ export function createModelGatewayQAnswer(
     // Live 2026-10-09: a FIT reading arrives after a warmed prepare, which
     // read the words only. The reader's fit question is swept then, from
     // the same reads, so any wording reaches the computed fit.
+    // D17 (live 15 Nov 2026, run bef9a7f4): a prepare warmed before the
+    // turn was read holds a request without the reading's v88 exclusion;
+    // the answer passes the exclusion it read (excludeRelationships), so
+    // it reaches the sweep however the prepare was started.
     const sweepForReading = (fitQuestion: {
       readonly text: string;
       readonly count: number | null;
       readonly previous?: boolean | undefined;
       readonly excludeShown?: boolean | undefined;
+      readonly excludeRelationships?: boolean | undefined;
     }): Promise<FitSweepResult | null> =>
       sweepable
         ? sweepFor(
             fitSweepAskOfReading(
               {
                 ...fitQuestion,
-                ...(request.excludeRelationships === true
+                ...(request.excludeRelationships === true ||
+                fitQuestion.excludeRelationships === true
                   ? { excludeRelationships: true }
                   : {}),
               },
@@ -9887,17 +9896,30 @@ export function createModelGatewayQAnswer(
       // relationships in; the reading's sweep leaves them out.
       const pastRelationships =
         request.excludeRelationships === true && !sweptExcludingRelationships;
+      // D17: the reading's exclusion, from this turn's own request (the
+      // prepare's may predate the reading). With no fit question read
+      // (a DISCOVER reading), their words are swept with it.
+      const readSweepFit =
+        request.excludeRelationships === true
+          ? {
+              ...(readFit ?? {
+                text: latest.content,
+                count: request.discoverCompanies?.count ?? null,
+              }),
+              excludeRelationships: true,
+            }
+          : readFit;
       const swept =
-        (pastShown || pastRelationships) && readFit !== undefined
-          ? await sweepForReading(readFit)
-          : recommendAll && readFit !== undefined
+        (pastShown || pastRelationships) && readSweepFit !== undefined
+          ? await sweepForReading(readSweepFit)
+          : recommendAll && readSweepFit !== undefined
             ? // The reading decides: the words' sweep may have read
               // "those" or nothing at all.
-              await sweepForReading(readFit)
+              await sweepForReading(readSweepFit)
             : ((await fitSweep) ??
-              (readFit === undefined || sweptAtPrepare
+              (readSweepFit === undefined || sweptAtPrepare
                 ? null
-                : await sweepForReading(readFit)));
+                : await sweepForReading(readSweepFit)));
       /**
        * Owner 2026-10-23: "rank them, the top three based on my mandate"
        * after a list nobody could score came back as the same three,
@@ -10031,11 +10053,28 @@ export function createModelGatewayQAnswer(
         request.askedAction === undefined &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
+        // D17 (live 15 Nov 2026, run bef9a7f4): the card set is final
+        // before a word of the summary is written. A company they asked to
+        // leave out never reaches the cards or the prose, so the answer's
+        // last check has nothing to drop and nothing contradicts it.
+        const inTouchNow =
+          request.excludeRelationships === true
+            ? relationshipCounterparts(await accountDigest)
+            : new Set<string>();
+        const leftOutNow = new Set([
+          ...sweep.excludedRelationships,
+          ...sweep.fits
+            .filter((fit) => inTouchNow.has(fit.companyId))
+            .map((fit) => fit.companyId),
+        ]);
+        const finalFits = sweep.fits.filter(
+          (fit) => !inTouchNow.has(fit.companyId),
+        );
         // voice-cards: "the top three" is three cards, not ten.
         const swept = fitSweepCardsBlock(
           sweep.ask.count === null
-            ? sweep.fits
-            : sweep.fits.slice(0, sweep.ask.count),
+            ? finalFits
+            : finalFits.slice(0, sweep.ask.count),
           sweep.ask.place === null
             ? "Fit against your mandate"
             : `Fit against your mandate: ${sweep.ask.place}`,
@@ -10057,8 +10096,8 @@ export function createModelGatewayQAnswer(
           });
           const shownCount =
             sweep.ask.count === null
-              ? sweep.fits.length
-              : Math.min(sweep.ask.count, sweep.fits.length);
+              ? finalFits.length
+              : Math.min(sweep.ask.count, finalFits.length);
           // The network's ranking failed twice (logged above): what follows
           // is their own pipeline, and it is said to be.
           const fromPipeline =
@@ -10068,10 +10107,11 @@ export function createModelGatewayQAnswer(
           // v88 (D1, D2): the answer itself says the exclusion it applied,
           // so nothing downstream can claim one that was not made.
           const leftOutLine =
-            sweep.ask.excludeRelationships !== true
+            sweep.ask.excludeRelationships !== true &&
+            request.excludeRelationships !== true
               ? ""
-              : sweep.excludedRelationships.length > 0
-                ? `I've left out the ${sweep.excludedRelationships.length === 1 ? "company" : `${String(sweep.excludedRelationships.length)} companies`} you're already in touch with. `
+              : leftOutNow.size > 0
+                ? `I've left out the ${leftOutNow.size === 1 ? "company" : `${String(leftOutNow.size)} companies`} you're already in touch with. `
                 : "None of these is a company you're already in touch with. ";
           const text =
             leftOutLine +
@@ -10089,6 +10129,7 @@ export function createModelGatewayQAnswer(
               cards: block.cards.length,
               considered: sweep.considered,
               excluded: sweep.excluded,
+              excludedRelationships: leftOutNow.size,
               fitCalls: sweep.calls.length,
               totalMs: Date.now() - startedAt,
             },

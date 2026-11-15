@@ -376,6 +376,13 @@ export async function runFitSweep(input: {
   readonly available: ReadonlySet<string>;
   /** Their own relationships and saves, already being read this turn. */
   readonly own: Promise<unknown>;
+  /**
+   * D17 (live 15 Nov 2026): the companies their account digest says they
+   * are in touch with. With excludeRelationships these are left out of
+   * the ranking too, so the answer's final check (withoutExcludedCompanies)
+   * finds nothing to drop after the summary is written.
+   */
+  readonly inTouch?: Promise<ReadonlySet<string>> | undefined;
 }): Promise<FitSweepResult | null> {
   const { ask, tools, context, available } = input;
   if (!available.has("fit_profile")) return null;
@@ -407,8 +414,15 @@ export async function runFitSweep(input: {
   // v88 (D1): their relationships are left out, not added.
   const withoutRelationships =
     ask.scope === "CANDIDATES" && ask.excludeRelationships === true;
+  const inTouch = withoutRelationships
+    ? await (input.inTouch ?? Promise.resolve(new Set<string>())).catch(
+        () => new Set<string>(),
+      )
+    : new Set<string>();
   const relationshipIds = new Set(
-    withoutRelationships ? own.relationships.map((row) => row.id) : [],
+    withoutRelationships
+      ? [...own.relationships.map((row) => row.id), ...inTouch]
+      : [],
   );
   for (const id of relationshipIds) excluded.add(id);
   // Each company with where it came from, said beside its fit.
