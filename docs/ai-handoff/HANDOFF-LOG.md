@@ -2254,3 +2254,16 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - New: `scripts/pre-gate.sh` (cheap checks before the gate; named failing tests; repo-scan tests; app typechecks; killed steps reported as FAIL).
 - Owner decisions open: (1) voice onboarding interview — who leads (voice model or code); (2) unrequested navigation on follow-up questions (13 Nov C10 v85 design) vs offering; (3) a paused gateway notice for founders instead of generic not-found.
 - Owner check needed: a real voice call on the GPT-Live line (sandbox has no UDP).
+
+## 15 Nov 2026, 14:35 Lagos — integration lead (Claude)
+
+- Production `64637e8c9` (gate PASS; migration `20261231591000_gateq_turn_ready_to_close` applied, hosted 303). Rollback `5757518c7`.
+- Live today:
+  - GateQ sustained journey certified 8/8 on `318577a8e`; on `64637e8c9` the new endings pass (one plan question per reply, close once, no invented questions), but a time span was read as money ("18 months" → USD 18) → fix `0bef7a8bf` (money only as said; a correction settles the dispute it ends; CAC metric), undeployed.
+  - Investor Q 8/8 on `5757518c7` (answered in place per decision 98; already-asked status; stage once; fits exclusion count; Q Pitch on phone; compare tray; burned-in label).
+  - Meeting move answers "moved" on `5757518c7`.
+  - Discovery video (Cloudflare Stream, signed, one player, reduced motion), compare, Q Pitch desktop: PASS on `318577a8e`.
+  - Fresh founder onboarding on `5757518c7` and `64637e8c9`: typed path, deck read, Keep/Not this, honest close, form persistence PASS; inline figure cards FAIL (race: figures created ~22 s after the read-back) → worker in progress.
+- Decision 98 recorded (navigation automatic when it advances the task; not on mere mention).
+- Demo-readiness audit: `audits/2026-11-15-demo-readiness.md`.
+- Owner items: search credit (Serper/Brave 402, Tavily 432); real-device check of video (iOS) and the voice line; meetings presentation (no-invite vs a connected calendar); demo-account clean-up or a fresh pair; GateQ voice/Tavus switch-on; decisions on voice-onboarding lead, paused-gateway notice, revoked-raise deck; rotate exposed credentials.
