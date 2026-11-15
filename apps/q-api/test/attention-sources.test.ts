@@ -143,6 +143,35 @@ describe("NEEDS_YOU notices, against the subject's current state", () => {
     expect(shown).toContain(NOTICES[1]?.id);
   });
 
+  it("D20: a chat notice names its relationship, so the report can list it once beside the reply owed", async () => {
+    const RELATIONSHIP = "66666666-0000-4000-8000-000000000007";
+    const chat = { ...NOTICES[3], relationship_id: RELATIONSHIP };
+    const queries: string[] = [];
+    const sql = ((strings: TemplateStringsArray) => {
+      const text = strings.join("?");
+      queries.push(text);
+      return Promise.resolve(
+        text.includes("from communication.notifications")
+          ? [chat, { ...NOTICES[5], relationship_id: null }]
+          : [],
+      );
+    }) as unknown as DatabaseExecutor;
+    const read = createAttentionSources({
+      sql,
+      noticeChecks: {},
+    }).sources?.NOTICE?.[0];
+    const items =
+      (await read?.(actor, { since: new Date(0), now: new Date() })) ?? [];
+    expect(items.map((item) => item.entity ?? null)).toEqual([
+      { kind: "RELATIONSHIP", id: RELATIONSHIP },
+      null,
+    ]);
+    // The subject is the notice's own conversation, matched by its key.
+    expect(
+      queries.find((q) => q.includes("communication.notifications")),
+    ).toMatch(/n\.dedupe_key = 'chat:' \|\| cv\.id::text/u);
+  });
+
   it("a check that fails fails the source (marked unread), never shows stale notices as current", async () => {
     const { sql } = fakeSql({
       proposals: [],

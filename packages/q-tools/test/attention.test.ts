@@ -372,6 +372,65 @@ describe("the attention report", () => {
       expect.objectContaining({ repliesSent: 2, callsBooked: 1 }),
     );
   });
+
+  it("D20 (live 249f4871): Watchly's message is listed once, not as the reply owed and again as its notice", async () => {
+    const WATCHLY = "3b5b294f-0000-4000-8000-000000000001";
+    const CLINICREST = "e583f4d5-0000-4000-8000-000000000002";
+    const owed = (id: string, name: string): QAttentionItem => ({
+      key: `msg:${id}:2026-11-15T05:00:00.000Z`,
+      source: "UNANSWERED_MESSAGE",
+      title: `${name} is waiting for your reply`,
+      entity: { kind: "RELATIONSHIP", id },
+      counterpart: name,
+      since: "2026-11-15T05:00:00.000Z",
+      decidable: true,
+    });
+    const notice = (
+      id: string,
+      title: string,
+      relationship?: string,
+    ): QAttentionItem => ({
+      key: `notice:${id}`,
+      source: "NOTICE",
+      title,
+      ...(relationship === undefined
+        ? {}
+        : { entity: { kind: "RELATIONSHIP" as const, id: relationship } }),
+      since: "2026-11-15T05:00:01.000Z",
+      decidable: false,
+    });
+    const port: AttentionPort = {
+      sources: {
+        UNANSWERED_MESSAGE: [
+          () =>
+            Promise.resolve([
+              owed(WATCHLY, "Watchly"),
+              owed(CLINICREST, "Clinicrest"),
+            ]),
+        ],
+        NOTICE: [
+          () =>
+            Promise.resolve([
+              notice("ecd766c0", "Watchly sent you a message", WATCHLY),
+              notice("a1", "Q prepared a plan for Ledgerline"),
+              // A message notice on a thread with no reply owed stays.
+              notice(
+                "a2",
+                "Basketari sent you a message",
+                "b2000000-0000-4000-8000-000000000003",
+              ),
+            ]),
+        ],
+      },
+    };
+    const report = await readAttention(port, actorA, { now: NOW });
+    expect(report.items.map((item) => item.title)).toEqual([
+      "Watchly is waiting for your reply",
+      "Clinicrest is waiting for your reply",
+      "Q prepared a plan for Ledgerline",
+      "Basketari sent you a message",
+    ]);
+  });
 });
 
 describe("the what_needs_me tool", () => {

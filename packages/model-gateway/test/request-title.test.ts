@@ -92,11 +92,69 @@ describe("a request already made for the same item (D15)", () => {
   });
 
   it("says where the request stands from the request, never an approval card", () => {
-    expect(requestStateLine("Ajopot", followUp("FULFILLED"))).toBe(
-      'You asked Ajopot for "Evidence that settles: whether active users are recurring" on 2026-11-15; they answered on 2026-11-15 with "Ajopot company overview", so I haven\'t asked again.',
+    const now = new Date("2026-11-20T10:00:00.000Z");
+    expect(requestStateLine("Ajopot", followUp("FULFILLED"), { now })).toBe(
+      'You asked Ajopot for "Evidence that settles: whether active users are recurring" on 15 Nov; they answered on 15 Nov with "Ajopot company overview", so I haven\'t asked again.',
     );
-    expect(requestStateLine("Ajopot", followUp("OPEN"))).toContain(
+    expect(requestStateLine("Ajopot", followUp("OPEN"), { now })).toContain(
       "it's still outstanding",
     );
+  });
+
+  describe("D19 (live 5c9344fd): a whole title and days as a person says them", () => {
+    // The live request 4c9a2968: made before D15b, so its title is the
+    // uncertainty sentence with the old prefix (well over 80 characters).
+    const live = {
+      ...followUp("FULFILLED"),
+      title: `Evidence that settles: ${LIVE_ABOUT}`,
+    };
+
+    it("an older request is named by what it is about, cut at a word with an ellipsis", () => {
+      const line = requestStateLine("Ajopot", live, {
+        now: new Date("2026-11-15T06:25:48.000Z"),
+      });
+      expect(line).not.toMatch(/unresolve"/u);
+      expect(line).not.toMatch(/\d{4}-\d{2}-\d{2}/u);
+      expect(line).toBe(
+        `You asked Ajopot for "${LIVE_ABOUT}" today; they answered today with "Ajopot company overview", so I haven't asked again.`,
+      );
+      const statement = `${LIVE_ABOUT} It also depends on the definition of active, on the cohort period and on the reconciliation with revenue.`;
+      const long = requestStateLine(
+        "Ajopot",
+        { ...live, about: { statement, standing: "REPORTED" } },
+        { now: new Date("2026-11-15T06:25:48.000Z") },
+      );
+      const quotedTitle = /for "([^"]+)"/u.exec(long)?.[1] ?? "";
+      expect(quotedTitle.endsWith("…")).toBe(true);
+      expect(quotedTitle.length).toBeLessThanOrEqual(120);
+      // Cut between words: what precedes the ellipsis is the statement's
+      // own opening, ending where a word ends.
+      const before = quotedTitle.slice(0, -1);
+      expect(statement.startsWith(before)).toBe(true);
+      expect(statement.charAt(before.length)).toMatch(/[\s,.]/u);
+    });
+
+    it("a request made since D15b keeps its own short title", () => {
+      const line = requestStateLine(
+        "Ajopot",
+        {
+          ...live,
+          title: "Supporting evidence for Ajopot's 18,700 active users",
+        },
+        { now: new Date("2026-11-16T09:00:00.000Z") },
+      );
+      expect(line).toBe(
+        'You asked Ajopot for "Supporting evidence for Ajopot\'s 18,700 active users" yesterday; they answered yesterday with "Ajopot company overview", so I haven\'t asked again.',
+      );
+    });
+
+    it("the day is the person's calendar day when their zone is known", () => {
+      const line = requestStateLine(
+        "Ajopot",
+        { ...live, requestedAt: "2026-11-12T23:30:00.000Z", status: "OPEN" },
+        { now: new Date("2026-11-15T06:00:00.000Z"), timeZone: "Africa/Lagos" },
+      );
+      expect(line).toContain(" on 13 Nov, and it's still outstanding");
+    });
   });
 });

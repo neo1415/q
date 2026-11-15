@@ -174,14 +174,40 @@ export async function readAttention(
   const unread: QAttentionSource[] = [];
   const items: QAttentionItem[] = [];
   const seen = new Set<string>();
+  /**
+   * D20 (live 15 Nov 2026, run 249f4871): "Watchly sent you a message" was
+   * listed both as the reply owed and as its notice. A notice whose
+   * subject is a relationship already listed as waiting for their reply
+   * is that same item (UNANSWERED_MESSAGE is read first), so it is not
+   * listed again.
+   */
+  const owedReplies = new Set<string>();
+  const sameAsOwedReply = (item: QAttentionItem): boolean =>
+    item.source === "NOTICE" &&
+    item.entity?.kind === "RELATIONSHIP" &&
+    owedReplies.has(item.entity.id);
   for (const { source, items: found, read } of results) {
     if (!read) unread.push(source);
     const fresh = found
-      .filter((item) => item.source === source && !seen.has(item.key))
+      .filter(
+        (item) =>
+          item.source === source &&
+          !seen.has(item.key) &&
+          !sameAsOwedReply(item),
+      )
       .sort((a, b) => Date.parse(b.since) - Date.parse(a.since));
     for (const item of fresh.slice(0, ATTENTION_ITEMS_PER_SOURCE)) {
       seen.add(item.key);
       items.push(item);
+    }
+    if (source === "UNANSWERED_MESSAGE") {
+      // Every reply owed, beyond the share listed too: its notice is the
+      // same item either way.
+      for (const item of fresh) {
+        if (item.entity?.kind === "RELATIONSHIP") {
+          owedReplies.add(item.entity.id);
+        }
+      }
     }
     // More than a source's share: the last one says how many more, so a
     // cap never reads as "that's all".

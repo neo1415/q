@@ -479,7 +479,16 @@ export type RelationshipStanding = {
 export type VehicleChoice =
   | { readonly kind: "VEHICLE"; readonly tool: string }
   /** No route: the plain line names the relationship step (null: none). */
-  | { readonly kind: "NONE"; readonly line: string | null };
+  | {
+      readonly kind: "NONE";
+      readonly line: string | null;
+      /**
+       * D11: the clause of `line` that states the relationship stage
+       * itself ("Your interest in Kazikit is waiting for them to accept"),
+       * from the stage code read; absent when the line names none.
+       */
+      readonly stage?: string;
+    };
 
 /** Diligence open: started (a milestone) and not passed (the service's rule). */
 function diligenceOpen(standing: NonNullable<RelationshipStanding>): boolean {
@@ -536,21 +545,25 @@ export function chooseVehicle(input: {
       return {
         kind: "NONE",
         line: `Your interest in ${them} is waiting for them to accept; once they do, you can send them questions or ask for documents through Capital Q.`,
+        stage: `Your interest in ${them} is waiting for them to accept`,
       };
     case "PASSED":
       return {
         kind: "NONE",
         line: `You passed on ${them}, so nothing can be asked of them through Capital Q unless the relationship is resumed.`,
+        stage: `You passed on ${them}`,
       };
     case "PAUSED":
       return {
         kind: "NONE",
         line: `Your relationship with ${them} is paused; resume it to send them questions or ask for documents.`,
+        stage: `Your relationship with ${them} is paused`,
       };
     default:
       return {
         kind: "NONE",
         line: `To ask ${them} directly, the next step is to express interest; once they accept, you can send questions or ask for documents through Capital Q.`,
+        stage: "the next step is to express interest",
       };
   }
 }
@@ -788,6 +801,96 @@ export function stepLineWithoutOffer(input: {
 }
 
 /**
+ * D11 (live 15 Nov 2026, run 396ebc21, Kazikit at INTEREST_EXPRESSED, a
+ * two-part question): the stage limit code would close with, known before
+ * the answer is written -- the line chooseVehicle names even with every
+ * vehicle held, so it depends on the relationship's stage alone, never on
+ * the run's tools. Null: the stage leaves a route open, or names no step.
+ */
+export function stageLimitOf(
+  standing: RelationshipStanding,
+  company: string | null,
+): { readonly line: string; readonly stage: string } | null {
+  const choice = chooseVehicle({
+    standing,
+    onRequestTitle: true,
+    holds: () => true,
+    company,
+  });
+  return choice.kind === "NONE" &&
+    choice.line !== null &&
+    choice.stage !== undefined
+    ? { line: choice.line, stage: choice.stage }
+    : null;
+}
+
+/**
+ * Trusted, before the answer is written: code closes an answer that leaves
+ * a material question only the company could settle with the stage line
+ * (stepLineWithoutOffer), so the answer does not state the stage too.
+ */
+export function stageLimitNote(line: string): string {
+  return `WHERE THE RELATIONSHIP STANDS (Capital Q's record; trusted, written by code): if your answer leaves a material open question that only the company could settle (an uncertainty to resolve by asking the founder or requesting a document), Capital Q closes your answer with this line, word for word: "${line.replace(/"/gu, "'")}". Then do not state that stage, or what it stops you doing, yourself: answer the substance and leave the stage to that line.`;
+}
+
+/** Words of a stage clause that carry no stage of their own. */
+const STAGE_FILLER: ReadonlySet<string> = new Set([
+  "your",
+  "you",
+  "with",
+  "them",
+  "they",
+  "their",
+  "the",
+  "for",
+  "and",
+  "next",
+]);
+
+/** Content stems (first five letters) of a text, without the company's name. */
+function stemsOf(text: string, company: string | null): ReadonlySet<string> {
+  const name = new Set(
+    (company ?? "")
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length > 0),
+  );
+  return new Set(
+    [...text.toLowerCase().matchAll(/\p{L}+/gu)]
+      .map((match) => match[0])
+      .filter(
+        (word) => word.length > 2 && !name.has(word) && !STAGE_FILLER.has(word),
+      )
+      .map((word) => word.slice(0, 5)),
+  );
+}
+
+/**
+ * D11: the sentences of Q's own drafted answer (never the person's words)
+ * that restate the stage code closes with: a sentence carrying two content
+ * stems of code's stage clause (for INTEREST_EXPRESSED, "interest" and
+ * "accept"), compared with the clause built from the stage code read.
+ * Code's line says the stage once; those sentences are dropped.
+ */
+export function stageRestatements(
+  answer: string,
+  stage: string,
+  company: string | null,
+): readonly string[] {
+  const wanted = stemsOf(stage, company);
+  if (wanted.size === 0) return [];
+  const needed = Math.min(2, wanted.size);
+  return answer
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => {
+      if (sentence.length === 0) return false;
+      const has = stemsOf(sentence, company);
+      return [...wanted].filter((stem) => has.has(stem)).length >= needed;
+    });
+}
+
+/**
  * On a yes to an uncertainty offer: the vehicle's call carries what it
  * resolves, from the offer's record (never from the model's words). A call
  * that already names one keeps it; only the three vehicles carry it.
@@ -959,16 +1062,79 @@ export function existingRequestFor(
 export function requestStateLine(
   company: string,
   followUp: DiligenceFollowUp,
+  at: DayReference = {},
 ): string {
-  const asked = day(followUp.requestedAt);
-  const since = asked === null ? "" : ` on ${asked}`;
-  const title = quoted(followUp.title, 120);
+  const asked = spokenDay(followUp.requestedAt, at);
+  const since = asked === null ? "" : ` ${asked}`;
+  const title = `"${requestHeading(followUp)}"`;
   if (followUp.status === "FULFILLED") {
     const documentTitle = followUp.document?.title ?? null;
-    const answered = day(followUp.fulfilledAt);
-    return `You asked ${company} for ${title}${since}; they answered${answered === null ? "" : ` on ${answered}`} with ${documentTitle === null ? "a document" : quoted(documentTitle, 120)}, so I haven't asked again.`;
+    const answered = spokenDay(followUp.fulfilledAt, at);
+    return `You asked ${company} for ${title}${since}; they answered${answered === null ? "" : ` ${answered}`} with ${documentTitle === null ? "a document" : quoted(documentTitle, 120)}, so I haven't asked again.`;
   }
   return `You asked ${company} for ${title}${since}, and it's still outstanding, so I haven't asked again.`;
+}
+
+/**
+ * D19 (live 15 Nov 2026, run 5c9344fd): the request's short, document-like
+ * title. Titles written since D15b are at most TITLE_MAX characters; an
+ * older request's title was the uncertainty sentence itself (longer than
+ * that), so what it is about is said instead, cut at a word.
+ */
+function requestHeading(followUp: DiligenceFollowUp): string {
+  const title = followUp.title.replace(/\s+/gu, " ").trim();
+  if (title.length > 0 && title.length <= TITLE_MAX) {
+    return title.replace(/"/gu, "'");
+  }
+  const about = followUp.about.statement.replace(/\s+/gu, " ").trim();
+  return wordCut((about.length > 0 ? about : title).replace(/"/gu, "'"), 120);
+}
+
+/** When a day is said, and in whose calendar. */
+export type DayReference = {
+  readonly now?: Date | undefined;
+  readonly timeZone?: string | null | undefined;
+};
+
+const calendarDay = (instant: Date, timeZone: string): string =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+
+/**
+ * D19: a day as a person says it -- "today", "yesterday", else "on 12 Nov"
+ * (with the year when it is not this year) -- in their time zone when
+ * known, else UTC. Null for a missing or unreadable date.
+ */
+export function spokenDay(
+  iso: string | null,
+  at: DayReference = {},
+): string | null {
+  if (iso === null) return null;
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return null;
+  const now = at.now ?? new Date();
+  let timeZone = at.timeZone ?? "UTC";
+  try {
+    calendarDay(now, timeZone);
+  } catch {
+    timeZone = "UTC";
+  }
+  const then = calendarDay(instant, timeZone);
+  const today = calendarDay(now, timeZone);
+  if (then === today) return "today";
+  const dayBefore = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (then === calendarDay(dayBefore, timeZone)) return "yesterday";
+  const spoken = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    day: "numeric",
+    month: "short",
+    ...(then.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
+  }).format(instant);
+  return `on ${spoken.replace(/\.$/u, "")}`;
 }
 
 /**
@@ -1091,8 +1257,20 @@ const EVIDENCE_WORDS: Readonly<Record<string, string>> = {
   DOCUMENT_SUPPORTED: "document-supported",
 };
 
+/**
+ * Text cut at a word, with "…" when anything was cut (D19: a plain slice
+ * left "…usage is unresolve").
+ */
+function wordCut(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  const kept = space > max / 3 ? cut.slice(0, space) : cut;
+  return `${kept.replace(/[\s,;:.-]+$/u, "")}…`;
+}
+
 const quoted = (text: string, max: number): string =>
-  `"${text.replace(/\s+/gu, " ").replace(/"/gu, "'").trim().slice(0, max)}"`;
+  `"${wordCut(text.replace(/\s+/gu, " ").replace(/"/gu, "'").trim(), max)}"`;
 
 /** What came back for one linked request, in code's words. */
 function cameBack(followUp: DiligenceFollowUp, company: string): string {

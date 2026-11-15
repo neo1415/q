@@ -383,4 +383,48 @@ describe("D17: fits leaving out the companies they are in touch with", () => {
       [...IN_TOUCH].sort(),
     );
   });
+
+  it("D17b (live 99b213d4): companies left out before any fit row was read are still counted", async () => {
+    const ask = fitSweepAskOfReading(
+      { text: "strongest fits", count: null, excludeRelationships: true },
+      [],
+      [],
+      [],
+    );
+    // Live: fit_top_candidates returned only the two non-relationship
+    // candidates; no relationship company surfaced in a fit row.
+    const execute: QToolPort["execute"] = (proposal) =>
+      Promise.resolve(
+        ok(proposal, "fit.top_candidates", {
+          status: "OK",
+          comparison: {
+            entries: NAMES.slice(8).map((_, i) => {
+              const fit = fitOf(i + 8);
+              return { name: fit.name, line: null, profile: fit.profile };
+            }),
+          },
+        }),
+      );
+    const result = await runFitSweep({
+      ask,
+      tools: { execute },
+      context: {} as Parameters<typeof runFitSweep>[0]["context"],
+      available: new Set(["fit_profile", "fit_top_candidates"]),
+      own: Promise.resolve({
+        relationships: IN_TOUCH.slice(0, 5).map((id, i) => ({
+          id,
+          name: NAMES[i] ?? "",
+        })),
+      }),
+      inTouch: Promise.resolve(new Set(IN_TOUCH)),
+    });
+    if (result === null) throw new Error("no sweep");
+    expect(result.fits.map((fit) => fit.name).sort()).toEqual([
+      "Basketari",
+      "Brancheon Works",
+    ]);
+    expect([...result.excludedRelationships].sort()).toEqual(
+      [...IN_TOUCH].sort(),
+    );
+  });
 });

@@ -168,15 +168,21 @@ export function createAttentionSources(dependencies: {
               title: string;
               body: string | null;
               created_at: Date;
+              /** A chat notice's relationship (its subject), else null. */
+              relationship_id?: string | null;
             }[]
           >`
-            select id, kind, dedupe_key, title, body, created_at
-              from communication.notifications
-             where user_id = ${actor.userId}
-               and tenant_id = ${actor.tenantId}
-               and read_at is null
-               and priority = 'NEEDS_YOU'
-             order by created_at desc
+            select n.id, n.kind, n.dedupe_key, n.title, n.body, n.created_at,
+                   cv.relationship_id
+              from communication.notifications n
+              left join communication.conversations cv
+                on n.kind = 'CHAT_MESSAGE'
+               and n.dedupe_key = 'chat:' || cv.id::text
+             where n.user_id = ${actor.userId}
+               and n.tenant_id = ${actor.tenantId}
+               and n.read_at is null
+               and n.priority = 'NEEDS_YOU'
+             order by n.created_at desc
              limit 60`;
           const rows = (
             await stillNeededNotices(
@@ -192,6 +198,11 @@ export function createAttentionSources(dependencies: {
             key: `notice:${row.id}`,
             source: "NOTICE",
             title: row.title.slice(0, 200),
+            // D20: a chat notice names its relationship, so the report
+            // lists it once beside the reply owed on the same thread.
+            ...(typeof row.relationship_id === "string"
+              ? { entity: { kind: "RELATIONSHIP", id: row.relationship_id } }
+              : {}),
             ...(row.body === null
               ? {}
               : ({

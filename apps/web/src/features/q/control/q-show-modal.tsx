@@ -14,7 +14,13 @@ import type { QTurn, QTurnObjectBlock } from "../conversation";
 import { QMarkdown } from "../markdown";
 import { useRoomDocumentHost } from "../room/document-host";
 import { setConversationTurns } from "./context-set";
-import { closeShown, showInModal, useShown, type Shown } from "./show-store";
+import {
+  closeShown,
+  showInModal,
+  shownNow,
+  useShown,
+  type Shown,
+} from "./show-store";
 
 /*
  * The cards and the room's card surface load the first time something is
@@ -75,6 +81,20 @@ export function shownOf(turn: QTurn): Shown | null {
 }
 
 /**
+ * D21: whether what is shown came from an answer before the latest turn
+ * (a later question or answer follows it in the conversation), or from no
+ * answer in it. Such a dialog is transient: a page change closes it. The
+ * answer that moved the page is the last turn, so what it shows stays.
+ */
+export function shownFromEarlierTurn(
+  shown: Pick<Shown, "key">,
+  turns: readonly Pick<QTurn, "id">[],
+): boolean {
+  const at = turns.findIndex((turn) => turn.id === shown.key);
+  return at === -1 || at < turns.length - 1;
+}
+
+/**
  * Lane 7 (owner 2026-10-21): what Q shows the person -- a card, a
  * comparison, a summary -- opens over whatever page they are on, closable
  * by its Close button, Escape, a click outside or "close it". The Q page
@@ -115,6 +135,17 @@ export function QShowModal({ turns }: { readonly turns: readonly QTurn[] }) {
   useEffect(() => {
     if (onQPage) closeShown();
   }, [onQPage]);
+
+  // D21 (live 15 Nov 2026): the fit cards from one answer stayed open over
+  // /work after a later turn moved the page. A page change leaves what an
+  // earlier answer showed; what the answer that moved the page shows stays.
+  const shownPath = useRef(pathname);
+  useEffect(() => {
+    if (shownPath.current === pathname) return;
+    shownPath.current = pathname;
+    const now = shownNow();
+    if (now !== null && shownFromEarlierTurn(now, turns)) closeShown();
+  }, [pathname, turns]);
 
   const title =
     shown?.choices !== undefined

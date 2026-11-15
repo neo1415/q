@@ -173,6 +173,12 @@ const DILIGENCE = tool(
   "app.diligence.change",
   "SIDE_EFFECT",
 );
+/** Their own relationships, read ahead of the model (named companies). */
+const LIST_RELATIONSHIPS = tool(
+  "list_my_relationships",
+  "relationship.list",
+  "READ_ONLY",
+);
 
 const NAMES: Readonly<Record<string, string>> = {
   [AJOPOT]: "Ajopot",
@@ -362,7 +368,10 @@ function conversation(options: {
   readonly script: readonly FakeBehaviour[];
   /** The diligence requests linked to an item, as get_relationship reads them now. */
   readonly followUps?: () => readonly unknown[];
+  /** Their relationships are listed ahead of the model, as live (D11). */
+  readonly listed?: boolean;
 }) {
+  const listed = options.listed === true ? [LIST_RELATIONSHIPS] : [];
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -415,13 +424,28 @@ function conversation(options: {
   /** Every tool the model or code ran through the port (the world). */
   const executed: QToolProposal[] = [];
   const tools: QToolPort = {
-    offer: () => Promise.resolve([GET_COMPANY, GET_RELATIONSHIP, CHAT]),
+    offer: () =>
+      Promise.resolve([GET_COMPANY, GET_RELATIONSHIP, CHAT, ...listed]),
     available: () =>
-      Promise.resolve([GET_COMPANY, GET_RELATIONSHIP, CHAT, DILIGENCE]),
+      Promise.resolve([
+        GET_COMPANY,
+        GET_RELATIONSHIP,
+        CHAT,
+        DILIGENCE,
+        ...listed,
+      ]),
     execute: (proposal) => {
       executed.push(proposal);
       const args = proposal.arguments as { companyId?: string };
       switch (proposal.name) {
+        case "list_my_relationships":
+          return Promise.resolve(
+            ok(proposal, "relationship.list", {
+              relationships: [AJOPOT, KAZIKIT].map((id) => ({
+                counterpart: { kind: "COMPANY", id, name: NAMES[id] },
+              })),
+            }),
+          );
         case "get_company":
           return Promise.resolve(
             ok(proposal, "company.get", profile(args.companyId ?? AJOPOT)),
@@ -460,6 +484,8 @@ function conversation(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools,
+    // D19: a fixed clock, so the request-state line says its days the same way every run.
+    now: () => new Date("2026-11-20T09:00:00.000Z"),
   });
   /** The declared app actions code runs (the approval card's payload). */
   const ran: TurnAppAction[] = [];
@@ -567,7 +593,7 @@ function conversation(options: {
     const text = completed.at(-1)?.message?.text ?? "";
     return { outcome, text };
   };
-  return { say, executed, ran, argumentReads, messages };
+  return { say, executed, ran, argumentReads, messages, alpha };
 }
 
 const readsOf = (companyId: string): FakeBehaviour => ({
@@ -707,6 +733,46 @@ describe("scenario 3 end to end: the uncertainty is resolved through one code-ow
     expect(turn.ran.filter((a) => "resolves" in a.arguments)).toEqual([]);
   });
 
+  it("D11 (live 396ebc21): a two-part Kazikit question at INTEREST_EXPRESSED says the stage once, in code's line", async () => {
+    // The live answer's own stage sentence, beside its analysis.
+    const MODEL_STAGE =
+      "Your interest is still awaiting Kazikit's acceptance, and no diligence exchange is recorded, so I can't obtain the accounts at this point.";
+    const ANALYSIS =
+      "Kazikit's revenue is not solidly evidenced. Its company profile states that it has no revenue yet; that is self-reported, not independently verified. I don't have Kazikit's management accounts, bank statements or other financial records.";
+    const turn = conversation({
+      readings: [QUESTION_ABOUT("Kazikit")],
+      listed: true,
+      script: [
+        readsOf(KAZIKIT),
+        analystAnswer(`${ANALYSIS} ${MODEL_STAGE}`, [
+          {
+            statement: "Kazikit's revenue figure is self-reported.",
+            standing: "REPORTED",
+            material: true,
+            mattersFor: ["VALUATION"],
+            resolveBy: ["REQUEST_DOCUMENT"],
+          },
+        ]),
+      ],
+    });
+    const first = await turn.say(
+      "How solid is Kazikit's revenue? Can you get their accounts?",
+    );
+    // Before writing, the answer was told code closes with the stage line.
+    const prompt = JSON.stringify(turn.alpha.calls[0]);
+    expect(prompt).toContain("WHERE THE RELATIONSHIP STANDS");
+    expect(prompt).toContain(
+      "Your interest in Kazikit is waiting for them to accept",
+    );
+    // Said once: code's line; the answer's restatement is dropped.
+    expect(first.text).not.toContain(MODEL_STAGE);
+    expect(first.text).toContain("Kazikit's revenue is not solidly evidenced.");
+    expect(first.text).toContain("other financial records.");
+    expect(first.text.split("waiting for them to accept").length).toBe(2);
+    expect(first.text).not.toContain("Want me to");
+    expect(turn.ran).toEqual([]);
+  });
+
   it("D13 with no open item: a chat message the model prepares on a turn that asked for the diligence request does not go", async () => {
     const turn = conversation({
       readings: [REQUEST_THAT(false)],
@@ -838,11 +904,11 @@ describe("D15 (live 15 Nov 2026, run e7ba2a79): asking again after the request",
       expect(again.outcome).not.toHaveProperty("offer");
       expect(again.text).not.toMatch(/is saved/u);
       expect(again.text).toContain(
-        'You asked Ajopot for "Supporting evidence for Ajopot" on 2026-11-15',
+        'You asked Ajopot for "Supporting evidence for Ajopot" on 15 Nov',
       );
       if (status === "FULFILLED") {
         expect(again.text).toContain(
-          'they answered on 2026-11-15 with "Ajopot company overview"',
+          'they answered on 15 Nov with "Ajopot company overview"',
         );
       } else {
         expect(again.text).toContain("it's still outstanding");

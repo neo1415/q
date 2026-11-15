@@ -531,7 +531,13 @@ export async function runFitSweep(input: {
     fits: ranked,
     considered: ask.scope === "CANDIDATES" ? all.length : wanted.size,
     excluded: leftOut.size,
-    excludedRelationships: [...leftOutRelationships],
+    // D17b (live 15 Nov 2026, run 99b213d4): every company they are in
+    // touch with was left out, most before any fit row was read (`wanted`
+    // skips them), so counting only those that surfaced said 0 and the
+    // answer "None of these is a company you're already in touch with".
+    excludedRelationships: [
+      ...new Set([...relationshipIds, ...leftOutRelationships]),
+    ],
     calls,
   };
 }

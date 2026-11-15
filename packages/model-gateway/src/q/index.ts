@@ -874,6 +874,10 @@ import {
   existingRequestFor,
   offerBacking,
   requestStateLine,
+  stageLimitNote,
+  stageLimitOf,
+  stageRestatements,
+  type VehicleChoice as StageVehicleChoice,
   decideUncertaintyOffer,
   DILIGENCE_DOCUMENTS_TOOL,
   offerDecisionTrace,
@@ -5966,6 +5970,28 @@ export function createModelGatewayQAnswer(
             outcome.result.data,
           );
           if (!read.success) return;
+          // D11 (live 396ebc21): the stage limit code may close with is
+          // told to the answer before it is written, so it is said once.
+          const limit =
+            read.data.yourSide === "INVESTOR"
+              ? stageLimitOf(
+                  {
+                    yourSide: read.data.yourSide,
+                    state: read.data.relationship?.state ?? null,
+                    milestones: read.data.relationship?.milestones ?? [],
+                  },
+                  read.data.counterpart.name,
+                )
+              : null;
+          if (limit !== null) {
+            namedCompanies.push({
+              scope: "RELATIONSHIP_CONTEXT",
+              statement: stageLimitNote(limit.line),
+              truthClass: "VERIFIED",
+              evidenceStatus: "PLATFORM_VERIFIED",
+              source: "Capital Q relationship record",
+            });
+          }
           const followUps = read.data.diligence?.followUps ?? [];
           if (read.data.yourSide !== "INVESTOR" || followUps.length === 0) {
             return;
@@ -12235,6 +12261,29 @@ export function createModelGatewayQAnswer(
         const offerRemoved: string[] =
           offerBinding.kind === "UNBOUND" ? [offerBinding.said] : [];
         const uncertaintyLines: string[] = [];
+        /**
+         * D11 (live 396ebc21): code closes with the stage line, so a
+         * sentence of the answer that restates that stage is dropped
+         * (stageRestatements: against the stage code read, never the
+         * person's words). The answer was told so before it was written.
+         */
+        const stageSaidByCode = (
+          vehicle: StageVehicleChoice | null,
+          company: string | null,
+        ): void => {
+          if (vehicle?.kind !== "NONE" || vehicle.stage === undefined) return;
+          const restated = stageRestatements(
+            analyst.answer,
+            vehicle.stage,
+            company,
+          );
+          if (restated.length === 0) return;
+          offerRemoved.push(...restated);
+          logger?.info(
+            { qRunId: request.runId, dropped: restated.length },
+            "the answer restated the stage code closes with: dropped by code",
+          );
+        };
         /** Q's own earlier answers in this conversation (code's record). */
         const earlierAnswers = earlier
           .filter((message) => message.role === "Q")
@@ -12382,7 +12431,15 @@ export function createModelGatewayQAnswer(
             ? null
             : {
                 followUp,
-                line: requestStateLine(subject.name ?? "the company", followUp),
+                // D19: days as a person says them, in their calendar.
+                line: requestStateLine(
+                  subject.name ?? "the company",
+                  followUp,
+                  {
+                    now: (dependencies.now ?? (() => new Date()))(),
+                    timeZone: personTimeZone(null, plan.screen?.timeZone),
+                  },
+                ),
               };
         };
         /** Whom an offer to resolve the item goes to (D13, D14). */
@@ -12496,6 +12553,7 @@ export function createModelGatewayQAnswer(
                   !saidEarlier(decision.line, earlierAnswers)
                 ) {
                   uncertaintyLines.push(decision.line);
+                  stageSaidByCode(vehicle, subject?.name ?? null);
                 }
                 offerBinding = { kind: "NONE" };
                 break;
@@ -12605,6 +12663,7 @@ export function createModelGatewayQAnswer(
             const step = stepLineWithoutOffer({ uncertainties, vehicle });
             if (step !== null && !saidEarlier(step, earlierAnswers)) {
               uncertaintyLines.push(step);
+              stageSaidByCode(vehicle, subject?.name ?? null);
             }
           }
         }
