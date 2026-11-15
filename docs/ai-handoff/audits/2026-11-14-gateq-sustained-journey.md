@@ -306,3 +306,103 @@ No settled item was asked again: team, revenue, CAC, raise, problem, pricing. Us
    - "We haven't sized the market" is stored as an `application.note` UNKNOWN, so Market shows as "Missing", not "Unknown".
    - The same acquisition line is stored twice (t46 COUNT and TEXT; duplicated on review).
    - The synthesis attributes Series A to the form.
+
+## Re-certification 15 Nov (30c99ccc5)
+
+- **Production:** `30c99ccc5`, which includes GateQ fix `ce4bf65e5`: intent never gates disagreement acts; CORRECTS only when signalled; per-clause reply check; dedupe; leave-open words kept out of the note; unknown answers the asked dimension; stage rows show every answer; interviewer prompt v9, `reading_version` 4.
+- **Founder:** `founder.fb0217.zawadi-wambui@fictional.capitalq.local`, Clinicly, KE. The profile stage is "Later" (`series_c_plus`). The founder was fresh, with no prior GateQ application. **Investor:** `investor.kilima-angels.njeri-kamau@fictional.capitalq.local`.
+- **Window:** 02:54:21–03:04Z. **Cost:** 34 model calls, **$0.1199** (ai_ops.model_usage: interview 26 calls and $0.0300; synthesis $0.0039; investor 7 calls and $0.0859). Recorded against reservation `ad6602c7`.
+- **Records created:**
+  - application `f08ea19a-b361-4471-aece-c7f4424be52a`, created 02:55:16Z on the first form action and SUBMITTED 02:59:51Z (ref `ga_56cmf73m56wexxrwmxrgmakppw`);
+  - 51 turns (25 PERSON) and 25 readings, all `reading_version` 4;
+  - 36 statements (10 FORM), 5 links and 2 disagreement events;
+  - submission `7b81e402` (dossier `gateq-dossier.v2`, snapshot v3, `documentsTotal` 2, `contradictionsTotal` 3);
+  - synthesis READY (`GATEQ_DOSSIER_SYNTHESIS@v2`, 15 points, complete, 51/51 turns read, uncitedDropped 0);
+  - 1 investor Q turn.
+- **Evidence (durable):** `docs/ai-handoff/evidence/2026-11-15-gateq/` holds:
+  - `01-founder-resume-form.jpg`
+  - `02-founder-review-disagreements.jpg`
+  - `03-investor-inbox-needs-judgement.jpg`
+  - `04-investor-dossier-stage-row.jpg`
+  - `05-investor-comparison-stage.jpg`
+  - `06-investor-q-answer.jpg`
+
+  Scripts and raw reads are in the non-durable scratchpad `gq10/`.
+
+- **Driver fix:** the 14 Nov run sent three leftover lines from a copied script. `drv.cjs` now deletes every stale `cmd/out/ready` file for its tag on start and refuses any command file older than the driver. `run.sh` refuses to reuse a command number. Every sent line is logged with its time (`s.sent`). The sent log matches the 25 PERSON turns exactly.
+- **Journey (25 founder turns):**
+  - Form: Seed, Health, USD 350,000, deck and product brief ticked.
+  - Turns 1–8: what it does; "2,300 patient records digitised and 600 weekly active users"; "Nobody pays yet"; "from 1 clinic to 4 since March"; "We don't know our CAC yet"; team; "really a Series A company now, not seed"; "Back to users: about 1,500 weekly active users." (undated, with no correction words).
+  - Turns 9–18: bare "Leave it open."; use of funds; "Sorry, I meant 400k, not 350k."; "We haven't sized the market."; problem; risk; pricing; "lead angel calls us seed… by age I'd say Series A. I'm not sure which is right."; bare "Leave it open." twice.
+  - **Break: the browser was closed. A new context signed in and resumed.**
+  - Turns 19–25: "Leave it open for now."; solution; "On weekly users, leave it open for Kilima."; acquisition; "Anything else you need from me?"; "Four clinics, the same four pilots…"; "That's all from me for now."
+  - Then review, submit, investor inbox, comparison and one investor Q turn.
+
+### Live re-check list
+
+- **First page load creates no application: PASS.** The gateway had 13 applications before the load and 13 after it. The founder had 0 founder rows. The two load POSTs were reads. The draft was created at 02:55:16Z, on Continue.
+- **Every leave-open is recorded: PASS.**
+  - t18, a bare "Leave it open.", was read as NO_STATEMENTS and wrote LEFT_OPEN on WAU DISAGREES `999b411e`.
+  - t34, a bare "Leave it open.", wrote LEFT_OPEN on stage DISAGREES `fb6195f5`.
+  - The repeats at t36, t38 and t42 met links that were already LEFT_OPEN. Each wrote nothing (NO_STATEMENTS) and created no statement, note or false link.
+- **Q's left-open claims are all backed: PASS.** Every Q turn was checked, questions included. The only left-open claim is t19, "I'll leave the weekly-active-user figures as they are", which matches the t18 event. The repeats got "Fair enough.", with no false negative and no false positive.
+- **An undated restatement becomes DISAGREES: PASS.** The t16 "about 1,500" is NEW `86e84c7a`, linked by DISAGREES `999b411e` against 600 `b9e75a66`. It is not a CORRECTS. Q asked "Which figure should I use?". Both values are visible as "left open by the founder" on the review, dossier, inbox Conflicting answers, synthesis ("remains unresolved") and investor Q.
+- **The real correction is CORRECTS for the raise only: PASS.**
+  - Raise: `90d7add3` (t22 USD 400,000 corrects form `a1d913ef`).
+  - Stage: `078ad774` is the founder's own "not seed".
+  - There are no other CORRECTS links. The review shows "Earlier answers, corrected (2)".
+- **No leave-open words in the note: PASS.** The note statements are the form note, the free pilot, CAC unknown, four years operating, the risk and acquisition.
+- **Market is a stated unknown: PASS, except the summary row.** `bd15481f` is `company.market` UNKNOWN (t24). The dossier `unknowns` is [Market], and `missing` holds only website, instrument and lead. The review shows "Market: You don't know yet". **Defect:** the inbox one-page summary shows "Market: Not covered".
+- **No duplicate statements within a turn: PASS.** No same-turn, same-dimension repeats. The t6 revenue ZERO and paying_customers ZERO share their words, but they are different quantities.
+- **Stage rows show every answer: PASS.**
+  - The inbox "Company and founder" Stage reads "Series A or Our lead angel calls us seed… (answers disagree)" (`04`).
+  - The comparison "Declared stage" shows the same (`05`).
+  - The review lists both stage statements, marked "Left open by the founder".
+  - Still single-valued: dossier JSON `company.stage` = "Series A".
+- **Synthesis wording: PASS.** Stage and traction are "remains unresolved", with no "left open" claim on an OPEN pair. "The form describes a monthly primary-care teleconsultation plan" refers to a real FORM statement (the profile-prefilled description). No interview answer is attributed to the form.
+- **Resume: PASS.**
+  - **No answer POST on load:** 5 POSTs, the first `{reopenOnly:true}` and the other 4 carrying only the session credential.
+  - **Counts unchanged:** statements 31, links 5, events 2, turns 37 and selection rows 1, both before and after the load.
+  - **No role step:** the page opened straight into the interview with the full transcript (`01`).
+  - **Documents:** both documents were restored. The review lists both, and the dossier has `documents` 2.
+  - **No interview claim** was left after submit.
+
+### Invariants
+
+1. **PASS (minor).** 25/25 PERSON turns read (18 READ, 7 NO_STATEMENTS). All 26 TURN statements have words and a source turn, and every one is referenced by a reading (unreferenced 0). Minor: `e204dcb1` (t32) stores paraphrased words, "by revenue I'd say seed", where the founder said "we're seed".
+2. **PASS.** The only CORRECTS links are `90d7add3` (raise, signalled) and `078ad774` (the founder's own "not seed"). The undated 1,500 did not supersede 600. No FORM statement was written after 02:55:18Z (FORM total 10).
+3. **PASS for WAU and stage. Defect: a false contradiction.**
+   - Both disagreements, `999b411e` and `fb6195f5`, are visible and LEFT_OPEN on every surface until submit.
+   - **Defect:** "2,300 patient records digitised" (t4) was read as `customers` = 2,300. "From 1 clinic to 4" (t8) became `customers` = 4. Code detection then linked DISAGREES `cc176a9a` (OPEN). It shows on the review, dossier, inbox, synthesis and investor Q as "answers disagree (open, not yet settled)".
+4. **FAIL (narrow).**
+   - t15 asked "where is Clinicly based today — which country?", though Kenya was given in the form (`908ca5a4`).
+   - t45 asked "How many clinics are using Clinicly today?" after "1 clinic to 4". This follows from the customers misclassification.
+   - t31–t39 asked "What does the product do day to day" four times. Turn 2 had given the description, though the solution dimension was formally unanswered until t40.
+5. **PASS.** After LEFT_OPEN on WAU (t18) and on the stage (t34), Q never asked about either again, including after resume.
+6. **PASS.** Same application, all turns, readings and statements kept. No writes on load, no role step, documents restored and submitted (2), no claim left.
+7. **PASS.** Each success claim has a matching record:
+   - t19 "leave the weekly-active-user figures" matches LEFT_OPEN `999b411e`.
+   - t23 "the raise is four hundred thousand… rather than three hundred and fifty" matches `90d7add3`.
+   - t15 "Series A, rather than seed" matches `078ad774`.
+   - t25 "the market isn't sized yet" matches `bd15481f`.
+8. **FAIL (narrow; values and states agree).**
+   - **These agree:** USD 400,000 (corrected from 350,000), WAU 600 vs 1,500 left open, stage Series A vs "seed by revenue…" left open, zero revenue, CAC unknown, market unknown and 2 documents. They match across the review, dossier, inbox detail, list row ("Needs your judgement: answers disagree"), comparison, Sent page ("Stage we invest at: Your answers disagree"), frozen qualification (STAGE UNRESOLVED / STAGE_DISPUTED, MAY_APPLY), synthesis and investor Q (`06`, which also gives both corrections).
+   - **These disagree:**
+     - The inbox one-page summary shows "Market: Not covered", where the same panel says "Market: Not known".
+     - Its Traction row shows only "2,300 … 600 weekly active users", the first two facts, without the left-open 1,500.
+     - Dossier `company.stage` is single-valued.
+     - The false 2,300-vs-4 contradiction (see 3).
+
+### Defects, ranked
+
+1. **P2 (invariants 3, 4, 8):** a count of a non-customer unit is classified as `customers`. "2,300 patient records digitised" became `customers` = 2,300, and code detection paired it with "1 clinic to 4" as DISAGREES `cc176a9a`. The re-ask at t45 follows from this. Fix in the reading quantity rules (prompt v9, `packages/q-core/src/prompts/tasks/gateq-interviewer.v9.ts`). Also add a guard in `packages/gateq-intake/src/application/statement-plan.ts` code detection: do not link two `customers` counts whose words name different units ("records" vs "clinic").
+2. **P2 (invariant 8):** `onePageSummary` in `apps/web/src/features/gateq/page/inbox-model.ts` (~575–615) has two faults.
+   - It drops UNKNOWN facts, so a stated-unknown Market reads "Not covered". It should say "Not known".
+   - It shows `facts.slice(0, 2)`, which hides one side of a left-open disagreement (the 1,500). It should show both sides of a disagreement, or mark the row "answers disagree".
+3. **P3 (invariant 4):**
+   - Q asked for the country, which the form had answered (t15). Coverage should treat the FORM `company.country` as settled.
+   - Q asked "day to day" four times while the description was given at t2.
+4. **P3:**
+   - Dossier JSON `company.stage` is still one value during a dispute (the inbox and comparison now render every answer).
+   - The t32 stored words are paraphrased.
+   - "They get paid faster because fewer claims are rejected" is stored as `company.description`.
