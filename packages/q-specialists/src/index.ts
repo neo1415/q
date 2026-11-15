@@ -322,9 +322,13 @@ export {
 } from "./hand-over.js";
 export {
   callPrepLine,
+  callPrepUnresolvedLine,
+  isCallPrepUnresolved,
   type CallPrep,
+  type CallPrepUnresolved,
   type QCallPrepPort,
 } from "./call-prep.js";
+export { orderCheckLine, referenceLeadOf } from "./list-order.js";
 export {
   createToolTeamJobPort,
   earlierRequestGoal,

@@ -41,6 +41,8 @@ export type ConversationEntity = {
 export type ShownList = {
   readonly via: "PAGE" | "Q_ANSWER";
   readonly items: readonly ConversationEntity[];
+  /** RC4 (audit 15 Nov): a Q list's own heading, as the person saw it. */
+  readonly title?: string | undefined;
 };
 
 export type ReferenceAsk =
@@ -344,7 +346,9 @@ export function listsFromHistory(
     for (const block of message.blocks ?? []) {
       if (block.kind !== "ANSWER_CARDS") continue;
       const items = blockEntities(block);
-      if (items.length > 0) lists.push({ via: "Q_ANSWER", items });
+      if (items.length > 0) {
+        lists.push({ via: "Q_ANSWER", items, title: block.title });
+      }
     }
     if (lists.length >= 4) break;
   }

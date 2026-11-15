@@ -580,6 +580,12 @@ import {
   tieLine,
   withFitIntegrity,
 } from "./fit-integrity.js";
+import {
+  connectedAlready,
+  inSecondPerson,
+  withReferenceLead,
+  withRelationshipStagesChecked,
+} from "./answer-continuity.js";
 import type { QAnswerCardsBlock, ArrivalSnapshot } from "@capital-q/contracts";
 import {
   ATTENTION_TOOL_NAME,
@@ -7754,7 +7760,15 @@ export function createModelGatewayQAnswer(
               counterparty.companyId === ownCompanyId
             );
           ownReadiness = ownReadinessFact(outcome.result.data, {
-            lead: request.questionKind === "ADVICE" && !aboutSomeoneElse,
+            // RC4 (audit 15 Nov): an analysis, comparison or document they
+            // asked for is answered as asked; the gaps are facts, not its
+            // opening.
+            lead:
+              request.questionKind === "ADVICE" &&
+              !aboutSomeoneElse &&
+              request.answerKind !== "ANALYSIS" &&
+              request.answerKind !== "COMPARISON" &&
+              request.answerKind !== "DOCUMENT",
             alreadySaid: leadLines !== undefined,
             // Code closes this answer with its own offer: one offer per
             // answer, so a yes binds to it (live 2026-10-30, run 2 offered
@@ -8973,6 +8987,9 @@ export function createModelGatewayQAnswer(
         }
         // QA F-107: how a tool failed is never said to the person.
         content = withoutInternalFailureLines(content);
+        // RC4 (audit 15 Nov): Q's notes speak of them in the third person;
+        // the answer speaks to them.
+        content = inSecondPerson(content);
         // QA F-44: other investors' interest is withheld, never denied.
         if (asksAboutOthersInterest(latest.content)) {
           content = withOthersInterestWithheld(content).slice(
@@ -9095,6 +9112,28 @@ export function createModelGatewayQAnswer(
             ANSWER_LIMIT_CHARS,
           );
         }
+        // RC4 (voice audit 15 Nov): a stated relationship stage about a
+        // named counterpart matches the canonical projection (the digest),
+        // or the sentence is replaced by the stage as recorded.
+        {
+          const staged = withRelationshipStagesChecked(
+            content,
+            await accountDigest,
+          );
+          if (staged.corrected.length > 0) {
+            content = staged.content.slice(0, ANSWER_LIMIT_CHARS);
+            logger?.warn(
+              { qRunId: request.runId, corrected: staged.corrected.length },
+              "q answer stated a relationship stage the projection contradicts; corrected by code",
+            );
+          }
+        }
+        // RC4: a place they pointed at is said with the list it was
+        // counted in (never a silent guess at "the first one").
+        content = withReferenceLead(content, request.referenceLead).slice(
+          0,
+          ANSWER_LIMIT_CHARS,
+        );
         // F-96: every line code wrote, in the language of their turn.
         content = await inTheirLanguage(content);
         // Nothing of a speculative answer is stored until it is adopted.
@@ -11416,6 +11455,8 @@ export function createModelGatewayQAnswer(
             // A first contact prepared by code this round (first-contact.ts).
             let firstContact: Promise<QToolCallOutcome> | null = null;
             let firstContactWithNote = false;
+            /** RC4: told when code refused a first contact to a connected counterpart. */
+            const inTouchNotes: ModelMessage[] = [];
             /** An email their mailbox could not send, as a Capital Q message instead (QA F-32). */
             let chatInstead: Promise<QToolCallOutcome> | null = null;
             let chatInsteadWhy: "NO_MAILBOX" | "NO_ADDRESS" = "NO_MAILBOX";
@@ -11576,7 +11617,25 @@ export function createModelGatewayQAnswer(
                   toolContext,
                 );
               }
-              const contact = firstContactOf(call, outcome);
+              const contactAsked = firstContactOf(call, outcome);
+              // RC4 (investor audit, Nixo 9 Nov): a counterpart the
+              // projection shows connected or further along never gets a
+              // first contact, and "not connected yet" is never said of it.
+              const inTouch =
+                contactAsked === null
+                  ? null
+                  : connectedAlready(await accountDigest, contactAsked);
+              if (inTouch !== null) {
+                logger?.warn(
+                  { qRunId: request.runId, stage: inTouch.stage },
+                  "first contact refused by code: the relationship is already connected",
+                );
+                inTouchNotes.push({
+                  role: "USER",
+                  content: `[Capital Q, not the person] They are already ${inTouch.stage.toLowerCase().replace(/_/gu, " ")} with ${inTouch.counterpart.name} (relationship ${inTouch.relationshipId}); this is not a first contact and no expression of interest is prepared. If a message is asked for, prepare it with that relationshipId. Never say they are not connected.`,
+                });
+              }
+              const contact = inTouch === null ? contactAsked : null;
               if (
                 contact !== null &&
                 firstContact === null &&
@@ -11728,7 +11787,7 @@ export function createModelGatewayQAnswer(
                 ),
               );
             }
-            const chainedResults: ModelMessage[] = [];
+            const chainedResults: ModelMessage[] = [...inTouchNotes];
             if (chainedThisRound.length > 0) {
               const stage = offeredByName.get(CHAINED_GET_TOOL)?.visibleStage;
               const stageWrite =
@@ -12010,7 +12069,12 @@ export function createModelGatewayQAnswer(
             containsCompanyName(latest.content, name),
           );
           const only = named.length === 1 ? named[0] : undefined;
-          if (only !== undefined) {
+          // RC4: never a first contact to a counterpart already connected.
+          if (
+            only !== undefined &&
+            connectedAlready(await accountDigest, { companyId: only[1] }) ===
+              null
+          ) {
             const outcome = await callTool(
               {
                 callId: `first-contact-${request.runId}`,

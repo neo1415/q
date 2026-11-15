@@ -293,6 +293,7 @@ function seam(options: {
   const compares: unknown[] = [];
   const leadBlocks: unknown[] = [];
   const leads: (string | undefined)[] = [];
+  const referenceLeads: QAnswerRequest["referenceLead"][] = [];
   const leadsSaid: (string | undefined)[] = [];
   const deltasAtDelegate: number[] = [];
   const closings: (string | undefined)[] = [];
@@ -327,6 +328,7 @@ function seam(options: {
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
+        referenceLeads.push(req.referenceLead);
         leadsSaid.push(req.leadLinesSaid?.answerMessageId);
         deltasAtDelegate.push(options.deltas?.length ?? 0);
         closings.push(req.closingLines);
@@ -498,6 +500,7 @@ function seam(options: {
     },
     probes,
     leads,
+    referenceLeads,
     leadsSaid,
     deltasAtDelegate,
     closings,
@@ -9086,5 +9089,228 @@ describe("investor uncertainty live re-check: D6 and D7", () => {
         parts: [{ kind: "CHAT" }, { kind: "LOOKUP" }],
       }),
     ).toBe(true);
+  });
+});
+
+/**
+ * RC4 (voice and conversation audit, 15 Nov 2026): replays of the owner's
+ * live founder turns, founder-turns.jsonl. Each failed on the code before
+ * the fix.
+ */
+describe("RC4 continuity and path capture (audit 15 Nov, founder turns)", () => {
+  const ZINO = "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1";
+  const CAPE = "b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2";
+  const CHIDI = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
+  const card = (id: string, name: string, at: number) => ({
+    key: `${String(at)}-${id}`,
+    name,
+    line: null,
+    about: null,
+    hue: at,
+    fit: null,
+    reasons: ["Fits what they publish."],
+    measures: [],
+    view: null,
+    said: null,
+    sourceCount: 1,
+    subject: { kind: "INVESTOR_ORGANISATION", investorOrganisationId: id },
+  });
+  const cards = (title: string, rows: readonly (readonly [string, string])[]) =>
+    [
+      {
+        kind: "ANSWER_CARDS",
+        shape: "RANKED",
+        title,
+        cards: rows.map(([id, name], index) => card(id, name, index + 1)),
+        followUps: [],
+      },
+    ] as unknown as QConversationMessage["blocks"];
+  // F7-08 / F7-13: the shortlist; F7-14: the list without Zino.
+  const shortlist = cards("Investors to talk to first", [
+    [ZINO, "Zino Aviation"],
+    [CAPE, "Cape Meridian Growth (fictional)"],
+    [CHIDI, "Chidi Nwosu Angel Investments (fictional)"],
+  ]);
+  const withoutZino = cards("Strongest opportunities, leaving out Zino", [
+    [CHIDI, "Chidi Nwosu Angel Investments (fictional)"],
+    [CAPE, "Cape Meridian Growth (fictional)"],
+  ]);
+  const earlier = [
+    {
+      role: "USER" as const,
+      content: "can you find investors whose mandate appears suitable for me",
+    },
+    {
+      role: "Q" as const,
+      content:
+        "Talk to Zino Aviation, Cape Meridian Growth (fictional) and Chidi Nwosu Angel Investments (fictional) first.",
+      blocks: shortlist,
+    },
+    {
+      role: "USER" as const,
+      content:
+        "Find my strongest opportunities and leave out companies I'm already talking to",
+    },
+    {
+      role: "Q" as const,
+      content: "I excluded Zino Aviation because you're already in diligence.",
+      blocks: withoutZino,
+    },
+    { role: "USER" as const, content: "What evidence would resolve that" },
+    {
+      role: "Q" as const,
+      content: "Checking Cape Meridian Growth's current mandate would.",
+    },
+  ];
+  const question = (
+    text: string,
+    extra: Record<string, unknown> = {},
+  ): TurnReaderResult =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "ADVICE", text },
+      aboutNamedOther: false,
+      nextSteps: false,
+      tool: null,
+      handOver: null,
+      ...extra,
+    }) as unknown as TurnReaderResult;
+
+  it("F7-22: an order they state that differs from the stored list is corrected by code, never agreed with", async () => {
+    const said =
+      "I thought Zino Aviation was the first . Just confirm, I'm not saying it is, but confirm. I thought it was Zino Aviation that was the first and then Chidi the second . But let me know";
+    const run = seam({ said, reading: question(said), outcomes: [], earlier });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    const line = run.stored.at(-1)?.content ?? "";
+    expect(line).toContain(
+      "1. Zino Aviation, 2. Cape Meridian Growth and 3. Chidi Nwosu Angel Investments",
+    );
+    expect(line).toContain(
+      "Chidi Nwosu Angel Investments was third, not second",
+    );
+    expect(line).not.toMatch(/you(?:'re| are) right|correct/iu);
+  });
+
+  it("an order they state that matches a list Q showed is left to the answer", async () => {
+    const said = "Zino Aviation was the first one, right?";
+    const run = seam({ said, reading: question(said), outcomes: [], earlier });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+  });
+
+  it("F7-20: 'the first company' says which list it was counted in when another list had a different first", async () => {
+    const said = "Back to the first um company, does the same concern apply";
+    const run = seam({ said, reading: question(said), outcomes: [], earlier });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    const lead = run.referenceLeads[0];
+    expect(lead?.always).toBe(true);
+    expect(lead?.name).toBe("Chidi Nwosu Angel Investments");
+    expect(lead?.line).toContain(
+      'the last list I showed you ("Strongest opportunities, leaving out Zino")',
+    );
+    expect(lead?.line).toContain("the first was Zino Aviation");
+  });
+
+  it("F1-04: the readiness list does not open an answer to a question that asks why", async () => {
+    const said =
+      "great....haven't gotten any interest from investors though...any idea why?";
+    const run = seam({
+      said,
+      reading: question(said, { nextSteps: true, answerKind: "ANALYSIS" }),
+      outcomes: [],
+      readinessLead: () =>
+        Promise.resolve(
+          "What to do next for your raise, most important first:\n1. Add 3 months of revenue evidence.",
+        ),
+    });
+    await run.answer.answer(request());
+    expect(run.leads).toEqual([undefined]);
+  });
+
+  it("F5-02: a turn of several questions is answered, not started as a plan job", async () => {
+    const said =
+      "really? great..so surely ther must be investors that are interestec in me, roght? how do i get them and how do i rank better against other founders";
+    const started: unknown[] = [];
+    const run = seam({
+      said,
+      reading: question(said, {
+        planAsk: {
+          kind: "GOAL",
+          research: "NONE",
+          side: "FOUNDER",
+          subject: "OWN",
+          deliverable: "PLAN",
+        },
+        answerKind: "ANALYSIS",
+        parts: [
+          { ask: "are investors interested in me", kind: "LOOKUP" },
+          { ask: "how do I get them", kind: "ANALYSIS" },
+          {
+            ask: "how do I rank better against other founders",
+            kind: "ANALYSIS",
+          },
+        ],
+      }),
+      outcomes: [],
+      plan: {
+        start: (_request, input) => {
+          started.push(input);
+          return Promise.resolve({
+            status: "STARTED" as const,
+            jobId: randomUUID(),
+            title: "Your plan",
+            line: "I'm on it.",
+          });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(started).toEqual([]);
+    expect(run.delegated()).toBe(1);
+  });
+
+  it("F7-04: a meeting with 'an investor' among several of theirs is asked about by name, never briefed for another record", async () => {
+    const said =
+      "If you were preparing me for an investor meeting, what would you tell me to work on first";
+    const run = seam({
+      said,
+      reading: question(said, { meetingPrep: { counterpart: "investor" } }),
+      outcomes: [],
+      callPrep: {
+        prepare: () =>
+          Promise.resolve({
+            kind: "WHICH" as const,
+            options: ["Zino Aviation", "Ventures Platform"],
+          }),
+      },
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    expect(run.stored.at(-1)?.content).toBe(
+      "Which one should I prepare you for: Zino Aviation or Ventures Platform?",
+    );
+  });
+
+  it("F7-04: with no investor meeting or relationship on record, the answer says so and answers in general", async () => {
+    const said =
+      "If you were preparing me for an investor meeting, what would you tell me to work on first";
+    const run = seam({
+      said,
+      reading: question(said, { meetingPrep: { counterpart: "investor" } }),
+      outcomes: [],
+      callPrep: {
+        prepare: () =>
+          Promise.resolve({ kind: "NONE" as const, role: "INVESTOR" as const }),
+      },
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.referenceLeads[0]?.line).toMatch(
+      /^You have no meeting booked with an investor/u,
+    );
   });
 });

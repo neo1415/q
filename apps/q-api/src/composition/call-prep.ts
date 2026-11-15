@@ -27,7 +27,8 @@ export type CallPrepSources = {
     | "counterpartMaterial"
     | "ownMaterial"
     | "upcomingMeetings"
-  >;
+  > &
+    Partial<Pick<RehearsalMaterial, "relationships">>;
   /** One record they may see, by the name they said; null when none or several. */
   readonly findByName: (
     actor: ActorContext,
@@ -40,6 +41,93 @@ export type CallPrepSources = {
   readonly write: CallPrepWriter;
   readonly logger?: Logger | undefined;
 };
+
+/**
+ * RC4 (voice audit 15 Nov 2026, F7-04): words that name a role, not a
+ * record. "If you were preparing me for an investor meeting" came back from
+ * the reader as the counterpart "investor", and the name search matched
+ * QInvest. The reader's slot is checked here: a counterpart made only of
+ * these words is resolved among the person's own meetings and
+ * relationships, never by a name search.
+ */
+const ROLE_ONLY = new Set([
+  "a",
+  "an",
+  "the",
+  "my",
+  "our",
+  "this",
+  "that",
+  "some",
+  "any",
+  "one",
+  "new",
+  "next",
+  "first",
+  "potential",
+  "prospective",
+  "possible",
+  "lead",
+  "seed",
+  "institutional",
+  "investor",
+  "investors",
+  "vc",
+  "vcs",
+  "fund",
+  "funds",
+  "angel",
+  "angels",
+  "backer",
+  "backers",
+  "firm",
+  "firms",
+  "partner",
+  "partners",
+  "founder",
+  "founders",
+  "company",
+  "companies",
+  "startup",
+  "startups",
+  "meeting",
+  "meetings",
+  "call",
+  "calls",
+  "pitch",
+  "with",
+]);
+
+/** Lower-cased words of a name, without notes such as "(fictional)". */
+function wordsOf(text: string): string[] {
+  return text
+    .replace(/\([^)]*\)/gu, " ")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length > 0);
+}
+
+export function namesOnlyARole(counterpart: string): boolean {
+  const words = wordsOf(counterpart);
+  return words.length > 0 && words.every((word) => ROLE_ONLY.has(word));
+}
+
+/**
+ * A record found by name is the one they named only when a distinctive
+ * word of its name is a word they said (or the whole name is): "Savanna"
+ * is Savanna Seed Partners; "investor" is not QInvest.
+ */
+export function nameIsSaid(recordName: string, said: string): boolean {
+  const spoken = new Set(wordsOf(said));
+  const name = wordsOf(recordName);
+  if (name.length === 0) return false;
+  return name.some(
+    (word) => word.length >= 3 && !ROLE_ONLY.has(word) && spoken.has(word),
+  );
+}
+
+/** Stages where a meeting with them is the next or a recent step. */
+const MEETING_STAGES = new Set(["CONNECTED", "MEETING_HELD", "IN_DILIGENCE"]);
 
 export function createCallPrepPort(
   dependencies: CallPrepSources,
@@ -62,13 +150,68 @@ export function createCallPrepPort(
         }
         const kind =
           viewer.role === "FOUNDER" ? "INVESTOR_ORGANISATION" : "COMPANY";
-        const id = await dependencies.findByName(
-          actor,
-          kind,
-          input.counterpart,
-        );
-        const them =
+        let counterpartSaid = input.counterpart;
+        let id: string | null = null;
+        if (namesOnlyARole(input.counterpart)) {
+          // RC4: a role, not a name: their own meetings first, then the
+          // relationships where a meeting is the step.
+          const [own, upcoming] = await Promise.all([
+            material.relationships === undefined
+              ? []
+              : material.relationships(actor).catch(() => []),
+            material.upcomingMeetings(actor).catch(() => []),
+          ]);
+          const sameSide = own.filter((row) => row.kind === kind);
+          const booked = sameSide.filter((row) =>
+            upcoming.some(
+              (meeting) => meeting.relationshipId === row.relationshipId,
+            ),
+          );
+          const candidates =
+            booked.length > 0
+              ? booked
+              : sameSide.filter((row) =>
+                  MEETING_STAGES.has(row.state.toUpperCase()),
+                );
+          const [only] = candidates;
+          if (candidates.length === 0 || only === undefined) {
+            dependencies.logger?.info(
+              { qRunId: request.runId, reason: "NONE_ON_RECORD" },
+              "call prep not given",
+            );
+            return {
+              kind: "NONE",
+              role: kind === "COMPANY" ? "FOUNDER" : "INVESTOR",
+            };
+          }
+          if (candidates.length > 1) {
+            return {
+              kind: "WHICH",
+              options: [...new Set(candidates.map((row) => row.name))],
+            };
+          }
+          id = only.id;
+          counterpartSaid = only.name;
+        } else {
+          const found = await dependencies.findByName(
+            actor,
+            kind,
+            input.counterpart,
+          );
+          id = found;
+        }
+        let them =
           id === null ? null : await material.counterpart(actor, kind, id);
+        // RC4: a record whose name they did not say is not the one they
+        // meant (a search can match a word inside another name).
+        if (them !== null && !nameIsSaid(them.name, counterpartSaid)) {
+          dependencies.logger?.info(
+            { qRunId: request.runId },
+            "call prep: the record found is not the one they named; prepared from the name",
+          );
+          them = null;
+          id = null;
+        }
         // Live 2026-10-23: a counterpart they cannot open by name (none, or
         // several as close) is still prepared, from their own record and
         // the name they said only: nothing of anyone else's is read.

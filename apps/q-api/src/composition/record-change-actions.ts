@@ -158,17 +158,27 @@ export function requestFor(
   const fields = { ...change.fields };
   const check = (schema: z.ZodType, value: unknown) => {
     const parsed = schema.safeParse(value);
-    return parsed.success
-      ? ({ ok: true, fields } as const)
-      : ({
-          ok: false,
-          reason: `That doesn't fit the form: ${parsed.error.issues
-            .map(
-              (issue) => `${issue.path.join(".") || "change"} ${issue.message}`,
-            )
-            .join("; ")
-            .slice(0, 300)}`,
-        } as const);
+    if (parsed.success) return { ok: true, fields } as const;
+    // RC4 (audit 15 Nov; live 9 Nov "That doesn't fit: expected at least
+    // one field to update"): a refusal of the form as a whole names no
+    // field and is a validator's words, never said to a person. It is
+    // said as what it means: nothing asked for is on this form.
+    const fieldIssues = parsed.error.issues.filter(
+      (issue) => issue.path.length > 0,
+    );
+    if (fieldIssues.length === 0) {
+      return {
+        ok: false,
+        reason: "Nothing in that request is something this form changes.",
+      } as const;
+    }
+    return {
+      ok: false,
+      reason: `That doesn't fit the form: ${fieldIssues
+        .map((issue) => `${issue.path.join(".")} ${issue.message}`)
+        .join("; ")
+        .slice(0, 300)}`,
+    } as const;
   };
   switch (change.kind) {
     case "CAPITAL_OBJECTIVE":

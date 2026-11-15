@@ -604,6 +604,19 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly referencedCompanyIds?: readonly string[] | undefined;
   /**
+   * RC4 (voice audit 15 Nov 2026): a place ("the first one") code bound to
+   * one of Q's own stored lists. The stored answer opens with `line` when
+   * it does not name `name`, or always when another list Q showed had a
+   * different record at that place: Q says which one it means.
+   */
+  readonly referenceLead?:
+    | {
+        readonly line: string;
+        readonly name: string;
+        readonly always: boolean;
+      }
+    | undefined;
+  /**
    * The declared action the reader read them as asking for, by its name
    * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
    */

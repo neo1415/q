@@ -57,17 +57,50 @@ export type CallPrep = {
     | undefined;
 };
 
+/**
+ * RC4 (voice audit 15 Nov 2026, F7-04): "if you were preparing me for an
+ * investor meeting…" was briefed as a call with QInvest, an investor with
+ * no relationship or meeting on record. A counterpart said only by its role
+ * ("an investor", "the VC") is resolved from the person's own meetings and
+ * relationships: one is prepared, several are asked about by name, and none
+ * is said, never an unrelated record that happens to match the word.
+ */
+export type CallPrepUnresolved =
+  | { readonly kind: "WHICH"; readonly options: readonly string[] }
+  | { readonly kind: "NONE"; readonly role: "INVESTOR" | "FOUNDER" };
+
+export function isCallPrepUnresolved(
+  value: CallPrep | CallPrepUnresolved,
+): value is CallPrepUnresolved {
+  return "kind" in value;
+}
+
+/** What Q says when the counterpart is not one record. */
+export function callPrepUnresolvedLine(unresolved: CallPrepUnresolved): string {
+  if (unresolved.kind === "NONE") {
+    return unresolved.role === "INVESTOR"
+      ? "You have no meeting booked with an investor, and no investor you're connected with yet, so there's no one meeting to brief you on. Here's how I'd prepare in general."
+      : "You have no meeting booked with a founder, and no company you're connected with yet, so there's no one meeting to brief you on. Here's how I'd prepare in general.";
+  }
+  const names = unresolved.options.slice(0, 5);
+  const last = names.pop() ?? "";
+  const list = names.length === 0 ? last : `${names.join(", ")} or ${last}`;
+  return `Which one should I prepare you for: ${list}?`;
+}
+
 export type QCallPrepPort = {
   /**
    * Null when the prep could not be had (no founder or investor side, or
    * the writer failed): the turn is then answered the usual way. A name
    * they cannot open is prepared from their own record and the name only.
+   * A counterpart said only by its role resolves among their own meetings
+   * and relationships, or comes back unresolved (WHICH or NONE).
    * Never throws, except to pass on a cancellation.
    */
   readonly prepare: (
     request: QAnswerRequest,
     input: { readonly counterpart: string; readonly said: string },
-  ) => Promise<CallPrep | null>;
+  ) => Promise<CallPrep | CallPrepUnresolved | null>;
 };
 
 export function callPrepLine(prep: CallPrep): string {

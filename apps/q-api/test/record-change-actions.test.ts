@@ -58,6 +58,20 @@ describe("requestFor", () => {
     });
     expect(bad.ok).toBe(false);
   });
+
+  it("RC4 (live 9 Nov): a refusal of the whole form is said plainly, never as the validator's words", () => {
+    const empty = requestFor({
+      kind: "CAPITAL_OBJECTIVE",
+      companyId: COMPANY,
+      operation: "UPDATE",
+      fields: {},
+    });
+    expect(empty).toEqual({
+      ok: false,
+      reason: "Nothing in that request is something this form changes.",
+    });
+    expect(JSON.stringify(empty)).not.toContain("expected at least one field");
+  });
 });
 
 describe("the record change board", () => {

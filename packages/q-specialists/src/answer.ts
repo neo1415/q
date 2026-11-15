@@ -15,6 +15,8 @@ import {
 } from "./tool-focus.js";
 import {
   callPrepLine,
+  callPrepUnresolvedLine,
+  isCallPrepUnresolved,
   rehearsalOffer,
   type QCallPrepPort,
 } from "./call-prep.js";
@@ -259,6 +261,11 @@ import {
   type ReferenceAsk,
   type ResolvedReference,
 } from "./conversation-entities.js";
+import {
+  orderCheckLine,
+  referenceLeadOf,
+  type ReferenceLead,
+} from "./list-order.js";
 import { bindReferences, boundCompanyIds } from "./reference-binding.js";
 import { correctsOwnCompany } from "./company/about-company.js";
 
@@ -386,6 +393,8 @@ type PointedAt = {
   readonly resolved: ResolvedReference | null;
   readonly note: string;
   readonly control?: ControlBinding | undefined;
+  /** RC4: the line that says which list a place was counted in. */
+  readonly lead?: ReferenceLead | null | undefined;
 };
 
 /** B5: spoken words that address Q by name ("thanks, Q"). */
@@ -443,7 +452,17 @@ function pointedAt(
       focus: focusFromHistory(history),
     });
     if (resolved !== null) {
-      return { ask, resolved, note: resolutionNote(ask, resolved) };
+      // RC4: which list the place was counted in, said with the answer.
+      const lead = referenceLeadOf(ask, resolved, listsFromHistory(history));
+      return {
+        ask,
+        resolved,
+        note:
+          lead === null
+            ? resolutionNote(ask, resolved)
+            : `${resolutionNote(ask, resolved)} ${lead.line} Say which list you counted in; never claim another order.`,
+        lead,
+      };
     }
     // A2: explicit places with no list that has them all. Never a guess at
     // which records were meant: Q asks.
@@ -5070,13 +5089,20 @@ export function createSpecialistQAnswer(
   const resolvedInRun = new Map<string, string>();
   /** A2: the companies explicit places bound, in the order said. */
   const placedInRun = new Map<string, readonly string[]>();
+  /** RC4: which list a place was counted in, said by the stored answer. */
+  const leadInRun = new Map<string, ReferenceLead>();
   const withReferences = (request: QAnswerRequest): QAnswerRequest => {
     const note = resolvedInRun.get(request.runId);
     const placed = placedInRun.get(request.runId);
+    const lead = leadInRun.get(request.runId);
+    const led =
+      lead === undefined || request.referenceLead !== undefined
+        ? request
+        : { ...request, referenceLead: lead };
     return note === undefined || request.references !== undefined
-      ? request
+      ? led
       : {
-          ...request,
+          ...led,
           references: note,
           ...(placed === undefined ? {} : { referencedCompanyIds: placed }),
         };
@@ -6629,11 +6655,15 @@ export function createSpecialistQAnswer(
     );
     if (pointed !== null) {
       resolvedInRun.set(request.runId, pointed.note);
+      if (pointed.lead !== undefined && pointed.lead !== null) {
+        leadInRun.set(request.runId, pointed.lead);
+      }
       while (resolvedInRun.size > PREREADS_MAX) {
         const oldest = resolvedInRun.keys().next().value;
         if (oldest === undefined) break;
         resolvedInRun.delete(oldest);
         placedInRun.delete(oldest);
+        leadInRun.delete(oldest);
       }
       const placed =
         pointed.ask?.kind === "POSITIONS" && pointed.resolved?.kind === "PAIR"
@@ -6668,6 +6698,20 @@ export function createSpecialistQAnswer(
         "q named a record from its own list by code",
       );
       return recordAnswer(request, conversationId, recalled);
+    }
+    // RC4 (audit 15 Nov, F7-22): an order they state of records Q listed
+    // ("I thought Zino was first and Chidi second") is checked against the
+    // lists stored with Q's turns; where it differs, the order as shown is
+    // said by code, never an agreement with a wrong guess.
+    const orderChecked = sequences.has(conversationId)
+      ? null
+      : orderCheckLine(latest.content, history);
+    if (orderChecked !== null) {
+      logger?.info(
+        { qRunId: request.runId, lane: "LIST_ORDER_CHECK", modelCalls: 0 },
+        "q checked a stated order against the lists it showed",
+      );
+      return recordAnswer(request, conversationId, orderChecked);
     }
     // "Open the second one" / "not that investor, the second one": a record
     // on their page or in Q's list, opened by code. Q's own company cards
@@ -7761,16 +7805,45 @@ export function createSpecialistQAnswer(
         counterpart: prepFor,
         said: latest.content,
       });
+      const unresolved =
+        prep !== null && isCallPrepUnresolved(prep) ? prep : null;
       logger?.info(
         {
           qRunId: request.runId,
-          prepared: prep !== null,
-          waiting: prep?.waiting.length ?? 0,
+          prepared: prep !== null && unresolved === null,
+          unresolved: unresolved?.kind ?? null,
+          waiting:
+            prep === null || isCallPrepUnresolved(prep)
+              ? 0
+              : prep.waiting.length,
           prepMs: Date.now() - startedAt,
         },
         "q prepared a call",
       );
-      if (prep !== null) {
+      // RC4: several meetings or relationships it could be: Q asks which.
+      if (unresolved?.kind === "WHICH") {
+        speculative.current?.cancel("ACTED");
+        return recordAnswer(
+          request,
+          conversationId,
+          callPrepUnresolvedLine(unresolved),
+        );
+      }
+      // None on record: the question is answered in general, and the
+      // answer opens by saying there is no one meeting to brief them on.
+      if (unresolved?.kind === "NONE") {
+        leadInRun.set(request.runId, {
+          line: callPrepUnresolvedLine(unresolved),
+          name: "",
+          always: true,
+        });
+        while (leadInRun.size > PREREADS_MAX) {
+          const oldest = leadInRun.keys().next().value;
+          if (oldest === undefined) break;
+          leadInRun.delete(oldest);
+        }
+      }
+      if (prep !== null && !isCallPrepUnresolved(prep)) {
         speculative.current?.cancel("ACTED");
         const offer = rehearsalOffer(prep);
         return recordAnswer(
@@ -8166,9 +8239,17 @@ export function createSpecialistQAnswer(
       taken: offeredPlan,
       standing: standingOffer?.kind === "PLAN" ? standingOffer : null,
     });
+    // RC4 (audit 15 Nov, F5-02): a turn the reader split into two or more
+    // questions ("are investors interested in me? how do I get them, and
+    // how do I rank better?") is answered, part by part; it never becomes
+    // a plan job with no answer. The plan stays offered for a plain yes.
+    const asksSeveralQuestions =
+      (read?.parts ?? []).filter((part) => part.kind !== "DOCUMENT").length >=
+      2;
     if (
       confident &&
       dependencies.plan !== undefined &&
+      !asksSeveralQuestions &&
       (offeredPlan !== null || planAskRoutes(read?.planAsk ?? null))
     ) {
       const planAsk =
@@ -8893,11 +8974,27 @@ export function createSpecialistQAnswer(
     // priorities and the plan offer. Which source a question draws on is
     // not whether it asks what to do next: that is nextSteps alone, read
     // beside the class (TURN_READER v74), for any question to Q.
+    // RC4 (audit 15 Nov, RC9 of the founder findings): the readiness list
+    // opened answers to "why no interest?", "match each profile field" and
+    // "what would improve your assessment in three months" -- questions
+    // that ask for an explanation or a piece of work, not for what to do
+    // next. The list opens an answer only when the reading's own answer
+    // kind is a plain reply (no analysis, comparison or document asked
+    // for) and the turn is one question; otherwise the readiness facts
+    // reach the answer as facts and the question is answered as asked.
+    const plainNextStepsAsk =
+      (read?.answerKind === null ||
+        read?.answerKind === undefined ||
+        read.answerKind === "CHAT" ||
+        read.answerKind === "LOOKUP" ||
+        read.answerKind === "FOLLOW_UP") &&
+      !asksSeveralQuestions;
     const asksNextSteps =
       !writingDocument &&
       read?.kind === "QUESTION_TO_Q" &&
       read.nextSteps === true &&
-      read.aboutNamedOther !== true;
+      read.aboutNamedOther !== true &&
+      plainNextStepsAsk;
     // Owner 2026-10-30: "What should I do today?" is answered in the
     // conversation from what Q already holds (TURN_READER v72: planAsk
     // null, nextSteps true). What Q is doing is said as it starts --
