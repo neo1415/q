@@ -112,7 +112,7 @@ describe("Q brands the gateway from the website: name, logo and colour", () => {
   });
 
   it("a site icon is not proposed as a logo; the name and colour still are", async () => {
-    if (tool === undefined) throw new Error("no tool");
+    if (action === undefined || tool === undefined) throw new Error("no tool");
     const canonical = await tool.toCanonical(
       tool.input.parse({ fromWebsite: true }),
       context,
@@ -134,6 +134,25 @@ describe("Q brands the gateway from the website: name, logo and colour", () => {
     expect(
       (canonical as { input: Record<string, unknown> }).input,
     ).not.toHaveProperty("logoAssetId");
+    // The card (and Q's line, built from it) says why no logo is proposed.
+    const card = action.card(canonical);
+    expect(card.summary).toBe("Brand your gateway #262c55");
+    expect(card.preview).toContain(
+      "Only a site icon was found, so no logo is used.",
+    );
+  });
+
+  it("a real logo or no image at all: the card says nothing about an icon", async () => {
+    if (action === undefined || tool === undefined) throw new Error("no tool");
+    const said = tool.input.parse({ fromWebsite: true });
+    for (const found of [
+      suggestion(),
+      suggestion({ logo: { status: "NOT_FOUND", reason: "NO_LOGO" } }),
+    ]) {
+      const canonical = await tool.toCanonical(said, context, portsWith(found));
+      expect(canonical).not.toHaveProperty("websiteIconLeftOut");
+      expect(action.card(canonical).preview).not.toContain("icon");
+    }
   });
 
   it("a name alone is still a proposal; nothing found is a plain refusal", async () => {

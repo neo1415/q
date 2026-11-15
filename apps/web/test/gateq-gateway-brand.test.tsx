@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +12,20 @@ import {
   GatewayBrandMark,
   gatewayAccentCss,
 } from "@/features/gateq/gateway-brand";
+import { isWordmark } from "@/features/gateq/gateway-logo-name";
+
+/** jsdom has no layout: give the image the size a browser draws it at. */
+function drawn(image: HTMLElement, width: number, height: number) {
+  for (const [key, value] of Object.entries({
+    naturalWidth: width,
+    naturalHeight: height,
+    clientWidth: width,
+    clientHeight: height,
+  })) {
+    Object.defineProperty(image, key, { configurable: true, value });
+  }
+  fireEvent.load(image);
+}
 
 afterEach(cleanup);
 
@@ -57,6 +71,57 @@ describe("B6: the public gateway in the investing organisation's brand", () => {
     );
     expect(logo.getAttribute("data-logo-kind")).toBe("LOGO");
     expect(logo.className).toContain("object-contain");
+  });
+
+  it("a wordmark logo is not followed by the name it spells; the name is its alt", () => {
+    render(
+      <GatewayBrandMark
+        gateway={{
+          publicId: "gq_0123456789abcdefghjkmnpqrs",
+          organisationDisplayName: "Payfast Ltd",
+          organisationPhotoUrl: null,
+          gatewayDisplayName: "Payfast",
+          gatewayLogo: {
+            assetId: "3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+            kind: "LOGO",
+          },
+        }}
+      />,
+    );
+    // Before the image has loaded, the name shows beside it.
+    expect(screen.getByText("Payfast")).toBeTruthy();
+    // Drawn 77×32 (a 60×25 viewBox at h-8): a wordmark.
+    drawn(screen.getByTestId("gateway-brand-logo"), 77, 32);
+    expect(screen.queryByText("Payfast")).toBeNull();
+    expect(screen.getByRole("img", { name: "Payfast" })).toBeTruthy();
+  });
+
+  it("a square or mark-and-name logo keeps the name beside it, image decorative", () => {
+    render(
+      <GatewayBrandMark
+        gateway={{
+          publicId: "gq_0123456789abcdefghjkmnpqrs",
+          organisationDisplayName: "Northwind Ventures",
+          organisationPhotoUrl: null,
+          gatewayLogo: {
+            assetId: "3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+            kind: "LOGO",
+          },
+        }}
+      />,
+    );
+    const logo = screen.getByTestId("gateway-brand-logo");
+    drawn(logo, 48, 32);
+    expect(screen.getByText("Northwind Ventures")).toBeTruthy();
+    expect(logo.getAttribute("alt")).toBe("");
+  });
+
+  it("a wordmark is at least 2.2 times as wide as it is tall", () => {
+    expect(isWordmark(60, 25)).toBe(true); // Stripe
+    expect(isWordmark(400, 100)).toBe(true); // Linear
+    expect(isWordmark(64, 32)).toBe(false);
+    expect(isWordmark(32, 32)).toBe(false);
+    expect(isWordmark(0, 0)).toBe(false);
   });
 
   it("falls back to the organisation's initial with no photo", () => {

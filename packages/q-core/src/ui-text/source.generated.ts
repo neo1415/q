@@ -4282,6 +4282,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Saved, no interest sent",
   "Saved.",
   "Saved. Founders see it before they apply.",
+  "Saved. Founders will see it when you reopen your gateway.",
   "Saved. Q follows it from its next message for you.",
   "Saved. Q uses this from your next message or call.",
   "Saved. Q uses your correction from now on.",

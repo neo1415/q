@@ -14,10 +14,15 @@ import {
 import { useT } from "@/features/i18n/language";
 
 import { appearanceAction, gatewayStatusAction } from "./gateq-actions";
+import { GatewayLogoWithName } from "../gateway-logo-name";
+
 import {
   GatewayBrandFromWebsite,
   type ChosenBrand,
 } from "./gateway-brand-from-website";
+
+const PREVIEW_NAME =
+  "truncate text-base font-semibold text-(--cq-text-primary)";
 
 /**
  * B6 / B7 (2026-11-14): an investor organisation's admins brand, place and
@@ -89,8 +94,14 @@ export function GatewayAppearancePanel({
         setSites(done.value.embedOrigins.join("\n"));
         router.refresh();
       }
+      // A paused gateway's public page is not found until it is reopened,
+      // so "shows it now" would not be true.
       setMessage(
-        done.ok ? "Saved. Your public gateway shows it now." : done.message,
+        done.ok
+          ? isOpen
+            ? "Saved. Your public gateway shows it now."
+            : "Saved. Founders will see it when you reopen your gateway."
+          : done.message,
       );
     });
   };
@@ -180,27 +191,35 @@ export function GatewayAppearancePanel({
         aria-label={t("Preview of your gateway's header")}
         role="group"
       >
-        {logo === null ? (
-          <span className="grid size-8 flex-none place-items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-strong) text-sm font-semibold text-(--cq-text-primary)">
-            {shownName.slice(0, 1).toUpperCase()}
-          </span>
-        ) : (
-          // Capital Q's stored copy (a data URL or our logo route).
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+        {logo?.kind === "LOGO" ? (
+          // As the public bar draws it: a wordmark is not followed by the
+          // name it already spells.
+          <GatewayLogoWithName
             src={logo.src}
-            alt=""
-            className={
-              logo.kind === "LOGO"
-                ? "h-8 max-w-40 flex-none object-contain"
-                : "size-8 flex-none rounded-full object-cover"
-            }
-            data-preview-logo-kind={logo.kind}
+            name={shownName}
+            imageClassName="h-8 max-w-40 flex-none object-contain"
+            nameClassName={PREVIEW_NAME}
+            imageData={{ "data-preview-logo-kind": "LOGO" }}
           />
+        ) : (
+          <>
+            {logo === null ? (
+              <span className="grid size-8 flex-none place-items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-strong) text-sm font-semibold text-(--cq-text-primary)">
+                {shownName.slice(0, 1).toUpperCase()}
+              </span>
+            ) : (
+              // Capital Q's stored copy (a data URL or our logo route).
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo.src}
+                alt=""
+                className="size-8 flex-none rounded-full object-cover"
+                data-preview-logo-kind={logo.kind}
+              />
+            )}
+            <span className={PREVIEW_NAME}>{shownName}</span>
+          </>
         )}
-        <span className="truncate text-base font-semibold text-(--cq-text-primary)">
-          {shownName}
-        </span>
       </div>
 
       {canChange ? (

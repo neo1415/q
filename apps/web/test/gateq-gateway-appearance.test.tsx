@@ -304,6 +304,63 @@ describe("Brand from website: the admin corrects what Capital Q found, then save
     );
   });
 
+  it("paused: Save says founders see it on reopening, not that the public page shows it now", async () => {
+    appearanceAction.mockResolvedValue({ ok: true, value: appearance() });
+    render(
+      <GatewayAppearancePanel
+        gatewayId={GATEWAY}
+        open={false}
+        previewHref="/g/gq_x"
+        appearance={appearance()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toBe(
+        "Saved. Founders will see it when you reopen your gateway.",
+      ),
+    );
+  });
+
+  it("open: Save says the public gateway shows it now", async () => {
+    appearanceAction.mockResolvedValue({ ok: true, value: appearance() });
+    panel();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toBe(
+        "Saved. Your public gateway shows it now.",
+      ),
+    );
+  });
+
+  it("a wordmark logo heads the preview without the name repeated beside it", () => {
+    render(
+      <GatewayAppearancePanel
+        gatewayId={GATEWAY}
+        open={false}
+        previewHref="/g/gq_x"
+        appearance={appearance({
+          displayName: "Wavepay",
+          logo: { assetId: ASSET, kind: "LOGO" },
+        })}
+      />,
+    );
+    const header = document.querySelector("[data-gateway-header-preview]");
+    const image = header?.querySelector("img");
+    if (image == null) throw new Error("no logo");
+    for (const [key, value] of Object.entries({
+      naturalWidth: 88,
+      naturalHeight: 22,
+      clientWidth: 128,
+      clientHeight: 32,
+    })) {
+      Object.defineProperty(image, key, { configurable: true, value });
+    }
+    fireEvent.load(image);
+    expect(header?.textContent).not.toContain("Wavepay");
+    expect(image.getAttribute("alt")).toBe("Wavepay");
+  });
+
   it("paused with no saved name: the profile name heads the preview, not a placeholder", () => {
     render(
       <GatewayAppearancePanel

@@ -5,6 +5,8 @@ import {
   brandStyleSheet,
 } from "@/features/brand-theme/brand-colour";
 
+import { GatewayLogoWithName } from "./gateway-logo-name";
+
 /**
  * B6: the public gateway in the investing organisation's colours.
  *
@@ -85,21 +87,19 @@ export function GatewayBrandMark({
   const name = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
   const mark = gatewayMarkImage(gateway);
   if (mark !== null && mark.kind === "LOGO") {
-    // A full logo keeps its own shape: never cropped into a circle.
+    // A full logo keeps its own shape: never cropped into a circle. A
+    // wordmark already spells the name, so it is not repeated beside it.
     return (
-      <span className="flex min-w-0 items-center gap-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={mark.src}
-          alt=""
-          className="h-8 max-w-40 flex-none object-contain sm:h-9"
-          data-testid="gateway-brand-logo"
-          data-logo-kind="LOGO"
-        />
-        <span className="truncate text-lg font-semibold tracking-tight text-(--cq-text-primary)">
-          {name}
-        </span>
-      </span>
+      <GatewayLogoWithName
+        src={mark.src}
+        name={name}
+        imageClassName="h-8 max-w-40 flex-none object-contain sm:h-9"
+        nameClassName="truncate text-lg font-semibold tracking-tight text-(--cq-text-primary)"
+        imageData={{
+          "data-testid": "gateway-brand-logo",
+          "data-logo-kind": "LOGO",
+        }}
+      />
     );
   }
   const photo = mark?.src ?? null;

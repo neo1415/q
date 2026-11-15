@@ -112,6 +112,8 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
     "لا يمكن إلا لمسؤولي شركتك تغيير مظهر بوابتك.",
   "Saved. Your public gateway shows it now.":
     "تم الحفظ. تظهر التغييرات الآن على بوابتك العامة.",
+  "Saved. Founders will see it when you reopen your gateway.":
+    "تم الحفظ. سيراه المؤسسون عند إعادة فتح بوابتك.",
   "Use a colour like #0f766e.": "استخدم لونًا مثل ‎#0f766e.",
   "Your gateway is open again.": "بوابتك مفتوحة من جديد.",
   "Your gateway is paused. Its page and embed no longer take applications.":

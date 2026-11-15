@@ -1,9 +1,4 @@
-import {
-  isBrandish,
-  readLogo,
-  readWebsiteBrand,
-  siteOf,
-} from "@capital-q/q-artifacts";
+import { isBrandish, readLogo, siteOf } from "@capital-q/q-artifacts";
 
 import { normaliseWebAddress } from "./domain/url-safety.js";
 import {
@@ -18,6 +13,7 @@ import {
   type VettedHttpWithReasons,
   type VettedRefusal,
 } from "./vetted-http.js";
+import { rankCssBrandColours } from "./website-colour.js";
 import {
   chooseWebsiteName,
   domainLabel,
@@ -581,7 +577,9 @@ export function createWebsiteIdentityReader(
     }
 
     // Colours: what the site declares (theme-color, TileColor, mask-icon,
-    // the manifest's theme_color), then what its own CSS uses most.
+    // the manifest's theme_color), then its CSS colours ranked by where
+    // they are used and how vivid they are, so a pale tint never beats
+    // the main brand colour (website-colour.ts).
     const css: string[] = [];
     const sheets = markup.stylesheets
       .filter((href) => isAsset(new URL(href)))
@@ -593,7 +591,17 @@ export function createWebsiteIdentityReader(
     const brandish = [
       ...markup.declaredColours,
       ...(manifest?.themeColour == null ? [] : [manifest.themeColour]),
-      ...readWebsiteBrand({ pageUrl, html, css }).colours,
+      ...rankCssBrandColours({
+        css: [
+          ...[...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/giu)].map(
+            (m) => m[1] ?? "",
+          ),
+          ...css.map((sheet) => sheet.slice(0, CSS_MAX)),
+        ],
+        inline: [...html.matchAll(/\bstyle\s*=\s*"([^"]*)"/giu)].map(
+          (m) => m[1] ?? "",
+        ),
+      }),
     ]
       .filter(isBrandish)
       .filter((hex, index, all) => all.indexOf(hex) === index);

@@ -489,6 +489,34 @@ describe("brand from website: the shapes real sites have", () => {
     expect(fetched).not.toContain("https://payfastcdn.attacker.example/x.css");
   });
 
+  it("a Stripe-like stylesheet: the main brand colour, never its pale tint (15 Nov re-check)", async () => {
+    const { read } = world({
+      "https://payfast.example/": {
+        body: `<html><head><title>Payfast</title>
+          <link rel="stylesheet" href="https://b.payfastcdn.example/v3/site.css">
+        </head><body></body></html>`,
+      },
+      "https://b.payfastcdn.example/v3/site.css": {
+        type: "text/css",
+        // The tint is named first and used most, as on the live site.
+        body: [
+          ":root{--accent-light:#b9b9f9;--accent-subtle:#7f7dfc;--brand-primary:#635bff;--hds-color-core-brand-600:#533afd}",
+          ".card{border-color:#b9b9f9}.chip{background:#b9b9f9}.tag{color:#b9b9f9}.rule{outline-color:#b9b9f9}",
+          "@media (min-width:600px){.Button--primary{background-color:#635bff}}",
+          "a.Link{color:#635bff}",
+        ].join("\n"),
+      },
+    });
+    const reading = await read("payfast.example");
+    expect(reading.colours).toMatchObject({
+      status: "FOUND",
+      primary: "#635bff",
+    });
+    // Deterministic: the same CSS reads the same way every time.
+    const again = await read("payfast.example");
+    expect(again.colours).toEqual(reading.colours);
+  });
+
   it("a Flutterwave-like title with the brand last: the brand, not the slogan", async () => {
     const { read } = world({
       "https://wavepay.example/": {

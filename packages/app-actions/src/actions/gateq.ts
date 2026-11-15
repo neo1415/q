@@ -188,6 +188,12 @@ const Appear = z
     gatewayId: UuidSchema,
     ...ForOrganisation,
     input: GatewayAppearanceRequestSchema,
+    /**
+     * Set only by Q's fromWebsite path: the site had only an icon, which Q
+     * leaves out, so the card says why no logo is proposed. Wording only;
+     * nothing is saved from it.
+     */
+    websiteIconLeftOut: z.literal(true).optional(),
   })
   .strict();
 type AppearInput = z.infer<typeof Appear>;
@@ -233,6 +239,9 @@ const SET_APPEARANCE = defineAppAction<
         ? [`Shown as ${input.input.displayName}.`]
         : []),
       ...(input.input.logoAssetId === null ? ["No logo."] : []),
+      ...(input.websiteIconLeftOut === true
+        ? ["Only a site icon was found, so no logo is used."]
+        : []),
     ].join(" "),
   }),
   done: (out) => (out.ok ? "Your gateway's look is updated." : NOT_THEIRS),
@@ -303,6 +312,7 @@ const SET_APPEARANCE = defineAppAction<
       let accentHex = current.value.accentHex;
       let logoAssetId: string | undefined;
       let displayName: string | undefined;
+      let iconLeftOut = false;
       if (tool.fromWebsite === true) {
         const suggested = await admin(ports).suggestBrand(
           context.actor,
@@ -324,6 +334,8 @@ const SET_APPEARANCE = defineAppAction<
         if (found.logo.status === "FOUND" && found.logo.kind === "LOGO") {
           logoAssetId = found.logo.assetId;
         }
+        iconLeftOut =
+          found.logo.status === "FOUND" && found.logo.kind === "ICON";
         if (
           found.colours.status !== "FOUND" &&
           logoAssetId === undefined &&
@@ -369,6 +381,7 @@ const SET_APPEARANCE = defineAppAction<
           ...(displayName === undefined ? {} : { displayName }),
           ...(logoAssetId === undefined ? {} : { logoAssetId }),
         },
+        ...(iconLeftOut ? { websiteIconLeftOut: true as const } : {}),
       };
     },
   },
