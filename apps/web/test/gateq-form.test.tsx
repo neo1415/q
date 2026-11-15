@@ -1164,6 +1164,119 @@ describe("live 14 Nov: entering the gateway again never saves over the applicati
   });
 });
 
+describe("the interview step after a dropped connection (live 318577a8e t16)", () => {
+  const ref = { current: null };
+  const at = "2026-11-15T06:41:00Z";
+  // The server recorded t16 and Q's t17 reply; the browser lost both.
+  const recorded = [
+    { seq: 15, role: "Q", text: "What problem do they face?", at },
+    { seq: 16, role: "PERSON", text: "Leave it open.", at },
+    { seq: 17, role: "Q", text: "Which figure should I use?", at },
+    { seq: 18, role: "PERSON", text: "Back to users: about 1,500.", at },
+    {
+      seq: 19,
+      role: "Q",
+      text: "Fair enough. Finish and review is ready.",
+      at,
+    },
+  ] as const;
+  const held = async (pendingTurn: {
+    id: string;
+    text: string;
+    after?: number;
+  }) => {
+    const { saveRecovery, readRecovery } =
+      await import("../src/features/gateq/form/session-recovery");
+    saveRecovery(GATEWAY.publicId, {
+      token: TOKEN,
+      answers: model.EMPTY_ANSWERS,
+      step: "interview",
+      interview: true,
+      pendingTurn,
+      submitKey: "",
+    });
+    return readRecovery;
+  };
+  const step = () =>
+    render(
+      <InterviewStep
+        headingRef={ref}
+        fund="Kilima Angels"
+        companyName="Solaix Co"
+        sessionToken={TOKEN}
+        gatewayPublicId={GATEWAY.publicId}
+        onFinish={() => undefined}
+      />,
+    );
+
+  it("marks a turn the server saved, with Q's reply, as sent and gives Send back", async () => {
+    const readRecovery = await held({
+      id: "turn-t16",
+      text: "Back to users: about 1,500.",
+      after: 17,
+    });
+    calls.transcript.mockResolvedValue({ ok: true, turns: recorded });
+    step();
+    await flush();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/needs confirmation/u)).toBeNull();
+    expect(readRecovery(GATEWAY.publicId)?.pendingTurn).toBeNull();
+    // Nothing was sent again; the next answer goes, with a new id.
+    expect(calls.turn).not.toHaveBeenCalled();
+    calls.turn.mockResolvedValue({
+      ok: true,
+      sessionToken: TOKEN,
+      reply: "Thanks.",
+      application: summary({}),
+    });
+    type("Your answer", "Leave it open.");
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Send" }).disabled,
+    ).toBe(false);
+    await press("Send");
+    expect(calls.turn).toHaveBeenCalledTimes(1);
+    expect(calls.turn.mock.calls[0]?.[1]).toBe("Leave it open.");
+    expect(calls.turn.mock.calls[0]?.[2]).not.toBe("turn-t16");
+  });
+
+  it("never takes an earlier answer in the same words for the held one", async () => {
+    // "Leave it open." at seq 16 came before this tab sent it again.
+    await held({ id: "turn-t20", text: "Leave it open.", after: 19 });
+    calls.transcript.mockResolvedValue({ ok: true, turns: recorded });
+    step();
+    await flush();
+    expect(screen.getByRole("alert").textContent).toMatch(/Not sent/u);
+    expect(calls.turn).not.toHaveBeenCalled();
+  });
+
+  it("recovers Q's reply to a saved turn by its own client turn id", async () => {
+    await held({
+      id: "turn-t18",
+      text: "Back to users: about 1,500.",
+      after: 17,
+    });
+    calls.transcript.mockResolvedValue({
+      ok: true,
+      turns: recorded.slice(0, 4),
+    });
+    calls.turn.mockResolvedValue({
+      ok: true,
+      sessionToken: TOKEN,
+      reply: "Fair enough.",
+      application: summary({}),
+      deduplicated: true,
+    });
+    step();
+    await flush();
+    expect(calls.turn).toHaveBeenCalledTimes(1);
+    expect(calls.turn.mock.calls[0]?.slice(1)).toEqual([
+      "Back to users: about 1,500.",
+      "turn-t18",
+    ]);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
 describe("the interview step", () => {
   const ref = { current: null };
 

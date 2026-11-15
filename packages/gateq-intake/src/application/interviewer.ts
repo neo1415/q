@@ -51,6 +51,13 @@ import {
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
 import { diligenceQuestionFor } from "./dossier.js";
+import {
+  closingLine,
+  isOpenEndedQuestion,
+  pointedToReview,
+  REVIEW_CONTROL,
+  REVIEW_POINTER,
+} from "./interview-close.js";
 import { regionIn } from "./cities.js";
 import {
   ACCUMULATING_DIMENSIONS,
@@ -70,6 +77,7 @@ import {
   renderDisagreements,
   renderKnownStatements,
   replyHeldToReading,
+  replySentences,
   StatementPlanSchema,
   withoutQuestions,
   type AskLog,
@@ -989,15 +997,42 @@ export function createGateQInterviewer(
         // picker chose it (live 30c99ccc5: the form's country at t15, "how
         // many clinics?" after "1 clinic to 4", "day to day" four times).
         // The question is replaced by the picker's next one, in fixed
-        // words; the rest of the reply stays.
-        const { reply: composed, asking: askingDimension } = (() => {
-          const unchanged = { reply: modelComposed, asking: modelAsking };
+        // words; the rest of the reply stays. An open "what would you like
+        // to cover next?" is held to the plan the same way (live
+        // 318577a8e: five times, t35–t43), and when nothing is left Q
+        // says so once and points to the review (interview-close.ts).
+        const {
+          reply: composed,
+          asking: askingDimension,
+          nothingLeft,
+        } = (() => {
+          const unchanged = {
+            reply: modelComposed,
+            asking: modelAsking,
+            nothingLeft: false,
+          };
           if (
             needsInput === null ||
-            modelAsking === null ||
             readBackLineText.length > 0 ||
             !englishTurn ||
-            discardedByIntent
+            (modelAsking !== null && discardedByIntent) ||
+            // A joke, an aside or an attempt to steer Q is not where the
+            // plan speaks; their question to Q ("anything else you need?")
+            // is.
+            (modelAsking === null &&
+              (["OPENING", "SMALL_TALK", "OFF_TOPIC", "SABOTAGE"] as const)
+                .map(String)
+                .includes(result.intent))
+          )
+            return unchanged;
+          const sentences = replySentences(modelComposed);
+          const openEnded = sentences.some(isOpenEndedQuestion);
+          // Q's own question on nothing in the plan (an answer to theirs,
+          // an offer to leave a disagreement open) stands as it is.
+          if (
+            modelAsking === null &&
+            !openEnded &&
+            sentences.some((sentence) => sentence.endsWith("?"))
           )
             return unchanged;
           const after: QuestionNeedsInput = {
@@ -1013,23 +1048,52 @@ export function createGateQInterviewer(
             ),
           };
           const afterNeeds = questionNeedsFor(after);
-          if (mayAskAbout(after, modelAsking, afterNeeds)) return unchanged;
+          if (
+            modelAsking !== null &&
+            mayAskAbout(after, modelAsking, afterNeeds)
+          )
+            return unchanged;
           const next = afterNeeds.find(
             (need) => need.dimension !== modelAsking,
           );
           // Nothing left to ask: the note once (it is capped like any
-          // other dimension), then no question at all, never a loop.
+          // other dimension), then no question at all, never a loop. Q
+          // says once that it has what it needs, with what stays open,
+          // and names the review step; later turns point there.
           if (
             next === undefined &&
             (modelAsking === "application.note" ||
               !mayAskAbout(after, "application.note", afterNeeds))
           ) {
             const kept = withoutQuestions(modelComposed);
+            const qLines = input.recentTurns
+              .filter((turn) => turn.role === "q")
+              .map((turn) => turn.text);
+            // After the close, the pointer only where the turn would
+            // otherwise leave them with no next step: their open question
+            // was cut, the reply is a bare acknowledgement, or Q's last
+            // line did not point there. Never the same line every turn.
+            const keptSentences = replySentences(kept);
+            const bare =
+              keptSentences.length <= 1 &&
+              kept.split(/\s+/u).filter(Boolean).length <= 4;
+            const line = kept.includes(REVIEW_CONTROL)
+              ? ""
+              : !pointedToReview(qLines)
+                ? closingLine(after.view)
+                : openEnded ||
+                    bare ||
+                    !(qLines.at(-1) ?? "").includes(REVIEW_CONTROL)
+                  ? REVIEW_POINTER
+                  : "";
             return {
-              reply: kept.length > 0 ? kept : "Thank you.",
+              reply: `${kept} ${line}`.trim().slice(0, 4_000),
               asking: null,
+              nothingLeft: true,
             };
           }
+          // The plan has more, and the model chose to ask nothing.
+          if (modelAsking === null && !openEnded) return unchanged;
           const question =
             next === undefined
               ? diligenceQuestionFor("application.note")
@@ -1051,6 +1115,7 @@ export function createGateQInterviewer(
               .trim()
               .slice(0, 4_000),
             asking: next?.dimension ?? "application.note",
+            nothingLeft: false,
           };
         })();
         logger?.debug(
@@ -1082,7 +1147,9 @@ export function createGateQInterviewer(
             : { notRecorded: planned.readBacks }),
           asking: askingDimension,
           questionForQ: result.questionForQ,
-          readyToReview: result.readyToReview,
+          // The plan has nothing left: ready for review, whatever the
+          // model said (advisory, as below).
+          readyToReview: nothingLeft || result.readyToReview,
           statementPlan: planned.plan,
         };
       }

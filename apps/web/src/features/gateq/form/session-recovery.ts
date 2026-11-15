@@ -53,7 +53,16 @@ const RecoverySchema = z
       })
       .strict(),
     pendingTurn: z
-      .object({ id: z.string().max(128), text })
+      .object({
+        id: z.string().max(128),
+        text,
+        /**
+         * The last transcript seq this tab had read when it sent the turn,
+         * so a reload can tell this answer from an earlier one in the same
+         * words ("Leave it open." twice). Absent on older recoveries.
+         */
+        after: z.number().int().min(0).optional(),
+      })
       .nullable()
       .default(null),
     submitKey: z.string().max(128).default(""),

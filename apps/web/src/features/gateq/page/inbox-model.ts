@@ -624,22 +624,61 @@ export function onePageSummary(
     }
     return "NOT_COVERED";
   };
+  /**
+   * Where a finding came from, from the one label source the dossier
+   * panel and the founder's review use (live 318577a8e: the 1,500 read
+   * "Estimated" here and "Said in the application" there). A v1 finding,
+   * which has no source kind, keeps its frozen provenance words.
+   */
+  const sourceOf = (fact: SummaryFact): string => {
+    const kind: unknown = "sourceKind" in fact ? fact.sourceKind : undefined;
+    const words = Object.entries(GATEQ_SOURCE_KIND_WORDS).find(
+      ([key]) => key === kind,
+    )?.[1];
+    if (words === undefined) return factProvenanceWords(fact);
+    return "backfilled" in fact && fact.backfilled === true
+      ? `${words}, carried from earlier records`
+      : words;
+  };
+  // Each finding with its source in brackets, findings apart by "; ", so
+  // no row runs a label into the next value ("Founder stated And 3 more").
   const line = (fact: SummaryFact) =>
-    `${fact.summary.replace(/\.\s*$/, "")}. ${factProvenanceWords(fact)}`;
+    `${fact.summary.replace(/[.;\s]+$/u, "")} (${sourceOf(fact)})`;
+  /**
+   * The statements that hold a count of customers on any dimension (live
+   * 318577a8e: "from 1 school to 4" on traction, while Customers read "Not
+   * covered"). The interview's settled-for-asking predicate counts these as
+   * the customers answer; the summary reads them the same way.
+   */
+  const customerCounts = new Set(
+    (view?.dimensions ?? []).flatMap((d) =>
+      d.statements
+        .filter(
+          (s) =>
+            s.valueKind !== "UNKNOWN" &&
+            (s.quantity === "customers" || s.quantity === "paying_customers"),
+        )
+        .map((s) => s.statementId),
+    ),
+  );
   for (const row of SUMMARY_ROWS) {
     const facts = all.filter(
       (fact) =>
         fact.truthClass !== "UNKNOWN" &&
         (row.dimensions === "FUNDRAISING"
           ? fact.group === "FUNDRAISING"
-          : row.dimensions.includes(fact.dimension)),
+          : row.dimensions.includes(fact.dimension) ||
+            (row.dimensions.includes("company.customers") &&
+              "statementId" in fact &&
+              typeof fact.statementId === "string" &&
+              customerCounts.has(fact.statementId))),
     );
     // An older submission has no dossier: its raise is still their claim.
     const legacyRaise =
       row.dimensions === "FUNDRAISING" &&
       facts.length === 0 &&
       item.raise !== null
-        ? `${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}. Founder stated`
+        ? `${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")} (Founder stated).`
         : null;
     if (facts.length === 0) {
       rows.push(
@@ -670,7 +709,12 @@ export function onePageSummary(
           .filter((state): state is GateqDisagreementState => state !== null),
       ),
     ];
-    const parts = facts.filter((fact) => shown.has(fact)).map(line);
+    const parts = [
+      `${facts
+        .filter((fact) => shown.has(fact))
+        .map(line)
+        .join("; ")}.`,
+    ];
     if (states.length > 0)
       parts.push(
         `Answers disagree: ${states

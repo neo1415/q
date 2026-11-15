@@ -90,8 +90,11 @@ import {
  * 5: prompt v10 (reading schema v3); a count names a metric only when its
  * unit fits the metric's declared unit, and words are a span of what was
  * said (live 30c99ccc5).
+ * 6: prompt v11; how the product works day to day is the solution, and a
+ * note naming a stage beside a stage answer of the same reading is that
+ * answer's, never a note (live 318577a8e).
  */
-export const STATEMENT_READING_VERSION = 5;
+export const STATEMENT_READING_VERSION = 6;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
@@ -718,6 +721,10 @@ function correctionStands(
 const LEAVE_OPEN_REQUEST =
   /^(?:(?:please|just|still|so|ok(?:ay)?|then|and|but|for now)[,\s]+)*(?:(?:can|could|would|will) you\s+|i'?d like you to\s+|let'?s\s+)?(?:please\s+)?(?:leave|keep)\s+(?:it|that|this|them|those|both|th(?:e|at|ose) [\w\s'-]{1,48}?)\s+(?:open|unresolved|undecided|unsettled|as (?:it is|they are))\b[^.!?]*[.!?]*$/iu;
 
+/** A funding stage named in words ("seed", "Series A", "pre-seed"). */
+const NAMES_A_STAGE =
+  /\b(?:pre[\s-]?seed|seed|series\s+[a-e]\b|growth[\s-]stage)\b/iu;
+
 export function withoutLeaveOpenRequests(text: string): string {
   const sentences = text.match(/[^.!?]+[.!?]*/gu) ?? [text];
   return sentences
@@ -1169,7 +1176,22 @@ export function planReading(input: PlanInput): PlanOutcome {
   const anyStanding = [...input.handles.disagreements.values()].some(
     (d) => d.active && d.state !== "RESOLVED",
   );
+  // A stage answer is the stage's, never a founder's note (live 318577a8e
+  // t32: "by age I'd say Series A. I'm not sure which is right." became a
+  // note beside the seed answer it qualifies). When this reading wrote the
+  // stage, a note that names a stage is that answer's remainder: the
+  // stage dimension holds it, and the transcript keeps their words.
+  const stageRead = ops.some(
+    (op) => op !== null && op.dimension === "company.stage",
+  );
   const asSaid = (op: GateQStatementOp): GateQStatementOp | null => {
+    if (
+      stageRead &&
+      op.dimension === "application.note" &&
+      op.value.kind === "TEXT" &&
+      NAMES_A_STAGE.test(`${op.words} ${op.value.text}`)
+    )
+      return null;
     if (
       op.dimension === "application.note" &&
       op.value.kind === "TEXT" &&
@@ -1716,21 +1738,26 @@ export const NOT_LEFT_OPEN_LINE =
   "I haven't marked those two answers as left open yet.";
 
 /**
- * The reply without what it asks: a question sentence keeps only the
- * clauses it asserts ("Series A, then; which country?" keeps "Series A,
- * then"). For replacing a question code ruled out, never for a claim.
+ * A reply's sentences, as a founder reads them: a stop ends a sentence
+ * only before a space or the end, so "USD 1.5m" stays one sentence.
+ */
+export function replySentences(text: string): readonly string[] {
+  return (text.trim().match(/(?:[^.!?]|[.!?](?!\s|$))+[.!?]*/gu) ?? [])
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+}
+
+/**
+ * The reply without what it asks: every question sentence is dropped
+ * whole, never a clause of one (live 318577a8e: cutting only the asking
+ * clauses of "Where does the money go, and how much to each, roughly in
+ * amounts?" left "roughly in amounts?" in the stored transcript the
+ * investor reads, and "if any?" at t21). For replacing a question code
+ * ruled out, never for a claim.
  */
 export function withoutQuestions(text: string): string {
-  return sentencesOf(text)
-    .map((sentence) =>
-      sentence.trim().endsWith("?")
-        ? partsOf(sentence)
-            .asserted.join("")
-            .trim()
-            .replace(/[,;:–—\s]+$/u, ".")
-        : sentence.trim(),
-    )
-    .filter((sentence) => sentence.length > 0 && sentence !== ".")
+  return replySentences(text)
+    .filter((sentence) => !sentence.endsWith("?"))
     .join(" ")
     .trim();
 }

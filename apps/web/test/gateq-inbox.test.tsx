@@ -253,7 +253,7 @@ describe("gateq-2's saved views and dossier words (pure)", () => {
       "Customers",
       "Market",
     ]);
-    expect(rows[1]?.value).toBe("$1,500,000. Founder stated");
+    expect(rows[1]?.value).toBe("$1,500,000 (Founder stated).");
     expect(rows[2]?.value).toBeNull();
     expect(model.openQuestions(null)).toEqual([]);
     expect(
@@ -315,10 +315,10 @@ describe("the one-page summary reads each row's own dimension (live 2026-11-14)"
         .map((row) => [row.label, row.value] as const),
     );
     expect(rows.get("Traction")).toBeNull();
-    expect(rows.get("Revenue")).toMatch(/^USD 0\./);
+    expect(rows.get("Revenue")).toMatch(/^USD 0 \(Founder stated\)\./);
     expect(rows.get("Customers")).toMatch(/^five SACCOs in Nakuru/);
     expect(rows.get("Market")).toBeNull();
-    expect(rows.get("Round")).toMatch(/^USD 300,000\./);
+    expect(rows.get("Round")).toMatch(/^USD 300,000 \(Founder stated\)\./);
   });
 });
 
@@ -373,9 +373,17 @@ describe("the one-page summary reads the projection (live 30c99ccc5, Clinicly)",
     ],
     statements: {
       dimensions: [
-        { dimension: "company.market", status: "UNKNOWN" },
-        { dimension: "company.customers", status: "UNANSWERED" },
-        { dimension: "claims.traction", status: "DISAGREEMENT_LEFT_OPEN" },
+        { dimension: "company.market", status: "UNKNOWN", statements: [] },
+        {
+          dimension: "company.customers",
+          status: "UNANSWERED",
+          statements: [],
+        },
+        {
+          dimension: "claims.traction",
+          status: "DISAGREEMENT_LEFT_OPEN",
+          statements: [],
+        },
       ],
     },
   } as unknown as Parameters<typeof model.onePageSummary>[1];
@@ -420,6 +428,105 @@ describe("the one-page summary reads the projection (live 30c99ccc5, Clinicly)",
     expect(byLabel.get("Market")).toBe("NOT_KNOWN");
     expect(byLabel.get("Revenue")).toBe("DECLINED");
     expect(byLabel.get("Traction")).toBe("NOT_COVERED");
+  });
+});
+
+describe("the one-page summary reads like the dossier (live 318577a8e, Solaix)", () => {
+  const id = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const fact = (
+    n: number,
+    dimension: string,
+    summary: string,
+    truthClass: "USER_CLAIM" | "ESTIMATE",
+    disagreementState: "LEFT_OPEN" | null = null,
+  ) => ({
+    dimension,
+    label: dimension,
+    summary,
+    provenance:
+      truthClass === "ESTIMATE"
+        ? ("ESTIMATED" as const)
+        : ("APPLICANT_PROVIDED" as const),
+    sourceFactId: id(n),
+    sourceTurnSeq: n,
+    truthClass,
+    evidenceStatus: "SELF_REPORTED" as const,
+    statementId: id(n),
+    sourceKind: "APPLICATION_STATEMENT" as const,
+    backfilled: false,
+    disagreementState,
+  });
+  const words = (n: number, quantity: string | null, summary: string) => ({
+    statementId: id(n),
+    valueKind: "COUNT",
+    quantity,
+    summary,
+  });
+  // The frozen Solaix dossier: 12,000 transactions, 600 weekly active
+  // users and a left-open "about 1,500" (an estimate), "from 1 school to
+  // 4" held as a customers count on traction, and a zero for paying ones.
+  const dossier = {
+    schemaVersion: "gateq-dossier.v2",
+    company: { name: "Solaix Co" },
+    unknowns: [],
+    declined: [],
+    dimensions: [
+      {
+        group: "TRACTION",
+        label: "Traction and revenue",
+        facts: [
+          fact(4, "claims.traction", "12,000 transactions", "USER_CLAIM"),
+          fact(5, "claims.traction", "600", "USER_CLAIM", "LEFT_OPEN"),
+          fact(16, "claims.traction", "About 1,500", "ESTIMATE", "LEFT_OPEN"),
+          fact(8, "claims.traction", "4", "USER_CLAIM"),
+        ],
+      },
+    ],
+    statements: {
+      dimensions: [
+        {
+          dimension: "claims.traction",
+          status: "DISAGREEMENT_LEFT_OPEN",
+          statements: [
+            words(4, null, "12,000 transactions"),
+            words(5, "weekly_active_users", "600"),
+            words(16, "weekly_active_users", "About 1,500"),
+            words(8, "customers", "4"),
+          ],
+        },
+        {
+          dimension: "company.customers",
+          status: "UNANSWERED",
+          statements: [],
+        },
+      ],
+    },
+  } as unknown as Parameters<typeof model.onePageSummary>[1];
+  const rows = new Map(
+    model
+      .onePageSummary({ companyName: "Solaix Co", raise: null }, dossier)
+      .map((row) => [row.label, row] as const),
+  );
+
+  it("keeps every finding apart from the next, with its source", () => {
+    const traction = rows.get("Traction")?.value ?? "";
+    // Live: "Founder stated And 3 more…", "Estimated Answers disagree…".
+    expect(traction).not.toMatch(
+      /(?:stated|Estimated|application) (?:And|Answers)\b/u,
+    );
+    expect(traction).toBe(
+      "12,000 transactions (Said in the application); 600 (Said in the application); About 1,500 (Said in the application); 4 (Said in the application). Answers disagree: left open by the founder.",
+    );
+  });
+
+  it("labels a source the way the dossier does, never Estimated beside Said", () => {
+    expect(rows.get("Traction")?.value).not.toMatch(/Estimated/u);
+  });
+
+  it("reads a held customers count as the customers answer, never Not covered", () => {
+    expect(rows.get("Customers")?.gap).toBeNull();
+    expect(rows.get("Customers")?.value).toBe("4 (Said in the application).");
   });
 });
 

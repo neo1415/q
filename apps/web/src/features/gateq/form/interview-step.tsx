@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useTransition,
@@ -33,6 +34,7 @@ import { readRecovery, amendRecovery } from "./session-recovery";
 import {
   latestQuestion,
   linesFromTranscript,
+  pendingTurnState,
   QUICK_REPLIES,
   type InterviewLine,
 } from "./form-model";
@@ -69,7 +71,15 @@ const icon = {
   "aria-hidden": true,
 } as const;
 
-type Turn = { readonly id: string; readonly text: string };
+type Turn = {
+  readonly id: string;
+  readonly text: string;
+  /** The last transcript seq read when it was sent (pendingTurnState). */
+  readonly after?: number | undefined;
+};
+
+const lastSeqOf = (turns: readonly { readonly seq: number }[]) =>
+  turns.reduce((max, turn) => Math.max(max, turn.seq), 0);
 
 function turnId(): string {
   return `turn-${crypto.randomUUID()}`;
@@ -120,6 +130,8 @@ export function InterviewStep({
   const [reads, setReads] = useState(0);
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  // The last transcript seq read from the server, kept with a sent turn.
+  const lastSeq = useRef(0);
   // VIDEO: "video" until the server says it is not offered or the person
   // chooses typing; the preview gallery and a missing token are typed.
   const [mode, setMode] = useState<"video" | "text">(
@@ -146,45 +158,6 @@ export function InterviewStep({
     };
   }, [roomOpen, sessionToken, preview]);
 
-  // Resume what the server recorded, every time this step mounts; on a
-  // fresh interview the server asks Q's opening question first.
-  useEffect(() => {
-    if (preview !== undefined || sessionToken === null) return;
-    let current = true;
-    const held =
-      gatewayPublicId === undefined
-        ? null
-        : (readRecovery(gatewayPublicId)?.pendingTurn ?? null);
-    void (
-      held === null
-        ? openInterviewAction(sessionToken)
-        : transcriptAction(sessionToken)
-    )
-      .then((result) => {
-        if (!current) return;
-        if (held !== null) setUnsent(held);
-        if (!result.ok) {
-          setProblem(result.message);
-          return;
-        }
-        setLines(linesFromTranscript(result.turns));
-        setLoaded(true);
-        if (held !== null) {
-          setUnsent(held);
-          setProblem(
-            "Your last answer needs confirmation. Retry to recover Q’s reply.",
-          );
-        }
-      })
-      .catch(() => {
-        if (current)
-          setProblem("The connection was interrupted. Please try again.");
-      });
-    return () => {
-      current = false;
-    };
-  }, [sessionToken, preview, reads, gatewayPublicId]);
-
   const sendTurn = (turn: Turn) => {
     if (sessionToken === null) return;
     startTransition(async () => {
@@ -210,8 +183,10 @@ export function InterviewStep({
         ok: false as const,
         message: "Couldn't restore Q's reply. Please try again.",
       }));
-      if (transcript.ok) setLines(linesFromTranscript(transcript.turns));
-      else {
+      if (transcript.ok) {
+        setLines(linesFromTranscript(transcript.turns));
+        lastSeq.current = lastSeqOf(transcript.turns);
+      } else {
         setProblem(transcript.message);
         setLoaded(false);
       }
@@ -220,13 +195,72 @@ export function InterviewStep({
       );
     });
   };
+  // A held answer the server saved with no reply yet, sent again under
+  // its own client turn id from the resume below.
+  const resendHeld = useEffectEvent((turn: Turn) => {
+    sendTurn(turn);
+  });
+
+  // Resume what the server recorded, every time this step mounts; on a
+  // fresh interview the server asks Q's opening question first.
+  useEffect(() => {
+    if (preview !== undefined || sessionToken === null) return;
+    let current = true;
+    const held =
+      gatewayPublicId === undefined
+        ? null
+        : (readRecovery(gatewayPublicId)?.pendingTurn ?? null);
+    void (
+      held === null
+        ? openInterviewAction(sessionToken)
+        : transcriptAction(sessionToken)
+    )
+      .then((result) => {
+        if (!current) return;
+        if (held !== null) setUnsent(held);
+        if (!result.ok) {
+          setProblem(result.message);
+          return;
+        }
+        setLines(linesFromTranscript(result.turns));
+        lastSeq.current = lastSeqOf(result.turns);
+        setLoaded(true);
+        if (held === null) return;
+        // Reconcile the held answer with what the server recorded: a turn
+        // the transcript holds with Q's reply was sent (Send comes back);
+        // one with no reply yet is sent again under its own client turn
+        // id, which returns the stored reply and never a second turn.
+        const state = pendingTurnState(result.turns, held);
+        if (state === "SENT") {
+          setUnsent(null);
+          if (gatewayPublicId !== undefined)
+            amendRecovery(gatewayPublicId, { pendingTurn: null });
+          return;
+        }
+        if (state === "AWAITING_REPLY") {
+          resendHeld(held);
+          return;
+        }
+        setUnsent(held);
+        setProblem(
+          "Your last answer needs confirmation. Retry to recover Q’s reply.",
+        );
+      })
+      .catch(() => {
+        if (current)
+          setProblem("The connection was interrupted. Please try again.");
+      });
+    return () => {
+      current = false;
+    };
+  }, [sessionToken, preview, reads, gatewayPublicId]);
 
   const say = (raw: string) => {
     const text = raw.trim();
     if (text === "" || pending || sessionToken === null) return;
     // A message still waiting on its retry keeps its id; a new one gets one.
     if (unsent !== null) return;
-    const turn = { id: turnId(), text };
+    const turn = { id: turnId(), text, after: lastSeq.current };
     setUnsent(turn);
     if (gatewayPublicId !== undefined)
       amendRecovery(gatewayPublicId, { pendingTurn: turn });
@@ -323,8 +357,10 @@ export function InterviewStep({
             const transcript = await transcriptAction(sessionToken).catch(
               () => null,
             );
-            if (transcript?.ok === true)
+            if (transcript?.ok === true) {
               setLines(linesFromTranscript(transcript.turns));
+              lastSeq.current = lastSeqOf(transcript.turns);
+            }
             if (typed) {
               // Typing by choice: a second session can still be offered.
               setChose(true);
@@ -366,8 +402,10 @@ export function InterviewStep({
             const transcript = await transcriptAction(sessionToken).catch(
               () => null,
             );
-            if (transcript?.ok === true)
+            if (transcript?.ok === true) {
               setLines(linesFromTranscript(transcript.turns));
+              lastSeq.current = lastSeqOf(transcript.turns);
+            }
           }}
         />
       ) : null}

@@ -8,7 +8,11 @@ import {
   gateqStatementIdentities,
   gateqStatementsInWords,
 } from "@capital-q/contracts";
-import type { GateQStatementOpV3 as GateQStatementOp } from "@capital-q/q-core";
+import {
+  createPromptRegistry,
+  PROMPT_DEFINITIONS,
+  type GateQStatementOpV3 as GateQStatementOp,
+} from "@capital-q/q-core";
 
 import type {
   ApplicationStatement,
@@ -29,6 +33,7 @@ import {
 import {
   reading,
   statementWorld,
+  type PromptSeen,
   type Script,
 } from "./support/statement-world.js";
 import { factsFromAnswers } from "../src/domain/form-answers.js";
@@ -63,7 +68,12 @@ type Turn = {
   readonly id: string;
   /** Which live run the turn and its reading come from. */
   readonly run:
-    "1f9e33016" | "d2ce8c91e" | "06910b145" | "78f8d72d5" | "30c99ccc5";
+    | "1f9e33016"
+    | "d2ce8c91e"
+    | "06910b145"
+    | "78f8d72d5"
+    | "30c99ccc5"
+    | "318577a8e";
   readonly say: string;
   readonly script: Script;
   readonly resumeBefore?: true;
@@ -1913,5 +1923,579 @@ describe("live relation replay: the fifth run (30c99ccc5), metrics, asking and w
     expect(frozen.company.stage).toMatch(/ or /u);
     expect(frozen.company.stage?.toLowerCase()).toMatch(/series a/u);
     expect(frozen.company.stage?.toLowerCase()).toMatch(/seed/u);
+  });
+});
+
+/**
+ * The sixth live run (318577a8e, application 24bc5d5c, Solaix): 8/8 with
+ * reply-quality defects. Replayed with the form and, turn by turn, the
+ * reply and asking label the live model gave (the two questions code cut
+ * are the model's own lines as reconstructed from what was left):
+ *
+ *   - P2a: t15 kept "roughly in amounts?" and t21 "if any?" when the
+ *     asking predicate replaced or dropped Q's question. A question is
+ *     dropped as whole sentences, never a clause of one;
+ *   - P2b: with nothing left to ask, Q said "What would you like to cover
+ *     next?" five times (t35–t43) and its close never named "Finish and
+ *     review". It says so once, with what stays open, then points to the
+ *     review, and never asks the same open question again;
+ *   - P3b: half of the stage sentence ("by age I'd say Series A. I'm not
+ *     sure which is right.") went into the Founder's note.
+ */
+const SIXTH_FORM = {
+  companyName: "Solaix Co",
+  oneLiner: "Pay-as-you-go solar home kits",
+  stage: "seed",
+  sectors: ["Climate"],
+  country: "KE",
+  raise: { amount: "350000", currency: "USD" },
+  contactName: "Otieno Wekesa",
+  contactEmail: "otieno@example.com",
+};
+
+const OPEN_NEXT = "Fair enough. What would you like to cover next?";
+
+const SIXTH: readonly Turn[] = [
+  {
+    id: "s-02",
+    run: "318577a8e",
+    say: "Solaix sells pay-as-you-go solar home kits to off-grid households in western Kenya; families pay a small daily amount over M-Pesa until they own the kit.",
+    script: () =>
+      reading({
+        reply:
+          "That's a clear model, and western Kenya gives it a useful focus. How many households are paying for kits today?",
+        asking: "company.customers",
+        statements: [
+          st({
+            dimension: "company.description",
+            value: {
+              kind: "TEXT",
+              text: "pay-as-you-go solar home kits for off-grid households in western Kenya",
+            },
+            words:
+              "Solaix sells pay-as-you-go solar home kits to off-grid households in western Kenya",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-04",
+    run: "318577a8e",
+    say: "Traction so far: 12,000 transactions processed and 600 weekly active users.",
+    script: () =>
+      reading({
+        reply:
+          "Twelve thousand transactions and six hundred weekly active users. How many households are paying for kits today?",
+        asking: "company.customers",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            unit: "transaction",
+            value: { kind: "COUNT", count: "12000" },
+            words: "12,000 transactions processed",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "600" },
+            words: "600 weekly active users",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-06",
+    run: "318577a8e",
+    say: "Nobody pays yet. The pilot kits are free for the first three months.",
+    script: () =>
+      reading({
+        reply:
+          "Understood, nobody pays yet. Where does the money go, and how much to each?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "paying_customers",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-08",
+    run: "318577a8e",
+    say: "On growth: we went from 1 school to 4 since March.",
+    script: () =>
+      reading({
+        reply:
+          "One school to four since March. What does the round split across, roughly?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "customers",
+            unit: "customer",
+            value: { kind: "COUNT", count: "4" },
+            words: "we went from 1 school to 4 since March",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-12",
+    run: "318577a8e",
+    say: "Team is four: I'm Otieno Wekesa, CEO, I ran field sales for a solar distributor in Kisumu for five years; our CTO Achieng Mutua built M-Pesa payment systems at a Nairobi lender; and two field engineers.",
+    script: () =>
+      reading({
+        reply:
+          "Four people, with field sales and M-Pesa payments experience. What problem do these households face today?",
+        asking: "company.problem",
+        statements: [
+          st({
+            dimension: "company.team",
+            value: {
+              kind: "TEXT",
+              text: "Otieno Wekesa, CEO; CTO Achieng Mutua; two field engineers",
+            },
+            words:
+              "Team is four: I'm Otieno Wekesa, CEO, I ran field sales for a solar distributor in Kisumu for five years",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t15: the model asked the use of funds a third time; code put
+    // the picker's question in, and kept "roughly in amounts?".
+    id: "s-14",
+    run: "318577a8e",
+    say: "Different topic: to be precise about stage, we're really a Series A company now, not seed. We've been operating for four years.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "That's a material correction: you're saying Series A rather than seed, and you've been operating for four years. Where does the money go, and how much to each, roughly in amounts?",
+        intent: "CORRECTION",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "series_a" },
+            words: "we're really a Series A company now, not seed",
+          }),
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "We've been operating for four years.",
+            },
+            words: "We've been operating for four years.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-16",
+    run: "318577a8e",
+    say: "Back to users: about 1,500 weekly users.",
+    script: () =>
+      reading({
+        reply:
+          "I have 600 weekly active users from earlier, and now about 1,500 weekly users. Which figure should I use?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            provenance: "ESTIMATED",
+            value: { kind: "COUNT", count: "1500" },
+            words: "about 1,500 weekly users",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-18",
+    run: "318577a8e",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Fair enough. What problem do these households face today that Solaix is solving?",
+        asking: "company.problem",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("claims.traction"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    // Live t21: the model asked revenue (a stated zero); code dropped the
+    // question and kept "if any?".
+    id: "s-20",
+    run: "318577a8e",
+    say: "Roughly $200k to more kits and inventory, $90k to field agents in Busia and Siaya, and $60k to the payments and lock-out software.",
+    script: () =>
+      reading({
+        reply:
+          "That's a clear split: about two hundred thousand dollars for kits and inventory, ninety thousand for field agents in Busia and Siaya, and sixty thousand for the payments and lockout software. How much revenue are you making today, if any?",
+        asking: "claims.revenue",
+        statements: [
+          st({
+            dimension: "raise.use_of_funds",
+            value: {
+              kind: "TEXT",
+              text: "$200k kits and inventory, $90k field agents, $60k payments and lock-out software",
+            },
+            words:
+              "Roughly $200k to more kits and inventory, $90k to field agents in Busia and Siaya, and $60k to the payments and lock-out software.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-24",
+    run: "318577a8e",
+    say: "We haven't sized the market.",
+    script: () =>
+      reading({
+        reply: "Understood. How do you make money once the pilot ends?",
+        asking: "company.business_model",
+        statements: [
+          st({
+            dimension: "company.market",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We haven't sized the market.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-26",
+    run: "318577a8e",
+    say: "Off-grid families spend a lot on kerosene and phone charging, and the light is poor for children doing homework.",
+    script: () =>
+      reading({
+        reply:
+          "That's the customer problem: kerosene and phone charging cost a lot, and poor light makes homework harder. How do you make money once the pilot ends?",
+        asking: "company.business_model",
+        statements: [
+          st({
+            dimension: "company.problem",
+            value: {
+              kind: "TEXT",
+              text: "off-grid families spend a lot on kerosene and phone charging",
+            },
+            words:
+              "Off-grid families spend a lot on kerosene and phone charging",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-30",
+    run: "318577a8e",
+    say: "Once the pilot ends each household pays 30 shillings a day until the kit is theirs.",
+    script: () =>
+      reading({
+        reply:
+          "Thirty shillings a day after the pilot, until each household owns the kit.",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "30 shillings a day per household until the kit is theirs",
+            },
+            words:
+              "each household pays 30 shillings a day until the kit is theirs",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t32: the second half of the stage sentence became a note.
+    id: "s-32",
+    run: "318577a8e",
+    say: "Our lead angel calls us seed, though, and honestly by revenue we're seed; by age I'd say Series A. I'm not sure which is right.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Fair enough, stage labels can get slippery. I have Series A from you already, and now seed by revenue; which stage should I use for this application?",
+        asking: "company.stage",
+        statements: [
+          st({
+            op: "DISAGREES",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "seed" },
+            words:
+              "Our lead angel calls us seed, though, and honestly by revenue we're seed",
+          }),
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "By age I'd say Series A. I'm not sure which is right.",
+            },
+            words: "by age I'd say Series A. I'm not sure which is right.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-34",
+    run: "318577a8e",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply: OPEN_NEXT,
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("company.stage"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    id: "s-36",
+    run: "318577a8e",
+    say: "Leave it open.",
+    script: () => reading({ reply: OPEN_NEXT }),
+  },
+  {
+    id: "s-38",
+    run: "318577a8e",
+    resumeBefore: true,
+    say: "Leave it open for now.",
+    script: () => reading({ reply: OPEN_NEXT }),
+  },
+  {
+    id: "s-40",
+    run: "318577a8e",
+    say: "Day to day, an agent installs the kit, the household pays by M-Pesa, and the kit unlocks for each day that is paid.",
+    script: () =>
+      reading({
+        reply:
+          "That's a clear operating loop: agents install the kit, households pay through M-Pesa, and payment keeps it unlocked. What would you like to cover next?",
+        statements: [
+          st({
+            dimension: "company.solution",
+            value: {
+              kind: "TEXT",
+              text: "an agent installs the kit, the household pays by M-Pesa, the kit unlocks for each paid day",
+            },
+            words:
+              "an agent installs the kit, the household pays by M-Pesa, and the kit unlocks for each day that is paid",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-42",
+    run: "318577a8e",
+    say: "On weekly users, leave it open for Kilima.",
+    script: () =>
+      reading({ reply: "Understood. What would you like to cover next?" }),
+  },
+  {
+    id: "s-44",
+    run: "318577a8e",
+    say: "We reach households through school head teachers and chama savings groups.",
+    script: () =>
+      reading({
+        reply:
+          "That gives me the route to the household: school head teachers and chama savings groups.",
+        statements: [
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "We reach households through school head teachers and chama savings groups.",
+            },
+            words:
+              "We reach households through school head teachers and chama savings groups.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "s-50",
+    run: "318577a8e",
+    say: "That's all from me for now.",
+    script: () =>
+      reading({
+        reply:
+          "Thanks, Otieno. I have the core picture of Solaix. The stage question remains between Series A and seed, but there's nothing else I need from you right now.",
+      }),
+  },
+];
+
+const REVIEW_STEP = /\bFinish and review\b/u;
+/** A reply's sentences: what a founder reads as one line each. */
+const sentencesIn = (text: string): readonly string[] =>
+  (text.match(/(?:[^.!?]|[.!?](?!\s|$))+[.!?]*/gu) ?? [])
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+/** The model's own reply for a turn, as its script gives it. */
+function modelReplyOf(turn: Turn, prompt: PromptSeen): string {
+  const result = turn.script(prompt);
+  return result === "FAIL" ? "" : result.reply;
+}
+
+function assertSixthOutcome(world: World, turn: Turn): void {
+  const reply = qReply(world, turn.id);
+  const prompt = world.prompts.at(-1);
+  const model = prompt === undefined ? "" : modelReplyOf(turn, prompt);
+  const modelSentences = sentencesIn(model);
+  // P2a: every sentence Q sends is whole: one of the model's own, or a
+  // line code wrote whole. Never the tail of a cut question.
+  for (const sentence of sentencesIn(reply)) {
+    expect(sentence, `${turn.id}: "${reply}"`).toMatch(/^[\p{Lu}\d"“]/u);
+    if (model.includes(sentence))
+      expect(modelSentences, `${turn.id}: a part of a sentence`).toContain(
+        sentence,
+      );
+  }
+  expect(reply, turn.id).not.toMatch(/roughly in amounts\?|\bif any\?/iu);
+  // The close names everything that stays open at that moment.
+  if (/everything I need/iu.test(reply))
+    for (const entry of viewOf(world).dimensions)
+      if (
+        ["DISAGREEMENT_OPEN", "DISAGREEMENT_LEFT_OPEN", "UNKNOWN"].includes(
+          entry.status,
+        )
+      )
+        expect(reply.toLowerCase(), entry.dimension).toContain(
+          entry.dimension.split(".")[1]?.replace(/_/gu, " ") ?? "(none)",
+        );
+  switch (turn.id) {
+    case "s-14":
+      expect(reply).toContain(
+        "That's a material correction: you're saying Series A rather than seed, and you've been operating for four years.",
+      );
+      expect(reply).not.toMatch(/where does the money go/iu);
+      break;
+    case "s-20":
+      expect(reply).toContain("sixty thousand for the payments");
+      expect(reply).not.toMatch(/revenue/iu);
+      break;
+    case "s-32": {
+      // P3b: the stage sentence stays with the stage; no half in the note.
+      const notes = dimensionView(viewOf(world), "application.note").items.map(
+        (i) => i.words,
+      );
+      expect(notes.join(" ")).not.toMatch(/series a|not sure which/iu);
+      break;
+    }
+  }
+}
+
+describe("live reply replay: the sixth run (318577a8e), whole questions and a close that points to review", () => {
+  it("cuts whole question sentences, closes once with what stays open, and never loops an open question", async () => {
+    const world = statementWorld();
+    let { intake, conversation } = world.services();
+    const { token } = await intake.start({
+      gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+    });
+    await intake.recordFacts({
+      token,
+      origin: "FORM",
+      facts: factsFromAnswers(SIXTH_FORM),
+    });
+    world.scripts.push(() =>
+      reading({
+        reply:
+          "Kilima brings together Nairobi-based operators to co-invest small cheques. What are you building, and who is it for?",
+        asking: "company.description",
+      }),
+    );
+    await conversation.openingFor({ token, correlationId: randomUUID() });
+
+    let before = viewOf(world);
+    for (const turn of SIXTH) {
+      world.advance(60_000);
+      if (turn.resumeBefore === true)
+        ({ intake, conversation } = world.services());
+      const calls = world.prompts.length;
+      world.scripts.push(turn.script);
+      await conversation.turn({
+        token,
+        message: turn.say,
+        clientTurnId: turn.id,
+        correlationId: randomUUID(),
+      });
+      const after = viewOf(world);
+      assertAfterTurn(world, turn, after, before, world.prompts.length > calls);
+      assertSixthOutcome(world, turn);
+      before = after;
+    }
+
+    const qLines = world
+      .store()
+      .turnRows.filter((t) => t.role === "Q")
+      .map((t) => t.text);
+    // P2b: the open "what next?" is never sent, and no question is put
+    // more than twice (once, and once more when it went unanswered).
+    expect(qLines.filter((l) => /cover next/iu.test(l))).toEqual([]);
+    const questions = qLines.flatMap((l) =>
+      sentencesIn(l).filter((s) => s.endsWith("?")),
+    );
+    for (const question of new Set(questions))
+      expect(
+        questions.filter((q) => q === question).length,
+        question,
+      ).toBeLessThanOrEqual(2);
+    // Q says once that it has what it needs, with what stays open, and
+    // names the review step; the last turn still points there.
+    const closes = qLines.filter((l) => /everything I need/iu.test(l));
+    expect(closes).toHaveLength(1);
+    const close = closes[0] ?? "";
+    expect(close).toMatch(REVIEW_STEP);
+    expect(close).toMatch(/traction still has two answers that disagree/iu);
+    expect(close).toMatch(/market is not known yet/iu);
+    // After the close, a turn whose open question was cut points to the
+    // review instead (t35–t43), never "what would you like to cover next?".
+    for (const id of ["s-34", "s-36", "s-38", "s-40", "s-42"])
+      expect(qReply(world, id), id).toMatch(REVIEW_STEP);
+    const last = qLines.at(-1) ?? "";
+    expect(last).toMatch(REVIEW_STEP);
+    expect(last.trim().endsWith("?")).toBe(false);
+
+    // The review the close points to holds both disagreements, resumed.
+    const review = await intake.coverage(token);
+    expect(review.coverage.contradictions).toHaveLength(2);
+  });
+});
+
+describe("the reader files how the product works as the solution (live 318577a8e t40)", () => {
+  it("reads with a prompt that says day to day is company.solution, never the business model", () => {
+    const active =
+      createPromptRegistry(PROMPT_DEFINITIONS).getActive(
+        "GATEQ_INTERVIEWER",
+      ).definition;
+    expect(active.version).toBeGreaterThanOrEqual(11);
+    expect(active.template).toContain(
+      "How the product works day to day (who does what, step by step",
+    );
+    expect(active.template).toMatch(
+      /is company\.solution, never company\.business_model/u,
+    );
   });
 });

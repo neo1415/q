@@ -761,6 +761,41 @@ export function linesFromTranscript(
   }));
 }
 
+/**
+ * Where an answer this tab sent (and lost the reply to) stands on the
+ * server, read from the transcript after a reload (live 318577a8e t16: the
+ * connection dropped, the server had saved the turn and Q's reply, and the
+ * reloaded page still said "needs confirmation" with Send disabled).
+ *
+ * - SENT: the transcript holds it after what the tab had read, with Q's
+ *   reply after it. Nothing to retry.
+ * - AWAITING_REPLY: it is there, Q's reply is not: sending it again under
+ *   the same client turn id returns that reply, never a second turn.
+ * - NOT_FOUND: the server never got it; the founder retries.
+ * - UNKNOWN: an older recovery with no position; the founder retries.
+ */
+export function pendingTurnState(
+  turns: readonly {
+    readonly seq: number;
+    readonly role: "PERSON" | "Q";
+    readonly text: string;
+  }[],
+  pending: { readonly text: string; readonly after?: number | undefined },
+): "SENT" | "AWAITING_REPLY" | "NOT_FOUND" | "UNKNOWN" {
+  const { after } = pending;
+  if (after === undefined) return "UNKNOWN";
+  const said = turns.find(
+    (turn) =>
+      turn.role === "PERSON" &&
+      turn.seq > after &&
+      turn.text.trim() === pending.text.trim(),
+  );
+  if (said === undefined) return "NOT_FOUND";
+  return turns.some((turn) => turn.role === "Q" && turn.seq > said.seq)
+    ? "SENT"
+    : "AWAITING_REPLY";
+}
+
 /** Q's most recent line, when it is the one waiting for an answer. */
 export function latestQuestion(lines: readonly InterviewLine[]): string | null {
   const last = lines.at(-1);
