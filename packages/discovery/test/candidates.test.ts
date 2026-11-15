@@ -486,7 +486,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v5",
+          eligibilityPolicyVersion: "eligibility.v6",
         },
         results,
       });
@@ -1139,7 +1139,7 @@ describe("structured candidate service", () => {
       expect("rank" in c).toBe(false);
     }
     expect(r.generatorVersion).toBe("structured-mandate.v7");
-    expect(r.eligibilityPolicyVersion).toBe("eligibility.v5");
+    expect(r.eligibilityPolicyVersion).toBe("eligibility.v6");
   });
 });
 
@@ -1305,9 +1305,14 @@ describe("Discover must not hard-cap (owner 2026-10-23)", () => {
       for (const id of german) expect(found).toContain(id);
       for (const id of found) seen.set(id, (seen.get(id) ?? 0) + 1);
     }
-    expect(seen.size).toBe(381);
-    for (const [id, times] of seen)
-      expect(times).toBe(german.includes(id) ? windows : 1);
+    // eligibility.v6 (live 2026-11-15 D5): a geography declared Must is
+    // hard eligibility, so the British companies are no longer candidates
+    // at all (before v6: 381 seen, each British one once).
+    expect(seen.size).toBe(german.length);
+    for (const [id, times] of seen) {
+      expect(german).toContain(id);
+      expect(times).toBe(windows);
+    }
     // A geography only preferred Strong as a constraint is not the
     // declared tier (the fit reads the same): each company once.
     const once = new Map<string, number>();

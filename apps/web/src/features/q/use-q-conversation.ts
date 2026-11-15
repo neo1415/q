@@ -27,6 +27,7 @@ import {
 } from "./actions";
 import {
   carriedApproval,
+  restorePendingApproval,
   shownCardsKey,
   type CarriedApproval,
 } from "./carried-approval";
@@ -845,7 +846,7 @@ export function useQConversation(
   const cards = useMemo(() => shownCardsKey(thread), [thread]);
   const waitingKey =
     conversationIdState === null ? null : `${conversationIdState}|${cards}`;
-  const carried: CarriedApproval | null = useMemo(
+  const carriedHere: CarriedApproval | null = useMemo(
     () =>
       live ||
       conversationIdState === null ||
@@ -856,6 +857,37 @@ export function useQConversation(
         : carriedApproval(conversationIdState, thread, waiting.items),
     [live, conversationIdState, cards, waiting, thread],
   );
+  // D6 (live 2026-11-15): the general thread (no page subject), reopened
+  // with no card of its own, rebuilds the newest waiting change's card
+  // from the server's pending approvals. Asked once per mount.
+  const general =
+    options.companyId === undefined &&
+    options.investorOrganisationId === undefined &&
+    options.relationshipId === undefined;
+  const [restored, setRestored] = useState<CarriedApproval | null>(null);
+  const restoreAsked = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!general || restoreAsked.current) return;
+    if (streaming || live || loading || cards !== "") return;
+    restoreAsked.current = true;
+    void pendingQApprovalsAction().then(async (result) => {
+      if (!mounted.current || !result.ok || result.value.length === 0) return;
+      const found = await restorePendingApproval(result.value, async (id) => {
+        const read = await readQConversationAction(id);
+        return read.ok ? read.value.messages : null;
+      });
+      if (mounted.current) setRestored(found);
+    });
+  }, [general, streaming, live, loading, cards]);
+  const carried: CarriedApproval | null =
+    carriedHere ?? (live || cards !== "" ? null : restored);
   useEffect(() => {
     if (streaming || live || waitingKey === null || cards === "") return;
     if (
@@ -1025,6 +1057,7 @@ export function useQConversation(
           return;
         }
         recordDecision(carried.approval.approvalId, decision);
+        setRestored(null);
         // Decided: never carried again from the last read.
         setWaiting((held) =>
           held === null

@@ -1098,6 +1098,52 @@ export function reviewLines(
     .filter((group) => group.items.length > 0);
 }
 
+/** Longer than this, Q's newest line is a smaller heading (live D7, 390). */
+export const LONG_HEADING_CHARS = 120;
+
+/** The heading size for Q's newest line: long lines read smaller. */
+export function questionHeadingSize(text: string): "lg" | "sm" {
+  return text.trim().length > LONG_HEADING_CHARS ? "sm" : "lg";
+}
+
+/**
+ * The review the one-tap Finish confirms: the journey's last record review
+ * (live 2026-11-15 D2). The server finishes on it, or asks what is still
+ * needed; it is never a typed yes after a thirty-line read-back.
+ */
+export const FINISH_REVIEW_STEP: Readonly<
+  Record<"founder" | "investor", string>
+> = {
+  founder: "F8.snapshot",
+  investor: "I11.review",
+};
+
+/**
+ * The compact summary beside Finish (live 2026-11-15 D2): one line a group,
+ * its known values only, at most `perGroup` of them and a count of the
+ * rest. They confirmed each value as they went; this is a glance, not a
+ * second read-back.
+ */
+export function finishSummary(
+  groups: ReturnType<typeof reviewLines>,
+  perGroup = 3,
+): readonly { readonly label: string; readonly text: string }[] {
+  return groups.flatMap((group) => {
+    const values = group.items
+      .map((item) => item.value?.trim() ?? "")
+      .filter((value) => value.length > 0);
+    if (values.length === 0) return [];
+    const shown = values.slice(0, perGroup).join(" · ");
+    const more = values.length - perGroup;
+    return [
+      {
+        label: group.label,
+        text: more > 0 ? `${shown} +${String(more)}` : shown,
+      },
+    ];
+  });
+}
+
 /**
  * Whether Q's findings from one uploaded document are in the session yet
  * (QA F-69): a processed file is not a read one, and Q is told to read a

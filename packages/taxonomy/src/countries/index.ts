@@ -1,6 +1,8 @@
 import { GEOGRAPHY_VOCABULARY } from "../reference-data/geography.js";
 import { geographyNodeId } from "./node-id.js";
 
+export { geographyNodeId };
+
 /**
  * Capital Q's one canonical country list (owner 2026-10-30: "hand-made
  * country lists are patching"). Every ISO 3166-1 country is a node of the
@@ -428,4 +430,49 @@ export function countryNamedIn(
   return country === null || surface === undefined
     ? null
     : { country, words: surface };
+}
+
+const NODE_ID_BY_CODE: ReadonlyMap<string, string> = new Map(
+  GEOGRAPHY_VOCABULARY.nodes.map((node) => [
+    geographyNodeId(node.code),
+    node.code,
+  ]),
+);
+
+const CHILD_CODES: ReadonlyMap<string, readonly string[]> = (() => {
+  const children = new Map<string, string[]>();
+  for (const node of GEOGRAPHY_VOCABULARY.nodes) {
+    if (node.parent === undefined) continue;
+    const list = children.get(node.parent) ?? [];
+    list.push(node.code);
+    children.set(node.parent, list);
+  }
+  return children;
+})();
+
+/**
+ * The ISO codes of every country a geography node stands over: the
+ * country itself, or each country under a region (East Africa: KE, RW,
+ * UG, TZ, …), from the same reference hierarchy the migrations render.
+ * Null for an id that is not a geography node. Pure reference data, so a
+ * declared "must match" region is checked the same way everywhere.
+ */
+export function countryCodesUnderGeographyNode(
+  nodeId: string | null | undefined,
+): ReadonlySet<string> | null {
+  if (nodeId === null || nodeId === undefined) return null;
+  const code = NODE_ID_BY_CODE.get(nodeId.toLowerCase());
+  if (code === undefined) return null;
+  const out = new Set<string>();
+  const pending = [code];
+  const seen = new Set<string>();
+  while (pending.length > 0) {
+    const next = pending.pop();
+    if (next === undefined || seen.has(next)) continue;
+    seen.add(next);
+    const country = BY_CANONICAL_CODE.get(next);
+    if (country !== undefined) out.add(country.iso);
+    pending.push(...(CHILD_CODES.get(next) ?? []));
+  }
+  return out;
 }

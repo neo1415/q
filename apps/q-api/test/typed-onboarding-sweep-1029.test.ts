@@ -167,7 +167,11 @@ describe("sweep D1: confirming the read-back finishes", () => {
     expect(yes.reply).not.toMatch(/team/u);
   });
 
-  it("before every essential is in, the button confirms that review alone and asks what comes next", async () => {
+  it("before every essential is in, the mandate review's tap asks what is still needed (live 2026-11-15 D2)", async () => {
+    // The screen's one-tap Finish taps the mandate review. Before D2 the
+    // tap confirmed the review alone ("Thank you, that's confirmed.");
+    // the review is now confirmed by the finish itself, once nothing
+    // needed is open, and the tap asks the needed answer instead.
     const recorded = everyEssential();
     delete recorded["I9.discovery_mode"];
     const world = investorSession({
@@ -178,11 +182,8 @@ describe("sweep D1: confirming the read-back finishes", () => {
     const say = typedWorld({ world, authority: () => reading({}) });
     const outcome = await say("Looks right", "I11.review");
     expect(outcome.view.session.status).toBe("ACTIVE");
-    expect(world.recordedValue("I11.review")).toEqual({
-      type: "CONFIRMATION",
-      confirmed: true,
-    });
-    expect(outcome.reply).toMatch(/^Thank you, that's confirmed\./u);
+    expect(world.recordedValue("I11.review")).toBeUndefined();
+    expect(outcome.reply).toMatch(/Before I can finish/u);
     expect(outcome.navigate).toBeNull();
   });
 

@@ -247,11 +247,12 @@ describe("only an explicit answer settles a list (unknown stays unknown)", () =>
       none: [],
       notKnown: [I.regulatoryAppetite, I.revenueState],
     });
-    // A skip of the theme's first question is the model's to handle.
-    expect(settle({ lastQTurn: fit?.question, utterance: "Skip." })).toEqual({
-      none: [],
-      notKnown: [],
-    });
+    // A skip of the theme's first question is taken too, never asked
+    // again (DECISIONS 78/79; live 2026-11-15 D1: "Skip that one for now."
+    // was called "needed" and re-asked). Before: left to the model.
+    expect(
+      settle({ lastQTurn: fit?.question, utterance: "Skip." }).notKnown,
+    ).toEqual(fit?.stepKeys);
   });
 
   it("an answer to something else settles nothing", () => {

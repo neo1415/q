@@ -85,7 +85,7 @@ const eligible = (
   id: string,
   mandateId = ACTIVE_MANDATE,
 ): EligibilityResult => ({
-  eligibilityPolicyVersion: "eligibility.v5",
+  eligibilityPolicyVersion: "eligibility.v6",
   mode: "INVESTOR_DISCOVER",
   companyId: id,
   investorOrganisationId: INVESTOR,
@@ -277,7 +277,7 @@ function inputs(
     eligibility: {
       sourceClass: "ELIGIBILITY_RESULT",
       decision: "ELIGIBLE",
-      policyVersion: "eligibility.v5",
+      policyVersion: "eligibility.v6",
     },
   };
 }
@@ -676,14 +676,14 @@ describe("feature computation (pure)", () => {
         mode: "INVESTOR_DISCOVER" as const,
         mandateId: ACTIVE_MANDATE,
         taxonomyVersion: { industry: 1 },
-        eligibilityPolicyVersion: "eligibility.v5" as const,
+        eligibilityPolicyVersion: "eligibility.v6" as const,
       },
       mandateId: ACTIVE_MANDATE,
       mandateVersion: 1,
       companyId: companyId(1),
       companyTenantId: TENANT_C,
       companyProjectionVersion: 1,
-      eligibilityPolicyVersion: "eligibility.v5" as const,
+      eligibilityPolicyVersion: "eligibility.v6" as const,
       eligibilityDecision: "ELIGIBLE" as const,
       candidateProvenance: {
         structured: {

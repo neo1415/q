@@ -264,14 +264,17 @@ describe("2-3. a held suggestion is put to them for its yes, and that yes never 
     expect(offTarget.outcome.reply).not.toMatch(/^That's fine/u);
   });
 
-  it("a needed question they said they would rather not answer is let go for now, as before", async () => {
-    const { say } = world([
+  it("a needed question they said they would rather not answer is recorded as not known, and the finish goes on", async () => {
+    // DECISIONS 78/79; live 2026-11-15 D1. Before: "That's fine, …" and
+    // the step stayed open, blocking the finish.
+    const { w, say } = world([
       () => authorityReading({ finishing: true }),
       () => authorityReading({ declined: [INBOUND] }),
     ]);
     await say("That's all for now.");
     const declined = await say("I'd rather not say for now.");
-    expect(declined.outcome.reply).toMatch(/^That's fine/u);
+    expect(declined.outcome.reply).not.toMatch(/still need/u);
+    expect(w.recordedValue(INBOUND)).toBeDefined();
   });
 
   it("a reply that does not approve it accepts nothing", async () => {

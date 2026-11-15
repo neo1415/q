@@ -71,7 +71,7 @@ const KEY: SlateKey = {
 };
 
 const VERSIONS = {
-  eligibilityPolicyVersion: "eligibility.v5" as const,
+  eligibilityPolicyVersion: "eligibility.v6" as const,
   structuredGeneratorVersion: "structured-mandate.v7" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
@@ -168,7 +168,7 @@ const eligible = (
   companyId: string,
   decision: EligibilityResult["decision"],
 ): EligibilityResult => ({
-  eligibilityPolicyVersion: "eligibility.v5",
+  eligibilityPolicyVersion: "eligibility.v6",
   mode: "INVESTOR_DISCOVER",
   companyId,
   investorOrganisationId: INVESTOR,
@@ -274,7 +274,7 @@ function harness(
           mode: "INVESTOR_DISCOVER",
           mandateId: MANDATE,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v5",
+          eligibilityPolicyVersion: "eligibility.v6",
         },
         results: query.companyIds.map((companyId) => {
           if ((options.stageExcluded ?? []).includes(companyId)) {

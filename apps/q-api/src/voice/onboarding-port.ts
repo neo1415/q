@@ -4544,6 +4544,105 @@ export function createOnboardingPort(input: {
     });
   };
 
+  // DECISIONS 78/79: "I don't know" -- or a skip -- on a needed step is
+  // recorded as unknown and they carry on; setAside uses it for a needed
+  // step they decline (live 2026-11-15 D1).
+  const recordNotKnownItems = async (
+    items: readonly { readonly stepKey: string; readonly quote: string }[],
+  ): Promise<OnboardingRecordResult[]> => {
+    const results: OnboardingRecordResult[] = [];
+    for (const item of items) {
+      const step = steps.get(item.stepKey);
+      if (step === undefined) {
+        results.push({
+          stepKey: item.stepKey.slice(0, 80),
+          outcome: "REJECTED",
+          reason: "There is no such step in this onboarding.",
+        });
+        continue;
+      }
+      const question = (
+        SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+      ).slice(0, 400);
+      if (!step.required) {
+        results.push({
+          stepKey: step.stepKey,
+          outcome: "REJECTED",
+          question,
+          reason: "An optional step they do not know is set aside.",
+        });
+        continue;
+      }
+      if (!said(item.quote)) {
+        results.push(unsaid(step.stepKey));
+        continue;
+      }
+      // Theirs only when the reading of their words found it (declined
+      // carries what they do not know, by meaning).
+      if (input.authority !== undefined) {
+        const authority = await input.authority();
+        if (authority?.declined.has(step.stepKey) !== true) {
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "REJECTED",
+            question,
+            reason: "Their words do not say they do not know this one.",
+          });
+          continue;
+        }
+      }
+      try {
+        const onRecord = (await current()).responses.find(
+          (r) => r.stepKey === step.stepKey,
+        );
+        // The step's own "Not sure yet" where it has one (investor v3,
+        // live re-check 2026-10-31): an answer its write target reads as
+        // unknown. Otherwise the words of NOT_KNOWN_TEXT.
+        const notSure = optionsOf(step).find(
+          (option) => option.key === NOT_SURE_OPTION_KEY,
+        );
+        const recorded = notSure?.label ?? NOT_KNOWN_TEXT;
+        if (
+          isNotKnownAnswer(onRecord?.value) ||
+          (onRecord?.value.type === "SINGLE_SELECT" &&
+            onRecord.value.optionKey === NOT_SURE_OPTION_KEY)
+        ) {
+          results.push({
+            stepKey: step.stepKey,
+            outcome: "COMMITTED",
+            question,
+            recorded,
+            alreadyRecorded: true,
+          });
+          continue;
+        }
+        // A new version over whatever was there (history kept): what was
+        // on record is no longer known, by their own word. A session
+        // pinned to a version without the option takes the words.
+        const asOption =
+          notSure === undefined
+            ? false
+            : await submit(step.stepKey, {
+                type: "SINGLE_SELECT",
+                optionKey: NOT_SURE_OPTION_KEY,
+              }).then(() => true, reported("not-sure option save", false));
+        if (!asOption) {
+          await submit(step.stepKey, { type: "TEXT", text: NOT_KNOWN_TEXT });
+        }
+        written.push(step.stepKey);
+        results.push({
+          stepKey: step.stepKey,
+          outcome: "COMMITTED",
+          question,
+          recorded: asOption ? recorded : NOT_KNOWN_TEXT,
+        });
+      } catch (error: unknown) {
+        results.push(refused(step.stepKey, error));
+      }
+    }
+    return results;
+  };
+
   return {
     ownerUserId: input.ownerUserId,
     state,
@@ -4983,13 +5082,10 @@ export function createOnboardingPort(input: {
         const noneIsAnswer =
           step.required && INVESTOR_NONE_STEPS.has(step.stepKey);
         if (step.required && !noneIsAnswer) {
-          results.push({
-            stepKey: step.stepKey,
-            outcome: "REJECTED",
-            question,
-            reason:
-              "This one is needed to set them up, so it cannot be set aside on the record. If they declined it for now, leave it: do not ask it again in this conversation (it is listed when they finish) and move on. Otherwise say briefly why it matters and ask it plainly.",
-          });
+          // A needed step they skip is recorded as not known (DECISIONS
+          // 78/79), never refused and asked again (live 2026-11-15 D1: a
+          // skipped question was called "needed" and came back).
+          results.push(...(await recordNotKnownItems([item])));
           continue;
         }
         if (!said(item.quote)) {
@@ -5763,99 +5859,7 @@ export function createOnboardingPort(input: {
       }
       return results;
     },
-    recordNotKnown: async (items) => {
-      const results: OnboardingRecordResult[] = [];
-      for (const item of items) {
-        const step = steps.get(item.stepKey);
-        if (step === undefined) {
-          results.push({
-            stepKey: item.stepKey.slice(0, 80),
-            outcome: "REJECTED",
-            reason: "There is no such step in this onboarding.",
-          });
-          continue;
-        }
-        const question = (
-          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
-        ).slice(0, 400);
-        if (!step.required) {
-          results.push({
-            stepKey: step.stepKey,
-            outcome: "REJECTED",
-            question,
-            reason: "An optional step they do not know is set aside.",
-          });
-          continue;
-        }
-        if (!said(item.quote)) {
-          results.push(unsaid(step.stepKey));
-          continue;
-        }
-        // Theirs only when the reading of their words found it (declined
-        // carries what they do not know, by meaning).
-        if (input.authority !== undefined) {
-          const authority = await input.authority();
-          if (authority?.declined.has(step.stepKey) !== true) {
-            results.push({
-              stepKey: step.stepKey,
-              outcome: "REJECTED",
-              question,
-              reason: "Their words do not say they do not know this one.",
-            });
-            continue;
-          }
-        }
-        try {
-          const onRecord = (await current()).responses.find(
-            (r) => r.stepKey === step.stepKey,
-          );
-          // The step's own "Not sure yet" where it has one (investor v3,
-          // live re-check 2026-10-31): an answer its write target reads as
-          // unknown. Otherwise the words of NOT_KNOWN_TEXT.
-          const notSure = optionsOf(step).find(
-            (option) => option.key === NOT_SURE_OPTION_KEY,
-          );
-          const recorded = notSure?.label ?? NOT_KNOWN_TEXT;
-          if (
-            isNotKnownAnswer(onRecord?.value) ||
-            (onRecord?.value.type === "SINGLE_SELECT" &&
-              onRecord.value.optionKey === NOT_SURE_OPTION_KEY)
-          ) {
-            results.push({
-              stepKey: step.stepKey,
-              outcome: "COMMITTED",
-              question,
-              recorded,
-              alreadyRecorded: true,
-            });
-            continue;
-          }
-          // A new version over whatever was there (history kept): what was
-          // on record is no longer known, by their own word. A session
-          // pinned to a version without the option takes the words.
-          const asOption =
-            notSure === undefined
-              ? false
-              : await submit(step.stepKey, {
-                  type: "SINGLE_SELECT",
-                  optionKey: NOT_SURE_OPTION_KEY,
-                }).then(() => true, reported("not-sure option save", false));
-          if (!asOption) {
-            await submit(step.stepKey, { type: "TEXT", text: NOT_KNOWN_TEXT });
-          }
-          written.push(step.stepKey);
-          results.push({
-            stepKey: step.stepKey,
-            outcome: "COMMITTED",
-            question,
-            recorded: asOption ? recorded : NOT_KNOWN_TEXT,
-          });
-        } catch (error: unknown) {
-          results.push(refused(step.stepKey, error));
-        }
-      }
-      return results;
-    },
+    recordNotKnown: recordNotKnownItems,
     pendingRecommendations: async () => {
       const view = await current();
       const list = await pendingNow().catch(reported("held writes read", []));

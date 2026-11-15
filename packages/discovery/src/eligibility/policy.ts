@@ -1,4 +1,5 @@
 import { reapproachAfterPass } from "@capital-q/network";
+import { countryCodesUnderGeographyNode } from "@capital-q/taxonomy/countries";
 import { RED_FLAG_INDUSTRY_CODES } from "@capital-q/taxonomy/reference-data";
 
 import {
@@ -42,8 +43,10 @@ import type {
  *
  * Hard rules come from exactly two declared places (doc 19 §13, §15;
  * investors module): a mandate constraint with importance HARD_EXCLUSION,
- * and a taxonomy preference with `isExclusion`. MUST is a strong preference
- * and AVOID is a soft negative; neither is evaluated here. Nothing observed
+ * and a taxonomy preference with `isExclusion`; and since v6 a geography the
+ * investor declared "must match" (their own selection). Any other MUST is
+ * a strong preference and AVOID is a soft negative; neither is evaluated
+ * here. Nothing observed
  * and nothing Q proposed can reach either place, and a taxonomy exclusion
  * is honoured only when its provenance is a person's own selection.
  *
@@ -71,6 +74,7 @@ const STAGE_DIMENSION = "stage";
 const GEOGRAPHY_DIMENSION = "geography.country";
 /** Red flags; the ones naming an industry are read against declared industry (v5). */
 const RED_FLAG_DIMENSION = "red_flag";
+const GEOGRAPHY_VOCABULARY = "geography";
 const INDUSTRY_VOCABULARY = "industry";
 
 function isActiveHardExclusion(c: MandateHardConstraint): boolean {
@@ -251,6 +255,88 @@ function codeCriterion(
   return excluded
     ? result(criterion, "FAIL", failReason)
     : result(criterion, "PASS");
+}
+
+/**
+ * v6: the countries a declared "must match" geography admits -- each
+ * positive geography preference at MUST of the person's own selection
+ * (a region stands for every country under it), and each
+ * `geography.country` constraint at MUST. Null: no must-match geography.
+ */
+export function mustMatchCountries(
+  mandate: MandateSnapshotForEligibility,
+): ReadonlySet<string> | null {
+  const out = new Set<string>();
+  let declared = false;
+  for (const p of mandate.taxonomyPreferences) {
+    if (
+      p.vocabularyCode !== GEOGRAPHY_VOCABULARY ||
+      p.isExclusion ||
+      p.preferenceStrength !== "MUST" ||
+      !(DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(p.source)
+    ) {
+      continue;
+    }
+    const countries = countryCodesUnderGeographyNode(p.nodeId);
+    // A node the reference hierarchy does not know is not guessed at.
+    if (countries === null) continue;
+    declared = true;
+    for (const iso of countries) out.add(iso);
+  }
+  for (const c of mandate.constraints) {
+    if (
+      c.dimension !== GEOGRAPHY_DIMENSION ||
+      c.importance !== "MUST" ||
+      c.isHardExclusion ||
+      c.automatedUse !== "ELIGIBLE" ||
+      c.value.kind !== "codes" ||
+      (c.operator !== "EQ" && c.operator !== "IN")
+    ) {
+      continue;
+    }
+    declared = true;
+    for (const iso of c.value.values) out.add(iso.toUpperCase());
+  }
+  return declared ? out : null;
+}
+
+/**
+ * The geography gate: the declared hard exclusions (as before) and, since
+ * v6, the must-match geography. A FAIL from either stands; an unstated
+ * country is UNKNOWN, which never withholds (ADR 0020) and is labelled.
+ */
+function geographyCriterion(
+  mandate: MandateSnapshotForEligibility,
+  company: CompanyEligibilityFacts,
+): CriterionResult {
+  const excluded = codeCriterion(
+    "HARD_EXCLUSION_GEOGRAPHY",
+    hardConstraints(mandate, GEOGRAPHY_DIMENSION),
+    company.headquartersCountry,
+    "COMPANY_GEOGRAPHY_UNKNOWN",
+    "GEOGRAPHY_OUTSIDE_HARD_MANDATE",
+  );
+  if (excluded.outcome === "FAIL") return excluded;
+  const must = mustMatchCountries(mandate);
+  if (must === null) return excluded;
+  const country = company.headquartersCountry?.trim().toUpperCase() ?? "";
+  if (country.length === 0) {
+    return result(
+      "HARD_EXCLUSION_GEOGRAPHY",
+      "UNKNOWN",
+      "COMPANY_GEOGRAPHY_UNKNOWN",
+    );
+  }
+  if (!must.has(country)) {
+    return result(
+      "HARD_EXCLUSION_GEOGRAPHY",
+      "FAIL",
+      "GEOGRAPHY_OUTSIDE_HARD_MANDATE",
+    );
+  }
+  return excluded.outcome === "UNKNOWN"
+    ? excluded
+    : result("HARD_EXCLUSION_GEOGRAPHY", "PASS");
 }
 
 function declaredExclusions(
@@ -530,15 +616,7 @@ export function evaluateHardEligibility(
         "STAGE_OUTSIDE_HARD_MANDATE",
       ),
     );
-    put(
-      codeCriterion(
-        "HARD_EXCLUSION_GEOGRAPHY",
-        hardConstraints(active, GEOGRAPHY_DIMENSION),
-        company.headquartersCountry,
-        "COMPANY_GEOGRAPHY_UNKNOWN",
-        "GEOGRAPHY_OUTSIDE_HARD_MANDATE",
-      ),
-    );
+    put(geographyCriterion(active, company));
     put(otherHardCriterion(active));
   }
 

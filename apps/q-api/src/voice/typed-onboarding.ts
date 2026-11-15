@@ -52,6 +52,7 @@ import {
   createOnboardingPort,
   type RecommendationStore,
 } from "./onboarding-port.js";
+import { isWholeNone, isWholeSkip } from "./list-settle.js";
 import { writeSession } from "./session-writes.js";
 import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
 import {
@@ -328,6 +329,8 @@ export function createTypedOnboarding(dependencies: {
         approved: ReadonlySet<string> = new Set<string>(),
         /** Q's line they answered: a held category is accepted only when it named it. */
         lastQTurn?: string,
+        /** A needed step their latest words skip, recorded as not known. */
+        declined: ReadonlySet<string> = new Set<string>(),
       ) =>
         createOnboardingPort({
           logger,
@@ -349,7 +352,7 @@ export function createTypedOnboarding(dependencies: {
           authority: () =>
             Promise.resolve({
               stated: new Set<string>(),
-              declined: new Set<string>(),
+              declined,
               handed: new Set<string>(),
               // A suggestion of Q's they approved, as the reading of their
               // latest words beside the reply found (never a phrase).
@@ -651,6 +654,8 @@ export function createTypedOnboarding(dependencies: {
       let navigate: InterviewTurnOutcome["navigate"] = null;
       let pausing = false;
       let showedReadBack = false;
+      /** This reply asks why about a topic, not for the topic's answer. */
+      let askedWhy = false;
       let path: string;
       if (authority?.pausing === true) {
         // What they said is saved first; the line says what is saved.
@@ -714,6 +719,31 @@ export function createTypedOnboarding(dependencies: {
             ? await reading
             : await conversation.answered(line, through);
         if (answeredIn === false) await conversation.flush?.(line);
+        // Already finishing, Q's last line asked a needed step, and they
+        // skipped it or said none: taken at once, before the finish reads
+        // the record (DECISIONS 78/79; live 2026-11-15 D1: "I'd rather skip
+        // that one" and "None yet, it's a new fund." to the portfolio
+        // question were refused, and portfolio blocked the finish).
+        const skippedKey = stillFinishing
+          ? lastAsked.get(input.onboardingSessionId)
+          : undefined;
+        if (skippedKey !== undefined) {
+          await settleFinishingAnswer({
+            stepKey: skippedKey,
+            utterance,
+            declinedByReading: authority?.declined.has(skippedKey) === true,
+            recordNone: (items) => portOf(false).recordNone(items, "NONE"),
+            recordNotKnown: (items) =>
+              portOf(
+                false,
+                new Set(),
+                undefined,
+                new Set([skippedKey]),
+              ).recordNotKnown(items),
+          }).catch((error: unknown) => {
+            logger.warn({ err: error }, "a finishing skip was not recorded");
+          });
+        }
         const finishing = portOf(true);
         const finished = await finishing.finish();
         // Read side by side: the record and Q's suggestions on it.
@@ -878,6 +908,7 @@ export function createTypedOnboarding(dependencies: {
           } else {
             seen.add(written.probing);
             bounded(probing, input.onboardingSessionId, written.probing);
+            askedWhy = true;
           }
         }
         // D81 #4: moving on from a topic, or after their correction of its
@@ -939,8 +970,13 @@ export function createTypedOnboarding(dependencies: {
       // before the screen's view was read, the outcome no longer names it,
       // and the line still asks it.
       const askedOpen = keptStepOf(input.journeyType, asking) ?? undefined;
+      // Live 2026-11-15 D3: "What makes crypto a hard no for you?" was
+      // followed at once by "No need to answer that one". A why is asked
+      // about an answer already given; that answer landing does not
+      // answer the why.
       if (
         path === "REPLY" &&
+        !askedWhy &&
         askedOpen !== undefined &&
         state.steps.some(
           (step) =>
@@ -1631,6 +1667,47 @@ export function tappedReview(
 }
 
 /**
+ * The review the screen's one-tap Finish confirms (live 2026-11-15 D2):
+ * the journey's last record review, after which the setup completes.
+ */
+export const FINISH_REVIEW_STEP: Readonly<
+  Record<"founder" | "investor", string>
+> = {
+  founder: "F8.snapshot",
+  investor: "I11.review",
+};
+
+/**
+ * Their answer to the needed step Q asked while finishing (DECISIONS
+ * 78/79): a plain none ("None yet, it's a new fund.") answers a list
+ * "None"; a skip, or what the reading found declines it, is recorded as
+ * not known. Either way they carry on and it is not asked again. Anything
+ * else is left to the reading. Returns what it recorded.
+ */
+export async function settleFinishingAnswer(input: {
+  readonly stepKey: string;
+  readonly utterance: string;
+  readonly declinedByReading: boolean;
+  readonly recordNone: (
+    items: readonly { readonly stepKey: string; readonly quote: string }[],
+  ) => Promise<readonly { readonly outcome: string }[]>;
+  readonly recordNotKnown: (
+    items: readonly { readonly stepKey: string; readonly quote: string }[],
+  ) => Promise<readonly { readonly outcome: string }[]>;
+}): Promise<"NONE" | "NOT_KNOWN" | null> {
+  const item = [{ stepKey: input.stepKey, quote: input.utterance }];
+  if (isWholeNone(input.utterance)) {
+    const [none] = await input.recordNone(item);
+    if (none?.outcome === "COMMITTED") return "NONE";
+  }
+  if (isWholeSkip(input.utterance) || input.declinedByReading) {
+    const [notKnown] = await input.recordNotKnown(item);
+    if (notKnown?.outcome === "COMMITTED") return "NOT_KNOWN";
+  }
+  return null;
+}
+
+/**
  * Their tap on a review's confirm button, as a typed yes (sweep D1): every
  * essential in, it finishes, settling the other reviews and any optional
  * question the journey waits on (never asking one); not yet, it confirms
@@ -1651,7 +1728,14 @@ export async function confirmTapped(input: {
   readonly completed: boolean;
 }> {
   const finished = await input.finishing.finish();
-  if (!finished.completed && finished.missing.length > 0) {
+  // The screen's Finish (live 2026-11-15 D2) taps the journey's last
+  // record review: with a needed answer still open, that answer is asked,
+  // never the review confirmed on its own ahead of it.
+  const finishTap =
+    input.tapped === FINISH_REVIEW_STEP[input.journeyType] &&
+    !finished.completed &&
+    finished.missing.length > 0;
+  if (!finished.completed && finished.missing.length > 0 && !finishTap) {
     try {
       await input.confirmOne();
     } catch {
@@ -1718,6 +1802,12 @@ export function waitingOnYes(
   });
 }
 
+const FINISH_REVIEWS: ReadonlySet<string> = new Set([
+  "I11.review",
+  "I12.handoff",
+  "F8.snapshot",
+]);
+
 /** What Q says when a question it just asked turns out to be answered. */
 export const ALREADY_ANSWERED_LINE =
   "No need to answer that one: your last message already covered it.";
@@ -1748,10 +1838,14 @@ export async function followUpIfAnswered(input: {
   if (row === undefined) return false;
   if (row.status === "OPEN" && row.savePending !== true) return false;
   if (!input.stillLast()) return false;
+  // A review is the finish's, read back for their yes: never asked bare
+  // here (live 2026-11-15 D3: "That's your mandate. Shall I make it
+  // live?" with needed answers still open, and their yes did nothing).
   const next =
     now.next?.find(
       (item) =>
         item.stepKey !== input.asked &&
+        !FINISH_REVIEWS.has(item.stepKey) &&
         now.steps.some(
           (step) =>
             step.stepKey === item.stepKey &&

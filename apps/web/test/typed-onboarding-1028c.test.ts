@@ -54,7 +54,11 @@ describe("defect 5: the Finish control", () => {
     ).toBe(false);
   });
 
-  it('pressing it says their "that\'s all" to Q (read back, then their yes), never confirms the review directly', () => {
+  it("pressing it shows a compact summary whose Finish finishes in one tap (live 2026-11-15 D2)", () => {
+    // Before D2: the tap said "that's all" to Q, which read back about
+    // thirty fields and waited for a typed yes. Now the summary's Finish
+    // confirms the mandate review through the confirm-by-tap path, which
+    // finishes (or asks what is still needed); never onFinish directly.
     const source = readFileSync(
       resolve(
         import.meta.dirname,
@@ -62,16 +66,19 @@ describe("defect 5: the Finish control", () => {
       ),
       "utf8",
     );
+    const summary = source.slice(
+      source.indexOf("data-q-finish-summary"),
+      source.indexOf("data-q-finish-confirm"),
+    );
+    expect(summary).toContain("finishSummary(");
+    expect(summary).toContain("FINISH_REVIEW_STEP[vocabulary.subject]");
+    expect(summary).toContain("void sayOne(");
+    expect(summary).not.toContain("onClick={onFinish}");
     const offer = source.slice(
       source.indexOf("data-q-finish-offer"),
       source.indexOf("data-q-finish\n"),
     );
-    expect(offer).toContain("void say(words)");
-    expect(offer).toContain("voiceSendText(words)");
-    expect(offer).not.toContain("onClick={onFinish}");
-    expect(source).toContain(
-      't("That\'s everything for now. Please finish my setup.")',
-    );
+    expect(offer).toContain("setFinishOpen(true)");
   });
 });
 

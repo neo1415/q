@@ -450,7 +450,7 @@ function collectingQueue(): RefreshQueue & {
 }
 
 const VERSIONS = {
-  eligibilityPolicyVersion: "eligibility.v5" as const,
+  eligibilityPolicyVersion: "eligibility.v6" as const,
   structuredGeneratorVersion: "structured-mandate.v7" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,

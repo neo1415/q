@@ -190,9 +190,28 @@ describe("a declined optional step is set aside, never recorded as a value", () 
     }
   });
 
-  it("never sets aside a required step, nor one the reading did not find declined", async () => {
+  it("a required step they decline is recorded as not known, never set aside (DECISIONS 78/79)", async () => {
+    // Live 2026-11-15 D1: a declined needed step used to be refused and
+    // asked again ("That information is needed…"). It is now an answer:
+    // not known, and they carry on. Before: REJECTED, left open.
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: SO_FAR,
+    });
+    const { gateway, seen } = settingAside("I2.stages", "no preference");
+    await createInterviewAgent({
+      gateway,
+      firewall: firewall(),
+      logger,
+      recommendations: world.recommendations,
+      delegation: readerOf(reading({ declined: ["I2.stages"] })),
+    }).turn({ ...turn(world, "no preference"), actor });
+    expect(world.skippedSteps()).not.toContain("I2.stages");
+    expect(seen[1]).toContain('"outcome":"COMMITTED"');
+  });
+
+  it("never sets aside a step the reading did not find declined", async () => {
     for (const [stepKey, declined] of [
-      ["I2.stages", ["I2.stages"]],
       ["I3.geography", []],
       ["I3.geography", ["I3.sectors"]],
     ] as const) {

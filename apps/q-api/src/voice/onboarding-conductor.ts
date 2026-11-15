@@ -289,6 +289,13 @@ function askLines(
   step: NextStep,
   names: ReadonlyMap<string, string> = new Map(),
 ): readonly Line[] {
+  // Live 2026-11-15 D3: a reopening asked "Here's what I have: <the
+  // cheque>. That's your mandate. Shall I make it live?" -- a part read
+  // back as the whole, and their "Yes, make it live" finished nothing.
+  // The mandate's review is the finish's: it is offered as the finish.
+  if (step.stepKey === MANDATE_REVIEW_STEP) {
+    return [{ text: FINISH_OFFER_LINE }];
+  }
   const content = confirmedContent(view, journeyType, step.stepKey, names);
   return [
     ...(content === null ? [] : [{ text: `Here's what I have: ${content}.` }]),
@@ -341,6 +348,25 @@ export function lastAskedStep(
 // ---------------------------------------------------------------------------
 
 const PICKING_UP = "Picking up where we left off.";
+
+/** The investor mandate's review: confirmed by the finish, never alone. */
+const MANDATE_REVIEW_STEP = "I11.review";
+
+const FINISH_OFFER_LINE = "I have what I need. Shall I finish your setup?";
+
+/**
+ * Whether a reopening already said it picked up since their last words
+ * (live 2026-11-15 D7: each reload added another "Picking up where we
+ * left off." line). Nothing new from them, nothing new from Q.
+ */
+export function alreadyPickedUp(
+  items: readonly { readonly role: string; readonly text: string }[],
+): boolean {
+  const lastPerson = items.findLastIndex((t) => t.role !== "Q");
+  return items
+    .slice(lastPerson + 1)
+    .some((t) => t.role === "Q" && t.text.trimStart().startsWith(PICKING_UP));
+}
 
 /** The resume as lines, so each can be said in the person's language. */
 export function resumeLines(
@@ -1142,7 +1168,10 @@ export function createOnboardingConductor(
     // one idempotent reference, so the API keeps one.
     const items = kept?.items ?? [];
     const last = items.at(-1);
-    if (!(last?.role === "Q" && last.text.includes(reply))) {
+    if (
+      !(last?.role === "Q" && last.text.includes(reply)) &&
+      !(reply.startsWith(PICKING_UP) && alreadyPickedUp(items))
+    ) {
       keep(
         input,
         reply,

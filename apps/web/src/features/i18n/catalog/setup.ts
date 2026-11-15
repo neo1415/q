@@ -60,6 +60,10 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
     "أنهِه لترى مراجعتك، أو تابع صوتياً.",
   // D3 (2026-10-28): finishing the typed setup once every essential is in.
   "Finish setup": "أنهِ الإعداد",
+  // Live 2026-11-15 D2: Finish shows a compact summary, then finishes.
+  "Your setup at a glance": "إعدادك في لمحة",
+  Finish: "إنهاء",
+  "Not yet": "ليس بعد",
   "Everything essential is in. You can add the rest later.":
     "كل الأساسيات موجودة. يمكنك إضافة الباقي لاحقاً.",
   // Re-test #3 (2026-10-28): Finish is their "that's all", said to Q.

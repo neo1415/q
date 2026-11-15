@@ -166,3 +166,42 @@ export function shownCardsKey(history: readonly QMessage[]): string {
   }
   return [...ids].sort().join(",");
 }
+
+/**
+ * Live 2026-11-15 D6: after a reload of /home the approval card was gone
+ * (only the "1" badge stayed), because the reopened thread was a new one
+ * that had never shown it. The general Q thread rebuilds the card of the
+ * newest change still waiting on the server (GET /v1/q/approvals), with
+ * the proposal its own conversation recorded. Nothing is inferred: no
+ * recorded proposal, no card. At most `limit` conversations are read.
+ */
+export async function restorePendingApproval(
+  pending: readonly QPendingApproval[],
+  readHistory: (conversationId: string) => Promise<readonly QMessage[] | null>,
+  limit = 3,
+): Promise<CarriedApproval | null> {
+  const newest = pending
+    .filter(
+      (item): item is QPendingApproval & { conversationId: string } =>
+        item.conversationId !== null,
+    )
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+    .slice(0, limit);
+  for (const item of newest) {
+    const history = await readHistory(item.conversationId);
+    if (history === null) continue;
+    const found = lastShown(history, item);
+    if (found === null) continue;
+    if (planCardStandsFor(found.proposal, history)) continue;
+    return {
+      approval: {
+        approvalId: item.approvalId,
+        proposalId: found.proposal.proposalId,
+        expiresAt: item.expiresAt,
+      },
+      proposal: found.proposal,
+      runId: item.runId,
+    };
+  }
+  return null;
+}

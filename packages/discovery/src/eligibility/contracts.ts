@@ -48,8 +48,17 @@ import { z } from "zod";
  * against the company's declared industry, like a taxonomy exclusion: a
  * declared match excludes; no declared industry stays UNKNOWN and never
  * withholds (ADR 0020). Before, every red flag was not evaluable.
+ *
+ * v6 (live 2026-11-15 D5): a geography the investor declared "must match"
+ * is a declared rule, so it is hard eligibility (CLAUDE.md: hard
+ * eligibility comes first, and only from declared rules). A company whose
+ * declared headquarters country is outside every must-match region or
+ * country is ineligible; one whose country is not stated stays eligible
+ * and is labelled (unknown is never negative evidence, ADR 0020). Strong
+ * and nice-to-have geographies stay ranking signals, as before. Stage and
+ * sector strengths are unchanged: Q does not offer "must match" for them.
  */
-export const ELIGIBILITY_POLICY_VERSION = "eligibility.v5" as const;
+export const ELIGIBILITY_POLICY_VERSION = "eligibility.v6" as const;
 
 /**
  * Every eligibility policy version a persisted artifact may name (feature
@@ -62,6 +71,7 @@ export const ELIGIBILITY_POLICY_VERSIONS = [
   "eligibility.v2",
   "eligibility.v3",
   "eligibility.v4",
+  "eligibility.v5",
   ELIGIBILITY_POLICY_VERSION,
 ] as const;
 

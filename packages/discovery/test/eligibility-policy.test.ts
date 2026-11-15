@@ -211,7 +211,7 @@ describe("eligibility policy v1 — golden scenarios", () => {
     ] as const;
 
     it("pins the policy version this behaviour belongs to", () => {
-      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v5");
+      expect(ELIGIBILITY_POLICY_VERSION).toBe("eligibility.v6");
     });
 
     it("an undeclared classification on the excluded node, alone in the vocabulary → UNKNOWN, kept (v3), never FAIL", () => {

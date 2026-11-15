@@ -383,14 +383,36 @@ export function optionsOf(
     configuration.stepType === "single_select" ||
     configuration.stepType === "multi_select"
   ) {
-    return configuration.options.map((option) => ({
-      key: option.optionKey,
-      label: option.label,
-      description: option.description,
-    }));
+    return configuration.options
+      .filter(
+        (option) =>
+          !(
+            option.optionKey === MUST_OPTION_KEY &&
+            MUST_NOT_ENFORCED.has(step.stepKey)
+          ),
+      )
+      .map((option) => ({
+        key: option.optionKey,
+        label: option.label,
+        description: option.description,
+      }));
   }
   return [];
 }
+
+const MUST_OPTION_KEY = "must";
+
+/**
+ * Strengths whose "Must match" Discover does not enforce (live 2026-11-15
+ * D5): Q offers only what the ranking honours. A must-match geography is
+ * hard eligibility (eligibility.v6); a sector, founder or green-flag
+ * strength is a ranking preference, so Q offers strong or nice to have.
+ */
+export const MUST_NOT_ENFORCED: ReadonlySet<string> = new Set([
+  "I3.sector_strength",
+  "I5.founder_strength",
+  "I6.green_flag_strength",
+]);
 
 /**
  * Steps whose numbers are money.

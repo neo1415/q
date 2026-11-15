@@ -123,6 +123,9 @@ import {
   contentHashOf,
   nothingNewLine,
   canOfferFinish,
+  questionHeadingSize,
+  FINISH_REVIEW_STEP,
+  finishSummary,
   chipsBelongTo,
   findingsFromDocument,
   findingsNotFromDocuments,
@@ -426,6 +429,8 @@ export function QOnboardingWorkspace({
   /** From the moment their words are sent until Q's first words show. */
   const [qThinking, setQThinking] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  /** Finish tapped: the compact summary and its one Finish button (D2). */
+  const [finishOpen, setFinishOpen] = useState(false);
   const [showGaps, setShowGaps] = useState(false);
   /** After an ambiguous answer, only the options that fit are offered. */
   const [narrowedTo, setNarrowedTo] = useState<readonly string[] | null>(null);
@@ -2692,7 +2697,7 @@ export function QOnboardingWorkspace({
             heading
           />
         ) : null}
-        <div ref={endRef} />
+        <div ref={endRef} className="scroll-mb-40" />
       </ol>
 
       {otherProposals.length > 0 ? (
@@ -3205,25 +3210,74 @@ export function QOnboardingWorkspace({
         // runtime still decides whether the session may complete.
         // Re-test #3: the tap is their "that's all": said to Q, which reads
         // the record back and finishes on their yes, as typed or spoken.
-        <div className="flex flex-wrap items-center gap-3" data-q-finish-offer>
-          <Button
-            disabled={working}
-            onClick={() => {
-              const words = finishWords;
-              if (voiceActive) {
-                voiceSendText(words);
-                return;
-              }
-              void say(words);
-            }}
-            data-q-finish
+        // Live 2026-11-15 D2: the tap sent a chat line, and Q read back
+        // about thirty fields and waited for a typed yes. They confirmed
+        // each value as they went (numbers read back, DECISIONS 78): the
+        // tap shows a compact summary, and its Finish finishes, through
+        // the same confirm-by-tap path the review's button uses.
+        finishOpen ? (
+          <section
+            aria-label={t("Your setup at a glance")}
+            className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
+            data-q-finish-summary
           >
-            {t("Finish setup")}
-          </Button>
-          <span className="cq-caption text-(--cq-text-secondary)">
-            {t("Everything essential is in. You can add the rest later.")}
-          </span>
-        </div>
+            <ul className="flex flex-col gap-1">
+              {finishSummary(reviewLines(view, vocabulary, labels)).map(
+                (line) => (
+                  <li
+                    key={line.label}
+                    className="cq-body min-w-0 break-words text-(--cq-text-primary)"
+                  >
+                    <span className="text-(--cq-text-secondary)">
+                      {line.label} ·{" "}
+                    </span>
+                    {line.text}
+                  </li>
+                ),
+              )}
+            </ul>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                disabled={working}
+                onClick={() => {
+                  setFinishOpen(false);
+                  void sayOne(
+                    finishWords,
+                    true,
+                    FINISH_REVIEW_STEP[vocabulary.subject],
+                  );
+                }}
+                data-q-finish-confirm
+              >
+                {t("Finish")}
+              </Button>
+              <Button
+                size="compact"
+                variant="quiet"
+                disabled={working}
+                onClick={() => setFinishOpen(false)}
+              >
+                {t("Not yet")}
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <div
+            className="flex flex-wrap items-center gap-3"
+            data-q-finish-offer
+          >
+            <Button
+              disabled={working}
+              onClick={() => setFinishOpen(true)}
+              data-q-finish
+            >
+              {t("Finish setup")}
+            </Button>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {t("Everything essential is in. You can add the rest later.")}
+            </span>
+          </div>
+        )
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3560,9 +3614,14 @@ function QLine({
     );
   }
   if (heading) {
+    // Live 2026-11-15 D7 (390): a long line of Q's in heading type ran
+    // under the docked composer. A long line is a smaller heading, and
+    // scrolling to it leaves room for the composer below.
     return (
-      <li data-turn={id} className="flex flex-col gap-1 pt-2">
-        <h2 className="cq-title-lg cq-prose text-balance text-(--cq-text-primary)">
+      <li data-turn={id} className="flex scroll-mb-40 flex-col gap-1 pt-2">
+        <h2
+          className={`${questionHeadingSize(text) === "sm" ? "cq-title-sm" : "cq-title-lg"} cq-prose break-words text-balance text-(--cq-text-primary)`}
+        >
           {text}
         </h2>
       </li>
