@@ -20,6 +20,7 @@ import {
   type DataRoomStore,
   type RelationshipConnection,
   type DisclosurePolicy,
+  type NoticeFailure,
 } from "../src/index.js";
 
 /**
@@ -90,6 +91,8 @@ function world(
     /** Relationship id -> where it stands (default: R1 connected). */
     readonly connections?: ReadonlyMap<string, RelationshipConnection>;
     readonly outline?: boolean;
+    /** The notice store refuses every notice (live audit 2026-11-15 D1). */
+    readonly noticesFail?: boolean;
   } = {},
 ) {
   const connections =
@@ -98,6 +101,7 @@ function world(
   let outline = options.outline ?? false;
   const documents = [PUBLIC_DOC, ON_REQUEST_DOC, SHARED_ONLY_DOC, PRIVATE_DOC];
   const requests: DataRoomRequestRecord[] = [];
+  const noticeFailures: NoticeFailure[] = [];
   const policies: DisclosurePolicy[] = [];
   const events: { eventType: string; payload: unknown }[] = [];
   const audits: { actionType: string }[] = [];
@@ -286,14 +290,26 @@ function world(
       },
     } as never,
     notify: (input) => {
+      if (options.noticesFail === true) {
+        return Promise.reject(
+          Object.assign(new Error("check constraint, row (Amara, Cap table)"), {
+            code: "23514",
+            constraint_name: "notifications_link_path_check",
+          }),
+        );
+      }
       notices.push(`${input.actingSide}:${input.title}`);
       return Promise.resolve();
+    },
+    onNoticeFailure: (failure) => {
+      noticeFailures.push(failure);
     },
     newCorrelationId: () => "cor_test",
     now: () => NOW,
   });
   return {
     service,
+    noticeFailures,
     relationships,
     documents,
     requests,
@@ -622,6 +638,70 @@ describe("request access and approval", () => {
       "data_room.access_requested",
       "data_room.access_decided",
     ]);
+  });
+});
+
+describe("live audit 2026-11-15: a decline's trace, and notices never silent", () => {
+  it("a decline appends data_room_access_declined (no note in it), a grant data_room_access_granted", async () => {
+    const { service, events } = world();
+    const asked = await service.requestAccess({
+      actor: investorOne,
+      companyId: COMPANY,
+      documentId: ON_REQUEST_DOC.documentId,
+      idempotencyKey: "key-00000201",
+    });
+    if (asked.outcome !== "OK") throw new Error("asked");
+    await service.decide({
+      actor: founder,
+      requestId: asked.value.requestId,
+      decision: "DECLINE",
+      note: "After a term sheet.",
+    });
+    const declined = events.filter(
+      (event) => event.eventType === "data_room_access_declined",
+    );
+    expect(declined).toHaveLength(1);
+    expect(declined[0]?.payload).toEqual({
+      requestId: asked.value.requestId,
+      documentId: ON_REQUEST_DOC.documentId,
+    });
+    expect(JSON.stringify(declined)).not.toContain("term sheet");
+  });
+
+  it("a notice the store refuses is reported with its kind and SQL state, and the action still succeeds", async () => {
+    const { service, noticeFailures, policies } = world({ noticesFail: true });
+    const asked = await service.requestAccess({
+      actor: investorOne,
+      companyId: COMPANY,
+      documentId: ON_REQUEST_DOC.documentId,
+      idempotencyKey: "key-00000202",
+    });
+    expect(asked.outcome).toBe("OK");
+    if (asked.outcome !== "OK") throw new Error("asked");
+    const approved = await service.decide({
+      actor: founder,
+      requestId: asked.value.requestId,
+      decision: "APPROVE",
+      days: 7,
+    });
+    expect(approved.outcome).toBe("OK");
+    expect(policies).toHaveLength(1);
+    expect(noticeFailures).toEqual([
+      {
+        notice: "DATA_ROOM_REQUESTED",
+        errorName: "Error",
+        errorCode: "23514",
+        constraint: "notifications_link_path_check",
+      },
+      {
+        notice: "DATA_ROOM_SHARED",
+        errorName: "Error",
+        errorCode: "23514",
+        constraint: "notifications_link_path_check",
+      },
+    ]);
+    // No names or titles from the failing row reach the log.
+    expect(JSON.stringify(noticeFailures)).not.toMatch(/Amara|Cap table/u);
   });
 });
 

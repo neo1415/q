@@ -194,6 +194,8 @@ import {
   createDiligenceService,
   createVisibilityCentre,
   systemDisclosureClock,
+  stillSharedDocumentIds,
+  type NoticeFailureReporter,
 } from "@capital-q/permissions";
 import { createScreenActionAudit } from "./http/app-action-audit.js";
 import {
@@ -2292,6 +2294,19 @@ const diligenceDocuments =
         storage,
         serveUnscanned,
       });
+// Live audit 2026-11-15 D1: a counterpart notice that could not be written
+// is one structured warning (the notice's kind, the SQL state and the
+// constraint; no names or titles), never swallowed. `event` is the line a
+// log search or alert counts.
+const noticeLogger = createLogger(apiServiceIdentity(config), {
+  level: config.observability.logLevel,
+});
+const onNoticeFailure: NoticeFailureReporter = (failure) => {
+  noticeLogger.warn(
+    { event: "counterpart_notice_failed", ...failure },
+    "counterpart notice not written",
+  );
+};
 const diligence = createDiligenceService({
   sql: database.sql,
   transactions: database.transactions,
@@ -2374,6 +2389,7 @@ const diligence = createDiligenceService({
       key: input.key,
       priority: input.priority,
     }),
+  onNoticeFailure,
   newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
 });
 // Overnight A3-A7: the profile's data room, pitch deck and founder pages,
@@ -2421,6 +2437,7 @@ const profileMaterial = createProfileMaterial({
       key: input.key,
       priority: input.priority,
     }),
+  onNoticeFailure,
   answers: createInvestorAnswers({
     sql: database.sql,
     transactions: database.transactions,
@@ -2820,6 +2837,13 @@ const deal = createDealCloseService({
   outbox,
   audit,
   outcomes,
+  // O3 (live audit 2026-11-15): a revoked share is no longer shared.
+  stillShared: (executor, relationshipId) =>
+    stillSharedDocumentIds(
+      createPostgresDisclosurePolicyRepository(),
+      executor,
+      relationshipId,
+    ),
   names: async ({ companyId, investorOrganisationId }) => ({
     company:
       (

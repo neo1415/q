@@ -36,6 +36,7 @@ import {
   type DisclosurePolicyManager,
   type FounderRequestsDependencies,
   type FounderRequestsNotice,
+  type NoticeFailureReporter,
 } from "@capital-q/permissions";
 import { createCorrelationId } from "@capital-q/observability";
 import {
@@ -89,6 +90,8 @@ export function createProfileMaterial(dependencies: {
   /** Founder documents (2026-10-08): the requests inbox's notices. */
   readonly notifyRequests?:
     ((input: FounderRequestsNotice) => Promise<unknown>) | undefined;
+  /** A notice that could not be written (logged, never silent). */
+  readonly onNoticeFailure?: NoticeFailureReporter | undefined;
   /** An answer recorded through the Knowledge Write Gate; absent: words only. */
   readonly answers?: FounderRequestsDependencies["answers"];
 }) {
@@ -208,6 +211,7 @@ export function createProfileMaterial(dependencies: {
     appender,
     audit: dependencies.audit,
     notify: dependencies.notify,
+    onNoticeFailure: dependencies.onNoticeFailure,
     newCorrelationId,
   });
 
@@ -293,6 +297,7 @@ export function createProfileMaterial(dependencies: {
     audit: dependencies.audit,
     answers: dependencies.answers,
     notify: dependencies.notifyRequests,
+    onNoticeFailure: dependencies.onNoticeFailure,
     newCorrelationId,
   });
 

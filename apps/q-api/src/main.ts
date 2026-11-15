@@ -554,6 +554,8 @@ import {
   createDisclosureResourceResolverRegistry,
   createPermissionsService,
   createPostgresDisclosurePolicyRepository,
+  stillSharedDocumentIds,
+  type NoticeFailureReporter,
   createRelationshipPartyResolver,
   createDiligenceService,
   createVisibilityCentre,
@@ -1953,6 +1955,13 @@ const dealService = createDealCloseService({
   outbox: interestServiceOptions.outbox,
   audit: createPostgresMaterialActionAuditWriter(),
   outcomes: outcomeService,
+  // O3 (live audit 2026-11-15): a revoked share is no longer shared.
+  stillShared: (executor, relationshipId) =>
+    stillSharedDocumentIds(
+      createPostgresDisclosurePolicyRepository(),
+      executor,
+      relationshipId,
+    ),
   names: async ({ companyId, investorOrganisationId }) => ({
     company:
       (await companies.findCanonicalCompany(CompanyIdSchema.parse(companyId)))
@@ -2584,6 +2593,15 @@ const investorMayFind = async (
  * a file here (no storage is composed): it reads listings and sections.
  * "Who can find the company" is the pitch rule (ADR 0041), as media uses it.
  */
+// Live audit 2026-11-15 D1: a counterpart notice that could not be written
+// is one structured warning (kind, SQL state, constraint; no names or
+// titles), never swallowed.
+const onNoticeFailure: NoticeFailureReporter = (failure) => {
+  logger.warn(
+    { event: "counterpart_notice_failed", ...failure },
+    "counterpart notice not written",
+  );
+};
 const profileMaterial = createProfileMaterial({
   sql: database.sql,
   transactions: database.transactions,
@@ -2627,6 +2645,7 @@ const profileMaterial = createProfileMaterial({
       key: input.key,
       priority: input.priority,
     }),
+  onNoticeFailure,
   // A founder's answer, recorded as their claim through the Write Gate.
   answers: createInvestorAnswerRecorder({
     evidence: createStatementEvidencePort(researchComposition.evidence),
@@ -2692,6 +2711,7 @@ const diligenceService = withRunCachedDiligenceViews(
         key: input.key,
         priority: input.actingSide === "INVESTOR" ? "NEEDS_YOU" : "UPDATE",
       }),
+    onNoticeFailure,
     newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
   }),
 );

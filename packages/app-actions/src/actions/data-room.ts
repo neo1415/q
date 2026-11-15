@@ -513,7 +513,7 @@ export const DECIDE_DATA_ROOM_REQUEST = defineAppAction<
         }
       : {
           summary: "Say no to this request",
-          preview: "They see that it wasn't shared. Nothing else changes.",
+          preview: "They're told it wasn't shared. Nothing else changes.",
         },
   done: (out) =>
     out.outcome === "OK"

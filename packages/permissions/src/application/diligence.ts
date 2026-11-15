@@ -30,6 +30,10 @@ import {
   type DisclosurePolicy,
 } from "../contracts/index.js";
 import type { DisclosureAccessService } from "./access-service.js";
+import {
+  reportNoticeFailure,
+  type NoticeFailureReporter,
+} from "./notice-failure.js";
 import type { DisclosurePolicyManager } from "./policy-manager.js";
 import type { DisclosurePolicyRepository } from "./ports.js";
 
@@ -261,6 +265,8 @@ export function createDiligenceService(dependencies: {
         readonly priority: "NEEDS_YOU" | "UPDATE";
       }) => Promise<unknown>)
     | undefined;
+  /** A notice that could not be written: logged by the app, never silent. */
+  readonly onNoticeFailure?: NoticeFailureReporter | undefined;
   readonly newCorrelationId: () => CorrelationId;
 }) {
   const { sql, transactions, requests, appender } = dependencies;
@@ -300,7 +306,15 @@ export function createDiligenceService(dependencies: {
 
   const notifyQuietly = (
     input: Parameters<NonNullable<typeof dependencies.notify>>[0],
-  ) => dependencies.notify?.(input).catch(() => undefined);
+  ) =>
+    dependencies.notify?.(input).catch((error: unknown) => {
+      // Never silent (live audit 2026-11-15 D1).
+      reportNoticeFailure(
+        dependencies.onNoticeFailure,
+        `DILIGENCE_${input.actingSide}`,
+        error,
+      );
+    });
 
   const refused = <T>(code: DiligenceRefusal): DiligenceOutcome<T> => ({
     outcome: "REFUSED",

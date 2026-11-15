@@ -86,9 +86,36 @@ export type AttentionSources = Partial<
  * notices, slate deltas, data-room requests, what Q did), composed by the
  * app over its own stores. Absent members leave their source unread.
  */
+/**
+ * A data-room request answered, as the reader's own side sees it (live
+ * audit 2026-11-15 D2): the investor that asked, or the founder that
+ * answered. The founder's note is never carried.
+ */
+export type DataRoomAnswer = {
+  readonly relationshipId: string;
+  /** The reader's side of the relationship. */
+  readonly side: "INVESTOR" | "COMPANY";
+  /** The other side's name; null: not known. */
+  readonly counterpart: string | null;
+  /** The document asked for; null: everything on request. */
+  readonly title: string | null;
+  readonly decision: "APPROVED" | "DECLINED";
+  readonly at: string;
+};
+
 export type AttentionPort = {
   /** Absent or partial: the missing sources are reported unread. */
   readonly sources?: AttentionSources | undefined;
+  /**
+   * Data-room requests answered since `since`, either side, for the
+   * account digest's recent events (D2). Absent: none listed.
+   */
+  readonly dataRoomAnswers?:
+    | ((
+        actor: ActorContext,
+        context: { readonly since: Date },
+      ) => Promise<readonly DataRoomAnswer[]>)
+    | undefined;
   readonly activity?:
     | ((
         actor: ActorContext,

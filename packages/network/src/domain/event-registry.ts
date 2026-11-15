@@ -595,6 +595,29 @@ export const DataRoomAccessGrantedRelationshipEvent = defineRelationshipEvent({
 });
 
 /**
+ * Live check 2026-11-15 (D2): the founder declined a data-room request.
+ * Activity only, both sides read it, so a decline leaves a trace in the
+ * relationship's history as a grant does. The founder's note stays on the
+ * decision row; nothing here says why.
+ */
+export const DataRoomAccessDeclinedPayloadSchema = z
+  .object({
+    requestId: UuidSchema,
+    /** Absent: the request was for every on-request document. */
+    documentId: UuidSchema.optional(),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_DECLINED =
+  "data_room_access_declined" as const;
+export const DataRoomAccessDeclinedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_DECLINED,
+  payloadSchema: DataRoomAccessDeclinedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The company declined this relationship's request for data-room documents. Nothing was shared.",
+});
+
+/**
  * Deal close (founder, 2026-10-08): the terms both sides see, the signature
  * against the signed document, and the clean end. Each is shared: both
  * sides are its subject. The terms, money and documents live on their rows
@@ -690,6 +713,7 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     DocumentSharedRelationshipEvent,
     DataRoomAccessRequestedRelationshipEvent,
     DataRoomAccessGrantedRelationshipEvent,
+    DataRoomAccessDeclinedRelationshipEvent,
     DealTermsRecordedRelationshipEvent,
     DealTermsSignedRelationshipEvent,
     DealClosedRelationshipEvent,

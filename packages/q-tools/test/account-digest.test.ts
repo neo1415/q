@@ -599,4 +599,78 @@ describe("the account digest after the live check", () => {
     expect(JSON.stringify(investor.recent)).not.toContain("Halyard");
     expect(JSON.stringify(founder.recent)).not.toContain("Cohort table");
   });
+  it("shows a data-room share and a decline in the recent events of each side, in its own words (live audit 2026-11-15 D2)", async () => {
+    const { ports } = tenantPorts();
+    const asked: ActorContext[] = [];
+    const withAnswers: AccountDigestPorts = {
+      ...ports,
+      attention: {
+        ...ports.attention,
+        dataRoomAnswers: (actor) => {
+          asked.push(actor);
+          return Promise.resolve(
+            actor.userId === actorB.userId
+              ? [
+                  {
+                    relationshipId: U(101),
+                    side: "INVESTOR" as const,
+                    counterpart: "Ajopot",
+                    title: "Financial summary",
+                    decision: "APPROVED" as const,
+                    at: "2026-11-14T15:46:00.000Z",
+                  },
+                  {
+                    relationshipId: U(102),
+                    side: "INVESTOR" as const,
+                    counterpart: "Nsuo Labs",
+                    title: null,
+                    decision: "DECLINED" as const,
+                    at: "2026-11-14T15:49:00.000Z",
+                  },
+                  // Before the window: not recent.
+                  {
+                    relationshipId: U(101),
+                    side: "INVESTOR" as const,
+                    counterpart: "Ajopot",
+                    title: "Old memo",
+                    decision: "APPROVED" as const,
+                    at: "2026-10-01T10:00:00.000Z",
+                  },
+                ]
+              : [
+                  {
+                    relationshipId: U(101),
+                    side: "COMPANY" as const,
+                    counterpart: "Savanna Seed",
+                    title: "Financial summary",
+                    decision: "DECLINED" as const,
+                    at: "2026-11-14T15:46:00.000Z",
+                  },
+                ],
+          );
+        },
+      },
+    };
+    const investor = await createAccountDigestReader(withAnswers)(actorB, {
+      now: NOW,
+    });
+    expect(investor.recent.map((event) => event.text)).toEqual(
+      expect.arrayContaining([
+        "Ajopot shared Financial summary with you",
+        "Nsuo Labs declined your request for their on-request documents",
+      ]),
+    );
+    expect(JSON.stringify(investor.recent)).not.toContain("Old memo");
+    const founder = await createAccountDigestReader(withAnswers)(actorA, {
+      now: NOW,
+    });
+    expect(founder.recent.map((event) => event.text)).toEqual(
+      expect.arrayContaining([
+        "You declined Savanna Seed's request for Financial summary",
+      ]),
+    );
+    expect(QAccountDigestSchema.safeParse(founder).success).toBe(true);
+    // Read as the asking person only.
+    expect(asked).toEqual([actorB, actorA]);
+  });
 });

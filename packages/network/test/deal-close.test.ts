@@ -62,7 +62,12 @@ type Ev = {
   actor_name: string | null;
 };
 
-function world() {
+function world(
+  options: {
+    /** What the Permissions read says is shared now (O3). */
+    readonly stillShared?: readonly string[];
+  } = {},
+) {
   let clock = Date.parse("2026-10-01T09:00:00.000Z");
   const tick = () => new Date((clock += 60_000));
   const events: Ev[] = [];
@@ -300,6 +305,9 @@ function world() {
   const service = createDealCloseService({
     sql,
     transactions,
+    ...(options.stillShared === undefined
+      ? {}
+      : { stillShared: () => Promise.resolve(options.stillShared ?? []) }),
     interests: {
       relationshipById: ({ actor: who }) =>
         Promise.resolve(
@@ -333,8 +341,8 @@ const SAFE = {
   valuationBasis: "POST_MONEY",
 } as const;
 
-function afterSoftCommit() {
-  const w = world();
+function afterSoftCommit(options: Parameters<typeof world>[0] = {}) {
+  const w = world(options);
   w.add("meeting_held", {});
   w.add("document_shared", { documentId: DOC, disclosurePolicyId: DOC });
   w.add("commitment_confirmed", { commitmentId: COMMITMENT, level: "SOFT" });
@@ -420,6 +428,29 @@ describe("deal close: steps in order", () => {
       [1, "SUPERSEDED"],
       [2, "RECORDED"],
     ]);
+  });
+
+  it("refuses a terms document whose share was revoked (live audit 2026-11-15 O3)", async () => {
+    const revoked = afterSoftCommit({ stillShared: [] });
+    expect(
+      await revoked.service.recordTerms({
+        actor: investor,
+        relationshipId: RELATIONSHIP,
+        terms: { ...SAFE, termsDocumentId: DOC },
+        idempotencyKey: "terms-key-0101",
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "DOCUMENT_NOT_SHARED" });
+    const view = await revoked.service.view(investor, RELATIONSHIP);
+    expect(view?.sharedDocumentIds).toEqual([]);
+
+    const live = afterSoftCommit({ stillShared: [DOC] });
+    const out = await live.service.recordTerms({
+      actor: investor,
+      relationshipId: RELATIONSHIP,
+      terms: { ...SAFE, termsDocumentId: DOC },
+      idempotencyKey: "terms-key-0102",
+    });
+    expect(out.outcome).toBe("OK");
   });
 
   it("refuses a terms document that was never shared with this relationship", async () => {

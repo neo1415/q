@@ -393,11 +393,13 @@ export {
   type AttentionReader,
   type AttentionSourceReader,
   type AttentionSources,
+  type DataRoomAnswer,
   type ReadAttentionInput,
 } from "./tools/attention.js";
 export {
   ACCOUNT_DIGEST_SECTION_DEADLINE_MS,
   createAccountDigestReader,
+  dataRoomAnswerEvents,
   digestRelationships,
   digestWork,
   diligenceEvents,

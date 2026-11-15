@@ -411,6 +411,28 @@ export const NotificationKindSchema = z.enum([
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 
+/**
+ * The one rule for a notification's link, the same as the database's
+ * `notifications_link_path_check` (migration 20261019090000): an in-app
+ * path only. No scheme, host, query or fragment, so a notice, and the push
+ * and email that carry it, can never send anyone off the app. Stricter by
+ * one case: never `//` at the start (a scheme-relative address).
+ *
+ * Producers check every link with this before they insert (live audit
+ * 2026-11-15 D1: data-room notices carried `?` and `#`, the insert was
+ * refused, and the refusal was swallowed), so a link the database would
+ * refuse fails in a unit test, not silently in production. A destination
+ * that needs a tab or an item is an alias path the web app redirects
+ * (`apps/web/next.config.ts`), never a query here.
+ */
+export const NOTIFICATION_LINK_PATH_PATTERN =
+  /^\/(?!\/)[A-Za-z0-9/_-]{0,200}$/u;
+
+/** True when `path` may be stored as a notification's link. */
+export function isNotificationLinkPath(path: string): boolean {
+  return NOTIFICATION_LINK_PATH_PATTERN.test(path);
+}
+
 export const NotificationDtoSchema = z
   .object({
     id: UuidSchema,

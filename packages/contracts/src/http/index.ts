@@ -1486,6 +1486,8 @@ export {
   type MeetingAvailabilityRequest,
   type MeetingAvailabilityResponse,
   type MeetingStatus,
+  isNotificationLinkPath,
+  NOTIFICATION_LINK_PATH_PATTERN,
   type NotificationDto,
   type NotificationKind,
   type NotificationList,

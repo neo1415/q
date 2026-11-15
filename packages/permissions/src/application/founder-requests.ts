@@ -51,6 +51,10 @@ import {
   type RelationshipConnection,
 } from "./data-room.js";
 import type { DisclosurePolicyManager } from "./policy-manager.js";
+import {
+  reportNoticeFailure,
+  type NoticeFailureReporter,
+} from "./notice-failure.js";
 import type { DisclosurePolicyRepository } from "./ports.js";
 
 /**
@@ -194,6 +198,8 @@ export type FounderRequestsDependencies = {
     | undefined;
   readonly notify?:
     ((input: FounderRequestsNotice) => Promise<unknown>) | undefined;
+  /** A notice that could not be written: logged by the app, never silent. */
+  readonly onNoticeFailure?: NoticeFailureReporter | undefined;
   readonly newCorrelationId: () => CorrelationId;
   readonly now?: (() => UtcTimestamp) | undefined;
 };
@@ -316,8 +322,16 @@ export function createFounderRequestsService(
   ): FounderRequestsOutcome<T> => ({ outcome: "REFUSED", code });
   const quietly = <T>(promise: Promise<T>, fallback: T) =>
     promise.catch(() => fallback);
+  // Quiet for the action (it already happened), never silent (live audit
+  // 2026-11-15 D1): a failure is reported with where the notice pointed.
   const notifyQuietly = (input: FounderRequestsNotice) =>
-    dependencies.notify?.(input).catch(() => undefined);
+    dependencies.notify?.(input).catch((error: unknown) => {
+      reportNoticeFailure(
+        dependencies.onNoticeFailure,
+        `FOUNDER_REQUESTS_${input.target}_${input.actingSide}`,
+        error,
+      );
+    });
   const expiryAfter = (days: number) =>
     new Date(Date.parse(now()) + days * DAY_MS).toISOString();
 

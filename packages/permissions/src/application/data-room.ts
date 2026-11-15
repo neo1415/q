@@ -24,6 +24,7 @@ import type {
   TransactionManager,
 } from "@capital-q/database";
 import {
+  RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_DECLINED,
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_GRANTED,
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
   RelationshipIdSchema,
@@ -38,6 +39,10 @@ import {
 } from "../contracts/index.js";
 import type { DisclosureAccessService } from "./access-service.js";
 import type { DisclosurePolicyManager } from "./policy-manager.js";
+import {
+  reportNoticeFailure,
+  type NoticeFailureReporter,
+} from "./notice-failure.js";
 import type { DisclosurePolicyRepository } from "./ports.js";
 
 /**
@@ -482,6 +487,12 @@ export function createDataRoomService(dependencies: {
         readonly priority: "NEEDS_YOU" | "UPDATE";
       }) => Promise<unknown>)
     | undefined;
+  /**
+   * A notice that could not be written (live audit 2026-11-15 D1: the
+   * refusal was swallowed, so no data-room notice reached anyone for five
+   * weeks). The action itself still succeeds; the app logs this.
+   */
+  readonly onNoticeFailure?: NoticeFailureReporter | undefined;
   readonly newCorrelationId: () => CorrelationId;
   readonly now?: (() => UtcTimestamp) | undefined;
 }) {
@@ -493,9 +504,15 @@ export function createDataRoomService(dependencies: {
   });
   const quietly = <T>(promise: Promise<T>, fallback: T) =>
     promise.catch(() => fallback);
+  // Quiet for the action (it already happened), never silent: a failure
+  // is reported with the notice's kind.
   const notifyQuietly = (
+    notice: "DATA_ROOM_REQUESTED" | "DATA_ROOM_DECLINED" | "DATA_ROOM_SHARED",
     input: Parameters<NonNullable<typeof dependencies.notify>>[0],
-  ) => dependencies.notify?.(input).catch(() => undefined);
+  ) =>
+    dependencies.notify?.(input).catch((error: unknown) => {
+      reportNoticeFailure(dependencies.onNoticeFailure, notice, error);
+    });
 
   async function grantsOf(
     relationshipId: string | null,
@@ -998,7 +1015,7 @@ export function createDataRoomService(dependencies: {
             ? "everything on request"
             : (requestable.find((d) => d.documentId === command.documentId)
                 ?.title ?? "a document");
-        await notifyQuietly({
+        await notifyQuietly("DATA_ROOM_REQUESTED", {
           relationshipId,
           actingSide: "INVESTOR",
           title: `{actor} asked for ${title}`.slice(0, 200),
@@ -1066,6 +1083,25 @@ export function createDataRoomService(dependencies: {
             note: command.note?.trim().slice(0, 1000) || null,
           });
           if (inserted) {
+            // A decline leaves a trace in the relationship's history, as a
+            // grant does (live audit 2026-11-15 D2). The note stays on the
+            // decision row.
+            await dependencies.appender.append(tx, {
+              relationshipId: RelationshipIdSchema.parse(
+                request.relationshipId,
+              ),
+              eventType: RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_DECLINED,
+              actor: { type: "HUMAN", id: command.actor.userId },
+              source: { type: "MANUAL", id: request.id },
+              visibilityScope: "relationship_shared",
+              payload: {
+                requestId: request.id,
+                ...(request.documentId === null
+                  ? {}
+                  : { documentId: request.documentId }),
+              },
+              correlationId,
+            });
             await dependencies.audit.record(tx, {
               ...auditActorFromContext(command.actor),
               auditEventId: createAuditEventId(),
@@ -1082,7 +1118,7 @@ export function createDataRoomService(dependencies: {
         });
         if (!recorded) return refused("ALREADY_DECIDED");
         // The investor is told, so a decline never leaves them waiting.
-        await notifyQuietly({
+        await notifyQuietly("DATA_ROOM_DECLINED", {
           relationshipId: request.relationshipId,
           actingSide: "COMPANY",
           title:
@@ -1177,7 +1213,7 @@ export function createDataRoomService(dependencies: {
         return true;
       });
       if (!recorded) return refused("ALREADY_DECIDED");
-      await notifyQuietly({
+      await notifyQuietly("DATA_ROOM_SHARED", {
         relationshipId: request.relationshipId,
         actingSide: "COMPANY",
         title:

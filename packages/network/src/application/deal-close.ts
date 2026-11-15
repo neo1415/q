@@ -180,6 +180,19 @@ export function createDealCloseService(dependencies: {
         relationshipId: string,
       ) => Promise<readonly DealMeetingNote[]>)
     | undefined;
+  /**
+   * The documents this relationship can open now: an unrevoked, unexpired
+   * disclosure policy names it (the Permissions context's own read). A
+   * revoked share stays in the history but is no longer shared (live audit
+   * 2026-11-15 O3), so terms or a signature cannot cite it. Absent: the
+   * history alone decides (tests that do not compose Permissions).
+   */
+  readonly stillShared?:
+    | ((
+        executor: DatabaseExecutor,
+        relationshipId: string,
+      ) => Promise<readonly string[]>)
+    | undefined;
   readonly newCorrelationId: () => CorrelationId;
   /** Today's date (UTC, YYYY-MM-DD) for a close; injectable for tests. */
   readonly today?: (() => string) | undefined;
@@ -278,6 +291,20 @@ export function createDealCloseService(dependencies: {
       }
     }
     return [...ids].sort();
+  }
+
+  /** Shared in the history and still shared now (O3: never a revoked one). */
+  async function sharedNow(
+    executor: DatabaseExecutor,
+    relationshipId: string,
+    events: readonly ProjectableEvent[],
+  ): Promise<string[]> {
+    const fromHistory = sharedDocumentIds(events);
+    if (dependencies.stillShared === undefined) return fromHistory;
+    const active = new Set(
+      await dependencies.stillShared(executor, relationshipId),
+    );
+    return fromHistory.filter((id) => active.has(id));
   }
 
   function auditActor(actor: ActorContext) {
@@ -535,7 +562,7 @@ export function createDealCloseService(dependencies: {
       checklist,
       updateCadence: closed ? postCloseCadence().sentence : null,
       passNoteDraft,
-      sharedDocumentIds: sharedDocumentIds(events),
+      sharedDocumentIds: await sharedNow(sql, party.relationshipId, events),
       reports: await reportsFor(party),
     };
   }
@@ -593,7 +620,9 @@ export function createDealCloseService(dependencies: {
         }
         if (
           terms.termsDocumentId !== undefined &&
-          !sharedDocumentIds(events).includes(terms.termsDocumentId)
+          !(await sharedNow(tx.sql, party.relationshipId, events)).includes(
+            terms.termsDocumentId,
+          )
         ) {
           return refused("DOCUMENT_NOT_SHARED");
         }
@@ -689,7 +718,11 @@ export function createDealCloseService(dependencies: {
         );
         if (projectDealStage(events).end !== null)
           return refused("NOT_IN_STAGE");
-        if (!sharedDocumentIds(events).includes(command.signedDocumentId)) {
+        if (
+          !(await sharedNow(tx.sql, party.relationshipId, events)).includes(
+            command.signedDocumentId,
+          )
+        ) {
           return refused("DOCUMENT_NOT_SHARED");
         }
         await tx.sql`

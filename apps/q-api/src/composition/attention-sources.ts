@@ -86,6 +86,62 @@ export function createAttentionSources(dependencies: {
   const { sql } = dependencies;
   const noticeChecks = dependencies.noticeChecks ?? needsYouChecks(sql);
   return {
+    // D2 (live audit 2026-11-15): data-room requests answered, for the
+    // digest's recent events. Only requests where the actor's own
+    // organisation is the company that answered or the investor that
+    // asked, each in its own tenant; never the founder's note.
+    dataRoomAnswers: async (actor, { since }) => {
+      if (actor.organisationId === undefined) return [];
+      const rows = await sql<
+        {
+          relationship_id: string;
+          decision: string;
+          created_at: Date;
+          document_title: string | null;
+          own_side: "COMPANY" | "INVESTOR";
+          company_name: string | null;
+          investor_name: string | null;
+        }[]
+      >`
+        select r.relationship_id, k.decision, k.created_at,
+               d.title as document_title,
+               case when c.organisation_id = ${actor.organisationId}
+                         and c.tenant_id = ${actor.tenantId}
+                    then 'COMPANY' else 'INVESTOR' end as own_side,
+               c.canonical_name as company_name,
+               i.display_name as investor_name
+          from evidence.data_room_access_requests r
+          join evidence.data_room_request_decisions k on k.request_id = r.id
+          join core.companies c
+            on c.id = r.company_id and c.tenant_id = r.tenant_id
+          join core.investor_organisations i
+            on i.id = r.investor_organisation_id
+          left join evidence.documents d on d.id = r.document_id
+         where k.created_at > ${since}
+           and ((c.organisation_id = ${actor.organisationId}
+                 and c.tenant_id = ${actor.tenantId})
+             or (i.organisation_id = ${actor.organisationId}
+                 and i.tenant_id = ${actor.tenantId}))
+         order by k.created_at desc
+         limit 20`;
+      return rows.flatMap((row) =>
+        row.decision === "APPROVED" || row.decision === "DECLINED"
+          ? [
+              {
+                relationshipId: row.relationship_id,
+                side: row.own_side,
+                counterpart:
+                  row.own_side === "COMPANY"
+                    ? row.investor_name
+                    : row.company_name,
+                title: row.document_title,
+                decision: row.decision,
+                at: new Date(row.created_at).toISOString(),
+              },
+            ]
+          : [],
+      );
+    },
     sources: {
       HELD_DRAFT: [
         async (actor) => {

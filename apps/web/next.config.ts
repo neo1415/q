@@ -56,6 +56,28 @@ const nextConfig: NextConfig = {
   redirects() {
     return Promise.resolve([
       { source: "/q", destination: "/home", permanent: false },
+      // Notification links (live audit 2026-11-15 D1). A stored notice link
+      // is a plain in-app path, never a query or fragment (the database's
+      // notifications_link_path_check, and isNotificationLinkPath), so a
+      // notice that opens a tab or an item names an alias path, sent on
+      // here. Each parameter is a strict id pattern; the destination is
+      // always this app's own page.
+      {
+        source: "/documents/requested",
+        destination: "/documents?tab=requested",
+        permanent: false,
+      },
+      {
+        source: "/documents/requested/:item([A-Za-z0-9_-]{1,120})",
+        destination: "/documents?tab=requested&item=:item",
+        permanent: false,
+      },
+      {
+        source:
+          "/company/:companyId([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})/data-room",
+        destination: "/company/:companyId?tab=dataroom",
+        permanent: false,
+      },
     ]);
   },
   headers() {

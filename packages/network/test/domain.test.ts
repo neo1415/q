@@ -151,6 +151,7 @@ describe("relationship event registry", () => {
       "document_shared",
       "data_room_access_requested",
       "data_room_access_granted",
+      "data_room_access_declined",
       "deal_terms_recorded",
       "deal_terms_signed",
       "deal_closed",

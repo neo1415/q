@@ -196,6 +196,13 @@ export {
   type RelationshipConnection,
 } from "./application/data-room.js";
 export {
+  noticeFailureOf,
+  reportNoticeFailure,
+  type NoticeFailure,
+  type NoticeFailureReporter,
+} from "./application/notice-failure.js";
+export { stillSharedDocumentIds } from "./application/relationship-shares.js";
+export {
   accessHistory,
   createFounderRequestsService,
   inboxCounts,

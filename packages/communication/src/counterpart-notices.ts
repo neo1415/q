@@ -1,3 +1,4 @@
+import { isNotificationLinkPath } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import { isKnownTimeZone } from "./schedule/slots.js";
@@ -26,6 +27,86 @@ export type CounterpartNoticeKind =
   /** A commitment moved a step: amount, sent, received (2026-10-04). */
   | "COMMITMENT";
 
+/**
+ * Where the receiving side acts: their inbox, their chat, the relationship
+ * page, its Diligence tab, or Capital; the founder's Documents inbox at one
+ * request (2026-10-08, `key` is its id); the investor's view of the
+ * company's data room (2026-10-08).
+ */
+export type CounterpartNoticeTarget =
+  | "INBOX"
+  | "CHAT"
+  | "RELATIONSHIP"
+  | "DILIGENCE"
+  | "CAPITAL"
+  | "DOCUMENTS"
+  | "COMPANY_PROFILE";
+
+export const COUNTERPART_NOTICE_TARGETS: readonly CounterpartNoticeTarget[] = [
+  "INBOX",
+  "CHAT",
+  "RELATIONSHIP",
+  "DILIGENCE",
+  "CAPITAL",
+  "DOCUMENTS",
+  "COMPANY_PROFILE",
+];
+
+/** An id that can stand as one path segment as it is. */
+const PATH_SEGMENT = /^[A-Za-z0-9_-]{1,120}$/u;
+
+/**
+ * The receiving side's link for a notice. Every link is a plain in-app
+ * path (`isNotificationLinkPath`, the database's own check): a tab or an
+ * item is an alias path that the web app redirects to the page's query
+ * (`apps/web/next.config.ts`), never a query or fragment stored here.
+ * Throws on a link the database would refuse, so it fails in tests.
+ */
+export function counterpartNoticeLinkPath(input: {
+  readonly target: CounterpartNoticeTarget;
+  /** The side that acted; the link is for the other side. */
+  readonly actingSide: "INVESTOR" | "COMPANY";
+  readonly key: string;
+  readonly companyId: string;
+  readonly investorOrganisationId: string;
+}): string {
+  // The receiver's page about the acting side.
+  const relationship =
+    input.actingSide === "INVESTOR"
+      ? `/relationships/investor/${input.investorOrganisationId}`
+      : `/relationships/company/${input.companyId}`;
+  const path = ((): string => {
+    switch (input.target) {
+      case "DOCUMENTS":
+        // -> /documents?tab=requested&item=<id>
+        return PATH_SEGMENT.test(input.key)
+          ? `/documents/requested/${input.key}`
+          : "/documents/requested";
+      case "COMPANY_PROFILE":
+        // -> /company/<id>?tab=dataroom
+        return `/company/${input.companyId}/data-room`;
+      case "CAPITAL":
+        return "/capital";
+      case "INBOX":
+        return input.actingSide === "INVESTOR"
+          ? "/company/interest"
+          : "/investors";
+      case "RELATIONSHIP":
+        return relationship;
+      case "DILIGENCE":
+        return `${relationship}/diligence`;
+      case "CHAT":
+        return `${relationship}/messages`;
+    }
+  })();
+  if (!isNotificationLinkPath(path)) {
+    throw new Error(
+      `counterpart notice link refused by the notification link rule (target ${input.target})`,
+    );
+  }
+  return path;
+}
+
 export function createCounterpartNotices(sql: DatabaseExecutor) {
   return {
     notify: async (input: {
@@ -47,22 +128,27 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
        * its Diligence tab, or Capital. `{actor}` in the title becomes the acting side's
        * own name, read here from the relationship, never from the caller.
        */
-      readonly target:
-        | "INBOX"
-        | "CHAT"
-        | "RELATIONSHIP"
-        | "DILIGENCE"
-        | "CAPITAL"
-        /**
-         * 2026-10-08: the founder's Documents inbox, opened at this
-         * request or question set (`key` is its id).
-         */
-        | "DOCUMENTS"
-        /** 2026-10-08: the investor's view of the company (data room, answers). */
-        | "COMPANY_PROFILE";
+      readonly target: CounterpartNoticeTarget;
       readonly key: string;
       readonly priority: "NEEDS_YOU" | "UPDATE";
     }): Promise<number> => {
+      const [sides] = await sql<
+        { company_id: string; investor_organisation_id: string }[]
+      >`
+        select company_id::text, investor_organisation_id::text
+          from network.relationships
+         where id = ${input.relationshipId}`;
+      if (sides === undefined) return 0;
+      // Built and checked here, before the insert: a link the database's
+      // check would refuse throws (and is logged by the caller) rather than
+      // vanishing with the notice (live audit 2026-11-15 D1).
+      const linkPath = counterpartNoticeLinkPath({
+        target: input.target,
+        actingSide: input.actingSide,
+        key: input.key,
+        companyId: sides.company_id,
+        investorOrganisationId: sides.investor_organisation_id,
+      });
       const zoned = await zonedBodies(input);
       const rows = await sql<{ id: string }[]>`
         insert into communication.notifications
@@ -77,26 +163,7 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
                    where z.zone = up.timezone
                    limit 1),
                  ${input.body === null ? null : input.body.slice(0, 1000)}),
-               case
-                 when ${input.target} = 'DOCUMENTS'
-                   then '/documents?tab=requested&item=' || ${encodeURIComponent(input.key)}
-                 when ${input.target} = 'COMPANY_PROFILE'
-                   then '/company/' || r.company_id::text || '#data-room'
-                 when ${input.target} = 'CAPITAL' then '/capital'
-                 when ${input.target} = 'INBOX' and ${input.actingSide} = 'INVESTOR' then '/company/interest'
-                 when ${input.target} = 'INBOX' then '/investors'
-                 when ${input.target} = 'RELATIONSHIP' and ${input.actingSide} = 'INVESTOR'
-                   then '/relationships/investor/' || r.investor_organisation_id::text
-                 when ${input.target} = 'RELATIONSHIP'
-                   then '/relationships/company/' || r.company_id::text
-                 when ${input.target} = 'DILIGENCE' and ${input.actingSide} = 'INVESTOR'
-                   then '/relationships/investor/' || r.investor_organisation_id::text || '/diligence'
-                 when ${input.target} = 'DILIGENCE'
-                   then '/relationships/company/' || r.company_id::text || '/diligence'
-                 when ${input.actingSide} = 'INVESTOR'
-                   then '/relationships/investor/' || r.investor_organisation_id::text || '/messages'
-                 else '/relationships/company/' || r.company_id::text || '/messages'
-               end,
+               ${linkPath},
                ${`${input.kind.toLowerCase()}:${input.key}`.slice(0, 200)},
                ${input.priority}
           from network.relationships r

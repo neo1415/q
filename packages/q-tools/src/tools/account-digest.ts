@@ -32,6 +32,7 @@ import type {
 import {
   createAttentionReader,
   type AttentionPort,
+  type DataRoomAnswer,
   type AttentionReader,
 } from "./attention.js";
 import type { QWorkIntelligencePort } from "./q-work.js";
@@ -517,14 +518,32 @@ export function createAccountDigestReader(
     if (report !== null && report.unread.length > 0) unread.add("WAITING");
 
     const relationships = digestRelationships(own);
-    const diligence = await section(
-      "REQUESTS",
-      () => openRequests(ports.relationships, actor, own, now),
-      {
-        requests: [] as readonly AccountDigestRequest[],
-        events: [] as readonly AccountDigestEvent[],
-      },
-    );
+    // D2 (live audit 2026-11-15): a data-room share or decline is in the
+    // recent events of both sides, whatever the relationship's stage. Read
+    // beside the diligence requests, not after them.
+    const readAnswers = ports.attention?.dataRoomAnswers;
+    const [diligence, answers] = await Promise.all([
+      section(
+        "REQUESTS",
+        () => openRequests(ports.relationships, actor, own, now),
+        {
+          requests: [] as readonly AccountDigestRequest[],
+          events: [] as readonly AccountDigestEvent[],
+        },
+      ),
+      readAnswers === undefined
+        ? Promise.resolve<readonly DataRoomAnswer[]>([])
+        : section(
+            "REQUESTS",
+            () =>
+              readAnswers(actor, {
+                since: new Date(
+                  now.getTime() - ACCOUNT_DIGEST_RECENT_DAYS * DAY_MS,
+                ),
+              }),
+            [] as readonly DataRoomAnswer[],
+          ),
+    ]);
     const requests = diligence.requests;
     const digest: QAccountDigest = {
       side: own?.side ?? null,
@@ -538,7 +557,12 @@ export function createAccountDigestReader(
       work: [...digestWork(work, errands, now, teamJobs)],
       requests: [...requests],
       gateq,
-      recent: [...recentEvents(own, report, now, diligence.events)],
+      recent: [
+        ...recentEvents(own, report, now, [
+          ...diligence.events,
+          ...dataRoomAnswerEvents(answers, now),
+        ]),
+      ],
       unread: [...unread].sort(),
       readAt: now.toISOString(),
     };
@@ -581,6 +605,39 @@ export function diligenceEvents(
       return [{ at, text: clip(text, 200), relationshipId }];
     },
   );
+}
+
+/**
+ * Data-room answers as recent events, in the reader's own words (D2):
+ * "Ajopot shared X with you", "You declined Savanna's request for X".
+ */
+export function dataRoomAnswerEvents(
+  answers: readonly DataRoomAnswer[],
+  now: Date,
+): readonly AccountDigestEvent[] {
+  const from = now.getTime() - ACCOUNT_DIGEST_RECENT_DAYS * DAY_MS;
+  return answers.flatMap((answer): AccountDigestEvent[] => {
+    const at = iso(answer.at);
+    if (at === null) return [];
+    const when = Date.parse(at);
+    if (when < from || when > now.getTime()) return [];
+    const who = clip(answer.counterpart ?? "", 120) || "The other side";
+    const title =
+      answer.title === null
+        ? "their on-request documents"
+        : clip(answer.title, 100) || "a document";
+    const text =
+      answer.side === "INVESTOR"
+        ? answer.decision === "APPROVED"
+          ? `${who} shared ${title} with you`
+          : `${who} declined your request for ${title}`
+        : answer.decision === "APPROVED"
+          ? `You shared ${answer.title === null ? "your on-request documents" : title} with ${who}`
+          : `You declined ${who}'s request for ${answer.title === null ? "your on-request documents" : title}`;
+    return [
+      { at, text: clip(text, 200), relationshipId: answer.relationshipId },
+    ];
+  });
 }
 
 /** Diligence requests open in their relationships, either way. */

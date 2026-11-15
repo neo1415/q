@@ -222,8 +222,8 @@ function answerInterest(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
                 : `Decline ${who}'s interest`,
             preview:
               who === null
-                ? "They are told you're not taking it forward. No reason is shared."
-                : `${who} is told you're not taking it forward. No reason is shared.`,
+                ? "No notice is sent; they see it as declined. No reason is shared."
+                : `${who} isn't sent a notice; they see it as declined. No reason is shared.`,
           };
     },
     proposed: (_input, summary) => readyToSendLine(summary, null),
@@ -379,8 +379,8 @@ function answerConnection(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
                 : `Decline ${who}'s connection request`,
             preview:
               who === null
-                ? "The founders are told you're not taking it forward. No reason is shared."
-                : `${who} is told you're not taking it forward. No reason is shared.`,
+                ? "No notice is sent; the founders see it as declined. No reason is shared."
+                : `${who} isn't sent a notice; they see it as declined. No reason is shared.`,
           };
     },
     proposed: (_input, summary) => readyToSendLine(summary, null),

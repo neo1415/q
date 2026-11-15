@@ -174,6 +174,7 @@ const EVENT_WORDS: Readonly<Record<string, string>> = {
   document_shared: "Document shared",
   data_room_access_requested: "Data-room access requested",
   data_room_access_granted: "Data-room access granted",
+  data_room_access_declined: "Data-room request declined",
   commitment_stated: "Commitment stated",
   commitment_confirmed: "Commitment confirmed by the other side",
   commitment_withdrawn: "Commitment withdrawn",
