@@ -27,7 +27,8 @@ import { randomUUID } from "node:crypto";
 const PER_TEST_USD = 1;
 // Owner-granted extra allowance for one UTC day (e.g. 15 Nov: "take another 5").
 const DAY_EXTRA_USD = { "2026-11-15": 5 };
-const PER_DAY_USD = \1 + (DAY_EXTRA_USD[new Date().toISOString().slice(0, 10)] ?? 0);
+const PER_DAY_USD =
+  5 + (DAY_EXTRA_USD[new Date().toISOString().slice(0, 10)] ?? 0);
 const FILE = process.env.CQ_TEST_LEDGER ?? `${homedir()}/.cq-test-ledger.jsonl`;
 const LOCK = `${FILE}.lock`;
 const today = new Date().toISOString().slice(0, 10);
