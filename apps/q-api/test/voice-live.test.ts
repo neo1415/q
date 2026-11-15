@@ -627,7 +627,7 @@ describe("GPT-Live line", () => {
     // The run is still held: this came back before it ended.
     expect(early?.partial).toBe(true);
     expect(early?.failed).toBe(false);
-    expect(early?.commentary).toContain("Runway is 14 months.");
+    expect(early?.commentary).toContain("Runway is fourteen months.");
     expect(early?.commentary).not.toContain("Burn has been flat");
     finish();
     const rest = await broker.delegate({
@@ -638,7 +638,7 @@ describe("GPT-Live line", () => {
     expect(rest?.partial).toBeUndefined();
     expect(rest?.commentary).toContain("Burn has been flat since March.");
     // What was already said is not handed over twice.
-    expect(rest?.commentary).not.toContain("Runway is 14 months.");
+    expect(rest?.commentary).not.toContain("Runway is fourteen months.");
     expect(runs).toHaveLength(1);
   });
 
@@ -653,8 +653,12 @@ describe("GPT-Live line", () => {
     await open(broker);
     const whole = await ask(broker, "dlg_1", "How is the runway?");
     expect(whole?.partial).toBeUndefined();
-    expect(whole?.commentary).toContain("Runway is 14 months.");
+    expect(whole?.commentary).toContain("Runway is fourteen months.");
     expect(whole?.commentary).toContain("Burn has been flat since March.");
+    // RC5: the exact words handed to the voice ride beside the commentary.
+    expect(whole?.said).toBe(
+      "Runway is fourteen months. Burn has been flat since March.",
+    );
   });
 
   it("says nothing more after a one-sentence answer was handed over early", async () => {
@@ -665,7 +669,7 @@ describe("GPT-Live line", () => {
       voiceSessionId: SESSION,
       delegation: { delegationId: "dlg_1", request: "Runway?", early: true },
     });
-    expect(early?.commentary).toContain("Runway is 14 months.");
+    expect(early?.commentary).toContain("Runway is fourteen months.");
     const rest = await ask(broker, "dlg_1", "Runway?");
     expect(rest?.commentary).toBeNull();
     expect(rest?.failed).toBe(false);

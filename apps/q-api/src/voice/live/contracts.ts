@@ -106,6 +106,19 @@ export const LiveDelegationRequestSchema = z
      * asks again (same id) for the rest. Absent: one answer, at the end.
      */
     early: z.boolean().optional(),
+    /**
+     * Audit 15 Nov (RC1, founder P1): the voice's playback of Q's last
+     * line stopped before its end (what it said fell short of the words
+     * handed to it). A card waiting on that line is read back before a
+     * spoken yes can approve it.
+     */
+    lastLineCut: z.boolean().optional(),
+    /**
+     * Audit 15 Nov (RC1, founder F7-03/F7-05): this request is the whole
+     * of an utterance a pause split; the earlier delegation on its first
+     * part is stopped and never answered.
+     */
+    replaces: DelegationIdSchema.optional(),
   })
   .strict();
 export type LiveDelegationRequest = z.infer<typeof LiveDelegationRequestSchema>;
@@ -131,6 +144,14 @@ export const LiveDelegationResultSchema = z
     delegationId: z.string(),
     /** Verified content for the voice to say in its own words; null: nothing to say. */
     commentary: z.string().nullable(),
+    /**
+     * RC5: Q's exact words inside `commentary`, as handed to the voice
+     * (figures already in words). The client replays them verbatim for
+     * "say that again" and compares what the voice said against them.
+     */
+    said: z.string().max(6_000).nullable().optional(),
+    /** The Q run these words come from (RC5). */
+    runId: z.string().uuid().optional(),
     /** A newer delegation replaced this one: keep quietly, do not speak. */
     stale: z.boolean(),
     approvalPending: z.boolean(),
@@ -200,6 +221,19 @@ export const LiveTranscriptReportSchema = z
              * conversation (only Q's runs write there).
              */
             delegated: z.boolean().optional(),
+            /**
+             * RC5 telemetry (audit 15 Nov), a Q line: the run it belongs
+             * to, the exact words handed to the voice, when its audio
+             * started and ended on the player, and whether what the voice
+             * said differed from the words it was handed.
+             */
+            runId: z.string().uuid().optional(),
+            handed: z.string().min(1).max(4_000).optional(),
+            audioStartAt: z.number().int().min(0).optional(),
+            audioEndAt: z.number().int().min(0).optional(),
+            diverged: z.boolean().optional(),
+            /** A USER line: when their speech ended (epoch ms). */
+            speechEndAt: z.number().int().min(0).optional(),
           })
           .strict(),
       )

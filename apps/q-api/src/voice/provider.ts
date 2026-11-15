@@ -60,6 +60,11 @@ export type VoiceSpeaker = {
    * alongside is the fact-built line, kept as what was said.
    */
   readonly facts?: ((facts: SpokenFacts) => void) | undefined;
+  /**
+   * Told the Q run a turn started, once (audit 15 Nov RC5: a voice line
+   * names the run it belongs to). Absent: nobody asks.
+   */
+  readonly run?: ((runId: string) => void) | undefined;
 };
 
 export type VoiceChannelHandlers = {

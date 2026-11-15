@@ -1,6 +1,13 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import { spokenFigures, speakable } from "../src/voice/speech.js";
+import { liveSpoken, qSpokenWords } from "../src/voice/live/broker.js";
+import {
+  spokenFigures,
+  spokenNumbers,
+  speakable,
+} from "../src/voice/speech.js";
 
 /**
  * Money and big numbers, said the way a person says them. "200 000 000
@@ -76,5 +83,85 @@ describe("figures, spoken", () => {
     expect(spokenFigures("USD 5m to 10 founders")).toBe(
       "5 million dollars to 10 founders",
     );
+  });
+});
+
+/**
+ * Audit 15 Nov 2026 (RC1, investor v-47e5ab44-039, run 2f1153d1): a
+ * mandate about to be approved, "€50,000–€100 million", was heard as "50
+ * billion to 100 million euros". The live voice is handed every figure in
+ * words, by code.
+ */
+describe("figures handed to the live voice", () => {
+  it("never gives a grouped lower bound the upper bound's scale", () => {
+    expect(spokenFigures("€50,000–€100 million")).toBe(
+      "50 thousand to 100 million euros",
+    );
+    // A bare lower bound still takes it, as a person means it.
+    expect(spokenFigures("USD 2–3m")).toBe("2 million to 3 million dollars");
+    // And never one that would then exceed the upper bound.
+    expect(spokenFigures("€500–€2 million")).toBe("500 to 2 million euros");
+  });
+
+  it("says the live case in words, never 'billion'", () => {
+    const said = liveSpoken(
+      "Your cheque range is €50,000–€100 million, typical €3 million.",
+    );
+    expect(said).toBe(
+      "Your cheque range is fifty thousand to one hundred million euros, typical three million euros.",
+    );
+    expect(said).not.toMatch(/billion|\d/u);
+    expect(
+      qSpokenWords({
+        facts: null,
+        said: "Pre-seed, €50,000–€100 million.",
+        approvalPending: false,
+      }),
+    ).toBe("Pre-seed, fifty thousand to one hundred million euros.");
+  });
+
+  it("formats money, years, dates, times and percentages deterministically", () => {
+    expect(spokenNumbers("€50,000")).toBe("fifty thousand euros");
+    expect(spokenNumbers("$1.5m")).toBe("one point five million dollars");
+    expect(spokenNumbers("founded in 2019, raising in 2026")).toBe(
+      "founded in twenty nineteen, raising in twenty twenty-six",
+    );
+    expect(spokenNumbers("since 2005")).toBe("since two thousand and five");
+    expect(spokenNumbers("Monday 16 November at 10:00")).toBe(
+      "Monday sixteenth November at ten o'clock",
+    );
+    expect(spokenNumbers("on November 3 at 9:30")).toBe(
+      "on November third at nine thirty",
+    );
+    expect(spokenNumbers("gross margin of 42.5%")).toBe(
+      "gross margin of forty-two point five percent",
+    );
+    expect(spokenNumbers("serves 60,000 merchants in 12 markets")).toBe(
+      "serves sixty thousand merchants in twelve markets",
+    );
+    expect(spokenNumbers("a 2,500 person team")).toBe(
+      "a two thousand five hundred person team",
+    );
+  });
+});
+
+describe("replay: the investor's mandate line (investor-turns.jsonl v-47e5ab44-039)", () => {
+  it("hands the voice Q's figures in words, never the 'billion' it said", () => {
+    const record = readFileSync(
+      new URL(
+        "../../../docs/ai-handoff/audits/2026-11-15-q-voice-audit/investor-turns.jsonl",
+        import.meta.url,
+      ),
+      "utf8",
+    )
+      .split("\n")
+      .filter((line) => line.includes('"turn_id":"v-47e5ab44-039"'))
+      .map((line) => JSON.parse(line) as { q_text: string; spoken: string })[0];
+    expect(record?.spoken).toContain("50 billion");
+    const said = liveSpoken(record?.q_text ?? "");
+    expect(said).toContain(
+      "with fifty thousand to one hundred million euros cheques and a three million euros typical cheque",
+    );
+    expect(said).not.toMatch(/billion/u);
   });
 });

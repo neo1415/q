@@ -2006,6 +2006,31 @@ const SEARCHED_EMPTY_MAX = 1_000;
 
 /** How long the answer waits for the turn's web search, from its start. */
 const WEB_LANE_BUDGET_MS = 9_000;
+/**
+ * Audit 15 Nov 2026 (RC1): "I'm checking what's public on X now" was said
+ * before 23 of 23 searches that every provider refused (Serper 402, the
+ * rest resting), often 30-60 s after it stopped being true. A resting or
+ * refused provider answers at once, so the line is said only while the
+ * search is still out this long after it started: a provider is really
+ * being asked. It is a holding line, never part of the answer.
+ */
+export const RESEARCH_LEAD_AFTER_MS = 700;
+
+/**
+ * Runs `say` once the search has been out RESEARCH_LEAD_AFTER_MS, unless
+ * it settled first (answered, failed, or no provider could take it).
+ */
+function whileSearching(search: Promise<unknown>, say: () => void): void {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (!settled) say();
+  }, RESEARCH_LEAD_AFTER_MS);
+  const done = () => {
+    settled = true;
+    clearTimeout(timer);
+  };
+  search.then(done, done);
+}
 
 /** What the model is told when the web search did not land in its budget. */
 const WEB_LANE_DROPPED_NOTE: ModelMessage = {
@@ -7638,18 +7663,23 @@ export function createModelGatewayQAnswer(
                 request.leadLines === undefined &&
                 readCache.get(call, toolContext) === null
               ) {
-                firstPublishedMs = Date.now() - startedAt;
+                // Claimed now, said only while a provider is really asked.
                 researchingSaid = true;
-                const delta = {
-                  runId: request.runId,
-                  tenantId: request.tenantId,
-                  messageId,
-                  text: `${researchLead(
-                    typeof entity === "string" ? entity.slice(0, 60) : null,
-                  )} `,
-                };
-                if (gate === null) deltas?.publish(delta);
-                else gate.emit(() => deltas?.publish(delta));
+                whileSearching(outcome, () => {
+                  if (firstPublishedMs !== null) return;
+                  firstPublishedMs = Date.now() - startedAt;
+                  const delta = {
+                    runId: request.runId,
+                    tenantId: request.tenantId,
+                    messageId,
+                    text: `${researchLead(
+                      typeof entity === "string" ? entity.slice(0, 60) : null,
+                    )} `,
+                    holding: true as const,
+                  };
+                  if (gate === null) deltas?.publish(delta);
+                  else gate.emit(() => deltas?.publish(delta));
+                });
               }
               logger?.info(
                 {
@@ -8599,7 +8629,10 @@ export function createModelGatewayQAnswer(
        * being made. Streamed only: the stored answer opens with what was
        * found, not with a line that is past by then.
        */
-      const sayResearching = (args: unknown): void => {
+      const sayResearching = (
+        args: unknown,
+        search: Promise<unknown>,
+      ): void => {
         if (firstPublishedMs !== null || leadLines !== undefined) return;
         const entity = (args as { readonly entityName?: unknown } | null)
           ?.entityName;
@@ -8607,8 +8640,17 @@ export function createModelGatewayQAnswer(
           typeof entity === "string" && entity.trim().length > 1
             ? entity.trim().slice(0, 60)
             : (namedOther?.name ?? null);
-        firstPublishedMs = Date.now() - startedAt;
-        sendSaid(`${researchLead(named)} `);
+        whileSearching(search, () => {
+          if (firstPublishedMs !== null || leadLines !== undefined) return;
+          firstPublishedMs = Date.now() - startedAt;
+          send({
+            runId: request.runId,
+            tenantId: request.tenantId,
+            messageId,
+            text: `${researchLead(named)} `,
+            holding: true,
+          });
+        });
       };
       // The early web search is said as it runs; where code has its own
       // opening line from their records, that line is said now instead,
@@ -8628,7 +8670,7 @@ export function createModelGatewayQAnswer(
           leadListOpen = true;
           sayLeadLines();
         } else if (said === "RESEARCHING") {
-          sayResearching(earlyWeb.call.arguments);
+          sayResearching(earlyWeb.call.arguments, earlyWeb.outcome);
         }
         logger?.info(
           {
@@ -11014,13 +11056,10 @@ export function createModelGatewayQAnswer(
           // Enough pages to answer from, not only to compare.
           const call = researchCallOf(prospectsThin ? 5 : 4);
           took("beforeResearch");
-          if (readCache.get(call, toolContext) === null) {
-            sayResearching(call.arguments);
-          }
-          const [outcome] = await Promise.all([
-            callTool(call, toolContext),
-            stageWrite,
-          ]);
+          const fresh = readCache.get(call, toolContext) === null;
+          const searching = callTool(call, toolContext);
+          if (fresh) sayResearching(call.arguments, searching);
+          const [outcome] = await Promise.all([searching, stageWrite]);
           took("research");
           landResearch(call, outcome);
         };
@@ -11165,12 +11204,9 @@ export function createModelGatewayQAnswer(
             }
             // Said only when the web is really asked (not answered from
             // what this person already read).
-            if (
+            const researching =
               call.name === PUBLIC_WEB_TOOL &&
-              readCache.get(call, toolContext) === null
-            ) {
-              sayResearching(call.arguments);
-            }
+              readCache.get(call, toolContext) === null;
             const companyId = (
               call.arguments as { readonly companyId?: unknown } | null
             )?.companyId;
@@ -11179,16 +11215,19 @@ export function createModelGatewayQAnswer(
               typeof companyId === "string"
                 ? chainedReads.get(chainedKey(call.name, companyId))
                 : undefined;
-            return kept !== undefined
-              ? kept.then((outcome) => ({ ...outcome, callId: call.callId }))
-              : callTool(
-                  {
-                    callId: call.callId,
-                    name: call.name,
-                    arguments: call.arguments,
-                  },
-                  toolContext,
-                );
+            const called =
+              kept !== undefined
+                ? kept.then((outcome) => ({ ...outcome, callId: call.callId }))
+                : callTool(
+                    {
+                      callId: call.callId,
+                      name: call.name,
+                      arguments: call.arguments,
+                    },
+                    toolContext,
+                  );
+            if (researching) sayResearching(call.arguments, called);
+            return called;
           };
           // One more round, once, when every call of a round was refused
           // or failed: the model picked the wrong tool and has no way to

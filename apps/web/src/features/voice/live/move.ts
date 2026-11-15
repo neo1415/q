@@ -139,6 +139,24 @@ export async function noteForMove(
 }
 
 /**
+ * The receipt of a run's move, for code to edit Q's words by (audit 15 Nov
+ * RC1): null when there is no route move to follow.
+ */
+export async function receiptForMove(
+  move: LiveMove | undefined,
+  follow: (path: string) => Promise<MoveOutcome> = (path) =>
+    followMoveNow({ path }),
+): Promise<MoveOutcome | null> {
+  if (move === undefined) return null;
+  const path = movePath(move);
+  if (path === null) {
+    readTurnNow();
+    return null;
+  }
+  return follow(path);
+}
+
+/**
  * R3 (hosted 2026-10-09, run ae1144d7: Q Brain's line "Up now: Tensorgate."
  * reached the voice 4.7 s before the company page's own reads finished).
  * Q Brain's spoken line is written before the browser has moved, so it
@@ -157,7 +175,9 @@ export function moveNote(outcome: MoveOutcome): string {
     case "FAILED":
       return `The page did NOT open on their screen. Say briefly that it didn't open and offer to try again; never say it is open. ${ARRIVAL_WORDING}`;
     case "PENDING":
-      return `The page is still loading on their screen: do not say it is open; say it is coming up. ${ARRIVAL_WORDING}`;
+      // Audit 15 Nov (RC1): never "coming up" unless a page actually
+      // opened; a page still loading is not mentioned at all.
+      return `The page is still loading on their screen: do not say it is open, coming up or loading, and say nothing about it. ${ARRIVAL_WORDING}`;
   }
 }
 

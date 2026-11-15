@@ -1229,9 +1229,12 @@ describe("turn timing harness", () => {
     const unknown = row("public web search, company not");
     expect(unknown.firstText).toBe("Looking into that now. ");
     expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(500);
+    // Audit 15 Nov RC1: the research line is a holding line too (said
+    // only while a provider is really asked); a voice keeps one of them.
     expect(unknown.holding.map((line) => line.text)).toEqual([
       "Looking into that now. ",
       "Looking into Acme Robotics now. ",
+      "I'm checking what's public on Acme Robotics now. ",
     ]);
     // Said as the skim returns, not after the full reading: measured from
     // the skim's own return, so a loaded machine's slower start of the

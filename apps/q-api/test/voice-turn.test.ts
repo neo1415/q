@@ -37,6 +37,7 @@ import {
   createVoiceTurnHandler,
   endsVoice,
   latestUtterance,
+  markApprovalUnheard,
   spokenAcknowledgement,
 } from "../src/voice/turn.js";
 
@@ -2028,7 +2029,7 @@ describe("a spoken question for Q", () => {
 });
 
 describe("a spoken approval in plain words (owner 2026-10-16)", () => {
-  const setup = (actionType: string) => {
+  const setup = (actionType: string, preview?: string) => {
     const runtime = fakeRuntime();
     const approvals = { approve: [] as unknown[], reject: [] as unknown[] };
     let reads = 0;
@@ -2041,6 +2042,7 @@ describe("a spoken approval in plain words (owner 2026-10-16)", () => {
             summary: "Send the follow-up to Harbourline",
             actionType,
             actionClass: "CONFIRM_REQUIRED",
+            ...(preview === undefined ? {} : { preview }),
           },
         }),
         event("q.approval.required", {
@@ -2139,6 +2141,46 @@ describe("a spoken approval in plain words (owner 2026-10-16)", () => {
     await s.say("no, don't send it");
     expect(s.approvals.reject).toHaveLength(1);
     expect(s.approvals.reject[0]).toMatchObject({ via: { channel: "VOICE" } });
+  });
+
+  /**
+   * Audit 15 Nov 2026, founder P1 (F7-11/F7-12): the voice was cut at "on
+   * the card for your ap…", the person said "Yes", and a message that
+   * committed them to a 16 Nov 10:00 call they never heard was sent.
+   */
+  describe("a spoken yes to content never read aloud (audit 15 Nov P1)", () => {
+    const BODY =
+      "Hello — thank you for following up. Monday 16 November at 10:00 a.m. Africa/Lagos works for me.";
+
+    it("reads the message back first, and only the next yes approves it", async () => {
+      const s = setup("app.chat.message.send", BODY);
+      await prepare(s);
+      const first = await s.say("Yes");
+      expect(s.approvals.approve).toEqual([]);
+      expect(first).toContain("16 November");
+      expect(first).toMatch(/Shall I go ahead\?/u);
+      await s.say("Yes");
+      expect(s.approvals.approve).toHaveLength(1);
+    });
+
+    it("a read-back whose playback was cut is read again before any yes counts", async () => {
+      const s = setup("app.chat.message.send", BODY);
+      await prepare(s);
+      await s.say("Yes");
+      markApprovalUnheard(s.bound);
+      const again = await s.say("Yes");
+      expect(s.approvals.approve).toEqual([]);
+      expect(again).toContain("16 November");
+      await s.say("Yes");
+      expect(s.approvals.approve).toHaveLength(1);
+    });
+
+    it("a card with no content to hear approves on the first yes, as before", async () => {
+      const s = setup("app.chat.message.send");
+      await prepare(s);
+      await s.say("Yes");
+      expect(s.approvals.approve).toHaveLength(1);
+    });
   });
 
   it("money keeps its card: words approve nothing and Q says to tap Approve", async () => {

@@ -46,7 +46,10 @@ import {
 } from "@capital-q/q-runtime";
 
 import type { ApprovedContinuation } from "../composition/approved-continuation.js";
-import { keepsItsCard } from "../composition/conversation-approvals.js";
+import {
+  keepsItsCard,
+  OUTWARD_ACTION_TYPES,
+} from "../composition/conversation-approvals.js";
 import type { VoiceSessionBinding } from "./bindings.js";
 import { writeSession } from "./session-writes.js";
 import {
@@ -316,8 +319,62 @@ const pendingApproval = new WeakMap<
     /** The proposal's kind and class: some keep their card's Approve. */
     readonly actionType?: string | undefined;
     readonly actionClass?: string | undefined;
+    /** The exact content the approval binds to (the card's preview). */
+    readonly preview?: string | null | undefined;
+    /**
+     * Whether the person has heard what a yes would send (audit 15 Nov
+     * RC1, founder P1 F7-12): false while an outward action's content was
+     * never said aloud in full. A spoken yes then reads it back first.
+     */
+    readonly readAloud?: boolean | undefined;
   }
 >();
+
+/**
+ * Whether a spoken yes needs the content read aloud first: something the
+ * other side receives (a message, an email, an invite) whose exact words
+ * are on the card. Audit 15 Nov (founder F7-12): the voice was cut at "on
+ * the card for your ap…", the person said "Yes", and a message committing
+ * them to a 16 Nov call they never heard was sent.
+ */
+export function needsReadBack(
+  actionType: string | undefined,
+  preview: string | null | undefined,
+): boolean {
+  if (preview === null || preview === undefined || preview.trim() === "")
+    return false;
+  const type = actionType ?? "";
+  return (
+    OUTWARD_ACTION_TYPES.has(type) || OUTWARD_ACTION_TYPES.has(`app.${type}`)
+  );
+}
+
+/** The most of a card's content said aloud; longer content is on screen. */
+const READ_BACK_MAX_CHARS = 600;
+
+/** What Q says before a spoken yes can send something outward. */
+export function readBackLine(summary: string, preview: string): string {
+  const content = preview.replace(/\s+/gu, " ").trim();
+  if (content.length <= READ_BACK_MAX_CHARS) {
+    return `Before I go ahead, here is exactly what it says. ${named(summary)}: "${content}" ${APPROVAL_QUESTION}`;
+  }
+  const cut = content.slice(0, READ_BACK_MAX_CHARS);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("? "));
+  const start = end > 0 ? cut.slice(0, end + 1) : cut;
+  return `Before I go ahead, here is how it reads. ${named(summary)}: "${start}" The whole text is on your screen. ${APPROVAL_QUESTION}`;
+}
+
+/**
+ * The line that carried a waiting card's question was not heard in full
+ * (the live line saw its playback cut): a spoken yes reads the content
+ * back before anything is approved.
+ */
+export function markApprovalUnheard(binding: VoiceSessionBinding): void {
+  const waiting = pendingApproval.get(binding);
+  if (waiting === undefined) return;
+  if (!needsReadBack(waiting.actionType, waiting.preview)) return;
+  pendingApproval.set(binding, { ...waiting, readAloud: false });
+}
 
 /** What Q says when a chat is ended aloud; the screen stays on the typed thread. */
 const END_LINE =
@@ -1227,6 +1284,7 @@ export function createVoiceTurnHandler(
       ...(utterance === undefined ? {} : { utteranceRef: utterance }),
     });
     const runId = result.run.id;
+    speaker.run?.(runId);
     thread.conversationId = result.run.conversationId ?? undefined;
     // Said once, at the head of the conversation it started.
     thread.opening = undefined;
@@ -1290,6 +1348,7 @@ export function createVoiceTurnHandler(
     let streamedRaw = "";
     let laughed = false;
     let proposedSummary: string | null = null;
+    let proposedPreview: string | null = null;
     let proposedKind: { actionType: string; actionClass: string } | null = null;
     /** The run's stage as it arrives, for the silence ladder (ADR 0062). */
     const silence: SilenceLive = { stage: null, approvalWaiting: false };
@@ -1376,6 +1435,12 @@ export function createVoiceTurnHandler(
             // now.") is the turn's one holding line, or nothing when the
             // ladder already said one.
             if (event.data.holding === true) {
+              // Audit 15 Nov RC1: a line heard only once the whole run is
+              // in (GPT-Live, duplex) chooses its own one holding line by
+              // code while the run works; this one would be heard after
+              // the fact ("Looking into Zino Aviation now." before the
+              // answer) and stack on top of that line.
+              if (speaker.deferred === true) break;
               if (holding.said) break;
               holding.said = true;
               // F-59: a holding line is not the answer. Counted as streamed,
@@ -1550,6 +1615,7 @@ export function createVoiceTurnHandler(
             silence.approvalWaiting = true;
             // What Q would do, in the words the approver reads on screen.
             proposedSummary = event.data.proposal.summary;
+            proposedPreview = event.data.proposal.preview ?? null;
             proposedKind = {
               actionType: event.data.proposal.actionType,
               actionClass: event.data.proposal.actionClass,
@@ -1562,6 +1628,12 @@ export function createVoiceTurnHandler(
               approvalId: event.data.approvalId,
               summary: proposedSummary,
               ...(proposedKind === null ? {} : proposedKind),
+              preview: proposedPreview,
+              // The question names the action, not its content.
+              readAloud: !needsReadBack(
+                proposedKind?.actionType,
+                proposedPreview,
+              ),
             });
             yield proposedSummary === null
               ? `I've prepared something that needs your approval. ${APPROVAL_QUESTION}`
@@ -2397,6 +2469,28 @@ export function createVoiceTurnHandler(
             ? { kind: "SPOKEN", path: "MOVE" }
             : { kind: "INTERRUPTED", path: "MOVE" };
         }
+      }
+      // A yes to content they never heard: Q reads it back first, and the
+      // card keeps waiting for a yes to what was read (audit 15 Nov P1).
+      if (
+        decision === "APPROVE" &&
+        approvalWaiting.readAloud === false &&
+        typeof approvalWaiting.preview === "string"
+      ) {
+        const heard = await speakLine(
+          speaker,
+          readBackLine(summary, approvalWaiting.preview),
+          signal,
+          binding,
+        );
+        pendingApproval.set(binding, { ...approvalWaiting, readAloud: heard });
+        logger.info(
+          { qVoiceSessionId: binding.voiceSessionId, heard },
+          "a spoken yes to unheard content: read back before approving",
+        );
+        return heard
+          ? { kind: "SPOKEN", path: "MOVE" }
+          : { kind: "INTERRUPTED", path: "MOVE" };
       }
       if (decision === "APPROVE" || decision === "REJECT") {
         pendingApproval.delete(binding);

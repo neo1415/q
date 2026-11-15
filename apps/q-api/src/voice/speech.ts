@@ -207,9 +207,18 @@ function rangeWords(
   highScale: string | undefined,
   code: string,
 ): string {
+  // A bare lower bound takes the upper bound's scale ("USD 2–3m") only
+  // when it has no scale of its own, no digit grouping and would not then
+  // exceed the upper bound. Audit 15 Nov (investor v-47e5ab44-039):
+  // "€50,000–€100 million" was said as "50 billion to 100 million euros".
+  const lowDigits = Number(low.replace(/[ ,\u00a0\u202f]/g, ""));
+  const highDigits = Number(high.replace(/[ ,\u00a0\u202f]/g, ""));
+  const inherits =
+    lowScale === undefined &&
+    !/[ ,\u00a0\u202f]/u.test(low) &&
+    lowDigits * multiplierOf(highScale) <= highDigits * multiplierOf(highScale);
   const lowValue =
-    Number(low.replace(/[ ,\u00a0\u202f]/g, "")) *
-    multiplierOf(lowScale ?? highScale);
+    lowDigits * multiplierOf(lowScale ?? (inherits ? highScale : undefined));
   const highValue =
     Number(high.replace(/[ ,\u00a0\u202f]/g, "")) * multiplierOf(highScale);
   if (!Number.isFinite(lowValue) || !Number.isFinite(highValue)) {
@@ -415,4 +424,186 @@ export async function* bySentence(
   if (signal?.aborted !== true && buffer.trim().length > 0) {
     yield buffer.trim();
   }
+}
+
+const ONES = [
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+] as const;
+const TENS_WORDS = [
+  "",
+  "",
+  "twenty",
+  "thirty",
+  "forty",
+  "fifty",
+  "sixty",
+  "seventy",
+  "eighty",
+  "ninety",
+] as const;
+const SCALE_WORDS: readonly (readonly [number, string])[] = [
+  [1e12, "trillion"],
+  [1e9, "billion"],
+  [1e6, "million"],
+  [1e3, "thousand"],
+];
+
+const one = (n: number): string => ONES[n] ?? String(n);
+
+function underHundred(n: number): string {
+  if (n < 20) return one(n);
+  const tens = TENS_WORDS[Math.floor(n / 10)] ?? "";
+  const rest = n % 10;
+  return rest === 0 ? tens : `${tens}-${one(rest)}`;
+}
+
+function underThousand(n: number): string {
+  const hundreds = Math.floor(n / 100);
+  const rest = n % 100;
+  if (hundreds === 0) return underHundred(rest);
+  const head = `${one(hundreds)} hundred`;
+  return rest === 0 ? head : `${head} and ${underHundred(rest)}`;
+}
+
+/** A whole number below a quadrillion, in words: 1500 → "one thousand five hundred". */
+export function cardinalWords(n: number): string {
+  if (!Number.isInteger(n) || n < 0 || n >= 1e15) return String(n);
+  if (n === 0) return "zero";
+  const parts: string[] = [];
+  let rest = n;
+  for (const [size, word] of SCALE_WORDS) {
+    if (rest >= size) {
+      parts.push(`${underThousand(Math.floor(rest / size))} ${word}`);
+      rest %= size;
+    }
+  }
+  if (rest > 0) parts.push(underThousand(rest));
+  return parts.join(" ");
+}
+
+/** "1.5" → "one point five"; "0.25" → "zero point two five". */
+function decimalWords(digits: string): string {
+  const [whole = "0", fraction = ""] = digits.split(".");
+  const head = cardinalWords(Number(whole));
+  if (fraction.length === 0) return head;
+  return `${head} point ${[...fraction].map((d) => one(Number(d))).join(" ")}`;
+}
+
+/** A year as people say it: 2026 → "twenty twenty-six", 2005 → "two thousand and five". */
+export function yearWords(year: number): string {
+  if (year >= 2000 && year < 2010) {
+    return year === 2000
+      ? "two thousand"
+      : `two thousand and ${one(year - 2000)}`;
+  }
+  const head = Math.floor(year / 100);
+  const tail = year % 100;
+  if (tail === 0) return `${underHundred(head)} hundred`;
+  return `${underHundred(head)} ${tail < 10 ? `oh ${one(tail)}` : underHundred(tail)}`;
+}
+
+const ORDINAL_ENDINGS: Readonly<Record<string, string>> = {
+  one: "first",
+  two: "second",
+  three: "third",
+  five: "fifth",
+  eight: "eighth",
+  nine: "ninth",
+  twelve: "twelfth",
+};
+
+function ordinalWords(n: number): string {
+  const words = cardinalWords(n);
+  const last = /([a-z]+)$/u.exec(words)?.[1];
+  if (last === undefined) return words;
+  const ordinal =
+    ORDINAL_ENDINGS[last] ??
+    (last.endsWith("y") ? `${last.slice(0, -1)}ieth` : `${last}th`);
+  return `${words.slice(0, words.length - last.length)}${ordinal}`;
+}
+
+const MONTHS =
+  "January|February|March|April|May|June|July|August|September|October|November|December";
+const DAY_BEFORE_MONTH = new RegExp(
+  String.raw`\b([1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\s+(${MONTHS})\b`,
+  "gu",
+);
+const MONTH_BEFORE_DAY = new RegExp(
+  String.raw`\b(${MONTHS})\s+([1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\b(?![.,]?\d)`,
+  "gu",
+);
+
+/**
+ * Every figure as words, for a voice that reads digits itself (the GPT-Live
+ * line; audit 15 Nov RC1: "€50,000–€100 million" was heard as "50 billion
+ * to 100 million euros"). Deterministic, after `spokenFigures`: money is
+ * already "50 thousand euros" and is said "fifty thousand euros"; a year
+ * is said as a year, a day of the month as an ordinal, a clock time as a
+ * time. Only for speech: the written answer keeps its figures.
+ */
+export function spokenNumbers(text: string): string {
+  return (
+    spokenFigures(text)
+      // Clock times: "10:00" → "ten o'clock", "10:30" → "ten thirty".
+      .replace(
+        /\b([01]?\d|2[0-3]):([0-5]\d)\b/gu,
+        (_all, h: string, m: string) => {
+          const minutes = Number(m);
+          const hour = cardinalWords(Number(h));
+          return minutes === 0
+            ? `${hour} o'clock`
+            : `${hour} ${minutes < 10 ? `oh ${one(minutes)}` : underHundred(minutes)}`;
+        },
+      )
+      .replace(
+        DAY_BEFORE_MONTH,
+        (_all, day: string, month: string) =>
+          `${ordinalWords(Number(day))} ${month}`,
+      )
+      .replace(
+        MONTH_BEFORE_DAY,
+        (_all, month: string, day: string) =>
+          `${month} ${ordinalWords(Number(day))}`,
+      )
+      // Years, where nothing makes them an amount.
+      .replace(
+        /(?<![\d.,])\b(19\d\d|20\d\d)\b(?![.,]?\d|\s*(?:%|thousand|million|billion|trillion|percent))/gu,
+        (_all, year: string) => yearWords(Number(year)),
+      )
+      // "2.5 thousand" (a grouped 2,500 compacted) is said whole.
+      .replace(
+        /(?<![\w.])(\d+)\.(\d+) thousand\b/gu,
+        (_all, whole: string, fraction: string) =>
+          cardinalWords(Math.round(Number(`${whole}.${fraction}`) * 1_000)),
+      )
+      .replace(
+        /(\d+(?:\.\d+)?)\s*%/gu,
+        (_all, n: string) => `${decimalWords(n)} percent`,
+      )
+      // Any other figure: "1.5" → "one point five", "12" → "twelve".
+      .replace(
+        /(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(?!\w)/gu,
+        (_all, whole: string, fraction: string | undefined) =>
+          decimalWords(`${whole.replace(/,/gu, "")}${fraction ?? ""}`),
+      )
+  );
 }

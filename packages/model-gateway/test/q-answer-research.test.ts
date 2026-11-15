@@ -34,6 +34,7 @@ import {
   ENVIRONMENT_NOTES_MAX_CHARS,
   environmentNotesFor,
   PROSPECT_RESEARCH_NOTE,
+  RESEARCH_LEAD_AFTER_MS,
   RESEARCH_NOTE,
   type QUserStatementRecorder,
 } from "../src/q/index.js";
@@ -3422,8 +3423,10 @@ describe("a person found only as a candidate is pictured through their organisat
   });
 });
 
-describe("the first words go out as the web search starts (owner 2026-10-23)", () => {
-  it("says what Q is checking before the records, the prompt or the model", async () => {
+describe("the research line is said only while a provider is really asked (owner 2026-10-23; audit 15 Nov RC1)", () => {
+  const run = async (
+    answer: (proposal: QToolProposal) => Promise<QToolCallOutcome>,
+  ) => {
     const said: string[] = [];
     let webAsked = false;
     const port: QToolPort = {
@@ -3431,11 +3434,9 @@ describe("the first words go out as the web search starts (owner 2026-10-23)", (
       execute: (proposal) => {
         if (proposal.name === "research_public_web") {
           webAsked = true;
-          // Nothing is said by the time the search is asked but the line
-          // that announces it.
-          expect(said).toEqual([
-            "I'm checking what's public on Zino Aviation now. ",
-          ]);
+          // Nothing is claimed before the search is out.
+          expect(said).toEqual([]);
+          return answer(proposal);
         }
         return Promise.resolve(researchOutcome(proposal, "Zino Aviation."));
       },
@@ -3458,8 +3459,34 @@ describe("the first words go out as the web search starts (owner 2026-10-23)", (
       "ANSWERED",
     );
     expect(webAsked).toBe(true);
-    expect(said[0]).toBe("I'm checking what's public on Zino Aviation now. ");
     expect(alpha.calls.length).toBeGreaterThan(0);
+    return said;
+  };
+
+  it("says what Q is checking while the search is out, as a holding line", async () => {
+    const said = await run(
+      (proposal) =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(researchOutcome(proposal, "Zino Aviation."));
+          }, RESEARCH_LEAD_AFTER_MS + 300);
+        }),
+    );
+    expect(said[0]).toBe("I'm checking what's public on Zino Aviation now. ");
+  });
+
+  it("never claims a search no provider could take (23 of 23 on 15 Nov)", async () => {
+    const unavailable = (proposal: QToolProposal): QToolCallOutcome => ({
+      ...researchOutcome(proposal, ""),
+      result: {
+        ok: true,
+        data: { status: "PROVIDER_UNAVAILABLE", sources: [] },
+      },
+    });
+    const said = await run((proposal) =>
+      Promise.resolve(unavailable(proposal)),
+    );
+    expect(said.join("")).not.toMatch(/checking what's public/u);
   });
 });
 

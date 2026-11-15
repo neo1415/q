@@ -183,9 +183,9 @@ describe("the GPT-Live delegation bridge", () => {
       partial: true,
     });
     await h.settle();
-    const first = h.sent[0];
-    expect(first?.type).toBe("session.thinking.append");
-    expect(first?.content).toContain("do not answer it now unless asked");
+    // Audit 15 Nov RC9: nothing of it is said or left as "thinking"
+    // while their newer request works.
+    expect(h.sent).toEqual([]);
   });
 
   it("waits for late words: a delegation can arrive before the transcript settles", () => {
@@ -247,7 +247,7 @@ describe("the GPT-Live delegation bridge", () => {
     expect(spoken[0]?.content).toContain("Tensorgate, Ledgerline, Tarmacly");
   });
 
-  it("keeps a late result as quiet context once a newer question has been answered", async () => {
+  it("stops an older run once a newer question has been answered, and never speaks it (RC9)", async () => {
     const h = harness();
     h.heard("Top three companies");
     h.delegation("dlg_1");
@@ -258,12 +258,12 @@ describe("the GPT-Live delegation bridge", () => {
     expect(h.asked[1]?.request).toBe("wait, what about the second one?");
     h.pending.get("dlg_2")?.({ commentary: "Verified: B is second because…" });
     await h.settle();
+    expect(h.bridge.state().delegations[0]?.status).toBe("CANCELLED");
     h.pending.get("dlg_1")?.({ commentary: "Verified list: A, B, C." });
     await h.settle();
-    expect(h.sent.at(-1)).toMatchObject({
-      type: "session.thinking.append",
-      delegation_id: "dlg_1",
-    });
+    expect(h.sent.some((e) => e.type === "session.thinking.append")).toBe(
+      false,
+    );
     const spoken = h.sent.filter((e) => e.type === "session.commentary.append");
     expect(spoken.map((e) => e.delegation_id)).toEqual(["dlg_2"]);
   });

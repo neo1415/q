@@ -24,7 +24,13 @@ import type { LiveMove } from "./move";
  * - a newer delegation supersedes an older one: the older result is kept
  *   as quiet context (`session.thinking.append`) so "the second one" keeps
  *   its referent, but it is never spoken over the newer question;
- * - progress is said at most once, quietly, never as filler.
+ * - progress is said at most once, quietly, never as filler: one
+ *   code-chosen holding line per utterance, only while a run is still
+ *   going after `progressAfterMs`, never stacked (audit 15 Nov RC1);
+ * - "say that again" replays Q's last words exactly, by code;
+ * - one sentence a pause split ("Thank you. Um. So, which problems…") is
+ *   one request: the rest joins it and replaces the run on its first half;
+ * - what the voice said is checked against the words it was handed.
  *
  * Dependency-free (no React, no DOM, no Zod) so the browser preview and
  * the recording harness (Node type stripping) run the same code.
@@ -62,6 +68,26 @@ export type DelegationOutcome = {
    * delegation asked again (without `early`) returns the rest.
    */
   readonly partial?: boolean | undefined;
+  /**
+   * Q's exact words inside `commentary` (RC5). Present: the bridge says
+   * them itself (so a move's receipt can edit them by code), replays them
+   * for "say that again", and checks what the voice said against them.
+   */
+  readonly said?: string | null | undefined;
+  /** The Q run the words come from (RC5). */
+  readonly runId?: string | undefined;
+};
+
+/** What a screen move's receipt said, for the words that follow it. */
+export type MoveReceipt = "DONE" | "FAILED" | "PENDING";
+
+/** One line of exact words handed to the voice (RC5 telemetry). */
+export type HandedLine = {
+  readonly words: string;
+  readonly kind: "ANSWER" | "HOLDING" | "REPEAT";
+  readonly runId?: string | undefined;
+  readonly delegationId: string | null;
+  readonly at: number;
 };
 
 /**
@@ -86,6 +112,10 @@ export type DelegationRequest = {
   }[];
   /** Ask for the start of the answer as soon as Q has verified some. */
   readonly early?: boolean | undefined;
+  /** The voice's playback of Q's last line stopped before its end. */
+  readonly lastLineCut?: boolean | undefined;
+  /** The earlier delegation this one's words complete (a split utterance). */
+  readonly replaces?: string | undefined;
 };
 
 export type Timers = {
@@ -141,6 +171,14 @@ export type LiveBridgeDependencies = {
   readonly beforeSpeak?:
     ((outcome: DelegationOutcome) => Promise<string | null>) | undefined;
   /**
+   * Follows a run's screen move and returns its receipt (null: nothing to
+   * follow). Used instead of `beforeSpeak` when Q's exact words came back:
+   * code then drops a claim that a page is open unless the receipt is
+   * DONE, and never says it is "coming up" (audit 15 Nov RC1).
+   */
+  readonly followMove?:
+    ((outcome: DelegationOutcome) => Promise<MoveReceipt | null>) | undefined;
+  /**
    * Who answers a finished utterance, read when it finishes (the line's
    * mode is known only once it opened). Null or absent: the voice decides.
    */
@@ -150,6 +188,16 @@ export type LiveBridgeDependencies = {
    * finished and routes it, if the voice has not delegated it by then.
    */
   readonly routeAfterMs?: number | undefined;
+  /**
+   * How much longer code waits when their words so far end unfinished
+   * (a filler, "so", "and", a comma): a pause mid-sentence is not the end.
+   */
+  readonly continueAfterMs?: number | undefined;
+  /**
+   * How long after a run started on part of an utterance the rest may
+   * still join it (replacing that run), while it has said nothing yet.
+   */
+  readonly mergeWithinMs?: number | undefined;
 };
 
 export type DelegationStatus =
@@ -177,6 +225,10 @@ export type DelegationRecord = {
   approvalPending?: boolean | undefined;
   /** The exchange sent with the request (read before the window moves). */
   context?: DelegationRequest["context"] | undefined;
+  /** Q's exact words the voice was handed for this run, in order. */
+  said?: string | undefined;
+  /** Something of this run has been handed to the voice. */
+  voiced?: boolean | undefined;
 };
 
 export type LiveBridgeState = {
@@ -213,6 +265,11 @@ export type LiveBridge = {
   /** Standing instructions for the rest of the call (a Q Pitch tour brief). */
   readonly brief: (text: string) => void;
   readonly state: () => LiveBridgeState;
+  /**
+   * The exact lines handed to the voice since the last call, oldest first
+   * (RC5): what a reply that just finished was told to say.
+   */
+  readonly takeHanded: () => readonly HandedLine[];
 };
 
 /** OpenAI caps each append at 500 tokens; characters are a safe bound. */
@@ -296,6 +353,321 @@ export const ROUTED_NOTE =
 
 /** Quiet this long after their words: an utterance the voice did not delegate is routed by code. */
 export const ROUTE_AFTER_MS = 1_500;
+/** The extra wait when their words end unfinished ("…Um. So"). */
+export const CONTINUE_AFTER_MS = 1_800;
+/** The rest of a split utterance joins the run on its first part this soon. */
+export const MERGE_WITHIN_MS = 8_000;
+
+const wordsOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .replace(/[’‘]/gu, "'")
+    .split(/[^\p{L}\p{N}']+/u)
+    .filter((word) => word.length > 0);
+
+/** Words that leave a sentence open when it stops on them. */
+const OPEN_ENDINGS = new Set([
+  ...FILLER,
+  "so",
+  "and",
+  "but",
+  "or",
+  "because",
+  "like",
+  "then",
+  "the",
+  "a",
+  "an",
+  "to",
+  "of",
+  "with",
+  "which",
+  "that",
+  "if",
+  "for",
+  "about",
+  "my",
+  "your",
+  "is",
+  "are",
+  "was",
+  "what",
+  "how",
+  "when",
+  "where",
+  "who",
+  "whether",
+  "also",
+  "plus",
+]);
+
+/**
+ * Whether their words so far stop mid-sentence: on a filler or a word that
+ * leaves the sentence open, a comma, a dash or an ellipsis (founder audit
+ * 15 Nov F7-03: "Thank you. Um. So" was routed alone).
+ */
+export function endsUnfinished(text: string): boolean {
+  const said = spokenWords(text).trim();
+  if (said.length === 0) return false;
+  if (/(?:,|;|:|…|\.\.\.|-|–|—)$/u.test(said)) return true;
+  const last = wordsOf(said).at(-1);
+  return last !== undefined && OPEN_ENDINGS.has(last);
+}
+
+const REQUEST_OPENERS = new Set([
+  "can",
+  "could",
+  "would",
+  "will",
+  "should",
+  "what",
+  "which",
+  "who",
+  "whom",
+  "whose",
+  "when",
+  "where",
+  "why",
+  "how",
+  "is",
+  "are",
+  "do",
+  "does",
+  "did",
+  "show",
+  "open",
+  "tell",
+  "give",
+  "find",
+  "compare",
+  "send",
+  "draft",
+  "take",
+  "go",
+  "list",
+  "explain",
+  "summarise",
+  "summarize",
+  "help",
+  "please",
+  "let's",
+  "check",
+  "book",
+  "schedule",
+  "prepare",
+  "write",
+  "remind",
+  "read",
+  "approve",
+  "decline",
+  "cancel",
+  "stop",
+  "start",
+  "what's",
+  "who's",
+  "how's",
+  "where's",
+  "rank",
+  "sort",
+  "search",
+  "pull",
+  "bring",
+  "run",
+  "rerun",
+  "exclude",
+  "leave",
+  "remove",
+  "add",
+  "update",
+  "change",
+  "set",
+]);
+
+/** Words that carry a sentence on from the words before them. */
+const CONTINUING = new Set([
+  "just",
+  "and",
+  "but",
+  "so",
+  "which",
+  "because",
+  "or",
+  "also",
+  "then",
+  "like",
+  "plus",
+  "sorry",
+  "actually",
+  "rather",
+  "especially",
+  "than",
+  "to",
+  "of",
+  "for",
+  "with",
+]);
+
+/**
+ * Whether the next words carry on the sentence before them rather than
+ * start a request of their own: they open on a carrying word ("Just
+ * confirm…", "and which…", ", which problems…") and are not a whole
+ * question by themselves. "I'm waiting" and "wait, what about the second
+ * one?" are new turns, never merged.
+ */
+export function continuesSentence(text: string): boolean {
+  const said = spokenWords(text).trim();
+  if (said.length === 0) return false;
+  if (/\?["'”’)]*$/u.test(said) && !/^[,;:–—-]/u.test(said)) return false;
+  if (/^[,;:–—-]/u.test(said)) return true;
+  const first = wordsOf(said).find((word) => !FILLER.has(word));
+  if (first === "i") return /^i mean\b/iu.test(said);
+  return first !== undefined && CONTINUING.has(first);
+}
+
+/**
+ * Whether a piece of an utterance already makes a whole request: a
+ * question, or a sentence that opens as one ("show me…", "what is…") and
+ * does not stop mid-sentence. "I thought Zino Aviation was the first."
+ * is not (founder F7-22: its "Just confirm…" came as a second run).
+ */
+export function completeRequest(text: string): boolean {
+  const said = spokenWords(text).trim();
+  if (said.length === 0 || endsUnfinished(said)) return false;
+  if (/\?["'”’)]*$/u.test(said)) return true;
+  const sentences = said
+    .split(/(?<=[.!?])\s+/u)
+    .filter((part) => part.length > 0);
+  const lastSentence = sentences.at(-1) ?? said;
+  const words = wordsOf(lastSentence).filter((word) => !FILLER.has(word));
+  const first =
+    words[0] === "i" &&
+    (words[1] === "want" || words[1] === "need" || words[1] === "'d")
+      ? "please"
+      : words[0];
+  return first !== undefined && REQUEST_OPENERS.has(first) && words.length >= 2;
+}
+
+/** Words that may surround a request to hear the last line again. */
+const REPEAT_FRAME = new Set([
+  "no",
+  "sorry",
+  "i",
+  "meant",
+  "mean",
+  "just",
+  "please",
+  "can",
+  "could",
+  "would",
+  "will",
+  "you",
+  "that",
+  "it",
+  "this",
+  "the",
+  "last",
+  "answer",
+  "thing",
+  "part",
+  "bit",
+  "line",
+  "one",
+  "explanation",
+  "again",
+  "gave",
+  "said",
+  "your",
+  "what",
+  "me",
+  "for",
+  "once",
+  "more",
+]);
+
+/**
+ * "Repeat that", "say that again", "can you repeat that last answer you
+ * just gave", "no, I meant just repeat the explanation", "come again",
+ * "pardon": a closed set, read by code, never a meaning guess. Founder
+ * audit 15 Nov F7-15/F7-16: the voice answered these itself, in its own
+ * words, with claims Q never made.
+ */
+export function asksToRepeat(text: string): boolean {
+  const words = wordsOf(spokenWords(text)).filter((word) => !FILLER.has(word));
+  if (words.length === 0 || words.length > 14) return false;
+  const joined = words.join(" ");
+  if (/^(?:pardon|come again)(?: please)?$/u.test(joined)) return true;
+  if (/^(?:sorry )?what did you (?:just )?say$/u.test(joined)) return true;
+  const verb = words.findIndex(
+    (word, index) =>
+      word === "repeat" ||
+      (word === "say" && words.slice(index + 1).includes("again")),
+  );
+  if (verb < 0) return false;
+  return words.every(
+    (word, index) =>
+      index === verb ||
+      word === "say" ||
+      word === "repeat" ||
+      REPEAT_FRAME.has(word),
+  );
+}
+
+/**
+ * A sentence of Q's that says a page is open or on its way, written before
+ * their screen moved (R3): dropped by code unless the receipt was DONE.
+ */
+const ARRIVAL_SENTENCE =
+  /^(?:(?:okay|ok|right|sure|done)[,.]?\s+)?(?:i(?:'ve| have)\s+(?:now\s+)?(?:opened|brought up|pulled up|put up)|opening\b|up now\b|here(?:'s| is)\b[^.]*\b(?:page|screen|open)|(?:it|the page|[^.]{0,60}\bpage)\s+(?:is|'s)\s+(?:now\s+)?(?:open|up|coming up|loading|ready)|[^.]{0,80}\b(?:is|are)\s+(?:now\s+)?(?:open|up) (?:on|in front of) (?:your|their) screen)/iu;
+
+/** Q's words without its claims about a page (receipt not DONE). */
+export function withoutArrival(words: string): string {
+  return words
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => !ARRIVAL_SENTENCE.test(sentence.trim()))
+    .join(" ")
+    .trim();
+}
+
+/** How long their quiet must last before an answer is handed over them. */
+export const QUIET_BEFORE_SPEAK_MS = 700;
+
+/**
+ * A nudge about work already asked for ("still waiting", "are you there",
+ * "can you do it or not"): a closed set, read by code. It never makes an
+ * earlier answer past (the founder's 25 s answer, live 2026-10-09).
+ */
+export function isNudge(text: string): boolean {
+  const words = wordsOf(spokenWords(text)).filter((word) => !FILLER.has(word));
+  if (words.length === 0 || words.length > 10) return false;
+  return /^(?:(?:hello|hey|so|okay|ok|well|q)\s+)*(?:i'?m\s+(?:still\s+)?waiting|still\s+waiting|are\s+you\s+(?:still\s+)?(?:there|with\s+me|working(?:\s+on\s+it)?|done)|you\s+there|hello|can\s+you\s+(?:do\s+it|hear\s+me)|any\s+(?:news|update)|is\s+it\s+(?:coming|done|ready)|how\s+far|what'?s\s+taking\s+(?:so\s+)?long)\b/u.test(
+    words.join(" "),
+  );
+}
+
+/** Said by code when a run's page move did not open. */
+export const MOVE_FAILED_LINE = "That page didn't open on your screen.";
+
+const normalised = (text: string): string[] =>
+  wordsOf(text.replace(/[-–—]/gu, " "));
+
+/**
+ * What the voice said against the words it was handed (RC5): `diverged`
+ * when it added, dropped or changed any word; `cut` when it stopped before
+ * the end of them.
+ */
+export function compareSpoken(
+  handed: string,
+  heard: string,
+): { readonly diverged: boolean; readonly cut: boolean } {
+  const expected = normalised(handed);
+  const got = normalised(heard);
+  const diverged = expected.join(" ") !== got.join(" ");
+  if (expected.length === 0) return { diverged, cut: false };
+  // Cut: the end of what it was handed never came (its last words).
+  const tail = expected.slice(-Math.min(3, expected.length)).join(" ");
+  const cut = !` ${got.join(" ")} `.includes(` ${tail} `);
+  return { diverged, cut };
+}
 /** A voice delegation this soon after code routed the same words joins that run. */
 const JOIN_WITHIN_MS = 15_000;
 /** The id of a turn code routed to Q (its own record, like typed_N). */
@@ -322,8 +694,19 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const settleMs = deps.settleMs ?? 400;
   const progressAfterMs = deps.progressAfterMs ?? 5_000;
   const routeAfterMs = deps.routeAfterMs ?? ROUTE_AFTER_MS;
+  const continueAfterMs = deps.continueAfterMs ?? CONTINUE_AFTER_MS;
+  const mergeWithinMs = deps.mergeWithinMs ?? MERGE_WITHIN_MS;
   let routeTimer: unknown = null;
+  let routeExtended = false;
   let routedCount = 0;
+  // RC1: one holding line per utterance of theirs, never stacked.
+  let heldSinceTheySpoke = false;
+  // RC5: the exact lines handed to the voice, until live-call takes them.
+  const handedLog: HandedLine[] = [];
+  // The last answer line handed, and what the voice has said of it, to
+  // tell whether its playback was cut before the end.
+  let check: { words: string; heard: string } | null = null;
+  let lastLineCut = false;
   // The transcript as the provider streamed it, both sides, in turns. A
   // turn changes side when the other side's delta arrives.
   const transcript: { role: "user" | "q"; text: string }[] = [];
@@ -416,7 +799,65 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       .map((turn) => ({ role: turn.role, text: spokenWords(turn.text) }))
       .filter((turn) => turn.text.length > 0);
 
+  /** Exact words handed to the voice, logged for RC5. */
+  const handWords = (
+    record: DelegationRecord | null,
+    words: string,
+    kind: HandedLine["kind"],
+    runId?: string,
+  ) => {
+    handedLog.push({
+      words,
+      kind,
+      ...(runId === undefined ? {} : { runId }),
+      delegationId: record?.id ?? null,
+      at: deps.now(),
+    });
+    while (handedLog.length > 24) handedLog.shift();
+    if (record !== null) record.voiced = true;
+    if (kind !== "HOLDING") check = { words, heard: "" };
+  };
+
+  /** Q's last answer, exactly as the voice was handed it, or null. */
+  const lastAnswer = (): string | null => {
+    for (let i = order.length - 1; i >= 0; i -= 1) {
+      const record = delegations.get(order[i] ?? "");
+      if (
+        record !== undefined &&
+        (record.status === "SPOKEN" || record.status === "RUNNING") &&
+        record.said !== undefined &&
+        record.said.length > 0
+      )
+        return record.said;
+    }
+    return null;
+  };
+
+  /**
+   * The run this utterance's earlier part started, when these words are
+   * its rest (RC1): still running, nothing of it said, started within
+   * `mergeWithinMs`, and its words were not a whole request by themselves.
+   */
+  const mergeTarget = (record: DelegationRecord, rest: string) => {
+    const index = order.indexOf(record.id);
+    const earlier =
+      index > 0 ? delegations.get(order[index - 1] ?? "") : undefined;
+    if (
+      earlier === undefined ||
+      earlier.status !== "RUNNING" ||
+      earlier.voiced === true ||
+      earlier.id === OPENING_ID ||
+      earlier.id.startsWith("typed_") ||
+      deps.now() - earlier.createdAt > mergeWithinMs ||
+      completeRequest(earlier.request) ||
+      !(endsUnfinished(earlier.request) || continuesSentence(rest))
+    )
+      return undefined;
+    return earlier;
+  };
+
   const run = (record: DelegationRecord, fixed?: string) => {
+    let replaces: DelegationRecord | undefined;
     if (fixed === undefined) {
       const request = readRequest();
       if (!heardRequest(request)) {
@@ -432,10 +873,32 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
         changed();
         return;
       }
+      // "Say that again": Q's last words, verbatim, by code (RC1; founder
+      // F7-15/F7-16). No run, and never the voice's own paraphrase.
+      const again = asksToRepeat(request) ? lastAnswer() : null;
+      if (again !== null) {
+        record.request = request;
+        askedUpTo = transcript.length;
+        boundary = true;
+        record.status = "SPOKEN";
+        record.said = again;
+        send("session.commentary.append", record.providerId, sayExactly(again));
+        handWords(record, again, "REPEAT");
+        changed();
+        return;
+      }
       record.context = contextBefore();
       record.request = request;
       askedUpTo = transcript.length;
       boundary = true;
+      // The rest of a sentence a pause split: one request, one run.
+      replaces = mergeTarget(record, request);
+      if (replaces !== undefined) {
+        replaces.status = "CANCELLED";
+        record.request = `${replaces.request} ${request}`;
+        record.context = replaces.context ?? record.context;
+        record.providerId ??= replaces.providerId;
+      }
     } else {
       record.request = fixed;
     }
@@ -446,12 +909,26 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       if (record.status !== "RUNNING" || progressed) return;
       progressed = true;
       // D6 (audit 14 Nov): "keep the conversation going" made the voice
-      // ad-lib questions on nearly every turn. One code-chosen line, sent
-      // only while this run is still running; never the result or a question.
+      // ad-lib questions on nearly every turn. RC1 (15 Nov): one
+      // code-chosen line per utterance of theirs, only while a run is
+      // still going after the threshold and nothing of it was said yet;
+      // never the result or a question, never on top of another.
+      if (record.voiced === true || heldSinceTheySpoke) return;
+      heldSinceTheySpoke = true;
       send("session.commentary.append", record.providerId, HOLDING_CONTENT);
+      handWords(null, HOLDING_LINE, "HOLDING");
     }, progressAfterMs);
     const finish = async (outcome: DelegationOutcome) => {
       timers.clearTimeout(progress);
+      const said = outcome.said;
+      if (typeof said === "string" && deps.followMove !== undefined) {
+        const receipt =
+          outcome.move === undefined
+            ? null
+            : await deps.followMove(outcome).catch(() => null);
+        settle(record, afterMove(outcome, said, receipt));
+        return;
+      }
       const note =
         deps.beforeSpeak === undefined
           ? null
@@ -470,10 +947,14 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
         failed: true,
       });
     };
+    const cut = lastLineCut;
+    lastLineCut = false;
     const base = {
       delegationId: record.id,
       request: record.request,
       context: record.context ?? contextBefore(),
+      ...(cut ? { lastLineCut: true } : {}),
+      ...(replaces === undefined ? {} : { replaces: replaces.id }),
     };
     void deps
       .delegate({ ...base, early: true })
@@ -493,40 +974,96 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   };
 
   /**
-   * The start of an answer while the run goes on. Spoken unless a newer
-   * request exists (then it is kept quietly, as a superseded answer is);
+   * Their words are still arriving and none of them has been asked yet
+   * ("Um", a breath before the rest): an answer handed now is spoken over
+   * them and the voice yields it (audit 15 Nov RC9, investor bdd2ef8f).
+   */
+  const theySpeak = () =>
+    deps.now() - lastInputAt < QUIET_BEFORE_SPEAK_MS &&
+    unaskedWords().length > 0;
+
+  /** Newer requests of their own, nudges ("still waiting") aside. */
+  const newerRequests = (record: DelegationRecord) =>
+    order.slice(order.indexOf(record.id) + 1).flatMap((id) => {
+      const newer = delegations.get(id);
+      return newer === undefined ||
+        newer.status === "UNHEARD" ||
+        newer.status === "CANCELLED" ||
+        isNudge(newer.request)
+        ? []
+        : [newer];
+    });
+  const working = (record: DelegationRecord) =>
+    record.status === "RUNNING" || record.status === "WAITING_FOR_WORDS";
+
+  /** Answers held while a newer request of theirs still works (by id). */
+  const held = new Map<string, DelegationOutcome>();
+
+  /** Q's words to the voice now, logged for RC5. */
+  const voice = (record: DelegationRecord, outcome: DelegationOutcome) => {
+    send(
+      "session.commentary.append",
+      record.providerId,
+      outcome.commentary ?? "",
+    );
+    if (typeof outcome.said === "string" && outcome.said.length > 0) {
+      record.said =
+        record.said === undefined || record.status !== "RUNNING"
+          ? outcome.said
+          : `${record.said} ${outcome.said}`;
+      handWords(record, outcome.said, "ANSWER", outcome.runId);
+    } else record.voiced = true;
+  };
+
+  /**
+   * Once a request's answer is spoken, every older request of theirs is
+   * past (audit 15 Nov RC9): a run still going is stopped, and an answer
+   * held for it is dropped -- never left as "thinking" for the voice to
+   * bring up later. A nudge ("still waiting") supersedes nothing.
+   */
+  const supersedeOlder = (record: DelegationRecord) => {
+    if (isNudge(record.request)) return;
+    for (const id of order.slice(0, order.indexOf(record.id))) {
+      const older = delegations.get(id);
+      if (older === undefined) continue;
+      if (held.delete(id)) older.status = "SUPERSEDED";
+      if (!working(older)) continue;
+      older.status = "CANCELLED";
+      if (deps.cancel !== undefined) void deps.cancel(id).catch(() => false);
+    }
+  };
+
+  /**
+   * The start of an answer while the run goes on: spoken unless a newer
+   * request of theirs exists (then the whole answer waits, see settle);
    * the status stays RUNNING until the rest arrives.
    */
   const speakStart = (record: DelegationRecord, outcome: DelegationOutcome) => {
     if (record.status === "CANCELLED") return;
     if (outcome.commentary === null || outcome.commentary.length === 0) return;
-    const index = order.indexOf(record.id);
-    if (order.slice(index + 1).length > 0) {
-      send(
-        "session.thinking.append",
-        record.providerId,
-        `Earlier request "${record.request}" (a newer one exists; do not answer it now unless asked): ${outcome.commentary}`,
-      );
+    if (newerRequests(record).length > 0) return;
+    if (theySpeak()) {
+      timers.setTimeout(() => {
+        speakStart(record, outcome);
+      }, QUIET_BEFORE_SPEAK_MS);
       return;
     }
-    send("session.commentary.append", record.providerId, outcome.commentary);
+    voice(record, outcome);
   };
 
   const settle = (record: DelegationRecord, outcome: DelegationOutcome) => {
-    if (record.status === "CANCELLED") return;
-    record.answeredAt = deps.now();
-    record.commentary = outcome.commentary;
-    record.approvalPending = outcome.approvalPending;
+    if (record.status === "CANCELLED" || record.status === "SUPERSEDED") return;
     const index = order.indexOf(record.id);
-    const statusOf = (id: string) => delegations.get(id)?.status;
-    const working = (id: string) =>
-      statusOf(id) === "RUNNING" || statusOf(id) === "WAITING_FOR_WORDS";
-    const newer = order.slice(index + 1);
     // Recorded live (2026-10-09): a nudge ("still waiting, can you do it or
     // not") was delegated too; its empty answer came back first and was
     // spoken ("I can't confirm…") while the real answer was still working.
     // A failed answer is never spoken while an earlier request works on.
-    if (outcome.failed === true && order.slice(0, index).some(working)) {
+    const earlierWorking = order.slice(0, index).some((id) => {
+      const earlier = delegations.get(id);
+      return earlier !== undefined && working(earlier);
+    });
+    if (outcome.failed === true && earlierWorking) {
+      record.answeredAt = deps.now();
       record.status = "FAILED";
       send(
         "session.thinking.append",
@@ -536,31 +1073,69 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       changed();
       return;
     }
-    // Spoken unless a newer request has already been answered: a slow
-    // verified answer is the freshest they can have while the newer ones
-    // still work or came back empty (the founder's nudges must never cost
-    // them the answer they waited for).
-    const superseded = newer.some((id) => statusOf(id) === "SPOKEN");
-    if (outcome.commentary === null || outcome.commentary.length === 0) {
-      record.status = superseded ? "SUPERSEDED" : "SPOKEN";
+    // Their words are still coming: the answer waits for the pause.
+    if (theySpeak()) {
+      timers.setTimeout(() => {
+        settle(record, outcome);
+      }, QUIET_BEFORE_SPEAK_MS);
+      return;
+    }
+    record.answeredAt = deps.now();
+    record.commentary = outcome.commentary;
+    record.approvalPending = outcome.approvalPending;
+    const newer = newerRequests(record);
+    const empty =
+      outcome.commentary === null || outcome.commentary.length === 0;
+    // Audit 15 Nov RC9: one spoken answer per request of theirs, the
+    // latest valid one. A newer request already answered: this one is
+    // past and is dropped (no "thinking" for the voice to bring up).
+    if (newer.some((one) => one.status === "SPOKEN")) {
+      record.status = "SUPERSEDED";
       changed();
       return;
     }
-    if (superseded) {
-      // Kept for reference ("the second one"), never spoken over the
-      // newer question.
+    // A newer request still works: this answer waits for it, and is
+    // spoken only if that one comes back with nothing (the founder's
+    // nudges never cost them the answer they waited for: a nudge is not
+    // a newer request).
+    if (!empty && outcome.failed !== true && newer.some(working)) {
       record.status = "SUPERSEDED";
-      send(
-        "session.thinking.append",
-        record.providerId,
-        `Earlier request "${record.request}" (replaced by a newer one; do not answer it now unless asked): ${outcome.commentary}`,
-      );
-    } else {
-      record.status = outcome.failed === true ? "FAILED" : "SPOKEN";
-      // Q's words as Q gave them, even while a newer request still works:
-      // a wrapper of the voice's own would be words Q never said.
-      send("session.commentary.append", record.providerId, outcome.commentary);
+      held.set(record.id, outcome);
+      changed();
+      return;
     }
+    if (empty || outcome.failed === true) {
+      // Nothing (or nothing verified) for this one: the newest answer
+      // held for an earlier request of theirs is said instead.
+      const fallback = order
+        .slice(0, index)
+        .reverse()
+        .find((id) => held.has(id));
+      if (fallback !== undefined) {
+        const earlier = delegations.get(fallback);
+        const kept = held.get(fallback);
+        held.delete(fallback);
+        record.status = outcome.failed === true ? "FAILED" : "SPOKEN";
+        if (earlier !== undefined && kept !== undefined) {
+          earlier.status = "SPOKEN";
+          voice(earlier, kept);
+          supersedeOlder(earlier);
+        }
+        changed();
+        return;
+      }
+    }
+    if (empty) {
+      record.status = "SPOKEN";
+      supersedeOlder(record);
+      changed();
+      return;
+    }
+    // Q's words as Q gave them: a wrapper of the voice's own would be
+    // words Q never said.
+    voice(record, outcome);
+    record.status = outcome.failed === true ? "FAILED" : "SPOKEN";
+    if (outcome.failed !== true) supersedeOlder(record);
     changed();
   };
 
@@ -616,6 +1191,13 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     }
     const words = unaskedWords();
     if (!heardRequest(words)) return;
+    // Their words stop mid-sentence ("Thank you. Um. So"): a pause, not
+    // the end. Waited for once more before they are routed (RC1).
+    if (!routeExtended && endsUnfinished(words)) {
+      routeExtended = true;
+      routeTimer = timers.setTimeout(routeHeard, continueAfterMs);
+      return;
+    }
     const firstUser = transcript.findIndex(
       (turn, index) => index >= askedUpTo && turn.role === "user",
     );
@@ -634,6 +1216,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       routing.guided !== true &&
       !answeringQ &&
       !awaitingApproval &&
+      !asksToRepeat(words) &&
       routing.isSmallTalk(words)
     )
       return;
@@ -705,8 +1288,18 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
             typeof event["delta"] === "string" ? event["delta"] : "";
           lastInputAt = deps.now();
           append("user", delta);
+          if (delta.length > 0 && heardRequest(delta)) {
+            heldSinceTheySpoke = false;
+            // They spoke over Q's last line: was all of it said? (RC1/P1)
+            if (check !== null) {
+              if (compareSpoken(check.words, check.heard).cut)
+                lastLineCut = true;
+              check = null;
+            }
+          }
           if (deps.routing !== undefined && delta.length > 0) {
             if (routeTimer !== null) timers.clearTimeout(routeTimer);
+            routeExtended = false;
             routeTimer = timers.setTimeout(routeHeard, routeAfterMs);
           }
           return;
@@ -715,6 +1308,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
           const delta =
             typeof event["delta"] === "string" ? event["delta"] : "";
           append("q", delta);
+          if (check !== null) check.heard += delta;
           return;
         }
         case "session.delegation.created":
@@ -830,6 +1424,31 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       send("session.instructions.append", null, words);
     },
     state: snapshot,
+    takeHanded: () => handedLog.splice(0, handedLog.length),
+  };
+}
+
+/**
+ * Q's words after its screen move (RC1, R3): a claim that the page is
+ * open, up or coming up is dropped unless the receipt was DONE; a move
+ * that FAILED says so in code's words first. Nothing is added otherwise.
+ */
+export function afterMove(
+  outcome: DelegationOutcome,
+  said: string,
+  receipt: MoveReceipt | null,
+): DelegationOutcome {
+  if (receipt === null || receipt === "DONE") return outcome;
+  const kept = withoutArrival(said);
+  const words =
+    receipt === "FAILED"
+      ? `${MOVE_FAILED_LINE}${kept.length > 0 ? ` ${kept}` : ""}`
+      : kept;
+  if (words === said) return outcome;
+  return {
+    ...outcome,
+    said: words.length === 0 ? null : words,
+    commentary: words.length === 0 ? null : sayExactly(words),
   };
 }
 

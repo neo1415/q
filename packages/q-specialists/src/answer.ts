@@ -925,6 +925,22 @@ async function rereadTurn<T>(
   }
 }
 
+/** The reader's routing decision for one run: closed codes, no words or ids. */
+export type QRunRouting = {
+  readonly kind: string;
+  readonly confidence: string | null;
+  readonly question: string | null;
+  readonly research: string;
+  readonly tool: string | null;
+  readonly teamJob: boolean;
+  readonly meetingPrep: boolean;
+  readonly aboutNamedOther: boolean;
+  readonly addressedToQ: boolean;
+  readonly navigation: string | null;
+  readonly navigationDestination: string | null;
+  readonly spoken: boolean;
+};
+
 export type SpecialistQAnswerDependencies = {
   readonly specialist: QSpecialist<
     CompanyIntelligenceRequest,
@@ -1220,6 +1236,18 @@ export type SpecialistQAnswerDependencies = {
     | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
+  /**
+   * Audit 15 Nov 2026 (RC5): the reader's routing decision is kept on the
+   * run itself, not only in logs that rotate with each deployment. Closed
+   * codes only; best effort (a failed write never fails the turn).
+   */
+  readonly recordRouting?:
+    | ((input: {
+        readonly tenantId: string;
+        readonly runId: string;
+        readonly routing: QRunRouting;
+      }) => Promise<void>)
+    | undefined;
   /**
    * Where a turn read as "show / hide my company" is handed to the action
    * proposer (CQ-QACT-001). Absent: such a turn is answered like any other.
@@ -7364,6 +7392,34 @@ export function createSpecialistQAnswer(
         },
         "q turn read",
       );
+      const recordRouting = dependencies.recordRouting;
+      if (recordRouting !== undefined) {
+        const routing: QRunRouting = {
+          kind: read.kind,
+          confidence:
+            typeof read.confidence === "string" ? read.confidence : null,
+          question: read.question?.kind ?? null,
+          research: (await research).mode,
+          tool: read.tool?.kind ?? null,
+          teamJob: read.teamJob ?? false,
+          meetingPrep: read.meetingPrep != null,
+          aboutNamedOther: read.aboutNamedOther === true,
+          addressedToQ: read.addressedToQ ?? true,
+          navigation: read.navigation?.mode ?? null,
+          navigationDestination: read.navigation?.destination ?? null,
+          spoken,
+        };
+        void recordRouting({
+          tenantId: request.tenantId,
+          runId: request.runId,
+          routing,
+        }).catch((error: unknown) => {
+          logger?.warn(
+            { err: error, qRunId: request.runId },
+            "q run routing not recorded",
+          );
+        });
+      }
     }
     // TURN_READER v44 (Zino live 2026-10-08 11:13): garbled speech read by
     // sound. The likely words become their turn, recorded beside what the

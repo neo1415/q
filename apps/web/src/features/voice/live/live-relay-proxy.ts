@@ -71,11 +71,19 @@ const DelegateBody = z
       .max(12)
       .optional(),
     early: z.boolean().optional(),
+    // Audit 15 Nov RC1 (the Q API's own contract): Q's last line was cut
+    // before its end; this request completes a split utterance.
+    lastLineCut: z.boolean().optional(),
+    replaces: DelegationId.optional(),
   })
   .strict();
 const DelegateResult = z.object({
   delegationId: z.string(),
   commentary: z.string().nullable(),
+  // RC5: Q's exact words and their run; stripped here, the bridge could
+  // neither replay them nor check what the voice said.
+  said: z.string().max(6_000).nullable().optional(),
+  runId: z.string().uuid().optional(),
   stale: z.boolean(),
   approvalPending: z.boolean(),
   failed: z.boolean(),
@@ -136,6 +144,13 @@ const TranscriptBody = z
             // B1: part of a turn handed to Q (the Q API's own contract);
             // without it here every marked batch would be refused.
             delegated: z.boolean().optional(),
+            // RC5 telemetry (the Q API's own contract).
+            runId: z.string().uuid().optional(),
+            handed: z.string().min(1).max(4_000).optional(),
+            audioStartAt: z.number().int().min(0).optional(),
+            audioEndAt: z.number().int().min(0).optional(),
+            diverged: z.boolean().optional(),
+            speechEndAt: z.number().int().min(0).optional(),
           })
           .strict(),
       )

@@ -104,6 +104,7 @@ import { createProfileGapReader } from "./profile-gap-reader.js";
 
 import { MANDATE_LABELS } from "./mandate-labels.js";
 import { createCallPrepPort, type CallPrepSources } from "./call-prep.js";
+import { createRunRoutingRecorder } from "./run-routing.js";
 
 /**
  * Q's intelligence composition (CQ-C5-R1 §6-§12).
@@ -634,6 +635,8 @@ export function composeQIntelligence(
     specialist,
     delegate: conversational,
     pageMoves,
+    // Audit 15 Nov (RC5): the routing decision is kept on the run.
+    recordRouting: createRunRoutingRecorder({ sql }),
     // Step 1: the turn reader is told the same situation as the answer.
     ...(dependencies.situationOf === undefined
       ? {}

@@ -29,7 +29,10 @@ import type { ExternalRehearsalLatency } from "../../composition/external-rehear
 import type { VoiceSessionBinding } from "../bindings.js";
 import { forRealtime } from "../duplex/broker.js";
 import type { DuplexSpendLedger } from "../duplex/spend.js";
-import type { DuplexTranscriptStore } from "../duplex/transcript.js";
+import type {
+  DuplexTranscriptStore,
+  VoiceLineTelemetry,
+} from "../duplex/transcript.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import {
   GPT_LIVE_USD_PER_SECOND,
@@ -37,8 +40,10 @@ import {
   OBSERVER_ATTACH_TIMEOUT_MS,
   type LiveVoiceProvider,
 } from "../providers/gpt-live.js";
+import { spokenNumbers } from "../speech.js";
 import {
   APPROVAL_QUESTION,
+  markApprovalUnheard,
   settledTurn,
   type VoiceTurnHandler,
 } from "../turn.js";
@@ -112,6 +117,9 @@ export function coalescedSegments(
   segments: LiveTranscriptReport["segments"],
 ): LiveTranscriptReport["segments"] {
   const joined: LiveTranscriptReport["segments"][number][] = [];
+  // A Q line with its own run or handed words is one line of its own (RC5).
+  const own = (segment: LiveTranscriptReport["segments"][number]) =>
+    segment.runId !== undefined || segment.handed !== undefined;
   for (const segment of segments) {
     const text = segment.text.trim();
     if (text.length === 0) continue;
@@ -120,9 +128,18 @@ export function coalescedSegments(
       last !== undefined &&
       last.role === segment.role &&
       last.delegated === segment.delegated &&
+      !own(last) &&
+      !own(segment) &&
       last.text.length + text.length < SEGMENT_MAX_CHARS
     ) {
-      joined[joined.length - 1] = { ...last, text: `${last.text} ${text}` };
+      joined[joined.length - 1] = {
+        ...last,
+        text: `${last.text} ${text}`,
+        // Their speech ended with the last piece.
+        ...(segment.speechEndAt === undefined
+          ? {}
+          : { speechEndAt: segment.speechEndAt }),
+      };
     } else {
       joined.push({ ...segment, text });
     }
@@ -225,6 +242,13 @@ type Delegation = {
   partialSent: string | null;
   /** Everything the run said and the facts it held, when it ended. */
   ended: { readonly said: string; readonly facts: SpokenFacts | null } | null;
+  /** The Q run this delegation started, once known (RC5). */
+  runId: () => string | null;
+  /**
+   * Replaced by the rest of the same utterance (a pause split it, RC1):
+   * stopped without leaving a "couldn't get that done" in the history.
+   */
+  merged: boolean;
 };
 
 type LiveLine = {
@@ -476,6 +500,36 @@ export const TRIAL_TICK_MS = 1_000;
 /** ... and saves its use every this many ticks (and when it ends). */
 export const TRIAL_PERSIST_TICKS = 5;
 
+/**
+ * A transcript segment's RC5 telemetry, its browser times clamped to the
+ * line's life like `spokenAt`.
+ */
+export function lineTelemetry(
+  segment: LiveTranscriptReport["segments"][number],
+  openedAt: number,
+  now: number,
+): VoiceLineTelemetry | undefined {
+  const at = (ms: number | undefined) =>
+    ms === undefined
+      ? undefined
+      : new Date(Math.min(now, Math.max(openedAt, ms)));
+  const telemetry: VoiceLineTelemetry = {
+    ...(segment.runId === undefined ? {} : { qRunId: segment.runId }),
+    ...(segment.handed === undefined ? {} : { handed: segment.handed }),
+    ...(segment.audioStartAt === undefined
+      ? {}
+      : { audioStartedAt: at(segment.audioStartAt) }),
+    ...(segment.audioEndAt === undefined
+      ? {}
+      : { audioEndedAt: at(segment.audioEndAt) }),
+    ...(segment.diverged === undefined ? {} : { diverged: segment.diverged }),
+    ...(segment.speechEndAt === undefined
+      ? {}
+      : { speechEndedAt: at(segment.speechEndAt) }),
+  };
+  return Object.keys(telemetry).length === 0 ? undefined : telemetry;
+}
+
 /** Q's run, collected: what it said, or the facts of a code-built answer. */
 function collector(
   id: string,
@@ -485,9 +539,12 @@ function collector(
   readonly speaker: VoiceSpeaker;
   readonly said: () => string;
   readonly held: () => SpokenFacts | null;
+  /** The Q run the turn started (RC5: every voice line names its run). */
+  readonly runId: () => string | null;
 } {
   let text = "";
   let held: SpokenFacts | null = null;
+  let runId: string | null = null;
   let announced = false;
   const add = (part: string) => {
     const trimmed = part.trim();
@@ -515,9 +572,13 @@ function collector(
       facts: (facts) => {
         held = facts;
       },
+      run: (id) => {
+        runId ??= id;
+      },
     },
     said: () => text.slice(0, SPOKEN_MAX),
     held: () => held,
+    runId: () => runId,
   };
 }
 
@@ -565,8 +626,16 @@ export const LIVE_NOT_FINISHED =
  * words exactly, and nothing that closes the answer.
  */
 export function partialCommentary(words: string): string {
-  const { say } = forRealtime(words);
-  return `The rest of this answer follows in a moment: do not close it or ask anything yet. ${sayExactly(say)}`;
+  return `The rest of this answer follows in a moment: do not close it or ask anything yet. ${sayExactly(liveSpoken(words))}`;
+}
+
+/**
+ * Q's words as the live voice is handed them (audit 15 Nov RC1): stage
+ * directions out, and every figure in words, by code, so the provider
+ * never reads "€50,000–€100 million" itself.
+ */
+export function liveSpoken(words: string): string {
+  return spokenNumbers(forRealtime(words).say);
 }
 
 /**
@@ -593,14 +662,15 @@ function restOf(
   const rest = ended.said.startsWith(sent)
     ? ended.said.slice(sent.length).trim()
     : ended.said;
-  const commentary = commentaryFor({
+  const words = qSpokenWords({
     facts: null,
     said: rest,
     approvalPending: result.approvalPending,
   });
   return {
     ...result,
-    commentary: commentary === null ? null : `${already}${commentary}`,
+    commentary: words === null ? null : `${already}${sayExactly(words)}`,
+    said: words === null ? null : withinSay(words),
   };
 }
 
@@ -615,8 +685,8 @@ export function qSpokenWords(input: {
   readonly said: string;
   readonly approvalPending: boolean;
 }): string | null {
-  if (input.facts !== null) return input.facts.fallback;
-  const { say } = forRealtime(input.said);
+  if (input.facts !== null) return spokenNumbers(input.facts.fallback);
+  const say = liveSpoken(input.said);
   if (say.length > 0) return say;
   return input.approvalPending ? LIVE_APPROVAL_READY : null;
 }
@@ -1032,6 +1102,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       first,
       partialSent: null,
       ended: null,
+      runId: speaker.runId,
+      merged: false,
       result: Promise.resolve({
         delegationId: id,
         commentary: null,
@@ -1072,7 +1144,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           speaker.speaker,
         );
         if (controller.signal.aborted || outcome.kind === "INTERRUPTED") {
-          if (controller.signal.aborted) unfinished();
+          if (controller.signal.aborted && !delegation.merged) unfinished();
           return {
             delegationId: id,
             commentary: controller.signal.aborted
@@ -1086,10 +1158,16 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         const facts = speaker.held();
         delegation.ended = { said, facts };
         const approvalPending = said.endsWith(APPROVAL_QUESTION);
+        const words =
+          line.qBackedRehearsal === true
+            ? null
+            : qSpokenWords({ facts, said, approvalPending });
         const commentary =
           line.qBackedRehearsal === true
             ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(said)}`
-            : commentaryFor({ facts, said, approvalPending });
+            : words === null
+              ? null
+              : sayExactly(words);
         line.history.push(...lead, asked);
         line.referents = [
           ...referentsOf(facts?.mustSay),
@@ -1107,11 +1185,16 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           after !== undefined && after.sequence > sequenceBefore
             ? liveMoveOf(after)
             : null;
+        const runId = speaker.runId();
         return {
           delegationId: id,
           commentary,
+          // RC5: the exact words handed to the voice, so the client can
+          // replay them ("say that again") and check what was heard.
+          said: words === null ? null : withinSay(words),
           approvalPending,
           failed: false,
+          ...(runId === null ? {} : { runId }),
           ...(move !== null ? { move } : {}),
         };
       } catch (error: unknown) {
@@ -1119,7 +1202,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           { err: error, qVoiceSessionId: line.voiceSessionId },
           "live delegation failed",
         );
-        unfinished();
+        if (!delegation.merged) unfinished();
         return {
           delegationId: id,
           commentary: sayExactly(LIVE_NOT_FINISHED),
@@ -1570,6 +1653,22 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           };
         }
       }
+      // The line that asked their card's question was cut before its end:
+      // a yes is not approval until the content is read back (RC1, P1).
+      if (delegation.lastLineCut === true) markApprovalUnheard(line.binding);
+      // The rest of an utterance a pause split (RC1): the earlier run on
+      // its first half stops quietly, and this one answers the whole.
+      if (delegation.replaces !== undefined) {
+        const earlier = line.delegations.get(delegation.replaces);
+        if (earlier !== undefined && !earlier.settled) {
+          earlier.merged = true;
+          earlier.controller.abort();
+          logger.info(
+            { qVoiceSessionId: line.voiceSessionId },
+            "live delegation merged into the rest of its utterance",
+          );
+        }
+      }
       // One delegation id, one run: a repeat joins the run in flight.
       let running = line.delegations.get(delegation.delegationId);
       if (running === undefined) {
@@ -1605,12 +1704,17 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         const words = await running.first;
         if (words !== null && running.partialSent === null) {
           running.partialSent = words;
+          const runId = running.runId();
           return {
             delegationId: delegation.delegationId,
             commentary:
               line.qBackedRehearsal === true
                 ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(words)}`
                 : partialCommentary(words),
+            ...(line.qBackedRehearsal === true
+              ? {}
+              : { said: withinSay(liveSpoken(words)) }),
+            ...(runId === null ? {} : { runId }),
             stale: line.latest !== delegation.delegationId,
             approvalPending: false,
             failed: false,
@@ -1632,6 +1736,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const running = line.delegations.get(delegationId);
       if (running === undefined) return false;
       if (running.settled) return false;
+      // Stopped on purpose (asked, or past: audit 15 Nov RC9): no "couldn't
+      // get that done" is left in Q's history for it.
+      running.merged = true;
       running.controller.abort();
       // Confirmed only once the run has actually let go.
       await running.result;
@@ -1688,6 +1795,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
             spokenAt: new Date(
               Math.min(at, Math.max(line.openedAt, segment.at)),
             ),
+            telemetry: lineTelemetry(segment, line.openedAt, at),
           });
           recorded += 1;
           if (segment.role === "USER") {

@@ -18,10 +18,16 @@ import {
 import { interceptHeard } from "../heard-intercept";
 import { watchSpokenMove } from "../use-follow-turn";
 import { idleEnds } from "./line-hold";
-import { noteForMove, receiptListener, type MoveOutcome } from "./move";
+import {
+  noteForMove,
+  receiptForMove,
+  receiptListener,
+  type MoveOutcome,
+} from "./move";
 import { createReplyLine, interruptsReply } from "./reply-line";
 import {
   boundedContent,
+  compareSpoken,
   createLiveBridge,
   type DelegationOutcome,
   type LiveBridgeState,
@@ -265,7 +271,8 @@ export function fastMoveLine(
   if (receipt === "FAILED") {
     return `The app tried to open what they asked for (${path}) and it did NOT open on their screen. Say briefly that it didn't open and offer to try again; never say it is open.`;
   }
-  return `What they asked for (${path}) is still loading on their screen: do not say it is open; say it is coming up. Do not ask Q's backend for it.`;
+  // Audit 15 Nov (RC1): "coming up" only once a page actually opened.
+  return `What they asked for (${path}) is still loading on their screen: do not say it is open, coming up or loading; say nothing about it. Do not ask Q's backend for it.`;
 }
 
 /**
@@ -327,6 +334,16 @@ export function contextPackage(
   ].filter((part): part is string => part !== null && part.length > 0);
   return parts.length === 0 ? null : parts.join("\n");
 }
+
+/** RC5 telemetry carried with a transcript segment (q-api contracts). */
+type LineTelemetry = {
+  readonly runId?: string;
+  readonly handed?: string;
+  readonly audioStartAt?: number;
+  readonly audioEndAt?: number;
+  readonly diverged?: boolean;
+  readonly speechEndAt?: number;
+};
 
 /** Transcript segments per report, and how long one may wait for more. */
 const TRANSCRIPT_BATCH = 6;
@@ -591,6 +608,8 @@ export async function startLiveCall(
     onChange: update,
     opening: options.opening,
     beforeSpeak: (outcome) => noteForMove(outcome.move),
+    // Q's exact words came back: code edits them by the move's receipt.
+    followMove: (outcome) => receiptForMove(outcome.move),
     routing: () =>
       routing === null
         ? null
@@ -601,18 +620,48 @@ export async function startLiveCall(
   });
 
   // C's fast path: the person's utterance, streamed, then final.
-  let utterance: { key: string; text: string } | null = null;
+  let utterance: { key: string; text: string; lastAt?: number } | null = null;
   let utteranceCount = 0;
   let utteranceTimer: ReturnType<typeof setTimeout> | null = null;
   // V (lead, 2026-10-09: the founder's live lines stored no transcript):
   // each final segment, both sides, goes to the Q API's voice_line_turns
   // (routed 'live') in small ordered batches, and the rest before the end.
-  const kept: {
+  const kept: ({
     role: "USER" | "Q";
     text: string;
     at: number;
     delegated?: true;
-  }[] = [];
+  } & LineTelemetry)[] = [];
+  // RC5: when the player's audio of the current reply started and ended.
+  let replyAudio: { start: number | null; end: number | null } = {
+    start: null,
+    end: null,
+  };
+  /**
+   * A finished reply's telemetry (audit 15 Nov RC5): the exact words it
+   * was handed, their run, whether it said something else, and its audio.
+   */
+  const replyTelemetry = (text: string): LineTelemetry => {
+    const lines = bridge.takeHanded();
+    const audio = replyAudio;
+    replyAudio = { start: null, end: null };
+    const handed = lines
+      .map((line) => line.words)
+      .join(" ")
+      .trim()
+      .slice(0, 4_000);
+    const runId = lines.findLast((line) => line.runId !== undefined)?.runId;
+    return {
+      ...(runId === undefined ? {} : { runId }),
+      ...(handed.length === 0
+        ? {}
+        : { handed, diverged: compareSpoken(handed, text).diverged }),
+      ...(audio.start === null ? {} : { audioStartAt: audio.start }),
+      ...(audio.start === null || audio.end === null || audio.end < audio.start
+        ? {}
+        : { audioEndAt: audio.end }),
+    };
+  };
   // B1: from a delegation until the person speaks again, the turn is Q's
   // run (already in the conversation); the server mirrors only the rest.
   let delegating = false;
@@ -661,7 +710,11 @@ export async function startLiveCall(
     });
     return flushing;
   };
-  const keep = (role: "USER" | "Q", text: string) => {
+  const keep = (
+    role: "USER" | "Q",
+    text: string,
+    telemetry: LineTelemetry = {},
+  ) => {
     const said = text.trim().slice(0, role === "USER" ? 2_000 : 4_000);
     if (said.length === 0) return;
     kept.push({
@@ -669,6 +722,7 @@ export async function startLiveCall(
       text: said,
       at: Date.now(),
       ...(delegating ? { delegated: true as const } : {}),
+      ...telemetry,
     });
     if (kept.length >= TRANSCRIPT_BATCH) void flushTranscript();
     else
@@ -688,7 +742,11 @@ export async function startLiveCall(
       void end("ended", "pitch_intercept");
       return;
     }
-    keep("USER", done.text);
+    keep(
+      "USER",
+      done.text,
+      done.lastAt === undefined ? {} : { speechEndAt: done.lastAt },
+    );
     options.onTranscript?.({
       key: done.key,
       role: "user",
@@ -703,7 +761,7 @@ export async function startLiveCall(
   // dip between chunks no longer ends it mid-word.
   const reply = createReplyLine({
     onTranscript: (line) => options.onTranscript?.(line),
-    keep: (text) => keep("Q", text),
+    keep: (text) => keep("Q", text, replyTelemetry(text)),
     settleMs: REPLY_SETTLE_MS,
   });
 
@@ -832,6 +890,8 @@ export async function startLiveCall(
           utterance = { key: `live_u${String(utteranceCount)}`, text: "" };
         }
         utterance.text += delta;
+        // RC5: the end of their speech is their last word's arrival.
+        utterance.lastAt = Date.now();
         options.onTranscript?.({
           key: utterance.key,
           role: "user",
@@ -1072,6 +1132,9 @@ export async function startLiveCall(
     const speaking = levelOf(output, outBuffer) > SPEAKING_LEVEL;
     if (speaking) lastSpeechAt = performance.now();
     if (speaking !== stats.qSpeaking) {
+      // RC5: the reply's audio as the player gave it out.
+      if (speaking) replyAudio.start ??= Date.now();
+      else replyAudio.end = Date.now();
       stats = { ...stats, qSpeaking: speaking };
       reply.speaking(speaking);
       update();
