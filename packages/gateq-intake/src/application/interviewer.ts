@@ -19,13 +19,14 @@ import {
   supportedLanguageOf,
   writtenLanguageNote,
   GATEQ_STATEMENT_QUANTITIES,
-  GateQInterviewerResultV2Schema,
+  GATEQ_STATEMENT_QUANTITY_UNITS,
+  GateQInterviewerResultV3Schema,
   GateQTurnIntentSchema,
   orEmptyCase,
   PROMPT_EMPTY_CASES,
-  type GateQInterviewerResultV2,
+  type GateQInterviewerResultV3,
   type GateQInterviewerVariables,
-  type GateQStatementOp,
+  type GateQStatementOpV3 as GateQStatementOp,
   type GateQTurnIntent,
   type PromptRegistry,
   type QPersonalityCode,
@@ -43,10 +44,13 @@ import {
 import {
   contradictionsForInterview,
   figureContradictions,
+  mayAskAbout,
   questionNeedsFor,
   type QuestionNeed,
+  type QuestionNeedsInput,
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
+import { diligenceQuestionFor } from "./dossier.js";
 import { regionIn } from "./cities.js";
 import {
   ACCUMULATING_DIMENSIONS,
@@ -67,6 +71,7 @@ import {
   renderKnownStatements,
   replyHeldToReading,
   StatementPlanSchema,
+  withoutQuestions,
   type AskLog,
   type StatementContext,
   type StatementPlan,
@@ -110,7 +115,7 @@ export type InterviewChannel = "voice" | "text";
 
 /** A legacy fact proposal as NEW statement(s), linked to nothing. */
 function statementsOfFact(
-  fact: GateQInterviewerResultV2["facts"][number],
+  fact: GateQInterviewerResultV3["facts"][number],
   utterance: string,
 ): GateQStatementOp[] {
   const words = (text: string) =>
@@ -666,10 +671,10 @@ export function createGateQInterviewer(
         );
         return { turnContext, carried, view, log, handles };
       })();
-      const needs =
+      const needsInput: QuestionNeedsInput | null =
         application === undefined
-          ? []
-          : questionNeedsFor({
+          ? null
+          : {
               policy: application.policy,
               qualification: application.qualification,
               facts: application.facts,
@@ -705,7 +710,8 @@ export function createGateQInterviewer(
                       return asksSince(statementState.log, dimension, since);
                     },
                   }),
-            });
+            };
+      const needs = needsInput === null ? [] : questionNeedsFor(needsInput);
 
       // The renderer supplies the charter-level four; this is the rest.
       const variables: Omit<
@@ -744,7 +750,14 @@ export function createGateQInterviewer(
           : {}),
         ...(promptVersion >= 7
           ? {
-              statementQuantities: GATEQ_STATEMENT_QUANTITIES.join(", "),
+              // v10 reads what each count counts: the list carries each
+              // metric's declared unit, the one code compares it with.
+              statementQuantities: GATEQ_STATEMENT_QUANTITIES.map((key) => {
+                const unit = GATEQ_STATEMENT_QUANTITY_UNITS[key];
+                return promptVersion >= 10 && unit !== undefined
+                  ? `${key} (unit: ${unit})`
+                  : key;
+              }).join(", "),
               unreadMessages:
                 statementState === null ||
                 statementState.turnContext.unread.length === 0
@@ -812,9 +825,9 @@ export function createGateQInterviewer(
         variables,
       });
 
-      let result: GateQInterviewerResultV2;
+      let result: GateQInterviewerResultV3;
       try {
-        const response = await gateway.execute<GateQInterviewerResultV2>(
+        const response = await gateway.execute<GateQInterviewerResultV3>(
           {
             taskClass: "NORMAL_DIALOGUE",
             // A stranger's application is their own commercial material,
@@ -826,7 +839,7 @@ export function createGateQInterviewer(
             attribution: { ...input.attribution, purpose: "ONBOARDING" },
           },
           {
-            schema: GateQInterviewerResultV2Schema,
+            schema: GateQInterviewerResultV3Schema,
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
@@ -834,7 +847,7 @@ export function createGateQInterviewer(
         if (response.output.kind !== "STRUCTURED") {
           throw new InterviewUnavailableError(true);
         }
-        result = GateQInterviewerResultV2Schema.parse(
+        result = GateQInterviewerResultV3Schema.parse(
           (response.output as { readonly value: unknown }).value,
         );
       } catch (error: unknown) {
@@ -955,13 +968,13 @@ export function createGateQInterviewer(
               ? ""
               : `Which country in ${planned.narrowTo} is the company based in?`)
           : "";
-        const askingDimension =
+        const modelAsking =
           readBackLineText.length > 0
             ? (planned.readBacks[0]?.dimension ?? "company.country")
             : result.asking !== null && DIMENSIONS.has(result.asking)
               ? (result.asking as ApplicationDimension)
               : null;
-        const composed =
+        const modelComposed =
           readBackLineText.length === 0
             ? result.reply
             : `${aroundReadBack(
@@ -970,6 +983,76 @@ export function createGateQInterviewer(
               )} ${readBackLineText}`
                 .trim()
                 .slice(0, 4_000);
+        // Q's own question is held to the one settled predicate, read
+        // after this turn's writes: a dimension the form or any statement
+        // answered, or asked to its cap, is not asked again unless the
+        // picker chose it (live 30c99ccc5: the form's country at t15, "how
+        // many clinics?" after "1 clinic to 4", "day to day" four times).
+        // The question is replaced by the picker's next one, in fixed
+        // words; the rest of the reply stays.
+        const { reply: composed, asking: askingDimension } = (() => {
+          const unchanged = { reply: modelComposed, asking: modelAsking };
+          if (
+            needsInput === null ||
+            modelAsking === null ||
+            readBackLineText.length > 0 ||
+            !englishTurn ||
+            discardedByIntent
+          )
+            return unchanged;
+          const after: QuestionNeedsInput = {
+            ...needsInput,
+            view: projectView(
+              [
+                ...turnContext.context.statements,
+                ...statementState.carried,
+                ...planned.plan.statements,
+              ],
+              [...turnContext.context.links, ...planned.plan.links],
+              [...turnContext.context.events, ...planned.plan.events],
+            ),
+          };
+          const afterNeeds = questionNeedsFor(after);
+          if (mayAskAbout(after, modelAsking, afterNeeds)) return unchanged;
+          const next = afterNeeds.find(
+            (need) => need.dimension !== modelAsking,
+          );
+          // Nothing left to ask: the note once (it is capped like any
+          // other dimension), then no question at all, never a loop.
+          if (
+            next === undefined &&
+            (modelAsking === "application.note" ||
+              !mayAskAbout(after, "application.note", afterNeeds))
+          ) {
+            const kept = withoutQuestions(modelComposed);
+            return {
+              reply: kept.length > 0 ? kept : "Thank you.",
+              asking: null,
+            };
+          }
+          const question =
+            next === undefined
+              ? diligenceQuestionFor("application.note")
+              : (questionAngle(
+                  next.dimension,
+                  input.variationSeed ?? turnContext.applicationId,
+                  input.askedCounts?.get(next.dimension) ?? 0,
+                ) ?? diligenceQuestionFor(next.dimension));
+          logger?.debug(
+            {
+              correlationId: input.attribution.correlationId,
+              ruledOut: modelAsking,
+              next: next?.dimension ?? null,
+            },
+            "gateq interview question on a settled dimension replaced",
+          );
+          return {
+            reply: `${withoutQuestions(modelComposed)} ${question}`
+              .trim()
+              .slice(0, 4_000),
+            asking: next?.dimension ?? "application.note",
+          };
+        })();
         logger?.debug(
           {
             correlationId: input.attribution.correlationId,

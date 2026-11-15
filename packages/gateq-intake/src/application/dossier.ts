@@ -86,6 +86,11 @@ const DILIGENCE_TEMPLATES: Readonly<Record<ApplicationDimension, string>> = {
   "application.note": "Is there anything else the investor should know?",
 };
 
+/** The fixed question for a dimension, for a line no model wrote. */
+export function diligenceQuestionFor(dimension: ApplicationDimension): string {
+  return DILIGENCE_TEMPLATES[dimension];
+}
+
 const truthClassOf = (
   provenance: FactProvenance,
 ): GateqDossierV1["dimensions"][number]["facts"][number]["truthClass"] =>
@@ -288,8 +293,34 @@ export function buildDossierV2(
       ];
     }),
   }));
+  // While the stage answers disagree, the company block holds every answer,
+  // never the one the profile happened to keep (live 30c99ccc5: `stage`
+  // "Series A" beside a left-open "seed by revenue"). The field's bound is
+  // the contract's; each answer in full stays in `statements`.
+  const stage = input.view.dimensions.find(
+    (d) => d.dimension === "company.stage",
+  );
+  const stageAnswers =
+    stage?.status === "DISAGREEMENT_OPEN" ||
+    stage?.status === "DISAGREEMENT_LEFT_OPEN"
+      ? [
+          ...new Set(
+            stage.statements
+              .filter((s) => s.valueKind !== "UNKNOWN")
+              .map((s) => s.summary),
+          ),
+        ]
+      : [];
+  const joined = stageAnswers.join(" or ");
   return GateqDossierV2Schema.parse({
     ...base,
+    company:
+      stageAnswers.length < 2
+        ? base.company
+        : {
+            ...base.company,
+            stage: joined.length <= 64 ? joined : `${joined.slice(0, 63)}…`,
+          },
     schemaVersion: GATEQ_DOSSIER_V2_SCHEMA_VERSION,
     dimensions,
     contradictionsTotal: gateqStandingDisagreements(lines).length,

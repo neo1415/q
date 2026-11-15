@@ -287,6 +287,8 @@ describe("the one-page summary reads each row's own dimension (live 2026-11-14)"
   // in the same group, the customers answer and no market answer.
   const dossier = {
     company: { name: "Branchari" },
+    unknowns: [],
+    declined: [],
     dimensions: [
       {
         group: "MARKET",
@@ -317,6 +319,107 @@ describe("the one-page summary reads each row's own dimension (live 2026-11-14)"
     expect(rows.get("Customers")).toMatch(/^five SACCOs in Nakuru/);
     expect(rows.get("Market")).toBeNull();
     expect(rows.get("Round")).toMatch(/^USD 300,000\./);
+  });
+});
+
+describe("the one-page summary reads the projection (live 30c99ccc5, Clinicly)", () => {
+  const id = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const fact = (
+    n: number,
+    dimension: string,
+    summary: string,
+    disagreementState: "OPEN" | "LEFT_OPEN" | null = null,
+  ) => ({
+    dimension,
+    label: dimension,
+    summary,
+    provenance: "APPLICANT_PROVIDED" as const,
+    sourceFactId: id(n),
+    sourceTurnSeq: n,
+    truthClass: "USER_CLAIM" as const,
+    evidenceStatus: "SELF_REPORTED" as const,
+    statementId: id(n),
+    sourceKind: "APPLICATION_STATEMENT" as const,
+    backfilled: false,
+    disagreementState,
+  });
+  // The frozen Clinicly dossier: traction 2,300 records and 600 weekly
+  // active users, then a left-open "about 1,500"; the market a stated
+  // unknown (`bd15481f`), which the panel calls "Not known".
+  const dossier = {
+    schemaVersion: "gateq-dossier.v2",
+    company: { name: "Clinicly" },
+    unknowns: [
+      { dimension: "company.market", label: "Market", group: "MARKET" },
+    ],
+    declined: [],
+    dimensions: [
+      {
+        group: "TRACTION",
+        label: "Traction and revenue",
+        facts: [
+          fact(4, "claims.traction", "2,300 patient records digitised"),
+          fact(5, "claims.traction", "600 weekly active users", "LEFT_OPEN"),
+          fact(16, "claims.traction", "1,500 weekly active users", "LEFT_OPEN"),
+          fact(6, "claims.revenue", "Nothing yet"),
+        ],
+      },
+      {
+        group: "FUNDRAISING",
+        label: "Fundraising",
+        facts: [fact(22, "raise.amount", "USD 400,000")],
+      },
+    ],
+    statements: {
+      dimensions: [
+        { dimension: "company.market", status: "UNKNOWN" },
+        { dimension: "company.customers", status: "UNANSWERED" },
+        { dimension: "claims.traction", status: "DISAGREEMENT_LEFT_OPEN" },
+      ],
+    },
+  } as unknown as Parameters<typeof model.onePageSummary>[1];
+  const rows = new Map(
+    model
+      .onePageSummary({ companyName: "Clinicly", raise: null }, dossier)
+      .map((row) => [row.label, row] as const),
+  );
+
+  it("says a stated unknown is not known, and a gap is not covered", () => {
+    expect(rows.get("Market")?.value).toBeNull();
+    expect(rows.get("Market")?.gap).toBe("NOT_KNOWN");
+    expect(model.SUMMARY_GAP_WORDS.NOT_KNOWN).toBe("Not known");
+    expect(rows.get("Customers")?.gap).toBe("NOT_COVERED");
+  });
+
+  it("shows every side of a disagreement, with its state", () => {
+    const traction = rows.get("Traction")?.value ?? "";
+    expect(traction).toContain("600 weekly active users");
+    expect(traction).toContain("1,500 weekly active users");
+    expect(traction).toMatch(/Answers disagree: left open by the founder/u);
+    // Nothing is silently dropped: the rest is counted.
+    expect(traction).toContain("2,300 patient records digitised");
+  });
+
+  it("reads a v1 dossier's stated unknowns from its own lists", () => {
+    const v1 = {
+      company: { name: "Clinicly" },
+      unknowns: [
+        { dimension: "company.market", label: "Market", group: "MARKET" },
+      ],
+      declined: [
+        { dimension: "claims.revenue", label: "Revenue", group: "TRACTION" },
+      ],
+      dimensions: [],
+    } as unknown as Parameters<typeof model.onePageSummary>[1];
+    const byLabel = new Map(
+      model
+        .onePageSummary({ companyName: "Clinicly", raise: null }, v1)
+        .map((row) => [row.label, row.gap] as const),
+    );
+    expect(byLabel.get("Market")).toBe("NOT_KNOWN");
+    expect(byLabel.get("Revenue")).toBe("DECLINED");
+    expect(byLabel.get("Traction")).toBe("NOT_COVERED");
   });
 });
 

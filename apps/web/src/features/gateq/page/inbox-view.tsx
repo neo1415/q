@@ -82,6 +82,7 @@ import {
   matchesSearch,
   monogram,
   onePageSummary,
+  SUMMARY_GAP_WORDS,
   openQuestions,
   PANE_VIEWS,
   paneCounts,
@@ -1250,7 +1251,9 @@ function Dossier({
               <span>{t(row.label)}</span>
               <span>
                 {row.value === null ? (
-                  <span className="gq2-unk">{t("Not covered")}</span>
+                  <span className="gq2-unk">
+                    {t(SUMMARY_GAP_WORDS[row.gap ?? "NOT_COVERED"])}
+                  </span>
                 ) : (
                   t(row.value)
                 )}

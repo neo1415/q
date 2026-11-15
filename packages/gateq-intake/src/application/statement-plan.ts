@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { z } from "zod";
+import { GATEQ_STATEMENT_QUANTITY_UNITS } from "@capital-q/q-core";
 import type {
   GateQDisagreementAction,
-  GateQStatementOp,
+  GateQStatementOpV3 as GateQStatementOp,
   GateQStatementValue,
 } from "@capital-q/q-core";
 
@@ -86,8 +87,11 @@ import {
  * 4: prompt v9; a founder's action on a disagreement is applied whatever the
  * turn's intent label, and a CORRECTS hides a figure only when the founder
  * signalled a correction (live 78f8d72d5).
+ * 5: prompt v10 (reading schema v3); a count names a metric only when its
+ * unit fits the metric's declared unit, and words are a span of what was
+ * said (live 30c99ccc5).
  */
-export const STATEMENT_READING_VERSION = 4;
+export const STATEMENT_READING_VERSION = 5;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
@@ -121,6 +125,76 @@ const QUANTITY_OF: Partial<Record<ApplicationDimension, StatementQuantity>> = {
   "claims.revenue": "revenue",
   "raise.amount": "raise_amount",
 };
+
+const plainText = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[‘’`]/gu, "'")
+    .replace(/[“”]/gu, '"')
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[.!?,;:]+$/u, "");
+const tokensOf = (text: string): ReadonlySet<string> =>
+  new Set(plainText(text).match(/[\p{L}\p{N}']+/gu) ?? []);
+
+/**
+ * The founder's own words for a statement: the reader's words when they
+ * are a span of what was said (case, quotes and spacing aside), otherwise
+ * the sentence or sentences of what was said that share most of the
+ * reader's words, as one span of the original. Never a paraphrase stored
+ * as theirs. With nothing said on hand (a composition), the reader's.
+ */
+export function ownWords(words: string, said: string): string {
+  if (said.trim().length === 0 || plainText(said).includes(plainText(words)))
+    return words;
+  const wanted = tokensOf(words);
+  const sentences = [...said.matchAll(/[^.!?]+[.!?]*/gu)];
+  const scored = sentences.map((match) => {
+    const own = tokensOf(match[0]);
+    return {
+      start: match.index,
+      end: match.index + match[0].length,
+      score: [...wanted].filter((token) => own.has(token)).length,
+    };
+  });
+  const best = Math.max(0, ...scored.map((s) => s.score));
+  const top = scored.filter((s) => s.score === best && best > 0);
+  const first = top[0];
+  const last = top.at(-1);
+  if (first === undefined || last === undefined)
+    return said.trim().slice(0, 2000);
+  return said.slice(first.start, last.end).trim().slice(0, 2000);
+}
+
+/** A unit as compared: lower case, letters only, each word singular. */
+const unitWords = (unit: string): readonly string[] =>
+  unit
+    .toLowerCase()
+    .replace(/[^\p{L}\s-]/gu, " ")
+    .split(/[\s-]+/u)
+    .filter((word) => word.length > 0)
+    .map((word) => (word.length > 3 ? word.replace(/s$/u, "") : word));
+
+/**
+ * Whether the reader's stated unit is the metric's declared unit (q-core
+ * GATEQ_STATEMENT_QUANTITY_UNITS). A shorter or longer name of the same
+ * unit fits ("user" for weekly active users, "paying customer" for
+ * customers): one ends the other, word for word. Nothing else is compared;
+ * a metric that declares no unit takes any.
+ */
+export function unitFits(unit: string, quantity: string): boolean {
+  const declared = (
+    GATEQ_STATEMENT_QUANTITY_UNITS as Readonly<Record<string, string>>
+  )[quantity];
+  if (declared === undefined) return true;
+  const said = unitWords(unit);
+  const own = unitWords(declared);
+  if (said.length === 0) return true;
+  const ends = (long: readonly string[], short: readonly string[]) =>
+    short.length <= long.length &&
+    short.every((word, i) => long[long.length - short.length + i] === word);
+  return ends(own, said) || ends(said, own);
+}
 
 function carriedValues(
   fact: ApplicationFact,
@@ -882,13 +956,22 @@ export function planReading(input: PlanInput): PlanOutcome {
   ) => {
     const unknown = value.kind === "UNKNOWN";
     // The quantity it names only when its value fits it (a share is not a
-    // number of users): the relation rule reads the same fit.
-    const quantity = NUMERIC_KINDS.has(value.kind)
-      ? (quantityFitting(
-          value.kind,
-          op.quantity ?? QUANTITY_OF[dimension] ?? null,
-        ) as StatementQuantity | null)
-      : null;
+    // number of users): the relation rule reads the same fit. A count also
+    // names it only when what it counts is that metric's unit, by the
+    // reader's own `unit` (live 30c99ccc5: "2,300 patient records" read as
+    // customers was paired with "4 clinics"): otherwise it is kept with no
+    // metric, and a number with no metric never relates.
+    const named = op.quantity ?? QUANTITY_OF[dimension] ?? null;
+    const quantity =
+      NUMERIC_KINDS.has(value.kind) &&
+      !(
+        value.kind === "COUNT" &&
+        named !== null &&
+        typeof op.unit === "string" &&
+        !unitFits(op.unit, named)
+      )
+        ? (quantityFitting(value.kind, named) as StatementQuantity | null)
+        : null;
     // A model never mints document support: only a value already on
     // record with it keeps it (the confirmation path is the Evidence one).
     const legacy = legacyOn(dimension);
@@ -1237,8 +1320,12 @@ export function planReading(input: PlanInput): PlanOutcome {
         });
       } else target = item.statementId;
     }
+    // The words stored are theirs, a span of what they said, never the
+    // reader's paraphrase (live 30c99ccc5 t32: "by revenue I'd say seed"
+    // for "by revenue we're seed").
+    const words = ownWords(op.words, turn.text);
     for (const value of shaped.values)
-      add(op, turn, value, dimension, op.words, target);
+      add(op, turn, value, dimension, words, target);
   }
 
   // Their yes to a figure Q read back is theirs, whether or not the
@@ -1627,6 +1714,26 @@ export function claimsLeftOpen(text: string): boolean {
 /** The deterministic line when a disagreement was not left open. */
 export const NOT_LEFT_OPEN_LINE =
   "I haven't marked those two answers as left open yet.";
+
+/**
+ * The reply without what it asks: a question sentence keeps only the
+ * clauses it asserts ("Series A, then; which country?" keeps "Series A,
+ * then"). For replacing a question code ruled out, never for a claim.
+ */
+export function withoutQuestions(text: string): string {
+  return sentencesOf(text)
+    .map((sentence) =>
+      sentence.trim().endsWith("?")
+        ? partsOf(sentence)
+            .asserted.join("")
+            .trim()
+            .replace(/[,;:–—\s]+$/u, ".")
+        : sentence.trim(),
+    )
+    .filter((sentence) => sentence.length > 0 && sentence !== ".")
+    .join(" ")
+    .trim();
+}
 
 /** The reply without the claim: sentences dropped, questions kept. */
 function withoutClaim(text: string, claim: RegExp): string {

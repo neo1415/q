@@ -107,6 +107,10 @@ const COVERED_BY: Readonly<
   Partial<Record<ApplicationDimension, readonly ApplicationDimension[]>>
 > = {
   "company.description": ["company.solution", "company.problem"],
+  // Live 30c99ccc5 (Clinicly): "one system for bookings, patient records
+  // and insurance claims" at turn 2, then "what does the product do day to
+  // day?" four times. What the company does is what its product does.
+  "company.solution": ["company.description"],
 };
 
 /**
@@ -126,7 +130,7 @@ const FIGURE_KINDS: ReadonlySet<string> = new Set([
   "ZERO",
 ]);
 
-export function questionNeedsFor(input: {
+export type QuestionNeedsInput = {
   readonly policy: GatewayPolicy;
   readonly qualification: QualificationResult;
   readonly facts: readonly ApplicationFact[];
@@ -156,8 +160,23 @@ export function questionNeedsFor(input: {
    */
   readonly asksSince?:
     ((dimension: ApplicationDimension) => number) | undefined;
-}): readonly QuestionNeed[] {
-  const limit = input.limit ?? 6;
+};
+
+/**
+ * THE settled-for-asking predicate (live 30c99ccc5): what Q may not ask
+ * about, whatever the reason. The question picker below and the check on
+ * Q's own question (`mayAskAbout`) read this one predicate, so a dimension
+ * answered by the form, by any statement (a range or a vague answer
+ * included) or asked to its cap is ruled out in both places.
+ */
+function askingState(input: QuestionNeedsInput): {
+  readonly answered: ReadonlySet<ApplicationDimension>;
+  readonly parked: (dimension: ApplicationDimension) => boolean;
+  readonly settledByView: (
+    dimension: ApplicationDimension,
+    reason: QuestionNeed["reason"],
+  ) => boolean;
+} {
   const statusOf = (dimension: ApplicationDimension) =>
     input.view?.dimensions.find((d) => d.dimension === dimension)?.status;
   /** Whether the view rules a question out, whatever its reason. */
@@ -198,10 +217,52 @@ export function questionNeedsFor(input: {
   );
   if (traction && missingSpecifics("claims.traction", input.facts) === null)
     answered.add("company.customers");
-  const needs: QuestionNeed[] = [];
-  const seen = new Set<ApplicationDimension>();
+  // The same from the statements: a held count (or stated zero) of
+  // customers on any dimension says how many there are (live 30c99ccc5:
+  // "from 1 clinic to 4" on traction, then "how many clinics today?").
+  for (const entry of input.view?.dimensions ?? [])
+    if (
+      entry.items.some(
+        (item) =>
+          item.value.kind !== "UNKNOWN" &&
+          (item.quantity === "customers" ||
+            item.quantity === "paying_customers"),
+      )
+    )
+      answered.add("company.customers");
   const parked = (dimension: ApplicationDimension): boolean =>
     (input.askedCounts?.get(dimension) ?? 0) >= MAX_ASKS_PER_DIMENSION;
+  return { answered, parked, settledByView };
+}
+
+/**
+ * Whether Q's question may be about this dimension: it is one the picker
+ * chose, or nothing rules it out (not answered, not settled, not asked to
+ * its cap). A question about anything else is a re-ask (live 30c99ccc5:
+ * the form's country asked at t15, "how many clinics?" after "1 clinic to
+ * 4", "what does it do day to day" four times).
+ */
+export function mayAskAbout(
+  input: QuestionNeedsInput,
+  dimension: ApplicationDimension,
+  needs: readonly QuestionNeed[],
+): boolean {
+  if (needs.some((need) => need.dimension === dimension)) return true;
+  const state = askingState(input);
+  return !(
+    state.answered.has(dimension) ||
+    state.parked(dimension) ||
+    state.settledByView(dimension, "UNDERSTANDING")
+  );
+}
+
+export function questionNeedsFor(
+  input: QuestionNeedsInput,
+): readonly QuestionNeed[] {
+  const limit = input.limit ?? 6;
+  const { answered, parked, settledByView } = askingState(input);
+  const needs: QuestionNeed[] = [];
+  const seen = new Set<ApplicationDimension>();
 
   const add = (
     dimension: ApplicationDimension | undefined,
