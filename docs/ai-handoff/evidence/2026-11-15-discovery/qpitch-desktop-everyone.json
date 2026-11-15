@@ -1,95 +1,95 @@
 {
- "form": "desktop",
- "console": [],
- "pageErrors": [],
- "failed": [],
- "audio": {
-  "capital-qweb-production.up.railway.app 200": 77
- },
- "samples": [
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "4 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 13
+  "form": "desktop",
+  "console": [],
+  "pageErrors": [],
+  "failed": [],
+  "audio": {
+    "capital-qweb-production.up.railway.app 200": 77
   },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "6 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 22
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "9 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 32
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "10 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 41
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "12 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 50
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "13 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 59
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "14 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 68
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "15 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 77
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "16 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 86
-  },
-  {
-   "url": "/home?qpitch=story&new=1&start=mwhi",
-   "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
-   "controls": "18 / 56 Back Pause Next Captions Mute End",
-   "film": false,
-   "qcard": false,
-   "sec": 95
-  }
- ],
- "entryStatus": 200,
- "entry": "Q Pitch Q tells the Capital Q story in its own voice. What it shows of the product uses fictional demonstration data, labelled as such. You can pause, go back, skip, start over or ask a question at any point, by voice or by typing. You can also ask Q from any page: \"Hey Q, pitch yourself\", or \"pitch yourself to investors\" or \"to founders\". Who is it for? Everyone About 7 minutes Start Investors Under 4 minutes Start Founders About 4½ minutes Start",
- "startCount": 1,
- "startUrl": "/home?qpitch=story&new=1&start=mwhigk65"
+  "samples": [
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "4 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 13
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "6 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 22
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "9 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 32
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "10 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 41
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "12 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 50
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "13 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 59
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "14 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 68
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "15 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 77
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "16 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 86
+    },
+    {
+      "url": "/home?qpitch=story&new=1&start=mwhi",
+      "story": "Skip to content 35 Q Chat What's on your mind today, Amara? Ask Q Q What is my mandate? What are my hard exclusions? What should I look at? Home Work Tasks 7 Board Documents Rehearsals The Q Daily To move an item with th",
+      "controls": "18 / 56 Back Pause Next Captions Mute End",
+      "film": false,
+      "qcard": false,
+      "sec": 95
+    }
+  ],
+  "entryStatus": 200,
+  "entry": "Q Pitch Q tells the Capital Q story in its own voice. What it shows of the product uses fictional demonstration data, labelled as such. You can pause, go back, skip, start over or ask a question at any point, by voice or by typing. You can also ask Q from any page: \"Hey Q, pitch yourself\", or \"pitch yourself to investors\" or \"to founders\". Who is it for? Everyone About 7 minutes Start Investors Under 4 minutes Start Founders About 4½ minutes Start",
+  "startCount": 1,
+  "startUrl": "/home?qpitch=story&new=1&start=mwhigk65"
 }

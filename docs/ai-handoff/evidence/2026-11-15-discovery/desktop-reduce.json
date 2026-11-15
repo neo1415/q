@@ -1,1053 +1,1053 @@
 {
- "tag": "desktop-reduce",
- "requests": [
-  {
-   "t": 1794727355196,
-   "rt": "fetch",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/854/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356534,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356567,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356588,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356599,
-   "rt": "image",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "image/jpeg"
-  },
-  {
-   "t": 1794727356609,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356619,
-   "rt": "image",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "image/jpeg"
-  },
-  {
-   "t": 1794727356619,
-   "rt": "image",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "image/jpeg"
-  },
-  {
-   "t": 1794727356643,
-   "rt": "image",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "image/jpeg"
-  },
-  {
-   "t": 1794727356710,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356710,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356710,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356710,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356710,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727356895,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1278/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356895,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356911,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1278/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356911,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1282/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356914,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356918,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1282/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356921,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356924,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356927,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/video/1282/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356934,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_1.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356951,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727356959,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/video/1282/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357273,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_2.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357298,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727357319,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_2.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357339,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727357430,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_2.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357430,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357442,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1918/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357466,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_2.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357543,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1918/seg_2.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357569,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
-   "hasToken": true,
-   "status": 200,
-   "ct": "application/vnd.apple.mpegurl"
-  },
-  {
-   "t": 1794727357791,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_3.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357791,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_3.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357791,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/video/1922/init.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357843,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/video/1922/seg_2.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357844,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_3.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357872,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1918/seg_3.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357911,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_4.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357930,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_4.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357975,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/video/1922/seg_3.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357989,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_4.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727357999,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_3.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358077,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_4.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358097,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_5.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358108,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_5.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358163,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_6.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358204,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_6.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358292,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_7.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358316,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_7.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358398,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_8.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358424,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_8.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358494,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_9.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358515,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_9.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358581,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_10.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358593,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_10.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358722,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_11.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358734,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_11.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358844,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_12.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358869,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_12.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358933,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_13.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  },
-  {
-   "t": 1794727358934,
-   "rt": "xhr",
-   "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_13.mp4",
-   "hasToken": false,
-   "status": 200,
-   "ct": "video/mp4"
-  }
- ],
- "console": [],
- "pageErrors": [],
- "url": "/discover",
- "timing": {
-  "domMs": 1105,
-  "videoElMs": 1456,
-  "posterAttrMs": 1456
- },
- "videos1": [
-  {
-   "i": 0,
-   "policy": "ACTIVE",
-   "playingAttr": "false",
-   "mutedProp": true,
-   "mutedAttr": false,
-   "playsinline": true,
-   "autoplay": false,
-   "preload": "metadata",
-   "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "src": "blob:https://capital-qweb-production.up.railway.app/fb11ccb0",
-   "paused": true,
-   "ct": 0,
-   "rs": 4,
-   "ns": 2,
-   "err": null,
-   "problem": null
-  },
-  {
-   "i": 1,
-   "policy": "STARTUP_BUFFER",
-   "playingAttr": "false",
-   "mutedProp": true,
-   "mutedAttr": false,
-   "playsinline": true,
-   "autoplay": false,
-   "preload": "auto",
-   "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "src": "blob:https://capital-qweb-production.up.railway.app/8c0f8dd5",
-   "paused": true,
-   "ct": 0,
-   "rs": 4,
-   "ns": 2,
-   "err": null,
-   "problem": null
-  },
-  {
-   "i": 2,
-   "policy": "STARTUP_BUFFER",
-   "playingAttr": "false",
-   "mutedProp": true,
-   "mutedAttr": false,
-   "playsinline": true,
-   "autoplay": false,
-   "preload": "auto",
-   "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "src": "blob:https://capital-qweb-production.up.railway.app/37f759eb",
-   "paused": true,
-   "ct": 0,
-   "rs": 4,
-   "ns": 2,
-   "err": null,
-   "problem": null
-  }
- ],
- "canPlay": {
-  "hls": "maybe",
-  "h264": "probably",
-  "mse": true
- },
- "navPos1": "1\nof 10+",
- "buttons": [
-  {
-   "t": "Collapse sidebar",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "You",
-   "pressed": null,
-   "h": 44,
-   "w": 215
-  },
-  {
-   "t": "Theme: Device",
-   "pressed": null,
-   "h": 40,
-   "w": 40
-  },
-  {
-   "t": "Notifications, 35 new",
-   "pressed": null,
-   "h": 40,
-   "w": 40
-  },
-  {
-   "t": "Sign out",
-   "pressed": null,
-   "h": 36,
-   "w": 36
-  },
-  {
-   "t": "Q",
-   "pressed": "false",
-   "h": 36,
-   "w": 64
-  },
-  {
-   "t": "Chat",
-   "pressed": "true",
-   "h": 36,
-   "w": 64
-  },
-  {
-   "t": "Board, 0 items",
-   "pressed": null,
-   "h": 36,
-   "w": 42
-  },
-  {
-   "t": "Conversations",
-   "pressed": null,
-   "h": 36,
-   "w": 42
-  },
-  {
-   "t": "More",
-   "pressed": null,
-   "h": 36,
-   "w": 42
-  },
-  {
-   "t": "Attach a document",
-   "pressed": null,
-   "h": 40,
-   "w": 40
-  },
-  {
-   "t": "Talk to Q",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "What is my mandate?",
-   "pressed": null,
-   "h": 44,
-   "w": 299
-  },
-  {
-   "t": "What are my hard exclusions?",
-   "pressed": null,
-   "h": 44,
-   "w": 299
-  },
-  {
-   "t": "What should I look at?",
-   "pressed": null,
-   "h": 44,
-   "w": 299
-  },
-  {
-   "t": "Hide Q",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "For you",
-   "pressed": "true",
-   "h": 44,
-   "w": 74
-  },
-  {
-   "t": "Your companies",
-   "pressed": "false",
-   "h": 44,
-   "w": 137
-  },
-  {
-   "t": "Unmute",
-   "pressed": "false",
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "Play pitch",
-   "pressed": null,
-   "h": 48,
-   "w": 141
-  },
-  {
-   "t": "Filters",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "More about Ledgerline",
-   "pressed": null,
-   "h": 44,
-   "w": 164
-  },
-  {
-   "t": "Save",
-   "pressed": "false",
-   "h": 56,
-   "w": 64
-  },
-  {
-   "t": "Pass",
-   "pressed": null,
-   "h": 56,
-   "w": 64
-  },
-  {
-   "t": "Ask Q",
-   "pressed": null,
-   "h": 56,
-   "w": 64
-  },
-  {
-   "t": "More",
-   "pressed": null,
-   "h": 56,
-   "w": 64
-  },
-  {
-   "t": "Previous company",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "Next company",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "Hide pages",
-   "pressed": null,
-   "h": 44,
-   "w": 44
-  },
-  {
-   "t": "Pin workspace",
-   "pressed": "false",
-   "h": 44,
-   "w": 44
-  }
- ],
- "overlayText": "Discover For you Your companies Play pitch Sound stays off until you turn it on Ledgerline Seed · Nigeria · Raising $1.8M Ledgerline checks every invoice at creation and files VAT returns for Nigerian SMEs, ready for FIRS e-invoicing. Seed, in your range +2 Profile Save Pass Ask Q More 1 of 10+",
- "playButton": 1,
- "videosAfterPlay": [
-  {
-   "i": 0,
-   "policy": "ACTIVE",
-   "playingAttr": "true",
-   "mutedProp": true,
-   "mutedAttr": false,
-   "playsinline": true,
-   "autoplay": false,
-   "preload": "metadata",
-   "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "src": "blob:https://capital-qweb-production.up.railway.app/fb11ccb0",
-   "paused": false,
-   "ct": 5.01,
-   "rs": 4,
-   "ns": 2,
-   "err": null,
-   "problem": null
-  },
-  {
-   "i": 1,
-   "policy": "STARTUP_BUFFER",
-   "playingAttr": "false",
-   "mutedProp": true,
-   "mutedAttr": false,
-   "playsinline": true,
-   "autoplay": false,
-   "preload": "auto",
-   "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "src": "blob:https://capital-qweb-production.up.railway.app/8c0f8dd5",
-   "paused": true,
-   "ct": 0,
-   "rs": 4,
-   "ns": 2,
-   "err": null,
-   "problem": null
-  },
-  {
-   "i": 2,
-   "policy": "STARTUP_BUFFER",
-   "playingAttr": "false",
-   "mutedProp": true,
-   "mutedAttr": false,
-   "playsinline": true,
-   "autoplay": false,
-   "preload": "auto",
-   "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
-   "src": "blob:https://capital-qweb-production.up.railway.app/37f759eb",
-   "paused": true,
-   "ct": 0,
-   "rs": 4,
-   "ns": 2,
-   "err": null,
-   "problem": null
-  }
- ],
- "metrics": {
-  "lcp": [
-   {
-    "t": 1312,
-    "el": "P.cq-feed-one-liner text-(--cq-text-primar",
-    "url": ""
-   },
-   {
-    "t": 1556,
-    "el": "VIDEO.cq-feed-video",
-    "url": "https://customer-yvhdyqtcx10huifu.cloudflarestream.com/eyJhbGciOiJSUzI1NiIsImtpZ"
-   }
+  "tag": "desktop-reduce",
+  "requests": [
+    {
+      "t": 1794727355196,
+      "rt": "fetch",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/854/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356534,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356567,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356588,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356599,
+      "rt": "image",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "image/jpeg"
+    },
+    {
+      "t": 1794727356609,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356619,
+      "rt": "image",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "image/jpeg"
+    },
+    {
+      "t": 1794727356619,
+      "rt": "image",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "image/jpeg"
+    },
+    {
+      "t": 1794727356643,
+      "rt": "image",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "image/jpeg"
+    },
+    {
+      "t": 1794727356710,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356710,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356710,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356710,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356710,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727356895,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1278/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356895,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356911,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1278/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356911,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1282/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356914,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356918,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1282/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356921,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356924,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356927,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/video/1282/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356934,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_1.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356951,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727356959,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/video/1282/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357273,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_2.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357298,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727357319,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_2.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357339,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727357430,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_2.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357430,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357442,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1918/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357466,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_2.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357543,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1918/seg_2.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357569,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/eyJhbGciOiJSUzI1NiIsImtpZCI6IjMzZDVhN2I0NDZlMzZmNDU5Y2ZiODM3MGViNDNiN…",
+      "hasToken": true,
+      "status": 200,
+      "ct": "application/vnd.apple.mpegurl"
+    },
+    {
+      "t": 1794727357791,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_3.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357791,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_3.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357791,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/video/1922/init.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357843,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/video/1922/seg_2.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357844,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_3.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357872,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/video/1918/seg_3.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357911,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_4.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357930,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/311f5f8bc849fd29a1e94da197f327d9/audio/130/seg_4.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357975,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/video/1922/seg_3.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357989,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_4.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727357999,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_3.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358077,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/591b553d403503f25b55a58e4542e4ea/audio/130/seg_4.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358097,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_5.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358108,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_5.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358163,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_6.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358204,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_6.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358292,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_7.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358316,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_7.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358398,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_8.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358424,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_8.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358494,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_9.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358515,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_9.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358581,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_10.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358593,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_10.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358722,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_11.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358734,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_11.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358844,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_12.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358869,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_12.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358933,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/audio/130/seg_13.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    },
+    {
+      "t": 1794727358934,
+      "rt": "xhr",
+      "host": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "path": "/2371b5df896672b84f15e32e6516fcb0/video/1924/seg_13.mp4",
+      "hasToken": false,
+      "status": 200,
+      "ct": "video/mp4"
+    }
   ],
-  "cls": 0,
-  "maxEvent": 40,
-  "events": [
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "pointerenter",
-    "d": 40
-   },
-   {
-    "n": "mouseover",
-    "d": 40
-   }
+  "console": [],
+  "pageErrors": [],
+  "url": "/discover",
+  "timing": {
+    "domMs": 1105,
+    "videoElMs": 1456,
+    "posterAttrMs": 1456
+  },
+  "videos1": [
+    {
+      "i": 0,
+      "policy": "ACTIVE",
+      "playingAttr": "false",
+      "mutedProp": true,
+      "mutedAttr": false,
+      "playsinline": true,
+      "autoplay": false,
+      "preload": "metadata",
+      "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "src": "blob:https://capital-qweb-production.up.railway.app/fb11ccb0",
+      "paused": true,
+      "ct": 0,
+      "rs": 4,
+      "ns": 2,
+      "err": null,
+      "problem": null
+    },
+    {
+      "i": 1,
+      "policy": "STARTUP_BUFFER",
+      "playingAttr": "false",
+      "mutedProp": true,
+      "mutedAttr": false,
+      "playsinline": true,
+      "autoplay": false,
+      "preload": "auto",
+      "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "src": "blob:https://capital-qweb-production.up.railway.app/8c0f8dd5",
+      "paused": true,
+      "ct": 0,
+      "rs": 4,
+      "ns": 2,
+      "err": null,
+      "problem": null
+    },
+    {
+      "i": 2,
+      "policy": "STARTUP_BUFFER",
+      "playingAttr": "false",
+      "mutedProp": true,
+      "mutedAttr": false,
+      "playsinline": true,
+      "autoplay": false,
+      "preload": "auto",
+      "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "src": "blob:https://capital-qweb-production.up.railway.app/37f759eb",
+      "paused": true,
+      "ct": 0,
+      "rs": 4,
+      "ns": 2,
+      "err": null,
+      "problem": null
+    }
   ],
-  "media": [
-   {
-    "ev": "loadstart",
-    "t": 1405,
-    "idx": 0,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadstart",
-    "t": 1449,
-    "idx": 1,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadstart",
-    "t": 1451,
-    "idx": 2,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadedmetadata",
-    "t": 2028,
-    "idx": 2,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadedmetadata",
-    "t": 2028,
-    "idx": 0,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadedmetadata",
-    "t": 2121,
-    "idx": 1,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadeddata",
-    "t": 2350,
-    "idx": 2,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "canplay",
-    "t": 2350,
-    "idx": 2,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadeddata",
-    "t": 2350,
-    "idx": 0,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "canplay",
-    "t": 2350,
-    "idx": 0,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "loadeddata",
-    "t": 2351,
-    "idx": 1,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "canplay",
-    "t": 2351,
-    "idx": 1,
-    "err": null,
-    "ct": 0
-   },
-   {
-    "ev": "playing",
-    "t": 10109,
-    "idx": 0,
-    "err": null,
-    "ct": 0.01
-   }
-  ]
- },
- "activeCount": 1
+  "canPlay": {
+    "hls": "maybe",
+    "h264": "probably",
+    "mse": true
+  },
+  "navPos1": "1\nof 10+",
+  "buttons": [
+    {
+      "t": "Collapse sidebar",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "You",
+      "pressed": null,
+      "h": 44,
+      "w": 215
+    },
+    {
+      "t": "Theme: Device",
+      "pressed": null,
+      "h": 40,
+      "w": 40
+    },
+    {
+      "t": "Notifications, 35 new",
+      "pressed": null,
+      "h": 40,
+      "w": 40
+    },
+    {
+      "t": "Sign out",
+      "pressed": null,
+      "h": 36,
+      "w": 36
+    },
+    {
+      "t": "Q",
+      "pressed": "false",
+      "h": 36,
+      "w": 64
+    },
+    {
+      "t": "Chat",
+      "pressed": "true",
+      "h": 36,
+      "w": 64
+    },
+    {
+      "t": "Board, 0 items",
+      "pressed": null,
+      "h": 36,
+      "w": 42
+    },
+    {
+      "t": "Conversations",
+      "pressed": null,
+      "h": 36,
+      "w": 42
+    },
+    {
+      "t": "More",
+      "pressed": null,
+      "h": 36,
+      "w": 42
+    },
+    {
+      "t": "Attach a document",
+      "pressed": null,
+      "h": 40,
+      "w": 40
+    },
+    {
+      "t": "Talk to Q",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "What is my mandate?",
+      "pressed": null,
+      "h": 44,
+      "w": 299
+    },
+    {
+      "t": "What are my hard exclusions?",
+      "pressed": null,
+      "h": 44,
+      "w": 299
+    },
+    {
+      "t": "What should I look at?",
+      "pressed": null,
+      "h": 44,
+      "w": 299
+    },
+    {
+      "t": "Hide Q",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "For you",
+      "pressed": "true",
+      "h": 44,
+      "w": 74
+    },
+    {
+      "t": "Your companies",
+      "pressed": "false",
+      "h": 44,
+      "w": 137
+    },
+    {
+      "t": "Unmute",
+      "pressed": "false",
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "Play pitch",
+      "pressed": null,
+      "h": 48,
+      "w": 141
+    },
+    {
+      "t": "Filters",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "More about Ledgerline",
+      "pressed": null,
+      "h": 44,
+      "w": 164
+    },
+    {
+      "t": "Save",
+      "pressed": "false",
+      "h": 56,
+      "w": 64
+    },
+    {
+      "t": "Pass",
+      "pressed": null,
+      "h": 56,
+      "w": 64
+    },
+    {
+      "t": "Ask Q",
+      "pressed": null,
+      "h": 56,
+      "w": 64
+    },
+    {
+      "t": "More",
+      "pressed": null,
+      "h": 56,
+      "w": 64
+    },
+    {
+      "t": "Previous company",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "Next company",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "Hide pages",
+      "pressed": null,
+      "h": 44,
+      "w": 44
+    },
+    {
+      "t": "Pin workspace",
+      "pressed": "false",
+      "h": 44,
+      "w": 44
+    }
+  ],
+  "overlayText": "Discover For you Your companies Play pitch Sound stays off until you turn it on Ledgerline Seed · Nigeria · Raising $1.8M Ledgerline checks every invoice at creation and files VAT returns for Nigerian SMEs, ready for FIRS e-invoicing. Seed, in your range +2 Profile Save Pass Ask Q More 1 of 10+",
+  "playButton": 1,
+  "videosAfterPlay": [
+    {
+      "i": 0,
+      "policy": "ACTIVE",
+      "playingAttr": "true",
+      "mutedProp": true,
+      "mutedAttr": false,
+      "playsinline": true,
+      "autoplay": false,
+      "preload": "metadata",
+      "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "src": "blob:https://capital-qweb-production.up.railway.app/fb11ccb0",
+      "paused": false,
+      "ct": 5.01,
+      "rs": 4,
+      "ns": 2,
+      "err": null,
+      "problem": null
+    },
+    {
+      "i": 1,
+      "policy": "STARTUP_BUFFER",
+      "playingAttr": "false",
+      "mutedProp": true,
+      "mutedAttr": false,
+      "playsinline": true,
+      "autoplay": false,
+      "preload": "auto",
+      "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "src": "blob:https://capital-qweb-production.up.railway.app/8c0f8dd5",
+      "paused": true,
+      "ct": 0,
+      "rs": 4,
+      "ns": 2,
+      "err": null,
+      "problem": null
+    },
+    {
+      "i": 2,
+      "policy": "STARTUP_BUFFER",
+      "playingAttr": "false",
+      "mutedProp": true,
+      "mutedAttr": false,
+      "playsinline": true,
+      "autoplay": false,
+      "preload": "auto",
+      "poster": "customer-yvhdyqtcx10huifu.cloudflarestream.com",
+      "src": "blob:https://capital-qweb-production.up.railway.app/37f759eb",
+      "paused": true,
+      "ct": 0,
+      "rs": 4,
+      "ns": 2,
+      "err": null,
+      "problem": null
+    }
+  ],
+  "metrics": {
+    "lcp": [
+      {
+        "t": 1312,
+        "el": "P.cq-feed-one-liner text-(--cq-text-primar",
+        "url": ""
+      },
+      {
+        "t": 1556,
+        "el": "VIDEO.cq-feed-video",
+        "url": "https://customer-yvhdyqtcx10huifu.cloudflarestream.com/eyJhbGciOiJSUzI1NiIsImtpZ"
+      }
+    ],
+    "cls": 0,
+    "maxEvent": 40,
+    "events": [
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "pointerenter",
+        "d": 40
+      },
+      {
+        "n": "mouseover",
+        "d": 40
+      }
+    ],
+    "media": [
+      {
+        "ev": "loadstart",
+        "t": 1405,
+        "idx": 0,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadstart",
+        "t": 1449,
+        "idx": 1,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadstart",
+        "t": 1451,
+        "idx": 2,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadedmetadata",
+        "t": 2028,
+        "idx": 2,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadedmetadata",
+        "t": 2028,
+        "idx": 0,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadedmetadata",
+        "t": 2121,
+        "idx": 1,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadeddata",
+        "t": 2350,
+        "idx": 2,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "canplay",
+        "t": 2350,
+        "idx": 2,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadeddata",
+        "t": 2350,
+        "idx": 0,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "canplay",
+        "t": 2350,
+        "idx": 0,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "loadeddata",
+        "t": 2351,
+        "idx": 1,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "canplay",
+        "t": 2351,
+        "idx": 1,
+        "err": null,
+        "ct": 0
+      },
+      {
+        "ev": "playing",
+        "t": 10109,
+        "idx": 0,
+        "err": null,
+        "ct": 0.01
+      }
+    ]
+  },
+  "activeCount": 1
 }

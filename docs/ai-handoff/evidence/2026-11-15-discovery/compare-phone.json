@@ -1,60 +1,60 @@
 {
- "form": "phone",
- "console": [],
- "pageErrors": [],
- "failed": [],
- "saved": [
-  {
-   "name": "Open profile",
-   "id": "526c2d72-9142-4e48-b106-ee4910f19318"
-  },
-  {
-   "name": "Open profile",
-   "id": "7b62eab6-39b9-4cb6-884a-878301f6928f"
-  },
-  {
-   "name": "Open profile",
-   "id": "84b9641f-b618-4fa3-8b35-1d19b1c71d82"
-  },
-  {
-   "name": "Open profile",
-   "id": "5be654c3-eb80-4bdf-aa5a-9cb29c521dbe"
-  },
-  {
-   "name": "Open profile",
-   "id": "63dec1b9-0bb5-49e0-8f2d-ae33a74e1263"
-  },
-  {
-   "name": "Ledgerfold",
-   "id": "84b9641f-b618-4fa3-8b35-1d19b1c71d82"
-  },
-  {
-   "name": "Ledgerline",
-   "id": "6f075a0b-8372-4458-9060-09afd73a9c37"
-  },
-  {
-   "name": "Watchly",
-   "id": "526c2d72-9142-4e48-b106-ee4910f19318"
-  }
- ],
- "pick": [
-  {
-   "name": "Open profile",
-   "id": "526c2d72-9142-4e48-b106-ee4910f19318"
-  },
-  {
-   "name": "Open profile",
-   "id": "7b62eab6-39b9-4cb6-884a-878301f6928f"
-  },
-  {
-   "name": "Open profile",
-   "id": "84b9641f-b618-4fa3-8b35-1d19b1c71d82"
-  }
- ],
- "compareMs": 7555,
- "url": "/discover/saved/compare?ids=526c2d72-9142-4e48-b106-ee4910f19318%2C7b62eab6-39b9-4cb6-884a-878301f6928f%2C84b9641f-b618-4fa3-8b35-1d19b1c71d82",
- "main": "Discover\nSaved\nSaved\n5\nPassed\nCompare\nComparing 3\nHow this is read\n1\nLedgerfold\n9.2/10 · Good fit · medium confidence\n\nInvestability 57 · Low confidence · based on 14 of 48 factors, developing · low confidence. Suitability 92 · 5 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence\nInvestability 57 · Low confidence · based on 14 of 48 factors\nSuitability 92 · 5 of 7 known\nUnicorn Potential: insufficient evidence\n\nseed · Nigeria\n\nStage\nRaising seed; you invest at seed.\nSector\nIn one of your sectors.\nGeography\nBased in Nigeria; in a region you invest in.\nCheque compatibility\n$2.5M (from their pitch) round; your $250k–$1M cheque fits (up to 40% of it).\nBusiness model\nBusiness model not clear yet.\nTraction\nYou have not set a traction minimum.\nTeam\nYou have no team requirements.\nThesis\nClose to your thesis.\nBest of 3\nRound terms\nPriced seed in their deck; whether they need a lead is not stated.\n\nQ's view: Worth a look. Seed financial infrastructure for Lagos market traders, raising $2.5M in a priced seed round, with the deck stating 6,400 bookkeeping users, 2,150 borrowers and about $38,000 monthly revenue. The sector, stage, thesis and cheque fit are aligned, while the lending model warrants focused diligence.\n\nOpen profile\n2\nPortside\n8.7/10 · Good fit · medium confidence\n\nInvestability 62 · Low confidence · based on 16 of 48 factors, developing · low confidence. Suitability 87 · 6 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence\nInvestability 62 · Low confidence · based on 16 of 48 factors\nSuitability 87 · 6 of 7 known\nUnicorn Potential: insufficient evidence\n\n3\nWatchly\n8.7/10 · Good fit · medium confidence\n\nInvestability 52 · Low confidence · based on 12 of 48 factors, developing · low confidence. Suitability 87 · 6 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence\nInvestability 52 · Low confidence · based on 12 of 48 factors\nSuitability 87 · 6 of 7 known\nUnicorn Potential: insufficient evidence\n\n0 selected\nPick one more to compare",
- "tables": 1,
- "hscroll": false,
- "defaultHead": "Discover Saved Saved 5 Passed Compare Your top three right now Why these three? 1 Ledgerfold 9.2/10 · Good fit · medium confidence Investability 57 · Low confidence · based on 14 of 48 factors, developing · low confidence. Suitability 92 · 5 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence Investability 57 · Low confidence · based on 14 of 48 factors Suitability 92 · 5 of 7 known Unicorn Potential: insufficient evidence seed · Nigeria Stage Raising seed; you inv"
+  "form": "phone",
+  "console": [],
+  "pageErrors": [],
+  "failed": [],
+  "saved": [
+    {
+      "name": "Open profile",
+      "id": "526c2d72-9142-4e48-b106-ee4910f19318"
+    },
+    {
+      "name": "Open profile",
+      "id": "7b62eab6-39b9-4cb6-884a-878301f6928f"
+    },
+    {
+      "name": "Open profile",
+      "id": "84b9641f-b618-4fa3-8b35-1d19b1c71d82"
+    },
+    {
+      "name": "Open profile",
+      "id": "5be654c3-eb80-4bdf-aa5a-9cb29c521dbe"
+    },
+    {
+      "name": "Open profile",
+      "id": "63dec1b9-0bb5-49e0-8f2d-ae33a74e1263"
+    },
+    {
+      "name": "Ledgerfold",
+      "id": "84b9641f-b618-4fa3-8b35-1d19b1c71d82"
+    },
+    {
+      "name": "Ledgerline",
+      "id": "6f075a0b-8372-4458-9060-09afd73a9c37"
+    },
+    {
+      "name": "Watchly",
+      "id": "526c2d72-9142-4e48-b106-ee4910f19318"
+    }
+  ],
+  "pick": [
+    {
+      "name": "Open profile",
+      "id": "526c2d72-9142-4e48-b106-ee4910f19318"
+    },
+    {
+      "name": "Open profile",
+      "id": "7b62eab6-39b9-4cb6-884a-878301f6928f"
+    },
+    {
+      "name": "Open profile",
+      "id": "84b9641f-b618-4fa3-8b35-1d19b1c71d82"
+    }
+  ],
+  "compareMs": 7555,
+  "url": "/discover/saved/compare?ids=526c2d72-9142-4e48-b106-ee4910f19318%2C7b62eab6-39b9-4cb6-884a-878301f6928f%2C84b9641f-b618-4fa3-8b35-1d19b1c71d82",
+  "main": "Discover\nSaved\nSaved\n5\nPassed\nCompare\nComparing 3\nHow this is read\n1\nLedgerfold\n9.2/10 · Good fit · medium confidence\n\nInvestability 57 · Low confidence · based on 14 of 48 factors, developing · low confidence. Suitability 92 · 5 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence\nInvestability 57 · Low confidence · based on 14 of 48 factors\nSuitability 92 · 5 of 7 known\nUnicorn Potential: insufficient evidence\n\nseed · Nigeria\n\nStage\nRaising seed; you invest at seed.\nSector\nIn one of your sectors.\nGeography\nBased in Nigeria; in a region you invest in.\nCheque compatibility\n$2.5M (from their pitch) round; your $250k–$1M cheque fits (up to 40% of it).\nBusiness model\nBusiness model not clear yet.\nTraction\nYou have not set a traction minimum.\nTeam\nYou have no team requirements.\nThesis\nClose to your thesis.\nBest of 3\nRound terms\nPriced seed in their deck; whether they need a lead is not stated.\n\nQ's view: Worth a look. Seed financial infrastructure for Lagos market traders, raising $2.5M in a priced seed round, with the deck stating 6,400 bookkeeping users, 2,150 borrowers and about $38,000 monthly revenue. The sector, stage, thesis and cheque fit are aligned, while the lending model warrants focused diligence.\n\nOpen profile\n2\nPortside\n8.7/10 · Good fit · medium confidence\n\nInvestability 62 · Low confidence · based on 16 of 48 factors, developing · low confidence. Suitability 87 · 6 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence\nInvestability 62 · Low confidence · based on 16 of 48 factors\nSuitability 87 · 6 of 7 known\nUnicorn Potential: insufficient evidence\n\n3\nWatchly\n8.7/10 · Good fit · medium confidence\n\nInvestability 52 · Low confidence · based on 12 of 48 factors, developing · low confidence. Suitability 87 · 6 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence\nInvestability 52 · Low confidence · based on 12 of 48 factors\nSuitability 87 · 6 of 7 known\nUnicorn Potential: insufficient evidence\n\n0 selected\nPick one more to compare",
+  "tables": 1,
+  "hscroll": false,
+  "defaultHead": "Discover Saved Saved 5 Passed Compare Your top three right now Why these three? 1 Ledgerfold 9.2/10 · Good fit · medium confidence Investability 57 · Low confidence · based on 14 of 48 factors, developing · low confidence. Suitability 92 · 5 of 7 known, good fit · medium confidence. Unicorn Potential: insufficient evidence Investability 57 · Low confidence · based on 14 of 48 factors Suitability 92 · 5 of 7 known Unicorn Potential: insufficient evidence seed · Nigeria Stage Raising seed; you inv"
 }
