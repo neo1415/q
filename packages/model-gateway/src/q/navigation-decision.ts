@@ -165,6 +165,11 @@ export type QNavigationGuard =
   | "BACK_AND_FORTH"
   /** C10 v84: GO to a destination code itself moves to at once. */
   | "ANSWER_MOVES"
+  /**
+   * Decision 98: CONTEXT on an evaluative question (answerKind ANALYSIS or
+   * COMPARISON) about a record it merely names: answered in place.
+   */
+  | "ANSWERED_IN_PLACE"
   /** The person pinned the workspace: the move is offered, never made. */
   | "PINNED";
 
@@ -1265,6 +1270,8 @@ export function gateByReading(
   context: {
     readonly pane?: QNavigationPane | undefined;
     readonly codeMoves?: boolean | undefined;
+    /** Decision 98: the reader read an ANALYSIS or COMPARISON ask. */
+    readonly evaluative?: boolean | undefined;
   } = {},
 ): QNavigationOutcome {
   const gated = gateByReadingAlone(outcome, navigation, context);
@@ -1312,6 +1319,7 @@ function gateByReadingAlone(
   context: {
     readonly pane?: QNavigationPane | undefined;
     readonly codeMoves?: boolean | undefined;
+    readonly evaluative?: boolean | undefined;
   },
 ): QNavigationOutcome {
   if (navigation === null) return outcome;
@@ -1336,6 +1344,21 @@ function gateByReadingAlone(
   }
   if (readsAsContext(navigation)) {
     const place = outcome.target ?? outcome.remembered;
+    // Decision 98 (live 15 Nov 2026, run 5c9344fd: "How solid is Ajopot's
+    // active users figure?" opened Ajopot's Overview): an evaluative
+    // question about a record it only names is answered where they are.
+    // A screen of their own that advances the task (their pipeline, their
+    // work list) still moves, and so does a tab of the record the reading
+    // names ("can I see their data room?"). From the reader's structured
+    // answerKind, never the words.
+    if (
+      context.evaluative === true &&
+      place !== null &&
+      place.recordId !== undefined &&
+      (!("tab" in navigation) || navigation.tab == null)
+    ) {
+      return STAY("ANSWERED_IN_PLACE");
+    }
     const pane = context.pane;
     if (place !== null && pane !== undefined) {
       if (pane.at !== null && sameSubject(place, pane.at))
@@ -1993,6 +2016,11 @@ export type QPageMoveReading = {
   readonly navigation: QReadNavigation | null;
   /** Fast GO: code moves to the reader's destination itself, at once. */
   readonly codeMoves?: boolean | undefined;
+  /**
+   * Decision 98: the reader read an evaluative ask (answerKind ANALYSIS or
+   * COMPARISON): a record it merely names is answered in place.
+   */
+  readonly evaluative?: boolean | undefined;
   /** A8: they asked to watch the company's pitch (companyMedia.pitch). */
   readonly pitch?: boolean | undefined;
   /**
@@ -2619,7 +2647,11 @@ export function createQPageMoves(dependencies: {
               paneHere,
             ),
             navigation,
-            { pane: paneHere, codeMoves: reading?.codeMoves },
+            {
+              pane: paneHere,
+              codeMoves: reading?.codeMoves,
+              evaluative: reading?.evaluative,
+            },
           );
           // Fast GO: held, in case the answer stored moves nothing after all.
           if (outcome.guard === "ANSWER_MOVES" && proposed.target !== null)
@@ -2723,6 +2755,7 @@ export function createQPageMoves(dependencies: {
             at: paneNow.at === null ? null : ownPlace(paneNow.at, records),
           },
           codeMoves: reading?.codeMoves,
+          evaluative: reading?.evaluative,
         });
         if (outcome.decision === "STAY") return null;
         dependencies.logger?.info(

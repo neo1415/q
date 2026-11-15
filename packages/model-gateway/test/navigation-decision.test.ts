@@ -2491,6 +2491,39 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
     expect(sameNavigationSubject(OVERVIEW, DATAROOM)).toBe(false);
   });
 
+  it("decision 98 (live 5c9344fd): an evaluative question about a company it names stays; task screens and named tabs still move", () => {
+    // "How solid is Ajopot's active users figure?": CONTEXT, answerKind
+    // ANALYSIS, the decision moved to Ajopot's Overview -- answered in place.
+    expect(
+      gateByReading(moved(OVERVIEW), nav("CONTEXT"), {
+        pane: pane({ at: null }),
+        evaluative: true,
+      }),
+    ).toEqual(STAYED("ANSWERED_IN_PLACE"));
+    expect(gateByReading(kept, nav("CONTEXT"), { evaluative: true })).toEqual(
+      STAYED("ANSWERED_IN_PLACE"),
+    );
+    // "Who should I follow up with?" -> their pipeline, a screen of their
+    // own that advances the task: still moves, evaluative or not.
+    const PIPELINE: QNavigateTarget = { page: "CRM_PIPELINE" };
+    expect(
+      gateByReading(moved(PIPELINE), nav("CONTEXT"), { evaluative: true }),
+    ).toEqual(moved(PIPELINE));
+    // A tab the reading names ("can I see their data room?") still moves.
+    // (The reading as the answer path passes it: v87 adds the tab.)
+    const onDataRoom = { ...nav("CONTEXT"), tab: "dataroom" as const };
+    expect(
+      gateByReading(moved(DATAROOM), onDataRoom, { evaluative: true }),
+    ).toEqual(moved(DATAROOM));
+    // Not evaluative (a lookup), or asked to GO: unchanged.
+    expect(gateByReading(moved(OVERVIEW), nav("CONTEXT"))).toEqual(
+      moved(OVERVIEW),
+    );
+    expect(
+      gateByReading(moved(OVERVIEW), nav("GO"), { evaluative: true }),
+    ).toEqual(moved(OVERVIEW));
+  });
+
   const request = (runId: string, at = "/home", extra = {}) =>
     ({
       runId,

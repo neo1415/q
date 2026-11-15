@@ -7069,6 +7069,11 @@ export function createSpecialistQAnswer(
               ? { ...reading.navigation, tab: "elevator" as const }
               : (reading?.navigation ?? null),
           codeMoves: go !== null,
+          // Decision 98: an evaluative ask about a record it only names is
+          // answered in place (the reader's answerKind, never the words).
+          evaluative:
+            reading?.answerKind === "ANALYSIS" ||
+            reading?.answerKind === "COMPARISON",
           // Live d96c63ee1: with tab null, the decision's own deck too.
           pitch: reading?.companyMedia?.pitch === true,
           // Live d96c63ee1: the record the turn is about, not the pane's.
