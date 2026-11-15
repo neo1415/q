@@ -2246,3 +2246,11 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Batch 2 `a029a2f3d` in CI: metrics P1-14 (failed read is unknown, not a Gap), P1-8 (rerank never crosses the declared geography tier), P1-9 (Q's top N = Discover's fit order), CI gate now waits for pgTAP and integration.
 - Security: production server SQL runs as `postgres` (bypasses RLS); the phased plan and new cross-tenant negative tests are being prepared on `sec/tenant-isolation-tests` (no database-wide switch). Supabase access is through the environment's network secret now; nothing stored in the repo.
 - Ledger: `BASELINE-LEDGER-2026-11-12.md`.
+
+## 15 Nov 2026, 06:40 Lagos — integration lead (Claude)
+
+- Production `30c99ccc5` (gate PASS first try after the new pre-gate). Next batch `3912cc2d9` in pre-gate → gate: Q crash fix (turnNotes bound), fit exclusion, no re-offer, GateQ units/asking/inbox summary, shared "still needed" check for every Needs-you surface, branding polish, meeting move.
+- Live on `30c99ccc5`: GateQ sustained 6/8 (best yet); uncertainty request flow end to end; account digest matches DB; branding on Stripe/Flutterwave/Linear/Capital Q all PASS.
+- New: `scripts/pre-gate.sh` (cheap checks before the gate; named failing tests; repo-scan tests; app typechecks; killed steps reported as FAIL).
+- Owner decisions open: (1) voice onboarding interview — who leads (voice model or code); (2) unrequested navigation on follow-up questions (13 Nov C10 v85 design) vs offering; (3) a paused gateway notice for founders instead of generic not-found.
+- Owner check needed: a real voice call on the GPT-Live line (sandbox has no UDP).
