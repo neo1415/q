@@ -240,8 +240,11 @@ export function beyondPieces(
   said: readonly string[],
   labels: readonly string[],
 ): readonly string[] {
+  // Whole clauses only: a comma between digits ("US$42,000", "1,850") is a
+  // thousands separator, never a clause break (live 2026-11-15 D4: the
+  // read-back quoted “000 MRR in October”).
   return beyond
-    .split(/[,;]/u)
+    .split(/;|(?<!\d),|,(?!\d{3}(?!\d))/u)
     .map((piece) => piece.trim())
     .filter(
       (piece) =>

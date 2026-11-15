@@ -3491,6 +3491,31 @@ export function createOnboardingUseCases(
           throw new OnboardingMutationConflictError();
         }
       }
+      // The cursor follows the step Q's new line asks, when it is another
+      // open step on their path (live 2026-11-15 D7). Navigation only.
+      const asked = command.turns.find(
+        (turn) => turn.role === "Q" && turn.stepKey !== undefined,
+      )?.stepKey;
+      if (
+        written &&
+        asked !== undefined &&
+        session.status === "ACTIVE" &&
+        sessions.pointAt !== undefined
+      ) {
+        const aggregate = await aggregateOf(runtime, tx.sql, session);
+        const target = openAskedStep(aggregate, asked);
+        if (target !== undefined) {
+          // Visited from now, as a step the cursor reaches by a write is.
+          if (!aggregate.states.has(target.stepKey)) {
+            await stepStates.upsert(tx, {
+              sessionId: session.id,
+              stepKey: target.stepKey,
+              status: "IN_PROGRESS",
+            });
+          }
+          await sessions.pointAt(tx, session.id, target.stepKey);
+        }
+      }
       // The reading of their words, beside the exchange it read: kept so a
       // restart or another instance still knows what was said earlier.
       if (

@@ -42,7 +42,11 @@ import {
 } from "../onboarding-kit/components/coverage-summary";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
-import { askQAction, readQRunAction } from "../q/actions";
+import {
+  askQAction,
+  pendingQApprovalsAction,
+  readQRunAction,
+} from "../q/actions";
 import { DeckOffer } from "./deck-offer";
 import { announceQGestures } from "../q-swarm/q-gestures";
 import {
@@ -51,6 +55,14 @@ import {
   onboardingThreadKeepLinesAction,
   onboardingThreadKeepTapAction,
 } from "./thread-actions";
+import { DeckFigureCards } from "./deck-figure-cards";
+import {
+  deckFigureCards,
+  deckReadLine,
+  uploadEventOf,
+  uploadNote as uploadNoteFor,
+  type DeckFigureCard,
+} from "./upload-lines";
 import { upsertLine } from "../voice/session";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import {
@@ -269,6 +281,11 @@ type Turn = {
   readonly kind: "Q" | "PERSON";
   readonly text: string;
   /**
+   * The file a screen's note to Q about an upload names (live 2026-11-15
+   * D5): shown as an upload event, never as the person's own words.
+   */
+  readonly uploaded?: string | undefined;
+  /**
    * Their words did not reach Q (onboarding speed 2026-10-20): shown as
    * not taken in, with a way to send them again, never as if Q heard them.
    */
@@ -428,7 +445,16 @@ export function QOnboardingWorkspace({
     (kind: Turn["kind"], text: string, id: string = newId()) => {
       // A spoken line re-sent under its id (the provider reporting one
       // utterance again as it grew) replaces the line it grew from.
-      setTurns((current) => upsertLine(current, { id, kind, text }));
+      const uploaded =
+        kind === "PERSON" ? (uploadEventOf(text) ?? undefined) : undefined;
+      setTurns((current) =>
+        upsertLine(current, {
+          id,
+          kind,
+          text,
+          ...(uploaded === undefined ? {} : { uploaded }),
+        }),
+      );
     },
     [],
   );
@@ -838,11 +864,15 @@ export function QOnboardingWorkspace({
         // the thread's last line (QA F-50: Q's line twice after a reload),
         // as it was before the reload.
         const history = redrawnThread(kept, pending);
-        const restored: Turn[] = history.map((turn) => ({
-          id: newId(),
-          kind: turn.role === "Q" ? ("Q" as const) : ("PERSON" as const),
-          text: turn.text,
-        }));
+        const restored: Turn[] = history.map((turn) => {
+          const uploaded = turn.role === "Q" ? null : uploadEventOf(turn.text);
+          return {
+            id: newId(),
+            kind: turn.role === "Q" ? ("Q" as const) : ("PERSON" as const),
+            text: turn.text,
+            ...(uploaded === null ? {} : { uploaded }),
+          };
+        });
         // D7: what they sent last time and Q never confirmed, unless the
         // thread shows it reached Q; offered back as not answered.
         const draft = readDraft(sessionId);
@@ -1854,6 +1884,8 @@ export function QOnboardingWorkspace({
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   /** A finished upload waiting for the person to hand it to Q. */
   const [heldUpload, setHeldUpload] = useState<string | null>(null);
+  /** D1: the page-cited figures Q read from an upload, offered here. */
+  const [deckFigures, setDeckFigures] = useState<readonly DeckFigureCard[]>([]);
   /**
    * The document in flight, as the voice stage shows it (owner 2026-10-27):
    * its name, where its reading is, and what it found once it lands.
@@ -1986,7 +2018,7 @@ export function QOnboardingWorkspace({
         );
         // QA F-68: Q took "keep it until…" as "not added yet" and told them
         // to use the upload button. It is added; it waits on the name.
-        const held = `I've added ${file.name}; it's here and waiting. You'll read it the moment my company exists, so ask me the company's name.`;
+        const held = uploadNoteFor("WAITING_FOR_COMPANY", file.name);
         if (voiceActive) setHeldUpload(held);
         else await sayNow.current(held);
         return;
@@ -2009,6 +2041,8 @@ export function QOnboardingWorkspace({
         }
         return;
       }
+      // Figure cards this upload's reading prepares are asked for after now.
+      const uploadStartedAt = Date.now() - 5_000;
       setUploadNote(`Uploading ${file.name}`);
       setUploadCard({ fileName: file.name, stage: "UPLOADING", found: [] });
       const target = await materialUploadTargetAction({
@@ -2178,18 +2212,50 @@ export function QOnboardingWorkspace({
       }
       if (!ready || !readable) setUploadCard(null);
       const found = first === "FOUND";
-      const toldRead = `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`;
-      const told = !ready
-        ? `I've just uploaded ${file.name}; it's still being read. Say you're reading it now and will show what you found in a minute, then carry on.`
-        : readable
-          ? found
-            ? toldRead
-            : `I've just uploaded ${file.name}; you're still reading it. Say you're reading it now and will show what you found in a minute, then carry on.`
-          : kind === "UNCLASSIFIED"
-            ? `I've just uploaded ${file.name}. Its first pages didn't make clear what kind of document it is, so it's kept private and not read: ask me what it is.`
-            : // Private material, by what it says: never read back. Q is
-              // told it arrived, by its name only.
-              `I've just uploaded ${file.name}. It's a private document: just note that I've shared it, don't read it, and tell me what's still outstanding.`;
+      const told = uploadNoteFor(
+        !ready
+          ? "STILL_READING"
+          : readable
+            ? found
+              ? "READ_BACK"
+              : "READING_NOW"
+            : kind === "UNCLASSIFIED"
+              ? "UNCLASSIFIED"
+              : // Private material, by what it says: never read back. Q
+                // is told it arrived, by its name only.
+                "PRIVATE",
+        file.name,
+      );
+      /**
+       * D1 (live 2026-11-15): once the reading's findings are in, Q's next
+       * line is code's, from the reading: what it says and the page-cited
+       * figures, offered here for their yes. Handed to a model as "read
+       * back what you found", it became a generic "saved so far … still
+       * to cover: what the company does" while the deck said it.
+       */
+      const sayWhatWasRead = async (): Promise<void> => {
+        const pending = await pendingQApprovalsAction().catch(() => null);
+        const figures =
+          pending !== null && pending.ok
+            ? deckFigureCards(pending.value, uploadStartedAt)
+            : [];
+        setDeckFigures((now) => [
+          ...now,
+          ...figures.filter(
+            (card) => !now.some((had) => had.approvalId === card.approvalId),
+          ),
+        ]);
+        const line = deckReadLine(
+          file.name,
+          findingsOf.current(documentId),
+          figures,
+        );
+        push("Q", line);
+        const sessionId = viewRef.current?.session.id;
+        if (sessionId !== undefined) {
+          void onboardingThreadKeepAction(sessionId, line);
+        }
+      };
       // Typed or spoken, Q hears about it the same way (founder
       // walkthrough F2): the upload is part of the conversation, not a
       // detour to the company page.
@@ -2210,6 +2276,9 @@ export function QOnboardingWorkspace({
               : `${file.name} is kept private.`,
         );
         setHeldUpload(told);
+      } else if (found) {
+        landedFor("FOUND");
+        await sayWhatWasRead();
       } else {
         await sayNow.current(told);
       }
@@ -2224,7 +2293,7 @@ export function QOnboardingWorkspace({
         }
         nothingNew();
       } else if (later === "FOUND") {
-        const landed = `I've finished reading ${file.name}. Read back what you found in it and check it with me.`;
+        const landed = uploadNoteFor("FINISHED_READING", file.name);
         if (landedFor("FOUND")) {
           // Told to the live call; the held "still reading" words are moot.
           setHeldUpload(null);
@@ -2233,7 +2302,7 @@ export function QOnboardingWorkspace({
           setUploadNote(`${file.name} is read.`);
           setHeldUpload(landed);
         } else {
-          await sayNow.current(landed);
+          await sayWhatWasRead();
         }
       }
     },
@@ -2442,6 +2511,7 @@ export function QOnboardingWorkspace({
             id={turn.id}
             kind={turn.kind}
             text={turn.text}
+            uploaded={turn.uploaded}
             unsent={turn.unsent === true}
             onSendAgain={
               turn.unsent === true && !working
@@ -2469,6 +2539,8 @@ export function QOnboardingWorkspace({
         {stage === null ? null : (
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
+        {/* D1: the figures Q read from the deck, offered for their yes here. */}
+        <DeckFigureCards cards={deckFigures} />
         {/* Q room W5 (R8): Q offers the deck once the upload is read. */}
         <DeckOffer
           founder={vocabulary.subject === "founder"}
@@ -3266,17 +3338,31 @@ function QLine({
   streaming = false,
   heading = false,
   unsent = false,
+  uploaded,
   onSendAgain,
 }: {
   readonly id: string;
   readonly kind: Turn["kind"];
   readonly text: string;
+  readonly uploaded?: string | undefined;
   readonly streaming?: boolean;
   readonly heading?: boolean;
   readonly unsent?: boolean;
   readonly onSendAgain?: (() => void) | undefined;
 }) {
   const t = useT();
+  if (uploaded !== undefined) {
+    // The screen's note to Q about an upload: an event, not their words.
+    return (
+      <li
+        data-turn={id}
+        data-upload-event
+        className="cq-caption text-center text-(--cq-text-tertiary)"
+      >
+        {t("You shared")} {uploaded}
+      </li>
+    );
+  }
   if (heading && text.includes("\n")) {
     // A read-back is blocks: an opening line, groups (a section name, then
     // one answer a line) and the question (live 2026-10-29: one run-on

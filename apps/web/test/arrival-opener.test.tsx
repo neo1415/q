@@ -224,6 +224,30 @@ describe("what waits, named (owner 2026-11-06)", () => {
     }
   });
 
+  it("a card titled as an instruction is named as one (live 2026-11-15 D6)", () => {
+    const phrases = waitingPhrases({
+      ...QUIET,
+      cards: [
+        {
+          ...card(3, ""),
+          counterpart: null,
+          title: "Keep your monthly burn of USD 55,000 for October 2026",
+        },
+        {
+          ...card(4, ""),
+          counterpart: null,
+          title: "Record your MRR of USD 42,000",
+        },
+      ],
+    });
+    const words = phrases.map((phrase) => phrase.words);
+    expect(words[0]).toBe(
+      "keep your monthly burn of USD 55,000 for October 2026",
+    );
+    expect(words[1]).toBe("record your MRR of USD 42,000");
+    expect(words.join(" ")).not.toMatch(/approve keep|approve record/u);
+  });
+
   it("'what are they?' is the answer to look, from the held list", () => {
     expect(readOpenerReply("What are they?")).toBe("SHOW");
   });

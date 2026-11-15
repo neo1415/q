@@ -180,6 +180,14 @@ export function createPostgresOnboardingSessionRepository(): OnboardingSessionRe
         ${sessionSelect(tx.sql)} where s.id = ${sessionId} and s.user_id = ${userId} for update`;
       return rows.length === 0 ? null : toSession(rows[0]);
     },
+    pointAt: async (tx, sessionId, stepKey) => {
+      await tx.sql`
+        update onboarding.sessions s
+           set current_step_key = ${stepKey}
+         where s.id = ${sessionId}
+           and s.status = 'ACTIVE'
+           and s.current_step_key is distinct from ${stepKey}`;
+    },
     commit: async (tx, sessionId, expectedVersion, update) => {
       const rows = await tx.sql`
         update onboarding.sessions s

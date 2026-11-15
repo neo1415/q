@@ -2189,7 +2189,7 @@ function pausingNote(
   return `They want to stop for now. ${String(saved)} things they told you are saved, and everything else they said is kept. In one or two warm sentences: say it's all kept, that they can pick up any time and you'll carry on where you left off, and that ${into}. Then stop talking: the call ends after your goodbye.`;
 }
 
-function completedNote(
+export function completedNote(
   journey: "investor" | "founder",
   already = false,
 ): string {
@@ -2202,7 +2202,7 @@ function completedNote(
   }
   return journey === "investor"
     ? "Their mandate is saved and live: Capital Q now matches companies to it. Tell them warmly, in one or two sentences, that it's done and that you're taking them to Discover now, where they'll see companies matched to it. Then stop talking: the call ends after your goodbye."
-    : "Their company profile is saved. Tell them warmly, in one or two sentences, that it's done, that investors who fit will now be matched to it, and that you're taking them to their home page now. Then stop talking: the call ends after your goodbye.";
+    : "Their company profile is saved. Tell them warmly, in one or two sentences, that it's done, that investors can find it only once they and the company are verified and they choose to make it visible (it is private until then, so never say investors will now be matched to it or can see it), and that you're taking them to their home page now. Then stop talking: the call ends after your goodbye.";
 }
 
 /**

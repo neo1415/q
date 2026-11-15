@@ -166,6 +166,35 @@ describe("QFOU-002 · a confirmed fact is not asked again", () => {
     });
     expect(questions.map((q) => q.key)).not.toContain("description");
   });
+
+  it("asks in plain words, never for the company's 'key signal' (live 2026-11-15 D6)", () => {
+    const questions = plan({
+      budget: 20,
+      proposed: [
+        {
+          key: "signal",
+          question:
+            "What evidence beyond the stated revenue should be recorded as the company's key signal?",
+          why: "x",
+        },
+      ],
+    });
+    const asked = questions.find((q) => q.key === "signal");
+    expect(asked).toBeDefined();
+    expect(asked?.question).not.toMatch(/\bsignal\b/iu);
+    // A plain proposal is kept as written.
+    const plain = plan({
+      budget: 20,
+      proposed: [
+        {
+          key: "signal",
+          question: "Do you have paying customers yet?",
+          why: "x",
+        },
+      ],
+    }).find((q) => q.key === "signal");
+    expect(plain?.question).toBe("Do you have paying customers yet?");
+  });
 });
 
 // ---------------------------------------------------------------------------

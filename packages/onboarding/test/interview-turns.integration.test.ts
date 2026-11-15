@@ -343,4 +343,57 @@ describe("onboarding interview thread against local PostgreSQL", () => {
       ).rejects.toBeInstanceOf(OnboardingRuntimeConfigurationError);
     });
   });
+
+  // Live 2026-11-15 D7: the cursor stayed on the review while Q asked
+  // functions, traction and the raise.
+  it("the cursor follows the open step Q's line asks; navigation only", async () => {
+    await withWorld(async ({ service, owner, sessionId }) => {
+      const before = await service.runtime.getSession({
+        actor: owner,
+        sessionId,
+      });
+      expect(before.session.currentStepKey).toBe("intent");
+      await service.runtime.appendInterviewTurns({
+        actor: owner,
+        sessionId,
+        turnRef: randomUUID(),
+        turns: [
+          { role: "PERSON", text: "Not sure yet.", channel: "TEXT" },
+          {
+            role: "Q",
+            text: "What is the company called?",
+            stepKey: "name",
+            channel: "TEXT",
+          },
+        ],
+      });
+      const after = await service.runtime.getSession({
+        actor: owner,
+        sessionId,
+      });
+      expect(after.session.currentStepKey).toBe("name");
+      expect(after.progress.currentStepKey).toBe("name");
+      // No answer changed: the version a write in flight expects still holds.
+      expect(after.session.version).toBe(before.session.version);
+      // A step not on their path never takes the cursor.
+      await service.runtime.appendInterviewTurns({
+        actor: owner,
+        sessionId,
+        turnRef: randomUUID(),
+        turns: [
+          {
+            role: "Q",
+            text: "How much are you raising?",
+            stepKey: "raise_amount",
+            channel: "TEXT",
+          },
+        ],
+      });
+      const still = await service.runtime.getSession({
+        actor: owner,
+        sessionId,
+      });
+      expect(still.session.currentStepKey).toBe("name");
+    });
+  });
 });

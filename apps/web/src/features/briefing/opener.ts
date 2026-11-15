@@ -101,7 +101,7 @@ export function openerOf(data: ArrivalData): Opener {
 export type WaitingPhrase = { readonly words: string; readonly weight: number };
 
 const IMPERATIVE =
-  /^(Approve|Reply|Send|Email|Book|Share|Follow|Answer|Check|Review|Confirm|Sign|Finish)\b/u;
+  /^(Approve|Reply|Send|Email|Book|Share|Follow|Answer|Check|Review|Confirm|Sign|Finish|Keep|Record|Add|Update)\b/u;
 
 function trimEnd(words: string): string {
   return words.trim().replace(/[.!?\s]+$/u, "");

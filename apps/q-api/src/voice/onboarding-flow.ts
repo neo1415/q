@@ -655,6 +655,16 @@ export const REVIEW_NOT_SHOWN_REASON =
   "The review has not been shown to them yet: read back what is saved and ask if it is right; finish on their yes.";
 
 /**
+ * The founder's close (live 2026-11-15 D2: "investors who fit will now be
+ * matched to it" while the company was private and unverified, and Q's own
+ * Home answer said investors could not find it yet). What is true: it is
+ * saved; investors find it only once it is verified and made visible; then
+ * it is matched.
+ */
+export const FOUNDER_FINISHED_LINE =
+  "That's everything I need. Your company profile is saved. Investors can find it only once you and the company are verified and you choose to make it visible; after that, Capital Q matches it to the investors who fit.";
+
+/**
  * What code says when they asked to finish (typed, live 2026-10-28, D3).
  * Finished: one line that it is done. Not yet: one line naming exactly
  * which required things are still open, then the first of them asked.
@@ -677,6 +687,8 @@ export function finishingLine(
   copy: {
     readonly labelOf: (stepKey: string) => string | undefined;
     readonly questionOf: (stepKey: string) => string | null;
+    /** Whether a held value was read from their uploaded document. */
+    readonly heldFromDocument?: ((stepKey: string) => boolean) | undefined;
     /**
      * What is saved, "Label: value" each, and the review step to ask: for a
      * review not shown yet, the read-back the person says yes to.
@@ -773,7 +785,7 @@ export function finishingLine(
       reply:
         journey === "investor"
           ? "That's everything I need. Your mandate is saved and live: Discover will show you companies matched to it."
-          : "That's everything I need. Your company profile is saved, and investors who fit will now be matched to it.",
+          : FOUNDER_FINISHED_LINE,
       asking: null,
     };
   }
@@ -839,14 +851,31 @@ export function finishingLine(
     // line their yes answers).
     const lineOf = (stepKey: string, value: string) =>
       `${copy.labelOf(stepKey) ?? plainStepLabel(stepKey)}: ${value.replace(/[.;\s]+$/u, "")}`;
-    const lines = [
-      lineOf(first.stepKey, held),
+    const keys = [
+      first.stepKey,
       ...queue.slice(1).flatMap((item) => {
         if (item.stepKey === copy.unsettled) return [];
         const value = copy.heldFor?.(item.stepKey)?.trim() ?? "";
-        return value.length === 0 ? [] : [lineOf(item.stepKey, value)];
+        return value.length === 0 ? [] : [item.stepKey];
       }),
     ].slice(0, 4);
+    const lines = keys.map((stepKey) =>
+      lineOf(
+        stepKey,
+        stepKey === first.stepKey ? held : (copy.heldFor?.(stepKey) ?? ""),
+      ),
+    );
+    // Where each value came from, said as it is (live 2026-11-15 D6: "From
+    // what you said: Use of funds …" for a value read from their deck).
+    const fromDeck = keys.filter(
+      (stepKey) => copy.heldFromDocument?.(stepKey) === true,
+    ).length;
+    const source =
+      fromDeck === 0
+        ? "From what you said"
+        : fromDeck === keys.length
+          ? "From your deck"
+          : "From what you said and your deck";
     const several = lines.length > 1;
     const which =
       finished.missing.length === lines.length
@@ -855,7 +884,7 @@ export function finishingLine(
           : "I need your yes on one thing"
         : `I still need ${String(finished.missing.length)} more answers from you, starting with your yes on ${several ? "these" : "this one"}`;
     return {
-      reply: `Before I can finish, ${which}. From what you said:\n\n${lines.join("\n")}\n\n${several ? "Shall I keep these? Say yes, or tell me what to change." : "Shall I keep that? Say yes, or tell me what it should be."}`,
+      reply: `Before I can finish, ${which}. ${source}:\n\n${lines.join("\n")}\n\n${several ? "Shall I keep these? Say yes, or tell me what to change." : "Shall I keep that? Say yes, or tell me what it should be."}`,
       asking: first.stepKey,
     };
   }

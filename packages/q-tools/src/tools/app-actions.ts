@@ -206,7 +206,9 @@ export function preparedLine(
     .join("; ");
   const what =
     changes.length === 0 ? card.summary : `${card.summary}: ${changes}`;
-  const said = `${closest === undefined ? "" : `${closest} `}${what}. It's on the card for your approval; nothing changes until you approve it.`;
+  // The card's words may end a sentence themselves (live 2026-11-15 D6:
+  // "investors don't see it.."): one full stop, never two.
+  const said = `${closest === undefined ? "" : `${closest} `}${what.replace(/[.\s]+$/u, "")}. It's on the card for your approval; nothing changes until you approve it.`;
   return said.length <= 600 ? said : `${said.slice(0, 597).trimEnd()}…`;
 }
 

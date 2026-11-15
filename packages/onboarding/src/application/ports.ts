@@ -168,6 +168,19 @@ export type OnboardingSessionRepository = {
     sessionId: OnboardingSessionId,
     userId: UserId,
   ) => Promise<OnboardingSession | null>;
+  /**
+   * Points the cursor at the step Q's line asks (live 2026-11-15 D7: the
+   * cursor stayed on the review while Q asked functions, traction and the
+   * raise). Navigation only, like going back: no answer changes, so neither
+   * `version` nor `last_activity_at` moves and no write in flight conflicts.
+   * Only an ACTIVE session moves. Optional: a repository without it leaves
+   * the cursor where the last write put it.
+   */
+  readonly pointAt?: (
+    tx: TransactionContext,
+    sessionId: OnboardingSessionId,
+    stepKey: string,
+  ) => Promise<void>;
   /** Applies the update, bumps `version` and `last_activity_at`; expects the given version. */
   readonly commit: (
     tx: TransactionContext,

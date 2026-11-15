@@ -99,6 +99,11 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
   "Investors don't see this.": "لا يرى المستثمرون هذا.",
   Invoices: "الفواتير",
   Keep: "احتفظ",
+  // D1/D5 (live 2026-11-15): deck figures offered in setup; an upload event.
+  "Figures Q read from your deck": "أرقام قرأها Q من عرضك التقديمي",
+  Kept: "تم الاحتفاظ به",
+  "Not kept": "لم يُحتفظ به",
+  "You shared": "شاركتَ",
   "Leave it": "اتركه",
   "Leave the rehearsal": "غادر التدريب",
   "Let Q learn how I like to work": "دع Q يتعلم كيف أحب أن أعمل",

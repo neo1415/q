@@ -178,6 +178,14 @@ export function createTypedOnboarding(dependencies: {
     readonly text: string;
     readonly asking: string | null;
     readonly labelOf: (stepKey: string) => string | undefined;
+    /**
+     * Steps their latest words answered (the reading beside the reply),
+     * or that hold their answer for its playback: asking those again is a
+     * playback or a check, never an unanswered ask (live 2026-11-15 D3: a
+     * clear description answered "No problem … let's leave it for now"
+     * because its save had not landed yet).
+     */
+    readonly answered: ReadonlySet<string>;
   }): { readonly text: string; readonly asking: string | null } => {
     const asks = replyAsks.get(input.sessionId) ?? new Map<string, number>();
     replyAsks.delete(input.sessionId);
@@ -192,6 +200,11 @@ export function createTypedOnboarding(dependencies: {
         ? undefined
         : input.state.steps.find((one) => one.stepKey === asked);
     if (asked === null || step === undefined || !neededOpen(step)) {
+      return { text: input.text, asking: input.asking };
+    }
+    if (input.answered.has(asked)) {
+      // Answered now: the count starts again should it ever reopen.
+      asks.delete(asked);
       return { text: input.text, asking: input.asking };
     }
     // e2e run 10 (integration): every ask of a still-open needed step
@@ -762,6 +775,9 @@ export function createTypedOnboarding(dependencies: {
           },
           heldFor: (stepKey) =>
             suggestions.find((item) => item.stepKey === stepKey)?.value ?? null,
+          heldFromDocument: (stepKey) =>
+            suggestions.find((item) => item.stepKey === stepKey)
+              ?.fromDocument === true,
           ...(review === undefined ? {} : { review }),
           ...(unsettled === undefined ? {} : { unsettled }),
         });
@@ -820,11 +836,12 @@ export function createTypedOnboarding(dependencies: {
         // The record speaks for itself, from code; the model's one line
         // (a lead-in, or a question asked before the list) is not put
         // around it (sweep D7: the summary came after Q's question).
-        text = savedSoFar(
-          await portOf(false).state(),
-          input.journeyType,
-          labelOf,
-        );
+        const readPort = portOf(false);
+        const [readState, readPending] = await Promise.all([
+          readPort.state(),
+          readPort.pendingRecommendations().catch(() => []),
+        ]);
+        text = savedSoFar(readState, input.journeyType, labelOf, readPending);
         path = "READ_BACK";
       } else if (written !== null) {
         // Q's reply now, never after the reading (ONBOARDING_TYPED_REPLY v5
@@ -887,6 +904,10 @@ export function createTypedOnboarding(dependencies: {
                 text,
                 asking,
                 labelOf,
+                answered: new Set([
+                  ...(authority?.stated ?? []),
+                  ...playedBack,
+                ]),
               })
             : { text, asking };
         text = parked.text;
@@ -1263,7 +1284,7 @@ export function withoutLastQuestion(text: string): string {
 /** Code's read-back of held values for their yes (finishingLine). */
 export function isReadBackLine(line: string): boolean {
   return (
-    /\bFrom what you said:/u.test(line) &&
+    /\bFrom (?:what you said|your deck)(?: and your deck)?:/u.test(line) &&
     /\bShall I keep (these|that)\?/u.test(line)
   );
 }
@@ -1498,8 +1519,20 @@ export function savedSoFar(
   state: OnboardingState,
   journey: "founder" | "investor",
   labelOf: (stepKey: string) => string | undefined,
+  /**
+   * Q's suggestions waiting on their yes (live 2026-11-15 D1: "Still to
+   * cover: what the company does" while the deck said it): a step with one
+   * is waiting for their yes, never still to cover, and never saved.
+   */
+  pending: readonly {
+    readonly stepKey: string;
+    readonly fromDocument: boolean;
+  }[] = [],
 ): string {
   const saved = groupedSaved(state, journey, labelOf);
+  const waitingOn = new Map(
+    pending.map((item) => [item.stepKey, item.fromDocument]),
+  );
   const named = (rows: readonly OnboardingState["steps"][number][]) =>
     rows.flatMap((row) => {
       const label = labelOf(row.stepKey);
@@ -1516,9 +1549,21 @@ export function savedSoFar(
         row.status === "OPEN" &&
         row.required &&
         row.kind !== "YES_NO" &&
-        row.savePending !== true,
+        row.savePending !== true &&
+        !waitingOn.has(row.stepKey),
     ),
   ).slice(0, 6);
+  const suggested = (fromDocument: boolean) =>
+    named(
+      state.steps.filter(
+        (row) =>
+          row.status === "OPEN" &&
+          row.savePending !== true &&
+          waitingOn.get(row.stepKey) === fromDocument,
+      ),
+    ).slice(0, 6);
+  const fromDeck = suggested(true);
+  const fromWords = suggested(false);
   // Final check 2026-10-30: two answers on the record that disagree are
   // said in the read-back, both kept, until they settle it (the question
   // itself is raised once by the conversation, from the same checks).
@@ -1531,6 +1576,12 @@ export function savedSoFar(
       ? ""
       : `To settle, both kept until you say which is right: ${toSettle.join(" ")}`,
     saving.length === 0 ? "" : `Still saving: ${saving.join(", ")}.`,
+    fromDeck.length === 0
+      ? ""
+      : `Read from your deck, not saved until you confirm: ${fromDeck.join(", ")}.`,
+    fromWords.length === 0
+      ? ""
+      : `Suggested from what you said, not saved until you confirm: ${fromWords.join(", ")}.`,
     needed.length === 0 ? "" : `Still to cover: ${needed.join(", ")}.`,
   ]
     .filter((part) => part.length > 0)

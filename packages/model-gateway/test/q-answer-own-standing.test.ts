@@ -1150,6 +1150,23 @@ describe("code's opening lines (lead 2026-10-03)", () => {
     );
   });
 
+  it("the same list reworded under the model's own heading is said once (live 2026-11-15 D6)", () => {
+    const lead =
+      "Investors can't find your company in Discover yet. What to do next, most important first:\n1. You have not yet chosen to make your company profile visible to investors. Readiness never makes that choice for you.\n2. A founder's identity has not been verified yet.\n3. Your organisation has not been verified yet.";
+    expect(
+      afterLeadLines(
+        "Before investors can see Mangrove Tally in their feeds, fix these three items:\n1. Choose to make your company profile visible to investors. Readiness can't make that choice for you.\n2. Verify your founder identity.\n3. Verify your organisation.\n\nThe first step is the gating choice: until your profile is visible, completing verification alone won't make Mangrove Tally appear in investor feeds.",
+        lead,
+      ),
+    ).toBe(
+      "The first step is the gating choice: until your profile is visible, completing verification alone won't make Mangrove Tally appear in investor feeds.",
+    );
+    // A list of another length is the model's own, and stays.
+    expect(
+      afterLeadLines("Two quick wins:\n1. Add a deck.\n2. Add a video.", lead),
+    ).toBe("Two quick wins:\n1. Add a deck.\n2. Add a video.");
+  });
+
   it("the model's follow-on never restarts the list (runs 56f815aa, a69d64a9)", () => {
     const lead = readinessLeadLines(READINESS) ?? "";
     // a69d64a9: the whole list again, its first item unnumbered.

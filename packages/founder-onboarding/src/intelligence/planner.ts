@@ -70,6 +70,24 @@ function defaultQuestion(key: FounderFactKey): string {
   return `We don't have the company's ${label} yet. Could you add ${pronoun}, if you know?`;
 }
 
+/**
+ * Plain questions for keys whose own name is jargon to a founder (live
+ * 2026-11-15 D6: "What evidence beyond the stated revenue ... should be
+ * recorded as the company's key signal?"). A proposed question that names
+ * the key's word is asked this way instead.
+ */
+const PLAIN_QUESTIONS: Partial<Record<FounderFactKey, string>> = {
+  signal:
+    "Beyond revenue, what shows most clearly that customers want this: paying customers, pilots, active users, signed partners or a waitlist?",
+};
+
+function plainQuestionOf(key: FounderFactKey, question: string): string {
+  const plain = PLAIN_QUESTIONS[key];
+  if (plain === undefined) return question;
+  const word = key.replace(/_/gu, " ");
+  return new RegExp(`\\b${word}s?\\b`, "iu").test(question) ? plain : question;
+}
+
 export function planFollowUpQuestions(
   input: PlannerInput,
 ): readonly PlannedQuestion[] {
@@ -139,7 +157,10 @@ export function planFollowUpQuestions(
     admit({
       key,
       stepKey,
-      question: proposal?.question ?? defaultQuestion(key),
+      question: plainQuestionOf(
+        key,
+        proposal?.question ?? defaultQuestion(key),
+      ),
       why: proposal?.why ?? "Capital Q needs this to describe the company.",
       reason: "REQUIRED_AND_UNANSWERED",
       readings: [],
@@ -182,7 +203,7 @@ export function planFollowUpQuestions(
     admit({
       key: proposal.key,
       stepKey,
-      question: proposal.question,
+      question: plainQuestionOf(proposal.key, proposal.question),
       why: proposal.why,
       reason: "MATERIAL_GAP",
       readings: [],

@@ -544,3 +544,101 @@ describe("a needed step Q's own replies keep asking is left for now (e2e run 8)"
     expect(fourth.reply).not.toMatch(/Which stages, again\?/u);
   });
 });
+
+/**
+ * Live founder run 2026-11-15 (D3, run log F1.description n=2..5): the
+ * description was answered, but its save had not landed when the next
+ * replies played it back ("The company does: …"), so each playback counted
+ * as another unanswered ask: the third became "I need this one: what does
+ * the company do?" and the fourth "No problem … let's leave it for now",
+ * in reply to a clear description. An ask their latest words answered is
+ * not an unanswered ask.
+ */
+describe("a needed step their latest words answered is never pressed or left for now (live D3)", () => {
+  const DESCRIPTION =
+    "Mangrove Tally is a WhatsApp-first bookkeeping app that records sales, credit owed and stock for informal retailers in Lagos.";
+  const playback = (lead: string) => ({
+    reply: `${lead} The company does: Mangrove Tally is a WhatsApp-first bookkeeping app that records sales, credit owed and stock for informal retailers in Lagos. Is that right?`,
+    asking: "F1.description",
+  });
+
+  it("the run's sequence: the same clear description four times", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F1.company_name": "Mangrove Tally (fictional)" },
+    });
+    const { say } = typedWorld({
+      world,
+      script: [
+        playback("That clarifies it."),
+        playback("Understood."),
+        playback("Thanks."),
+        playback("Got it."),
+      ],
+      // Their words state the description each time, as the reading of
+      // them beside the reply finds; its save has not landed yet.
+      authority: reading({ stated: ["F1.description"] }),
+    });
+    const outcomes = [];
+    for (let index = 0; index < 4; index += 1) {
+      outcomes.push(await say(DESCRIPTION));
+    }
+    for (const outcome of outcomes) {
+      expect(outcome.reply).not.toMatch(/I need this one/u);
+      expect(outcome.reply).not.toMatch(/leave it for now/u);
+      expect(outcome.reply).not.toMatch(/No problem/u);
+    }
+  });
+
+  it("a single clean answer after two asks is not pressed either", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F1.company_name": "Mangrove Tally (fictional)" },
+    });
+    let answering = false;
+    const { say } = typedWorld({
+      world,
+      script: [
+        {
+          reply: "Thanks. What does the company do?",
+          asking: "F1.description",
+        },
+        { reply: "Sure. What does it do?", asking: "F1.description" },
+        playback("That clarifies it."),
+      ],
+      authority: () => reading(answering ? { stated: ["F1.description"] } : {}),
+    });
+    await say("We founded it in 2024.");
+    await say("We founded it in 2024.");
+    answering = true;
+    const answered = await say(DESCRIPTION);
+    expect(answered.reply).not.toMatch(/I need this one/u);
+    expect(answered.reply).not.toMatch(/leave it for now/u);
+  });
+
+  it("an unanswered ask is still pressed the third time (DECISIONS 77 kept)", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F1.company_name": "Mangrove Tally (fictional)" },
+    });
+    const { say } = typedWorld({
+      world,
+      script: [
+        {
+          reply: "Thanks. What does the company do?",
+          asking: "F1.description",
+        },
+        { reply: "Sure. What does it do?", asking: "F1.description" },
+        { reply: "And what does it do?", asking: "F1.description" },
+      ],
+      authority: reading({}),
+    });
+    await say("We founded it in 2024.");
+    await say("We founded it in 2024.");
+    const third = await say("We founded it in 2024.");
+    expect(third.reply).toMatch(/I need this one/u);
+  });
+});

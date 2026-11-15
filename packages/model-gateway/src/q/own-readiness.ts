@@ -211,6 +211,31 @@ export function afterLeadLines(text: string, leadLines: string): string {
     if (repeated === undefined) break;
     rest = unnumbered.slice(repeated.length).trimStart();
   }
+  // The same list again in the model's own words, under its own heading
+  // (live 2026-11-15 D6: "Before investors can see Mangrove Tally in their
+  // feeds, fix these three items: 1. Choose to make … 2. Verify your
+  // founder identity. 3. Verify your organisation."): a numbered list of
+  // as many items, opening the model's words, is code's list said twice.
+  const numbered = leadLines
+    .split("\n")
+    .filter((line) => /^\s*\d+[.)]\s+/u.test(line)).length;
+  if (numbered >= 2) {
+    const lines = rest.split("\n");
+    const headed = /:\s*$/u.test(lines[0] ?? "") ? 1 : 0;
+    const listed = lines.slice(headed, headed + numbered);
+    if (
+      listed.length === numbered &&
+      listed.every((line, index) =>
+        new RegExp(`^\\s*${String(index + 1)}[.)]\\s+\\S`, "u").test(line),
+      ) &&
+      !/^\s*\d+[.)]\s+/u.test(lines[headed + numbered] ?? "")
+    ) {
+      return lines
+        .slice(headed + numbered)
+        .join("\n")
+        .trimStart();
+    }
+  }
   // A bare leading item marker with nothing repeated is still a list restart.
   return rest.replace(/^1[.)]\s+/u, "");
 }
