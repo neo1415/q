@@ -6,6 +6,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { LanguageProvider } from "@/features/i18n/language";
 import { QConversationPanel } from "@/features/q/q-conversation";
 
+import { StoryHarnessHost } from "../story/story-harness-host";
 import { SampleApproval } from "./sample-approval";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,9 @@ export default async function WorkspaceHarnessPage({
   const params = await searchParams;
   const enabled = params["ws"] === "on";
   const approval = params["approval"] === "1";
+  // `?story=1`: the Q Pitch story mounted with the page, as the app's layout
+  // mounts it (the phone check: a closed page sheet must not hide it).
+  const story = params["story"] === "1";
   return (
     <LanguageProvider language="en">
       <AppShell
@@ -86,6 +90,9 @@ export default async function WorkspaceHarnessPage({
           </ul>
         </PageContainer>
         {approval ? <SampleApproval /> : null}
+        {story ? (
+          <StoryHarnessHost home="/dev/workspace?ws=on&story=1" />
+        ) : null}
       </AppShell>
     </LanguageProvider>
   );

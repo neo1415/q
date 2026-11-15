@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { DiscoveredCompanyDto } from "@capital-q/contracts";
 
 import { aiPresenterLine, FeedCard } from "../src/features/discover/feed-card";
+import { burnedTitleCropY } from "../src/features/discover/player/ai-presenter";
 
 afterEach(cleanup);
 
@@ -96,5 +97,65 @@ describe("an AI-presented pitch on Discover", () => {
     const phone = css.lastIndexOf("@media (max-width: 1023px) {", at);
     expect(phone).toBeGreaterThan(0);
     expect(css.slice(phone, at)).not.toContain("\n  }\n");
+  });
+});
+
+/**
+ * Live 2026-11-15 (Discover at 1440, Watchly): the wide stage crops the
+ * portrait pitch, which left its burned-in label row at the stage's foot,
+ * a second, larger "AI presenter · AI-generated". Where the crop allows,
+ * the picture shifts so the band falls outside the stage.
+ */
+describe("an AI-presented pitch on a stage wider than the pitch", () => {
+  const shownBottom = (y: number, shown: number) =>
+    (y / 100) * (1 - shown) + shown;
+
+  it("shifts the picture so its burned-in band is cropped away", () => {
+    // The desktop page pane at 1440: about 820 x 900, a 9:16 pitch.
+    const y = burnedTitleCropY({
+      boxWidth: 820,
+      boxHeight: 900,
+      frameWidth: 9,
+      frameHeight: 16,
+      titleTop: 77,
+    });
+    expect(y).not.toBeNull();
+    const shown = 900 / ((820 * 16) / 9);
+    expect(shownBottom(y ?? 50, shown)).toBeLessThanOrEqual(0.75);
+    // Centred, the band was on screen.
+    expect(shownBottom(50, shown)).toBeGreaterThan(0.77);
+  });
+
+  it("stays centred when the crop leaves room, and leaves a full-height pitch alone", () => {
+    // A very wide stage: centred already hides the band.
+    expect(
+      burnedTitleCropY({
+        boxWidth: 1600,
+        boxHeight: 900,
+        frameWidth: 9,
+        frameHeight: 16,
+        titleTop: 77,
+      }),
+    ).toBe(50);
+    // A phone: the whole picture shows; the words lift above the band.
+    expect(
+      burnedTitleCropY({
+        boxWidth: 390,
+        boxHeight: 693,
+        frameWidth: 9,
+        frameHeight: 16,
+        titleTop: 77,
+      }),
+    ).toBeNull();
+    // No AI presenter, no band.
+    expect(
+      burnedTitleCropY({
+        boxWidth: 820,
+        boxHeight: 900,
+        frameWidth: 9,
+        frameHeight: 16,
+        titleTop: null,
+      }),
+    ).toBeNull();
   });
 });

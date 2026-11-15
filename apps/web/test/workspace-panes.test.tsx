@@ -163,6 +163,30 @@ describe("on a phone", () => {
     expect(pane?.getAttribute("data-ws-sheet")).toBe("open");
     expect(screen.getByRole("heading").textContent).toBe("Capital");
   });
+
+  it("the Q Pitch story's own move opens the sheet on the page it shows (live 2026-11-15)", async () => {
+    const { markQPitchRunning } =
+      await import("../src/features/q-pitch/tour-presence");
+    phone = true;
+    installMatchMedia();
+    pathname = "/home";
+    markQPitchRunning(true);
+    try {
+      const view = render(<Shell page={null} />);
+      const pane = document.querySelector("[data-ws-page]");
+      expect(pane?.getAttribute("data-ws-sheet")).toBe("closed");
+      pathname = "/discover";
+      view.rerender(<Shell page={<h1>Discover</h1>} />);
+      expect(pane?.getAttribute("data-ws-sheet")).toBe("open");
+      expect(screen.queryByRole("button", { name: /Opened/u })).toBeNull();
+      // Back on Q's home, the story's Q stage: the sheet closes.
+      pathname = "/home";
+      view.rerender(<Shell page={null} />);
+      expect(pane?.getAttribute("data-ws-sheet")).toBe("closed");
+    } finally {
+      markQPitchRunning(false);
+    }
+  });
 });
 
 describe("the phone's way to the pages", () => {

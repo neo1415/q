@@ -15,6 +15,15 @@ export function markQPitchRunning(on: boolean): void {
   running = on;
 }
 
+/**
+ * Whether a tour is up in this tab. A phone's page sheet follows the
+ * tour's own moves, so the page the story is showing is on screen rather
+ * than behind a "View" bar (live 2026-11-15, /q-pitch at 390).
+ */
+export function qPitchIsRunning(): boolean {
+  return running;
+}
+
 /** The decision, pure (tests). */
 export function tourHoldsVoice(input: {
   readonly running: boolean;

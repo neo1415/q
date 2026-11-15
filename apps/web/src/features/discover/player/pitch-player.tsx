@@ -32,7 +32,7 @@ import {
   type PlaybackSource,
 } from "./pitch-playback";
 import { claimActivePlayer, releaseActivePlayer } from "./active-player";
-import { burnedTitleTop } from "./ai-presenter";
+import { burnedTitleCropY, burnedTitleTop } from "./ai-presenter";
 import { reportPlaybackStall } from "../feed/use-feed-budget";
 import { recoverStream, restartPitch, setStreamWarmth } from "./hls-source";
 import { hasBeenActive, onAudioUnlock } from "./sound-policy";
@@ -650,6 +650,46 @@ export function PitchPlayer({
     };
   }, [variant, playbackUrl, titleTop]);
 
+  // A stage wider than the pitch crops it: where that crop can take the
+  // burned-in label row out of the picture, it does (burnedTitleCropY), so
+  // the AI presenter disclosure shows once, in the app's own line.
+  const pitchAspect = company.pitch?.aspectRatio;
+  const [titleCropY, setTitleCropY] = useState<number | null>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (variant !== "stage" || titleTop === null || video === null) return;
+    const [fw = 9, fh = 16] = pitchFrame(pitchAspect)
+      .aspectRatio.split("/")
+      .map(Number);
+    // A landscape pitch is shown whole (object-fit: contain): no crop.
+    if (fw > fh) return;
+    const measure = () => {
+      const box = video.getBoundingClientRect();
+      const known = video.videoWidth > 0 && video.videoHeight > 0;
+      setTitleCropY(
+        burnedTitleCropY({
+          boxWidth: box.width,
+          boxHeight: box.height,
+          frameWidth: known ? video.videoWidth : fw,
+          frameHeight: known ? video.videoHeight : fh,
+          titleTop,
+        }),
+      );
+    };
+    // The observer's first report is the first measure.
+    video.addEventListener("loadedmetadata", measure);
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
+    observer?.observe(video);
+    return () => {
+      video.removeEventListener("loadedmetadata", measure);
+      observer?.disconnect();
+    };
+  }, [variant, titleTop, pitchAspect]);
+  const cropY = variant === "stage" && titleTop !== null ? titleCropY : null;
+
   // The card in view hands its element to the feed's progress bar.
   useEffect(() => {
     if (onElement === undefined) return;
@@ -780,10 +820,14 @@ export function PitchPlayer({
         data-pitch-frame
         data-orientation={w > h ? "landscape" : "portrait"}
         data-problem={problem ?? undefined}
+        data-burned-crop={cropY === null ? undefined : ""}
       >
         <video
           ref={videoRef}
           className="cq-feed-video"
+          {...(cropY === null
+            ? {}
+            : { style: { objectPosition: `50% ${String(cropY)}%` } })}
           playsInline
           muted={muted}
           loop

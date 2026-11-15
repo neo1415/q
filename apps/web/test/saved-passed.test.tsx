@@ -125,6 +125,38 @@ describe("Saved", () => {
     ).toBe("false");
   });
 
+  it("keeps the tray invisible and inert, never only moved, when hidden or on Compare", () => {
+    render(
+      <Shortlist
+        initialTab="SAVED"
+        saved={[company(LEDGERFOLD, "Ledgerfold"), company(NSUO, "Nsuo Labs")]}
+        passed={[]}
+        top={top}
+        ports={ports()}
+      />,
+    );
+    const tray = element("[data-compare-tray]");
+    // Live 2026-11-15: "0 selected · Pick one more" covered compared rows.
+    expect(tray.className).toMatch(/(^|\s)invisible(\s|$)/u);
+    expect(tray.hasAttribute("inert")).toBe(true);
+    fireEvent.click(element(`[data-pick="${LEDGERFOLD}"]`));
+    expect(tray.className).toMatch(/(^|\s)visible(\s|$)/u);
+    expect(tray.hasAttribute("inert")).toBe(false);
+    cleanup();
+    render(
+      <Shortlist
+        initialTab="COMPARE"
+        saved={[company(LEDGERFOLD, "Ledgerfold"), company(NSUO, "Nsuo Labs")]}
+        passed={[]}
+        top={top}
+        ports={ports()}
+      />,
+    );
+    const compareTray = element("[data-compare-tray]");
+    expect(compareTray.className).toMatch(/(^|\s)invisible(\s|$)/u);
+    expect(compareTray.hasAttribute("inert")).toBe(true);
+  });
+
   it("passes optimistically: the row leaves Saved and appears in Passed, recorded as pass then unsave", async () => {
     vi.useFakeTimers();
     const live = ports();

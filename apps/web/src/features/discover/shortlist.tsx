@@ -131,6 +131,8 @@ function ShortlistInner({
   const [savedRows, setSavedRows] = useState(saved ?? []);
   const [passedRows, setPassedRows] = useState(passed ?? []);
   const [selected, setSelected] = useState<readonly string[]>([]);
+  // The compare tray serves picking on Saved only.
+  const trayShown = tab === "SAVED" && selected.length > 0;
   const [comparison, setComparison] = useState<FitComparisonDto | null>(picked);
   const [comparing, setComparing] = useState(false);
   const [why, setWhy] = useState(false);
@@ -559,14 +561,19 @@ function ShortlistInner({
         )}
       </div>
 
+      {/* Live 2026-11-15 (Compare at 1440, ?ids=): in the narrower page
+          pane the slide alone left the hidden tray on screen, "0 selected"
+          over the compared rows. Hidden, it is invisible and inert, not
+          only moved; visibility waits for the slide to finish. */}
       <div
         className={cx(
-          "fixed bottom-[74px] inset-x-3 z-(--cq-z-sticky) flex items-center gap-3.5 rounded-[14px] bg-[var(--cq-tile,var(--cq-text-primary))] py-2.5 ps-[18px] pe-2.5 text-[var(--cq-on-tile,var(--cq-text-inverse))] shadow-(--cq-shadow-overlay) transition-transform duration-300 ease-(--cq-ease) motion-reduce:transition-none lg:inset-x-auto lg:bottom-6 lg:start-1/2 lg:-translate-x-1/2 lg:whitespace-nowrap rtl:lg:translate-x-1/2",
-          tab === "SAVED" && selected.length > 0
-            ? "translate-y-0"
-            : "pointer-events-none translate-y-[160%] lg:translate-y-[140%]",
+          "fixed bottom-[74px] inset-x-3 z-(--cq-z-sticky) flex items-center gap-3.5 rounded-[14px] bg-[var(--cq-tile,var(--cq-text-primary))] py-2.5 ps-[18px] pe-2.5 text-[var(--cq-on-tile,var(--cq-text-inverse))] shadow-(--cq-shadow-overlay) transition-[transform,translate,visibility] duration-300 ease-(--cq-ease) motion-reduce:transition-none lg:inset-x-auto lg:bottom-6 lg:start-1/2 lg:-translate-x-1/2 lg:whitespace-nowrap rtl:lg:translate-x-1/2",
+          trayShown
+            ? "visible translate-y-0"
+            : "pointer-events-none invisible translate-y-[160%] lg:translate-y-[140%]",
         )}
-        aria-hidden={!(tab === "SAVED" && selected.length > 0)}
+        aria-hidden={!trayShown}
+        inert={!trayShown}
         data-compare-tray
       >
         <span className="flex-1 text-sm" aria-live="polite">

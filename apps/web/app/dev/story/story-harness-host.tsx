@@ -87,7 +87,13 @@ function editionOnce(): StoryEditionId {
   return editionLatch;
 }
 
-export function StoryHarnessHost() {
+/**
+ * `home`: where the story's Home is, when the harness is mounted on
+ * another dev page (the workspace harness's phone check).
+ */
+export function StoryHarnessHost({
+  home,
+}: { readonly home?: string | undefined } = {}) {
   const voice = useSyncExternalStore(
     noSubscription,
     () => voiceOf(window.location.search),
@@ -104,7 +110,7 @@ export function StoryHarnessHost() {
     <StoryHost
       account={HARNESS_ACCOUNT}
       role="INVESTOR"
-      harness={stills ? STILLS : HARNESS}
+      harness={withHome(stills ? STILLS : HARNESS, home)}
       voice={voice}
       film={film}
       edition={edition}
@@ -114,3 +120,15 @@ export function StoryHarnessHost() {
 }
 
 const noSubscription = () => () => undefined;
+
+function withHome(
+  harness: { readonly pathFor: typeof harnessPath; readonly live?: boolean },
+  home: string | undefined,
+): { readonly pathFor: typeof harnessPath; readonly live?: boolean } {
+  if (home === undefined) return harness;
+  return {
+    ...harness,
+    pathFor: (route: StoryRoute) =>
+      route === "home" ? home : harnessPath(route),
+  };
+}

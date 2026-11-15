@@ -1826,6 +1826,13 @@
     .cq-feed-overlay:has([data-ai-presenter]) {
       bottom: var(--cq-feed-burned-band);
     }
+    /* Unless the stage's crop has taken that band out of the picture
+       (data-burned-crop, pitch-player.tsx): then nothing is there to
+       keep clear. */
+    .cq-feed-stage:has([data-slot-active] [data-burned-crop])
+      .cq-feed-overlay:has([data-ai-presenter]) {
+      bottom: 0;
+    }
   }
 
   /*

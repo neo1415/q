@@ -75,6 +75,7 @@ import {
   STORY_ANCHORS,
   type StoryPathFor,
 } from "./story-pages";
+import { StoryLayer } from "./story-layer";
 import { StoryPlayer, type StorySnapshot } from "./story-player";
 import {
   preloadStory,
@@ -209,7 +210,16 @@ function liveLine(current: () => QSessionValue | null) {
   };
 }
 
-export function StoryHost({
+/** The story, drawn where a phone's hidden page sheet cannot hide it. */
+export function StoryHost(props: Parameters<typeof StoryHostBody>[0]) {
+  return (
+    <StoryLayer>
+      <StoryHostBody {...props} />
+    </StoryLayer>
+  );
+}
+
+function StoryHostBody({
   account,
   role,
   onExit,

@@ -24,6 +24,7 @@ import {
 
 import { QAperture } from "@/features/q-aperture";
 import { useQSessionOptional } from "@/features/q/q-session";
+import { qPitchIsRunning } from "@/features/q-pitch/tour-presence";
 import { useT } from "@/features/i18n/language";
 
 import { PagePaneWidthContext } from "./page-pane-width";
@@ -290,7 +291,9 @@ export function WorkspacePagePane({
       if (pathname === Q_HOME) {
         setSheetOpen(false);
         setPeek(null);
-      } else if (ownMoveJustNow()) {
+      } else if (ownMoveJustNow() || qPitchIsRunning()) {
+        // The person's own move, or the Q Pitch story's (which shows the
+        // page it moved to): the sheet opens on it.
         setSheetOpen(true);
         setPeek(null);
       } else if (!sheetOpen) {
