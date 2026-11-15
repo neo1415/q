@@ -77,7 +77,15 @@ for (const batch of batches) {
     (arg) => !arg.startsWith("-") && !arg.includes("*"),
   );
   console.log(
-    `lint ${label.join(" ")}: ${result.status === 0 ? "ok" : "FAILED"} (${Math.round((Date.now() - started) / 1000)}s)`,
+    `lint ${label.join(" ")}: ${result.status === 0 ? "ok" : "FAILED"} (${Math.round((Date.now() - started) / 1000)}s)${
+      // A batch killed by the kernel (e.g. out of memory under a busy
+      // machine) prints no lint messages; say so instead of a bare FAILED.
+      result.signal
+        ? ` killed by ${result.signal}`
+        : result.status !== 0
+          ? ` exit ${result.status}`
+          : ""
+    }`,
   );
   if (result.status !== 0) failed = true;
 }
