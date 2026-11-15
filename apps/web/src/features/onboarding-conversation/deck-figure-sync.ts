@@ -42,6 +42,26 @@ export const FIGURE_WATCH_ON_OPEN_DELAYS_MS: readonly number[] = [
 /** Reads in a row that add nothing before found cards count as settled. */
 const SETTLED_AFTER = 2;
 
+/**
+ * Q's working line under the thread (live re-check 2026-11-15, 84ac9afa7:
+ * "Reading …pdf" stayed up after Q's read-back line until the cards came
+ * 62.7 s after the upload, so "Still reading figures…" was never seen).
+ * A turn's own stage comes first; once the read-back is said and the
+ * figure cards are still being read for, that is what the line says, in
+ * place of the upload's note; otherwise the upload's note.
+ */
+export function workingNote(input: {
+  readonly turnStage: string | null;
+  readonly uploadNote: string | null;
+  readonly figuresReading: boolean;
+  /** "Still reading figures…", already translated. */
+  readonly stillReading: string;
+}): string | null {
+  if (input.turnStage !== null) return input.turnStage;
+  if (input.figuresReading) return input.stillReading;
+  return input.uploadNote;
+}
+
 /** The cards shown, with any newly read ones added (never one twice). */
 export function mergeFigureCards(
   now: readonly DeckFigureCard[],

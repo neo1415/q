@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
@@ -24,7 +24,7 @@ import {
   readLastMode,
   writeLastMode,
 } from "../onboarding-kit/last-mode";
-import { groupOf } from "./models/journey";
+import { groupOf, resumeGroup } from "./models/journey";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
@@ -132,6 +132,21 @@ export function FounderOnboardingScreen({
       writeLastMode("founder", "conversation");
     }
   }, [mode]);
+  // Re-check 2026-11-15: the form opened (on load, or from "Use the form")
+  // reopens at the first step still to answer when the session stands on
+  // a screen they finished. An editor opened for a step (onEdit) is left
+  // where it was asked for.
+  const resumeForm = useRef(opening.mode === "form");
+  const raw = state.session?.raw;
+  useEffect(() => {
+    if (!resumeForm.current || mode !== "form" || state.phase !== "ready") {
+      return;
+    }
+    if (raw === undefined) return;
+    resumeForm.current = false;
+    const target = resumeGroup(raw);
+    if (target !== null) void actions.openStep(target.id);
+  }, [mode, state.phase, raw, actions]);
   // F17: the final Continue waits for Q's first reading instead of failing.
   const [finishing, setFinishing] = useState(false);
   // Set when the person asks for Q's voice from the form: the workspace
@@ -265,7 +280,10 @@ export function FounderOnboardingScreen({
           <Button
             variant="secondary"
             size="compact"
-            onClick={() => setMode("form")}
+            onClick={() => {
+              resumeForm.current = true;
+              setMode("form");
+            }}
             data-use-the-form
           >
             {t("Use the form")}

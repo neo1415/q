@@ -107,6 +107,84 @@ export function figureCountIn(value: string, quote: string): number {
   return digitRuns(quote).filter((run) => significant(run) === wanted).length;
 }
 
+/** The longest words still read as one figure ("About US$48,000 a month"). */
+const FIGURE_WORDS_MAX = 60;
+
+/**
+ * One stated figure answers one metric (live founder re-check 2026-11-15,
+ * 84ac9afa7): "About US$48,000 a month." to Q's burn question was saved
+ * as the burn and also held as "Monthly revenue: $48,000" for their yes.
+ * A reading that files the same figure from the same words under more
+ * steps than the words state it keeps only as many steps as the figure is
+ * said, in this order: the step Q's line asked, a step the reading says
+ * they stated (not Q's inference), then the reading's own order. The
+ * other steps' answers from that figure are dropped. Answers with no
+ * figure, prose that merely contains one, and a figure said once for each
+ * step are untouched.
+ */
+export function oneMetricPerFigure<
+  T extends {
+    readonly stepKey: string;
+    readonly value: unknown;
+    readonly quote: string;
+    readonly source?: string | undefined;
+  },
+>(answers: readonly T[], asked: ReadonlySet<string>): T[] {
+  /** The figure an answer's value is, when the quote states it. */
+  const figureOf = (answer: T): string | null => {
+    const raw =
+      typeof answer.value === "number"
+        ? [String(answer.value)]
+        : typeof answer.value === "string" &&
+            answer.value.length <= FIGURE_WORDS_MAX
+          ? digitRuns(answer.value)
+          : [];
+    const figures = [...new Set(raw.map((run) => significant(run)))];
+    const [figure] = figures;
+    if (figures.length !== 1 || figure === undefined) return null;
+    return figureStatedIn(figure, answer.quote) === true ? figure : null;
+  };
+  const rank = (answer: T): number =>
+    (asked.has(answer.stepKey) ? 0 : 2) +
+    (answer.source === "INFERRED" ? 1 : 0);
+  const groups = new Map<
+    string,
+    { readonly figure: string; readonly answers: T[] }
+  >();
+  for (const answer of answers) {
+    const figure = figureOf(answer);
+    if (figure === null) continue;
+    const span = `${normalised(answer.quote)}\u0000${figure}`;
+    const group = groups.get(span) ?? { figure, answers: [] };
+    group.answers.push(answer);
+    groups.set(span, group);
+  }
+  const dropped = new Set<T>();
+  for (const { figure, answers: group } of groups.values()) {
+    const steps = [...new Set(group.map((answer) => answer.stepKey))];
+    const quote = group[0]?.quote ?? "";
+    const allowed = Math.max(1, figureCountIn(figure, quote));
+    if (steps.length <= allowed) continue;
+    const best = (stepKey: string) =>
+      Math.min(
+        ...group
+          .filter((answer) => answer.stepKey === stepKey)
+          .map((answer) => rank(answer)),
+      );
+    const kept = new Set(
+      steps
+        .map((stepKey, order) => ({ stepKey, order, rank: best(stepKey) }))
+        .sort((a, b) => a.rank - b.rank || a.order - b.order)
+        .slice(0, allowed)
+        .map((item) => item.stepKey),
+    );
+    for (const answer of group) {
+      if (!kept.has(answer.stepKey)) dropped.add(answer);
+    }
+  }
+  return answers.filter((answer) => !dropped.has(answer));
+}
+
 /** Letters and digits in any script, case folded, single-spaced. */
 function normalised(text: string): string {
   return text

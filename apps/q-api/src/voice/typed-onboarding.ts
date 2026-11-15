@@ -7,6 +7,8 @@ import type { OnboardingSessionView } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import type { QDelegationReader } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
+import { FOUNDER_V10_STEPS } from "@capital-q/founder-onboarding";
+import { isNotKnownAnswer } from "@capital-q/onboarding";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
@@ -1459,6 +1461,26 @@ export function reviewOf(
 const READ_BACK_ITEMS = 40;
 
 /**
+ * Saved fields the coverage profile does not list (founder v10, DECISIONS
+ * 79: city, founding year, one line), read back all the same (live
+ * founder re-check 2026-11-15, 84ac9afa7: the saved summary left out the
+ * founding year and the city, so "2024" was never said back).
+ */
+const READ_BACK_ONLY_LABELS: Readonly<Record<string, string>> = {
+  [FOUNDER_V10_STEPS.city]: "City",
+  [FOUNDER_V10_STEPS.foundedYear]: "Founding year",
+  [FOUNDER_V10_STEPS.oneLine]: "In one line",
+};
+
+/** How a step answered "I don't know" is read back. */
+export const NOT_KNOWN_READ_BACK = "Not known";
+
+/** Whether a saved value is the canonical "I don't know" answer. */
+function isNotKnownWords(value: string): boolean {
+  return isNotKnownAnswer({ type: "TEXT", text: value });
+}
+
+/**
  * What is saved, grouped by the setup's own sections ("Raise: Raising now:
  * Yes; Target: $400,000"), every essential always in, optional answers
  * after them up to READ_BACK_ITEMS (production re-test 2026-10-28: a
@@ -1490,11 +1512,15 @@ export function groupedSaved(
     // Live 2026-10-29: "Welcome: What brings you to Capital Q: are you
     // raising…?: I'm raising". A step with no plain label is the journey's
     // own move (the intent), not a fact about them; it is not read back.
-    const label = labelOf(row.stepKey);
+    const label = labelOf(row.stepKey) ?? READ_BACK_ONLY_LABELS[row.stepKey];
     if (label === undefined) continue;
     const phase = manifests.get(row.stepKey)?.configuration.phaseKey ?? "";
     const items = groups.get(phase) ?? [];
-    items.push(`${label}: ${plain(row.value ?? "")}`);
+    // DECISIONS 78: "I don't know" settles a step and holds no value; it
+    // is read back as not known, never as if it were the answer.
+    items.push(
+      `${label}: ${isNotKnownWords(row.value ?? "") ? NOT_KNOWN_READ_BACK : plain(row.value ?? "")}`,
+    );
     groups.set(phase, items);
   }
   const titles = new Map(

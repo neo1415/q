@@ -480,6 +480,38 @@ export function currentGroup(view: OnboardingSessionView): Group {
   return group ?? SNAPSHOT_GROUP;
 }
 
+/**
+ * Where the form reopens (live founder re-check 2026-11-15, 84ac9afa7: a
+ * reload put the form back on "Your company", every field of it saved,
+ * while the next question was the stage). When the cursor stands on a
+ * screen whose every step is settled, the screen of the first step on
+ * their path still to answer, if it has been reached; otherwise null and
+ * the form stays where the session is. Navigation only, never a write.
+ */
+export function resumeGroup(view: OnboardingSessionView): Group | null {
+  if (view.session.status !== "ACTIVE") return null;
+  const steps = view.progress.eligibleSteps;
+  const statusOf = (key: string) =>
+    steps.find((step) => step.stepKey === key)?.status;
+  const settled = (status: string | undefined) =>
+    status === "COMPLETED" || status === "SKIPPED";
+  const current = currentGroup(view);
+  const open = (group: Group) =>
+    group.stepKeys.some((key) => {
+      const status = statusOf(key);
+      return status !== undefined && !settled(status);
+    });
+  if (open(current)) return null;
+  const next = steps.find((step) => !settled(step.status));
+  const group = next === undefined ? undefined : groupOf(next.stepKey);
+  if (group === undefined || group.id === current.id) return null;
+  const reached = group.stepKeys.some((key) => {
+    const status = statusOf(key);
+    return status !== undefined && status !== "PENDING";
+  });
+  return reached ? group : null;
+}
+
 function groupStatus(
   group: Group,
   state: RuntimeState,

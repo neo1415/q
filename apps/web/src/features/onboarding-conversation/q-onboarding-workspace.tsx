@@ -60,6 +60,7 @@ import {
   FIGURE_WATCH_ON_OPEN_DELAYS_MS,
   mergeFigureCards,
   watchDeckFigures,
+  workingNote,
 } from "./deck-figure-sync";
 import {
   deckFigureCards,
@@ -2371,6 +2372,9 @@ export function QOnboardingWorkspace({
           figures,
         );
         push("Q", line);
+        // The read-back is said: "Reading <file>" is over (re-check
+        // 2026-11-15, 84ac9afa7: it stayed up until the cards came).
+        setUploadNote(null);
         const sessionId = viewRef.current?.session.id;
         if (sessionId !== undefined) {
           void onboardingThreadKeepAction(sessionId, line);
@@ -2673,7 +2677,8 @@ export function QOnboardingWorkspace({
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
         {/* D1: the figures Q read from the deck, offered for their yes here. */}
-        <DeckFigureCards cards={deckFigures} reading={figuresReading} />
+        {/* While they are still read for, Q's working line says so. */}
+        <DeckFigureCards cards={deckFigures} />
         {/* Q room W5 (R8): Q offers the deck once the upload is read. */}
         <DeckOffer
           founder={vocabulary.subject === "founder"}
@@ -2795,15 +2800,30 @@ export function QOnboardingWorkspace({
 
       {askingQ ? (
         <QStateIndicator state="WORKING" detail={qStageLabel} />
-      ) : qThinking || uploadNote !== null ? (
+      ) : qThinking || uploadNote !== null || figuresReading ? (
         // Q's working mark and one line, fixed in height and replaced in
         // place (lane 3's shared WorkingLine): the stage when it names
         // something ("Saving your round size", "Looking up Nixo", "Reading
-        // deck.pdf"), else nothing but the mark.
-        <div className="flex h-8 items-center gap-3" data-q-turn-working>
+        // deck.pdf", then "Still reading figures…" once the read-back is
+        // said and the figure cards are not in yet), else only the mark.
+        <div
+          className="flex h-8 items-center gap-3"
+          data-q-turn-working
+          data-deck-figures-reading={
+            figuresReading && turnStage === null ? "" : undefined
+          }
+        >
           <QMark size="sm" state="WORKING" />
           <span className="sr-only">{t("Q is working")}</span>
-          <WorkingLine label={turnStage ?? uploadNote} reserve />
+          <WorkingLine
+            label={workingNote({
+              turnStage,
+              uploadNote,
+              figuresReading,
+              stillReading: t("Still reading figures…"),
+            })}
+            reserve
+          />
         </div>
       ) : reading && !readingLanded && !readingTimedOut ? (
         <QStateIndicator state="WORKING" detail="Reading what you said" />

@@ -56,6 +56,7 @@ import {
   type RecommendationStore,
 } from "./onboarding-port.js";
 import { plainStepLabel, SPOKEN_QUESTIONS } from "./step-copy.js";
+import { oneMetricPerFigure } from "./value-support.js";
 import {
   sharesTopic,
   spokenQuestion,
@@ -778,7 +779,12 @@ export function createOnboardingConversation(dependencies: {
       bare &&
       !askedSteps.has(item.stepKey) &&
       quotedFrom(item.quote, [latestWords]);
-    const kept = read.answers.filter((answer) => !fromBareLine(answer));
+    // One stated figure answers one metric, the one Q asked about (re-check
+    // 2026-11-15: a burn figure was also held as monthly revenue).
+    const kept = oneMetricPerFigure(
+      read.answers.filter((answer) => !fromBareLine(answer)),
+      askedSteps,
+    );
     const bareDropped = [
       ...read.answers,
       ...read.declined,
