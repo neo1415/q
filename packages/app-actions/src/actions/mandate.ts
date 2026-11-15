@@ -553,10 +553,16 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         (!("min" in filled["chequeRange"]) ||
           !("max" in filled["chequeRange"]) ||
           !("typical" in filled["chequeRange"]));
+      // Leaving out the minimum or maximum would wipe it; a range that names
+      // both may go ahead without a readable mandate (typical is optional).
+      const missesBound =
+        partialCheque &&
+        (!("min" in (filled["chequeRange"] as object)) ||
+          !("max" in (filled["chequeRange"] as object)));
       if (partialCheque) {
         const current =
           full === null || full === undefined ? null : chequeRangeOf(full);
-        if (full === null || full === undefined) {
+        if ((full === null || full === undefined) && missesBound) {
           return refusal(
             "I couldn't read their current cheque range, so I can't change one part of it without risking the rest. Ask for the full range (from, typically, up to) or try again.",
             { forModel: true },
