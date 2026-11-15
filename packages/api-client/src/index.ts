@@ -382,6 +382,7 @@ export {
   listGateways,
   publishGatewayVersion,
   getGatewayAppearance,
+  getGatewayAppearanceLogo,
   setGatewayAppearance,
   suggestGatewayBrand,
   setGatewayStatus,

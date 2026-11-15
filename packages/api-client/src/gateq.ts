@@ -119,6 +119,43 @@ export function getGatewayAppearance(session: ApiSession, gatewayId: string) {
   );
 }
 
+/**
+ * The gateway's saved logo for its own people, open or paused (the settings
+ * preview); null when it has none or this person may not see it.
+ */
+export async function getGatewayAppearanceLogo(
+  session: ApiSession,
+  gatewayId: string,
+): Promise<{
+  readonly contentType: string | null;
+  readonly bytes: Uint8Array;
+} | null> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/u, "")}${path(
+      "/v1/gateq/gateways/:gatewayId/appearance/logo",
+      { gatewayId },
+    )}`,
+    {
+      method: "GET",
+      headers: {
+        accept: "image/png,image/jpeg,image/svg+xml",
+        authorization: `Bearer ${session.accessToken}`,
+        ...(session.organisationId === undefined
+          ? {}
+          : { "x-organisation-id": session.organisationId }),
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  if (!response.ok) return null;
+  return {
+    contentType: response.headers.get("content-type"),
+    bytes: new Uint8Array(await response.arrayBuffer()),
+  };
+}
+
 /** B6/B7: a new appearance revision (an admin of the organisation). */
 export function setGatewayAppearance(
   session: ApiSession,

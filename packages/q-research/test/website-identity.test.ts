@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { createVettedHttp, type Transport } from "../src/vetted-http.js";
 import {
@@ -52,6 +55,17 @@ function world(
       typeof page.body === "string"
         ? new TextEncoder().encode(page.body)
         : (page.body ?? new Uint8Array());
+    // As the real transport does: past the bound is refused, or cut when
+    // a prefix was asked for.
+    if (body.byteLength > input.maxBytes) {
+      return Promise.resolve({
+        status: page.status ?? 200,
+        location: page.location ?? null,
+        contentType: page.type ?? "text/html; charset=utf-8",
+        body: input.prefix === undefined ? null : body.slice(0, input.maxBytes),
+        truncated: input.prefix !== undefined,
+      });
+    }
     return Promise.resolve({
       status: page.status ?? 200,
       location: page.location ?? null,
@@ -419,5 +433,240 @@ describe("the page's own statements, pure", () => {
     );
     expect(cleanName("x".repeat(300))).toHaveLength(120);
     expect(cleanName("   ")).toBeNull();
+  });
+});
+
+/**
+ * The live defects of 14 Nov 2026 (audits/2026-11-14-gateq-branding-live.md),
+ * reproduced on mock domains with the same shapes.
+ */
+describe("brand from website: the shapes real sites have", () => {
+  const SVG_MARK =
+    '<svg viewBox="0 0 60 25" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h60v25H0z" fill="#635bff"/></svg>';
+
+  it("a Stripe-like site: locale redirect, raw title, CSS on its own CDN host", async () => {
+    const { read, fetched } = world({
+      "https://payfast.example/": {
+        status: 302,
+        location: "https://payfast.example/nl",
+      },
+      "https://payfast.example/nl": {
+        body: `<html><head>
+          <title>Payfast | Financiële infrastructuur voor meer omzet</title>
+          <link rel="stylesheet" href="https://b.payfastcdn.example/v3/site.css">
+          <link rel="stylesheet" href="https://cdn.other.example/widget.css">
+          <link rel="stylesheet" href="https://payfastcdn.attacker.example/x.css">
+        </head><body><header><nav><a href="/nl">${SVG_MARK}</a></nav></header></body></html>`,
+      },
+      "https://b.payfastcdn.example/v3/site.css": {
+        type: "text/css",
+        body: ".btn{background:#635bff}.link{color:#635bff}a:hover{color:#635bff}",
+      },
+      "https://cdn.other.example/widget.css": {
+        type: "text/css",
+        body: "a{color:#dc2626}",
+      },
+    });
+    const reading = await read("payfast.example");
+    expect(reading.sourceUrl).toBe("https://payfast.example/nl");
+    expect(reading.name).toEqual({
+      status: "FOUND",
+      value: "Payfast",
+      from: "TITLE",
+    });
+    expect(reading.logo).toMatchObject({
+      status: "FOUND",
+      kind: "LOGO",
+      contentType: "image/svg+xml",
+    });
+    expect(reading.colours).toMatchObject({
+      status: "FOUND",
+      primary: "#635bff",
+    });
+    expect(fetched).toContain("https://b.payfastcdn.example/v3/site.css");
+    // Not the site's own CDN: never asked.
+    expect(fetched).not.toContain("https://cdn.other.example/widget.css");
+    expect(fetched).not.toContain("https://payfastcdn.attacker.example/x.css");
+  });
+
+  it("a Flutterwave-like title with the brand last: the brand, not the slogan", async () => {
+    const { read } = world({
+      "https://wavepay.example/": {
+        body: `<title>Endless possibilities for every business - Wavepay</title><meta name="theme-color" content="#262c55">`,
+      },
+    });
+    const reading = await read("wavepay.example");
+    expect(reading.name).toEqual({
+      status: "FOUND",
+      value: "Wavepay",
+      from: "TITLE",
+    });
+  });
+
+  it("a title that is only a slogan is no name: NAME_NOT_CREDIBLE", async () => {
+    const { read } = world({
+      "https://wavepay.example/": {
+        body: `<title>Endless possibilities for every business</title><meta name="theme-color" content="#262c55">`,
+      },
+    });
+    const reading = await read("wavepay.example");
+    expect(reading.name).toEqual({
+      status: "NOT_FOUND",
+      reason: "NAME_NOT_CREDIBLE",
+    });
+    expect(reading.colours).toMatchObject({ primary: "#262c55" });
+  });
+
+  it("a 1.3 MB page whose head holds the logo is read, not refused", async () => {
+    const filler = `<p>${"lorem ipsum ".repeat(110_000)}</p>`;
+    const { read } = world({
+      "https://lineal.example/": {
+        body: `<html><head><title>Lineal – Plan and build products</title>
+          <meta name="theme-color" content="#5e6ad2">
+        </head><body><header><img src="/static/lineal-logo.png" alt="Lineal logo"></header>${filler}</body></html>`,
+      },
+      "https://lineal.example/static/lineal-logo.png": {
+        type: "image/png",
+        body: PNG,
+      },
+    });
+    const reading = await read("lineal.example");
+    expect(reading.name).toEqual({
+      status: "FOUND",
+      value: "Lineal",
+      from: "LOGO_LABEL",
+    });
+    expect(reading.logo).toMatchObject({ status: "FOUND", kind: "LOGO" });
+    expect(reading.colours).toMatchObject({ primary: "#5e6ad2" });
+  });
+
+  it("a page past the hard cap with nothing usable in its prefix is TOO_LARGE", async () => {
+    const { read } = world({
+      "https://lineal.example/": {
+        body: `<html><body>${"x".repeat(2_100_000)}<title>Lineal</title></body></html>`,
+      },
+    });
+    const reading = await read("lineal.example");
+    expect(reading.name).toEqual({ status: "NOT_FOUND", reason: "TOO_LARGE" });
+    expect(reading.logo).toEqual({ status: "NOT_FOUND", reason: "TOO_LARGE" });
+    expect(reading.colours).toEqual({
+      status: "NOT_FOUND",
+      reason: "TOO_LARGE",
+    });
+  });
+
+  it("names from JSON-LD, and declared colours first (mask-icon, manifest)", async () => {
+    const { read } = world({
+      [HOME]: {
+        body: `<title>Welcome</title>
+          <link rel="mask-icon" href="/mask.svg" color="#0f766e">
+          <link rel="manifest" href="/m.json">
+          <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"Kilima site"},{"@type":"Organization","name":"Kilima Angels"}]}</script>
+          <style>a{color:#b45309}</style>`,
+      },
+      "https://kilima.example/m.json": {
+        type: "application/manifest+json",
+        body: JSON.stringify({ theme_color: "#1d4ed8" }),
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.name).toEqual({
+      status: "FOUND",
+      value: "Kilima Angels",
+      from: "SCHEMA_ORG",
+    });
+    expect(reading.colours).toEqual({
+      status: "FOUND",
+      primary: "#0f766e",
+      secondary: "#1d4ed8",
+    });
+  });
+
+  it("a long og:site_name that is a sentence falls through to a credible source", async () => {
+    const { read } = world({
+      [HOME]: {
+        body: `<meta property="og:site_name" content="The best place for every angel investor in East Africa to meet founders">
+          <title>Kilima | Angels</title>`,
+      },
+    });
+    const reading = await read("kilima.example");
+    expect(reading.name).toEqual({
+      status: "FOUND",
+      value: "Kilima",
+      from: "TITLE",
+    });
+  });
+});
+
+describe("the real transport reads a bounded prefix", () => {
+  let close: (() => Promise<void>) | null = null;
+  afterEach(async () => {
+    await close?.();
+    close = null;
+  });
+
+  it("stops once the head and header are read, and keeps a hard cap", async () => {
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/html" });
+      response.write(
+        "<html><head><title>Lineal</title></head><body><header>L</header>",
+      );
+      // 1.3 MB more, in chunks, as a large page arrives.
+      const chunk = "x".repeat(65_536);
+      let sent = 0;
+      const more = () => {
+        while (sent < 1_300_000) {
+          sent += chunk.length;
+          if (!response.write(chunk)) {
+            response.once("drain", more);
+            return;
+          }
+        }
+        response.end();
+      };
+      more();
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    close = () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      });
+    const port = (server.address() as AddressInfo).port;
+    const http = createVettedHttp({
+      resolve: () => Promise.resolve([{ address: "127.0.0.1", family: 4 }]),
+      // Loopback allowed only to exercise the socket plumbing here.
+      isAllowed: () => true,
+    });
+    const url = `http://brand.example.com:${String(port)}/`;
+    const early = await http.fetch(url, {
+      accept: "text/html",
+      maxBytes: 2_000_000,
+      prefix: { stopAfter: ["</head>", "</header>"] },
+    });
+    if (!early.ok) throw new Error(early.reason);
+    expect(early.response.truncated).toBe(true);
+    expect(early.response.body.byteLength).toBeLessThan(1_300_000);
+    expect(new TextDecoder().decode(early.response.body)).toContain(
+      "<title>Lineal</title>",
+    );
+
+    const capped = await http.fetch(url, {
+      accept: "text/html",
+      maxBytes: 100_000,
+      prefix: {},
+    });
+    if (!capped.ok) throw new Error(capped.reason);
+    expect(capped.response.body.byteLength).toBe(100_000);
+    expect(capped.response.truncated).toBe(true);
+
+    // Without a prefix the same body is still refused.
+    const refused = await http.fetch(url, {
+      accept: "text/html",
+      maxBytes: 100_000,
+    });
+    expect(refused).toEqual({ ok: false, reason: "TOO_LARGE" });
   });
 });

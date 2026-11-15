@@ -3433,6 +3433,7 @@ const { app, logger } = createApp(config, security, {
   },
   gateqPublicLogo: (publicId) => gateqAdmin.publicLogo(publicId),
   gateqGatewayAppearance: (command) => gateqAdmin.appearance(command),
+  gateqGatewayAppearanceLogo: (command) => gateqAdmin.appearanceLogo(command),
   gateqGatewayAdmin: gatewayAdminActionsPort({
     admin: gateqAdmin,
     listGateways: (command) => gateq.listGateways(command),

@@ -61,6 +61,7 @@ const appearance = (
   canChange: true,
   displayName: null,
   logo: null,
+  organisationName: null,
   ...over,
 });
 
@@ -279,6 +280,42 @@ describe("Brand from website: the admin corrects what Capital Q found, then save
       displayName: "Kilima Angel Network",
       logoAssetId: ASSET,
     });
+  });
+
+  it("paused: the saved logo is drawn from the authenticated route and the saved name heads the preview", () => {
+    render(
+      <GatewayAppearancePanel
+        gatewayId={GATEWAY}
+        open={false}
+        previewHref="/g/gq_x"
+        appearance={appearance({
+          displayName: "Wavepay",
+          logo: { assetId: ASSET, kind: "LOGO" },
+        })}
+        organisationName="Kilima Angels"
+      />,
+    );
+    const header = document.querySelector("[data-gateway-header-preview]");
+    expect(header?.textContent).toContain("Wavepay");
+    expect(header?.textContent).not.toContain("Your firm");
+    // Never the public /g/:id/logo, which is 404 while paused.
+    expect(header?.querySelector("img")?.getAttribute("src")).toBe(
+      `/gateq/logo/${GATEWAY}?v=${ASSET}`,
+    );
+  });
+
+  it("paused with no saved name: the profile name heads the preview, not a placeholder", () => {
+    render(
+      <GatewayAppearancePanel
+        gatewayId={GATEWAY}
+        open={false}
+        previewHref="/g/gq_x"
+        appearance={appearance({ organisationName: "Kilima Angels" })}
+        organisationName="Kilima Angels"
+      />,
+    );
+    const header = document.querySelector("[data-gateway-header-preview]");
+    expect(header?.textContent).toContain("Kilima Angels");
   });
 
   it("only a favicon: shown as an icon, not a logo, and off until chosen", async () => {

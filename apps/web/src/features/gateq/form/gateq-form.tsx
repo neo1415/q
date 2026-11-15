@@ -168,7 +168,9 @@ export function GateQForm({
 }: GateQFormProps) {
   const t = useT();
 
-  const fund = gateway.organisationDisplayName;
+  // The name the organisation chose for its gateway, as its header bar
+  // shows it; else the canonical profile name.
+  const fund = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
   const anonymous = prefill === null;
   const initial = answersFromProfile(prefill);
   // Live D7 (2026-11-13): every document, the deck too, goes only if they
@@ -833,7 +835,9 @@ function GateCard({
 }) {
   const t = useT();
 
-  const fund = gateway.organisationDisplayName;
+  // The name the organisation chose for its gateway, as its header bar
+  // shows it; else the canonical profile name.
+  const fund = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
   // Brand from website: the logo and name the investor's admins chose.
   const mark = gatewayMarkImage(gateway);
   return (
@@ -931,9 +935,7 @@ function GateCard({
           )}
           <p className="cq-caption gq-t3">
             {sent
-              ? t(
-                  `Sent. ${gateway.organisationDisplayName} has your application.`,
-                )
+              ? t(`Sent. ${fund} has your application.`)
               : t("Nothing is sent until you press Submit.")}
           </p>
         </div>

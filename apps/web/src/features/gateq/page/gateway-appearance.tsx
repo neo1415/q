@@ -52,14 +52,15 @@ export function GatewayAppearancePanel({
   );
   const [message, setMessage] = useState<string | null>(null);
   // Brand from website: the name and logo the gateway shows. A saved logo
-  // is drawn from Capital Q's copy through the public page's logo route.
+  // is drawn from Capital Q's copy through the authenticated settings
+  // route, which serves it while the gateway is paused too.
   const [nameText, setNameText] = useState(appearance?.displayName ?? "");
   const [logo, setLogo] = useState<ChosenBrand["logo"]>(
     appearance?.logo == null
       ? null
       : {
           ...appearance.logo,
-          src: `${previewHref}/logo?v=${appearance.logo.assetId}`,
+          src: `/gateq/logo/${gatewayId}?v=${appearance.logo.assetId}`,
         },
   );
   const [isOpen, setIsOpen] = useState(open);

@@ -96,6 +96,11 @@ export type VettedResponse = {
   readonly status: number;
   readonly contentType: string;
   readonly body: Uint8Array;
+  /**
+   * True when only the first `maxBytes` (or the part up to the `prefix`
+   * markers) was read, by request (`prefix`); never set otherwise.
+   */
+  readonly truncated?: boolean | undefined;
 };
 
 /** One hop, already vetted: connect to `address`, speak to `url`'s host. */
@@ -106,13 +111,25 @@ export type Transport = (input: {
   readonly accept: string;
   readonly maxBytes: number;
   readonly timeoutMs: number;
+  /** Keep the first `maxBytes` instead of refusing a longer body. */
+  readonly prefix?: PrefixRead | undefined;
 }) => Promise<{
   readonly status: number;
   readonly location: string | null;
   readonly contentType: string;
-  /** Null when the body ran past `maxBytes`. */
+  /** Null when the body ran past `maxBytes` (and no prefix was asked for). */
   readonly body: Uint8Array | null;
+  readonly truncated?: boolean | undefined;
 }>;
+
+/**
+ * Read a bounded prefix rather than refuse a long body (a 1.27 MB home
+ * page whose <head> is in its first kilobytes). `stopAfter`: stop as
+ * soon as every one of these ASCII markers has been read (matched without
+ * regard to case), e.g. "</head>" and "</header>". The hard cap is
+ * still `maxBytes`.
+ */
+export type PrefixRead = { readonly stopAfter?: readonly string[] | undefined };
 
 /** Node's own http(s), pinned to the vetted address through `lookup`. */
 export const nodeTransport: Transport = (input) =>
@@ -154,21 +171,51 @@ export const nodeTransport: Transport = (input) =>
         const chunks: Buffer[] = [];
         let total = 0;
         let over = false;
+        let cut = false;
+        const markers = input.prefix?.stopAfter ?? [];
+        // Markers are looked for in what is new, with a short overlap so
+        // one split across two chunks is still seen.
+        const longest = Math.max(0, ...markers.map((m) => m.length));
+        const seen = new Set<string>();
+        let tail = "";
         response.on("data", (chunk: Buffer) => {
-          total += chunk.byteLength;
-          if (total > input.maxBytes) {
-            over = true;
+          if (over || cut) return;
+          const room = input.maxBytes - total;
+          if (chunk.byteLength > room) {
+            if (input.prefix === undefined) {
+              over = true;
+            } else {
+              chunks.push(chunk.subarray(0, room));
+              total += room;
+              cut = true;
+            }
             response.destroy();
             return;
           }
+          total += chunk.byteLength;
           chunks.push(chunk);
+          if (markers.length > 0) {
+            const window = (tail + chunk.toString("latin1")).toLowerCase();
+            for (const marker of markers) {
+              if (window.includes(marker.toLowerCase())) seen.add(marker);
+            }
+            tail = window.slice(-longest);
+            if (seen.size === markers.length) {
+              cut = true;
+              response.destroy();
+            }
+          }
         });
+        let settled = false;
         const done = () => {
+          if (settled) return;
+          settled = true;
           resolve({
             status,
             location,
             contentType,
             body: over ? null : new Uint8Array(Buffer.concat(chunks)),
+            truncated: cut,
           });
         };
         response.on("end", done);
@@ -211,6 +258,8 @@ type GetOptions = {
   readonly accept: string;
   readonly maxBytes: number;
   readonly sameSite?: ((url: URL) => boolean) | undefined;
+  /** Read the first `maxBytes` rather than refuse a longer body. */
+  readonly prefix?: PrefixRead | undefined;
 };
 
 export type VettedHttp = {
@@ -297,6 +346,7 @@ export function createVettedHttp(
           accept: options.accept,
           maxBytes: options.maxBytes,
           timeoutMs,
+          ...(options.prefix === undefined ? {} : { prefix: options.prefix }),
         });
       } catch (error: unknown) {
         return refuse(
@@ -318,13 +368,23 @@ export function createVettedHttp(
         return refuse("HTTP_ERROR");
       }
       if (response.body === null) return refuse("TOO_LARGE");
+      // The bound holds whatever the transport did: past it is a refusal,
+      // or, when a prefix was asked for, the first maxBytes only.
+      let body = response.body;
+      let truncated = response.truncated === true;
+      if (body.byteLength > options.maxBytes) {
+        if (options.prefix === undefined) return refuse("TOO_LARGE");
+        body = body.slice(0, options.maxBytes);
+        truncated = true;
+      }
       return {
         ok: true,
         response: {
           url: url.href,
           status: response.status,
           contentType: response.contentType,
-          body: response.body,
+          body,
+          ...(truncated ? { truncated: true } : {}),
         },
       };
     }

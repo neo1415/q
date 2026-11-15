@@ -47,6 +47,8 @@ const REASON: Readonly<Record<GatewayBrandReason, string>> = {
   TOO_MANY_REDIRECTS: "Your website redirected too many times.",
   NOT_HTML: "Your website's address didn't return a web page.",
   NO_NAME: "No name was found on your website.",
+  NAME_NOT_CREDIBLE:
+    "Your website's title reads like a slogan, not a firm name, so it wasn't used.",
   NO_LOGO: "No logo was found on your website.",
   UNSUPPORTED_LOGO_FORMAT:
     "Your website's logo isn't a PNG, JPEG or plain SVG image Capital Q can use safely.",

@@ -136,7 +136,12 @@ export type GatewayWebsiteReading = {
     | Missing;
 };
 type GatewayNameSource =
-  "OG_SITE_NAME" | "MANIFEST" | "APPLICATION_NAME" | "TITLE";
+  | "OG_SITE_NAME"
+  | "MANIFEST"
+  | "APPLICATION_NAME"
+  | "SCHEMA_ORG"
+  | "LOGO_LABEL"
+  | "TITLE";
 
 export type GatewayBrandSources = {
   /**
@@ -200,7 +205,24 @@ export type GatewayAdminService = {
   readonly appearance: (command: {
     readonly actor: ActorContext;
     readonly gatewayId: GatewayId;
-  }) => Promise<GatewayAppearance & { readonly canChange: boolean }>;
+  }) => Promise<
+    GatewayAppearance & {
+      readonly canChange: boolean;
+      /** The canonical name as this person may read it; null: unknown. */
+      readonly organisationName: string | null;
+    }
+  >;
+  /**
+   * The saved logo's bytes for the gateway's own people (investor.gateway
+   * .view), open or paused: the settings preview. Null: no logo.
+   */
+  readonly appearanceLogo: (command: {
+    readonly actor: ActorContext;
+    readonly gatewayId: GatewayId;
+  }) => Promise<{
+    readonly contentType: GatewayLogoContentType;
+    readonly bytes: Uint8Array;
+  } | null>;
   readonly setAppearance: (command: {
     readonly actor: ActorContext;
     readonly gatewayId: GatewayId;
@@ -325,7 +347,24 @@ export function createGatewayAdminService(
       }
       const current =
         (await appearances.current(gateway.id)) ?? NEVER_SET(gateway.id);
-      return { ...current, canChange };
+      // Read through the investors service as this person, so a name they
+      // may not read is never shown; the preview falls back without it.
+      const record = await dependencies.brand
+        ?.canonical(actor, gateway.investorOrganisationId)
+        .catch(() => null);
+      return {
+        ...current,
+        canChange,
+        organisationName: record?.displayName ?? null,
+      };
+    },
+
+    appearanceLogo: async ({ actor, gatewayId }) => {
+      // Whatever the gateway's status: its own people see what they saved.
+      const gateway = await authorised(actor, gatewayId, GATEWAY_VIEW);
+      const current = await appearances.current(gateway.id);
+      if (current?.logo == null || logos === undefined) return null;
+      return logos.bytes(gateway.id, current.logo.assetId);
     },
 
     setAppearance: async ({
