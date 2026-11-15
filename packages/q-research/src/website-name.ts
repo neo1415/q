@@ -113,7 +113,12 @@ const wordsOf = (text: string) =>
   text.split(/\s+/u).filter((word) => word.length > 0);
 
 const isGeneric = (text: string) =>
-  GENERIC.has(text.toLowerCase().replace(/[.!]+$/u, "").trim());
+  GENERIC.has(
+    text
+      .toLowerCase()
+      .replace(/[.!]+$/u, "")
+      .trim(),
+  );
 
 /** Reads like a name a firm calls itself, matched to the domain or not. */
 function nameShaped(text: string, maxWords: number): boolean {
@@ -212,7 +217,10 @@ export type ChosenName =
       readonly value: string;
       readonly from: WebsiteNameSource;
     }
-  | { readonly status: "NOT_FOUND"; readonly reason: "NO_NAME" | "NAME_NOT_CREDIBLE" };
+  | {
+      readonly status: "NOT_FOUND";
+      readonly reason: "NO_NAME" | "NAME_NOT_CREDIBLE";
+    };
 
 /**
  * The first statement, in order, that holds a credible name. NO_NAME when

@@ -526,7 +526,13 @@ export function createWebsiteIdentityReader(
     // https first, then http once, as the brand-kit reader does. A long
     // page is read up to the bound (its head and header come first).
     const pagePrefix: PrefixRead = { stopAfter: HTML_STOP_AFTER };
-    let page = await get(address.url, ACCEPT_HTML, HTML_MAX, onSite, pagePrefix);
+    let page = await get(
+      address.url,
+      ACCEPT_HTML,
+      HTML_MAX,
+      onSite,
+      pagePrefix,
+    );
     if (!page.ok || !page.response.contentType.includes("html")) {
       const fallback = await get(
         address.fallback,

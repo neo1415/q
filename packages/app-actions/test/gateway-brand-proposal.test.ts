@@ -79,7 +79,7 @@ function portsWith(found: GatewayBrandSuggestionDto): AppActionPorts {
     suggestBrand: () => Promise.resolve({ ok: true, value: found }),
     setStatus: () => Promise.resolve({ ok: false }),
   };
-  return { gateqGatewayAdmin: admin } as unknown as AppActionPorts;
+  return { gateqGatewayAdmin: admin };
 }
 
 const action = APP_ACTIONS.find((a) => a.name === "gateway.appearance.set");
@@ -104,7 +104,7 @@ describe("Q brands the gateway from the website: name, logo and colour", () => {
         logoAssetId: ASSET,
       },
     });
-    const card = action.card(canonical as Parameters<typeof action.card>[0]);
+    const card = action.card(canonical);
     expect(card.summary).toBe(
       "Brand your gateway #262c55, with the logo from your website",
     );

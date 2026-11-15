@@ -62,8 +62,7 @@ function world(
         status: page.status ?? 200,
         location: page.location ?? null,
         contentType: page.type ?? "text/html; charset=utf-8",
-        body:
-          input.prefix === undefined ? null : body.slice(0, input.maxBytes),
+        body: input.prefix === undefined ? null : body.slice(0, input.maxBytes),
         truncated: input.prefix !== undefined,
       });
     }

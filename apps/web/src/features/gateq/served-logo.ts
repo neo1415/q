@@ -40,7 +40,8 @@ export function servedLogo(
   const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
   const svg = !png && !jpeg && isServedSvgLogo(contentType, bytes);
   if (!png && !jpeg && !svg) return null;
-  return new Response(bytes, {
+  // A copy backed by its own ArrayBuffer is a BodyInit; any view is not.
+  return new Response(new Uint8Array(bytes), {
     headers: {
       "Content-Type": svg ? "image/svg+xml" : png ? "image/png" : "image/jpeg",
       "X-Content-Type-Options": "nosniff",

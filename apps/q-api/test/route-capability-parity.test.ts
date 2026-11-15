@@ -296,6 +296,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
   // Brand from website: the open gateway's stored logo bytes, anonymous.
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_LOGO_PATH": PUBLIC,
+  // The same bytes for the gateway's own people while it is paused.
+  "api/http/gateq.ts GET GATEQ_GATEWAY_APPEARANCE_LOGO_PATH": exempt(
+    "the image the Gate tab's settings preview draws for the gateway's own people; an <img> source, not an action, and Q brands the gateway through gateway.appearance.set",
+  ),
   "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH": exempt(
     "the founder ticking their own documents in the GateQ form, at the moment they press Send; consent belongs on that screen",
   ),

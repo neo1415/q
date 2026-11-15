@@ -33,7 +33,6 @@ export async function GET(
   );
   if (logo === null) return NOT_FOUND();
   return (
-    servedLogo(logo.contentType, logo.bytes, "private, no-store") ??
-    NOT_FOUND()
+    servedLogo(logo.contentType, logo.bytes, "private, no-store") ?? NOT_FOUND()
   );
 }

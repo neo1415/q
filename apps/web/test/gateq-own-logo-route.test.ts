@@ -9,12 +9,15 @@ import { GET } from "../app/(app)/gateq/logo/[gatewayId]/route";
  * the public route checks them, and nothing is shared-cached.
  */
 
-const session = vi.hoisted(() => ({
-  value: { baseUrl: "https://api.example", accessToken: "token-1" } as {
-    baseUrl: string;
-    accessToken: string;
-  } | null,
-}));
+type Session = { baseUrl: string; accessToken: string };
+const session = vi.hoisted(() => {
+  // Declared, not inferred: tests sign the person out with null.
+  const signedIn = (): Session | null => ({
+    baseUrl: "https://api.example",
+    accessToken: "token-1",
+  });
+  return { value: signedIn() };
+});
 vi.mock("@/features/q/context", () => ({
   apiSession: () => Promise.resolve(session.value),
 }));
@@ -52,7 +55,7 @@ describe("the gateway's own logo route", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(String(url)).toBe(
+    expect(url).toBe(
       `https://api.example/v1/gateq/gateways/${GATEWAY}/appearance/logo`,
     );
     expect(

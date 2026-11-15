@@ -508,7 +508,10 @@ describe("brand from website: the canonical website, suggested, corrected, saved
     expect(own?.bytes).toEqual(PNG);
     // A member who may view the settings sees the same preview.
     expect(
-      await w.admin.appearanceLogo({ actor: MEMBER_A, gatewayId: w.gateway.id }),
+      await w.admin.appearanceLogo({
+        actor: MEMBER_A,
+        gatewayId: w.gateway.id,
+      }),
     ).not.toBeNull();
     const appearance = await w.admin.appearance({
       actor: ADMIN_A,

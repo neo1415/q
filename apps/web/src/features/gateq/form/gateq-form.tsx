@@ -935,9 +935,7 @@ function GateCard({
           )}
           <p className="cq-caption gq-t3">
             {sent
-              ? t(
-                  `Sent. ${fund} has your application.`,
-                )
+              ? t(`Sent. ${fund} has your application.`)
               : t("Nothing is sent until you press Submit.")}
           </p>
         </div>
