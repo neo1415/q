@@ -11,6 +11,18 @@ import type {
   QToolPort,
 } from "@capital-q/q-runtime";
 
+import {
+  applyConditions,
+  conditionWords,
+  counted,
+  listed as listedNames,
+  predicate,
+  unknownLine,
+  violatingItems,
+  type Judge,
+  type ListConditions,
+} from "./list-conditions.js";
+
 /**
  * TURN_READER v58 (owner 2026-10-23): "Which investors should I talk to
  * first, and why?" from a founder, answered by code. It was read as
@@ -579,6 +591,7 @@ export function viewOf(pick: ProspectPick): string {
 
 export function prospectCardsBlock(
   picks: readonly ProspectPick[],
+  title = "Investors to talk to first",
 ): QAnswerCardsBlock | null {
   const cards: QAnswerCard[] = picks.map((pick, at) => ({
     key: `${String(at + 1)}-${pick.investorOrganisationId}`.slice(0, 64),
@@ -601,7 +614,7 @@ export function prospectCardsBlock(
   const parsed = QAnswerCardsBlockSchema.safeParse({
     kind: "ANSWER_CARDS",
     shape: "RANKED",
-    title: "Investors to talk to first",
+    title,
     cards,
     followUps:
       picks[0] === undefined
@@ -668,5 +681,300 @@ export async function runInvestorProspects(input: {
     calls: [prospected, interested].filter(
       (call): call is QToolCallOutcome => call !== null,
     ),
+  };
+}
+
+/**
+ * Audit 2026-11-15 RC2 (P0, founder F7-13 and F7-09): "find my strongest
+ * opportunities and leave out the ones I'm already talking to" listed Zino
+ * Aviation first (in diligence, messaged a minute earlier), and "which
+ * would be poor fits?" got the same shortlist: this lane had no condition
+ * input at all. The conditions are the turn reader's (v89
+ * `listConditions`, v88 `excludeRelationships`); this applies them by code
+ * before anything is ranked, from the same two reads as above:
+ * - relationship: whom they are in contact with is code's -- every
+ *   relationship the account digest knows, and every investor that
+ *   expressed interest and was not declined;
+ * - sector, stage, geography: what each investor publishes against this
+ *   company (the prospects tool's own standing); not published is unknown,
+ *   never a mismatch, and is named as unknown;
+ * - worst first: only investors whose published criteria say they miss
+ *   this company, most misses first.
+ * A revenue condition is about companies, not investors: it cannot be
+ * applied here, so this returns null and the full path answers -- never the
+ * plain shortlist. The answer is written from the final list, names the
+ * condition it applied, and a last code check drops anything that breaks it.
+ */
+type ProspectItem = {
+  readonly id: string;
+  readonly name: string;
+  readonly interest: Interest | null;
+  readonly prospect: Prospect | null;
+};
+
+function publishedStanding(
+  item: ProspectItem,
+  dimension: "sector" | "stage" | "geography",
+): "INSIDE" | "OUTSIDE" | "UNKNOWN" {
+  const standing = item.prospect?.publishedFit?.[dimension];
+  if (standing === "MET") return "INSIDE";
+  if (standing === "NOT_MET") return "OUTSIDE";
+  if (dimension === "sector") {
+    const fit = item.prospect?.sector?.fit;
+    if (fit === "MATCH") return "INSIDE";
+    if (fit === "MISMATCH") return "OUTSIDE";
+  }
+  return "UNKNOWN";
+}
+
+function missesOf(item: ProspectItem): { misses: number; met: number } {
+  const sides = (["stage", "sector", "geography"] as const).map((dimension) =>
+    publishedStanding(item, dimension),
+  );
+  return {
+    misses: sides.filter((side) => side === "OUTSIDE").length,
+    met: sides.filter((side) => side === "INSIDE").length,
+  };
+}
+
+function pickOf(item: ProspectItem): ProspectPick {
+  const profile = item.prospect;
+  if (item.interest !== null) {
+    return {
+      investorOrganisationId: item.id,
+      name: item.name,
+      kind: "INTERESTED",
+      line: typeWords(profile?.investorType ?? item.interest.investorType),
+      about: profile?.publicDescription ?? null,
+      why: interestWhy(item.interest, focusOf(profile?.publicDescription)),
+      fit: profile?.publishedFit,
+    };
+  }
+  const one = profile as Prospect;
+  return {
+    investorOrganisationId: item.id,
+    name: item.name,
+    kind: "LIKELY_FIT",
+    line:
+      [typeWords(one.investorType), one.hqCountry]
+        .filter((part): part is string => part !== null && part.length > 0)
+        .join(" · ") || null,
+    about: one.publicDescription,
+    why: prospectWhy(one),
+    fit: one.publishedFit,
+    fitKnown: one.fitKnown,
+  };
+}
+
+export type ConditionedProspectsAnswer = InvestorProspectsAnswer & {
+  readonly excludedInContact: number;
+  readonly unknown: number;
+};
+
+export async function runConditionedProspects(input: {
+  readonly ask: InvestorProspectsAsk;
+  readonly conditions: ListConditions;
+  readonly companyId: string;
+  readonly tools: Pick<QToolPort, "execute">;
+  readonly context: QToolExecutionContext;
+  readonly available: ReadonlySet<string>;
+  /** Investor organisations the account digest says they are in contact with. */
+  readonly inContact: Promise<ReadonlySet<string>>;
+}): Promise<ConditionedProspectsAnswer | null> {
+  const { ask, conditions, companyId, tools, context, available } = input;
+  // Revenue is a company's, never an investor's: no lane here honours it.
+  if (conditions.revenue !== null) return null;
+  if (!available.has(PROSPECTS_TOOL)) return null;
+  const [prospected, interested, digestInContact] = await Promise.all([
+    tools
+      .execute(
+        {
+          callId: "q-investor-prospects",
+          name: PROSPECTS_TOOL,
+          arguments: { companyId, limit: 10 },
+        },
+        context,
+      )
+      .catch(() => null),
+    available.has(INTEREST_TOOL)
+      ? tools
+          .execute(
+            {
+              callId: "q-incoming-interest",
+              name: INTEREST_TOOL,
+              arguments: { companyId },
+            },
+            context,
+          )
+          .catch(() => null)
+      : Promise.resolve(null),
+    input.inContact.catch(() => new Set<string>()),
+  ]);
+  const prospectData = dataOf(prospected) as { prospects?: unknown } | null;
+  if (prospectData === null || !Array.isArray(prospectData.prospects)) {
+    return null;
+  }
+  // Whom they are in contact with must be known to exclude or keep them.
+  if (
+    conditions.relationship !== null &&
+    !available.has(INTEREST_TOOL) &&
+    digestInContact.size === 0
+  ) {
+    return null;
+  }
+  const interestData = dataOf(interested) as { interests?: unknown } | null;
+  const prospects = prospectData.prospects as Prospect[];
+  const interests = (
+    Array.isArray(interestData?.interests)
+      ? (interestData.interests as Interest[])
+      : []
+  ).filter((one) => one.answer !== "DECLINED");
+  const inContact = new Set([
+    ...digestInContact,
+    ...interests.map((one) => one.investorOrganisationId),
+  ]);
+  const profileOf = new Map(
+    prospects.map((one) => [one.investorOrganisationId, one]),
+  );
+  // Interested first (accepted, then waiting), then the ranking's order.
+  const items: ProspectItem[] = [];
+  const seen = new Set<string>();
+  for (const one of [...interests].sort(
+    (a, b) =>
+      (a.answer === "ACCEPTED" ? 0 : 1) - (b.answer === "ACCEPTED" ? 0 : 1) ||
+      b.expressedAt.localeCompare(a.expressedAt),
+  )) {
+    if (seen.has(one.investorOrganisationId)) continue;
+    seen.add(one.investorOrganisationId);
+    items.push({
+      id: one.investorOrganisationId,
+      name: one.investorName,
+      interest: one,
+      prospect: profileOf.get(one.investorOrganisationId) ?? null,
+    });
+  }
+  for (const one of prospects) {
+    if (seen.has(one.investorOrganisationId)) continue;
+    seen.add(one.investorOrganisationId);
+    items.push({
+      id: one.investorOrganisationId,
+      name: one.name,
+      interest: null,
+      prospect: one,
+    });
+  }
+  const inContactOf = (item: ProspectItem) => inContact.has(item.id);
+  const excludedInContact =
+    conditions.relationship === "EXCLUDE_IN_CONTACT"
+      ? items.filter(inContactOf).length
+      : 0;
+  const pool = items.filter((item) =>
+    conditions.relationship === "EXCLUDE_IN_CONTACT"
+      ? !inContactOf(item)
+      : conditions.relationship === "ONLY_IN_CONTACT"
+        ? inContactOf(item)
+        : true,
+  );
+  const judge: Judge<ProspectItem> = (item, dimension) => {
+    if (dimension === "revenue") return "UNKNOWN";
+    const wanted = conditions[dimension];
+    const side = publishedStanding(item, dimension);
+    if (wanted === null || side === "UNKNOWN") return "UNKNOWN";
+    return side === wanted ? "MEETS" : "FAILS";
+  };
+  const applied = applyConditions(pool, conditions, judge);
+  const worst = conditions.order === "WORST_FIRST";
+  // Worst first: only those whose published criteria miss this company,
+  // most misses first; nothing known is not a poor fit, it is unknown.
+  const notKnown = worst
+    ? applied.kept.filter((item) => {
+        const { misses, met } = missesOf(item);
+        return misses === 0 && met === 0;
+      })
+    : [];
+  const ordered = worst
+    ? applied.kept
+        .map((item, at) => ({ item, at, ...missesOf(item) }))
+        .filter((one) => one.misses > 0)
+        .sort((a, b) => b.misses - a.misses || a.met - b.met || a.at - b.at)
+        .map((one) => one.item)
+    : applied.kept;
+  const asked = Math.min(COUNT_MAX, Math.max(1, ask.count ?? COUNT_DEFAULT));
+  let chosen = ordered.slice(0, asked);
+  // The last code check: nothing shown breaks a stated condition.
+  const broken = new Set(
+    violatingItems(chosen, conditions, judge, inContactOf).map(
+      (item) => item.id,
+    ),
+  );
+  if (broken.size > 0) chosen = chosen.filter((item) => !broken.has(item.id));
+  const picks = chosen.map(pickOf);
+  const words = conditionWords(conditions, "FOUNDER");
+  const leftOut =
+    conditions.relationship === "EXCLUDE_IN_CONTACT"
+      ? excludedInContact > 0
+        ? `Leaving out the ${excludedInContact === 1 ? "investor" : `${counted(excludedInContact)} investors`} you're already talking to. `
+        : "None of these is an investor you're already talking to. "
+      : conditions.relationship === "ONLY_IN_CONTACT"
+        ? "Only investors you're already talking to. "
+        : "";
+  const which =
+    words.length === 0
+      ? ""
+      : `${picks.length === 1 ? "one" : counted(picks.length)} ${predicate(words, picks.length === 1)}`;
+  const names = listedNames(picks.map((pick) => pick.name));
+  const head =
+    picks.length === 0
+      ? worst
+        ? "None of the investors I can check publishes criteria that say they'd be a poor fit for your company."
+        : words.length > 0
+          ? `I can't find an investor on Capital Q${conditions.relationship === "EXCLUDE_IN_CONTACT" ? " beyond those" : ""} that ${predicate(words, true)}.`
+          : conditions.relationship === "EXCLUDE_IN_CONTACT"
+            ? "Beyond those, I don't have another investor on Capital Q to name for your company right now."
+            : "I don't have an investor on Capital Q to name for that right now."
+      : worst
+        ? `Poor fits on what they publish, poorest first: ${names}.`
+        : which.length > 0
+          ? `Of the investors I can check, ${which}: talk to ${names} first.`
+          : `Talk to ${names} first.`;
+  const parts = [`${leftOut}${head}`];
+  for (const pick of picks) {
+    const how = fitWords(pick.fit);
+    parts.push(
+      `${pick.name}: ${how === null ? sentence(pick.why) : `${sentence(how)} ${sentence(pick.why)}`.trim()}`,
+    );
+  }
+  const unknownItems = [
+    ...applied.unknown.map((one) => ({
+      name: one.item.name,
+      dimensions: one.dimensions,
+    })),
+  ];
+  const tail = unknownLine(unknownItems).trim();
+  if (tail.length > 0) parts.push(tail);
+  if (notKnown.length > 0) {
+    parts.push(
+      `${listedNames(notKnown.slice(0, 5).map((item) => item.name))} ${notKnown.length === 1 ? "doesn't" : "don't"} publish enough to tell either way.`,
+    );
+  }
+  if (!worst && picks.some((pick) => pick.kind !== "INTERESTED")) {
+    parts.push(
+      picks.some((pick) => pick.kind === "INTERESTED")
+        ? "The others are picked from what each publishes, not interest they have shown."
+        : "Each is picked from what they publish, not interest they have shown.",
+    );
+  }
+  return {
+    text: parts.join(" "),
+    block: prospectCardsBlock(
+      picks,
+      worst ? "Poor fits on what they publish" : "Investors to talk to first",
+    ),
+    shown: picks.length,
+    calls: [prospected, interested].filter(
+      (call): call is QToolCallOutcome => call !== null,
+    ),
+    excludedInContact,
+    unknown: unknownItems.length + notKnown.length,
   };
 }

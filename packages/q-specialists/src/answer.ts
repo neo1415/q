@@ -9372,11 +9372,24 @@ export function createSpecialistQAnswer(
         : {}),
       // v88 (owner live 14 Nov 2026, D1): companies other than those they
       // are already in contact with, on a FIT or catalog question.
+      // v89 (audit 2026-11-15, RC2): a founder's investors too ("which
+      // investors fit, leaving out ones I'm already talking to").
       ...(read?.kind === "QUESTION_TO_Q" &&
       (read.question?.kind === "FIT" ||
-        read.question?.kind === "DISCOVER_COMPANIES") &&
-      read.question.excludeRelationships === true
+        read.question?.kind === "DISCOVER_COMPANIES" ||
+        read.question?.kind === "INVESTOR_PROSPECTS") &&
+      (read.question.excludeRelationships === true ||
+        read.question.listConditions?.relationship === "EXCLUDE_IN_CONTACT")
         ? { excludeRelationships: true }
+        : {}),
+      // v89 (RC2): the conditions they put on the list, applied by code.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      (read.question?.kind === "FIT" ||
+        read.question?.kind === "DISCOVER_COMPANIES" ||
+        read.question?.kind === "INVESTOR_PROSPECTS") &&
+      read.question.listConditions !== null &&
+      read.question.listConditions !== undefined
+        ? { listConditions: { ...read.question.listConditions } }
         : {}),
       // v62: a comparison as the reader understood it (never recall: the
       // reader drops fromShown when compare is set), so the answer builds

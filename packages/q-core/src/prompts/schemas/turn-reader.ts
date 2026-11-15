@@ -1574,3 +1574,55 @@ export const TurnReaderV88ResultSchema = TurnReaderV87ResultSchema.extend({
   question: TurnQuestionV88Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV88Result = z.infer<typeof TurnReaderV88ResultSchema>;
+
+/**
+ * v89 (audit 2026-11-15, RC2): a ranked list answered by code dropped the
+ * condition the person stated. "Show me the ones with actual revenue",
+ * "pre-revenue but unusually strong", "outside my preferred sectors" (an
+ * investor) and "which would be poor fits", "leave out the ones I'm already
+ * talking to" (a founder) all came back as the plain top of the fit
+ * ranking. The reading now says, by meaning and in any language, which
+ * conditions they put on a list (`question.listConditions`): by
+ * relationship, by revenue, inside or outside the mandate on sector, stage
+ * or geography, and best or worst first. Which items meet them stays
+ * code's, from the records; unknown is never read as "no". Lenient: each
+ * malformed field reads as not stated, and a malformed whole as none.
+ */
+export const TURN_READER_V89_SCHEMA_VERSION = 89;
+const InsideOutsideV89Schema = z
+  .enum(["INSIDE", "OUTSIDE"])
+  .nullable()
+  .default(null)
+  .catch(null);
+export const TurnListConditionsV89Schema = z
+  .object({
+    relationship: z
+      .enum(["EXCLUDE_IN_CONTACT", "ONLY_IN_CONTACT"])
+      .nullable()
+      .default(null)
+      .catch(null),
+    revenue: z
+      .enum(["HAS_REVENUE", "PRE_REVENUE"])
+      .nullable()
+      .default(null)
+      .catch(null),
+    sector: InsideOutsideV89Schema,
+    stage: InsideOutsideV89Schema,
+    geography: InsideOutsideV89Schema,
+    order: z
+      .enum(["BEST_FIRST", "WORST_FIRST"])
+      .default("BEST_FIRST")
+      .catch("BEST_FIRST"),
+  })
+  .strict();
+export type TurnListConditionsV89 = z.infer<typeof TurnListConditionsV89Schema>;
+export const TurnQuestionV89Schema = TurnQuestionV88Schema.extend({
+  listConditions: TurnListConditionsV89Schema.nullable()
+    .default(null)
+    .catch(null),
+}).strict();
+export type TurnQuestionV89 = z.infer<typeof TurnQuestionV89Schema>;
+export const TurnReaderV89ResultSchema = TurnReaderV88ResultSchema.extend({
+  question: TurnQuestionV89Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV89Result = z.infer<typeof TurnReaderV89ResultSchema>;
