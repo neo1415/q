@@ -65,7 +65,9 @@ describe("ChatDraftEditor", () => {
     fireEvent.change(field, {
       target: { value: "Hi Amara, Tuesday at 10 works for us." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const save = screen.getByRole("button", { name: "Save changes" });
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(save);
     await waitFor(() => expect(onRevised).toHaveBeenCalledTimes(1));
     expect(reviseChatDraftAction).toHaveBeenCalledWith(APPROVAL, {
       body: "Hi Amara, Tuesday at 10 works for us.",
@@ -91,14 +93,13 @@ describe("ChatDraftEditor", () => {
     render(<ChatDraftEditor approvalId={APPROVAL} onRevised={onRevised} />);
     fireEvent.click(screen.getByRole("button", { name: "Edit message" }));
     await screen.findByLabelText("Message");
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    // The refusal arrives through an async server action and a transition;
-    // under a loaded machine the default 1 s wait timed out (14 Nov pre-gate).
-    await screen.findByText(
-      "That approval has already been decided.",
-      undefined,
-      { timeout: 5000 },
-    );
+    // The editor and its enabled Save arrive in one commit: before the fix
+    // the field showed while Save was still disabled, and this click was
+    // dropped under load (the refusal then never appeared).
+    const save = screen.getByRole("button", { name: "Save changes" });
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(save);
+    await screen.findByText("That approval has already been decided.");
     expect(onRevised).not.toHaveBeenCalled();
   });
 });

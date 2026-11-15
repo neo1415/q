@@ -30,15 +30,22 @@ export function ChatDraftEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // State set after an `await` inside an async transition is no longer part
+  // of that transition (React 19), so it committed on its own, before
+  // `pending` went false: the editor showed with Save still disabled and a
+  // quick click was silently dropped. Wrapping those updates in
+  // startTransition commits them together with `pending` going false.
   const open = () =>
     startTransition(async () => {
       const result = await readChatDraft(approvalId);
-      if (result.ok) {
-        setDraft({ body: result.value.body });
-        setMessage(null);
-      } else {
-        setMessage(result.message);
-      }
+      startTransition(() => {
+        if (result.ok) {
+          setDraft({ body: result.value.body });
+          setMessage(null);
+        } else {
+          setMessage(result.message);
+        }
+      });
     });
 
   const save = () =>
@@ -46,10 +53,10 @@ export function ChatDraftEditor({
       if (draft === null) return;
       const result = await reviseChatDraftAction(approvalId, draft);
       if (!result.ok) {
-        setMessage(result.message);
+        startTransition(() => setMessage(result.message));
         return;
       }
-      setDraft(null);
+      startTransition(() => setDraft(null));
       onRevised();
     });
 
