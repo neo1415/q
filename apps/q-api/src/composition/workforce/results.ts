@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { QArtifactDetail, QPlanStatus } from "@capital-q/contracts";
-import type { QWorkJobResult } from "@capital-q/q-tools";
+import type { QWorkJobResult, QWorkTeamJob } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 import { REVIEWER_REVISION_PREFIX } from "./documents.js";
@@ -309,6 +309,37 @@ export function createWorkforceJobResults(dependencies: {
         };
       }),
     );
+  };
+}
+
+/**
+ * Live check 15 Nov 2026 (O2): the lead Q's own jobs for the person, as
+ * their rows stand, for the account digest's "Q's work" section. One
+ * bounded owner-scoped read (no step results, no artifact reads); rows of
+ * any other owner are dropped even if a store returned them.
+ */
+export function createWorkforceTeamJobs(dependencies: {
+  readonly store: Pick<WorkforceStore, "listJobs">;
+}): (actor: ActorContext) => Promise<readonly QWorkTeamJob[]> {
+  return async (actor) => {
+    const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const jobs = await dependencies.store.listJobs(owner, {
+      limit: 20,
+      before: null,
+    });
+    return jobs
+      .filter(
+        (job) =>
+          job.source_kind === "JOB" &&
+          job.tenant_id === owner.tenantId &&
+          job.user_id === owner.userId,
+      )
+      .map((job) => ({
+        jobId: job.id,
+        goal: job.goal,
+        status: job.status,
+        updatedAt: new Date(job.updated_at).toISOString(),
+      }));
   };
 }
 

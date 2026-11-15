@@ -411,11 +411,192 @@ describe("the account digest's bounds", () => {
     expect(digest.gateq).toBeNull();
   });
 
+  it("a team-jobs read that fails marks the work unread", async () => {
+    const { ports } = tenantPorts();
+    const digest = await createAccountDigestReader({
+      ...ports,
+      work: {
+        ...(ports.work as QToolPorts["work"]),
+        teamJobs: () => Promise.reject(new Error("store down")),
+      } as unknown as QToolPorts["work"],
+    })(actorB, { now: NOW });
+    expect(digest.unread).toContain("WORK");
+    expect(digest.work.map((w) => w.goal)).toEqual([
+      "Reach three seed fintechs",
+    ]);
+  });
+
   it("a person with no ports composed reads as unread, not as nothing", async () => {
     const digest = await createAccountDigestReader({})(actorB, { now: NOW });
     expect(digest.unread).toEqual(
       expect.arrayContaining(["RELATIONSHIPS", "MEETINGS", "WORK"]),
     );
     expect(digest.relationshipsTotal).toBe(0);
+  });
+});
+
+/**
+ * Live check 15 Nov 2026: the lead Q's finished jobs (O2) and answered
+ * document requests (O3) were missing from the digest.
+ */
+describe("the account digest after the live check", () => {
+  const job = (
+    n: number,
+    status: string,
+    updatedAt: string,
+    goal = `Job ${String(n)}`,
+  ) => ({ jobId: U(700 + n), goal, status, updatedAt });
+
+  it("lists the lead Q's running jobs and those finished in the last days, the owner's own only", async () => {
+    const asked: ActorContext[] = [];
+    const { ports } = tenantPorts();
+    const withJobs: AccountDigestPorts = {
+      ...ports,
+      work: {
+        ...(ports.work as QToolPorts["work"]),
+        teamJobs: (actor: ActorContext) => {
+          asked.push(actor);
+          return Promise.resolve(
+            actor.userId === actorB.userId
+              ? [
+                  job(
+                    1,
+                    "RUNNING",
+                    "2026-11-14T20:00:00.000Z",
+                    "Memo on Ledgerline",
+                  ),
+                  job(
+                    2,
+                    "DONE",
+                    "2026-11-12T10:00:00.000Z",
+                    "Research fintech seed rounds",
+                  ),
+                  job(
+                    3,
+                    "FAILED",
+                    "2026-11-12T09:00:00.000Z",
+                    "Compare two decks",
+                  ),
+                  // Finished before the window: left out.
+                  job(4, "DONE", "2026-11-01T10:00:00.000Z", "Old research"),
+                  // Held for them: still in hand, whatever its age.
+                  job(
+                    5,
+                    "HELD",
+                    "2026-10-15T10:00:00.000Z",
+                    "Draft to Tensorgate",
+                  ),
+                ]
+              : [],
+          );
+        },
+      } as unknown as QToolPorts["work"],
+    };
+    const investor = await createAccountDigestReader(withJobs)(actorB, {
+      now: NOW,
+    });
+    expect(QAccountDigestSchema.parse(investor)).toEqual(investor);
+    const goals = investor.work.map((w) => w.goal);
+    expect(goals).toEqual(
+      expect.arrayContaining([
+        "Memo on Ledgerline",
+        "Research fintech seed rounds",
+        "Compare two decks",
+        "Draft to Tensorgate",
+        "Reach three seed fintechs",
+      ]),
+    );
+    expect(goals).not.toContain("Old research");
+    // Running work first.
+    expect(
+      investor.work
+        .slice(0, 3)
+        .every((w) => ["ACTIVE", "RUNNING", "HELD"].includes(w.status)),
+    ).toBe(true);
+    expect(
+      investor.work.find((w) => w.goal === "Compare two decks"),
+    ).toMatchObject({
+      kind: "JOB",
+      status: "FAILED",
+      updatedAt: "2026-11-12T09:00:00.000Z",
+    });
+    // Read as the asking person only; the founder's digest has none of them.
+    expect(asked.every((actor) => actor === actorB)).toBe(true);
+    const founder = await createAccountDigestReader(withJobs)(actorA, {
+      now: NOW,
+    });
+    expect(JSON.stringify(founder)).not.toContain("Memo on Ledgerline");
+    expect(asked.at(-1)).toBe(actorA);
+  });
+
+  it("shows an answered document request as a recent event on both sides, worded for each", async () => {
+    const { ports } = tenantPorts();
+    const closed = (actor: ActorContext) =>
+      actor.userId === actorA.userId
+        ? [
+            {
+              title: "Cap table",
+              status: "FULFILLED" as const,
+              at: "2026-11-14T19:19:00.000Z",
+            },
+            // Before the window: not recent.
+            {
+              title: "Old deck",
+              status: "FULFILLED" as const,
+              at: "2026-11-01T10:00:00.000Z",
+            },
+          ]
+        : [
+            {
+              title: "Cohort table",
+              status: "FULFILLED" as const,
+              at: "2026-11-14T08:00:00.000Z",
+            },
+            {
+              title: "Bank statements",
+              status: "DECLINED" as const,
+              at: "2026-11-13T08:00:00.000Z",
+            },
+          ];
+    const base = ports.relationships as NonNullable<
+      QToolPorts["relationships"]
+    >;
+    const withClosed: AccountDigestPorts = {
+      ...ports,
+      relationships: {
+        ...base,
+        diligence: async (actor: ActorContext, relationshipId: string) => {
+          const area = await base.diligence?.(actor, relationshipId);
+          return area === null || area === undefined
+            ? null
+            : { ...area, closedRequests: closed(actor) };
+        },
+      } as QToolPorts["relationships"],
+    };
+    const founder = await createAccountDigestReader(withClosed)(actorA, {
+      now: NOW,
+    });
+    expect(founder.recent).toEqual(
+      expect.arrayContaining([
+        {
+          at: "2026-11-14T19:19:00.000Z",
+          text: "You answered Halyard Ventures's request for Cap table",
+          relationshipId: U(101),
+        },
+      ]),
+    );
+    expect(JSON.stringify(founder.recent)).not.toContain("Old deck");
+    const investor = await createAccountDigestReader(withClosed)(actorB, {
+      now: NOW,
+    });
+    expect(investor.recent.map((event) => event.text)).toEqual(
+      expect.arrayContaining([
+        "Clinicrest answered your request for Cohort table",
+        "Clinicrest declined your request for Bank statements",
+      ]),
+    );
+    // Firewall: neither side's events name the other tenant's requests.
+    expect(JSON.stringify(investor.recent)).not.toContain("Halyard");
+    expect(JSON.stringify(founder.recent)).not.toContain("Cohort table");
   });
 });

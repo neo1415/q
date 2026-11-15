@@ -603,6 +603,8 @@ export function createWorkPort(dependencies: {
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
   /** Workforce jobs' persisted results (reviewer changes, diligence questions). */
   readonly jobResults?: QWorkIntelligencePort["jobResults"];
+  /** O2: the lead Q's own jobs, as their rows stand (owner's only). */
+  readonly teamJobs?: QWorkIntelligencePort["teamJobs"];
   /** ADR 0028 errands, read and stopped beside delegated work. */
   readonly errands?:
     | {
@@ -724,6 +726,9 @@ export function createWorkPort(dependencies: {
     ...(dependencies.jobResults === undefined
       ? {}
       : { jobResults: dependencies.jobResults }),
+    ...(dependencies.teamJobs === undefined
+      ? {}
+      : { teamJobs: dependencies.teamJobs }),
     answer: (actor, delegationId, laneId, answer) =>
       store.answer(actor, delegationId, laneId, answer),
     setAway: (actor, away) => store.setAway(actor, away),

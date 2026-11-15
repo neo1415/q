@@ -141,6 +141,8 @@ export type DiligenceView = {
     } | null;
     /** When it was fulfilled; null: not (yet). */
     readonly fulfilledAt: string | null;
+    /** When it was declined; null: not. Absent: not read. */
+    readonly declinedAt?: string | null | undefined;
     /**
      * The uncertainty it was asked to resolve and its standing then
      * (addendum 14 Nov 2026); null: none named.
@@ -492,6 +494,7 @@ export function createDiligenceService(dependencies: {
                   title: titles.get(row.fulfilment.documentId)?.title ?? null,
                 },
           fulfilledAt: row.fulfilment?.at ?? null,
+          declinedAt: row.decline?.at ?? null,
           about: aboutOf(row.about),
           questions: carried.get(row.id) ?? null,
         })),

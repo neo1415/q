@@ -835,6 +835,8 @@ export const DiligenceDtoSchema = z
               .nullable(),
             /** When it was fulfilled; null: not (yet). Additive (14 Nov). */
             fulfilledAt: UtcTimestampSchema.nullable().optional(),
+            /** When it was declined; null: not. Additive (15 Nov). */
+            declinedAt: UtcTimestampSchema.nullable().optional(),
             /** The uncertainty it was asked to resolve; null: none named. */
             about: DiligenceRequestAboutSchema.nullable().optional(),
             /**

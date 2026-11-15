@@ -1,5 +1,14 @@
+import {
+  settledChatNotices,
+  settledProposalNotices,
+} from "@capital-q/communication";
 import type { QAttentionItem } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
+import { settledDataRoomRequestNotices } from "@capital-q/evidence";
+import {
+  settledDiligenceRequestNotices,
+  settledInterestNotices,
+} from "@capital-q/network";
 import type { AttentionPort } from "@capital-q/q-tools";
 import { HELD_REASON_WHY } from "./workforce/review.js";
 
@@ -46,6 +55,102 @@ export function jobAttentionItems(rows: readonly JobRow[]): QAttentionItem[] {
   });
 }
 
+/** One unread NEEDS_YOU notice, as its "still needed" check reads it. */
+export type NeedsYouNotice = {
+  readonly id: string;
+  readonly userId: string;
+  readonly dedupeKey: string;
+};
+
+/**
+ * Ids of the given notices whose subject no longer waits on the person. A
+ * notice it cannot place is not returned: unknown stays shown.
+ */
+export type NoticeSettledCheck = (
+  notices: readonly NeedsYouNotice[],
+) => Promise<ReadonlySet<string>>;
+
+const UUID_PATTERN =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const CARD_WAITING_KEY = new RegExp(
+  `^instr:${UUID_PATTERN}:card-waiting:(${UUID_PATTERN})$`,
+  "iu",
+);
+
+/**
+ * Live check 15 Nov 2026 (O1): a notice that asks for an action is shown
+ * only while its subject still needs that action. Notices are append-only
+ * history, written once when something asked; whether it still asks is the
+ * subject's current state. Each NEEDS_YOU kind declares its check here,
+ * each check read through the owning context's own export (communication:
+ * proposals and chat; network: interests and document requests; evidence:
+ * data-room requests; Q runtime: approval cards). A kind with no check is
+ * shown as before. Reading at the moment of asking (rather than marking
+ * notices read when the state moves) covers every way the state can move
+ * -- the person, a colleague, Q for them, the other side -- and notices
+ * written before this check existed, without a sweep or a migration.
+ */
+export function needsYouChecks(
+  sql: DatabaseExecutor,
+): Readonly<Record<string, readonly NoticeSettledCheck[]>> {
+  return {
+    TIME_PROPOSED: [(notices) => settledProposalNotices(sql, notices)],
+    CHAT_MESSAGE: [(notices) => settledChatNotices(sql, notices)],
+    INTEREST_RECEIVED: [(notices) => settledInterestNotices(sql, notices)],
+    CONNECTION_REQUESTED: [(notices) => settledInterestNotices(sql, notices)],
+    DILIGENCE: [
+      (notices) => settledDiligenceRequestNotices(sql, notices),
+      (notices) => settledDataRoomRequestNotices(sql, notices),
+    ],
+    // "X is waiting for your yes": settled once the card is answered,
+    // withdrawn or expired (no longer PENDING).
+    Q_WORK: [
+      async (notices) => {
+        const parsed = notices.flatMap((notice) => {
+          const approvalId = CARD_WAITING_KEY.exec(notice.dedupeKey)?.[1];
+          return approvalId === undefined
+            ? []
+            : [{ ...notice, approvalId: approvalId.toLowerCase() }];
+        });
+        if (parsed.length === 0) return new Set<string>();
+        const rows = await sql<{ id: string }[]>`
+          select n.id
+            from unnest(${parsed.map((one) => one.id)}::uuid[],
+                        ${parsed.map((one) => one.userId)}::uuid[],
+                        ${parsed.map((one) => one.approvalId)}::uuid[])
+                   as n(id, user_id, approval_id)
+            join q_runtime.approvals a on a.id = n.approval_id
+           where a.status <> 'PENDING'`;
+        return new Set(rows.map((row) => row.id));
+      },
+    ],
+  };
+}
+
+/** The notices still needed, in their order; a failing check throws. */
+export async function stillNeededNotices<
+  T extends NeedsYouNotice & { readonly kind: string },
+>(
+  rows: readonly T[],
+  checks: Readonly<Record<string, readonly NoticeSettledCheck[]>>,
+): Promise<readonly T[]> {
+  const byKind = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = byKind.get(row.kind) ?? [];
+    list.push(row);
+    byKind.set(row.kind, list);
+  }
+  const settled = new Set<string>();
+  await Promise.all(
+    [...byKind].flatMap(([kind, notices]) =>
+      (checks[kind] ?? []).map(async (check) => {
+        for (const id of await check(notices)) settled.add(id);
+      }),
+    ),
+  );
+  return rows.filter((row) => !settled.has(row.id));
+}
+
 /**
  * RECOVERY-2026-10 B1: the "what needs you" sources no tool port holds,
  * read from the person's own rows. Every predicate is their user id (or
@@ -54,7 +159,8 @@ export function jobAttentionItems(rows: readonly JobRow[]): QAttentionItem[] {
  * never swallowed into an empty list here.
  *
  * Held drafts and stopped workforce jobs: q_runtime.workforce_* (theirs).
- * Notices: their unread NEEDS_YOU notifications.
+ * Notices: their unread NEEDS_YOU notifications whose subject still waits
+ * on them (needsYouChecks).
  * Document requests: data-room access requests to their own company with
  * no decision yet.
  * New matches: companies in their organisation's current Discover slate
@@ -63,8 +169,12 @@ export function jobAttentionItems(rows: readonly JobRow[]): QAttentionItem[] {
  */
 export function createAttentionSources(dependencies: {
   readonly sql: DatabaseExecutor;
+  /** Per NEEDS_YOU kind; default: needsYouChecks over the same sql. */
+  readonly noticeChecks?:
+    Readonly<Record<string, readonly NoticeSettledCheck[]>> | undefined;
 }): AttentionPort {
   const { sql } = dependencies;
+  const noticeChecks = dependencies.noticeChecks ?? needsYouChecks(sql);
   return {
     sources: {
       HELD_DRAFT: [
@@ -139,22 +249,35 @@ export function createAttentionSources(dependencies: {
       ],
       NOTICE: [
         async (actor) => {
-          const rows = await sql<
+          // Read beyond the 20 shown: settled notices are dropped below.
+          const read = await sql<
             {
               id: string;
+              kind: string;
+              dedupe_key: string;
               title: string;
               body: string | null;
               created_at: Date;
             }[]
           >`
-            select id, title, body, created_at
+            select id, kind, dedupe_key, title, body, created_at
               from communication.notifications
              where user_id = ${actor.userId}
                and tenant_id = ${actor.tenantId}
                and read_at is null
                and priority = 'NEEDS_YOU'
              order by created_at desc
-             limit 20`;
+             limit 60`;
+          const rows = (
+            await stillNeededNotices(
+              read.map((row) => ({
+                ...row,
+                userId: actor.userId,
+                dedupeKey: row.dedupe_key,
+              })),
+              noticeChecks,
+            )
+          ).slice(0, 20);
           return rows.map((row): QAttentionItem => ({
             key: `notice:${row.id}`,
             source: "NOTICE",
