@@ -35,6 +35,13 @@ export const GATEQ_GATEWAY_STATUS_PATH =
  */
 export const GATEQ_GATEWAY_BRAND_SUGGESTION_PATH =
   "/v1/gateq/gateways/:gatewayId/brand-suggestion" as const;
+/**
+ * The gateway's saved logo bytes for its own people (investor.gateway.view),
+ * open or paused, so the settings preview never breaks while the gateway
+ * is paused. The public route below stays 404 for a paused gateway.
+ */
+export const GATEQ_GATEWAY_APPEARANCE_LOGO_PATH =
+  "/v1/gateq/gateways/:gatewayId/appearance/logo" as const;
 /** The gateway's saved logo bytes, for an open gateway (anonymous). */
 export const GATEQ_PUBLIC_GATEWAY_LOGO_PATH =
   "/v1/gateq/public/:publicId/logo" as const;
@@ -129,6 +136,11 @@ export const GatewayAppearanceDtoSchema = z
     /** Null: the canonical record's name is shown. */
     displayName: GatewayDisplayNameSchema.nullable().default(null),
     logo: GatewayLogoRefSchema.nullable().default(null),
+    /**
+     * The canonical organisation name as this viewer may read it, for the
+     * settings preview while the gateway is paused; null when unknown.
+     */
+    organisationName: z.string().min(1).max(300).nullable().default(null),
   })
   .strict();
 export type GatewayAppearanceDto = z.infer<typeof GatewayAppearanceDtoSchema>;

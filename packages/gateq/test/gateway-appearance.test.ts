@@ -479,6 +479,51 @@ describe("brand from website: the canonical website, suggested, corrected, saved
     expect(w.assets).toHaveLength(0);
   });
 
+  it("paused: the public logo is gone, but its own people still preview the saved logo and name", async () => {
+    const w = world();
+    const suggestion = await w.admin.suggestBrand({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    if (suggestion.logo.status !== "FOUND") throw new Error("no logo");
+    await w.admin.setStatus({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+      status: "DISABLED",
+    });
+    await w.admin.setAppearance({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+      accentHex: "#0f766e",
+      embedOrigins: [],
+      displayName: "Kilima Angel Network",
+      logoAssetId: suggestion.logo.assetId,
+    });
+    expect(await w.admin.publicLogo(w.gateway.publicId)).toBeNull();
+    const own = await w.admin.appearanceLogo({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    expect(own?.contentType).toBe("image/png");
+    expect(own?.bytes).toEqual(PNG);
+    // A member who may view the settings sees the same preview.
+    expect(
+      await w.admin.appearanceLogo({ actor: MEMBER_A, gatewayId: w.gateway.id }),
+    ).not.toBeNull();
+    const appearance = await w.admin.appearance({
+      actor: ADMIN_A,
+      gatewayId: w.gateway.id,
+    });
+    expect(appearance).toMatchObject({
+      displayName: "Kilima Angel Network",
+      organisationName: "Kilima Angels",
+    });
+    // Another tenant: the one "does not exist".
+    await expect(
+      w.admin.appearanceLogo({ actor: ADMIN_B, gatewayId: w.gateway.id }),
+    ).rejects.toThrow(GatewayNotFoundError);
+  });
+
   it("a non-admin is refused, and another tenant's admin is told it does not exist", async () => {
     const w = world();
     await expect(

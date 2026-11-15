@@ -47,6 +47,7 @@ import {
   GATEQ_GATEWAY_VERSION_PATH,
   GATEQ_GATEWAY_VERSIONS_PATH,
   GATEQ_GATEWAYS_PATH,
+  GATEQ_GATEWAY_APPEARANCE_LOGO_PATH,
   GATEQ_PUBLIC_GATEWAY_LOGO_PATH,
   GATEQ_PUBLIC_GATEWAY_PATH,
   GATEQ_SVG_LOGO_CSP,
@@ -256,6 +257,19 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
           readonly assetId: string;
           readonly kind: "LOGO" | "ICON";
         } | null;
+      } | null>)
+    | undefined;
+  /**
+   * The gateway's saved logo bytes for its own people, open or paused (the
+   * settings preview); null when it has none. Authorised in the service.
+   */
+  readonly gatewayAppearanceLogo?:
+    | ((command: {
+        readonly actor: ActorContext;
+        readonly gatewayId: GatewayId;
+      }) => Promise<{
+        readonly contentType: GatewayLogoContentType;
+        readonly bytes: Uint8Array;
       } | null>)
     | undefined;
   /** The open gateway's saved logo bytes (Capital Q's storage), or null. */
@@ -1059,6 +1073,48 @@ export function registerGateQRoutes(
   // rebuilds from it), served with nosniff and a sandboxing policy, so it
   // can only ever be drawn as an image. The pages draw it through <img>,
   // where an SVG runs no script in any case.
+  const sendLogo = (
+    reply: FastifyReply,
+    logo: {
+      readonly contentType: GatewayLogoContentType;
+      readonly bytes: Uint8Array;
+    } | null,
+    cacheControl: string,
+  ) => {
+    const bytes = logo?.bytes;
+    const isPng =
+      bytes !== undefined &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47;
+    const isJpeg =
+      bytes !== undefined &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff;
+    const isSvg =
+      logo != null &&
+      logo.contentType === "image/svg+xml" &&
+      isSanitisedSvgLogo(logo.bytes);
+    if (logo == null || !(isPng || isJpeg || isSvg)) {
+      reply.callNotFound();
+      return undefined;
+    }
+    void reply
+      .header(
+        "Content-Type",
+        isSvg ? "image/svg+xml" : isPng ? "image/png" : "image/jpeg",
+      )
+      .header("X-Content-Type-Options", "nosniff")
+      .header(
+        "Content-Security-Policy",
+        isSvg ? GATEQ_SVG_LOGO_CSP : "default-src 'none'; sandbox",
+      )
+      .header("Cache-Control", cacheControl);
+    return reply.send(Buffer.from(logo.bytes));
+  };
+
   if (dependencies.publicLogo !== undefined) {
     const readLogo = dependencies.publicLogo;
     app.get(GATEQ_PUBLIC_GATEWAY_LOGO_PATH, async (request, reply) => {
@@ -1070,38 +1126,26 @@ export function registerGateQRoutes(
         return undefined;
       }
       const logo = await readLogo(publicId.data).catch(() => null);
-      const bytes = logo?.bytes;
-      const isPng =
-        bytes !== undefined &&
-        bytes[0] === 0x89 &&
-        bytes[1] === 0x50 &&
-        bytes[2] === 0x4e &&
-        bytes[3] === 0x47;
-      const isJpeg =
-        bytes !== undefined &&
-        bytes[0] === 0xff &&
-        bytes[1] === 0xd8 &&
-        bytes[2] === 0xff;
-      const isSvg =
-        logo !== null &&
-        logo.contentType === "image/svg+xml" &&
-        isSanitisedSvgLogo(logo.bytes);
-      if (logo === null || !(isPng || isJpeg || isSvg)) {
-        reply.callNotFound();
-        return undefined;
-      }
-      void reply
-        .header(
-          "Content-Type",
-          isSvg ? "image/svg+xml" : isPng ? "image/png" : "image/jpeg",
-        )
-        .header("X-Content-Type-Options", "nosniff")
-        .header(
-          "Content-Security-Policy",
-          isSvg ? GATEQ_SVG_LOGO_CSP : "default-src 'none'; sandbox",
-        )
-        .header("Cache-Control", "public, max-age=300");
-      return reply.send(Buffer.from(logo.bytes));
+      return sendLogo(reply, logo, "public, max-age=300");
     });
+  }
+
+  // The same bytes for the gateway's own people whatever its status, so
+  // the settings preview shows a saved logo while the gateway is paused
+  // (the public route above stays 404 then). Authenticated and authorised
+  // (investor.gateway.view) in the service; every refusal is the one 404.
+  if (dependencies.gatewayAppearanceLogo !== undefined) {
+    const readOwnLogo = dependencies.gatewayAppearanceLogo;
+    app.get(
+      GATEQ_GATEWAY_APPEARANCE_LOGO_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const logo = await readOwnLogo({
+          actor: getActorContext(request),
+          gatewayId: gatewayIdOf(request),
+        }).catch(() => null);
+        return sendLogo(reply, logo, "private, no-store");
+      },
+    );
   }
 }

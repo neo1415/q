@@ -338,7 +338,9 @@ export function ApplyExperience({
 }) {
   const t = useT();
 
-  const fund = gateway.organisationDisplayName;
+  // The name the organisation chose for its gateway, as its header bar
+  // shows it; else the canonical profile name.
+  const fund = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
   const [token, setToken] = useState<string | null>(
     initialSession?.token ?? null,
   );

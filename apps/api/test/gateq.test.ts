@@ -105,6 +105,8 @@ function buildApp(options: {
   };
   readonly publicLogo?: Uint8Array;
   readonly publicLogoType?: "image/png" | "image/jpeg" | "image/svg+xml";
+  /** The settings preview's logo for the gateway's own people. */
+  readonly ownLogo?: Uint8Array | "refused";
   readonly editDenied?: boolean;
   readonly extractions?: PolicyExtractionRecord[];
 }): {
@@ -223,6 +225,17 @@ function buildApp(options: {
       ? {}
       : {
           gateqPublicBrand: () => Promise.resolve(options.publicBrand ?? null),
+        }),
+    ...(options.ownLogo === undefined
+      ? {}
+      : {
+          gateqGatewayAppearanceLogo: () =>
+            options.ownLogo === "refused"
+              ? Promise.reject(new GatewayNotFoundError())
+              : Promise.resolve({
+                  contentType: "image/png" as const,
+                  bytes: options.ownLogo ?? new Uint8Array(),
+                }),
         }),
     ...(options.publicLogo === undefined
       ? {}
@@ -550,6 +563,30 @@ describe("the public route", () => {
         "title",
       ].sort(),
     );
+  });
+
+  it("brand from website: the gateway's own people get its saved logo whatever its status; others the one 404", async () => {
+    const PNG = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 2,
+    ]);
+    const own = `/v1/gateq/gateways/${GATEWAY.id}/appearance/logo`;
+    const { app } = buildApp({ principal: PRINCIPAL, ownLogo: PNG });
+    const logo = await app.inject({ method: "GET", url: own });
+    expect(logo.statusCode).toBe(200);
+    expect(logo.headers["content-type"]).toBe("image/png");
+    expect(logo.headers["x-content-type-options"]).toBe("nosniff");
+    expect(logo.headers["cache-control"]).toBe("private, no-store");
+    expect(new Uint8Array(logo.rawPayload)).toEqual(PNG);
+
+    const refused = buildApp({ principal: PRINCIPAL, ownLogo: "refused" });
+    expect(
+      (await refused.app.inject({ method: "GET", url: own })).statusCode,
+    ).toBe(404);
+
+    const anonymous = buildApp({ principal: null, ownLogo: PNG });
+    expect(
+      (await anonymous.app.inject({ method: "GET", url: own })).statusCode,
+    ).toBe(401);
   });
 
   it("brand from website: carries the chosen name and logo reference, and serves only PNG or JPEG logo bytes", async () => {

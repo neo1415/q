@@ -418,6 +418,8 @@ export type ApiModules = {
   readonly gateqPublicLogo?: GateQRoutesDependencies["publicLogo"];
   /** B6/B7: reading a gateway's appearance for its settings. */
   readonly gateqGatewayAppearance?: GateQRoutesDependencies["gatewayAppearance"];
+  /** The saved logo for the gateway's own people, open or paused. */
+  readonly gateqGatewayAppearanceLogo?: GateQRoutesDependencies["gatewayAppearanceLogo"];
   /** B6/B7: the gateway's administration as the declared actions reach it. */
   readonly gateqGatewayAdmin?: AppActionPorts["gateqGatewayAdmin"];
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
@@ -1086,6 +1088,7 @@ export function createApp(
       publicBrand: modules.gateqPublicBrand,
       publicLogo: modules.gateqPublicLogo,
       gatewayAppearance: modules.gateqGatewayAppearance,
+      gatewayAppearanceLogo: modules.gateqGatewayAppearanceLogo,
     });
   }
 

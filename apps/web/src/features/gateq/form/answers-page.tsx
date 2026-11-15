@@ -69,7 +69,9 @@ export function GateHero({
   readonly questions: number;
 }) {
   const t = useT();
-  const fund = gateway.organisationDisplayName;
+  // The name the organisation chose for its gateway, as its header bar
+  // shows it; else the canonical profile name.
+  const fund = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
   // Brand from website: the logo the investor's admins chose, if any.
   const mark = gatewayMarkImage(gateway);
   return (
@@ -249,7 +251,9 @@ export function AnswersPage({
 }) {
   const t = useT();
   const language = useUiLanguage();
-  const fund = gateway.organisationDisplayName;
+  // The name the organisation chose for its gateway, as its header bar
+  // shows it; else the canonical profile name.
+  const fund = gateway.gatewayDisplayName ?? gateway.organisationDisplayName;
   const sectors = answers.sectors === DECLINED ? [] : answers.sectors;
   const [other, setOther] = useState(answers.otherSector !== "");
   const inList = COUNTRY_CHOICES.some((c) => c.value === answers.country);
