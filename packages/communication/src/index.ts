@@ -122,6 +122,7 @@ export {
 } from "./schedule/proposal.js";
 export {
   createMeetingProposalPort,
+  noInviteNote,
   type MeetingProposalPort,
 } from "./schedule/proposal-port.js";
 export {

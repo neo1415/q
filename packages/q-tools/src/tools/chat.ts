@@ -596,6 +596,11 @@ export const ChatProposalOutputSchema = z
        * placed: nothing prepared yet; `says` asks where they are, once.
        */
       "NEEDS_TIME_ZONE",
+      /**
+       * D-Q3: a call time under the 18-hour floor; nothing prepared, and
+       * `says` asks for a later time.
+       */
+      "TOO_SOON",
     ]),
     awaitingApprovalOf: z.string(),
     /**

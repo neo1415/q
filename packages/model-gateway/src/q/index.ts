@@ -287,6 +287,16 @@ import {
   type PromiseGrounds,
 } from "./promise-check.js";
 import { toolLoopBudget } from "./tool-loop-budget.js";
+import {
+  meetingIntentOf,
+  meetingVehicleDecision,
+  type MeetingIntent,
+} from "./meeting-vehicle.js";
+export {
+  meetingIntentOf,
+  meetingVehicleDecision,
+  type MeetingIntent,
+} from "./meeting-vehicle.js";
 export {
   checkAnswer,
   claimCorpus,
@@ -3759,6 +3769,12 @@ export function createModelGatewayQAnswer(
   const openResolutionByRun = new Map<string, OpenResolutionItem>();
   const askedVehicleByRun = new Map<string, string>();
   /**
+   * D-Q3 (live 15 Nov 2026): the meeting the turn asked for (askedAction:
+   * set up or move a call), per run. A chat message or profile change on
+   * such a turn is refused with the meeting vehicle named.
+   */
+  const meetingIntentByRun = new Map<string, MeetingIntent>();
+  /**
    * D15 (live 15 Nov 2026, run e7ba2a79): their diligence requests linked
    * to an open item, per run and company, as the relationship read
    * returned them; an item already asked for is never offered again.
@@ -3777,6 +3793,7 @@ export function createModelGatewayQAnswer(
       offerToolByRun,
       openResolutionByRun,
       askedVehicleByRun,
+      meetingIntentByRun,
     ]) {
       if (store.size > 256) {
         const [oldest] = store.keys();
@@ -3934,6 +3951,17 @@ export function createModelGatewayQAnswer(
           : null;
       if (discover?.kind === "REFUSE") {
         return notAsked(asked.callId, discover.safeMessage);
+      }
+      const meeting = meetingVehicleDecision(
+        asked,
+        meetingIntentByRun.get(toolContext.runId) ?? null,
+      );
+      if (meeting.kind === "REFUSE") {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: asked.name },
+          "a meeting turn's message or profile change went to the meeting vehicle",
+        );
+        return notAsked(asked.callId, meeting.said);
       }
       const chosen =
         discover?.kind === "SET"
@@ -6727,6 +6755,10 @@ export function createModelGatewayQAnswer(
         UNCERTAINTY_VEHICLES.has(request.askedAction)
       ) {
         askedVehicleByRun.set(request.runId, request.askedAction);
+      }
+      const meetingIntent = meetingIntentOf(request.askedAction);
+      if (meetingIntent !== null) {
+        meetingIntentByRun.set(request.runId, meetingIntent);
       }
       if (request.aboutNamedOther === true) {
         codeSaysCheckedRuns.add(request.runId);

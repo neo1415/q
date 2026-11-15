@@ -686,7 +686,7 @@ describe("reminders and briefs", () => {
     ).toEqual({ outcome: "REFUSED", code: "NOT_A_PARTY" });
   });
 
-  it("prepares one prep brief for the organiser within 24 hours of the call", async () => {
+  it("prepares a prep brief for each person on the call within 24 hours of it, each from their own side (D-Q4)", async () => {
     const w = world();
     await w.service.schedule(SCHEDULE);
     await w.service.createReminder({
@@ -707,7 +707,37 @@ describe("reminders and briefs", () => {
     expect(brief?.body).toContain("Prep brief: Intro call");
     expect(brief?.body).toContain("With: Ada Ventures (Ada)");
     expect(brief?.body).toContain("- Ask about churn");
-    expect(await w.service.brief(FOUNDER, meetingId)).toBeNull();
+    // Live 15 Nov 2026 (D-Q4): the other side gets their own brief, with
+    // the organiser's side listed and none of the organiser's reminders.
+    const theirs = await w.service.brief(FOUNDER, meetingId);
+    expect(theirs?.body).toContain("Prep brief: Intro call");
+    expect(theirs?.body).toContain("(Ben)");
+    expect(theirs?.body).not.toContain("Ask about churn");
+    expect(theirs?.body).toContain("- none");
+    expect(await w.service.brief(STRANGER, meetingId)).toBeNull();
+  });
+
+  it("a call agreed without a calendar never says the link is in a calendar invite (D-Q4, live 15 Nov 2026)", async () => {
+    const w = world();
+    const agreed = await w.service.recordAgreed({
+      actor: INVESTOR,
+      relationshipId: REL,
+      purpose: "Introductory call",
+      startsAt: new Date("2026-10-06T09:00:00Z"),
+      durationMinutes: 30,
+      timeZone: "UTC",
+      idempotencyKey: "errand:agreed:0001",
+      correlationId: "cor_00000000-0000-4000-8000-000000000009",
+    });
+    expect(agreed.outcome).toBe("OK");
+    w.advance(new Date("2026-10-05T09:30:00Z"));
+    expect(await w.service.prepareBriefs("cor")).toBe(1);
+    const meetingId = w.store.meetings[0]?.id ?? "";
+    for (const person of [INVESTOR, FOUNDER]) {
+      const body = (await w.service.brief(person, meetingId))?.body ?? "";
+      expect(body).not.toContain("in your calendar invite");
+      expect(body).toContain("Link: none yet. No calendar invite was sent");
+    }
   });
 });
 

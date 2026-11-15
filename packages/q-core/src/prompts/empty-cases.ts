@@ -48,6 +48,10 @@ export const PROMPT_EMPTY_CASES = {
     // "WHAT THEY JUST SAID is empty on the first turn. That is your opening"
     utterance: "(empty: this is the first turn; they have said nothing yet)",
   },
+  WORK_SLOT_READER: {
+    // "Your own last message to them, before their reply (empty when none)"
+    qAsked: "(empty: you have not written to them since offering the times)",
+  },
   WORK_CONVERSE: {
     // "WHAT YOU MAY SAY (approved by ...; empty means nothing)"
     brief: "(empty: nothing is approved to say)",

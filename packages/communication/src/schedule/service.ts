@@ -638,8 +638,11 @@ export function createScheduleService(
   }
 
   function viewFor(record: MeetingRecord, viewerUserId: string): MeetingView {
+    // D-Q4: every person on the call has their own brief once composed.
     const brief =
-      record.organiserUserId === viewerUserId && record.prepBriefAt !== null;
+      (record.organiserUserId === viewerUserId ||
+        record.participants.some((p) => p.userId === viewerUserId)) &&
+      record.prepBriefAt !== null;
     return view(record, viewerUserId, brief);
   }
 
@@ -1893,43 +1896,73 @@ export function createScheduleService(
       );
       let prepared = 0;
       for (const meeting of meetings) {
-        const counterpartName =
-          (await directory.counterpartName({
-            relationshipId: meeting.relationshipId,
-            organiserTenantId: meeting.organiserTenantId,
-          })) ?? "the other side";
-        const openReminders = (
-          await store.listReminders(meeting.organiserUserId, 100)
-        ).filter(
-          (reminder) =>
-            reminder.relationshipId === meeting.relationshipId &&
-            reminder.source === "PERSON" &&
-            (reminder.status === "PENDING" || reminder.status === "DELIVERED"),
-        );
-        const body = composePrepBrief({
-          meeting,
-          counterpartName,
-          openReminders,
-        });
+        // D-Q4 (live 15 Nov 2026): a brief for each person on the call,
+        // not the organiser alone; each from their own side's view and
+        // their own reminders only.
+        const people = meeting.participants.some(
+          (participant) => participant.userId === meeting.organiserUserId,
+        )
+          ? meeting.participants
+          : [
+              {
+                participantTenantId: meeting.organiserTenantId,
+                userId: meeting.organiserUserId,
+              },
+              ...meeting.participants,
+            ];
+        const briefs: {
+          readonly tenantId: string;
+          readonly userId: string;
+          readonly body: string;
+        }[] = [];
+        for (const person of people) {
+          const counterpartName =
+            (await directory.counterpartName({
+              relationshipId: meeting.relationshipId,
+              organiserTenantId: person.participantTenantId,
+            })) ?? "the other side";
+          const openReminders = (
+            await store.listReminders(person.userId, 100)
+          ).filter(
+            (reminder) =>
+              reminder.relationshipId === meeting.relationshipId &&
+              reminder.source === "PERSON" &&
+              (reminder.status === "PENDING" ||
+                reminder.status === "DELIVERED"),
+          );
+          briefs.push({
+            tenantId: person.participantTenantId,
+            userId: person.userId,
+            body: composePrepBrief({
+              meeting,
+              counterpartName,
+              openReminders,
+              forTenantId: person.participantTenantId,
+              calendarEvent: hasCalendarEvent(meeting),
+            }),
+          });
+        }
         await transactions.run(async (tx) => {
-          await store.saveBrief(tx, {
-            meetingId: meeting.id,
-            tenantId: meeting.organiserTenantId,
-            userId: meeting.organiserUserId,
-            composerVersion: PREP_BRIEF_COMPOSER_VERSION,
-            body,
-          });
-          await store.notify(tx, {
-            tenantId: meeting.organiserTenantId,
-            userId: meeting.organiserUserId,
-            kind: "MEETING_PREP_READY",
-            title: `Prep brief ready: ${meeting.purpose}`.slice(0, 200),
-            body: null,
-            linkPath: null,
-            reminderId: null,
-            meetingId: meeting.id,
-            dedupeKey: `meeting-brief:${meeting.id}`,
-          });
+          for (const brief of briefs) {
+            await store.saveBrief(tx, {
+              meetingId: meeting.id,
+              tenantId: brief.tenantId,
+              userId: brief.userId,
+              composerVersion: PREP_BRIEF_COMPOSER_VERSION,
+              body: brief.body,
+            });
+            await store.notify(tx, {
+              tenantId: brief.tenantId,
+              userId: brief.userId,
+              kind: "MEETING_PREP_READY",
+              title: `Prep brief ready: ${meeting.purpose}`.slice(0, 200),
+              body: null,
+              linkPath: null,
+              reminderId: null,
+              meetingId: meeting.id,
+              dedupeKey: `meeting-brief:${meeting.id}`,
+            });
+          }
         });
         prepared += 1;
       }

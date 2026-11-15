@@ -279,6 +279,8 @@ import {
 } from "./composition/workforce/store.js";
 import {
   houseEtiquetteOf,
+  orEmptyCase,
+  PROMPT_EMPTY_CASES,
   resolveLanguage,
   scriptLanguageOf,
   spokenLanguageNote,
@@ -3958,6 +3960,16 @@ const qTools = createQTools({
             null)
           : null,
       ),
+      // D-Q3 (live 15 Nov 2026): who may propose call times on a
+      // relationship (the company side, someone who may speak for it).
+      proposalSide: async (actor, relationshipId) => {
+        if (actor.actorType !== "HUMAN") return null;
+        const party =
+          (await appActionPorts.proposals
+            ?.party({ actorUserId: actor.userId, relationshipId })
+            .catch(() => null)) ?? null;
+        return party === null ? null : { side: party.side, binds: party.binds };
+      },
       // R1: list_schedule's per-relationship calls, from the briefs.
       relationshipBriefs: createOwnBriefsReader({
         interests: interestService,
@@ -6561,6 +6573,10 @@ const errandNegotiation: ErrandNegotiation = {
       timeZone: input.timeZone,
       now: input.now,
       reply: input.reply,
+      qAsked: orEmptyCase(
+        input.qAsked,
+        PROMPT_EMPTY_CASES.WORK_SLOT_READER.qAsked,
+      ),
     }),
   recordAgreed: (input) => schedule.recordAgreed(input),
   sendInvites: async (invite) => {

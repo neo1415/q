@@ -5,7 +5,7 @@ import {
   ActorContextSchema,
   type ActorContextResolver,
 } from "@capital-q/security";
-import type { WorkSlotReaderResult } from "@capital-q/q-core";
+import type { WorkSlotReaderV2Result } from "@capital-q/q-core";
 
 import {
   createErrandRunner,
@@ -44,7 +44,7 @@ type Message = {
   id: string;
   viaQ: boolean;
   envelope: null;
-  from: "OTHER_SIDE";
+  from: "OTHER_SIDE" | "YOU";
   senderName: string;
   kind: "TEXT";
   text: string;
@@ -52,7 +52,9 @@ type Message = {
   sentAt: string;
 };
 
-function world(read: (reply: string) => WorkSlotReaderResult | null) {
+function world(
+  read: (reply: string, qAsked: string) => WorkSlotReaderV2Result | null,
+) {
   let current: ErrandRow = {
     id: "00000000-0000-4000-8000-0000000000f1",
     tenant_id: TENANT,
@@ -84,6 +86,8 @@ function world(read: (reply: string) => WorkSlotReaderResult | null) {
   const other: { kind: string; key: string }[] = [];
   const recorded: string[] = [];
   const invited: string[] = [];
+  const notes: (string | undefined)[] = [];
+  const asked: string[] = [];
   let clock = NOW;
   const view: MeetingView = {
     id: MEETING,
@@ -148,6 +152,18 @@ function world(read: (reply: string) => WorkSlotReaderResult | null) {
         if (input.request.kind === "TEXT" && !keys.has(input.idempotencyKey)) {
           keys.add(input.idempotencyKey);
           sent.push({ key: input.idempotencyKey, body: input.request.body });
+          clock = new Date(clock.getTime() + 1_000);
+          messages.push({
+            id: `00000000-0000-4000-8000-${String(messages.length + 1).padStart(12, "0")}`,
+            viaQ: true,
+            envelope: null,
+            from: "YOU",
+            senderName: "Ada",
+            kind: "TEXT",
+            text: input.request.body,
+            attachmentTitle: null,
+            sentAt: clock.toISOString(),
+          });
         }
         return Promise.resolve(null);
       },
@@ -191,8 +207,12 @@ function world(read: (reply: string) => WorkSlotReaderResult | null) {
     },
     negotiation: {
       zoneOf: () => Promise.resolve(ZONE),
-      readSlots: (input) => Promise.resolve(read(input.reply)),
+      readSlots: (input) => {
+        asked.push(input.qAsked);
+        return Promise.resolve(read(input.reply, input.qAsked));
+      },
       recordAgreed: (input) => {
+        notes.push(input.noInviteNote);
         const first = !recorded.includes(input.idempotencyKey);
         if (first) recorded.push(input.idempotencyKey);
         return Promise.resolve({
@@ -217,6 +237,8 @@ function world(read: (reply: string) => WorkSlotReaderResult | null) {
     other,
     recorded,
     invited,
+    notes,
+    asked,
     patches,
     row: () => current,
     say: (text: string) => {
@@ -239,7 +261,7 @@ function world(read: (reply: string) => WorkSlotReaderResult | null) {
 describe("booking without Google", () => {
   it("offers 3 times once, in the owner's zone, and tells both sides", async () => {
     const w = world(() => ({
-      answer: "NONE",
+      meaning: "NONE",
       pick: null,
       otherTime: null,
       quote: null,
@@ -270,9 +292,9 @@ describe("booking without Google", () => {
     );
   });
 
-  it("books the time they pick, once, with an invite and 'link to follow'", async () => {
+  it("books the time they accept, once, and says plainly that no calendar invite was sent", async () => {
     const w = world(() => ({
-      answer: "PICKED",
+      meaning: "ACCEPT",
       pick: 2,
       otherTime: null,
       quote: "the second",
@@ -289,19 +311,25 @@ describe("booking without Google", () => {
     expect(w.recorded).toEqual([
       `errand:${w.row().id}:agreed:${slots[1] ?? ""}`,
     ]);
-    expect(w.invited).toEqual([MEETING]);
+    // D-Q1 (live 15 Nov 2026): no calendar, no invite -- and it says so.
+    expect(w.invited).toEqual([]);
+    expect(w.notes[0]).toContain(
+      "No calendar invite was sent: no Google Calendar is connected.",
+    );
     // Booked, then (no brief to answer from) the errand is done.
     expect(w.patches.some((patch) => patch.stage === "CALL_BOOKED")).toBe(true);
     expect(w.row().meeting_id).toBe(MEETING);
     const agreed = w.sent.filter((post) => post.key.includes(":agreed:"));
     expect(agreed).toHaveLength(1);
-    expect(agreed[0]?.body).toContain("A video link will follow.");
+    expect(agreed[0]?.body).toContain("No calendar invite was sent");
+    expect(agreed[0]?.body).toContain("connect Google Calendar in Settings");
+    expect(agreed[0]?.body).not.toContain("invite is in your email");
     expect(w.owner).toContain("call");
   });
 
   it("takes a time they name inside working hours, and asks the owner about one outside", async () => {
     const inside = world(() => ({
-      answer: "OTHER_TIME",
+      meaning: "COUNTER",
       pick: null,
       otherTime: "2026-10-07T15:00:00+01:00",
       quote: "Wednesday at 3pm",
@@ -314,7 +342,7 @@ describe("booking without Google", () => {
     ]);
 
     const outside = world(() => ({
-      answer: "OTHER_TIME",
+      meaning: "COUNTER",
       pick: null,
       otherTime: "2026-10-07T21:00:00+01:00",
       quote: "Wednesday 9pm",
@@ -331,7 +359,7 @@ describe("booking without Google", () => {
 
   it("never books on an unclear reply or a pick it did not offer", async () => {
     const unclear = world(() => ({
-      answer: "NONE",
+      meaning: "NONE",
       pick: null,
       otherTime: null,
       quote: null,
@@ -342,7 +370,7 @@ describe("booking without Google", () => {
     expect(unclear.recorded).toEqual([]);
 
     const bogus = world(() => ({
-      answer: "PICKED",
+      meaning: "ACCEPT",
       pick: 5,
       otherTime: null,
       quote: "five",
@@ -351,5 +379,46 @@ describe("booking without Google", () => {
     bogus.say("number five");
     await bogus.runner.tick();
     expect(bogus.recorded).toEqual([]);
+  });
+
+  /**
+   * Live 15 Nov 2026 (audit 2026-11-15-meetings-through-q-live.md, step 2):
+   * Savanna's "Would Tue 17 Nov, 10:00 (UTC) work for a 30-minute call
+   * about Introductory call?" was read as agreement and booked 60 s later.
+   * The reader now says what it means; a question is answered, not booked.
+   */
+  it("a question about an offered time gets a reply, never a booking; the yes to it books", async () => {
+    const w = world((reply, qAsked) =>
+      reply.startsWith("Would")
+        ? {
+            meaning: "QUESTION",
+            pick: 2,
+            otherTime: null,
+            quote: reply.slice(0, 80),
+          }
+        : qAsked.includes("Reply yes to confirm")
+          ? { meaning: "ACCEPT", pick: 2, otherTime: null, quote: reply }
+          : { meaning: "NONE", pick: null, otherTime: null, quote: null },
+    );
+    await w.runner.tick();
+    const slots = w.row().proposed_slots as string[];
+    w.say(
+      "Would Tue 17 Nov, 10:00 (UTC) work for a 30-minute call about Introductory call?",
+    );
+    await w.runner.tick();
+    expect(w.recorded).toEqual([]);
+    expect(w.row().meeting_id).toBeNull();
+    const confirm = w.sent.filter((post) => post.key.includes(":asked:"));
+    expect(confirm).toHaveLength(1);
+    expect(confirm[0]?.body).toContain("Reply yes to confirm it");
+    expect(confirm[0]?.body).toContain("nothing is booked until you do");
+
+    w.say("Yes, that works.");
+    await w.runner.tick();
+    // The reader saw Q's own question with the yes.
+    expect(w.asked.at(-1)).toContain("Reply yes to confirm it");
+    expect(w.recorded).toEqual([
+      `errand:${w.row().id}:agreed:${slots[1] ?? ""}`,
+    ]);
   });
 });

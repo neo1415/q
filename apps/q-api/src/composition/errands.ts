@@ -12,10 +12,11 @@ import {
   type ModelDataPosture,
   type QSubjectRef,
 } from "@capital-q/contracts";
-import type {
-  ChatService,
-  CounterpartNotices,
-  ScheduleService,
+import {
+  noInviteNote,
+  type ChatService,
+  type CounterpartNotices,
+  type ScheduleService,
 } from "@capital-q/communication";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -28,7 +29,7 @@ import {
   ErrandReplyResultSchema,
   renderPrompt,
   type ErrandReplyResult,
-  type WorkSlotReaderResult,
+  type WorkSlotReaderV2Result,
   type ErrandReplyVariablesV2,
 } from "@capital-q/q-core";
 import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
@@ -150,7 +151,7 @@ function steps(plan: ErrandStartPayload): string[] {
   }
   if (plan.bookCall !== null) {
     lines.push(
-      `Book "${plan.bookCall.purpose}" (${String(plan.bookCall.durationMinutes)} min) at the first free time on your calendar, with a Google Meet invite to their people.`,
+      `Book "${plan.bookCall.purpose}" (${String(plan.bookCall.durationMinutes)} min). With your Google Calendar connected: at the first free time on it, with a Google Meet invite to their people. Without it: Q offers them times in the chat and books one only when they accept it, with no calendar invite.`,
     );
   }
   if (plan.brief !== null) {
@@ -158,7 +159,9 @@ function steps(plan: ErrandStartPayload): string[] {
       `Answer their questions for up to two weeks, saying only:\n"${plan.brief}"\nAnything else comes back to you.`,
     );
   }
-  lines.push("Tell you at each step, with the call's time and link.");
+  lines.push(
+    "Tell you at each step, with the call's time, and its link once there is one.",
+  );
   return lines;
 }
 
@@ -405,7 +408,9 @@ export type ErrandNegotiation = {
     readonly timeZone: string;
     readonly now: string;
     readonly reply: string;
-  }) => Promise<WorkSlotReaderResult | null>;
+    /** Q's own last message in the chat before their reply; "" for none. */
+    readonly qAsked: string;
+  }) => Promise<WorkSlotReaderV2Result | null>;
   readonly recordAgreed: ScheduleService["recordAgreed"];
   /** Email the .ics to the organiser and every invitee; throws on failure. */
   readonly sendInvites: (input: {
@@ -703,6 +708,58 @@ export function createPostgresErrandStore(sql: DatabaseExecutor): ErrandStore {
   };
 }
 
+/**
+ * What the slot reader's meaning lets code do (live 15 Nov 2026, D-Q3):
+ * book only an ACCEPT of an offered time, or weigh a COUNTER; a QUESTION
+ * about an offered time is ASKED -- answered, never booked. Anything that
+ * does not fit the offer is NONE.
+ */
+export function slotDecision(
+  read: WorkSlotReaderV2Result | null,
+  offered: number,
+):
+  | { readonly kind: "NONE" }
+  | { readonly kind: "DECLINED"; readonly quote: string | null }
+  | { readonly kind: "ASKED"; readonly pick: number }
+  | { readonly kind: "ACCEPTED"; readonly pick: number }
+  | { readonly kind: "COUNTER"; readonly otherTime: string } {
+  if (read === null) return { kind: "NONE" };
+  const pick =
+    read.pick !== null && read.pick >= 1 && read.pick <= offered
+      ? read.pick
+      : null;
+  switch (read.meaning) {
+    case "DECLINE":
+      return { kind: "DECLINED", quote: read.quote };
+    case "ACCEPT":
+      return pick === null ? { kind: "NONE" } : { kind: "ACCEPTED", pick };
+    case "QUESTION":
+      return pick === null ? { kind: "NONE" } : { kind: "ASKED", pick };
+    case "COUNTER":
+      return read.otherTime === null
+        ? { kind: "NONE" }
+        : { kind: "COUNTER", otherTime: read.otherTime };
+    case "NONE":
+      return { kind: "NONE" };
+  }
+}
+
+/** Q's (their side's) last message before the other side's new ones. */
+function lastFromUs(
+  messages: readonly {
+    readonly from: string;
+    readonly text: string | null;
+    readonly sentAt: string;
+  }[],
+  before: number,
+): string {
+  const ours = messages.filter(
+    (message) =>
+      message.from !== "OTHER_SIDE" && Date.parse(message.sentAt) < before,
+  );
+  return (ours.at(-1)?.text ?? "").slice(0, 1_500);
+}
+
 export function createErrandRunner(dependencies: {
   readonly store: ErrandStore;
   readonly resolver: ActorContextResolver;
@@ -927,6 +984,7 @@ export function createErrandRunner(dependencies: {
     plan: ErrandStartPayload,
     link: string | null,
     reply: string,
+    qAsked: string,
     negotiation: ErrandNegotiation,
   ): Promise<boolean> {
     const call = plan.bookCall;
@@ -949,9 +1007,30 @@ export function createErrandRunner(dependencies: {
       timeZone: zone,
       now: now().toISOString(),
       reply,
+      qAsked,
     });
-    if (read === null || read.answer === "NONE") return false;
-    if (read.answer === "DECLINED") {
+    const decision = slotDecision(read, offered.length);
+    if (decision.kind === "NONE") return false;
+    if (decision.kind === "ASKED") {
+      // Live 15 Nov 2026 (D-Q3): "Would Tue 17 Nov, 10:00 (UTC) work…?"
+      // is a question, never an acceptance: it gets a reply asking them
+      // to confirm, and nothing is booked until they say yes.
+      const asked = offered[decision.pick - 1];
+      if (asked === undefined) return false;
+      const label = slotLabel(asked, zone);
+      const posted = await post(
+        actor,
+        row,
+        `asked:${asked.toISOString()}`,
+        `${label} works for ${principal}. Reply yes to confirm it and the call is booked; nothing is booked until you do.`,
+      ).catch(() => false);
+      if (!posted) return false;
+      await update(row.id, {
+        lastStep: `${row.counterpart_name} asked about ${label}; Q asked them to confirm it.`,
+      });
+      return true;
+    }
+    if (decision.kind === "DECLINED") {
       await update(row.id, {
         lastStep: `${row.counterpart_name} doesn't want a call for now.`,
       });
@@ -960,15 +1039,15 @@ export function createErrandRunner(dependencies: {
         link,
         "call-declined",
         `${row.counterpart_name} doesn't want a call for now`,
-        read.quote,
+        decision.quote,
       );
       return false;
     }
     let at: Date | null = null;
-    if (read.answer === "PICKED" && read.pick !== null) {
-      at = offered[read.pick - 1] ?? null;
-    } else if (read.answer === "OTHER_TIME" && read.otherTime !== null) {
-      const named = new Date(read.otherTime);
+    if (decision.kind === "ACCEPTED") {
+      at = offered[decision.pick - 1] ?? null;
+    } else {
+      const named = new Date(decision.otherTime);
       // Their own time is taken when it is ahead, and inside the owner's
       // working hours (the availability the plan allows); otherwise the
       // owner decides.
@@ -993,6 +1072,19 @@ export function createErrandRunner(dependencies: {
       }
     }
     if (at === null) return false;
+    // D-Q1/D-Q4 (live 15 Nov 2026): no calendar is connected, so no
+    // calendar invite is sent, and every party is told so in the same
+    // words as an accepted proposal (2e1fb1d33).
+    const blocked =
+      (await schedule
+        .calendarStatus?.(row.user_id)
+        .catch(() => "CALENDAR_NOT_CONNECTED" as const)) ??
+      "CALENDAR_NOT_CONNECTED";
+    const note = noInviteNote(
+      blocked === "CALENDAR_REVOKED"
+        ? "CALENDAR_REVOKED"
+        : "CALENDAR_NOT_CONNECTED",
+    );
     const recorded = await negotiation.recordAgreed({
       actor,
       relationshipId: row.relationship_id,
@@ -1003,6 +1095,7 @@ export function createErrandRunner(dependencies: {
       idempotencyKey: `errand:${row.id}:agreed:${at.toISOString()}`,
       qActionId: row.q_action_id,
       correlationId: `cor_${randomUUID()}`,
+      noInviteNote: note,
     });
     if (recorded.outcome !== "OK") {
       await update(row.id, {
@@ -1011,27 +1104,11 @@ export function createErrandRunner(dependencies: {
       return false;
     }
     const when = slotLabel(at, zone);
-    let invited = true;
-    if (!recorded.alreadyScheduled) {
-      await negotiation
-        .sendInvites({
-          meetingId: recorded.meeting.id,
-          start: at,
-          end: new Date(at.getTime() + call.durationMinutes * 60_000),
-          purpose: call.purpose,
-          timeZone: zone,
-          organiser: recorded.organiser,
-          invitees: recorded.invitees,
-        })
-        .catch(() => {
-          invited = false;
-        });
-    }
     await post(
       actor,
       row,
       `agreed:${at.toISOString()}`,
-      `Booked for ${when}. ${invited ? "A calendar invite is in your email. " : ""}A video link will follow.`,
+      `Booked for ${when}. ${note}`,
     ).catch(() => false);
     await update(row.id, {
       stage: "CALL_BOOKED",
@@ -1362,6 +1439,10 @@ export function createErrandRunner(dependencies: {
             .map((message) => message.text ?? "")
             .join("\n")
             .slice(0, 6_000),
+          lastFromUs(
+            read.messages,
+            Math.min(...fresh.map((message) => Date.parse(message.sentAt))),
+          ),
           dependencies.negotiation,
         ))
       ) {

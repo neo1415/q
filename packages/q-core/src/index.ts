@@ -1513,6 +1513,7 @@ export {
   WORK_STAND_IN_REPLY_V1,
   WORK_STAND_IN_REPLY_V2,
   WORK_SLOT_READER_V1,
+  WORK_SLOT_READER_V2,
 } from "./prompts/tasks/q-work.v1.js";
 export {
   WorkConverseResultSchema,
@@ -1523,6 +1524,10 @@ export {
   WorkSlotReaderResultSchema,
   type WorkSlotReaderResult,
   type WorkSlotReaderVariables,
+  WorkSlotReaderV2ResultSchema,
+  type WorkSlotReaderV2Result,
+  type WorkSlotReaderV2Variables,
+  type SlotReaderMeaning,
   type WorkConverseResult,
   type WorkConverseVariables,
   type WorkInterviewReportResult,

@@ -34,7 +34,19 @@ const action = APP_ACTIONS.find(
   (candidate) => candidate.name === "relationship.outcome.meeting",
 );
 
-function ports(held: "OK" | "REFUSED") {
+type Listed = {
+  readonly id: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly timeZone: string;
+  readonly status: "SCHEDULED" | "CANCELLED";
+};
+
+function meeting(id: string, startsAt: string, endsAt: string): Listed {
+  return { id, startsAt, endsAt, timeZone: "UTC", status: "SCHEDULED" };
+}
+
+function ports(held: "OK" | "REFUSED", calls: readonly Listed[] = []) {
   const order: string[] = [];
   const confirmHeld = vi.fn(() => {
     order.push("held");
@@ -66,6 +78,20 @@ function ports(held: "OK" | "REFUSED") {
         dismissReminder: vi.fn(),
         organisedMeeting: vi.fn(),
         joinCall: vi.fn(),
+        listMeetings: vi.fn(() =>
+          Promise.resolve(
+            calls.map((call) => ({
+              ...call,
+              relationshipId: REL,
+              purpose: "Introductory call",
+              organisedByYou: true,
+              organiserName: "Ama",
+              meetLink: null,
+              attendees: [],
+              hasBrief: false,
+            })),
+          ),
+        ),
       },
       outcomes: {
         recordMeetingOutcome,
@@ -111,5 +137,106 @@ describe("relationship.outcome.meeting with a call", () => {
       input: { outcome: "INTRODUCTIONS" },
     });
     expect(world.order).toEqual(["outcome"]);
+  });
+});
+
+/**
+ * Live 15 Nov 2026 (D-Q2; audit 2026-11-15-meetings-through-q-live.md,
+ * step 5): "Mark the Introductory call with Savanna Seed as held" prepared
+ * `{outcome: OTHER}` with no meetingId for a call two days away, so
+ * approving it would skip confirmHeld and record an outcome early.
+ */
+describe("D-Q2: a meeting outcome binds its call, and never one still to come", () => {
+  const FUTURE = meeting(
+    CALL,
+    "2099-11-17T10:00:00.000Z",
+    "2099-11-17T10:30:00.000Z",
+  );
+  const ENDED = meeting(
+    "22222222-0000-4000-8000-000000000002",
+    "2020-11-10T10:00:00.000Z",
+    "2020-11-10T10:30:00.000Z",
+  );
+  const family = APP_ACTIONS.find(
+    (candidate) => candidate.name === "relationship.outcome.change",
+  );
+
+  it("the live shape (no meetingId, the only call in the future) is refused server-side; nothing recorded", async () => {
+    if (action === undefined) throw new Error("no action");
+    const world = ports("OK", [FUTURE]);
+    const out = await action.run(world.ports, context, {
+      relationshipId: REL,
+      input: { outcome: "OTHER" },
+    });
+    expect(out).toEqual({ outcome: "REFUSED", code: "MEETING_NOT_ENDED" });
+    expect(world.confirmHeld).not.toHaveBeenCalled();
+    expect(world.recordMeetingOutcome).not.toHaveBeenCalled();
+    expect(
+      action.done(
+        out,
+        { relationshipId: REL, input: { outcome: "OTHER" } },
+        {},
+      ),
+    ).toContain("hasn't happened yet");
+  });
+
+  it("unnamed, it binds the latest ended call and marks it held first", async () => {
+    if (action === undefined) throw new Error("no action");
+    const world = ports("OK", [FUTURE, ENDED]);
+    await action.run(world.ports, context, {
+      relationshipId: REL,
+      input: { outcome: "FOLLOW_UP_MEETING" },
+    });
+    expect(world.order).toEqual(["held", "outcome"]);
+    expect(world.confirmHeld).toHaveBeenCalledWith(
+      expect.objectContaining({ meetingId: ENDED.id }),
+    );
+  });
+
+  it("a named call still to come is refused, said as not ended (not 'not found')", async () => {
+    if (action === undefined) throw new Error("no action");
+    const world = ports("OK", [FUTURE]);
+    const out = await action.run(world.ports, context, {
+      relationshipId: REL,
+      input: { outcome: "OTHER", meetingId: CALL },
+    });
+    expect(out).toEqual({ outcome: "REFUSED", code: "MEETING_NOT_ENDED" });
+    expect(world.recordMeetingOutcome).not.toHaveBeenCalled();
+  });
+
+  it("Q's path refuses before preparing a card, with the call's time; after it ends the card binds the call", async () => {
+    const tool = family?.tool;
+    if (tool === undefined) throw new Error("no tool");
+    const qContext = { ...context, surface: "Q" as const };
+    const early = await tool.toCanonical(
+      {
+        relationship: REL,
+        operation: "MEETING_OUTCOME",
+        meetingOutcome: "OTHER",
+      },
+      qContext,
+      ports("OK", [FUTURE]).ports,
+    );
+    expect(early).toEqual({
+      refused: expect.stringContaining(
+        "That call hasn't happened yet",
+      ) as unknown,
+    });
+    const late = await tool.toCanonical(
+      {
+        relationship: REL,
+        operation: "MEETING_OUTCOME",
+        meetingOutcome: "OTHER",
+      },
+      qContext,
+      ports("OK", [ENDED]).ports,
+    );
+    expect(late).toEqual({
+      operation: "MEETING_OUTCOME",
+      input: {
+        relationshipId: REL,
+        input: { outcome: "OTHER", meetingId: ENDED.id },
+      },
+    });
   });
 });

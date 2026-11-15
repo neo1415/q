@@ -279,3 +279,53 @@ export const WorkSlotReaderResultSchema = z
   })
   .strict();
 export type WorkSlotReaderResult = z.infer<typeof WorkSlotReaderResultSchema>;
+
+/**
+ * v2 (live 15 Nov 2026, D-Q3): Savanna's "Would Tue 17 Nov, 10:00 (UTC)
+ * work…?" was read as PICKED and the call was booked. What the reply MEANS
+ * is read into one closed set -- an acceptance, a decline, a counter, a
+ * question, or nothing yet -- and code books only an ACCEPT of an offered
+ * time (or a COUNTER inside the owner's own hours). A question gets a
+ * reply, never a booking. `qAsked` is Q's own last message in the chat,
+ * so a short "yes" to Q's question is read against it.
+ */
+export const WORK_SLOT_READER_V2_SCHEMA_VERSION = 2;
+
+export const WorkSlotReaderV2VariablesSchema =
+  WorkSlotReaderVariablesSchema.extend({
+    /** Q's own last message to them, before their reply. Trusted; "" for none. */
+    qAsked: z.string().max(1_500),
+  }).strict();
+export type WorkSlotReaderV2Variables = z.infer<
+  typeof WorkSlotReaderV2VariablesSchema
+>;
+
+export const SLOT_READER_MEANINGS = [
+  "ACCEPT",
+  "DECLINE",
+  "COUNTER",
+  "QUESTION",
+  "NONE",
+] as const;
+export type SlotReaderMeaning = (typeof SLOT_READER_MEANINGS)[number];
+
+export const WorkSlotReaderV2ResultSchema = z
+  .object({
+    /**
+     * ACCEPT: they say yes to one offered time (pick). DECLINE: they don't
+     * want a call. COUNTER: they state a different time that suits them
+     * (otherTime). QUESTION: they ask something, including whether a time
+     * would work. NONE: nothing settled yet.
+     */
+    meaning: z.enum(SLOT_READER_MEANINGS),
+    /** 1-based number of the offered time: the one accepted, or asked about. */
+    pick: z.number().int().min(1).max(5).nullable(),
+    /** For COUNTER: the start they named, ISO 8601 with its offset. */
+    otherTime: z.string().max(40).nullable(),
+    /** Their words that carry the meaning, copied exactly. */
+    quote: z.string().max(300).nullable(),
+  })
+  .strict();
+export type WorkSlotReaderV2Result = z.infer<
+  typeof WorkSlotReaderV2ResultSchema
+>;

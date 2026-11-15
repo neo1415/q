@@ -22,11 +22,13 @@ import {
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
 import type { RelationshipIntelligencePort } from "../ports.js";
+import { appActionKey, type AppApprovalPort } from "./app-actions.js";
 import { closestByName } from "./connection-requests.js";
+import { ERRAND_CALL_LEAD_MINUTES } from "./errands.js";
 import { admitted } from "./relationships.js";
 import {
-  CHAT_MESSAGE_SEND,
   ChatProposalOutputSchema,
+  ERRAND_START,
   exactlyOne,
   MEETING_CANCEL,
   MEETING_RESCHEDULE,
@@ -200,7 +202,25 @@ export type ScheduleIntelligencePort = {
   readonly counterpartCanHost?:
     | ((actor: ActorContext, relationshipId: string) => Promise<boolean>)
     | undefined;
+  /**
+   * Live 15 Nov 2026 (D-Q3): the actor's side on the relationship for a
+   * meeting time proposal (only the company side proposes) and whether
+   * they may speak for it. Null: not a party. Absent: not composed, so no
+   * proposal is prepared and the errand is the vehicle.
+   */
+  readonly proposalSide?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<{
+        readonly side: "FOUNDER" | "INVESTOR";
+        readonly binds: boolean;
+      } | null>)
+    | undefined;
 };
+
+/** The approval type of a meeting time proposal (`app.<name>`). */
+export const MEETING_PROPOSAL_ACTION = "app.schedule.proposal.propose";
 
 /** Capital Q's words for a call blocked on the organiser's calendar. */
 async function blockedSays(
@@ -438,9 +458,9 @@ const GUIDANCE: Readonly<Record<string, string>> = {
   NOT_CONNECTED:
     "Calls open once they are connected with them: interest expressed and accepted.",
   CALENDAR_NOT_CONNECTED:
-    "Their Google Calendar is not connected. Capital Q says why and how to fix it (`says`). It is not a dead end: ask which time suits them (or take the one they named) and prepare it with propose_meeting, which proposes that time to the other side in the chat. Promise no invite.",
+    "Their Google Calendar is not connected. Capital Q says why and how to fix it (`says`). It is not a dead end: ask which time suits them (or take the one they named) and prepare it with propose_meeting, which prepares that time as a proposal the other side accepts (or Q's errand when they are the investor). Promise no invite.",
   CALENDAR_REVOKED:
-    "Their Google Calendar connection expired. Capital Q says why and how to fix it (`says`). It is not a dead end: ask which time suits them (or take the one they named) and prepare it with propose_meeting, which proposes that time to the other side in the chat. Promise no invite.",
+    "Their Google Calendar connection expired. Capital Q says why and how to fix it (`says`). It is not a dead end: ask which time suits them (or take the one they named) and prepare it with propose_meeting, which prepares that time as a proposal the other side accepts (or Q's errand when they are the investor). Promise no invite.",
   UNAVAILABLE: "Their calendar could not be read just now; try again shortly.",
 };
 
@@ -560,36 +580,6 @@ function createFindMeetingTimesTool(
   });
 }
 
-/**
- * The chat message that proposes a call when no calendar invite can be
- * sent (autopilot P1). Plain, in the person's voice; the time in their
- * zone, or UTC said as UTC when no zone is known.
- */
-export function meetingProposalBody(input: {
-  readonly purpose: string;
-  readonly durationMinutes: number;
-  readonly iso: string;
-  readonly timeZone: string | undefined;
-  /** Who it goes to: their own call title is not a topic to them. */
-  readonly counterpartName?: string | undefined;
-}): string {
-  const instant = new Date(input.iso);
-  const when =
-    input.timeZone === undefined
-      ? `${localLabel(instant, "UTC")} UTC`
-      : `${localLabel(instant, input.timeZone)} (${input.timeZone})`;
-  const stated = input.purpose.trim().replace(/[.\s]+$/u, "");
-  // Live a7b99c465: "a 30-minute call about Call with Ledgerfold", sent to
-  // Ledgerfold. The invite's own title, the one this tool gives a call
-  // ("Call with <them>"), says no more than "a call" does.
-  const purpose =
-    input.counterpartName !== undefined &&
-    stated.toLowerCase() === `call with ${input.counterpartName}`.toLowerCase()
-      ? ""
-      : stated;
-  return `Would ${when} work for a ${String(input.durationMinutes)}-minute call${purpose === "" ? "" : ` about ${purpose}`}? If another time suits you better, suggest one here and I'll send an invite.`;
-}
-
 // --- propose_meeting --------------------------------------------------------
 
 export const ProposeMeetingInputSchema = z
@@ -624,9 +614,18 @@ export type ProposeMeetingInput = z.output<typeof ProposeMeetingInputSchema>;
 
 export const ProposeMeetingChangeInputSchema = z
   .object({
-    meetingId: UuidSchema.describe(
-      "A call they organised, by id from list_schedule.",
+    meetingId: UuidSchema.optional().describe(
+      "A call they organised, by id from list_schedule. Or counterpartName instead.",
     ),
+    counterpartName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "Instead of meetingId: who the call is with, as they said it. Capital Q finds their one upcoming call with them.",
+      ),
     change: z.enum(["RESCHEDULE", "CANCEL"]),
     when: LocalWhenSchema.optional().describe(
       "RESCHEDULE only: the new time as they said it; resolved in their time zone.",
@@ -649,14 +648,19 @@ export const ProposeMeetingChangeInputSchema = z
   )
   .refine((input) => input.startsAt === undefined || input.when === undefined, {
     message: "give when or startsAt, not both",
-  });
+  })
+  .refine(
+    (input) =>
+      (input.meetingId === undefined) !== (input.counterpartName === undefined),
+    { message: "name the call by meetingId or counterpartName, not both" },
+  );
 export type ProposeMeetingChangeInput = z.infer<
   typeof ProposeMeetingChangeInputSchema
 >;
 
 type MeetingGrant = NonNullable<
   Awaited<ReturnType<ScheduleIntelligencePort["organisedMeeting"]>>
->;
+> & { readonly counterpartName: string };
 
 // --- propose_reminder ---------------------------------------------------------
 
@@ -819,7 +823,11 @@ export function createScheduleTools(
   schedule: ScheduleIntelligencePort,
   chat: ChatIntelligencePort,
   relationships: RelationshipIntelligencePort,
-  options: { readonly now?: (() => Date) | undefined } = {},
+  options: {
+    readonly now?: (() => Date) | undefined;
+    /** The app action board: a meeting time proposal is prepared on it. */
+    readonly appApprovals?: AppApprovalPort | undefined;
+  } = {},
 ): readonly AnyQToolDefinition[] {
   const now = options.now ?? (() => new Date());
 
@@ -1017,6 +1025,165 @@ export function createScheduleTools(
     awaitingApprovalOf: summary,
   });
 
+  /**
+   * D-Q3 (live 15 Nov 2026): with no calendar invite possible, the vehicle
+   * is code's choice, never a chat message promising an invite. The
+   * company side, by someone who may speak for it, proposes the time as a
+   * meeting time proposal (`schedule.proposal.propose`): nothing is booked
+   * until the other side accepts it. Anyone else hands it to Q's errand,
+   * which offers times in the chat and books only on an answer read by
+   * meaning. A move of a booked call goes only as a proposal. Every time
+   * is at least ERRAND_CALL_LEAD_MINUTES ahead and labelled in the zone it
+   * was named in (UTC said as UTC when none is known).
+   */
+  const noCalendarVehicle = async (
+    context: { readonly runId: string; readonly actor: ActorContext },
+    reason: CalendarBlockReason,
+    grant: {
+      readonly relationshipId: string;
+      readonly counterpartName: string;
+    },
+    call: {
+      readonly purpose: string;
+      readonly durationMinutes: number;
+      readonly iso: string;
+      readonly timeZone: string | undefined;
+      readonly rescheduleOfMeetingId?: string | undefined;
+      readonly reason?: string | undefined;
+    },
+  ): Promise<ChatProposalOutput> => {
+    const zone = call.timeZone ?? "UTC";
+    const start = new Date(call.iso);
+    const when = zonedLabel(start, zone);
+    const name = grant.counterpartName;
+    const moving = call.rescheduleOfMeetingId !== undefined;
+    if (start.getTime() < now().getTime() + ERRAND_CALL_LEAD_MINUTES * 60_000) {
+      return {
+        status: "TOO_SOON",
+        awaitingApprovalOf: "",
+        says: `${when} is less than 18 hours away. Call times go to ${name} at least 18 hours ahead, so they have time to answer. Which later time should I propose?`.slice(
+          0,
+          600,
+        ),
+        guidance:
+          "Nothing was prepared. Ask for a time at least 18 hours from now (or offer one), then call again with it.",
+      };
+    }
+    const fix = await blockedSays(schedule, context.actor, reason, grant);
+    const party = await schedule
+      .proposalSide?.(context.actor, grant.relationshipId)
+      .catch(() => null);
+    if (
+      party?.side === "FOUNDER" &&
+      party.binds &&
+      options.appApprovals !== undefined
+    ) {
+      const input = {
+        purpose: call.purpose,
+        options: [
+          {
+            startsAt: start.toISOString(),
+            endsAt: new Date(
+              start.getTime() + call.durationMinutes * 60_000,
+            ).toISOString(),
+            timeZone: zone,
+          },
+        ],
+        ...(moving
+          ? { rescheduleOfMeetingId: call.rescheduleOfMeetingId }
+          : {}),
+      };
+      const status = options.appApprovals.prepareForApproval({
+        runId: context.runId,
+        tenantId: context.actor.tenantId,
+        actorUserId: context.actor.userId,
+        actionType: MEETING_PROPOSAL_ACTION,
+        payload: {
+          relationshipId: grant.relationshipId,
+          idempotencyKey: appActionKey(
+            context.runId,
+            "schedule.proposal.propose",
+            { relationshipId: grant.relationshipId, input },
+          ),
+          input,
+        },
+        reason: call.reason,
+      });
+      return {
+        // The calendar's status, said in Capital Q's words by the answer
+        // seam; the card, when one was made, is the proposal.
+        status: status === "PREPARED" ? reason : status,
+        awaitingApprovalOf: moving
+          ? `Propose moving the call with ${name} to ${when}`
+          : `Propose a call to ${name}: ${when}`,
+        says:
+          status === "PREPARED"
+            ? `${fix} Meanwhile I've prepared ${when} as a proposed time for ${name}${moving ? " to move the call" : ""}: ${moving ? "the call stays as booked" : "nothing is booked"} until they accept it, and no calendar invite is sent.`.slice(
+                0,
+                600,
+              )
+            : fix,
+      };
+    }
+    if (moving) {
+      return {
+        status: reason,
+        awaitingApprovalOf: "",
+        says: `${fix} Only the company side proposes a new time for a booked call, so ask ${name} in the chat to propose one.`.slice(
+          0,
+          600,
+        ),
+      };
+    }
+    const running =
+      chat.activeErrand === undefined
+        ? null
+        : await chat
+            .activeErrand(context.actor, {
+              relationshipId: grant.relationshipId,
+              companyId: null,
+            })
+            .catch(() => null);
+    if (running !== null) {
+      return {
+        status: "ALREADY_ACTIVE",
+        awaitingApprovalOf: `Q is already looking after ${running.counterpartName} for you, including the call.`,
+      };
+    }
+    const status = chat.prepareForApproval({
+      runId: context.runId,
+      tenantId: context.actor.tenantId,
+      actorUserId: context.actor.userId,
+      proposal: {
+        actionType: ERRAND_START,
+        payload: {
+          relationshipId: grant.relationshipId,
+          counterpartName: name,
+          expressInterest: false,
+          openingMessage: null,
+          brief: null,
+          bookCall: {
+            purpose: call.purpose,
+            durationMinutes: call.durationMinutes,
+            notBefore: start.toISOString(),
+          },
+        },
+      },
+      reason: call.reason,
+    });
+    return {
+      status: status === "PREPARED" ? reason : status,
+      awaitingApprovalOf: `Book a call with ${name}, then Q looks after the rest`,
+      says:
+        status === "PREPARED"
+          ? `${fix} Meanwhile I've prepared it as an errand: Q offers ${name} times in the chat from ${when} and books one only when they accept it. No calendar invite is sent.`.slice(
+              0,
+              600,
+            )
+          : fix,
+    };
+  };
+
   return [
     createFindMeetingTimesTool(schedule, chat, relationships),
 
@@ -1029,7 +1196,7 @@ export function createScheduleTools(
       id: PROPOSE_MEETING,
       providerName: "propose_meeting",
       description:
-        "Prepares a call with the other side of one connected relationship at one exact time, for the person to approve. On approval it becomes a Google Calendar invite with a Meet link, sent from their calendar to the other side's people. Without their Google Calendar connected, it prepares a chat message proposing that time to the other side instead (never a dead end). Use find_meeting_times first unless they named a time.",
+        "Prepares a call with the other side of one connected relationship at one exact time, for the person to approve. On approval it becomes a Google Calendar invite with a Meet link, sent from their calendar to the other side's people. Without their Google Calendar connected, Capital Q prepares that time as a meeting time proposal the other side must accept (the company side), or as Q's errand that agrees a time in the chat (the investor side); nothing is booked and no invite is promised until they accept. Use this, never a chat message, whenever they ask to set up, book or propose a call. Use find_meeting_times first unless they named a time.",
       supportedPurposes: [...PURPOSES],
       requiredScopeKinds: [...SCOPES],
       input: ProposeMeetingInputSchema,
@@ -1071,61 +1238,34 @@ export function createScheduleTools(
             : await schedule
                 .canSchedule(context.actor, grant.relationshipId)
                 .catch(() => "OK" as const);
-        const at = await instantOf(input, context, {
-          relationshipId: grant.relationshipId,
-          durationMinutes: input.durationMinutes,
-        });
-        if (isCalendarBlock(bookable)) {
-          // Autopilot P1 (live 2026-10-04: "I can't set up or book a Google
-          // Meet from here. Your meeting with Nixo is still not arranged"):
-          // a missing calendar is never a dead end. No invite can be sent,
-          // so the time is proposed to them in the relationship's chat --
-          // a card the person approves like any message -- and the
-          // calendar fix is said beside it (meetfix-57's words).
-          const status = prepare(
-            context,
-            {
-              actionType: CHAT_MESSAGE_SEND,
-              payload: {
-                relationshipId: grant.relationshipId,
-                counterpartName: grant.counterpartName,
-                body: meetingProposalBody({
-                  counterpartName: grant.counterpartName,
-                  purpose: input.purpose,
-                  durationMinutes: input.durationMinutes,
-                  iso: at.iso,
-                  timeZone: at.timeZone,
-                }),
-              },
-            },
-            at.asked === undefined
-              ? labelled(
-                  `Propose a call to ${grant.counterpartName}`,
-                  at.iso,
-                  at.timeZone,
-                )
-              : `Propose a call to ${grant.counterpartName}, ${at.asked}`,
-            reasonOf(input),
-          );
-          const fix = await blockedSays(
-            schedule,
-            context.actor,
-            bookable,
-            grant,
-          );
-          // The status stays the calendar's (said in Capital Q's words by
-          // the answer seam); the card, when one was made, is the message.
+        let at: Awaited<ReturnType<typeof instantOf>>;
+        try {
+          at = await instantOf(input, context, {
+            relationshipId: grant.relationshipId,
+            durationMinutes: input.durationMinutes,
+          });
+        } catch (error: unknown) {
+          // One short question, never a profile card in its place.
+          if (!(error instanceof NoTimeZoneError)) throw error;
           return {
-            status: bookable,
-            awaitingApprovalOf: status.awaitingApprovalOf,
-            says:
-              status.status === "PREPARED"
-                ? `${fix} Meanwhile I've drafted a message proposing the time to ${grant.counterpartName}; approve it and they can confirm in the chat.`.slice(
-                    0,
-                    600,
-                  )
-                : fix,
+            status: "NEEDS_TIME_ZONE" as const,
+            awaitingApprovalOf: "",
+            says: `Which city are you in, so ${whenWords(input.when)} is right? Then I'll prepare the call.`,
+            guidance: error.safeMessage,
           };
+        }
+        if (isCalendarBlock(bookable)) {
+          // Autopilot P1: a missing calendar is never a dead end. D-Q3
+          // (live 15 Nov 2026): nor is it a chat message promising "I'll
+          // send an invite". Code chooses the vehicle that books only on
+          // the other side's explicit yes.
+          return noCalendarVehicle(context, bookable, grant, {
+            purpose: input.purpose,
+            durationMinutes: input.durationMinutes,
+            iso: at.iso,
+            timeZone: at.timeZone,
+            reason: reasonOf(input),
+          });
         }
         return prepare(
           context,
@@ -1157,56 +1297,141 @@ export function createScheduleTools(
       id: PROPOSE_MEETING_CHANGE,
       providerName: "propose_meeting_change",
       description:
-        "Prepares moving (RESCHEDULE, with the new start) or cancelling (CANCEL) a call the person organised, for them to approve. On approval the Google Calendar event is updated or deleted and everyone invited is told.",
+        "Prepares moving (RESCHEDULE, with the new start) or cancelling (CANCEL) a call the person organised, for them to approve; name the call by meetingId or by whom it is with (counterpartName). With their Google Calendar connected, on approval the event is updated or deleted and everyone invited is told. Without it, a move is proposed to the other side and the call stays as booked until they accept. Use this, never a chat message or a profile change, when they ask to move a call.",
       supportedPurposes: [...Q_TASK_CLASSES],
       requiredScopeKinds: ["OWN_Q_CONVERSATION"],
       input: ProposeMeetingChangeInputSchema,
       authorize: async (input, { actor, plan }) => {
         if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
+        // Live 15 Nov 2026 (D-Q3): "move the call with Savanna to Thursday
+        // afternoon" names the call by whom it is with. Their one upcoming
+        // call with them that they organised; several are asked about.
+        let meetingId = input.meetingId;
+        if (meetingId === undefined) {
+          const relationshipId = await resolveRelationship(
+            { counterpartName: input.counterpartName },
+            actor,
+            plan,
+            relationships,
+          ).catch(() => null);
+          if (relationshipId === null) return deny("NOT_AVAILABLE");
+          const upcoming = await schedule.upcoming(actor).catch(() => null);
+          const theirs = (upcoming?.meetings ?? []).filter(
+            (meeting) =>
+              meeting.relationshipId === relationshipId &&
+              meeting.organisedByYou &&
+              Date.parse(meeting.startsAt) > now().getTime(),
+          );
+          const [only] = theirs;
+          if (only === undefined) {
+            return deny(
+              "NOT_AVAILABLE",
+              `No upcoming call you organised with ${input.counterpartName ?? "them"} is on record.`,
+            );
+          }
+          if (theirs.length > 1) {
+            return deny(
+              "NOT_AVAILABLE",
+              `More than one upcoming call with ${input.counterpartName ?? "them"}: ${theirs
+                .slice(0, 5)
+                .map((meeting) => `${meeting.purpose} [${meeting.id}]`)
+                .join(", ")}. Ask which one.`,
+            );
+          }
+          meetingId = only.id;
+        }
         const meeting = await schedule
-          .organisedMeeting(actor, input.meetingId)
+          .organisedMeeting(actor, meetingId)
           .catch(() => null);
-        return meeting === null || meeting.status !== "SCHEDULED"
-          ? deny("NOT_AVAILABLE")
-          : allow("CONFIDENTIAL", meeting);
+        if (meeting === null || meeting.status !== "SCHEDULED") {
+          return deny("NOT_AVAILABLE");
+        }
+        const thread = await chat
+          .thread(actor, meeting.relationshipId)
+          .catch(() => null);
+        return allow("CONFIDENTIAL", {
+          ...meeting,
+          counterpartName: thread?.counterpartName ?? "the other side",
+        });
       },
       execute: async (input, context, meeting) => {
-        const at =
-          input.change === "CANCEL" ? null : await instantOf(input, context);
-        return at === null
-          ? prepare(
-              context,
-              {
-                actionType: MEETING_CANCEL,
-                payload: {
-                  meetingId: meeting.id,
-                  relationshipId: meeting.relationshipId,
-                  purpose: meeting.purpose,
-                  startsAt: meeting.startsAt,
-                },
+        if (input.change === "CANCEL") {
+          return prepare(
+            context,
+            {
+              actionType: MEETING_CANCEL,
+              payload: {
+                meetingId: meeting.id,
+                relationshipId: meeting.relationshipId,
+                purpose: meeting.purpose,
+                startsAt: meeting.startsAt,
               },
-              `Cancel: ${meeting.purpose}`,
-            )
-          : prepare(
-              context,
-              {
-                actionType: MEETING_RESCHEDULE,
-                payload: {
-                  meetingId: meeting.id,
-                  relationshipId: meeting.relationshipId,
-                  purpose: meeting.purpose,
-                  startsAt: at.iso,
-                  durationMinutes:
-                    input.durationMinutes ??
-                    Math.round(
-                      (Date.parse(meeting.endsAt) -
-                        Date.parse(meeting.startsAt)) /
-                        60_000,
-                    ),
-                },
-              },
-              labelled(`Move: ${meeting.purpose}`, at.iso, at.timeZone),
-            );
+            },
+            `Cancel: ${meeting.purpose}`,
+          );
+        }
+        const durationMinutes =
+          input.durationMinutes ??
+          Math.round(
+            (Date.parse(meeting.endsAt) - Date.parse(meeting.startsAt)) /
+              60_000,
+          );
+        let at: Awaited<ReturnType<typeof instantOf>>;
+        try {
+          at = await instantOf(input, context, {
+            relationshipId: meeting.relationshipId,
+            durationMinutes,
+          });
+        } catch (error: unknown) {
+          // Live 15 Nov 2026: an unknown zone is one question, never a
+          // profile card in place of the move they asked for.
+          if (!(error instanceof NoTimeZoneError)) throw error;
+          return {
+            status: "NEEDS_TIME_ZONE" as const,
+            awaitingApprovalOf: "",
+            says: `Which city are you in, so ${whenWords(input.when)} is right? Then I'll prepare the move.`,
+            guidance: error.safeMessage,
+          };
+        }
+        const bookable =
+          schedule.canSchedule === undefined
+            ? "OK"
+            : await schedule
+                .canSchedule(context.actor, meeting.relationshipId)
+                .catch(() => "OK" as const);
+        if (isCalendarBlock(bookable)) {
+          // No calendar event to move: the move is proposed to the other
+          // side and the call stays as booked until they accept.
+          return noCalendarVehicle(
+            context,
+            bookable,
+            {
+              relationshipId: meeting.relationshipId,
+              counterpartName: meeting.counterpartName,
+            },
+            {
+              purpose: meeting.purpose,
+              durationMinutes,
+              iso: at.iso,
+              timeZone: at.timeZone,
+              rescheduleOfMeetingId: meeting.id,
+            },
+          );
+        }
+        return prepare(
+          context,
+          {
+            actionType: MEETING_RESCHEDULE,
+            payload: {
+              meetingId: meeting.id,
+              relationshipId: meeting.relationshipId,
+              purpose: meeting.purpose,
+              startsAt: at.iso,
+              durationMinutes,
+            },
+          },
+          labelled(`Move: ${meeting.purpose}`, at.iso, at.timeZone),
+        );
       },
     }),
 

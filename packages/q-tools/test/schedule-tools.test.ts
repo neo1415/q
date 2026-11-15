@@ -7,7 +7,6 @@ import {
   type RelationshipBrief,
 } from "@capital-q/contracts";
 
-import { meetingProposalBody } from "../src/tools/schedule.js";
 import {
   createDefaultQTools,
   createQToolExecutor,
@@ -78,6 +77,7 @@ function world(
     findSlots?: ScheduleIntelligencePort["findSlots"];
     relationshipBriefs?: ScheduleIntelligencePort["relationshipBriefs"];
     relationships?: RelationshipIntelligencePort;
+    side?: "FOUNDER" | "INVESTOR";
   } = {},
 ) {
   const prepared: { actionType: string; payload: unknown }[] = [];
@@ -153,6 +153,8 @@ function world(
     ...(options.relationshipBriefs === undefined
       ? {}
       : { relationshipBriefs: options.relationshipBriefs }),
+    proposalSide: () =>
+      Promise.resolve({ side: options.side ?? "FOUNDER", binds: true }),
   };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(
@@ -160,6 +162,15 @@ function world(
         fakePorts({
           chat,
           schedule,
+          appApprovals: {
+            prepareForApproval: (entry) => {
+              prepared.push({
+                actionType: entry.actionType,
+                payload: entry.payload,
+              });
+              return "PREPARED";
+            },
+          },
           relationships:
             options.relationships ?? ({} as RelationshipIntelligencePort),
         }),
@@ -486,36 +497,190 @@ describe("schedule tools", () => {
       );
     });
 
-    it("autopilot P1: without Calendar, no invite is prepared -- the time is proposed in the chat instead, never a dead end", async () => {
+    /**
+     * Live 15 Nov 2026 (audit 2026-11-15-meetings-through-q-live.md, 1a/1b):
+     * Ama (company side, no calendar) asked to set up a call with Savanna
+     * Seed and got a chat message "… I'll send an invite". The vehicle is
+     * now the meeting time proposal: nothing booked until they accept, no
+     * invite promised, the time labelled in the zone it was named in.
+     */
+    it("D-Q3: without Calendar, the company side's call is a meeting time proposal, never a chat message", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-15T16:12:47Z"));
       const { executor, prepared } = world({ calendarConnected: false });
       const outcome = await executor.execute(
-        meetingAt({ day: "tomorrow", time: "14:00" }),
+        meetingAt({ day: "tuesday", time: "10:00" }),
         contextFor(
           actorB,
           withZone(
             relationshipPlan(base(actorB), RELATIONSHIP),
-            "Europe/London",
+            "Africa/Lagos",
           ),
         ),
       );
-      // No calendar invite: a chat message proposing the time, for approval.
       expect(prepared.map((one) => one.actionType)).toEqual([
-        "chat.message.send",
+        "app.schedule.proposal.propose",
       ]);
-      const body = (prepared[0]?.payload as { body: string }).body;
-      expect(body).toMatch(
-        /^Would .+ \(Europe\/London\) work for a 30-minute call/u,
+      expect(prepared[0]?.payload).toMatchObject({
+        relationshipId: RELATIONSHIP,
+        input: {
+          purpose: "Intro",
+          options: [
+            {
+              startsAt: "2026-11-17T09:00:00.000Z",
+              endsAt: "2026-11-17T09:30:00.000Z",
+              timeZone: "Africa/Lagos",
+            },
+          ],
+        },
+      });
+      const data = (
+        outcome.result as {
+          data: { status: string; says: string; awaitingApprovalOf: string };
+        }
+      ).data;
+      expect(data.status).toBe("CALENDAR_NOT_CONNECTED");
+      expect(data.awaitingApprovalOf).toBe(
+        "Propose a call to Apex: Tue 17 Nov, 10:00 (Africa/Lagos)",
       );
-      expect(body).toContain("suggest one here");
+      expect(data.says).toContain("Your Google Calendar isn't connected");
+      expect(data.says).toContain("nothing is booked until they accept it");
+      expect(data.says).toContain("no calendar invite is sent");
+      expect(JSON.stringify(outcome.result)).not.toMatch(/send an invite/u);
+    });
+
+    it("D-Q3: a slot under the 18-hour floor (live: Mon 16 Nov 10:00 Lagos, 17 h ahead) is never prepared", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-15T16:12:47Z"));
+      const { executor, prepared } = world({ calendarConnected: false });
+      const outcome = await executor.execute(
+        meetingAt({ day: "monday", time: "10:00" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Africa/Lagos",
+          ),
+        ),
+      );
+      expect(prepared).toEqual([]);
       const data = (
         outcome.result as { data: { status: string; says: string } }
       ).data;
-      expect(data.status).toBe("CALENDAR_NOT_CONNECTED");
-      expect(data.says).toContain("Your Google Calendar isn't connected");
-      expect(data.says).toContain("drafted a message proposing the time");
+      expect(data.status).toBe("TOO_SOON");
+      expect(data.says).toContain("less than 18 hours away");
+    });
+
+    it("D-Q3: the investor side, who may not propose, gets Q's errand for the call, with no invite promised", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-15T16:12:47Z"));
+      const { executor, prepared } = world({
+        calendarConnected: false,
+        side: "INVESTOR",
+      });
+      const outcome = await executor.execute(
+        meetingAt({ day: "tuesday", time: "10:00" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Africa/Lagos",
+          ),
+        ),
+      );
+      expect(prepared).toEqual([
+        {
+          actionType: "q.errand.start",
+          payload: {
+            relationshipId: RELATIONSHIP,
+            counterpartName: "Apex",
+            expressInterest: false,
+            openingMessage: null,
+            brief: null,
+            bookCall: {
+              purpose: "Intro",
+              durationMinutes: 30,
+              notBefore: "2026-11-17T09:00:00.000Z",
+            },
+          },
+        },
+      ]);
+      expect(JSON.stringify(outcome.result)).toContain(
+        "No calendar invite is sent",
+      );
+    });
+
+    /**
+     * Live 15 Nov 2026 (step 4/4b): "Move the call with Savanna to Thursday
+     * afternoon" got a profile time-zone card, and the explicit move a chat
+     * message. The move names the call by whom it is with and, without a
+     * calendar, is a proposal to move THAT call.
+     */
+    it("D-Q3: a move named by whom it is with becomes a proposal to move that call; an unknown zone is one question, no profile card", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-04T09:00:00Z"));
+      const own = Object.assign({} as RelationshipIntelligencePort, {
+        ownRelationships: () =>
+          Promise.resolve({
+            items: [
+              { relationshipId: RELATIONSHIP, counterpart: { name: "Apex" } },
+            ],
+          }),
+      });
+      const move = {
+        callId: "m1",
+        name: "propose_meeting_change",
+        arguments: {
+          counterpartName: "Apex",
+          change: "RESCHEDULE",
+          when: { day: "thursday", time: "15:00" },
+        },
+      };
+      const placed = world({ calendarConnected: false, relationships: own });
+      await placed.executor.execute(
+        move,
+        contextFor(actorB, {
+          ...ownPlan(),
+          screen: { route: "HOME" as const, timeZone: "Africa/Lagos" },
+        }),
+      );
+      expect(placed.prepared).toMatchObject([
+        {
+          actionType: "app.schedule.proposal.propose",
+          payload: {
+            relationshipId: RELATIONSHIP,
+            input: {
+              purpose: "Intro",
+              rescheduleOfMeetingId: MEETING,
+              options: [
+                {
+                  startsAt: "2026-10-08T14:00:00.000Z",
+                  timeZone: "Africa/Lagos",
+                },
+              ],
+            },
+          },
+        },
+      ]);
+
+      const unplaced = world({ calendarConnected: false, relationships: own });
+      const asked = await unplaced.executor.execute(
+        move,
+        contextFor(actorB, ownPlan()),
+      );
+      expect(unplaced.prepared).toEqual([]);
+      const data = (asked.result as { data: { status: string; says: string } })
+        .data;
+      expect(data.status).toBe("NEEDS_TIME_ZONE");
+      expect(data.says).toContain("Which city are you in");
+      expect(JSON.stringify(asked.result)).toContain(
+        "Never prepare a profile change for it unless they ask",
+      );
     });
 
     it("says a revoked calendar plainly, with the reconnect link and the paste-a-link alternative (meetfix-57)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-28T10:00:00Z"));
       const { executor, prepared } = world({ calendarRevoked: true });
       const outcome = await executor.execute(
         meetingAt({ day: "tomorrow", time: "14:00" }),
@@ -528,7 +693,7 @@ describe("schedule tools", () => {
         ),
       );
       expect(prepared.map((one) => one.actionType)).toEqual([
-        "chat.message.send",
+        "app.schedule.proposal.propose",
       ]);
       const data = (
         outcome.result as { data: { status: string; says: string } }
@@ -540,11 +705,13 @@ describe("schedule tools", () => {
       );
       expect(first).toContain(`(${GOOGLE_RECONNECT_PATH})`);
       expect(second).toMatch(
-        /^Or paste a Meet link and I'll set it up and join\. Meanwhile I've drafted a message proposing the time/u,
+        /^Or paste a Meet link and I'll set it up and join\. Meanwhile I've prepared .+ as a proposed time for Apex/u,
       );
     });
 
     it("offers that the other side host when their calendar is connected (meetfix-57)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-28T10:00:00Z"));
       const { executor } = world({
         calendarConnected: false,
         counterpartCanHost: true,
@@ -1015,33 +1182,5 @@ describe("zoneFromWords: a place as they said it", () => {
     expect(zoneFromWords("Nairobi, Kenya")).toBe("Africa/Nairobi");
     expect(zoneFromWords("sounds good")).toBeNull();
     expect(zoneFromWords("")).toBeNull();
-  });
-});
-
-describe("the chat proposal of a call (live a7b99c465)", () => {
-  const at = {
-    durationMinutes: 30,
-    iso: "2026-10-27T14:00:00.000Z",
-    timeZone: "Africa/Lagos",
-  } as const;
-
-  it("never says the call is 'about Call with' the person it is sent to", () => {
-    const body = meetingProposalBody({
-      ...at,
-      purpose: "Call with Ledgerfold",
-      counterpartName: "Ledgerfold",
-    });
-    expect(body).not.toMatch(/about Call with/u);
-    expect(body).toMatch(/^Would .+ work for a 30-minute call\? /u);
-  });
-
-  it("keeps a purpose that says something", () => {
-    expect(
-      meetingProposalBody({
-        ...at,
-        purpose: "Their Series A plan",
-        counterpartName: "Ledgerfold",
-      }),
-    ).toMatch(/call about Their Series A plan\?/u);
   });
 });

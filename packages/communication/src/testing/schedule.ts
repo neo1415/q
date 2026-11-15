@@ -179,7 +179,12 @@ export function createInMemoryScheduleStore(
           .map(copy),
       ),
     saveBrief: (_tx, input) => {
-      if (!briefs.some((b) => b.meetingId === input.meetingId)) {
+      // As the table: unique (meeting_id, user_id).
+      if (
+        !briefs.some(
+          (b) => b.meetingId === input.meetingId && b.userId === input.userId,
+        )
+      ) {
         briefs.push({
           meetingId: input.meetingId,
           userId: input.userId,

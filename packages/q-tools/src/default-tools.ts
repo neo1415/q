@@ -231,7 +231,9 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ports.chat === undefined ||
     ports.relationships === undefined
       ? []
-      : createScheduleTools(ports.schedule, ports.chat, ports.relationships)),
+      : createScheduleTools(ports.schedule, ports.chat, ports.relationships, {
+          appApprovals: ports.appApprovals,
+        })),
     // BIZ-002: every profile field the page edits, Q prepares through the
     // tools generated from the app's action registry (ADR 0040).
     // HARDEN P0 (live 2026-10-02): "search online and fill my profile's

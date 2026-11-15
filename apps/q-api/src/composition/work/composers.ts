@@ -16,9 +16,9 @@ import {
   WorkInterviewTurnResultSchema,
   WorkShortlistResultSchema,
   WorkStandInReplyResultSchema,
-  WorkSlotReaderResultSchema,
-  type WorkSlotReaderResult,
-  type WorkSlotReaderVariables,
+  WorkSlotReaderV2ResultSchema,
+  type WorkSlotReaderV2Result,
+  type WorkSlotReaderV2Variables,
   type WorkConverseResult,
   type WorkConverseVariables,
   type WorkInterviewReportResult,
@@ -86,7 +86,7 @@ type TaskVariables = {
     | "environmentNotes"
   >;
   WORK_SLOT_READER: Omit<
-    WorkSlotReaderVariables,
+    WorkSlotReaderV2Variables,
     | "operatingMode"
     | "communicationProfile"
     | "communicationGuidance"
@@ -259,11 +259,11 @@ export function createWorkComposers(dependencies: {
         "STYLE_ONLY",
       ),
     slotReader: (who: Who, variables: TaskVariables["WORK_SLOT_READER"]) =>
-      call<"WORK_SLOT_READER", WorkSlotReaderResult>(
+      call<"WORK_SLOT_READER", WorkSlotReaderV2Result>(
         "WORK_SLOT_READER",
         who,
         variables,
-        WorkSlotReaderResultSchema,
+        WorkSlotReaderV2ResultSchema,
         SMALL,
         "You are reading a reply, not writing one. Code books only what you report.",
       ),

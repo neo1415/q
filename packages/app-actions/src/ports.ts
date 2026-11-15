@@ -256,6 +256,7 @@ export type AppActionPorts = {
         | "confirmHeld"
         | "joinCall"
         | "organisedMeeting"
+        | "listMeetings"
       >
     | undefined;
   /**

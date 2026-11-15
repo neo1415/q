@@ -16,9 +16,12 @@ import {
 } from "@capital-q/contracts";
 import type { OutcomeRefusal, OutcomeResult } from "@capital-q/network";
 
+import { meetingTimeLabel } from "@capital-q/communication";
+
 import {
   defineAppAction,
   defineAppActionFamily,
+  refusal,
   type AnyAppAction,
   type AppActionContext,
 } from "../define.js";
@@ -76,6 +79,15 @@ function outcomeProblem(
   out: OutcomeResult,
 ): { readonly code: KnownErrorCode; readonly detail: string } | null {
   return out.outcome === "OK" ? null : REFUSALS[out.code];
+}
+
+function meetingOutcomeProblem(
+  out: MeetingOutcomeResult,
+): { readonly code: KnownErrorCode; readonly detail: string } | null {
+  if (out.outcome === "OK") return null;
+  return out.code === "MEETING_NOT_ENDED"
+    ? MEETING_NOT_ENDED
+    : REFUSALS[out.code];
 }
 
 const http = {
@@ -284,6 +296,77 @@ const Outcome = z
   })
   .strict();
 
+/**
+ * A meeting outcome refused because the call it is about has not ended
+ * (live 15 Nov 2026, D-Q2): never recorded for a call still to come.
+ */
+type MeetingOutcomeResult =
+  | OutcomeResult
+  | { readonly outcome: "REFUSED"; readonly code: "MEETING_NOT_ENDED" };
+
+const MEETING_NOT_ENDED = {
+  code: "RESOURCE_CONFLICT" as const,
+  detail:
+    "That call hasn't happened yet. Record how it went once it has ended.",
+};
+
+/**
+ * Which Capital Q call an outcome is about. Named: that one. Unnamed: the
+ * latest booked call on the relationship that has ended; when only calls
+ * still to come are booked, none may be bound and the outcome waits
+ * (NOT_ENDED). No call on record at all: a meeting held elsewhere, bound
+ * to nothing (NONE). Read as the person, through the schedule service.
+ */
+export async function meetingToBind(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  relationshipId: string,
+  named: string | undefined,
+  now: Date = new Date(),
+): Promise<
+  | { readonly kind: "BOUND"; readonly meetingId: string }
+  | { readonly kind: "NONE" }
+  | {
+      readonly kind: "NOT_ENDED";
+      readonly startsAt: string;
+      readonly timeZone: string;
+    }
+> {
+  const listed =
+    ports.schedule?.listMeetings === undefined
+      ? null
+      : await ports.schedule
+          .listMeetings(context.actor, relationshipId)
+          .catch(() => null);
+  const booked = (listed ?? []).filter(
+    (meeting) => meeting.status === "SCHEDULED",
+  );
+  const ended = (meeting: { readonly endsAt: string }) =>
+    Date.parse(meeting.endsAt) <= now.getTime();
+  if (named !== undefined) {
+    const meeting = booked.find((one) => one.id === named);
+    return meeting !== undefined && !ended(meeting)
+      ? {
+          kind: "NOT_ENDED",
+          startsAt: meeting.startsAt,
+          timeZone: meeting.timeZone,
+        }
+      : { kind: "BOUND", meetingId: named };
+  }
+  const latestEnded = booked
+    .filter(ended)
+    .toSorted((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt))[0];
+  if (latestEnded !== undefined) {
+    return { kind: "BOUND", meetingId: latestEnded.id };
+  }
+  const next = booked.toSorted(
+    (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),
+  )[0];
+  return next === undefined
+    ? { kind: "NONE" }
+    : { kind: "NOT_ENDED", startsAt: next.startsAt, timeZone: next.timeZone };
+}
+
 const OUTCOME_WORDS: Readonly<
   Record<z.infer<typeof RecordMeetingOutcomeRequestSchema>["outcome"], string>
 > = {
@@ -294,83 +377,107 @@ const OUTCOME_WORDS: Readonly<
   OTHER: "things are moving forward",
 };
 
-const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
-  {
-    name: "relationship.outcome.meeting",
-    consequence: "COMMITMENT",
-    supersedes: true,
-    short: "record how a meeting went",
-    area: "relationships",
-    classification: "CONSEQUENTIAL",
-    does: "Records what a meeting led to (diligence, a follow-up meeting, materials, introductions) on a connected relationship, once the person confirms it.",
-    input: Outcome,
-    output: z.custom<OutcomeResult>(),
-    authorize: servicesDecide,
-    run: async (ports, context, input) => {
-      // An outcome that names the call says the call happened: the
-      // schedule service (the call's owner) marks it held first, so a call
-      // without the meeting bot still reaches MEETING_HELD (2026-10-03).
-      const meetingId = input.input.meetingId;
-      if (
-        meetingId !== undefined &&
-        ports.schedule?.confirmHeld !== undefined
-      ) {
-        const held = await ports.schedule.confirmHeld({
-          actor: context.actor,
-          relationshipId: input.relationshipId,
-          meetingId,
-          correlationId: context.correlationId,
-        });
-        if (held.outcome !== "OK") {
-          return { outcome: "REFUSED", code: "NOT_FOUND" } as const;
-        }
-      }
-      const out = await outcomes(ports).recordMeetingOutcome({
+const MEETING_OUTCOME = defineAppAction<
+  z.infer<typeof Outcome>,
+  MeetingOutcomeResult
+>({
+  name: "relationship.outcome.meeting",
+  consequence: "COMMITMENT",
+  supersedes: true,
+  short: "record how a meeting went",
+  area: "relationships",
+  classification: "CONSEQUENTIAL",
+  does: "Records what a meeting led to (diligence, a follow-up meeting, materials, introductions) on a connected relationship, once the person confirms it.",
+  input: Outcome,
+  output: z.custom<MeetingOutcomeResult>(),
+  authorize: servicesDecide,
+  run: async (ports, context, input) => {
+    // D-Q2 (live 15 Nov 2026): enforced here whatever the input says.
+    // Unnamed, the outcome binds the relationship's latest ended call;
+    // while the only booked call is still to come, nothing is recorded.
+    const bound = await meetingToBind(
+      ports,
+      context,
+      input.relationshipId,
+      input.input.meetingId,
+    );
+    if (bound.kind === "NOT_ENDED") {
+      return { outcome: "REFUSED", code: "MEETING_NOT_ENDED" } as const;
+    }
+    const meetingId = bound.kind === "BOUND" ? bound.meetingId : undefined;
+    // An outcome that names the call says the call happened: the
+    // schedule service (the call's owner) marks it held first, so a call
+    // without the meeting bot still reaches MEETING_HELD (2026-10-03).
+    if (meetingId !== undefined && ports.schedule?.confirmHeld !== undefined) {
+      const held = await ports.schedule.confirmHeld({
         actor: context.actor,
         relationshipId: input.relationshipId,
-        outcome:
-          input.input.outcome === "DILIGENCE"
-            ? { kind: "DILIGENCE" }
-            : { kind: "PROGRESSED", step: input.input.outcome },
-        meetingId: input.input.meetingId,
+        meetingId,
         correlationId: context.correlationId,
       });
-      // Deal close (2026-10-08): the shared meeting summary is filed with
-      // the outcome, keyed by the correlation so a retry files it once.
-      if (out.outcome === "OK" && !out.deduplicated) {
-        await fileReport(
-          ports,
-          context,
-          input.relationshipId,
-          "MEETING_SUMMARY",
-          `meeting-summary:${context.correlationId}`,
-        );
+      if (held.outcome !== "OK") {
+        return held.outcome === "REFUSED" && held.code === "INVALID_TIME"
+          ? ({ outcome: "REFUSED", code: "MEETING_NOT_ENDED" } as const)
+          : ({ outcome: "REFUSED", code: "NOT_FOUND" } as const);
       }
-      return out;
-    },
-    targets: (input) => [
-      { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
-    ],
-    card: (input) => ({
-      summary: "Record how the meeting went",
-      preview: `On the relationship, both sides see that ${OUTCOME_WORDS[input.input.outcome]}.`,
-    }),
-    done: (out, input) =>
-      out.outcome === "OK"
-        ? `Recorded: ${OUTCOME_WORDS[input.input.outcome]}.`
-        : (outcomeProblem(out)?.detail ?? "That couldn't be recorded."),
-    succeeded,
-    http: {
-      method: "POST",
-      path: NETWORK_RELATIONSHIP_MEETING_OUTCOME_PATH,
-      fromRequest: (params, body) => ({
-        relationshipId: params["relationshipId"],
-        input: body,
-      }),
-      ...http,
-    },
+    }
+    const out = await outcomes(ports).recordMeetingOutcome({
+      actor: context.actor,
+      relationshipId: input.relationshipId,
+      outcome:
+        input.input.outcome === "DILIGENCE"
+          ? { kind: "DILIGENCE" }
+          : { kind: "PROGRESSED", step: input.input.outcome },
+      meetingId,
+      correlationId: context.correlationId,
+    });
+    // Deal close (2026-10-08): the shared meeting summary is filed with
+    // the outcome, keyed by the correlation so a retry files it once.
+    if (out.outcome === "OK" && !out.deduplicated) {
+      await fileReport(
+        ports,
+        context,
+        input.relationshipId,
+        "MEETING_SUMMARY",
+        `meeting-summary:${context.correlationId}`,
+      );
+    }
+    return out;
   },
-);
+  targets: (input) => [
+    { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
+  ],
+  card: (input) => ({
+    summary: "Record how the meeting went",
+    preview: `${input.input.meetingId === undefined ? "" : "The call is marked as held. "}On the relationship, both sides see that ${OUTCOME_WORDS[input.input.outcome]}.`,
+  }),
+  done: (out, input) =>
+    out.outcome === "OK"
+      ? `Recorded: ${OUTCOME_WORDS[input.input.outcome]}.`
+      : (meetingOutcomeProblem(out)?.detail ?? "That couldn't be recorded."),
+  succeeded: (out) => out.outcome === "OK",
+  http: {
+    method: "POST",
+    path: NETWORK_RELATIONSHIP_MEETING_OUTCOME_PATH,
+    fromRequest: (params, body) => ({
+      relationshipId: params["relationshipId"],
+      input: body,
+    }),
+    status: (out) =>
+      out.outcome === "OK" && out.deduplicated
+        ? (200 as const)
+        : (201 as const),
+    problem: meetingOutcomeProblem,
+    notFound: (out) => out.outcome === "REFUSED" && out.code === "NOT_FOUND",
+    respond: (out) =>
+      out.outcome === "OK"
+        ? RelationshipOutcomeResultDtoSchema.parse({
+            relationshipId: out.relationshipId,
+            deduplicated: out.deduplicated,
+          })
+        : undefined,
+  },
+});
 
 /**
  * One Q tool for the four (ADR 0040 family): a run offers at most
@@ -406,6 +513,38 @@ const OutcomeTool = Named.extend({
     ),
 }).strict();
 
+/**
+ * D-Q2 (live 15 Nov 2026): "Mark the call as held" prepared an outcome
+ * card with no meeting, for a call two days away. Q's card binds the call
+ * it is about, and a call still to come is refused before any card, in
+ * the person's words with its time.
+ */
+async function meetingOutcomeCanonical(
+  relationshipId: string,
+  outcome:
+    z.infer<typeof RecordMeetingOutcomeRequestSchema>["outcome"] | undefined,
+  context: AppActionContext,
+  ports: AppActionPorts,
+) {
+  if (outcome === undefined) return null;
+  const bound = await meetingToBind(ports, context, relationshipId, undefined);
+  if (bound.kind === "NOT_ENDED") {
+    return refusal(
+      `That call hasn't happened yet: it is booked for ${meetingTimeLabel(bound.startsAt, bound.timeZone)}. You can record how it went once it has ended; nothing was prepared.`,
+    );
+  }
+  return {
+    operation: "MEETING_OUTCOME" as const,
+    input: {
+      relationshipId,
+      input: {
+        outcome,
+        ...(bound.kind === "BOUND" ? { meetingId: bound.meetingId } : {}),
+      },
+    },
+  };
+}
+
 export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   z.infer<typeof OutcomeTool>
 >({
@@ -437,7 +576,7 @@ export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
       ],
       names: "RELATIONSHIP",
     },
-    toCanonical: (tool, context) => {
+    toCanonical: (tool, context, ports) => {
       const relationshipId = tool.relationship;
       switch (tool.operation) {
         case "NOT_PROCEED":
@@ -460,16 +599,11 @@ export const OUTCOME_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
             input: { relationshipId },
           });
         case "MEETING_OUTCOME":
-          return Promise.resolve(
-            tool.meetingOutcome === undefined
-              ? null
-              : {
-                  operation: "MEETING_OUTCOME",
-                  input: {
-                    relationshipId,
-                    input: { outcome: tool.meetingOutcome },
-                  },
-                },
+          return meetingOutcomeCanonical(
+            relationshipId,
+            tool.meetingOutcome,
+            context,
+            ports,
           );
       }
     },
