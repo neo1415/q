@@ -837,20 +837,138 @@ export type OpenResolutionItem = {
   readonly title: string;
 };
 
-const TITLE_MAX = 200;
+/** A request heading: short, as a document is named on a checklist (D15b). */
+const TITLE_MAX = 80;
 
 /**
- * The document title code suggests for a request that would settle the
- * item: the statement itself, as the founder's checklist will read it
- * beside "what it's about". Never longer than the request contract allows.
+ * D15b (live 15 Nov 2026, request 4c9a2968): the request was titled
+ * "Evidence that settles: Whether Ajopot's 18,700 active users represent
+ * recurring, financially relevant usage is unresolved." -- the uncertainty
+ * sentence, naming no document. The title is now document-like: the
+ * document the answer itself suggested (its `resolveBy` detail, when it
+ * gave one), else "Supporting evidence for <what the item is about>",
+ * the item's subject in its own words, else for the company. `about`
+ * stays separate, beside it, as the founder's checklist shows it.
  */
-export function resolutionTitleOf(statement: string): string {
-  const one = statement.replace(/\s+/gu, " ").trim();
-  const title = `Evidence that settles: ${one}`;
+export function resolutionTitleOf(
+  statement: string,
+  company?: string | null,
+  suggestedDocument?: string | null,
+): string {
+  const suggested = (suggestedDocument ?? "").replace(/\s+/gu, " ").trim();
+  if (suggested.length >= 3) return capped(sentenceCase(suggested));
+  const subject = subjectOf(statement);
+  const named = subject.split(" ").length >= 2 && subject.length <= 70;
+  return capped(
+    `Supporting evidence for ${named ? subject : (company ?? "this question")}`,
+  );
+}
+
+function sentenceCase(text: string): string {
+  const plain = text.replace(/[.\s]+$/u, "");
+  return plain.charAt(0).toUpperCase() + plain.slice(1);
+}
+
+function capped(title: string): string {
   if (title.length <= TITLE_MAX) return title;
   const cut = title.slice(0, TITLE_MAX - 1);
   const space = cut.lastIndexOf(" ");
-  return `${space > 40 ? cut.slice(0, space) : cut}…`;
+  return `${space > 30 ? cut.slice(0, space) : cut}…`;
+}
+
+/**
+ * What an uncertainty sentence is about, as a noun phrase: "Whether
+ * Ajopot's 18,700 active users represent recurring usage is unresolved."
+ * is about "Ajopot's 18,700 active users". Structure only (the sentence's
+ * own clause shape, never a word list of topics); the whole sentence,
+ * trimmed, when it has no such shape.
+ */
+export function subjectOf(statement: string): string {
+  const one = statement.replace(/\s+/gu, " ").trim().replace(/[.]+$/u, "");
+  const whether = /^(?:whether|if|how|what|why)\s+(.+)$/iu.exec(one);
+  const rest = whether?.[1] ?? one;
+  // The subject ends where its verb begins: the first auxiliary or verb
+  // form after at least two words ("... users represent ...").
+  const words = rest.split(" ");
+  const verbAt = words.findIndex(
+    (word, at) =>
+      at >= 1 &&
+      /^(?:is|are|was|were|has|have|had|can|could|will|would|does|do|did|reflects?|represents?|includes?|means?|holds?|covers?|comes?|stands?)$/iu.test(
+        word,
+      ),
+  );
+  const subject = (verbAt > 0 ? words.slice(0, verbAt) : words).join(" ");
+  // A sentence's opening article reads lower-case mid-title; a name keeps
+  // its capital ("Ajopot's active users").
+  return /^(?:The|A|An|Its|Their)\s/u.test(subject)
+    ? subject.charAt(0).toLowerCase() + subject.slice(1)
+    : subject;
+}
+
+// ---------------------------------------------------------------------------
+// D15 (live 15 Nov 2026): a request already made for the same item
+// ---------------------------------------------------------------------------
+
+const ITEM_WORD = /[\p{L}\p{N}][\p{L}\p{N},.'’-]*/gu;
+
+function itemWords(text: string): ReadonlySet<string> {
+  return new Set(
+    [...text.toLowerCase().matchAll(ITEM_WORD)]
+      .map((match) => match[0].replace(/[,.'’-]+$/u, ""))
+      .filter((word) => word.length > 3),
+  );
+}
+
+/**
+ * Whether two statements of an open item are the same item: most of their
+ * content words are shared (Dice >= 0.5). Both are Capital Q's own stored
+ * or computed sentences, compared as data; nothing here reads the
+ * person's words.
+ */
+export function sameItem(a: string, b: string): boolean {
+  const left = itemWords(a);
+  const right = itemWords(b);
+  if (left.size === 0 || right.size === 0) return false;
+  let shared = 0;
+  for (const word of left) if (right.has(word)) shared += 1;
+  return (2 * shared) / (left.size + right.size) >= 0.5;
+}
+
+/**
+ * The request already made for the item an offer would settle: an open or
+ * answered diligence request to the same company linked to the same item.
+ * A declined one does not hold a new offer back (asking again is theirs).
+ */
+export function existingRequestFor(
+  statement: string,
+  followUps: readonly DiligenceFollowUp[],
+): DiligenceFollowUp | null {
+  const matching = followUps.filter(
+    (followUp) =>
+      followUp.status !== "DECLINED" &&
+      sameItem(followUp.about.statement, statement),
+  );
+  return matching.at(-1) ?? null;
+}
+
+/**
+ * Where that request stands, from the request's own record (never from an
+ * action receipt): outstanding since the day asked, or answered and with
+ * what. Said by code; the answer assesses what came back.
+ */
+export function requestStateLine(
+  company: string,
+  followUp: DiligenceFollowUp,
+): string {
+  const asked = day(followUp.requestedAt);
+  const since = asked === null ? "" : ` on ${asked}`;
+  const title = quoted(followUp.title, 120);
+  if (followUp.status === "FULFILLED") {
+    const documentTitle = followUp.document?.title ?? null;
+    const answered = day(followUp.fulfilledAt);
+    return `You asked ${company} for ${title}${since}; they answered${answered === null ? "" : ` on ${answered}`} with ${documentTitle === null ? "a document" : quoted(documentTitle, 120)}, so I haven't asked again.`;
+  }
+  return `You asked ${company} for ${title}${since}, and it's still outstanding, so I haven't asked again.`;
 }
 
 /**
@@ -875,7 +993,7 @@ export function openResolutionOf(
     action: offer.action,
     counterparty: offer.counterparty,
     about: offer.about,
-    title: resolutionTitleOf(offer.about.statement),
+    title: resolutionTitleOf(offer.about.statement, offer.counterparty.name),
   };
 }
 

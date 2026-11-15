@@ -197,7 +197,10 @@ const profile = (companyId: string) => ({
 });
 
 /** Where Savanna Seed stands with each company, as hosted read showed. */
-const relationshipWith = (companyId: string) => {
+const relationshipWith = (
+  companyId: string,
+  followUps: readonly unknown[] = [],
+) => {
   const counterpart = {
     kind: "COMPANY",
     id: companyId,
@@ -230,6 +233,16 @@ const relationshipWith = (companyId: string) => {
       ],
       nextStep: "NONE",
     },
+    ...(inDiligence && followUps.length > 0
+      ? {
+          diligence: {
+            openRequests: [],
+            answeredRequests: [],
+            sharedDocuments: [],
+            followUps,
+          },
+        }
+      : {}),
     truthClass: "VERIFIED",
     source: "Capital Q relationship history",
   };
@@ -347,6 +360,8 @@ const CHAT_CALL: FakeBehaviour = {
 function conversation(options: {
   readonly readings: readonly Reading[];
   readonly script: readonly FakeBehaviour[];
+  /** The diligence requests linked to an item, as get_relationship reads them now. */
+  readonly followUps?: () => readonly unknown[];
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -416,7 +431,10 @@ function conversation(options: {
             ok(
               proposal,
               "relationship.get",
-              relationshipWith(args.companyId ?? AJOPOT),
+              relationshipWith(
+                args.companyId ?? AJOPOT,
+                options.followUps?.() ?? [],
+              ),
             ),
           );
         default:
@@ -615,7 +633,8 @@ describe("scenario 3 end to end: the uncertainty is resolved through one code-ow
         arguments: {
           operation: "REQUEST",
           relationship: "Ajopot",
-          title: `Evidence that settles: ${DEFINITION}`,
+          // D15b: a document-like heading; what it is about stays beside it.
+          title: "Supporting evidence for Ajopot",
           resolves: { statement: DEFINITION, standing: "REPORTED" },
         },
       });
@@ -766,5 +785,93 @@ describe("scenario 3 end to end: the uncertainty is resolved through one code-ow
           (a.arguments as { relationship?: unknown }).relationship === "Ajopot",
       ),
     ).toEqual([]);
+  });
+});
+
+/** Request 4c9a2968 as the relationship read returns it after the yes. */
+const FOLLOW_UP = (status: "OPEN" | "FULFILLED") => ({
+  title: "Supporting evidence for Ajopot",
+  about: { statement: DEFINITION, standing: "REPORTED" },
+  status,
+  requestedAt: "2026-11-15T03:10:32.000Z",
+  fulfilledAt: status === "FULFILLED" ? "2026-11-15T03:12:01.000Z" : null,
+  document:
+    status === "FULFILLED"
+      ? {
+          title: "Ajopot company overview",
+          summary:
+            "Repeats 52,000 registered and 18,700 active users; no cohort table.",
+        }
+      : null,
+  answers: [],
+  declineNote: null,
+});
+
+describe("D15 (live 15 Nov 2026, run e7ba2a79): asking again after the request", () => {
+  it.each(["FULFILLED", "OPEN"] as const)(
+    "a request already made for the same item (%s) is never offered again; its own state is said",
+    async (status) => {
+      let followUps: readonly unknown[] = [];
+      const turn = conversation({
+        readings: [QUESTION_ABOUT("Ajopot"), QUESTION_ABOUT("Ajopot")],
+        script: [
+          readsOf(AJOPOT),
+          analystAnswer(LIVE_ANSWER, LIVE_UNCERTAINTIES),
+          readsOf(AJOPOT),
+          analystAnswer(
+            "The latest company overview repeats 52,000 registered users and 18,700 active users. What remains open is the six-month cohort.",
+            LIVE_UNCERTAINTIES,
+          ),
+        ],
+        followUps: () => followUps,
+      });
+      const first = await turn.say(
+        "How solid is Ajopot's active users figure?",
+      );
+      expect(first.text).toContain("Want me to ask Ajopot for a document");
+      // The request was made and (live) answered with the overview.
+      followUps = [FOLLOW_UP(status)];
+      const again = await turn.say(
+        "How solid is Ajopot's active users figure?",
+      );
+      expect(again.text).not.toContain("Want me to ask Ajopot");
+      expect(again.outcome).not.toHaveProperty("offer");
+      expect(again.text).not.toMatch(/is saved/u);
+      expect(again.text).toContain(
+        'You asked Ajopot for "Supporting evidence for Ajopot" on 2026-11-15',
+      );
+      if (status === "FULFILLED") {
+        expect(again.text).toContain(
+          'they answered on 2026-11-15 with "Ajopot company overview"',
+        );
+      } else {
+        expect(again.text).toContain("it's still outstanding");
+      }
+      expect(turn.ran).toEqual([]);
+    },
+  );
+
+  it("a declined request does not hold a new offer back", async () => {
+    let followUps: readonly unknown[] = [];
+    const turn = conversation({
+      readings: [QUESTION_ABOUT("Ajopot"), QUESTION_ABOUT("Ajopot")],
+      script: [
+        readsOf(AJOPOT),
+        analystAnswer(LIVE_ANSWER, LIVE_UNCERTAINTIES),
+        readsOf(AJOPOT),
+        analystAnswer(LIVE_ANSWER, LIVE_UNCERTAINTIES),
+      ],
+      followUps: () => followUps,
+    });
+    await turn.say("How solid is Ajopot's active users figure?");
+    followUps = [
+      {
+        ...FOLLOW_UP("OPEN"),
+        status: "DECLINED",
+        declineNote: "Not ready yet.",
+      },
+    ];
+    const again = await turn.say("How solid is Ajopot's active users figure?");
+    expect(again.text).toContain("Want me to ask Ajopot for a document");
   });
 });

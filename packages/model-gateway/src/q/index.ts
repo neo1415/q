@@ -9,7 +9,10 @@ import {
 
 import { z } from "zod";
 
-import { GetRelationshipOutputSchema } from "@capital-q/q-tools";
+import {
+  GetRelationshipOutputSchema,
+  type DiligenceFollowUp,
+} from "@capital-q/q-tools";
 
 import { carriesScreenMove, withoutUnaskedMoves } from "./unasked-moves.js";
 import {
@@ -868,6 +871,9 @@ import {
   checkedLine,
   chooseVehicle,
   codeUncertaintyOffer,
+  existingRequestFor,
+  offerBacking,
+  requestStateLine,
   decideUncertaintyOffer,
   DILIGENCE_DOCUMENTS_TOOL,
   offerDecisionTrace,
@@ -3748,8 +3754,18 @@ export function createModelGatewayQAnswer(
    */
   const openResolutionByRun = new Map<string, OpenResolutionItem>();
   const askedVehicleByRun = new Map<string, string>();
+  /**
+   * D15 (live 15 Nov 2026, run e7ba2a79): their diligence requests linked
+   * to an open item, per run and company, as the relationship read
+   * returned them; an item already asked for is never offered again.
+   */
+  const followUpsByRun = new Map<
+    string,
+    Map<string, readonly DiligenceFollowUp[]>
+  >();
   const boundedRunState = (): void => {
     for (const store of [
+      followUpsByRun,
       publicWebByRun,
       codeSaysCheckedRuns,
       onRequestSeenRuns,
@@ -5954,6 +5970,12 @@ export function createModelGatewayQAnswer(
           if (read.data.yourSide !== "INVESTOR" || followUps.length === 0) {
             return;
           }
+          const byCompany =
+            followUpsByRun.get(request.runId) ??
+            new Map<string, readonly DiligenceFollowUp[]>();
+          byCompany.set(companyId, followUps);
+          followUpsByRun.set(request.runId, byCompany);
+          boundedRunState();
           const note = reassessmentNote({
             company: read.data.counterpart.name ?? "the company",
             followUps,
@@ -12323,6 +12345,46 @@ export function createModelGatewayQAnswer(
             holds: (name) => classificationOf(name) !== undefined,
             company: subject.name,
           });
+        /**
+         * D15 (live 15 Nov 2026, run e7ba2a79): after Ajopot answered the
+         * request, the same question was offered again and the status
+         * line was the action's ("... is saved"). The item an offer would
+         * settle, already asked for of this company (open or answered):
+         * that request and the line saying where it stands. Null: never
+         * asked, or declined.
+         */
+        let requestStateSaid = false;
+        const alreadyAsked = (
+          subject: {
+            readonly companyId: string;
+            readonly name: string | null;
+          } | null,
+          about: string | null,
+        ): {
+          readonly followUp: DiligenceFollowUp;
+          readonly line: string;
+        } | null => {
+          if (subject === null) return null;
+          // This turn's relationship read (standingWith reads it first),
+          // else what the prepared follow-up read held.
+          const followUps =
+            runCompanies
+              .read(request.runId)
+              .relationships.get(`COMPANY:${subject.companyId}`)?.diligence
+              ?.followUps ??
+            followUpsByRun.get(request.runId)?.get(subject.companyId) ??
+            [];
+          if (followUps.length === 0) return null;
+          const backing = offerBacking(uncertainties, about);
+          if (backing === null) return null;
+          const followUp = existingRequestFor(backing.statement, followUps);
+          return followUp === null
+            ? null
+            : {
+                followUp,
+                line: requestStateLine(subject.name ?? "the company", followUp),
+              };
+        };
         /** Whom an offer to resolve the item goes to (D13, D14). */
         const counterpartyOf = (subject: {
           readonly companyId: string;
@@ -12354,6 +12416,7 @@ export function createModelGatewayQAnswer(
             subject === null || standing === undefined
               ? null
               : vehicleOf(subject, standing);
+          const askedBefore = alreadyAsked(subject, about);
           const decision = decideUncertaintyOffer({
             action: bound.action,
             about,
@@ -12382,57 +12445,67 @@ export function createModelGatewayQAnswer(
             },
             "an offer to resolve an uncertainty was held against its materiality and route",
           );
-          switch (decision.kind) {
-            case "KEEP":
-              offerBinding = {
-                kind: "BOUND",
-                offer: {
-                  ...bound,
-                  about: decision.about,
-                  ...(subject === null
-                    ? {}
-                    : { counterparty: counterpartyOf(subject) }),
-                },
-              };
-              break;
-            case "REBIND":
-              offerRemoved.push(bound.said);
-              uncertaintyLines.push(decision.said);
-              offerBinding = {
-                kind: "BOUND",
-                offer: {
-                  action: decision.tool,
-                  request: bound.request,
-                  said: decision.said,
-                  about: decision.about,
-                  ...(subject === null
-                    ? {}
-                    : { counterparty: counterpartyOf(subject) }),
-                },
-              };
-              break;
-            case "NO_ROUTE":
-              offerRemoved.push(bound.said);
-              // Said once: not beside code's own closing line (D7's stage
-              // limit already says what the relationship allows).
-              // Owner directive 14 Nov (point 4): the relationship step is
-              // said once in a conversation, not on every answer about them.
-              if (
-                decision.line !== null &&
-                request.closingLines === undefined &&
-                !saidEarlier(decision.line, earlierAnswers)
-              ) {
-                uncertaintyLines.push(decision.line);
-              }
-              offerBinding = { kind: "NONE" };
-              break;
-            case "DROP":
-              offerRemoved.push(bound.said);
-              offerBinding = { kind: "NONE" };
-              break;
-            case "PASS":
-              break;
-          }
+          if (askedBefore !== null) {
+            // D15: the same item was already asked for; where that request
+            // stands is said instead of a second offer.
+            offerRemoved.push(bound.said);
+            if (!saidEarlier(askedBefore.line, earlierAnswers)) {
+              uncertaintyLines.push(askedBefore.line);
+            }
+            requestStateSaid = true;
+            offerBinding = { kind: "NONE" };
+          } else
+            switch (decision.kind) {
+              case "KEEP":
+                offerBinding = {
+                  kind: "BOUND",
+                  offer: {
+                    ...bound,
+                    about: decision.about,
+                    ...(subject === null
+                      ? {}
+                      : { counterparty: counterpartyOf(subject) }),
+                  },
+                };
+                break;
+              case "REBIND":
+                offerRemoved.push(bound.said);
+                uncertaintyLines.push(decision.said);
+                offerBinding = {
+                  kind: "BOUND",
+                  offer: {
+                    action: decision.tool,
+                    request: bound.request,
+                    said: decision.said,
+                    about: decision.about,
+                    ...(subject === null
+                      ? {}
+                      : { counterparty: counterpartyOf(subject) }),
+                  },
+                };
+                break;
+              case "NO_ROUTE":
+                offerRemoved.push(bound.said);
+                // Said once: not beside code's own closing line (D7's stage
+                // limit already says what the relationship allows).
+                // Owner directive 14 Nov (point 4): the relationship step is
+                // said once in a conversation, not on every answer about them.
+                if (
+                  decision.line !== null &&
+                  request.closingLines === undefined &&
+                  !saidEarlier(decision.line, earlierAnswers)
+                ) {
+                  uncertaintyLines.push(decision.line);
+                }
+                offerBinding = { kind: "NONE" };
+                break;
+              case "DROP":
+                offerRemoved.push(bound.said);
+                offerBinding = { kind: "NONE" };
+                break;
+              case "PASS":
+                break;
+            }
         }
         if (
           uncertaintyLines.length === 0 &&
@@ -12464,8 +12537,27 @@ export function createModelGatewayQAnswer(
           // where code already closes the answer (a plan offer, a stage
           // limit), on a turn that wants no next step, or beside a change
           // this turn prepared.
+          // D15: an item already asked for of this company (open or
+          // answered) is never offered again; its request's state is said.
+          const askedBefore = alreadyAsked(subject, null);
+          if (askedBefore !== null) {
+            if (!saidEarlier(askedBefore.line, earlierAnswers)) {
+              uncertaintyLines.push(askedBefore.line);
+            }
+            requestStateSaid = true;
+            logger?.info(
+              {
+                qRunId: request.runId,
+                status: askedBefore.followUp.status,
+              },
+              "a material uncertainty already asked for: its request's state, no new offer",
+            );
+          }
           const own =
-            request.closingLines === undefined && offerTurn && !preparedByTool
+            askedBefore === null &&
+            request.closingLines === undefined &&
+            offerTurn &&
+            !preparedByTool
               ? codeUncertaintyOffer({
                   uncertainties,
                   vehicle,
@@ -12831,10 +12923,20 @@ export function createModelGatewayQAnswer(
           );
           parityGap = gap;
         }
+        // D15: where a diligence request stands is the request's (said
+        // above), never its approval card's "is saved".
+        const onlyDiligence =
+          requestStateSaid &&
+          receipts.every(
+            (receipt) =>
+              receipt.kind !== "ACTION" ||
+              receipt.actionType.startsWith("app.diligence."),
+          );
         const statusLine =
           analyst.proposalStatus &&
           approvalLine === null &&
           !preparedThisTurn &&
+          !onlyDiligence &&
           dependencies.receipts !== undefined
             ? proposalStatusLine(receipts)
             : null;
