@@ -2635,6 +2635,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "New owner",
   "New password",
   "New reports from chat appear here.",
+  "New result",
   "New task",
   "New this week",
   "New video",

@@ -83,6 +83,7 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "In focus": "قيد التركيز",
   Investor: "المستثمر",
   "Latest exchange": "آخر تبادل",
+  "New result": "نتيجة جديدة",
   "Loading your chats…": "جارٍ تحميل محادثاتك…",
   "Mandate fit measures how well this company matches the mandate you declared. It is not a judgement of the business.":
     "يقيس التوافق مع التفويض مدى مطابقة هذه الشركة للتفويض الذي أعلنته. وليس حكماً على الشركة نفسها.",

@@ -115,6 +115,7 @@ import {
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
+import { VoiceRoom, VoiceRoomPresence } from "./voice-room-layout";
 import { answerCardsDrawn, useSettledReveal } from "./settled-reveal";
 import { registerActSlot } from "@/features/workspace/act-slot";
 import { threadInOrder, type SpokenLine } from "./spoken";
@@ -806,6 +807,8 @@ export function QConversationPanel({
   }, [conversing]);
   // An object shown over the presence holds the stage (E1 stage mode).
   const [objectShown, setObjectShown] = useState(false);
+  // Phase 4A: the room's presence is compact once Q shows something.
+  const roomCompact = objectShown;
   const threadEnd = useRef<HTMLDivElement>(null);
   useFollowNewest(
     threadEnd,
@@ -814,13 +817,18 @@ export function QConversationPanel({
   );
   // Owner 2026-11-06: the Q view's room starts at Q's presence; nothing
   // follows the newest words there (the exchange sits under Q).
+  // Owner audit 2026-11-15 (Phase 4B): only on arriving in the room. This
+  // ran on every new word too, so a person scrolling down to the cards
+  // while Q spoke was thrown back to the top with each caption update.
   useEffect(() => {
     const body = bodyRef.current;
     if (body !== null && bigPresence) body.scrollTop = 0;
-  }, [bigPresence, newest]);
+  }, [bigPresence]);
   // In the workspace the pane is 300-640 px, never the wide stage.
   const viewportWide = useWide();
   const wide = viewportWide && !workspace;
+  // The room presence is drawn at one size; compact is a transform.
+  const roomPixels = wide ? 280 : 200;
   // The Board is closed until its icon is pressed: what Q makes is in the
   // thread, inline (founder direction A, 2026-09-28).
   // The Board opens from the answer chip on other pages (?board=1, C6).
@@ -1467,96 +1475,132 @@ export function QConversationPanel({
                   // under it only the current exchange -- their last line,
                   // Q's latest reply as a caption, its cards one line each.
                   // The whole transcript, cards and lists are Chat's.
-                  <div
-                    className="flex w-full flex-col items-center gap-4"
-                    data-q-voice-room
-                  >
-                    <div
-                      className="cq-voice-room-presence"
-                      aria-hidden="true"
-                      data-q-presence="stage"
-                      data-q-room-presence="conversation"
-                    >
-                      <ViewTransition
-                        name="q-aperture"
-                        share="cq-q-morph"
-                        default="none"
-                      >
-                        <QAperture
-                          state={presence.state}
-                          size={wide ? 280 : 200}
-                          inputLevel={client.inputLevel}
-                          outputLevel={client.outputLevel}
-                          stage
-                        />
-                      </ViewTransition>
-                    </div>
-                    <div className="flex min-h-6 flex-col items-center gap-2">
-                      {stateLabel === null ? null : (
-                        <span
-                          className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
-                          role="status"
-                          data-q-state-pill
+                  // Owner audit 2026-11-15 (Phase 4A): large while
+                  // nothing is shown; once Q shows something, Q moves
+                  // aside (a side column, or a dock on a phone) and the
+                  // content leads. Same elements throughout: no remount.
+                  <VoiceRoom
+                    compact={roomCompact}
+                    resultKey={stageObject}
+                    aside={
+                      <>
+                        <div
+                          className="cq-voice-room-presence"
+                          aria-hidden="true"
+                          data-q-presence="stage"
+                          data-q-room-presence="conversation"
                         >
-                          <span
-                            aria-hidden="true"
-                            className={cx(
-                              "size-2 rounded-full bg-(--cq-accent)",
-                              voice.active && "motion-safe:animate-pulse",
-                            )}
-                          />
-                          {t(stateLabel)}
-                        </span>
-                      )}
-                      <StageLine current={presence.stage} reserve />
-                    </div>
-                    {/* The exchange for a screen reader, each turn with
+                          <ViewTransition
+                            name="q-aperture"
+                            share="cq-q-morph"
+                            default="none"
+                          >
+                            <VoiceRoomPresence
+                              compact={roomCompact}
+                              pixels={roomPixels}
+                              shown={
+                                roomCompact
+                                  ? wide
+                                    ? ROOM_COMPACT_WIDE
+                                    : ROOM_COMPACT_PHONE
+                                  : roomPixels
+                              }
+                              speaking={presence.state === "SPEAKING"}
+                              outputLevel={client.outputLevel}
+                            >
+                              <QAperture
+                                state={presence.state}
+                                size={roomPixels}
+                                inputLevel={client.inputLevel}
+                                outputLevel={client.outputLevel}
+                                stage
+                                showing={roomCompact}
+                              />
+                            </VoiceRoomPresence>
+                          </ViewTransition>
+                        </div>
+                        <div
+                          className={
+                            roomCompact
+                              ? "flex min-h-6 min-w-0 flex-col items-start gap-1"
+                              : "flex min-h-6 flex-col items-center gap-2"
+                          }
+                          data-q-voice-status
+                        >
+                          {stateLabel === null ? null : (
+                            <span
+                              className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                              role="status"
+                              data-q-state-pill
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={cx(
+                                  "size-2 rounded-full bg-(--cq-accent)",
+                                  voice.active && "motion-safe:animate-pulse",
+                                )}
+                              />
+                              {t(stateLabel)}
+                            </span>
+                          )}
+                          <StageLine current={presence.stage} reserve />
+                        </div>
+                        {/* The exchange for a screen reader, each turn with
                         its id and disposition (G-R3; audit 06 §9). Text
                         only: nothing focusable is hidden here. The words
                         on screen below are not read a second time. */}
-                    <ol className="sr-only" aria-label={t("Latest exchange")}>
-                      {latestExchange(thread).map((line) =>
-                        line.role === "person" ? (
-                          <li
-                            key={line.id}
-                            data-q-turn-id={line.turnId ?? line.id}
-                            data-q-turn-role="USER"
-                            data-q-disposition={rowDisposition(line)}
-                          >
-                            {t("You:")} {line.text}
-                          </li>
-                        ) : (
-                          <li
-                            key={line.id}
-                            data-q-turn-id={line.turnId ?? line.id}
-                            data-q-turn-role="Q"
-                            data-q-disposition={rowDisposition(line)}
-                            data-q-failure={rowFailure(line)}
-                          >
-                            Q: {plainFromMarkdown(line.text)}
-                          </li>
-                        ),
-                      )}
-                      {liveIsPerson ? (
-                        <li
-                          key={live.id}
-                          data-q-turn-id={live.id}
-                          data-q-turn-role="USER"
+                        <ol
+                          className="sr-only"
+                          aria-label={t("Latest exchange")}
                         >
-                          You, speaking: {live.text}
-                        </li>
-                      ) : null}
-                    </ol>
-                    <QCurrentExchange
-                      announce={false}
-                      lines={latestExchange(thread)}
-                      live={liveIsPerson ? live.text : null}
-                      qSaying={voice.active ? qSaying : null}
-                      captions={captions || voice.active}
-                      onOpenChat={() => chooseView("chat")}
-                      earlier={thread.length > latestExchange(thread).length}
-                      cardLines={false}
-                    />
+                          {latestExchange(thread).map((line) =>
+                            line.role === "person" ? (
+                              <li
+                                key={line.id}
+                                data-q-turn-id={line.turnId ?? line.id}
+                                data-q-turn-role="USER"
+                                data-q-disposition={rowDisposition(line)}
+                              >
+                                {t("You:")} {line.text}
+                              </li>
+                            ) : (
+                              <li
+                                key={line.id}
+                                data-q-turn-id={line.turnId ?? line.id}
+                                data-q-turn-role="Q"
+                                data-q-disposition={rowDisposition(line)}
+                                data-q-failure={rowFailure(line)}
+                              >
+                                Q: {plainFromMarkdown(line.text)}
+                              </li>
+                            ),
+                          )}
+                          {liveIsPerson ? (
+                            <li
+                              key={live.id}
+                              data-q-turn-id={live.id}
+                              data-q-turn-role="USER"
+                            >
+                              You, speaking: {live.text}
+                            </li>
+                          ) : null}
+                        </ol>
+                        <QCurrentExchange
+                          announce={false}
+                          lines={latestExchange(thread)}
+                          live={liveIsPerson ? live.text : null}
+                          qSaying={voice.active ? qSaying : null}
+                          captions={captions || voice.active}
+                          onOpenChat={() => chooseView("chat")}
+                          earlier={
+                            thread.length > latestExchange(thread).length
+                          }
+                          cardLines={false}
+                          compact={roomCompact}
+                        />
+                      </>
+                    }
+                  >
                     {/* Owner 2026-11-06: the answer's cards in full under
                         the exchange, the same stage as before (cards
                         canvas, room documents, live previews, the flight
@@ -1646,7 +1690,7 @@ export function QConversationPanel({
                       onAsk={sayOrAsk}
                       onOpenArtifact={showArtifact}
                     />
-                  </div>
+                  </VoiceRoom>
                 ) : (
                   <ol
                     className="flex w-full flex-col gap-5"
@@ -2231,3 +2275,7 @@ function latestExchange<T extends { readonly role: string }>(
   const at = lines.findLastIndex((line) => line.role === "person");
   return at < 0 ? lines : lines.slice(at);
 }
+
+/** Phase 4A: the room presence's compact size, desktop and phone. */
+const ROOM_COMPACT_WIDE = 112;
+const ROOM_COMPACT_PHONE = 56;

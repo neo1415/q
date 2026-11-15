@@ -423,7 +423,10 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
     const pinned = room?.querySelector(".cq-voice-room-presence");
     expect(pinned?.querySelector("[data-q-aperture]")).not.toBeNull();
     expect(pinned?.getAttribute("aria-hidden")).toBe("true");
-    expect(room?.firstElementChild).toBe(pinned);
+    // Phase 4A: first in the room's aside, which is first in the room.
+    const aside = room?.querySelector("[data-q-voice-aside]");
+    expect(room?.firstElementChild).toBe(aside);
+    expect(aside?.firstElementChild).toBe(pinned);
     // One presence only: the stage under it draws none of its own.
     expect(room?.querySelectorAll("[data-q-aperture]")).toHaveLength(1);
     // No transcript: no thread, no earlier turns.
@@ -476,6 +479,88 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
     expect(thread).toContain("Earlier question 1");
     expect(thread).toContain("Find me founders raising in fintech");
     expect(document.querySelector("[data-q-voice-room]")).toBeNull();
+  });
+});
+
+describe("the voice room once Q shows something (owner audit 2026-11-15, Phase 4)", () => {
+  async function renderRoom() {
+    localStorage.setItem("cq.q.view", "presence");
+    const view = render(
+      <QConversationPanel
+        connected
+        context={CONTEXT}
+        conversationId="00000000-0000-4000-8000-000000000001"
+      />,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    return view;
+  }
+
+  it("is large with nothing shown, and compact (content first) once cards are up", async () => {
+    state.turns = [
+      { kind: "PERSON", id: "p-1", text: "Hello", unconfirmed: false },
+      qAnswer("q-1", "Hello. What shall we look at?"),
+    ];
+    const { rerender } = await renderRoom();
+    const room = () => document.querySelector("[data-q-voice-room]");
+    expect(room()?.hasAttribute("data-q-voice-compact")).toBe(false);
+    expect(
+      document
+        .querySelector("[data-q-voice-presence-box]")
+        ?.getAttribute("data-q-voice-presence-box"),
+    ).toBe("full");
+    const before = document.querySelector("[data-q-aperture]");
+
+    state.turns = longConversation();
+    rerender(
+      <QConversationPanel
+        connected
+        context={CONTEXT}
+        conversationId="00000000-0000-4000-8000-000000000001"
+      />,
+    );
+    await screen.findAllByText(NAMES[0] ?? "", {}, { timeout: 4000 });
+    expect(room()?.hasAttribute("data-q-voice-compact")).toBe(true);
+    expect(
+      document
+        .querySelector("[data-q-voice-presence-box]")
+        ?.getAttribute("data-q-voice-presence-box"),
+    ).toBe("compact");
+    // The same presence element: never remounted, so the swarm runs on.
+    expect(document.querySelector("[data-q-aperture]")).toBe(before);
+    // The captions are discreet beside it.
+    expect(document.querySelector("[data-q-exchange-compact]")).not.toBeNull();
+  });
+
+  it("never moves the scroll as Q's words arrive", async () => {
+    state.turns = longConversation();
+    const { rerender } = await renderRoom();
+    const body = document.querySelector<HTMLElement>(
+      "[data-q-voice-stage-body]",
+    );
+    if (body === null) throw new Error("no stage body");
+    // Where the person scrolled to, reading the cards.
+    body.scrollTop = 420;
+    for (const words of ["I found", "I found five", "I found five founders"]) {
+      const answer = qAnswer("q-7", words);
+      state.turns = [
+        ...longConversation(),
+        ...(answer.kind === "Q" ? [{ ...answer, streaming: true }] : []),
+      ];
+      rerender(
+        <QConversationPanel
+          connected
+          context={CONTEXT}
+          conversationId="00000000-0000-4000-8000-000000000001"
+        />,
+      );
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      });
+      expect(body.scrollTop).toBe(420);
+    }
   });
 });
 

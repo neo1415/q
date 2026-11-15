@@ -13,6 +13,7 @@ import {
 import type { VoiceSessionClient, VoiceState } from "./session";
 import { VOICE_STATE_LABELS } from "./session";
 import { useT } from "@/features/i18n/language";
+import { isNearBottom } from "@/features/q/follow-newest";
 
 /**
  * The voice stage (CQ-Q-VOICE-001 rework): when the person talks with Q,
@@ -157,8 +158,17 @@ export function VoiceStage({
   const lastQ = [...lines].reverse().find((line) => line.role === "q");
   const lastPerson = [...lines].reverse().find((line) => line.role === "user");
 
+  // Owner audit 2026-11-15 (Phase 4B): a new line follows only a reader
+  // already at the end; one who scrolled back to read stays put.
+  const listAtEnd = useRef(true);
+  const onListScroll = () => {
+    const list = listRef.current;
+    if (list !== null) listAtEnd.current = isNearBottom(list);
+  };
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    if (listAtEnd.current) {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    }
   }, [lines.length]);
 
   // A new step means fresh picks.
@@ -312,6 +322,7 @@ export function VoiceStage({
           {showAll ? (
             <ol
               ref={listRef}
+              onScroll={onListScroll}
               className="cq-stage-scroll w-full max-w-2xl flex-none space-y-3 overflow-y-auto rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
               style={{ maxHeight: "32vh" }}
               aria-label={t("Everything we've said")}

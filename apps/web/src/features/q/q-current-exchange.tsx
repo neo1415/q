@@ -66,6 +66,7 @@ export function QCurrentExchange({
   onOpenChat,
   cardLines = true,
   announce = true,
+  compact = false,
 }: {
   /** The person's last line and what Q said after it. */
   readonly lines: readonly ExchangeLine[];
@@ -89,6 +90,12 @@ export function QCurrentExchange({
    * on the page, so nothing is read twice; the buttons stay reachable.
    */
   readonly announce?: boolean | undefined;
+  /**
+   * Phase 4A (owner audit 2026-11-15): Q is showing something, so the
+   * words are a discreet caption beside the compact presence -- smaller,
+   * fewer lines, aligned with it -- and the content leads.
+   */
+  readonly compact?: boolean | undefined;
 }) {
   const t = useT();
   const person = lines.findLast((line) => line.role === "person");
@@ -105,12 +112,21 @@ export function QCurrentExchange({
   const more = cards.length - shown.length;
   return (
     <div
-      className="flex w-full max-w-2xl flex-col items-center gap-3 text-center"
+      className={
+        compact
+          ? "flex w-full min-w-0 flex-col items-start gap-1 text-start"
+          : "flex w-full max-w-2xl flex-col items-center gap-3 text-center"
+      }
       data-q-current-exchange
+      data-q-exchange-compact={compact ? "" : undefined}
     >
       {said === null ? null : (
         <p
-          className="cq-body m-0 line-clamp-2 text-(--cq-text-secondary)"
+          className={
+            compact
+              ? "cq-caption m-0 line-clamp-1 text-(--cq-text-secondary)"
+              : "cq-body m-0 line-clamp-2 text-(--cq-text-secondary)"
+          }
           aria-hidden={announce ? undefined : true}
           data-q-exchange-person
         >
@@ -120,7 +136,11 @@ export function QCurrentExchange({
       )}
       {captions && caption !== null ? (
         <p
-          className="cq-body m-0 line-clamp-3 text-(--cq-text-primary)"
+          className={
+            compact
+              ? "cq-body-sm m-0 line-clamp-2 text-(--cq-text-primary)"
+              : "cq-body m-0 line-clamp-3 text-(--cq-text-primary)"
+          }
           aria-live={announce ? "polite" : undefined}
           aria-hidden={announce ? undefined : true}
           data-q-exchange-caption

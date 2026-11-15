@@ -1,5 +1,6 @@
 import type { QApertureState } from "../q-aperture/aperture-state";
 import type { QMotion } from "../q-aperture/aperture-frame";
+import { createLevelEnvelope } from "../q-aperture/level-envelope";
 import { presenceFor, SMALL_PIXELS } from "./presence-machine";
 import { createPresenceSim, MAX_DT } from "./presence-dynamics";
 import { createQMoment } from "./presence-q-moment";
@@ -144,6 +145,8 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
   let colour = host.colour;
   let dark = host.dark;
   const eased = { input: 0, output: 0 };
+  const inputEnvelope = createLevelEnvelope();
+  const outputEnvelope = createLevelEnvelope();
   let figure = "";
   const note = (next: string) => {
     if (next === figure) return;
@@ -210,11 +213,13 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       clock += dt;
       stepped = dt;
       const raw = host.levels();
-      sim.step(clock, dt, raw);
-      const k = (was: number, next: number) =>
-        1 - Math.exp(-Math.min(dt, 1 / 30) * (next > was ? 26 : 8));
-      eased.input += (raw.input - eased.input) * k(eased.input, raw.input);
-      eased.output += (raw.output - eased.output) * k(eased.output, raw.output);
+      // Phase 4C (owner 2026-11-15): the meters' raw levels are a clipped
+      // square wave per syllable; the swarm reads them through one
+      // attack/release envelope with a soft cap, so speech swells and
+      // settles instead of snapping on every frame.
+      eased.input = inputEnvelope.step(raw.input, dt * 1000);
+      eased.output = outputEnvelope.step(raw.output, dt * 1000);
+      sim.step(clock, dt, eased);
       const aim = host.leanTarget();
       stepLean(lean, aim.x, aim.y, dt);
     } else if (sim.figure() !== shown || figure === "") {

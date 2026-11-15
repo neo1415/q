@@ -27,7 +27,7 @@ export function isNearBottom(
   );
 }
 
-function scrollerOf(element: HTMLElement): HTMLElement {
+export function scrollerOf(element: HTMLElement): HTMLElement {
   for (let at = element.parentElement; at !== null; at = at.parentElement) {
     const overflow = getComputedStyle(at).overflowY;
     if (overflow === "auto" || overflow === "scroll") return at;
@@ -115,9 +115,16 @@ export function useAnchorQuestion(
   questionRef: RefObject<HTMLElement | null>,
   key: string | undefined,
 ): void {
+  // The same question under a new key (a spoken line that then lands as
+  // its turn) is not a new question: anchoring it again pulled a reader
+  // who had scrolled into the answer back up (owner audit 2026-11-15, 4B).
+  const anchored = useRef<string | null>(null);
   useEffect(() => {
     const question = questionRef.current;
     if (question === null || key === undefined) return;
+    const words = question.textContent;
+    if (words !== "" && words === anchored.current) return;
+    anchored.current = words;
     const scroller = scrollerOf(question);
     const top =
       scroller === document.scrollingElement
@@ -126,4 +133,23 @@ export function useAnchorQuestion(
     const offset = question.getBoundingClientRect().top - top - 12;
     scroller.scrollTo({ top: scroller.scrollTop + offset, behavior: "smooth" });
   }, [questionRef, key]);
+}
+
+/** Where a new result sits against the visible part of its scroller. */
+export type ResultCue = "above" | "below" | null;
+
+/**
+ * Phase 4B (owner audit 2026-11-15): a new result never moves the reader.
+ * When it lands out of view, a quiet "New result" control says which way
+ * it is; null when it is (at least partly) in view already.
+ */
+export function resultCue(
+  target: { readonly top: number; readonly bottom: number },
+  view: { readonly top: number; readonly bottom: number },
+  /** The least of the result that must be visible to count as seen. */
+  margin = 48,
+): ResultCue {
+  if (target.top > view.bottom - margin) return "below";
+  if (target.bottom < view.top + margin) return "above";
+  return null;
 }

@@ -5968,6 +5968,92 @@
 }
 
 /*
+ * Owner audit 2026-11-15 (Phase 4A): once Q shows something, the room's
+ * presence, state and captions move aside and the content leads. Before
+ * that the aside is no box at all, so the pinned presence above keeps the
+ * room as its sticky container.
+ */
+.cq-voice-aside {
+  display: contents;
+}
+/* Phone: a compact dock at the stage's foot, presence beside the words. */
+[data-q-voice-compact] > .cq-voice-aside {
+  order: 99;
+  position: sticky;
+  bottom: 0;
+  z-index: var(--cq-z-sticky);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  margin-inline: -20px;
+  padding-block: 8px;
+  padding-inline: max(20px, env(safe-area-inset-left))
+    max(20px, env(safe-area-inset-right));
+  background: var(--cq-stage-canvas);
+  border-top: 1px solid var(--cq-border-subtle);
+}
+[data-q-voice-compact] > .cq-voice-aside > .cq-voice-room-presence {
+  grid-row: 1 / span 2;
+  position: static;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+@media (min-width: 640px) {
+  [data-q-voice-compact] > .cq-voice-aside {
+    margin-inline: -32px;
+    padding-inline: max(32px, env(safe-area-inset-left))
+      max(32px, env(safe-area-inset-right));
+  }
+}
+/* Desktop: a side column, pinned while the content scrolls. */
+@media (min-width: 1024px) {
+  [data-q-voice-compact] > .cq-voice-aside {
+    order: 0;
+    top: 0;
+    bottom: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-inline: 0;
+    padding: 24px 0 0;
+    border-top: 0;
+    background: none;
+  }
+}
+/* A new result out of view: a quiet way to it, never a scroll. */
+.cq-voice-new-result {
+  order: 98;
+  position: sticky;
+  bottom: 88px;
+  z-index: var(--cq-z-sticky);
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding-inline: 16px;
+  border-radius: var(--cq-radius-circle);
+  border: 1px solid var(--cq-border-subtle);
+  background: var(--cq-surface);
+  color: var(--cq-text-primary);
+}
+.cq-voice-room:not([data-q-voice-compact]) > .cq-voice-new-result {
+  bottom: 16px;
+}
+@media (min-width: 1024px) {
+  [data-q-voice-compact] > .cq-voice-new-result {
+    grid-column: 2;
+    justify-self: center;
+    bottom: 16px;
+  }
+}
+
+/*
  * Owner 2026-10-28: on a phone Q's page is a plain conversation, like
  * ChatGPT. The moving light and the animated corner mark are for the wide
  * screen. Owner 2026-11-06: Q's room presence is the Q (voice) view's
