@@ -76,6 +76,8 @@ export const STATEMENT_QUANTITIES = [
   "runway_months",
   "raise_amount",
   "pre_money_valuation",
+  /** Customer acquisition cost: money spent to win one customer. */
+  "cac",
 ] as const;
 export const StatementQuantitySchema = z.enum(STATEMENT_QUANTITIES);
 export type StatementQuantity = z.infer<typeof StatementQuantitySchema>;

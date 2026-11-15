@@ -93,8 +93,11 @@ import {
  * 6: prompt v11; how the product works day to day is the solution, and a
  * note naming a stage beside a stage answer of the same reading is that
  * answer's, never a note (live 318577a8e).
+ * 7: prompt v12; an unknown about a named metric goes on that metric's
+ * dimension, never the one Q asked about, and not knowing beside an
+ * answer of the same reading is that answer's (live 5757518c7).
  */
-export const STATEMENT_READING_VERSION = 6;
+export const STATEMENT_READING_VERSION = 7;
 
 export type StatementContext = {
   readonly statements: readonly ApplicationStatement[];
@@ -721,6 +724,36 @@ function correctionStands(
 const LEAVE_OPEN_REQUEST =
   /^(?:(?:please|just|still|so|ok(?:ay)?|then|and|but|for now)[,\s]+)*(?:(?:can|could|would|will) you\s+|i'?d like you to\s+|let'?s\s+)?(?:please\s+)?(?:leave|keep)\s+(?:it|that|this|them|those|both|th(?:e|at|ose) [\w\s'-]{1,48}?)\s+(?:open|unresolved|undecided|unsettled|as (?:it is|they are))\b[^.!?]*[.!?]*$/iu;
 
+/**
+ * Where a metric's answer lives: the dimensions a statement about it may
+ * sit on, its home first. An unknown about a metric they named goes to its
+ * home when the reader filed it elsewhere (the note, or the dimension Q
+ * happened to ask about). Metrics with no single home are left as read.
+ */
+const METRIC_DIMENSIONS: Readonly<
+  Partial<Record<string, readonly ApplicationDimension[]>>
+> = {
+  revenue: ["claims.revenue", "claims.traction"],
+  mrr: ["claims.revenue", "claims.traction"],
+  arr: ["claims.revenue", "claims.traction"],
+  gmv: ["claims.traction", "claims.revenue"],
+  paying_customers: ["claims.traction", "company.customers"],
+  customers: ["claims.traction", "company.customers"],
+  users: ["claims.traction"],
+  daily_active_users: ["claims.traction"],
+  weekly_active_users: ["claims.traction"],
+  monthly_active_users: ["claims.traction"],
+  wallets: ["claims.traction"],
+  transactions: ["claims.traction"],
+  pilots: ["claims.traction"],
+  growth_rate_monthly: ["claims.traction"],
+  churn_rate_monthly: ["claims.traction"],
+  retention_rate: ["claims.traction"],
+  gross_margin: ["company.business_model"],
+  cac: ["company.business_model"],
+  raise_amount: ["raise.amount"],
+};
+
 /** A funding stage named in words ("seed", "Series A", "pre-seed"). */
 const NAMES_A_STAGE =
   /\b(?:pre[\s-]?seed|seed|series\s+[a-e]\b|growth[\s-]stage)\b/iu;
@@ -1204,15 +1237,45 @@ export function planReading(input: PlanInput): PlanOutcome {
         ? op
         : { ...op, words, value: { kind: "TEXT", text } };
     }
+    if (op.value.kind === "UNKNOWN" && op.value.declined !== true) {
+      // Not knowing beside an answer the same reading gives on the same
+      // dimension and metric is that answer's uncertainty, not a second
+      // answer (live 5757518c7 t32: "I'm not sure which is right" next to
+      // the seed answer became a third Stage row, "Not known"). The
+      // disagreement holds it; the transcript keeps their words.
+      if (
+        ops.some(
+          (other) =>
+            other !== null &&
+            other !== op &&
+            other.value.kind !== "UNKNOWN" &&
+            other.dimension === op.dimension &&
+            (other.quantity ?? null) === (op.quantity ?? null),
+        )
+      )
+        return null;
+      // An unknown about a metric they named is about that metric, on its
+      // dimension, whatever Q asked (live 5757518c7 t10: "We don't know our
+      // CAC yet." to a market question became Market not known).
+      const named = op.quantity ?? null;
+      const homes = named === null ? undefined : METRIC_DIMENSIONS[named];
+      if (
+        homes !== undefined &&
+        !homes.some((dimension) => dimension === op.dimension)
+      )
+        return { ...op, dimension: homes[0] ?? op.dimension };
+    }
     // "Not known" is about something, never about a note: said in answer
     // to Q's question on a dimension that holds nothing yet, it is that
     // dimension's stated unknown (live 78f8d72d5 t22: "We haven't sized
     // the market bottom-up yet" stored as a note, so Market showed as
-    // Missing, not as a stated unknown).
+    // Missing, not as a stated unknown). Only when they named no metric:
+    // a named one went to its own dimension just above.
     const asked = input.lastAsked ?? null;
     if (
       op.dimension === "application.note" &&
       op.value.kind === "UNKNOWN" &&
+      op.quantity === null &&
       op.turn === null &&
       asked !== null &&
       asked !== "application.note" &&

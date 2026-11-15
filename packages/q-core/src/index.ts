@@ -105,6 +105,7 @@ export { GATEQ_INTERVIEWER_V8 } from "./prompts/tasks/gateq-interviewer.v8.js";
 export { GATEQ_INTERVIEWER_V9 } from "./prompts/tasks/gateq-interviewer.v9.js";
 export { GATEQ_INTERVIEWER_V10 } from "./prompts/tasks/gateq-interviewer.v10.js";
 export { GATEQ_INTERVIEWER_V11 } from "./prompts/tasks/gateq-interviewer.v11.js";
+export { GATEQ_INTERVIEWER_V12 } from "./prompts/tasks/gateq-interviewer.v12.js";
 export {
   GATEQ_INTERVIEWER_SCHEMA_NAME,
   GATEQ_INTERVIEWER_SCHEMA_VERSION,

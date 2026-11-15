@@ -312,6 +312,8 @@ export function statementWorld() {
       askingDimension: input.askingDimension ?? null,
       intent: input.intent ?? null,
       latencyMs: input.latencyMs ?? null,
+      readyToClose:
+        input.role === "Q" && input.readyToClose === true ? true : null,
       createdAt: now.toISOString(),
     });
     return { seq };

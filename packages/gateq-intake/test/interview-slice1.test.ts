@@ -332,6 +332,7 @@ function world(
         askingDimension?: StoredTurn["askingDimension"] | null | undefined;
         intent?: string | null | undefined;
         latencyMs?: number | null | undefined;
+        readyToClose?: boolean | null | undefined;
         disclosureLineage?: StoredTurn["disclosureLineage"];
       }) =>
         transactions.run(async (tx) => {
@@ -362,6 +363,8 @@ function world(
             askingDimension: input.askingDimension ?? null,
             intent: input.intent ?? null,
             latencyMs: input.latencyMs ?? null,
+            readyToClose:
+              input.role === "Q" && input.readyToClose === true ? true : null,
             createdAt: now.toISOString(),
             ...(input.disclosureLineage === undefined
               ? {}

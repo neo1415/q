@@ -46,6 +46,7 @@ const MONEY_QUANTITIES: ReadonlySet<string> = new Set([
   "burn_monthly",
   "raise_amount",
   "pre_money_valuation",
+  "cac",
 ]);
 
 export type GateqValueKind =

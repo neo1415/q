@@ -661,10 +661,18 @@ export function onePageSummary(
         .map((s) => s.statementId),
     ),
   );
+  // The raise's currency travels with its amount (live 5757518c7: the
+  // Round row read "USD 400,000 (…); USD (Given in the form)"). It is its
+  // own finding only when no amount is on record to carry it.
+  const amountHeld = all.some(
+    (fact) =>
+      fact.dimension === "raise.amount" && fact.truthClass !== "UNKNOWN",
+  );
   for (const row of SUMMARY_ROWS) {
     const facts = all.filter(
       (fact) =>
         fact.truthClass !== "UNKNOWN" &&
+        !(amountHeld && fact.dimension === "raise.currency") &&
         (row.dimensions === "FUNDRAISING"
           ? fact.group === "FUNDRAISING"
           : row.dimensions.includes(fact.dimension) ||

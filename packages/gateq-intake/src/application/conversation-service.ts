@@ -161,6 +161,8 @@ function historyFrom(stored: readonly StoredTurn[]): {
   readonly askedAlready: readonly ApplicationDimension[];
   readonly askedCounts: ReadonlyMap<ApplicationDimension, number>;
   readonly tangents: number;
+  /** Q's latest turn left its close standing (stored, never re-read). */
+  readonly readyToClose: boolean;
 } {
   const recentTurns = stored.slice(-RECENT_TURNS).map((turn) => ({
     role: turn.role === "PERSON" ? ("person" as const) : ("q" as const),
@@ -196,7 +198,12 @@ function historyFrom(stored: readonly StoredTurn[]): {
       break;
     }
   }
-  return { recentTurns, askedAlready, askedCounts, tangents };
+  // From the latest Q turn of the whole transcript, never a window of it
+  // (live 5757518c7: the close was said again once it left the last eight).
+  const readyToClose =
+    [...stored].reverse().find((turn) => turn.role === "Q")?.readyToClose ===
+    true;
+  return { recentTurns, askedAlready, askedCounts, tangents, readyToClose };
 }
 
 export function createConversationService(
@@ -435,6 +442,7 @@ export function createConversationService(
               tangents: history.tangents,
               askedAlready: history.askedAlready,
               askedCounts: history.askedCounts,
+              readyToClose: history.readyToClose,
               emphasis,
               variationSeed: applicationId,
               attribution: {
@@ -468,6 +476,9 @@ export function createConversationService(
           reply: outcome.reply,
           asking: outcome.asking,
           intent: outcome.intent,
+          ...(opening || outcome.readyToClose !== true
+            ? {}
+            : { readyToClose: true }),
           facts: opening ? [] : outcome.facts,
           ...(opening || outcome.statementPlan === undefined
             ? {}

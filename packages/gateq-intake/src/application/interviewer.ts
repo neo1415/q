@@ -53,8 +53,6 @@ import { questionAngle } from "./answer-specificity.js";
 import { diligenceQuestionFor } from "./dossier.js";
 import {
   closingLine,
-  isOpenEndedQuestion,
-  pointedToReview,
   REVIEW_CONTROL,
   REVIEW_POINTER,
 } from "./interview-close.js";
@@ -298,6 +296,12 @@ export type InterviewTurnInput = {
    * Absent: the application id on its facts, else a fixed default.
    */
   readonly variationSeed?: string | undefined;
+  /**
+   * Whether Q's last turn left the close standing: it said it has what it
+   * needs and nothing has reopened the plan since. Read from the stored Q
+   * turn, so a close is said once however long the interview runs.
+   */
+  readonly readyToClose?: boolean | undefined;
   /** Who the work is attributed to. A guest carries no user. */
   readonly attribution: {
     readonly tenantId: string;
@@ -339,6 +343,12 @@ export type InterviewTurnOutcome = {
   /** Advisory. GATE-001 decides whether submission is possible. */
   readonly readyToReview: boolean;
   /**
+   * The plan has nothing left, Q asked nothing, and its close has been
+   * said (this turn or earlier). Stored with the Q turn; absent on the
+   * legacy path.
+   */
+  readonly readyToClose?: boolean | undefined;
+  /**
    * Every statement row this turn writes, with its ids, checkpointed with
    * the reply so a retry writes the same rows (slice 2). Absent on the
    * legacy path.
@@ -356,6 +366,7 @@ export const InterviewTurnOutcomeSchema = z
     asking: ApplicationDimensionSchema.nullable(),
     questionForQ: z.string().nullable(),
     readyToReview: z.boolean(),
+    readyToClose: z.boolean().optional(),
     statementPlan: StatementPlanSchema.optional(),
   })
   .transform((outcome) => {
@@ -982,7 +993,12 @@ export function createGateQInterviewer(
             : result.asking !== null && DIMENSIONS.has(result.asking)
               ? (result.asking as ApplicationDimension)
               : null;
-        const modelComposed =
+        // Invariant 7: "noted" or "left open" only when the reading did
+        // so. Checked on the model's words before the ending is decided, so
+        // a claim inside a question it asks is still replaced, and the
+        // lines code adds below (the plan's question, the close) are not
+        // the model's to check.
+        const modelComposed = replyHeldToReading(
           readBackLineText.length === 0
             ? result.reply
             : `${aroundReadBack(
@@ -990,131 +1006,114 @@ export function createGateQInterviewer(
                 planned.readBacks.map((item) => item.amount),
               )} ${readBackLineText}`
                 .trim()
-                .slice(0, 4_000);
-        // Q's own question is held to the one settled predicate, read
-        // after this turn's writes: a dimension the form or any statement
-        // answered, or asked to its cap, is not asked again unless the
-        // picker chose it (live 30c99ccc5: the form's country at t15, "how
-        // many clinics?" after "1 clinic to 4", "day to day" four times).
-        // The question is replaced by the picker's next one, in fixed
-        // words; the rest of the reply stays. An open "what would you like
-        // to cover next?" is held to the plan the same way (live
-        // 318577a8e: five times, t35–t43), and when nothing is left Q
-        // says so once and points to the review (interview-close.ts).
+                .slice(0, 4_000),
+          planned.recordedCount,
+          planned.leftOpenCount,
+        );
+        // How the reply ends is the plan's, decided here after this turn's
+        // writes, never the model's: Q's question on a dimension the plan
+        // allows stands; any other question sentence (one on a settled or
+        // capped dimension, or one about nothing in particular: "what would
+        // you like to clarify next?", live 5757518c7, seven times) is
+        // dropped whole and the plan's next question is asked in fixed
+        // words. With nothing left there is no question at all: Q says
+        // once that it has what it needs, with what stays open, and names
+        // the review step; later turns only point there. Whether the close
+        // was said is persisted with the Q turn (`readyToClose`), so it is
+        // never said twice however long the interview runs (live: t13 and
+        // again at t45, once the first had left the last eight turns).
+        const after: QuestionNeedsInput | null =
+          needsInput === null
+            ? null
+            : {
+                ...needsInput,
+                view: projectView(
+                  [
+                    ...turnContext.context.statements,
+                    ...statementState.carried,
+                    ...planned.plan.statements,
+                  ],
+                  [...turnContext.context.links, ...planned.plan.links],
+                  [...turnContext.context.events, ...planned.plan.events],
+                ),
+              };
+        const afterNeeds = after === null ? [] : questionNeedsFor(after);
+        /** The plan's next dimension besides one ruled out, the note once. */
+        const planNext = (
+          ruledOut: ApplicationDimension | null,
+        ): ApplicationDimension | null => {
+          const next = afterNeeds.find((need) => need.dimension !== ruledOut);
+          if (next !== undefined) return next.dimension;
+          return after !== null &&
+            ruledOut !== "application.note" &&
+            mayAskAbout(after, "application.note", afterNeeds)
+            ? "application.note"
+            : null;
+        };
+        const planEmpty = after !== null && planNext(null) === null;
         const {
           reply: composed,
           asking: askingDimension,
           nothingLeft,
-        } = (() => {
+        } = ((): {
+          readonly reply: string;
+          readonly asking: ApplicationDimension | null;
+          readonly nothingLeft: boolean;
+        } => {
           const unchanged = {
             reply: modelComposed,
             asking: modelAsking,
             nothingLeft: false,
           };
-          if (
-            needsInput === null ||
-            readBackLineText.length > 0 ||
-            !englishTurn ||
-            (modelAsking !== null && discardedByIntent) ||
-            // A joke, an aside or an attempt to steer Q is not where the
-            // plan speaks; their question to Q ("anything else you need?")
-            // is.
-            (modelAsking === null &&
-              (["OPENING", "SMALL_TALK", "OFF_TOPIC", "SABOTAGE"] as const)
-                .map(String)
-                .includes(result.intent))
-          )
+          if (after === null || readBackLineText.length > 0 || !englishTurn)
             return unchanged;
-          const sentences = replySentences(modelComposed);
-          const openEnded = sentences.some(isOpenEndedQuestion);
-          // Q's own question on nothing in the plan (an answer to theirs,
-          // an offer to leave a disagreement open) stands as it is.
-          if (
-            modelAsking === null &&
-            !openEnded &&
-            sentences.some((sentence) => sentence.endsWith("?"))
-          )
-            return unchanged;
-          const after: QuestionNeedsInput = {
-            ...needsInput,
-            view: projectView(
-              [
-                ...turnContext.context.statements,
-                ...statementState.carried,
-                ...planned.plan.statements,
-              ],
-              [...turnContext.context.links, ...planned.plan.links],
-              [...turnContext.context.events, ...planned.plan.events],
-            ),
-          };
-          const afterNeeds = questionNeedsFor(after);
           if (
             modelAsking !== null &&
             mayAskAbout(after, modelAsking, afterNeeds)
           )
             return unchanged;
-          const next = afterNeeds.find(
-            (need) => need.dimension !== modelAsking,
-          );
-          // Nothing left to ask: the note once (it is capped like any
-          // other dimension), then no question at all, never a loop. Q
-          // says once that it has what it needs, with what stays open,
-          // and names the review step; later turns point there.
-          if (
-            next === undefined &&
-            (modelAsking === "application.note" ||
-              !mayAskAbout(after, "application.note", afterNeeds))
-          ) {
+          const next = planNext(modelAsking);
+          if (next === null) {
             const kept = withoutQuestions(modelComposed);
-            const qLines = input.recentTurns
-              .filter((turn) => turn.role === "q")
-              .map((turn) => turn.text);
-            // After the close, the pointer only where the turn would
-            // otherwise leave them with no next step: their open question
-            // was cut, the reply is a bare acknowledgement, or Q's last
-            // line did not point there. Never the same line every turn.
-            const keptSentences = replySentences(kept);
-            const bare =
-              keptSentences.length <= 1 &&
-              kept.split(/\s+/u).filter(Boolean).length <= 4;
-            const line = kept.includes(REVIEW_CONTROL)
-              ? ""
-              : !pointedToReview(qLines)
+            const line =
+              input.readyToClose !== true
                 ? closingLine(after.view)
-                : openEnded ||
-                    bare ||
-                    !(qLines.at(-1) ?? "").includes(REVIEW_CONTROL)
-                  ? REVIEW_POINTER
-                  : "";
+                : kept.includes(REVIEW_CONTROL)
+                  ? ""
+                  : REVIEW_POINTER;
             return {
               reply: `${kept} ${line}`.trim().slice(0, 4_000),
               asking: null,
               nothingLeft: true,
             };
           }
-          // The plan has more, and the model chose to ask nothing.
-          if (modelAsking === null && !openEnded) return unchanged;
+          // The plan has more, and the reply asks nothing: it stands.
+          if (
+            modelAsking === null &&
+            !replySentences(modelComposed).some((s) => s.endsWith("?"))
+          )
+            return unchanged;
           const question =
-            next === undefined
+            next === "application.note"
               ? diligenceQuestionFor("application.note")
               : (questionAngle(
-                  next.dimension,
+                  next,
                   input.variationSeed ?? turnContext.applicationId,
-                  input.askedCounts?.get(next.dimension) ?? 0,
-                ) ?? diligenceQuestionFor(next.dimension));
+                  input.askedCounts?.get(next) ?? 0,
+                ) ?? diligenceQuestionFor(next));
           logger?.debug(
             {
               correlationId: input.attribution.correlationId,
               ruledOut: modelAsking,
-              next: next?.dimension ?? null,
+              next,
             },
-            "gateq interview question on a settled dimension replaced",
+            "gateq interview reply ends with the plan's question",
           );
           return {
             reply: `${withoutQuestions(modelComposed)} ${question}`
               .trim()
               .slice(0, 4_000),
-            asking: next?.dimension ?? "application.note",
+            asking: next,
             nothingLeft: false,
           };
         })();
@@ -1133,12 +1132,7 @@ export function createGateQInterviewer(
           "gateq interview turn read into statements",
         );
         return {
-          // Invariant 7: "noted" only when the reading recorded something.
-          reply: replyHeldToReading(
-            composed,
-            planned.recordedCount,
-            planned.leftOpenCount,
-          ),
+          reply: composed,
           intent: result.intent,
           facts: planned.plan.legacyFacts,
           rejectedFacts: planned.rejected,
@@ -1150,6 +1144,12 @@ export function createGateQInterviewer(
           // The plan has nothing left: ready for review, whatever the
           // model said (advisory, as below).
           readyToReview: nothingLeft || result.readyToReview,
+          // The close stands while the plan stays empty and Q asks nothing:
+          // said this turn, or said before and not reopened since.
+          readyToClose:
+            planEmpty &&
+            askingDimension === null &&
+            (nothingLeft || input.readyToClose === true),
           statementPlan: planned.plan,
         };
       }

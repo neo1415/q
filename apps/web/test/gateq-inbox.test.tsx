@@ -528,6 +528,31 @@ describe("the one-page summary reads like the dossier (live 318577a8e, Solaix)",
     expect(rows.get("Customers")?.gap).toBeNull();
     expect(rows.get("Customers")?.value).toBe("4 (Said in the application).");
   });
+
+  it("never shows the raise's currency as a finding beside its amount (live 5757518c7)", () => {
+    const form = (n: number, dimension: string, summary: string) => ({
+      ...fact(n, dimension, summary, "USER_CLAIM"),
+      sourceKind: "FORM" as const,
+    });
+    const round = (facts: readonly unknown[]) =>
+      new Map(
+        model
+          .onePageSummary({ companyName: "Stockum", raise: null }, {
+            ...dossier,
+            dimensions: [{ group: "FUNDRAISING", label: "Fundraising", facts }],
+          } as unknown as Parameters<typeof model.onePageSummary>[1])
+          .map((row) => [row.label, row.value] as const),
+      ).get("Round");
+    // Live: "USD 400,000 (Said in the application); USD (Given in the form)".
+    expect(
+      round([
+        fact(22, "raise.amount", "USD 400,000", "USER_CLAIM"),
+        form(30, "raise.currency", "USD"),
+      ]),
+    ).toBe("USD 400,000 (Said in the application).");
+    // With no amount on record, the currency is what they said.
+    expect(round([form(30, "raise.currency", "USD")])).toMatch(/^USD \(/u);
+  });
 });
 
 describe("the inbox, driven like an investor", () => {

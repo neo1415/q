@@ -316,6 +316,8 @@ export type IntakeService = {
     readonly reply: string;
     readonly asking: StoredTurn["askingDimension"];
     readonly intent: string;
+    /** Whether the close stands after this reply (stored with the Q turn). */
+    readonly readyToClose?: boolean | undefined;
     readonly facts: readonly NewApplicationFact[];
     readonly sourceTurnSeq?: number | undefined;
     readonly latencyMs?: number | undefined;
@@ -637,6 +639,7 @@ export function createIntakeService(
           askingDimension: input.asking,
           intent: input.intent,
           latencyMs: input.latencyMs,
+          readyToClose: input.readyToClose === true ? true : null,
           disclosureLineage: input.disclosureLineage,
         });
         await turns.finishExchange(tx, application.id, input.claimId);

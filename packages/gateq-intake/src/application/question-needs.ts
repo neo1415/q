@@ -95,7 +95,14 @@ const UNDERSTANDING_ORDER: readonly ApplicationDimension[] = [
   "claims.revenue",
   "company.team",
   "raise.use_of_funds",
+  // The rest of what the review reports as Missing: the plan is not empty
+  // while any is unanswered and not yet asked to its cap (live 5757518c7:
+  // "That's everything I need" at t13 with instrument and lead never
+  // asked).
+  "raise.instrument",
+  "raise.lead_status",
   "contact.name",
+  "company.website",
 ];
 
 /**

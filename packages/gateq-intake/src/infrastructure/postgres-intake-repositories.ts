@@ -512,6 +512,7 @@ const TurnRow = z.object({
   asking_dimension: z.string().nullable(),
   intent: z.string().nullable(),
   latency_ms: z.number().int().nullable(),
+  ready_to_close: z.boolean().nullable().optional(),
   created_at: z.unknown(),
   disclosure_lineage: z.unknown().optional(),
 });
@@ -530,6 +531,7 @@ function toTurn(row: unknown): StoredTurn {
     askingDimension: asking.success ? asking.data : null,
     intent: r.intent,
     latencyMs: r.latency_ms,
+    ...(r.ready_to_close === true ? { readyToClose: true } : {}),
     createdAt: iso(r.created_at),
     ...(r.disclosure_lineage == null
       ? {}
@@ -561,9 +563,9 @@ export function createPostgresApplicationTurnRepository(options: {
       if (locked[0]["status"] === "SUBMITTED")
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       await tx.sql`
-      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, disclosure_lineage)
+      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, ready_to_close, disclosure_lineage)
       select ${input.applicationId}, ${input.tenantId}, coalesce(max(seq), 0) + 1,
-             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}, ${input.latencyMs ?? null}, ${input.disclosureLineage === undefined ? null : jsonbParam(tx.sql, DisclosureLineageSchema.parse(input.disclosureLineage))}
+             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}, ${input.latencyMs ?? null}, ${input.role === "Q" && input.readyToClose === true ? true : null}, ${input.disclosureLineage === undefined ? null : jsonbParam(tx.sql, DisclosureLineageSchema.parse(input.disclosureLineage))}
         from gateq.application_turns where application_id = ${input.applicationId}
       on conflict (application_id, client_turn_id, role) do nothing`;
     };
@@ -644,14 +646,14 @@ export function createPostgresApplicationTurnRepository(options: {
       const rows =
         limit === undefined
           ? await sql`
-              select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
+              select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, ready_to_close, created_at, disclosure_lineage
                 from gateq.application_turns
                where application_id = ${applicationId}
                order by seq asc
                limit 400`
           : await sql`
               select * from (
-                select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
+                select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, ready_to_close, created_at, disclosure_lineage
                   from gateq.application_turns
                  where application_id = ${applicationId}
                  order by seq desc
@@ -662,7 +664,7 @@ export function createPostgresApplicationTurnRepository(options: {
 
     findExchange: async (applicationId, clientTurnId) => {
       const rows = await sql`
-        select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
+        select id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, ready_to_close, created_at, disclosure_lineage
           from gateq.application_turns
          where application_id = ${applicationId}
            and client_turn_id = ${clientTurnId}`;

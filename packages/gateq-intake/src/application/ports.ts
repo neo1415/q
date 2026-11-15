@@ -172,6 +172,11 @@ export type StoredTurn = {
   readonly intent: string | null;
   /** Q turns only: server time to the reply, in milliseconds. */
   readonly latencyMs: number | null;
+  /**
+   * Q turns only: the close stands after this turn (Q said it has what it
+   * needs, and the plan has stayed empty). Null or absent: it does not.
+   */
+  readonly readyToClose?: boolean | null | undefined;
   readonly createdAt: string;
 };
 
@@ -224,6 +229,7 @@ export type ApplicationTurnRepository = {
       readonly askingDimension?: ApplicationDimension | null | undefined;
       readonly intent?: string | null | undefined;
       readonly latencyMs?: number | null | undefined;
+      readonly readyToClose?: boolean | null | undefined;
       readonly disclosureLineage?: DisclosureLineage | undefined;
     },
   ) => Promise<void>;
@@ -254,6 +260,7 @@ export type ApplicationTurnRepository = {
     readonly askingDimension?: ApplicationDimension | null | undefined;
     readonly intent?: string | null | undefined;
     readonly latencyMs?: number | null | undefined;
+    readonly readyToClose?: boolean | null | undefined;
     readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<{ readonly seq: number }>;
   readonly countFor: (applicationId: ApplicationId) => Promise<number>;

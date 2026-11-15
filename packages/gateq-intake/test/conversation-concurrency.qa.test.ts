@@ -262,6 +262,8 @@ function exchangeWorld() {
             askingDimension: input.askingDimension ?? null,
             intent: input.intent ?? null,
             latencyMs: input.latencyMs ?? null,
+            readyToClose:
+              input.role === "Q" && input.readyToClose === true ? true : null,
             createdAt: "2026-10-13T12:00:00.000Z",
           });
           return { seq: rows.length };

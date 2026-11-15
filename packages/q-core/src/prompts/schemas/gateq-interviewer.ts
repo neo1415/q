@@ -317,6 +317,8 @@ export const GATEQ_STATEMENT_QUANTITIES = [
   "runway_months",
   "raise_amount",
   "pre_money_valuation",
+  /** Customer acquisition cost: money spent to win one customer. */
+  "cac",
 ] as const;
 
 /**

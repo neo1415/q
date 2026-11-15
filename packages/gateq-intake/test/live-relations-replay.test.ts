@@ -73,7 +73,8 @@ type Turn = {
     | "06910b145"
     | "78f8d72d5"
     | "30c99ccc5"
-    | "318577a8e";
+    | "318577a8e"
+    | "5757518c7";
   readonly say: string;
   readonly script: Script;
   readonly resumeBefore?: true;
@@ -1100,16 +1101,22 @@ function assertFourthOutcome(
       expect(wau()[0]?.state).toBe("OPEN");
       break;
     }
-    case "f-06":
+    case "f-06": {
       // The claim shares a "?" sentence and is still checked: nothing was
-      // left open, so it is replaced and the question is kept.
+      // left open, so it is replaced. The open question the model made up
+      // is not sent (live 5757518c7): the reply ends with the plan's
+      // question, on the dimension the Q turn records.
       expect(qReply(world, id)).toContain(NOT_LEFT_OPEN_LINE);
-      expect(qReply(world, id)).toContain(
-        "What would you like to know before you send?",
+      expect(qReply(world, id)).not.toMatch(/would you like to know/iu);
+      const row = store.turnRows.find(
+        (t) => t.role === "Q" && t.clientTurnId === id,
       );
+      expect(row?.askingDimension ?? null).not.toBeNull();
+      expect(qReply(world, id).trim().endsWith("?")).toBe(true);
       expect(qReply(world, id)).not.toMatch(/I'll leave/u);
       expect(store.eventRows).toHaveLength(0);
       break;
+    }
     case "f-07":
       expect(dimensionView(view, "company.stage").status).toBe(
         "DISAGREEMENT_LEFT_OPEN",
@@ -2468,12 +2475,28 @@ describe("live reply replay: the sixth run (318577a8e), whole questions and a cl
     expect(closes).toHaveLength(1);
     const close = closes[0] ?? "";
     expect(close).toMatch(REVIEW_STEP);
-    expect(close).toMatch(/traction still has two answers that disagree/iu);
+    // The plan empties only once instrument, lead and website were asked
+    // (live 5757518c7), by when stage disagrees too.
+    expect(close).toMatch(
+      /stage and traction each still have two answers that disagree/iu,
+    );
     expect(close).toMatch(/market is not known yet/iu);
-    // After the close, a turn whose open question was cut points to the
-    // review instead (t35–t43), never "what would you like to cover next?".
-    for (const id of ["s-34", "s-36", "s-38", "s-40", "s-42"])
-      expect(qReply(world, id), id).toMatch(REVIEW_STEP);
+    // A turn whose open question was cut (t35–t43) never asks "what would
+    // you like to cover next?": it asks the plan's question, on the
+    // dimension its Q turn records, or, with nothing left, points to the
+    // review.
+    const closeSeq =
+      world.store().turnRows.find((t) => t.role === "Q" && t.text === close)
+        ?.seq ?? Number.MAX_SAFE_INTEGER;
+    for (const id of ["s-34", "s-36", "s-38", "s-40", "s-42"]) {
+      const row = world
+        .store()
+        .turnRows.find((t) => t.role === "Q" && t.clientTurnId === id);
+      if (row === undefined || row.seq < closeSeq) {
+        expect(row?.askingDimension ?? null, id).not.toBeNull();
+        expect(qReply(world, id).trim().endsWith("?"), id).toBe(true);
+      } else expect(qReply(world, id), id).toMatch(REVIEW_STEP);
+    }
     const last = qLines.at(-1) ?? "";
     expect(last).toMatch(REVIEW_STEP);
     expect(last.trim().endsWith("?")).toBe(false);
@@ -2497,5 +2520,761 @@ describe("the reader files how the product works as the solution (live 318577a8e
     expect(active.template).toMatch(
       /is company\.solution, never company\.business_model/u,
     );
+  });
+});
+
+/**
+ * The seventh live run (re-certification 5757518c7, Stockum,
+ * audits/2026-11-14-gateq-sustained-journey.md "Re-certification 15 Nov
+ * (5757518c7)"), in the founder's words with the live model's replies:
+ *
+ *   - P2b: "That's everything I need for now" at t13, after six founder
+ *     turns, and again at t45: whether the close was said was read from
+ *     the last eight turns only;
+ *   - P2b: seven replies ended with a question the model made up ("What
+ *     would you like to clarify next?", "Which other part of the
+ *     application would you like to clarify?", "What would you like to do
+ *     next?"); a word list missed them;
+ *   - P2b: the plan was empty at t13 while market, instrument and lead were
+ *     unanswered;
+ *   - P2: "We don't know our CAC yet." in answer to a market question was
+ *     filed as Market not known; CAC was lost;
+ *   - P3: "I'm not sure which is right" wrote a third Stage row, "Not known".
+ */
+const SEVENTH_FORM = {
+  companyName: "Stockum",
+  oneLiner:
+    "Retail restocking for neighbourhood shops in Kenya: Stockum takes orders by app or USSD and delivers",
+  stage: "seed",
+  sectors: ["Commerce"],
+  country: "KE",
+  raise: { amount: "350000", currency: "USD" },
+  contactName: "Otieno Omondi",
+  contactEmail: "otieno@example.com",
+};
+
+/** The model's own open questions of the seventh run (asking nothing). */
+const CLARIFY_NEXT = "Fair enough. What would you like to clarify next?";
+const OTHER_PART =
+  "Fair enough. Which other part of the application would you like to clarify?";
+
+const SEVENTH: readonly Turn[] = [
+  {
+    id: "k-02",
+    run: "5757518c7",
+    say: "Stockum restocks neighbourhood dukas in Nairobi: shopkeepers order by app or USSD in the evening and we deliver next morning from partner distributors. I started it after watching my mother close her shop half a day every week to queue at a wholesaler.",
+    script: () =>
+      reading({
+        reply:
+          "Nairobi, app or USSD, and next-morning delivery: that's a clear operating rhythm. How many neighbourhood shops are customers today?",
+        asking: "company.customers",
+        statements: [
+          st({
+            dimension: "company.description",
+            value: {
+              kind: "TEXT",
+              text: "Stockum restocks neighbourhood dukas in Nairobi",
+            },
+            words:
+              "Stockum restocks neighbourhood dukas in Nairobi: shopkeepers order by app or USSD in the evening and we deliver next morning from partner distributors.",
+          }),
+          st({
+            dimension: "company.problem",
+            value: {
+              kind: "TEXT",
+              text: "my mother close her shop half a day every week to queue at a wholesaler",
+            },
+            words:
+              "my mother close her shop half a day every week to queue at a wholesaler",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-04",
+    run: "5757518c7",
+    say: "Traction so far: 18,000 crates delivered and 600 weekly active shops.",
+    script: () =>
+      reading({
+        reply:
+          "Eighteen thousand crates delivered and 600 weekly active shops: that's useful traction. How does the round split across uses, roughly in amounts?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            unit: "crate",
+            value: { kind: "COUNT", count: "18000" },
+            words: "18,000 crates delivered",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "600" },
+            words: "600 weekly active shops",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-06",
+    run: "5757518c7",
+    say: "Nobody pays yet. Delivery is free for the first three months.",
+    script: () =>
+      reading({
+        reply:
+          "Understood: no paying customers yet, with delivery free for the first three months. Where does the money go, and how much to each?",
+        asking: "raise.use_of_funds",
+        statements: [
+          st({
+            dimension: "claims.revenue",
+            quantity: "revenue",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet.",
+          }),
+          st({
+            dimension: "claims.traction",
+            quantity: "paying_customers",
+            value: { kind: "ZERO" },
+            words: "Nobody pays yet.",
+          }),
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "Delivery is free for the first three months.",
+            },
+            words: "Delivery is free for the first three months.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-08",
+    run: "5757518c7",
+    say: "On growth: we went from 1 kiosk-chain customer to 4 since March.",
+    script: () =>
+      reading({
+        reply:
+          "That's a useful growth signal: four kiosk-chain customers now, up from one since March. How big is the market for this, in numbers?",
+        asking: "company.market",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "customers",
+            unit: "customer",
+            value: { kind: "COUNT", count: "4" },
+            words: "we went from 1 kiosk-chain customer to 4 since March",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t10: said in answer to the market question. The reader names
+    // the metric (CAC), whatever Q asked.
+    id: "k-10",
+    run: "5757518c7",
+    say: "We don't know our CAC yet.",
+    script: () =>
+      reading({
+        reply:
+          "Fair enough: CAC isn't worked out yet. Who are the founders and key hires, and what is their relevant experience?",
+        intent: "UNKNOWN_OR_SKIP",
+        asking: "company.team",
+        statements: [
+          st({
+            dimension: "application.note",
+            quantity: "cac",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We don't know our CAC yet.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t13: the full close, after six founder turns.
+    id: "k-12",
+    run: "5757518c7",
+    say: "Team is four: I'm Otieno Omondi, CEO, I ran route sales for a soft-drinks distributor in Nairobi for six years; our CTO Wanjiku Mwangi built USSD ordering at a Nairobi bank; and two operations leads.",
+    script: () =>
+      reading({
+        reply:
+          "Four people: you as CEO, with six years in Nairobi route sales; Wanjiku as CTO, with USSD-ordering experience at a Nairobi bank; and two operations leads.",
+        statements: [
+          st({
+            dimension: "company.team",
+            value: {
+              kind: "TEXT",
+              text: "Otieno Omondi, CEO; CTO Wanjiku Mwangi; two operations leads",
+            },
+            words:
+              "Team is four: I'm Otieno Omondi, CEO, I ran route sales for a soft-drinks distributor in Nairobi for six years",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-14",
+    run: "5757518c7",
+    say: "Different topic: to be precise about stage, we're really a Series A company now, not seed. We've been operating for four years.",
+    script: (prompt) =>
+      reading({
+        reply: "Thanks for the correction.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "series_a" },
+            words: "we're really a Series A company now, not seed",
+          }),
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "We've been operating for four years.",
+            },
+            words: "We've been operating for four years",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-16",
+    run: "5757518c7",
+    say: "Back to users: about 1,500 weekly active shops.",
+    script: () =>
+      reading({
+        reply:
+          "I have 600 weekly active shops here, and you've now said about 1,500. Which figure is right?",
+        asking: "claims.traction",
+        statements: [
+          st({
+            dimension: "claims.traction",
+            quantity: "weekly_active_users",
+            unit: "weekly active user",
+            value: { kind: "COUNT", count: "1500" },
+            words: "about 1,500 weekly active shops",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-18",
+    run: "5757518c7",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply: "Fair enough.",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("claims.traction"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    id: "k-20",
+    run: "5757518c7",
+    say: "Roughly $200k to delivery vans, $90k to field agents in Kayole and Githurai, and $60k to the ordering app and USSD.",
+    script: () =>
+      reading({
+        reply:
+          "That gives me the shape of the raise: about two hundred thousand dollars for delivery vans, ninety thousand for field agents in Kayole and Githurai, and sixty thousand for the ordering app and USSD.",
+        statements: [
+          st({
+            dimension: "raise.use_of_funds",
+            value: {
+              kind: "TEXT",
+              text: "$200k delivery vans, $90k field agents, $60k ordering app and USSD",
+            },
+            words:
+              "Roughly $200k to delivery vans, $90k to field agents in Kayole and Githurai, and $60k to the ordering app and USSD.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-22",
+    run: "5757518c7",
+    say: "Sorry, I meant 400k, not 350k.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "Understood: you're correcting the raise from 350,000 dollars to 400,000 dollars.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: handleOn(prompt.text, "raise.amount"),
+            dimension: "raise.amount",
+            quantity: "raise_amount",
+            value: { kind: "MONEY", amount: "400000", currency: "USD" },
+            words: "Sorry, I meant 400k, not 350k.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t25: "What would you like to do next?"
+    id: "k-24",
+    run: "5757518c7",
+    say: "We haven't sized the market.",
+    script: () =>
+      reading({
+        reply:
+          "Understood: the market isn't sized yet. What would you like to do next?",
+        intent: "UNKNOWN_OR_SKIP",
+        statements: [
+          st({
+            dimension: "company.market",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "We haven't sized the market.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-26",
+    run: "5757518c7",
+    say: "Shopkeepers lose half a day a week queuing at wholesalers, and they run out of fast-moving stock like flour and cooking oil.",
+    script: () =>
+      reading({
+        reply:
+          "That makes the pain very concrete: lost selling time and stockouts on everyday essentials.",
+        statements: [
+          st({
+            dimension: "company.problem",
+            value: {
+              kind: "TEXT",
+              text: "Shopkeepers lose half a day a week queuing at wholesalers",
+            },
+            words: "Shopkeepers lose half a day a week queuing at wholesalers",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-28",
+    run: "5757518c7",
+    say: "The main risk is that distributors start their own delivery and cut us out.",
+    script: () =>
+      reading({
+        reply:
+          "That's a real strategic risk: distributors could start delivering directly and cut Stockum out.",
+        statements: [
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "The main risk is that distributors start their own delivery and cut us out.",
+            },
+            words:
+              "The main risk is that distributors start their own delivery and cut us out.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-30",
+    run: "5757518c7",
+    say: "Once the trial ends each shop pays a 3% fee on every order.",
+    script: () =>
+      reading({
+        reply:
+          "That clarifies the model: after the trial, each shop pays a 3% fee on every order.",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "Once the trial ends each shop pays a 3% fee on every order.",
+            },
+            words:
+              "Once the trial ends each shop pays a 3% fee on every order.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t32: "I'm not sure which is right" became a third Stage row.
+    id: "k-32",
+    run: "5757518c7",
+    say: "Our lead angel calls us seed, though, and honestly by revenue we're seed; by age I'd say Series A. I'm not sure which is right.",
+    script: (prompt) =>
+      reading({
+        reply:
+          "I hear the split: your lead angel calls Stockum seed, while you describe it as seed by revenue and Series A by age. Which stage should I use for the application?",
+        asking: "company.stage",
+        statements: [
+          st({
+            op: "DISAGREES",
+            target: handleOn(prompt.text, "company.stage"),
+            dimension: "company.stage",
+            value: { kind: "CODE", code: "seed" },
+            words:
+              "Our lead angel calls us seed, though, and honestly by revenue we're seed",
+          }),
+          st({
+            dimension: "company.stage",
+            value: { kind: "UNKNOWN", declined: false },
+            provenance: "UNKNOWN",
+            words: "I'm not sure which is right",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-34",
+    run: "5757518c7",
+    say: "Leave it open.",
+    script: (prompt) =>
+      reading({
+        reply: OTHER_PART,
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("company.stage"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+  },
+  {
+    id: "k-36",
+    run: "5757518c7",
+    say: "Leave it open.",
+    script: () => reading({ reply: OTHER_PART }),
+  },
+  {
+    id: "k-38",
+    run: "5757518c7",
+    resumeBefore: true,
+    say: "Leave it open for now.",
+    script: () => reading({ reply: CLARIFY_NEXT }),
+  },
+  {
+    // Live t41: "What part of that process would you like to clarify next?"
+    id: "k-40",
+    run: "5757518c7",
+    say: "Day to day, a shopkeeper orders on the app or by USSD before 8pm, we batch the orders by estate, and our rider collects from the distributor and delivers by 7am; the shop pays on delivery by M-Pesa.",
+    script: () =>
+      reading({
+        reply:
+          "That's a clear day-to-day flow, and M-Pesa on delivery makes the payment step easy to understand. What part of that process would you like to clarify next?",
+        statements: [
+          st({
+            dimension: "company.solution",
+            value: {
+              kind: "TEXT",
+              text: "orders by app or USSD before 8pm, batched by estate, delivered by 7am, paid on delivery by M-Pesa",
+            },
+            words:
+              "Day to day, a shopkeeper orders on the app or by USSD before 8pm, we batch the orders by estate, and our rider collects from the distributor and delivers by 7am",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-42",
+    run: "5757518c7",
+    say: "On weekly users, leave it open for Kilima.",
+    script: () => reading({ reply: CLARIFY_NEXT }),
+  },
+  {
+    // Live t45: the full close again, the t13 close out of the last eight.
+    id: "k-44",
+    run: "5757518c7",
+    say: "We reach shops through distributor sales reps and church chama groups.",
+    script: () =>
+      reading({
+        reply:
+          "Distributor sales reps and church chama groups: that gives me two clear routes into the shops.",
+        statements: [
+          st({
+            dimension: "company.business_model",
+            value: {
+              kind: "TEXT",
+              text: "We reach shops through distributor sales reps and church chama groups.",
+            },
+            words:
+              "We reach shops through distributor sales reps and church chama groups.",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-46",
+    run: "5757518c7",
+    say: "Anything else you need from me?",
+    script: () =>
+      reading({ reply: "Thanks for checking.", intent: "QUESTION_FOR_Q" }),
+  },
+  {
+    id: "k-48",
+    run: "5757518c7",
+    say: "Beyond capital, introductions to FMCG distributors and to a county trade office would help most.",
+    script: () =>
+      reading({
+        reply:
+          "That makes sense: distribution relationships are central to the model.",
+        statements: [
+          st({
+            dimension: "application.note",
+            value: {
+              kind: "TEXT",
+              text: "Beyond capital, introductions to FMCG distributors and to a county trade office would help most.",
+            },
+            words:
+              "Beyond capital, introductions to FMCG distributors and to a county trade office would help most.",
+          }),
+        ],
+      }),
+  },
+  {
+    // Live t51: "A SAFE, and no lead yet, got it. What would you like to
+    // clarify next?"
+    id: "k-50",
+    run: "5757518c7",
+    say: "We'd take the round as a SAFE, and we don't have a lead investor yet.",
+    script: () =>
+      reading({
+        reply:
+          "A SAFE, and no lead yet: got it. What would you like to clarify next?",
+        statements: [
+          st({
+            dimension: "raise.instrument",
+            value: { kind: "TEXT", text: "SAFE" },
+            words: "We'd take the round as a SAFE",
+          }),
+          st({
+            dimension: "raise.lead_status",
+            value: { kind: "TEXT", text: "no lead investor yet" },
+            words: "we don't have a lead investor yet",
+          }),
+        ],
+      }),
+  },
+  {
+    id: "k-52",
+    run: "5757518c7",
+    say: "Is there anything else you still need?",
+    script: () =>
+      reading({ reply: "Thanks for asking.", intent: "QUESTION_FOR_Q" }),
+  },
+  {
+    id: "k-54",
+    run: "5757518c7",
+    say: "That's all from me for now.",
+    script: () =>
+      reading({
+        reply:
+          "Understood. You've covered what I need, and you can review and submit when you're ready.",
+        intent: "SUBMIT_INTENT",
+      }),
+  },
+];
+
+/** The model-made open questions of the seventh run, sentence by sentence. */
+const MADE_UP_QUESTIONS =
+  /would you like to (?:clarify|do)|which other part|what part of that process/iu;
+const CLOSE = /That's everything I need for now\./u;
+/** Coverage dimensions the plan must not give up on before the close. */
+const CORE_AT_CLOSE = [
+  "company.market",
+  "raise.instrument",
+  "raise.lead_status",
+] as const;
+
+async function seventhWorld() {
+  const world = statementWorld();
+  const services = world.services();
+  const { token } = await services.intake.start({
+    gatewayPublicId: "gq_23456789abcdefghjkmnpqrs99",
+  });
+  await services.intake.recordFacts({
+    token,
+    origin: "FORM",
+    facts: factsFromAnswers(SEVENTH_FORM),
+  });
+  world.scripts.push(() =>
+    reading({
+      reply:
+        "Kilima brings together Nairobi operators who co-invest in East African founders. What are you building, and who is it for?",
+      asking: "company.description",
+    }),
+  );
+  await services.conversation.openingFor({
+    token,
+    correlationId: randomUUID(),
+  });
+  return { world, services, token };
+}
+
+describe("live reply replay: the seventh run (5757518c7), the plan decides how a reply ends", () => {
+  it("closes once when the plan first empties, never ends on a made-up question, and files CAC as CAC", async () => {
+    const { world, services, token } = await seventhWorld();
+    let { conversation } = services;
+    let before = viewOf(world);
+    /** Per core dimension at the close: answered, or asked to its cap. */
+    let coreAtClose: Record<string, boolean> | null = null;
+    for (const turn of SEVENTH) {
+      world.advance(60_000);
+      if (turn.resumeBefore === true) ({ conversation } = world.services());
+      const calls = world.prompts.length;
+      world.scripts.push(turn.script);
+      await conversation.turn({
+        token,
+        message: turn.say,
+        clientTurnId: turn.id,
+        correlationId: randomUUID(),
+      });
+      const after = viewOf(world);
+      assertAfterTurn(world, turn, after, before, world.prompts.length > calls);
+      before = after;
+
+      const reply = qReply(world, turn.id);
+      // Every sentence Q sends is whole: one of the model's own, or a line
+      // code wrote whole.
+      const prompt = world.prompts.at(-1);
+      const model = prompt === undefined ? "" : modelReplyOf(turn, prompt);
+      for (const sentence of sentencesIn(reply)) {
+        expect(sentence, `${turn.id}: "${reply}"`).toMatch(/^[\p{Lu}\d"“]/u);
+        if (model.includes(sentence))
+          expect(sentencesIn(model), turn.id).toContain(sentence);
+      }
+      if (coreAtClose === null && CLOSE.test(reply)) {
+        const qRows = world.store().turnRows.filter((t) => t.role === "Q");
+        coreAtClose = Object.fromEntries(
+          CORE_AT_CLOSE.map((dimension) => [
+            dimension,
+            dimensionView(after, dimension).status !== "UNANSWERED" ||
+              qRows.filter((t) => t.askingDimension === dimension).length >= 2,
+          ]),
+        );
+      }
+      // P2: CAC is CAC, though said to a market question; market is
+      // untouched.
+      if (turn.id === "k-10") {
+        const cac = byWords(world, "We don't know our CAC yet.");
+        expect(cac.dimension).toBe("company.business_model");
+        expect(cac.quantity).toBe("cac");
+        expect(cac.value.kind).toBe("UNKNOWN");
+        expect(dimensionView(after, "company.market").status).toBe(
+          "UNANSWERED",
+        );
+      }
+      // P3: "not sure which is right" is the disagreement they leave open,
+      // never a third Stage answer.
+      if (turn.id === "k-32")
+        expect(
+          dimensionView(after, "company.stage").items.filter(
+            (i) => i.value.kind === "UNKNOWN",
+          ),
+        ).toEqual([]);
+    }
+
+    const qRows = world.store().turnRows.filter((t) => t.role === "Q");
+    // P2b: every reply ends with the plan's question or with none. A reply
+    // that ends on a question names the dimension the plan put, and no
+    // question the model made up is ever sent.
+    for (const row of qRows) {
+      const last = sentencesIn(row.text).at(-1) ?? "";
+      if (last.endsWith("?"))
+        expect(row.askingDimension, `"${row.text}"`).not.toBeNull();
+      for (const sentence of sentencesIn(row.text))
+        expect(sentence, `"${row.text}"`).not.toMatch(MADE_UP_QUESTIONS);
+    }
+    // The close is said exactly once, and not before the core dimensions
+    // were answered or asked to their cap (live: at t13 and again at t45).
+    const closes = qRows.filter((t) => CLOSE.test(t.text));
+    expect(closes).toHaveLength(1);
+    expect(closes[0]?.clientTurnId).not.toBe("k-12");
+    expect(coreAtClose).toEqual({
+      "company.market": true,
+      "raise.instrument": true,
+      "raise.lead_status": true,
+    });
+    expect(closes[0]?.text).toMatch(REVIEW_STEP);
+    // After it, a turn with nothing left only points to the review.
+    const closeSeq = closes[0]?.seq ?? Number.MAX_SAFE_INTEGER;
+    for (const row of qRows.filter((t) => t.seq > closeSeq))
+      if (row.askingDimension === null)
+        expect(row.text, row.clientTurnId).toContain(
+          "Finish and review is ready whenever you are.",
+        );
+    const lastQ = qRows.at(-1)?.text ?? "";
+    expect(lastQ).toMatch(REVIEW_STEP);
+    expect(lastQ.trim().endsWith("?")).toBe(false);
+  });
+
+  it("clears the close when new information reopens the plan, and says it again when the plan empties", async () => {
+    const { world, services, token } = await seventhWorld();
+    const { conversation } = services;
+    const say = async (id: string, message: string, script: Script) => {
+      world.advance(60_000);
+      world.scripts.push(script);
+      await conversation.turn({
+        token,
+        message,
+        clientTurnId: id,
+        correlationId: randomUUID(),
+      });
+      return qReply(world, id);
+    };
+    for (const turn of SEVENTH) await say(turn.id, turn.say, turn.script);
+    expect(
+      world
+        .store()
+        .turnRows.filter((t) => t.role === "Q" && CLOSE.test(t.text)),
+    ).toHaveLength(1);
+    // New information: a different raise reopens the plan.
+    const reopened = await say(
+      "k-56",
+      "Our lead angel thinks we should raise 500k.",
+      (prompt) =>
+        reading({
+          reply:
+            "That's a different figure from the 400,000 on record. Which raise should I use?",
+          asking: "raise.amount",
+          statements: [
+            st({
+              op: "DISAGREES",
+              target: prompt.statement("Sorry, I meant 400k, not 350k."),
+              dimension: "raise.amount",
+              quantity: "raise_amount",
+              value: { kind: "MONEY", amount: "500000", currency: "USD" },
+              words: "Our lead angel thinks we should raise 500k.",
+            }),
+          ],
+        }),
+    );
+    expect(reopened).not.toMatch(CLOSE);
+    expect(reopened).not.toMatch(REVIEW_STEP);
+    expect(reopened.trim().endsWith("?")).toBe(true);
+    const leftOpen = await say("k-58", "Leave it open.", (prompt) =>
+      reading({
+        reply: "Fair enough.",
+        disagreementActions: [
+          {
+            disagreement: prompt.disagreement("raise.amount"),
+            action: "LEAVE_OPEN",
+            keep: null,
+          },
+        ],
+      }),
+    );
+    // The plan is empty again: the close is said again, once.
+    expect(leftOpen).toMatch(CLOSE);
+    const later = await say("k-60", "Thanks.", () =>
+      reading({ reply: "You're welcome." }),
+    );
+    expect(later).not.toMatch(CLOSE);
+    expect(later).toContain("Finish and review is ready whenever you are.");
   });
 });

@@ -84,6 +84,7 @@ const QUANTITY_NOUN: Readonly<Record<string, string>> = {
   runway_months: "months of runway",
   raise_amount: "raise",
   pre_money_valuation: "pre-money valuation",
+  cac: "customer acquisition cost",
 };
 
 /** Dimensions whose money is read as an amount, not the founder's sentence. */
