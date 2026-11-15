@@ -645,9 +645,15 @@ function assertTurnOutcome(
       expect(disagreementsOn("weekly_active_users")[0]?.state).toBe(
         "LEFT_OPEN",
       );
+      // The model asked nothing and the plan has more: its next question
+      // follows, in fixed words, so the founder has a next step.
       expect(qReply(world, "r-10")).toBe(
-        "I'll leave those two weekly-active figures open.",
+        "I'll leave those two weekly-active figures open. How does the product solve that problem, and what does it replace?",
       );
+      expect(
+        store.turnRows.find((t) => t.role === "Q" && t.clientTurnId === "r-10")
+          ?.askingDimension,
+      ).not.toBeNull();
       break;
     case "r-12":
       expect(dimensionView(view, "company.stage").status).toBe(
@@ -3190,11 +3196,45 @@ describe("live reply replay: the seventh run (5757518c7), the plan decides how a
       for (const sentence of sentencesIn(row.text))
         expect(sentence, `"${row.text}"`).not.toMatch(MADE_UP_QUESTIONS);
     }
-    // The close is said exactly once, and not before the core dimensions
-    // were answered or asked to their cap (live: at t13 and again at t45).
+    // Mid-interview, no reply leaves the founder without a next step: the
+    // turns where the model asked nothing while the plan had more (live:
+    // "Thanks for the correction.", "Fair enough.", the stall the owner
+    // saw) end with the plan's question, in fixed words, on a dimension.
+    const firstClose =
+      qRows.find((t) => CLOSE.test(t.text))?.seq ?? Number.MAX_SAFE_INTEGER;
+    for (const id of ["k-12", "k-14", "k-18", "k-20", "k-22", "k-26"]) {
+      const row = qRows.find((t) => t.clientTurnId === id);
+      expect(row?.seq ?? 0, id).toBeLessThan(firstClose);
+      expect(row?.text.trim().endsWith("?"), `${id}: "${row?.text}"`).toBe(
+        true,
+      );
+      expect(row?.askingDimension ?? null, id).not.toBeNull();
+    }
+    expect(qReply(world, "k-14")).toBe(
+      "Thanks for the correction. What instrument and terms are proposed for the round?",
+    );
+    for (const row of qRows.filter((t) => t.seq < firstClose))
+      expect(row.text.trim().endsWith("?"), `"${row.text}"`).toBe(true);
+    // The close is said once each time the plan empties, and not before the
+    // core dimensions were answered or asked to their cap (live: at t13 and
+    // again at t45 with nothing reopened between). Here the plan empties at
+    // k-28; at k-32 the lead angel's "seed" is new information that
+    // disagrees with the stage on record, Q asks which is right, and the
+    // plan empties again at k-34. Never a third time.
     const closes = qRows.filter((t) => CLOSE.test(t.text));
-    expect(closes).toHaveLength(1);
-    expect(closes[0]?.clientTurnId).not.toBe("k-12");
+    expect(closes.map((t) => t.clientTurnId)).toEqual(["k-28", "k-34"]);
+    expect(qRows.find((t) => t.clientTurnId === "k-32")?.askingDimension).toBe(
+      "company.stage",
+    );
+    for (const row of qRows.filter(
+      (t) => t.seq > (closes[0]?.seq ?? 0) && t.seq < (closes[1]?.seq ?? 0),
+    )) {
+      expect(CLOSE.test(row.text), row.clientTurnId).toBe(false);
+      if (row.askingDimension === null)
+        expect(row.text, row.clientTurnId).toContain(
+          "Finish and review is ready whenever you are.",
+        );
+    }
     expect(coreAtClose).toEqual({
       "company.market": true,
       "raise.instrument": true,
@@ -3202,7 +3242,7 @@ describe("live reply replay: the seventh run (5757518c7), the plan decides how a
     });
     expect(closes[0]?.text).toMatch(REVIEW_STEP);
     // After it, a turn with nothing left only points to the review.
-    const closeSeq = closes[0]?.seq ?? Number.MAX_SAFE_INTEGER;
+    const closeSeq = closes.at(-1)?.seq ?? Number.MAX_SAFE_INTEGER;
     for (const row of qRows.filter((t) => t.seq > closeSeq))
       if (row.askingDimension === null)
         expect(row.text, row.clientTurnId).toContain(
@@ -3228,11 +3268,12 @@ describe("live reply replay: the seventh run (5757518c7), the plan decides how a
       return qReply(world, id);
     };
     for (const turn of SEVENTH) await say(turn.id, turn.say, turn.script);
+    // k-28 and, after the stage disagreement reopened the plan, k-34.
     expect(
       world
         .store()
         .turnRows.filter((t) => t.role === "Q" && CLOSE.test(t.text)),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     // New information: a different raise reopens the plan.
     const reopened = await say(
       "k-56",
@@ -3276,5 +3317,59 @@ describe("live reply replay: the seventh run (5757518c7), the plan decides how a
     );
     expect(later).not.toMatch(CLOSE);
     expect(later).toContain("Finish and review is ready whenever you are.");
+  });
+
+  it("ends a reply that asks nothing with the plan's question, unless it answers their question about that very question", async () => {
+    const { world, services, token } = await seventhWorld();
+    const { conversation } = services;
+    const say = async (id: string, message: string, script: Script) => {
+      world.advance(60_000);
+      world.scripts.push(script);
+      await conversation.turn({
+        token,
+        message,
+        clientTurnId: id,
+        correlationId: randomUUID(),
+      });
+      return world
+        .store()
+        .turnRows.find((t) => t.role === "Q" && t.clientTurnId === id);
+    };
+    // An answer the model acknowledged and asked nothing after (the
+    // seventh run's "Thanks for the correction."): the plan's question.
+    const acknowledged = await say(
+      "x-01",
+      "We deliver crates to neighbourhood shops in Nairobi.",
+      () => reading({ reply: "Thanks, that's helpful." }),
+    );
+    expect(acknowledged?.text).toBe(
+      "Thanks, that's helpful. What problem does the company solve, and for whom is it most acute?",
+    );
+    expect(acknowledged?.askingDimension).toBe("company.problem");
+    // They ask Q about that question, which the plan still puts next: the
+    // answer is the point, and the question it explains still stands, so
+    // it is not repeated straight after it.
+    const explained = await say("x-02", "What do you mean by most acute?", () =>
+      reading({
+        reply: "I mean the customers who feel the problem most often.",
+        intent: "QUESTION_FOR_Q",
+      }),
+    );
+    expect(explained?.text).toBe(
+      "I mean the customers who feel the problem most often.",
+    );
+    expect(explained?.askingDimension ?? null).toBeNull();
+    // A question about something else: the answer, then the plan's next
+    // question in fixed words.
+    const answered = await say("x-03", "Do you need my pitch deck?", () =>
+      reading({
+        reply: "No deck is needed; your own words are enough.",
+        intent: "QUESTION_FOR_Q",
+      }),
+    );
+    expect(answered?.text).toMatch(
+      /^No deck is needed; your own words are enough\. \p{Lu}[^?]*\?$/u,
+    );
+    expect(answered?.askingDimension ?? null).not.toBeNull();
   });
 });

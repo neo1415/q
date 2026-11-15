@@ -945,6 +945,10 @@ export function createGateQInterviewer(
       // reply; the legacy facts are re-projected from the statements.
       if (statementState !== null) {
         const { turnContext } = statementState;
+        /** The dimension Q's last line asked about, if any. */
+        const lastAsked =
+          [...input.recentTurns].reverse().find((turn) => turn.role === "q")
+            ?.asking ?? null;
         const agreedReadBacks =
           result.intent === "SABOTAGE"
             ? []
@@ -971,9 +975,7 @@ export function createGateQInterviewer(
           actions: result.disagreementActions,
           discard: discardedByIntent,
           sabotage: result.intent === "SABOTAGE",
-          lastAsked:
-            [...input.recentTurns].reverse().find((turn) => turn.role === "q")
-              ?.asking ?? null,
+          lastAsked,
           agreedTo,
           agreedReadBacks,
           now: now(),
@@ -1087,10 +1089,20 @@ export function createGateQInterviewer(
               nothingLeft: true,
             };
           }
-          // The plan has more, and the reply asks nothing: it stands.
+          // The plan has more and the reply asks nothing: the plan's next
+          // question is added in its fixed words, so no mid-interview
+          // reply leaves them without a next step (live: Q stalled after
+          // "Thanks, that's helpful."). One exception: they asked Q
+          // something (the reading's intent, not a word match) and the
+          // plan's next question is the one their question is about, the
+          // dimension Q's last line asked. Q's answer is the point and the
+          // question it explains is still standing, so it is not asked
+          // again straight after the answer.
           if (
             modelAsking === null &&
-            !replySentences(modelComposed).some((s) => s.endsWith("?"))
+            !replySentences(modelComposed).some((s) => s.endsWith("?")) &&
+            result.intent === "QUESTION_FOR_Q" &&
+            next === lastAsked
           )
             return unchanged;
           const question =
