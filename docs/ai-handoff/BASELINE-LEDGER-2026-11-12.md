@@ -786,3 +786,14 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - `3b7145616`: gate `ci-local PASS` (1501 s, all six lanes), no migration; rollback point `651a3bd50`; Railway SUCCESS on all four by 01:13 UTC. Contents: `d4796f0dd` (pipeline stage, cancelled meetings and the cheque path held to the records) and `3b7145616` (rankings wait for the turn reader, conditions carry, widen past the shown list, ordinals only from the reader, follow-up from the card). Live re-check: `live-recheck-3b7145616.md` (9 of 10 pass; the follow-up on a conditioned list still runs wide).
 - In progress: the conditioned-list follow-up, navigation wording and the unprompted founder disclosure line.
 - Test budget 16 Nov: USD 0.14 of 5 used.
+
+## Transaction pooler trial on q-api: rolled back (16 Nov, 21:53 Lagos)
+
+- **Production:** `4c832ca1f` (gate PASS 1847 s; migration `20261231595500` applied, hosted 306). Contains the reader warm-up and the transaction-pooler-safe LISTEN connection.
+- **The trial (decision 101):** at 20:36 UTC q-api moved from the session pooler (port 5432, pool 3) to the transaction pooler (port 6543, pool 10). The URL was edited without printing it; prior values were saved in a 0600 scratch file.
+- **What happened:**
+  - The wake listeners started cleanly.
+  - The first live Q turn (`dff4faca`, 20:44 UTC) reached SYNTHESIS, made one classification call (which timed out at 3 s) and then hung for more than 90 s with no further model call.
+  - Request latency did not improve: POST /runs took 4.7 s, workforce/overview 4.2 s.
+- **Rollback:** at 20:46 UTC to port 5432, `session_pooler`, pool 3. Redeployed SUCCESS at 20:53. A smoke turn then completed in 11.4 s, and the hung run was recovered as FAILED.
+- **Cause:** not yet known. It needs an offline investigation before another attempt; candidates are a statement or transaction pattern unsafe under transaction pooling, or an await on a connection-scoped setting. Until then q-api stays on the session pooler.
