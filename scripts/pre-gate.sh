@@ -69,10 +69,14 @@ tsc_status=$?
 printf '%s\n' "$tsc_out" | tail -20
 [ "$tsc_status" -eq 0 ] || bad "root tsc (exit $tsc_status)"
 
-step "app typechecks (each touched app's own tsconfig)"
+step "app typechecks (each touched app's own tsconfig; every app when a package changed)"
 # The root tsconfig does not cover every app's own config (apps/web test
 # typing slipped through to the gate, 14 Nov).
-for app in $(printf '%s\n' "${changed[@]}" | grep -oE '^apps/[^/]+' | sort -u); do
+# A package change can break an app that imports it (live 16 Nov: an
+# evidence row type broke q-api while only packages/ and apps/web changed).
+apps_to_check=$(printf '%s\n' "${changed[@]}" | grep -oE '^apps/[^/]+' | sort -u)
+if printf '%s\n' "${changed[@]}" | grep -qE '^packages/[^/]+/src/'; then apps_to_check=$(ls -d apps/*/ | sed 's#/$##'); fi
+for app in $apps_to_check; do
   if [ -f "$app/package.json" ] && grep -q '"typecheck"' "$app/package.json"; then
     app_out=$(cd "$app" && NODE_OPTIONS=--max-old-space-size=6144 pnpm run -s typecheck 2>&1)
     app_status=$?

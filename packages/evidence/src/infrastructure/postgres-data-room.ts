@@ -26,7 +26,7 @@ export type DataRoomDocumentRow = {
   readonly title: string;
   readonly documentType: string;
   /** The stored sensitivity class (HIGHLY_CONFIDENTIAL, ...), as text. */
-  readonly sensitivityClass: string | null;
+  readonly sensitivityClass?: string | null;
   /** No entry: PRIVATE, filed under "other" (or the deck's own folder). */
   readonly level: DataRoomLevel;
   readonly folderCode: string;
