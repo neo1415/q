@@ -54,6 +54,7 @@ import {
   projectView,
   quantityFitting,
   relatable,
+  sameFigure,
   SINGLE_VALUED_DIMENSIONS,
   valuesConflict,
   type LegacyIncompleteness,
@@ -939,6 +940,14 @@ export type PlanInput = {
    */
   readonly discard: boolean;
   /**
+   * True when the reading labelled the turn a correction of something said
+   * before (the reader's meaning, never a word match). The plan then works
+   * out which earlier statements of the founder it corrects
+   * (`correctionTargets`) and links them CORRECTS: they become history,
+   * never deleted.
+   */
+  readonly correction?: boolean | undefined;
+  /**
    * True when the turn was read as an attempt to steer Q (SABOTAGE). Such a
    * turn may still leave a disagreement open (it hides nothing), but it
    * never settles one.
@@ -976,10 +985,151 @@ export type PlanOutcome = {
    * say it is leaving something unresolved only when this is above zero.
    */
   readonly leftOpenCount: number;
+  /**
+   * CORRECTS links this turn wrote. Q may say it treated something as a
+   * correction only when this is above zero (invariant 7).
+   */
+  readonly correctedCount: number;
   readonly incomplete: readonly LegacyIncompleteness[];
 };
 
 const at = (ms: number) => new Date(ms).toISOString();
+
+/** The founder's own statements: said in a turn or given in the form. */
+const FOUNDER_ORIGINS: ReadonlySet<ApplicationStatement["origin"]> = new Set([
+  "TURN",
+  "FORM",
+]);
+
+/** The figure a numeric value holds, as a digit string; null for prose. */
+function figureOf(value: StatementValue): string | null {
+  switch (value.kind) {
+    case "COUNT":
+      return value.count;
+    case "PERCENT":
+      return value.percent.replace(/^-/u, "");
+    case "MONEY":
+      return value.amount;
+    case "ZERO":
+    case "UNKNOWN":
+    case "TEXT":
+    case "CODE":
+      return null;
+  }
+}
+
+/** Where a figure was cut in two: "...gross margin of 29." then "3%.". */
+const CUT_BEFORE = /\d[.,]$/u;
+const CUT_AFTER = /^\d/u;
+
+export type CorrectionTargets = {
+  /**
+   * Statements that hold a figure cut in two: consecutive statements of one
+   * earlier turn whose words, joined at a decimal point or thousands
+   * separator, make a figure the correction states and neither half holds
+   * (live 0490be41: "...gross margin of 29." and "3%." for 29.3%).
+   */
+  readonly split: readonly ApplicationStatement[];
+  /**
+   * A figure on record under one metric that the correction states again
+   * under another metric, or under none on the list, on the same dimension
+   * (the deck's 82% "gross margin" restated as licence margin): the same
+   * number, a different measure.
+   */
+  readonly reclassified: readonly ApplicationStatement[];
+  /**
+   * Earlier figures for the same metric, on the same dimension and a
+   * comparable period, that differ from the correction's (the relation
+   * rule, `relatable`). Used only when no figure-based target exists for
+   * the turn (a turn that names the figure it corrects says which one), and
+   * only where a figure may be hidden at all (`correctionStands`): the
+   * correction label alone has misread a second answer as a correction
+   * (live 78f8d72d5 t16, "Back to users: about 1,500 weekly active users").
+   */
+  readonly sameMetric: readonly ApplicationStatement[];
+};
+
+/**
+ * Which earlier statements a statement read from a correction turn
+ * corrects. Deterministic over the record: the reader says the turn is a
+ * correction (its meaning); code says of what, by figure and metric, never
+ * by guessing a handle. Only the founder's own statements (TURN or FORM),
+ * from earlier turns, still current (`earlier` holds only those shown).
+ */
+export function correctionTargets(
+  statement: ApplicationStatement,
+  earlier: readonly ApplicationStatement[],
+): CorrectionTargets {
+  const candidates = earlier.filter(
+    (s) =>
+      s.id !== statement.id &&
+      FOUNDER_ORIGINS.has(s.origin) &&
+      (s.sourceTurnId === null || s.sourceTurnId !== statement.sourceTurnId) &&
+      Date.parse(s.statedAt) < Date.parse(statement.statedAt),
+  );
+  const own = figureOf(statement.value);
+  const stated = new Set([
+    ...figuresIn(statement.words),
+    ...(own === null ? [] : figuresIn(own)),
+  ]);
+
+  const split: ApplicationStatement[] = [];
+  const byTurn = new Map<string, ApplicationStatement[]>();
+  for (const s of candidates) {
+    if (s.sourceTurnId === null) continue;
+    const group = byTurn.get(s.sourceTurnId) ?? [];
+    group.push(s);
+    byTurn.set(s.sourceTurnId, group);
+  }
+  for (const group of byTurn.values()) {
+    const ordered = [...group].sort(
+      (a, b) =>
+        Date.parse(a.statedAt) - Date.parse(b.statedAt) ||
+        a.id.localeCompare(b.id),
+    );
+    for (let index = 0; index + 1 < ordered.length; index += 1) {
+      const left = ordered[index];
+      const right = ordered[index + 1];
+      if (left === undefined || right === undefined) continue;
+      if (left.dimension !== right.dimension) continue;
+      const before = left.words.trim();
+      const after = right.words.trim();
+      if (!CUT_BEFORE.test(before) || !CUT_AFTER.test(after)) continue;
+      const apart = new Set([...figuresIn(before), ...figuresIn(after)]);
+      const joined = figuresIn(`${before}${after}`).filter(
+        (figure) => !apart.has(figure),
+      );
+      if (!joined.some((figure) => stated.has(figure))) continue;
+      for (const half of [left, right])
+        if (!split.includes(half)) split.push(half);
+    }
+  }
+
+  const metric = quantityFitting(statement.value.kind, statement.quantity);
+  const reclassified =
+    own === null
+      ? []
+      : candidates.filter((s) => {
+          const theirs = quantityFitting(s.value.kind, s.quantity);
+          return (
+            s.dimension === statement.dimension &&
+            theirs !== null &&
+            theirs !== metric &&
+            sameFigure(s.value, statement.value)
+          );
+        });
+
+  const sameMetric =
+    metric === null
+      ? []
+      : candidates.filter(
+          (s) =>
+            quantityFitting(s.value.kind, s.quantity) === metric &&
+            relatable(s, statement) &&
+            valuesConflict(s.value, statement.value),
+        );
+  return { split, reclassified, sameMetric };
+}
 
 function latestInstant(context: StatementContext): number {
   let latest = 0;
@@ -1733,6 +1883,86 @@ export function planReading(input: PlanInput): PlanOutcome {
     }
   }
 
+  // A turn the reader read as a correction corrects something on record
+  // (live 0490be41: "Correction to my earlier answer, which got cut at the
+  // decimal point..." was kept as notes, both halves of the cut note stayed
+  // current, and Q said it had treated them as corrected). Each statement
+  // of the turn is linked CORRECTS to the earlier statements it corrects,
+  // by figure first; by metric only when the turn names no figure on
+  // record and the reader linked none itself, and then only where the
+  // founder signalled that the earlier figure was wrong (as for the
+  // reader's own CORRECTS). Corrected statements become history; nothing
+  // is deleted.
+  if (
+    input.correction === true &&
+    !input.discard &&
+    input.currentRead !== true &&
+    input.current.id !== null
+  ) {
+    const earlier = existing.filter((s) => visible.has(s.id));
+    const fresh = newStatements.filter(
+      (s) => s.sourceTurnId === input.current.id,
+    );
+    const found = fresh.map((statement) => ({
+      statement,
+      targets: correctionTargets(statement, earlier),
+    }));
+    const byFigure = found.some(
+      ({ targets }) =>
+        targets.split.length > 0 || targets.reclassified.length > 0,
+    );
+    const correctedHere = new Set(
+      links.filter((l) => l.kind === "CORRECTS").map((l) => l.toStatementId),
+    );
+    for (const { statement, targets } of found) {
+      const readerLinked = links.some(
+        (l) => l.kind === "CORRECTS" && l.fromStatementId === statement.id,
+      );
+      const chosen = [
+        ...targets.split,
+        ...targets.reclassified,
+        ...(byFigure || readerLinked
+          ? []
+          : targets.sameMetric.filter((target) =>
+              correctionStands(
+                target,
+                statement,
+                input.current.text,
+                input.handles.disagreements.values(),
+              ),
+            )),
+      ];
+      for (const target of chosen) {
+        if (correctedHere.has(target.id)) continue;
+        if (
+          link(
+            "CORRECTS",
+            statement.id,
+            target.id,
+            "CODE_DETECTED",
+            input.current.id,
+          ) === null
+        )
+          continue;
+        correctedHere.add(target.id);
+        touched.add(target.dimension);
+      }
+    }
+    // A disagreement this turn's code found against a statement it now
+    // corrects never stood: the correction settles it.
+    for (let index = links.length - 1; index >= 0; index -= 1) {
+      const made = links[index];
+      if (
+        made !== undefined &&
+        made.kind === "DISAGREES" &&
+        made.origin === "CODE_DETECTED" &&
+        (correctedHere.has(made.toStatementId) ||
+          correctedHere.has(made.fromStatementId))
+      )
+        links.splice(index, 1);
+    }
+  }
+
   // What they said about a disagreement on record.
   const corrected = new Set(
     links.filter((l) => l.kind === "CORRECTS").map((l) => l.toStatementId),
@@ -1937,6 +2167,7 @@ export function planReading(input: PlanInput): PlanOutcome {
     recordedCount: newStatements.length,
     unfiledFigures,
     leftOpenCount: leftOpen,
+    correctedCount: links.filter((l) => l.kind === "CORRECTS").length,
     incomplete: projected.incomplete,
   };
 }
@@ -2063,6 +2294,26 @@ export function claimsLeftOpen(text: string): boolean {
   );
 }
 
+/**
+ * A claim that an earlier answer was corrected, replaced or superseded
+ * ("I'll treat this as correcting the two partial notes", "I've replaced
+ * the 82%", "that corrects the earlier figure"). Thanks for a correction
+ * claims nothing.
+ */
+const CLAIMS_CORRECTION =
+  /\b(?:(?:i've|i have|i'll|i will|i'm|i am)\s+(?:now\s+)?(?:(?:treat|mark|record|log|tak|count|read|fil)\w*\s+(?:this|that|it|these|those|them)\s+as\s+(?:an?\s+)?correct\w*|correct\w*|replac\w*|supersed\w*|overwr\w*|swapp?\w*)|(?:has|have|is|are|was|were)\s+(?:now\s+)?(?:been\s+)?(?:corrected|replaced|superseded)|(?:this|that|it)\s+(?:now\s+)?(?:corrects|replaces|supersedes))\b/iu;
+
+/** Whether a reply claims an earlier answer was corrected. */
+export function claimsCorrection(text: string): boolean {
+  return sentencesOf(text).some((sentence) =>
+    asserts(sentence, CLAIMS_CORRECTION),
+  );
+}
+
+/** The deterministic line when no earlier answer was corrected. */
+export const NOT_CORRECTED_LINE =
+  "I haven't marked any earlier answer as corrected.";
+
 /** The deterministic line when a disagreement was not left open. */
 export const NOT_LEFT_OPEN_LINE =
   "I haven't marked those two answers as left open yet.";
@@ -2141,15 +2392,26 @@ function withoutClaim(text: string, claim: RegExp): string {
  * recorded stands only when the reading recorded a statement, and one that
  * a disagreement is left open only when a LEFT_OPEN stands (invariant 7).
  * Otherwise the claim is removed, whatever sentence it shares, and the
- * deterministic line says what is true.
+ * deterministic line says what is true. Likewise a claim that an earlier
+ * answer was corrected stands only when the plan wrote a CORRECTS link.
  */
 export function replyHeldToReading(
   reply: string,
   recordedCount: number,
   leftOpenCount?: number,
   unfiledFigures: readonly string[] = [],
+  correctedCount?: number,
 ): string {
   let text = reply;
+  // A correction is a CORRECTS link the plan wrote; without one, Q does not
+  // say it corrected anything, and says so (live 0490be41 18acc1d3).
+  if (
+    correctedCount !== undefined &&
+    correctedCount === 0 &&
+    claimsCorrection(text)
+  )
+    text =
+      `${NOT_CORRECTED_LINE} ${withoutClaim(text, CLAIMS_CORRECTION)}`.trim();
   // An update is a statement filed against an answer; a figure kept only
   // as their note updates nothing, and Q says what it did with it.
   const filed = recordedCount - unfiledFigures.length;

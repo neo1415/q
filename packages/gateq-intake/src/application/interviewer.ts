@@ -976,6 +976,7 @@ export function createGateQInterviewer(
                 ),
           actions: result.disagreementActions,
           discard: discardedByIntent,
+          correction: result.intent === "CORRECTION",
           sabotage: result.intent === "SABOTAGE",
           lastAsked,
           agreedTo,
@@ -1014,6 +1015,7 @@ export function createGateQInterviewer(
           planned.recordedCount,
           planned.leftOpenCount,
           planned.unfiledFigures,
+          planned.correctedCount,
         );
         // How the reply ends is the plan's, decided here after this turn's
         // writes, never the model's: Q's question on a dimension the plan

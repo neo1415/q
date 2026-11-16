@@ -203,7 +203,7 @@ function canonicalDecimal(decimal: string): string {
 }
 
 /** Whether two values are the same figure: same unit, same exact amount. */
-function sameFigure(a: StatementValue, b: StatementValue): boolean {
+export function sameFigure(a: StatementValue, b: StatementValue): boolean {
   const left = comparable(a);
   const right = comparable(b);
   return (
