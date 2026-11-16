@@ -253,3 +253,15 @@ Thames Arc, conversation `2a26d43b`. Screenshots: `evidence/2026-11-16-scenario-
 **Still FAIL on the count.** Asked "What hiring does Halyard Security have planned for 2027, by role?", Q said "4 public-sector account managers" and "5 in Q1". The stored chunk row reads "Public-sector account manager | Sales | 3 2027-Q1". The follow-up, answered from context, repeated it.
 
 Web search and the GateQ read no longer ran. A fix is in progress: code-extracted table rows given to the answer as facts, and the check bound to those rows on both turns.
+
+## Scenario D recheck on `9c7b38925` (16 Nov, 23:09 UTC)
+
+Thames Arc, conversation `28071f0c`, run `a1777c9a`. Screenshots: `evidence/2026-11-16-scenario-d-9c7b38925/`. The database safety fix `6a0fa2274` is also live, with no timeout or stall errors seen since.
+
+**FAIL again, the third failure of this shape.** Q said "four public-sector account managers" (the source says 3), and on the follow-up "five hires in Q1" (the source says 4). No claim-check log line appeared for the run.
+
+Q's earlier wrong answers were persisted to memory and recalled into new conversations. Next steps:
+
+- mandatory claim-check diagnostics;
+- a replay built from this run's real stored data;
+- memory integrity: Q's own answers are never recalled as figure evidence, and corrections supersede the stored item.
