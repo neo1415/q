@@ -422,3 +422,9 @@ Core Seven remains the governing assessment framework. The new directive authori
     - Q does not navigate merely because a company, person or page is mentioned (for example "how solid is Ajopot's figure" answers in place).
     - In ambiguous situations, with unsaved work, or when the user asked to stay, Q stays and offers navigation instead.
     - This is consistent with the existing navigation decisions (C10 v85, navigation clarification of 14 Nov); the navigation architecture is not redesigned.
+
+99. **Demo evidence: showcase companies, financial readability and paid calls** (owner, 2026-11-16, answering the evidence directive's open questions).
+    - "Halia" is **Halyard Security** (the fictional seeded company).
+    - **Nixo** is the third showcase company. The owner's wording was "use Nixo"; its founder account carries no test markers, so the lead confirms with the owner that the account is theirs before writing synthetic documents into it.
+    - **Shared means readable:** once a founder shares a HIGHLY_CONFIDENTIAL financial document (management accounts, financial model, bank statement) with one investor through the product's grant or diligence workflow, Q may read that document for that investor only. Unshared documents stay unreadable to every investor's Q; the Context Firewall, combination-risk guard and revocation still apply. This amends the rule in `packages/documents` sensitivity handling and needs an ADR.
+    - **Paid calls approved:** switch on the hosted embedding provider for document indexing, and read new decks (about 4 model calls each), within the test budget.
