@@ -245,3 +245,11 @@ Thames Arc, new conversation `e7e3c866`. Screenshots: `evidence/2026-11-16-scena
 Turn 1 also ran `public_web.search`, two `company.search` calls and `app.gateq.inbox.summarise`, none of which a hiring question needs.
 
 A fix is in progress. It covers table layouts in the extracted text, a total stated in a different sentence from the parts, the follow-up turn, and the web and GateQ reads.
+
+## Scenario D recheck on `a65386689` (16 Nov, 21:33 UTC)
+
+Thames Arc, conversation `2a26d43b`. Screenshots: `evidence/2026-11-16-scenario-d-a65386689/`. Migration `20261231596000` was applied before the deploy; the investor names now read "Savanna Seed Partners" and "Thames Arc Capital".
+
+**Still FAIL on the count.** Asked "What hiring does Halyard Security have planned for 2027, by role?", Q said "4 public-sector account managers" and "5 in Q1". The stored chunk row reads "Public-sector account manager | Sales | 3 2027-Q1". The follow-up, answered from context, repeated it.
+
+Web search and the GateQ read no longer ran. A fix is in progress: code-extracted table rows given to the answer as facts, and the check bound to those rows on both turns.
