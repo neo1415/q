@@ -235,3 +235,13 @@ Thames Arc's investor, new conversation `6233d75a`, run `5690a49c`. Application 
 **Verdict: PASS (minor).** This is the ca639a8f0 fix: Q reads the submitted application through a GateQ tool, cites it by name and date, shows the pre-seed→seed correction and the whole 29.3%, and keeps non-GateQ facts separately labelled.
 
 **Spend:** USD 0.1302 across 3 runs (budget ledger `c95983ac`, reserved 0.80).
+
+## Scenario D recheck on `927f25ddd` (16 Nov, 19:40 UTC)
+
+Thames Arc, new conversation `e7e3c866`. Screenshots: `evidence/2026-11-16-scenario-d-927f25ddd/`.
+
+**FAIL on the count.** Asked "How many people is Halyard Security planning to hire next year, and in which roles?", Q said 15 hires, including "4 public-sector account managers". The document and fixture say 3, so the parts sum to 16. The follow-up "Which quarter does each group start?" repeated 4.
+
+Turn 1 also ran `public_web.search`, two `company.search` calls and `app.gateq.inbox.summarise`, none of which a hiring question needs.
+
+A fix is in progress. It covers table layouts in the extracted text, a total stated in a different sentence from the parts, the follow-up turn, and the web and GateQ reads.
