@@ -5,18 +5,21 @@
 // product's own HTTP API, each step as the seeded fictional person whose
 // action it is (investor or founder). Nothing here writes SQL.
 //
-//   node scripts/seed/evidence/relationships.mjs seed     [halyard|tensorgate]
+//   node scripts/seed/evidence/relationships.mjs seed     [halyard|tensorgate|nixo]
 //   node scripts/seed/evidence/relationships.mjs mandates
 //   node scripts/seed/evidence/relationships.mjs gateq-form       # no model call
 //   node scripts/seed/evidence/relationships.mjs gateq-interview  # paid: 3 turns
 //   node scripts/seed/evidence/relationships.mjs gateq-correct    # paid: 1 turn
 //   node scripts/seed/evidence/relationships.mjs gateq-submit     # paid: synthesis
-//   node scripts/seed/evidence/relationships.mjs verify
+//   node scripts/seed/evidence/relationships.mjs verify   [halyard|tensorgate|nixo]
 //
 // Pairs (scripts/seed/evidence/manifests/*.json `plannedShareWith`):
 //   Halyard Security <-> Thames Arc Capital: the investor expresses interest,
 //     the founder accepts, the investor records that diligence started.
 //   Tensorgate <-> Savanna Seed Partners: the same, from DISCOVERED.
+//   Nixo <-> Savanna Seed Partners: the same, from no relationship
+//     (decision 99: Nixo is the owner's own account, seeded like the
+//     fictional companies; see "Nixo" below).
 // Then, per pair: the investor asks for one diligence document and the
 // founder answers it with one of the planned documents; the investor asks for
 // the bank statement, which stays OPEN (scenario D: the founder shares it
@@ -32,8 +35,19 @@
 // sign-in re-checks fictional_demo on the returned user). Every current
 // member of both companies and every current representative of the investor
 // must carry them too, or the pair is refused before any write, because the
-// product notifies those people. Nixo, Ledgerline, Baridi and non-fictional
+// product notifies those people. Ledgerline, Baridi and non-fictional
 // tenants are never named here. No meeting or calendar invite is created.
+//
+// Nixo (decision 99, 2026-11-16): the owner confirmed the Nixo founder
+// account is theirs and asked for it to be seeded like the fictional
+// companies. It carries no markers, so it is admitted by an allow-list of
+// exactly one company id (UNMARKED_FOUNDER_ALLOW_LIST, as in upload.mjs):
+// its current members may be unmarked, the founder signs in through a
+// one-time admin sign-in link (generate_link type magiclink, no email sent,
+// no password read or changed; the Supabase secret key is fetched with
+// SUPABASE_ACCESS_TOKEN and kept in memory only), and the session must
+// resolve to exactly that company's current founder. The investor side keeps
+// every marker check.
 //
 // Idempotent: state is read before every write (relationship state through
 // read-only SQL, diligence and access through the API), requests are keyed
@@ -55,6 +69,20 @@ const REPORT =
 
 const THAMES_ARC = "cfbc217a-5ba2-407f-a684-084a96d892f7";
 const SAVANNA = "1c4b9266-350c-409d-9582-04a0f771b8a8";
+const NIXO = "d48c26d2-5aca-4788-9033-073b0f9d08ec";
+
+/**
+ * Companies whose members may lack the fictional markers. Exactly one entry,
+ * by company id: Nixo, under decision 99 (docs/ai-handoff/DECISIONS.md,
+ * owner, 2026-11-16). Do not add to this list without a recorded owner
+ * decision.
+ */
+const UNMARKED_FOUNDER_ALLOW_LIST = new Map([
+  [
+    NIXO,
+    "decision 99 (2026-11-16): owner confirmed the Nixo founder account is theirs; session by one-time admin sign-in link, no password change",
+  ],
+]);
 
 // The planned shares come from the committed manifests; this table names
 // only the requests and the relationship each pair uses.
@@ -103,6 +131,28 @@ const PAIRS = {
       about: null,
     },
     mustStayPrivate: ["tg-bank-statement"],
+  },
+  nixo: {
+    company: { name: "Nixo", slug: "nixo", id: NIXO },
+    investorId: SAVANNA,
+    interestNote:
+      "Tooling for forward-deployed engineering teams fits our seed thesis. We'd like to understand contracted against billed revenue and the team plan before the round closes.",
+    answered: {
+      title: "Customer contract summary",
+      note: "Every paid contract: segment, start date, billing start, seats and annual value.",
+      documentId: "nx-customer-contracts",
+      about: {
+        statement:
+          "Contracted ARR of $1.08m against $864k of annualised billed subscriptions",
+        standing: "REPORTED",
+      },
+    },
+    pending: {
+      title: "Business bank statements, Aug to Oct 2026",
+      note: "To tie the 31 Oct 2026 cash and the burn in the management accounts to the bank.",
+      about: null,
+    },
+    mustStayPrivate: ["nx-bank-statement"],
   },
 };
 
@@ -197,6 +247,73 @@ async function signIn(email) {
   return session;
 }
 
+let adminKeys = null;
+/**
+ * Supabase secret and publishable keys from the management API, in memory
+ * only (decision 78; decision 99 for Nixo). Never printed or persisted.
+ */
+async function supabaseAdminKeys() {
+  if (adminKeys) return adminKeys;
+  const r = await fetch(
+    `https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys?reveal=true`,
+    {
+      headers: { authorization: `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}` },
+    },
+  );
+  if (!r.ok) throw new Error(`api-keys: HTTP ${r.status}`);
+  const list = await r.json();
+  const pick = (type, name) =>
+    list.find((k) => k.type === type)?.api_key ??
+    list.find((k) => k.name === name)?.api_key;
+  const secret = pick("secret", "service_role");
+  const publishable = pick("publishable", "anon");
+  if (!secret || !publishable) throw new Error("api-keys: keys missing");
+  adminKeys = { secret, publishable };
+  return adminKeys;
+}
+
+/**
+ * The founder's session. An allow-listed company (Nixo only) signs in
+ * through a one-time admin sign-in link (generate_link sends no email; no
+ * password is read or changed) and must resolve to exactly its founder;
+ * every other founder uses the marked password sign-in.
+ */
+async function founderSession(company) {
+  if (!UNMARKED_FOUNDER_ALLOW_LIST.has(company.id))
+    return signIn(company.founder.email);
+  const cacheKey = `admin-link:${company.id}`;
+  if (sessions.has(cacheKey)) return sessions.get(cacheKey);
+  const { url } = await publicConfig();
+  const { secret, publishable } = await supabaseAdminKeys();
+  const link = await fetch(`${url}/auth/v1/admin/generate_link`, {
+    method: "POST",
+    headers: {
+      apikey: secret,
+      authorization: `Bearer ${secret}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ type: "magiclink", email: company.founder.email }),
+  });
+  const linkBody = await link.json().catch(() => ({}));
+  if (!link.ok) throw new Error(`generate_link: HTTP ${link.status}`);
+  const tokenHash =
+    linkBody.hashed_token ?? linkBody.properties?.hashed_token ?? null;
+  if (!tokenHash) throw new Error("generate_link: no token hash");
+  const verified = await fetch(`${url}/auth/v1/verify`, {
+    method: "POST",
+    headers: { apikey: publishable, "content-type": "application/json" },
+    body: JSON.stringify({ type: "email", token_hash: tokenHash }),
+  });
+  const body = await verified.json().catch(() => ({}));
+  if (!verified.ok || !body.access_token)
+    throw new Error(`verify: HTTP ${verified.status}`);
+  if (body.user?.id !== company.founder.auth_id)
+    throw new Error("signed-in account is not the allow-listed founder");
+  const session = { token: body.access_token, authUserId: body.user.id };
+  sessions.set(cacheKey, session);
+  return session;
+}
+
 async function call(token, method, path, body, idempotencyKey, extra = {}) {
   for (let attempt = 1; ; attempt++) {
     const r = await fetch(`${API}${path}`, {
@@ -236,13 +353,29 @@ const MARKED = `u.raw_app_meta_data->>'fictional_demo' = 'true'
 async function resolveCompany(spec) {
   const [company] = await sql(
     `select id, tenant_id, organisation_id from core.companies
-      where canonical_name = ${text(spec.name)} and slug = ${text(spec.slug)}`,
+      where canonical_name = ${text(spec.name)} and slug = ${text(spec.slug)}
+        ${spec.id ? `and id = ${uuid(spec.id)}` : ""}`,
   );
   if (!company) throw new Error(`${spec.name}: company not found`);
+  // Only an allow-listed company id (Nixo, decision 99) skips the marker
+  // checks below; it must still have exactly one current founder.
+  if (UNMARKED_FOUNDER_ALLOW_LIST.has(company.id)) {
+    const founders = await sql(
+      `select p.id as profile_id, u.id as auth_id, u.email
+         from core.company_members m
+         join identity.user_profiles p on p.id = m.user_id
+         join auth.users u on u.id = p.auth_user_id
+        where m.company_id = ${uuid(company.id)}
+          and m.is_founder and m.is_current`,
+    );
+    if (founders.length !== 1)
+      throw new Error(`${spec.name}: expected exactly one current founder`);
+    return { ...company, founder: founders[0] };
+  }
   // Every current member must be a seeded fictional account: the product
   // notifies them when the investor acts.
   const [members] = await sql(
-    `select count(*) filter (where not (${MARKED})) as unmarked, count(*) as n
+    `select count(*) filter (where not coalesce(${MARKED}, false)) as unmarked, count(*) as n
        from core.company_members m
        join identity.user_profiles p on p.id = m.user_id
        join auth.users u on u.id = p.auth_user_id
@@ -475,7 +608,7 @@ async function seedPair(key) {
     !investor.display_name.startsWith(manifest.plannedInvestor.split(" ")[0])
   )
     throw new Error(`${key}: manifest names ${manifest.plannedInvestor}`);
-  const founder = await signIn(company.founder.email);
+  const founder = await founderSession(company);
   if (founder.authUserId !== company.founder.auth_id)
     throw new Error("signed in as a different founder than resolved");
   const rep = await signIn(investor.rep.email);
@@ -588,7 +721,7 @@ async function verifyPair(key, otherInvestorId) {
   const company = await resolveCompany(spec.company);
   const investor = await resolveInvestor(spec.investorId);
   const other = await resolveInvestor(otherInvestorId);
-  const founder = await signIn(company.founder.email);
+  const founder = await founderSession(company);
   const rep = await signIn(investor.rep.email);
   const outsider = await signIn(other.rep.email);
   const row = await relationshipRow(company.id, investor.id);
@@ -1039,11 +1172,15 @@ if (mode === "seed") {
   report.mandates = await enrichMandates();
   console.log(JSON.stringify(report.mandates, null, 1));
 } else if (mode === "verify") {
-  report.verify = {
-    halyard: await verifyPair("halyard", SAVANNA),
-    tensorgate: await verifyPair("tensorgate", THAMES_ARC),
+  const outsider = {
+    halyard: SAVANNA,
+    tensorgate: THAMES_ARC,
+    nixo: THAMES_ARC,
   };
-  for (const v of Object.values(report.verify)) {
+  report.verify ??= {};
+  for (const key of keys)
+    report.verify[key] = await verifyPair(key, outsider[key]);
+  for (const v of keys.map((key) => report.verify[key])) {
     const leaks = v.checks.filter(
       (c) =>
         c.otherRoomListed ||
