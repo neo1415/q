@@ -1,3 +1,4 @@
+import type { MessageSensitivity } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import type { TenantId } from "@capital-q/security";
 
@@ -61,8 +62,23 @@ export type ChunkEmbeddingRepository = {
       readonly tenantId?: TenantId | undefined;
       readonly configurationVersion: string;
       readonly limit: number;
+      /**
+       * Absent: every class (a self-hosted runtime). Present: only chunks
+       * whose own class AND whose document's class are listed here.
+       */
+      readonly allowedSensitivities?: readonly MessageSensitivity[] | undefined;
+      /** Chunks already attempted in this sweep, so a failure is not re-read. */
+      readonly excludeChunkIds?: readonly ChunkId[] | undefined;
     },
   ) => Promise<readonly Chunk[]>;
+  /** ACTIVE chunks without a vector here that the ceiling withholds. */
+  readonly countChunksWithheldBySensitivity: (
+    executor: DatabaseExecutor,
+    query: {
+      readonly configurationVersion: string;
+      readonly allowedSensitivities: readonly MessageSensitivity[];
+    },
+  ) => Promise<number>;
   readonly countByConfiguration: (
     executor: DatabaseExecutor,
     tenantId: TenantId,

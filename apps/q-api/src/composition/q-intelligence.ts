@@ -1,6 +1,9 @@
 import type { EtiquetteGuides } from "@capital-q/q-core";
 import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
-import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
+import {
+  loadEmbeddingConfig,
+  type EmbeddingConfig,
+} from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import { createPostgresCompanyKnowledge } from "@capital-q/discovery";
 import type { ActorContext } from "@capital-q/security";
@@ -33,12 +36,14 @@ import {
 import type {
   ArrivalSnapshot,
   ModelDataPosture,
+  ModelSensitivity,
   QLanguageCode,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createEmbeddingService,
   createLocalTeiEmbeddingProvider,
+  createOpenAIEmbeddingProvider,
   QWEN3_EMBEDDING_CONFIGURATION,
   type EmbeddingService,
 } from "@capital-q/q-embeddings";
@@ -212,6 +217,13 @@ export type QIntelligenceDependencies = {
    */
   readonly embeddings?: EmbeddingService | undefined;
   /**
+   * Decision 99: with a hosted embedder, the strongest class its provider
+   * may be sent (the gateway's reviewed record). A plan above it searches
+   * lexically. Absent: a self-hosted runtime, no ceiling.
+   */
+  readonly queryEmbeddingCeiling?:
+    (() => Promise<ModelSensitivity | null>) | undefined;
+  /**
    * Records a person's statement about their own company as their claim
    * (CQ-Q-RESEARCH-001 §21). Absent means a proposed statement is not kept.
    */
@@ -372,19 +384,38 @@ export type QIntelligenceComposition = {
 };
 
 /**
- * The production query-embedding service, over the local runtime that holds
- * document text on a private network (CQ-RAG-002).
+ * The production query-embedding service (CQ-RAG-002), over the provider
+ * `Q_EMBEDDING_PROVIDER` names: the local runtime on a private network by
+ * default, or (decision 99) the hosted OpenAI adapter.
  *
  * The configuration is the one chunks were embedded under; a query embedded
- * under a different model would search a space nothing was indexed in. The
- * runtime being unreachable is a per-request degradation the retrieval
- * service already reports — not a reason to withhold the port, and not a
- * reason to start without one.
+ * under a different model would search a space nothing was indexed in. With
+ * `openai` it is exactly the workers' (`OPENAI_TE3_SMALL_1024_CONFIGURATION`,
+ * the adapter's default, which the workers' chunk sweep also writes under),
+ * so the stored vectors and the query vector share one configuration
+ * version. The runtime or key being absent is a per-request degradation the
+ * retrieval service already reports, lexical-only — not a reason to
+ * withhold the port, and not a reason to start without one.
  */
 export function createProductionEmbeddingService(options?: {
   readonly onMissing?: (missing: readonly string[]) => void;
+  /** The q-api's reviewed OpenAI model-provider key, if configured. */
+  readonly openaiApiKey?: string | undefined;
+  /** For tests; the process environment otherwise. */
+  readonly config?: EmbeddingConfig | undefined;
 }): EmbeddingService {
-  const config = loadEmbeddingConfig();
+  const config = options?.config ?? loadEmbeddingConfig();
+  if (config.provider === "openai") {
+    if (options?.openaiApiKey === undefined) {
+      options?.onMissing?.(["OPENAI_API_KEY"]);
+    }
+    return createEmbeddingService({
+      provider: createOpenAIEmbeddingProvider({
+        apiKey: options?.openaiApiKey,
+        timeoutMs: config.timeoutMs,
+      }),
+    });
+  }
   if (config.missing.length > 0) options?.onMissing?.(config.missing);
   return createEmbeddingService({
     provider: createLocalTeiEmbeddingProvider({
@@ -427,6 +458,9 @@ export function composeQIntelligence(
     semantic: createPostgresSemanticSearch(),
     hydration,
     ...(embeddings === undefined ? {} : { embeddings }),
+    ...(dependencies.queryEmbeddingCeiling === undefined
+      ? {}
+      : { queryEmbeddingCeiling: dependencies.queryEmbeddingCeiling }),
     ...(logger === undefined ? {} : { logger }),
   });
 

@@ -57,9 +57,14 @@ export const OPENAI_TE3_SMALL_1024_CONFIGURATION: EmbeddingConfiguration =
     maxDimension: 1536,
     normalization: "L2_UNIT",
     instructionStrategy: "QUERY_ONLY",
-    // Far under the model's 8,191-token limit (a token is never shorter
-    // than a character), so the API never truncates an input.
-    maxInputCharacters: 4_000,
+    // Under the model's 8,191-token limit for ordinary text (English runs
+    // ~4 characters a token). Raised from 4,000 (decision 99) because 126
+    // document chunks run to 4,817 characters; a chunk past this is embedded
+    // from a deterministic prefix by the chunk sweep, and an input the API
+    // still refuses (dense non-Latin text) fails alone as INPUT_TOO_LARGE.
+    // Not part of the configuration version: the vector of any input that
+    // fitted before is unchanged.
+    maxInputCharacters: 8_000,
     maxBatchItems: 64,
     maxBatchCharacters: 256_000,
   });

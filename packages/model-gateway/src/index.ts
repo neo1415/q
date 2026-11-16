@@ -90,6 +90,10 @@ export {
   type RoutePlan,
 } from "./policy/eligibility.js";
 export {
+  createEmbeddingCeilingReader,
+  embeddingProviderCeiling,
+} from "./policy/embedding-ceiling.js";
+export {
   alwaysHealthy,
   createProcessLocalProviderHealth,
   type ProviderHealthOptions,

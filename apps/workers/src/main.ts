@@ -141,6 +141,7 @@ import {
   createDiligenceDocumentSummariser,
 } from "@capital-q/model-gateway/q";
 import {
+  createPostgresModelCatalog,
   createPostgresProviderSpendReader,
   parseProviderBalanceSettings,
   providerBlockedAlertText,
@@ -269,6 +270,12 @@ import {
   refreshCompanyEmbeddings,
   runCompanyEmbeddingRefresh,
 } from "./recommendations/embeddings.js";
+import {
+  CHUNK_EMBEDDING_SWEEP_INTERVAL_MS,
+  CHUNK_EMBEDDING_SWEEP_MAX_CHUNKS,
+  chunkEmbeddingCeiling,
+  runChunkEmbeddingSweepLoop,
+} from "./chunk-embeddings.js";
 import {
   DOCUMENT_JOB_INTERVAL_MS,
   runDocumentJobTicker,
@@ -1841,6 +1848,24 @@ await Promise.all([
           logger,
           limit: COMPANY_EMBEDDING_REFRESH_LIMIT,
           intervalMs: 30 * 60 * 1000,
+          signal: shutdownController.signal,
+        }),
+        // Decision 99: document chunks too, with the same embedder (one
+        // configuration version, which q-api's query embedder matches),
+        // only up to the provider's reviewed sensitivity ceiling.
+        runChunkEmbeddingSweepLoop({
+          runtime: {
+            sql: database.sql,
+            transactions: database.transactions,
+            embeddings: recommendationEmbedder.embedder,
+            ceiling: chunkEmbeddingCeiling(
+              recommendationEmbedder.embedder,
+              createPostgresModelCatalog({ sql: database.sql }),
+            ),
+            logger,
+          },
+          intervalMs: CHUNK_EMBEDDING_SWEEP_INTERVAL_MS,
+          maxChunks: CHUNK_EMBEDDING_SWEEP_MAX_CHUNKS,
           signal: shutdownController.signal,
         }),
       ]),

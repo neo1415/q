@@ -164,6 +164,21 @@ export function createPostgresChunkEmbeddingRepository(): ChunkEmbeddingReposito
     listChunksMissingEmbedding: async (executor, query) => {
       // Only ACTIVE chunks are worth embedding: spending on a vector for a
       // superseded or revoked chunk buys nothing that may ever be retrieved.
+      //
+      // `allowedSensitivities` (decision 99): a chunk is listed only when
+      // BOTH its own class and its document's current class are among the
+      // classes the provider may be sent. Filtering here, not after the
+      // read, keeps withheld chunks from occupying every page of a bounded
+      // sweep forever.
+      const allowed =
+        query.allowedSensitivities === undefined
+          ? null
+          : [...query.allowedSensitivities];
+      const excluded =
+        query.excludeChunkIds === undefined ||
+        query.excludeChunkIds.length === 0
+          ? null
+          : [...query.excludeChunkIds];
       const rows = await executor`
         select c.id, c.tenant_id, c.chunk_set_id, c.document_version_id, c.subject_type,
                c.subject_id, c.parent_chunk_id, c.chunk_index, c.role, c.chunk_kind,
@@ -173,6 +188,16 @@ export function createPostgresChunkEmbeddingRepository(): ChunkEmbeddingReposito
           from q_knowledge.chunks c
          where c.status = 'ACTIVE'
            and (${query.tenantId ?? null}::uuid is null or c.tenant_id = ${query.tenantId ?? null})
+           and (${excluded}::uuid[] is null or not (c.id = any(${excluded}::uuid[])))
+           and (${allowed}::text[] is null or (
+                 c.sensitivity_class = any(${allowed}::text[])
+                 and not exists (
+                   select 1
+                     from q_knowledge.chunk_sets cs
+                     join evidence.documents d
+                       on d.id = cs.document_id and d.tenant_id = cs.tenant_id
+                    where cs.id = c.chunk_set_id and cs.tenant_id = c.tenant_id
+                      and not (d.sensitivity_class = any(${allowed}::text[])))))
            and not exists (
              select 1 from q_knowledge.embeddings e
               where e.chunk_id = c.id
@@ -180,6 +205,30 @@ export function createPostgresChunkEmbeddingRepository(): ChunkEmbeddingReposito
          order by c.created_at, c.id
          limit ${query.limit}`;
       return rows.map((row): Chunk => toChunk(row));
+    },
+
+    countChunksWithheldBySensitivity: async (executor, query) => {
+      // The complement of the filter above: ACTIVE, still vectorless under
+      // this configuration, and above the ceiling by its own class or its
+      // document's. They stay lexical-only; this is the count that says so.
+      const allowed = [...query.allowedSensitivities];
+      const rows = await executor<{ n: number }[]>`
+        select count(*)::int as n
+          from q_knowledge.chunks c
+         where c.status = 'ACTIVE'
+           and not exists (
+             select 1 from q_knowledge.embeddings e
+              where e.chunk_id = c.id
+                and e.configuration_version = ${query.configurationVersion})
+           and (not (c.sensitivity_class = any(${allowed}::text[]))
+                or exists (
+                  select 1
+                    from q_knowledge.chunk_sets cs
+                    join evidence.documents d
+                      on d.id = cs.document_id and d.tenant_id = cs.tenant_id
+                   where cs.id = c.chunk_set_id and cs.tenant_id = c.tenant_id
+                     and not (d.sensitivity_class = any(${allowed}::text[]))))`;
+      return rows[0]?.n ?? 0;
     },
 
     countByConfiguration: async (executor, tenantId, configurationVersion) => {

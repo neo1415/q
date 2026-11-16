@@ -1,3 +1,7 @@
+import {
+  sensitivityAtMost,
+  type MessageSensitivity,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { getMeter, type Logger } from "@capital-q/observability";
 import type { EmbeddingService } from "@capital-q/q-embeddings";
@@ -64,6 +68,18 @@ export type AuthorisedRetrievalDependencies = {
    * and never silently reaches for a paid API instead.
    */
   readonly embeddings?: EmbeddingService | undefined;
+  /**
+   * Decision 99: where the embedder is a hosted provider, the strongest
+   * class it may be sent (the Model Gateway's reviewed provider record;
+   * null means nothing). The query text is the person's own words, which
+   * the answer path already sends to a model under `plan.maxSensitivity`;
+   * the same rule applies here, so a plan whose ceiling is above the
+   * provider's (HIGHLY_CONFIDENTIAL, RESTRICTED) is searched lexically and
+   * its question never reaches the embedding vendor. Absent: a self-hosted
+   * runtime, unchanged.
+   */
+  readonly queryEmbeddingCeiling?:
+    (() => Promise<MessageSensitivity | null>) | undefined;
   readonly config?: RetrievalConfig | undefined;
   /**
    * Step 5: overrides the reranker the config names (a model reranker
@@ -139,8 +155,15 @@ const SLOW_RETRIEVAL_MS = 2_000;
 export function createAuthorisedRetrievalService(
   dependencies: AuthorisedRetrievalDependencies,
 ): AuthorisedRetrievalService {
-  const { sql, lexical, semantic, hydration, embeddings, logger } =
-    dependencies;
+  const {
+    sql,
+    lexical,
+    semantic,
+    hydration,
+    embeddings,
+    queryEmbeddingCeiling,
+    logger,
+  } = dependencies;
   const config = dependencies.config ?? DEFAULT_RETRIEVAL_CONFIG;
   const reranker = dependencies.reranker ?? rerankerFor(config.reranker);
   const meter = getMeter("@capital-q/q-knowledge");
@@ -210,6 +233,30 @@ export function createAuthorisedRetrievalService(
         searchMs: null,
         reason: "EMBEDDING_UNAVAILABLE",
       };
+    }
+    if (queryEmbeddingCeiling !== undefined) {
+      // Privacy before availability: the question is sent only where the
+      // plan's own ceiling is within the provider's. A catalogue that cannot
+      // be read is treated as "nothing", never as "anything".
+      let ceiling: MessageSensitivity | null;
+      try {
+        ceiling = await queryEmbeddingCeiling();
+      } catch (error: unknown) {
+        logger?.warn({ err: error }, "embedding ceiling could not be read");
+        ceiling = null;
+      }
+      if (
+        ceiling === null ||
+        !sensitivityAtMost(envelope.maxSensitivity, ceiling)
+      ) {
+        return {
+          candidates: [],
+          state: "UNAVAILABLE",
+          embeddingMs: null,
+          searchMs: null,
+          reason: "EMBEDDING_INELIGIBLE",
+        };
+      }
     }
     const embeddingStarted = Date.now();
     let vector: readonly number[];

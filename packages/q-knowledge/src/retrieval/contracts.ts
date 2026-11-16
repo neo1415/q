@@ -287,6 +287,8 @@ export type RetrievalDegradation = {
    */
   readonly reason:
     | "EMBEDDING_UNAVAILABLE"
+    /** The plan's sensitivity is above the hosted embedder's ceiling. */
+    | "EMBEDDING_INELIGIBLE"
     | "LEXICAL_UNAVAILABLE"
     | "SEMANTIC_UNAVAILABLE"
     | "STRATEGY_REQUESTED"

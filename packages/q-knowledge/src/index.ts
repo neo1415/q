@@ -100,6 +100,12 @@ export {
   type PersistedEmbedding,
 } from "./application/embedding-persistence.js";
 export {
+  embeddingInputFor,
+  sweepChunkEmbeddings,
+  type ChunkEmbeddingSweepDependencies,
+  type ChunkEmbeddingSweepReport,
+} from "./application/chunk-embedding-sweep.js";
+export {
   createPostgresChunkEmbeddingRepository,
   createPostgresSemanticSearch,
 } from "./infrastructure/postgres-embedding-repository.js";

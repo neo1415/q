@@ -494,6 +494,7 @@ import {
   createModelProviderRegistry,
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
+  createEmbeddingCeilingReader,
   indexCatalog,
   providerJustifiedCeiling,
   createPostgresModelUsageRepository,
@@ -4902,6 +4903,9 @@ const qActionPort = createQActionPort({
 // reached, retrieval runs lexically and says so in its own diagnostics,
 // which is an honest degradation rather than a silent one.
 const embeddings = createProductionEmbeddingService({
+  // Decision 99: Q_EMBEDDING_PROVIDER=openai uses the reviewed OpenAI key
+  // this service already holds, under the workers' configuration.
+  openaiApiKey: providerSecrets.openai?.reveal(),
   onMissing: (missing) => {
     logger.warn(
       { missing },
@@ -4909,19 +4913,41 @@ const embeddings = createProductionEmbeddingService({
     );
   },
 });
+const embeddingDescriptor = embeddings.describe();
+// Decision 99: a hosted embedder is sent a question only when the plan's
+// ceiling is within the provider's reviewed ceiling (the gateway's record).
+// The self-hosted runtime keeps text on the private network: no ceiling.
+const queryEmbeddingCeiling =
+  embeddingDescriptor.configuration.runtime === "HOSTED_API"
+    ? createEmbeddingCeilingReader({
+        catalog: modelCatalog,
+        providerCode: embeddingDescriptor.providerCode,
+        modelCode: embeddingDescriptor.configuration.modelCode,
+      })
+    : undefined;
+logger.info(
+  {
+    provider: embeddingDescriptor.providerCode,
+    configuration: embeddingDescriptor.configuration.configurationVersion,
+  },
+  "query embedding configured",
+);
 // One embedding before anyone asks for one. The runtime loads its model
 // on first use, and that cost landed on the first person to speak after a
 // start: a retrieval that should take under a second took twelve. Best
 // effort and detached; a runtime that is not there yet is reported by
-// retrieval itself, per request, as a degradation.
-void embeddings
-  .embedQuery("Capital Q is starting.", "EVIDENCE_RETRIEVAL", {
-    signal: AbortSignal.timeout(30_000),
-  })
-  .then(() => logger.info({}, "embedding runtime warm"))
-  .catch((error: unknown) =>
-    logger.warn({ err: error }, "embedding runtime not warmed"),
-  );
+// retrieval itself, per request, as a degradation. A hosted API has no
+// model to load, so it is not warmed (and not paid for) at every start.
+if (embeddingDescriptor.configuration.runtime !== "HOSTED_API") {
+  void embeddings
+    .embedQuery("Capital Q is starting.", "EVIDENCE_RETRIEVAL", {
+      signal: AbortSignal.timeout(30_000),
+    })
+    .then(() => logger.info({}, "embedding runtime warm"))
+    .catch((error: unknown) =>
+      logger.warn({ err: error }, "embedding runtime not warmed"),
+    );
+}
 // What Q remembers about a person (ADR 0012): the memory service over
 // q_knowledge.memory_items, its write gate, and the learner that runs
 // after every run to propose memories and keep the conversation summary
@@ -5769,6 +5795,7 @@ const qIntelligence = composeQIntelligence({
   tools: runSubjects.observe(qTools.port),
   gateway: modelGateway,
   embeddings,
+  queryEmbeddingCeiling,
   statements: researchComposition.statements,
   profileUpdates: profileBoard,
   // J7: a quote that would clear a field is read for whether it asks to.

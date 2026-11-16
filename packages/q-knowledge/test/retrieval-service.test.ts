@@ -232,6 +232,90 @@ describe("authorised retrieval service", () => {
     expect(result.executedStrategy).toBe("LEXICAL_ONLY");
   });
 
+  describe("decision 99: a hosted embedder's sensitivity ceiling", () => {
+    const hosted = () => ({
+      describe: () => {
+        throw new Error("unused");
+      },
+      embedDocuments: () => Promise.reject(new Error("unused")),
+      embedQuery: vi.fn().mockResolvedValue({
+        vector: [1, 0],
+        dimension: 2,
+        configurationVersion: "capital-q-openai-te3-small-1024-v1",
+      }),
+      health: () => Promise.reject(new Error("unused")),
+    });
+    const lexicalHit: LexicalSearchPort = {
+      search: () =>
+        Promise.resolve([{ chunkId: chunkId(1), rank: 1, lexicalScore: 0.5 }]),
+    };
+
+    it("a HIGHLY_CONFIDENTIAL plan's question never reaches a CONFIDENTIAL-ceiling provider", async () => {
+      const embeddings = hosted();
+      const semantic = { search: vi.fn().mockResolvedValue([]) };
+      const service = createAuthorisedRetrievalService({
+        sql,
+        lexical: lexicalHit,
+        semantic,
+        hydration: fakeHydration([hydrated(chunkId(1))]),
+        embeddings,
+        queryEmbeddingCeiling: () => Promise.resolve("CONFIDENTIAL"),
+      });
+      const result = await service.retrieve({
+        query: "runway and payroll",
+        envelope: envelope({ maxSensitivity: "HIGHLY_CONFIDENTIAL" }),
+      });
+      expect(embeddings.embedQuery).not.toHaveBeenCalled();
+      expect(semantic.search).not.toHaveBeenCalled();
+      expect(result.degraded.reason).toBe("EMBEDDING_INELIGIBLE");
+      expect(result.executedStrategy).toBe("LEXICAL_ONLY");
+      expect(result.hits.map((h) => h.chunkId)).toEqual([chunkId(1)]);
+    });
+
+    it("a CONFIDENTIAL plan is embedded and searched semantically", async () => {
+      const embeddings = hosted();
+      const semantic = { search: vi.fn().mockResolvedValue([]) };
+      const service = createAuthorisedRetrievalService({
+        sql,
+        lexical: lexicalHit,
+        semantic,
+        hydration: fakeHydration([hydrated(chunkId(1))]),
+        embeddings,
+        queryEmbeddingCeiling: () => Promise.resolve("CONFIDENTIAL"),
+      });
+      const result = await service.retrieve({
+        query: "market size",
+        envelope: envelope({ maxSensitivity: "CONFIDENTIAL" }),
+      });
+      expect(embeddings.embedQuery).toHaveBeenCalledTimes(1);
+      expect(semantic.search).toHaveBeenCalledTimes(1);
+      expect(result.degraded.semantic).toBe("OK");
+    });
+
+    it("an unreadable or empty ceiling sends nothing", async () => {
+      for (const ceiling of [
+        () => Promise.resolve(null),
+        () => Promise.reject(new Error("catalogue down")),
+      ]) {
+        const embeddings = hosted();
+        const service = createAuthorisedRetrievalService({
+          sql,
+          lexical: lexicalHit,
+          semantic: noSemantic,
+          hydration: fakeHydration([hydrated(chunkId(1))]),
+          embeddings,
+          queryEmbeddingCeiling: ceiling,
+        });
+        const result = await service.retrieve({
+          query: "market size",
+          envelope: envelope({ maxSensitivity: "PUBLIC" }),
+        });
+        expect(embeddings.embedQuery).not.toHaveBeenCalled();
+        expect(result.degraded.reason).toBe("EMBEDDING_INELIGIBLE");
+      }
+    });
+  });
+
   it("runs the lexical and semantic halves concurrently under the one envelope (2026-10-12)", async () => {
     // Lexical is held open until the semantic half has already embedded the
     // query and searched: sequential execution would deadlock this test.
