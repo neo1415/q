@@ -278,7 +278,7 @@ export function DataRoomTab({
     }).then(async (result) => {
       setSaid(
         result.ok
-          ? `Shared with ${person.name}: view only, for 30 days.`
+          ? `Shared with ${person.name}: view only, for 30 days.${loaded?.folder.investorQReads === true ? " They and their Q will be able to read it until you stop sharing." : ""}`
           : result.message,
       );
       await load(openCode, ids);

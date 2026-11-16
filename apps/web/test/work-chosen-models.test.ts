@@ -275,6 +275,7 @@ describe("the data room as folders", () => {
       history: [],
       candidates: [],
       awaitingConnection: [],
+      investorQReads: false,
     };
     const people = folderPeople({
       folderDocumentIds: [UUID(2), UUID(3)],

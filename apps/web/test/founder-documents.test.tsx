@@ -35,6 +35,13 @@ const actions = vi.hoisted(() => ({
   outline: vi.fn((..._args: unknown[]) =>
     Promise.resolve({ ok: true, value: undefined }),
   ),
+  share: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ ok: true, value: undefined }),
+  ),
+  loadDocument: vi.fn(
+    (..._args: unknown[]): Promise<{ ok: boolean; [key: string]: unknown }> =>
+      Promise.resolve({ ok: false, message: "x" }),
+  ),
 }));
 
 vi.mock("../src/features/documents/requests/request-actions", () => ({
@@ -43,10 +50,10 @@ vi.mock("../src/features/documents/requests/request-actions", () => ({
   answerQuestionAction: actions.answer,
   newAnswerKey: () => Promise.resolve("6f1e2a4c-1b2c-4d3e-8f9a-0b1c2d3e4f5a"),
   loadInboxAction: () => Promise.resolve({ ok: false, message: "x" }),
-  loadDocumentAccessAction: () => Promise.resolve({ ok: false, message: "x" }),
+  loadDocumentAccessAction: actions.loadDocument,
   loadFolderAccessAction: () => Promise.resolve({ ok: false, message: "x" }),
   revokeAccessAction: actions.revoke,
-  shareDocumentAction: vi.fn(),
+  shareDocumentAction: actions.share,
   shareFolderAction: vi.fn(),
   setFolderLevelAction: vi.fn(),
 }));
@@ -317,6 +324,53 @@ describe("the access sheet", () => {
     expect(
       document.querySelector("[data-access-history]")?.textContent,
     ).toContain("revoked for Harbour Lane Partners (fictional)");
+  });
+
+  // ADR 0078 (decision 99): sharing a highly confidential document says,
+  // once, that the investor's Q can read it for them; nothing else does.
+  const shareWith = async (investorQReads: boolean) => {
+    render(
+      <AccessSheet
+        companyId={fixtures.REVIEW_COMPANY}
+        target={{
+          kind: "DOCUMENT",
+          documentId: fixtures.UNIT_ECONOMICS,
+          title: "Management accounts",
+        }}
+        initial={{ ...fixtures.reviewDocumentAccess(), investorQReads }}
+        onClose={() => undefined}
+      />,
+    );
+    // The sheet reloads after a share; the reload succeeds here.
+    actions.loadDocument.mockResolvedValueOnce({
+      ok: true,
+      value: { ...fixtures.reviewDocumentAccess(), investorQReads },
+    });
+    const zino = fixtures
+      .reviewDocumentAccess()
+      .candidates.find((c) => c.investorOrganisationName.startsWith("Zino"));
+    fireEvent.change(
+      document.querySelector("[data-access-candidate]") as HTMLSelectElement,
+      { target: { value: zino?.relationshipId } },
+    );
+    fireEvent.click(
+      document.querySelector("[data-access-share]") as HTMLButtonElement,
+    );
+    await waitFor(() => expect(actions.share).toHaveBeenCalledTimes(1));
+  };
+
+  it("says the investor's Q can read a highly confidential document once shared", async () => {
+    await shareWith(true);
+    const line =
+      "Shared. Zino Capital (fictional) and their Q will be able to read this until you stop sharing. They've been told.";
+    expect(await screen.findByText(line)).toBeTruthy();
+    expect(document.body.textContent?.split("their Q").length).toBe(2);
+  });
+
+  it("keeps the short confirmation for any other document", async () => {
+    await shareWith(false);
+    expect(await screen.findByText("Shared. They've been told.")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("their Q");
   });
 });
 

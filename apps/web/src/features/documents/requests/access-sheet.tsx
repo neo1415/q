@@ -59,6 +59,21 @@ export type AccessTarget =
 const selectClass =
   "cq-body-sm min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
 
+/**
+ * The share confirmation (ADR 0078, decision 99): for a document the
+ * investor's Q can read once shared (highly confidential: management
+ * accounts, financials, a financial model, a bank statement), it says so,
+ * once, plainly. Every other share keeps the short confirmation.
+ */
+function sharedWords(
+  investorQReads: boolean,
+  name: string | undefined,
+): string {
+  if (!investorQReads || name === undefined)
+    return "Shared. They've been told.";
+  return `Shared. ${name} and their Q will be able to read this until you stop sharing. They've been told.`;
+}
+
 const HISTORY_WORDS = {
   SHARED: "shared with",
   REVOKED: "revoked for",
@@ -400,7 +415,12 @@ function DocumentAccess({
           onShare={(input) =>
             run(
               () => shareDocumentAction(access.documentId, input),
-              "Shared. They've been told.",
+              sharedWords(
+                access.investorQReads,
+                access.candidates.find(
+                  (c) => c.relationshipId === input.relationshipId,
+                )?.investorOrganisationName,
+              ),
             )
           }
         />
@@ -520,7 +540,12 @@ function FolderAccess({
           onShare={(input) =>
             run(
               () => shareFolderAction(companyId, access.folderCode, input),
-              "Shared. They've been told.",
+              sharedWords(
+                access.investorQReads,
+                access.candidates.find(
+                  (c) => c.relationshipId === input.relationshipId,
+                )?.investorOrganisationName,
+              ),
             )
           }
         />

@@ -766,6 +766,32 @@ describe("founder requests: the access editor", () => {
     ]);
   });
 
+  it("says a highly confidential document is one the investor's Q reads once shared (ADR 0078)", async () => {
+    const { service, documents } = world();
+    expect(
+      (await service.documentAccess(founder, FILED.documentId))?.investorQReads,
+    ).toBe(false);
+    expect(
+      (await service.folderAccess(founder, COMPANY, "cap_table"))
+        ?.investorQReads,
+    ).toBe(false);
+    for (const sensitivityClass of ["CONFIDENTIAL", "RESTRICTED", null]) {
+      documents[1] = { ...FILED, sensitivityClass };
+      expect(
+        (await service.documentAccess(founder, FILED.documentId))
+          ?.investorQReads,
+      ).toBe(false);
+    }
+    documents[1] = { ...FILED, sensitivityClass: "HIGHLY_CONFIDENTIAL" };
+    expect(
+      (await service.documentAccess(founder, FILED.documentId))?.investorQReads,
+    ).toBe(true);
+    expect(
+      (await service.folderAccess(founder, COMPANY, "cap_table"))
+        ?.investorQReads,
+    ).toBe(true);
+  });
+
   it("never shares with another company's relationship, nor for another company", async () => {
     const { service, policies } = world();
     expect(

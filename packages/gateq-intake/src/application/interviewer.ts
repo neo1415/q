@@ -76,6 +76,7 @@ import {
   renderKnownStatements,
   replyHeldToReading,
   replySentences,
+  sentencePieces,
   StatementPlanSchema,
   withoutQuestions,
   type AskLog,
@@ -180,7 +181,8 @@ function statementsOfFact(
  */
 function aroundReadBack(reply: string, amounts: readonly string[]): string {
   const trimmed = reply.trim();
-  const sentences = trimmed.match(/[^.!?]+[.!?]*/gu) ?? [trimmed];
+  const pieces = sentencePieces(trimmed);
+  const sentences = pieces.length > 0 ? pieces : [trimmed];
   const kept = sentences.filter(
     (sentence, index) =>
       !(index === sentences.length - 1 && sentence.trim().endsWith("?")) &&

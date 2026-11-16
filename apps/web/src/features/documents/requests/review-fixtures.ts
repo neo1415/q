@@ -281,6 +281,7 @@ export function reviewDocumentAccess(): DocumentAccessDto {
         investorOrganisationName: "Meridian Seed (fictional)",
       },
     ],
+    investorQReads: false,
   };
 }
 
@@ -309,6 +310,7 @@ export function reviewFolderAccess(): FolderAccessDto {
     ],
     candidates: reviewDocumentAccess().candidates,
     awaitingConnection: reviewDocumentAccess().awaitingConnection,
+    investorQReads: true,
   };
 }
 

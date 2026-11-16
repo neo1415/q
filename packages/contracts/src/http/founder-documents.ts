@@ -373,6 +373,12 @@ export const DocumentAccessDtoSchema = z
      * shown as "connect first", never shareable until accepted.
      */
     awaitingConnection: z.array(AccessCandidateSchema).max(200).default([]),
+    /**
+     * ADR 0078 (decision 99): a HIGHLY_CONFIDENTIAL document that, once
+     * shared, the investor's Q can read for that investor. The founder is
+     * told so, once, when they share it.
+     */
+    investorQReads: z.boolean().default(false),
   })
   .strict();
 export type DocumentAccessDto = z.infer<typeof DocumentAccessDtoSchema>;
@@ -407,6 +413,8 @@ export const FolderAccessDtoSchema = z
     /** Connected investors only (see DocumentAccessDto.candidates). */
     candidates: z.array(AccessCandidateSchema).max(200),
     awaitingConnection: z.array(AccessCandidateSchema).max(200).default([]),
+    /** Any document in the folder is one an investor's Q reads (above). */
+    investorQReads: z.boolean().default(false),
   })
   .strict();
 export type FolderAccessDto = z.infer<typeof FolderAccessDtoSchema>;

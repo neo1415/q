@@ -94,6 +94,11 @@ export type DataRoomDocument = {
   readonly companyId: string;
   readonly title: string;
   readonly documentType: string;
+  /**
+   * The stored sensitivity class. HIGHLY_CONFIDENTIAL is what a share lets
+   * the investor's Q read for them (ADR 0078); absent reads as not.
+   */
+  readonly sensitivityClass?: string | null;
   readonly level: DataRoomLevel;
   readonly folderCode: string;
   readonly checklistItemCode: string | null;

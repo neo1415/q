@@ -361,6 +361,13 @@ export function createFounderRequestsService(
     return company === null ? null : { company, document };
   }
 
+  /**
+   * ADR 0078: a shared HIGHLY_CONFIDENTIAL document is one the investor's Q
+   * can read for them; the share screen says so. RESTRICTED never unlocks.
+   */
+  const investorQReads = (document: DataRoomDocument): boolean =>
+    document.sensitivityClass === "HIGHLY_CONFIDENTIAL";
+
   async function names(companyId: string) {
     const relationships = await quietly(
       dependencies.relationshipsOf(companyId),
@@ -917,6 +924,7 @@ export function createFounderRequestsService(
         history: accessHistory(policies, nameOf, at),
         candidates,
         awaitingConnection,
+        investorQReads: investorQReads(document),
       };
     },
 
@@ -975,6 +983,7 @@ export function createFounderRequestsService(
         investors: investors.filter((investor) => investor.documents > 0),
         candidates,
         awaitingConnection,
+        investorQReads: inFolder.some(investorQReads),
       };
     },
 

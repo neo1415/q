@@ -174,12 +174,17 @@ export function ownWords(words: string, said: string): string {
   if (said.trim().length === 0 || plainText(said).includes(plainText(words)))
     return words;
   const wanted = tokensOf(words);
-  const sentences = [...said.matchAll(/[^.!?]+[.!?]*/gu)];
-  const scored = sentences.map((match) => {
-    const own = tokensOf(match[0]);
+  let offset = 0;
+  const sentences = sentencePieces(said).map((piece) => {
+    const start = said.indexOf(piece, offset);
+    offset = start + piece.length;
+    return { piece, start };
+  });
+  const scored = sentences.map(({ piece, start }) => {
+    const own = tokensOf(piece);
     return {
-      start: match.index,
-      end: match.index + match[0].length,
+      start,
+      end: start + piece.length,
       score: [...wanted].filter((token) => own.has(token)).length,
     };
   });
@@ -899,7 +904,7 @@ const NAMES_A_STAGE =
   /\b(?:pre[\s-]?seed|seed|series\s+[a-e]\b|growth[\s-]stage)\b/iu;
 
 export function withoutLeaveOpenRequests(text: string): string {
-  const sentences = text.match(/[^.!?]+[.!?]*/gu) ?? [text];
+  const sentences = sentencePieces(text);
   return sentences
     .filter((sentence) => !LEAVE_OPEN_REQUEST.test(sentence.trim()))
     .join("")
@@ -1696,7 +1701,7 @@ export function planReading(input: PlanInput): PlanOutcome {
     const onRecord = new Set(
       existing.flatMap((statement) => figuresIn(statement.words)),
     );
-    for (const sentence of input.current.text.match(/[^.!?]+[.!?]*/gu) ?? []) {
+    for (const sentence of sentencePieces(input.current.text)) {
       const figures = figuresIn(sentence);
       if (
         figures.length === 0 ||
@@ -1943,8 +1948,10 @@ export function planReading(input: PlanInput): PlanOutcome {
 const CLAIMS_RECORDED =
   /\b(?:noted|recorded|saved|logged|captured|added (?:that|it|this)|(?:i've|i have|i'll) (?:got|note|add|record|save|log|capture)\w*(?: (?:that|it|this))?(?: down)?|on (?:the|your) (?:record|application) now)\b/iu;
 
-const sentencesOf = (text: string): readonly string[] =>
-  text.trim().match(/[^.!?]+[.!?]*/gu) ?? [text];
+const sentencesOf = (text: string): readonly string[] => {
+  const pieces = sentencePieces(text.trim());
+  return pieces.length > 0 ? pieces : [text];
+};
 
 /** A sentence's clauses, each with the separator that ends it. */
 const clausesOf = (sentence: string): readonly string[] =>
@@ -2060,14 +2067,47 @@ export function claimsLeftOpen(text: string): boolean {
 export const NOT_LEFT_OPEN_LINE =
   "I haven't marked those two answers as left open yet.";
 
+/** Short forms whose stop never ends a sentence ("e.g. 40 shops", "U.S."). */
+const ABBREVIATION =
+  /(?:^|[\s(])(?:e\.g|i\.e|vs|approx|incl|mr|mrs|ms|dr|fig|ref|(?:\p{L}\.)+\p{L})\.$/iu;
+
+/** A list marker on its own ("1.", "b)", "iv."): it opens the next sentence. */
+const LIST_MARKER = /^\s*(?:\d{1,2}|[a-h]|[ivx]{1,4})[.)]$/iu;
+
 /**
- * A reply's sentences, as a founder reads them: a stop ends a sentence
- * only before a space or the end, so "USD 1.5m" stays one sentence.
+ * The one sentence splitter for what a founder says and what Q replies:
+ * pieces, in order, that together are the text exactly (each keeps its
+ * leading space, as the old match did, so joining them gives the text
+ * back). A stop ends a sentence only before a space or the end, and never
+ * after a short form or a lone list marker, so "29.3%", "USD 1.5m",
+ * "$2.0m", "v1.2" and "1,200.50" stay inside their sentence (live
+ * 2026-11-16: "...gross margin of 29.3%." was kept as two notes, "...29."
+ * and "3%.").
+ */
+export function sentencePieces(text: string): readonly string[] {
+  const pieces: string[] = [];
+  let start = 0;
+  for (const stop of text.matchAll(/[.!?]+(?=\s|$)/gu)) {
+    const end = stop.index + stop[0].length;
+    const piece = text.slice(start, end);
+    if (
+      stop[0] === "." &&
+      (ABBREVIATION.test(piece) || LIST_MARKER.test(piece))
+    )
+      continue;
+    pieces.push(piece);
+    start = end;
+  }
+  if (start < text.length) pieces.push(text.slice(start));
+  return pieces.filter((piece) => piece.trim().length > 0);
+}
+
+/**
+ * A reply's sentences, as a founder reads them, trimmed (sentencePieces):
+ * "USD 1.5m" stays one sentence.
  */
 export function replySentences(text: string): readonly string[] {
-  return (text.trim().match(/(?:[^.!?]|[.!?](?!\s|$))+[.!?]*/gu) ?? [])
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length > 0);
+  return sentencePieces(text.trim()).map((sentence) => sentence.trim());
 }
 
 /**

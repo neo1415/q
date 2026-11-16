@@ -684,6 +684,7 @@ describe("the data room as folders", () => {
           },
         ],
         awaitingConnection: [],
+        investorQReads: false,
       },
     });
     vi.mocked(requestActions.loadDocumentAccessAction).mockResolvedValue({
@@ -708,6 +709,7 @@ describe("the data room as folders", () => {
         history: [],
         candidates: [],
         awaitingConnection: [],
+        investorQReads: false,
       },
     });
     render(

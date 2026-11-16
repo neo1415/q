@@ -155,6 +155,8 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   Share: "مشاركة",
   "Sharing…": "جارٍ المشاركة…",
   "Shared. They've been told.": "تمت المشاركة. أُبلغوا بذلك.",
+  "Shared. {name} and their Q will be able to read this until you stop sharing. They've been told.":
+    "تمت المشاركة. سيتمكن {name} ومعه Q الخاص به من قراءته إلى أن توقف المشاركة. أُبلغوا بذلك.",
   "Shared with {name}. They've been told.":
     "تمت المشاركة مع {name}. أُبلغوا بذلك.",
   "That wasn't shared. Try again.": "لم تتم المشاركة. حاول مرة أخرى.",

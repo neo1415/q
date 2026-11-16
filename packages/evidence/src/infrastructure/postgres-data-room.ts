@@ -25,6 +25,8 @@ export type DataRoomDocumentRow = {
   readonly companyId: string;
   readonly title: string;
   readonly documentType: string;
+  /** The stored sensitivity class (HIGHLY_CONFIDENTIAL, ...), as text. */
+  readonly sensitivityClass: string | null;
   /** No entry: PRIVATE, filed under "other" (or the deck's own folder). */
   readonly level: DataRoomLevel;
   readonly folderCode: string;
@@ -108,6 +110,7 @@ type DocRow = {
   company_id: string;
   title: string;
   document_type: string;
+  sensitivity_class: string | null;
   level: DataRoomLevel | null;
   folder_code: string | null;
   checklist_item_code: string | null;
@@ -125,6 +128,7 @@ const toDoc = (row: DocRow): DataRoomDocumentRow => ({
   companyId: row.company_id,
   title: row.title,
   documentType: row.document_type,
+  sensitivityClass: row.sensitivity_class,
   level: row.level ?? "PRIVATE",
   folderCode:
     row.folder_code ??
@@ -143,6 +147,7 @@ const toDoc = (row: DocRow): DataRoomDocumentRow => ({
 export function createPostgresDataRoom() {
   const documents = (executor: DatabaseExecutor) => executor`
     select d.id as document_id, d.tenant_id, d.company_id, d.title, d.document_type,
+           d.sensitivity_class::text as sensitivity_class,
            e.level, e.folder_code, e.checklist_item_code, e.valid_until,
            coalesce(e.page_count, x.page_count) as page_count,
            v.mime_type, d.current_version_id,

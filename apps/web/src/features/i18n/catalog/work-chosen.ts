@@ -132,6 +132,8 @@ export const WORK_CHOSEN_AR: Readonly<Record<string, string>> = {
     "تعذّر سحب بعض الوصول. حاول مجدداً.",
   "Shared with {name}: view only, for 30 days.":
     "شورك مع {name}: عرض فقط، لمدة 30 يوماً.",
+  "Shared with {name}: view only, for 30 days. They and their Q will be able to read it until you stop sharing.":
+    "شورك مع {name}: عرض فقط، لمدة 30 يوماً. سيتمكنون هم وQ الخاص بهم من قراءته إلى أن توقف المشاركة.",
   "Change who can see this folder": "غيّر من يمكنه رؤية هذا المجلد",
   "Who can see {name}": "من يمكنه رؤية {name}",
   " · asked for by {names}": " · طلبه {names}",
