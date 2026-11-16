@@ -227,6 +227,7 @@ import {
 import { namedCompanyFitLine } from "./named-fit-line.js";
 import {
   asksReasonForPlace,
+  cardNamesInWords,
   companyCardNamesInConversation,
 } from "./shown-list-explanation.js";
 import { boundCompaniesOf } from "./bound-companies.js";
@@ -1133,6 +1134,13 @@ export const OUTWARD_FOLLOW_ON_RESERVE = 2;
  * production, 2.4 s seen). Past it the answer goes on without it.
  */
 export const ARRIVAL_SKIM_GRACE_MS = 250;
+
+/**
+ * The subject line of a follow-up answered from the card Q showed: no
+ * document was searched for it (live re-check of 6f9b63cc5).
+ */
+const CARD_FOLLOW_UP_SUBJECT =
+  "the card you showed them in this conversation (supplied below); their documents were not searched for this follow-up";
 
 export function taskClassForCapability(
   capability: QCapability,
@@ -4760,6 +4768,24 @@ export function createModelGatewayQAnswer(
       if (named.length === 0 || dependencies.arrivalSkim === undefined) {
         return null;
       }
+      // Live re-check of 6f9b63cc5 (run 1, "How come it made the list?"): a
+      // why about an item of a list Q showed here, naming no one on their
+      // arrival, is the reader's to bind to that card (shown-list
+      // explanation), not an arrival follow-up: no third classification
+      // call for it. Their arrival stays among the wide reads of any turn
+      // that is not answered from a card.
+      if (
+        (request.executionClass === "CONTEXTUAL_FOLLOW_UP" &&
+          request.followUpCompanyId !== undefined) ||
+        (asksReasonForPlace(latest.content) &&
+          companyCardNamesInConversation(earlier).length > 0 &&
+          cardNamesInWords(
+            latest.content,
+            named.map((item) => item.counterpart?.name ?? ""),
+          ).length === 0)
+      ) {
+        return null;
+      }
       const skim = await dependencies.arrivalSkim
         .skim({
           utterance: latest.content,
@@ -7418,9 +7444,24 @@ export function createModelGatewayQAnswer(
        * keeps one result per run and query plan, so a reading that changes
        * nothing about the searches costs nothing. A failed refinement
        * keeps the warmed result.
+       *
+       * Live re-check of 6f9b63cc5 (Phase 3 latency): a follow-up answered
+       * from the card Q showed (coveredFollowUp below) takes none of the
+       * documents' passages, so it never waits for a second search after
+       * the reading (it held the answer call ~1.5 s behind the reader).
        */
+      const coveredCard =
+        request.executionClass === "CONTEXTUAL_FOLLOW_UP" &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q") &&
+        request.followUpCompanyId !== undefined
+          ? shownCompanyCard(earlier, request.followUpCompanyId)
+          : null;
       const refinesRetrieval =
         warmed !== undefined &&
+        coveredCard === null &&
         (request.retrievalFocus !== undefined ||
           (request.askParts?.length ?? 0) >= 2);
       let retrievalRefineMs: number | null = null;
@@ -7634,15 +7675,7 @@ export function createModelGatewayQAnswer(
        * call). A contextual follow-up about one company Q already showed
        * on a card is answered from that card: no wide reads, no tool round.
        */
-      const coveredFollowUp =
-        request.executionClass === "CONTEXTUAL_FOLLOW_UP" &&
-        request.writingDocument !== true &&
-        request.askedAction === undefined &&
-        (request.turnKind === undefined ||
-          request.turnKind === "QUESTION_TO_Q") &&
-        request.followUpCompanyId !== undefined
-          ? shownCompanyCard(earlier, request.followUpCompanyId)
-          : null;
+      const coveredFollowUp = coveredCard;
       const withoutWideReads =
         coveredFollowUp !== null ||
         personByCode ||
@@ -8245,7 +8278,23 @@ export function createModelGatewayQAnswer(
       // beside the public pages' (figure-conflicts.ts).
       let suppliedFacts: readonly ConflictFact[] = [];
       const assemblePrompt = async (w: WideReads) => {
-        const assembled = await assembledRead;
+        /**
+         * Live re-check of 6f9b63cc5 (Phase 3 latency, d): a follow-up
+         * answered from the card Q showed is answered from that card, its
+         * list's title (conditions) and words (order) and the question --
+         * not their documents' passages, which only lengthen the call. The
+         * firewall's facts that remain are unchanged; the account digest
+         * is still in the situation below.
+         */
+        const searched = await assembledRead;
+        const assembled =
+          coveredCard === null
+            ? searched
+            : {
+                ...searched,
+                facts: [],
+                subjectDescription: CARD_FOLLOW_UP_SUBJECT,
+              };
         const facts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
@@ -9766,9 +9815,11 @@ export function createModelGatewayQAnswer(
       // request?", "what did they say?", "did they accept?") is answered
       // from the Arrival Snapshot by code: no tool, no model round. Read on
       // its own, so S2's route gating of the wide reads cannot skip it.
+      // A follow-up the reading bound to a card Q showed is that card's,
+      // never the arrival skim's (live re-check of 6f9b63cc5).
       const followUp =
         prepared.arrivalAnswer ??
-        (prepared.arrivalLate === null
+        (prepared.arrivalLate === null || coveredCard !== null
           ? null
           : await settledWithin(
               prepared.arrivalLate,
