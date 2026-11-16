@@ -128,7 +128,7 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
     expect(flash.sensitivityCeiling).toBe("PUBLIC");
   });
 
-  it("loads step 7's reasoning levels from the routing policy (20261231260000)", async () => {
+  it("loads the answer reasoning levels from the routing policy (20261231260000, 20261231594500)", async () => {
     const snapshot = await loadModelCatalogSnapshot(db.sql, new Date());
     const dialogue = snapshot.routingPolicies.find(
       (p) => p.status === "ACTIVE" && p.taskClass === "NORMAL_DIALOGUE",
@@ -137,8 +137,9 @@ describe("@capital-q/model-gateway against local PostgreSQL", () => {
       ANSWER_CHAT: "NONE",
       ANSWER_LOOKUP: "NONE",
       ANSWER_FOLLOW_UP: "LOW",
-      ANSWER_COMPARISON: "MEDIUM",
-      ANSWER_ANALYSIS: "MEDIUM",
+      // 20261231594500: comparison and analysis think at LOW (latency).
+      ANSWER_COMPARISON: "LOW",
+      ANSWER_ANALYSIS: "LOW",
       ANSWER_DOCUMENT: "MEDIUM",
     });
     const classification = snapshot.routingPolicies.find(
