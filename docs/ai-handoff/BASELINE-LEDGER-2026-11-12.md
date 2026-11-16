@@ -779,3 +779,10 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - pre-gate (`scripts/pre-gate.sh`).
 - Gate failures in this batch and their shared cause: checks the pre-gate did not yet cover (an app's own typecheck, repository-scan tests, a killed tsc reported as PASS, failing tests not named). Each is now a pre-gate step.
 - Live checks in progress: GateQ sustained (8 invariants), meetings over HTTP; then investor uncertainty, branding on real sites.
+
+## Voice-audit fixes deployed — `651a3bd50` (16 Nov, 00:18 Lagos) and `3b7145616` (16 Nov, 02:13 Lagos)
+
+- `651a3bd50`: gate `ci-local PASS` (1479 s); migration `20261231592000` (voice telemetry) applied before the deploy (hosted 304). Contents: the RC1–RC5 fixes from `audits/2026-11-15-q-voice-audit/root-causes.md` and the D8 cheque merge. Live re-check: `live-recheck-651a3bd50.md` (3 pass, 3 partial, 4 fail).
+- `3b7145616`: gate `ci-local PASS` (1501 s, all six lanes), no migration; rollback point `651a3bd50`; Railway SUCCESS on all four by 01:13 UTC. Contents: `d4796f0dd` (pipeline stage, cancelled meetings and the cheque path held to the records) and `3b7145616` (rankings wait for the turn reader, conditions carry, widen past the shown list, ordinals only from the reader, follow-up from the card). Live re-check: `live-recheck-3b7145616.md` (9 of 10 pass; the follow-up on a conditioned list still runs wide).
+- In progress: the conditioned-list follow-up, navigation wording and the unprompted founder disclosure line.
+- Test budget 16 Nov: USD 0.14 of 5 used.
