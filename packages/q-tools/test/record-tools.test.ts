@@ -203,7 +203,9 @@ describe("a document held back by its classification", () => {
     return { ...base, scopes: [...base.scopes, ...evidence] };
   };
 
-  it("says the report is held back and how its figures can be used; the deck is not flagged", async () => {
+  // ADR 0079 (owner decision 100): their own highly confidential report
+  // is readable to their own Q, said as the company's own figures.
+  it("says their own report is readable to their Q, as the company's own figures; the deck is not flagged", async () => {
     const outcome = await executor.execute(
       call("list_uploaded_documents", {}),
       contextFor(actorA, plan()),
@@ -212,8 +214,10 @@ describe("a document held back by its classification", () => {
       title: string;
       qUse?: string;
     }[];
-    expect(items[0]?.qUse).toMatch(/Held back from Q by its classification/u);
-    expect(items[0]?.qUse).toMatch(/USER_CLAIM/u);
+    expect(items[0]?.qUse).toMatch(/Q may read it for them/u);
+    expect(items[0]?.qUse).toMatch(/DOCUMENT_SUPPORTED/u);
+    expect(items[0]?.qUse).toMatch(/not independently verified/u);
+    expect(items[0]?.qUse).not.toMatch(/Held back/u);
     expect(items[1]?.qUse).toBeUndefined();
   });
 });
@@ -841,11 +845,12 @@ describe("figures read locally from a held-back document", () => {
       qUse?: string;
       confirmedFigures?: string[];
     }[];
-    expect(item?.qUse).toMatch(
-      /Figures from this document are ready for your confirmation/u,
-    );
+    // The code-read figures keep waiting for confirmation (owner
+    // 2026-10-28), beside the document Q may now read (ADR 0079).
     expect(item?.qUse).toMatch(/4 key figures/u);
-    expect(item?.qUse).toMatch(/Held back from Q/u);
+    expect(item?.qUse).toMatch(/Keep, Change or say Not this/u);
+    expect(item?.qUse).toMatch(/Q may read it for them/u);
+    expect(item?.qUse).not.toMatch(/Held back from Q/u);
     expect(item?.confirmedFigures).toBeUndefined();
   });
 
@@ -860,7 +865,7 @@ describe("figures read locally from a held-back document", () => {
       qUse?: string;
       confirmedFigures?: string[];
     }[];
-    expect(item?.qUse).toMatch(/confirmed 1 figure from it/u);
+    expect(item?.qUse).toMatch(/1 figure they confirmed from it/u);
     expect(item?.confirmedFigures).toEqual([line]);
   });
 });
@@ -891,6 +896,15 @@ describe("their company record names documents held back from Q (S02-F, 2026-10-
           updatedAt: "2026-10-28T10:00:00Z",
           sensitivityClass: "HIGHLY_CONFIDENTIAL",
           figures: { pending: 2, confirmed: [] },
+        },
+        {
+          documentId: "d3",
+          title: "Founder passport",
+          documentType: "IDENTITY",
+          status: "ACTIVE",
+          processing: "COMPLETED",
+          updatedAt: "2026-10-28T10:00:00Z",
+          sensitivityClass: "RESTRICTED",
         },
       ]),
   };
@@ -924,11 +938,10 @@ describe("their company record names documents held back from Q (S02-F, 2026-10-
     );
     expect(out.data).toEqual({ state: "UNVERIFIED" });
     const held = out.heldBackDocuments as { title: string; qUse: string }[];
-    expect(held.map((one) => one.title)).toEqual([
-      "Management accounts Sept 2026",
-    ]);
+    // ADR 0079: their highly confidential accounts are readable to their
+    // own Q now; only the RESTRICTED identity document is held back.
+    expect(held.map((one) => one.title)).toEqual(["Founder passport"]);
     expect(held[0]?.qUse).toContain("Held back from Q");
-    expect(held[0]?.qUse).toContain("ready for your confirmation");
   });
 
   it("nothing about documents where the plan does not admit them", async () => {

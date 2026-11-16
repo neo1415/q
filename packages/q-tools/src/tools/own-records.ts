@@ -134,6 +134,9 @@ function subjectKind(input: ReadMyRecordInput): Subject["subjectType"] {
 }
 
 /**
+ * ADR 0079 (decision 100): only RESTRICTED documents are held back from
+ * their own Q now; their highly confidential ones are readable to it.
+ *
  * Stress re-score 3 (2026-10-29, S02-F): asked from Home "what is our
  * actual MRR? can I trust the deck?", Q answered from their own company
  * record with the deck's $65K and never said their September management
@@ -285,7 +288,11 @@ export const ListUploadedDocumentsOutputSchema = z
             status: z.string().max(64),
             processing: z.string().max(64).nullable(),
             updatedAt: z.string().max(40),
-            /** Present when Q may not read it: why, and the compliant path. */
+            /**
+             * How Q may use it, where its classification says something:
+             * held back (RESTRICTED) with the compliant path, or (ADR 0079)
+             * their own highly confidential material Q may read for them.
+             */
             qUse: z.string().max(600).optional(),
             /**
              * Figures the founder confirmed from it (their own USER_CLAIM),
@@ -301,14 +308,15 @@ export const ListUploadedDocumentsOutputSchema = z
   .strict();
 
 /**
- * Stress 2026-10-28 (F02, J1, S02-F): the founder's management accounts
- * ($51K recognised MRR against the deck's $65K) are HIGHLY_CONFIDENTIAL by
- * Evidence's classification, so no firewall plan admits their chunks and no
- * model provider may receive them (EVIDENCE_DOCUMENTS ceiling CONFIDENTIAL;
- * model-gateway providerJustifiedCeiling). That is by design. What was
- * wrong is silence: Q listed the report as read ("COMPLETED") and then
- * reasoned as if it held nothing else. A held-back document now says so,
- * with the compliant path, wherever Q lists it.
+ * Stress 2026-10-28 (F02, J1, S02-F): Q listed a held-back report as read
+ * ("COMPLETED") and then reasoned as if it held nothing else. A held-back
+ * document now says so, with the compliant path, wherever Q lists it.
+ *
+ * ADR 0079 (owner decision 100, 2026-11-16) supersedes the 2026-10-28 rule
+ * that held the founder's own HIGHLY_CONFIDENTIAL documents (management
+ * accounts, financial model, bank statements) back from their own Q: their
+ * own Q reads them now (ownDocumentQUse). Only RESTRICTED material is held
+ * back from the owner. Every caller of this is the owner's own listing.
  */
 export function heldBackFromQ(
   sensitivityClass: string | null | undefined,
@@ -317,14 +325,9 @@ export function heldBackFromQ(
     readonly confirmed: readonly unknown[];
   },
 ): string | null {
-  if (
-    sensitivityClass !== "HIGHLY_CONFIDENTIAL" &&
-    sensitivityClass !== "RESTRICTED"
-  ) {
-    return null;
-  }
+  if (sensitivityClass !== "RESTRICTED") return null;
   const held =
-    "Held back from Q by its classification (highly confidential, e.g. management accounts or a financial model): Q does not read its contents and never sends them to a model, so nothing in it is in Q's answers. Say so plainly whenever their figures or contradictions come up.";
+    "Held back from Q by its classification (restricted, e.g. an identity document): Q does not read its contents and never sends them to a model, so nothing in it is in Q's answers. Say so plainly whenever it comes up.";
   // Owner 2026-10-28: its key figures are read by code, never a model, and
   // offered to the founder; only what they confirm becomes theirs.
   const pending = figures?.pending ?? 0;
@@ -335,7 +338,41 @@ export function heldBackFromQ(
   if (confirmed > 0) {
     return `${held} The founder confirmed ${String(confirmed)} figure${confirmed === 1 ? "" : "s"} from it as their own stated figures (USER_CLAIM, SELF_REPORTED), set against their deck by code in confirmedFigures: use those, with both sides of any contradiction, and never more of the document.`;
   }
-  return `${held} The compliant path: the founder states the key figures themselves (for example monthly revenue and its month), which become their own stated figures (USER_CLAIM) Q can use and set beside the deck's.`;
+  return `${held} The compliant path: the founder states the key figures themselves, which become their own stated figures (USER_CLAIM) Q can use.`;
+}
+
+/**
+ * How their own Q may use one of their own company's documents, by its
+ * classification: RESTRICTED is held back (heldBackFromQ); HIGHLY_CONFIDENTIAL
+ * (ADR 0079, decision 100) is readable for them through the document read
+ * tools, said as the company's own figures (DOCUMENT_SUPPORTED at most). The
+ * figures Capital Q's code read for confirmation keep working beside it.
+ * Null: nothing to say.
+ */
+export function ownDocumentQUse(
+  sensitivityClass: string | null | undefined,
+  figures?: {
+    readonly pending: number;
+    readonly confirmed: readonly unknown[];
+  },
+): string | null {
+  const held = heldBackFromQ(sensitivityClass, figures);
+  if (held !== null || sensitivityClass !== "HIGHLY_CONFIDENTIAL") return held;
+  const pending = figures?.pending ?? 0;
+  const confirmed = figures?.confirmed.length ?? 0;
+  return [
+    "Their own company's highly confidential material: Q may read it for them (read_document_pages or read_company_document) and cite it by title and page. Its figures are the company's own (USER_CLAIM, DOCUMENT_SUPPORTED), not independently verified; set them beside the deck with both sides of any difference.",
+    ...(pending > 0
+      ? [
+          `Capital Q's code also read ${String(pending)} key figure${pending === 1 ? "" : "s"} from it, waiting on their setup screen to Keep, Change or say Not this.`,
+        ]
+      : []),
+    ...(confirmed > 0
+      ? [
+          `${String(confirmed)} figure${confirmed === 1 ? "" : "s"} they confirmed from it ${confirmed === 1 ? "is" : "are"} in confirmedFigures, set against their deck by code.`,
+        ]
+      : []),
+  ].join(" ");
 }
 export type ListUploadedDocumentsOutput = z.infer<
   typeof ListUploadedDocumentsOutputSchema
@@ -378,7 +415,7 @@ export function createListUploadedDocumentsTool(
       items: (await documents.list(context.actor, grant.subjectId))
         .slice(0, 50)
         .map((item) => {
-          const held = heldBackFromQ(item.sensitivityClass, item.figures);
+          const held = ownDocumentQUse(item.sensitivityClass, item.figures);
           const confirmed = item.figures?.confirmed ?? [];
           return {
             documentId: item.documentId,

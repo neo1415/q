@@ -35,7 +35,9 @@ type Row = {
  * reads withheld nothing: its text could reach a model through Q. It is
  * now named as held back and never read, whoever asks -- except (ADR 0078,
  * owner decision 99) by the investor the founder shared it with, through
- * an active grant to their own organisation, for that investor's turns.
+ * an active grant to their own organisation, for that investor's turns,
+ * and (ADR 0079, owner decision 100) by a current member of the company
+ * that owns it, for that member's own Q.
  */
 export function heldBackClass(sensitivityClass: string | null): boolean {
   return (
@@ -45,9 +47,9 @@ export function heldBackClass(sensitivityClass: string | null): boolean {
 }
 
 /**
- * ADR 0078 (owner decision 99, "shared means readable"): only a
- * HIGHLY_CONFIDENTIAL document is ever unlocked by a share; RESTRICTED
- * (identity artefacts) never enters Q, shared or not.
+ * ADR 0078 (owner decision 99, "shared means readable") and ADR 0079
+ * (decision 100, the owner's own Q): only a HIGHLY_CONFIDENTIAL document is
+ * ever unlocked; RESTRICTED (identity artefacts) never enters Q.
  */
 function shareMayUnlock(sensitivityClass: string | null): boolean {
   return sensitivityClass === "HIGHLY_CONFIDENTIAL";
@@ -58,6 +60,56 @@ export type SharedUnder = {
   readonly grantId: string;
   readonly expiresAt: string | null;
 };
+
+/**
+ * ADR 0079 (owner decision 100): the membership a member of the owning
+ * company read its highly confidential document under (provenance).
+ */
+export type OwnCompanyRead = {
+  readonly companyId: string;
+  readonly membershipId: string;
+};
+
+/**
+ * ADR 0079 (owner decision 100): whether this person is, now, an active
+ * member of the organisation that owns this company, in their tenant --
+ * resolved from the server-built access context (its organisation and
+ * membership), never from an id the client or a model supplied. An ended
+ * membership, another company, or a context without a membership is null.
+ */
+export function createOwnCompanyMembership(sql: DatabaseExecutor) {
+  return async (
+    actor: ActorContext,
+    companyId: string,
+  ): Promise<OwnCompanyRead | null> => {
+    if (
+      actor.organisationId === undefined ||
+      actor.membershipId === undefined
+    ) {
+      return null;
+    }
+    const rows = await sql<{ company_id: string; membership_id: string }[]>`
+      select c.id::text as company_id, m.id::text as membership_id
+        from core.companies c
+        join identity.organisation_memberships m
+          on m.organisation_id = c.organisation_id
+         and m.tenant_id = c.tenant_id
+       where c.id = ${companyId}::uuid
+         and c.tenant_id = ${actor.tenantId}
+         and c.organisation_id = ${actor.organisationId}
+         and m.id = ${actor.membershipId}::uuid
+         and m.user_id = ${actor.userId}
+         and m.membership_status = 'active'
+       limit 1`;
+    const row = rows[0];
+    return row === undefined
+      ? null
+      : {
+          companyId: row.company_id.toLowerCase(),
+          membershipId: row.membership_id.toLowerCase(),
+        };
+  };
+}
 
 export function createMaterialDocumentReads(dependencies: {
   readonly sql: DatabaseExecutor;
@@ -78,6 +130,17 @@ export function createMaterialDocumentReads(dependencies: {
         companyId: string,
         documentId: string,
       ) => Promise<SharedUnder | null>)
+    | undefined;
+  /**
+   * ADR 0079 (owner decision 100): the actor's current membership of the
+   * company's owning organisation (createOwnCompanyMembership), or null.
+   * Absent: the owner's highly confidential documents stay held back.
+   */
+  readonly ownMember?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<OwnCompanyRead | null>)
     | undefined;
 }) {
   const { sql, view } = dependencies;
@@ -104,6 +167,51 @@ export function createMaterialDocumentReads(dependencies: {
       return null;
     }
     return lookup(actor, companyId, entry.documentId).catch(() => null);
+  };
+
+  /**
+   * ADR 0079 (owner decision 100): a highly confidential document read by
+   * its own company's member: only the data room's OWNER entry (its own
+   * team, decided by the room's owner check), only HIGHLY_CONFIDENTIAL
+   * (RESTRICTED never), only with a membership active now, asked afresh on
+   * every read. A failed lookup is no read.
+   */
+  const ownReadOf = async (
+    actor: ActorContext,
+    companyId: string,
+    entry: { readonly access: string },
+    sensitivityClass: string | null,
+  ): Promise<OwnCompanyRead | null> => {
+    const member = dependencies.ownMember;
+    if (
+      member === undefined ||
+      entry.access !== "OWNER" ||
+      !shareMayUnlock(sensitivityClass)
+    ) {
+      return null;
+    }
+    const read = await member(actor, companyId).catch(() => null);
+    return read !== null && read.companyId === companyId.toLowerCase()
+      ? read
+      : null;
+  };
+
+  /** The one unlock that applies to this entry, if any. */
+  const unlockOf = async (
+    actor: ActorContext,
+    companyId: string,
+    entry: { readonly documentId: string; readonly access: string },
+    sensitivityClass: string | null,
+  ): Promise<{
+    readonly sharedUnder?: SharedUnder;
+    readonly ownCompanyRead?: OwnCompanyRead;
+  } | null> => {
+    if (entry.access === "OWNER") {
+      const own = await ownReadOf(actor, companyId, entry, sensitivityClass);
+      return own === null ? null : { ownCompanyRead: own };
+    }
+    const shared = await shareOf(actor, companyId, entry, sensitivityClass);
+    return shared === null ? null : { sharedUnder: shared };
   };
 
   const lookup = async (
@@ -184,15 +292,15 @@ export function createMaterialDocumentReads(dependencies: {
         entries.map(async (entry) => {
           const row = all.get(entry.documentId);
           const classified = heldBackClass(row?.sensitivity_class ?? null);
-          const shared = classified
-            ? await shareOf(
+          const unlocked = classified
+            ? await unlockOf(
                 actor,
                 companyId,
                 entry,
                 row?.sensitivity_class ?? null,
               )
             : null;
-          const heldBack = classified && shared === null;
+          const heldBack = classified && unlocked === null;
           return {
             ...entry,
             documentType: row?.document_type ?? null,
@@ -206,7 +314,7 @@ export function createMaterialDocumentReads(dependencies: {
                 ? row.text.slice(0, OPENING_CHARS)
                 : null,
             ...(heldBack ? { heldBack: true } : {}),
-            ...(shared === null ? {} : { sharedUnder: shared }),
+            ...(unlocked ?? {}),
           };
         }),
       );
@@ -219,6 +327,7 @@ export function createMaterialDocumentReads(dependencies: {
       readonly text: string;
       readonly truncated: boolean;
       readonly sharedUnder?: SharedUnder;
+      readonly ownCompanyRead?: OwnCompanyRead;
     } | null> => {
       const room = await view(actor, companyId);
       if (room === null) return null;
@@ -231,23 +340,23 @@ export function createMaterialDocumentReads(dependencies: {
         return null;
       }
       const row = (await lookup(companyId, [id], 60)).get(id);
-      let shared: SharedUnder | null = null;
+      let unlocked: Awaited<ReturnType<typeof unlockOf>> = null;
       if (heldBackClass(row?.sensitivity_class ?? null)) {
         // Checked again here, at the read itself, before any text leaves.
-        shared = await shareOf(
+        unlocked = await unlockOf(
           actor,
           companyId,
           entry,
           row?.sensitivity_class ?? null,
         );
-        if (shared === null) return null;
+        if (unlocked === null) return null;
       }
       const text = row?.text?.trim() ?? "";
       if (text.length === 0) return null;
       return {
         text: text.slice(0, TEXT_CHARS),
         truncated: text.length > TEXT_CHARS,
-        ...(shared === null ? {} : { sharedUnder: shared }),
+        ...(unlocked ?? {}),
       };
     },
     /**
@@ -267,6 +376,7 @@ export function createMaterialDocumentReads(dependencies: {
         readonly text: string;
       }[];
       readonly sharedUnder?: SharedUnder;
+      readonly ownCompanyRead?: OwnCompanyRead;
     } | null> => {
       const room = await view(actor, companyId);
       if (room === null) return null;
@@ -283,10 +393,10 @@ export function createMaterialDocumentReads(dependencies: {
           from evidence.documents d
          where d.company_id = ${companyId} and d.id = ${id}`;
       const sensitivityClass = held[0]?.sensitivity_class ?? null;
-      let shared: SharedUnder | null = null;
+      let unlocked: Awaited<ReturnType<typeof unlockOf>> = null;
       if (heldBackClass(sensitivityClass)) {
-        shared = await shareOf(actor, companyId, entry, sensitivityClass);
-        if (shared === null) return null;
+        unlocked = await unlockOf(actor, companyId, entry, sensitivityClass);
+        if (unlocked === null) return null;
       }
       const rows = await sql<
         { page_number: number; text: string | null; page_count: number }[]
@@ -313,7 +423,7 @@ export function createMaterialDocumentReads(dependencies: {
         pages: rows
           .filter((row) => row.text !== null)
           .map((row) => ({ page: row.page_number, text: row.text ?? "" })),
-        ...(shared === null ? {} : { sharedUnder: shared }),
+        ...(unlocked ?? {}),
       };
     },
   };

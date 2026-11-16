@@ -87,6 +87,8 @@ export type ProfileMaterialPort = {
         readonly truncated: boolean;
         /** ADR 0078: present when the text was read under a share. */
         readonly sharedUnder?: MaterialShare | undefined;
+        /** ADR 0079: present when its own company's member read it. */
+        readonly ownCompanyRead?: MaterialOwnRead | undefined;
       } | null>)
     | undefined;
   /**
@@ -110,6 +112,8 @@ export type ProfileMaterialPort = {
         }[];
         /** ADR 0078: present when the pages were read under a share. */
         readonly sharedUnder?: MaterialShare | undefined;
+        /** ADR 0079: present when its own company's member read them. */
+        readonly ownCompanyRead?: MaterialOwnRead | undefined;
       } | null>)
     | undefined;
 };
@@ -124,6 +128,17 @@ export type MaterialShare = {
   readonly grantId: string;
   /** When the grant ends; null: no expiry. */
   readonly expiresAt: string | null;
+};
+
+/**
+ * ADR 0079 (owner decision 100): the current membership of the owning
+ * company's organisation under which its own member's Q read one of its
+ * highly confidential documents. Resolved server-side from the person's
+ * access context, never from anything the client or model supplied.
+ */
+export type MaterialOwnRead = {
+  readonly companyId: string;
+  readonly membershipId: string;
 };
 
 /** One data-room document as Q may find it (R0). */
@@ -150,6 +165,11 @@ export type MaterialDocument = {
    * investor's organisation; readable by their Q under this grant only.
    */
   readonly sharedUnder?: MaterialShare | undefined;
+  /**
+   * ADR 0079: a highly confidential document of the person's own company,
+   * readable by their own Q as a current member of it.
+   */
+  readonly ownCompanyRead?: MaterialOwnRead | undefined;
 };
 
 const CompanyInputSchema = z

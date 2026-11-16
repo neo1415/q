@@ -355,7 +355,7 @@ export function createWorkforceDocuments(dependencies: {
         for (const title of room.heldBack)
           codeGaps.push(heldBackGap(title, request.scope === "OWN_COMPANY"));
         if (room.heldBack.length > 0)
-          company = `${company}\n\nHELD BACK FROM Q (classified highly confidential; never read, no model received them; say so wherever figures or contradictions come up, and that their figures become usable once the founder confirms them): ${room.heldBack.map((title) => `"${title.slice(0, 160)}"`).join(", ")}`;
+          company = `${company}\n\nHELD BACK FROM Q (classified highly confidential or restricted; never read, no model received them; say so wherever figures or contradictions come up, and that their figures become usable once the founder confirms them): ${room.heldBack.map((title) => `"${title.slice(0, 160)}"`).join(", ")}`;
         const text = dataRoomText(room.passages);
         if (text.length > 0) company = `${company}\n\n${text}`;
         if (room.passages.length === 0)

@@ -6,8 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   WorkforceLiveSchema,
+  type DataRoomView,
   type QArtifactContent,
 } from "@capital-q/contracts";
+import type { DatabaseExecutor } from "@capital-q/database";
 import type {
   AnalysisCritiqueResult,
   AnalysisDocumentResult,
@@ -36,6 +38,7 @@ import {
   deliveredDocument,
   deliveryText,
 } from "../src/composition/workforce/delivery.js";
+import { createMaterialDocumentReads } from "../src/composition/material-documents.js";
 import { createWorkforceDocuments } from "../src/composition/workforce/documents.js";
 import {
   createOwnContextReader,
@@ -1683,6 +1686,91 @@ describe("F03: the founder's own analysis reads their documents", () => {
     expect(JSON.stringify(world.filed[0]?.content)).toMatch(
       /held back from Q.*become usable once you confirm them/su,
     );
+  });
+});
+
+// ADR 0079 (owner decision 100): live run b87ad973's "what's missing" job
+// ignored the founder's own management accounts and asked them for
+// evidence they had already uploaded. The founder's own analysis now reads
+// their highly confidential documents through the same data-room reads,
+// as a current member of the company; with no membership it stays held.
+describe("decision 100: the founder's own job reads their highly confidential documents", () => {
+  const MEMBERSHIP = "00000000-0000-4000-8000-0000000000d1";
+  function ownerRoom(companyId: string): DataRoomView {
+    return {
+      viewer: "OWNER",
+      companyId,
+      stageCode: "seed",
+      countryCode: "GB",
+      folders: [{ code: "finance", label: "Finance" }],
+      documents: [
+        {
+          documentId: "00000000-0000-4000-8000-00000000c009",
+          title: "Halyard management accounts Oct 2026",
+          folderCode: "finance",
+          checklistItemCode: null,
+          level: "PRIVATE",
+          visibilityScope: "organisation_private",
+          kind: "PDF",
+          pageCount: 2,
+          updatedAt: "2026-11-01T00:00:00.000Z",
+          validUntil: null,
+          sharedWith: 0,
+          openedBy: 0,
+          version: 1,
+        },
+      ],
+      checklist: [],
+      requests: [],
+    };
+  }
+  function reads(member: boolean): DataRoomReads {
+    const fake = (_strings: TemplateStringsArray, ..._values: unknown[]) =>
+      Promise.resolve([
+        {
+          id: "00000000-0000-4000-8000-00000000c009",
+          document_type: "MANAGEMENT_ACCOUNTS",
+          sensitivity_class: "HIGHLY_CONFIDENTIAL",
+          text: "Gross margin 29.3% (October 2026). Net burn GBP 92,340 a month.",
+        },
+      ]);
+    return createMaterialDocumentReads({
+      sql: fake as unknown as DatabaseExecutor,
+      view: (_actor, companyId) => Promise.resolve(ownerRoom(companyId)),
+      ownMember: (_actor, companyId) =>
+        Promise.resolve(
+          member ? { companyId, membershipId: MEMBERSHIP } : null,
+        ),
+    });
+  }
+
+  it("a current member's job reads the accounts and cites them", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+      dataRoom: reads(true),
+    });
+    const result = await world.documents(world.input);
+    expect(result.status).toBe("READY");
+    const company = world.writes[0]?.company ?? "";
+    expect(company).toContain("Gross margin 29.3%");
+    expect(company).toContain("(USER_CLAIM, DOCUMENT_SUPPORTED)");
+    expect(company).not.toContain("HELD BACK FROM Q");
+    expect(JSON.stringify(world.filed[0]?.content)).not.toMatch(
+      /held back from Q/u,
+    );
+  });
+
+  it("without a current membership the accounts stay held back", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+      dataRoom: reads(false),
+    });
+    await world.documents(world.input);
+    const company = world.writes[0]?.company ?? "";
+    expect(company).not.toContain("Gross margin 29.3%");
+    expect(company).toContain("HELD BACK FROM Q");
   });
 });
 

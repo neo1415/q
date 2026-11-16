@@ -19,6 +19,7 @@ import { findRecordByName, spokenNameScore } from "./client-actions.js";
 import {
   planAdmits,
   type MaterialDocument,
+  type MaterialOwnRead,
   type MaterialShare,
   type ProfileMaterialPort,
 } from "./profile-material.js";
@@ -379,7 +380,7 @@ const NONE_LINE =
  * heldBackFromQ's; this names where the figures become usable.
  */
 export const HELD_BACK_LINE =
-  "This document is classified highly confidential (management accounts, a financial model): Q does not read its contents and never sends them to a model. Say plainly that it is held back from Q, and that its figures become usable once the founder confirms them (on their setup screen) or states them; never guess what it says.";
+  "This document is classified highly confidential or restricted (management accounts, a financial model, an identity document): Q does not read its contents for this person and never sends them to a model. Say plainly that it is held back from Q, and that its figures become usable once the founder confirms them (on their setup screen) or states them; never guess what it says.";
 
 /** The held-back answer for one resolved document. */
 function heldBackAnswer(document: MaterialDocument) {
@@ -428,6 +429,38 @@ const SHARED_UNDER = z
   })
   .strict()
   .optional();
+
+/**
+ * ADR 0079 (owner decision 100): a highly confidential document of the
+ * person's own company (management accounts, a financial model, a bank
+ * statement), read for their own Q as a current member of that company.
+ * It is the company's own management material: DOCUMENT_SUPPORTED at most,
+ * never independently verified.
+ */
+export const OWN_COMPANY_READ_LINE =
+  "This is their own company's highly confidential material (for example management accounts, a financial model or a bank statement), read for them because they are a member of the company. Use it and cite it by title and page; say what it states as their company's own figures ('your management accounts show...'), document-supported but not independently verified, and set it beside other figures (the deck, what they told Q) with both sides of any difference. Never call it unreadable or held back, and never pass it on to anyone else.";
+
+const OWN_COMPANY_READ = z
+  .object({
+    companyId: z.string().min(1).max(64),
+    membershipId: z.string().min(1).max(64),
+    say: z.string().max(800),
+  })
+  .strict()
+  .optional();
+
+/** The provenance an own-company highly confidential read carries. */
+function ownCompanyRead(read: MaterialOwnRead | undefined) {
+  return read === undefined
+    ? {}
+    : {
+        ownCompanyRead: {
+          companyId: read.companyId,
+          membershipId: read.membershipId,
+          say: OWN_COMPANY_READ_LINE,
+        },
+      };
+}
 
 /** The provenance a shared read carries; nothing for an ordinary read. */
 function sharedUnder(share: MaterialShare | undefined) {
@@ -513,6 +546,8 @@ const ReadOutputSchema = z.union([
       alsoHeldBack: ALSO_HELD_BACK,
       /** ADR 0078: the grant a shared highly confidential read is under. */
       sharedUnder: SHARED_UNDER,
+      /** ADR 0079: the membership an own-company read is under. */
+      ownCompanyRead: OWN_COMPANY_READ,
     })
     .strict(),
   NotOneSchema,
@@ -575,7 +610,8 @@ export function createReadCompanyDocumentTool(
       // CONFIDENTIAL for this investor's turn only -- the founder's share is
       // the owner-approved disclosure (decision 99) -- so it reaches only a
       // provider whose ceiling is CONFIDENTIAL (zero retention or contract).
-      // The stored document keeps its class for everyone else.
+      // The stored document keeps its class for everyone else. ADR 0079
+      // (decision 100): the same handling for its own company's member.
       return allow<ReadOutput>("CONFIDENTIAL", {
         status: "READ",
         documentId: resolved.document.documentId.toLowerCase(),
@@ -589,6 +625,8 @@ export function createReadCompanyDocumentTool(
         ...alsoHeldBack(resolved.heldBack),
         // The grant the read itself re-checked, not the listing's.
         ...sharedUnder(read.sharedUnder),
+        // The membership the read itself re-checked (ADR 0079).
+        ...ownCompanyRead(read.ownCompanyRead),
       });
     },
     execute: (_input, _context, grant) => Promise.resolve(grant),
@@ -638,6 +676,8 @@ const PagesOutputSchema = z.union([
       alsoHeldBack: ALSO_HELD_BACK,
       /** ADR 0078: the grant a shared highly confidential read is under. */
       sharedUnder: SHARED_UNDER,
+      /** ADR 0079: the membership an own-company read is under. */
+      ownCompanyRead: OWN_COMPANY_READ,
     })
     .strict(),
   z
@@ -760,6 +800,7 @@ export function createReadDocumentPagesTool(
         evidenceStatus: "DOCUMENT_SUPPORTED",
         ...alsoHeldBack(resolved.heldBack),
         ...sharedUnder(read.sharedUnder),
+        ...ownCompanyRead(read.ownCompanyRead),
       });
     },
     execute: (_input, _context, grant) => Promise.resolve(grant),

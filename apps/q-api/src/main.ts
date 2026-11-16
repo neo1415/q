@@ -579,7 +579,7 @@ import { createContextFirewall } from "@capital-q/q-firewall";
 import {
   createQTools,
   findRecordByName,
-  heldBackFromQ,
+  ownDocumentQUse,
   readOwnThesis,
   type DocumentStudioPort,
   type InvestorGatesPort,
@@ -952,7 +952,10 @@ import {
   createOwnDiligence,
 } from "./composition/own-diligence.js";
 import { createProfileMaterial } from "./composition/profile-material.js";
-import { createMaterialDocumentReads } from "./composition/material-documents.js";
+import {
+  createMaterialDocumentReads,
+  createOwnCompanyMembership,
+} from "./composition/material-documents.js";
 import { createAttachedDocumentReads } from "./composition/attached-documents.js";
 // end ADMIN block
 // ADMIN-3 block
@@ -3562,12 +3565,13 @@ const appActionPorts: OwnReadPorts = {
         // downloaded, which it can either way (run 8b5ff536: "its reading
         // status is failed… I have not shared it").
         qReading: file.processing,
-        // Stress 2026-10-28: a highly confidential file is never read by Q;
-        // it says so, with the compliant path, rather than "COMPLETED" alone.
+        // Stress 2026-10-28: a held-back file says so, with the compliant
+        // path, rather than "COMPLETED" alone; ADR 0079 (decision 100): a
+        // highly confidential one of their own is readable to their Q.
         ...((): { qUse?: string; confirmedFigures?: string } => {
           // Owner 2026-10-28: figures read by code wait for their
           // confirmation; the ones they confirmed are theirs, beside the deck.
-          const held = heldBackFromQ(file.sensitivityClass, file.figures);
+          const held = ownDocumentQUse(file.sensitivityClass, file.figures);
           return held === null
             ? {}
             : {
@@ -4152,6 +4156,9 @@ const qTools = createQTools({
             companyId,
             documentId,
           }),
+        // ADR 0079 (decision 100): their own company's highly confidential
+        // documents, for a current member's own Q.
+        ownMember: createOwnCompanyMembership(database.sql),
       }),
     },
     // Lane ob1: their own setup conversation, recalled for their own questions.
@@ -6030,6 +6037,10 @@ const workforceDocuments = createWorkforceDocuments({
   dataRoom: createMaterialDocumentReads({
     sql: database.sql,
     view: (actor, companyId) => profileMaterial.dataRoom.view(actor, companyId),
+    // ADR 0079 (decision 100): a founder's own analysis job reads their own
+    // company's highly confidential documents, as a current member; the
+    // analysis is filed private to them. No share lookup here (ADR 0078).
+    ownMember: createOwnCompanyMembership(database.sql),
   }),
   logger,
 });

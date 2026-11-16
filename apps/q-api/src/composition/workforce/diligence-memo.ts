@@ -243,8 +243,8 @@ export async function readDataRoom(
  */
 export function heldBackGap(title: string, own: boolean): string {
   return own
-    ? `"${title.slice(0, 160)}" is held back from Q: it is classified highly confidential, so its contents were not read and no model received them. Its figures become usable once you confirm them on your setup screen (or state them yourself); until then nothing here is checked against it.`
-    : `"${title.slice(0, 160)}" is held back from Q: it is classified highly confidential, so its contents were not read and no model received them. Nothing here is checked against it.`;
+    ? `"${title.slice(0, 160)}" is held back from Q: it is classified highly confidential or restricted, so its contents were not read and no model received them. Its figures become usable once you confirm them on your setup screen (or state them yourself); until then nothing here is checked against it.`
+    : `"${title.slice(0, 160)}" is held back from Q: it is classified highly confidential or restricted, so its contents were not read and no model received them. Nothing here is checked against it.`;
 }
 
 /** The passages as the writer reads them, each with its truth axes. */

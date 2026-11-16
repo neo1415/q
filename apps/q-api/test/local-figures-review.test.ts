@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sensitivityWithin } from "@capital-q/contracts";
 import { SCOPE_CATALOGUE } from "@capital-q/q-firewall";
 import { retrievalConstraintsFor } from "@capital-q/q-knowledge";
-import { heldBackFromQ } from "@capital-q/q-tools";
+import { ownDocumentQUse } from "@capital-q/q-tools";
 
 import { createLocalFigureStatus } from "../src/composition/local-figures.js";
 
@@ -139,7 +139,7 @@ describe("F03: 'review my documents' shows the contradiction, never the accounts
     const listed = await port.list({} as never, "company");
     // What list_uploaded_documents hands the model, as the tool shapes it.
     const items = listed.map((item) => {
-      const held = heldBackFromQ(item.sensitivityClass, item.figures);
+      const held = ownDocumentQUse(item.sensitivityClass, item.figures);
       return {
         documentId: item.documentId,
         title: item.title,

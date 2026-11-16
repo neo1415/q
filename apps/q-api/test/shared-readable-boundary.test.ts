@@ -56,6 +56,30 @@ describe("shared means readable stays on the chat read path (ADR 0078)", () => {
     expect(main.match(/\bsharedGrant:/gu)?.length).toBe(1);
   });
 
+  // ADR 0079 (owner decision 100): the owner's own read is resolved in one
+  // place (createOwnCompanyMembership) and given to exactly two
+  // compositions: the chat document reads and the founder's own analysis
+  // job's data-room reads. Neither feeds ranking, discovery or memory.
+  it("the owner's own read has one lookup and two compositions", () => {
+    expect(using(/\bcreateOwnCompanyMembership\b/u)).toEqual([
+      "apps/q-api/src/composition/material-documents.ts",
+      "apps/q-api/src/main.ts",
+    ]);
+    const main = readFileSync(join(ROOT, "apps/q-api/src/main.ts"), "utf8");
+    expect(main.match(/\bownMember:/gu)?.length).toBe(2);
+  });
+
+  it("no ranking, discovery, retrieval or memory code reads an owner's highly confidential document", () => {
+    const leaks = using(
+      /\bownCompanyRead\b|\bcreateOwnCompanyMembership\b|\bownMember\b|\bMaterialOwnRead\b/u,
+    ).filter((path) =>
+      /^packages\/(discovery|q-knowledge|q-memory|q-embeddings|q-firewall|founder-onboarding|companies|investors)\//u.test(
+        path,
+      ),
+    );
+    expect(leaks).toEqual([]);
+  });
+
   it("no ranking, discovery, retrieval or memory code reads shared material", () => {
     const leaks = using(
       /\bsharedUnder\b|\bqReadableShare\b|\bsharedGrant\b/u,

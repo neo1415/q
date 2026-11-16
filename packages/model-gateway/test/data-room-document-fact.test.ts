@@ -108,6 +108,33 @@ describe("the facts from a read", () => {
     expect(facts[0]?.truthClass).toBe("UNKNOWN");
   });
 
+  // ADR 0079 (owner decision 100): the founder's own management accounts,
+  // open in their viewer, reach their chat turn with how they are said.
+  it("the founder's own highly confidential document carries its own-read line", () => {
+    const facts = dataRoomDocumentFacts(
+      {
+        status: "READ",
+        title: "Halyard management accounts Oct 2026",
+        pageCount: 2,
+        pages: [{ page: 1, text: "Gross margin 29.3%" }],
+        ownCompanyRead: {
+          companyId: COMPANY,
+          membershipId: "00000000-0000-4000-8000-0000000000d1",
+          say: "This is their own company's highly confidential material. Never call it unreadable or held back.",
+        },
+      },
+      { companyId: COMPANY, documentId: DECK, open: true },
+    );
+    expect(facts[0]).toMatchObject({
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+    });
+    expect(facts[0]?.statement).toContain("[p. 1] Gross margin 29.3%");
+    expect(facts[0]?.statement).toMatch(
+      /Never call it unreadable or held back/u,
+    );
+  });
+
   it("anything not read adds nothing", () => {
     expect(
       dataRoomDocumentFacts(

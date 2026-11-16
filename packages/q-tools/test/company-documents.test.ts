@@ -459,3 +459,107 @@ describe("a shared highly confidential document (ADR 0078)", () => {
     current = share;
   });
 });
+
+// ADR 0079 (owner decision 100): the founder's own highly confidential
+// management accounts are read for their own Q, as a current member of
+// the company, at the CONFIDENTIAL ceiling, as the company's own material
+// (DOCUMENT_SUPPORTED at most), with the membership named; when the
+// membership no longer holds at the read, nothing is read.
+describe("the founder's own highly confidential document (ADR 0079)", () => {
+  const ACCOUNTS = "00000000-0000-4000-8000-00000000c009";
+  const MEMBERSHIP = "00000000-0000-4000-8000-0000000000d1";
+  const own = { companyId: COMPANY_B_NETWORK, membershipId: MEMBERSHIP };
+  const ownDoc: MaterialDocument = {
+    ...doc(
+      ACCOUNTS,
+      "Halyard management accounts Oct 2026",
+      "Finance",
+      "MANAGEMENT_ACCOUNTS",
+      "OWNER",
+    ),
+    ownCompanyRead: own,
+  };
+  let current: typeof own | null = own;
+  const withOwn: ProfileMaterialPort = {
+    ...material,
+    documents: (_actor, companyId) =>
+      Promise.resolve(
+        companyId === COMPANY_B_NETWORK ? [...ROOM, ownDoc] : null,
+      ),
+    documentText: (_actor, _companyId, documentId) =>
+      Promise.resolve(
+        documentId === ACCOUNTS && current !== null
+          ? {
+              text: "Gross margin 29.3%; net burn GBP 92,340 a month.",
+              truncated: false,
+              ownCompanyRead: current,
+            }
+          : null,
+      ),
+    documentPages: (_actor, _companyId, documentId) =>
+      Promise.resolve(
+        documentId === ACCOUNTS && current !== null
+          ? {
+              pageCount: 2,
+              pages: [{ page: 1, text: "Gross margin 29.3%" }],
+              ownCompanyRead: current,
+            }
+          : null,
+      ),
+  };
+
+  it("reads it for its own member, as the company's own material, at CONFIDENTIAL", async () => {
+    current = own;
+    const reader = createReadCompanyDocumentTool(fakePorts(), withOwn);
+    const decision = await reader.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.sensitivity).toBe("CONFIDENTIAL");
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      text: "Gross margin 29.3%; net burn GBP 92,340 a month.",
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+      ownCompanyRead: {
+        companyId: COMPANY_B_NETWORK,
+        membershipId: MEMBERSHIP,
+      },
+    });
+    const said = JSON.stringify(decision.grant);
+    expect(said).toMatch(/not independently verified/u);
+    expect(said).toMatch(/Never call it unreadable or held back/u);
+    expect(said).not.toMatch(/EXTERNALLY_VERIFIED|HELD_BACK|sharedUnder/u);
+  });
+
+  it("reads its pages for its own member", async () => {
+    current = own;
+    const pager = createReadDocumentPagesTool(fakePorts(), withOwn);
+    const decision = await pager.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.sensitivity).toBe("CONFIDENTIAL");
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      pages: [{ page: 1, text: "Gross margin 29.3%" }],
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+      ownCompanyRead: { membershipId: MEMBERSHIP },
+    });
+  });
+
+  it("reads nothing once the membership ends after the listing", async () => {
+    current = null;
+    const reader = createReadCompanyDocumentTool(fakePorts(), withOwn);
+    const decision = await reader.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("DENY");
+    current = own;
+  });
+});

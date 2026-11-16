@@ -95,6 +95,7 @@ type PagesRead = {
   readonly candidates?: unknown;
   readonly alsoHeldBack?: unknown;
   readonly sharedUnder?: unknown;
+  readonly ownCompanyRead?: unknown;
 };
 
 const text = (value: unknown): string | null =>
@@ -200,6 +201,14 @@ export function dataRoomDocumentFacts(
       ? text(Reflect.get(under, "say"))
       : null;
   if (underSay !== null) body += `\n${underSay}`;
+  // ADR 0079 (decision 100): the founder's own highly confidential
+  // document, read for their own Q as a member of the company.
+  const own = result.ownCompanyRead;
+  const ownSay =
+    typeof own === "object" && own !== null
+      ? text(Reflect.get(own, "say"))
+      : null;
+  if (ownSay !== null) body += `\n${ownSay}`;
   facts.push({
     ...base,
     source: `Data room: "${name}"`.slice(0, 200),

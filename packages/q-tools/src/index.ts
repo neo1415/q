@@ -211,6 +211,7 @@ export {
 export {
   createListUploadedDocumentsTool,
   heldBackFromQ,
+  ownDocumentQUse,
   createOwnRecordTools,
   createReadMyRecordTool,
   createReadRelationshipEmailTool,
@@ -801,6 +802,7 @@ export {
   READ_COMPANY_DATA_ROOM,
   READ_COMPANY_DECK,
   type MaterialDocument,
+  type MaterialOwnRead,
   type MaterialShare,
   type ProfileMaterialPort,
 } from "./tools/profile-material.js";
