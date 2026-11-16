@@ -1,6 +1,6 @@
-# Synthetic demo evidence: Tensorgate and Halyard Security
+# Synthetic demo evidence: Tensorgate, Halyard Security and Nixo
 
-Phases 2 and 3 of the owner directive of 16 Nov 2026 (`docs/ai-handoff/directives/2026-11-16-demo-evidence-data-room-seeding.md`). This folder builds a deterministic evidence pack for the two fictional tavus-20 showcase companies. It works locally and offline: nothing here uploads, seeds, writes to a database or calls a model.
+Phases 2 and 3 of the owner directive of 16 Nov 2026 (`docs/ai-handoff/directives/2026-11-16-demo-evidence-data-room-seeding.md`). This folder builds a deterministic evidence pack for the three showcase companies: the two fictional tavus-20 companies, and Nixo (decision 99: the owner's own account, seeded like the fictional ones with the same synthetic marking). It works locally and offline: nothing here uploads, seeds, writes to a database or calls a model.
 
 ## Files
 
@@ -8,6 +8,7 @@ Phases 2 and 3 of the owner directive of 16 Nov 2026 (`docs/ai-handoff/directive
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `fixtures/tensorgate.json`                         | Source of truth for Tensorgate (USD). It holds 18 months of actuals (May 2025 to Oct 2026), customers, invoices, the bank account at a fictitious bank, the cap table, the seed raise, projections to Dec 2027, the team and the known discrepancies.                                                                         |
 | `fixtures/halyard.json`                            | The same for Halyard Security (GBP).                                                                                                                                                                                                                                                                                          |
+| `fixtures/nixo.json`                               | The same for Nixo (USD), plus `recordedProfile` (what production records, read read-only on 16 Nov 2026) and `assumptions` (every field that had to be invented). It also drives a generated 12-slide deck, `nx-pitch-deck.pdf`.                                                                                              |
 | `documents.mjs`                                    | Builds the document models, the CSVs and the manifest from a fixture. Pure: it uses no clock and no randomness.                                                                                                                                                                                                               |
 | `render.mjs`                                       | Renders text-native PDFs with `pdf-lib`, the library the memo and deck export already uses. It is resolved from `packages/deck-render`, so no dependency was added. Every page carries the synthetic header line, a light diagonal watermark, and a footer with the company, title, version, period, issue date and page n/m. |
 | `generate.mjs`                                     | Writes the files to `out/<company>/`, which is gitignored, and checks the committed manifests.                                                                                                                                                                                                                                |
@@ -43,12 +44,35 @@ bash scripts/heavy.sh npx vitest run apps/workers/test/demo-evidence-fixtures.te
   - There are no certificates, registries, seals or signatures, and customer names are withheld.
   - Titles never say "fictional"; the header line says what the document is.
 
+## Nixo (`nx-*`)
+
+Nixo is not in the tavus-20 seed and had no documents or claims. The fixture keeps everything production records and invents the rest, listing each invented field under `assumptions`.
+
+- **Recorded and kept:**
+  - name, legal name (Nixo Inc.), website, founding date (1 Jan 2025), San Francisco, seed stage, and both descriptions;
+  - the founder, Priya Khandelwal: one full-time founder, role recorded as "other", so the documents say "Founder";
+  - the recorded team size of 12 (30 Sep 2026);
+  - the raise: USD 5,000,000 on a SAFE, timeframe 3 to 6 months, and the three use-of-funds lines.
+- **Invented:**
+  - the business: per-seat subscriptions for forward-deployed engineering teams at 1,200 a seat a month, plus onboarding fees;
+  - six anonymised customers (A to F, by segment), with invoices, 18 months of actuals and the bank at a fictitious bank (Bramblewick Commerce Bank);
+  - pre-seed SAFEs, the cap table and the projections;
+  - the raise's cap (30m post-money), minimum cheque (100k), close date (26 Feb 2027) and use-of-funds split.
+- **Deliberate discrepancies:**
+  - **Team size.** The profile records a team of 12; payroll shows 10 employees at 30 Sep 2026, because the founder counted two contract forward-deployed engineers.
+  - **Contracted against billed.** Contracted ARR is 1,080,000, against 864,000 of annualised billed subscriptions. Customer F signed in October 2026 and is billed only from 1 Jan 2027.
+- **Deck.** Nixo has no deck, so `nx-pitch-deck.pdf` (PITCH_DECK, landscape, one slide per page) is generated from the fixture. Its figures are the accounts' figures, and the plan slide is labelled PROJECTION.
+
 ## What the upload step will need
 
 The upload step is not part of this slice.
 
 - Upload as each company's fictional founder, through the supported document route, with the manifest's `documentType` declared and text-layer PDFs, so no kind classification or page transcription runs. Default level is PRIVATE.
 - Six documents per company are HIGHLY_CONFIDENTIAL by default, because their types are FINANCIAL, MANAGEMENT_ACCOUNTS or FINANCIAL_MODEL: the management accounts, monthly actuals, revenue breakdown, invoice register, bank statement and projections. An investor's Q cannot read them even when they are shared. See the inventory, decision 5 (a/b/c). The CONFIDENTIAL ones are the contracts, cohorts, concentration, cap table, raise terms, KPI pack and team plan.
+- **Nixo.** The founder account has no fictional markers. `upload.mjs` admits it through `UNMARKED_FOUNDER_ALLOW_LIST`, which holds only Nixo's company id and cites decision 99. The marker check is unchanged for everyone else, and the signed-in account must still be the resolved founder.
+  - Sign-in (decision 99, amended): no password is read or changed. The script fetches the Supabase secret key through the management API with `SUPABASE_ACCESS_TOKEN` (decision 78) and keeps it in memory only. It then generates a one-time magic-link token hash with the auth admin API (`generate_link`, type `magiclink`, which sends no email) and exchanges it at `/auth/v1/verify` for a session. This is for seeding only.
+  - Uploading `nx-pitch-deck.pdf` starts deck reading: about four model calls, approved under decision 99.
+  - The planned investor is Savanna Seed Partners, which has no Nixo relationship yet.
 - Grants go through the data-room approval or diligence-share workflow:
   - Tensorgate: to Savanna Seed Partners, where the relationship exists.
   - Halyard: to Thames Arc, where a relationship must exist first.

@@ -32,9 +32,10 @@ export async function loadPdfLib() {
   return import(pathToFileURL(require.resolve("pdf-lib")).href);
 }
 
-const PAGE = { width: 595.28, height: 841.89 };
+// A4 portrait for documents; A4 landscape, one slide per page, for a deck.
+const PORTRAIT = { width: 595.28, height: 841.89 };
+const LANDSCAPE = { width: 841.89, height: 595.28 };
 const MARGIN = 40;
-const BODY_TOP = 772;
 const BODY_BOTTOM = 76;
 const GREY = 0.35;
 
@@ -92,6 +93,9 @@ export async function renderPdf(doc, fx, pdfLib) {
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const ink = rgb(0.1, 0.1, 0.12);
+  const PAGE = doc.layout === "slides" ? LANDSCAPE : PORTRAIT;
+  // 772 is the portrait body top the existing packs were rendered with.
+  const BODY_TOP = doc.layout === "slides" ? 525 : 772;
   const width = PAGE.width - 2 * MARGIN;
 
   const pages = [];
@@ -134,7 +138,9 @@ export async function renderPdf(doc, fx, pdfLib) {
   y -= 22;
 
   doc.blocks.forEach((block, index) => {
-    if (block.kind === "heading") {
+    if (block.kind === "pageBreak") {
+      newPage();
+    } else if (block.kind === "heading") {
       // A heading stays with the start of what follows it: a whole short
       // table, or the first few lines of anything else.
       const next = doc.blocks[index + 1];

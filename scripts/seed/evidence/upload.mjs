@@ -1,8 +1,25 @@
 // Phase 5 of the owner directive of 16 Nov 2026
 // (docs/ai-handoff/directives/2026-11-16-demo-evidence-data-room-seeding.md):
-// upload the synthetic evidence pack for Tensorgate (`tg-*`) and Halyard
-// Security (`hs-*`) through the product's normal founder document API, as
-// each company's own seeded fictional founder, and verify ingestion.
+// upload the synthetic evidence pack for Tensorgate (`tg-*`), Halyard
+// Security (`hs-*`) and Nixo (`nx-*`) through the product's normal founder
+// document API, as each company's own founder, and verify ingestion.
+//
+// Nixo (decision 99, 2026-11-16): the owner confirmed the Nixo founder
+// account is theirs and asked for it to be seeded like the fictional
+// companies. That account carries no fictional_demo/synthetic markers, so it
+// is admitted by an explicit allow-list of exactly one company id
+// (UNMARKED_FOUNDER_ALLOW_LIST below); every other company still requires a
+// marked founder, and the signed-in account must be that company's resolved
+// founder.
+//
+// Nixo sign-in (decision 99, amended 2026-11-16): there is no seed password
+// for this account, and its password is never read or changed. The script
+// fetches the Supabase secret key with SUPABASE_ACCESS_TOKEN (management API
+// `api-keys`, as decision 78 allows), keeps it in memory only, asks the auth
+// admin API for a one-time magic-link token hash (`generate_link`, type
+// magiclink: no email is sent) for the resolved founder's email, and
+// exchanges that hash at `/auth/v1/verify` for a normal user session. Seeding
+// only; the key is never printed, logged, written or committed.
 //
 // FOUNDER-PRIVATE ONLY. This script never shares, grants, changes a data-room
 // level or a download audience, deletes, or archives anything. Documents stay
@@ -10,12 +27,13 @@
 // on sharing.
 //
 //   node scripts/seed/evidence/generate.mjs              # build out/ first
-//   node scripts/seed/evidence/upload.mjs upload [tensorgate|halyard]
-//   node scripts/seed/evidence/upload.mjs verify [tensorgate|halyard]
+//   node scripts/seed/evidence/upload.mjs upload [tensorgate|halyard|nixo]
+//   node scripts/seed/evidence/upload.mjs verify [tensorgate|halyard|nixo]
 //   node scripts/seed/evidence/upload.mjs negative       # investor cannot see them
 //
 // Environment (names only; never printed): SUPABASE_ACCESS_TOKEN (read-only
-// SQL through the management API), CQ_SEED_ACCOUNT_PASSWORD, and the public
+// SQL through the management API; for Nixo also the api-keys read above),
+// CQ_SEED_ACCOUNT_PASSWORD (fictional accounts), and the public
 // Supabase config as CQ_SB_URL/CQ_SB_PUBLISHABLE or CQ_PUBLIC_JSON (a file with
 // NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY; keep it out
 // of the repository and shred it after use). NODE_USE_ENV_PROXY=1 in the
@@ -27,11 +45,14 @@
 // already there. Idempotency-Key headers are derived from the seed id and the
 // file's hash, so a retried request replays rather than duplicates.
 //
-// No model call is expected: every document declares its manifest
-// documentType (no kind classification), PDFs carry a text layer (no page
-// transcription), and none is a PITCH_DECK or COMPANY_PROFILE (no deck
-// reading or claim cards). `verify` reports ai_ops.model_usage rows for the
-// founders' tenants since the upload began, so a surprise call is visible.
+// Model calls: every document declares its manifest documentType (no kind
+// classification) and PDFs carry a text layer (no page transcription). For
+// Tensorgate and Halyard none is a PITCH_DECK or COMPANY_PROFILE, so no model
+// call is expected. Nixo's pack includes a generated PITCH_DECK
+// (`nx-pitch-deck`), so its upload triggers deck reading, about 4 model calls,
+// which the owner approved (decision 99, paid calls). `verify` reports
+// ai_ops.model_usage rows for the founders' tenants since the upload began,
+// so any call is visible.
 //
 // Logs only short id prefixes: never an email, password, key or token.
 import { createHash } from "node:crypto";
@@ -44,7 +65,25 @@ const HERE = new URL("./", import.meta.url).pathname;
 const COMPANIES = {
   tensorgate: { name: "Tensorgate", slug: "tensorgate" },
   halyard: { name: "Halyard Security", slug: "halyard-security" },
+  nixo: {
+    name: "Nixo",
+    slug: "nixo",
+    id: "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+  },
 };
+
+/**
+ * Companies whose founder account may lack the fictional_demo/synthetic
+ * markers. Exactly one entry, by company id, never by name: Nixo, under
+ * decision 99 (docs/ai-handoff/DECISIONS.md, owner, 2026-11-16). Do not add
+ * to this list without a recorded owner decision.
+ */
+const UNMARKED_FOUNDER_ALLOW_LIST = new Map([
+  [
+    "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+    "decision 99 (2026-11-16): owner confirmed the Nixo founder account is theirs; session by one-time admin sign-in link, no password change",
+  ],
+]);
 // The fictional investor used for the negative check (dev-world seed).
 const NEGATIVE_INVESTOR = "investor.savanna-seed@fictional.capitalq.local";
 const REPORT =
@@ -100,22 +139,99 @@ function publicConfig() {
   };
 }
 
-/** Password sign-in; returns { token, authUserId }. Never logs the email. */
-async function signIn(email) {
-  const password = process.env.CQ_SEED_ACCOUNT_PASSWORD;
-  if (!password) throw new Error("missing CQ_SEED_ACCOUNT_PASSWORD");
-  const { url, key } = publicConfig();
-  const r = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+let adminKeys = null;
+/**
+ * Supabase secret and publishable keys from the management API, in memory
+ * only (decision 78; decision 99 for Nixo). Never printed or persisted.
+ */
+async function supabaseAdminKeys() {
+  if (adminKeys) return adminKeys;
+  const token = process.env.SUPABASE_ACCESS_TOKEN;
+  if (!token) throw new Error("missing SUPABASE_ACCESS_TOKEN");
+  const r = await fetch(
+    `https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys?reveal=true`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  if (!r.ok) throw new Error(`api-keys: HTTP ${r.status}`);
+  const list = await r.json();
+  const pick = (type, name) =>
+    list.find((k) => k.type === type)?.api_key ??
+    list.find((k) => k.name === name)?.api_key;
+  const secret = pick("secret", "service_role");
+  const publishable = pick("publishable", "anon");
+  if (!secret || !publishable) throw new Error("api-keys: keys missing");
+  adminKeys = { secret, publishable };
+  return adminKeys;
+}
+
+/**
+ * Session for an allow-listed founder without touching their password: a
+ * one-time magic-link token hash from the auth admin API (generate_link
+ * sends no email), exchanged at /auth/v1/verify. Returns the verify body.
+ */
+async function adminLinkSession(email) {
+  const { url } = publicConfig();
+  const { secret, publishable } = await supabaseAdminKeys();
+  const link = await fetch(`${url}/auth/v1/admin/generate_link`, {
     method: "POST",
-    headers: { apikey: key, "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    headers: {
+      apikey: secret,
+      authorization: `Bearer ${secret}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ type: "magiclink", email }),
   });
-  if (!r.ok) throw new Error(`sign-in refused: HTTP ${r.status}`);
-  const body = await r.json();
+  const linkBody = await link.json().catch(() => ({}));
+  if (!link.ok) throw new Error(`generate_link: HTTP ${link.status}`);
+  const tokenHash =
+    linkBody.hashed_token ?? linkBody.properties?.hashed_token ?? null;
+  if (!tokenHash) throw new Error("generate_link: no token hash");
+  const verified = await fetch(`${url}/auth/v1/verify`, {
+    method: "POST",
+    headers: { apikey: publishable, "content-type": "application/json" },
+    body: JSON.stringify({ type: "email", token_hash: tokenHash }),
+  });
+  const body = await verified.json().catch(() => ({}));
+  if (!verified.ok || !body.access_token)
+    throw new Error(`verify: HTTP ${verified.status}`);
+  return body;
+}
+
+/**
+ * Sign-in; returns { token, authUserId }. Never logs the email.
+ * `company` is the resolved company. A company on the allow-list (Nixo
+ * only) signs in through a one-time admin sign-in link and must resolve to
+ * exactly its founder; every other account signs in with the shared seed
+ * password and must carry the fictional marker.
+ */
+async function signIn(email, company) {
+  const allowUnmarked =
+    company !== undefined && UNMARKED_FOUNDER_ALLOW_LIST.has(company.id);
+  let body;
+  if (allowUnmarked) {
+    body = await adminLinkSession(email);
+  } else {
+    const password = process.env.CQ_SEED_ACCOUNT_PASSWORD;
+    if (!password) throw new Error("missing CQ_SEED_ACCOUNT_PASSWORD");
+    const { url, key } = publicConfig();
+    const r = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: key, "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!r.ok) throw new Error(`sign-in refused: HTTP ${r.status}`);
+    body = await r.json();
+  }
   // Belt and braces: the account must carry the service-role fictional
-  // marker the seeds set (app_metadata cannot be set by the user).
-  if (body.user?.app_metadata?.fictional_demo !== true)
+  // marker the seeds set (app_metadata cannot be set by the user), unless
+  // the company is on the allow-list and the account is that company's
+  // resolved founder.
+  if (allowUnmarked) {
+    if (body.user?.id !== company.founder.auth_id)
+      throw new Error("signed-in account is not the allow-listed founder");
+  } else if (body.user?.app_metadata?.fictional_demo !== true) {
     throw new Error("signed-in account is not a seeded fictional account");
+  }
   return { token: body.access_token, authUserId: body.user.id };
 }
 
@@ -151,9 +267,13 @@ async function resolveCompany(key) {
   const [company] = await sql(
     `select id, tenant_id, organisation_id from core.companies
       where canonical_name = '${spec.name.replace(/'/g, "''")}'
-        and slug = '${spec.slug}'`,
+        and slug = '${spec.slug}'
+        ${spec.id ? `and id = ${uuid(spec.id)}` : ""}`,
   );
   if (!company) throw new Error(`${key}: company not found`);
+  // Only an allow-listed company id may resolve an unmarked founder; the
+  // marker filter stays in place for every other company.
+  const unmarkedAllowed = UNMARKED_FOUNDER_ALLOW_LIST.has(company.id);
   const founders = await sql(
     `select p.id as profile_id, u.id as auth_id, u.email,
             exists (select 1 from onboarding.sessions s
@@ -164,13 +284,19 @@ async function resolveCompany(key) {
        join identity.user_profiles p on p.id = m.user_id
        join auth.users u on u.id = p.auth_user_id
       where c.id = ${uuid(company.id)}
-        and u.raw_app_meta_data->>'fictional_demo' = 'true'
-        and u.raw_app_meta_data->>'synthetic' = 'true'
+        ${
+          unmarkedAllowed
+            ? ""
+            : `and u.raw_app_meta_data->>'fictional_demo' = 'true'
+        and u.raw_app_meta_data->>'synthetic' = 'true'`
+        }
       order by onboarded desc, m.started_at nulls last, p.id`,
   );
   if (founders.length === 0)
-    throw new Error(`${key}: no seeded fictional founder`);
-  return { ...company, founder: founders[0] };
+    throw new Error(
+      `${key}: no ${unmarkedAllowed ? "current" : "seeded fictional"} founder`,
+    );
+  return { ...company, key, founder: founders[0] };
 }
 
 function manifestFor(key) {
@@ -198,7 +324,7 @@ async function listCompanyDocuments(token, companyId) {
 async function uploadCompany(key) {
   const company = await resolveCompany(key);
   const manifest = manifestFor(key);
-  const session = await signIn(company.founder.email);
+  const session = await signIn(company.founder.email, company);
   if (session.authUserId !== company.founder.auth_id)
     throw new Error("signed in as a different account than resolved");
   console.log(
@@ -401,7 +527,7 @@ async function verifyCompany(key, sinceIso) {
       group by 1, 2`,
   );
   // The founder's own listing through the API: documents and data room.
-  const session = await signIn(company.founder.email);
+  const session = await signIn(company.founder.email, company);
   const listed = await listCompanyDocuments(session.token, company.id);
   const listedIds = new Set(listed.map((d) => d.id));
   const outline = await call(

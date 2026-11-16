@@ -10,6 +10,7 @@ import { defaultDocumentSensitivity } from "@capital-q/evidence";
 import { ParserOutputSchema } from "@capital-q/evidence/contracts";
 
 import {
+  amount,
   balanceSheet,
   bankTransactions,
   buildDocuments,
@@ -19,6 +20,7 @@ import {
   loadFixture,
   MANIFEST_DIR,
   monthLabel,
+  oneDecimal,
   ownershipHundredths,
   raiseTermsLine,
   revenueByCustomer,
@@ -38,8 +40,9 @@ import { EXTRACTION_PARSER_LIMITS } from "../src/parser/limits.js";
 import { createCsvExtractor } from "../src/parser/spreadsheets.js";
 
 /**
- * Consistency validator for the synthetic demo evidence of Tensorgate and
- * Halyard Security (owner directive 2026-11-16, phases 2-3).
+ * Consistency validator for the synthetic demo evidence of Tensorgate,
+ * Halyard Security and Nixo (owner directive 2026-11-16, phases 2-3;
+ * decision 99 for Nixo).
  *
  * The fixture is the source of truth. These checks hold the arithmetic
  * between the documents (revenue to invoices, cash roll-forward, burn and
@@ -48,6 +51,11 @@ import { createCsvExtractor } from "../src/parser/spreadsheets.js";
  * its claims, and read every generated file back through the workers' own
  * PDF and CSV extractors, so the files are known to be ingestible before
  * anyone uploads them.
+ *
+ * Tensorgate and Halyard are tied to the 6 Oct tavus-20 seed. Nixo is not in
+ * that seed: its fixture carries the profile as recorded in production
+ * (`recordedProfile`, read read-only on 16 Nov 2026) and lists every field it
+ * had to invent (`assumptions`); the Nixo-only checks hold it to both.
  */
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..", "..");
@@ -266,8 +274,17 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
   (key) => {
     const fx = loadFixture(key);
     const docs = buildDocuments(fx);
-    const companySeed = seed.find((c) => c.company === fx.seedSource.company);
-    if (companySeed === undefined) throw new Error(`no seed for ${key}`);
+    const companySeed =
+      fx.seedSource.file === undefined
+        ? undefined
+        : seed.find((c) => c.company === fx.seedSource.company);
+    if (fx.seedSource.file !== undefined && companySeed === undefined)
+      throw new Error(`no seed for ${key}`);
+    const recorded = fx.recordedProfile;
+    if (companySeed === undefined && recorded === undefined)
+      throw new Error(`${key}: neither a seed entry nor a recorded profile`);
+    const isSeeded = companySeed !== undefined;
+    const price = fx.pricing?.pricePerSeatPerMonth ?? 0;
     const months = fx.actuals.map((a) => a.month);
     let extracted: Extracted[] = [];
 
@@ -283,63 +300,177 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
 
     // ------------------------------------------------ the seed is preserved
 
-    it("keeps the seeded identity, founders, raise and deck figures", () => {
-      expect(fx.company.legalName).toBe(companySeed.legalName);
-      const names = [...fx.team.founders, ...fx.team.keyPeople].map(
-        (p) => p.name,
-      );
-      expect(names).toContain(companySeed.founderPerson.name);
-      for (const t of companySeed.team) expect(names).toContain(t.name);
+    it.runIf(isSeeded)(
+      "keeps the seeded identity, founders, raise and deck figures",
+      () => {
+        if (companySeed === undefined) throw new Error("unreachable");
+        expect(fx.company.legalName).toBe(companySeed.legalName);
+        const names = [...fx.team.founders, ...fx.team.keyPeople].map(
+          (p) => p.name,
+        );
+        expect(names).toContain(companySeed.founderPerson.name);
+        for (const t of companySeed.team) expect(names).toContain(t.name);
 
-      const c = companySeed.capital;
-      expect(fx.raise.targetAmount).toBe(c.targetRaise.amount);
-      expect(fx.raise.currency).toBe(c.targetRaise.currency);
-      expect(fx.currency).toBe(c.targetRaise.currency);
-      expect(fx.raise.instrument).toBe(c.instrument);
-      expect(fx.raise.valuationCap).toBe(c.valuationCap?.amount);
-      expect(fx.raise.preMoneyValuation).toBe(c.preMoneyValuation?.amount);
-      expect(fx.raise.targetCloseOn).toBe(c.targetCloseDate);
-      expect(fx.raise.minimumCheque).toBe(c.minimumCheque.amount);
-      expect(fx.raise.useOfFunds).toEqual(c.useOfFunds);
+        const c = companySeed.capital;
+        expect(fx.raise.targetAmount).toBe(c.targetRaise.amount);
+        expect(fx.raise.currency).toBe(c.targetRaise.currency);
+        expect(fx.currency).toBe(c.targetRaise.currency);
+        expect(fx.raise.instrument).toBe(c.instrument);
+        expect(fx.raise.valuationCap).toBe(c.valuationCap?.amount);
+        expect(fx.raise.preMoneyValuation).toBe(c.preMoneyValuation?.amount);
+        expect(fx.raise.targetCloseOn).toBe(c.targetCloseDate);
+        expect(fx.raise.minimumCheque).toBe(c.minimumCheque.amount);
+        expect(fx.raise.useOfFunds).toEqual(c.useOfFunds);
 
-      expect(fx.deckStatedFigures.cash).toBe(c.cashPosition.amount);
-      expect(fx.deckStatedFigures.monthlyNetBurn).toBe(c.monthlyNetBurn.amount);
-      expect(fx.deckStatedFigures.runwayMonths).toBe(c.runwayMonthsCurrent);
-      expect(fx.deckStatedFigures.headcount).toBe(companySeed.headcount);
-    });
+        expect(fx.deckStatedFigures?.cash).toBe(c.cashPosition.amount);
+        expect(fx.deckStatedFigures?.monthlyNetBurn).toBe(
+          c.monthlyNetBurn.amount,
+        );
+        expect(fx.deckStatedFigures?.runwayMonths).toBe(c.runwayMonthsCurrent);
+        expect(fx.deckStatedFigures?.headcount).toBe(companySeed.headcount);
+      },
+    );
 
-    it("matches every seeded KPI point (the SELF_REPORTED claims) exactly", () => {
-      const map = KPI_MAP[key] ?? {};
-      for (const point of companySeed.metrics.points) {
-        const actual = fx.actuals.find((a) => a.month === point.period);
-        expect(actual, point.period).toBeDefined();
-        for (const [code, value] of Object.entries(point.values)) {
-          const field = KPI_FIELD[code];
-          const convert = map[code];
-          if (field === undefined || convert === undefined) {
-            throw new Error(`unmapped KPI ${code}`);
-          }
-          expect(actual?.kpis[field], `${point.period} ${code}`).toBe(
-            convert(value),
-          );
+    it.runIf(!isSeeded)(
+      "keeps every recorded profile field and lists every invented one",
+      () => {
+        if (recorded === undefined) throw new Error("unreachable");
+        expect(fx.seedSource.companyId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(fx.seedSource.decision).toContain("decision 99");
+        expect(fx.company.name).toBe(recorded.canonicalName);
+        expect(fx.company.legalName).toBe(recorded.legalName);
+        expect(fx.company.website).toBe(recorded.websiteUrl);
+        expect(fx.company.foundedOn).toBe(recorded.foundedDate);
+        expect(fx.company.headquarters).toContain(recorded.headquartersCity);
+        expect(fx.company.stage).toBe(recorded.stage);
+        expect(fx.company.oneLiner).toBe(recorded.shortDescription);
+        expect(fx.team.founders.map((f) => f.name)).toEqual([
+          recorded.founderName,
+        ]);
+        expect(fx.team.founders).toHaveLength(recorded.founderCount);
+
+        const r = recorded.raise;
+        expect(fx.raise.targetAmount).toBe(r.targetAmount);
+        expect(fx.raise.currency).toBe(r.currency);
+        expect(fx.currency).toBe(r.currency);
+        expect(fx.raise.instrument.toLowerCase()).toContain(r.instrument);
+        expect(fx.raise.useOfFunds.map((u) => u.line).join("; ")).toBe(
+          r.useOfFundsSummary,
+        );
+        // Recorded timeframe: 3 to 6 months from 30 Sep 2026.
+        expect(fx.raise.targetCloseOn >= "2026-12-30").toBe(true);
+        expect(fx.raise.targetCloseOn <= "2027-03-30").toBe(true);
+
+        // Nothing recorded for these, so each must be declared as invented.
+        const invented = (fx.assumptions ?? []).map((a) => a.field).join(" | ");
+        for (const field of [
+          "raise.valuationCap",
+          "raise.minimumCheque",
+          "raise.targetCloseOn",
+          "raise.useOfFunds",
+          "customers",
+          "invoices",
+          "actuals",
+          "funding",
+          "openingBalances",
+          "capTable",
+          "bank",
+          "projections",
+          "hiringPlan",
+          "headcount",
+          "deck",
+        ]) {
+          expect(invented, field).toContain(field);
         }
-      }
-    });
+        for (const a of fx.assumptions ?? []) {
+          expect(a.value.length, a.field).toBeGreaterThan(0);
+          expect(a.note.length, a.field).toBeGreaterThan(5);
+        }
+        // Customers are invented and anonymous: a letter and a segment only.
+        for (const c of fx.customers)
+          expect(c.label).toMatch(/^Customer [A-Z]$/);
+        expect(fx.team.keyPeople).toHaveLength(0);
+      },
+    );
 
-    it("keeps the seeded month-end cash close to the deck's figure", () => {
-      const asOf = fx.deckStatedFigures.cashAsOf.slice(0, 7);
-      const atDeck = fx.actuals.find((a) => a.month === asOf);
-      expect(atDeck).toBeDefined();
-      // The deck rounds ("$1.1m", "480k"); the accounts are within 1%.
-      const cash = atDeck?.cash.closing ?? 0;
-      expect(
-        Math.abs(cash - fx.deckStatedFigures.cash) / fx.deckStatedFigures.cash,
-      ).toBeLessThan(0.01);
-      expect(
-        Math.abs((atDeck?.netBurn ?? 0) - fx.deckStatedFigures.monthlyNetBurn) /
-          fx.deckStatedFigures.monthlyNetBurn,
-      ).toBeLessThan(0.05);
-    });
+    it.runIf(isSeeded)(
+      "matches every seeded KPI point (the SELF_REPORTED claims) exactly",
+      () => {
+        const map = KPI_MAP[key] ?? {};
+        for (const point of companySeed?.metrics.points ?? []) {
+          const actual = fx.actuals.find((a) => a.month === point.period);
+          expect(actual, point.period).toBeDefined();
+          for (const [code, value] of Object.entries(point.values)) {
+            const field = KPI_FIELD[code];
+            const convert = map[code];
+            if (field === undefined || convert === undefined) {
+              throw new Error(`unmapped KPI ${code}`);
+            }
+            expect(actual?.kpis[field], `${point.period} ${code}`).toBe(
+              convert(value),
+            );
+          }
+        }
+      },
+    );
+
+    it.runIf(isSeeded)(
+      "keeps the seeded month-end cash close to the deck's figure",
+      () => {
+        const deck = fx.deckStatedFigures;
+        if (deck === undefined) throw new Error("no deck figures");
+        const asOf = deck.cashAsOf.slice(0, 7);
+        const atDeck = fx.actuals.find((a) => a.month === asOf);
+        expect(atDeck).toBeDefined();
+        // The deck rounds ("$1.1m", "480k"); the accounts are within 1%.
+        const cash = atDeck?.cash.closing ?? 0;
+        expect(Math.abs(cash - deck.cash) / deck.cash).toBeLessThan(0.01);
+        expect(
+          Math.abs((atDeck?.netBurn ?? 0) - deck.monthlyNetBurn) /
+            deck.monthlyNetBurn,
+        ).toBeLessThan(0.05);
+      },
+    );
+
+    it.runIf(!isSeeded)(
+      "generates a deck whose every figure is the accounts' figure",
+      () => {
+        const deck = extracted.find(
+          (e) => e.doc.id === `${fx.idPrefix}-pitch-deck`,
+        );
+        expect(deck?.doc.documentType).toBe("PITCH_DECK");
+        expect(deck?.doc.layout).toBe("slides");
+        expect(deck?.pageCount ?? 0).toBeGreaterThanOrEqual(10);
+        expect(deck?.pageCount ?? 0).toBeLessThanOrEqual(12);
+        const text = deck?.text ?? "";
+        const last = fx.actuals[fx.actuals.length - 1];
+        if (last === undefined) throw new Error("no actuals");
+        const k = last.kpis;
+        for (const figure of [
+          amount(last.cash.closing),
+          amount(last.netBurn),
+          oneDecimal(last.cash.closing / last.netBurn),
+          amount(num(k["contractedArr"])),
+          amount(num(k["annualisedSubscriptionRevenue"])),
+          amount(num(k["billedSeats"])),
+        ]) {
+          expect(text, figure).toContain(figure);
+        }
+        // Quarterly revenue on the traction slide sums the monthly actuals.
+        const q3 = sum(
+          fx.actuals
+            .filter((a) => a.month >= "2026-07" && a.month <= "2026-09")
+            .map((a) => a.revenue.total),
+        );
+        expect(text).toContain(`Q3 2026 | ${amount(q3)}`);
+        // The plan slide is labelled a projection on the slide itself.
+        expect(text).toContain("PROJECTION - not actual results");
+        // One slide per page, numbered 1 to n.
+        deck?.pageTexts.forEach((page, i) => {
+          expect(page).toContain(`${String(i + 1)}. `);
+        });
+      },
+    );
 
     // ------------------------------------------------ arithmetic
 
@@ -486,7 +617,37 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
       for (const a of fx.actuals) {
         const end = lastDay(a.month);
         const k = a.kpis;
-        if (key === "tensorgate") {
+        if (key === "nixo") {
+          expect(k["designPartners"]).toBe(
+            fx.customers.filter((c) => (c.designPartnerSince ?? "9") <= end)
+              .length,
+          );
+          const signed = fx.customers.filter(
+            (c) => (c.contractSignedOn ?? "9") <= end,
+          );
+          expect(k["paidContracts"]).toBe(signed.length);
+          const seats = k["seatsByCustomer"] as Record<string, number>;
+          expect(sum(Object.values(seats))).toBe(k["billedSeats"]);
+          expect(num(k["billedSeats"]) * price).toBe(
+            a.revenue.lines["platformSubscriptions"],
+          );
+          expect(k["annualisedSubscriptionRevenue"]).toBe(
+            num(a.revenue.lines["platformSubscriptions"]) * 12,
+          );
+          for (const c of fx.customers) {
+            const billing = (c.billingStartOn ?? "9").slice(0, 7) <= a.month;
+            const scheduled = (c.seatSchedule ?? [])
+              .filter((x) => x.from <= a.month)
+              .reduce((_, x) => x.seats, 0);
+            expect(seats[c.id] ?? 0, `${a.month} ${c.id}`).toBe(
+              billing ? scheduled : 0,
+            );
+          }
+          const contracted = sum(
+            signed.map((c) => seats[c.id] ?? c.contractedSeats ?? 0),
+          );
+          expect(k["contractedArr"]).toBe(contracted * price * 12);
+        } else if (key === "tensorgate") {
           expect(k["designPartners"]).toBe(
             fx.customers.filter((c) => (c.designPartnerSince ?? "9") <= end)
               .length,
@@ -527,8 +688,25 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
       ];
       expect(sum(ownershipHundredths(pro))).toBe(10000);
       const total = sum(holders.map((h) => h.shares));
+      if (!isSeeded) {
+        // Post-money SAFEs as converted: amount / cap of the fully diluted total.
+        const safes = holders.filter((h) => h.class.startsWith("SAFE"));
+        const rounds = [...fx.fundingBeforeWindow, ...fx.funding];
+        expect(safes).toHaveLength(rounds.length);
+        safes.forEach((h, i) => {
+          const round = rounds[i] as { amount: number; valuationCap?: number };
+          expect(h.shares / total).toBe(
+            round.amount / (round.valuationCap ?? Number.NaN),
+          );
+        });
+        const proNew = fx.capTable.proForma.newShares;
+        expect(proNew / (total + proNew)).toBe(
+          fx.raise.targetAmount / (fx.raise.valuationCap ?? Number.NaN),
+        );
+        return;
+      }
       const summary =
-        companySeed.dataRoom.find((d) => d.title.startsWith("Cap table"))
+        companySeed?.dataRoom.find((d) => d.title.startsWith("Cap table"))
           ?.summary ?? [];
       for (const [line, names] of Object.entries(SEED_OWNERSHIP[key] ?? {})) {
         expect(summary).toContain(line);
@@ -566,8 +744,23 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
       ]);
       expect(funded[0]?.fundingReceived).toBe(fx.raise.targetAmount);
       const deckFinancials =
-        companySeed.deck.find((s) => s.section === "financials")?.content ?? [];
-      if (key === "tensorgate") {
+        companySeed?.deck.find((s) => s.section === "financials")?.content ??
+        [];
+      if (key === "nixo") {
+        // No seeded deck: the generated deck states the plan, and the plan is
+        // billed seats x price x 12, with Customer F billed from January 2027.
+        for (const p of projections) {
+          expect(p.arr).toBe((p.billedSeats ?? 0) * price * 12);
+          expect(p.revenue).toBe((p.billedSeats ?? 0) * price);
+        }
+        const end = projections[projections.length - 1];
+        const deck =
+          extracted.find((e) => e.doc.id === `${fx.idPrefix}-pitch-deck`)
+            ?.text ?? "";
+        expect(deck).toContain(
+          `subscription ARR of USD ${amount(end?.arr ?? 0)} at Dec 2027`,
+        );
+      } else if (key === "tensorgate") {
         expect(deckFinancials[0]).toContain("$1.4m in 2027");
         expect(
           sum(
@@ -597,6 +790,7 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
           `${fx.idPrefix}-cap-table`,
           `${fx.idPrefix}-projections-2027`,
           `${fx.idPrefix}-raise-terms`,
+          ...(isSeeded ? [] : [`${fx.idPrefix}-pitch-deck`]),
         ].sort(),
       );
       for (const e of mentioning) {
@@ -612,6 +806,15 @@ describe.each(FIXTURE_KEYS.map((key) => [key]))(
 
     it("plants each known discrepancy in exactly the stated documents", () => {
       expect(fx.knownDiscrepancies.filter((d) => d.deliberate).length).toBe(2);
+      if (recorded !== undefined) {
+        // The planted team-size gap is the recorded figure against payroll.
+        const sep = fx.actuals.find((a) => a.month === "2026-09");
+        const employees = sep?.headcount.total ?? 0;
+        const contractors = num(sep?.kpis["contractorsForwardDeployed"]);
+        expect(recorded.teamSizeRecordedOn).toBe("2026-09-30");
+        expect(employees).not.toBe(recorded.teamSize);
+        expect(employees + contractors).toBe(recorded.teamSize);
+      }
       for (const d of fx.knownDiscrepancies) {
         expect(d.reason.length).toBeGreaterThan(40);
         const stated = new Set(d.evidence.map((e) => e.documentId));

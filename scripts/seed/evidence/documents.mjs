@@ -1,5 +1,7 @@
-// Synthetic evidence documents for the two fictional tavus-20 showcase
-// companies (Tensorgate, Halyard Security), built from one fixture each.
+// Synthetic evidence documents for the three showcase companies: the two
+// fictional tavus-20 companies (Tensorgate, Halyard Security) and Nixo
+// (decision 99: the owner's own account, seeded like the fictional ones with
+// the same synthetic marking), built from one fixture each.
 //
 // Pure and deterministic: no clock, no randomness, no network, no model.
 // The fixture JSON is the single source of truth; every number printed in
@@ -18,7 +20,7 @@ import { fileURLToPath } from "node:url";
 export const SYNTHETIC_HEADER =
   "SYNTHETIC DEMO DOCUMENT - NOT A REAL FINANCIAL OR OFFICIAL RECORD";
 export const WATERMARK_TEXT = "SYNTHETIC DEMO DOCUMENT";
-export const FIXTURE_KEYS = ["tensorgate", "halyard"];
+export const FIXTURE_KEYS = ["tensorgate", "halyard", "nixo"];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const FIXTURE_DIR = join(HERE, "fixtures");
@@ -185,6 +187,23 @@ export function licenceMarginTwelve(fx) {
   return { revenue, cost };
 }
 
+/**
+ * Subscription gross margin (Nixo): subscription revenue less hosting and
+ * model inference, excluding onboarding fees and the contract engineers.
+ */
+export function subscriptionMarginTwelve(fx) {
+  const rows = fx.actuals.slice(-12);
+  const revenue = rows.reduce(
+    (s, a) => s + (a.revenue.lines.platformSubscriptions ?? 0),
+    0,
+  );
+  const cost = rows.reduce(
+    (s, a) => s + (a.cogs.lines.hostingAndInference ?? 0),
+    0,
+  );
+  return { revenue, cost };
+}
+
 /** The one sentence of raise terms every document that mentions the raise prints. */
 export function raiseTermsLine(fx) {
   const r = fx.raise;
@@ -226,6 +245,12 @@ const LINE_LABELS = {
   travelAndOnSite: "Travel and on-site deployment",
   recruitment: "Recruitment",
   other: "Other",
+  platformSubscriptions: "Platform subscriptions",
+  onboardingServices: "Onboarding and integration services",
+  hostingAndInference: "Hosting and model inference",
+  contractForwardDeployedEngineers: "Contract forward-deployed engineers",
+  payrollProduct: "Payroll - product",
+  officeSanFrancisco: "Office (San Francisco)",
 };
 export function lineLabel(key) {
   const label = LINE_LABELS[key];
@@ -239,7 +264,34 @@ const HEADCOUNT_LABELS = {
   operations: "Operations",
   deployment: "Deployment",
   sales: "Sales",
+  product: "Product",
 };
+
+/** Nixo: the month index of `month` from the start of `from` (both YYYY-MM). */
+function monthIndex(from, month) {
+  const [ya, ma] = from.split("-").map(Number);
+  const [yb, mb] = month.split("-").map(Number);
+  return (yb - ya) * 12 + (mb - ma);
+}
+
+/** Nixo: onboarding fee recognised for one customer in one month (thirds from go-live). */
+function onboardingRecognised(c, month) {
+  const i = monthIndex(c.goLiveOn.slice(0, 7), month);
+  return i >= 0 && i < 3 ? c.onboardingFee / 3 : 0;
+}
+
+/** Nixo: employees and contractors at 30 Sep 2026, the date the profile recorded a team of 12. */
+function nixoTeamAtSeptember(fx) {
+  const sep = fx.actuals.find((a) => a.month === "2026-09");
+  return `${sep.headcount.total} employees and ${sep.kpis.contractorsForwardDeployed} contract forward-deployed engineers at 30 Sep 2026`;
+}
+
+/** Nixo: the one customer that has signed but is not billed yet. */
+function nixoSignedNotBilling(fx) {
+  const c = fx.customers.find((x) => x.status === "SIGNED_NOT_BILLING");
+  if (c === undefined) throw new Error("no signed-not-billing customer");
+  return c;
+}
 
 function customerName(fx, id) {
   const c = fx.customers.find((x) => x.id === id);
@@ -262,6 +314,11 @@ export function revenueByCustomer(fx, month) {
     }
     const a = fx.actuals.find((x) => x.month === month);
     out["TG-C01"] += a.revenue.lines.implementation;
+  } else if (fx.key === "nixo") {
+    const a = fx.actuals.find((x) => x.month === month);
+    for (const [id, seats] of Object.entries(a.kpis.seatsByCustomer))
+      out[id] += seats * fx.pricing.pricePerSeatPerMonth;
+    for (const c of fx.customers) out[c.id] += onboardingRecognised(c, month);
   } else {
     const a = fx.actuals.find((x) => x.month === month);
     for (const [id, seats] of Object.entries(a.kpis.seatsByCustomer))
@@ -336,9 +393,13 @@ function managementAccounts(fx) {
       `${fx.documentDefaults.preparedBy}. Accrual basis. Amounts in ${C}, whole units.`,
     ),
     p(
-      fx.key === "tensorgate"
-        ? "Revenue recognition: each paid contract's annual platform floor (180,000) is recognised evenly by month from the billing start date. The implementation fee is recognised over the first three months of service. No usage above the floor was billed in the period."
-        : "Revenue recognition: licences at 12 per user per year are recognised monthly (1.00 per licensed seat per month). Deployment fees are invoiced at contract signature and recognised at go-live. The deployment team's payroll is reported in cost of sales.",
+      {
+        tensorgate:
+          "Revenue recognition: each paid contract's annual platform floor (180,000) is recognised evenly by month from the billing start date. The implementation fee is recognised over the first three months of service. No usage above the floor was billed in the period.",
+        halyard:
+          "Revenue recognition: licences at 12 per user per year are recognised monthly (1.00 per licensed seat per month). Deployment fees are invoiced at contract signature and recognised at go-live. The deployment team's payroll is reported in cost of sales.",
+        nixo: "Revenue recognition: platform subscriptions at 1,200 per forward-deployed engineering seat per month are invoiced monthly in advance and recognised in the month of service. Onboarding and integration fees are invoiced at contract signature and recognised in thirds over the first three months from go-live. Hosting, model inference and the contract forward-deployed engineers who deliver onboarding are reported in cost of revenue.",
+      }[fx.key],
     ),
     h(`Summary for ${monthLong(last.month)}`),
     table(
@@ -366,6 +427,14 @@ function managementAccounts(fx) {
     blocks.push(
       p(
         `Licence gross margin, 12 months to ${monthLabel(t12.to)}: ${percent1(lm.revenue - lm.cost, lm.revenue)} (licence revenue ${amount(lm.revenue)} less hosting, authenticator services and support tooling ${amount(lm.cost)}; excludes the deployment team and deployment fees).`,
+      ),
+    );
+  }
+  if (fx.key === "nixo") {
+    const sm = subscriptionMarginTwelve(fx);
+    blocks.push(
+      p(
+        `Subscription gross margin, 12 months to ${monthLabel(t12.to)}: ${percent1(sm.revenue - sm.cost, sm.revenue)} (subscription revenue ${amount(sm.revenue)} less hosting and model inference ${amount(sm.cost)}; excludes onboarding fees and the contract forward-deployed engineers).`,
       ),
     );
   }
@@ -656,6 +725,21 @@ function revenueBreakdown(fx) {
         `${customerName(fx, c.id)} signed on ${dateLabel(c.contractSignedOn)}. Billing start: ${dateLabel(c.billingStartOn)}, after deployment acceptance on ${dateLabel(c.goLiveOn)}. Its 180,000 annual floor counts in contracted ARR from August 2026 and in recognised revenue from October 2026.`,
       ),
     );
+  } else if (fx.key === "nixo") {
+    const c = nixoSignedNotBilling(fx);
+    const last = lastActual(fx);
+    blocks.push(
+      h("Contracted against billed"),
+      p(
+        // No dates after the last actual month here: this is an actuals
+        // document. The billing start is in the customer contract summary.
+        `${customerName(fx, c.id)} signed on ${dateLabel(c.contractSignedOn)} for ${c.contractedSeats} seats, but its subscription is not yet billed: billing starts after its planned go-live (see the customer contract summary). Its ${amount(c.contractedSeats * fx.pricing.pricePerSeatPerMonth * 12)} a year counts in contracted ARR (${amount(last.kpis.contractedArr)} at ${monthLabel(last.month)}) but not in recognised revenue: subscription revenue for ${monthLabel(last.month)} is ${amount(last.revenue.lines.platformSubscriptions)}, ${amount(last.kpis.annualisedSubscriptionRevenue)} annualised. Its ${amount(c.onboardingFee)} onboarding fee was invoiced and collected in ${monthLabel(last.month)} and is held in deferred revenue.`,
+      ),
+      h("Subscription revenue"),
+      p(
+        "Subscription revenue for each customer equals its billed seats in the month at 1,200 per seat per month. Seat counts by customer are in the cohorts and retention document.",
+      ),
+    );
   } else {
     blocks.push(
       h("Licence revenue"),
@@ -735,6 +819,9 @@ const PAYMENT_DAY = {
   travelAndOnSite: 18,
   recruitment: 20,
   other: 22,
+  hostingAndInference: 3,
+  officeSanFrancisco: 1,
+  contractForwardDeployedEngineers: 28,
 };
 const PAYEE = {
   cloudAndGpuEnclaveCapacity: "Cloud infrastructure provider",
@@ -752,6 +839,9 @@ const PAYEE = {
   travelAndOnSite: "Travel and on-site costs",
   recruitment: "Recruitment fee",
   other: "Sundry payments",
+  hostingAndInference: "Cloud hosting and model inference provider",
+  officeSanFrancisco: "Office rent",
+  contractForwardDeployedEngineers: "Contract engineering services",
 };
 
 /** Bank transactions for one month, derived from receipts and cost lines. */
@@ -910,17 +1000,52 @@ function customerContracts(fx) {
   const blocks = [
     h("Scope"),
     p(
-      fx.key === "tensorgate"
-        ? "Summary of each design-partner and paid agreement. Customer names are withheld under the agreements."
-        : "Summary of each customer agreement. Customer names are withheld: public bodies approve their own announcements.",
+      {
+        tensorgate:
+          "Summary of each design-partner and paid agreement. Customer names are withheld under the agreements.",
+        halyard:
+          "Summary of each customer agreement. Customer names are withheld: public bodies approve their own announcements.",
+        nixo: "Summary of each subscription agreement. Customer names are withheld under the agreements; each customer is identified by a letter and its segment.",
+      }[fx.key],
     ),
   ];
   for (const c of fx.customers) {
     const rows = [
       ["Segment", c.segment],
-      ["Status", c.status.replace("_", " ").toLowerCase()],
+      ["Status", c.status.replaceAll("_", " ").toLowerCase()],
     ];
-    if (fx.key === "tensorgate") {
+    if (fx.key === "nixo") {
+      const C = fx.currency;
+      const price = fx.pricing.pricePerSeatPerMonth;
+      const seats = c.seatSchedule
+        .map((s) => `${amount(s.seats)} from ${monthLabel(s.from)}`)
+        .join("; ");
+      rows.push(
+        ["Design partner since", dateLabel(c.designPartnerSince)],
+        ["Contract signed", dateLabel(c.contractSignedOn)],
+        [
+          "Billing start",
+          c.status === "SIGNED_NOT_BILLING"
+            ? `${c.contractedSeats} seats contracted, billing from ${dateLabel(c.billingStartOn)}, after planned go-live on ${dateLabel(c.goLiveOn)}`
+            : `${dateLabel(c.billingStartOn)} (go-live ${dateLabel(c.goLiveOn)})`,
+        ],
+        ["Term", `${c.termMonths} months; ${c.renewal.toLowerCase()}`],
+        [
+          "Price",
+          `${C} ${amount(price)} per forward-deployed engineering seat per month, billed monthly in advance`,
+        ],
+        ["Billed seats", seats === "" ? "None yet" : seats],
+        [
+          "Onboarding fee",
+          `${C} ${amount(c.onboardingFee)}, invoiced at signature, recognised over three months from go-live`,
+        ],
+        ["Payment pattern", c.paymentPattern],
+        [
+          "Data handling",
+          "Deployment metadata and time records only; no customer end-user data",
+        ],
+      );
+    } else if (fx.key === "tensorgate") {
       rows.push(["Design partner since", dateLabel(c.designPartnerSince)]);
       if (c.contractSignedOn) {
         rows.push(
@@ -1053,6 +1178,49 @@ function cohorts(fx) {
         "No design partner or customer has left. Logo retention over the period: 100%.",
       ),
     );
+  } else if (fx.key === "nixo") {
+    const start = fx.actuals.find((a) => a.month === "2025-10");
+    const end = lastActual(fx);
+    const cohort = Object.keys(start.kpis.seatsByCustomer);
+    const s0 = cohort.reduce((s, id) => s + start.kpis.seatsByCustomer[id], 0);
+    const s1 = cohort.reduce((s, id) => s + end.kpis.seatsByCustomer[id], 0);
+    blocks.push(
+      h("Scope"),
+      p(
+        "Billed forward-deployed engineering seats by customer and month. Subscription revenue is 1,200 per seat per month.",
+      ),
+      ...monthTables(
+        months,
+        (g) => [
+          ...fx.customers.map((c) =>
+            row(
+              customerName(fx, c.id),
+              g.map((m) => amount(get(m).kpis.seatsByCustomer[c.id] ?? 0)),
+            ),
+          ),
+          row(
+            "Billed seats",
+            g.map((m) => amount(get(m).kpis.billedSeats)),
+          ),
+        ],
+        "Billed seats",
+      ),
+      h("Design partner to paid contract"),
+      table(
+        ["Customer", "Partner since", "Contract signed", "Months to convert"],
+        fx.customers.map((c) => [
+          customerName(fx, c.id),
+          dateLabel(c.designPartnerSince),
+          dateLabel(c.contractSignedOn),
+          String(monthsBetween(c.designPartnerSince, c.contractSignedOn)),
+        ]),
+        { labelWidth: 170 },
+      ),
+      h("Net seat retention"),
+      p(
+        `Customers billed at ${monthLabel(start.month)} (${cohort.length}) held ${amount(s0)} seats then and ${amount(s1)} at ${monthLabel(end.month)}: net seat retention ${percent1(s1, s0)}. No customer has left; logo retention 100%.`,
+      ),
+    );
   } else {
     const start = fx.actuals.find((a) => a.month === "2025-10");
     const end = lastActual(fx);
@@ -1159,6 +1327,16 @@ function concentration(fx) {
     blocks.push(
       p(
         `Largest customer by ARR at ${monthLabel(end.month)}: ${customerName(fx, bigId)}, ${amount(bigSeats * 12)} of ${amount(end.kpis.arr)} ARR (${percent1(bigSeats, end.kpis.licensedSeats)}).`,
+      ),
+    );
+  } else if (fx.key === "nixo") {
+    const end = lastActual(fx);
+    const [bigId, bigSeats] = Object.entries(end.kpis.seatsByCustomer).sort(
+      (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1),
+    )[0];
+    blocks.push(
+      p(
+        `Largest customer by billed seats at ${monthLabel(end.month)}: ${customerName(fx, bigId)}, ${amount(bigSeats)} of ${amount(end.kpis.billedSeats)} seats (${percent1(bigSeats, end.kpis.billedSeats)}).`,
       ),
     );
   } else {
@@ -1338,13 +1516,17 @@ function projectionsDoc(fx) {
   const pr = fx.projections;
   const months = pr.months.map((x) => x.month);
   const get = (m) => pr.months.find((x) => x.month === m);
-  const extra =
-    fx.key === "tensorgate"
-      ? [["Contracted ARR", (m) => amount(get(m).contractedArr)]]
-      : [
-          ["Licensed seats", (m) => amount(get(m).licensedSeats)],
-          ["ARR", (m) => amount(get(m).arr)],
-        ];
+  const extra = {
+    tensorgate: [["Contracted ARR", (m) => amount(get(m).contractedArr)]],
+    halyard: [
+      ["Licensed seats", (m) => amount(get(m).licensedSeats)],
+      ["ARR", (m) => amount(get(m).arr)],
+    ],
+    nixo: [
+      ["Billed seats", (m) => amount(get(m).billedSeats)],
+      ["Subscription ARR", (m) => amount(get(m).arr)],
+    ],
+  }[fx.key];
   const opening = pr.months[0].cashOpening;
   const y2027 = pr.months.filter((x) => x.month.startsWith("2027"));
   const blocks = [
@@ -1471,6 +1653,64 @@ function kpiPack(fx) {
         "Median overhead is measured against the same model and hardware outside the enclave.",
       ),
     );
+  } else if (fx.key === "nixo") {
+    const t12 = trailingTwelve(fx);
+    const sm = subscriptionMarginTwelve(fx);
+    const f = nixoSignedNotBilling(fx);
+    blocks.push(
+      ...monthTables(
+        months,
+        (g) => [
+          row(
+            "Billed seats",
+            g.map((m) => amount(get(m).kpis.billedSeats)),
+          ),
+          row(
+            "Paid contracts",
+            g.map((m) => String(get(m).kpis.paidContracts)),
+          ),
+          row(
+            "Design partners",
+            g.map((m) => String(get(m).kpis.designPartners)),
+          ),
+          row(
+            `Annualised subscription revenue (${C})`,
+            g.map((m) => amount(get(m).kpis.annualisedSubscriptionRevenue)),
+          ),
+          row(
+            `Contracted ARR (${C})`,
+            g.map((m) => amount(get(m).kpis.contractedArr)),
+          ),
+          row(
+            "Deployments tracked",
+            g.map((m) => amount(get(m).kpis.deploymentsTracked)),
+          ),
+          row(
+            "Employees (month end)",
+            g.map((m) => String(get(m).headcount.total)),
+          ),
+          row(
+            "Contract forward-deployed engineers",
+            g.map((m) => String(get(m).kpis.contractorsForwardDeployed)),
+          ),
+        ],
+        "Product and commercial metrics",
+      ),
+      h(`Financial position, ${monthLong(last.month)}`),
+      p(
+        `Contracted ARR ${C} ${amount(last.kpis.contractedArr)}; annualised subscription revenue ${C} ${amount(last.kpis.annualisedSubscriptionRevenue)}. ${customerName(fx, f.id)} signed on ${dateLabel(f.contractSignedOn)} for ${f.contractedSeats} seats, with billing from ${dateLabel(f.billingStartOn)}.`,
+      ),
+      p(
+        `Gross margin, 12 months to ${monthLabel(t12.to)}: ${percent1(t12.revenue - t12.cogs, t12.revenue)} with onboarding delivery in cost of revenue; subscription gross margin ${percent1(sm.revenue - sm.cost, sm.revenue)}.`,
+      ),
+      p(
+        `Net burn ${C} ${amount(last.netBurn)}; cash ${C} ${amount(last.cash.closing)}; runway ${oneDecimal(last.cash.closing / last.netBurn)} months at this burn.`,
+      ),
+      h("Team"),
+      p(
+        `${nixoTeamAtSeptember(fx)}. Headcount figures in this pack count employees only.`,
+      ),
+    );
   } else {
     const t12 = trailingTwelve(fx);
     blocks.push(
@@ -1537,8 +1777,23 @@ function teamDoc(fx) {
   const blocks = [
     h("Founders"),
     ...fx.team.founders.map((f) => p(`${f.name}, ${f.role}. ${f.summary}`)),
-    h("Key people"),
-    ...fx.team.keyPeople.map((f) => p(`${f.name}, ${f.role}. ${f.summary}`)),
+    ...(fx.team.keyPeople.length > 0
+      ? [
+          h("Key people"),
+          ...fx.team.keyPeople.map((f) =>
+            p(`${f.name}, ${f.role}. ${f.summary}`),
+          ),
+        ]
+      : []),
+    ...(fx.key === "nixo"
+      ? [
+          h("Employees and contractors"),
+          p(fx.team.contractorsNote),
+          p(
+            `${nixoTeamAtSeptember(fx)}; ${last.headcount.total} employees and ${last.kpis.contractorsForwardDeployed} contract forward-deployed engineers at ${dateLabel(lastDay(last.month))}.`,
+          ),
+        ]
+      : []),
     h(`Headcount at ${dateLabel(lastDay(last.month))}`),
     table(
       ["Function", "People"],
@@ -1593,9 +1848,211 @@ function teamDoc(fx) {
   };
 }
 
+/**
+ * Nixo has no deck of its own, so a short text-native deck is generated
+ * from the same fixture: one slide per page, every number read from or
+ * derived from the fixture, projections labelled as projections.
+ */
+function pitchDeck(fx) {
+  const C = fx.currency;
+  const r = fx.raise;
+  const last = lastActual(fx);
+  const t12 = trailingTwelve(fx);
+  const sm = subscriptionMarginTwelve(fx);
+  const f = nixoSignedNotBilling(fx);
+  const live = fx.customers.filter((c) => c.status === "LIVE");
+  const price = fx.pricing.pricePerSeatPerMonth;
+  const pr = fx.projections.months;
+  const endProjection = pr[pr.length - 1];
+  const start = fx.actuals.find((a) => a.month === "2025-10");
+  const cohort = Object.keys(start.kpis.seatsByCustomer);
+  const s0 = cohort.reduce((s, id) => s + start.kpis.seatsByCustomer[id], 0);
+  const s1 = cohort.reduce((s, id) => s + last.kpis.seatsByCustomer[id], 0);
+  const quarters = [
+    ["Q3 2025", ["2025-07", "2025-08", "2025-09"]],
+    ["Q4 2025", ["2025-10", "2025-11", "2025-12"]],
+    ["Q1 2026", ["2026-01", "2026-02", "2026-03"]],
+    ["Q2 2026", ["2026-04", "2026-05", "2026-06"]],
+    ["Q3 2026", ["2026-07", "2026-08", "2026-09"]],
+  ];
+  const get = (m) => fx.actuals.find((a) => a.month === m);
+  const slide = (n, title, ...body) => [
+    ...(n > 1 ? [{ kind: "pageBreak" }] : []),
+    h(`${n}. ${title}`),
+    ...body,
+  ];
+  const blocks = [
+    ...slide(
+      1,
+      fx.company.name,
+      p(fx.company.oneLiner),
+      p(
+        `Seed round: ${C} ${amount(r.targetAmount)} on a ${r.instrument}. ${fx.company.headquarters}. Founded ${dateLabel(fx.company.foundedOn)}.`,
+      ),
+      p(`${fx.team.founders.map((x) => `${x.name}, ${x.role}`).join("; ")}.`),
+    ),
+    ...slide(
+      2,
+      "The problem",
+      p(
+        "AI companies win enterprise contracts by sending forward-deployed engineers to make the product work inside each customer.",
+      ),
+      p(
+        "That custom work is rarely priced, tracked or reused, so gross margin drifts toward services levels and leadership cannot see which deployments make money.",
+      ),
+    ),
+    ...slide(
+      3,
+      "The product",
+      p(
+        "Nixo is software for forward-deployed engineering teams: scope and price each custom deployment, record engineer time and model-inference cost against it, reuse deployment templates, and report margin by customer and by deployment.",
+      ),
+      p(
+        "Used by forward-deployed engineers day to day, and by finance and leadership for margin reporting.",
+      ),
+    ),
+    ...slide(
+      4,
+      "Business model",
+      table(
+        ["", ""],
+        [
+          [
+            "Subscription",
+            `${C} ${amount(price)} per forward-deployed engineering seat per month, annual contracts, billed monthly in advance`,
+          ],
+          [
+            "Onboarding",
+            "One-off fee of 12,000 to 30,000, invoiced at signature, recognised over three months from go-live",
+          ],
+        ],
+        { labelWidth: 140 },
+      ),
+    ),
+    ...slide(
+      5,
+      `Traction to ${monthLong(last.month)} (actual)`,
+      table(
+        ["", monthLabel(last.month)],
+        [
+          ["Paying customers (live)", String(live.length)],
+          ["Billed seats", amount(last.kpis.billedSeats)],
+          [
+            `Annualised subscription revenue (${C})`,
+            amount(last.kpis.annualisedSubscriptionRevenue),
+          ],
+          [`Contracted ARR (${C})`, amount(last.kpis.contractedArr)],
+          ["Deployments tracked", amount(last.kpis.deploymentsTracked)],
+        ],
+        { labelWidth: 260 },
+      ),
+      p(
+        `Contracted ARR includes ${customerName(fx, f.id)}: ${f.contractedSeats} seats signed on ${dateLabel(f.contractSignedOn)}, billing from ${dateLabel(f.billingStartOn)}.`,
+      ),
+    ),
+    ...slide(
+      6,
+      "Recognised revenue by quarter (actual)",
+      table(
+        ["Quarter", `Revenue (${C})`, "Billed seats at quarter end"],
+        quarters.map(([label, ms]) => [
+          label,
+          amount(ms.reduce((s, m) => s + get(m).revenue.total, 0)),
+          amount(get(ms[2]).kpis.billedSeats),
+        ]),
+        { labelWidth: 160 },
+      ),
+    ),
+    ...slide(
+      7,
+      "Unit economics (actual)",
+      p(
+        `Gross margin, 12 months to ${monthLabel(t12.to)}: ${percent1(t12.revenue - t12.cogs, t12.revenue)}, with onboarding delivery by contract engineers in cost of revenue.`,
+      ),
+      p(
+        `Subscription gross margin over the same 12 months: ${percent1(sm.revenue - sm.cost, sm.revenue)} after hosting and model inference.`,
+      ),
+      p(
+        `Net seat retention: customers billed at ${monthLabel(start.month)} grew from ${amount(s0)} to ${amount(s1)} seats by ${monthLabel(last.month)} (${percent1(s1, s0)}). No customer has left.`,
+      ),
+    ),
+    ...slide(
+      8,
+      "Customers",
+      p(
+        "Names withheld under the agreements; each customer is identified by a letter and its segment.",
+      ),
+      table(
+        ["Customer", "Contract signed", `Seats at ${monthLabel(last.month)}`],
+        fx.customers.map((c) => [
+          customerName(fx, c.id),
+          dateLabel(c.contractSignedOn),
+          c.status === "SIGNED_NOT_BILLING"
+            ? `${c.contractedSeats} contracted, not yet billed`
+            : amount(last.kpis.seatsByCustomer[c.id]),
+        ]),
+        { widths: [300, 100, 130] },
+      ),
+    ),
+    ...slide(
+      9,
+      "Team",
+      ...fx.team.founders.map((x) => p(`${x.name}, ${x.role}. ${x.summary}`)),
+      p(
+        `${last.headcount.total} employees and ${last.kpis.contractorsForwardDeployed} contract forward-deployed engineers at ${dateLabel(lastDay(last.month))}.`,
+      ),
+    ),
+    ...slide(
+      10,
+      `Financial position, ${monthLong(last.month)} (actual)`,
+      table(
+        ["", C],
+        [
+          ["Cash at month end", amount(last.cash.closing)],
+          ["Net burn in the month", amount(last.netBurn)],
+          [
+            "Runway at this burn (months)",
+            oneDecimal(last.cash.closing / last.netBurn),
+          ],
+        ],
+        { labelWidth: 260 },
+      ),
+    ),
+    ...slide(
+      11,
+      "Plan to December 2027 (PROJECTION - not actual results)",
+      p(
+        `Projection: ${amount(endProjection.billedSeats)} billed seats and subscription ARR of ${C} ${amount(endProjection.arr)} at ${monthLabel(endProjection.month)}; ${endProjection.headcount} employees.`,
+      ),
+      p(
+        `Planned net burn after the raise: about ${C} ${amount(r.plannedMonthlyNetBurnPostRaise)} a month. The full projection and its assumptions are in the projections document.`,
+      ),
+    ),
+    ...slide(
+      12,
+      "The raise",
+      p(raiseTermsLine(fx)),
+      table(
+        ["Use of funds", "Share", `Amount (${C})`],
+        r.useOfFunds.map((u) => [u.line, `${u.percent}%`, amount(u.amount)]),
+        { labelWidth: 300 },
+      ),
+    ),
+  ];
+  return {
+    ...docBase(fx, "pitch-deck", "Seed pitch deck", "PITCH_DECK", "pdf", {
+      from: fx.periods.firstActualMonth,
+      to: fx.periods.lastActualMonth,
+    }),
+    layout: "slides",
+    blocks,
+  };
+}
+
 /** Every document for one company, in a fixed order. */
 export function buildDocuments(fx) {
   return [
+    ...(fx.key === "nixo" ? [pitchDeck(fx)] : []),
     managementAccounts(fx),
     monthlyActualsCsv(fx),
     revenueBreakdown(fx),
@@ -1616,6 +2073,7 @@ export function buildDocuments(fx) {
 
 /** Data-room folder and checklist codes (evidence.data_room_* reference data). */
 const PLACEMENT = {
+  "pitch-deck": { folder: "fundraising", checklistItem: "pitch_deck" },
   "management-accounts": {
     folder: "financials",
     checklistItem: "management_accounts",
@@ -1670,6 +2128,18 @@ const PLANNED_SHARES = {
     "projections-2027",
     "kpi-pack",
   ],
+  nixo: [
+    "pitch-deck",
+    "management-accounts",
+    "revenue-breakdown",
+    "customer-contracts",
+    "cohorts-retention",
+    "customer-concentration",
+    "cap-table",
+    "raise-terms",
+    "projections-2027",
+    "kpi-pack",
+  ],
 };
 
 export function buildManifest(fx, docs) {
@@ -1679,6 +2149,13 @@ export function buildManifest(fx, docs) {
     companyKey: fx.key,
     fixture: `scripts/seed/evidence/fixtures/${fx.key}.json`,
     synthetic: true,
+    ...(fx.seedSource.companyId === undefined
+      ? {}
+      : {
+          companyId: fx.seedSource.companyId,
+          seedAuthority: fx.seedSource.decision,
+          inventedFields: fx.assumptions.map((a) => a.field),
+        }),
     sensitivityRule:
       "packages/evidence/src/domain/sensitivity.ts defaultDocumentSensitivity: FINANCIAL, MANAGEMENT_ACCOUNTS and FINANCIAL_MODEL are HIGHLY_CONFIDENTIAL; every other type is CONFIDENTIAL.",
     qReadRule:

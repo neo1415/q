@@ -26,6 +26,12 @@ export type Customer = {
   readonly annualFloor?: Money;
   readonly deploymentFee?: Money | null;
   readonly licensedUsersAtFullRollout?: number;
+  readonly onboardingFee?: Money;
+  readonly contractedSeats?: number;
+  readonly seatSchedule?: readonly {
+    readonly from: string;
+    readonly seats: number;
+  }[];
 };
 
 export type Lines = {
@@ -90,12 +96,16 @@ export type ProjectionMonth = {
   readonly contractedArr?: Money;
   readonly licensedSeats?: number;
   readonly arr?: Money;
+  readonly billedSeats?: number;
 };
 
 export type KnownDiscrepancy = {
   readonly id: string;
   readonly topic: string;
-  readonly deckStatement: string;
+  /** What the deck said (Tensorgate, Halyard). */
+  readonly deckStatement?: string;
+  /** What the recorded profile, KPI pack or deck said (Nixo). */
+  readonly profileStatement?: string;
   readonly accountsStatement: string;
   readonly reason: string;
   /** False for a reconciliation the 6 Oct seed forced, not a planted contradiction. */
@@ -110,12 +120,51 @@ export type Fixture = {
   readonly schemaVersion: number;
   readonly key: string;
   readonly idPrefix: string;
-  readonly seedSource: { readonly file: string; readonly company: string };
+  /** tavus-20 seed file (Tensorgate, Halyard) or the hosted profile read (Nixo). */
+  readonly seedSource: {
+    readonly file?: string;
+    readonly company: string;
+    readonly companyId?: string;
+    readonly decision?: string;
+  };
+  /** Nixo: the profile as recorded in production, read read-only. */
+  readonly recordedProfile?: {
+    readonly canonicalName: string;
+    readonly legalName: string;
+    readonly websiteUrl: string;
+    readonly foundedDate: string;
+    readonly headquartersCity: string;
+    readonly headquartersCountry: string;
+    readonly stage: string;
+    readonly shortDescription: string;
+    readonly primaryDescription: string;
+    readonly founderName: string;
+    readonly founderCount: number;
+    readonly teamSize: number;
+    readonly teamSizeRecordedOn: string;
+    readonly raise: {
+      readonly currency: string;
+      readonly targetAmount: Money;
+      readonly instrument: string;
+      readonly targetStage: string;
+      readonly useOfFundsSummary: string;
+    };
+  };
+  /** Nixo: every field the fixture invented where nothing was recorded. */
+  readonly assumptions?: readonly {
+    readonly field: string;
+    readonly value: string;
+    readonly note: string;
+  }[];
+  readonly pricing?: { readonly pricePerSeatPerMonth: Money };
   readonly company: {
     readonly name: string;
     readonly legalName: string;
     readonly website: string;
     readonly foundedOn: string;
+    readonly headquarters?: string;
+    readonly stage?: string;
+    readonly oneLiner?: string;
   };
   readonly currency: string;
   readonly documentDefaults: {
@@ -172,7 +221,8 @@ export type Fixture = {
     }[];
     readonly plannedMonthlyNetBurnPostRaise: Money;
   };
-  readonly deckStatedFigures: {
+  /** The seeded deck's figures (Tensorgate, Halyard); Nixo had no deck. */
+  readonly deckStatedFigures?: {
     readonly cash: Money;
     readonly cashAsOf: string;
     readonly monthlyNetBurn: Money;
@@ -208,6 +258,7 @@ export type TableBlock = {
 export type Block =
   | { readonly kind: "heading"; readonly text: string }
   | { readonly kind: "paragraph"; readonly text: string }
+  | { readonly kind: "pageBreak" }
   | TableBlock;
 
 export type DocumentModel = {
@@ -221,6 +272,8 @@ export type DocumentModel = {
   readonly issuedOn: string;
   readonly version: string;
   readonly pageBanner?: string;
+  /** "slides": landscape pages, one slide per page (the generated deck). */
+  readonly layout?: "slides";
   readonly blocks?: readonly Block[];
   readonly csv?: {
     readonly header: readonly string[];
@@ -250,6 +303,9 @@ export type Manifest = {
   readonly schemaVersion: number;
   readonly company: string;
   readonly companyKey: string;
+  readonly companyId?: string;
+  readonly seedAuthority?: string;
+  readonly inventedFields?: readonly string[];
   readonly plannedInvestor: string;
   readonly documents: readonly ManifestEntry[];
 };
@@ -278,6 +334,10 @@ export function trailingTwelve(fx: Fixture): {
   readonly cogs: Money;
 };
 export function licenceMarginTwelve(fx: Fixture): {
+  readonly revenue: Money;
+  readonly cost: Money;
+};
+export function subscriptionMarginTwelve(fx: Fixture): {
   readonly revenue: Money;
   readonly cost: Money;
 };

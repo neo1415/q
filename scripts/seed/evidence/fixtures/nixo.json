@@ -1,0 +1,2697 @@
+{
+  "schemaVersion": 1,
+  "key": "nixo",
+  "idPrefix": "nx",
+  "seedSource": {
+    "kind": "hosted-profile",
+    "company": "Nixo",
+    "companyId": "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+    "readOn": "2026-11-16",
+    "decision": "docs/ai-handoff/DECISIONS.md decision 99 (owner, 2026-11-16): seed Nixo like the fictional companies, with the same synthetic marking.",
+    "note": "Nixo is not in docs/seed/tavus-20. Its recorded profile (core.companies, core.capital_objectives, core.company_team_facts, onboarding.responses, knowledge.company_profiles) was read read-only on 2026-11-16 and is preserved under recordedProfile. It had 0 documents and 0 claims."
+  },
+  "recordedProfile": {
+    "canonicalName": "Nixo",
+    "legalName": "Nixo Inc.",
+    "websiteUrl": "https://withnixo.com",
+    "foundedDate": "2025-01-01",
+    "headquartersCity": "San Francisco",
+    "headquartersCountry": "US",
+    "stage": "seed",
+    "shortDescription": "Helping AI companies achieve SaaS-level margins from custom deployments and services work.",
+    "primaryDescription": "Nixo helps AI companies improve the margins and operational visibility of custom deployments and services work through software for forward-deployed engineering teams.",
+    "sectorCodes": ["enterprise_software"],
+    "businessModelCodes": ["b2b_saas"],
+    "founderName": "Priya Khandelwal",
+    "founderRoleOption": "other",
+    "founderCount": 1,
+    "fullTimeFounders": "all",
+    "teamSize": 12,
+    "teamSizeRecordedOn": "2026-09-30",
+    "teamFunctions": ["product", "engineering", "operations", "domain"],
+    "tractionSignal": "users",
+    "raising": "active",
+    "raiseTimeframe": "3_6 months (recorded 2026-09-30)",
+    "raise": {
+      "currency": "USD",
+      "targetAmount": 5000000,
+      "instrument": "safe",
+      "targetStage": "seed",
+      "valuation": null,
+      "minimumCheque": null,
+      "targetCloseDate": null,
+      "useOfFundsSummary": "Product and engineering; Sales and go-to-market; Runway and operations"
+    }
+  },
+  "assumptions": [
+    {
+      "field": "raise.valuationCap",
+      "value": "30,000,000 post-money",
+      "note": "No valuation recorded on the profile."
+    },
+    {
+      "field": "raise.minimumCheque",
+      "value": "100,000",
+      "note": "No minimum cheque recorded."
+    },
+    {
+      "field": "raise.targetCloseOn",
+      "value": "2027-02-26",
+      "note": "No close date recorded; chosen inside the recorded 3-6 month timeframe from 30 Sep 2026."
+    },
+    {
+      "field": "raise.useOfFunds percentages and amounts",
+      "value": "50% / 30% / 20%",
+      "note": "The three line names are recorded; the split is invented."
+    },
+    {
+      "field": "raise.plannedMonthlyNetBurnPostRaise",
+      "value": "about 200,000",
+      "note": "Average projected net burn from March to December 2027."
+    },
+    {
+      "field": "raise.instrument wording",
+      "value": "SAFE (post-money)",
+      "note": "Recorded as 'safe'; post-money is assumed."
+    },
+    {
+      "field": "team.founders[0].role",
+      "value": "Founder",
+      "note": "Onboarding recorded the founder role as 'other' and no business title; no CEO or CTO title is assumed."
+    },
+    {
+      "field": "team.founders[0].summary",
+      "value": "Responsibilities only",
+      "note": "No founder biography is recorded; none is invented beyond responsibilities."
+    },
+    {
+      "field": "headcount by function and month; 2 contract forward-deployed engineers from May 2026",
+      "value": "10 employees at 30 Sep 2026, 11 at 31 Oct 2026",
+      "note": "The profile records a team of 12 (30 Sep 2026); the split into employees and contractors is invented and is a planted discrepancy."
+    },
+    {
+      "field": "customers (six, anonymised as Customer A-F with segments)",
+      "value": "5 live, 1 signed not yet billing",
+      "note": "No customers are recorded. All six are invented; no real company is named."
+    },
+    {
+      "field": "pricing",
+      "value": "1,200 per seat per month, annual, billed monthly in advance; onboarding fee 12,000-30,000 recognised over three months from go-live",
+      "note": "Invented."
+    },
+    {
+      "field": "invoices, receipts and payment timing",
+      "value": "derived from customers and pricing",
+      "note": "Invented."
+    },
+    {
+      "field": "actuals (revenue, costs, cash) May 2025 to Oct 2026",
+      "value": "derived",
+      "note": "Invented; reconciled to invoices and the bank statement."
+    },
+    {
+      "field": "fundingBeforeWindow and funding",
+      "value": "Pre-seed SAFE 2,000,000 (14 Feb 2025) and second close 1,000,000 (20 Nov 2025), both at a 16,000,000 post-money cap",
+      "note": "No previous rounds are recorded. Investor names are generic."
+    },
+    {
+      "field": "openingBalances at 30 Apr 2025",
+      "value": "cash 1,890,000",
+      "note": "Invented."
+    },
+    {
+      "field": "capTable",
+      "value": "founder 71.25%, option pool 10%, SAFEs as converted 18.75%",
+      "note": "Invented; no cap table is recorded."
+    },
+    {
+      "field": "bank",
+      "value": "Bramblewick Commerce Bank",
+      "note": "Fictitious institution; masked account number."
+    },
+    {
+      "field": "projections Nov 2026 to Dec 2027",
+      "value": "subscription revenue only",
+      "note": "Invented."
+    },
+    {
+      "field": "hiringPlan",
+      "value": "9 hires in 2027",
+      "note": "Invented, tied to the recorded use-of-funds lines."
+    },
+    {
+      "field": "deck",
+      "value": "nx-pitch-deck",
+      "note": "Nixo has no deck; this text-native deck is generated from this fixture."
+    }
+  ],
+  "company": {
+    "name": "Nixo",
+    "legalName": "Nixo Inc.",
+    "website": "https://withnixo.com",
+    "headquarters": "San Francisco, United States",
+    "foundedOn": "2025-01-01",
+    "stage": "seed",
+    "sector": "Enterprise software",
+    "oneLiner": "Helping AI companies achieve SaaS-level margins from custom deployments and services work.",
+    "businessModel": "B2B SaaS, per-seat annual subscription for forward-deployed engineering teams, with an onboarding fee"
+  },
+  "currency": "USD",
+  "documentDefaults": {
+    "issuedOn": "2026-11-16",
+    "version": "1.0",
+    "preparedBy": "Prepared by the company with its outsourced accountant; unaudited"
+  },
+  "periods": {
+    "firstActualMonth": "2025-05",
+    "lastActualMonth": "2026-10",
+    "projectionFirstMonth": "2026-11",
+    "projectionLastMonth": "2027-12"
+  },
+  "bank": {
+    "name": "Bramblewick Commerce Bank",
+    "fictitious": true,
+    "accountName": "Nixo Inc. - operating account",
+    "accountMasked": "XXXX XXXX 7731",
+    "statementFrom": "2026-08-01",
+    "statementTo": "2026-10-31"
+  },
+  "kpiDefinitions": [
+    {
+      "code": "billed_seats",
+      "label": "Billed seats: forward-deployed engineering seats invoiced in the month",
+      "unit": "count"
+    },
+    {
+      "code": "contracted_arr",
+      "label": "Contracted ARR: seats under signed contracts x 1,200 x 12, including seats not yet billed",
+      "unit": "money",
+      "currency": "USD"
+    },
+    {
+      "code": "annualised_subscription_revenue",
+      "label": "Annualised subscription revenue: the month's recognised subscription revenue x 12",
+      "unit": "money",
+      "currency": "USD"
+    },
+    {
+      "code": "paid_contracts",
+      "label": "Paid contracts: signed subscription agreements",
+      "unit": "count"
+    },
+    {
+      "code": "deployments_tracked",
+      "label": "Customer deployments tracked on the platform at month end",
+      "unit": "count"
+    }
+  ],
+  "pricing": {
+    "pricePerSeatPerMonth": 1200
+  },
+  "openingBalances": {
+    "asOf": "2025-04-30",
+    "cash": 1890000,
+    "receivables": 0,
+    "deferredRevenue": 0,
+    "otherPayablesAndAccruals": 15000,
+    "capitalRaisedToDate": 2000000
+  },
+  "customers": [
+    {
+      "id": "NX-C01",
+      "label": "Customer A",
+      "segment": "AI customer-support agents company (Series B)",
+      "designPartnerSince": "2025-03-10",
+      "contractSignedOn": "2025-06-16",
+      "goLiveOn": "2025-07-01",
+      "billingStartOn": "2025-07-01",
+      "status": "LIVE",
+      "onboardingFee": 18000,
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "seatSchedule": [
+        {
+          "from": "2025-07",
+          "seats": 8
+        },
+        {
+          "from": "2025-10",
+          "seats": 12
+        },
+        {
+          "from": "2026-02",
+          "seats": 16
+        },
+        {
+          "from": "2026-07",
+          "seats": 20
+        }
+      ],
+      "paymentPattern": "Pays on day 12 of the invoice month"
+    },
+    {
+      "id": "NX-C02",
+      "label": "Customer B",
+      "segment": "Legal AI platform (Series A)",
+      "designPartnerSince": "2025-05-05",
+      "contractSignedOn": "2025-09-08",
+      "goLiveOn": "2025-10-01",
+      "billingStartOn": "2025-10-01",
+      "status": "LIVE",
+      "onboardingFee": 18000,
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "seatSchedule": [
+        {
+          "from": "2025-10",
+          "seats": 6
+        },
+        {
+          "from": "2026-03",
+          "seats": 10
+        },
+        {
+          "from": "2026-08",
+          "seats": 12
+        }
+      ],
+      "paymentPattern": "Pays on day 20 of the invoice month"
+    },
+    {
+      "id": "NX-C03",
+      "label": "Customer C",
+      "segment": "Enterprise data-agent company (Series A)",
+      "designPartnerSince": "2025-09-15",
+      "contractSignedOn": "2025-12-10",
+      "goLiveOn": "2026-01-01",
+      "billingStartOn": "2026-01-01",
+      "status": "LIVE",
+      "onboardingFee": 12000,
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "seatSchedule": [
+        {
+          "from": "2026-01",
+          "seats": 5
+        },
+        {
+          "from": "2026-06",
+          "seats": 8
+        }
+      ],
+      "paymentPattern": "Pays on day 26 of the invoice month"
+    },
+    {
+      "id": "NX-C04",
+      "label": "Customer D",
+      "segment": "AI coding-assistant company serving banks (Series C)",
+      "designPartnerSince": "2025-12-01",
+      "contractSignedOn": "2026-03-18",
+      "goLiveOn": "2026-04-01",
+      "billingStartOn": "2026-04-01",
+      "status": "LIVE",
+      "onboardingFee": 24000,
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "seatSchedule": [
+        {
+          "from": "2026-04",
+          "seats": 10
+        },
+        {
+          "from": "2026-08",
+          "seats": 14
+        }
+      ],
+      "paymentPattern": "Pays on day 8 of the following month"
+    },
+    {
+      "id": "NX-C05",
+      "label": "Customer E",
+      "segment": "Clinical documentation AI company (Series B)",
+      "designPartnerSince": "2026-03-02",
+      "contractSignedOn": "2026-06-22",
+      "goLiveOn": "2026-07-01",
+      "billingStartOn": "2026-07-01",
+      "status": "LIVE",
+      "onboardingFee": 18000,
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "seatSchedule": [
+        {
+          "from": "2026-07",
+          "seats": 6
+        }
+      ],
+      "paymentPattern": "Pays on day 15 of the invoice month"
+    },
+    {
+      "id": "NX-C06",
+      "label": "Customer F",
+      "segment": "AI voice-agents company (Series B)",
+      "designPartnerSince": "2026-06-15",
+      "contractSignedOn": "2026-10-07",
+      "goLiveOn": "2026-12-14",
+      "billingStartOn": "2027-01-01",
+      "status": "SIGNED_NOT_BILLING",
+      "onboardingFee": 30000,
+      "contractedSeats": 15,
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "seatSchedule": [],
+      "paymentPattern": "Pays on day 28 of the invoice month"
+    }
+  ],
+  "invoices": [
+    {
+      "number": "NX-INV-0001",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-06-16",
+      "dueOn": "2025-07-16",
+      "paidOn": "2025-07-07",
+      "serviceMonth": "2025-07",
+      "kind": "ONBOARDING",
+      "description": "Onboarding and integration fee, invoiced at signature (recognised over the first three months from go-live)",
+      "amount": 18000
+    },
+    {
+      "number": "NX-INV-0002",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-07-01",
+      "dueOn": "2025-07-31",
+      "paidOn": "2025-07-12",
+      "serviceMonth": "2025-07",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-07: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0003",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-08-01",
+      "dueOn": "2025-08-31",
+      "paidOn": "2025-08-12",
+      "serviceMonth": "2025-08",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-08: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0004",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-09-01",
+      "dueOn": "2025-10-01",
+      "paidOn": "2025-09-12",
+      "serviceMonth": "2025-09",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-09: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0005",
+      "customerId": "NX-C02",
+      "issuedOn": "2025-09-08",
+      "dueOn": "2025-10-08",
+      "paidOn": "2025-09-29",
+      "serviceMonth": "2025-10",
+      "kind": "ONBOARDING",
+      "description": "Onboarding and integration fee, invoiced at signature (recognised over the first three months from go-live)",
+      "amount": 18000
+    },
+    {
+      "number": "NX-INV-0006",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-10-01",
+      "dueOn": "2025-10-31",
+      "paidOn": "2025-10-12",
+      "serviceMonth": "2025-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-10: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0007",
+      "customerId": "NX-C02",
+      "issuedOn": "2025-10-01",
+      "dueOn": "2025-10-31",
+      "paidOn": "2025-10-20",
+      "serviceMonth": "2025-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-10: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0008",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-11-01",
+      "dueOn": "2025-12-01",
+      "paidOn": "2025-11-12",
+      "serviceMonth": "2025-11",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-11: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0009",
+      "customerId": "NX-C02",
+      "issuedOn": "2025-11-01",
+      "dueOn": "2025-12-01",
+      "paidOn": "2025-11-20",
+      "serviceMonth": "2025-11",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-11: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0010",
+      "customerId": "NX-C01",
+      "issuedOn": "2025-12-01",
+      "dueOn": "2025-12-31",
+      "paidOn": "2025-12-12",
+      "serviceMonth": "2025-12",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-12: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0011",
+      "customerId": "NX-C02",
+      "issuedOn": "2025-12-01",
+      "dueOn": "2025-12-31",
+      "paidOn": "2025-12-20",
+      "serviceMonth": "2025-12",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2025-12: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0012",
+      "customerId": "NX-C03",
+      "issuedOn": "2025-12-10",
+      "dueOn": "2026-01-09",
+      "paidOn": "2025-12-31",
+      "serviceMonth": "2026-01",
+      "kind": "ONBOARDING",
+      "description": "Onboarding and integration fee, invoiced at signature (recognised over the first three months from go-live)",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0013",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-01-01",
+      "dueOn": "2026-01-31",
+      "paidOn": "2026-01-12",
+      "serviceMonth": "2026-01",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-01: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0014",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-01-01",
+      "dueOn": "2026-01-31",
+      "paidOn": "2026-01-20",
+      "serviceMonth": "2026-01",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-01: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0015",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-01-01",
+      "dueOn": "2026-01-31",
+      "paidOn": "2026-01-26",
+      "serviceMonth": "2026-01",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-01: 5 seats at 1,200 per seat per month",
+      "amount": 6000
+    },
+    {
+      "number": "NX-INV-0016",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-02-01",
+      "dueOn": "2026-03-03",
+      "paidOn": "2026-02-12",
+      "serviceMonth": "2026-02",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-02: 16 seats at 1,200 per seat per month",
+      "amount": 19200
+    },
+    {
+      "number": "NX-INV-0017",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-02-01",
+      "dueOn": "2026-03-03",
+      "paidOn": "2026-02-20",
+      "serviceMonth": "2026-02",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-02: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0018",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-02-01",
+      "dueOn": "2026-03-03",
+      "paidOn": "2026-02-26",
+      "serviceMonth": "2026-02",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-02: 5 seats at 1,200 per seat per month",
+      "amount": 6000
+    },
+    {
+      "number": "NX-INV-0019",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-03-01",
+      "dueOn": "2026-03-31",
+      "paidOn": "2026-03-12",
+      "serviceMonth": "2026-03",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-03: 16 seats at 1,200 per seat per month",
+      "amount": 19200
+    },
+    {
+      "number": "NX-INV-0020",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-03-01",
+      "dueOn": "2026-03-31",
+      "paidOn": "2026-03-20",
+      "serviceMonth": "2026-03",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-03: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0021",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-03-01",
+      "dueOn": "2026-03-31",
+      "paidOn": "2026-03-26",
+      "serviceMonth": "2026-03",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-03: 5 seats at 1,200 per seat per month",
+      "amount": 6000
+    },
+    {
+      "number": "NX-INV-0022",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-03-18",
+      "dueOn": "2026-04-17",
+      "paidOn": "2026-04-08",
+      "serviceMonth": "2026-04",
+      "kind": "ONBOARDING",
+      "description": "Onboarding and integration fee, invoiced at signature (recognised over the first three months from go-live)",
+      "amount": 24000
+    },
+    {
+      "number": "NX-INV-0023",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-04-01",
+      "dueOn": "2026-05-01",
+      "paidOn": "2026-04-12",
+      "serviceMonth": "2026-04",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-04: 16 seats at 1,200 per seat per month",
+      "amount": 19200
+    },
+    {
+      "number": "NX-INV-0024",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-04-01",
+      "dueOn": "2026-05-01",
+      "paidOn": "2026-04-20",
+      "serviceMonth": "2026-04",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-04: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0025",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-04-01",
+      "dueOn": "2026-05-01",
+      "paidOn": "2026-04-26",
+      "serviceMonth": "2026-04",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-04: 5 seats at 1,200 per seat per month",
+      "amount": 6000
+    },
+    {
+      "number": "NX-INV-0026",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-04-01",
+      "dueOn": "2026-05-01",
+      "paidOn": "2026-05-08",
+      "serviceMonth": "2026-04",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-04: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0027",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-05-01",
+      "dueOn": "2026-05-31",
+      "paidOn": "2026-05-12",
+      "serviceMonth": "2026-05",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-05: 16 seats at 1,200 per seat per month",
+      "amount": 19200
+    },
+    {
+      "number": "NX-INV-0028",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-05-01",
+      "dueOn": "2026-05-31",
+      "paidOn": "2026-05-20",
+      "serviceMonth": "2026-05",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-05: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0029",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-05-01",
+      "dueOn": "2026-05-31",
+      "paidOn": "2026-05-26",
+      "serviceMonth": "2026-05",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-05: 5 seats at 1,200 per seat per month",
+      "amount": 6000
+    },
+    {
+      "number": "NX-INV-0030",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-05-01",
+      "dueOn": "2026-05-31",
+      "paidOn": "2026-06-08",
+      "serviceMonth": "2026-05",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-05: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0031",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-06-01",
+      "dueOn": "2026-07-01",
+      "paidOn": "2026-06-12",
+      "serviceMonth": "2026-06",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-06: 16 seats at 1,200 per seat per month",
+      "amount": 19200
+    },
+    {
+      "number": "NX-INV-0032",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-06-01",
+      "dueOn": "2026-07-01",
+      "paidOn": "2026-06-20",
+      "serviceMonth": "2026-06",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-06: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0033",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-06-01",
+      "dueOn": "2026-07-01",
+      "paidOn": "2026-06-26",
+      "serviceMonth": "2026-06",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-06: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0034",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-06-01",
+      "dueOn": "2026-07-01",
+      "paidOn": "2026-07-08",
+      "serviceMonth": "2026-06",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-06: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0035",
+      "customerId": "NX-C05",
+      "issuedOn": "2026-06-22",
+      "dueOn": "2026-07-22",
+      "paidOn": "2026-07-13",
+      "serviceMonth": "2026-07",
+      "kind": "ONBOARDING",
+      "description": "Onboarding and integration fee, invoiced at signature (recognised over the first three months from go-live)",
+      "amount": 18000
+    },
+    {
+      "number": "NX-INV-0036",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-07-01",
+      "dueOn": "2026-07-31",
+      "paidOn": "2026-07-12",
+      "serviceMonth": "2026-07",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-07: 20 seats at 1,200 per seat per month",
+      "amount": 24000
+    },
+    {
+      "number": "NX-INV-0037",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-07-01",
+      "dueOn": "2026-07-31",
+      "paidOn": "2026-07-20",
+      "serviceMonth": "2026-07",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-07: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0038",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-07-01",
+      "dueOn": "2026-07-31",
+      "paidOn": "2026-07-26",
+      "serviceMonth": "2026-07",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-07: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0039",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-07-01",
+      "dueOn": "2026-07-31",
+      "paidOn": "2026-08-08",
+      "serviceMonth": "2026-07",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-07: 10 seats at 1,200 per seat per month",
+      "amount": 12000
+    },
+    {
+      "number": "NX-INV-0040",
+      "customerId": "NX-C05",
+      "issuedOn": "2026-07-01",
+      "dueOn": "2026-07-31",
+      "paidOn": "2026-07-15",
+      "serviceMonth": "2026-07",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-07: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0041",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-08-01",
+      "dueOn": "2026-08-31",
+      "paidOn": "2026-08-12",
+      "serviceMonth": "2026-08",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-08: 20 seats at 1,200 per seat per month",
+      "amount": 24000
+    },
+    {
+      "number": "NX-INV-0042",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-08-01",
+      "dueOn": "2026-08-31",
+      "paidOn": "2026-08-20",
+      "serviceMonth": "2026-08",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-08: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0043",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-08-01",
+      "dueOn": "2026-08-31",
+      "paidOn": "2026-08-26",
+      "serviceMonth": "2026-08",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-08: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0044",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-08-01",
+      "dueOn": "2026-08-31",
+      "paidOn": "2026-09-08",
+      "serviceMonth": "2026-08",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-08: 14 seats at 1,200 per seat per month",
+      "amount": 16800
+    },
+    {
+      "number": "NX-INV-0045",
+      "customerId": "NX-C05",
+      "issuedOn": "2026-08-01",
+      "dueOn": "2026-08-31",
+      "paidOn": "2026-08-15",
+      "serviceMonth": "2026-08",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-08: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0046",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-09-01",
+      "dueOn": "2026-10-01",
+      "paidOn": "2026-09-12",
+      "serviceMonth": "2026-09",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-09: 20 seats at 1,200 per seat per month",
+      "amount": 24000
+    },
+    {
+      "number": "NX-INV-0047",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-09-01",
+      "dueOn": "2026-10-01",
+      "paidOn": "2026-09-20",
+      "serviceMonth": "2026-09",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-09: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0048",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-09-01",
+      "dueOn": "2026-10-01",
+      "paidOn": "2026-09-26",
+      "serviceMonth": "2026-09",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-09: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0049",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-09-01",
+      "dueOn": "2026-10-01",
+      "paidOn": "2026-10-08",
+      "serviceMonth": "2026-09",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-09: 14 seats at 1,200 per seat per month",
+      "amount": 16800
+    },
+    {
+      "number": "NX-INV-0050",
+      "customerId": "NX-C05",
+      "issuedOn": "2026-09-01",
+      "dueOn": "2026-10-01",
+      "paidOn": "2026-09-15",
+      "serviceMonth": "2026-09",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-09: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0051",
+      "customerId": "NX-C01",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-10-12",
+      "serviceMonth": "2026-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-10: 20 seats at 1,200 per seat per month",
+      "amount": 24000
+    },
+    {
+      "number": "NX-INV-0052",
+      "customerId": "NX-C02",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-10-20",
+      "serviceMonth": "2026-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-10: 12 seats at 1,200 per seat per month",
+      "amount": 14400
+    },
+    {
+      "number": "NX-INV-0053",
+      "customerId": "NX-C03",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-10-26",
+      "serviceMonth": "2026-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-10: 8 seats at 1,200 per seat per month",
+      "amount": 9600
+    },
+    {
+      "number": "NX-INV-0054",
+      "customerId": "NX-C04",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-11-08",
+      "serviceMonth": "2026-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-10: 14 seats at 1,200 per seat per month",
+      "amount": 16800
+    },
+    {
+      "number": "NX-INV-0055",
+      "customerId": "NX-C05",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-10-15",
+      "serviceMonth": "2026-10",
+      "kind": "SUBSCRIPTION",
+      "description": "Platform subscription, 2026-10: 6 seats at 1,200 per seat per month",
+      "amount": 7200
+    },
+    {
+      "number": "NX-INV-0056",
+      "customerId": "NX-C06",
+      "issuedOn": "2026-10-07",
+      "dueOn": "2026-11-06",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-12",
+      "kind": "ONBOARDING",
+      "description": "Onboarding and integration fee, invoiced at signature (recognised over the first three months from go-live)",
+      "amount": 30000
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-05",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 0,
+          "onboardingServices": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 1500,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 1500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 45000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 0,
+          "payrollOperations": 0,
+          "softwareAndTools": 1800,
+          "officeSanFrancisco": 1200,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 66150
+      },
+      "headcount": {
+        "engineering": 3,
+        "product": 1,
+        "goToMarket": 0,
+        "operations": 0,
+        "total": 4
+      },
+      "kpis": {
+        "seatsByCustomer": {},
+        "billedSeats": 0,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 2,
+        "paidContracts": 0,
+        "contractedSeats": 0,
+        "contractedArr": 0,
+        "annualisedSubscriptionRevenue": 0,
+        "deploymentsTracked": 0
+      },
+      "cash": {
+        "opening": 1890000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 67650,
+        "closing": 1822350
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 67650,
+      "runwayMonths": 26.9,
+      "grossProfit": -1500,
+      "netResult": -67650
+    },
+    {
+      "month": "2025-06",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 0,
+          "onboardingServices": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [
+        {
+          "description": "Customer A onboarding fee invoiced at signature, deferred until go-live",
+          "amount": -18000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 1500,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 1500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 45000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 0,
+          "payrollOperations": 0,
+          "softwareAndTools": 1800,
+          "officeSanFrancisco": 1200,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 66150
+      },
+      "headcount": {
+        "engineering": 3,
+        "product": 1,
+        "goToMarket": 0,
+        "operations": 0,
+        "total": 4
+      },
+      "kpis": {
+        "seatsByCustomer": {},
+        "billedSeats": 0,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 2,
+        "paidContracts": 1,
+        "contractedSeats": 0,
+        "contractedArr": 0,
+        "annualisedSubscriptionRevenue": 0,
+        "deploymentsTracked": 0
+      },
+      "cash": {
+        "opening": 1822350,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 67650,
+        "closing": 1754700
+      },
+      "receivablesClosing": 18000,
+      "deferredRevenueClosing": 18000,
+      "netBurn": 67650,
+      "runwayMonths": 25.9,
+      "grossProfit": -1500,
+      "netResult": -67650
+    },
+    {
+      "month": "2025-07",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 9600,
+          "onboardingServices": 6000
+        },
+        "total": 15600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer A onboarding fee (1 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 2700,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 2700
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 45000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 0,
+          "payrollOperations": 0,
+          "softwareAndTools": 1800,
+          "officeSanFrancisco": 1200,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 66150
+      },
+      "headcount": {
+        "engineering": 3,
+        "product": 1,
+        "goToMarket": 0,
+        "operations": 0,
+        "total": 4
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 8
+        },
+        "billedSeats": 8,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 2,
+        "paidContracts": 1,
+        "contractedSeats": 8,
+        "contractedArr": 115200,
+        "annualisedSubscriptionRevenue": 115200,
+        "deploymentsTracked": 12
+      },
+      "cash": {
+        "opening": 1754700,
+        "receipts": 27600,
+        "fundingReceived": 0,
+        "payments": 68850,
+        "closing": 1713450
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 12000,
+      "netBurn": 41250,
+      "runwayMonths": 41.5,
+      "grossProfit": 12900,
+      "netResult": -53250
+    },
+    {
+      "month": "2025-08",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 9600,
+          "onboardingServices": 6000
+        },
+        "total": 15600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer A onboarding fee (2 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 2700,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 2700
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 60000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 0,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2100,
+          "officeSanFrancisco": 1200,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 9000,
+          "other": 300
+        },
+        "total": 100450
+      },
+      "headcount": {
+        "engineering": 4,
+        "product": 1,
+        "goToMarket": 0,
+        "operations": 1,
+        "total": 6
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 8
+        },
+        "billedSeats": 8,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 2,
+        "paidContracts": 1,
+        "contractedSeats": 8,
+        "contractedArr": 115200,
+        "annualisedSubscriptionRevenue": 115200,
+        "deploymentsTracked": 12
+      },
+      "cash": {
+        "opening": 1713450,
+        "receipts": 9600,
+        "fundingReceived": 0,
+        "payments": 103150,
+        "closing": 1619900
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 6000,
+      "netBurn": 93550,
+      "runwayMonths": 17.3,
+      "grossProfit": 12900,
+      "netResult": -87550
+    },
+    {
+      "month": "2025-09",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 9600,
+          "onboardingServices": 6000
+        },
+        "total": 15600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer A onboarding fee (3 of 3)",
+          "amount": 6000
+        },
+        {
+          "description": "Customer B onboarding fee invoiced at signature, deferred until go-live",
+          "amount": -18000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 2700,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 2700
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 60000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2250,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 108200
+      },
+      "headcount": {
+        "engineering": 4,
+        "product": 1,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 7
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 8
+        },
+        "billedSeats": 8,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 3,
+        "paidContracts": 2,
+        "contractedSeats": 8,
+        "contractedArr": 115200,
+        "annualisedSubscriptionRevenue": 115200,
+        "deploymentsTracked": 12
+      },
+      "cash": {
+        "opening": 1619900,
+        "receipts": 27600,
+        "fundingReceived": 0,
+        "payments": 110900,
+        "closing": 1536600
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 18000,
+      "netBurn": 83300,
+      "runwayMonths": 18.4,
+      "grossProfit": 12900,
+      "netResult": -95300
+    },
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 21600,
+          "onboardingServices": 6000
+        },
+        "total": 27600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer B onboarding fee (1 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 4200,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 4200
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 60000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2250,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 108200
+      },
+      "headcount": {
+        "engineering": 4,
+        "product": 1,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 7
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 12,
+          "NX-C02": 6
+        },
+        "billedSeats": 18,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 3,
+        "paidContracts": 2,
+        "contractedSeats": 18,
+        "contractedArr": 259200,
+        "annualisedSubscriptionRevenue": 259200,
+        "deploymentsTracked": 27
+      },
+      "cash": {
+        "opening": 1536600,
+        "receipts": 21600,
+        "fundingReceived": 0,
+        "payments": 112400,
+        "closing": 1445800
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 12000,
+      "netBurn": 90800,
+      "runwayMonths": 15.9,
+      "grossProfit": 23400,
+      "netResult": -84800
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 21600,
+          "onboardingServices": 6000
+        },
+        "total": 27600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer B onboarding fee (2 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 4200,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 4200
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 60000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2250,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 9000,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 114700
+      },
+      "headcount": {
+        "engineering": 4,
+        "product": 1,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 7
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 12,
+          "NX-C02": 6
+        },
+        "billedSeats": 18,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 3,
+        "paidContracts": 2,
+        "contractedSeats": 18,
+        "contractedArr": 259200,
+        "annualisedSubscriptionRevenue": 259200,
+        "deploymentsTracked": 27
+      },
+      "cash": {
+        "opening": 1445800,
+        "receipts": 21600,
+        "fundingReceived": 1000000,
+        "payments": 118900,
+        "closing": 2348500
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 6000,
+      "netBurn": 97300,
+      "runwayMonths": 24.1,
+      "grossProfit": 23400,
+      "netResult": -91300
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 21600,
+          "onboardingServices": 6000
+        },
+        "total": 27600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer B onboarding fee (3 of 3)",
+          "amount": 6000
+        },
+        {
+          "description": "Customer C onboarding fee invoiced at signature, deferred until go-live",
+          "amount": -12000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 4200,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 4200
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 75000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2400,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 123350
+      },
+      "headcount": {
+        "engineering": 5,
+        "product": 1,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 8
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 12,
+          "NX-C02": 6
+        },
+        "billedSeats": 18,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 4,
+        "paidContracts": 3,
+        "contractedSeats": 18,
+        "contractedArr": 259200,
+        "annualisedSubscriptionRevenue": 259200,
+        "deploymentsTracked": 27
+      },
+      "cash": {
+        "opening": 2348500,
+        "receipts": 33600,
+        "fundingReceived": 0,
+        "payments": 127550,
+        "closing": 2254550
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 12000,
+      "netBurn": 93950,
+      "runwayMonths": 24,
+      "grossProfit": 23400,
+      "netResult": -99950
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 27600,
+          "onboardingServices": 4000
+        },
+        "total": 31600
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer C onboarding fee (1 of 3)",
+          "amount": 4000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 4950,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 4950
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 75000,
+          "payrollProduct": 13000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2400,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 123350
+      },
+      "headcount": {
+        "engineering": 5,
+        "product": 1,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 8
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 12,
+          "NX-C02": 6,
+          "NX-C03": 5
+        },
+        "billedSeats": 23,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 4,
+        "paidContracts": 3,
+        "contractedSeats": 23,
+        "contractedArr": 331200,
+        "annualisedSubscriptionRevenue": 331200,
+        "deploymentsTracked": 35
+      },
+      "cash": {
+        "opening": 2254550,
+        "receipts": 27600,
+        "fundingReceived": 0,
+        "payments": 128300,
+        "closing": 2153850
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 8000,
+      "netBurn": 100700,
+      "runwayMonths": 21.4,
+      "grossProfit": 26650,
+      "netResult": -96700
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 32400,
+          "onboardingServices": 4000
+        },
+        "total": 36400
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer C onboarding fee (2 of 3)",
+          "amount": 4000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 5550,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 5550
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 75000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2550,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 136500
+      },
+      "headcount": {
+        "engineering": 5,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 9
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 16,
+          "NX-C02": 6,
+          "NX-C03": 5
+        },
+        "billedSeats": 27,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 4,
+        "paidContracts": 3,
+        "contractedSeats": 27,
+        "contractedArr": 388800,
+        "annualisedSubscriptionRevenue": 388800,
+        "deploymentsTracked": 41
+      },
+      "cash": {
+        "opening": 2153850,
+        "receipts": 32400,
+        "fundingReceived": 0,
+        "payments": 142050,
+        "closing": 2044200
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 4000,
+      "netBurn": 109650,
+      "runwayMonths": 18.6,
+      "grossProfit": 30850,
+      "netResult": -105650
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 37200,
+          "onboardingServices": 4000
+        },
+        "total": 41200
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer C onboarding fee (3 of 3)",
+          "amount": 4000
+        },
+        {
+          "description": "Customer D onboarding fee invoiced at signature, deferred until go-live",
+          "amount": -24000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 6150,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 6150
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 75000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2550,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 136500
+      },
+      "headcount": {
+        "engineering": 5,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 9
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 16,
+          "NX-C02": 10,
+          "NX-C03": 5
+        },
+        "billedSeats": 31,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 5,
+        "paidContracts": 4,
+        "contractedSeats": 31,
+        "contractedArr": 446400,
+        "annualisedSubscriptionRevenue": 446400,
+        "deploymentsTracked": 47
+      },
+      "cash": {
+        "opening": 2044200,
+        "receipts": 37200,
+        "fundingReceived": 0,
+        "payments": 142650,
+        "closing": 1938750
+      },
+      "receivablesClosing": 24000,
+      "deferredRevenueClosing": 24000,
+      "netBurn": 105450,
+      "runwayMonths": 18.4,
+      "grossProfit": 35050,
+      "netResult": -101450
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 49200,
+          "onboardingServices": 8000
+        },
+        "total": 57200
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer D onboarding fee (1 of 3)",
+          "amount": 8000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 7650,
+          "contractForwardDeployedEngineers": 0
+        },
+        "total": 7650
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 90000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2700,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 6000,
+          "recruitment": 12000,
+          "other": 300
+        },
+        "total": 168150
+      },
+      "headcount": {
+        "engineering": 6,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 16,
+          "NX-C02": 10,
+          "NX-C03": 5,
+          "NX-C04": 10
+        },
+        "billedSeats": 41,
+        "contractorsForwardDeployed": 0,
+        "designPartners": 5,
+        "paidContracts": 4,
+        "contractedSeats": 41,
+        "contractedArr": 590400,
+        "annualisedSubscriptionRevenue": 590400,
+        "deploymentsTracked": 62
+      },
+      "cash": {
+        "opening": 1938750,
+        "receipts": 61200,
+        "fundingReceived": 0,
+        "payments": 175800,
+        "closing": 1824150
+      },
+      "receivablesClosing": 12000,
+      "deferredRevenueClosing": 16000,
+      "netBurn": 114600,
+      "runwayMonths": 15.9,
+      "grossProfit": 49550,
+      "netResult": -118600
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 49200,
+          "onboardingServices": 8000
+        },
+        "total": 57200
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer D onboarding fee (2 of 3)",
+          "amount": 8000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 7650,
+          "contractForwardDeployedEngineers": 22000
+        },
+        "total": 29650
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 90000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2700,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 151650
+      },
+      "headcount": {
+        "engineering": 6,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 16,
+          "NX-C02": 10,
+          "NX-C03": 5,
+          "NX-C04": 10
+        },
+        "billedSeats": 41,
+        "contractorsForwardDeployed": 2,
+        "designPartners": 5,
+        "paidContracts": 4,
+        "contractedSeats": 41,
+        "contractedArr": 590400,
+        "annualisedSubscriptionRevenue": 590400,
+        "deploymentsTracked": 62
+      },
+      "cash": {
+        "opening": 1824150,
+        "receipts": 49200,
+        "fundingReceived": 0,
+        "payments": 181300,
+        "closing": 1692050
+      },
+      "receivablesClosing": 12000,
+      "deferredRevenueClosing": 8000,
+      "netBurn": 132100,
+      "runwayMonths": 12.8,
+      "grossProfit": 27550,
+      "netResult": -124100
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 52800,
+          "onboardingServices": 8000
+        },
+        "total": 60800
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer D onboarding fee (3 of 3)",
+          "amount": 8000
+        },
+        {
+          "description": "Customer E onboarding fee invoiced at signature, deferred until go-live",
+          "amount": -18000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 8100,
+          "contractForwardDeployedEngineers": 22000
+        },
+        "total": 30100
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 90000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2700,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 151650
+      },
+      "headcount": {
+        "engineering": 6,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 16,
+          "NX-C02": 10,
+          "NX-C03": 8,
+          "NX-C04": 10
+        },
+        "billedSeats": 44,
+        "contractorsForwardDeployed": 2,
+        "designPartners": 6,
+        "paidContracts": 5,
+        "contractedSeats": 44,
+        "contractedArr": 633600,
+        "annualisedSubscriptionRevenue": 633600,
+        "deploymentsTracked": 66
+      },
+      "cash": {
+        "opening": 1692050,
+        "receipts": 52800,
+        "fundingReceived": 0,
+        "payments": 181750,
+        "closing": 1563100
+      },
+      "receivablesClosing": 30000,
+      "deferredRevenueClosing": 18000,
+      "netBurn": 128950,
+      "runwayMonths": 12.1,
+      "grossProfit": 30700,
+      "netResult": -120950
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 64800,
+          "onboardingServices": 6000
+        },
+        "total": 70800
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer E onboarding fee (1 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 9600,
+          "contractForwardDeployedEngineers": 22000
+        },
+        "total": 31600
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 90000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2700,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 151650
+      },
+      "headcount": {
+        "engineering": 6,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 20,
+          "NX-C02": 10,
+          "NX-C03": 8,
+          "NX-C04": 10,
+          "NX-C05": 6
+        },
+        "billedSeats": 54,
+        "contractorsForwardDeployed": 2,
+        "designPartners": 6,
+        "paidContracts": 5,
+        "contractedSeats": 54,
+        "contractedArr": 777600,
+        "annualisedSubscriptionRevenue": 777600,
+        "deploymentsTracked": 81
+      },
+      "cash": {
+        "opening": 1563100,
+        "receipts": 82800,
+        "fundingReceived": 0,
+        "payments": 183250,
+        "closing": 1462650
+      },
+      "receivablesClosing": 12000,
+      "deferredRevenueClosing": 12000,
+      "netBurn": 100450,
+      "runwayMonths": 14.6,
+      "grossProfit": 39200,
+      "netResult": -112450
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 72000,
+          "onboardingServices": 6000
+        },
+        "total": 78000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer E onboarding fee (2 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 10500,
+          "contractForwardDeployedEngineers": 22000
+        },
+        "total": 32500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 90000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2700,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 151650
+      },
+      "headcount": {
+        "engineering": 6,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 20,
+          "NX-C02": 12,
+          "NX-C03": 8,
+          "NX-C04": 14,
+          "NX-C05": 6
+        },
+        "billedSeats": 60,
+        "contractorsForwardDeployed": 2,
+        "designPartners": 6,
+        "paidContracts": 5,
+        "contractedSeats": 60,
+        "contractedArr": 864000,
+        "annualisedSubscriptionRevenue": 864000,
+        "deploymentsTracked": 90
+      },
+      "cash": {
+        "opening": 1462650,
+        "receipts": 67200,
+        "fundingReceived": 0,
+        "payments": 184150,
+        "closing": 1345700
+      },
+      "receivablesClosing": 16800,
+      "deferredRevenueClosing": 6000,
+      "netBurn": 116950,
+      "runwayMonths": 11.5,
+      "grossProfit": 45500,
+      "netResult": -106150
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 72000,
+          "onboardingServices": 6000
+        },
+        "total": 78000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred Customer E onboarding fee (3 of 3)",
+          "amount": 6000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 10500,
+          "contractForwardDeployedEngineers": 22000
+        },
+        "total": 32500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 90000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2700,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 2500,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 0,
+          "other": 300
+        },
+        "total": 151650
+      },
+      "headcount": {
+        "engineering": 6,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 20,
+          "NX-C02": 12,
+          "NX-C03": 8,
+          "NX-C04": 14,
+          "NX-C05": 6
+        },
+        "billedSeats": 60,
+        "contractorsForwardDeployed": 2,
+        "designPartners": 6,
+        "paidContracts": 5,
+        "contractedSeats": 60,
+        "contractedArr": 864000,
+        "annualisedSubscriptionRevenue": 864000,
+        "deploymentsTracked": 90
+      },
+      "cash": {
+        "opening": 1345700,
+        "receipts": 72000,
+        "fundingReceived": 0,
+        "payments": 184150,
+        "closing": 1233550
+      },
+      "receivablesClosing": 16800,
+      "deferredRevenueClosing": 0,
+      "netBurn": 112150,
+      "runwayMonths": 11,
+      "grossProfit": 45500,
+      "netResult": -106150
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "platformSubscriptions": 72000,
+          "onboardingServices": 0
+        },
+        "total": 72000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Customer F onboarding fee invoiced at signature, deferred until go-live",
+          "amount": -30000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hostingAndInference": 10500,
+          "contractForwardDeployedEngineers": 22000
+        },
+        "total": 32500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 105000,
+          "payrollProduct": 26000,
+          "payrollGoToMarket": 13000,
+          "payrollOperations": 10000,
+          "softwareAndTools": 2850,
+          "officeSanFrancisco": 4800,
+          "professionalFees": 16000,
+          "insurance": 850,
+          "travelAndEvents": 1500,
+          "recruitment": 15000,
+          "other": 300
+        },
+        "total": 195300
+      },
+      "headcount": {
+        "engineering": 7,
+        "product": 2,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 11
+      },
+      "kpis": {
+        "seatsByCustomer": {
+          "NX-C01": 20,
+          "NX-C02": 12,
+          "NX-C03": 8,
+          "NX-C04": 14,
+          "NX-C05": 6
+        },
+        "billedSeats": 60,
+        "contractorsForwardDeployed": 2,
+        "designPartners": 6,
+        "paidContracts": 6,
+        "contractedSeats": 75,
+        "contractedArr": 1080000,
+        "annualisedSubscriptionRevenue": 864000,
+        "deploymentsTracked": 90
+      },
+      "cash": {
+        "opening": 1233550,
+        "receipts": 102000,
+        "fundingReceived": 0,
+        "payments": 227800,
+        "closing": 1107750
+      },
+      "receivablesClosing": 16800,
+      "deferredRevenueClosing": 30000,
+      "netBurn": 125800,
+      "runwayMonths": 8.8,
+      "grossProfit": 39500,
+      "netResult": -155800
+    }
+  ],
+  "funding": [
+    {
+      "receivedOn": "2025-11-20",
+      "round": "Pre-seed second close",
+      "instrument": "SAFE (post-money)",
+      "amount": 1000000,
+      "valuationCap": 16000000,
+      "investors": [
+        {
+          "name": "Existing pre-seed investors (pro rata)",
+          "amount": 600000
+        },
+        {
+          "name": "New angel investors",
+          "amount": 400000
+        }
+      ]
+    }
+  ],
+  "fundingBeforeWindow": [
+    {
+      "receivedOn": "2025-02-14",
+      "round": "Pre-seed",
+      "instrument": "SAFE (post-money)",
+      "amount": 2000000,
+      "valuationCap": 16000000,
+      "investors": [
+        {
+          "name": "Pre-seed micro-funds (two)",
+          "amount": 1400000
+        },
+        {
+          "name": "Angel investors",
+          "amount": 600000
+        }
+      ]
+    }
+  ],
+  "capTable": {
+    "asOf": "2026-10-31",
+    "basis": "Fully diluted. Both pre-seed SAFEs are shown as converted at their 16,000,000 post-money cap; the actual conversion happens at the next priced round.",
+    "holders": [
+      {
+        "holder": "Priya Khandelwal",
+        "class": "Common stock (founder)",
+        "shares": 7125000
+      },
+      {
+        "holder": "Employee option pool",
+        "class": "Options (granted and unallocated)",
+        "shares": 1000000
+      },
+      {
+        "holder": "Pre-seed SAFE investors",
+        "class": "SAFE (as converted, 16,000,000 cap)",
+        "shares": 1250000
+      },
+      {
+        "holder": "Pre-seed second-close SAFE investors",
+        "class": "SAFE (as converted, 16,000,000 cap)",
+        "shares": 625000
+      }
+    ],
+    "proForma": {
+      "description": "Illustrative, after the seed SAFE converts at its 30,000,000 post-money cap",
+      "newHolder": "Seed SAFE investors",
+      "newShares": 2000000
+    }
+  },
+  "raise": {
+    "roundName": "Seed",
+    "currency": "USD",
+    "targetAmount": 5000000,
+    "instrument": "SAFE (post-money)",
+    "targetCloseOn": "2027-02-26",
+    "minimumCheque": 100000,
+    "useOfFunds": [
+      {
+        "line": "Product and engineering",
+        "percent": 50,
+        "amount": 2500000
+      },
+      {
+        "line": "Sales and go-to-market",
+        "percent": 30,
+        "amount": 1500000
+      },
+      {
+        "line": "Runway and operations",
+        "percent": 20,
+        "amount": 1000000
+      }
+    ],
+    "plannedMonthlyNetBurnPostRaise": 200000,
+    "valuationCap": 30000000
+  },
+  "team": {
+    "founders": [
+      {
+        "name": "Priya Khandelwal",
+        "role": "Founder",
+        "summary": "Sole full-time founder. Leads product, customer deployments and the seed raise."
+      }
+    ],
+    "keyPeople": [],
+    "contractorsNote": "Two contract forward-deployed engineers since May 2026, paid monthly and reported in cost of revenue. They are not employees and are not in the headcount figures.",
+    "hiringPlan": [
+      {
+        "role": "Forward-deployed platform engineer",
+        "function": "Engineering",
+        "count": 4,
+        "startBy": "2027-Q2",
+        "fundedBy": "Product and engineering"
+      },
+      {
+        "role": "Product designer",
+        "function": "Product",
+        "count": 1,
+        "startBy": "2027-Q2",
+        "fundedBy": "Product and engineering"
+      },
+      {
+        "role": "Account executive",
+        "function": "Go-to-market",
+        "count": 2,
+        "startBy": "2027-Q2",
+        "fundedBy": "Sales and go-to-market"
+      },
+      {
+        "role": "Customer success lead",
+        "function": "Go-to-market",
+        "count": 1,
+        "startBy": "2027-Q3",
+        "fundedBy": "Sales and go-to-market"
+      },
+      {
+        "role": "Finance and operations lead",
+        "function": "Operations",
+        "count": 1,
+        "startBy": "2027-Q3",
+        "fundedBy": "Runway and operations"
+      }
+    ]
+  },
+  "projections": {
+    "label": "PROJECTION - not actual results",
+    "assumptions": [
+      "Seed SAFE of 5,000,000 closes in February 2027 (target close 26 Feb 2027).",
+      "Customer F's 15 contracted seats are billed from January 2027; other seats grow by 4 a month from February 2027.",
+      "Revenue is subscription revenue only, collected in the month billed. Onboarding fees are left out, including the 30,000 already collected from Customer F in October 2026.",
+      "Headcount rises from 11 to 21 by August 2027 under the hiring plan; the two contract engineers continue.",
+      "Costs: 14,500 per employee a month, 22,000 for contractors, hosting at 1,500 plus 150 per seat, and 14,000 of other operating costs."
+    ],
+    "months": [
+      {
+        "month": "2026-11",
+        "revenue": 72000,
+        "costs": 206000,
+        "netBurn": 134000,
+        "fundingReceived": 0,
+        "headcount": 11,
+        "billedSeats": 60,
+        "arr": 864000,
+        "cashOpening": 1107750,
+        "cashClosing": 973750
+      },
+      {
+        "month": "2026-12",
+        "revenue": 74400,
+        "costs": 220800,
+        "netBurn": 146400,
+        "fundingReceived": 0,
+        "headcount": 12,
+        "billedSeats": 62,
+        "arr": 892800,
+        "cashOpening": 973750,
+        "cashClosing": 827350
+      },
+      {
+        "month": "2027-01",
+        "revenue": 92400,
+        "costs": 223050,
+        "netBurn": 130650,
+        "fundingReceived": 0,
+        "headcount": 12,
+        "billedSeats": 77,
+        "arr": 1108800,
+        "cashOpening": 827350,
+        "cashClosing": 696700
+      },
+      {
+        "month": "2027-02",
+        "revenue": 97200,
+        "costs": 223650,
+        "netBurn": 126450,
+        "fundingReceived": 5000000,
+        "headcount": 12,
+        "billedSeats": 81,
+        "arr": 1166400,
+        "cashOpening": 696700,
+        "cashClosing": 5570250
+      },
+      {
+        "month": "2027-03",
+        "revenue": 102000,
+        "costs": 224250,
+        "netBurn": 122250,
+        "fundingReceived": 0,
+        "headcount": 12,
+        "billedSeats": 85,
+        "arr": 1224000,
+        "cashOpening": 5570250,
+        "cashClosing": 5448000
+      },
+      {
+        "month": "2027-04",
+        "revenue": 106800,
+        "costs": 268350,
+        "netBurn": 161550,
+        "fundingReceived": 0,
+        "headcount": 15,
+        "billedSeats": 89,
+        "arr": 1281600,
+        "cashOpening": 5448000,
+        "cashClosing": 5286450
+      },
+      {
+        "month": "2027-05",
+        "revenue": 111600,
+        "costs": 297950,
+        "netBurn": 186350,
+        "fundingReceived": 0,
+        "headcount": 17,
+        "billedSeats": 93,
+        "arr": 1339200,
+        "cashOpening": 5286450,
+        "cashClosing": 5100100
+      },
+      {
+        "month": "2027-06",
+        "revenue": 116400,
+        "costs": 327550,
+        "netBurn": 211150,
+        "fundingReceived": 0,
+        "headcount": 19,
+        "billedSeats": 97,
+        "arr": 1396800,
+        "cashOpening": 5100100,
+        "cashClosing": 4888950
+      },
+      {
+        "month": "2027-07",
+        "revenue": 121200,
+        "costs": 342650,
+        "netBurn": 221450,
+        "fundingReceived": 0,
+        "headcount": 20,
+        "billedSeats": 101,
+        "arr": 1454400,
+        "cashOpening": 4888950,
+        "cashClosing": 4667500
+      },
+      {
+        "month": "2027-08",
+        "revenue": 126000,
+        "costs": 357750,
+        "netBurn": 231750,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "billedSeats": 105,
+        "arr": 1512000,
+        "cashOpening": 4667500,
+        "cashClosing": 4435750
+      },
+      {
+        "month": "2027-09",
+        "revenue": 130800,
+        "costs": 358350,
+        "netBurn": 227550,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "billedSeats": 109,
+        "arr": 1569600,
+        "cashOpening": 4435750,
+        "cashClosing": 4208200
+      },
+      {
+        "month": "2027-10",
+        "revenue": 135600,
+        "costs": 358950,
+        "netBurn": 223350,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "billedSeats": 113,
+        "arr": 1627200,
+        "cashOpening": 4208200,
+        "cashClosing": 3984850
+      },
+      {
+        "month": "2027-11",
+        "revenue": 140400,
+        "costs": 359550,
+        "netBurn": 219150,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "billedSeats": 117,
+        "arr": 1684800,
+        "cashOpening": 3984850,
+        "cashClosing": 3765700
+      },
+      {
+        "month": "2027-12",
+        "revenue": 145200,
+        "costs": 360150,
+        "netBurn": 214950,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "billedSeats": 121,
+        "arr": 1742400,
+        "cashOpening": 3765700,
+        "cashClosing": 3550750
+      }
+    ]
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "nx-team-size",
+      "topic": "Team size",
+      "profileStatement": "Team of 12 (founder onboarding, 30 Sep 2026).",
+      "accountsStatement": "The payroll shows 10 employees at 30 Sep 2026 (11 at 31 Oct 2026); two contract forward-deployed engineers are paid through cost of revenue.",
+      "reason": "The founder counted the two contract forward-deployed engineers in the team of 12 on the profile. The accounts and the team plan count employees only, so the payroll headcount at 30 Sep 2026 is 10.",
+      "evidence": [
+        {
+          "documentId": "nx-team-hiring-plan",
+          "text": "10 employees and 2 contract forward-deployed engineers at 30 Sep 2026"
+        },
+        {
+          "documentId": "nx-kpi-pack",
+          "text": "10 employees and 2 contract forward-deployed engineers at 30 Sep 2026"
+        }
+      ],
+      "deliberate": true
+    },
+    {
+      "id": "nx-contracted-vs-billed",
+      "topic": "Contracted ARR against billed revenue",
+      "profileStatement": "Contracted ARR 1,080,000 at 31 Oct 2026 (KPI pack and deck).",
+      "accountsStatement": "Subscription revenue recognised in October 2026 is 72,000, 864,000 annualised.",
+      "reason": "Customer F signed on 7 Oct 2026 for 15 seats, but its subscription starts after its deployment team moves onto the platform, so its 216,000 a year counts in contracted ARR from October 2026 and in billed revenue only from January 2027. Its 30,000 onboarding fee was invoiced and collected in October and sits in deferred revenue.",
+      "evidence": [
+        {
+          "documentId": "nx-revenue-breakdown",
+          "text": "its subscription is not yet billed"
+        },
+        {
+          "documentId": "nx-customer-contracts",
+          "text": "billing from 01 Jan 2027"
+        },
+        {
+          "documentId": "nx-kpi-pack",
+          "text": "billing from 01 Jan 2027"
+        },
+        {
+          "documentId": "nx-pitch-deck",
+          "text": "billing from 01 Jan 2027"
+        }
+      ],
+      "deliberate": true
+    }
+  ],
+  "sharingPlan": {
+    "investor": "Savanna Seed Partners",
+    "investorFictional": true,
+    "note": "Fictional USD seed investor with no relationship with Nixo yet; a relationship must exist first. Planned grants go through the data-room approval or diligence-share workflow, never by widening visibility."
+  }
+}
