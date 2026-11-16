@@ -211,7 +211,7 @@ export type ModelGatewayExecuteOptions<T> = {
    * to; the other models stay the fallback once the first has failed (its
    * attempts, the hedge included). For a short classification whose policy
    * backup is a far dearer model (live 2026-11-16: the turn reader hedged
-   * from gpt-5.6-luna to claude-sonnet-5-5 on 239 of 709 reads in a day,
+   * from the first reader model to the backup model on 239 of 709 reads in a day,
    * USD 2.97 of USD 3.93, up to USD 0.058 a read).
    */
   readonly sameModelHedgeFirst?: boolean | undefined;
@@ -1436,10 +1436,10 @@ export function createModelGateway(
         // different model is asked only once this one has failed its
         // retries, or at once when its account is spent or its key refused
         // (PERMANENT and AUTHENTICATION are not retryable). Live 2026-11-06
-        // 13:00: a single gpt-5.6-luna timeout handed a 17k-token reading to
+        // 13:00: a single the first reader model timeout handed a 17k-token reading to
         // Groq, whose per-request limit refused it (413), and the turn went
         // unread; before Groq joined the policy the same timeout was simply
-        // retried on luna, and answered. (CQ-VOICE-010 had moved on after a
+        // retried on the first model, and answered. (CQ-VOICE-010 had moved on after a
         // timeout to save a second wait; a fallback that cannot take the
         // request costs the whole turn, which is worse.)
         const canRetryHere =

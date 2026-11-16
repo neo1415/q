@@ -291,7 +291,7 @@ export type QTurnReading = Omit<
  * How long one reading attempt may take. Live 2026-10-30 (run 8bc5116c,
  * "Plan my raise over 8 weeks"): both attempts timed out at 6.0 s and the
  * re-read answered at 5,986 ms. ai_ops.model_usage, reads of 12k+ input
- * tokens on gpt-5.6-luna: p90 4.5 s on 23 Oct rising to 5.7 s on 30 Oct,
+ * tokens on the first reader model: p90 4.5 s on 23 Oct rising to 5.7 s on 30 Oct,
  * with 6 s cut-offs 0-4 a day before and 8-9 a day since. Latency follows
  * the output (r 0.77; ~9 ms a token over ~270 tokens) on a fixed start
  * that grew from ~0.7 s to ~2.4 s as the input grew 13k -> 17k tokens. At
@@ -302,10 +302,10 @@ export type QTurnReading = Omit<
 export const TURN_READER_ATTEMPT_TIMEOUT_MS = 9_000;
 
 /**
- * The cost bound fits a reading on the Claude backup's Sonnet (DECISIONS
+ * The cost bound fits a reading on the backup model (DECISIONS
  * 69: no smaller model for the reader). The gateway estimates an attempt
  * with no cache credit, ~31k input tokens at $2/M plus the output room:
- * ~$0.075, so $0.01 skipped Sonnet for a smaller model. $0.15 leaves room
+ * ~$0.075, so $0.01 skipped the backup model for a smaller model. $0.15 leaves room
  * for the second attempt. It is a bound, not a spend: a reading on OpenAI
  * costs what it did.
  */
@@ -321,7 +321,7 @@ const TURN_READER_BUDGET = {
 /**
  * Live 2026-10-29: 26 of 548 reads failed in 24 h (17 TIMEOUT), and an
  * unread planning ask became a research memo. A real customer's turn is
- * CONFIDENTIAL, and only gpt-5.6-luna may carry it (both Gemini models are
+ * CONFIDENTIAL, and only the first reader model may carry it (both Gemini models are
  * PUBLIC; Groq's on-demand tier refuses a request this size, 413), so the
  * policy's hedge never had a second model. Still waiting at 3.5 s (p50
  * 2.0 s, p90 4.2 s, p99 5.5 s), the same model is asked again and the
@@ -329,27 +329,27 @@ const TURN_READER_BUDGET = {
  *
  * Live 2026-11-16 (scenarios D-G, runs d58a4564, 11daded9, 7cef5d87,
  * 06de74f3): the FAST_CLASSIFICATION policy (v2) hedges to its backup,
- * claude-sonnet-5-5, at 2.0 s, and under the synthetic posture luna was
+ * the backup model, at 2.0 s, and under the synthetic posture the first model was
  * also cut at 2.5 s (TURN_READER_FAST_FIRST_ATTEMPT_MS, measured on Gemini
- * flash-lite in October, no longer the first model). ai_ops.model_usage,
- * the last 24 h: luna 709 first reads, 106 cut at 2.5 s (15%), answered
- * p50 1.50 s, p90 2.35 s, p95 2.44 s, p99 2.74 s; Sonnet ran on 239 of them
+ * an earlier first model in October, no longer the first model). ai_ops.model_usage,
+ * the last 24 h: the first model 709 first reads, 106 cut at 2.5 s (15%), answered
+ * p50 1.50 s, p90 2.35 s, p95 2.44 s, p99 2.74 s; the backup model ran on 239 of them
  * for USD 2.97 of the day's USD 3.93 reader spend, up to USD 0.058 a read
  * (~37k input tokens, ~4x a whole fresh turn). Now the read is hedged on
- * luna itself at its observed p95 (2.5 s), each luna attempt cut at 4 s
+ * the first model itself at its observed p95 (2.5 s), each the first model attempt cut at 4 s
  * (TURN_READER_FIRST_ATTEMPT_MS), and
- * Sonnet is asked only when luna has failed twice (sameModelHedgeFirst;
- * DECISIONS 69 keeps Sonnet as the reader's backup -- never a smaller
+ * the backup model is asked only when the first model has failed twice (sameModelHedgeFirst;
+ * DECISIONS 69 keeps the backup model as the reader's backup -- never a smaller
  * model). The gateway logs a hedge and a fallback, with the cost.
  */
 export const TURN_READER_SAME_MODEL_HEDGE_MS = 2_500;
 
 /**
- * How long each luna attempt (the first and its hedge) may take before the
+ * How long each the first model attempt (the first and its hedge) may take before the
  * backup is asked, in every posture. ai_ops.model_usage, 10 days to
- * 2026-11-16: 2,193 successful luna reads, 2,175 inside 3.0 s, 16 in
+ * 2026-11-16: 2,193 successful the first model reads, 2,175 inside 3.0 s, 16 in
  * 3.0-4.0 s, 3 over 4.0 s (0.14%). Live run 04d46602 (13:01 UTC): three
- * luna classifications hung together and the backup then took 8.8 s, so a
+ * the first model classifications hung together and the backup then took 8.8 s, so a
  * hung attempt must end well before the 9 s budget. Worst case now: the
  * first cut at 4.0 s, its hedge (from 2.5 s) at 6.5 s, then the backup.
  */
