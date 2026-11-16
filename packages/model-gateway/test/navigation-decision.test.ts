@@ -2524,6 +2524,30 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
     ).toEqual(moved(OVERVIEW));
   });
 
+  it("decision 98 (live recheck 651a3bd50 T5): a meeting prep with no meeting booked is briefed in place, not on the rehearsal page", () => {
+    // "Get me ready for my meeting with Watchly": every meeting CANCELLED,
+    // and the decision moved to Watchly's rehearsal (CONTEXT).
+    const REHEARSAL: QNavigateTarget = {
+      page: "COMPANY_REHEARSAL",
+      recordId: SILO,
+    };
+    expect(
+      gateByReading(moved(REHEARSAL), nav("CONTEXT"), { meetingBooked: false }),
+    ).toEqual(STAYED("NO_MEETING_BOOKED"));
+    // A real upcoming meeting: rehearsing advances the task; still moves.
+    expect(
+      gateByReading(moved(REHEARSAL), nav("CONTEXT"), { meetingBooked: true }),
+    ).toEqual(moved(REHEARSAL));
+    // Asked to go there ("open the rehearsal"): it opens.
+    expect(
+      gateByReading(moved(REHEARSAL), nav("GO"), { meetingBooked: false }),
+    ).toEqual(moved(REHEARSAL));
+    // Not a rehearsal page: unchanged.
+    expect(
+      gateByReading(moved(OVERVIEW), nav("CONTEXT"), { meetingBooked: false }),
+    ).toEqual(moved(OVERVIEW));
+  });
+
   const request = (runId: string, at = "/home", extra = {}) =>
     ({
       runId,

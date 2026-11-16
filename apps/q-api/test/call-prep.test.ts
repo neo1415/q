@@ -365,6 +365,78 @@ describe("a meeting named only by its role (RC4, F7-04)", () => {
     expect(written).toEqual([]);
   });
 
+  // Live recheck 651a3bd50 T5: every Savanna–Watchly meeting CANCELLED,
+  // briefed as "booked for Tuesday 17 November" from the correspondence.
+  it("T5: with every meeting cancelled, the writer is told none is booked and the prep carries the cancelled ones", async () => {
+    const written: Parameters<CallPrepWriter>[1][] = [];
+    const watchly = {
+      relationshipId: RELATIONSHIP,
+      kind: "INVESTOR_ORGANISATION" as const,
+      id: INVESTOR,
+      name: "Savanna Seed Partners",
+      state: "CONNECTED",
+    };
+    const port = createCallPrepPort({
+      material: () => ({
+        viewer: () =>
+          Promise.resolve({ role: "FOUNDER", organisationName: "Watchly" }),
+        counterpart: () =>
+          Promise.resolve({
+            name: "Savanna Seed Partners",
+            profile: "Type: VC",
+            relationshipId: RELATIONSHIP,
+          }),
+        theirMessages: () =>
+          Promise.resolve("Savanna: Booked for Tuesday 17 November at 10:00."),
+        theirCalls: () => Promise.resolve(""),
+        counterpartMaterial: () => Promise.resolve({ text: "", sources: [] }),
+        ownMaterial: () => Promise.resolve({ text: "", sources: [] }),
+        // The scheduled-only read: every meeting with them is cancelled.
+        upcomingMeetings: () => Promise.resolve([]),
+        relationships: () => Promise.resolve([watchly]),
+      }),
+      findByName: () => Promise.resolve(INVESTOR),
+      meetingsOnRecord: () =>
+        Promise.resolve([
+          { startsAt: "2099-11-17T10:00:00Z", status: "CANCELLED" },
+          { startsAt: "2099-11-19T10:00:00Z", status: "CANCELLED" },
+        ]),
+      write: (_request, input) => {
+        written.push(input);
+        return Promise.resolve(RESULT);
+      },
+    });
+    const prep = prepOf(
+      await port.prepare(request, {
+        counterpart: "Savanna Seed Partners",
+        said: "Get me ready for my meeting with Savanna Seed Partners",
+      }),
+    );
+    expect(written[0]?.soFar).toContain("MEETINGS: none is booked with them.");
+    expect(written[0]?.soFar).toContain(
+      "CANCELLED (not happening): 2099-11-17T10:00:00Z, 2099-11-19T10:00:00Z.",
+    );
+    expect(written[0]?.soFar).not.toContain("MEETINGS BOOKED");
+    expect(prep?.meetings).toEqual({
+      booked: [],
+      cancelled: ["2099-11-17T10:00:00Z", "2099-11-19T10:00:00Z"],
+    });
+    // Decision 98: no meeting booked, so the rehearsal is not opened unasked.
+    expect(await port.bookedWith?.(request, "Savanna Seed Partners")).toBe(
+      false,
+    );
+  });
+
+  it("a meeting booked with them is said to be booked, for that name or a role", async () => {
+    const { port } = founder({
+      relationships: [zino, ventures],
+      meetings: ["r-zino"],
+    });
+    expect(await port.bookedWith?.(request, "Zino")).toBe(true);
+    expect(await port.bookedWith?.(request, "Ventures Platform")).toBe(false);
+    expect(await port.bookedWith?.(request, "my investor meeting")).toBe(true);
+  });
+
   it("a record the search found whose name they never said is not prepared as theirs", async () => {
     const { port, written } = founder({ relationships: [] });
     const prep = prepOf(

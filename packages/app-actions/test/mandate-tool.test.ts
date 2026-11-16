@@ -183,6 +183,30 @@ describe("the mandate change card shows each field before and after (F-29)", () 
     );
   });
 
+  // Live recheck 651a3bd50 T9: "Change my usual cheque size to 600k" named
+  // no currency; the mandate tool's arguments were refused and the turn
+  // ended on the onboarding answer (typical only, no before -> after).
+  it("T9: a usual cheque in their words, with no currency, is the mandate's full range before → after", async () => {
+    const card = await cardFor({ chequeRange: { typical: "600k" } });
+    expect(card.preview).toBe(
+      "Cheque: USD from 100,000, up to 500,000 → USD from 100,000, typically 600,000, up to 500,000",
+    );
+  });
+
+  it("T9: a cheque change that changes nothing is refused, saying what it already is", async () => {
+    const tool = family?.tool;
+    if (tool === undefined) throw new Error("no tool");
+    const canonical: unknown = await tool.toCanonical(
+      tool.input.parse({ chequeRange: { max: "500,000" } }),
+      context,
+      withMandate,
+    );
+    expect(canonical).toMatchObject({
+      refused:
+        "Your maximum cheque is already USD 500,000, so nothing would change.",
+    });
+  });
+
   it("refuses a partial cheque change when the current range can't be read", async () => {
     const action = family;
     const tool = action?.tool;

@@ -38,6 +38,20 @@ export type CallPrepSources = {
   /** What already waits for their approval (the Approval Engine's list). */
   readonly waiting?:
     ((actor: ActorContext) => Promise<readonly WaitingItem[]>) | undefined;
+  /**
+   * Live recheck 651a3bd50 T5: every meeting on record with one
+   * relationship, with its status (the meetings read model, scoped to
+   * relationships their organisation is a party to). Absent: only the
+   * upcoming scheduled meetings are known.
+   */
+  readonly meetingsOnRecord?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<
+        readonly { readonly startsAt: string; readonly status: string }[]
+      >)
+    | undefined;
   readonly write: CallPrepWriter;
   readonly logger?: Logger | undefined;
 };
@@ -129,10 +143,54 @@ export function nameIsSaid(recordName: string, said: string): boolean {
 /** Stages where a meeting with them is the next or a recent step. */
 const MEETING_STAGES = new Set(["CONNECTED", "MEETING_HELD", "IN_DILIGENCE"]);
 
+/** A cancelled meeting is said while it is recent or still ahead. */
+const CANCELLED_LOOKBACK_MS = 7 * 86_400_000;
+
 export function createCallPrepPort(
   dependencies: CallPrepSources,
 ): QCallPrepPort {
+  /** Start times of the relationship's cancelled meetings, recent or ahead. */
+  const cancelledMeetings = async (
+    actor: ActorContext,
+    relationshipId: string,
+  ): Promise<string[]> => {
+    if (dependencies.meetingsOnRecord === undefined) return [];
+    const all = await dependencies
+      .meetingsOnRecord(actor, relationshipId)
+      .catch(() => []);
+    const from = Date.now() - CANCELLED_LOOKBACK_MS;
+    return all
+      .filter(
+        (meeting) =>
+          meeting.status === "CANCELLED" &&
+          Date.parse(meeting.startsAt) >= from,
+      )
+      .map((meeting) => meeting.startsAt)
+      .sort();
+  };
   return {
+    bookedWith: async (request, counterpart) => {
+      const material = dependencies.material();
+      if (material.relationships === undefined) return null;
+      const viewer = await material.viewer(request.actor);
+      if (viewer === null) return null;
+      const kind =
+        viewer.role === "FOUNDER" ? "INVESTOR_ORGANISATION" : "COMPANY";
+      const [own, upcoming] = await Promise.all([
+        material.relationships(request.actor),
+        material.upcomingMeetings(request.actor),
+      ]);
+      const role = namesOnlyARole(counterpart);
+      const theirs = own.filter(
+        (row) =>
+          row.kind === kind && (role || nameIsSaid(row.name, counterpart)),
+      );
+      return theirs.some((row) =>
+        upcoming.some(
+          (meeting) => meeting.relationshipId === row.relationshipId,
+        ),
+      );
+    },
     prepare: async (request, input) => {
       const actor = request.actor;
       // Why a prep was not given, for the turn's log (live 2026-10-23).
@@ -248,6 +306,14 @@ export function createCallPrepPort(
         const booked = meetings.filter(
           (meeting) => meeting.relationshipId === relationshipId,
         );
+        // Live recheck 651a3bd50 T5: every Savanna–Watchly meeting was
+        // CANCELLED, yet the brief, drawn from the correspondence, said a
+        // call "was booked for Tuesday 17 November". Meeting facts come from
+        // the meetings read model with their status.
+        const cancelled =
+          relationshipId === null || booked.length > 0
+            ? []
+            : await cancelledMeetings(actor, relationshipId);
         const soFar = [
           them === null
             ? "Nothing about them is on record that they can see."
@@ -255,7 +321,15 @@ export function createCallPrepPort(
               ? "No relationship on record yet: this would be the first contact."
               : null,
           booked.length === 0
-            ? null
+            ? relationshipId === null
+              ? null
+              : [
+                  "MEETINGS: none is booked with them.",
+                  ...(cancelled.length === 0
+                    ? []
+                    : [`CANCELLED (not happening): ${cancelled.join(", ")}.`]),
+                  "A time named or proposed in the messages is not a booking: never say a meeting is booked, scheduled, confirmed or pending.",
+                ].join("\n")
             : `MEETINGS BOOKED:\n${booked
                 .map((meeting) => `- ${meeting.startsAt}: ${meeting.purpose}`)
                 .join("\n")}`,
@@ -302,6 +376,14 @@ export function createCallPrepPort(
           counterpartName: name,
           ...prep,
           waiting: related.about === "SAME_PEOPLE" ? related.waiting : [],
+          ...(relationshipId === null
+            ? {}
+            : {
+                meetings: {
+                  booked: booked.map((meeting) => meeting.startsAt),
+                  cancelled,
+                },
+              }),
           // Only a record they could open: the rehearsal lobby for it.
           counterpart: them === null || id === null ? null : { kind, id },
         };

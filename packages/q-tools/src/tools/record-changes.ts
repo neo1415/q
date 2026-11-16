@@ -117,9 +117,32 @@ function prepareWith(port: RecordChangePort) {
 
 // --- a profile fact first given during onboarding (ADR 0024) --------------
 
+/**
+ * Live recheck 651a3bd50 T9: "Change my usual cheque size to 600k" was
+ * prepared here as the onboarding answer cheque_typical alone -- a card
+ * with no minimum, maximum, currency or before -> after, for a value
+ * already held. The cheque range has one write path: change_my_mandate's
+ * chequeRange (the D8 merge and the full before -> after card). Its parts
+ * are not offered to Q here.
+ */
+export const CHEQUE_ANSWER_FIELDS: ReadonlySet<string> = new Set([
+  "cheque_currency",
+  "cheque_min",
+  "cheque_typical",
+  "cheque_max",
+]);
+
+type OfferedProfileAnswerField = Exclude<
+  (typeof PROFILE_ANSWER_FIELDS.investor)[number],
+  "cheque_currency" | "cheque_min" | "cheque_typical" | "cheque_max"
+>;
+
 const PROFILE_ANSWER_FIELD_NAMES = [
-  ...PROFILE_ANSWER_FIELDS.investor,
   ...PROFILE_ANSWER_FIELDS.founder,
+  ...PROFILE_ANSWER_FIELDS.investor.filter(
+    (field): field is OfferedProfileAnswerField =>
+      !CHEQUE_ANSWER_FIELDS.has(field),
+  ),
 ] as const;
 
 export const ProposeProfileAnswerInputSchema = z
@@ -158,7 +181,7 @@ export function createProposeProfileAnswerTool(
     ...COMMON,
     id: PROPOSE_PROFILE_ANSWER,
     providerName: "propose_profile_answer_change",
-    description: `Prepares a change to one fact on their own profile that they first gave during onboarding: an investor's sectors, geographies, business models, customer types, stages, cheque sizes, criteria, founder preferences, exclusions, discovery style or portfolio; a founder's company categories, team facts or traction. The change goes into the same records onboarding wrote (their mandate or company). ${RESULT_NOTE}`,
+    description: `Prepares a change to one fact on their own profile that they first gave during onboarding: an investor's sectors, geographies, business models, customer types, stages, criteria, founder preferences, exclusions, discovery style or portfolio; a founder's company categories, team facts or traction. The change goes into the same records onboarding wrote (their mandate or company). Never a cheque size (minimum, usual or typical, maximum, currency): that is change_my_mandate's chequeRange. ${RESULT_NOTE}`,
     requiredScopeKinds: [],
     input: ProposeProfileAnswerInputSchema,
     authorize: (input, context) =>

@@ -90,6 +90,52 @@ describe("a relationship stage is the projection's (RC4)", () => {
     expect(withRelationshipStagesChecked(fine, null).corrected).toEqual([]);
   });
 
+  it("live recheck 651a3bd50 T4: 'not yet as a pipeline relationship' about Ajopot in diligence is replaced", () => {
+    const AJOPOT = "6c6c6c6c-6c6c-46c6-86c6-6c6c6c6c6c6c";
+    const savanna = digest([
+      {
+        ...row(AJOPOT, "Ajopot", "IN_DILIGENCE"),
+        stageSince: "2026-10-03T09:00:00Z",
+      },
+      row(TENSORGATE, "Tensorgate", "CONNECTED"),
+    ]);
+    const asked = "Do I already have Ajopot in my pipeline?";
+    const said =
+      "Yes—but only as a diligence item, not yet as a pipeline relationship. Its revenue is company-stated.";
+    const checked = withRelationshipStagesChecked(said, savanna, asked);
+    expect(checked.corrected).toEqual(["Ajopot"]);
+    expect(checked.content).not.toMatch(/not yet as a pipeline/iu);
+    expect(checked.content).toContain(
+      "From your records: Ajopot is in your pipeline, in diligence since 3 Oct.",
+    );
+    expect(checked.content).toContain("Its revenue is company-stated.");
+    // Named in the sentence itself, in any stage from interest expressed on.
+    for (const stage of [
+      "INTEREST_EXPRESSED",
+      "CONNECTED",
+      "MEETING_HELD",
+      "INVESTED",
+    ] as const) {
+      expect(
+        stageContradictions(
+          "Ajopot isn't in your pipeline yet.",
+          digest([row(AJOPOT, "Ajopot", stage)]),
+        ),
+      ).toHaveLength(1);
+    }
+    // True of a passed relationship, and of a sentence naming no one when
+    // the question did not name exactly one counterpart.
+    expect(
+      stageContradictions(
+        "Ajopot isn't in your pipeline.",
+        digest([row(AJOPOT, "Ajopot", "PASSED")]),
+      ),
+    ).toEqual([]);
+    expect(
+      stageContradictions(said, savanna, "Is anything in my pipeline?"),
+    ).toEqual([]);
+  });
+
   it("a first contact is never prepared for a counterpart already connected", () => {
     expect(connectedAlready(owner, { company: "Nixo" })?.stage).toBe(
       "INVESTED",

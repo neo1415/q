@@ -660,6 +660,35 @@ describe("owner directive 14 Nov 2026 (point 4): when what was checked is said",
     ).toEqual({ askedPublic: true, cannotAnswer: true, lacksEvidence: true });
   });
 
+  // Live recheck 651a3bd50 T4: "Do I already have Ajopot in my pipeline?"
+  // closed with the web-unavailable line; the answer needed nothing public.
+  it("a question about their own records never says the web was unavailable unless they asked about the web", () => {
+    const need = checkedLineNeedOf(
+      { missingEvidence: ["Ajopot's audited revenue"] },
+      { turnKind: "QUESTION_TO_Q", questionKind: "THEIR_OWN_RECORDS" },
+    );
+    expect(need.recordsQuestion).toBe(true);
+    for (const check of ["UNAVAILABLE", "NOT_RUN", "NOTHING_FOUND"] as const) {
+      expect(
+        checkedLine({
+          check,
+          subject: "Ajopot",
+          need: { ...need, cannotAnswer: true },
+        }),
+      ).toBeNull();
+    }
+    expect(
+      checkedLine({
+        check: "UNAVAILABLE",
+        subject: "Ajopot",
+        need: checkedLineNeedOf(
+          {},
+          { questionKind: "THEIR_OWN_RECORDS", asksForWeb: true },
+        ),
+      }),
+    ).toContain("public web search was unavailable");
+  });
+
   it("not searched: said when they asked, or when the answer could not be given at all", () => {
     const none = {
       askedPublic: false,

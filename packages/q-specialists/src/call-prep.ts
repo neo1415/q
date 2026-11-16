@@ -43,6 +43,18 @@ export type CallPrep = {
   /** Summaries of related work already waiting for their approval. */
   readonly waiting: readonly string[];
   /**
+   * Live recheck 651a3bd50 T5: the meetings with them as the meetings read
+   * model holds them, by status (ISO start times). A cancelled meeting is
+   * never presented as booked; a time named in their messages is not a
+   * booking. Absent: no relationship to read meetings for.
+   */
+  readonly meetings?:
+    | {
+        readonly booked: readonly string[];
+        readonly cancelled: readonly string[];
+      }
+    | undefined;
+  /**
    * The counterpart's record, when they could open it: the rehearsal is
    * offered only then, as a page they can open (live 2026-11-13: "Want to
    * rehearse it? I'll play Clinicrest." then, on "yes", "A rehearsal with
@@ -101,7 +113,72 @@ export type QCallPrepPort = {
     request: QAnswerRequest,
     input: { readonly counterpart: string; readonly said: string },
   ) => Promise<CallPrep | CallPrepUnresolved | null>;
+  /**
+   * Decision 98 (live recheck 651a3bd50 T5): whether a meeting with the
+   * counterpart they named (or, for a role, any of theirs on that side) is
+   * booked -- scheduled, not cancelled -- in the meetings read model. Null
+   * when it cannot be told. No model is called.
+   */
+  readonly bookedWith?:
+    | ((
+        request: QAnswerRequest,
+        counterpart: string,
+      ) => Promise<boolean | null>)
+    | undefined;
 };
+
+const MEETING_DAY = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+});
+
+function daysOf(isoTimes: readonly string[]): string[] {
+  const days = isoTimes
+    .map((iso) => new Date(iso))
+    .filter((at) => !Number.isNaN(at.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime())
+    .map((at) => MEETING_DAY.format(at));
+  return [...new Set(days)];
+}
+
+function listed(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+}
+
+/**
+ * With no meeting booked, what the meetings read model holds, said by code:
+ * "No meeting is booked with Watchly; the calls on 17 Nov and 19 Nov were
+ * cancelled." Null when a meeting is booked or nothing is known.
+ */
+export function meetingStatusLine(prep: CallPrep): string | null {
+  const meetings = prep.meetings;
+  if (meetings === undefined || meetings.booked.length > 0) return null;
+  const name = prep.counterpartName.trim();
+  const cancelled = daysOf(meetings.cancelled);
+  if (cancelled.length === 0) return `No meeting is booked with ${name} yet.`;
+  return cancelled.length === 1
+    ? `No meeting is booked with ${name}; the call on ${cancelled[0] ?? ""} was cancelled.`
+    : `No meeting is booked with ${name}; the calls on ${listed(cancelled)} were cancelled.`;
+}
+
+/** A sentence that presents a meeting, call or slot as booked or pending. */
+const MEETING_CLAIM =
+  /\b(?:call|meeting|slot|session|catch-?up|intro(?:duction)?)s?\b[^.!?\n]*\b(?:booked|scheduled|confirmed|arranged|set\s+(?:up\s+)?for|planned|lined\s+up|proposed|pending|upcoming|coming\s+up)\b|\b(?:booked|scheduled|confirmed|arranged|proposed|upcoming)\b[^.!?\n]*\b(?:call|meeting|slot|session|catch-?up)s?\b/iu;
+
+/**
+ * With no meeting booked, every sentence of the writer's text that presents
+ * one as booked or pending is left out (the meetings read model is the
+ * source of meeting facts, never the correspondence).
+ */
+export function withoutBookingClaims(text: string): string {
+  return text
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => !MEETING_CLAIM.test(sentence))
+    .join(" ")
+    .trim();
+}
 
 export function callPrepLine(prep: CallPrep): string {
   const sentence = (text: string) => {
@@ -111,9 +188,25 @@ export function callPrepLine(prep: CallPrep): string {
   const investor = prep.viewerRole === "INVESTOR";
   const first = prep.waiting[0];
   const theyWant = prep.theyWant?.trim() ?? "";
+  // Live recheck 651a3bd50 T5: meeting facts come from the meetings read
+  // model with their status, said by code; the writer's own wording of a
+  // booking is left out when none is booked.
+  const meetingLine = meetingStatusLine(prep);
+  const whoTheyAre =
+    meetingLine === null
+      ? prep.whoTheyAre
+      : withoutBookingClaims(prep.whoTheyAre);
+  const soFar =
+    meetingLine === null ? prep.soFar : withoutBookingClaims(prep.soFar);
+  const soFarLines = [
+    ...(meetingLine === null ? [] : [meetingLine]),
+    ...(soFar.length === 0 ? [] : [sentence(soFar)]),
+  ].join(" ");
   return [
-    `**Who they are**\n${sentence(prep.whoTheyAre)}`,
-    `**So far**\n${sentence(prep.soFar)}`,
+    ...(whoTheyAre.length === 0
+      ? []
+      : [`**Who they are**\n${sentence(whoTheyAre)}`]),
+    `**So far**\n${soFarLines.length === 0 ? sentence(prep.soFar) : soFarLines}`,
     `**${investor ? "What to ask them" : "What they'll likely ask"}**\n${prep.questions
       .map(
         (item, index) =>

@@ -221,8 +221,10 @@ export {
   REASSESS_READINESS,
 } from "./tools/own-records.js";
 export {
+  CHEQUE_ANSWER_FIELDS,
   createProposeProfileAnswerTool,
   createRecordChangeTools,
+  ProposeProfileAnswerInputSchema,
   ProposeRecordChangeOutputSchema,
   PROPOSE_PROFILE_ANSWER,
 } from "./tools/record-changes.js";

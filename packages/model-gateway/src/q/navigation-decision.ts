@@ -170,6 +170,12 @@ export type QNavigationGuard =
    * COMPARISON) about a record it merely names: answered in place.
    */
   | "ANSWERED_IN_PLACE"
+  /**
+   * Decision 98 (live recheck 651a3bd50 T5): getting ready for a meeting
+   * with no meeting booked with them is briefed in place; the rehearsal
+   * page is not opened unasked.
+   */
+  | "NO_MEETING_BOOKED"
   /** The person pinned the workspace: the move is offered, never made. */
   | "PINNED";
 
@@ -1272,6 +1278,8 @@ export function gateByReading(
     readonly codeMoves?: boolean | undefined;
     /** Decision 98: the reader read an ANALYSIS or COMPARISON ask. */
     readonly evaluative?: boolean | undefined;
+    /** QPageMoveReading.meetingBooked: false holds a rehearsal move. */
+    readonly meetingBooked?: boolean | undefined;
   } = {},
 ): QNavigationOutcome {
   const gated = gateByReadingAlone(outcome, navigation, context);
@@ -1320,8 +1328,24 @@ function gateByReadingAlone(
     readonly pane?: QNavigationPane | undefined;
     readonly codeMoves?: boolean | undefined;
     readonly evaluative?: boolean | undefined;
+    readonly meetingBooked?: boolean | undefined;
   },
 ): QNavigationOutcome {
+  // Decision 98 (live recheck 651a3bd50 T5): "get me ready for my meeting
+  // with Watchly" opened Watchly's rehearsal while every meeting with them
+  // was cancelled. Rehearsing advances the task only toward a real
+  // meeting: with none booked the brief is given in place (it carries its
+  // own rehearsal offer), unless they asked to go there.
+  const moveTo = outcome.target ?? outcome.remembered;
+  if (
+    context.meetingBooked === false &&
+    moveTo !== null &&
+    (moveTo.page === "COMPANY_REHEARSAL" ||
+      moveTo.page === "INVESTOR_REHEARSAL") &&
+    !readsAsGo(navigation)
+  ) {
+    return STAY("NO_MEETING_BOOKED");
+  }
   if (navigation === null) return outcome;
   if (readsAsNoNavigation(navigation)) {
     return outcome.decision === "STAY" && outcome.remembered === null
@@ -2021,6 +2045,13 @@ export type QPageMoveReading = {
    * COMPARISON): a record it merely names is answered in place.
    */
   readonly evaluative?: boolean | undefined;
+  /**
+   * A meeting-prep turn (reader meetingPrep): whether a meeting with that
+   * counterpart is booked (scheduled, not cancelled) in the meetings read
+   * model. False: their rehearsal page is not moved to unasked (decision
+   * 98). Undefined: not a meeting prep, or not known.
+   */
+  readonly meetingBooked?: boolean | undefined;
   /** A8: they asked to watch the company's pitch (companyMedia.pitch). */
   readonly pitch?: boolean | undefined;
   /**
@@ -2651,6 +2682,7 @@ export function createQPageMoves(dependencies: {
               pane: paneHere,
               codeMoves: reading?.codeMoves,
               evaluative: reading?.evaluative,
+              meetingBooked: reading?.meetingBooked,
             },
           );
           // Fast GO: held, in case the answer stored moves nothing after all.
@@ -2756,6 +2788,7 @@ export function createQPageMoves(dependencies: {
           },
           codeMoves: reading?.codeMoves,
           evaluative: reading?.evaluative,
+          meetingBooked: reading?.meetingBooked,
         });
         if (outcome.decision === "STAY") return null;
         dependencies.logger?.info(

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { ProposeProfileAnswerInputSchema } from "@capital-q/q-tools";
+
 import {
   CAPITAL_OBJECTIVE_CHANGE,
   COMPANY_TEAM_CHANGE,
@@ -71,6 +73,45 @@ describe("requestFor", () => {
       reason: "Nothing in that request is something this form changes.",
     });
     expect(JSON.stringify(empty)).not.toContain("expected at least one field");
+  });
+});
+
+// Live recheck 651a3bd50 T9: "Change my usual cheque size to 600k" became
+// onboarding.answer.revise on I2.cheque_typical. The cheque range has one
+// write path, the mandate change; the profile-answer path refuses it.
+describe("a cheque size is never a profile answer (T9)", () => {
+  it("cheque parts are refused, naming the mandate tool, and not offered to Q", async () => {
+    for (const field of [
+      "cheque_typical",
+      "cheque_min",
+      "cheque_max",
+      "cheque_currency",
+    ] as const) {
+      const result = await board(true).prepare({
+        runId: randomUUID(),
+        actor,
+        change: {
+          kind: "PROFILE_ANSWER",
+          journey: "investor",
+          field,
+          value: "600000",
+        },
+      });
+      expect(result.status).toBe("REFUSED");
+      expect(result.reason).toContain("change_my_mandate");
+    }
+    expect(
+      ProposeProfileAnswerInputSchema.safeParse({
+        field: "cheque_typical",
+        value: "600000",
+      }).success,
+    ).toBe(false);
+    expect(
+      ProposeProfileAnswerInputSchema.safeParse({
+        field: "sectors",
+        value: ["Fintech"],
+      }).success,
+    ).toBe(true);
   });
 });
 

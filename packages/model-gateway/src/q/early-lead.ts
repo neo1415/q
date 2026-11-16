@@ -65,9 +65,20 @@ type Row = {
 const OWN_PIPELINE =
   /\b(?:my|our)\s+(?:(?:fundraising|fund-raising|investor|deal|raise|current)\s+)?pipeline\b/iu;
 
+/**
+ * Live recheck 651a3bd50 T4: "Do I already have Ajopot in my pipeline?" is
+ * a yes-or-no question about one thing, not a summary: it was opened with
+ * "You have 13 relationships on Capital Q: ...", which they did not ask
+ * for. A question that opens with a yes-or-no verb and asks whether
+ * something is in (or on) their pipeline is answered directly.
+ */
+const PIPELINE_MEMBERSHIP =
+  /^\s*(?:(?:so|and|ok(?:ay)?|q)[,\s]+)*(?:is|are|was|were|do|does|did|have|has|am)\b[^.?!]*\b(?:in|on|part\s+of)\s+(?:my|our)\s+(?:(?:fundraising|fund-raising|investor|deal|raise|current)\s+)?pipeline\b/iu;
+
 /** The ask is for a summary of their own pipeline or relationships. */
 export function asksForPipelineSummary(text: string): boolean {
   const plain = text.replace(/[’]/gu, "'");
+  if (PIPELINE_MEMBERSHIP.test(plain)) return false;
   return PIPELINE_ASK.test(plain) || OWN_PIPELINE.test(plain);
 }
 

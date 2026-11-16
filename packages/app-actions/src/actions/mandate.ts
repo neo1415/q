@@ -158,6 +158,87 @@ function chequeWords(cheque: Cheque): string {
     : `${cheque.currency} ${parts.join(", ")}`;
 }
 
+const SCALE: Readonly<Record<string, number>> = {
+  k: 3,
+  thousand: 3,
+  m: 6,
+  mn: 6,
+  mm: 6,
+  million: 6,
+  b: 9,
+  bn: 9,
+  billion: 9,
+};
+
+/**
+ * An amount as they said it, in digits: "600k" is "600000", "1.5m" is
+ * "1500000", "$600,000" is "600000". Shifted as text, never through a
+ * float. Anything else is returned as given, for the schema to refuse.
+ */
+export function chequeAmountInDigits(said: string): string {
+  const match =
+    /^\s*[^\d\s.]{0,3}\s*(\d[\d,]*)(?:\.(\d+))?\s*(k|thousand|mn|mm|m|million|bn|b|billion)?\s*$/iu.exec(
+      said,
+    );
+  if (match === null) return said;
+  const whole = (match[1] ?? "").replace(/,/gu, "");
+  const fraction = match[2] ?? "";
+  const zeros = SCALE[(match[3] ?? "").toLowerCase()] ?? 0;
+  const shifted =
+    fraction.length <= zeros
+      ? `${whole}${fraction.padEnd(zeros, "0")}`
+      : `${whole}${fraction.slice(0, zeros)}.${fraction.slice(zeros)}`;
+  const trimmed = shifted.replace(/^0+(?=\d)/u, "");
+  return trimmed.length === 0 ? said : trimmed;
+}
+
+function chequeInDigits(range: {
+  readonly currency?: string | undefined;
+  readonly min?: string | undefined;
+  readonly typical?: string | undefined;
+  readonly max?: string | undefined;
+}): Partial<Cheque> {
+  const out: Record<string, string> = {};
+  if (range.currency !== undefined) {
+    out["currency"] = range.currency.trim().toUpperCase();
+  }
+  for (const part of ["min", "typical", "max"] as const) {
+    const value = range[part];
+    if (value !== undefined) out[part] = chequeAmountInDigits(value);
+  }
+  return out;
+}
+
+const CHEQUE_PART_WORDS = {
+  min: "minimum cheque",
+  typical: "typical cheque",
+  max: "maximum cheque",
+} as const;
+
+/**
+ * A cheque change that changes nothing, said to them: "Your typical cheque
+ * is already USD 600,000, so nothing would change." Null when the range as
+ * it stands is not known.
+ */
+function chequeAlreadyLine(
+  said: Partial<Cheque>,
+  current: Cheque | null,
+): string | null {
+  if (current === null) return null;
+  const parts = (["min", "typical", "max"] as const).filter(
+    (part) => said[part] !== undefined,
+  );
+  const [only] = parts;
+  const value = only === undefined ? undefined : current[only];
+  if (parts.length === 1 && only !== undefined && value !== undefined) {
+    const amount = Number.isFinite(Number(value))
+      ? Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })
+      : value;
+    return `Your ${CHEQUE_PART_WORDS[only]} is already ${current.currency} ${amount}, so nothing would change.`;
+  }
+  return `Your cheque range is already ${chequeWords(current)}, so nothing would change.`;
+}
+
 const NOT_SET = "Not set";
 
 /**
@@ -399,14 +480,20 @@ const MandateTool = z
     discoveryMode: z.enum(DISCOVERY_MODES).optional(),
     chequeRange: z
       .object({
-        currency: z.string().max(3),
+        currency: z
+          .string()
+          .max(3)
+          .optional()
+          .describe("ISO currency; omit when they did not say one."),
         min: z.string().max(32).optional(),
         typical: z.string().max(32).optional(),
         max: z.string().max(32).optional(),
       })
       .strict()
       .optional()
-      .describe("Cheque sizes as decimal strings in one ISO currency."),
+      .describe(
+        "Every cheque size (minimum, usual or typical, maximum, currency) is changed here and nowhere else, as decimal strings (600k is 600000). Give only the parts they named: the rest is kept.",
+      ),
     minStageCode: StageCode.optional().describe(
       `The earliest stage they invest at, one of: ${STAGE_WORDS}. "Pre-seed to Series A" is pre_seed to series_a.`,
     ),
@@ -469,14 +556,14 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   tool: {
     name: "change_my_mandate",
     description:
-      "Prepares a change to their own investor organisation's mandate, as the mandate form makes it: create one, update name, discoveryMode, chequeRange, minStageCode, maxStageCode or rawMandateText, activate it, or close it. Sectors, geographies, business models, criteria, founder preferences and exclusions are propose_profile_answer_change. Nothing changes until they approve exactly it.",
+      "Prepares a change to their own investor organisation's mandate, as the mandate form makes it: create one, update name, discoveryMode, chequeRange, minStageCode, maxStageCode or rawMandateText, activate it, or close it. Every cheque size change (minimum, usual or typical, maximum, currency) is this tool's chequeRange, never propose_profile_answer_change. Sectors, geographies, business models, criteria, founder preferences and exclusions are propose_profile_answer_change. Nothing changes until they approve exactly it.",
     input: MandateTool,
     references: {},
     scopes: ["INVESTOR_PROFILE", "INVESTOR_MANDATE"],
     purposes: ["INVESTOR_QUESTION", "ACTION_PREPARATION", "GENERAL_QUESTION"],
     eval: {
       say: [
-        "Change our typical cheque to 250,000 dollars.",
+        "Change my usual cheque size to 600k.",
         "We now invest from pre-seed to Series A, update the mandate.",
       ],
     },
@@ -488,9 +575,13 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
       const investorOrganisationId = InvestorOrganisationIdSchema.parse(own);
       const { operation: said, mandateId, ...fields } = tool;
       const operation = said ?? "UPDATE";
-      const filled = Object.fromEntries(
+      const filled: Record<string, unknown> = Object.fromEntries(
         Object.entries(fields).filter(([, value]) => value !== undefined),
       );
+      // Live recheck 651a3bd50 T9: "600k" said as an amount is 600000.
+      if (fields.chequeRange !== undefined) {
+        filled["chequeRange"] = chequeInDigits(fields.chequeRange);
+      }
       if (operation === "UPDATE" && Object.keys(filled).length === 0) {
         // Live 2026-10-14: a mandate described in business models, customer
         // types, green flags and exclusions reached this tool with nothing
@@ -504,6 +595,12 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         );
       }
       if (operation === "CREATE") {
+        if (
+          fields.chequeRange !== undefined &&
+          fields.chequeRange.currency === undefined
+        ) {
+          return refusal("Which currency are those cheque sizes in?");
+        }
         return {
           operation,
           input: {
@@ -546,6 +643,25 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
       // whole range, wiping the minimum and maximum. A partial range in the
       // same currency keeps every part the person did not mention, so the
       // card shows and approval binds the full range that will be stored.
+      // Live recheck 651a3bd50 T9: "my usual cheque size to 600k" names no
+      // currency; it is the mandate's own, or asked for when unreadable.
+      const currentCheque =
+        full === null || full === undefined ? null : chequeRangeOf(full);
+      const saidCheque = filled["chequeRange"] as
+        Partial<Cheque> | null | undefined;
+      if (
+        saidCheque !== undefined &&
+        saidCheque !== null &&
+        saidCheque.currency === undefined
+      ) {
+        if (currentCheque === null) {
+          return refusal("Which currency is that cheque size in?");
+        }
+        filled["chequeRange"] = {
+          ...saidCheque,
+          currency: currentCheque.currency,
+        };
+      }
       const partialCheque =
         filled["chequeRange"] !== undefined &&
         filled["chequeRange"] !== null &&
@@ -582,6 +698,13 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
               JSON.stringify(value ?? null),
         );
         if (unchanged) {
+          // T9: a cheque change that changes nothing is said plainly to
+          // them, with the value as it stands ("it's already 600,000").
+          const already =
+            saidCheque !== undefined && saidCheque !== null
+              ? chequeAlreadyLine(saidCheque, currentCheque)
+              : null;
+          if (already !== null) return refusal(already);
           return refusal(
             "Nothing would change: the mandate already says that. If they asked to add or remove a sector, geography, business model, customer type, founder preference, green flag or exclusion, prepare it with propose_profile_answer_change instead.",
             { forModel: true },

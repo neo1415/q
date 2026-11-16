@@ -48,12 +48,22 @@ export function withReferenceLead(
 
 /** What an answer can claim about where a relationship stands. */
 type StageClaim =
-  "NOT_CONNECTED" | "AWAITING_ACCEPTANCE" | "IN_DILIGENCE" | "INVESTED";
+  | "NOT_CONNECTED"
+  | "NOT_IN_PIPELINE"
+  | "AWAITING_ACCEPTANCE"
+  | "IN_DILIGENCE"
+  | "INVESTED";
 
 const CLAIMS: readonly [StageClaim, RegExp][] = [
   [
     "NOT_CONNECTED",
     /\b(?:not|n't|never)\s+(?:yet\s+|been\s+|even\s+)*(?:connected|in\s+touch)\b|\bno\s+(?:relationship|connection)\s+(?:yet\s+)?(?:with|to)\b|\bhaven'?t\s+(?:yet\s+)?connected\b/iu,
+  ],
+  // Live recheck 651a3bd50 T4: "Yes, but only as a diligence item, not yet
+  // as a pipeline relationship" about a relationship IN_DILIGENCE.
+  [
+    "NOT_IN_PIPELINE",
+    /(?:\bnot|n't|\bnever)\s+(?:yet\s+|currently\s+|actually\s+|really\s+|formally\s+|even\s+)*(?:(?:in|on|part\s+of)\s+(?:your|the)\s+(?:active\s+|current\s+)?pipeline|(?:as\s+)?an?\s+(?:active\s+|formal\s+|real\s+)?pipeline\s+(?:relationship|company|deal|entry|item|opportunity))\b|\bno\s+pipeline\s+relationship\b|\boutside\s+(?:of\s+)?your\s+pipeline\b/iu,
   ],
   [
     "AWAITING_ACCEPTANCE",
@@ -76,6 +86,16 @@ const CONTRADICTS: Readonly<
     "IN_DILIGENCE",
     "INVESTED",
     "PAUSED",
+  ]),
+  // A relationship at any stage from interest expressed onward is in the
+  // pipeline (their pipeline is their relationships: early-lead PIPELINE_NOTE).
+  NOT_IN_PIPELINE: new Set<RelationshipStateV2>([
+    "INTEREST_EXPRESSED",
+    "CONNECTED",
+    "MEETING_HELD",
+    "IN_DILIGENCE",
+    "PAUSED",
+    "INVESTED",
   ]),
   AWAITING_ACCEPTANCE: new Set<RelationshipStateV2>([
     "CONNECTED",
@@ -150,6 +170,11 @@ export function stageLine(row: AccountDigestRelationship): string {
   return `From your records: ${plain(row.counterpart.name)} is ${STAGE_WORDS[row.stage]}${since(row.stageSince)}.`;
 }
 
+/** Their pipeline holds it, with the stage as recorded. */
+export function pipelineLine(row: AccountDigestRelationship): string {
+  return `From your records: ${plain(row.counterpart.name)} is in your pipeline, ${STAGE_WORDS[row.stage]}${since(row.stageSince)}.`;
+}
+
 /** A stated stage that the projection contradicts, with the row it is about. */
 export type StageContradiction = {
   readonly sentence: string;
@@ -165,11 +190,15 @@ function sentencesOf(text: string): string[] {
 /**
  * Every sentence that names exactly one counterpart the digest holds and
  * states a stage the projection contradicts. A sentence naming several is
- * left alone: which one the stage is about is not code's to guess.
+ * left alone: which one the stage is about is not code's to guess. A
+ * sentence denying pipeline membership that names no counterpart ("Yes,
+ * but not yet as a pipeline relationship") is about the one counterpart
+ * the person's own question named, when it named exactly one.
  */
 export function stageContradictions(
   content: string,
   digest: QAccountDigest | null,
+  asked?: string,
 ): readonly StageContradiction[] {
   if (digest === null || digest.relationships.length === 0) return [];
   const rows = digest.relationships
@@ -182,16 +211,27 @@ export function stageContradictions(
         readonly matcher: RegExp;
       } => entry.matcher !== null,
     );
+  const askedAbout =
+    asked === undefined
+      ? []
+      : rows.filter((entry) => entry.matcher.test(asked));
+  const [askedOnly] = askedAbout;
   const found: StageContradiction[] = [];
   for (const sentence of sentencesOf(content)) {
     const named = rows.filter((entry) => entry.matcher.test(sentence));
     const [only] = named;
-    if (named.length !== 1 || only === undefined) continue;
+    if (named.length > 1) continue;
     const words = sentence.replace(/[’]/gu, "'");
     for (const [claim, pattern] of CLAIMS) {
       if (!pattern.test(words)) continue;
-      if (CONTRADICTS[claim].has(only.row.stage)) {
-        found.push({ sentence, claim, row: only.row });
+      const about =
+        only ??
+        (claim === "NOT_IN_PIPELINE" && askedAbout.length === 1
+          ? askedOnly
+          : undefined);
+      if (about === undefined) continue;
+      if (CONTRADICTS[claim].has(about.row.stage)) {
+        found.push({ sentence, claim, row: about.row });
         break;
       }
     }
@@ -206,14 +246,19 @@ export function stageContradictions(
 export function withRelationshipStagesChecked(
   content: string,
   digest: QAccountDigest | null,
+  asked?: string,
 ): { readonly content: string; readonly corrected: readonly string[] } {
-  const found = stageContradictions(content, digest);
+  const found = stageContradictions(content, digest, asked);
   if (found.length === 0) return { content, corrected: [] };
   let text = content;
   const said = new Set<string>();
   for (const one of found) {
     const id = one.row.relationshipId;
-    const replacement = said.has(id) ? "" : stageLine(one.row);
+    const replacement = said.has(id)
+      ? ""
+      : one.claim === "NOT_IN_PIPELINE"
+        ? pipelineLine(one.row)
+        : stageLine(one.row);
     said.add(id);
     text = text.replace(one.sentence, replacement);
   }

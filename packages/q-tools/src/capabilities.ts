@@ -950,7 +950,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "propose_profile_answer_change",
     "PROFILE",
-    "Changes a profile fact first given during onboarding (an investor's sectors, stages, cheque, criteria, exclusions, discovery style; a founder's categories, team facts, traction), applied when they approve.",
+    "Changes a profile fact first given during onboarding (an investor's sectors, stages, criteria, exclusions, discovery style; a founder's categories, team facts, traction), on approval. Never a cheque size (change_my_mandate).",
     { approval: "PREPARE_APPROVE", executes: ["onboarding.answer.revise"] },
   ),
   tool(

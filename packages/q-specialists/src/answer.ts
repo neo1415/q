@@ -7130,6 +7130,23 @@ export function createSpecialistQAnswer(
       .catch(() => null);
     fastGoes.set(request.runId, fastGo);
     setTimeout(() => fastGoes.delete(request.runId), 120_000).unref?.();
+    // A meeting prep (not a rehearsal they asked for): whether a meeting
+    // with that counterpart is booked, from the meetings read model.
+    const meetingBookedFor = async (
+      reading: Awaited<typeof readingFirst>,
+    ): Promise<{ readonly meetingBooked?: boolean }> => {
+      const counterpart = reading?.meetingPrep?.counterpart ?? null;
+      const booked = dependencies.callPrep?.bookedWith;
+      if (
+        counterpart === null ||
+        booked === undefined ||
+        reading?.reference?.open === "REHEARSAL"
+      ) {
+        return {};
+      }
+      const known = await booked(request, counterpart).catch(() => null);
+      return known === null ? {} : { meetingBooked: known };
+    };
     dependencies.pageMoves?.heard?.(
       request,
       Promise.all([readingFirst, fastGo]).then(
@@ -7148,6 +7165,9 @@ export function createSpecialistQAnswer(
           evaluative:
             reading?.answerKind === "ANALYSIS" ||
             reading?.answerKind === "COMPARISON",
+          // Decision 98 (live recheck 651a3bd50 T5): a meeting prep opens
+          // the rehearsal only toward a meeting actually booked with them.
+          ...(await meetingBookedFor(reading)),
           // Live d96c63ee1: with tab null, the decision's own deck too.
           pitch: reading?.companyMedia?.pitch === true,
           // Live d96c63ee1: the record the turn is about, not the pane's.

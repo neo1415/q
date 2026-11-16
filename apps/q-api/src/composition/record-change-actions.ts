@@ -40,7 +40,11 @@ import {
   type AnyQActionDefinition,
   type QActionProposer,
 } from "@capital-q/q-actions";
-import type { RecordChange, RecordChangePort } from "@capital-q/q-tools";
+import {
+  CHEQUE_ANSWER_FIELDS,
+  type RecordChange,
+  type RecordChangePort,
+} from "@capital-q/q-tools";
 import {
   capability,
   type ActorContext,
@@ -1158,6 +1162,14 @@ export function createRecordChangeBoard(
           summary: "Update your role at your investor organisation",
         };
       case "PROFILE_ANSWER": {
+        // Live recheck 651a3bd50 T9: the cheque range has one write path,
+        // the mandate change (D8 merge, full before -> after card).
+        if (CHEQUE_ANSWER_FIELDS.has(change.field)) {
+          return {
+            reason:
+              "A cheque size is part of the mandate: prepare it with change_my_mandate (chequeRange), never as a setup answer.",
+          };
+        }
         const answer = resolveProfileAnswer(change.field, change.value);
         if ("reason" in answer) return { reason: answer.reason };
         const own =

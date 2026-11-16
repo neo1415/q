@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   callPrepLine,
+  meetingStatusLine,
   rehearsalOffer,
+  withoutBookingClaims,
   type CallPrep,
 } from "../src/call-prep.js";
 
@@ -109,5 +111,54 @@ describe("the rehearsal is offered only as a page that can be opened", () => {
     if (offer?.kind !== "NAVIGATION_OFFER") throw new Error("no offer");
     expect(offer.openLabel.length).toBeLessThanOrEqual(48);
     expect(offer.place.length).toBeLessThanOrEqual(48);
+  });
+});
+
+// Live recheck 651a3bd50 T5 ("Get me ready for my meeting with Watchly"):
+// every Savanna–Watchly meeting was CANCELLED, yet the brief said "A
+// 30-minute introductory call was booked for Tuesday 17 November ...; a
+// later proposed Thursday 19 November slot also appears".
+describe("meeting facts in a brief come from the meetings read model (T5)", () => {
+  const live: CallPrep = {
+    ...base,
+    viewerRole: "INVESTOR",
+    counterpartName: "Watchly",
+    whoTheyAre: "A seed-stage B2B SaaS company in Lagos",
+    soFar:
+      "You are connected with Watchly. A 30-minute introductory call was booked for Tuesday 17 November at 10:00 UTC; a later proposed Thursday 19 November slot also appears in the correspondence, so confirm which meeting is current. Ama shared their deck on 2 Nov.",
+    meetings: {
+      booked: [],
+      cancelled: ["2026-11-19T10:00:00Z", "2026-11-17T10:00:00Z"],
+    },
+  };
+
+  it("cancelled meetings are never presented as booked; code says none is booked and which were cancelled", () => {
+    const text = callPrepLine(live);
+    expect(text).not.toMatch(/was booked|proposed Thursday/iu);
+    expect(text).toContain(
+      "**So far**\nNo meeting is booked with Watchly; the calls on 17 Nov and 19 Nov were cancelled. You are connected with Watchly. Ama shared their deck on 2 Nov.",
+    );
+    expect(
+      meetingStatusLine({
+        ...live,
+        meetings: { booked: [], cancelled: ["2026-11-19T10:00:00Z"] },
+      }),
+    ).toBe(
+      "No meeting is booked with Watchly; the call on 19 Nov was cancelled.",
+    );
+  });
+
+  it("a booked meeting leaves the writer's text as it is", () => {
+    const text = callPrepLine({
+      ...live,
+      soFar: "A call is booked for 17 Nov.",
+      meetings: { booked: ["2026-11-17T10:00:00Z"], cancelled: [] },
+    });
+    expect(text).toContain("**So far**\nA call is booked for 17 Nov.");
+    expect(
+      withoutBookingClaims(
+        "The call was scheduled for Friday. Ask about churn.",
+      ),
+    ).toBe("Ask about churn.");
   });
 });

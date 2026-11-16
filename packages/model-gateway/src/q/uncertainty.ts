@@ -113,6 +113,17 @@ export type CheckedLineNeed = {
   readonly cannotAnswer: boolean;
   /** The answer's own fields list evidence it lacks (missingEvidence). */
   readonly lacksEvidence: boolean;
+  /**
+   * The reader read a question about their own records (THEIR_OWN_RECORDS
+   * or PROGRESS: their pipeline, relationships, mandate) and not about the
+   * web. Live recheck 651a3bd50 T4: "Do I already have Ajopot in my
+   * pipeline?" closed with "The public web search was unavailable this
+   * turn": the web search ran only because a company was named (records
+   * and web in parallel); the answer needed nothing public, so its absence
+   * is never said (939ad92d0: said only where it changes how the answer
+   * reads).
+   */
+  readonly recordsQuestion?: true;
 };
 
 /**
@@ -149,6 +160,7 @@ export function checkedLine(input: {
   const whom = input.subject === null ? "" : ` on ${input.subject}`;
   const them = input.subject ?? "them";
   const { askedPublic, cannotAnswer, lacksEvidence } = input.need;
+  if (input.need.recordsQuestion === true && !askedPublic) return null;
   switch (input.check) {
     case "READ":
       return null;
@@ -293,6 +305,10 @@ export function checkedLineNeedOf(
     cannotAnswer: read.insufficientEvidence === true,
     lacksEvidence:
       Array.isArray(read.missingEvidence) && read.missingEvidence.length > 0,
+    ...(request.questionKind === "THEIR_OWN_RECORDS" ||
+    request.questionKind === "PROGRESS"
+      ? { recordsQuestion: true as const }
+      : {}),
   };
 }
 

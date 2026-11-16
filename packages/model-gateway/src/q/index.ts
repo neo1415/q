@@ -9393,6 +9393,8 @@ export function createModelGatewayQAnswer(
           const staged = withRelationshipStagesChecked(
             content,
             await accountDigest,
+            // A pipeline denial naming no one is about whom they asked.
+            latest.content,
           );
           if (staged.corrected.length > 0) {
             content = staged.content.slice(0, ANSWER_LIMIT_CHARS);

@@ -5400,6 +5400,12 @@ const qIntelligence = composeQIntelligence({
       ),
     waiting: async (actor) =>
       await qActions.listPendingApprovals({ actor, limit: 20 }),
+    // Live recheck 651a3bd50 T5: meetings with their status, so a
+    // cancelled one is never briefed as booked.
+    meetingsOnRecord: async (actor, relationshipId) =>
+      (
+        await schedule.listMeetingsForRelationships(actor, [relationshipId])
+      ).get(relationshipId) ?? [],
   },
   // Owner 2026-10-22: findings and cards beside the answer, at about twice
   // the input tokens a typed turn; CQ_Q_PARALLEL_EXTRAS=off for one call.

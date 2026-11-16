@@ -109,6 +109,19 @@ describe("their own pipeline, in any words", () => {
     expect(asksForPipelineSummary("What is a sales pipeline?")).toBe(false);
   });
 
+  // Live recheck 651a3bd50 T4: a yes-or-no question about one company was
+  // opened with "You have 13 relationships on Capital Q: ...".
+  it("whether one company is in their pipeline is answered directly, not opened with a summary", () => {
+    for (const asked of [
+      "Do I already have Ajopot in my pipeline?",
+      "Is Ajopot already in my pipeline?",
+      "So is Watchly part of our pipeline?",
+    ]) {
+      expect(asksForPipelineSummary(asked)).toBe(false);
+    }
+    expect(asksForPipelineSummary("What's waiting in my pipeline?")).toBe(true);
+  });
+
   it("counts the relationships the cards show, never an empty pipeline", () => {
     const lead = pipelineLead(
       {
