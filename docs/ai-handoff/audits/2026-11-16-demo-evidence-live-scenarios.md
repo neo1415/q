@@ -17,3 +17,20 @@ Root-cause work in progress:
 2. The same deck must give the same reading on every turn.
 3. Q must not request documents that are already shared.
 4. The research guard covers own-records and data-room questions.
+
+## Scenarios A–C rerun on `bab915357` (11:45 UTC)
+
+Savanna, conversation `3d510d8e`, new wording. Cost USD 0.23 (ledger `0ab566db`).
+
+| Turn | Ask                                                                          | Result                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | "How much cash is Tensorgate burning each month, and how long will it last?" | **PASS, slow.** Q read the data room and the shared management accounts (`company.data_room.read` and `…document.pages.read`). It gave "$152,800 October net burn, $948,840 cash, 6.2 months (p. 1)" and the deck's "$135,000, $1.1m at 30 Sep, 8.1 months", calling the accounts the better working figure. It named the shared accounts and made no request offer. 21 tools, **23.1 s**. |
+| 2    | "Is that consistent with their pitch deck?"                                  | **PASS, thin.** Q stated both sets of figures and said they conflict, with dates. It did not give the reasons the accounts carry (SOC 2 audit, round legal fees, reserved GPU) or note the September vs October period. 5.7 s.                                                                                                                                                             |
+| 3    | "Which documents did you use for that?"                                      | **PASS.** Q named "Management accounts, May 2025 to Oct 2026" and the October 2026 seed deck. It also sent a stray separate line, "The company profile is ready to open." 7.4 s.                                                                                                                                                                                                           |
+| 4    | "What's still unresolved, and what would settle it?"                         | **PASS.** Q said which balance and burn are current, and that a reconciled cash-flow and runway schedule would settle it. No already-shared document was requested and no web line appeared. 5.7 s.                                                                                                                                                                                        |
+
+Open items:
+
+- turn 1 latency (23 s);
+- explaining the reasons for a discrepancy when the accounts carry them;
+- the stray "ready to open" line.
