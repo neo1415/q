@@ -420,6 +420,12 @@ import {
   settledWithin,
 } from "./owned-first.js";
 import { createSingleFlight } from "./single-flight.js";
+import {
+  createGateqLabelGuard,
+  gateqReadingHeld,
+  readNamedGateqApplications,
+  withoutUnsourcedGateqLabels,
+} from "./gateq-application-fact.js";
 import { stableToolOrder } from "./tool-order.js";
 import {
   askedToOpen,
@@ -5503,6 +5509,33 @@ export function createModelGatewayQAnswer(
     })();
     dataRoomRead.catch(() => undefined);
     /**
+     * Live scenario F, defect 5 (16 Nov): an investor's turn naming a
+     * company with a SUBMITTED application in their own GateQ inbox reads
+     * that application, through read_my and gateq_inbox_summarise under
+     * this plan, as the asker (gateq-application-fact.ts). Not when the
+     * application is the one on their screen: the page read has it.
+     */
+    let gateqFacts: readonly AuthorisedFact[] = [];
+    const gateqApplicationRead = (async (): Promise<void> => {
+      if (latest === undefined) return;
+      if (plan.screen?.manifest?.focus?.kind === "GATEQ_APPLICATION") return;
+      const { names } = await prefetchToolsRead;
+      gateqFacts = await readNamedGateqApplications({
+        side: askerSideOf(request),
+        available: names,
+        latest: latest.content,
+        earlier: earlier
+          .filter((message) => message.role === "USER")
+          .map((message) => message.content),
+        execute: (name, args, callId) =>
+          tools
+            .execute({ callId, name, arguments: { ...args } }, toolContext)
+            .then((outcome) => (outcome.result.ok ? outcome.result.data : null))
+            .catch(() => null),
+      });
+    })();
+    gateqApplicationRead.catch(() => undefined);
+    /**
      * Q room R1: the whole page on their screen (sections, tab, filters,
      * open windows), sent as ids only and read back here through the read
      * tools the model could call, under the same plan, as the asker. A ref
@@ -7074,6 +7107,7 @@ export function createModelGatewayQAnswer(
       timed("compare", compareRead),
       timed("data-room", dataRoomRead),
       timed("page", pageRead),
+      timed("gateq-application", gateqApplicationRead),
     ]);
     // The data room's documents ride with the attached ones: both are
     // documents read for them, as them, before the model is asked.
@@ -7251,6 +7285,7 @@ export function createModelGatewayQAnswer(
       compareFacts,
       compareIds,
       dataRoomFacts,
+      gateqFacts,
       compareTable,
       compareVerdict,
       compareLate: compareFor,
@@ -7709,6 +7744,7 @@ export function createModelGatewayQAnswer(
         compareFacts: preparedCompareFacts,
         compareIds: preparedCompareIds,
         dataRoomFacts,
+        gateqFacts,
         compareTable: preparedCompareTable,
         compareVerdict: preparedCompareVerdict,
         compareLate,
@@ -8757,6 +8793,7 @@ export function createModelGatewayQAnswer(
           ...compareFacts,
           ...(chartFact === null ? [] : [chartFact]),
           ...dataRoomFacts,
+          ...gateqFacts,
           ...onScreenPage,
           ...(w.ownDay === null ? [] : [w.ownDay]),
           ...(w.arrival === null ? [] : [w.arrival]),
@@ -9436,6 +9473,20 @@ export function createModelGatewayQAnswer(
         facts.map((fact) => fact.statement);
       const claims = createClaimChecker(() => claimSources());
       /**
+       * Live scenario F, defect 5: "GateQ" is said only about a GateQ
+       * application reading this run holds (gateq-application-fact.ts);
+       * an investor's sentence that credits GateQ without one is not
+       * published as written. The tool round's results are read once the
+       * model's messages exist (below).
+       */
+      let gateqToolResults: () => readonly ModelMessage[] = () => [];
+      const gateqHeld = (): boolean =>
+        gateqReadingHeld({ facts, toolResults: gateqToolResults() });
+      const gateqLabels = createGateqLabelGuard(
+        askerSideOf(request) === "INVESTOR",
+        gateqHeld,
+      );
+      /**
        * Step 8: what backs a sentence claiming an action -- this run's
        * successful acting tool results, read at each sentence -- and the
        * promise check over Q's own sentences (promise-check.ts).
@@ -9493,8 +9544,10 @@ export function createModelGatewayQAnswer(
         // is published.
         // Fact labels are rewritten before a sentence goes out, not only
         // in the stored answer: on a voice call it is said aloud (H3b).
+        const labelled = gateqLabels.sentence(sentence);
+        if (labelled === null) return;
         const sentenceGuarded = guardSentence(
-          citeAuthorisedFacts(sentence, facts),
+          citeAuthorisedFacts(labelled, facts),
           firstSentence,
           groundsNow(),
         );
@@ -11676,6 +11729,7 @@ export function createModelGatewayQAnswer(
       // the values rendered into it are sources (templateValues).
       const taskTemplate =
         registry.getActive("COMPANY_ANALYST").definition.template;
+      gateqToolResults = () => messages;
       claimSources = () => [
         ...facts.map((fact) => fact.statement),
         latest.content,
@@ -14060,11 +14114,22 @@ export function createModelGatewayQAnswer(
         }
         // Natural register (Zino live 2026-10-07): "Capital Q records
         // that you have…" is said in Q's own first person.
+        const gateqLabelled = withoutUnsourcedGateqLabels(
+          promises.text,
+          askerSideOf(request) === "INVESTOR",
+          gateqHeld(),
+        );
+        if (gateqLabelled.changed > 0) {
+          logger?.info(
+            { qRunId: request.runId, changed: gateqLabelled.changed },
+            "GateQ wording without a GateQ reading was not published as written",
+          );
+        }
         const recommendationGuarded = withoutRecommendationClaims(
           withOneCaveat(
             inFirstPerson(
               citeAuthorisedFacts(
-                withoutPublicSourceLabels(promises.text, publicSources),
+                withoutPublicSourceLabels(gateqLabelled.text, publicSources),
                 facts,
               ),
             ).text,
