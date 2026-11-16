@@ -3126,7 +3126,7 @@ describe("C10 v85: a CONTEXT reading's own destination, where the decision staye
 
   it("live replay: 'Who should I follow up with this week?' on Work brings the pipeline up; NONE never moves", async () => {
     for (const [mode, expected] of [
-      ["CONTEXT", ["I've opened Pipeline."]],
+      ["CONTEXT", ["I've opened your pipeline."]],
       ["NONE", []],
     ] as const) {
       const published: { content: string; blocks: unknown }[] = [];

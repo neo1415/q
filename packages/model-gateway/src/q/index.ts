@@ -225,6 +225,10 @@ import {
   type CompanyFactAsk,
 } from "./named-company-fact.js";
 import { namedCompanyFitLine } from "./named-fit-line.js";
+import {
+  asksReasonForPlace,
+  companyCardNamesInConversation,
+} from "./shown-list-explanation.js";
 import { boundCompaniesOf } from "./bound-companies.js";
 import {
   FIRST_CONTACT_TOOL,
@@ -660,6 +664,15 @@ import {
 
 // The names a turn's words give, for the conversation core's first words.
 export { companyNameCandidates } from "./named-company-fact.js";
+// Live re-check of cb28c00e5: an explanation about Q's own shown list.
+export {
+  asksForTheWeb,
+  asksReasonForPlace,
+  asksToOpenAPage,
+  cardNamesInWords,
+  companyCardNamesInConversation,
+  sameCompanyName,
+} from "./shown-list-explanation.js";
 export {
   analystResultBlocks,
   askedSubjects,
@@ -7046,7 +7059,14 @@ export function createModelGatewayQAnswer(
           // likely a follow-up on those cards, which the answer may take
           // from the card alone (no wide reads); the reading decides, so
           // the reads wait for it rather than start here.
-          const cardNames = companyCardNamesOfLastQ(prepared.earlier);
+          // Live re-check of cb28c00e5 (turn D): a why about a card of an
+          // earlier list ("why is MedTrail ranked first in the earlier
+          // list?") is a card follow-up too: every card Q showed here.
+          const cardNames = asksReasonForPlace(prepared.latest.content)
+            ? new Set(
+                companyCardNamesInConversation(prepared.earlier).map(nameKey),
+              )
+            : companyCardNamesOfLastQ(prepared.earlier);
           const candidates = [
             ...companyNameCandidates(
               prepared.latest.content,

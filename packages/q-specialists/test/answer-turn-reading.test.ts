@@ -989,7 +989,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(stored?.content ?? "").not.toMatch(
       /can't open|isn't one of yours|don't see/iu,
     );
-    expect(stored?.content ?? "").toMatch(/I've opened Work/u);
+    expect(stored?.content ?? "").toMatch(/I've opened Q's work/u);
   });
 
   it("W4: with the workspace on screen, the page pane's move is its own message; code's own move wins; off, nothing runs", async () => {

@@ -304,7 +304,7 @@ describe("the answer path while pinned (createQPageMoves)", () => {
   it("CONTEXT: the page stays; the place is offered (plain Open)", async () => {
     const published = await run("CONTEXT", true);
     expect(published).toHaveLength(1);
-    expect(published[0]?.content).toBe(pinnedLine("Pipeline"));
+    expect(published[0]?.content).toBe(pinnedLine("Your pipeline"));
     const [offer] = published[0]?.blocks ?? [];
     expect(offer).toMatchObject({
       kind: "NAVIGATION_OFFER",
@@ -332,7 +332,7 @@ describe("the answer path while pinned (createQPageMoves)", () => {
     expect(await run("NONE", true)).toEqual([]);
     expect(await run("NONE", false)).toEqual([]);
     const unpinned = await run("CONTEXT", false);
-    expect(unpinned[0]?.content).toBe("I've opened Pipeline.");
+    expect(unpinned[0]?.content).toBe("I've opened your pipeline.");
   });
 });
 
@@ -500,7 +500,7 @@ describe("contextual moves land with the reading, not after the decider", () => 
     );
     await wait(50);
     expect(published).toHaveLength(1);
-    expect(published[0]?.content).toBe("I've opened Pipeline.");
+    expect(published[0]?.content).toBe("I've opened your pipeline.");
     expect(published[0]?.at).toBeLessThan(100);
   });
 
@@ -512,7 +512,7 @@ describe("contextual moves land with the reading, not after the decider", () => 
     );
     await wait(200);
     expect(published.map((one) => one.content)).toEqual([
-      "I've opened Pipeline.",
+      "I've opened your pipeline.",
     ]);
   });
 
@@ -528,7 +528,7 @@ describe("contextual moves land with the reading, not after the decider", () => 
     );
     await wait(50);
     expect(published.map((one) => one.content)).toEqual([
-      pinnedLine("Pipeline"),
+      pinnedLine("Your pipeline"),
     ]);
   });
 

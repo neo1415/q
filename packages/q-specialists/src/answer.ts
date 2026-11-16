@@ -630,6 +630,11 @@ import {
   withOpenResolution,
   UNCERTAINTY_VEHICLES,
   type OpenResolutionItem,
+  asksForTheWeb,
+  asksReasonForPlace,
+  asksToOpenAPage,
+  cardNamesInWords,
+  sameCompanyName as sameCardName,
 } from "@capital-q/model-gateway/q";
 
 /**
@@ -901,6 +906,95 @@ function lastShownCardCompanies(
 }
 
 /**
+ * Live re-check of cb28c00e5 (16 Nov 2026, turns C and D): "Why is it
+ * there?" after a one-card list (read with aboutNamedOther, research
+ * EXPLICIT and navigation CONTEXT to Discover: "there" became a place) and
+ * "And why is MedTrail ranked first in the earlier list?" (read
+ * THEIR_OWN_RECORDS about an earlier list's card: 31 reads). Each earlier
+ * fix matched the previous wording; this is the principle, decided in code
+ * after the reader from the person's own words and the cards Q showed:
+ *
+ * A turn that asks why or how an item of any list Q showed in this
+ * conversation is placed, ranked or included -- by its name, its place
+ * ("the second one"), "it/that one/this one" right after a one-card list,
+ * or the reading's own binding -- is a shown-list explanation. It is
+ * answered from that card and its list's stated conditions and order; it
+ * never reaches the public web unless their words ask for it, and never
+ * moves the page unless their words ask to open or go (decision 98).
+ *
+ * Order matters: a shown company their words name wins; then deixis right
+ * after a one-card list (before anything the reading made of "there");
+ * then the reading's binding, a company the reading names, and code's
+ * place in the list. A company the reading names that is on no card Q showed
+ * (and their words name none) is someone else: not bound. Null: not a
+ * shown-list explanation.
+ */
+function shownListExplanation(input: {
+  readonly read: ShownItemReading | null;
+  readonly utterance: string;
+  /** Every company on a card Q showed in this conversation. */
+  readonly shown: ReadonlyMap<string, string>;
+  /** The companies on the cards of Q's latest turn, in card order. */
+  readonly lastShown: readonly string[];
+  readonly bound: string | null;
+  readonly listPlace: { readonly id: string; readonly kind: string } | null;
+}): string | null {
+  const { read, utterance, shown, lastShown, bound, listPlace } = input;
+  if (shown.size === 0 || read === null) return null;
+  // The reading's own web flag is not the person's words (turn C: the
+  // reader's EXPLICIT research came from aboutNamedOther, not from them).
+  if (!plainQuestionToQ({ ...read, asksForWeb: false })) return null;
+  if (asksForTheWeb(utterance) || !asksReasonForPlace(utterance)) return null;
+  const cards = [...shown];
+  const idsNamed = (names: readonly string[]): readonly string[] => [
+    ...new Set(
+      cards.flatMap(([id, cardName]) =>
+        names.some((name) => sameCardName(name, cardName)) ? [id] : [],
+      ),
+    ),
+  ];
+  const inWords = idsNamed(
+    cardNamesInWords(
+      utterance,
+      cards.map(([, name]) => name),
+    ),
+  );
+  if (inWords.length > 1) return null;
+  if (inWords.length === 1) return inWords[0] ?? null;
+  const readerNames = [
+    read.namedOther?.name ?? null,
+    read.reference?.name ?? null,
+  ].flatMap((name) =>
+    name === null || name.trim().length === 0 ? [] : [name.trim()],
+  );
+  const readerShown = idsNamed(readerNames);
+  const someoneElse = readerNames.length > 0 && readerShown.length === 0;
+  const lastOne = lastShown.length === 1 ? (lastShown[0] ?? null) : null;
+  if (lastOne !== null && !someoneElse && POINTS_BACK.test(utterance))
+    return lastOne;
+  if (bound !== null && shown.has(bound.toLowerCase())) return bound;
+  // The company the reading names before code's count of places: a
+  // worst-first list's cards are stored best first, so "the first one" by
+  // storage is not the first one said (live re-check of 3b7145616).
+  if (readerShown.length === 1) return readerShown[0] ?? null;
+  if (readerShown.length > 1) return null;
+  if (
+    listPlace !== null &&
+    listPlace.kind === "COMPANY" &&
+    shown.has(listPlace.id.toLowerCase())
+  )
+    return listPlace.id;
+  if (
+    lastOne !== null &&
+    !someoneElse &&
+    ((read.reference?.shown ?? null) !== null ||
+      (read.fromShown ?? null) !== null)
+  )
+    return lastOne;
+  return null;
+}
+
+/**
  * Live re-check of 3b7145616 (16 Nov 2026, turn C): "Why is the first one
  * there?" after Q's conditioned list was read ADVICE with research
  * EXPLICIT and class COMPLEX_ANALYSIS: 8 reads, a web search, two model
@@ -1159,6 +1253,12 @@ export type QRunRouting = {
   readonly addressedToQ: boolean;
   readonly navigation: string | null;
   readonly navigationDestination: string | null;
+  /**
+   * Live re-check of cb28c00e5 (decision 98): why code changed the
+   * reading's navigation ("SHOWN_LIST_EXPLANATION": an explanation about
+   * Q's own shown list, held in place); null: the reading's own.
+   */
+  readonly navigationGuard: string | null;
   readonly spoken: boolean;
   /**
    * Live re-check 15 Nov 2026: the code lane that answered a run the
@@ -5396,6 +5496,7 @@ export function createSpecialistQAnswer(
       addressedToQ: true,
       navigation: null,
       navigationDestination: null,
+      navigationGuard: null,
       spoken: request.spoken === true,
       lane,
       executionClass: null,
@@ -7387,6 +7488,66 @@ export function createSpecialistQAnswer(
     // time before the answer goes, per stage, on every turn (counts and
     // milliseconds only; nothing they said). See "q turn timing" below.
     const turnStartedAt = Date.now();
+    // Turn C (live re-check of 3b7145616): the companies Q showed on cards,
+    // and code's place in Q's own list ("the first one"), for a follow-up
+    // answered from one of those cards.
+    const shownCards = shownCardCompanies(history);
+    const lastShown = lastShownCardCompanies(history);
+    const listPlace =
+      pointed !== null &&
+      pointed.ask?.kind === "ORDINAL" &&
+      pointed.resolved?.kind === "ONE" &&
+      pointed.resolved.via === "Q_ANSWER"
+        ? pointed.resolved.entity
+        : null;
+    /**
+     * Live re-check of cb28c00e5 (turn C, decision 98): "Why is it there?"
+     * after a one-card list was read navigation CONTEXT to Discover and the
+     * page moved. A shown-list explanation (shownListExplanation) moves no
+     * page unless their own words ask to open or go somewhere: the
+     * reading's navigation is held to NONE here, as it lands, before the
+     * page-move decision, the fast GO or the routing read it; recorded as
+     * the run's navigationGuard.
+     */
+    let navigationGuard: string | null = null;
+    const heldInPlace = (reading: QTurnReading | null): QTurnReading | null => {
+      if (reading === null) return null;
+      const explained = shownListExplanation({
+        read: reading,
+        utterance: latest.content,
+        shown: shownCards,
+        lastShown,
+        bound: null,
+        listPlace,
+      });
+      if (explained === null || asksToOpenAPage(latest.content)) return reading;
+      const navigation = reading.navigation ?? null;
+      if (
+        navigation !== null &&
+        navigation.mode === "NONE" &&
+        (navigation.destination ?? null) === null
+      )
+        return reading;
+      navigationGuard = "SHOWN_LIST_EXPLANATION";
+      logger?.info(
+        {
+          qRunId: request.runId,
+          navigationGuard,
+          readerNavigation: navigation?.mode ?? null,
+          readerDestination: navigation?.destination ?? null,
+        },
+        "q held a shown-list explanation in place",
+      );
+      return {
+        ...reading,
+        navigation: {
+          mode: "NONE",
+          negated: navigation?.negated ?? false,
+          destination: null,
+          tab: null,
+        },
+      };
+    };
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -7404,7 +7565,7 @@ export function createSpecialistQAnswer(
           "q early reading not used",
         );
       }
-      return earlyRead ?? (await readTurn().catch(() => null));
+      return heldInPlace(earlyRead ?? (await readTurn().catch(() => null)));
     })();
     // C10 (TURN_READER v83): the page-move decision moves or offers a page
     // only where this reading asks for navigation; it is told the reading's
@@ -7434,36 +7595,33 @@ export function createSpecialistQAnswer(
       const known = await booked(request, counterpart).catch(() => null);
       return known === null ? {} : { meetingBooked: known };
     };
-    // Turn C (live re-check of 3b7145616): the companies Q showed on cards,
-    // and code's place in Q's own list ("the first one"), for a follow-up
-    // answered from one of those cards.
-    const shownCards = shownCardCompanies(history);
-    const lastShown = lastShownCardCompanies(history);
-    const listPlace =
-      pointed !== null &&
-      pointed.ask?.kind === "ORDINAL" &&
-      pointed.resolved?.kind === "ONE" &&
-      pointed.resolved.via === "Q_ANSWER"
-        ? pointed.resolved.entity
-        : null;
     dependencies.pageMoves?.heard?.(
       request,
       Promise.all([readingFirst, fastGo]).then(
         async ([reading, go]) => ({
           // Decision 98 (turn C): a "why" about one item of Q's own shown
           // list is answered from its card, where they are.
-          fromShownCard: shownItemTurn({
-            read: reading,
-            utterance: latest.content,
-            company: shownCardCompanyOf({
+          fromShownCard:
+            shownListExplanation({
               read: reading,
+              utterance: latest.content,
               shown: shownCards,
+              lastShown,
               bound: null,
               listPlace,
-              lastShown,
+            }) !== null ||
+            shownItemTurn({
+              read: reading,
               utterance: latest.content,
-            }),
-          }).why,
+              company: shownCardCompanyOf({
+                read: reading,
+                shown: shownCards,
+                bound: null,
+                listPlace,
+                lastShown,
+                utterance: latest.content,
+              }),
+            }).why,
           // A pitch to watch is placed on the Elevator pitch tab, as in
           // placedNavigation (the decision is told the same tab).
           navigation:
@@ -7664,10 +7822,12 @@ export function createSpecialistQAnswer(
     }
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
-      read = await rereadTurn(
-        readTurn,
-        readerAbort.signal,
-        dependencies.turnRereadDeadlineMs ?? TURN_REREAD_DEADLINE_MS,
+      read = heldInPlace(
+        await rereadTurn(
+          readTurn,
+          readerAbort.signal,
+          dependencies.turnRereadDeadlineMs ?? TURN_REREAD_DEADLINE_MS,
+        ),
       );
       turnUnread = read === null;
       logger?.warn(
@@ -7759,6 +7919,7 @@ export function createSpecialistQAnswer(
         addressedToQ: read.addressedToQ ?? true,
         navigation: read.navigation?.mode ?? null,
         navigationDestination: read.navigation?.destination ?? null,
+        navigationGuard,
         spoken,
         lane: "READER",
         // The class the answer path takes (below), kept on the run as
@@ -8022,27 +8183,52 @@ export function createSpecialistQAnswer(
     // Q's own shown list (a fit list or a conditioned one) with no web
     // wording keeps to Capital Q's records, recorded in routing; a "why"
     // about it is answered from its card as a contextual follow-up.
-    const shownItemCompany = shownCardCompanyOf({
+    // Live re-check of cb28c00e5 (turns C and D): the principle first --
+    // an explanation about any list Q showed here, bound from their words,
+    // deixis after a one-card list, the reading's binding or the place.
+    const explained = shownListExplanation({
       read,
+      utterance: latest.content,
       shown: shownCards,
+      lastShown,
       bound: followUpCompany,
       listPlace: placeFromList,
-      lastShown,
-      utterance: latest.content,
     });
-    const shownItem = shownItemTurn({
-      read,
-      utterance: latest.content,
-      company: shownItemCompany,
-    });
+    const shownItemCompany =
+      explained ??
+      shownCardCompanyOf({
+        read,
+        shown: shownCards,
+        bound: followUpCompany,
+        listPlace: placeFromList,
+        lastShown,
+        utterance: latest.content,
+      });
+    const shownItem =
+      explained !== null
+        ? { aboutItem: true, why: true }
+        : shownItemTurn({
+            read,
+            utterance: latest.content,
+            company: shownItemCompany,
+          });
     let researchGuard: string | null = null;
     if (shownItem.aboutItem && (await research).mode !== "NEVER") {
       research = Promise.resolve(NO_RESEARCH);
       researchGuard = "SHOWN_LIST_ITEM";
     }
     if (
+      explained !== null &&
+      followUpCompanyInRun.get(request.runId)?.toLowerCase() !==
+        explained.toLowerCase()
+    ) {
+      // Their words (or deixis on a one-card list) name the card; any other
+      // binding of this run gives way to it.
+      followUpCompanyInRun.delete(request.runId);
+    }
+    if (
       shownItem.why &&
-      followUpCompany === null &&
+      (followUpCompany === null || explained !== null) &&
       shownItemCompany !== null &&
       !followUpCompanyInRun.has(request.runId)
     ) {
@@ -8059,6 +8245,7 @@ export function createSpecialistQAnswer(
           qRunId: request.runId,
           researchGuard,
           why: shownItem.why,
+          explanation: explained !== null,
         },
         "q follow-up on an item of its own shown list",
       );

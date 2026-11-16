@@ -233,7 +233,7 @@ describe("complete screens are still placed with the reading", () => {
     });
     await wait(150);
     expect(intentsOf(published)).toEqual([]);
-    expect(published[0]?.content).toBe(pinnedLine("Pipeline"));
+    expect(published[0]?.content).toBe(pinnedLine("Your pipeline"));
   });
 });
 

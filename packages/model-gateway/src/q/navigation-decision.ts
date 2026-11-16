@@ -2373,6 +2373,69 @@ const REHEARSAL_PAGES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Live re-check of cb28c00e5 (16 Nov 2026): "I've opened For you." -- a
+ * tab's raw title in the move line. Each of their own screens (a page or
+ * tab code can move to with no record), as Q says it mid-sentence, by its
+ * route and tab id ("" for the page itself). The site map test keeps every
+ * such place in this table.
+ */
+const OWN_PLACE_SAID: Readonly<Record<string, string>> = {
+  "/analytics#": "your analytics",
+  "/board#": "your board",
+  "/company/data-room#": "your data room",
+  "/company/data-room#dataroom": "your data room",
+  "/company/data-room#deck": "your pitch deck",
+  "/company/interest#": "your investor interest",
+  "/company/visibility#": "your company's visibility",
+  "/daily#": "the Q Daily",
+  "/discover#": "your Discover feed",
+  "/discover#for-you": "your Discover feed",
+  "/discover#yours": "your companies in Discover",
+  "/discover#founders": "founders' videos in Discover",
+  "/discover/passed#": "the companies you passed on",
+  "/discover/saved#": "your saved companies",
+  "/discover/saved/compare#": "your saved companies side by side",
+  "/documents#": "your documents",
+  "/explore#": "the Explore page",
+  "/gateq#": "GateQ",
+  "/gateq#inbox": "your GateQ inbox",
+  "/gateq#gate": "your gate in GateQ",
+  "/gateq#find": "GateQ's Find tab",
+  "/gateq#claim": "GateQ's Claim tab",
+  "/gateq#applications": "your GateQ applications",
+  "/home#": "your Q home page",
+  "/investors#": "your investors",
+  "/investors/top#": "the top companies",
+  "/mandate#": "your mandate",
+  "/onboarding/founder#": "your founder setup",
+  "/onboarding/investor#": "your investor setup",
+  "/pitch#": "your pitch",
+  "/pitch/new#": "a new pitch",
+  "/profile#": "your profile",
+  "/q-pitch#": "the Capital Q tour",
+  "/rehearsals#": "your rehearsals",
+  "/relationships#": "your relationships",
+  "/relationships#overview": "your relationships",
+  "/relationships#pipeline": "your pipeline",
+  "/relationships#capital": "your capital overview",
+  "/relationships#capital-raise": "your raise",
+  "/relationships#capital-readiness": "your readiness",
+  "/relationships#capital-action-plan": "your action plan",
+  "/relationships#capital-plan": "your capital plan",
+  "/relationships#capital-investors": "your investors",
+  "/results#": "your results",
+  "/reviews#": "your reviews",
+  "/search#": "people search",
+  "/settings#": "your settings",
+  "/settings/memory#": "Q's memory settings",
+  "/settings/usage#": "your usage",
+  "/verification#": "your verification",
+  "/work#": "Q's work",
+  "/work#team": "Q's team",
+  "/work#cost": "Q's costs",
+};
+
+/**
  * Live re-check of 3b7145616 (16 Nov 2026): a move's own message said the
  * site map's raw page title ("I've opened Company profile.", "I've opened
  * Relationship."). The place as Q says it, mid-sentence: the record by
@@ -2407,8 +2470,17 @@ export function spokenPlace(
   const generic = `the ${midSentence(pageTitle)}`;
   const page = target.page as string;
   let said: string;
-  if (recordId === null) {
-    // One of their own screens: its title (a tab's, else the page's).
+  const ownSaid =
+    landing === null
+      ? undefined
+      : OWN_PLACE_SAID[`${landing.page.route}#${tab?.id ?? ""}`];
+  if (recordId === null && ownSaid !== undefined) {
+    // Live re-check of cb28c00e5: one of their own screens as Q says it
+    // ("your Discover feed", "your pipeline"), never its raw title ("For
+    // you", "Pipeline").
+    said = ownSaid;
+  } else if (recordId === null) {
+    // A screen not in the table: its title (a tab's, else the page's).
     said = (tab?.title ?? pageTitle).replace(/^(?:The|Your|A|An)\b/u, (word) =>
       word.toLocaleLowerCase(),
     );

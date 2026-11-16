@@ -1485,6 +1485,94 @@ describe("live re-check 9913a5b64: 'that one' on a one-company conditioned list 
   }
 });
 
+/**
+ * Live re-check of cb28c00e5 (16 Nov 2026), turn D: "And why is MedTrail
+ * ranked first in the earlier list?" -- a card of the list before the
+ * latest one. 31 tools and 8 model calls: the warm-up took the name for a
+ * company beyond the latest cards and started the wide reads. Shown-list
+ * membership is every card Q showed in the conversation.
+ */
+describe("live re-check cb28c00e5: a why about a card of an earlier list is answered from that card", () => {
+  for (const shape of [
+    (name: string) => `And why is ${name} ranked first in the earlier list?`,
+    (name: string) => `How come ${name} topped the first list?`,
+  ]) {
+    it(`"${shape("<first card>")}": one answer call, at most two reads, no web`, async () => {
+      const { turn } = conversationSeam({
+        execute: (proposal, context) =>
+          proposal.name === "research_public_web"
+            ? Promise.resolve(
+                ok(proposal, "public_web.search", {
+                  status: "OK",
+                  sources: [],
+                }),
+              )
+            : investorExecute(proposal, context),
+        offered: [
+          ...INVESTOR_TOOLS,
+          ["get_company", "company.get"],
+          ["get_relationship", "relationship.get"],
+          ["list_schedule", "schedule.list"],
+          ["list_pending_approvals", "approvals.pending.list"],
+          ["list_q_work", "q.work.list"],
+          ["search_companies", "company.search"],
+          ["research_public_web", "public_web.search"],
+        ],
+        digest: digestOf("INVESTOR", []),
+        investor: true,
+      });
+      const aAsked = "Which of my best matches have revenue on record?";
+      const a = await turn(
+        aAsked,
+        {
+          questionKind: "FIT",
+          fitQuestion: { text: aAsked, count: null },
+          listConditions: { ...NO_CONDITIONS, revenue: "HAS_REVENUE" },
+        },
+        undefined,
+        { warm: true },
+      );
+      const bAsked = "Show the weakest of those outside my sectors";
+      const b = await turn(
+        bAsked,
+        {
+          questionKind: "FIT",
+          fitQuestion: { text: bAsked, count: null },
+          listConditions: {
+            ...NO_CONDITIONS,
+            sector: "OUTSIDE",
+            order: "WORST_FIRST",
+          },
+        },
+        undefined,
+        { warm: true },
+      );
+      const first = COMPANIES.find((one) => one.name === a.cards[0]);
+      expect(first).toBeDefined();
+      expect(b.cards).not.toContain(first?.name);
+      const d = await turn(
+        shape(first?.name ?? "-"),
+        {
+          executionClass: "CONTEXTUAL_FOLLOW_UP",
+          followUpCompanyId: first?.id,
+          research: Promise.resolve({
+            mode: "NEVER",
+            announceSourceChange: false,
+          }),
+        },
+        undefined,
+        { warm: true },
+      );
+      expect(d.outcome.kind).toBe("ANSWERED");
+      expect(d.modelCalls).toHaveLength(1);
+      expect(d.tools).not.toContain("research_public_web");
+      expect(d.tools.length).toBeLessThanOrEqual(2);
+      // The earlier list's own conditions go with its card.
+      expect(JSON.stringify(d.modelCalls[0])).toContain("revenue on record");
+    });
+  }
+});
+
 // Live re-check of 3b7145616: "one has revenue on record and are outside
 // your preferred sectors" -- only the first predicate agreed with one.
 describe("conditioned-list sentence agreement", () => {

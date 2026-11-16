@@ -542,3 +542,267 @@ describe("live re-check 9913a5b64: 'that one' on a one-company list is answered 
     expect(s.delegated[0]?.followUpCompanyId).toBeUndefined();
   });
 });
+
+/**
+ * Live re-check of cb28c00e5 (16 Nov 2026), investor conversation:
+ *  A "Which of my best matches have revenue on record?" -- ten cards,
+ *    MedTrail first (tied 9.2 with three others).
+ *  B "Show the weakest of those outside my sectors" -- "None of the ten ...
+ *    so I looked wider ... weakest first: Baridi at 6.2." (one card).
+ *  C "Why is it there?" -- read ADVICE, aboutNamedOther, navigation CONTEXT
+ *    to DISCOVER: research EXPLICIT, the page moved to Discover, 6 model
+ *    calls. The reader took "there" for a place.
+ *  D "And why is MedTrail ranked first in the earlier list?" -- read
+ *    THEIR_OWN_RECORDS, navigation CONTEXT to DISCOVER: 31 tools.
+ * The principle, not the shape: a why/how about the place of an item of
+ * any list Q showed in this conversation is a shown-list explanation --
+ * answered from that card (research NEVER unless their words ask for the
+ * web, class CONTEXTUAL_FOLLOW_UP, followUpCompanyId), and it moves no
+ * page unless their words ask to open or go (decision 98), recorded as
+ * navigationGuard.
+ */
+describe("live re-check cb28c00e5: a shown-list explanation answers from the card, in place", () => {
+  const BARIDI = "3ab2cc02-160f-4812-a6b1-000000000003";
+  const KESHO = "3ab2cc02-160f-4812-a6b1-000000000004";
+  const NAFASI = "3ab2cc02-160f-4812-a6b1-000000000005";
+  const revenueList = cardsMessage(
+    "Of the ten companies closest to your mandate that I checked, four have revenue on record. Ranked by fit with your mandate: MedTrail at 9.2, Mizan at 9.2, Kesho at 9.2 and Nafasi at 9.2.",
+    "Fit against your mandate: revenue on record",
+    [
+      { name: "MedTrail", subject: { kind: "COMPANY", companyId: MEDTRAIL } },
+      { name: "Mizan", subject: { kind: "COMPANY", companyId: MIZAN } },
+      { name: "Kesho", subject: { kind: "COMPANY", companyId: KESHO } },
+      { name: "Nafasi", subject: { kind: "COMPANY", companyId: NAFASI } },
+    ],
+  );
+  const widened = cardsMessage(
+    "None of the ten companies I just showed are outside your preferred sectors, so I looked wider. Of the 45 companies on Capital Q I checked, one has revenue on record and is outside your preferred sectors. The weakest fits against your mandate, weakest first: Baridi at 6.2.",
+    "Weakest fits against your mandate: revenue on record and outside your preferred sectors",
+    [{ name: "Baridi", subject: { kind: "COMPANY", companyId: BARIDI } }],
+  );
+  const afterA = [
+    message("USER", "Which of my best matches have revenue on record?"),
+    revenueList,
+  ];
+  const afterB = [
+    ...afterA,
+    message("USER", "Show the weakest of those outside my sectors"),
+    widened,
+  ];
+  const discover = {
+    mode: "CONTEXT",
+    negated: false,
+    destination: "DISCOVER",
+  };
+  const reading = (
+    text: string,
+    question: string,
+    rest: Record<string, unknown>,
+  ): Record<string, unknown> => ({
+    kind: "QUESTION_TO_Q",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: { kind: question, text },
+    aboutNamedOther: false,
+    namedOther: null,
+    reference: null,
+    navigation: discover,
+    ...rest,
+  });
+
+  type Move = {
+    readonly fromShownCard?: boolean;
+    readonly navigation?: {
+      readonly mode: string;
+      readonly destination?: string | null;
+    } | null;
+  };
+  async function replay(
+    said: string,
+    read: Record<string, unknown>,
+    earlier: readonly QConversationMessage[],
+  ) {
+    const heard: Promise<unknown>[] = [];
+    const s = seam(said, read, earlier, null, {
+      start: () => undefined,
+      heard: (_request, landed) => {
+        heard.push(landed);
+      },
+      settle: (_request, blocks) => Promise.resolve(blocks),
+    });
+    await s.answer.answer(investorRequest());
+    return {
+      asked: s.delegated[0],
+      routing: s.routings[0],
+      move: (await heard[0]) as Move | undefined,
+    };
+  }
+
+  const explained: readonly (readonly [
+    string,
+    string,
+    Record<string, unknown>,
+    readonly QConversationMessage[],
+    string,
+  ])[] = [
+    // C exactly as observed (the reader's other fields as each could be).
+    [
+      "C, as observed",
+      "Why is it there?",
+      reading("Why is it there?", "ADVICE", { aboutNamedOther: true }),
+      afterB,
+      BARIDI,
+    ],
+    [
+      "C, the reader's own web flag",
+      "Why is it there?",
+      reading("Why is it there?", "ADVICE", {
+        aboutNamedOther: true,
+        asksForWeb: true,
+      }),
+      afterB,
+      BARIDI,
+    ],
+    [
+      "C, the reader names the company longer than its card",
+      "Why is it there?",
+      reading("Why is it there?", "ADVICE", {
+        aboutNamedOther: true,
+        namedOther: { kind: "COMPANY", name: "Baridi Cold Chain" },
+      }),
+      afterB,
+      BARIDI,
+    ],
+    // D exactly as observed: an earlier list's card, by name.
+    [
+      "D, as observed",
+      "And why is MedTrail ranked first in the earlier list?",
+      reading(
+        "And why is MedTrail ranked first in the earlier list?",
+        "THEIR_OWN_RECORDS",
+        {},
+      ),
+      afterB,
+      MEDTRAIL,
+    ],
+    // Unseen paraphrases.
+    [
+      "by name, made the list, reader asks the web",
+      "how come Baridi made that list?",
+      reading("how come Baridi made that list?", "PUBLIC_FACTS", {
+        aboutNamedOther: true,
+        namedOther: { kind: "COMPANY", name: "Baridi" },
+        asksForWeb: true,
+      }),
+      afterB,
+      BARIDI,
+    ],
+    [
+      "by place, above the rest",
+      "what put the second one above the rest?",
+      reading("what put the second one above the rest?", "THEIR_OWN_RECORDS", {
+        navigation: { mode: "CONTEXT", negated: false, destination: null },
+      }),
+      afterA,
+      MIZAN,
+    ],
+    [
+      "by deixis, included, reader reads GO",
+      "why's this one included?",
+      reading("why's this one included?", "ADVICE", {
+        navigation: { mode: "GO", negated: false, destination: "DISCOVER" },
+      }),
+      afterB,
+      BARIDI,
+    ],
+  ];
+  for (const [how, said, read, earlier, company] of explained) {
+    it(`${how}: "${said}" -- the card, no web, no move, recorded`, async () => {
+      const { asked, routing, move } = await replay(said, read, earlier);
+      expect(asked?.executionClass).toBe("CONTEXTUAL_FOLLOW_UP");
+      expect(asked?.followUpCompanyId?.toLowerCase()).toBe(company);
+      expect((await asked?.research)?.mode).toBe("NEVER");
+      expect(routing).toMatchObject({
+        research: "NEVER",
+        executionClass: "CONTEXTUAL_FOLLOW_UP",
+        navigation: "NONE",
+        navigationDestination: null,
+        navigationGuard: "SHOWN_LIST_EXPLANATION",
+      });
+      expect(move?.fromShownCard).toBe(true);
+      expect(move?.navigation?.mode).toBe("NONE");
+      expect(move?.navigation?.destination ?? null).toBeNull();
+    });
+  }
+
+  it("asking to open the page keeps the move: 'Why is it there? Open its profile.'", async () => {
+    const said = "Why is it there? Open its profile.";
+    const { routing, move } = await replay(
+      said,
+      reading(said, "ADVICE", {
+        navigation: { mode: "GO", negated: false, destination: null },
+      }),
+      afterB,
+    );
+    expect(move?.navigation?.mode).toBe("GO");
+    expect(routing?.navigationGuard ?? null).toBeNull();
+  });
+
+  it("'open Baridi's profile' still navigates", async () => {
+    const said = "open Baridi's profile";
+    const { routing, move } = await replay(
+      said,
+      reading(said, "THEIR_OWN_RECORDS", {
+        aboutNamedOther: true,
+        namedOther: { kind: "COMPANY", name: "Baridi" },
+        navigation: { mode: "GO", negated: false, destination: null },
+      }),
+      afterB,
+    );
+    expect(move?.fromShownCard).toBe(false);
+    expect(move?.navigation?.mode).toBe("GO");
+    expect(routing?.navigationGuard ?? null).toBeNull();
+  });
+
+  it("'why is my mandate so narrow' is not bound to a card", async () => {
+    const said = "Why is my mandate so narrow?";
+    const { asked, routing, move } = await replay(
+      said,
+      reading(said, "THEIR_OWN_RECORDS", {}),
+      afterB,
+    );
+    expect(asked?.followUpCompanyId).toBeUndefined();
+    expect(routing?.navigationGuard ?? null).toBeNull();
+    expect(move?.fromShownCard).toBe(false);
+  });
+
+  it("'any news on Baridi?' keeps its research", async () => {
+    const said = "Any news on Baridi?";
+    const { asked, routing } = await replay(
+      said,
+      reading(said, "PUBLIC_FACTS", {
+        aboutNamedOther: true,
+        namedOther: { kind: "COMPANY", name: "Baridi" },
+        asksForWeb: true,
+        navigation: { mode: "NONE", negated: false, destination: null },
+      }),
+      afterB,
+    );
+    expect((await asked?.research)?.mode).not.toBe("NEVER");
+    expect(routing).toMatchObject({ researchGuard: null });
+  });
+
+  it("a why about a company on no card Q showed is not bound", async () => {
+    const said = "Why isn't Acme Health on that list?";
+    const { asked, routing } = await replay(
+      said,
+      reading(said, "ADVICE", {
+        aboutNamedOther: true,
+        namedOther: { kind: "COMPANY", name: "Acme Health" },
+      }),
+      afterB,
+    );
+    expect(asked?.followUpCompanyId).toBeUndefined();
+    expect(routing?.navigationGuard ?? null).toBeNull();
+  });
+});
