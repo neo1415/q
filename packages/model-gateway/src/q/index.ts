@@ -226,6 +226,7 @@ import {
 } from "./named-company-fact.js";
 import { namedCompanyFitLine } from "./named-fit-line.js";
 import {
+  asksForTheWeb,
   asksReasonForPlace,
   cardNamesInWords,
   companyCardNamesInConversation,
@@ -536,6 +537,15 @@ import {
   ownCompanySnapshotFact,
 } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
+import type { CheckedLineNeed } from "./uncertainty.js";
+import {
+  alreadySharedLine,
+  listedDocumentsOf,
+  sharedDocumentFor,
+  sharedDocumentReads,
+  sharedDocumentsFact,
+  type ListedDocument,
+} from "./shared-documents.js";
 import {
   DATA_ROOM_FACTS_MAX_CHARS,
   dataRoomDocumentFacts,
@@ -1282,6 +1292,14 @@ const TURN_NOTES_MAX_CHARS = 9_400;
 
 /** At most this many names are listed in the note. */
 const NAMED_IN_FACTS_MAX = 4;
+/**
+ * Live 16 Nov 2026: companies of theirs a turn (or Q's last reply) names
+ * whose figures and deck are read beside the profile; more names than this
+ * read profiles only.
+ */
+const NAMED_FIGURES_MAX = 2;
+/** Companies whose shared documents one investor turn lists. */
+const SHARED_LISTINGS_MAX = 2;
 /** At most this many of their facts are quoted, within this many characters. */
 const NAMED_FACTS_QUOTED_MAX = 16;
 const NAMED_FACTS_QUOTED_CHARS = 2_400;
@@ -3956,9 +3974,20 @@ export function createModelGatewayQAnswer(
     string,
     Map<string, readonly DiligenceFollowUp[]>
   >();
+  /**
+   * Live 16 Nov 2026 (shared-documents.ts): per run and company, the
+   * documents its data room shows this investor, as code listed them; a
+   * document already shared is never offered as a request, and a turn
+   * answered from them carries no public-web disclosure.
+   */
+  const sharedDocumentsByRun = new Map<
+    string,
+    Map<string, readonly ListedDocument[]>
+  >();
   const boundedRunState = (): void => {
     for (const store of [
       followUpsByRun,
+      sharedDocumentsByRun,
       publicWebByRun,
       codeSaysCheckedRuns,
       onRequestSeenRuns,
@@ -4459,6 +4488,13 @@ export function createModelGatewayQAnswer(
     readonly ownIndex: AuthorisedFact | null;
     readonly onboardingFacts: readonly AuthorisedFact[];
     readonly arrival: AuthorisedFact | null;
+    /**
+     * Live 16 Nov 2026: the documents each company's data room showed
+     * them (shared-documents.ts), so a turn that reuses these reads still
+     * never offers to request what is already shared.
+     */
+    readonly sharedListings?:
+      readonly (readonly [string, readonly ListedDocument[]])[] | undefined;
   };
   const NO_WIDE_READS: WideReads = {
     namedCompanies: [],
@@ -6135,6 +6171,10 @@ export function createModelGatewayQAnswer(
     const namedCompanyCalls: QToolCallObservation[] = [];
     /** Companies the own-records read above took, so none is read twice. */
     const namedIds = new Set<string>();
+    /** Companies whose figures and deck facts were given (never twice). */
+    const figuresTaken = new Set<string>();
+    /** The names those reads gave each company, by id (lowercase). */
+    const namedNames = new Map<string, string>();
     const namedRead = async (): Promise<void> => {
       const standingCall = standingOf();
       if (standingCall === null || !prefetchTools.has("get_company")) return;
@@ -6147,8 +6187,34 @@ export function createModelGatewayQAnswer(
         `${latest.content}\n${lastQ?.content.slice(0, 4_000) ?? ""}`,
         knownCompaniesOf(standing.result.data),
       ).filter((company) => company.companyId !== onScreen);
-      for (const company of named) namedIds.add(company.companyId);
+      for (const company of named) {
+        namedIds.add(company.companyId);
+        namedNames.set(company.companyId.toLowerCase(), company.name);
+      }
       if (named.length > 0) stepStarts(request, "REVIEWING_COMPANY");
+      // Live 16 Nov 2026 (Savanna on Tensorgate, T1-T3): a company of
+      // theirs this turn or Q's last reply names was read for its profile
+      // only, and the turn-named read below then skipped it as already
+      // taken, so the deck's burn and runway (FINANCIALS, read and
+      // discarded) never reached the answer, and "does that match their
+      // deck?" was answered with no deck at all. The same company now gets
+      // the same reads whichever path names it: its published figures and
+      // its deck beside the profile (A4), for at most two companies so a
+      // long list in Q's last reply does not read every deck.
+      const withFigures = named.length <= NAMED_FIGURES_MAX;
+      const side = (name: string, companyId: string, index: number) =>
+        withFigures && prefetchTools.has(name)
+          ? tools
+              .execute(
+                {
+                  callId: `q-named-${name === "read_company_deck" ? "deck" : "figures"}-${String(index)}`,
+                  name,
+                  arguments: { companyId },
+                },
+                toolContext,
+              )
+              .catch(() => null)
+          : Promise.resolve(null);
       await Promise.all(
         named.map(async (company, index) => {
           const call = {
@@ -6156,7 +6222,11 @@ export function createModelGatewayQAnswer(
             name: "get_company",
             arguments: { companyId: company.companyId },
           };
-          const outcome = await tools.execute(call, toolContext);
+          const [outcome, figures, deck] = await Promise.all([
+            tools.execute(call, toolContext),
+            side("read_company_figures", company.companyId, index),
+            side("read_company_deck", company.companyId, index),
+          ]);
           namedCompanyCalls.push({
             toolName: outcome.toolName,
             providerName: call.name,
@@ -6164,12 +6234,54 @@ export function createModelGatewayQAnswer(
             failureCode: outcome.failureCode,
             latencyMs: outcome.latencyMs,
           });
+          for (const [name, read] of [
+            ["read_company_figures", figures],
+            ["read_company_deck", deck],
+          ] as const) {
+            if (read === null) continue;
+            namedCompanyCalls.push({
+              toolName: read.toolName,
+              providerName: name,
+              status: read.status,
+              failureCode: read.failureCode,
+              latencyMs: read.latencyMs,
+            });
+          }
           if (!outcome.result.ok) return;
           const fact = onScreenCompanyFact(
             outcome.result.data,
             "A company of theirs this conversation names",
           );
           if (fact !== null) namedCompanies.push(fact);
+          if (!withFigures) return;
+          const canonical = (
+            outcome.result.data as { readonly canonicalName?: unknown } | null
+          )?.canonicalName;
+          if (typeof canonical !== "string") return;
+          const figuresOk =
+            figures !== null &&
+            figures.status === "SUCCEEDED" &&
+            figures.result.ok;
+          const deckOk =
+            deck !== null && deck.status === "SUCCEEDED" && deck.result.ok;
+          if (!figuresOk && !deckOk) return;
+          figuresTaken.add(company.companyId);
+          namedCompanies.push(
+            ...(figuresOk
+              ? companyFiguresFacts(figures.result.data, canonical)
+              : []),
+            ...(deckOk
+              ? companyDeckFiguresFacts(deck.result.data, canonical)
+              : []),
+            companyFiguresLimitFact(canonical, {
+              published: figuresOk,
+              deck: !prefetchTools.has("read_company_deck")
+                ? "NOT_ASKED"
+                : deckOk
+                  ? "READ"
+                  : "NOT_AVAILABLE",
+            }),
+          );
         }),
       );
     };
@@ -6268,8 +6380,31 @@ export function createModelGatewayQAnswer(
             latencyMs: outcome.latencyMs,
           });
         }
-        if (namedIds.has(read.companyId)) continue;
+        if (namedIds.has(read.companyId)) {
+          // Live 16 Nov 2026 (T1): taken by the own-records read for its
+          // profile; its figures and deck, read here, still count, once.
+          const name = (read.data as { readonly canonicalName?: unknown })
+            .canonicalName;
+          if (typeof name === "string" && !figuresTaken.has(read.companyId)) {
+            figuresTaken.add(read.companyId);
+            namedCompanies.push(
+              ...companyFiguresFacts(read.figures, name),
+              ...companyDeckFiguresFacts(read.deck, name),
+              companyFiguresLimitFact(name, {
+                published: read.figures !== null,
+                deck: read.deckRead,
+              }),
+            );
+          }
+          continue;
+        }
         namedIds.add(read.companyId);
+        figuresTaken.add(read.companyId);
+        const readName = (read.data as { readonly canonicalName?: unknown })
+          .canonicalName;
+        if (typeof readName === "string") {
+          namedNames.set(read.companyId.toLowerCase(), readName);
+        }
         if (capitalQAsked && isCapitalQCompanyRead(read.data)) {
           capitalQAsCompany = true;
         }
@@ -6372,6 +6507,133 @@ export function createModelGatewayQAnswer(
             truthClass: "VERIFIED",
             evidenceStatus: "PLATFORM_VERIFIED",
             source: "Capital Q diligence requests and what came back",
+          });
+        }),
+      );
+    };
+    /**
+     * Live 16 Nov 2026 (shared-documents.ts; Savanna on Tensorgate): on an
+     * investor's turn about a company (on screen, or named this turn or in
+     * Q's last reply), the documents that company has made open to them are
+     * listed through read_company_data_room -- their own Data room tab, as
+     * them, so another investor's grants and founder-private documents are
+     * never in it -- and the most evidential ones are read through
+     * read_document_pages (a shared highly confidential one under its grant,
+     * ADR 0078), before the model is asked. Documents the screen lane read
+     * already are not read twice.
+     */
+    const sharedDocumentsRead = async (): Promise<void> => {
+      if (
+        askerSideOf(request) !== "INVESTOR" ||
+        !prefetchTools.has("read_company_data_room")
+      ) {
+        return;
+      }
+      const onScreen =
+        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
+      const ids = [...(onScreen === null ? [] : [onScreen]), ...namedIds]
+        .map((id) => id.toLowerCase())
+        .filter((id, index, all) => all.indexOf(id) === index)
+        .slice(0, SHARED_LISTINGS_MAX);
+      const onScreenRead = new Set(
+        dataRoomDocumentReads({
+          screen: plan.screen,
+          question: latest.content,
+        }).map((read) => read.documentId),
+      );
+      const canRead = prefetchTools.has("read_document_pages");
+      await Promise.all(
+        ids.map(async (companyId, index) => {
+          const listing = await tools
+            .execute(
+              {
+                callId: `q-shared-documents-${String(index)}`,
+                name: "read_company_data_room",
+                arguments: { companyId },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          namedCompanyCalls.push(
+            ...(listing === null
+              ? []
+              : [
+                  {
+                    toolName: listing.toolName,
+                    providerName: "read_company_data_room",
+                    status: listing.status,
+                    failureCode: listing.failureCode,
+                    latencyMs: listing.latencyMs,
+                  },
+                ]),
+          );
+          if (listing === null || !listing.result.ok) return;
+          const documents = listedDocumentsOf(listing.result.data);
+          if (documents === null || documents.length === 0) return;
+          const byCompany =
+            sharedDocumentsByRun.get(request.runId) ??
+            new Map<string, readonly ListedDocument[]>();
+          byCompany.set(companyId, documents);
+          sharedDocumentsByRun.set(request.runId, byCompany);
+          boundedRunState();
+          const known = runCompanies.read(request.runId);
+          const name =
+            known.companyNames.get(companyId) ??
+            known.profiles.get(companyId) ??
+            namedNames.get(companyId) ??
+            (companyId === onScreen?.toLowerCase()
+              ? onScreenCompanyName
+              : null) ??
+            "The company";
+          const listed = sharedDocumentsFact(name, documents);
+          if (listed !== null) namedCompanies.push(listed);
+          if (!canRead) return;
+          const reads = sharedDocumentReads({
+            documents,
+            question: latest.content,
+            alreadyRead: onScreenRead,
+          });
+          if (reads.length === 0) return;
+          const share = Math.floor(
+            DATA_ROOM_FACTS_MAX_CHARS / (reads.length * ids.length),
+          );
+          const outcomes = await Promise.all(
+            reads.map((document, at) =>
+              tools
+                .execute(
+                  {
+                    callId: `q-shared-document-${String(index)}-${String(at)}`,
+                    name: "read_document_pages",
+                    arguments: { companyId, documentId: document.documentId },
+                  },
+                  toolContext,
+                )
+                .catch(() => null),
+            ),
+          );
+          outcomes.forEach((outcome, at) => {
+            const document = reads[at];
+            if (outcome === null || document === undefined) return;
+            namedCompanyCalls.push({
+              toolName: outcome.toolName,
+              providerName: "read_document_pages",
+              status: outcome.status,
+              failureCode: outcome.failureCode,
+              latencyMs: outcome.latencyMs,
+            });
+            if (!outcome.result.ok) return;
+            namedCompanies.push(
+              ...dataRoomDocumentFacts(
+                outcome.result.data,
+                {
+                  companyId,
+                  documentId: document.documentId,
+                  open: false,
+                  shared: true,
+                },
+                share,
+              ),
+            );
           });
         }),
       );
@@ -6714,6 +6976,7 @@ export function createModelGatewayQAnswer(
           Promise.all([
             timed("cheque", chequeRead()),
             timed("followUps", followUpRead()),
+            timed("sharedDocuments", sharedDocumentsRead()),
           ]),
         );
         await Promise.all([
@@ -6738,6 +7001,9 @@ export function createModelGatewayQAnswer(
           ownIndex,
           onboardingFacts,
           arrival,
+          sharedListings: [
+            ...(sharedDocumentsByRun.get(request.runId) ?? new Map()),
+          ],
         };
         // RC3: kept for a short follow-up of this conversation, with the
         // reads that produced it (provenance); facts keep their own.
@@ -6782,6 +7048,13 @@ export function createModelGatewayQAnswer(
             },
             "q wide reads answered from this conversation's evidence",
           );
+          if ((kept.value.sharedListings?.length ?? 0) > 0) {
+            sharedDocumentsByRun.set(
+              request.runId,
+              new Map(kept.value.sharedListings),
+            );
+            boundedRunState();
+          }
           return {
             ...kept.value,
             namedCompanyCalls: [],
@@ -13193,6 +13466,55 @@ export function createModelGatewayQAnswer(
                 ),
               };
         };
+        /**
+         * Live 16 Nov 2026 (T4: Q asked Tensorgate for "the latest
+         * management accounts" its founder had already shared with this
+         * investor): before any offer to request a document, what this
+         * run listed as already shared with them is checked. A document
+         * that answers the item is named instead, and nothing is requested.
+         */
+        const alreadyShared = (
+          subject: {
+            readonly companyId: string;
+            readonly name: string | null;
+          } | null,
+          about: string | null,
+          asked: unknown,
+        ): { readonly line: string } | null => {
+          const byCompany = sharedDocumentsByRun.get(request.runId);
+          if (byCompany === undefined || byCompany.size === 0) return null;
+          // The subject the answer is about; else the one company whose
+          // documents this turn listed.
+          const documents =
+            subject !== null
+              ? byCompany.get(subject.companyId.toLowerCase())
+              : byCompany.size === 1
+                ? [...byCompany.values()][0]
+                : undefined;
+          if (documents === undefined) return null;
+          const backing = offerBacking(uncertainties, about);
+          const said = [
+            about ?? "",
+            backing?.statement ?? "",
+            typeof asked === "string"
+              ? asked
+              : asked === undefined || asked === null
+                ? ""
+                : JSON.stringify(asked).slice(0, 2_000),
+          ].join(" ");
+          const document = sharedDocumentFor(said, documents);
+          if (document === null) return null;
+          const name =
+            subject?.name ??
+            (subject === null
+              ? null
+              : (runCompanies
+                  .read(request.runId)
+                  .companyNames.get(subject.companyId.toLowerCase()) ??
+                null)) ??
+            "The company";
+          return { line: alreadySharedLine(name, document) };
+        };
         /** Whom an offer to resolve the item goes to (D13, D14). */
         const counterpartyOf = (subject: {
           readonly companyId: string;
@@ -13224,7 +13546,9 @@ export function createModelGatewayQAnswer(
             subject === null || standing === undefined
               ? null
               : vehicleOf(subject, standing);
-          const askedBefore = alreadyAsked(subject, about);
+          const sharedBefore = alreadyShared(subject, about, bound.request);
+          const askedBefore =
+            sharedBefore === null ? alreadyAsked(subject, about) : null;
           const decision = decideUncertaintyOffer({
             action: bound.action,
             about,
@@ -13253,7 +13577,15 @@ export function createModelGatewayQAnswer(
             },
             "an offer to resolve an uncertainty was held against its materiality and route",
           );
-          if (askedBefore !== null) {
+          if (sharedBefore !== null) {
+            // Already shared with them: named, never requested again.
+            offerRemoved.push(bound.said);
+            if (!saidEarlier(sharedBefore.line, earlierAnswers)) {
+              uncertaintyLines.push(sharedBefore.line);
+            }
+            requestStateSaid = true;
+            offerBinding = { kind: "NONE" };
+          } else if (askedBefore !== null) {
             // D15: the same item was already asked for; where that request
             // stands is said instead of a second offer.
             offerRemoved.push(bound.said);
@@ -13348,7 +13680,15 @@ export function createModelGatewayQAnswer(
           // this turn prepared.
           // D15: an item already asked for of this company (open or
           // answered) is never offered again; its request's state is said.
-          const askedBefore = alreadyAsked(subject, null);
+          const sharedBefore = alreadyShared(subject, null, null);
+          if (sharedBefore !== null) {
+            if (!saidEarlier(sharedBefore.line, earlierAnswers)) {
+              uncertaintyLines.push(sharedBefore.line);
+            }
+            requestStateSaid = true;
+          }
+          const askedBefore =
+            sharedBefore === null ? alreadyAsked(subject, null) : null;
           if (askedBefore !== null) {
             if (!saidEarlier(askedBefore.line, earlierAnswers)) {
               uncertaintyLines.push(askedBefore.line);
@@ -13364,6 +13704,7 @@ export function createModelGatewayQAnswer(
           }
           const own =
             askedBefore === null &&
+            sharedBefore === null &&
             request.closingLines === undefined &&
             offerTurn &&
             !preparedByTool
@@ -13421,7 +13762,27 @@ export function createModelGatewayQAnswer(
         // Slice 0: on a turn about someone not theirs, what was checked --
         // only where it changes how the answer reads (checkedLine).
         if (codeSaysCheckedRuns.has(request.runId)) {
-          const need = checkedLineNeedOf(analyst, request);
+          // Live 16 Nov 2026 (T4: "What would resolve the remaining
+          // question on Tensorgate?" closed with "The public web search was
+          // unavailable this turn"): a turn about a company whose data room
+          // this run read for them is a records / data-room question, not a
+          // web one. What was checked is said only when their own words ask
+          // about the public web or news (the reader's flag is not their
+          // words), as for a shown-list explanation (6f9b63cc5).
+          const fromDataRoom =
+            [...(sharedDocumentsByRun.get(request.runId)?.values() ?? [])]
+              .flat()
+              .some(
+                (document) =>
+                  document.access === "SHARED" || document.access === "OPEN",
+              ) && !asksForTheWeb(latest.content);
+          const need: CheckedLineNeed = fromDataRoom
+            ? {
+                ...checkedLineNeedOf(analyst, request),
+                askedPublic: false,
+                recordsQuestion: true,
+              }
+            : checkedLineNeedOf(analyst, request);
           const line = checkedLine({
             check: publicCheckOf({
               seen: publicWebByRun.get(request.runId) ?? [],

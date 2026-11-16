@@ -268,6 +268,12 @@ const DataRoomOutputSchema = z
       .array(
         z
           .object({
+            /**
+             * Live 16 Nov 2026 (Savanna on Tensorgate): the id, so the
+             * document a listing names is read or opened by id, never
+             * re-found by its title.
+             */
+            documentId: z.string().uuid(),
             title: z.string(),
             folder: z.string(),
             /** In words: open to you, on request, requested, shared with you; owner: its level. */
@@ -355,6 +361,7 @@ export function createReadCompanyDataRoomTool(
         return Promise.resolve({
           viewer: "INVESTOR" as const,
           documents: view.documents.map((d) => ({
+            documentId: d.documentId,
             title: d.title,
             folder: folder.get(d.folderCode) ?? d.folderCode,
             status:
@@ -373,6 +380,7 @@ export function createReadCompanyDataRoomTool(
       return Promise.resolve({
         viewer: "OWNER" as const,
         documents: view.documents.map((d) => ({
+          documentId: d.documentId,
           title: d.title,
           folder: folder.get(d.folderCode) ?? d.folderCode,
           status: `${levels[d.level]}; opened by ${String(d.openedBy)}`,

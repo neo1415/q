@@ -183,6 +183,7 @@ describe("profile material tools", () => {
       viewer: "INVESTOR",
       documents: [
         {
+          documentId: "00000000-0000-4000-8000-00000000d002",
           title: "Cap table summary",
           folder: "Cap table and equity",
           status: "you asked; waiting",
