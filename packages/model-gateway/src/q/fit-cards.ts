@@ -657,3 +657,32 @@ export function withPlatformFit(
   });
   return parsed.data;
 }
+
+/**
+ * Scenario E (live 2026-11-16, run 06de74f3): the Tensorgate card said "no
+ * source documents yet" while 8 of its documents were shared with the
+ * asking investor and read for the answer beside it. A company card counts
+ * the documents this run listed as readable to the person asking (shared
+ * with them, or open to them in the data room), never fewer than its own
+ * citations. `readable` is the run's count per company id (lower case).
+ */
+export function withReadableSourceCounts(
+  block: QAnswerCardsBlock,
+  readable: ReadonlyMap<string, number>,
+): QAnswerCardsBlock {
+  if (readable.size === 0) return block;
+  let changed = false;
+  const cards = block.cards.map((card) => {
+    const subject = card.subject;
+    const count =
+      subject?.kind === "COMPANY"
+        ? (readable.get(subject.companyId.toLowerCase()) ?? 0)
+        : 0;
+    if (count <= card.sourceCount) return card;
+    changed = true;
+    const counted: QAnswerCard = { ...card, sourceCount: count };
+    if (PLATFORM_FIT_CARDS.has(card)) PLATFORM_FIT_CARDS.add(counted);
+    return counted;
+  });
+  return changed ? { ...block, cards } : block;
+}

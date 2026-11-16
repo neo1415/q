@@ -310,7 +310,9 @@ export const TURN_READER_ATTEMPT_TIMEOUT_MS = 9_000;
  * costs what it did.
  */
 const TURN_READER_BUDGET = {
-  maxAttempts: 2,
+  // The model, its same-model hedge, then the policy's backup (live
+  // 2026-11-16: see TURN_READER_SAME_MODEL_HEDGE_MS).
+  maxAttempts: 3,
   maxEstimatedCostUsd: 0.15,
   maxOutputTokens: 1_200,
   attemptTimeoutMs: TURN_READER_ATTEMPT_TIMEOUT_MS,
@@ -324,8 +326,34 @@ const TURN_READER_BUDGET = {
  * policy's hedge never had a second model. Still waiting at 3.5 s (p50
  * 2.0 s, p90 4.2 s, p99 5.5 s), the same model is asked again and the
  * first valid answer wins: about one read in six, ~USD 0.002 each.
+ *
+ * Live 2026-11-16 (scenarios D-G, runs d58a4564, 11daded9, 7cef5d87,
+ * 06de74f3): the FAST_CLASSIFICATION policy (v2) hedges to its backup,
+ * claude-sonnet-5-5, at 2.0 s, and under the synthetic posture luna was
+ * also cut at 2.5 s (TURN_READER_FAST_FIRST_ATTEMPT_MS, measured on Gemini
+ * flash-lite in October, no longer the first model). ai_ops.model_usage,
+ * the last 24 h: luna 709 first reads, 106 cut at 2.5 s (15%), answered
+ * p50 1.50 s, p90 2.35 s, p95 2.44 s, p99 2.74 s; Sonnet ran on 239 of them
+ * for USD 2.97 of the day's USD 3.93 reader spend, up to USD 0.058 a read
+ * (~37k input tokens, ~4x a whole fresh turn). Now the read is hedged on
+ * luna itself at its observed p95 (2.5 s), each luna attempt cut at 4 s
+ * (TURN_READER_FIRST_ATTEMPT_MS), and
+ * Sonnet is asked only when luna has failed twice (sameModelHedgeFirst;
+ * DECISIONS 69 keeps Sonnet as the reader's backup -- never a smaller
+ * model). The gateway logs a hedge and a fallback, with the cost.
  */
-export const TURN_READER_SAME_MODEL_HEDGE_MS = 3_500;
+export const TURN_READER_SAME_MODEL_HEDGE_MS = 2_500;
+
+/**
+ * How long each luna attempt (the first and its hedge) may take before the
+ * backup is asked, in every posture. ai_ops.model_usage, 10 days to
+ * 2026-11-16: 2,193 successful luna reads, 2,175 inside 3.0 s, 16 in
+ * 3.0-4.0 s, 3 over 4.0 s (0.14%). Live run 04d46602 (13:01 UTC): three
+ * luna classifications hung together and the backup then took 8.8 s, so a
+ * hung attempt must end well before the 9 s budget. Worst case now: the
+ * first cut at 4.0 s, its hedge (from 2.5 s) at 6.5 s, then the backup.
+ */
+export const TURN_READER_FIRST_ATTEMPT_MS = 4_000;
 
 /**
  * The reader's thinking (owner 2026-11-06: "measure first, then reader
@@ -344,17 +372,6 @@ export const TURN_READER_SAME_MODEL_HEDGE_MS = 3_500;
  */
 export const TURN_READER_REASONING = "NONE" as const;
 export const TURN_READER_REASONING_KEY = "TURN_READ";
-
-/**
- * How long the first model gets when a synthetic-demo posture routes the
- * read to the fast shared model first and another waits behind it. Measured
- * 2026-10-01 (ai_ops.model_usage, 72 h, Gemini flash-lite): 66 reads
- * answered, p90 1.4 s, p99 3.2 s, only 4 over 2.5 s; 8 hung to the 6 s
- * deadline, each a 6 s stall before the fallback read the turn. At 2.5 s a
- * hung read costs 2.5 s and the fallback keeps its full 6 s. Not applied to
- * other postures, where the first model is the slower one (p50 ~2 s).
- */
-export const TURN_READER_FAST_FIRST_ATTEMPT_MS = 2_500;
 
 /**
  * The reader's action list budget (HARDEN, 2026-10-02: the app-action
@@ -680,10 +697,9 @@ export function createQTurnReader(dependencies: {
               // reading: its kind, appAction and askedAction still route it.
               lenientFields: TURN_READER_LENIENT_FIELDS,
               sameModelHedgeAfterMs: TURN_READER_SAME_MODEL_HEDGE_MS,
+              sameModelHedgeFirst: true,
+              firstAttemptTimeoutMs: TURN_READER_FIRST_ATTEMPT_MS,
               ...(input.signal === undefined ? {} : { signal: input.signal }),
-              ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
-                ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
-                : {}),
             },
           );
         let response: Awaited<ReturnType<typeof ask>>;
@@ -707,6 +723,19 @@ export function createQTurnReader(dependencies: {
             ...rendered.messages,
             { role: "USER", content: TURN_READER_CORRECTION },
           ]);
+        }
+        if (response.fallbackUsed) {
+          // Its cost is a reader's concern (live 2026-11-16: up to USD
+          // 0.058 a read on the backup): said once per read, with it.
+          logger.warn(
+            {
+              correlationId: input.attribution.correlationId,
+              qRunId: input.attribution.qRunId,
+              attempts: response.attempts.length,
+              costUsd: response.cost.amount,
+            },
+            "the turn was read by the policy's backup model",
+          );
         }
         if (response.output.kind !== "STRUCTURED") return null;
         const parsed = TurnReaderV89ResultSchema.safeParse(

@@ -358,6 +358,86 @@ function opensARequest(text: string, at: number, match: string): boolean {
   return REQUEST_OBJECT.test(text.slice(at + match.length));
 }
 
+/** Text at `at` starts the message or a sentence. */
+function startsASentence(text: string, at: number): boolean {
+  return /(?:^|[.!?:;]\s+|\n\s*)$/u.test(text.slice(0, at));
+}
+
+/**
+ * Request verbs and function words that open an ask ("Put…", "Line up…",
+ * "Rank…", "Let's…"): at the start of a sentence they are the request,
+ * never the first word of a company's name. Only ever stripped from the
+ * front of a run of two or more capitalised words.
+ */
+const LEADING_REQUEST_WORDS: ReadonlySet<string> = new Set([
+  "put",
+  "line",
+  "lay",
+  "set",
+  "stack",
+  "rank",
+  "sort",
+  "order",
+  "list",
+  "pull",
+  "bring",
+  "get",
+  "fetch",
+  "check",
+  "look",
+  "run",
+  "take",
+  "walk",
+  "map",
+  "score",
+  "match",
+  "pit",
+  "weigh",
+  "contrast",
+  "assess",
+  "evaluate",
+  "review",
+  "analyse",
+  "analyze",
+  "summarise",
+  "summarize",
+  "explain",
+  "describe",
+  "draft",
+  "write",
+  "prepare",
+  "research",
+  "investigate",
+  "benchmark",
+  "read",
+  "add",
+  "save",
+  "pass",
+  "send",
+  "email",
+  "message",
+  "ask",
+  "let",
+  "let's",
+  "help",
+  "now",
+  "also",
+  "but",
+  "then",
+  "just",
+  "maybe",
+  "between",
+  "both",
+  "either",
+  "versus",
+  "vs",
+  "about",
+  "for",
+  "with",
+  "on",
+  "of",
+]);
+
 /** One word at the start of a sentence: its capital may be grammar's. */
 function opensASentence(text: string, at: number, match: string): boolean {
   if (/\s/u.test(match)) return false;
@@ -393,6 +473,22 @@ export function companyNameCandidates(
     const words = match[0]
       .split(/\s+/u)
       .filter((word) => !NOT_COMPANY_WORDS.has(word.toLowerCase()));
+    // Scenario E (live 2026-11-16, run 06de74f3): "Put Halyard Security,
+    // Tensorgate and Nixo side by side" searched "Put Halyard Security",
+    // found no company of exactly that name, and Halyard dropped out of
+    // the comparison. A run that opens a sentence carries the request's
+    // verb, capitalised by grammar: it is stripped when it is a request
+    // word, or when the reader heard the name without it.
+    while (words.length >= 2 && startsASentence(said, match.index)) {
+      // A name the reader heard whole ("Match Group") is kept whole.
+      if (named.has(nameKey(words.join(" ").replace(/'s$/u, "")))) break;
+      const first = (words[0] ?? "").toLowerCase();
+      const rest = words.slice(1).join(" ").replace(/'s$/u, "");
+      if (!LEADING_REQUEST_WORDS.has(first) && !named.has(nameKey(rest))) {
+        break;
+      }
+      words.shift();
+    }
     const name = words.join(" ").replace(/'s$/u, "").trim();
     if (
       heard !== undefined &&

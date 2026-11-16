@@ -183,6 +183,7 @@ import {
   createRunFits,
   fitAnswerCardsBlock,
   withPlatformFit,
+  withReadableSourceCounts,
   isPlatformFitCard,
   fitCardsSummary,
   fitSweepCardsBlock,
@@ -550,6 +551,7 @@ import {
   asksToReconcile,
   documentDeckDifferenceFact,
   listedDocumentsOf,
+  readableListed,
   sharedDocumentFor,
   sharedDocumentReads,
   sharedDocumentsFact,
@@ -5225,7 +5227,41 @@ export function createModelGatewayQAnswer(
       );
       if (reads.length === 0) return null;
       stepStarts(request, "COMPARING_OPPORTUNITIES");
-      await Promise.all(reads);
+      // Scenario E (live 2026-11-16, run 06de74f3): what each compared
+      // company shared with this investor (or opened to them in its data
+      // room) is listed with the comparison's own reads, as them, so the
+      // card's documents and the answer's rest on one listing per company.
+      const listings =
+        askerSideOf(request) === "INVESTOR" &&
+        names.has("read_company_data_room")
+          ? targets.map((companyId, index) =>
+              tools
+                .execute(
+                  {
+                    callId: `q-compare-documents-${String(index)}`,
+                    name: "read_company_data_room",
+                    arguments: { companyId },
+                  },
+                  toolContext,
+                )
+                .then((outcome) => {
+                  const documents = outcome.result.ok
+                    ? listedDocumentsOf(outcome.result.data)
+                    : null;
+                  if (documents === null || documents.length === 0) return;
+                  const byCompany =
+                    sharedDocumentsByRun.get(request.runId) ??
+                    new Map<string, readonly ListedDocument[]>();
+                  if (!byCompany.has(companyId.toLowerCase())) {
+                    byCompany.set(companyId.toLowerCase(), documents);
+                  }
+                  sharedDocumentsByRun.set(request.runId, byCompany);
+                  boundedRunState();
+                })
+                .catch(() => undefined),
+            )
+          : [];
+      await Promise.all([...reads, ...listings]);
       // Live 2026-11-13 (Ajopot): a company whose Traction cell would be
       // empty after its published figures and profile has its deck read,
       // as the deck service shows it to this reader (an investor: the
@@ -6225,10 +6261,42 @@ export function createModelGatewayQAnswer(
       const lastQ = [...earlier].reverse().find((m) => m.role === "Q");
       const onScreen =
         counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
-      const named = companiesNamedIn(
-        `${latest.content}\n${lastQ?.content.slice(0, 4_000) ?? ""}`,
-        knownCompaniesOf(standing.result.data),
-      ).filter((company) => company.companyId !== onScreen);
+      const known = knownCompaniesOf(standing.result.data);
+      // Scenarios D4/E (live 2026-11-16, runs 7cef5d87, 06de74f3): a turn
+      // that names its own company ("What closing balance does Halyard
+      // Security's latest bank statement show?") also read Watchly and
+      // Rankpay, from Q's greeting ("You're connected with Watchly", and
+      // "ranked against" near-matched as Rankpay). The person's words are
+      // matched as speech bends them; Q's last reply only exactly, and only
+      // the companies the reader heard the turn mean, or all of them when
+      // the turn names none -- a follow-up pointing back at what Q listed
+      // ("compare those three").
+      const heard = heardNames(request);
+      const turnNamesOne =
+        heard.length > 0 ||
+        companyNameCandidates(latest.content, 2, heard).length > 0;
+      const heardKeys = new Set(heard.map((name) => name.trim().toLowerCase()));
+      const named = [
+        ...companiesNamedIn(latest.content, known),
+        ...companiesNamedIn(
+          lastQ?.content.slice(0, 4_000) ?? "",
+          known,
+          5,
+          "EXACT",
+        ).filter(
+          // A company the reader heard the turn mean is read wherever Q
+          // named it ("does that match their deck?" after Q's answer).
+          (company) =>
+            !turnNamesOne || heardKeys.has(company.name.trim().toLowerCase()),
+        ),
+      ]
+        .filter(
+          (company, index, all) =>
+            all.findIndex((one) => one.companyId === company.companyId) ===
+            index,
+        )
+        .slice(0, 5)
+        .filter((company) => company.companyId !== onScreen);
       for (const company of named) {
         namedIds.add(company.companyId);
         namedNames.set(company.companyId.toLowerCase(), company.name);
@@ -14699,6 +14767,20 @@ export function createModelGatewayQAnswer(
                 ? namedSubjects
                 : selectedCompanySubjects
               : askedSubjects(request.subjects, plan);
+        // Scenario E: each company card counts the documents this run
+        // listed as readable to them (shared, or open in the data room).
+        const readableByCompany = (): ReadonlyMap<string, number> => {
+          const counts = new Map<string, number>();
+          for (const [companyId, documents] of sharedDocumentsByRun.get(
+            request.runId,
+          ) ?? []) {
+            counts.set(
+              companyId.toLowerCase(),
+              readableListed(documents).length,
+            );
+          }
+          return counts;
+        };
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
           question: latest.content,
@@ -14725,18 +14807,21 @@ export function createModelGatewayQAnswer(
           block.kind === "ANSWER_CARDS"
             ? // QO-06: one fit scale, the platform's, where it computed one.
               // F-133: every card's levels are code's, never the model's.
-              withCodeFitMeasures(
-                withPlatformFit(
-                  withCardSubjects(block, companiesRead),
-                  runFits.read(request.runId),
+              withReadableSourceCounts(
+                withCodeFitMeasures(
+                  withPlatformFit(
+                    withCardSubjects(block, companiesRead),
+                    runFits.read(request.runId),
+                  ),
+                  {
+                    investorFit: (id) =>
+                      [...companiesRead.investors.values()].find(
+                        (investor) => investor.investorOrganisationId === id,
+                      )?.fit,
+                    isPlatform: isPlatformFitCard,
+                  },
                 ),
-                {
-                  investorFit: (id) =>
-                    [...companiesRead.investors.values()].find(
-                      (investor) => investor.investorOrganisationId === id,
-                    )?.fit,
-                  isPlatform: isPlatformFitCard,
-                },
+                readableByCompany(),
               )
             : block,
         );
@@ -14745,7 +14830,7 @@ export function createModelGatewayQAnswer(
         // more fits, code lays them out from those fits (deterministic,
         // the platform's own scores and reasons).
         const fitsRead = runFits.take(request.runId);
-        const builtCards = (modelBlocks ?? []).some(
+        const fitCards = (modelBlocks ?? []).some(
           (block) => block.kind === "ANSWER_CARDS",
         )
           ? null
@@ -14758,6 +14843,10 @@ export function createModelGatewayQAnswer(
                 listConditionsUnhonoured ||
                 (sweep !== null && !sweep.ask.fitAsked),
             });
+        const builtCards =
+          fitCards === null
+            ? null
+            : withReadableSourceCounts(fitCards, readableByCompany());
         if (builtCards !== null) {
           logger?.info(
             { qRunId: request.runId, cards: builtCards.cards.length },

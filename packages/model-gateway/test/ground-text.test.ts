@@ -82,7 +82,11 @@ describe("groundText (workforce messages and documents)", () => {
 
   it("keeps the answer path's defaults unchanged", () => {
     const said = new Set<string>();
-    expect(checkSentence("Our ARR is $3M.", corpus, said).text).toBe(
+    // Scenario E: with ARR in the material the honest unknown would be
+    // false, so the ungrounded sentence goes; with none, it stands.
+    expect(checkSentence("Our ARR is $3M.", corpus, said).text).toBeNull();
+    const none = claimCorpus(["A founder writing to investors."], TODAY);
+    expect(checkSentence("Our ARR is $3M.", none, said).text).toBe(
       "Neither Capital Q's records nor the sources I read give a figure for ARR yet.",
     );
   });

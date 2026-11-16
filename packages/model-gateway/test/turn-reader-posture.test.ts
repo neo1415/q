@@ -6,7 +6,6 @@ import type { ModelGateway } from "../src/index.js";
 import { createQTurnReader } from "../src/q/index.js";
 import {
   TURN_READER_ATTEMPT_TIMEOUT_MS,
-  TURN_READER_FAST_FIRST_ATTEMPT_MS,
   TURN_READER_SAME_MODEL_HEDGE_MS,
 } from "../src/q/turn-reader.js";
 
@@ -80,29 +79,29 @@ describe("the turn reader's data posture", () => {
     expect(requests[0]).not.toHaveProperty("dataPosture");
   });
 
-  // Speed sweep 2026-10-01: the fast shared model hung to the 6 s deadline
-  // on 8 of 74 reads; it now gets 2.5 s before the fallback reads the turn.
-  it("gives the fast first model 2.5 s under the synthetic posture, and nothing shorter otherwise", async () => {
-    const fast = recording();
-    await createQTurnReader({
-      gateway: fast.gateway,
-      logger,
-      dataPosture: "SYNTHETIC_DEMO",
-    }).read(input);
-    expect(TURN_READER_FAST_FIRST_ATTEMPT_MS).toBe(2_500);
-    expect(fast.options[0]?.firstAttemptTimeoutMs).toBe(2_500);
-    expect(
-      (fast.requests[0]?.budget as { attemptTimeoutMs: number })
-        .attemptTimeoutMs,
-    ).toBe(TURN_READER_ATTEMPT_TIMEOUT_MS);
-
-    const real = recording();
-    await createQTurnReader({
-      gateway: real.gateway,
-      logger,
-      dataPosture: "REAL_CUSTOMER",
-    }).read(input);
-    expect(real.options[0]).not.toHaveProperty("firstAttemptTimeoutMs");
+  // Live 2026-11-16 (runs d58a4564, 11daded9, 7cef5d87, 06de74f3): luna was
+  // cut at 2.5 s under the synthetic posture and the policy's 2.0 s hedge
+  // went to claude-sonnet-5-5, up to USD 0.058 a read. Every posture now
+  // cuts at 4 s (past 99.86% of luna's reads), hedging on luna first.
+  it("cuts each luna attempt at 4 s in every posture, and hedges on the same model before the backup", async () => {
+    for (const dataPosture of ["SYNTHETIC_DEMO", "REAL_CUSTOMER"] as const) {
+      const seen = recording();
+      await createQTurnReader({
+        gateway: seen.gateway,
+        logger,
+        dataPosture,
+      }).read(input);
+      expect(seen.options[0]?.firstAttemptTimeoutMs).toBe(4_000);
+      expect(seen.options[0]?.sameModelHedgeFirst).toBe(true);
+      expect(seen.options[0]?.sameModelHedgeAfterMs).toBe(2_500);
+      const budget = seen.requests[0]?.budget as {
+        attemptTimeoutMs: number;
+        maxAttempts: number;
+      };
+      expect(budget.attemptTimeoutMs).toBe(TURN_READER_ATTEMPT_TIMEOUT_MS);
+      // The model, its hedge, then the backup when both failed.
+      expect(budget.maxAttempts).toBe(3);
+    }
   });
 
   // Live 2026-10-29: a real customer's read has one eligible model, so a

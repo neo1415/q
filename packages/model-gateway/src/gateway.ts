@@ -206,6 +206,16 @@ export type ModelGatewayExecuteOptions<T> = {
    */
   readonly sameModelHedgeAfterMs?: number | undefined;
   /**
+   * Opt-in, with `sameModelHedgeAfterMs`: the first attempt's hedge asks
+   * the SAME model again even when the policy names another model to hedge
+   * to; the other models stay the fallback once the first has failed (its
+   * attempts, the hedge included). For a short classification whose policy
+   * backup is a far dearer model (live 2026-11-16: the turn reader hedged
+   * from gpt-5.6-luna to claude-sonnet-5-5 on 239 of 709 reads in a day,
+   * USD 2.97 of USD 3.93, up to USD 0.058 a read).
+   */
+  readonly sameModelHedgeFirst?: boolean | undefined;
+  /**
    * STRUCTURED output only: whether one refused element of a list refuses
    * the whole object (REFUSE, the default) or is dropped and logged
    * (DROP). For callers whose lists are independent readings.
@@ -934,6 +944,7 @@ export function createModelGateway(
             options.onTextDelta,
             options.firstAttemptTimeoutMs,
             options.sameModelHedgeAfterMs,
+            options.sameModelHedgeFirst === true,
             {
               invalidListItems: options.invalidListItems,
               lenientFields: options.lenientFields,
@@ -986,6 +997,7 @@ export function createModelGateway(
     onTextDelta: ((text: string) => void) | undefined,
     firstAttemptTimeoutMs: number | undefined,
     sameModelHedgeAfterMs: number | undefined,
+    sameModelHedgeFirst: boolean,
     accept: AcceptOptions,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
@@ -1233,6 +1245,7 @@ export function createModelGateway(
         // to word by word, with the policy's hedge configured and a second
         // model eligible, asks that model too once hedgeAfterMs has passed.
         const otherModel =
+          !(sameModelHedgeFirst && sameModelHedgeAfterMs !== undefined) &&
           attemptNumber === 1 &&
           onTextDelta === undefined &&
           hedgeAfterMs !== null &&
@@ -1296,7 +1309,11 @@ export function createModelGateway(
                     hedgeProvider,
                     attemptNumber + 1,
                     signal,
-                    request.budget.attemptTimeoutMs,
+                    // The same model again keeps the first's patience: a
+                    // model that hung once is not waited out for longer.
+                    sameModel !== undefined
+                      ? timeoutMs
+                      : request.budget.attemptTimeoutMs,
                   ),
                 firstCandidate: candidate,
                 secondCandidate: hedgeTo,
@@ -1304,6 +1321,9 @@ export function createModelGateway(
                 callerSignal,
                 onHedge: () => {
                   attemptNumber += 1;
+                  // A same-model hedge is that model's second attempt: if
+                  // both fail, the next model is asked, not this one again.
+                  if (sameModel !== undefined) attemptsOnCandidate += 1;
                   metrics.hedges.add(1, {
                     task_class: request.taskClass,
                     provider: hedgeTo.provider.code,

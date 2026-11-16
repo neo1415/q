@@ -109,6 +109,14 @@ export function companiesNamedIn(
   text: string,
   known: readonly KnownCompany[],
   max = 5,
+  /**
+   * Scenario D4 (live 2026-11-16, run 7cef5d87): Q's own greeting ("…ranked
+   * against your mandate") near-matched Rankpay and the turn read its deck,
+   * figures and data room for a Halyard question. Approximate matching is
+   * for the person's words, which speech bends; Q's own text is code's and
+   * is matched exactly ("EXACT").
+   */
+  match: "APPROXIMATE" | "EXACT" = "APPROXIMATE",
 ): KnownCompany[] {
   const words = letters(text);
   const squashed = words.replace(/\s+/g, "");
@@ -116,7 +124,11 @@ export function companiesNamedIn(
   for (const company of known) {
     const core = coreOf(company.name);
     if (core.length < 3) continue;
-    if (core.length < FUZZY_FROM) {
+    if (core.length < FUZZY_FROM || match === "EXACT") {
+      if (match === "EXACT" && core.length >= FUZZY_FROM) {
+        if (squashed.includes(core)) scored.push({ company, distance: 0 });
+        continue;
+      }
       if (new RegExp(`\\b${core}\\b`).test(words)) {
         scored.push({ company, distance: 0 });
       }
@@ -132,7 +144,7 @@ export function companiesNamedIn(
   // edit, only for words of five letters or more, and only when exactly
   // one of their companies is that close.
   const seen = new Set(scored.map((entry) => entry.company.companyId));
-  for (const word of words.split(/\s+/)) {
+  for (const word of match === "EXACT" ? [] : words.split(/\s+/)) {
     if (word.length < 5) continue;
     const near = closestByName(known, word, (company) =>
       letters(company.name).replace(SUFFIXES, " ").replace(/\s+/g, " ").trim(),

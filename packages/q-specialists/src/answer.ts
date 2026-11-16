@@ -1025,6 +1025,59 @@ function shownItemTurn(input: {
 }
 
 /**
+ * Scenarios D-E (live 2026-11-16, defect 7): `public_web.search` ran on
+ * every investor question about a company's own figures, diligence or
+ * documents ("How much cash does Halyard actually have in the bank?",
+ * "Does the bank balance agree with their management accounts?"), because
+ * the reading said research EXPLICIT. Their own records answer those; the
+ * web is asked only when the person's own words ask about the public
+ * world. Narrower than WEB_WORDING: "latest", "reports" and "sources" name
+ * a bank statement or a management report as often as the press.
+ */
+const PUBLIC_WORLD_WORDING =
+  /\b(?:web|online|internet|google|public(?:ly)?|news|press|headlines?|articles?|media|website|linkedin|crunchbase|search(?:es|ed|ing)?|look(?:ing)?\s+(?:it|them|this|that|him|her)\s+up|announce(?:d|s|ments?)?|out\s+there)\b/iu;
+
+/** A company's figures, as an investor asks for them. */
+const COMPANY_FIGURES_WORDING =
+  /\b(?:burn(?:s|ing|ed|\s+rate)?|runway|cash|revenue|mrr|arr|margins?|profit|loss(?:es)?|expenses?|costs?|spend(?:ing)?|financials?|p&l|ebitda|balance|payroll|valuation|cap\s+table)\b/iu;
+
+/** Diligence and the documents a company shared. */
+const DILIGENCE_WORDING =
+  /\b(?:diligence|data\s*room|documents?|statements?|accounts|deck|contracts?|invoices?|requests?|requested|shared|answered|fulfil(?:led|ls)?|fulfill(?:ed|s)?)\b/iu;
+
+/**
+ * An investor's question that their own records answer: about their own
+ * records or progress, or about a company's figures, diligence or shared
+ * documents, and with no words asking about the public world. The reading's
+ * research flag does not decide it (same principle as SHOWN_LIST_ITEM).
+ */
+export function ownRecordsInvestorQuestion(input: {
+  readonly read: {
+    readonly kind: string;
+    readonly addressedToQ?: boolean | undefined;
+    readonly question?: { readonly kind?: string } | null | undefined;
+    readonly namedOther?:
+      { readonly kind: string; readonly name: string } | null | undefined;
+  } | null;
+  readonly utterance: string;
+  readonly side: "INVESTOR" | "FOUNDER" | null;
+}): boolean {
+  const { read, utterance } = input;
+  if (input.side !== "INVESTOR" || read === null) return false;
+  if (read.kind !== "QUESTION_TO_Q" || read.addressedToQ === false) {
+    return false;
+  }
+  if (PUBLIC_WORLD_WORDING.test(utterance)) return false;
+  const kind = read.question?.kind ?? null;
+  if (kind === "THEIR_OWN_RECORDS" || kind === "PROGRESS") return true;
+  return (
+    read.namedOther?.kind === "COMPANY" &&
+    (COMPANY_FIGURES_WORDING.test(utterance) ||
+      DILIGENCE_WORDING.test(utterance))
+  );
+}
+
+/**
  * Live re-check 15 Nov 2026 (T1): lists a quick first read may not answer
  * before the full reading, whose list conditions it does not carry.
  */
@@ -8220,6 +8273,25 @@ export function createSpecialistQAnswer(
     if (shownItem.aboutItem && (await research).mode !== "NEVER") {
       research = Promise.resolve(NO_RESEARCH);
       researchGuard = "SHOWN_LIST_ITEM";
+    }
+    // Scenarios D-E (defect 7): an investor's own-records, figures or
+    // diligence question keeps to Capital Q's records unless their words
+    // ask about the public world; recorded in routing.
+    if (
+      researchGuard === null &&
+      ownRecordsInvestorQuestion({
+        read,
+        utterance: latest.content,
+        side: askerSideOf(request),
+      }) &&
+      (await research).mode !== "NEVER"
+    ) {
+      research = Promise.resolve(NO_RESEARCH);
+      researchGuard = "OWN_RECORDS";
+      logger?.info(
+        { qRunId: request.runId, researchGuard },
+        "q kept an own-records question off the public web",
+      );
     }
     if (
       explained !== null &&

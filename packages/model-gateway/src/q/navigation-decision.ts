@@ -177,7 +177,13 @@ export type QNavigationGuard =
    */
   | "NO_MEETING_BOOKED"
   /** The person pinned the workspace: the move is offered, never made. */
-  | "PINNED";
+  | "PINNED"
+  /**
+   * Decision 98 (live 2026-11-16, run 04d46602): the turn's reading was
+   * still due at the decision's deadline, so whether a page move was asked
+   * is unknown: the page stays (unknown is never read as asked).
+   */
+  | "READING_LATE";
 
 // --- 0. The site map (W2) ---------------------------------------------
 
@@ -2874,11 +2880,12 @@ export function createQPageMoves(dependencies: {
           // C10: whether to move at all is the reading's (v84), never the
           // words'; waited for no longer than the decision's own deadline.
           let timer: ReturnType<typeof setTimeout> | undefined;
-          const reading = await Promise.race([
+          const late = Symbol("late");
+          const landed = await Promise.race([
             heard,
-            new Promise<null>((resolve) => {
+            new Promise<typeof late>((resolve) => {
               timer = setTimeout(
-                () => resolve(null),
+                () => resolve(late),
                 Math.max(
                   0,
                   began + NAVIGATION_DECISION_DEADLINE_MS - Date.now(),
@@ -2886,6 +2893,27 @@ export function createQPageMoves(dependencies: {
               );
             }),
           ]).finally(() => clearTimeout(timer));
+          // Live 2026-11-16 (run 04d46602, "What's Tensorgate's monthly
+          // burn and cash runway?"): the reading took 12 s, the decision
+          // was not told it in time, and its MOVE opened the company's
+          // profile ("I've opened the company profile.") for a figures
+          // question the reading then read as NONE. A reading that is still
+          // due holds a move: the page stays and the answer comes in place.
+          if (landed === late && turn.readingFollows === true) {
+            dependencies.logger?.info(
+              {
+                qRunId: request.runId,
+                proposed: proposed.decision,
+                guard: "READING_LATE",
+                ms: Date.now() - began,
+              },
+              "q page move held: the turn's reading had not landed",
+            );
+            return proposed.decision === "STAY"
+              ? proposed
+              : STAY("READING_LATE");
+          }
+          const reading = landed === late ? null : landed;
           const navigation = reading?.navigation ?? null;
           // v85: CONTEXT naming one of their own screens, where the
           // decision proposed nothing, is placed by code (same policy).

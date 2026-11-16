@@ -191,6 +191,41 @@ export function planOfferBlock(prepared = true): QResultBlock {
   };
 }
 
+/** About this long, a recommendation in the chat line is cut at a sentence. */
+export const CHAT_RECOMMENDATION_CHARS = 360;
+
+/**
+ * Scenario G (live 2026-11-16, run b87ad973): the chat line ended items
+ * mid-sentence ("…+ 5,303…", "…with approved…"), cut by code for a stored
+ * bound. A recommendation as the chat says it: its whole sentences, as
+ * many as fit about CHAT_RECOMMENDATION_CHARS and never fewer than the
+ * first; whether anything was left for the document. An older stored item
+ * that code cut ("…" at its end) goes back to its last whole sentence, or,
+ * with none, is not said here at all (null): the document holds it.
+ */
+export function chatRecommendation(
+  text: string,
+): { readonly text: string; readonly shortened: boolean } | null {
+  const whole = text.trim();
+  const cutByCode = whole.endsWith("…");
+  const body = cutByCode ? whole.slice(0, -1) : whole;
+  const ends = [...body.matchAll(/[.!?](?=["')\]]?(?:\s|$))/gu)].map(
+    (match) => match.index + 1,
+  );
+  if (!cutByCode && body.length <= CHAT_RECOMMENDATION_CHARS) {
+    return { text: body, shortened: false };
+  }
+  const complete = cutByCode ? ends : [...ends, body.length];
+  const first = complete[0];
+  if (first === undefined) return null;
+  const fits = complete.filter((end) => end <= CHAT_RECOMMENDATION_CHARS);
+  const end = fits.length > 0 ? (fits[fits.length - 1] ?? first) : first;
+  return {
+    text: body.slice(0, end).trim(),
+    shortened: cutByCode || end < body.length,
+  };
+}
+
 /** What Q says when the document lands: 4-6 lines. */
 export function deliveryText(document: DeliveredDocument): string {
   const { delivery } = document;
@@ -202,14 +237,25 @@ export function deliveryText(document: DeliveredDocument): string {
     ...(reduced === undefined ? [] : [reduced]),
     withoutSourceIds(delivery.summary.trim()),
   ];
-  if (delivery.topRecommendations.length > 0) {
+  const said = delivery.topRecommendations.flatMap((one) => {
+    const chat = chatRecommendation(withoutSourceIds(one.trim()));
+    return chat === null ? [] : [chat];
+  });
+  // Items not said here (cut mid-sentence with no whole sentence before
+  // the cut) are named as a count, never dropped silently.
+  const more = delivery.topRecommendations.length - said.length;
+  if (said.length > 0) {
     lines.push(
-      `What I'd do first:\n${delivery.topRecommendations
-        .map(
-          (one, index) =>
-            `${String(index + 1)}. ${withoutSourceIds(one.trim())}`,
-        )
+      `What I'd do first:\n${said
+        .map((one, index) => `${String(index + 1)}. ${one.text}`)
         .join("\n")}`,
+    );
+  }
+  if (more > 0 || said.some((one) => one.shortened)) {
+    lines.push(
+      more > 0
+        ? `${more === 1 ? "One more recommendation is" : `${String(more)} more recommendations are`} in the document${said.some((one) => one.shortened) ? ", with each in full" : ""}.`
+        : "Each recommendation is in full in the document.",
     );
   }
   if (!delivery.passed && delivery.openIssues > 0) {

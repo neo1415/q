@@ -211,3 +211,50 @@ describe("hedged on the same model, when the caller opts in", () => {
     expect(alpha.calls).toHaveLength(1);
   });
 });
+
+/**
+ * Live 2026-11-16 (runs d58a4564, 11daded9, 7cef5d87, 06de74f3): the turn
+ * reader's policy hedged from gpt-5.6-luna to its far dearer backup at
+ * 2.0 s, up to USD 0.058 a read. A caller may ask for the same model first
+ * (`sameModelHedgeFirst`); the policy's other model stays the fallback.
+ */
+describe("hedged on the same model first, when the caller asks", () => {
+  it("before: a slow first read is hedged to the policy's other model", async () => {
+    const { gateway, alpha, beta } = build([SLOW, QUICK], [QUICK], 100);
+    const value = await gateway.execute(request(), {
+      sameModelHedgeAfterMs: 100,
+    });
+    expect(value.providerCode).toBe("beta");
+    expect(alpha.calls).toHaveLength(1);
+    expect(beta.calls).toHaveLength(1);
+  });
+
+  it("asks the same model again, and the policy's other model not at all", async () => {
+    const { gateway, alpha, beta } = build([SLOW, QUICK], [QUICK], 100);
+    const value = await gateway.execute(request(), {
+      sameModelHedgeAfterMs: 100,
+      sameModelHedgeFirst: true,
+    });
+    expect(value.providerCode).toBe("alpha");
+    expect(value.output).toMatchObject({ kind: "TEXT", text: "quick second" });
+    expect(value.fallbackUsed).toBe(false);
+    expect(alpha.calls).toHaveLength(2);
+    expect(beta.calls).toHaveLength(0);
+  });
+
+  it("falls back to the other model only once the first failed, hedge included", async () => {
+    const { gateway, alpha, beta } = build(
+      [{ kind: "HANG" }, { kind: "FAIL", failureClass: "TRANSIENT" }],
+      [QUICK],
+      100,
+    );
+    const value = await gateway.execute(request(), {
+      sameModelHedgeAfterMs: 50,
+      sameModelHedgeFirst: true,
+    });
+    expect(value.providerCode).toBe("beta");
+    expect(value.fallbackUsed).toBe(true);
+    expect(alpha.calls).toHaveLength(2);
+    expect(beta.calls).toHaveLength(1);
+  }, 10_000);
+});

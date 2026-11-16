@@ -896,6 +896,21 @@ function metricOf(sentence: string): string | null {
   return null;
 }
 
+/**
+ * Scenario E (live 2026-11-16, run 06de74f3): a comparison stated
+ * Tensorgate's "USD 360,000 of contracted ARR", then a sentence with an
+ * ungrounded figure about ARR became "Neither Capital Q's records nor the
+ * sources I read give a figure for ARR yet" -- false, the records hold
+ * one, and the answer contradicted itself. The honest unknown is said only
+ * when no source names the metric at all; otherwise the ungrounded
+ * sentence is removed and the grounded figures stand.
+ */
+function sourcesNameMetric(label: string, corpus: ClaimCorpus): boolean {
+  return METRICS.some(
+    ([pattern, metric]) => metric === label && pattern.test(corpus.text),
+  );
+}
+
 /** The words after a claim in its sentence ("… points"). */
 function afterClaim(sentence: string, claim: Claim): string {
   const at = sentence.indexOf(claim.text);
@@ -1000,7 +1015,11 @@ function checkOne(
     ungrounded.includes("NAME") || options.unknownLine === false
       ? null
       : metricOf(sentence);
-  if (metric === null || said.has(metric)) {
+  if (
+    metric === null ||
+    said.has(metric) ||
+    sourcesNameMetric(metric, corpus)
+  ) {
     return { check: { text: null, ungrounded }, figures: [] };
   }
   said.add(metric);

@@ -2711,7 +2711,7 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
     }
   });
 
-  it("a reading that never lands holds the decision no longer than its deadline (then the decision stands)", async () => {
+  it("a reading that never lands holds the decision to its deadline, and then the page stays (READING_LATE)", async () => {
     vi.useFakeTimers();
     try {
       const published: number[] = [];
@@ -2733,8 +2733,12 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
       moves.heard?.(r, new Promise(() => undefined));
       await vi.advanceTimersByTimeAsync(5_900);
       expect(published).toEqual([]);
+      // Live 2026-11-16 (run 04d46602): a reading still due at the deadline
+      // no longer lets the decision move the page (it opened a company
+      // profile for a figures question the reading read as NONE). A GO
+      // the reading carries still moves when it lands (fast GO).
       await vi.advanceTimersByTimeAsync(200);
-      expect(published).toHaveLength(1);
+      expect(published).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
