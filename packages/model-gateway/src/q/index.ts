@@ -1742,6 +1742,25 @@ export function shownCompanyCard(
 }
 
 /**
+ * Live re-check of 9913a5b64 (16 Nov 2026, turn C): the names (by
+ * `nameKey`) of the companies on the cards of Q's latest turn. Empty when
+ * that turn showed no company cards.
+ */
+export function companyCardNamesOfLastQ(
+  earlier: readonly QConversationMessage[],
+): ReadonlySet<string> {
+  const lastQ = earlier.findLast((message) => message.role === "Q");
+  const names = new Set<string>();
+  for (const block of lastQ?.blocks ?? []) {
+    if (block.kind !== "ANSWER_CARDS") continue;
+    for (const card of block.cards) {
+      if (card.subject?.kind === "COMPANY") names.add(nameKey(card.name));
+    }
+  }
+  return names;
+}
+
+/**
  * Q intelligence step 2: the conversation state (entity ledger, lists,
  * open threads, earlier summary), built by code from stored turns. Fenced:
  * names and the summary are data from records and words.
@@ -7022,14 +7041,25 @@ export function createModelGatewayQAnswer(
       started
         .then((prepared) => {
           if (prepared === null) return undefined;
-          const names =
-            companyNameCandidates(
+          // Live re-check of 9913a5b64 (turn C): right after Q showed
+          // company cards, a turn that names nothing beyond them is most
+          // likely a follow-up on those cards, which the answer may take
+          // from the card alone (no wide reads); the reading decides, so
+          // the reads wait for it rather than start here.
+          const cardNames = companyCardNamesOfLastQ(prepared.earlier);
+          const candidates = [
+            ...companyNameCandidates(
               prepared.latest.content,
               2,
               heardNames(request),
-            ).length > 0 ||
-            lowercaseNameCandidates(prepared.latest.content).length > 0;
-          if (!names && request.plan.screen?.manifest?.focus === undefined) {
+            ),
+            ...lowercaseNameCandidates(prepared.latest.content),
+          ].filter((name) => !cardNames.has(nameKey(name)));
+          if (cardNames.size > 0 && candidates.length === 0) return undefined;
+          if (
+            candidates.length === 0 &&
+            request.plan.screen?.manifest?.focus === undefined
+          ) {
             return undefined;
           }
           return prepared.wide();

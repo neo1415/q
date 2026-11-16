@@ -457,3 +457,88 @@ describe("live re-check 3b7145616: a 'why' about a conditioned-list item is answ
     expect(s.routings[0]).toMatchObject({ researchGuard: null });
   });
 });
+
+/**
+ * Live re-check of 9913a5b64 (16 Nov 2026), turn C: the conditioned list
+ * held one company ("one has revenue on record and is outside your
+ * preferred sectors ... weakest first: Baridi at 6.2"), and the follow-up
+ * pointed at it by deixis ("that one", "it"), not by place or name. The
+ * one company on the cards of Q's latest turn is the one meant: the turn
+ * is a contextual follow-up answered from its card, with no public web.
+ */
+describe("live re-check 9913a5b64: 'that one' on a one-company list is answered from its card", () => {
+  const BARIDI = "3ab2cc02-160f-4812-a6b1-000000000003";
+  const revenueList = cardsMessage(
+    "Of the ten companies closest to your mandate that I checked, two have revenue on record. Ranked by fit with your mandate: MedTrail at 8.1 and Mizan at 7.4.",
+    "Fit against your mandate: revenue on record",
+    [
+      { name: "MedTrail", subject: { kind: "COMPANY", companyId: MEDTRAIL } },
+      { name: "Mizan", subject: { kind: "COMPANY", companyId: MIZAN } },
+    ],
+  );
+  const oneOutside = cardsMessage(
+    "Of the 45 companies on Capital Q I checked, one has revenue on record and is outside your preferred sectors. The weakest fits against your mandate, weakest first: Baridi at 6.2. It's on screen.",
+    "Weakest fits against your mandate: revenue on record and outside your preferred sectors",
+    [{ name: "Baridi", subject: { kind: "COMPANY", companyId: BARIDI } }],
+  );
+  const history = [
+    message(
+      "USER",
+      "Of the companies that fit me best, which are already earning revenue?",
+    ),
+    revenueList,
+    message("USER", "Now the weakest ones outside my sectors"),
+    oneOutside,
+  ];
+  const deixis = (
+    text: string,
+    pointer: Record<string, unknown>,
+  ): Record<string, unknown> => ({
+    kind: "QUESTION_TO_Q",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: { kind: "ADVICE", text },
+    aboutNamedOther: false,
+    namedOther: null,
+    navigation: { mode: "CONTEXT", negated: false, destination: null },
+    ...pointer,
+  });
+  const noName = {
+    open: null,
+    name: null,
+    shown: null,
+    retryLast: false,
+    sameFor: null,
+  };
+  const pointers: readonly (readonly [string, Record<string, unknown>])[] = [
+    ["no pointer at all", { reference: null }],
+    ["a reference with no name", { reference: noName }],
+    [
+      "an answer from the shown turn",
+      { fromShown: { turn: 2, reshow: false } },
+    ],
+    ["its number in the list", { reference: { ...noName, shown: 1 } }],
+  ];
+  for (const said of ["Why is that one at the top?", "Why is it there?"]) {
+    for (const [how, pointer] of pointers) {
+      it(`"${said}" (${how}): a card follow-up, no web`, async () => {
+        const s = seam(said, deixis(said, pointer), history);
+        await s.answer.answer(investorRequest());
+        const asked = s.delegated[0];
+        expect(asked?.executionClass).toBe("CONTEXTUAL_FOLLOW_UP");
+        expect(asked?.followUpCompanyId).toBe(BARIDI);
+        expect((await asked?.research)?.mode).not.toBe("EXPLICIT");
+        expect(s.routings[0]).toMatchObject({
+          executionClass: "CONTEXTUAL_FOLLOW_UP",
+        });
+      });
+    }
+  }
+
+  it("a why about something else is not bound to the one card", async () => {
+    const said = "Why is my mandate so narrow?";
+    const s = seam(said, deixis(said, { reference: null }), history);
+    await s.answer.answer(investorRequest());
+    expect(s.delegated[0]?.followUpCompanyId).toBeUndefined();
+  });
+});

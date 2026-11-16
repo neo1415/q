@@ -822,8 +822,11 @@ function shownCardCompanyOf(input: {
   readonly shown: ReadonlyMap<string, string>;
   readonly bound: string | null;
   readonly listPlace: { readonly id: string; readonly kind: string } | null;
+  /** The companies on the cards of Q's latest turn, in card order. */
+  readonly lastShown: readonly string[];
+  readonly utterance: string;
 }): string | null {
-  const { read, shown, bound, listPlace } = input;
+  const { read, shown, bound, listPlace, lastShown, utterance } = input;
   if (shown.size === 0 || read === null) return null;
   if (bound !== null && shown.has(bound.toLowerCase())) return bound;
   const names = [
@@ -850,7 +853,51 @@ function shownCardCompanyOf(input: {
     readingMarksPlace(read, listPlace.id, [])
   )
     return listPlace.id;
+  // Live re-check of 9913a5b64 (turn C): "Why is that one at the top?"
+  // after a list of one company. The reading named nobody (no company, and
+  // no person or investor either) and the words point back ("that one",
+  // "it") or the reading points into what Q showed: the one company on
+  // the cards of Q's latest turn is the one meant.
+  const lastOne = lastShown.length === 1 ? (lastShown[0] ?? null) : null;
+  if (
+    lastOne !== null &&
+    names.length === 0 &&
+    (read.namedOther ?? null) === null &&
+    ((read.reference?.shown ?? null) !== null ||
+      (read.fromShown ?? null) !== null ||
+      POINTS_BACK.test(utterance))
+  )
+    return lastOne;
   return null;
+}
+
+/** Words that point back at something already said or shown. */
+const POINTS_BACK =
+  /\b(?:it|its|it's|that|this|that\s+one|this\s+one|the\s+one|that\s+company|this\s+company)\b/iu;
+
+/**
+ * Live re-check of 9913a5b64 (turn C): the companies on the cards of Q's
+ * latest turn, by id, in card order (empty when it showed none).
+ */
+function lastShownCardCompanies(
+  history: readonly {
+    readonly role: string;
+    readonly blocks?: readonly QResultBlock[] | null | undefined;
+  }[],
+): readonly string[] {
+  const lastQ = history.findLast((message) => message.role === "Q");
+  const ids: string[] = [];
+  for (const block of lastQ?.blocks ?? []) {
+    if (block.kind !== "ANSWER_CARDS") continue;
+    for (const card of block.cards) {
+      if (
+        card.subject?.kind === "COMPANY" &&
+        !ids.includes(card.subject.companyId)
+      )
+        ids.push(card.subject.companyId);
+    }
+  }
+  return ids;
 }
 
 /**
@@ -7391,6 +7438,7 @@ export function createSpecialistQAnswer(
     // and code's place in Q's own list ("the first one"), for a follow-up
     // answered from one of those cards.
     const shownCards = shownCardCompanies(history);
+    const lastShown = lastShownCardCompanies(history);
     const listPlace =
       pointed !== null &&
       pointed.ask?.kind === "ORDINAL" &&
@@ -7412,6 +7460,8 @@ export function createSpecialistQAnswer(
               shown: shownCards,
               bound: null,
               listPlace,
+              lastShown,
+              utterance: latest.content,
             }),
           }).why,
           // A pitch to watch is placed on the Elevator pitch tab, as in
@@ -7977,6 +8027,8 @@ export function createSpecialistQAnswer(
       shown: shownCards,
       bound: followUpCompany,
       listPlace: placeFromList,
+      lastShown,
+      utterance: latest.content,
     });
     const shownItem = shownItemTurn({
       read,

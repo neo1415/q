@@ -1010,6 +1010,7 @@ function conversationSeam(input: {
     asked: string,
     reading: Partial<QAnswerRequest>,
     priorQ?: { readonly content: string; readonly blocks: unknown },
+    options: { readonly warm?: boolean } = {},
   ) => {
     const run = randomUUID();
     if (priorQ !== undefined) {
@@ -1071,7 +1072,7 @@ function conversationSeam(input: {
         };
     const executedBefore = executed.length;
     const callsBefore = alpha.calls.length;
-    const outcome = await seam.answer({
+    const unread = {
       runId: run,
       tenantId: TENANT,
       actorUserId: USER,
@@ -1085,9 +1086,20 @@ function conversationSeam(input: {
       subjects: [],
       retrieval: { kind: "NOT_CONFIGURED" },
       plan,
+    } as unknown as QAnswerRequest;
+    const request = {
+      ...unread,
       turnKind: "QUESTION_TO_Q",
       ...reading,
-    } as unknown as QAnswerRequest);
+    } as QAnswerRequest;
+    // As q-api composes it: the specialist warms the gateway's prepare
+    // with the turn as it arrives, beside the turn reader.
+    if (options.warm === true) seam.warm?.(unread);
+    const outcome = await seam.answer(request);
+    // Whatever the warm-up started lands before the turn is counted.
+    for (let at = 0; at < 20; at += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
     return {
       outcome,
       text: completed.at(-1)?.message.text ?? "",
@@ -1372,6 +1384,105 @@ describe("live re-check 3b7145616: a follow-up on a conditioned list is answered
     expect(evidence).toContain(`weakest first: ${company?.name ?? "-"}`);
     expect(evidence).toContain("outside your preferred sectors");
   });
+});
+
+/**
+ * Live re-check of 9913a5b64 (16 Nov 2026), turns A-C: "Of the companies
+ * that fit me best, which are already earning revenue?", "Now the weakest
+ * ones outside my sectors" (one company, revenue carried, worst first),
+ * "Why is that one at the top?". Routed CONTEXTUAL_FOLLOW_UP with research
+ * NEVER, yet seven reads ran (their day, their relationships, a company
+ * search, the company and its relationship): the gateway's warm-up, which
+ * starts beside the turn reader, took "the top" for a company name typed
+ * in lowercase and started the wide reads before the reading said the
+ * turn is about a card Q showed.
+ */
+describe("live re-check 9913a5b64: 'that one' on a one-company conditioned list is answered from its card", () => {
+  const followUps = [
+    "Why is that one at the top?",
+    "Why is it there?",
+    "Why is the first one there?",
+    // The fixture's one outside-sector company with revenue, named.
+    "Why is Shiftwell at the top?",
+  ];
+  for (const asked of followUps) {
+    it(`"${asked}": one answer call, at most two reads, no web`, async () => {
+      const { turn } = conversationSeam({
+        execute: (proposal, context) =>
+          proposal.name === "research_public_web"
+            ? Promise.resolve(
+                ok(proposal, "public_web.search", {
+                  status: "OK",
+                  sources: [],
+                }),
+              )
+            : investorExecute(proposal, context),
+        offered: [
+          ...INVESTOR_TOOLS,
+          ["get_company", "company.get"],
+          ["get_relationship", "relationship.get"],
+          ["list_schedule", "schedule.list"],
+          ["list_pending_approvals", "approvals.pending.list"],
+          ["list_q_work", "q.work.list"],
+          ["search_companies", "company.search"],
+          ["research_public_web", "public_web.search"],
+        ],
+        digest: digestOf("INVESTOR", []),
+        investor: true,
+      });
+      const aAsked =
+        "Of the companies that fit me best, which are already earning revenue?";
+      await turn(
+        aAsked,
+        {
+          questionKind: "FIT",
+          fitQuestion: { text: aAsked, count: null },
+          listConditions: { ...NO_CONDITIONS, revenue: "HAS_REVENUE" },
+        },
+        undefined,
+        { warm: true },
+      );
+      const bAsked = "Now the weakest ones outside my sectors";
+      const b = await turn(
+        bAsked,
+        {
+          questionKind: "FIT",
+          fitQuestion: { text: bAsked, count: null },
+          listConditions: {
+            ...NO_CONDITIONS,
+            sector: "OUTSIDE",
+            order: "WORST_FIRST",
+          },
+        },
+        undefined,
+        { warm: true },
+      );
+      // One company on the list, as live.
+      expect(b.cards).toHaveLength(1);
+      const company = COMPANIES.find((one) => one.name === b.cards[0]);
+      expect(company).toBeDefined();
+      const c = await turn(
+        asked,
+        {
+          executionClass: "CONTEXTUAL_FOLLOW_UP",
+          followUpCompanyId: company?.id,
+          research: Promise.resolve({
+            mode: "NEVER",
+            announceSourceChange: false,
+          }),
+        },
+        undefined,
+        { warm: true },
+      );
+      expect(c.outcome.kind).toBe("ANSWERED");
+      expect(c.modelCalls).toHaveLength(1);
+      expect(c.tools).not.toContain("research_public_web");
+      expect(c.tools.length).toBeLessThanOrEqual(2);
+      expect(JSON.stringify(c.modelCalls[0])).toContain(
+        `weakest first: ${company?.name ?? "-"}`,
+      );
+    });
+  }
 });
 
 // Live re-check of 3b7145616: "one has revenue on record and are outside

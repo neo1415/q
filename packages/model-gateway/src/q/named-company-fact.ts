@@ -510,6 +510,36 @@ const LOWER_STOPS = new Set([
 ]);
 
 /**
+ * Live re-check of 9913a5b64 (16 Nov 2026, turn C): words that name a
+ * place in a list. "Why is that one at the top?" made "top" a lowercase
+ * company candidate, so the warm-up searched it and started the wide
+ * reads beside a follow-up answered from the card Q showed.
+ */
+const LIST_PLACE_WORDS = new Set([
+  "top",
+  "bottom",
+  "middle",
+  "end",
+  "start",
+  "first",
+  "second",
+  "third",
+  "fourth",
+  "fifth",
+  "last",
+  "final",
+  "former",
+  "latter",
+  "previous",
+  "best",
+  "worst",
+  "weakest",
+  "strongest",
+  "highest",
+  "lowest",
+]);
+
+/**
  * Turn latency round 5: a company typed in lowercase ("risks with
  * northwind ledger") as candidates, when no capitalised name was found.
  * The phrase after a word such as "with", "about" or "compare", cut at
@@ -541,6 +571,9 @@ export function lowercaseNameCandidates(text: string, max = 2): string[] {
       if (name.length > 4) break;
     }
     if (name.length === 0 || name.length > 4) continue;
+    // A place in a list ("at the top", "the first one") is a pointer into
+    // what Q showed, never a company's name; "first bank" still is one.
+    if (name.every((word) => LIST_PLACE_WORDS.has(word))) continue;
     const candidate = name.join(" ");
     if (candidate.length < 3 || found.includes(candidate)) continue;
     found.push(candidate);
