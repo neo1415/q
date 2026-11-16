@@ -9,6 +9,8 @@
 //   node scripts/seed/evidence/relationships.mjs mandates
 //   node scripts/seed/evidence/relationships.mjs gateq-form       # no model call
 //   node scripts/seed/evidence/relationships.mjs gateq-interview  # paid: 3 turns
+//   node scripts/seed/evidence/relationships.mjs gateq-correct    # paid: 1 turn
+//   node scripts/seed/evidence/relationships.mjs gateq-submit     # paid: synthesis
 //   node scripts/seed/evidence/relationships.mjs verify
 //
 // Pairs (scripts/seed/evidence/manifests/*.json `plannedShareWith`):
@@ -852,6 +854,13 @@ const GATEQ = {
     "Our management accounts for the 12 months to October 2026 show a gross margin of 29.3%.",
     "Both are our figures from different documents. I'd rather leave that open for the investor to weigh: the deck figure is licence margin, and the accounts put the deployment team's payroll in cost of sales.",
   ],
+  // Decision 100: the 29.3% note was stored split at the decimal point
+  // ("…29." and "3%.", before fix 9cf769860). The founder restates it whole
+  // in one turn, saying it is a correction, so the split notes are kept as
+  // superseded history rather than deleted. The draft is corrected, not
+  // restarted.
+  correction:
+    "Correction to my earlier answer, which got cut at the decimal point: our management accounts for the 12 months to October 2026 show a gross margin of 29.3%, not 29 and 3% as two notes, because the deployment team sits in cost of sales. The 82.0% in the pitch deck is licence margin.",
 };
 
 async function gateqApplication(mode) {
@@ -966,6 +975,20 @@ async function gateqApplication(mode) {
       if (!ok(r)) throw new Error(`turn ${i + 1} ${brief(r)}`);
     }
   }
+  if (mode === "gateq-correct") {
+    // The interview is already open on this draft; one turn, keyed so a
+    // retry is the same turn and spends no second model call.
+    const r = await applicant("POST", "/v1/gateq/apply/turn", {
+      message: GATEQ.correction,
+      clientTurnId: "cq-evidence-gateq-halyard-correct-margin",
+    });
+    log.push({
+      step: "founder.correct_margin",
+      status: r.status,
+      deduplicated: r.body?.deduplicated,
+      body: ok(r) ? undefined : brief(r),
+    });
+  }
   if (mode === "gateq-submit") {
     const r = await applicant("POST", "/v1/gateq/apply/submit", {
       clientRequestId: "cq-evidence-gateq-halyard-submit",
@@ -1039,14 +1062,20 @@ if (mode === "seed") {
     );
   }
 } else if (mode.startsWith("gateq-")) {
-  if (!["gateq-form", "gateq-interview", "gateq-submit"].includes(mode))
-    throw new Error("mode: gateq-form | gateq-interview | gateq-submit");
+  const gateqModes = [
+    "gateq-form",
+    "gateq-interview",
+    "gateq-correct",
+    "gateq-submit",
+  ];
+  if (!gateqModes.includes(mode))
+    throw new Error(`mode: ${gateqModes.join(" | ")}`);
   report.gateq ??= {};
   report.gateq[mode] = await gateqApplication(mode);
   console.log(JSON.stringify(report.gateq[mode], null, 1));
 } else {
   throw new Error(
-    "mode: seed | mandates | verify | gateq-form | gateq-interview | gateq-submit",
+    "mode: seed | mandates | verify | gateq-form | gateq-interview | gateq-correct | gateq-submit",
   );
 }
 writeFileSync(REPORT, JSON.stringify(report, null, 2));

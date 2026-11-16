@@ -130,3 +130,13 @@ node scripts/seed/evidence/relationships.mjs verify       # SQL + three accounts
   - fix the decimal-point split in the statement reader;
   - or choose a discrepancy on a quantified dimension (stage or traction count), then re-run `gateq-interview` and `gateq-submit`.
 - **Q-turn check.** That Thames Arc's and Savanna's Q can now cite the shared CONFIDENTIAL documents needs a live Q turn, with its budget.
+
+## 7. GateQ margin correction attempt (decision 100, 16 Nov 13:37 UTC)
+
+Halyard's application `0490be41` (`ga_1kqfa1zd54naktn20bgvn5n4sz`) was corrected, not restarted, through the applicant's own route as the seeded fictional founder (sign-in re-checks `fictional_demo` and `synthetic`). New mode: `node scripts/seed/evidence/relationships.mjs gateq-correct`, one `POST /v1/gateq/apply/turn`, `clientTurnId` `cq-evidence-gateq-halyard-correct-margin`.
+
+- **Sent (turn `95c9b0c1`, seq 8):** "Correction to my earlier answer, which got cut at the decimal point: our management accounts for the 12 months to October 2026 show a gross margin of 29.3%, not 29 and 3% as two notes, because the deployment team sits in cost of sales. The 82.0% in the pitch deck is licence margin."
+- **Stored (reading v9, outcome READ):** two new `application.note` TEXT statements, `fab7161a` (the whole 29.3% sentence, kept intact by fix 9cf769860) and `2e7e813b` ("The 82.0% in the pitch deck is licence margin."). No `gross_margin` quantity, no CORRECTS and no DISAGREES link. The only link on the application is still the stage CORRECTS (`232b4645` → `6c25ff0a`). There are no disagreement events.
+- **Not superseded:** the split notes `311b5d8f` ("…gross margin of 29.") and `326b8d65` ("3%.") are still active in coverage, not history. Q's reply (`18acc1d3`, intent CORRECTION) says "I'll treat this as correcting the two partial notes", but no link was recorded. **Defect:** Q's words claim a correction that the record does not hold. The reader treated the correction as prose for `application.note` instead of `CORRECTS S<n>`. The founder applicant API has no other route that supersedes a statement.
+- **Submit withheld,** as instructed: the application is still IN_PROGRESS, so submitting would freeze both split notes into Thames Arc's dossier. The lead decides what comes next. Options: a reader fix so that an explicit correction of a note links CORRECTS (a single target, or both halves), then one more turn; or accept the notes as they stand.
+- **Cost:** 1 model call (NORMAL_DIALOGUE / ONBOARDING), $0.0019 (`ai_ops.model_usage`, PRICE_SNAPSHOT). Budget reserved $0.30 (`21dc58d3`), with the actual recorded.
