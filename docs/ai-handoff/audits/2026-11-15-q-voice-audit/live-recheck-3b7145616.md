@@ -40,3 +40,21 @@ Investor `a7a6d845`, new wording; USD 0.19 (ledger `e3ba7982`).
   - Such a question never researches unless the person asks about the web.
   - It never navigates unless the person asks to open a page.
   - The fix is tested on unseen paraphrases.
+
+## Follow-up on `6f9b63cc5` (16 Nov, 05:44 UTC; gate PASS 1439 s; Railway SUCCESS ×4 by 05:43 UTC)
+
+Investor `3594f160`, unseen wording; USD 0.16 (ledger `b8ee0890`).
+
+| Ask                                                         | Result                                                                                                                                                                                      |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Which companies that match my mandate already make money?" | 10 of 23 with revenue on record; unknowns named. PASS                                                                                                                                       |
+| "Narrow that to the weakest ones beyond my sectors"         | "None of the ten … so I looked wider"; Baridi 6.2, weakest first. PASS                                                                                                                      |
+| "How come it made the list?"                                | Correct (the filter asked for; sector mismatch, partial geography). `CONTEXTUAL_FOLLOW_UP`, `research: NEVER`, `navigationGuard: SHOWN_LIST_EXPLANATION`, **0 tools**, stayed on Home. PASS |
+| "What put the second one in the first list above the rest?" | Mizan, correctly not "above the rest": tied at 9.2 with three others. 0 tools, in place. PASS                                                                                               |
+| "Open Baridi's profile" (negative)                          | "Opening Baridi…", moved to the profile. PASS                                                                                                                                               |
+
+Correctness, routing and navigation now hold for unseen wording. **Latency is still open:** each explanation took 13–15 s with no tools. The time goes to:
+
+- the reader and a third classification call (2.0 s + 0.3 s + 1.4 s);
+- one answer call of 7.3–7.8 s, whose text is delivered only at `q.message.completed` (12.2 s and 14.5 s), not streamed.
+  That is the next latency item (deliverable D).
