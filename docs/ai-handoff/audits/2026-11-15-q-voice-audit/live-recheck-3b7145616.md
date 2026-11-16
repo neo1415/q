@@ -18,3 +18,12 @@ Evidence: screenshots `docs/ai-handoff/evidence/2026-11-16-recheck-3b7145616/`; 
 | T7' | (founder) "And which suit us worst?"                                                   | PARTIAL   | **PASS**  | Exclusion carried; says none publishes criteria that make a poor fit, and names two that publish too little.                                                                                                   |
 
 Other findings (queued in the same fix): navigation messages read as raw page titles ("I've opened Company profile.", "I've opened Relationship.").
+
+## Follow-up on `9913a5b64` (16 Nov, 02:27 UTC; gate PASS 1411 s; Railway SUCCESS ×4 by 02:26 UTC)
+
+Re-asked with new wording (investor `20b55202`, founder `2997ffe6`; USD 0.16, ledger `590cea84`).
+
+- "Why is that one at the top?" after a one-item worst-first list: answer correct and in place. Routing `CONTEXTUAL_FOLLOW_UP`, `research: NEVER`, `navigation: NONE`, `researchGuard: SHOWN_LIST_ITEM`. No web search, no page move. **Still PARTIAL on cost:** 7 record tools, 1 answer call, 9.6 s; the answer-from-card path did not fire. A fix is in progress.
+- Count-one grammar: "one has revenue on record and is outside your preferred sectors". PASS.
+- Founder "Which investors match us best, not counting the ones we already have conversations with?": no unprompted withholding line. PASS.
+- The widened list no longer said "None of the … I just showed …, so I looked wider" on this run; this is being checked in the same fix.
