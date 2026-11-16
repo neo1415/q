@@ -159,6 +159,47 @@ describe("readDataRoom", () => {
     ).toBeLessThanOrEqual(6_000);
   });
 
+  // Live 16 Nov 2026 (b87ad973, Halyard's founder): the deck and an old cap
+  // table used the passage budget before the management accounts.
+  it("reads the management accounts and revenue evidence first, and names every title", async () => {
+    const read: string[] = [];
+    const titles = [
+      ["deck", "Halyard seed deck (Oct 2026)", "PITCH_DECK"],
+      ["cap", "Cap table at 30 Sep 2026", "CORPORATE"],
+      ["inv", "Invoice register, Nov 2025 to Oct 2026", "FINANCIAL"],
+      [
+        "ma",
+        "Management accounts, Nov 2025 to Oct 2026",
+        "MANAGEMENT_ACCOUNTS",
+      ],
+    ] as const;
+    const room = await readDataRoom(
+      {
+        documents: () =>
+          Promise.resolve(
+            titles.map(([documentId, title, documentType]) => ({
+              documentId,
+              title,
+              folder: "F",
+              documentType,
+              access: "OWNER" as const,
+              pageCount: null,
+              updatedAt: "2026-11-12T00:00:00.000Z",
+              opening: null,
+            })),
+          ),
+        documentText: (_a, _c, id) => {
+          read.push(id);
+          return Promise.resolve({ text: "x".repeat(50_000), truncated: true });
+        },
+      },
+      actor,
+      "company",
+    );
+    expect(read.slice(0, 2)).toEqual(["ma", "inv"]);
+    expect(room.titles).toEqual(titles.map(([, title]) => title));
+  });
+
   it("reads nothing when the data room cannot be read as them", async () => {
     const room = await readDataRoom(
       {

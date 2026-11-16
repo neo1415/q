@@ -558,6 +558,7 @@ import {
   sharedPageRange,
   type ListedDocument,
 } from "./shared-documents.js";
+import { ownEvidenceTurn, readOwnDocuments } from "./own-documents.js";
 import {
   DATA_ROOM_FACTS_MAX_CHARS,
   dataRoomDocumentFacts,
@@ -8794,6 +8795,33 @@ export function createModelGatewayQAnswer(
       const prefetchable = new Set(
         offeredForRun.map((tool) => tool.definition.name),
       );
+      // Live 16 Nov (own-documents.ts, Halyard on b156a9cd1): a founder's
+      // own evidence question lists what their company uploaded and
+      // pre-reads its most useful pages (ADR 0079), beside the reads below.
+      const ownDocumentsRead = ownEvidenceTurn({
+        side: askerSideOf(request),
+        questionKind: request.questionKind,
+        executionClass: request.executionClass,
+        turnKind: request.turnKind,
+        writingDocument: request.writingDocument,
+        aboutSomeoneElse:
+          counterparty !== undefined &&
+          !(
+            counterparty.kind === "COMPANY" &&
+            counterparty.companyId === ownCompanyId
+          ),
+      })
+        ? readOwnDocuments({
+            execute: (proposal) => callTool(proposal, toolContext),
+            available: new Set(
+              (availableForRun ?? offeredForRun).map(
+                (tool) => tool.definition.name,
+              ),
+            ),
+            ownCompanyId,
+            question: latest.content,
+          })
+        : Promise.resolve([]);
       if (
         (request.questionKind === "ADVICE" ||
           request.questionKind === "THEIR_OWN_RECORDS") &&
@@ -8912,10 +8940,12 @@ export function createModelGatewayQAnswer(
                 facts: [],
                 subjectDescription: CARD_FOLLOW_UP_SUBJECT,
               };
+        const ownDocuments = await ownDocumentsRead;
         const facts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
           ...(ownHeldBack === null ? [] : [ownHeldBack]),
+          ...ownDocuments,
           ...(ownTeam === null ? [] : [ownTeam]),
           ...w.onboardingFacts,
           ...(ownProfile === null ? [] : [ownProfile]),

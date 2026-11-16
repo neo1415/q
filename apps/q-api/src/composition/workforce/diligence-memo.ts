@@ -145,6 +145,29 @@ export type DataRoomPassage = {
 const MATERIAL =
   /financ|accounts|statement|deck|pitch|traction|metric|kpi|revenue|customer|contract|cap ?table|report|investor update/iu;
 
+/**
+ * Live 16 Nov 2026 (b87ad973, Halyard's founder): with the passages capped
+ * at DATA_ROOM_BOUNDS.totalChars, a material-or-not sort read whatever was
+ * listed first (the deck, an old cap table), and the founder's management
+ * accounts and invoice register -- readable to them since ADR 0079 -- fell
+ * outside the budget. Management accounts lead, then the revenue evidence,
+ * then other financials, then the rest of the material.
+ */
+const RANKS: readonly (readonly [RegExp, number])[] = [
+  [/management\s+accounts?|MANAGEMENT_ACCOUNTS/u, 5],
+  [/invoice|revenue|receivable|sales\s+ledger/iu, 4],
+  [/financ|accounts|statement|bank|kpi|metric/iu, 3],
+  [/cap(?:itali[sz]ation)?\s*table|contract|customer/iu, 2],
+];
+function materialRank(document: {
+  readonly title: string;
+  readonly documentType: string | null;
+}): number {
+  const words = `${document.title} ${document.documentType ?? ""}`;
+  for (const [pattern, rank] of RANKS) if (pattern.test(words)) return rank;
+  return MATERIAL.test(words) ? 1 : 0;
+}
+
 function sentences(text: string): readonly string[] {
   return text
     .replace(/\s+/gu, " ")
@@ -169,6 +192,8 @@ export async function readDataRoom(
   readonly available: boolean;
   /** Titles open to them but held back from Q by classification; never read. */
   readonly heldBack: readonly string[];
+  /** Every title open to them (read or not), so none is asked for again. */
+  readonly titles?: readonly string[];
 }> {
   const listed = await reads.documents(actor, companyId).catch(() => null);
   if (listed === null)
@@ -184,11 +209,7 @@ export async function readDataRoom(
     .map((document) => document.title);
   const open = openable.filter((document) => document.heldBack !== true);
   const chosen = [...open]
-    .sort(
-      (a, b) =>
-        Number(MATERIAL.test(`${b.title} ${b.documentType ?? ""}`)) -
-        Number(MATERIAL.test(`${a.title} ${a.documentType ?? ""}`)),
-    )
+    .sort((a, b) => materialRank(b) - materialRank(a))
     .slice(0, DATA_ROOM_BOUNDS.documents);
   const passages: DataRoomPassage[] = [];
   let used = 0;
@@ -233,6 +254,7 @@ export async function readDataRoom(
     notOpen: listed.length - openable.length,
     available: true,
     heldBack,
+    titles: openable.map((document) => document.title).slice(0, 40),
   };
 }
 

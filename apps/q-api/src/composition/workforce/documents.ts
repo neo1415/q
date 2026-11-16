@@ -356,6 +356,11 @@ export function createWorkforceDocuments(dependencies: {
           codeGaps.push(heldBackGap(title, request.scope === "OWN_COMPANY"));
         if (room.heldBack.length > 0)
           company = `${company}\n\nHELD BACK FROM Q (classified highly confidential or restricted; never read, no model received them; say so wherever figures or contradictions come up, and that their figures become usable once the founder confirms them): ${room.heldBack.map((title) => `"${title.slice(0, 160)}"`).join(", ")}`;
+        // Live 16 Nov (b87ad973): the founder's own job asked them for a cap
+        // table and invoices already uploaded. Every document their room
+        // holds is named, and never asked for again.
+        if (request.scope === "OWN_COMPANY" && (room.titles?.length ?? 0) > 0)
+          company = `${company}\n\nDOCUMENTS THEY HAVE ALREADY UPLOADED (never ask them to upload or provide any of these; name it and use it, or say which part needs bringing up to date): ${(room.titles ?? []).map((title) => `"${title.slice(0, 160)}"`).join(", ")}`;
         const text = dataRoomText(room.passages);
         if (text.length > 0) company = `${company}\n\n${text}`;
         if (room.passages.length === 0)
