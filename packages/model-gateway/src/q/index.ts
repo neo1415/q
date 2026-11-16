@@ -291,6 +291,7 @@ import {
   templateValues,
   type ClaimKind,
 } from "./claim-check.js";
+import { documentRowFacts } from "./document-rows.js";
 import {
   checkPromises,
   createPromiseChecker,
@@ -8984,6 +8985,9 @@ export function createModelGatewayQAnswer(
           ...(w.ownIndex === null ? [] : [w.ownIndex]),
           ...(pitchMoment === null ? [] : [pitchMoment]),
           ...assembled.facts,
+          // A passage's count table, its rows read by code and said plainly
+          // beside it (document-rows.ts; live run 91bb8564).
+          ...documentRowFacts(assembled.facts),
         ];
         // D3 and slice 1: every fact citable by label, and what each is
         // (the prompt the model answers is the last one assembled).
@@ -11932,6 +11936,13 @@ export function createModelGatewayQAnswer(
           .filter((message) => message.role === "Q")
           .map((message) => message.content),
         ...[...ownRecordNotes].map((message) => message.content),
+        // Live re-check on a65386689 (run 91bb8564): recall carried Q's
+        // own replies and summaries from two earlier conversations ("Q
+        // said: ... 4 public-sector account managers"), rendered into the
+        // task message, and they bound the wrong count as if a document
+        // had said it. What memory recalls is talk, not the document: an
+        // echo. Their own past words still ground (recalledOwnWords).
+        memory,
       ];
       claimSources = () => [
         ...facts.map((fact) => fact.statement),

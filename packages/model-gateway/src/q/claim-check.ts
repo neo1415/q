@@ -33,6 +33,8 @@
 
 import { countryOfName } from "@capital-q/taxonomy/countries";
 
+import { documentTables } from "./document-rows.js";
+
 export type ClaimKind = "NUMBER" | "MONEY" | "PERCENT" | "DATE" | "NAME";
 
 /** One checkable claim in a sentence. */
@@ -89,6 +91,12 @@ export interface ClaimCorpus {
    * what a count of a named item is bound to.
    */
   readonly sourceLines: readonly (readonly string[])[];
+  /**
+   * Per quarter ("2027-Q1"), what each count table of the sources adds up
+   * to over its rows starting then (document-rows.ts): what a count said
+   * of a quarter ("5 in Q1") is bound to.
+   */
+  readonly periodCounts: ReadonlyMap<string, readonly number[]>;
 }
 
 export interface SentenceCheck {
@@ -352,6 +360,24 @@ export function claimCorpus(
     }
     if (own.length > 0) sourceLines.push(own);
   }
+  // Each table's rows starting in a quarter, added up (document-rows.ts);
+  // from the sources only, never from Q's own earlier words.
+  const periodCounts = new Map<string, number[]>();
+  for (const own of sourceLines) {
+    if (!own.some((line) => line.includes("|"))) continue;
+    for (const table of documentTables(own.join("\n"))) {
+      const sums = new Map<string, number>();
+      for (const row of table.rows) {
+        if (row.period === null) continue;
+        sums.set(row.period, (sums.get(row.period) ?? 0) + row.count);
+      }
+      for (const [period, sum] of sums) {
+        const known = periodCounts.get(period) ?? [];
+        if (!known.includes(sum)) known.push(sum);
+        periodCounts.set(period, known);
+      }
+    }
+  }
   const iso = today.toISOString().slice(0, 10);
   const all = [...sources, ...echoes, iso];
   for (const source of all) {
@@ -397,6 +423,7 @@ export function claimCorpus(
     ordinary,
     minutes,
     sourceLines,
+    periodCounts,
   };
 }
 
@@ -1432,6 +1459,77 @@ function totalsStatedIn(previous: string): readonly number[] {
     .map((figure) => figure.value);
 }
 
+/**
+ * Live re-check on a65386689 (run 91bb8564): "15 people ...: 5 in Q1, 10
+ * in Q2 and 1 in Q3", where the plan's Q1 rows add up to 4. A count said of
+ * a quarter is held to what the sources' count tables add up to over their
+ * rows starting then (claimCorpus `periodCounts`); a quarter said without
+ * its year is bound only where the tables give it in one year.
+ */
+const PERIOD_AFTER =
+  /^\s+(?:(?:new\s+)?(?:people|persons|hires|roles|staff|employees|heads)\s+)?(?:in|by|during|from|for|starting(?:\s+in)?)\s+(?:the\s+)?(?:(?<y1>(?:19|20)\d{2})\s?-\s?q(?<q1>[1-4])|q(?<q2>[1-4])(?:\s+(?:of\s+)?(?<y2>(?:19|20)\d{2}))?)(?![\p{L}\p{N}])/iu;
+
+type PeriodPart = {
+  readonly figure: Figure;
+  readonly quarter: string;
+  readonly year: string | null;
+};
+
+function periodPartsIn(text: string): PeriodPart[] {
+  return figuresIn(text).flatMap((figure) => {
+    if (
+      figure.kind !== "NUMBER" ||
+      !Number.isInteger(figure.value) ||
+      isYear(figure)
+    ) {
+      return [];
+    }
+    const match = PERIOD_AFTER.exec(text.slice(figure.end));
+    const groups = match?.groups;
+    const quarter = groups?.["q1"] ?? groups?.["q2"];
+    if (quarter === undefined) return [];
+    return [
+      { figure, quarter, year: groups?.["y1"] ?? groups?.["y2"] ?? null },
+    ];
+  });
+}
+
+function bindPeriod(part: PeriodPart, corpus: ClaimCorpus): CountBinding {
+  const keys = [...corpus.periodCounts.keys()].filter(
+    (key) =>
+      key.endsWith(`-Q${part.quarter}`) &&
+      (part.year === null || key.startsWith(part.year)),
+  );
+  if (keys.length === 0) return { kind: "UNPLACED" };
+  if (new Set(keys.map((key) => key.slice(0, 4))).size > 1) {
+    return { kind: "UNPLACED" };
+  }
+  const values = new Set(
+    keys.flatMap((key) => corpus.periodCounts.get(key) ?? []),
+  );
+  if (values.has(part.figure.value)) {
+    return { kind: "GROUNDED", sources: new Set() };
+  }
+  return {
+    kind: "CONTRADICTED",
+    only: values.size === 1 ? ([...values][0] ?? null) : null,
+    sources: new Set(),
+  };
+}
+
+/** A count written as a word ("four account managers") the rows contradict. */
+function wordCountContradicted(text: string, corpus: ClaimCorpus): boolean {
+  const lower = text.toLowerCase();
+  return COUNT_WORD_PATTERNS.some((pattern, value) =>
+    [...lower.matchAll(pattern)].some((match) => {
+      const item = countedItem(lower.slice(match.index + match[0].length));
+      return (
+        item !== null && bindCount(value, item, corpus).kind === "CONTRADICTED"
+      );
+    }),
+  );
+}
+
 function checkCounts(
   sentence: string,
   corpus: ClaimCorpus,
@@ -1443,11 +1541,35 @@ function checkCounts(
     contradicted: true,
     totals: [],
   };
+  // A count written as a word is never rewritten: the sentence goes.
+  if (wordCountContradicted(sentence, corpus)) return contradicted;
   let text = sentence;
   const grounded = new Set<number>();
   const corrections: { readonly sources: ReadonlySet<number> }[] = [];
+  let periodCorrections = 0;
+  const periodValues: number[] = [];
+  const periods = periodPartsIn(sentence);
+  const parts = [
+    ...listedParts(sentence).map((figure) => ({ figure, period: null })),
+    ...periods.map((period) => ({ figure: period.figure, period })),
+  ].sort((left, right) => right.figure.index - left.figure.index);
   // Right to left, so a correction never moves a figure still to check.
-  for (const figure of [...listedParts(sentence)].reverse()) {
+  for (const { figure, period } of parts) {
+    if (period !== null) {
+      const bound = bindPeriod(period, corpus);
+      if (bound.kind === "GROUNDED") {
+        periodValues.push(figure.value);
+        continue;
+      }
+      if (bound.kind !== "CONTRADICTED") continue;
+      if (bound.only === null || !/^\d+$/u.test(figure.text.trim())) {
+        return contradicted;
+      }
+      text = `${text.slice(0, figure.index)}${String(bound.only)}${text.slice(figure.end)}`;
+      periodValues.push(bound.only);
+      periodCorrections += 1;
+      continue;
+    }
     const item = countedItem(sentence.slice(figure.end));
     if (item === null) continue;
     const bound = bindCount(figure.value, item, corpus);
@@ -1462,6 +1584,21 @@ function checkCounts(
     text = `${text.slice(0, figure.index)}${String(bound.only)}${text.slice(figure.end)}`;
     corrections.push({ sources: bound.sources });
   }
+  if (periodCorrections > 0) {
+    // A quarter's count is put right only where the sentence's quarters,
+    // as put right, add up to the head count it (or the sentence before)
+    // states, each of them on the tables: "15 people ...: 4 in Q1, 10 in
+    // Q2 and 1 in Q3". Otherwise the sentence goes.
+    const after = periodPartsIn(text);
+    const sum = after.reduce((all, part) => all + part.figure.value, 0);
+    const stated = [...totalsStatedIn(text), ...totalsStatedIn(previous)];
+    const placed = after.every(
+      (part) => bindPeriod(part, corpus).kind === "GROUNDED",
+    );
+    if (after.length < 2 || !placed || !stated.includes(sum)) {
+      return contradicted;
+    }
+  }
   const total = statedTotal(text, corpus);
   if (total === "OFF") return contradicted;
   if (corrections.length > 0 && total === null) {
@@ -1473,11 +1610,11 @@ function checkCounts(
     // source. Otherwise the sentence goes (the claim check's rule), never
     // a figure code chose alone: "2 deployment engineers joined in July"
     // is not the plan's count.
-    const parts = listedParts(text);
-    const sum = parts.reduce((all, part) => all + part.value, 0);
+    const listed = listedParts(text);
+    const sum = listed.reduce((all, part) => all + part.value, 0);
     const stated = totalsStatedIn(previous);
-    const addsUp = parts.length >= 2 && stated.includes(sum);
-    if (parts.length >= 2 && stated.length > 0 && !addsUp) {
+    const addsUp = listed.length >= 2 && stated.includes(sum);
+    if (listed.length >= 2 && stated.length > 0 && !addsUp) {
       return contradicted;
     }
     const recited = corrections.every((correction) =>
@@ -1487,9 +1624,9 @@ function checkCounts(
   }
   return {
     text,
-    corrected: corrections.length,
+    corrected: corrections.length + periodCorrections,
     contradicted: false,
-    totals: total === null ? [] : [total],
+    totals: [...(total === null ? [] : [total]), ...periodValues],
   };
 }
 
@@ -1525,6 +1662,14 @@ function headCountListedNext(
  * contradict (a finding is kept or dropped, never rewritten).
  */
 function countsContradicted(text: string, corpus: ClaimCorpus): boolean {
+  if (wordCountContradicted(text, corpus)) return true;
+  if (
+    periodPartsIn(text).some(
+      (part) => bindPeriod(part, corpus).kind === "CONTRADICTED",
+    )
+  ) {
+    return true;
+  }
   return listedParts(text).some((figure) => {
     const item = countedItem(text.slice(figure.end));
     return (
