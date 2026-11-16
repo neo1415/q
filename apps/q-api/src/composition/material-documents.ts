@@ -33,7 +33,9 @@ type Row = {
  * firewall plan and no model provider may receive it. The data room's own
  * view lists it for its team (and for anyone it is shared with), so these
  * reads withheld nothing: its text could reach a model through Q. It is
- * now named as held back and never read, whoever asks.
+ * now named as held back and never read, whoever asks -- except (ADR 0078,
+ * owner decision 99) by the investor the founder shared it with, through
+ * an active grant to their own organisation, for that investor's turns.
  */
 export function heldBackClass(sensitivityClass: string | null): boolean {
   return (
@@ -42,14 +44,67 @@ export function heldBackClass(sensitivityClass: string | null): boolean {
   );
 }
 
+/**
+ * ADR 0078 (owner decision 99, "shared means readable"): only a
+ * HIGHLY_CONFIDENTIAL document is ever unlocked by a share; RESTRICTED
+ * (identity artefacts) never enters Q, shared or not.
+ */
+function shareMayUnlock(sensitivityClass: string | null): boolean {
+  return sensitivityClass === "HIGHLY_CONFIDENTIAL";
+}
+
+/** The grant a shared, held-back document is read under (provenance). */
+export type SharedUnder = {
+  readonly grantId: string;
+  readonly expiresAt: string | null;
+};
+
 export function createMaterialDocumentReads(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly view: (
     actor: ActorContext,
     companyId: string,
   ) => Promise<DataRoomView | null>;
+  /**
+   * ADR 0078: the data room's own active grant of one document to the
+   * actor's investor organisation (permissions' qReadableShare: the same
+   * relationship, grant and access-service checks that let them open it),
+   * or null. Absent: nothing held back is ever read (the diligence
+   * workforce composes this without it).
+   */
+  readonly sharedGrant?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+        documentId: string,
+      ) => Promise<SharedUnder | null>)
+    | undefined;
 }) {
   const { sql, view } = dependencies;
+
+  /**
+   * Whether a held-back document is readable to this person after all:
+   * only an investor's OPEN entry, only HIGHLY_CONFIDENTIAL, only under an
+   * active grant to their own organisation, asked afresh on every read
+   * (never cached), so a revoked or expired grant closes it at once. A
+   * failed lookup is no share.
+   */
+  const shareOf = async (
+    actor: ActorContext,
+    companyId: string,
+    entry: { readonly documentId: string; readonly access: string },
+    sensitivityClass: string | null,
+  ): Promise<SharedUnder | null> => {
+    const lookup = dependencies.sharedGrant;
+    if (
+      lookup === undefined ||
+      entry.access !== "OPEN" ||
+      !shareMayUnlock(sensitivityClass)
+    ) {
+      return null;
+    }
+    return lookup(actor, companyId, entry.documentId).catch(() => null);
+  };
 
   const lookup = async (
     companyId: string,
@@ -125,24 +180,36 @@ export function createMaterialDocumentReads(dependencies: {
         entries.map((e) => e.documentId),
         2,
       );
-      return entries.map((entry) => {
-        const row = all.get(entry.documentId);
-        const heldBack = heldBackClass(row?.sensitivity_class ?? null);
-        return {
-          ...entry,
-          documentType: row?.document_type ?? null,
-          // The opening only where they may open it: a title they may
-          // know exists says nothing more of what is inside. Never for a
-          // document held back from Q.
-          opening:
-            !heldBack &&
-            openable.includes(entry.documentId) &&
-            row?.text != null
-              ? row.text.slice(0, OPENING_CHARS)
-              : null,
-          ...(heldBack ? { heldBack: true } : {}),
-        };
-      });
+      return Promise.all(
+        entries.map(async (entry) => {
+          const row = all.get(entry.documentId);
+          const classified = heldBackClass(row?.sensitivity_class ?? null);
+          const shared = classified
+            ? await shareOf(
+                actor,
+                companyId,
+                entry,
+                row?.sensitivity_class ?? null,
+              )
+            : null;
+          const heldBack = classified && shared === null;
+          return {
+            ...entry,
+            documentType: row?.document_type ?? null,
+            // The opening only where they may open it: a title they may
+            // know exists says nothing more of what is inside. Never for a
+            // document held back from Q.
+            opening:
+              !heldBack &&
+              openable.includes(entry.documentId) &&
+              row?.text != null
+                ? row.text.slice(0, OPENING_CHARS)
+                : null,
+            ...(heldBack ? { heldBack: true } : {}),
+            ...(shared === null ? {} : { sharedUnder: shared }),
+          };
+        }),
+      );
     },
     documentText: async (
       actor: ActorContext,
@@ -151,6 +218,7 @@ export function createMaterialDocumentReads(dependencies: {
     ): Promise<{
       readonly text: string;
       readonly truncated: boolean;
+      readonly sharedUnder?: SharedUnder;
     } | null> => {
       const room = await view(actor, companyId);
       if (room === null) return null;
@@ -163,12 +231,23 @@ export function createMaterialDocumentReads(dependencies: {
         return null;
       }
       const row = (await lookup(companyId, [id], 60)).get(id);
-      if (heldBackClass(row?.sensitivity_class ?? null)) return null;
+      let shared: SharedUnder | null = null;
+      if (heldBackClass(row?.sensitivity_class ?? null)) {
+        // Checked again here, at the read itself, before any text leaves.
+        shared = await shareOf(
+          actor,
+          companyId,
+          entry,
+          row?.sensitivity_class ?? null,
+        );
+        if (shared === null) return null;
+      }
       const text = row?.text?.trim() ?? "";
       if (text.length === 0) return null;
       return {
         text: text.slice(0, TEXT_CHARS),
         truncated: text.length > TEXT_CHARS,
+        ...(shared === null ? {} : { sharedUnder: shared }),
       };
     },
     /**
@@ -187,6 +266,7 @@ export function createMaterialDocumentReads(dependencies: {
         readonly page: number;
         readonly text: string;
       }[];
+      readonly sharedUnder?: SharedUnder;
     } | null> => {
       const room = await view(actor, companyId);
       if (room === null) return null;
@@ -202,7 +282,12 @@ export function createMaterialDocumentReads(dependencies: {
         select d.sensitivity_class::text as sensitivity_class
           from evidence.documents d
          where d.company_id = ${companyId} and d.id = ${id}`;
-      if (heldBackClass(held[0]?.sensitivity_class ?? null)) return null;
+      const sensitivityClass = held[0]?.sensitivity_class ?? null;
+      let shared: SharedUnder | null = null;
+      if (heldBackClass(sensitivityClass)) {
+        shared = await shareOf(actor, companyId, entry, sensitivityClass);
+        if (shared === null) return null;
+      }
       const rows = await sql<
         { page_number: number; text: string | null; page_count: number }[]
       >`
@@ -228,6 +313,7 @@ export function createMaterialDocumentReads(dependencies: {
         pages: rows
           .filter((row) => row.text !== null)
           .map((row) => ({ page: row.page_number, text: row.text ?? "" })),
+        ...(shared === null ? {} : { sharedUnder: shared }),
       };
     },
   };

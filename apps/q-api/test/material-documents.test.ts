@@ -201,3 +201,161 @@ describe("a highly confidential document is never read for Q", () => {
     ).toBeNull();
   });
 });
+
+// ADR 0078 (owner decision 99, "shared means readable"): a highly
+// confidential document the founder shared with ONE investor's
+// organisation is read for that investor's Q only, under the grant the
+// data room resolves for them, checked again at the read itself; every
+// other investor, the owner, a revoked grant and RESTRICTED stay held back.
+describe("a shared highly confidential document (ADR 0078)", () => {
+  const ACCOUNTS = "00000000-0000-4000-8000-00000000c009";
+  const PASSPORT = "00000000-0000-4000-8000-00000000c00a";
+  const GRANT = "00000000-0000-4000-8000-0000000009aa";
+  const investorRoom: DataRoomView = {
+    viewer: "INVESTOR",
+    companyId: COMPANY,
+    folders: [{ code: "finance", label: "Finance" }],
+    documents: [ACCOUNTS, PASSPORT].map((documentId, index) => ({
+      documentId,
+      title: index === 0 ? "Management accounts Sept 2026" : "Passport",
+      folderCode: "finance",
+      shownAs: "SHARED" as const,
+      access: "OPEN" as const,
+      kind: "PDF",
+      pageCount: 2,
+      updatedAt: "2026-10-28T00:00:00.000Z",
+      validUntil: null,
+      openedAt: null,
+      accessEndsAt: "2026-12-01T00:00:00.000Z",
+    })),
+  };
+  const rows = [
+    {
+      id: ACCOUNTS,
+      document_type: "MANAGEMENT_ACCOUNTS",
+      sensitivity_class: "HIGHLY_CONFIDENTIAL",
+      text: "Cash $410,000; monthly burn $38,000",
+      page_number: 1,
+      page_count: 2,
+    },
+    {
+      id: PASSPORT,
+      document_type: "IDENTITY",
+      sensitivity_class: "RESTRICTED",
+      text: "Passport number X",
+      page_number: 1,
+      page_count: 1,
+    },
+  ];
+  function shared(
+    view: DataRoomView,
+    grant: { current: { grantId: string; expiresAt: string | null } | null },
+    withLookup = true,
+  ) {
+    const askedFor: string[] = [];
+    const fake = (_strings: TemplateStringsArray, ..._values: unknown[]) =>
+      Promise.resolve(rows);
+    const port = createMaterialDocumentReads({
+      sql: fake as unknown as DatabaseExecutor,
+      view: () => Promise.resolve(view),
+      ...(withLookup
+        ? {
+            sharedGrant: (_actor: ActorContext, _c: string, id: string) => {
+              askedFor.push(id);
+              return Promise.resolve(grant.current);
+            },
+          }
+        : {}),
+    });
+    return { port, askedFor };
+  }
+  const active = { grantId: GRANT, expiresAt: "2026-12-01T00:00:00.000Z" };
+
+  it("lists, reads and pages it for the investor it was shared with, naming the grant", async () => {
+    const { port } = shared(investorRoom, { current: active });
+    const documents = await port.documents(actor, COMPANY);
+    expect(documents?.[0]).toMatchObject({
+      documentId: ACCOUNTS,
+      opening: "Cash $410,000; monthly burn $38,000",
+      sharedUnder: active,
+    });
+    expect(documents?.[0]?.heldBack).toBeUndefined();
+    expect(await port.documentText(actor, COMPANY, ACCOUNTS)).toEqual({
+      text: "Cash $410,000; monthly burn $38,000",
+      truncated: false,
+      sharedUnder: active,
+    });
+    expect(
+      await port.documentPages(actor, COMPANY, ACCOUNTS, { from: 1, to: 1 }),
+    ).toMatchObject({ sharedUnder: active });
+  });
+
+  it("stays held back for an investor with no grant (another investor)", async () => {
+    const { port } = shared(investorRoom, { current: null });
+    const documents = await port.documents(actor, COMPANY);
+    expect(documents?.[0]).toMatchObject({ heldBack: true, opening: null });
+    expect(documents?.[0]?.sharedUnder).toBeUndefined();
+    expect(await port.documentText(actor, COMPANY, ACCOUNTS)).toBeNull();
+    expect(
+      await port.documentPages(actor, COMPANY, ACCOUNTS, { from: 1, to: 2 }),
+    ).toBeNull();
+  });
+
+  it("closes the moment the grant is revoked, even after it was listed", async () => {
+    const grant: {
+      current: { grantId: string; expiresAt: string | null } | null;
+    } = { current: active };
+    const { port } = shared(investorRoom, grant);
+    expect((await port.documents(actor, COMPANY))?.[0]?.sharedUnder).toEqual(
+      active,
+    );
+    grant.current = null;
+    expect(await port.documentText(actor, COMPANY, ACCOUNTS)).toBeNull();
+    expect(
+      await port.documentPages(actor, COMPANY, ACCOUNTS, { from: 1, to: 2 }),
+    ).toBeNull();
+  });
+
+  it("never unlocks RESTRICTED, and never asks without the share lookup", async () => {
+    const { port, askedFor } = shared(investorRoom, { current: active });
+    expect(await port.documentText(actor, COMPANY, PASSPORT)).toBeNull();
+    expect(askedFor).not.toContain(PASSPORT);
+    const none = shared(investorRoom, { current: active }, false);
+    expect(await none.port.documentText(actor, COMPANY, ACCOUNTS)).toBeNull();
+  });
+
+  it("leaves the founder's own Q unchanged: the owner view is still held back", async () => {
+    const ownerRoom: DataRoomView = {
+      viewer: "OWNER",
+      companyId: COMPANY,
+      stageCode: "seed",
+      countryCode: "NG",
+      folders: [{ code: "finance", label: "Finance" }],
+      documents: [
+        {
+          documentId: ACCOUNTS,
+          title: "Management accounts Sept 2026",
+          folderCode: "finance",
+          checklistItemCode: null,
+          level: "SHARED_ONLY",
+          visibilityScope: "specifically_shared",
+          kind: "PDF",
+          pageCount: 2,
+          updatedAt: "2026-10-28T00:00:00.000Z",
+          validUntil: null,
+          sharedWith: 1,
+          openedBy: 0,
+          version: 1,
+        },
+      ],
+      checklist: [],
+      requests: [],
+    };
+    const { port, askedFor } = shared(ownerRoom, { current: active });
+    expect((await port.documents(actor, COMPANY))?.[0]).toMatchObject({
+      heldBack: true,
+    });
+    expect(await port.documentText(actor, COMPANY, ACCOUNTS)).toBeNull();
+    expect(askedFor).toEqual([]);
+  });
+});

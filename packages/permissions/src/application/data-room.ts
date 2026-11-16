@@ -1231,6 +1231,86 @@ export function createDataRoomService(dependencies: {
     },
 
     /**
+     * ADR 0078 (owner decision 99, "shared means readable"): the active
+     * grant under which this investor's Q may read one document the
+     * evidence classification otherwise holds back from Q. Exactly the
+     * investor branch of `open` below, minus the PUBLIC level: a CONNECTED
+     * relationship of the actor's own investor organisation (resolved
+     * here from the actor, never from a client id), an unrevoked,
+     * unexpired grant naming this document, and the access service's
+     * `view` decision for this person. A room-wide level is not a share
+     * with one investor, so PUBLIC alone answers null; so does the
+     * owner (the founder's own Q is unchanged) and every failed read.
+     * Decided afresh on every call: revocation and expiry take effect on
+     * the next read.
+     */
+    qReadableShare: async (query: {
+      readonly actor: ActorContext;
+      readonly companyId: string;
+      readonly documentId: string;
+    }): Promise<{
+      readonly grantId: string;
+      readonly expiresAt: string | null;
+    } | null> => {
+      const reader = await readerOf(query.actor, query.companyId);
+      if (
+        reader === null ||
+        reader.kind !== "INVESTOR" ||
+        reader.connection !== "CONNECTED" ||
+        reader.relationshipId === null
+      ) {
+        return null;
+      }
+      const document = await quietly(
+        store.document(sql, query.documentId),
+        null,
+      );
+      if (
+        document === null ||
+        document.companyId !== reader.company.id ||
+        document.currentVersionId === null
+      ) {
+        return null;
+      }
+      const find = dependencies.policyRepository.findUnrevokedForRecipient;
+      if (find === undefined) return null;
+      const policies = await quietly(
+        find(sql, {
+          resourceType: "document",
+          recipient: { type: "RELATIONSHIP", id: reader.relationshipId },
+        }),
+        [] as readonly DisclosurePolicy[],
+      );
+      const at = now();
+      const id = document.documentId.toLowerCase();
+      const active = policies.filter(
+        (policy) =>
+          policy.resource.type === "document" &&
+          policy.resource.id.toLowerCase() === id &&
+          isPolicyActiveAt(policy, at),
+      );
+      if (active.length === 0) return null;
+      const decision = await quietly(
+        dependencies.access.canDisclose({
+          principal: actorPrincipal(query.actor),
+          resource: { type: "document", id: document.documentId },
+          requestedAccess: "view",
+        }),
+        null,
+      );
+      if (decision?.outcome !== "ALLOW") return null;
+      // The longest-lasting grant names the share (as activeGrants does).
+      const chosen = active.reduce((best, policy) =>
+        best.expiresAt === null
+          ? best
+          : policy.expiresAt === null || policy.expiresAt > best.expiresAt
+            ? policy
+            : best,
+      );
+      return { grantId: chosen.id, expiresAt: chosen.expiresAt };
+    },
+
+    /**
      * Opens one document for reading: the owner, an investor who can find
      * the company (PUBLIC), or one whose relationship holds an active grant
      * (decided again by the access service). View-only: shown inline with

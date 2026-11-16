@@ -85,6 +85,8 @@ export type ProfileMaterialPort = {
       ) => Promise<{
         readonly text: string;
         readonly truncated: boolean;
+        /** ADR 0078: present when the text was read under a share. */
+        readonly sharedUnder?: MaterialShare | undefined;
       } | null>)
     | undefined;
   /**
@@ -106,8 +108,22 @@ export type ProfileMaterialPort = {
           readonly page: number;
           readonly text: string;
         }[];
+        /** ADR 0078: present when the pages were read under a share. */
+        readonly sharedUnder?: MaterialShare | undefined;
       } | null>)
     | undefined;
+};
+
+/**
+ * ADR 0078 (owner decision 99, "shared means readable"): the active data
+ * room grant of a highly confidential document to the asking investor's
+ * own organisation, under which their Q may read it. Resolved server-side
+ * from the person, never from anything the client or model supplied.
+ */
+export type MaterialShare = {
+  readonly grantId: string;
+  /** When the grant ends; null: no expiry. */
+  readonly expiresAt: string | null;
 };
 
 /** One data-room document as Q may find it (R0). */
@@ -129,6 +145,11 @@ export type MaterialDocument = {
    * it, whoever may open it on screen. Absent: not held back.
    */
   readonly heldBack?: boolean | undefined;
+  /**
+   * ADR 0078: a highly confidential document the founder shared with this
+   * investor's organisation; readable by their Q under this grant only.
+   */
+  readonly sharedUnder?: MaterialShare | undefined;
 };
 
 const CompanyInputSchema = z

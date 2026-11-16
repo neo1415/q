@@ -4142,6 +4142,15 @@ const qTools = createQTools({
         sql: database.sql,
         view: (actor, companyId) =>
           profileMaterial.dataRoom.view(actor, companyId),
+        // ADR 0078 (decision 99): a held-back document the founder shared
+        // with this investor's organisation, by the data room's own grant
+        // check, for this investor's chat turns only.
+        sharedGrant: (actor, companyId, documentId) =>
+          profileMaterial.dataRoom.qReadableShare({
+            actor,
+            companyId,
+            documentId,
+          }),
       }),
     },
     // Lane ob1: their own setup conversation, recalled for their own questions.

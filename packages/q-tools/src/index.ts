@@ -801,6 +801,7 @@ export {
   READ_COMPANY_DATA_ROOM,
   READ_COMPANY_DECK,
   type MaterialDocument,
+  type MaterialShare,
   type ProfileMaterialPort,
 } from "./tools/profile-material.js";
 export {

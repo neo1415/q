@@ -19,6 +19,7 @@ import { findRecordByName, spokenNameScore } from "./client-actions.js";
 import {
   planAdmits,
   type MaterialDocument,
+  type MaterialShare,
   type ProfileMaterialPort,
 } from "./profile-material.js";
 
@@ -409,6 +410,38 @@ const ALSO_HELD_BACK = z
   .strict()
   .optional();
 
+/**
+ * ADR 0078 (owner decision 99, "shared means readable"): a highly
+ * confidential document the founder shared with this investor's own
+ * organisation is read for this investor only, under the grant named here
+ * (provenance). The figures in it are the company's own management
+ * material: DOCUMENT_SUPPORTED at most, never independently verified.
+ */
+export const SHARED_WITH_YOU_LINE =
+  "The founder shared this document with their organisation, so Q may read it for them. It is the company's own management material: say what it states as the company's figures (for example 'their management accounts show...'), not as independently verified, and never pass it on to anyone else.";
+
+const SHARED_UNDER = z
+  .object({
+    grantId: z.string().min(1).max(64),
+    expiresAt: z.string().nullable(),
+    say: z.string().max(600),
+  })
+  .strict()
+  .optional();
+
+/** The provenance a shared read carries; nothing for an ordinary read. */
+function sharedUnder(share: MaterialShare | undefined) {
+  return share === undefined
+    ? {}
+    : {
+        sharedUnder: {
+          grantId: share.grantId,
+          expiresAt: share.expiresAt,
+          say: SHARED_WITH_YOU_LINE,
+        },
+      };
+}
+
 const ON_REQUEST_LINE =
   "That document is listed on request: they cannot open it yet. Say so, and offer to ask the company for it (request_data_room_access). Nothing opened.";
 
@@ -478,6 +511,8 @@ const ReadOutputSchema = z.union([
       truthClass: z.literal("USER_CLAIM"),
       evidenceStatus: z.literal("DOCUMENT_SUPPORTED"),
       alsoHeldBack: ALSO_HELD_BACK,
+      /** ADR 0078: the grant a shared highly confidential read is under. */
+      sharedUnder: SHARED_UNDER,
     })
     .strict(),
   NotOneSchema,
@@ -536,6 +571,11 @@ export function createReadCompanyDocumentTool(
       if (read === null) {
         return deny("NOT_AVAILABLE", "That document has no readable text yet.");
       }
+      // ADR 0078: a shared highly confidential read is carried at
+      // CONFIDENTIAL for this investor's turn only -- the founder's share is
+      // the owner-approved disclosure (decision 99) -- so it reaches only a
+      // provider whose ceiling is CONFIDENTIAL (zero retention or contract).
+      // The stored document keeps its class for everyone else.
       return allow<ReadOutput>("CONFIDENTIAL", {
         status: "READ",
         documentId: resolved.document.documentId.toLowerCase(),
@@ -547,6 +587,8 @@ export function createReadCompanyDocumentTool(
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         ...alsoHeldBack(resolved.heldBack),
+        // The grant the read itself re-checked, not the listing's.
+        ...sharedUnder(read.sharedUnder),
       });
     },
     execute: (_input, _context, grant) => Promise.resolve(grant),
@@ -594,6 +636,8 @@ const PagesOutputSchema = z.union([
       truthClass: z.literal("USER_CLAIM"),
       evidenceStatus: z.literal("DOCUMENT_SUPPORTED"),
       alsoHeldBack: ALSO_HELD_BACK,
+      /** ADR 0078: the grant a shared highly confidential read is under. */
+      sharedUnder: SHARED_UNDER,
     })
     .strict(),
   z
@@ -715,6 +759,7 @@ export function createReadDocumentPagesTool(
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         ...alsoHeldBack(resolved.heldBack),
+        ...sharedUnder(read.sharedUnder),
       });
     },
     execute: (_input, _context, grant) => Promise.resolve(grant),

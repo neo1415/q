@@ -93,6 +93,8 @@ function world(
     readonly outline?: boolean;
     /** The notice store refuses every notice (live audit 2026-11-15 D1). */
     readonly noticesFail?: boolean;
+    /** The access service's answer (default ALLOW). */
+    readonly disclose?: "ALLOW" | "DENY";
   } = {},
 ) {
   const connections =
@@ -266,7 +268,8 @@ function world(
         ),
     },
     access: {
-      canDisclose: () => Promise.resolve({ outcome: "ALLOW" } as never),
+      canDisclose: () =>
+        Promise.resolve({ outcome: options.disclose ?? "ALLOW" } as never),
     },
     signedInline: () =>
       Promise.resolve({
@@ -1030,5 +1033,103 @@ describe("access goes through the relationship (2026-10-08)", () => {
 
   it("outlines nothing when not allowed", () => {
     expect(lockedOutline([], [PUBLIC_DOC], false)).toBeNull();
+  });
+});
+
+// ADR 0078 (owner decision 99, "shared means readable"): the grant under
+// which one investor's Q may read a held-back document the founder shared
+// with them. The same relationship, grant and access-service checks as
+// open(); never the PUBLIC level alone, never the owner, never another
+// investor, and gone the moment the grant is revoked or expires.
+describe("qReadableShare (ADR 0078)", () => {
+  const R2 = "00000000-0000-4000-8000-000000000502";
+  const both = () =>
+    new Map<string, RelationshipConnection>([
+      [R1, "CONNECTED"],
+      [R2, "CONNECTED"],
+    ]);
+  const share = (
+    policies: DisclosurePolicy[],
+    documentId: string,
+    relationshipId: string,
+    patch: Partial<{ expiresAt: string | null; revokedAt: string | null }> = {},
+  ) => {
+    const policy = {
+      id: `00000000-0000-4000-8000-0000000009${String(10 + policies.length)}`,
+      resource: { type: "document", id: documentId },
+      recipient: { type: "RELATIONSHIP", id: relationshipId },
+      scopeType: "relationship_shared",
+      accessLevel: "view",
+      expiresAt: "2026-11-01T00:00:00.000Z",
+      revokedAt: null,
+      createdAt: NOW,
+      ...patch,
+    } as unknown as DisclosurePolicy;
+    policies.push(policy);
+    return policy;
+  };
+  const ask = (
+    service: ReturnType<typeof world>["service"],
+    who: ActorContext,
+    documentId: string,
+  ) => service.qReadableShare({ actor: who, companyId: COMPANY, documentId });
+
+  it("names the active grant to the investor's own relationship", async () => {
+    const { service, policies } = world();
+    const granted = share(policies, SHARED_ONLY_DOC.documentId, R1);
+    expect(await ask(service, investorOne, SHARED_ONLY_DOC.documentId)).toEqual(
+      { grantId: granted.id, expiresAt: "2026-11-01T00:00:00.000Z" },
+    );
+  });
+
+  it("answers null for another investor with no grant of their own", async () => {
+    const { service, policies, relationships } = world({ connections: both() });
+    relationships.set(INV_ORG_2, R2);
+    share(policies, SHARED_ONLY_DOC.documentId, R1);
+    expect(
+      await ask(service, investorTwo, SHARED_ONLY_DOC.documentId),
+    ).toBeNull();
+    expect(await ask(service, stranger, SHARED_ONLY_DOC.documentId)).toBeNull();
+  });
+
+  it("answers null once the grant is revoked or has expired", async () => {
+    const revoked = world();
+    share(revoked.policies, SHARED_ONLY_DOC.documentId, R1, {
+      revokedAt: "2026-10-05T00:00:00.000Z",
+    });
+    expect(
+      await ask(revoked.service, investorOne, SHARED_ONLY_DOC.documentId),
+    ).toBeNull();
+    const expired = world();
+    share(expired.policies, SHARED_ONLY_DOC.documentId, R1, {
+      expiresAt: "2026-10-01T00:00:00.000Z",
+    });
+    expect(
+      await ask(expired.service, investorOne, SHARED_ONLY_DOC.documentId),
+    ).toBeNull();
+  });
+
+  it("answers null for the owner, for a PUBLIC level alone, and when access refuses", async () => {
+    const { service, policies } = world();
+    share(policies, SHARED_ONLY_DOC.documentId, R1);
+    expect(await ask(service, founder, SHARED_ONLY_DOC.documentId)).toBeNull();
+    expect(await ask(service, investorOne, PUBLIC_DOC.documentId)).toBeNull();
+    const refused = world({ disclose: "DENY" });
+    share(refused.policies, SHARED_ONLY_DOC.documentId, R1);
+    expect(
+      await ask(refused.service, investorOne, SHARED_ONLY_DOC.documentId),
+    ).toBeNull();
+  });
+
+  it("answers null before the founder accepts the relationship", async () => {
+    const { service, policies } = world({
+      connections: new Map<string, RelationshipConnection>([
+        [R1, "INTEREST_PENDING"],
+      ]),
+    });
+    share(policies, SHARED_ONLY_DOC.documentId, R1);
+    expect(
+      await ask(service, investorOne, SHARED_ONLY_DOC.documentId),
+    ).toBeNull();
   });
 });

@@ -360,3 +360,102 @@ describe("a held-back document beside the deck", () => {
     expect(decision.grant).toMatchObject({ status: "HELD_BACK" });
   });
 });
+
+// ADR 0078 (owner decision 99, "shared means readable"): management
+// accounts the founder shared with this investor's organisation are read
+// for them, as the company's own material (DOCUMENT_SUPPORTED, never
+// verified), with the grant they were read under; revoked between the
+// listing and the read, nothing is read.
+describe("a shared highly confidential document (ADR 0078)", () => {
+  const ACCOUNTS = "00000000-0000-4000-8000-00000000c009";
+  const GRANT = "00000000-0000-4000-8000-0000000009aa";
+  const share = { grantId: GRANT, expiresAt: "2026-12-01T00:00:00.000Z" };
+  const sharedDoc: MaterialDocument = {
+    ...doc(
+      ACCOUNTS,
+      "Management accounts Sept 2026",
+      "Finance",
+      "MANAGEMENT_ACCOUNTS",
+      "OPEN",
+    ),
+    sharedUnder: share,
+  };
+  let current: typeof share | null = share;
+  const withShared: ProfileMaterialPort = {
+    ...material,
+    documents: (_actor, companyId) =>
+      Promise.resolve(
+        companyId === COMPANY_B_NETWORK ? [...ROOM, sharedDoc] : null,
+      ),
+    documentText: (_actor, _companyId, documentId) =>
+      Promise.resolve(
+        documentId === ACCOUNTS && current !== null
+          ? {
+              text: "Cash $410,000; monthly burn $38,000.",
+              truncated: false,
+              sharedUnder: current,
+            }
+          : null,
+      ),
+    documentPages: (_actor, _companyId, documentId) =>
+      Promise.resolve(
+        documentId === ACCOUNTS && current !== null
+          ? {
+              pageCount: 1,
+              pages: [{ page: 1, text: "Cash $410,000" }],
+              sharedUnder: current,
+            }
+          : null,
+      ),
+  };
+
+  it("reads it under the grant, as the company's own material", async () => {
+    current = share;
+    const reader = createReadCompanyDocumentTool(fakePorts(), withShared);
+    const decision = await reader.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.sensitivity).toBe("CONFIDENTIAL");
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      text: "Cash $410,000; monthly burn $38,000.",
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+      sharedUnder: { grantId: GRANT, expiresAt: share.expiresAt },
+    });
+    expect(JSON.stringify(decision.grant)).toMatch(
+      /not as independently verified/u,
+    );
+    expect(JSON.stringify(decision.grant)).not.toMatch(/EXTERNALLY_VERIFIED/u);
+    expect(JSON.stringify(decision.grant)).not.toMatch(/alsoHeldBack/u);
+  });
+
+  it("reads its pages under the grant", async () => {
+    current = share;
+    const pager = createReadDocumentPagesTool(fakePorts(), withShared);
+    const decision = await pager.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      sharedUnder: { grantId: GRANT },
+    });
+  });
+
+  it("reads nothing once the grant is revoked after the listing", async () => {
+    current = null;
+    const reader = createReadCompanyDocumentTool(fakePorts(), withShared);
+    const decision = await reader.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: ACCOUNTS },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("DENY");
+    current = share;
+  });
+});
