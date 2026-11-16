@@ -171,26 +171,19 @@ function seam(said: string, skim: TurnSkimResult | null) {
 }
 
 describe("the fast lane (K)", () => {
-  it("answers companies of a kind from the skim, without waiting for the full reading", async () => {
+  it("a ranked list of companies of a kind waits for the full reading (live re-check T1)", async () => {
+    // The quick first read carries no list conditions ("…with revenue",
+    // "outside my sectors"): a list it answered dropped them.
     const s = seam("show me three fintech companies in Nigeria", SKIM_DISCOVER);
     const started = Date.now();
     const outcome = await s.answer.answer(request());
     const took = Date.now() - started;
     expect(outcome.kind).toBe("ANSWERED");
     expect(s.skims()).toBe(1);
+    expect(s.reads()).toBe(1);
     expect(s.delegated).toHaveLength(1);
-    expect(s.delegated[0]?.questionKind).toBe("DISCOVER_COMPANIES");
-    expect(s.delegated[0]?.discoverCompanies).toMatchObject({
-      sectors: ["fintech"],
-      countries: ["NG"],
-      count: 3,
-    });
-    expect(await s.delegated[0]?.research).toEqual({
-      mode: "NEVER",
-      announceSourceChange: false,
-    });
-    // The answer is handed over in the skim's time, not the reading's.
-    expect(took).toBeLessThan(READ_MS - 100);
+    expect(s.delegated[0]?.questionKind).toBe("ADVICE");
+    expect(took).toBeGreaterThanOrEqual(READ_MS - 20);
   });
 
   it("a skim that names anything else waits for the full reading", async () => {
@@ -226,7 +219,7 @@ describe("the fast lane (K)", () => {
     expect(s.delegated[0]?.questionKind).toBe("ADVICE");
   });
 
-  it("pure fit is handed over directly after the existing skim", async () => {
+  it("a fit ranking the skim read waits for the full reading (live re-check T1)", async () => {
     const s = seam("Which companies fit my mandate and why?", {
       kind: "FIT",
       confidence: "HIGH",
@@ -236,9 +229,9 @@ describe("the fast lane (K)", () => {
     });
     const started = Date.now();
     await s.answer.answer(request());
-    expect(Date.now() - started).toBeLessThan(READ_MS - 100);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(READ_MS - 20);
     expect(s.skims()).toBe(1);
-    expect(s.delegated[0]?.questionKind).toBe("FIT");
+    expect(s.reads()).toBe(1);
   });
 
   it("a skim that is not sure waits for the full reading", async () => {

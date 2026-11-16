@@ -227,15 +227,18 @@ describe("v56 excludeShown on the answer path", () => {
     expect(s.delegated[0]?.fitQuestion?.excludeShown).toBe(true);
   });
 
-  it("with nothing shown yet, the code lane still answers without a reading", async () => {
+  it("with nothing shown yet, a fit ranking still waits for the reading (live re-check T1)", async () => {
     const said = "Show my top 3 companies against my mandate";
     const s = seam(said, fitReading(said, {}), []);
     await s.answer.answer(investorRequest());
-    expect(s.reads()).toBe(0);
+    // Words cannot prove a ranking ask carries no condition: it is read.
+    expect(s.reads()).toBe(1);
     expect(s.delegated[0]?.fitQuestion).toEqual({
       text: said,
-      count: null,
+      count: 3,
       previous: false,
+      excludeShown: false,
+      mandateRelevant: false,
     });
   });
 });

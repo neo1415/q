@@ -52,6 +52,29 @@ export function listConditionsOf(
   };
 }
 
+/**
+ * Live re-check 15 Nov 2026 (T7): the conditions of the list Q showed just
+ * before, carried to a follow-up on it. Each condition this turn's reading
+ * states replaces the carried one; the order is this turn's when it read
+ * any conditions at all ("and the poor fits?" is worst first). Null with
+ * nothing carried and nothing read.
+ */
+export function carriedListConditions(
+  read: ListConditions | null,
+  carried: ListConditions | null,
+): ListConditions | null {
+  if (carried === null) return read;
+  if (read === null) return carried;
+  return {
+    relationship: read.relationship ?? carried.relationship,
+    revenue: read.revenue ?? carried.revenue,
+    sector: read.sector ?? carried.sector,
+    stage: read.stage ?? carried.stage,
+    geography: read.geography ?? carried.geography,
+    order: read.order,
+  };
+}
+
 /** Any condition at all, the relationship exclusion included. */
 export function hasAnyCondition(conditions: ListConditions | null): boolean {
   return (
@@ -459,7 +482,44 @@ const CARDS_MAX = 10;
  * nothing could be read): the full path answers instead, never the plain
  * ranking.
  */
-export async function runConditionedCompanyList(input: {
+export async function runConditionedCompanyList(
+  input: ConditionedCompanyListInput,
+): Promise<ConditionedListAnswer | null> {
+  const first = await conditionedCompanyListOnce(input);
+  const shownBefore = input.within?.length ?? 0;
+  if (first === null || shownBefore === 0 || first.shown.length > 0) {
+    return first;
+  }
+  /*
+   * Live re-check 15 Nov 2026 (T2, "the weakest fits outside my sectors"
+   * after a mandate ranking): the condition was applied only to the ten
+   * companies just shown -- in-sector by construction -- and Q said none
+   * exist. When the condition rules out everything shown, the same
+   * conditions are applied to the catalog's candidate pool, and the
+   * answer says it looked wider. Should that read fail, Q says plainly it
+   * looked only at the list shown and offers to look wider.
+   */
+  const words = conditionWords(input.conditions, "INVESTOR");
+  const these = `the ${counted(shownBefore)} ${shownBefore === 1 ? "company" : "companies"} I just showed`;
+  const wider = await conditionedCompanyListOnce({ ...input, within: null });
+  if (wider === null) {
+    return {
+      ...first,
+      text: `${first.text} I only looked at ${these}; say if you want me to look across Capital Q.`,
+    };
+  }
+  const none =
+    words.length > 0
+      ? `None of ${these} ${predicate(words, shownBefore === 1)}, so I looked wider.`
+      : `I couldn't rank ${these} that way, so I looked wider.`;
+  return {
+    ...wider,
+    text: `${none} ${wider.text}`,
+    calls: [...first.calls, ...wider.calls],
+  };
+}
+
+type ConditionedCompanyListInput = {
   readonly conditions: ListConditions;
   /** The companies the question is about, when it is about those shown. */
   readonly within: readonly string[] | null;
@@ -476,8 +536,22 @@ export async function runConditionedCompanyList(input: {
   readonly own: Promise<unknown>;
   /** Whom the account digest says they are in touch with. */
   readonly inTouch: Promise<ReadonlySet<string>>;
-}): Promise<ConditionedListAnswer | null> {
+};
+
+async function conditionedCompanyListOnce(
+  input: ConditionedCompanyListInput,
+): Promise<ConditionedListAnswer | null> {
   const { conditions, tools, context, available } = input;
+  // An "outside my mandate" or "weakest first" ask is answered from more
+  // than the catalog's best matches on the mandate, which are inside it by
+  // construction: the catalog in name order is read beside them.
+  const beyondBest =
+    conditions.order === "WORST_FIRST" ||
+    conditions.sector === "OUTSIDE" ||
+    conditions.stage === "OUTSIDE" ||
+    conditions.geography === "OUTSIDE";
+  const poolMax = beyondBest ? POOL_MAX * 2 : POOL_MAX;
+  let widePool = false;
   if (!available.has("fit_profile") && !available.has("fit_top_candidates"))
     return null;
   if (conditions.revenue !== null && !available.has("read_company_figures"))
@@ -527,11 +601,34 @@ export async function runConditionedCompanyList(input: {
       catalog !== null && catalog.result.ok
         ? (catalog.result.data as { companies?: unknown } | null)?.companies
         : undefined;
-    pool = Array.isArray(companies)
-      ? (companies as { companyId?: unknown }[]).flatMap((one) =>
-          typeof one.companyId === "string" ? [one.companyId] : [],
-        )
-      : [];
+    const idsOf = (list: unknown): string[] =>
+      Array.isArray(list)
+        ? (list as { companyId?: unknown }[]).flatMap((one) =>
+            typeof one.companyId === "string" ? [one.companyId] : [],
+          )
+        : [];
+    pool = idsOf(companies);
+    if (beyondBest && catalog !== null && catalog.result.ok) {
+      const byName = await read(
+        "discover_companies",
+        {
+          sectors: [...(input.discover?.sectors ?? [])],
+          countries: [...(input.discover?.countries ?? [])],
+          stages: [...(input.discover?.stages ?? [])],
+          limit: POOL_MAX,
+          order: "NAME",
+        },
+        "q-conditions-catalog-names",
+      );
+      const more =
+        byName !== null && byName.result.ok
+          ? idsOf(
+              (byName.result.data as { companies?: unknown } | null)?.companies,
+            )
+          : [];
+      for (const id of more) if (!pool.includes(id)) pool.push(id);
+      widePool = more.length > 0;
+    }
     if (pool.length === 0 && available.has("fit_top_candidates")) {
       const top = await read(
         "fit_top_candidates",
@@ -556,7 +653,7 @@ export async function runConditionedCompanyList(input: {
           ? inContact.has(id)
           : true,
     )
-    .slice(0, POOL_MAX);
+    .slice(0, poolMax);
   const outcomes = await readFitSets({
     ids: pool,
     read,
@@ -637,7 +734,9 @@ export async function runConditionedCompanyList(input: {
       ? `Of the ${counted(input.within.length)} companies I just showed`
       : conditions.relationship === "ONLY_IN_CONTACT"
         ? `Of the ${counted(pool.length)} companies you're in touch with`
-        : `Of the ${counted(fits.length)} companies closest to your mandate that I checked`;
+        : widePool
+          ? `Of the ${counted(fits.length)} companies on Capital Q I checked`
+          : `Of the ${counted(fits.length)} companies closest to your mandate that I checked`;
   const unknown = unknownLine(
     applied.unknown.map((one) => ({
       name: one.item.name,

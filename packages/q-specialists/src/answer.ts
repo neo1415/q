@@ -163,7 +163,6 @@ import {
   lastShownEntityId,
   type PreparedFollowUpPort,
   dailyLaneOf,
-  fitRankingLaneOf,
   type KnownEntityMatcher,
 } from "./fast-lane.js";
 
@@ -706,23 +705,35 @@ export function namedInWords(utterance: string, name: string): boolean {
   return false;
 }
 
-/** Q already showed company cards in this conversation (v56). */
-function companyCardsShownIn(
-  history: readonly {
-    readonly role: string;
-    readonly blocks?: readonly QResultBlock[] | null | undefined;
-  }[],
+/**
+ * Live re-check 15 Nov 2026 (T8): whether the turn reading marks a place
+ * in a list Q showed -- a numbered pointer into SHOWN (v40
+ * `reference.shown`), an answer from a shown turn (v54 `fromShown`), or a
+ * reference of its own bound to the same record. Structure only; the
+ * word "first" alone never does.
+ */
+function readingMarksPlace(
+  read: {
+    readonly reference?: { readonly shown?: number | null } | null | undefined;
+    readonly fromShown?: unknown;
+  } | null,
+  recordId: string,
+  readerBoundIds: readonly string[],
 ): boolean {
-  return history.some(
-    (message) =>
-      message.role === "Q" &&
-      (message.blocks ?? []).some(
-        (block) =>
-          block.kind === "ANSWER_CARDS" &&
-          block.cards.some((card) => card.subject?.kind === "COMPANY"),
-      ),
-  );
+  if (read === null) return false;
+  if ((read.reference?.shown ?? null) !== null) return true;
+  if ((read.fromShown ?? null) !== null) return true;
+  return readerBoundIds.includes(recordId.toLowerCase());
 }
+
+/**
+ * Live re-check 15 Nov 2026 (T1): lists a quick first read may not answer
+ * before the full reading, whose list conditions it does not carry.
+ */
+const RANKED_LIST_LANES: ReadonlySet<string> = new Set([
+  "FIT",
+  "DISCOVER_COMPANIES",
+]);
 
 /** Blocks that are words, not something on screen to look at again. */
 const TEXT_ONLY_BLOCKS: ReadonlySet<QResultBlock["kind"]> = new Set([
@@ -939,6 +950,14 @@ export type QRunRouting = {
   readonly navigation: string | null;
   readonly navigationDestination: string | null;
   readonly spoken: boolean;
+  /**
+   * Live re-check 15 Nov 2026: the code lane that answered a run the
+   * reader never read ("READER" when the reading routed it), so every run
+   * carries its routing, not only the read ones.
+   */
+  readonly lane: string;
+  /** RC3: the turn's execution class, from the reading (null: unread). */
+  readonly executionClass: string | null;
 };
 
 export type SpecialistQAnswerDependencies = {
@@ -5115,20 +5134,85 @@ export function createSpecialistQAnswer(
     return recordAnswer(request, conversationId, spoken.said, spoken.blocks);
   };
 
+  /**
+   * Live re-check 15 Nov 2026 (RC5 follow-up): runs whose routing is kept,
+   * and the code lane that answered a run before any reading, so every run
+   * carries its routing (a code lane's run had none). Bounded.
+   */
+  const routedRuns = new Set<string>();
+  const codeLaneOfRun = new Map<string, string>();
+  const noteCodeLane = (runId: string, lane: string): void => {
+    codeLaneOfRun.set(runId, lane);
+    while (codeLaneOfRun.size > PREREADS_MAX) {
+      const oldest = codeLaneOfRun.keys().next().value;
+      if (oldest === undefined) break;
+      codeLaneOfRun.delete(oldest);
+    }
+  };
+  const routeRun = (request: QAnswerRequest, routing: QRunRouting): void => {
+    const recordRouting = dependencies.recordRouting;
+    if (recordRouting === undefined || routedRuns.has(request.runId)) return;
+    routedRuns.add(request.runId);
+    while (routedRuns.size > PREREADS_MAX) {
+      const [oldest] = routedRuns;
+      if (oldest === undefined) break;
+      routedRuns.delete(oldest);
+    }
+    void recordRouting({
+      tenantId: request.tenantId,
+      runId: request.runId,
+      routing,
+    }).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "q run routing not recorded",
+      );
+    });
+  };
+  /** A run no reading routed: kept as the code lane that answered it. */
+  const routeUnreadRun = (request: QAnswerRequest): void => {
+    const lane = codeLaneOfRun.get(request.runId) ?? "CODE";
+    codeLaneOfRun.delete(request.runId);
+    routeRun(request, {
+      kind: "CODE_LANE",
+      confidence: null,
+      question: null,
+      research: "NEVER",
+      tool: null,
+      teamJob: false,
+      meetingPrep: false,
+      aboutNamedOther: false,
+      addressedToQ: true,
+      navigation: null,
+      navigationDestination: null,
+      spoken: request.spoken === true,
+      lane,
+      executionClass: null,
+    });
+    routedRuns.delete(request.runId);
+  };
   /** B6: the reference each run's words were bound to, for its answer. */
   const resolvedInRun = new Map<string, string>();
   /** A2: the companies explicit places bound, in the order said. */
   const placedInRun = new Map<string, readonly string[]>();
   /** RC4: which list a place was counted in, said by the stored answer. */
   const leadInRun = new Map<string, ReferenceLead>();
+  /** T3: the one company the reading bound the turn's pointer to. */
+  const followUpCompanyInRun = new Map<string, string>();
   const withReferences = (request: QAnswerRequest): QAnswerRequest => {
     const note = resolvedInRun.get(request.runId);
     const placed = placedInRun.get(request.runId);
     const lead = leadInRun.get(request.runId);
-    const led =
+    const followUpCompanyId = followUpCompanyInRun.get(request.runId);
+    const withLead =
       lead === undefined || request.referenceLead !== undefined
         ? request
         : { ...request, referenceLead: lead };
+    const led =
+      followUpCompanyId === undefined ||
+      withLead.followUpCompanyId !== undefined
+        ? withLead
+        : { ...withLead, followUpCompanyId };
     return note === undefined || request.references !== undefined
       ? led
       : {
@@ -5546,15 +5630,11 @@ export function createSpecialistQAnswer(
         scope.filter.tenantId === request.tenantId,
     );
 
-  /** S2: a plain fit ranking, only over their own firewall-bound mandate. */
-  const ownFitRankingOf = (request: QAnswerRequest, text: string) => {
-    const lane = fitRankingLaneOf(text);
-    return lane !== null && ownMandateInPlan(request) ? lane : null;
-  };
-
   /**
    * S2: words that code answers before any reading -- a page by its name,
-   * a bare screen command, a cards request, a plain fit ranking. The early
+   * a bare screen command, a cards request. (A plain fit ranking was one
+   * until the live re-check of 15 Nov 2026, T1: words cannot prove a
+   * ranking ask carries no condition, so it now waits for the reading.) The early
    * skim and turn reading are not begun for them (live 2026-10-15: 64 of
    * 70 runs that only navigated still paid 1-2 classification calls).
    * Words only, so this can never widen what is answered; when a code lane
@@ -5564,7 +5644,6 @@ export function createSpecialistQAnswer(
     (pageRequestOf(text) !== null && !takenBack(text)) ||
     screenActOfTurn(text) !== null ||
     cardsLaneOf(text) !== null ||
-    fitRankingLaneOf(text) !== null ||
     // Owner 2026-10-20: a tab by its name ("open the data room", "now the
     // pitch deck") is opened by code (screenTabAnswer / namedRecordAnswer);
     // its early skim and reading were two model calls nobody used.
@@ -6259,6 +6338,7 @@ export function createSpecialistQAnswer(
       await hydrate({ tenantId: request.tenantId, conversationId });
       if (!sequences.has(conversationId)) {
         const capabilities = await capabilitiesOf(request);
+        noteCodeLane(request.runId, "OWN_MANDATE");
         logger?.info(
           { qRunId: request.runId, lane: "OWN_MANDATE" },
           "q fast lane",
@@ -6289,6 +6369,7 @@ export function createSpecialistQAnswer(
       if (choice !== null) {
         const read = await readOffered(request, choice).catch(() => null);
         if (read !== null) {
+          noteCodeLane(request.runId, "PLAN_READ");
           logger?.info(
             { qRunId: request.runId, lane: "PLAN_READ", modelCalls: 0 },
             "q read the offered plan back by code",
@@ -6323,6 +6404,7 @@ export function createSpecialistQAnswer(
           return { status: "NONE" } as const;
         });
         if (ran.status !== "NONE") {
+          noteCodeLane(request.runId, "PLAN_RUN");
           logger?.info(
             {
               qRunId: request.runId,
@@ -6346,28 +6428,19 @@ export function createSpecialistQAnswer(
       request.plan.screen?.route !== "ONBOARDING" &&
       !sequences.has(conversationId)
     ) {
-      // v56: once Q has shown company cards here, a fit ranking waits for
-      // the reading, which says whether they want the next ones rather
-      // than the same ones again (production 2026-10-17, 4f07dae7).
-      const instant =
-        instantLaneOf(latest.content, history) ??
-        (companyCardsShownIn(history)
-          ? null
-          : ownFitRankingOf(request, latest.content));
+      // Live re-check 15 Nov 2026 (T1): no ranking is answered here. A
+      // fit ranking ("of my best-fitting companies, which bring in
+      // revenue?") waits for the reading, whose list conditions decide
+      // what is ranked; the words alone cannot prove there are none.
+      const instant = instantLaneOf(latest.content, history);
       if (instant !== null) {
         const capabilities = await capabilitiesOf(request);
-        logger?.info(
-          {
-            qRunId: request.runId,
-            lane:
-              instant.questionKind === "DISCOVER_INVESTORS"
-                ? "INVESTOR_DISCOVERY"
-                : instant.questionKind === "FIT"
-                  ? "FIT_BY_CODE"
-                  : "KNOWN_ENTITY",
-          },
-          "q fast lane",
-        );
+        const lane =
+          instant.questionKind === "DISCOVER_INVESTORS"
+            ? "INVESTOR_DISCOVERY"
+            : "KNOWN_ENTITY";
+        noteCodeLane(request.runId, lane);
+        logger?.info({ qRunId: request.runId, lane }, "q fast lane");
         return delegate.answer({
           ...request,
           research: Promise.resolve(NO_RESEARCH),
@@ -6391,6 +6464,7 @@ export function createSpecialistQAnswer(
     ) {
       const followUp = preparedFollowUpOf(latest.content, history);
       if (followUp !== null) {
+        noteCodeLane(request.runId, "PREPARED_FOLLOW_UP");
         logger?.info(
           { qRunId: request.runId, lane: "PREPARED_FOLLOW_UP", modelCalls: 0 },
           "q answered a prepared-entity follow-up by code",
@@ -6723,6 +6797,7 @@ export function createSpecialistQAnswer(
         ? null
         : ordinalRecallLine(latest.content, pointed.resolved);
     if (recalled !== null) {
+      noteCodeLane(request.runId, "ORDINAL_RECALL");
       logger?.info(
         { qRunId: request.runId, lane: "ORDINAL_RECALL", modelCalls: 0 },
         "q named a record from its own list by code",
@@ -6737,6 +6812,7 @@ export function createSpecialistQAnswer(
       ? null
       : orderCheckLine(latest.content, history);
     if (orderChecked !== null) {
+      noteCodeLane(request.runId, "LIST_ORDER_CHECK");
       logger?.info(
         { qRunId: request.runId, lane: "LIST_ORDER_CHECK", modelCalls: 0 },
         "q checked a stated order against the lists it showed",
@@ -7269,13 +7345,19 @@ export function createSpecialistQAnswer(
       // this turn's words (the fast lane checks so): never a follow-up on
       // what was shown, so it is taken here too.
       const discovery = lane?.questionKind === "DISCOVER_INVESTORS";
+      // Live re-check 15 Nov 2026 (T1): a ranked list of companies waits
+      // for the full reading, whose list conditions ("which of them have
+      // revenue", "outside my sectors") the quick first read does not
+      // carry; answered before it, the condition was silently dropped.
       if (
         lane !== null &&
+        !RANKED_LIST_LANES.has(lane.questionKind ?? "") &&
         (discovery || !context.turns.some((turn) => turn.blocks.length > 0)) &&
         !(await waitingOnThem())
       ) {
         speculative.current?.cancel("KIND");
         readerAbort.abort();
+        noteCodeLane(request.runId, `SKIM_${lane.questionKind}`);
         logger?.info(
           {
             qRunId: request.runId,
@@ -7328,6 +7410,7 @@ export function createSpecialistQAnswer(
         !(await waitingOnThem())
       ) {
         speculative.current?.cancel("KIND");
+        noteCodeLane(request.runId, `SKIM_${late.questionKind}`);
         logger?.info(
           { qRunId: request.runId, lane: late.questionKind, late: true },
           "q fast lane",
@@ -7412,9 +7495,8 @@ export function createSpecialistQAnswer(
         },
         "q turn read",
       );
-      const recordRouting = dependencies.recordRouting;
-      if (recordRouting !== undefined) {
-        const routing: QRunRouting = {
+      if (dependencies.recordRouting !== undefined) {
+        routeRun(request, {
           kind: read.kind,
           confidence:
             typeof read.confidence === "string" ? read.confidence : null,
@@ -7428,16 +7510,17 @@ export function createSpecialistQAnswer(
           navigation: read.navigation?.mode ?? null,
           navigationDestination: read.navigation?.destination ?? null,
           spoken,
-        };
-        void recordRouting({
-          tenantId: request.tenantId,
-          runId: request.runId,
-          routing,
-        }).catch((error: unknown) => {
-          logger?.warn(
-            { err: error, qRunId: request.runId },
-            "q run routing not recorded",
-          );
+          lane: "READER",
+          // The class the answer path takes (below), kept on the run as
+          // well as in the log, for every path the reading routes to
+          // (meeting prep included).
+          executionClass: executionClassOfTurn({
+            read,
+            history,
+            latestId: latest.id,
+            carriesDocuments:
+              (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
+          }),
         });
       }
     }
@@ -7495,6 +7578,10 @@ export function createSpecialistQAnswer(
     const boundToPage =
       pointed?.control !== undefined ||
       (pointed?.resolved?.kind === "ONE" && pointed.resolved.via === "PAGE");
+    /** T8: the records the reading's own references bound (lower-case ids). */
+    let readerBoundIds: readonly string[] = [];
+    let readerBoundCompanies: readonly string[] = [];
+    let readerBoundNote = false;
     if (read !== null && read.addressedToQ !== false) {
       // v79: a name the reader read the words to joins this turn's ledger
       // only when it really is in the conversation's words (no invention,
@@ -7621,7 +7708,69 @@ export function createSpecialistQAnswer(
           },
           "q bound a reference by the reader's reading",
         );
+        readerBoundIds = binding.bound.flatMap((one) =>
+          one.entities.flatMap((entity) =>
+            entity.id === null ? [] : [entity.id.toLowerCase()],
+          ),
+        );
+        readerBoundCompanies = [
+          ...new Set(
+            binding.bound.flatMap((one) =>
+              one.entities.flatMap((entity) =>
+                entity.kind === "COMPANY" && entity.id !== null
+                  ? [entity.id]
+                  : [],
+              ),
+            ),
+          ),
+        ];
+        readerBoundNote = true;
       }
+    }
+    // Live re-check 15 Nov 2026 (T8): "who should we approach first?"
+    // opened with "By the first one I mean Zino Aviation…": the word
+    // "first" was read as a place in Q's list. A place in a list is bound
+    // only when the reading marks one -- a numbered pointer into what Q
+    // showed (reference.shown), an answer from a shown turn (fromShown), or
+    // its own reference to the same record -- never from the word alone.
+    const placeFromList =
+      pointed !== null &&
+      pointed.ask?.kind === "ORDINAL" &&
+      pointed.resolved?.kind === "ONE" &&
+      pointed.resolved.via === "Q_ANSWER"
+        ? pointed.resolved.entity
+        : null;
+    const placeMarked =
+      placeFromList !== null &&
+      readingMarksPlace(read, placeFromList.id, readerBoundIds);
+    // T3: the one company this turn points at, as the reading bound it,
+    // for a follow-up answered from the card Q showed of it.
+    const followUpCompany =
+      readerBoundCompanies.length === 1
+        ? (readerBoundCompanies[0] ?? null)
+        : readerBoundCompanies.length === 0 &&
+            placeMarked &&
+            placeFromList?.kind === "COMPANY"
+          ? placeFromList.id
+          : null;
+    if (followUpCompany !== null) {
+      followUpCompanyInRun.set(request.runId, followUpCompany);
+      while (followUpCompanyInRun.size > PREREADS_MAX) {
+        const oldest = followUpCompanyInRun.keys().next().value;
+        if (oldest === undefined) break;
+        followUpCompanyInRun.delete(oldest);
+      }
+    }
+    if (pointed !== null && placeFromList !== null && !placeMarked) {
+      leadInRun.delete(request.runId);
+      if (!readerBoundNote) {
+        resolvedInRun.delete(request.runId);
+        placedInRun.delete(request.runId);
+      }
+      logger?.info(
+        { qRunId: request.runId, ask: "ORDINAL" },
+        "a place word the reading did not mark as a list reference; not bound",
+      );
     }
     // A reading the speculation cannot be is known now: stop it at once
     // rather than at the end of the path.
@@ -10149,6 +10298,9 @@ ${line}`;
         await followWithLateMove(request, outcome);
         return outcome;
       } finally {
+        // Every run keeps its routing: one no reading routed, as the code
+        // lane that answered it.
+        routeUnreadRun(request);
         // Step 11: the state's save ran beside the turn; a run ends only
         // once it has settled (it never fails the answer).
         await statesInRun

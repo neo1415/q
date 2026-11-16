@@ -633,6 +633,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly referencedCompanyIds?: readonly string[] | undefined;
   /**
+   * Live re-check 15 Nov 2026 (T3): the one company the turn reading bound
+   * this turn's pointer to ("why the first one?"), as an id. A contextual
+   * follow-up whose company Q already showed on a card is answered from
+   * that card. Grants nothing: only what this person was shown is used.
+   */
+  readonly followUpCompanyId?: string | undefined;
+  /**
    * RC4 (voice audit 15 Nov 2026): a place ("the first one") code bound to
    * one of Q's own stored lists. The stored answer opens with `line` when
    * it does not name `name`, or always when another list Q showed had a

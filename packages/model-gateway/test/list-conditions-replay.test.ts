@@ -899,3 +899,402 @@ describe("RC2 founder lane (P0): investor prospects honour the stated condition"
     );
   });
 });
+
+// ---------------------------------------------------------------------
+// Live re-check of 651a3bd50 (15 Nov 2026): T2, T3 and T7, each replayed
+// as a conversation through the same answer seam q-api composes.
+// ---------------------------------------------------------------------
+
+/** One conversation: every turn sees the turns (and cards) before it. */
+function conversationSeam(input: {
+  readonly execute: QToolPort["execute"];
+  readonly offered: readonly (readonly [string, string])[];
+  readonly digest: QAccountDigest;
+  readonly investor: boolean;
+}) {
+  const conversationId = randomUUID();
+  const alpha = createFakeModelProvider({
+    code: "alpha",
+    script: [ANALYST, ANALYST, ANALYST, ANALYST],
+  });
+  const gateway = createModelGateway({
+    catalog: createStaticModelCatalog(
+      testCatalog((s) => ({
+        ...s,
+        models: s.models.map((m) => ({ ...m, supportsTools: true })),
+      })),
+    ),
+    registry: createModelProviderRegistry([alpha]),
+    usage: createInMemoryModelUsageRepository(),
+    sleep: () => Promise.resolve(),
+  });
+  const messages: QConversationMessage[] = [];
+  const completed: Completed[] = [];
+  const executed: string[] = [];
+  const message = (
+    run: string,
+    role: "USER" | "Q",
+    content: string,
+    blocks?: unknown,
+  ): QConversationMessage =>
+    ({
+      id: randomUUID(),
+      tenantId: TENANT,
+      conversationId,
+      runId: run,
+      role,
+      content,
+      contentType: "TEXT",
+      createdAt: new Date().toISOString(),
+      ...(blocks === undefined ? {} : { blocks }),
+    }) as never;
+  const repositories = {
+    messages: {
+      listForRun: () => Promise.resolve([...messages]),
+      listRecentForConversationOfRun: () => Promise.resolve([...messages]),
+      insert: (
+        _tx: unknown,
+        row: { runId: string; content: string; blocks?: unknown },
+      ) => {
+        const stored = message(row.runId, "Q", row.content, row.blocks);
+        messages.push(stored);
+        return Promise.resolve(stored);
+      },
+      findById: () => Promise.resolve(null),
+    },
+    runs: { allocateEventSequence: () => Promise.resolve(2) },
+    runEvents: {
+      append: (
+        _tx: unknown,
+        event: { eventType?: string; payload?: unknown },
+      ) => {
+        if (event.eventType === "q.message.completed") {
+          completed.push(event.payload as Completed);
+        }
+        return Promise.resolve({});
+      },
+    },
+  } as unknown as QRuntimeRepositories;
+  const tools: QToolPort = {
+    offer: () =>
+      Promise.resolve(input.offered.map(([name, tool]) => offered(name, tool))),
+    execute: (proposal, context) => {
+      executed.push(proposal.name);
+      return input.execute(proposal, context);
+    },
+  };
+  const seam = createModelGatewayQAnswer({
+    gateway,
+    repositories,
+    sql: {} as never,
+    transactions: { run: (work) => work({} as never) },
+    tools,
+    accountDigestOf: () => Promise.resolve(input.digest),
+    ...(input.investor
+      ? {}
+      : {
+          ownCompanySnapshot: () =>
+            Promise.resolve({
+              companyId: COMPANY,
+              name: "Nixo",
+              shortDescription: "Payments for pharmacies.",
+              stageCode: "seed",
+              countryCode: "NG",
+            }),
+        }),
+  });
+  const investorOrganisationId = randomUUID();
+  const turn = async (
+    asked: string,
+    reading: Partial<QAnswerRequest>,
+    priorQ?: { readonly content: string; readonly blocks: unknown },
+  ) => {
+    const run = randomUUID();
+    if (priorQ !== undefined) {
+      messages.push(message(randomUUID(), "Q", priorQ.content, priorQ.blocks));
+    }
+    messages.push(message(run, "USER", asked));
+    const now = new Date();
+    const plan = input.investor
+      ? PermittedContextPlanSchema.parse({
+          contractVersion: 1,
+          policyVersion: Q_CONTEXT_FIREWALL_POLICY_VERSION,
+          planId: randomUUID(),
+          fingerprint: "0".repeat(64),
+          runId: run,
+          tenantId: TENANT,
+          actor: { userId: USER },
+          purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+          subjects: [],
+          scopes: [
+            {
+              kind: "INVESTOR_MANDATE",
+              contextLabel: "investor_private",
+              sensitivity: "CONFIDENTIAL",
+              layer: "STRUCTURED_STATE",
+              factCategories: ["INVESTOR_THESIS"],
+              projection: "FULL",
+              rights: {
+                canUseForReasoning: true,
+                canDiscloseExistence: true,
+                canQuote: true,
+                canProvideLink: false,
+              },
+              filter: { tenantId: TENANT, investorOrganisationId },
+              isEvidence: true,
+              subject: {
+                kind: "INVESTOR_ORGANISATION",
+                investorOrganisationId,
+              },
+            },
+          ],
+          denied: [],
+          maxSensitivity: "CONFIDENTIAL",
+          allowedLayers: [],
+          combinationConstraints: [],
+          evaluatedAt: now.toISOString(),
+          revalidateAfter: new Date(now.getTime() + 60_000).toISOString(),
+          revalidateOnResume: true,
+        })
+      : {
+          runId: run,
+          tenantId: TENANT,
+          actor: { userId: USER },
+          purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+          subjects: [],
+          screen: { route: "HOME" },
+          scopes: [{ kind: "OWN_Q_CONVERSATION" }],
+          denied: [],
+          maxSensitivity: "PUBLIC",
+        };
+    const executedBefore = executed.length;
+    const callsBefore = alpha.calls.length;
+    const outcome = await seam.answer({
+      runId: run,
+      tenantId: TENANT,
+      actorUserId: USER,
+      actor: ActorContextSchema.parse({
+        userId: USER,
+        tenantId: TENANT,
+        actorType: "HUMAN",
+      }),
+      correlationId: `cor_${run}`,
+      capability: "ANSWER",
+      subjects: [],
+      retrieval: { kind: "NOT_CONFIGURED" },
+      plan,
+      turnKind: "QUESTION_TO_Q",
+      ...reading,
+    } as unknown as QAnswerRequest);
+    return {
+      outcome,
+      text: completed.at(-1)?.message.text ?? "",
+      cards: cardsOf(completed),
+      tools: executed.slice(executedBefore),
+      modelCalls: alpha.calls.slice(callsBefore),
+    };
+  };
+  return { turn };
+}
+
+const INVESTOR_TOOLS: readonly (readonly [string, string])[] = [
+  ["discover_companies", "discovery.companies"],
+  ["fit_top_candidates", "fit.top_candidates"],
+  ["fit_profile", "fit.profile"],
+  ["read_company_figures", "company.figures.read"],
+  ["list_my_relationships", "relationship.list_mine"],
+];
+
+/** Q's earlier mandate ranking, as the cards it stored with its turn. */
+function shownRanking(companies: readonly Company[]) {
+  return {
+    content: `Ranked by fit with your mandate: ${companies.map((one) => one.name).join(", ")}.`,
+    blocks: [
+      {
+        kind: "ANSWER_CARDS",
+        shape: "RANKED",
+        title: "Fit against your mandate",
+        cards: companies.map((one, at) => ({
+          key: `c${String(at)}`,
+          name: one.name,
+          line: null,
+          hue: 0,
+          fit: { score: 9 - at, measured: 9, of: 9 },
+          reasons: [
+            `${one.name} matches your seed stage and a preferred sector`,
+          ],
+          measures: [],
+          subject: { kind: "COMPANY", companyId: one.id },
+        })),
+        followUps: [],
+      },
+    ],
+  };
+}
+
+describe("live re-check T2: a condition that rules out everything shown looks wider", () => {
+  it("'the weakest fits outside my sectors' after an in-sector ranking widens to the catalog, and says so", async () => {
+    const { turn } = conversationSeam({
+      execute: investorExecute,
+      offered: INVESTOR_TOOLS,
+      digest: digestOf("INVESTOR", []),
+      investor: true,
+    });
+    const asked = "Now show me the weakest fits that sit outside my sectors";
+    const t2 = await turn(
+      asked,
+      {
+        questionKind: "FIT",
+        fitQuestion: { text: asked, count: null, previous: true },
+        listConditions: {
+          ...NO_CONDITIONS,
+          sector: "OUTSIDE",
+          order: "WORST_FIRST",
+        },
+      },
+      shownRanking(named(["Nixo", "Halyard Security"])),
+    );
+    expect(t2.modelCalls).toHaveLength(0);
+    // Never "none exist" from the two shown alone.
+    expect(t2.text).toMatch(
+      /^None of the two companies I just showed are outside your preferred sectors, so I looked wider\./u,
+    );
+    expect(t2.cards.sort()).toEqual(["Shiftwell", "Tensorgate"]);
+    for (const company of named(t2.cards)) {
+      expect(company.sector).toBe("MISMATCH");
+    }
+    expect(t2.text).toContain("weakest first");
+    // Unknown sector is named as unknown, never shown as outside.
+    expect(t2.cards).not.toContain("Clearwater Assurance");
+  });
+});
+
+describe("live re-check T7: conditions stated in the conversation carry to the follow-up", () => {
+  it("founder: 'And the ones that fit badly?' keeps 'skip the ones I'm already in conversation with'", async () => {
+    // In conversation with Zino and Chidi (the account digest).
+    const execute: QToolPort["execute"] = (proposal) => {
+      if (proposal.name === "find_prospective_investors") {
+        return Promise.resolve(
+          ok(proposal, "investor.prospects", {
+            fitVersion: "prospect-fit.v2",
+            companySource: "CAPITAL_Q_RECORD",
+            compared: { countryCode: "NG", stageCode: "seed" },
+            prospects: PROSPECTS,
+            notes: [],
+          }),
+        );
+      }
+      if (proposal.name === "list_incoming_interest") {
+        return Promise.resolve(
+          ok(proposal, "investor.interest.incoming", { interests: [] }),
+        );
+      }
+      return Promise.resolve(ok(proposal, "unused", null));
+    };
+    const { turn } = conversationSeam({
+      execute,
+      offered: [
+        ["find_prospective_investors", "investor.prospects"],
+        ["list_incoming_interest", "investor.interest.incoming"],
+      ],
+      digest: digestOf("COMPANY", [ZINO, CHIDI]),
+      investor: false,
+    });
+    const t6Asked =
+      "Which investors are a good fit for us, but skip the ones I'm already in conversation with?";
+    const t6 = await turn(t6Asked, {
+      questionKind: "INVESTOR_PROSPECTS",
+      investorProspects: { text: t6Asked, count: null },
+      excludeRelationships: true,
+      listConditions: { ...NO_CONDITIONS, relationship: "EXCLUDE_IN_CONTACT" },
+    });
+    expect(t6.text).not.toContain("Zino");
+    expect(t6.text).not.toContain("Chidi");
+    const t7Asked = "And the ones that fit badly?";
+    const t7 = await turn(t7Asked, {
+      questionKind: "INVESTOR_PROSPECTS",
+      investorProspects: { text: t7Asked, count: null },
+      executionClass: "CONTEXTUAL_FOLLOW_UP",
+      // The reading carries the order only; the exclusion is not restated.
+      listConditions: { ...NO_CONDITIONS, order: "WORST_FIRST" },
+    });
+    expect(t7.modelCalls).toHaveLength(0);
+    // Chidi, whom they are talking to, is never named -- not even as unknown.
+    expect(t7.text).not.toContain("Chidi");
+    expect(t7.cards).not.toContain("Chidi Nwosu Angel Investments (fictional)");
+    expect(t7.text).toMatch(/already talking to/u);
+    expect(t7.cards).toEqual([
+      "Cape Meridian Growth (fictional)",
+      "Baobab Capital (fictional)",
+    ]);
+  });
+
+  it("a condition the follow-up states replaces the carried one", async () => {
+    const { turn } = conversationSeam({
+      execute: investorExecute,
+      offered: INVESTOR_TOOLS,
+      digest: digestOf("INVESTOR", []),
+      investor: true,
+    });
+    const said = "only the ones with actual revenue";
+    const t1 = await turn(said, {
+      questionKind: "FIT",
+      fitQuestion: { text: said, count: null },
+      listConditions: { ...NO_CONDITIONS, revenue: "HAS_REVENUE" },
+    });
+    expect(t1.cards.sort()).toEqual(
+      ["Clearwater Assurance", "Nixo", "Shiftwell"].sort(),
+    );
+    const t2 = await turn("and the pre-revenue ones?", {
+      questionKind: "FIT",
+      fitQuestion: { text: "and the pre-revenue ones?", count: null },
+      listConditions: { ...NO_CONDITIONS, revenue: "PRE_REVENUE" },
+    });
+    expect(t2.cards.sort()).toEqual(["Tangible", "Tensorgate"]);
+  });
+});
+
+describe("live re-check T3: 'Why the first one?' is answered from the card Q showed", () => {
+  it("one answer call and no tool round when the card covers the company", async () => {
+    const { turn } = conversationSeam({
+      execute: investorExecute,
+      offered: [
+        ...INVESTOR_TOOLS,
+        ["get_company", "company.get"],
+        ["get_relationship", "relationship.get"],
+        ["list_schedule", "schedule.list"],
+        ["list_pending_approvals", "approvals.pending.list"],
+        ["list_q_work", "q.work.list"],
+      ],
+      digest: digestOf("INVESTOR", []),
+      investor: true,
+    });
+    const shown = shownRanking(named(["Nixo", "Halyard Security"]));
+    const t3 = await turn(
+      "Why the first one?",
+      {
+        executionClass: "CONTEXTUAL_FOLLOW_UP",
+        references: ` "the first one" = Nixo (company ${CO(1)})`,
+        followUpCompanyId: CO(1),
+      },
+      shown,
+    );
+    expect(t3.outcome.kind).toBe("ANSWERED");
+    // Reader + one answer call: here (after the reader), the one answer call.
+    expect(t3.modelCalls).toHaveLength(1);
+    expect(t3.tools.length).toBeLessThanOrEqual(2);
+    for (const name of [
+      "list_schedule",
+      "list_pending_approvals",
+      "list_q_work",
+      "get_relationship",
+      "fit_profile",
+    ]) {
+      expect(t3.tools).not.toContain(name);
+    }
+    // The card Q showed is what the answer is written from.
+    expect(JSON.stringify(t3.modelCalls[0])).toContain(
+      "Nixo matches your seed stage",
+    );
+  });
+});

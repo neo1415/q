@@ -373,9 +373,9 @@ describe("the known-entity instant lane", () => {
 });
 
 /**
- * S2 (lane S, 2026-10-15): a plain fit ranking of their own candidates, and
- * words a code lane answers (a page, a screen command, cards), make no
- * classification call. Authorisation is unchanged: the same plan reaches
+ * S2 (lane S, 2026-10-15): words a code lane answers (a page, a screen
+ * command, cards) make no classification call; a fit ranking no longer is
+ * one (live re-check 15 Nov 2026, T1) and is read first. Authorisation is unchanged: the same plan reaches
  * the delegate, and without their own mandate in the plan the readers run.
  */
 describe("S2: code lanes ahead of the skim", () => {
@@ -393,24 +393,18 @@ describe("S2: code lanes ahead of the skim", () => {
     "Which three companies in my feed fit my mandate best?",
     "top 5 startups in Kenya for my mandate",
   ])(
-    "%s: computed fit with zero model calls, under the same plan",
+    "%s: read first (live re-check T1: words cannot prove a ranking carries no condition), under the same plan",
     async (said) => {
       const s = seam(said);
       const req = investorRequest();
       prereadOf(s, req);
       await s.answer.answer(req);
-      expect(s.modelCalls()).toBe(0);
+      // No code lane answers a ranking before the reading.
+      expect(s.modelCalls()).toBeGreaterThan(0);
       expect(s.delegated).toHaveLength(1);
       const delegated = s.delegated[0];
       expect(delegated?.plan).toBe(req.plan);
       expect(delegated?.actor).toBe(req.actor);
-      expect(delegated?.questionKind).toBe("FIT");
-      expect(delegated?.fitQuestion).toEqual({
-        text: said,
-        count: null,
-        previous: false,
-      });
-      expect(await delegated?.research).toMatchObject({ mode: "NEVER" });
     },
   );
 

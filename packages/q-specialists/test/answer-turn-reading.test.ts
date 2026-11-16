@@ -9203,7 +9203,21 @@ describe("RC4 continuity and path capture (audit 15 Nov, founder turns)", () => 
 
   it("F7-20: 'the first company' says which list it was counted in when another list had a different first", async () => {
     const said = "Back to the first um company, does the same concern apply";
-    const run = seam({ said, reading: question(said), outcomes: [], earlier });
+    // Live re-check T8: the reading marks the place (a pointer into SHOWN).
+    const run = seam({
+      said,
+      reading: question(said, {
+        reference: {
+          open: null,
+          name: null,
+          shown: 1,
+          retryLast: false,
+          sameFor: null,
+        },
+      }),
+      outcomes: [],
+      earlier,
+    });
     await run.answer.answer(request());
     expect(run.delegated()).toBe(1);
     const lead = run.referenceLeads[0];
