@@ -7636,6 +7636,10 @@ export function createSpecialistQAnswer(
           evaluative:
             reading?.answerKind === "ANALYSIS" ||
             reading?.answerKind === "COMPARISON",
+          // Live rerun on bab915357 (turn 3, "Which documents did you use
+          // for that?"): a follow-up on Q's own answer is answered in place;
+          // no unasked "the company profile is ready to open".
+          followUp: reading?.answerKind === "FOLLOW_UP",
           // Decision 98 (live recheck 651a3bd50 T5): a meeting prep opens
           // the rehearsal only toward a meeting actually booked with them.
           ...(await meetingBookedFor(reading)),

@@ -1282,10 +1282,45 @@ export function gateByReading(
     readonly meetingBooked?: boolean | undefined;
     /** QPageMoveReading.fromShownCard: answered from a card Q showed. */
     readonly fromShownCard?: boolean | undefined;
+    /** QPageMoveReading.followUp: a follow-up on Q's own last answer. */
+    readonly followUp?: boolean | undefined;
   } = {},
 ): QNavigationOutcome {
-  const gated = gateByReadingAlone(outcome, navigation, context);
+  const gated = holdProfileOffer(
+    gateByReadingAlone(outcome, navigation, context),
+    navigation,
+    context.followUp === true,
+  );
   return context.pane?.pinned === true ? holdForPin(gated, navigation) : gated;
+}
+
+/**
+ * Live rerun on bab915357 (16 Nov 2026, Savanna on Tensorgate, turn 3:
+ * "Which documents did you use for that?"): answered in place, naming the
+ * management accounts and the deck, and then a separate message, "The
+ * company profile is ready to open." Nobody asked to go anywhere, and the
+ * documents the answer names are offered by the answer itself (it may
+ * offer to open the named document, once). A follow-up on Q's own last
+ * answer (the reader's answerKind FOLLOW_UP, never the words) is answered
+ * where they are: an OFFER of a record's bare profile (no tab, document,
+ * thread or item) is held -- unless they asked to go there (GO). A move
+ * the reading allows, and an offer of a specific tab or document, stand.
+ */
+function holdProfileOffer(
+  outcome: QNavigationOutcome,
+  navigation: TurnNavigationIntentV84 | null,
+  followUp: boolean,
+): QNavigationOutcome {
+  if (!followUp || outcome.decision !== "OFFER") return outcome;
+  const target = outcome.target;
+  if (target === null || readsAsGo(navigation)) return outcome;
+  if (target.page !== "COMPANY" && target.page !== "INVESTOR") return outcome;
+  const bare =
+    (target.tab == null || target.tab === "overview") &&
+    target.documentId == null &&
+    target.threadId == null &&
+    target.itemId == null;
+  return bare ? STAY("ANSWERED_IN_PLACE") : outcome;
 }
 
 /**
@@ -2074,6 +2109,12 @@ export type QPageMoveReading = {
    * (decision 98; guard ANSWERED_IN_PLACE).
    */
   readonly fromShownCard?: boolean | undefined;
+  /**
+   * Live rerun on bab915357 (turn 3): the reader read a follow-up on Q's
+   * own last answer (answerKind FOLLOW_UP). An unasked offer of a record's
+   * bare profile is held (holdProfileOffer).
+   */
+  readonly followUp?: boolean | undefined;
   /** A8: they asked to watch the company's pitch (companyMedia.pitch). */
   readonly pitch?: boolean | undefined;
   /**
@@ -2893,6 +2934,7 @@ export function createQPageMoves(dependencies: {
               evaluative: reading?.evaluative,
               meetingBooked: reading?.meetingBooked,
               fromShownCard: reading?.fromShownCard,
+              followUp: reading?.followUp,
             },
           );
           // Fast GO: held, in case the answer stored moves nothing after all.
@@ -3000,6 +3042,7 @@ export function createQPageMoves(dependencies: {
           evaluative: reading?.evaluative,
           meetingBooked: reading?.meetingBooked,
           fromShownCard: reading?.fromShownCard,
+          followUp: reading?.followUp,
         });
         if (outcome.decision === "STAY") return null;
         dependencies.logger?.info(

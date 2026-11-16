@@ -133,7 +133,7 @@ export function sharedDocumentsFact(
         ]),
     shared.length + open.length === 0
       ? ""
-      : `For any question about ${company}'s figures, performance or evidence, answer from these documents before saying a figure is not recorded: what was read of them is given as DATA ROOM DOCUMENT facts, and any other can be read now (read_document_pages or read_company_document). Name each document you rely on by its title and period, and offer to open it (open_company_document). Where a document and the deck differ, give both with their dates and explain the difference; never call one wrong. They are already shared: never offer to request any of them, and never say ${company} has not provided them. A document not named here is not open to them: never name or guess one.`,
+      : `For any question about ${company}'s figures, performance or evidence, answer from these documents before saying a figure is not recorded: what was read of them is given as DATA ROOM DOCUMENT facts, and any other can be read now (read_document_pages or read_company_document). Name each document you rely on by its title and period, and offer to open it (open_company_document). Where a document and the deck differ, give both with their periods and explain the difference from the document's own notes and line items for those periods, or say the documents do not explain it; never call either wrong, and never give a reason the documents do not state. They are already shared: never offer to request any of them, and never say ${company} has not provided them. A document not named here is not open to them: never name or guess one.`,
   ];
   return {
     scope: "DATA_ROOM",
@@ -255,4 +255,208 @@ export function alreadySharedLine(
   document: ListedDocument,
 ): string {
   return `${company} has already shared "${document.title}" with you in their data room, so there is nothing to request for this: the answer above draws on it, and I can open it for you.`;
+}
+
+/**
+ * Live rerun on bab915357 (16 Nov 2026, Savanna on Tensorgate, turn 1:
+ * 23.1 s, 21 tools): a figures question about one company. The figures a
+ * question asks for, as code reads the words: cash, burn, runway, revenue
+ * and the like. Only ever narrows what is read or waited on for the turn
+ * (a figures read bounded to the summary pages, no wait on the public web
+ * or the day): anything not read here stays one tool call away.
+ */
+const ASKED_FIGURES =
+  /\b(?:burn(?:s|ing|ed|\s+rate)?|runway|cash(?:\s+balance)?|revenue|mrr|arr|margins?|profit|loss(?:es)?|expenses?|costs?|spend(?:ing)?|financials?|p&l|ebitda|balance|payroll)\b/iu;
+
+/** The turn asks for a company's figures (cash, burn, runway, revenue...). */
+export function asksForFigures(question: string): boolean {
+  return ASKED_FIGURES.test(question);
+}
+
+/**
+ * The turn asks whether two sources agree or why they differ ("is that
+ * consistent with their deck?", "why don't they match?"). The reader's
+ * comparison reading decides first where there is one (the caller ORs it).
+ */
+const RECONCILES =
+  /\b(?:deck|pitch|consistent|consistency|inconsisten\w*|match(?:es|ing)?|differ\w*|discrepan\w*|reconcil\w*|why|explain\w*|conflict\w*|line\s+up|square|agree\w*|compare\w*)\b/iu;
+export function asksToReconcile(question: string): boolean {
+  return RECONCILES.test(question);
+}
+
+/**
+ * Which pages a shared document is read for this turn. A figures question
+ * reads the summary page (a management pack states the period's cash,
+ * burn and runway first); a question about whether the document agrees
+ * with the deck reads the pages that also carry the month-by-month lines
+ * and their notes. Anything else reads the document as before (bounded by
+ * the tool). Pages beyond these stay one read_document_pages call away.
+ */
+export const FIGURES_SUMMARY_PAGES = 1;
+export const RECONCILE_PAGES = 3;
+export function sharedPageRange(input: {
+  readonly question: string;
+  readonly reconcile: boolean;
+}): { readonly fromPage: number; readonly toPage: number } | null {
+  if (input.reconcile) return { fromPage: 1, toPage: RECONCILE_PAGES };
+  if (asksForFigures(input.question)) {
+    return { fromPage: 1, toPage: FIGURES_SUMMARY_PAGES };
+  }
+  return null;
+}
+
+/** A sentence that explains a movement, in the document's own words. */
+const EXPLAINS =
+  /\b(?:adds?|added|includ(?:es?|ed|ing)|due\s+to|because|reflects?|reflecting|one[-\s]off|reserved|offset|driven|higher|lower|increase[sd]?|decrease[sd]?|rose|fell|timing|deferred|non[-\s]recurring|note)\b/iu;
+const NOTE_MAX_CHARS = 320;
+const NOTES_MAX = 4;
+
+/**
+ * The document's own explanatory notes on the pages read: prose lines (not
+ * table rows, not its header or watermark) that explain a figure or a
+ * movement, verbatim, with their page. Never composed: code quotes, it does
+ * not reason about why.
+ */
+export function documentNotes(
+  pages: readonly { readonly page: number; readonly text: string }[],
+): readonly { readonly page: number; readonly note: string }[] {
+  const notes: { page: number; note: string }[] = [];
+  for (const page of pages) {
+    for (const raw of page.text.split(/\n+/u)) {
+      const line = raw.replace(/\s+/gu, " ").trim();
+      if (line.length < 30 || line.includes("|")) continue;
+      if (/SYNTHETIC DEMO|NOT A REAL/iu.test(line)) continue;
+      const words = line.split(" ").length;
+      if (words < 6 || !/[a-z]{3}/u.test(line)) continue;
+      if (!EXPLAINS.test(line)) continue;
+      if (notes.some((one) => one.note === line)) continue;
+      notes.push({ page: page.page, note: line.slice(0, NOTE_MAX_CHARS) });
+      if (notes.length >= NOTES_MAX) return notes;
+    }
+  }
+  return notes;
+}
+
+/** The period headings on the pages read ("Summary for October 2026"). */
+const PERIOD_HEADING =
+  /^(?:summary\s+for|balance\s+sheet\s+summary\s+at|cash\s+flow|profit\s+and\s+loss|for\s+the\s+month\s+(?:ended|of)|as\s+at|position\s+at)\b[^|]{0,60}\b(?:19|20)\d{2}\b/iu;
+export function documentPeriods(
+  pages: readonly { readonly page: number; readonly text: string }[],
+): readonly { readonly page: number; readonly period: string }[] {
+  const found: { page: number; period: string }[] = [];
+  for (const page of pages) {
+    for (const raw of page.text.split(/\n+/u)) {
+      const line = raw.replace(/\s+/gu, " ").trim();
+      const match = PERIOD_HEADING.exec(line);
+      if (match === null) continue;
+      if (found.some((one) => one.period === match[0])) continue;
+      found.push({ page: page.page, period: match[0].slice(0, 80) });
+      if (found.length >= 4) return found;
+    }
+  }
+  return found;
+}
+
+/** The deck's FINANCIALS figures, as read_company_deck gives them. */
+function deckFinancials(deck: unknown): readonly {
+  label: string;
+  value: string;
+  asOf: string | null;
+  slide: number | null;
+}[] {
+  if (typeof deck !== "object" || deck === null) return [];
+  const sections: unknown = Reflect.get(deck, "sections");
+  if (!Array.isArray(sections)) return [];
+  const financials: unknown = sections.find(
+    (section: unknown) =>
+      typeof section === "object" &&
+      section !== null &&
+      Reflect.get(section, "section") === "FINANCIALS" &&
+      Reflect.get(section, "status") === "PRESENT",
+  );
+  if (typeof financials !== "object" || financials === null) return [];
+  const facts: unknown = Reflect.get(financials, "facts");
+  if (!Array.isArray(facts)) return [];
+  return facts
+    .flatMap((fact: unknown) => {
+      if (typeof fact !== "object" || fact === null) return [];
+      const label = text(Reflect.get(fact, "label"));
+      const value = text(Reflect.get(fact, "value"));
+      if (label === null || value === null) return [];
+      const pages: unknown = Reflect.get(fact, "pages");
+      const slide = Array.isArray(pages)
+        ? pages.find(
+            (page: unknown): page is number => typeof page === "number",
+          )
+        : undefined;
+      return [
+        {
+          label: label.slice(0, 80),
+          value: value.slice(0, 60),
+          asOf: text(Reflect.get(fact, "asOf"))?.slice(0, 40) ?? null,
+          slide: slide ?? null,
+        },
+      ];
+    })
+    .slice(0, 6);
+}
+
+/**
+ * Live rerun on bab915357 (turn 2, "Is that consistent with their pitch
+ * deck?"): Q gave both figure sets and said they conflict, but not why,
+ * though the management accounts carry the period and its line items, and
+ * the deck's cash is at 30 Sep while the accounts' is at October's month
+ * end. Where a company's deck states figures and a document it shared with
+ * them was read, the evidence puts both side by side with their periods,
+ * quotes the document's own notes for the figure, and asks the answer to
+ * explain the difference from those notes (or to say the documents do not
+ * explain it), never calling either figure wrong and never giving a reason
+ * the documents do not state. Null when the deck states no figures or no
+ * page of the document was read.
+ */
+export function documentDeckDifferenceFact(input: {
+  readonly company: string;
+  readonly deck: unknown;
+  readonly document: {
+    readonly title: string;
+    readonly pages: readonly { readonly page: number; readonly text: string }[];
+  };
+}): AuthorisedFact | null {
+  const deck = deckFinancials(input.deck);
+  if (deck.length === 0 || input.document.pages.length === 0) return null;
+  const periods = documentPeriods(input.document.pages);
+  const notes = documentNotes(input.document.pages);
+  const deckSaid = deck
+    .map(
+      (fact) =>
+        `${fact.label}: ${fact.value}${fact.asOf === null ? "" : ` (as of ${fact.asOf})`}${fact.slide === null ? "" : `, slide ${String(fact.slide)}`}`,
+    )
+    .join("; ");
+  const periodSaid =
+    periods.length === 0
+      ? `its own period (named in its title)`
+      : periods
+          .map((one) => `"${one.period}" (p. ${String(one.page)})`)
+          .join(", ");
+  const notesSaid =
+    notes.length === 0
+      ? `The pages read carry no note explaining a movement in these figures; its line items by month (DATA ROOM DOCUMENT facts) may show which costs or receipts changed between the two periods.`
+      : `Its own notes on the pages read: ${notes
+          .map((one) => `"${one.note}" (p. ${String(one.page)})`)
+          .join(" ")}`;
+  return {
+    scope: "DATA_ROOM",
+    statement:
+      `${input.company.toUpperCase()}'S DECK AND "${input.document.title}" SIDE BY SIDE (code placed them; neither is wrong). The deck states: ${deckSaid}. The document states its figures for ${periodSaid}. ${notesSaid} When they differ, or they ask whether they match: give both with their periods (the deck's date and the document's month), then explain the difference only from the document's own notes and its line items for those periods; if those do not explain it, say the documents do not explain the difference. Never call either figure wrong, and never give a reason the documents do not state.`.slice(
+        0,
+        STATEMENT_MAX,
+      ),
+    // It quotes the company's own claims (deck and document): never more.
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "DOCUMENT_SUPPORTED",
+    source: `Their Data room tab and the deck for ${input.company}`.slice(
+      0,
+      200,
+    ),
+  };
 }

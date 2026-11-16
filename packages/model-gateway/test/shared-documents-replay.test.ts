@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -29,10 +29,13 @@ import {
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import {
+  asksForFigures,
+  documentDeckDifferenceFact,
   listedDocumentsOf,
   sharedDocumentFor,
   sharedDocumentReads,
   sharedDocumentsFact,
+  sharedPageRange,
 } from "../src/q/shared-documents.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
@@ -267,6 +270,10 @@ const TOOLS: readonly QOfferedTool[] = [
   offered("read_company_data_room", "company.data_room.read"),
   offered("read_document_pages", "company.data_room.document.pages.read"),
   offered("research_public_web", "public_web.search"),
+  // Their day (production offers these to an investor on every turn).
+  offered("list_schedule", "schedule.list"),
+  offered("list_pending_approvals", "approvals.pending.list"),
+  offered("list_q_work", "q.work.list"),
   offered("diligence_documents", "app.diligence.request", "SIDE_EFFECT"),
 ];
 
@@ -301,8 +308,17 @@ function outcomeOf(proposal: QToolProposal, data: unknown): QToolCallOutcome {
   };
 }
 
+/** A traced step of a timed turn, in virtual milliseconds from its start. */
+type Traced = { readonly what: string; readonly ms: number };
+
 /** The data room authorises as the person: Savanna sees its grants only. */
-function toolsFor(room: unknown): QToolPort & {
+function toolsFor(
+  room: unknown,
+  timing?: {
+    readonly latencyMs: (proposal: QToolProposal) => number;
+    readonly trace: (what: string) => void;
+  },
+): QToolPort & {
   readonly executed: QToolProposal[];
 } {
   const executed: QToolProposal[] = [];
@@ -373,6 +389,12 @@ function toolsFor(room: unknown): QToolPort & {
         const id = typeof asked === "string" ? asked : "";
         return shared.has(id) ? pagesRead(id) : null;
       }
+      case "list_schedule":
+        return { items: [] };
+      case "list_pending_approvals":
+        return { approvals: [] };
+      case "list_q_work":
+        return { work: [] };
       case "research_public_web":
         return {
           status: "PROVIDER_UNAVAILABLE",
@@ -387,9 +409,16 @@ function toolsFor(room: unknown): QToolPort & {
     executed,
     offer: () => Promise.resolve(TOOLS),
     available: () => Promise.resolve(TOOLS),
-    execute: (proposal) => {
+    execute: async (proposal) => {
       executed.push(proposal);
-      return Promise.resolve(outcomeOf(proposal, respond(proposal)));
+      if (timing !== undefined) {
+        timing.trace(`start ${proposal.name}`);
+        await new Promise((resolve) =>
+          setTimeout(resolve, timing.latencyMs(proposal)),
+        );
+        timing.trace(`end ${proposal.name}`);
+      }
+      return outcomeOf(proposal, respond(proposal));
     },
   };
 }
@@ -457,11 +486,34 @@ async function turn(options: {
   readonly room?: unknown;
   readonly questionKind?: string;
   readonly research?: "EXPLICIT" | "NEVER";
+  /** Production-shaped latencies on the virtual clock (timing replay). */
+  readonly timing?: {
+    readonly latencyMs: (proposal: QToolProposal) => number;
+    readonly modelMs: number;
+  };
 }) {
-  const alpha = createFakeModelProvider({
+  const traced: Traced[] = [];
+  const clockStart = Date.now();
+  const trace = (what: string): void => {
+    traced.push({ what, ms: Date.now() - clockStart });
+  };
+  const fake = createFakeModelProvider({
     code: "alpha",
     script: options.script,
   });
+  const timing = options.timing;
+  const alpha: typeof fake =
+    timing === undefined
+      ? fake
+      : {
+          ...fake,
+          generate: async (request, context) => {
+            trace("model asked");
+            await new Promise((resolve) => setTimeout(resolve, timing.modelMs));
+            trace("model answered");
+            return fake.generate(request, context);
+          },
+        };
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(
       testCatalog((s) => ({
@@ -523,7 +575,10 @@ async function turn(options: {
       },
     },
   } as unknown as QRuntimeRepositories;
-  const tools = toolsFor(options.room ?? SAVANNA_ROOM);
+  const tools = toolsFor(
+    options.room ?? SAVANNA_ROOM,
+    timing === undefined ? undefined : { latencyMs: timing.latencyMs, trace },
+  );
   const seam = createModelGatewayQAnswer({
     gateway,
     repositories,
@@ -560,7 +615,7 @@ async function turn(options: {
     .flatMap((call) => call.request.messages.map((m) => m.content))
     .join("\n");
   const said = completed.at(-1)?.message.text ?? "";
-  return { outcome, sent, said, executed: tools.executed };
+  return { outcome, sent, said, executed: tools.executed, traced };
 }
 
 const ANSWER = (text: string): FakeBehaviour => ({
@@ -612,7 +667,7 @@ describe("live 16 Nov 2026: an investor's figures question is answered from what
   });
 
   it("T2: a follow-up about the deck carries the deck's figures and the accounts', to compare and explain", async () => {
-    const { sent } = await turn({
+    const { sent, executed } = await turn({
       earlier: [
         { role: "USER", content: T1 },
         { role: "Q", content: T1_ANSWER },
@@ -623,9 +678,35 @@ describe("live 16 Nov 2026: an investor's figures question is answered from what
     expect(sent).toContain("Current monthly net burn: About $135k");
     expect(sent).toContain("Runway at current burn: 8.1 months");
     expect(sent).toContain("152,800");
+    // Live rerun on bab915357 (turn 2): "they conflict", with no reason,
+    // though the accounts carry the period and its notes. Both periods and
+    // the document's own notes reach the answer, with the instruction to
+    // explain the difference from them (or say they do not explain it).
+    expect(sent).toContain("SIDE BY SIDE (code placed them; neither is wrong)");
+    expect(sent).toContain("Cash: $1.1m (as of September 30, 2026), slide 10");
+    expect(sent).toContain('\\"Summary for October 2026\\" (p. 1)');
     expect(sent).toContain(
-      "Where a document and the deck differ, give both with their dates and explain the difference; never call one wrong.",
+      'Its own notes on the pages read: \\"October adds the SOC 2 Type I audit fee (18,500) and seed-round legal fees (9,000).\\" (p. 1)',
     );
+    expect(sent).toContain(
+      "explain the difference only from the document's own notes and its line items for those periods; if those do not explain it, say the documents do not explain the difference. Never call either figure wrong, and never give a reason the documents do not state.",
+    );
+    expect(sent).toContain(
+      "explain the difference from the document's own notes and line items for those periods, or say the documents do not explain it",
+    );
+    // Whether they agree is read from the accounts alone, over the pages
+    // that carry both periods' lines, not the whole document.
+    const pages = executed.filter(
+      (call) => call.name === "read_document_pages",
+    );
+    expect(pages.map((call) => call.arguments)).toEqual([
+      {
+        companyId: TENSORGATE,
+        documentId: DOC.accounts,
+        fromPage: 1,
+        toPage: 3,
+      },
+    ]);
   });
 
   it("T3: which documents -- the listing names them, by title and period", async () => {
@@ -777,6 +858,56 @@ describe("shared-documents helpers", () => {
     }
   });
 
+  it("bounds a figures read to the summary page and a consistency read to the pages of both periods", () => {
+    const T1_LIVE =
+      "How much cash is Tensorgate burning each month, and how long will it last?";
+    expect(asksForFigures(T1_LIVE)).toBe(true);
+    expect(sharedPageRange({ question: T1_LIVE, reconcile: false })).toEqual({
+      fromPage: 1,
+      toPage: 1,
+    });
+    expect(
+      sharedPageRange({
+        question: "Is that consistent with their pitch deck?",
+        reconcile: true,
+      }),
+    ).toEqual({ fromPage: 1, toPage: 3 });
+    // Not a figures question: the document as before (the tool's bound).
+    expect(sharedPageRange({ question: T3, reconcile: false })).toBeNull();
+  });
+
+  it("a document with no note of its own is said to carry none, and nothing is invented", () => {
+    // The seeded accounts' page 1 (scripts/seed/evidence/documents.mjs):
+    // the summary table and the basis of preparation, no movement note.
+    const page = [
+      "Management accounts, May 2025 to Oct 2026",
+      "Basis of preparation",
+      "Prepared by the company with its outsourced bookkeeper; unaudited. Accrual basis. Amounts in USD, whole units.",
+      "Summary for October 2026",
+      "Cash at month end 948,840",
+      "Net burn (payments less customer receipts) 152,800",
+    ].join("\n");
+    const fact = documentDeckDifferenceFact({
+      company: "Tensorgate",
+      deck: DECK,
+      document: { title: ACCOUNTS_TITLE, pages: [{ page: 1, text: page }] },
+    });
+    expect(fact?.statement).toContain('"Summary for October 2026" (p. 1)');
+    expect(fact?.statement).toContain(
+      "The pages read carry no note explaining a movement in these figures",
+    );
+    expect(fact?.statement).not.toMatch(/SOC 2|legal fees|GPU/u);
+    expect(fact?.truthClass).toBe("USER_CLAIM");
+    // No deck figures, or no page read: no side-by-side at all.
+    expect(
+      documentDeckDifferenceFact({
+        company: "Tensorgate",
+        deck: { sections: [] },
+        document: { title: ACCOUNTS_TITLE, pages: [{ page: 1, text: page }] },
+      }),
+    ).toBeNull();
+  });
+
   it("a figures item is answered by the shared accounts; a pending request is said as pending", () => {
     expect(
       sharedDocumentFor("current burn and runway", listed)?.documentId,
@@ -793,5 +924,126 @@ describe("shared-documents helpers", () => {
     ]);
     expect(fact?.statement).toContain("pending, never ask again");
     expect(fact?.truthClass).toBe("VERIFIED");
+  });
+});
+
+/**
+ * Live rerun on bab915357 (16 Nov 2026, 11:45 UTC, conversation 3d510d8e):
+ * turn 1 ("How much cash is Tensorgate burning each month, and how long
+ * will it last?") was right but took 23.1 s with 21 tools. Replayed on a
+ * virtual clock with production-shaped latencies (each an HTTPS hop from
+ * q-api to the api and its database; the data-room listing and a page read
+ * re-authorise the room, so they cost more):
+ *   list_my_relationships   400 ms     read_company_data_room   600 ms
+ *   get_company / figures   300 ms     read_document_pages      900 ms
+ *   read_company_deck       500 ms     schedule / approvals /
+ *   get_relationship        300 ms       Q work                 300 ms
+ *   research_public_web   4,000 ms     answer model           1,000 ms
+ * Target: the answer call starts within ~4 s of arrival; the data-room
+ * listing and the page reads overlap the other reads instead of following
+ * them; schedule, approvals, Q work and the public web never block it; and
+ * the page reads ask only for the pages that carry the figures.
+ */
+const LATENCY: Readonly<Record<string, number>> = {
+  list_my_relationships: 400,
+  get_company: 300,
+  read_company_figures: 300,
+  read_company_deck: 500,
+  get_relationship: 300,
+  read_company_data_room: 600,
+  read_document_pages: 900,
+  list_schedule: 300,
+  list_pending_approvals: 300,
+  list_q_work: 300,
+  search_companies: 300,
+  research_public_web: 4_000,
+};
+
+/** Runs `work` on the virtual clock (as shown-list-explanation-timing.test.ts does). */
+async function onVirtualClock<T>(work: () => Promise<T>): Promise<T> {
+  let settled = false;
+  const running = work().finally(() => {
+    settled = true;
+  });
+  for (let step = 0; !settled && step < 200_000; step += 1) {
+    if (vi.getTimerCount() > 0) {
+      await vi.advanceTimersToNextTimerAsync();
+    } else {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+  return running;
+}
+
+describe("live rerun bab915357: a figures question over shared documents is not slow", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "performance",
+        "Date",
+      ],
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const T1_LIVE =
+    "How much cash is Tensorgate burning each month, and how long will it last?";
+
+  it("T1: the answer call starts within ~4 s; data-room reads overlap; no day or web read blocks it", async () => {
+    const { traced, executed, sent } = await onVirtualClock(() =>
+      turn({
+        earlier: [],
+        said: T1_LIVE,
+        script: [ANSWER(T1_ANSWER)],
+        timing: {
+          latencyMs: (proposal) => LATENCY[proposal.name] ?? 300,
+          modelMs: 1_000,
+        },
+      }),
+    );
+    if (process.env["CQ_TIMING_DEBUG"] === "1") {
+      console.log(traced.map((t) => `${String(t.ms)} ${t.what}`).join("\n"));
+    }
+    const at = (what: string): number =>
+      traced.find((one) => one.what === what)?.ms ?? Number.POSITIVE_INFINITY;
+    const asked = at("model asked");
+    // Still right: the accounts read, the figures reach the answer.
+    expect(sent).toContain(
+      "Net burn (payments less customer receipts) | 152,800",
+    );
+    expect(asked).toBeLessThanOrEqual(4_000);
+    // The listing starts beside the first reads, not after the named reads.
+    expect(at("start read_company_data_room")).toBeLessThan(
+      at("end read_company_deck"),
+    );
+    // Nothing the figures do not need finishes after the model was asked
+    // and before it: no day read or web search holds the answer back.
+    for (const name of [
+      "list_schedule",
+      "list_pending_approvals",
+      "list_q_work",
+    ]) {
+      expect(at(`start ${name}`)).toBeGreaterThanOrEqual(asked);
+    }
+    // The web search begun with the turn (owner: in parallel) is not waited
+    // on, and the answer is not asked again with it: one answer call.
+    expect(asked).toBeLessThan(at("end research_public_web"));
+    expect(traced.filter((one) => one.what === "model asked")).toHaveLength(1);
+    // Page reads are bounded to the pages that carry the figures.
+    const pageReads = executed.filter(
+      (call) => call.name === "read_document_pages",
+    );
+    expect(pageReads.length).toBeGreaterThan(0);
+    for (const call of pageReads) {
+      const args = call.arguments as Record<string, unknown>;
+      expect(args["fromPage"]).toBe(1);
+      expect(typeof args["toPage"]).toBe("number");
+    }
   });
 });

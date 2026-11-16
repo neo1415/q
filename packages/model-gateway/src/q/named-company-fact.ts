@@ -608,7 +608,7 @@ export async function readNamedVisibleCompany(input: {
   readonly available: ReadonlySet<string>;
   readonly callIndex: number;
   /** Called once a company matched, as its profile read starts. */
-  readonly onFound?: (() => void) | undefined;
+  readonly onFound?: ((companyId: string) => void) | undefined;
 }): Promise<NamedVisibleCompanyRead | null> {
   const { name, tools, context, available } = input;
   if (!available.has(SEARCH_TOOL) || !available.has(GET_TOOL)) return null;
@@ -634,7 +634,7 @@ export async function readNamedVisibleCompany(input: {
   if (exact.size !== 1) return null;
   const [companyId] = [...exact];
   if (companyId === undefined || input.exclude.has(companyId)) return null;
-  input.onFound?.();
+  input.onFound?.(companyId);
   const read = await readVisibleCompanyById({
     companyId,
     tools,

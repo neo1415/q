@@ -2524,6 +2524,38 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
     ).toEqual(moved(OVERVIEW));
   });
 
+  it("live rerun bab915357 T3: a follow-up on Q's own answer offers no bare profile ('The company profile is ready to open.')", () => {
+    // "Which documents did you use for that?" (Savanna on Tensorgate):
+    // answered in place naming the accounts and the deck, then a separate
+    // "The company profile is ready to open." Held for a FOLLOW_UP reading,
+    // whatever its mode, and with no reading mode at all.
+    for (const navigation of [nav("CONTEXT"), nav("OFFER_ONLY"), null]) {
+      expect(gateByReading(offered, navigation, { followUp: true })).toEqual(
+        STAYED("ANSWERED_IN_PLACE"),
+      );
+    }
+    // A CONTEXT move the reading allows becomes no offer either way once
+    // OFFER_ONLY turns it into one.
+    expect(
+      gateByReading(moved(OVERVIEW), nav("OFFER_ONLY"), { followUp: true }),
+    ).toEqual(STAYED("ANSWERED_IN_PLACE"));
+    // Failing before the fix: the offer stood.
+    expect(gateByReading(offered, nav("CONTEXT"))).toEqual(offered);
+    // Asked to go there: the offer stands.
+    expect(gateByReading(offered, nav("GO"), { followUp: true })).toEqual(
+      offered,
+    );
+    // A tab or document of the record ("the data room") is not the bare
+    // profile: it stands, and so does a contextual move.
+    const offeredRoom = { ...moved(DATAROOM), decision: "OFFER" as const };
+    expect(
+      gateByReading(offeredRoom, nav("CONTEXT"), { followUp: true }),
+    ).toEqual(offeredRoom);
+    expect(
+      gateByReading(moved(OVERVIEW), nav("CONTEXT"), { followUp: true }),
+    ).toEqual(moved(OVERVIEW));
+  });
+
   it("decision 98 (live recheck 651a3bd50 T5): a meeting prep with no meeting booked is briefed in place, not on the rehearsal page", () => {
     // "Get me ready for my meeting with Watchly": every meeting CANCELLED,
     // and the decision moved to Watchly's rehearsal (CONTEXT).

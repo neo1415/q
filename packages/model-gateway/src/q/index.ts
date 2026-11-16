@@ -540,10 +540,14 @@ import { onScreenDocumentFact } from "./document-fact.js";
 import type { CheckedLineNeed } from "./uncertainty.js";
 import {
   alreadySharedLine,
+  asksForFigures,
+  asksToReconcile,
+  documentDeckDifferenceFact,
   listedDocumentsOf,
   sharedDocumentFor,
   sharedDocumentReads,
   sharedDocumentsFact,
+  sharedPageRange,
   type ListedDocument,
 } from "./shared-documents.js";
 import {
@@ -4495,6 +4499,11 @@ export function createModelGatewayQAnswer(
      */
     readonly sharedListings?:
       readonly (readonly [string, readonly ListedDocument[]])[] | undefined;
+    /**
+     * Live rerun on bab915357: a page of a document the company shared
+     * with them was read for this turn (the answer is drawn from it).
+     */
+    readonly sharedRead?: boolean | undefined;
   };
   const NO_WIDE_READS: WideReads = {
     namedCompanies: [],
@@ -6190,6 +6199,8 @@ export function createModelGatewayQAnswer(
       for (const company of named) {
         namedIds.add(company.companyId);
         namedNames.set(company.companyId.toLowerCase(), company.name);
+        // Its shared documents are listed now, beside its profile reads.
+        startShared(company.companyId);
       }
       if (named.length > 0) stepStarts(request, "REVIEWING_COMPANY");
       // Live 16 Nov 2026 (Savanna on Tensorgate, T1-T3): a company of
@@ -6265,6 +6276,12 @@ export function createModelGatewayQAnswer(
           const deckOk =
             deck !== null && deck.status === "SUCCEEDED" && deck.result.ok;
           if (!figuresOk && !deckOk) return;
+          if (deckOk) {
+            deckByCompany.set(
+              company.companyId.toLowerCase(),
+              deck.result.data,
+            );
+          }
           figuresTaken.add(company.companyId);
           namedCompanies.push(
             ...(figuresOk
@@ -6351,13 +6368,15 @@ export function createModelGatewayQAnswer(
             available: prefetchTools,
             callIndex: index,
             // Its stage goes out once a company matched, as its read starts.
-            onFound: () => {
+            onFound: (companyId) => {
               stepStarts(request, "REVIEWING_COMPANY");
+              startShared(companyId);
             },
           }).catch(() => null),
         ),
         ...bound.map((companyId, index) => {
           stepStarts(request, "REVIEWING_COMPANY");
+          startShared(companyId);
           return readVisibleCompanyById({
             companyId,
             tools,
@@ -6371,6 +6390,12 @@ export function createModelGatewayQAnswer(
       await own.catch(() => undefined);
       for (const read of found) {
         if (read === null) continue;
+        if (
+          read.deck !== null &&
+          !deckByCompany.has(read.companyId.toLowerCase())
+        ) {
+          deckByCompany.set(read.companyId.toLowerCase(), read.deck);
+        }
         for (const { providerName, outcome } of read.calls) {
           namedCompanyCalls.push({
             toolName: outcome.toolName,
@@ -6512,38 +6537,66 @@ export function createModelGatewayQAnswer(
       );
     };
     /**
-     * Live 16 Nov 2026 (shared-documents.ts; Savanna on Tensorgate): on an
-     * investor's turn about a company (on screen, or named this turn or in
-     * Q's last reply), the documents that company has made open to them are
-     * listed through read_company_data_room -- their own Data room tab, as
-     * them, so another investor's grants and founder-private documents are
-     * never in it -- and the most evidential ones are read through
-     * read_document_pages (a shared highly confidential one under its grant,
-     * ADR 0078), before the model is asked. Documents the screen lane read
-     * already are not read twice.
+     * Live rerun on bab915357 (16 Nov 2026, turn 1: 23.1 s, 21 tools): the
+     * listing waited for every named read (profile, figures and deck) and
+     * the page reads for the listing, one hop after another, and each page
+     * read took the whole document. A company's listing now starts the
+     * moment its id is known (on screen at once; a named company as its
+     * search or their standing resolves it), beside its profile reads, and
+     * its page reads follow the listing straight away, bounded to the pages
+     * the question needs (sharedPageRange). Same tools, same plan, as them.
      */
-    const sharedDocumentsRead = async (): Promise<void> => {
+    type SharedRead = {
+      readonly listing: QToolCallOutcome | null;
+      readonly documents: readonly ListedDocument[] | null;
+      readonly reads: readonly {
+        readonly document: ListedDocument;
+        readonly outcome: QToolCallOutcome | null;
+      }[];
+    };
+    const sharedStarted = new Map<string, Promise<SharedRead>>();
+    /** The deck each company's read gave (for the difference fact). */
+    const deckByCompany = new Map<string, unknown>();
+    let sharedWasRead = false;
+    const sharedReconcile =
+      asksToReconcile(latest.content) || readAsComparison(request);
+    const sharedRange = sharedPageRange({
+      question: latest.content,
+      reconcile: sharedReconcile,
+    });
+    const sharedOnScreenRead = new Set(
+      dataRoomDocumentReads({
+        screen: plan.screen,
+        question: latest.content,
+      }).map((read) => read.documentId),
+    );
+    /**
+     * Live rerun on bab915357: an investor's question about a company's
+     * figures (cash, burn, runway...), the company on screen or named, and
+     * not a question about the web. Only narrows what this turn waits on.
+     */
+    const figuresAboutACompany =
+      askerSideOf(request) === "INVESTOR" &&
+      asksForFigures(latest.content) &&
+      !asksForTheWeb(latest.content) &&
+      (counterparty?.kind === "COMPANY" ||
+        request.namedOther?.kind === "COMPANY");
+    const sharedEligible = (): boolean =>
+      askerSideOf(request) === "INVESTOR" &&
+      prefetchTools.has("read_company_data_room");
+    const startShared = (rawId: string): void => {
+      if (!sharedEligible()) return;
+      const companyId = rawId.toLowerCase();
       if (
-        askerSideOf(request) !== "INVESTOR" ||
-        !prefetchTools.has("read_company_data_room")
+        sharedStarted.has(companyId) ||
+        sharedStarted.size >= SHARED_LISTINGS_MAX
       ) {
         return;
       }
-      const onScreen =
-        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
-      const ids = [...(onScreen === null ? [] : [onScreen]), ...namedIds]
-        .map((id) => id.toLowerCase())
-        .filter((id, index, all) => all.indexOf(id) === index)
-        .slice(0, SHARED_LISTINGS_MAX);
-      const onScreenRead = new Set(
-        dataRoomDocumentReads({
-          screen: plan.screen,
-          question: latest.content,
-        }).map((read) => read.documentId),
-      );
-      const canRead = prefetchTools.has("read_document_pages");
-      await Promise.all(
-        ids.map(async (companyId, index) => {
+      const index = sharedStarted.size;
+      sharedStarted.set(
+        companyId,
+        (async (): Promise<SharedRead> => {
           const listing = await tools
             .execute(
               {
@@ -6554,89 +6607,168 @@ export function createModelGatewayQAnswer(
               toolContext,
             )
             .catch(() => null);
-          namedCompanyCalls.push(
-            ...(listing === null
-              ? []
-              : [
-                  {
-                    toolName: listing.toolName,
-                    providerName: "read_company_data_room",
-                    status: listing.status,
-                    failureCode: listing.failureCode,
-                    latencyMs: listing.latencyMs,
-                  },
-                ]),
-          );
-          if (listing === null || !listing.result.ok) return;
-          const documents = listedDocumentsOf(listing.result.data);
-          if (documents === null || documents.length === 0) return;
-          const byCompany =
-            sharedDocumentsByRun.get(request.runId) ??
-            new Map<string, readonly ListedDocument[]>();
-          byCompany.set(companyId, documents);
-          sharedDocumentsByRun.set(request.runId, byCompany);
-          boundedRunState();
-          const known = runCompanies.read(request.runId);
-          const name =
-            known.companyNames.get(companyId) ??
-            known.profiles.get(companyId) ??
-            namedNames.get(companyId) ??
-            (companyId === onScreen?.toLowerCase()
-              ? onScreenCompanyName
-              : null) ??
-            "The company";
-          const listed = sharedDocumentsFact(name, documents);
-          if (listed !== null) namedCompanies.push(listed);
-          if (!canRead) return;
-          const reads = sharedDocumentReads({
+          const documents =
+            listing === null || !listing.result.ok
+              ? null
+              : listedDocumentsOf(listing.result.data);
+          if (
+            documents === null ||
+            documents.length === 0 ||
+            !prefetchTools.has("read_document_pages")
+          ) {
+            return { listing, documents, reads: [] };
+          }
+          const chosen = sharedDocumentReads({
             documents,
             question: latest.content,
-            alreadyRead: onScreenRead,
+            alreadyRead: sharedOnScreenRead,
+            // Whether two sources agree is read from the most evidential
+            // one, with the room the pages of both periods need.
+            ...(sharedReconcile ? { max: 1 } : {}),
           });
-          if (reads.length === 0) return;
-          const share = Math.floor(
-            DATA_ROOM_FACTS_MAX_CHARS / (reads.length * ids.length),
-          );
-          const outcomes = await Promise.all(
-            reads.map((document, at) =>
-              tools
+          const reads = await Promise.all(
+            chosen.map(async (document, at) => ({
+              document,
+              outcome: await tools
                 .execute(
                   {
                     callId: `q-shared-document-${String(index)}-${String(at)}`,
                     name: "read_document_pages",
-                    arguments: { companyId, documentId: document.documentId },
+                    arguments: {
+                      companyId,
+                      documentId: document.documentId,
+                      ...(sharedRange ?? {}),
+                    },
                   },
                   toolContext,
                 )
                 .catch(() => null),
-            ),
+            })),
           );
-          outcomes.forEach((outcome, at) => {
-            const document = reads[at];
-            if (outcome === null || document === undefined) return;
-            namedCompanyCalls.push({
-              toolName: outcome.toolName,
-              providerName: "read_document_pages",
-              status: outcome.status,
-              failureCode: outcome.failureCode,
-              latencyMs: outcome.latencyMs,
-            });
-            if (!outcome.result.ok) return;
-            namedCompanies.push(
-              ...dataRoomDocumentFacts(
-                outcome.result.data,
-                {
-                  companyId,
-                  documentId: document.documentId,
-                  open: false,
-                  shared: true,
-                },
-                share,
-              ),
-            );
-          });
-        }),
+          return { listing, documents, reads };
+        })(),
       );
+    };
+    /**
+     * Live 16 Nov 2026 (shared-documents.ts; Savanna on Tensorgate): on an
+     * investor's turn about a company (on screen, or named this turn or in
+     * Q's last reply), the documents that company has made open to them are
+     * listed through read_company_data_room -- their own Data room tab, as
+     * them, so another investor's grants and founder-private documents are
+     * never in it -- and the most evidential ones are read through
+     * read_document_pages (a shared highly confidential one under its grant,
+     * ADR 0078), before the model is asked. Documents the screen lane read
+     * already are not read twice. startShared began the reads; this turns
+     * them into facts once the companies' names are known.
+     */
+    const sharedDocumentsRead = async (): Promise<void> => {
+      if (!sharedEligible()) return;
+      const onScreen =
+        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
+      for (const id of [
+        ...(onScreen === null ? [] : [onScreen]),
+        ...namedIds,
+      ]) {
+        startShared(id);
+      }
+      const started = [...sharedStarted.entries()];
+      const results = await Promise.all(
+        started.map(([, read]) => read.catch(() => null)),
+      );
+      started.forEach(([companyId], at) => {
+        const result = results[at];
+        if (result === null || result === undefined) return;
+        const { listing, documents, reads } = result;
+        if (listing !== null) {
+          namedCompanyCalls.push({
+            toolName: listing.toolName,
+            providerName: "read_company_data_room",
+            status: listing.status,
+            failureCode: listing.failureCode,
+            latencyMs: listing.latencyMs,
+          });
+        }
+        if (documents === null || documents.length === 0) return;
+        const byCompany =
+          sharedDocumentsByRun.get(request.runId) ??
+          new Map<string, readonly ListedDocument[]>();
+        byCompany.set(companyId, documents);
+        sharedDocumentsByRun.set(request.runId, byCompany);
+        boundedRunState();
+        const known = runCompanies.read(request.runId);
+        const name =
+          known.companyNames.get(companyId) ??
+          known.profiles.get(companyId) ??
+          namedNames.get(companyId) ??
+          (companyId === onScreen?.toLowerCase()
+            ? onScreenCompanyName
+            : null) ??
+          "The company";
+        const listed = sharedDocumentsFact(name, documents);
+        if (listed !== null) namedCompanies.push(listed);
+        if (reads.length === 0) return;
+        const share = Math.floor(
+          DATA_ROOM_FACTS_MAX_CHARS / (reads.length * started.length),
+        );
+        let differenceGiven = false;
+        for (const { document, outcome } of reads) {
+          if (outcome === null) continue;
+          namedCompanyCalls.push({
+            toolName: outcome.toolName,
+            providerName: "read_document_pages",
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          if (!outcome.result.ok) continue;
+          const facts = dataRoomDocumentFacts(
+            outcome.result.data,
+            {
+              companyId,
+              documentId: document.documentId,
+              open: false,
+              shared: true,
+            },
+            share,
+          );
+          if (facts.length === 0) continue;
+          sharedWasRead = true;
+          namedCompanies.push(...facts);
+          // Live rerun on bab915357 (turn 2): the deck's figures and the
+          // document's, side by side with their periods and the document's
+          // own notes, so a difference is explained from the document.
+          if (differenceGiven) continue;
+          const read = outcome.result.data as {
+            readonly title?: unknown;
+            readonly pages?: unknown;
+          } | null;
+          const pages: { page: number; text: string }[] = Array.isArray(
+            read?.pages,
+          )
+            ? (read.pages as readonly unknown[]).flatMap((page) => {
+                if (typeof page !== "object" || page === null) return [];
+                const number: unknown = Reflect.get(page, "page");
+                const words: unknown = Reflect.get(page, "text");
+                return typeof number === "number" && typeof words === "string"
+                  ? [{ page: number, text: words }]
+                  : [];
+              })
+            : [];
+          const difference = documentDeckDifferenceFact({
+            company: name,
+            deck: deckByCompany.get(companyId),
+            document: {
+              title:
+                typeof read?.title === "string" ? read.title : document.title,
+              pages,
+            },
+          });
+          if (difference !== null) {
+            namedCompanies.push(difference);
+            differenceGiven = true;
+          }
+        }
+      });
     };
     /**
      * Owner QA I7 (cheque-fit-fact.ts): "does my cheque fit X's round?"
@@ -6963,6 +7095,11 @@ export function createModelGatewayQAnswer(
     const wide = (): Promise<WideReads> => {
       wideRead ??= (async (): Promise<WideReads> => {
         const wideStarted = Date.now();
+        // Live rerun on bab915357: the company on screen's shared documents
+        // are listed and read from the first moment, beside every other read.
+        if (counterparty?.kind === "COMPANY") {
+          startShared(counterparty.companyId);
+        }
         const ownNamed = namedRead();
         // RC3 item 3 (independent reads side by side): the cheque fit and
         // the diligence follow-ups need only the companies named (namedIds),
@@ -6984,7 +7121,14 @@ export function createModelGatewayQAnswer(
           timed("index", phased("index", indexDone)),
           timed("onboarding", phased("onboarding", onboardingRead)),
           named,
-          timed("day", phased("day", dayRead)),
+          // Live rerun on bab915357 (turn 1, 23.1 s): an investor's figures
+          // question about a company is answered from that company's
+          // records and the documents it shared; their schedule, approvals
+          // and Q's work list say nothing to it, so they are not read for it
+          // (still one tool call away).
+          figuresAboutACompany
+            ? Promise.resolve()
+            : timed("day", phased("day", dayRead)),
           timed("arrival", phased("arrival", arrivalRead)),
           afterNamed,
         ]);
@@ -7004,6 +7148,7 @@ export function createModelGatewayQAnswer(
           sharedListings: [
             ...(sharedDocumentsByRun.get(request.runId) ?? new Map()),
           ],
+          sharedRead: sharedWasRead,
         };
         // RC3: kept for a short follow-up of this conversation, with the
         // reads that produced it (provenance); facts keep their own.
@@ -8320,6 +8465,32 @@ export function createModelGatewayQAnswer(
       ) {
         offered = offered.filter((tool) =>
           MESSAGE_TURN_TOOLS.has(tool.definition.name),
+        );
+      }
+      // Live rerun on bab915357 (turn 1, 23.1 s): an investor's figures
+      // question about one company, answered from documents that company
+      // shared with them (read above), waited for the public web search
+      // begun with the turn and was then asked again with it. The web
+      // search has nothing to add to a private company's own accounts: when
+      // those were read and their words do not ask about the web, the
+      // answer neither waits for it nor is asked again with it, and the
+      // model is not handed the web tool for this turn. Decided from what
+      // code read (the shared pages), not the model's words.
+      if (
+        earlyWeb !== null &&
+        !earlyWeb.claimed &&
+        wideReads.sharedRead === true &&
+        askerSideOf(request) === "INVESTOR" &&
+        asksForFigures(latest.content) &&
+        !asksForTheWeb(latest.content)
+      ) {
+        earlyWeb.claimed = true;
+        offered = offered.filter(
+          (tool) => !PUBLIC_WEB_TOOLS.has(tool.definition.name),
+        );
+        logger?.info(
+          { qRunId: request.runId, sinceStartMs: Date.now() - startedAt },
+          "q early web search not waited on: answered from shared documents",
         );
       }
       logger?.info(
