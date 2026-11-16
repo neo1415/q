@@ -14,10 +14,13 @@ import { createRequestDatabaseClient } from "@capital-q/database";
 
 import { redriveBlockedDocuments } from "./documents/redrive.js";
 import { createPgmqQueueClient } from "./queue/pgmq.js";
+import { WORKER_DATABASE_DEFAULTS } from "./statement-budget.js";
 
 const apply = process.argv.includes("--apply");
 const config = loadWorkerConfig();
-const database = createRequestDatabaseClient(loadDatabaseConfig());
+const database = createRequestDatabaseClient(
+  loadDatabaseConfig(WORKER_DATABASE_DEFAULTS),
+);
 
 try {
   const result = await redriveBlockedDocuments({

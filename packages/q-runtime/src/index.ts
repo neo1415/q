@@ -283,8 +283,13 @@ export {
 export {
   createRunEngineHeartbeat,
   ENGINE_HEARTBEAT_INTERVAL_MS,
+  RUN_STALL_AFTER_MS,
   type RunEngineHeartbeat,
 } from "./application/engine-heartbeat.js";
+export {
+  createRunProgress,
+  type RunProgress,
+} from "./application/run-progress.js";
 // ETIQUETTE block (ADR 0050): a person's own business etiquette guide.
 export {
   createPostgresEtiquetteGuideStore,

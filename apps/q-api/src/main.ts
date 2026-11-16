@@ -603,6 +603,7 @@ import {
 import {
   createLangGraphQOrchestrator,
   createPostgresQCheckpointStore,
+  Q_ORCHESTRATION_VERSION,
 } from "@capital-q/q-orchestrator";
 import {
   createCapitalObjectiveQSubjectResolver,
@@ -613,6 +614,7 @@ import {
   createOrganisationQSubjectResolver,
   createOrphanedRunSweep,
   createRunEngineHeartbeat,
+  createRunProgress,
   createPostgresQRunEventNotifier,
   createPostgresQRuntimeRepositories,
   createQOrchestrationRuntime,
@@ -870,6 +872,10 @@ import {
   createMemoryLearner,
   withLearning,
 } from "./composition/memory-learner.js";
+import {
+  progressObservedGateway,
+  progressObservedTools,
+} from "./composition/run-progress.js";
 import { createRecallGraphPort } from "./composition/recall-graph.js";
 import { createRehearsalRecallPort } from "./composition/rehearsal-recall.js";
 import {
@@ -1392,46 +1398,55 @@ const providerAccounts = watchProviderAccounts(
 // DECISIONS 101: when the turn reader's route was last used in this
 // process, read off the ledger the gateway writes for every attempt.
 const readerRouteActivity = createReaderRouteActivity();
-const modelGateway = timedModelGateway(
-  createModelGateway({
-    catalog: modelCatalog,
-    registry: createModelProviderRegistry(providers),
-    usage: readerRouteActivity.observe(
-      createPostgresModelUsageRepository({ sql: database.sql }),
-    ),
-    // DECISIONS 68: the same health, watched, so voice can tell when the
-    // OpenAI account is out and fall back to ElevenLabs.
-    health: providerAccounts.health,
-    onProviderBlocked: (event) =>
-      operatorAlert.send(providerBlockedAlertText(event)).then(() => undefined),
-    syntheticDemo,
-    // Owner 2026-10-28: the demo posture covers the seeded world only; a
-    // person who signed up for real is routed as a customer.
-    syntheticSubject: createPostgresSyntheticSubjectReader({
-      sql: database.sql,
+// The run progress deadline (16 Nov 2026): every run-attributed model call
+// and tool result in this process marks its run as moving; the engine
+// heartbeat fails an interactive answer run that stops moving.
+const runProgress = createRunProgress();
+const modelGateway = progressObservedGateway(
+  timedModelGateway(
+    createModelGateway({
+      catalog: modelCatalog,
+      registry: createModelProviderRegistry(providers),
+      usage: readerRouteActivity.observe(
+        createPostgresModelUsageRepository({ sql: database.sql }),
+      ),
+      // DECISIONS 68: the same health, watched, so voice can tell when the
+      // OpenAI account is out and fall back to ElevenLabs.
+      health: providerAccounts.health,
+      onProviderBlocked: (event) =>
+        operatorAlert
+          .send(providerBlockedAlertText(event))
+          .then(() => undefined),
+      syntheticDemo,
+      // Owner 2026-10-28: the demo posture covers the seeded world only; a
+      // person who signed up for real is routed as a customer.
+      syntheticSubject: createPostgresSyntheticSubjectReader({
+        sql: database.sql,
+      }),
+      // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
+      // counts, shared with the workers' gateway; unset means no cap.
+      spendCap: (() => {
+        const capUsd = parseDailySpendCapUsd(process.env);
+        return capUsd === undefined
+          ? undefined
+          : createDailySpendCap({
+              capUsd,
+              readSpentSinceUsd: createPostgresDailySpendReader({
+                sql: database.sql,
+              }),
+              onReadFailure: (error) => {
+                logger.warn(
+                  { err: error, spendCap: "DAILY_AGGREGATE" },
+                  "daily spend cap could not read the ledger; using the last total",
+                );
+              },
+            });
+      })(),
+      logger,
     }),
-    // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
-    // counts, shared with the workers' gateway; unset means no cap.
-    spendCap: (() => {
-      const capUsd = parseDailySpendCapUsd(process.env);
-      return capUsd === undefined
-        ? undefined
-        : createDailySpendCap({
-            capUsd,
-            readSpentSinceUsd: createPostgresDailySpendReader({
-              sql: database.sql,
-            }),
-            onReadFailure: (error) => {
-              logger.warn(
-                { err: error, spendCap: "DAILY_AGGREGATE" },
-                "daily spend cap could not read the ledger; using the last total",
-              );
-            },
-          });
-    })(),
-    logger,
-  }),
-  voiceTimings,
+    voiceTimings,
+  ),
+  runProgress,
 );
 logger.info(
   { modelProviders: modelProviderConfigStatus(providerSecrets) },
@@ -5806,7 +5821,7 @@ const qIntelligence = composeQIntelligence({
   sql: database.sql,
   transactions: database.transactions,
   repositories,
-  tools: runSubjects.observe(qTools.port),
+  tools: progressObservedTools(runSubjects.observe(qTools.port), runProgress),
   gateway: modelGateway,
   embeddings,
   queryEmbeddingCeiling,
@@ -5893,6 +5908,7 @@ const checkpoints = createPostgresQCheckpointStore({
   poolMax: Math.max(1, Math.floor(checkpointDatabase.poolMax / 2)),
   connectTimeoutSeconds: checkpointDatabase.connectTimeoutSeconds,
   idleTimeoutSeconds: checkpointDatabase.idleTimeoutSeconds,
+  statementTimeoutMs: checkpointDatabase.statementTimeoutMs,
 });
 // G-D24: the runs this process orchestrates heartbeat, so one caught by a
 // restart or deploy is closed within about a minute and a half (engine
@@ -5904,6 +5920,12 @@ const runEngineHeartbeat = createRunEngineHeartbeat({
     repositories,
   }),
   logger,
+  // Interactive answer runs only: workforce and other background runs keep
+  // their own limits and are never failed for silence here.
+  stall: {
+    progress: runProgress,
+    appliesTo: (run) => run.orchestrationVersion === Q_ORCHESTRATION_VERSION,
+  },
 });
 runEngineHeartbeat.start();
 const orchestrationRuntime = runEngineHeartbeat.runtime;

@@ -19,6 +19,7 @@ import {
   writeAllowed,
   type DeadQActionMode,
 } from "./outbox/dead-q-actions.js";
+import { WORKER_DATABASE_DEFAULTS } from "./statement-budget.js";
 
 const args = process.argv.slice(2);
 const mode: DeadQActionMode = args.includes("--requeue")
@@ -45,7 +46,9 @@ if (mode !== "DRY_RUN") {
   }
 }
 
-const database = createRequestDatabaseClient(loadDatabaseConfig());
+const database = createRequestDatabaseClient(
+  loadDatabaseConfig(WORKER_DATABASE_DEFAULTS),
+);
 try {
   const summary = await settleDeadQActionEvents(database.sql, mode);
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);

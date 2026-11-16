@@ -8,6 +8,7 @@ import type { Sql } from "postgres";
 import {
   createPostgresClient,
   createPostgresListenClient,
+  transactionLimitsFor,
 } from "./internal/postgres.js";
 import { createTransactionManager } from "./transaction.js";
 import type { RequestDatabase } from "./types.js";
@@ -48,7 +49,9 @@ export function createRequestDatabaseClient(
   return {
     accessClass: "REQUEST",
     sql,
-    transactions: createTransactionManager(sql),
+    transactions: createTransactionManager(sql, {
+      limits: transactionLimitsFor(config, "REQUEST"),
+    }),
     listen: (channel, onNotify, onListen) =>
       listener.listen(channel, onNotify, onListen),
     close: async () => {

@@ -27,6 +27,9 @@ export type QCheckpointStore = {
   readonly close: () => Promise<void>;
 };
 
+/** How far past the statement budget a checkpoint query gives up client-side. */
+export const CHECKPOINT_QUERY_DEADLINE_GRACE_MS = 2_000;
+
 /** The schema doc 12 §10.4 assigns to orchestration infrastructure. */
 export const Q_CHECKPOINT_SCHEMA = "q_runtime" as const;
 
@@ -56,10 +59,25 @@ export function createPostgresQCheckpointStore(options: {
   readonly poolMax?: number | undefined;
   readonly connectTimeoutSeconds?: number | undefined;
   readonly idleTimeoutSeconds?: number | undefined;
+  /**
+   * The service's statement budget (DATABASE_STATEMENT_TIMEOUT_MS). Sent
+   * at connect (honoured on a direct connection) and enforced by the
+   * client as a per-query deadline a little past it, because Supavisor
+   * drops startup parameters and a checkpoint read nothing answers must
+   * not hold a run (16 Nov 2026). Absent: neither.
+   */
+  readonly statementTimeoutMs?: number | undefined;
 }): QCheckpointStore {
   const pool = new pg.Pool({
     connectionString: options.connectionString,
     max: options.poolMax ?? 3,
+    ...(options.statementTimeoutMs === undefined
+      ? {}
+      : {
+          statement_timeout: options.statementTimeoutMs,
+          query_timeout:
+            options.statementTimeoutMs + CHECKPOINT_QUERY_DEADLINE_GRACE_MS,
+        }),
     ...(options.connectTimeoutSeconds === undefined
       ? {}
       : { connectionTimeoutMillis: options.connectTimeoutSeconds * 1_000 }),

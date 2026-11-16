@@ -61,6 +61,32 @@ describe("parseDatabaseConfig", () => {
     expect(config.secrets.listenUrl).toBe(LISTEN_URL);
   });
 
+  it("takes a service's own statement budget when the variable is unset", () => {
+    expect(
+      parseDatabaseConfig(BASE_ENV, { statementTimeoutMs: 120_000 })
+        .statementTimeoutMs,
+    ).toBe(120_000);
+    expect(
+      parseDatabaseConfig(
+        { ...BASE_ENV, DATABASE_STATEMENT_TIMEOUT_MS: "" },
+        { statementTimeoutMs: 120_000 },
+      ).statementTimeoutMs,
+    ).toBe(120_000);
+    // The variable still wins over the service default.
+    expect(
+      parseDatabaseConfig(
+        { ...BASE_ENV, DATABASE_STATEMENT_TIMEOUT_MS: "4000" },
+        { statementTimeoutMs: 120_000 },
+      ).statementTimeoutMs,
+    ).toBe(4_000);
+    expect(
+      parseDatabaseConfig({
+        ...BASE_ENV,
+        DATABASE_STATEMENT_TIMEOUT_MS: "300000",
+      }).statementTimeoutMs,
+    ).toBe(300_000);
+  });
+
   it("refuses a warm ping that is not faster than the idle timeout", () => {
     const parse = (warm: string) => () =>
       parseDatabaseConfig({

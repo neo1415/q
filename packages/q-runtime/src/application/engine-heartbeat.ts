@@ -1,11 +1,13 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 
+import type { QRunRecord } from "../contracts/index.js";
 import type {
   QLifecycleOutcome,
   QOrchestrationRuntime,
   QRunRef,
 } from "./orchestration-runtime.js";
+import type { RunProgress } from "./run-progress.js";
 
 /**
  * Which runs this process is orchestrating, said durably (RECOVERY G-D24).
@@ -24,6 +26,17 @@ import type {
  */
 
 export const ENGINE_HEARTBEAT_INTERVAL_MS = 15 * 1000;
+
+/**
+ * Silence after which a watched interactive run is failed (16 Nov 2026).
+ * A healthy turn finishes in about 11 s and moves at least every few
+ * seconds; the slowest legitimate gap without a stage change, model call
+ * or tool result is a read bounded by the statement budget (10 s) or a
+ * tool bounded by its own HTTP timeouts. 90 s is well past both and well
+ * short of the minutes the pooler-trial run hung. Checked on each beat,
+ * so a stalled run fails 90-105 s after its last progress.
+ */
+export const RUN_STALL_AFTER_MS = 90 * 1000;
 
 const NOT_IN_FLIGHT = new Set([
   "AWAITING_INPUT",
@@ -50,9 +63,28 @@ export function createRunEngineHeartbeat(options: {
   readonly runtime: QOrchestrationRuntime;
   readonly intervalMs?: number | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * The progress deadline. A held run it applies to that shows no progress
+   * (run-progress.ts) for `afterMs` is failed as RUN_EXPIRED, whose public
+   * line is the one a person already sees for a run that did not finish,
+   * instead of being kept alive by its heartbeat. Absent: no deadline.
+   */
+  readonly stall?:
+    | {
+        readonly progress: RunProgress;
+        readonly afterMs?: number | undefined;
+        /**
+         * Which runs it applies to: interactive answer runs only. Long
+         * background work (workforce jobs) keeps its own limits.
+         */
+        readonly appliesTo: (run: QRunRecord) => boolean;
+      }
+    | undefined;
 }): RunEngineHeartbeat {
-  const { sql, logger } = options;
+  const { sql, logger, stall } = options;
   const held = new Map<string, QRunRef>();
+  /** Stalled runs being failed now, so overlapping beats fail each once. */
+  const failing = new Set<string>();
   let timer: ReturnType<typeof setInterval> | undefined;
 
   async function touch(runIds: readonly string[]): Promise<void> {
@@ -76,12 +108,16 @@ export function createRunEngineHeartbeat(options: {
     const id = ref.runId;
     if (NOT_IN_FLIGHT.has(outcome.run.status)) {
       held.delete(id);
+      stall?.progress.release(id);
       return;
     }
     if (!held.has(id)) {
       held.set(id, ref);
+      if (stall?.appliesTo(outcome.run) === true) stall.progress.watch(id);
       void touch([id]);
     }
+    // A lifecycle move is progress (no-op for a run not watched).
+    stall?.progress.note(id);
   }
 
   const inner = options.runtime;
@@ -109,7 +145,42 @@ export function createRunEngineHeartbeat(options: {
     expire: tracked(inner.expire),
   };
 
-  const beat = () => touch([...held.keys()]);
+  /** Fails each held, watched run that has stopped making progress. */
+  async function failStalled(): Promise<void> {
+    if (stall === undefined) return;
+    const afterMs = stall.afterMs ?? RUN_STALL_AFTER_MS;
+    for (const { runId, silentMs } of stall.progress.stalled(afterMs)) {
+      const ref = held.get(runId);
+      if (ref === undefined) {
+        stall.progress.release(runId);
+        continue;
+      }
+      if (failing.has(runId)) continue;
+      failing.add(runId);
+      logger?.warn(
+        { qRunId: runId, silentMs, stallAfterMs: afterMs },
+        "q run made no progress within its deadline; failing it",
+      );
+      try {
+        // The tracked fail: releases the run from the heartbeat and the
+        // watch. Whatever the stuck work does later meets a terminal run.
+        await runtime.fail(ref, "RUN_EXPIRED");
+      } catch (error: unknown) {
+        // Left watched: the next beat tries again.
+        logger?.warn(
+          { err: error, qRunId: runId },
+          "q stalled run could not be failed; retrying next beat",
+        );
+      } finally {
+        failing.delete(runId);
+      }
+    }
+  }
+
+  const beat = async () => {
+    await touch([...held.keys()]);
+    await failStalled();
+  };
 
   return {
     runtime,

@@ -100,8 +100,13 @@ const databaseEnvSchema = z.object({
   DATABASE_WARM_INTERVAL_SECONDS: boundedInt(25, 0, 240),
   DATABASE_CONNECT_TIMEOUT_SECONDS: boundedInt(10, 1, 60),
   // Interactive request budget. Long rebuilds belong in workers with their own
-  // limits, not in a request-path query allowed to run for minutes.
-  DATABASE_STATEMENT_TIMEOUT_MS: boundedInt(10_000, 100, 60_000),
+  // limits, not in a request-path query allowed to run for minutes. A
+  // service whose work is batch (workers) passes its own default to
+  // loadDatabaseConfig; the variable still overrides it. Enforced on every
+  // connection mode (packages/database: startup parameter, SET LOCAL per
+  // transaction behind a pooler, and a client-side deadline per query),
+  // because Supavisor drops startup parameters (16 Nov 2026).
+  DATABASE_STATEMENT_TIMEOUT_MS: boundedInt(10_000, 100, 300_000),
 });
 
 export type DatabaseConfig = {
@@ -142,8 +147,23 @@ export function supavisorSessionUrl(url: string): string | undefined {
   return url.replace(HOST_PORT, `$1:${SUPAVISOR_SESSION_PORT}`);
 }
 
-export function parseDatabaseConfig(env: EnvironmentInput): DatabaseConfig {
-  const parsed = parseConfig("database", databaseEnvSchema, env);
+/** Per-service defaults; an explicit environment variable still wins. */
+export type DatabaseConfigDefaults = {
+  /** The statement budget when DATABASE_STATEMENT_TIMEOUT_MS is unset. */
+  readonly statementTimeoutMs?: number | undefined;
+};
+
+export function parseDatabaseConfig(
+  env: EnvironmentInput,
+  defaults: DatabaseConfigDefaults = {},
+): DatabaseConfig {
+  const statementDefault = defaults.statementTimeoutMs;
+  const input =
+    statementDefault !== undefined &&
+    (env["DATABASE_STATEMENT_TIMEOUT_MS"] ?? "") === ""
+      ? { ...env, DATABASE_STATEMENT_TIMEOUT_MS: String(statementDefault) }
+      : env;
+  const parsed = parseConfig("database", databaseEnvSchema, input);
   if (
     parsed.DATABASE_WARM_INTERVAL_SECONDS !== 0 &&
     parsed.DATABASE_WARM_INTERVAL_SECONDS >=
@@ -192,8 +212,10 @@ export function parseDatabaseConfig(env: EnvironmentInput): DatabaseConfig {
 }
 
 /** Call once at a composition root, never per request. */
-export function loadDatabaseConfig(): DatabaseConfig {
-  return parseDatabaseConfig(process.env);
+export function loadDatabaseConfig(
+  defaults: DatabaseConfigDefaults = {},
+): DatabaseConfig {
+  return parseDatabaseConfig(process.env, defaults);
 }
 
 /**

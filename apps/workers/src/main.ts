@@ -174,6 +174,7 @@ import { createPipelineMetrics } from "./documents/metrics.js";
 import { createUnavailableMalwareScanner } from "./documents/malware.js";
 import { createDomainEventHandler } from "./events/document-processing-handler.js";
 import { createProductionEventRegistry } from "./event-registry.js";
+import { WORKER_DATABASE_DEFAULTS } from "./statement-budget.js";
 import {
   runSyntheticAutoVerifySweeps,
   verificationAttestationFor,
@@ -296,7 +297,7 @@ const SERVICE_NAME = "workers";
 
 // Validated once at startup, never per job.
 const config = loadWorkerConfig();
-const databaseConfig = loadDatabaseConfig();
+const databaseConfig = loadDatabaseConfig(WORKER_DATABASE_DEFAULTS);
 
 const telemetry = createTelemetryRuntime();
 await telemetry.start();

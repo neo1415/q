@@ -591,6 +591,11 @@ import {
 } from "./company/own-names.js";
 import type { QNamedCompanyPort } from "./named-company.js";
 import {
+  ReadDeadlineError,
+  TURN_READ_DEADLINE_MS,
+  withinDeadline,
+} from "./bounded-read.js";
+import {
   bindHeardName,
   nameReadings,
   type QNameCandidatesPort,
@@ -1389,6 +1394,12 @@ export type SpecialistQAnswerDependencies = {
   readonly situationOf?: QSituationPort | undefined;
   /** The situation's clock; tests fix it. */
   readonly now?: (() => Date) | undefined;
+  /**
+   * How long the turn waits for its situation header and conversation
+   * state before it reads the turn without them (bounded-read.ts).
+   * Default TURN_READ_DEADLINE_MS; tests shorten it.
+   */
+  readonly turnReadDeadlineMs?: number | undefined;
   /**
    * K fast lane: a short first read beside the turn reader; a HIGH
    * confidence "companies of a kind" or "fit" is answered by the read-only
@@ -2905,6 +2916,8 @@ export function createSpecialistQAnswer(
     logger,
     turns,
   } = dependencies;
+  const turnReadDeadlineMs =
+    dependencies.turnReadDeadlineMs ?? TURN_READ_DEADLINE_MS;
   let last: CompanyIntelligenceResult | null = null;
   /**
    * U4/F8: a move the words asked for alongside a question, per run; the
@@ -2941,10 +2954,15 @@ export function createSpecialistQAnswer(
   ): Promise<RunConversationState | null> => {
     const kept = statesInRun.get(who.runId);
     if (kept !== undefined) return kept;
-    const started = loadConversationState(
-      { repositories, sql, transactions, logger },
-      who,
-      history,
+    // Bounded (16 Nov 2026): a read that never returns leaves the turn
+    // read from history alone, as a failed read does.
+    const started = withinDeadline(
+      loadConversationState(
+        { repositories, sql, transactions, logger },
+        who,
+        history,
+      ),
+      turnReadDeadlineMs,
     ).then(
       (loaded) => {
         logger?.debug(
@@ -2959,7 +2977,11 @@ export function createSpecialistQAnswer(
       },
       (error: unknown) => {
         logger?.warn(
-          { err: error, qRunId: who.runId },
+          {
+            err: error,
+            qRunId: who.runId,
+            timedOut: error instanceof ReadDeadlineError,
+          },
           "the conversation state was not read; reading the turn from history alone",
         );
         return null;
@@ -6102,6 +6124,42 @@ export function createSpecialistQAnswer(
   };
 
   /**
+   * Who is asking, for the header; null (told as unknown) when the read
+   * fails or does not finish within the turn's read deadline (16 Nov 2026:
+   * a read that never returned hung the turn).
+   */
+  const situationAskerOf = async (
+    actor: ActorContext,
+    screen:
+      | {
+          readonly companyId?: string | undefined;
+          readonly investorOrganisationId?: string | undefined;
+        }
+      | null
+      | undefined,
+  ) => {
+    const read = dependencies.situationOf?.(actor, {
+      ...(screen?.companyId === undefined
+        ? {}
+        : { companyId: screen.companyId }),
+      ...(screen?.investorOrganisationId === undefined
+        ? {}
+        : { investorOrganisationId: screen.investorOrganisationId }),
+    });
+    if (read === undefined) return null;
+    try {
+      return (await withinDeadline(read, turnReadDeadlineMs)) ?? null;
+    } catch (error: unknown) {
+      if (error instanceof ReadDeadlineError) {
+        logger?.warn(
+          { deadlineMs: error.deadlineMs, actorUserId: actor.userId },
+          "the situation was not read in time; reading the turn without it",
+        );
+      }
+      return null;
+    }
+  };
+  /**
    * The situation header for the reader (step 1): the same builder the
    * answer uses, from the person's own records and their screen's route,
    * zone and surface (closed kinds; about no one else).
@@ -6124,17 +6182,7 @@ export function createSpecialistQAnswer(
       now: (dependencies.now ?? (() => new Date()))(),
       // R2 (owner live 7 Nov): the record on their screen, named by the
       // port from the ids the firewall passed on.
-      asker:
-        (await dependencies
-          .situationOf?.(actor, {
-            ...(screen?.companyId === undefined
-              ? {}
-              : { companyId: screen.companyId }),
-            ...(screen?.investorOrganisationId === undefined
-              ? {}
-              : { investorOrganisationId: screen.investorOrganisationId }),
-          })
-          .catch(() => null)) ?? null,
+      asker: await situationAskerOf(actor, screen),
       deviceTimeZone: screen?.timeZone,
       surface: situationSurfaceOf(spoken, screen?.surface),
       page: screen?.route ?? null,

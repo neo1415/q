@@ -211,7 +211,64 @@ type Fn = (...args: unknown[]) => unknown;
 type QueryLike = Promise<unknown> & {
   handle: Fn;
   executed?: boolean;
+  /** The driver's own; settles the awaited query (postgres.js Query). */
+  reject?: (error: unknown) => void;
+  cancel?: () => unknown;
+  /** Set for a cursor or forEach read, which governs its own pace. */
+  cursorFn?: unknown;
+  forEachFn?: unknown;
 };
+
+/** Client-side limits applied where each query is handed to the driver. */
+export type SqlInstrumentOptions = {
+  /**
+   * Milliseconds after a query is handed to the driver at which it is
+   * asked to cancel and its await rejects with SQLSTATE 57014 (TIMEOUT).
+   * Undefined: no deadline.
+   */
+  readonly queryDeadlineMs?: number | undefined;
+};
+
+/**
+ * The error a query's await rejects with when its client deadline passes:
+ * shaped like the server's statement timeout (57014), so it is classified
+ * as TIMEOUT and never carries query text.
+ */
+export class QueryDeadlineError extends Error {
+  readonly code = "57014";
+  readonly deadlineMs: number;
+  constructor(deadlineMs: number) {
+    super(`query exceeded its ${String(deadlineMs)} ms client deadline`);
+    this.name = "QueryDeadlineError";
+    this.deadlineMs = deadlineMs;
+  }
+}
+
+/**
+ * Bounds one query's await (pooler-safe statement timeout, 16 Nov 2026).
+ * When the deadline passes the driver is asked to cancel (a CancelRequest
+ * to the backend, or the query is dropped from the queue if never sent)
+ * and the await rejects at once, whether or not the cancel lands: a
+ * pooler that never answers must not hold the caller. A late answer from
+ * the server then settles nothing. Cursor and forEach reads are left alone.
+ */
+function armDeadline(query: QueryLike, deadlineMs: number): void {
+  const timer = setTimeout(() => {
+    if (query.cursorFn !== undefined || query.forEachFn !== undefined) return;
+    try {
+      void Promise.resolve(query.cancel?.()).catch(() => undefined);
+    } catch {
+      // Best effort: the rejection below is what bounds the caller.
+    }
+    query.reject?.(new QueryDeadlineError(deadlineMs));
+  }, deadlineMs);
+  timer.unref();
+  const clear = () => {
+    clearTimeout(timer);
+  };
+  // The native then: the driver's own `then` would hand the query over.
+  void Promise.prototype.then.call(query, clear, clear);
+}
 
 function isQuery(value: unknown): value is QueryLike {
   return (
@@ -232,14 +289,22 @@ function statementText(first: unknown): string {
  * is awaited or executed). A query used only as a fragment of another is
  * never handled, so never counted. Behaviour is otherwise untouched.
  */
-function track(value: unknown, first: unknown): unknown {
+function track(
+  value: unknown,
+  first: unknown,
+  options: SqlInstrumentOptions,
+): unknown {
   if (!isQuery(value)) return value;
   const query = value;
   const handle = query.handle;
   const text = statementText(first);
   const stack = TRACE ? new Error().stack : undefined;
+  const deadlineMs = options.queryDeadlineMs;
   query.handle = function (this: QueryLike, ...args: unknown[]) {
-    if (this.executed !== true) querySent(text, stack);
+    if (this.executed !== true) {
+      querySent(text, stack);
+      if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
+    }
     return handle.apply(this, args);
   };
   return query;
@@ -251,14 +316,21 @@ function track(value: unknown, first: unknown): unknown {
  * connections send is counted where it is sent; BEGIN and COMMIT (or
  * ROLLBACK) count one each. Arguments, results and errors pass through.
  */
-export function instrumentSql<T extends object>(sql: T): T {
+export function instrumentSql<T extends object>(
+  sql: T,
+  options: SqlInstrumentOptions = {},
+): T {
   const wrapFunction =
     (fn: Fn, target: object): Fn =>
     (...args: unknown[]) =>
-      track(fn.apply(target, args), args[0]);
+      track(fn.apply(target, args), args[0], options);
   return new Proxy(sql, {
     apply(target, thisArg, args: unknown[]) {
-      return track(Reflect.apply(target as Fn, thisArg, args), args[0]);
+      return track(
+        Reflect.apply(target as Fn, thisArg, args),
+        args[0],
+        options,
+      );
     },
     get(target, property, receiver) {
       const value: unknown = Reflect.get(target, property, receiver);
@@ -269,7 +341,8 @@ export function instrumentSql<T extends object>(sql: T): T {
           const last = args.length - 1;
           const work = args[last];
           if (typeof work === "function") {
-            args[last] = (inner: object) => (work as Fn)(instrumentSql(inner));
+            args[last] = (inner: object) =>
+              (work as Fn)(instrumentSql(inner, options));
           }
           querySent(property === "begin" ? "begin" : "savepoint", undefined);
           const done = fn.apply(target, args) as Promise<unknown>;
@@ -280,7 +353,7 @@ export function instrumentSql<T extends object>(sql: T): T {
       }
       if (property === "reserve") {
         return async (...args: unknown[]) =>
-          instrumentSql((await fn.apply(target, args)) as object);
+          instrumentSql((await fn.apply(target, args)) as object, options);
       }
       return wrapFunction(fn, target);
     },

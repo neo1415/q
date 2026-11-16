@@ -62,15 +62,54 @@ export function createSavepointTransactionManager(
  * the use case knows whether that is safe. Bounded retry belongs at the
  * application boundary, applied to work proven idempotent.
  */
-export function createTransactionManager(sql: Sql): TransactionManager {
+export type TransactionLimits = {
+  readonly statementTimeoutMs: number;
+  readonly lockTimeoutMs: number;
+};
+
+export function createTransactionManager(
+  sql: Sql,
+  options: {
+    /**
+     * Applied with SET LOCAL semantics at the start of every transaction
+     * (behind a pooler, where startup parameters are dropped). Scoped to
+     * the transaction, so safe under transaction pooling. Absent: none.
+     */
+    readonly limits?: TransactionLimits | undefined;
+  } = {},
+): TransactionManager {
+  const limits = options.limits;
   return {
     run: async (work) => {
       try {
         // The driver unwraps an array-of-promises result; boxing the value
         // keeps `run` honest about returning exactly what `work` returned.
         const { value } = await sql.begin(async (transactionSql) => {
+          // Sent ahead of the work's first statement on the same
+          // connection, in order, without waiting for it: no extra round
+          // trip before the work starts. Its own failure still fails the
+          // unit (the work's statements then fail as aborted too).
+          const applied =
+            limits === undefined
+              ? undefined
+              : transactionSql`
+                  select set_config('statement_timeout', ${String(limits.statementTimeoutMs)}, true),
+                         set_config('lock_timeout', ${String(limits.lockTimeoutMs)}, true)`.then(
+                  () => undefined,
+                );
+          // Handled at once so an early failure is never an unhandled
+          // rejection; still awaited below, where it propagates.
+          void applied?.catch(() => undefined);
           const context: TransactionContext = { sql: transactionSql };
-          return { value: await work(context) };
+          let result: Awaited<ReturnType<typeof work>>;
+          try {
+            result = await work(context);
+          } catch (error) {
+            await applied?.catch(() => undefined);
+            throw error;
+          }
+          await applied;
+          return { value: result };
         });
         return value;
       } catch (error) {

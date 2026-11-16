@@ -3,7 +3,10 @@ import {
   type DatabaseConfig,
 } from "@capital-q/config/database";
 
-import { createPostgresClient } from "./internal/postgres.js";
+import {
+  createPostgresClient,
+  transactionLimitsFor,
+} from "./internal/postgres.js";
 import { createTransactionManager } from "./transaction.js";
 import type { PrivilegedDatabase } from "./types.js";
 
@@ -37,7 +40,9 @@ export function createPrivilegedDatabaseClient(
   return {
     accessClass: "PRIVILEGED_SERVICE",
     sql,
-    transactions: createTransactionManager(sql),
+    transactions: createTransactionManager(sql, {
+      limits: transactionLimitsFor(config, "PRIVILEGED_SERVICE"),
+    }),
     listen: (channel, onNotify, onListen) =>
       sql.listen(channel, onNotify, onListen),
     close: () => sql.end(),

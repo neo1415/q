@@ -1,16 +1,40 @@
+// Read-only: one deployment's logs, filtered by pattern and time window.
+//
+//   node qlogs.mjs <commit-prefix> <pattern> <from HH:MM:SS> <to HH:MM:SS>
+//
+// SVC picks the service (default @capital-q/q-api). DEPLOYMENT_ID reads
+// that deployment instead of the newest non-failed one of the commit: the
+// same commit is often deployed more than once (a variable change, a
+// rollback and redeploy), and the earlier deployment's logs are the ones
+// an incident is in. The commit prefix is still checked against it.
 import { rw } from "./rw.mjs";
 const r = await rw(
-  `query { projects { edges { node { name services { edges { node { name deployments(first: 20) { edges { node { id status meta } } } } } } } } } }`,
+  `query { projects { edges { node { name services { edges { node { name deployments(first: 20) { edges { node { id status createdAt meta } } } } } } } } } }`,
 );
 const p = r.data.projects.edges.find((e) => e.node.name === "Q").node;
 const svc = p.services.edges.find(
   (e) => e.node.name === (process.env.SVC ?? "@capital-q/q-api"),
 ).node;
-const dep = svc.deployments.edges.find(
-  (e) =>
-    (e.node.meta?.commitHash ?? "").startsWith(process.argv[2]) &&
-    e.node.status !== "FAILED",
-)?.node;
+const ofCommit = svc.deployments.edges
+  .map((e) => e.node)
+  .filter((d) => (d.meta?.commitHash ?? "").startsWith(process.argv[2]));
+const wanted = process.env.DEPLOYMENT_ID;
+const dep =
+  wanted === undefined || wanted === ""
+    ? ofCommit.find((d) => d.status !== "FAILED")
+    : ofCommit.find((d) => d.id === wanted);
+if (dep === undefined) {
+  console.error(
+    wanted
+      ? `deployment ${wanted} is not one of ${process.argv[2]}'s last 20 on this service`
+      : `no deployment of ${process.argv[2]} on this service`,
+  );
+  for (const d of ofCommit) {
+    console.error(`  ${d.id} ${d.status} ${d.createdAt ?? ""}`);
+  }
+  process.exit(1);
+}
+console.error(`deployment ${dep.id} ${dep.status} ${dep.createdAt ?? ""}`);
 const l = await rw(
   `query($d:String!){ deploymentLogs(deploymentId:$d, limit: 5000) { message timestamp attributes { key value } } }`,
   { d: dep.id },

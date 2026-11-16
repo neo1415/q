@@ -47,6 +47,7 @@ describe("driver options", () => {
       connection: {
         application_name: "capital-q:request",
         statement_timeout: 1500,
+        lock_timeout: 1500,
       },
     });
   });

@@ -16,9 +16,12 @@ import { createRequestDatabaseClient } from "@capital-q/database";
 import { createPostgresInvestabilityStore } from "@capital-q/readiness";
 
 import { composeInvestability } from "./investability/composition.js";
+import { WORKER_DATABASE_DEFAULTS } from "./statement-budget.js";
 
 const apply = process.argv.includes("--apply");
-const database = createRequestDatabaseClient(loadDatabaseConfig());
+const database = createRequestDatabaseClient(
+  loadDatabaseConfig(WORKER_DATABASE_DEFAULTS),
+);
 
 try {
   if (!apply) {

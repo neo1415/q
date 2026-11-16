@@ -22,6 +22,7 @@ import { createPostgresChunkRepository } from "@capital-q/q-knowledge";
 
 import { backfillDeckReadings } from "./evidence/deck-reading-backfill.js";
 import { composeWorkerModelGateway } from "./model-gateway.js";
+import { WORKER_DATABASE_DEFAULTS } from "./statement-budget.js";
 
 function flag(name: string, fallback: number): number {
   const at = process.argv.indexOf(name);
@@ -37,7 +38,7 @@ const apply = process.argv.includes("--apply");
 const max = flag("--max", 25);
 const maxUsd = flag("--max-usd", 1);
 const config = loadWorkerConfig();
-const databaseConfig = loadDatabaseConfig();
+const databaseConfig = loadDatabaseConfig(WORKER_DATABASE_DEFAULTS);
 const logger = createLogger(
   {
     serviceName: "workers-deck-backfill",
