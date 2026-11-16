@@ -2267,3 +2267,49 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Decision 98 recorded (navigation automatic when it advances the task; not on mere mention).
 - Demo-readiness audit: `audits/2026-11-15-demo-readiness.md`.
 - Owner items: search credit (Serper/Brave 402, Tavily 432); real-device check of video (iOS) and the voice line; meetings presentation (no-invite vs a connected calendar); demo-account clean-up or a fresh pair; GateQ voice/Tavus switch-on; decisions on voice-onboarding lead, paused-gateway notice, revoked-raise deck; rotate exposed credentials.
+
+## 16 Nov 2026, 19:20 Lagos — integration lead (Claude)
+
+**Production:** `d252444b1` (gate PASS; rollback point `1626553fb`). Migration `20261231594500` (answer reasoning LOW for comparison and analysis) was applied before `77187e4aa`; hosted shows 305 applied. q-api now has the variable `Q_EMBEDDING_PROVIDER=openai`.
+
+**Shipped today, in order:**
+
+- **Voice-audit re-check fixes:** `3b7145616`, `9913a5b64`, `cb28c00e5`, `6f9b63cc5`, `aa4f4158f`. Shown-list explanations are now answered from the card, in place, without web search; 13–15 s became 4–7 s.
+- **Shared means readable** (decision 99, ADR 0078): `4f43012a6`.
+- **Q reads documents shared with the asking investor:** `bab915357`, `a5f3d95e9`.
+- **Chunk embeddings and q-api semantic retrieval:** `3034088b3`. HIGHLY_CONFIDENTIAL chunks are never sent; 2,497 embedded, 0 HC.
+- **GateQ decimal split and share-screen copy:** `9cf769860`.
+- **Scenario D–G fixes:** `b396c307f`. These cover follow-up freshness after a share, the reader hedge, company-name verbs, comparison cards, own-records web guard and whole-sentence summaries.
+- **Investor GateQ dossier read and labelling guard:** `ca639a8f0`.
+- **Founder reads own documents** (decision 100, ADR 0079): `b156a9cd1`.
+- **GateQ corrections supersede earlier statements, with an honesty check on replies:** `5d08eaaa0`.
+- **Answer speed** (`fbf022688`, reasoning, tools, setup read): figures/why/comparison went from 17.8/26.9/27.8 s to 15.4/11.3/17.2 s.
+- **Founder's own documents pre-read:** `1626553fb`.
+- **Reader asked at turn start:** `d252444b1`.
+
+**Demo evidence** (directive `directives/2026-11-16-demo-evidence-data-room-seeding.md`; decisions 99 and 100):
+
+- **Inventory:** `audits/2026-11-16-demo-evidence-inventory.md`.
+- **Evidence packs:** deterministic generator plus validator in `scripts/seed/evidence/`.
+- **Uploads:** Tensorgate (13), Halyard Security (13) and Nixo (14 including a deck), all founder-private, through the product (`audits/2026-11-16-demo-evidence-upload.md`).
+- **Relationships:** Halyard ↔ Thames Arc and Tensorgate ↔ Savanna, both IN_DILIGENCE.
+- **Shares:** 15 documents shared, plus answered and pending requests. Halyard's bank statement was later shared by fulfilling a request.
+- **GateQ:** Halyard's application was corrected (pre-seed → seed; split margin notes superseded) and SUBMITTED at 15:44 UTC (`audits/2026-11-16-demo-evidence-relationships.md`).
+- **Live scenarios:** `audits/2026-11-16-demo-evidence-live-scenarios.md`. A–C pass, E passes on `8647c718c`, G passes on `1626553fb`. D passes in a new conversation (the same-conversation freshness fix is in `b396c307f`; not re-run). F: dossier read shipped, not re-run since submission.
+
+**Open, with the owner:**
+
+- Move q-api to the transaction pooler and raise `DATABASE_POOL_MAX` (currently 3).
+- Warm the reader route after 15+ minutes idle (the cold first turn adds 2–3.5 s).
+
+**Open, next:**
+
+- Re-run D (same conversation) and F (Thames Arc reads Halyard's submitted dossier through Q).
+- Live timing on `d252444b1`.
+- A founder chat attachment of a HIGHLY_CONFIDENTIAL file is still held back (ADR 0079 note).
+- Requests-inbox share copy still uses the old wording for HC documents.
+- The GateQ correction note is stored twice, one copy per split half.
+- Nixo has no investor relationship or shares yet.
+- Other demo companies have no evidence packs yet.
+
+**Test spend 16 Nov:** about USD 2.03 of 5.
