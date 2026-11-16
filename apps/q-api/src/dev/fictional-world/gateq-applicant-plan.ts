@@ -84,14 +84,14 @@ export function applicantPlan(runId: string): ApplicantPlan {
     ...TEMPLATE,
     key,
     name,
-    legalName: `${name} Ltd (fictional)`,
+    legalName: `${name} Ltd`,
     // Reserved TLD: can never resolve to a real site.
     website: `https://${key}.example`,
     shortDescription: `A fictional company for GateQ certification run ${runId}. Not a real business.`,
     founder: {
       ...TEMPLATE.founder,
       displayName: `Gatepath Founder ${runId.toUpperCase()}`,
-      headline: `Founder, ${name} (fictional certification account)`,
+      headline: `Founder, ${name}`,
       professionalSummary: story("Professional summary"),
       backgroundSummary: story("Background"),
     },
@@ -110,7 +110,7 @@ export function applicantPlan(runId: string): ApplicantPlan {
     deck: [],
   };
   const document: ApplicantDocument = {
-    title: `${name} one-pager (fictional)`,
+    title: `${name} one-pager`,
     filename: `${key}-one-pager.txt`,
     mimeType: "text/plain",
     documentType: "COMPANY_PROFILE",

@@ -666,8 +666,12 @@ async function seedCompany(c) {
       "GET",
       `/v1/documents?companyId=${s.companyId}`,
     ).catch(() => ({ items: [] }));
+    // Titles written before 16 Nov 2026 ended " (fictional)"; either form
+    // is the same document.
     const have = new Set(
-      (listed.items ?? listed.documents ?? []).map((d) => d.title),
+      (listed.items ?? listed.documents ?? []).map((d) =>
+        String(d.title).replace(/ \(fictional\)$/, ""),
+      ),
     );
     s.documentIds = s.documentIds ?? {};
     for (const doc of c.documents) {
@@ -710,7 +714,7 @@ async function seedCompany(c) {
         c.seedKey,
         {
           kind: "PITCH_DECK",
-          title: `${c.name} investor deck (fictional)`,
+          title: `${c.name} investor deck`,
           filename: `${c.key}-deck.pdf`,
           mime: "application/pdf",
         },
@@ -1135,8 +1139,11 @@ async function seedInvestor(inv) {
       "GET",
       `/v1/gateq/gateways?investorOrganisationId=${s.investorOrganisationId}`,
     ).catch(() => ({ gateways: [] }));
+    // Gates made before 16 Nov 2026 carry the old "(fictional)" name.
     let gateway = (existing.gateways ?? existing.items ?? []).find(
-      (g) => g.name === `${inv.name} gate`,
+      (g) =>
+        g.name === `${inv.name} gate` ||
+        g.name === `${inv.name} (fictional) gate`,
     );
     gateway ??= await api(
       e,

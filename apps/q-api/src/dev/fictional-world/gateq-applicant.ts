@@ -96,10 +96,13 @@ async function ensureDocument(
     : [];
   for (const one of documents) {
     const document = asRecord(one);
-    if (
-      document["title"] === plan.document.title &&
-      typeof document["id"] === "string"
-    ) {
+    // A one-pager uploaded before 16 Nov 2026 carries a " (fictional)"
+    // title suffix; it is the same document.
+    const title =
+      typeof document["title"] === "string"
+        ? document["title"].replace(/ \(fictional\)$/, "")
+        : null;
+    if (title === plan.document.title && typeof document["id"] === "string") {
       return { documentId: document["id"], created: false };
     }
   }

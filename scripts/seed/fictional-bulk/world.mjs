@@ -1256,7 +1256,7 @@ function buildCompany(n, used, people) {
   const documents = [
     {
       kind: "COMPANY_PROFILE",
-      title: `${name} company overview (fictional)`,
+      title: `${name} company overview`,
       filename: `${slug(name)}-overview.txt`,
       mime: "text/plain",
     },
@@ -1264,7 +1264,7 @@ function buildCompany(n, used, people) {
   if (evidence !== "thin" && fin.currency !== undefined) {
     documents.push({
       kind: "MANAGEMENT_ACCOUNTS",
-      title: `${name} management accounts summary, H1 2026 (fictional)`,
+      title: `${name} management accounts summary, H1 2026`,
       filename: `${slug(name)}-management-accounts-h1-2026.csv`,
       mime: "text/csv",
     });
@@ -1274,21 +1274,21 @@ function buildCompany(n, used, people) {
     // is unknown is listed as unknown, never as zero.
     documents.push({
       kind: "FINANCIAL",
-      title: `${name} financial summary, founder claim (fictional)`,
+      title: `${name} financial summary, founder claim`,
       filename: `${slug(name)}-financial-summary.txt`,
       mime: "text/plain",
     });
   }
   documents.push({
     kind: "PRODUCT",
-    title: `${name} product brief (fictional)`,
+    title: `${name} product brief`,
     filename: `${slug(name)}-product-brief.txt`,
     mime: "text/plain",
   });
   if (evidence === "strong") {
     documents.push({
       kind: "COMMERCIAL",
-      title: `${name} customer and pipeline summary (fictional)`,
+      title: `${name} customer and pipeline summary`,
       filename: `${slug(name)}-pipeline.csv`,
       mime: "text/csv",
     });
@@ -1298,7 +1298,7 @@ function buildCompany(n, used, people) {
     key,
     seedKey: `${SEED_MARKER}:${key}`,
     name,
-    legalName: `${name.replace(/ (Labs|Technologies|Systems|Works|Hub|Co|Africa)$/, "")} ${r.pick(["Ltd", "Limited", "Inc.", "B.V.", "GmbH", "FZ-LLC", "Pvt Ltd", "(Pty) Ltd"])} (fictional)`,
+    legalName: `${name.replace(/ (Labs|Technologies|Systems|Works|Hub|Co|Africa)$/, "")} ${r.pick(["Ltd", "Limited", "Inc.", "B.V.", "GmbH", "FZ-LLC", "Pvt Ltd", "(Pty) Ltd"])}`,
     website: `https://${slug(name)}.example`,
     foundedDate,
     countryOption,
@@ -1313,7 +1313,7 @@ function buildCompany(n, used, people) {
     founder: {
       email: `founder.${key}.${slug(founderName)}@${ACCOUNT_DOMAIN}`,
       displayName: founderName,
-      headline: `${ROLE_TITLES[founderRole]}, ${name} (fictional demo founder)`,
+      headline: `${ROLE_TITLES[founderRole]}, ${name}`,
       roleOption: founderRole,
       businessTitle: ROLE_TITLES[founderRole],
       professionalSummary: `Leads ${name}. Previously spent ${r.int(3, 12)} years in ${r.pick(["banking operations", "consulting", "product management", "software engineering", "logistics", "public health", "sales leadership"])} at a fictional ${r.pick(["regional", "pan-African", "global", "local"])} firm.`,
@@ -1322,7 +1322,7 @@ function buildCompany(n, used, people) {
     members: members.map((m, i) => ({
       email: `member.${key}.${i + 1}.${slug(m.name)}@${ACCOUNT_DOMAIN}`,
       displayName: m.name,
-      headline: `${m.title}, ${name} (fictional demo team member)`,
+      headline: `${m.title}, ${name}`,
       businessTitle: m.title,
       isFounder: m.isFounder,
       appRole: m.appRole,
@@ -1487,7 +1487,7 @@ export function countriesOf(geographies) {
 export const INVESTORS = [
   {
     key: "baobab-ridge",
-    name: "Baobab Ridge Capital (fictional)",
+    name: "Baobab Ridge Capital",
     type: "vc",
     stages: ["pre_seed", "seed"],
     currency: "usd",
@@ -1521,7 +1521,7 @@ export const INVESTORS = [
   },
   {
     key: "sahel-bridge",
-    name: "Sahel Bridge Ventures (fictional)",
+    name: "Sahel Bridge Ventures",
     type: "vc",
     stages: ["seed", "series_a"],
     currency: "usd",
@@ -1550,7 +1550,7 @@ export const INVESTORS = [
   },
   {
     key: "kilima-angels",
-    name: "Kilima Angel Network (fictional)",
+    name: "Kilima Angel Network",
     type: "syndicate",
     stages: ["pre_seed", "seed"],
     currency: "usd",
@@ -1579,7 +1579,7 @@ export const INVESTORS = [
   },
   {
     key: "cape-meridian",
-    name: "Cape Meridian Growth (fictional)",
+    name: "Cape Meridian Growth",
     type: "vc",
     stages: ["series_a", "series_b"],
     currency: "usd",
@@ -1617,7 +1617,7 @@ export const INVESTORS = [
   },
   {
     key: "nile-delta",
-    name: "Nile Delta Partners (fictional)",
+    name: "Nile Delta Partners",
     type: "vc",
     stages: ["seed", "series_a"],
     currency: "usd",
@@ -1646,7 +1646,7 @@ export const INVESTORS = [
   },
   {
     key: "gulf-horizon",
-    name: "Gulf Horizon Family Office (fictional)",
+    name: "Gulf Horizon Family Office",
     type: "family_office",
     stages: ["series_a", "series_b", "series_c_plus"],
     currency: "aed",
@@ -1681,7 +1681,7 @@ export const INVESTORS = [
   },
   {
     key: "thames-arc",
-    name: "Thames Arc Capital (fictional)",
+    name: "Thames Arc Capital",
     type: "vc",
     stages: ["seed", "series_a"],
     currency: "gbp",
@@ -1710,7 +1710,7 @@ export const INVESTORS = [
   },
   {
     key: "rhine-impact",
-    name: "Rhine Impact Fund (fictional)",
+    name: "Rhine Impact Fund",
     type: "institutional",
     stages: ["seed", "series_a", "series_b"],
     currency: "eur",
@@ -1745,7 +1745,7 @@ export const INVESTORS = [
   },
   {
     key: "lagos-forge",
-    name: "Lagos Forge Fund (fictional)",
+    name: "Lagos Forge Fund",
     type: "vc",
     stages: ["pre_seed", "seed"],
     currency: "ngn",
@@ -1780,7 +1780,7 @@ export const INVESTORS = [
   },
   {
     key: "monsoon-cvc",
-    name: "Monsoon Digital Ventures (fictional)",
+    name: "Monsoon Digital Ventures",
     type: "cvc",
     stages: ["seed", "series_a"],
     currency: "usd",
@@ -1814,7 +1814,7 @@ export const INVESTORS = [
   },
   {
     key: "atlas-health",
-    name: "Atlas Health Partners (fictional)",
+    name: "Atlas Health Partners",
     type: "vc",
     stages: ["seed", "series_a", "series_b"],
     currency: "usd",
@@ -1843,7 +1843,7 @@ export const INVESTORS = [
   },
   {
     key: "savanna-scale",
-    name: "Savanna Scale Credit (fictional)",
+    name: "Savanna Scale Credit",
     type: "institutional",
     stages: ["series_a", "series_b", "series_c_plus"],
     currency: "usd",

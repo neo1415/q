@@ -9,11 +9,11 @@ import type { FictionalInterest, FictionalInvestor } from "./types.js";
 export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   {
     key: "lagoon-angels",
-    name: "Lagoon Angels Circle (fictional)",
+    name: "Lagoon Angels Circle",
     typeOption: "syndicate",
     person: {
       displayName: "Ngozi Ubah-Martins",
-      headline: "Lead, Lagoon Angels Circle (fictional demo investor)",
+      headline: "Lead, Lagoon Angels Circle",
       businessTitle: "Syndicate lead",
     },
     stages: ["pre_seed", "seed"],
@@ -28,11 +28,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "chidi-nwosu-angel",
-    name: "Chidi Nwosu Angel Investments (fictional)",
+    name: "Chidi Nwosu Angel Investments",
     typeOption: "angel",
     person: {
       displayName: "Chidi Nwosu",
-      headline: "Angel investor (fictional demo investor)",
+      headline: "Angel investor",
       businessTitle: "Angel investor",
     },
     stages: ["pre_seed", "seed"],
@@ -47,11 +47,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "savanna-seed",
-    name: "Savanna Seed Partners (fictional)",
+    name: "Savanna Seed Partners",
     typeOption: "vc",
     person: {
       displayName: "Amara Diallo-Benson",
-      headline: "Partner, Savanna Seed Partners (fictional demo investor)",
+      headline: "Partner, Savanna Seed Partners",
       businessTitle: "Partner",
     },
     stages: ["seed"],
@@ -66,12 +66,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "equator-line",
-    name: "Equator Line Capital (fictional)",
+    name: "Equator Line Capital",
     typeOption: "vc",
     person: {
       displayName: "Daniel Otieno-Brooks",
-      headline:
-        "General Partner, Equator Line Capital (fictional demo investor)",
+      headline: "General Partner, Equator Line Capital",
       businessTitle: "General Partner",
     },
     stages: ["series_a"],
@@ -86,12 +85,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "tidewater-growth",
-    name: "Tidewater Growth Partners (fictional)",
+    name: "Tidewater Growth Partners",
     typeOption: "vc",
     person: {
       displayName: "Sipho Ndlovu-Carter",
-      headline:
-        "Managing Partner, Tidewater Growth Partners (fictional demo investor)",
+      headline: "Managing Partner, Tidewater Growth Partners",
       businessTitle: "Managing Partner",
     },
     stages: ["series_a", "series_b"],
@@ -111,11 +109,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "pacdf",
-    name: "Pan-African Climate Development Fund (fictional)",
+    name: "Pan-African Climate Development Fund",
     typeOption: "institutional",
     person: {
       displayName: "Aïcha Traoré-Williams",
-      headline: "Investment Director, PACDF (fictional demo investor)",
+      headline: "Investment Director, PACDF",
       businessTitle: "Investment Director",
     },
     stages: ["series_a", "series_b"],
@@ -130,12 +128,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "transcoastal-ventures",
-    name: "Transcoastal Telecom Ventures (fictional)",
+    name: "Transcoastal Telecom Ventures",
     typeOption: "cvc",
     person: {
       displayName: "Rania Haddad-Okoro",
-      headline:
-        "Head of Ventures, Transcoastal Telecom (fictional demo investor)",
+      headline: "Head of Ventures, Transcoastal Telecom",
       businessTitle: "Head of Ventures",
     },
     stages: ["seed", "series_a"],
@@ -150,11 +147,11 @@ export const FICTIONAL_INVESTORS: readonly FictionalInvestor[] = [
   },
   {
     key: "rift-valley-seed",
-    name: "Rift Valley Seed Fund (fictional)",
+    name: "Rift Valley Seed Fund",
     typeOption: "vc",
     person: {
       displayName: "Njeri Waweru",
-      headline: "Partner, Rift Valley Seed Fund (fictional demo investor)",
+      headline: "Partner, Rift Valley Seed Fund",
       businessTitle: "Partner",
     },
     stages: ["pre_seed", "seed"],

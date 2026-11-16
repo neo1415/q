@@ -59,7 +59,9 @@ describe("GateQ applicant plan", () => {
     expect(a.company.name).not.toBe(b.company.name);
     const seededNames = new Set(FICTIONAL_COMPANIES.map((c) => c.name));
     expect(seededNames.has(a.company.name)).toBe(false);
-    expect(a.company.legalName).toContain("fictional");
+    // The synthetic marking is the account's and the story's, not the
+    // name's (owner directive 2026-11-16).
+    expect(a.company.legalName).not.toMatch(/fictional/i);
     expect(new URL(a.company.website).hostname.endsWith(".example")).toBe(true);
     expect(a.company.shortDescription.length).toBeLessThanOrEqual(400);
     const story = storyText(a.company);
@@ -81,7 +83,7 @@ describe("GateQ applicant plan", () => {
       declaredSizeBytes: new TextEncoder().encode(plan.document.body)
         .byteLength,
     });
-    expect(request.title).toContain("fictional");
+    expect(request.title).not.toContain("(fictional)");
     expect(plan.document.body).toContain("FICTIONAL");
   });
 

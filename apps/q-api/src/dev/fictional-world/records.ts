@@ -193,8 +193,7 @@ export function createSeedRecords(database: RequestDatabase) {
             claim.documentTitle === undefined ? "USER_STATEMENT" : "DOCUMENT",
           subject,
           title: (
-            claim.documentTitle ??
-            `${company.name} founder statement (fictional)`
+            claim.documentTitle ?? `${company.name} founder statement`
           ).slice(0, 200),
           metadata: { fictionalDemo: true, seed: "fictional-world" },
         },

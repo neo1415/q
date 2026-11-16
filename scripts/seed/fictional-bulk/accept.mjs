@@ -198,7 +198,7 @@ for (const key of coKeys) {
   const { ctx, page } = await signIn(c.founder.email);
   await visit(page, "/profile");
   const ui = await import("../tavus20/ui.mjs");
-  const wanted = `${c.founder.businessTitle}, ${c.name} (fictional demo founder)`;
+  const wanted = `${c.founder.businessTitle}, ${c.name}`;
   const out = await ui
     .setField(page, "You and your team", "Headline", wanted)
     .catch((e) => String(e.message).slice(0, 120));

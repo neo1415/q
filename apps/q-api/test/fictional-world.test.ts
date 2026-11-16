@@ -45,11 +45,14 @@ describe("fictional world content", () => {
       expect(company.shortDescription.length).toBeLessThanOrEqual(400);
       // Reserved TLD: no fictional website can resolve to a real one.
       expect(new URL(company.website).hostname.endsWith(".example")).toBe(true);
-      expect(company.legalName).toContain("fictional");
+      // Names carry no "(fictional)" suffix (owner directive 2026-11-16):
+      // the synthetic marking is the story's first line and the account's.
+      expect(company.legalName).not.toMatch(/fictional/i);
+      expect(company.founder.headline).not.toMatch(/fictional/i);
     }
     for (const investor of FICTIONAL_INVESTORS) {
-      expect(investor.name).toContain("(fictional)");
-      expect(investor.person.headline).toContain("fictional");
+      expect(investor.name).not.toMatch(/fictional/i);
+      expect(investor.person.headline).not.toMatch(/fictional/i);
     }
   });
 
@@ -92,7 +95,7 @@ describe("fictional world content", () => {
         }
         if (claim.evidenceStatus === "DOCUMENT_SUPPORTED") {
           documentSupported += 1;
-          expect(claim.documentTitle).toMatch(/fictional/);
+          expect(claim.documentTitle).not.toMatch(/fictional/i);
         }
       }
       expect(company.claims.some((c) => c.truthClass === "UNKNOWN")).toBe(true);

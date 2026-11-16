@@ -48,7 +48,7 @@ test("400 complete fictional companies with unique keys, names and accounts", ()
   for (const c of companies) {
     assert.ok(c.seedKey.startsWith(SEED_MARKER));
     assert.ok(c.website.endsWith(".example"), c.website);
-    assert.ok(c.legalName.endsWith("(fictional)"));
+    assert.ok(!c.legalName.includes("(fictional)"), c.legalName);
     for (const e of emails.slice(0, 3))
       assert.ok(e.endsWith(`@${ACCOUNT_DOMAIN}`));
     assert.ok(storyText(c).startsWith("Fictional demo company."));
@@ -134,7 +134,7 @@ test("investors: coherent mandates, logins and GateQ derived from the mandate", 
   assert.ok(investors.length >= 10 && investors.length <= 15);
   const order = ["pre_seed", "seed", "series_a", "series_b", "series_c_plus"];
   for (const inv of investors) {
-    assert.ok(inv.name.endsWith("(fictional)"));
+    assert.ok(!inv.name.includes("(fictional)"), inv.name);
     assert.ok(inv.logins.length >= 2);
     const [min, typical, max] = inv.cheque.map(Number);
     assert.ok(min > 0 && min <= typical && typical <= max, inv.key);

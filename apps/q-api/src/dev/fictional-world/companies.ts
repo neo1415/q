@@ -15,7 +15,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "ledgerfold",
     name: "Ledgerfold",
-    legalName: "Ledgerfold Technologies Ltd (fictional)",
+    legalName: "Ledgerfold Technologies Ltd",
     website: "https://ledgerfold.example",
     foundedDate: "2023-02-14",
     countryOption: "ng",
@@ -31,7 +31,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Adaeze Nwachukwu",
-      headline: "CEO, Ledgerfold (fictional demo founder)",
+      headline: "CEO, Ledgerfold",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -99,7 +99,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Ledgerfold loan tape, March 2026 (fictional)",
+        documentTitle: "Ledgerfold loan tape, March 2026",
       },
       {
         claimKey: "financial.par30",
@@ -212,7 +212,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "tarmacly",
     name: "Tarmacly",
-    legalName: "Tarmacly Logistics Nigeria Ltd (fictional)",
+    legalName: "Tarmacly Logistics Nigeria Ltd",
     website: "https://tarmacly.example",
     foundedDate: "2021-06-01",
     countryOption: "ng",
@@ -228,7 +228,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Musa Garba-Lawal",
-      headline: "CEO, Tarmacly (fictional demo founder)",
+      headline: "CEO, Tarmacly",
       roleOption: "ceo",
       businessTitle: "Founder and CEO",
       professionalSummary:
@@ -304,7 +304,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         lifecycleStatus: "CONTRADICTORY",
-        documentTitle: "Tarmacly management accounts, March 2026 (fictional)",
+        documentTitle: "Tarmacly management accounts, March 2026",
       },
       {
         claimKey: "traction.trips",
@@ -408,7 +408,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "yamfield-agro",
     name: "Yamfield Agro",
-    legalName: "Yamfield Agro Services Ltd (fictional)",
+    legalName: "Yamfield Agro Services Ltd",
     website: "https://yamfield.example",
     foundedDate: "2025-01-20",
     countryOption: "ng",
@@ -419,7 +419,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     categories: ["agritech", "agriculture", "energy_access", "small_business"],
     founder: {
       displayName: "Terna Iorliam",
-      headline: "Founder, Yamfield Agro (fictional demo founder)",
+      headline: "Founder, Yamfield Agro",
       roleOption: "ceo",
       businessTitle: "Founder and CEO",
       professionalSummary:
@@ -549,7 +549,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "clinicrest",
     name: "Clinicrest",
-    legalName: "Clinicrest Health Supply Ltd (fictional)",
+    legalName: "Clinicrest Health Supply Ltd",
     website: "https://clinicrest.example",
     foundedDate: "2022-09-05",
     countryOption: "ng",
@@ -565,7 +565,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Dr. Folake Adebayo-Hart",
-      headline: "CEO, Clinicrest (fictional demo founder)",
+      headline: "CEO, Clinicrest",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -631,8 +631,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
         lifecycleStatus: "CONTRADICTORY",
-        documentTitle:
-          "Clinicrest management accounts, February 2026 (fictional)",
+        documentTitle: "Clinicrest management accounts, February 2026",
       },
       {
         claimKey: "financial.monthly_revenue",
@@ -646,8 +645,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle:
-          "Clinicrest management accounts, February 2026 (fictional)",
+        documentTitle: "Clinicrest management accounts, February 2026",
       },
       {
         claimKey: "market.outlets",
@@ -716,7 +714,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "marketlight-grids",
     name: "Marketlight Grids",
-    legalName: "Marketlight Grids Energy Ltd (fictional)",
+    legalName: "Marketlight Grids Energy Ltd",
     website: "https://marketlight.example",
     foundedDate: "2020-11-10",
     countryOption: "ng",
@@ -732,7 +730,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Hauwa Bello-Idris",
-      headline: "CEO, Marketlight Grids (fictional demo founder)",
+      headline: "CEO, Marketlight Grids",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -792,7 +790,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         structuredValue: { kind: "QUANTITY", value: "2.1", unit: "MW" },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Marketlight asset register, Q1 2026 (fictional)",
+        documentTitle: "Marketlight asset register, Q1 2026",
       },
       {
         claimKey: "financial.annualised_revenue",
@@ -875,7 +873,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "tallyloom",
     name: "Tallyloom",
-    legalName: "Tallyloom Software Ltd (fictional)",
+    legalName: "Tallyloom Software Ltd",
     website: "https://tallyloom.example",
     foundedDate: "2019-04-03",
     countryOption: "ng",
@@ -891,7 +889,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Babajide Coker",
-      headline: "CEO, Tallyloom (fictional demo founder)",
+      headline: "CEO, Tallyloom",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -947,7 +945,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Tallyloom audited accounts FY2025 (fictional)",
+        documentTitle: "Tallyloom audited accounts FY2025",
       },
       {
         claimKey: "customers.employers",
@@ -1042,7 +1040,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "ajopot",
     name: "Ajopot",
-    legalName: "Ajopot Digital Savings Ltd (fictional)",
+    legalName: "Ajopot Digital Savings Ltd",
     website: "https://ajopot.example",
     foundedDate: "2024-03-18",
     countryOption: "ng",
@@ -1053,7 +1051,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     categories: ["fintech", "digital_banking", "digital_wallet", "consumer"],
     founder: {
       displayName: "Temitope Alade",
-      headline: "CEO, Ajopot (fictional demo founder)",
+      headline: "CEO, Ajopot",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -1191,7 +1189,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "maji-loop",
     name: "Maji Loop",
-    legalName: "Maji Loop Water Ltd (fictional)",
+    legalName: "Maji Loop Water Ltd",
     website: "https://majiloop.example",
     foundedDate: "2022-05-09",
     countryOption: "ke",
@@ -1207,7 +1205,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Wanjiru Kamau",
-      headline: "CEO, Maji Loop (fictional demo founder)",
+      headline: "CEO, Maji Loop",
       roleOption: "ceo",
       businessTitle: "Founder and CEO",
       professionalSummary:
@@ -1270,7 +1268,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Utility meter reconciliation 2025 (fictional)",
+        documentTitle: "Utility meter reconciliation 2025",
       },
       {
         claimKey: "financial.revenue_2025",
@@ -1337,7 +1335,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "nsuo-labs",
     name: "Nsuo Labs",
-    legalName: "Nsuo Labs Ghana Ltd (fictional)",
+    legalName: "Nsuo Labs Ghana Ltd",
     website: "https://nsuolabs.example",
     foundedDate: "2025-02-11",
     countryOption: "gh",
@@ -1353,7 +1351,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Kwabena Asante-Mensah",
-      headline: "Founder, Nsuo Labs (fictional demo founder)",
+      headline: "Founder, Nsuo Labs",
       roleOption: "ceo",
       businessTitle: "Founder and CEO",
       professionalSummary:
@@ -1461,7 +1459,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "brightkloof-energy",
     name: "Brightkloof Energy",
-    legalName: "Brightkloof Energy (Pty) Ltd (fictional)",
+    legalName: "Brightkloof Energy (Pty) Ltd",
     website: "https://brightkloof.example",
     foundedDate: "2018-08-27",
     countryOption: "za",
@@ -1477,7 +1475,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Thandiwe Mokoena",
-      headline: "CEO, Brightkloof Energy (fictional demo founder)",
+      headline: "CEO, Brightkloof Energy",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -1535,7 +1533,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Brightkloof audited accounts FY2025 (fictional)",
+        documentTitle: "Brightkloof audited accounts FY2025",
       },
       {
         claimKey: "traction.sites",
@@ -1616,7 +1614,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "souqsheet",
     name: "Souqsheet",
-    legalName: "Souqsheet for Software S.A.E. (fictional)",
+    legalName: "Souqsheet for Software S.A.E.",
     website: "https://souqsheet.example",
     foundedDate: "2021-01-12",
     countryOption: "eg",
@@ -1632,7 +1630,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Mariam El-Sayed",
-      headline: "CEO, Souqsheet (fictional demo founder)",
+      headline: "CEO, Souqsheet",
       roleOption: "ceo",
       businessTitle: "Co-founder and CEO",
       professionalSummary:
@@ -1709,7 +1707,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
         },
         truthClass: "USER_CLAIM",
         evidenceStatus: "DOCUMENT_SUPPORTED",
-        documentTitle: "Souqsheet revenue report, February 2026 (fictional)",
+        documentTitle: "Souqsheet revenue report, February 2026",
       },
       {
         claimKey: "risk.credit_loss",
@@ -1772,7 +1770,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
   {
     key: "kazikit",
     name: "Kazikit",
-    legalName: "Kazikit Technologies Ltd (fictional)",
+    legalName: "Kazikit Technologies Ltd",
     website: "https://kazikit.example",
     foundedDate: "2025-04-07",
     countryOption: "ke",
@@ -1788,7 +1786,7 @@ export const FICTIONAL_COMPANIES: readonly FictionalCompany[] = [
     ],
     founder: {
       displayName: "Brian Mwangi",
-      headline: "Co-founder, Kazikit (fictional demo founder)",
+      headline: "Co-founder, Kazikit",
       roleOption: "cto",
       businessTitle: "Co-founder and CTO",
       professionalSummary:

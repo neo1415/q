@@ -14,7 +14,9 @@
  *   model), uploaded as the company's pitch deck and filed publicly;
  * - Q preferences (Daily off for invented people).
  *
- * Only companies whose legal name is marked "(fictional)" are touched. Real
+ * Only companies whose founder account carries the synthetic markers
+ * (app_metadata fictional_demo = synthetic = true) are touched; names no
+ * longer carry a "(fictional)" suffix (owner directive 2026-11-16). Real
  * companies seeded from public research are never given invented material.
  *
  *   /root/sb node scripts/seed/fictional-bulk/enrich.mjs --hosted [--only ledgerfold,tarmacly]
@@ -110,7 +112,7 @@ export function documentsFor(c) {
   return [
     {
       kind: "COMPANY_PROFILE",
-      title: `${c.name} company overview (fictional)`,
+      title: `${c.name} company overview`,
       filename: `${c.key}-overview.txt`,
       mime: "text/plain",
       text: [
@@ -130,7 +132,7 @@ export function documentsFor(c) {
     },
     {
       kind: "FINANCIAL",
-      title: `${c.name} financial summary, founder claim (fictional)`,
+      title: `${c.name} financial summary, founder claim`,
       filename: `${c.key}-financial-summary.txt`,
       mime: "text/plain",
       text: [
@@ -147,7 +149,7 @@ export function documentsFor(c) {
     },
     {
       kind: "PRODUCT",
-      title: `${c.name} product brief (fictional)`,
+      title: `${c.name} product brief`,
       filename: `${c.key}-product-brief.txt`,
       mime: "text/plain",
       text: [
@@ -175,10 +177,10 @@ async function enrich(c) {
   };
   const f = `founder.${c.key}@${"fictional.capitalq.local"}`;
   const rows = await lib.sql(
-    `select c.id, c.organisation_id, c.legal_name from core.companies c join identity.organisation_memberships m on m.organisation_id = c.organisation_id join identity.user_profiles p on p.id = m.user_id join auth.users u on u.id = p.auth_user_id where lower(u.email) = lower('${f}') and u.raw_app_meta_data->>'fictional_demo' = 'true'`,
+    `select c.id, c.organisation_id, c.legal_name from core.companies c join identity.organisation_memberships m on m.organisation_id = c.organisation_id join identity.user_profiles p on p.id = m.user_id join auth.users u on u.id = p.auth_user_id where lower(u.email) = lower('${f}') and u.raw_app_meta_data->>'fictional_demo' = 'true' and u.raw_app_meta_data->>'synthetic' = 'true'`,
   );
   const row = rows[0];
-  if (!row || !String(row.legal_name ?? "").endsWith("(fictional)"))
+  if (!row)
     throw new Error(`${c.name}: not a marked fictional company; refusing`);
   const companyId = row.id;
   const base = `/v1/companies/${companyId}`;
@@ -189,7 +191,7 @@ async function enrich(c) {
     const members = teamFromStory(c).map((m) => ({
       ...m,
       email: `member.${c.key}.${slug(bare(m.displayName))}@fictional.capitalq.local`,
-      headline: `${m.businessTitle}, ${c.name} (fictional demo team member)`,
+      headline: `${m.businessTitle}, ${c.name}`,
     }));
     for (const m of members) {
       const id = await lib.sql(
@@ -288,7 +290,7 @@ async function enrich(c) {
         `${MARKER}:${c.key}`,
         {
           kind: "PITCH_DECK",
-          title: `${c.name} investor deck (fictional)`,
+          title: `${c.name} investor deck`,
           filename: `${c.key}-deck.pdf`,
           mime: "application/pdf",
         },
