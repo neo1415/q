@@ -34,6 +34,12 @@ export type ArrivalSnapshotRoutesDependencies = ActorContextDependencies & {
      */
     readonly refreshAfterWrite?: ((actor: ActorContext) => void) | undefined;
   };
+  /**
+   * DECISIONS 101: someone opened Q (Home asks for this snapshot while it
+   * renders). Synchronous and never throws; the reader warm-up decides on
+   * its own whether its route needs warming. Absent: nothing happens.
+   */
+  readonly onArrival?: ((actor: ActorContext) => void) | undefined;
 };
 
 /**
@@ -100,9 +106,9 @@ export function registerArrivalSnapshotRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       void reply.header("Cache-Control", "no-store");
-      const snapshot = await dependencies.snapshots.forActor(
-        getActorContext(request),
-      );
+      const actor = getActorContext(request);
+      dependencies.onArrival?.(actor);
+      const snapshot = await dependencies.snapshots.forActor(actor);
       if (snapshot === null) {
         const problem = createProblemDetails({
           code: "RESOURCE_NOT_FOUND",

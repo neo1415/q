@@ -44,7 +44,10 @@ const CONTEXT: ActorContext = {
   actorType: "HUMAN",
 };
 
-function buildApp(signedIn = true) {
+function buildApp(
+  signedIn = true,
+  readerWarmup?: { onArrival: (actor: ActorContext) => void },
+) {
   const security: QApiSecurityDependencies = {
     authenticator: {
       authenticate: () =>
@@ -74,11 +77,42 @@ function buildApp(signedIn = true) {
   });
   const { app } = createApp(parseQApiConfig({ NODE_ENV: "test" }), security, {
     arrivalSnapshots: snapshots,
+    ...(readerWarmup === undefined ? {} : { readerWarmup }),
   });
   return { app, probes: () => probes };
 }
 
 describe("GET /v1/q/arrival-snapshot", () => {
+  it("tells the reader warm-up someone arrived, with the session actor (DECISIONS 101)", async () => {
+    const arrivals: ActorContext[] = [];
+    const { app } = buildApp(true, {
+      onArrival: (actor) => {
+        arrivals.push(actor);
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/arrival-snapshot",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(arrivals).toEqual([CONTEXT]);
+  });
+
+  it("is not told of an arrival nobody is signed in for", async () => {
+    const arrivals: ActorContext[] = [];
+    const { app } = buildApp(false, {
+      onArrival: (actor) => {
+        arrivals.push(actor);
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/arrival-snapshot",
+    });
+    expect(response.statusCode).toBe(401);
+    expect(arrivals).toEqual([]);
+  });
+
   it("returns the session actor's snapshot, uncached by the browser", async () => {
     const { app } = buildApp();
     const response = await app.inject({

@@ -73,6 +73,13 @@ const databaseEnvSchema = z.object({
     .regex(POSTGRES_URL, "expected a postgresql:// connection string"),
   DATABASE_PRIVILEGED_URL: optionalPostgresUrl,
   DATABASE_MIGRATION_URL: optionalPostgresUrl,
+  // Where LISTEN connects when queries go through the transaction pooler.
+  // LISTEN holds a session open to receive notifications; a transaction-mode
+  // pooler hands the server connection to another client after every
+  // transaction, so notifications are never delivered there. Unset with a
+  // :6543 DATABASE_URL, it is that URL on Supavisor's session port (5432):
+  // same host, user and password, so no second secret has to be managed.
+  DATABASE_LISTEN_URL: optionalPostgresUrl,
   DATABASE_CONNECTION_MODE: z.enum(DATABASE_CONNECTION_MODES).default("direct"),
   // Bounded so a misconfiguration cannot open fifty connections per replica.
   // Total load is replicas × pool, and that product is what the database sees.
@@ -110,8 +117,30 @@ export type DatabaseConfig = {
     readonly url: string;
     readonly privilegedUrl: string | undefined;
     readonly migrationUrl: string | undefined;
+    /**
+     * The session connection LISTEN uses, set only in transaction_pooler
+     * mode (explicit or derived). Undefined: LISTEN rides the request pool's
+     * own dedicated connection, as it always has.
+     */
+    readonly listenUrl: string | undefined;
   };
 };
+
+/** Supavisor's ports on one host: transaction mode and session mode. */
+const SUPAVISOR_TRANSACTION_PORT = "6543";
+const SUPAVISOR_SESSION_PORT = "5432";
+const HOST_PORT = /(@[^/?#@]+):(\d+)(?=[/?#]|$)/;
+
+/**
+ * The same connection string on Supavisor's session port, or undefined when
+ * the URL is not on the transaction port. Only the port changes; nothing of
+ * the URL is ever logged or returned in an error.
+ */
+export function supavisorSessionUrl(url: string): string | undefined {
+  const match = HOST_PORT.exec(url);
+  if (match?.[2] !== SUPAVISOR_TRANSACTION_PORT) return undefined;
+  return url.replace(HOST_PORT, `$1:${SUPAVISOR_SESSION_PORT}`);
+}
 
 export function parseDatabaseConfig(env: EnvironmentInput): DatabaseConfig {
   const parsed = parseConfig("database", databaseEnvSchema, env);
@@ -129,6 +158,22 @@ export function parseDatabaseConfig(env: EnvironmentInput): DatabaseConfig {
     ]);
   }
 
+  let listenUrl: string | undefined;
+  if (parsed.DATABASE_CONNECTION_MODE === "transaction_pooler") {
+    listenUrl =
+      parsed.DATABASE_LISTEN_URL ?? supavisorSessionUrl(parsed.DATABASE_URL);
+    if (listenUrl === undefined) {
+      // Fail at boot rather than run with wake-ups that silently never come.
+      throw new ConfigurationError("database", [
+        {
+          variable: "DATABASE_LISTEN_URL",
+          reason:
+            "required with DATABASE_CONNECTION_MODE=transaction_pooler unless DATABASE_URL is on port 6543",
+        },
+      ]);
+    }
+  }
+
   return {
     runtime: toRuntimeConfig(parsed),
     connectionMode: parsed.DATABASE_CONNECTION_MODE,
@@ -141,6 +186,7 @@ export function parseDatabaseConfig(env: EnvironmentInput): DatabaseConfig {
       url: parsed.DATABASE_URL,
       privilegedUrl: parsed.DATABASE_PRIVILEGED_URL,
       migrationUrl: parsed.DATABASE_MIGRATION_URL,
+      listenUrl,
     },
   };
 }

@@ -5,7 +5,10 @@ import {
 
 import type { Sql } from "postgres";
 
-import { createPostgresClient } from "./internal/postgres.js";
+import {
+  createPostgresClient,
+  createPostgresListenClient,
+} from "./internal/postgres.js";
 import { createTransactionManager } from "./transaction.js";
 import type { RequestDatabase } from "./types.js";
 
@@ -32,16 +35,25 @@ export function createRequestDatabaseClient(
     "REQUEST",
   );
 
+  // Transaction-pooler mode: LISTEN needs a session, so it gets its own
+  // client on the session URL (one connection, opened at the first listen).
+  // Every other mode keeps LISTEN on the request client, unchanged.
+  const listenUrl = config.secrets.listenUrl;
+  const listener =
+    listenUrl === undefined
+      ? sql
+      : createPostgresListenClient(listenUrl, config, "REQUEST");
+
   const stopWarm = keepWarm(sql, config.warmIntervalSeconds);
   return {
     accessClass: "REQUEST",
     sql,
     transactions: createTransactionManager(sql),
     listen: (channel, onNotify, onListen) =>
-      sql.listen(channel, onNotify, onListen),
-    close: () => {
+      listener.listen(channel, onNotify, onListen),
+    close: async () => {
       stopWarm();
-      return sql.end();
+      await Promise.all([sql.end(), listener === sql ? null : listener.end()]);
     },
   };
 }

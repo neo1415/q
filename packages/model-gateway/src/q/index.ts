@@ -788,6 +788,13 @@ export {
   type QSituationSurface,
 } from "./situation-header.js";
 export {
+  createReaderRouteActivity,
+  createReaderWarmup,
+  READER_WARMUP_IDLE_MS,
+  type ReaderRouteActivity,
+  type ReaderWarmup,
+} from "./reader-warmup.js";
+export {
   createQTurnReader,
   readerActions,
   TURN_READER_ACTIONS_MAX,

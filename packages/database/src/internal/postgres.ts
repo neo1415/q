@@ -65,3 +65,26 @@ export function createPostgresClient(
     postgres(connectionString, resolvePostgresOptions(config, accessClass)),
   );
 }
+
+/**
+ * A client used only for LISTEN, on a session connection (see
+ * DATABASE_LISTEN_URL). postgres.js gives LISTEN one dedicated connection
+ * outside the pool, so `max: 1` bounds this client to that one session slot.
+ * Not instrumented: it serves no request and carries no request's queries.
+ */
+export function createPostgresListenClient(
+  connectionString: string,
+  config: DatabaseConfig,
+  accessClass: DatabaseAccessClass,
+): Sql {
+  const options = resolvePostgresOptions(config, accessClass);
+  return postgres(connectionString, {
+    ...options,
+    max: 1,
+    prepare: true,
+    connection: {
+      ...options.connection,
+      application_name: `${options.connection.application_name}:listen`,
+    },
+  });
+}

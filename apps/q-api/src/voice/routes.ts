@@ -130,6 +130,11 @@ const FIRST_MESSAGE_MAX = 700;
 
 export type QVoiceRoutesDependencies = ActorContextDependencies & {
   /**
+   * DECISIONS 101: a voice line is being opened, so the person is about to
+   * speak to Q. Synchronous and never throws (the reader warm-up).
+   */
+  readonly onArrival?: ((actor: ActorContext) => void) | undefined;
+  /**
    * Multilingual Q: the language this person chose for Q (Settings), which
    * overrides the device's locale on every voice line. Absent: the device's.
    */
@@ -719,6 +724,7 @@ export function registerQVoiceRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const actor = getActorContext(request);
+      dependencies.onArrival?.(actor);
       const requested = parseContract(
         CreateQVoiceSessionRequestSchema,
         request.body ?? {},

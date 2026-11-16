@@ -17,6 +17,7 @@ const TASK_NAMES: Readonly<
   MEETING: "Meetings",
   DOCUMENT: "Documents",
   VOICE_REALTIME: "Live voice",
+  WARMUP: "Getting ready to answer",
   OTHER: "Other",
 };
 

@@ -7,6 +7,7 @@ import {
   type UiTextRoutesDependencies,
 } from "./composition/ui-text.js";
 import type { DatabaseHealth } from "@capital-q/database";
+import type { ActorContext } from "@capital-q/security";
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
 import { registerBriefingCommandRoutes } from "./http/briefing-command.js";
@@ -256,6 +257,12 @@ export type QApiModules = {
   /** Owner 14 Nov 2026: the account digest every Q turn reads. */
   readonly accountDigest?:
     AccountDigestRoutesDependencies["accountDigest"] | undefined;
+  /**
+   * DECISIONS 101: warms the turn reader's route when someone opens Q (the
+   * arrival snapshot read, a voice line opening) after an idle spell.
+   */
+  readonly readerWarmup?:
+    { readonly onArrival: (actor: ActorContext) => void } | undefined;
   /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
   readonly arrivalSnapshots?:
     ArrivalSnapshotRoutesDependencies["snapshots"] | undefined;
@@ -629,6 +636,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       snapshots: modules.arrivalSnapshots,
+      onArrival: modules.readerWarmup?.onArrival,
     });
   }
   // DAILY block: The Q Daily (the person's own editions and preferences).
@@ -842,6 +850,7 @@ export function createApp(
     registerQVoiceRoutes(app, {
       // E-03: one registry for the card route and the think route.
       cards: voiceCards,
+      onArrival: modules.readerWarmup?.onArrival,
       authenticator: security.authenticator,
       resolver: security.resolver,
       identity: security.identity,

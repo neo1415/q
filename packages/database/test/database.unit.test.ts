@@ -74,7 +74,10 @@ describe("driver options", () => {
   it("disables prepared statements for transaction_pooler mode", () => {
     expect(
       resolvePostgresOptions(
-        config({ DATABASE_CONNECTION_MODE: "transaction_pooler" }),
+        config({
+          DATABASE_CONNECTION_MODE: "transaction_pooler",
+          DATABASE_LISTEN_URL: LOCAL_TEST_URL,
+        }),
         "REQUEST",
       ).prepare,
     ).toBe(false);
@@ -182,6 +185,44 @@ describe("failure handling", () => {
   it("passes an existing DatabaseError through unchanged", () => {
     const original = new DatabaseError("TIMEOUT");
     expect(toDatabaseError(original)).toBe(original);
+  });
+});
+
+describe("LISTEN connection", () => {
+  // Two unreachable ports, so the failing connection names which URL LISTEN
+  // dialled. Nothing listens on either; no database is needed.
+  const QUERY_URL = `postgresql://test:${SECRET}@127.0.0.1:6543/test`;
+  const LISTEN_ONLY_URL = `postgresql://test:${SECRET}@127.0.0.1:9/test`;
+
+  async function listenFailurePort(
+    overrides: Record<string, string>,
+  ): Promise<unknown> {
+    const database = createRequestDatabaseClient(
+      config({ DATABASE_URL: QUERY_URL, ...overrides }),
+    );
+    try {
+      await database.listen("cq_test_channel", () => undefined);
+      return "connected";
+    } catch (error) {
+      return (error as { port?: unknown }).port;
+    } finally {
+      await database.close();
+    }
+  }
+
+  it("rides the request URL outside transaction mode (unchanged)", async () => {
+    expect(
+      await listenFailurePort({ DATABASE_LISTEN_URL: LISTEN_ONLY_URL }),
+    ).toBe(6543);
+  });
+
+  it("uses the session URL in transaction_pooler mode", async () => {
+    expect(
+      await listenFailurePort({
+        DATABASE_CONNECTION_MODE: "transaction_pooler",
+        DATABASE_LISTEN_URL: LISTEN_ONLY_URL,
+      }),
+    ).toBe(9);
   });
 });
 

@@ -522,6 +522,8 @@ import {
   createTaxonomyChooser,
   CLEAR_QUESTION,
   createQTurnReader,
+  createReaderRouteActivity,
+  createReaderWarmup,
   type QReceiptPort,
 } from "@capital-q/model-gateway/q";
 import {
@@ -1387,11 +1389,16 @@ const operatorAlert: { send: (alert: OperatorAlert) => Promise<boolean> } = {
 const providerAccounts = watchProviderAccounts(
   createProcessLocalProviderHealth(),
 );
+// DECISIONS 101: when the turn reader's route was last used in this
+// process, read off the ledger the gateway writes for every attempt.
+const readerRouteActivity = createReaderRouteActivity();
 const modelGateway = timedModelGateway(
   createModelGateway({
     catalog: modelCatalog,
     registry: createModelProviderRegistry(providers),
-    usage: createPostgresModelUsageRepository({ sql: database.sql }),
+    usage: readerRouteActivity.observe(
+      createPostgresModelUsageRepository({ sql: database.sql }),
+    ),
     // DECISIONS 68: the same health, watched, so voice can tell when the
     // OpenAI account is out and fall back to ElevenLabs.
     health: providerAccounts.health,
@@ -8897,6 +8904,14 @@ const { app, logger: appLogger } = createApp(
     // Owner 14 Nov 2026: the account digest, for the resume opening.
     accountDigest: qTools.accountDigest,
     arrivalSnapshots,
+    // DECISIONS 101: opening Q after 15+ idle minutes warms the reader's
+    // route with one tiny call that carries nothing about anyone.
+    readerWarmup: createReaderWarmup({
+      gateway: modelGateway,
+      activity: readerRouteActivity,
+      logger,
+      dataPosture: demoDataPosture,
+    }),
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },

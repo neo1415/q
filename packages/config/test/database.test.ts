@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDatabaseConfig, resolveDatabaseUrl } from "../src/database.js";
+import {
+  parseDatabaseConfig,
+  resolveDatabaseUrl,
+  supavisorSessionUrl,
+} from "../src/database.js";
 import { ConfigurationError } from "../src/errors.js";
 
 // Synthetic. The password is a sentinel used to prove it never leaks.
 const REQUEST_URL = "postgresql://test:super-secret-test-value@localhost/test";
 const PRIVILEGED_URL = "postgresql://svc:other-secret-value@localhost/test";
 const MIGRATION_URL = "postgresql://mig:third-secret-value@localhost/test";
+const LISTEN_URL = "postgresql://lsn:fourth-secret-value@localhost:5432/test";
+// Supavisor shape: tenant-qualified user, pooler host, transaction port.
+const POOLER_TX_URL =
+  "postgresql://postgres.tenant:super-secret-test-value@pooler.example.test:6543/postgres?sslmode=require";
 
 const BASE_ENV = { NODE_ENV: "test", DATABASE_URL: REQUEST_URL };
 
@@ -23,6 +31,7 @@ describe("parseDatabaseConfig", () => {
     expect(config.secrets.url).toBe(REQUEST_URL);
     expect(config.secrets.privilegedUrl).toBeUndefined();
     expect(config.secrets.migrationUrl).toBeUndefined();
+    expect(config.secrets.listenUrl).toBeUndefined();
   });
 
   it("reads every override", () => {
@@ -37,6 +46,7 @@ describe("parseDatabaseConfig", () => {
       DATABASE_STATEMENT_TIMEOUT_MS: "2500",
       DATABASE_PRIVILEGED_URL: PRIVILEGED_URL,
       DATABASE_MIGRATION_URL: MIGRATION_URL,
+      DATABASE_LISTEN_URL: LISTEN_URL,
     });
 
     expect(config.runtime.deploymentEnvironment).toBe("staging");
@@ -48,6 +58,7 @@ describe("parseDatabaseConfig", () => {
     expect(config.statementTimeoutMs).toBe(2500);
     expect(config.secrets.privilegedUrl).toBe(PRIVILEGED_URL);
     expect(config.secrets.migrationUrl).toBe(MIGRATION_URL);
+    expect(config.secrets.listenUrl).toBe(LISTEN_URL);
   });
 
   it("refuses a warm ping that is not faster than the idle timeout", () => {
@@ -104,6 +115,69 @@ describe("parseDatabaseConfig", () => {
     });
     expect(serialised).not.toContain("super-secret-test-value");
     expect(serialised).not.toContain("not-a-number");
+  });
+});
+
+describe("transaction pooler LISTEN connection", () => {
+  it("keeps LISTEN on the request pool in direct and session modes", () => {
+    for (const mode of ["direct", "session_pooler"]) {
+      const config = parseDatabaseConfig({
+        ...BASE_ENV,
+        DATABASE_URL: POOLER_TX_URL,
+        DATABASE_CONNECTION_MODE: mode,
+        DATABASE_LISTEN_URL: LISTEN_URL,
+      });
+      expect(config.secrets.listenUrl).toBeUndefined();
+    }
+  });
+
+  it("derives the session-port URL from a :6543 DATABASE_URL, changing only the port", () => {
+    const config = parseDatabaseConfig({
+      ...BASE_ENV,
+      DATABASE_URL: POOLER_TX_URL,
+      DATABASE_CONNECTION_MODE: "transaction_pooler",
+    });
+    expect(config.secrets.listenUrl).toBe(
+      POOLER_TX_URL.replace(":6543/", ":5432/"),
+    );
+    expect(config.secrets.url).toBe(POOLER_TX_URL);
+  });
+
+  it("prefers an explicit DATABASE_LISTEN_URL", () => {
+    const config = parseDatabaseConfig({
+      ...BASE_ENV,
+      DATABASE_URL: POOLER_TX_URL,
+      DATABASE_CONNECTION_MODE: "transaction_pooler",
+      DATABASE_LISTEN_URL: LISTEN_URL,
+    });
+    expect(config.secrets.listenUrl).toBe(LISTEN_URL);
+  });
+
+  it("refuses transaction mode with no session URL to listen on, naming no value", () => {
+    let caught: unknown;
+    try {
+      parseDatabaseConfig({
+        ...BASE_ENV,
+        DATABASE_CONNECTION_MODE: "transaction_pooler",
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ConfigurationError);
+    const issues = JSON.stringify((caught as ConfigurationError).issues);
+    expect(issues).toContain("DATABASE_LISTEN_URL");
+    expect(issues).not.toContain("super-secret-test-value");
+  });
+
+  it("only rewrites a port that is Supavisor's transaction port", () => {
+    expect(supavisorSessionUrl(REQUEST_URL)).toBeUndefined();
+    expect(
+      supavisorSessionUrl("postgresql://u:p@h.example.test:5432/db"),
+    ).toBeUndefined();
+    // A password that happens to contain ":6543" is never touched.
+    expect(
+      supavisorSessionUrl("postgresql://u:a:6543b@h.example.test:6543"),
+    ).toBe("postgresql://u:a:6543b@h.example.test:5432");
   });
 });
 

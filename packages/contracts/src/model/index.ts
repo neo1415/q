@@ -533,6 +533,9 @@ export const MODEL_USAGE_PURPOSES = [
   "DOCUMENT",
   // DUPLEX: full-duplex voice lines; the daily spend cap sums these rows.
   "VOICE_REALTIME",
+  // DECISIONS 101: one tiny call that warms the turn reader's route after
+  // an idle spell. Carries nothing about anyone; told apart from real work.
+  "WARMUP",
   "OTHER",
 ] as const;
 export const ModelUsagePurposeSchema = z.enum(MODEL_USAGE_PURPOSES);

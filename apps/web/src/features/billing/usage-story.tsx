@@ -40,6 +40,7 @@ const PURPOSE_STORY: Readonly<Record<Purpose, string>> = {
   MEETING: "Joined and wrote up your meetings",
   DOCUMENT: "Read and wrote documents for you",
   VOICE_REALTIME: "Spoke with you live",
+  WARMUP: "Got ready to answer you quickly",
   OTHER: "Other work for you",
 };
 
