@@ -1046,6 +1046,17 @@ const DILIGENCE_WORDING =
   /\b(?:diligence|data\s*room|documents?|statements?|accounts|deck|contracts?|invoices?|requests?|requested|shared|answered|fulfil(?:led|ls)?|fulfill(?:ed|s)?)\b/iu;
 
 /**
+ * A company's own plans, as an investor asks about them: hiring and
+ * headcount, its team's roles, use of funds, projections, milestones.
+ * Live re-check on 927f25ddd (run 9604481f): "How many people is Halyard
+ * Security planning to hire next year, and in which roles?" was read as
+ * public facts and searched the web with the whole question, while the
+ * plan Halyard shared with them answers it.
+ */
+const COMPANY_PLAN_WORDING =
+  /\b(?:hire[sd]?|hiring|headcount|recruit(?:s|ing|ment)?|roles|team\s+size|plan(?:s|ned|ning)?\s+to\s+(?:hire|recruit|grow|spend|raise|use)|hiring\s+plan|use\s+of\s+funds|projections?|forecasts?|budget(?:ed|s)?|milestones?|roadmap)\b/iu;
+
+/**
  * An investor's question that their own records answer: about their own
  * records or progress, or about a company's figures, diligence or shared
  * documents, and with no words asking about the public world. The reading's
@@ -1073,7 +1084,8 @@ export function ownRecordsInvestorQuestion(input: {
   return (
     read.namedOther?.kind === "COMPANY" &&
     (COMPANY_FIGURES_WORDING.test(utterance) ||
-      DILIGENCE_WORDING.test(utterance))
+      DILIGENCE_WORDING.test(utterance) ||
+      COMPANY_PLAN_WORDING.test(utterance))
   );
 }
 

@@ -9653,7 +9653,19 @@ export function createModelGatewayQAnswer(
        */
       let claimSources: () => readonly string[] = () =>
         facts.map((fact) => fact.statement);
-      const claims = createClaimChecker(() => claimSources());
+      /**
+       * Live re-check on 927f25ddd (conversation e7e3c866): Q's own
+       * earlier replies and its record of the conversation are not what
+       * a document says. They still ground a figure by value, but a count
+       * of a named item is never bound to them (claimCorpus `echoes`), so
+       * a wrong count is not grounded by having been said before.
+       */
+      let claimEchoes: () => readonly string[] = () => [];
+      const claims = createClaimChecker(
+        () => claimSources(),
+        new Date(),
+        () => claimEchoes(),
+      );
       /**
        * Live scenario F, defect 5: "GateQ" is said only about a GateQ
        * application reading this run holds (gateq-application-fact.ts);
@@ -11912,14 +11924,28 @@ export function createModelGatewayQAnswer(
       const taskTemplate =
         registry.getActive("COMPANY_ANALYST").definition.template;
       gateqToolResults = () => messages;
+      // Q's own record of this conversation (its summary and ledger): an
+      // echo of what Q said, never a source a count is bound to.
+      const ownRecordNotes = new Set<ModelMessage>();
+      claimEchoes = () => [
+        ...earlier
+          .filter((message) => message.role === "Q")
+          .map((message) => message.content),
+        ...[...ownRecordNotes].map((message) => message.content),
+      ];
       claimSources = () => [
         ...facts.map((fact) => fact.statement),
         latest.content,
         // Step 9: their own words from earlier conversations, verbatim.
         ...recalledOwnWords,
-        ...earlier.map((message) => message.content),
+        ...earlier
+          .filter((message) => message.role !== "Q")
+          .map((message) => message.content),
         ...messages
-          .filter((message) => !instructionMessages.has(message))
+          .filter(
+            (message) =>
+              !instructionMessages.has(message) && !ownRecordNotes.has(message),
+          )
           .map((message) =>
             rendered.messages.includes(message)
               ? templateValues(message.content, taskTemplate)
@@ -12004,10 +12030,9 @@ export function createModelGatewayQAnswer(
       // Q intelligence step 2: who and what this conversation has named,
       // in order, with corrections, as Capital Q's own record.
       if (request.conversationState !== undefined) {
-        messages = [
-          ...messages,
-          conversationStateNote(request.conversationState),
-        ];
+        const stateNote = conversationStateNote(request.conversationState);
+        ownRecordNotes.add(stateNote);
+        messages = [...messages, stateNote];
       }
       // Owner live 2026-10-17: what Q already showed here, as context.
       // The earlier research goes in its own note (below), whole; the
@@ -13573,7 +13598,12 @@ export function createModelGatewayQAnswer(
                     );
                     return accepted.ok ? accepted.value : null;
                   })();
-          const joined = joinExtras(analyst, value, pending.read);
+          const joined = joinExtras(
+            analyst,
+            value,
+            pending.read,
+            claimEchoes(),
+          );
           analyst = joined.value;
           extrasJoin = joined.join;
           if (joined.ungrounded > 0) {
@@ -14338,7 +14368,10 @@ export function createModelGatewayQAnswer(
         // Step 6: the stored answer is held to the same check the streamed
         // sentences were, so the screen never shows what voice withheld.
         const answerClaims = stageClock.time("claimCheckAnswer", () =>
-          checkAnswer(recommendationGuarded.text, claimCorpus(claimSources())),
+          checkAnswer(
+            recommendationGuarded.text,
+            claimCorpus(claimSources(), new Date(), claimEchoes()),
+          ),
         );
         logUngrounded(answerClaims.ungrounded, "answer");
         // Step 8: the stored answer is held to the same promise check.

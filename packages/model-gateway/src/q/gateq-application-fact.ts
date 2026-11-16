@@ -112,6 +112,38 @@ export function namedInboxEntries(
   return before.length === 1 ? before : [];
 }
 
+/** Words about the application itself: GateQ, the form, the screening. */
+const APPLICATION_WORDING =
+  /\b(?:gate\s?q|applications?|applied|apply(?:ing)?|applicants?|submitted|submissions?|dossier|forms?|interview(?:ed)?|mandate|screen(?:ed|ing)?|qualif(?:y|ies|ied|ication))\b/iu;
+
+/**
+ * Words asking about the company's own records rather than its application:
+ * its figures, its documents and diligence, its plans (hiring, headcount,
+ * use of funds, projections).
+ */
+const COMPANY_RECORDS_WORDING =
+  /\b(?:hire[sd]?|hiring|headcount|staff|employees|recruit(?:s|ing|ment)?|roles?|plan(?:s|ned|ning)?|projections?|forecasts?|budget|use\s+of\s+funds|milestones?|roadmap|burn|runway|cash|revenue|arr|mrr|margins?|profit|loss(?:es)?|costs?|financials?|accounts|p&l|balance|cap\s+table|diligence|data\s*room|documents?|statements?|deck|contracts?|customers?)\b/iu;
+
+/**
+ * Live re-check on 927f25ddd (conversation e7e3c866): "How many people is
+ * Halyard Security planning to hire next year, and in which roles?" read
+ * Halyard's GateQ application (6.5 KB of form answers) beside the plan
+ * that answers it, and the follow-up read it again. The application is
+ * read when the turn is about the application, or names the company with
+ * no narrower ask its own records answer (an overview, a bare name); not
+ * for a question about its figures, documents or plans, and on a pointer
+ * turn only when the conversation's words are about the application.
+ */
+export function asksOfApplication(input: {
+  readonly latest: string;
+  readonly earlier: readonly string[];
+  readonly namedNow: boolean;
+}): boolean {
+  if (APPLICATION_WORDING.test(input.latest)) return true;
+  if (input.namedNow) return !COMPANY_RECORDS_WORDING.test(input.latest);
+  return input.earlier.some((text) => APPLICATION_WORDING.test(text));
+}
+
 /** The inbox list `read_my {kind: "gateq"}` returned, or none. */
 export function inboxEntriesOf(data: unknown): readonly GateqInboxEntry[] {
   const parsed = ReadMyOutputSchema.safeParse(data);
@@ -195,7 +227,14 @@ export async function readNamedGateqApplications(input: {
   const listed = inboxEntriesOf(
     await input.execute("read_my", { kind: "gateq" }, "q-gateq-inbox"),
   );
-  const wanted = namedInboxEntries(listed, input.latest, input.earlier);
+  const namedNow = namedInboxEntries(listed, input.latest, []).length > 0;
+  const wanted = asksOfApplication({
+    latest: input.latest,
+    earlier: input.earlier,
+    namedNow,
+  })
+    ? namedInboxEntries(listed, input.latest, input.earlier)
+    : [];
   const read = await Promise.all(
     wanted.map(async (entry, index) =>
       gateqApplicationFacts(

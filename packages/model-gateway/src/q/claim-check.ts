@@ -84,10 +84,11 @@ export interface ClaimCorpus {
   /** The minutes of every clock time a source states ("56" of 08:56). */
   readonly minutes: ReadonlySet<string>;
   /**
-   * Every source line, lower-cased (a JSON tool result's escaped line
-   * breaks count as breaks): what a count of a named item is bound to.
+   * Each source's lines in order, lower-cased (a JSON tool result's escaped
+   * line breaks count as breaks), with Q's own earlier words taken out:
+   * what a count of a named item is bound to.
    */
-  readonly segments: readonly string[];
+  readonly sourceLines: readonly (readonly string[])[];
 }
 
 export interface SentenceCheck {
@@ -328,24 +329,36 @@ function listLengths(source: string): number[] {
 export function claimCorpus(
   sources: readonly string[],
   today: Date = new Date(),
+  /**
+   * Q's own earlier words (its replies, its summaries of the conversation).
+   * They ground a figure by value as any source does, but a count of a
+   * named item is never bound to them: what Q said before is not what the
+   * document says, and a wrong count repeated is still wrong.
+   */
+  echoes: readonly string[] = [],
 ): ClaimCorpus {
   const numbers: SourceNumber[] = [];
   const lines: Operand[][] = [];
   const dates = new Set<string>();
   const ordinary = new Set<string>();
   const minutes = new Set<string>();
-  const segments: string[] = [];
+  const sourceLines: string[][] = [];
+  const echoed = echoSentences(echoes);
+  for (const source of sources) {
+    const own: string[] = [];
+    for (const segment of source.split(SEGMENT_BREAK)) {
+      const trimmed = withoutEchoes(normaliseText(segment), echoed).trim();
+      if (trimmed.length > 0) own.push(trimmed);
+    }
+    if (own.length > 0) sourceLines.push(own);
+  }
   const iso = today.toISOString().slice(0, 10);
-  const all = [...sources, iso];
+  const all = [...sources, ...echoes, iso];
   for (const source of all) {
     // A count of records a tool returned ("you've reached out to 20
     // companies") is the length of a list it holds.
     for (const length of listLengths(source)) {
       numbers.push({ value: length, currency: null });
-    }
-    for (const segment of source.split(SEGMENT_BREAK)) {
-      const trimmed = normaliseText(segment).trim();
-      if (trimmed.length > 0) segments.push(trimmed);
     }
     for (const line of source.split(/\n|(?<=[.;!?])\s+(?=[A-Z])/u)) {
       const own = figuresIn(line);
@@ -383,8 +396,35 @@ export function claimCorpus(
     dates,
     ordinary,
     minutes,
-    segments,
+    sourceLines,
   };
+}
+
+/** Q's own earlier sentences, long enough to be recognised where quoted. */
+function echoSentences(echoes: readonly string[]): readonly string[] {
+  const out = new Set<string>();
+  for (const echo of echoes) {
+    for (const part of echo.split(
+      /\r?\n|\\n|(?<=[.;!?])\s+|(?<=:)\s+|(?<=;)\s*/u,
+    )) {
+      const trimmed = normaliseText(part).trim();
+      if (trimmed.length >= ECHO_MIN_CHARS) out.add(trimmed);
+    }
+  }
+  // Longest first, so a sentence is taken out before a part of it.
+  return [...out].sort((left, right) => right.length - left.length);
+}
+
+const ECHO_MIN_CHARS = 24;
+
+/** A source line with Q's own earlier sentences quoted in it taken out. */
+function withoutEchoes(line: string, echoed: readonly string[]): string {
+  let out = line;
+  for (const sentence of echoed) {
+    if (out.length < sentence.length) continue;
+    if (out.includes(sentence)) out = out.split(sentence).join(" ¦ ");
+  }
+  return out;
 }
 
 /**
@@ -1086,9 +1126,6 @@ const COUNT_WORDS: readonly string[] = [
   "twelve",
 ];
 
-/** A line short enough that a count on it is the count of what it names. */
-const BOUND_SEGMENT_MAX = 300;
-
 const singular = (word: string): string =>
   word.endsWith("ies") && word.length > 4
     ? `${word.slice(0, -3)}y`
@@ -1133,9 +1170,87 @@ function countedItem(after: string): readonly string[] | null {
   return words;
 }
 
-/** A pattern for the item as a source may write it (either number, hyphens). */
-function itemPattern(words: readonly string[]): RegExp {
-  const body = words
+/** A count a source line states: a whole number (not a year) or a word. */
+type LineCount = {
+  readonly value: number;
+  readonly index: number;
+  readonly end: number;
+};
+
+const COUNT_WORD_PATTERNS = COUNT_WORDS.map(
+  (word) => new RegExp(`(?<![\\p{L}])${word}(?![\\p{L}])`, "gu"),
+);
+
+function countsAt(line: string): LineCount[] {
+  const out: LineCount[] = [];
+  for (const figure of figuresIn(line)) {
+    if (figure.kind !== "NUMBER" || !Number.isInteger(figure.value)) continue;
+    if (isYear(figure)) continue;
+    out.push({ value: figure.value, index: figure.index, end: figure.end });
+  }
+  for (const [value, pattern] of COUNT_WORD_PATTERNS.entries()) {
+    for (const match of line.matchAll(pattern)) {
+      out.push({
+        value,
+        index: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+  }
+  return out.sort((left, right) => left.index - right.index);
+}
+
+const isYear = (figure: Figure): boolean =>
+  /^\d{4}$/u.test(figure.text.trim()) &&
+  figure.value >= 1900 &&
+  figure.value <= 2100;
+
+/**
+ * Live re-check on 927f25ddd (16 Nov 2026, conversation e7e3c866): the
+ * plan's rows came as retrieved passages, and a 4 anywhere along a line
+ * that named "public-sector account manager" (Q's own earlier reply, a
+ * run-together passage) grounded "4 public-sector account managers". A
+ * count is bound to a row, not to a line: the count written right before
+ * the item ("3 account managers"), else the first count after it across a
+ * column break ("Public-sector account manager | Sales | 3 2027-Q1"), else,
+ * where the line holds only the item, the count opening the next line
+ * (columns extracted one per line). A role wrapped across two table lines
+ * ("Information security and assurance | Operations | 1" over "manager |
+ * G&A") is that role's row.
+ */
+const COUNT_BEFORE_GAP = /^\s+(?:[\p{L}-]+\s+)?$/u;
+const COLUMN_BREAK = /[|:\t=–—]|\s{2,}/u;
+const COLUMN_GAP_MAX = 80;
+const SENTENCE_END = /[.!?](?:\s|$)/u;
+const LINE_OPENS_WITH_COUNT =
+  /^\s*(?:\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?![\p{L}\p{N}])/u;
+
+function boundCount(line: string, start: number, end: number): number | null {
+  const counts = countsAt(line);
+  const before = counts.filter((count) => count.end <= start).at(-1);
+  if (
+    before !== undefined &&
+    COUNT_BEFORE_GAP.test(line.slice(before.end, start))
+  ) {
+    return before.value;
+  }
+  const after = counts.find((count) => count.index >= end);
+  if (after === undefined) return null;
+  const gap = line.slice(end, after.index);
+  if (/^\s*$/u.test(gap)) return after.value;
+  if (
+    gap.length <= COLUMN_GAP_MAX &&
+    COLUMN_BREAK.test(gap) &&
+    !SENTENCE_END.test(gap)
+  ) {
+    return after.value;
+  }
+  return null;
+}
+
+/** The item as a source may write it (either number, hyphens). */
+function itemBody(words: readonly string[]): string {
+  return words
     .map((word) => {
       if (word === "and") return "(?:and|&)";
       const base = singular(word);
@@ -1146,80 +1261,128 @@ function itemPattern(words: readonly string[]): RegExp {
       return `(?:${forms.join("|")})`;
     })
     .join("[\\s-]+");
-  return new RegExp(`(?<![\\p{L}])${body}(?![\\p{L}])`, "u");
 }
 
-const COUNT_WORD_PATTERNS = COUNT_WORDS.map(
-  (word) => new RegExp(`(?<![\\p{L}])${word}(?![\\p{L}])`, "u"),
-);
+/** A row's count for the item, and where the row is. */
+type RowCount = {
+  readonly value: number;
+  readonly source: number;
+  readonly row: string;
+};
 
-/** The counts a source line states: whole numbers, not years. */
-function countsOn(segment: string): number[] {
-  const out: number[] = [];
-  for (const figure of figuresIn(segment)) {
-    if (figure.kind !== "NUMBER" || !Number.isInteger(figure.value)) continue;
-    if (isYear(figure)) continue;
-    out.push(figure.value);
-  }
-  for (const [value, pattern] of COUNT_WORD_PATTERNS.entries()) {
-    if (pattern.test(segment)) out.push(value);
-  }
-  return out;
+/** Every row of the sources that names the item and binds a count to it. */
+function itemRows(item: readonly string[], corpus: ClaimCorpus): RowCount[] {
+  const whole = new RegExp(`(?<![\\p{L}])${itemBody(item)}(?![\\p{L}])`, "gu");
+  // A table cell wrapped onto the next line: the head of the item ending
+  // the cell, the rest of it opening the next line.
+  const wraps = item.flatMap((_, at) => {
+    const head = item.slice(0, at);
+    const tail = item.slice(at);
+    if (
+      head.filter((word) => word !== "and").length < 2 ||
+      head.at(-1) === "and" ||
+      tail[0] === "and"
+    ) {
+      return [];
+    }
+    return [
+      {
+        head: new RegExp(
+          `(?<![\\p{L}])${itemBody(head)}(?=\\s*(?:\\||$))`,
+          "gu",
+        ),
+        tail: new RegExp(`^\\s*${itemBody(tail)}(?![\\p{L}])`, "u"),
+      },
+    ];
+  });
+  const rows: RowCount[] = [];
+  corpus.sourceLines.forEach((lines, source) => {
+    lines.forEach((line, at) => {
+      const next = lines[at + 1] ?? "";
+      const found: { readonly start: number; readonly end: number }[] = [];
+      for (const match of line.matchAll(whole)) {
+        found.push({ start: match.index, end: match.index + match[0].length });
+      }
+      for (const wrap of wraps) {
+        if (!wrap.tail.test(next)) continue;
+        for (const match of line.matchAll(wrap.head)) {
+          found.push({
+            start: match.index,
+            end: match.index + match[0].length,
+          });
+        }
+      }
+      for (const { start, end } of found) {
+        let value = boundCount(line, start, end);
+        if (value === null) {
+          // The line is the item alone; its count opens the next line.
+          const rest = `${line.slice(0, start)}${line.slice(end)}`;
+          if (/^[\s|:()-]*$/u.test(rest) && LINE_OPENS_WITH_COUNT.test(next)) {
+            value = countsAt(next)[0]?.value ?? null;
+          }
+        }
+        if (value !== null) rows.push({ value, source, row: line });
+      }
+    });
+  });
+  return rows;
 }
-
-const isYear = (figure: Figure): boolean =>
-  /^\d{4}$/u.test(figure.text.trim()) &&
-  figure.value >= 1900 &&
-  figure.value <= 2100;
 
 /** What the sources hold of a count of one item. */
 type CountBinding =
-  | { readonly kind: "GROUNDED" | "UNPLACED" }
-  /** Short lines name the item with counts, none of them this one. */
-  | { readonly kind: "CONTRADICTED"; readonly only: number | null };
+  | { readonly kind: "UNPLACED" }
+  /** A row naming the item binds this count (the sources it is in). */
+  | { readonly kind: "GROUNDED"; readonly sources: ReadonlySet<number> }
+  /** Rows name the item with counts, none of them this one. */
+  | {
+      readonly kind: "CONTRADICTED";
+      /** The one count every such row gives, or null where they differ. */
+      readonly only: number | null;
+      readonly sources: ReadonlySet<number>;
+    };
 
 function bindCount(
   value: number,
   item: readonly string[],
   corpus: ClaimCorpus,
 ): CountBinding {
-  const pattern = itemPattern(item);
-  const naming = corpus.segments.filter((segment) => pattern.test(segment));
-  if (naming.length === 0) return { kind: "UNPLACED" };
-  if (naming.some((segment) => countsOn(segment).includes(value))) {
-    return { kind: "GROUNDED" };
+  const rows = itemRows(item, corpus);
+  if (rows.length === 0) return { kind: "UNPLACED" };
+  const matching = rows.filter((row) => row.value === value);
+  if (matching.length > 0) {
+    return {
+      kind: "GROUNDED",
+      sources: new Set(matching.map((row) => row.source)),
+    };
   }
-  const short = naming
-    .filter((segment) => segment.length <= BOUND_SEGMENT_MAX)
-    .map((segment) => ({ segment, counts: countsOn(segment) }))
-    .filter((entry) => entry.counts.length > 0);
-  if (short.length === 0) return { kind: "UNPLACED" };
-  // Their total ("10 engineers" over a line of 6 and a line of 4).
-  const distinct = [...new Set(short.map((entry) => entry.segment))];
-  if (
-    distinct.length >= 2 &&
-    short.every((entry) => entry.counts.length === 1) &&
-    distinct.reduce(
-      (sum, segment) =>
-        sum +
-        (short.find((entry) => entry.segment === segment)?.counts[0] ?? 0),
-      0,
-    ) === value
-  ) {
-    return { kind: "GROUNDED" };
+  // Their total, within one source ("10 engineers" over a row of 6 and a
+  // row of 4).
+  const bySource = new Map<number, Map<string, number>>();
+  for (const row of rows) {
+    const own = bySource.get(row.source) ?? new Map<string, number>();
+    if (!own.has(row.row)) own.set(row.row, row.value);
+    bySource.set(row.source, own);
   }
-  // The one value the sources give, where every line naming it agrees.
-  const values = new Set(short.flatMap((entry) => entry.counts));
+  const totalled = [...bySource.entries()].filter(
+    ([, own]) =>
+      own.size >= 2 &&
+      [...own.values()].reduce((sum, one) => sum + one, 0) === value,
+  );
+  if (totalled.length > 0) {
+    return {
+      kind: "GROUNDED",
+      sources: new Set(totalled.map(([source]) => source)),
+    };
+  }
+  const values = new Set(rows.map((row) => row.value));
   return {
     kind: "CONTRADICTED",
-    only:
-      distinct.length === 1 && values.size === 1
-        ? ([...values][0] ?? null)
-        : null,
+    only: values.size === 1 ? ([...values][0] ?? null) : null,
+    sources: new Set(rows.map((row) => row.source)),
   };
 }
 
-/** A sentence's counts of named items, held to the lines that name them. */
+/** A sentence's counts of named items, held to the rows that name them. */
 type CountsChecked = {
   /** The sentence, any count the sources settle put right. */
   readonly text: string;
@@ -1237,11 +1400,43 @@ type CountsChecked = {
 /** "15 people in total", "a total of 15": the stated total. */
 const TOTAL_AFTER = /^\s*(?:[\p{L}'-]+\s+){0,3}?in\s+total\b/iu;
 const TOTAL_BEFORE = /\b(?:a\s+)?total\s+of\s+$/iu;
+/** "hire 15 people", "15 new hires": a head count stated as a total. */
+const TOTAL_UNIT =
+  /^\s+(?:new\s+|additional\s+|more\s+)?(?:people|persons|hires|staff|employees|roles|positions|heads|members)\b/iu;
 /** A list that is only part of the total ("including 3 …"). */
 const PART_OF =
   /\b(?:including|includes|such as|among them|for example|e\.g\.|of which|at least|up to|about|around|roughly|approximately|others?|more|rest)\b/iu;
 
-function checkCounts(sentence: string, corpus: ClaimCorpus): CountsChecked {
+/** The counts of named items a sentence lists. */
+function listedParts(text: string): Figure[] {
+  return figuresIn(text).filter(
+    (figure) =>
+      figure.kind === "NUMBER" &&
+      Number.isInteger(figure.value) &&
+      !isYear(figure) &&
+      !isIncidental(text, figure, false) &&
+      countedItem(text.slice(figure.end)) !== null,
+  );
+}
+
+/** Head counts the sentence before states ("planning to hire 15 people"). */
+function totalsStatedIn(previous: string): readonly number[] {
+  return figuresIn(previous)
+    .filter(
+      (figure) =>
+        figure.kind === "NUMBER" &&
+        Number.isInteger(figure.value) &&
+        !isYear(figure) &&
+        TOTAL_UNIT.test(previous.slice(figure.end)),
+    )
+    .map((figure) => figure.value);
+}
+
+function checkCounts(
+  sentence: string,
+  corpus: ClaimCorpus,
+  previous = "",
+): CountsChecked {
   const contradicted: CountsChecked = {
     text: sentence,
     corrected: 0,
@@ -1249,40 +1444,94 @@ function checkCounts(sentence: string, corpus: ClaimCorpus): CountsChecked {
     totals: [],
   };
   let text = sentence;
-  let corrected = 0;
-  const counted = figuresIn(sentence).filter(
-    (figure) =>
-      figure.kind === "NUMBER" &&
-      Number.isInteger(figure.value) &&
-      !isYear(figure) &&
-      !isIncidental(sentence, figure, false),
-  );
+  const grounded = new Set<number>();
+  const corrections: { readonly sources: ReadonlySet<number> }[] = [];
   // Right to left, so a correction never moves a figure still to check.
-  for (const figure of [...counted].reverse()) {
+  for (const figure of [...listedParts(sentence)].reverse()) {
     const item = countedItem(sentence.slice(figure.end));
     if (item === null) continue;
     const bound = bindCount(figure.value, item, corpus);
+    if (bound.kind === "GROUNDED") {
+      for (const source of bound.sources) grounded.add(source);
+      continue;
+    }
     if (bound.kind !== "CONTRADICTED") continue;
     if (bound.only === null || !/^\d+$/u.test(figure.text.trim())) {
       return contradicted;
     }
     text = `${text.slice(0, figure.index)}${String(bound.only)}${text.slice(figure.end)}`;
-    corrected += 1;
+    corrections.push({ sources: bound.sources });
   }
   const total = statedTotal(text, corpus);
   if (total === "OFF") return contradicted;
-  // A count is put right only where two independent things agree: the one
-  // line that names the item, and the sentence's own total, which the
-  // parts then add up to. Otherwise the sentence goes (the claim check's
-  // rule), never a figure code chose alone: a count of another kind ("2
-  // deployment engineers joined in July") is not the plan's count.
-  if (corrected > 0 && total === null) return contradicted;
+  if (corrections.length > 0 && total === null) {
+    // A count is put right only where the rows naming the item agree on
+    // one count, whichever source states it, and the sentence is plainly
+    // reciting those rows: its parts, put right, add up to the head count
+    // the sentence before stated ("planning to hire 15 people. The roles
+    // are ..."), or its other counts are grounded on rows of the same
+    // source. Otherwise the sentence goes (the claim check's rule), never
+    // a figure code chose alone: "2 deployment engineers joined in July"
+    // is not the plan's count.
+    const parts = listedParts(text);
+    const sum = parts.reduce((all, part) => all + part.value, 0);
+    const stated = totalsStatedIn(previous);
+    const addsUp = parts.length >= 2 && stated.includes(sum);
+    if (parts.length >= 2 && stated.length > 0 && !addsUp) {
+      return contradicted;
+    }
+    const recited = corrections.every((correction) =>
+      [...correction.sources].some((source) => grounded.has(source)),
+    );
+    if (!addsUp && !recited) return contradicted;
+  }
   return {
     text,
-    corrected,
+    corrected: corrections.length,
     contradicted: false,
     totals: total === null ? [] : [total],
   };
+}
+
+/**
+ * A head count this sentence states that the next sentence's parts,
+ * each bound to its source row (as put right), add up to: the sum is the
+ * answer's own arithmetic, visible to the reader.
+ */
+function headCountListedNext(
+  sentence: string,
+  next: string | undefined,
+  corpus: ClaimCorpus,
+): readonly number[] {
+  if (next === undefined) return [];
+  const stated = totalsStatedIn(sentence);
+  if (stated.length === 0) return [];
+  const listed = checkCounts(next, corpus, sentence);
+  if (listed.contradicted) return [];
+  const parts = listedParts(listed.text);
+  if (parts.length < 2) return [];
+  const bound = parts.every((part) => {
+    const item = countedItem(listed.text.slice(part.end));
+    return (
+      item !== null && bindCount(part.value, item, corpus).kind === "GROUNDED"
+    );
+  });
+  const sum = parts.reduce((all, part) => all + part.value, 0);
+  return bound && stated.includes(sum) ? [sum] : [];
+}
+
+/**
+ * Whether a text states a count of a named item that the rows naming it
+ * contradict (a finding is kept or dropped, never rewritten).
+ */
+function countsContradicted(text: string, corpus: ClaimCorpus): boolean {
+  return listedParts(text).some((figure) => {
+    const item = countedItem(text.slice(figure.end));
+    return (
+      item !== null &&
+      bindCount(figure.value, item, corpus).kind === "CONTRADICTED"
+    );
+  });
 }
 
 /**
@@ -1304,7 +1553,8 @@ function statedTotal(text: string, corpus: ClaimCorpus): number | "OFF" | null {
     (figure) =>
       figure.end <= colon &&
       (TOTAL_AFTER.test(text.slice(figure.end, colon)) ||
-        TOTAL_BEFORE.test(text.slice(0, figure.index))),
+        TOTAL_BEFORE.test(text.slice(0, figure.index)) ||
+        TOTAL_UNIT.test(text.slice(figure.end, colon))),
   );
   const parts = figures.filter(
     (figure) =>
@@ -1342,6 +1592,19 @@ export interface SentenceCheckOptions {
    * grounding), so arithmetic split over two sentences stays visible.
    */
   readonly before?: readonly Operand[] | undefined;
+  /**
+   * The sentence just before, in the same paragraph: a head count it
+   * states ("planning to hire 15 people") is the total the next
+   * sentence's parts may add up to.
+   */
+  readonly previous?: string | undefined;
+  /**
+   * The sentence just after, in the same paragraph (the whole answer's
+   * check only): a head count stated here ("planning to hire 15 people")
+   * is grounded when the parts it lists next, each bound to its row, add
+   * up to it.
+   */
+  readonly next?: string | undefined;
 }
 
 /**
@@ -1368,17 +1631,14 @@ function checkOne(
   said: Set<string>,
   options: SentenceCheckOptions,
 ): { readonly check: SentenceCheck; readonly figures: readonly Operand[] } {
-  const counts = checkCounts(sentence, corpus);
+  const counts = checkCounts(sentence, corpus, options.previous);
   if (counts.contradicted) {
     return { check: { text: null, ungrounded: ["NUMBER"] }, figures: [] };
   }
-  const checked = checkClaims(
-    counts.text,
-    corpus,
-    said,
-    options,
-    counts.totals,
-  );
+  const checked = checkClaims(counts.text, corpus, said, options, [
+    ...counts.totals,
+    ...headCountListedNext(counts.text, options.next, corpus),
+  ]);
   if (counts.corrected === 0) return checked;
   // Logged as what was not grounded as written; the text is put right.
   const corrected: ClaimKind[] = Array.from(
@@ -1492,30 +1752,39 @@ export interface ClaimChecker {
 export function createClaimChecker(
   sources: () => readonly string[],
   today: Date = new Date(),
+  /** Q's own earlier words (claimCorpus `echoes`). */
+  echoes: () => readonly string[] = () => [],
 ): ClaimChecker {
   let key: readonly string[] | null = null;
   let corpus: ClaimCorpus | null = null;
   const said = new Set<string>();
   // The sentence just before, while the paragraph goes on.
   let before: readonly Operand[] = [];
+  let previous = "";
   const current = (): ClaimCorpus => {
-    const now = sources();
+    const now = [...sources(), "\u0000", ...echoes()];
     if (
       corpus === null ||
       key === null ||
       key.length !== now.length ||
       key.some((source, index) => source !== now[index])
     ) {
-      key = [...now];
-      corpus = claimCorpus(now, today);
+      key = now;
+      const split = now.indexOf("\u0000");
+      corpus = claimCorpus(now.slice(0, split), today, now.slice(split + 1));
     }
     return corpus;
   };
   return {
     sentence: (sentence) => {
-      const checked = checkOne(sentence, current(), said, { before });
+      const checked = checkOne(sentence, current(), said, {
+        before,
+        previous,
+      });
       // A paragraph break ends what the next sentence may work from.
-      before = /\n\s*$/u.test(sentence) ? [] : checked.figures;
+      const ends = /\n\s*$/u.test(sentence);
+      before = ends ? [] : checked.figures;
+      previous = ends ? "" : sentence;
       return checked.check;
     },
   };
@@ -1539,10 +1808,16 @@ export function checkAnswer(
     const sentences = body.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"“(*])/u);
     const kept: string[] = [];
     let before: readonly Operand[] = [];
-    for (const sentence of sentences) {
-      const one = checkOne(sentence, corpus, said, { before });
+    let previous = "";
+    for (const [at, sentence] of sentences.entries()) {
+      const one = checkOne(sentence, corpus, said, {
+        before,
+        previous,
+        next: sentences[at + 1],
+      });
       const checked = one.check;
       before = one.figures;
+      previous = sentence;
       ungrounded.push(...checked.ungrounded);
       if (checked.text !== null) kept.push(checked.text);
     }
@@ -1567,6 +1842,9 @@ export function checkAnswer(
  * sentences go through.
  */
 export function figuresGrounded(text: string, corpus: ClaimCorpus): boolean {
+  // A count of a named item the rows naming it contradict (live
+  // e7e3c866: "4 public-sector account managers" as a finding).
+  if (countsContradicted(text, corpus)) return false;
   const figures = figuresIn(text).filter(
     (figure) => !isIncidental(text, figure),
   );

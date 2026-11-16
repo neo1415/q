@@ -117,6 +117,8 @@ export function joinExtras<T extends CompanyAnalystV26Result>(
   answer: T,
   extras: Extras | null,
   read: readonly ModelMessage[],
+  /** Q's own earlier words in this conversation (claimCorpus `echoes`). */
+  echoes: readonly string[] = [],
 ): {
   readonly value: T;
   readonly join: ExtrasJoin;
@@ -140,11 +142,14 @@ export function joinExtras<T extends CompanyAnalystV26Result>(
   ) {
     return { value: answer, join: "NO_EXTRAS", ungrounded: 0 };
   }
-  // Every number either writer was given, or the answer said.
-  const known = claimCorpus([
-    answer.answer,
-    ...read.map((message) => message.content),
-  ]);
+  // Every number either writer was given, or the answer said. What Q
+  // says (this answer, its earlier replies) grounds a figure by value but
+  // never binds a count of a named item (live e7e3c866).
+  const known = claimCorpus(
+    read.map((message) => message.content),
+    new Date(),
+    [answer.answer, ...echoes],
+  );
   const findings = extras.findings.filter((finding) =>
     figuresGrounded(finding.statement, known),
   );

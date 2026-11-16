@@ -221,6 +221,23 @@ describe("an investor's own-records question keeps off the public web (defect 7)
     expect(s.routings[0]?.researchGuard).toBe("OWN_RECORDS");
   });
 
+  it("live re-check on 927f25ddd (run 9604481f): a question about the company's hiring plan, read as public facts, is held too", async () => {
+    for (const said of [
+      "How many people is Halyard Security planning to hire next year, and in which roles?",
+      "What is Halyard Security's headcount plan for 2027?",
+    ]) {
+      // The live reading: research EXPLICIT.
+      const reading = {
+        ...halyardReading(said, "PUBLIC_FACTS"),
+        asksForWeb: true,
+      };
+      const s = seam(said, reading, [message("Q", "Welcome back, Amelia.")]);
+      await s.answer.answer(investorRequest());
+      expect((await s.delegated[0]?.research)?.mode).toBe("NEVER");
+      expect(s.routings[0]?.researchGuard).toBe("OWN_RECORDS");
+    }
+  });
+
   it("their words asking about the public world keep the reading's research", async () => {
     const said =
       "Is there any news coverage of Halyard Security's bank balance or funding?";
