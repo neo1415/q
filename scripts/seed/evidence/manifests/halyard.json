@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "company": "Halyard Security",
+  "companyKey": "halyard",
+  "fixture": "scripts/seed/evidence/fixtures/halyard.json",
+  "synthetic": true,
+  "sensitivityRule": "packages/evidence/src/domain/sensitivity.ts defaultDocumentSensitivity: FINANCIAL, MANAGEMENT_ACCOUNTS and FINANCIAL_MODEL are HIGHLY_CONFIDENTIAL; every other type is CONFIDENTIAL.",
+  "qReadRule": "HIGHLY_CONFIDENTIAL documents are held back from Q (packages/q-tools/src/tools/own-records.ts heldBackFromQ) even when shared; an investor's Q cannot read them under current rules.",
+  "plannedInvestor": "Thames Arc",
+  "plannedInvestorNote": "Fictional GBP investor (mandate 150k-2M GBP) with a gateway and no relationship yet. A grant needs a relationship first; planned grants go through the data-room approval or diligence-share workflow.",
+  "documents": [
+    {
+      "id": "hs-management-accounts",
+      "fileName": "hs-management-accounts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Management accounts, May 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "management_accounts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-monthly-actuals",
+      "fileName": "hs-monthly-actuals.csv",
+      "mimeType": "text/csv",
+      "title": "Monthly actuals data, May 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "monthly_financials_24m",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "hs-revenue-breakdown",
+      "fileName": "hs-revenue-breakdown.pdf",
+      "mimeType": "application/pdf",
+      "title": "Monthly revenue by customer",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "revenue_by_customer",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "hs-invoice-register",
+      "fileName": "hs-invoice-register.csv",
+      "mimeType": "text/csv",
+      "title": "Invoice register",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-04",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "hs-bank-statement",
+      "fileName": "hs-bank-statement.pdf",
+      "mimeType": "application/pdf",
+      "title": "Business account statement, Aug 2026 to Oct 2026, with monthly balances",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "hs-customer-contracts",
+      "fileName": "hs-customer-contracts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Customer contract summary",
+      "documentType": "CUSTOMER",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "commercial",
+      "checklistItem": "customer_contracts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "hs-cohorts-retention",
+      "fileName": "hs-cohorts-retention.pdf",
+      "mimeType": "application/pdf",
+      "title": "Customer cohorts and retention",
+      "documentType": "CUSTOMER",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "unit_economics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-customer-concentration",
+      "fileName": "hs-customer-concentration.pdf",
+      "mimeType": "application/pdf",
+      "title": "Customer concentration",
+      "documentType": "COMMERCIAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-11",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "commercial",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-cap-table",
+      "fileName": "hs-cap-table.pdf",
+      "mimeType": "application/pdf",
+      "title": "Capitalisation table and ownership",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "cap_table",
+      "checklistItem": "cap_table_full",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-raise-terms",
+      "fileName": "hs-raise-terms.pdf",
+      "mimeType": "application/pdf",
+      "title": "Seed round terms and use of funds",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-11",
+        "to": "2026-12"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "use_of_funds",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-projections-2027",
+      "fileName": "hs-projections-2027.pdf",
+      "mimeType": "application/pdf",
+      "title": "Projections to December 2027, with assumptions",
+      "documentType": "FINANCIAL_MODEL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2026-11",
+        "to": "2027-12"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "financial_model",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-kpi-pack",
+      "fileName": "hs-kpi-pack.pdf",
+      "mimeType": "application/pdf",
+      "title": "KPI and product metrics pack",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "key_metrics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Thames Arc",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "hs-team-hiring-plan",
+      "fileName": "hs-team-hiring-plan.pdf",
+      "mimeType": "application/pdf",
+      "title": "Team and hiring plan",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2027-12"
+      },
+      "issuedOn": "2026-11-13",
+      "version": "1.0",
+      "dataRoomFolder": "team",
+      "checklistItem": "team_bios",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    }
+  ]
+}

@@ -1,0 +1,3308 @@
+{
+  "schemaVersion": 1,
+  "key": "halyard",
+  "idPrefix": "hs",
+  "seedSource": {
+    "file": "docs/seed/tavus-20/companies-full.json",
+    "company": "Halyard Security"
+  },
+  "company": {
+    "name": "Halyard Security",
+    "legalName": "Halyard Security Ltd",
+    "website": "https://halyard-security.example",
+    "headquarters": "Edinburgh, United Kingdom",
+    "foundedOn": "2023-01-30",
+    "stage": "seed",
+    "sector": "Cybersecurity / Public-sector SaaS",
+    "oneLiner": "Passkey rollout and phishing-resistant sign-in for NHS trusts and UK councils.",
+    "businessModel": "B2B SaaS, per-user annual licence"
+  },
+  "currency": "GBP",
+  "documentDefaults": {
+    "issuedOn": "2026-11-13",
+    "version": "1.0",
+    "preparedBy": "Prepared by the company's finance lead; unaudited management information"
+  },
+  "periods": {
+    "firstActualMonth": "2025-05",
+    "lastActualMonth": "2026-10",
+    "projectionFirstMonth": "2026-11",
+    "projectionLastMonth": "2027-12"
+  },
+  "bank": {
+    "name": "Thistledown Merchant Bank",
+    "fictitious": true,
+    "accountName": "Halyard Security Ltd - business current account",
+    "accountMasked": "XXXX XXXX 2093",
+    "sortCodeMasked": "XX-XX-XX",
+    "statementFrom": "2026-08-01",
+    "statementTo": "2026-10-31"
+  },
+  "kpiDefinitions": [
+    {
+      "code": "organisations",
+      "label": "NHS trusts, health boards and councils",
+      "unit": "count"
+    },
+    {
+      "code": "staff_enrolled",
+      "label": "Staff enrolled with passkeys",
+      "unit": "count"
+    },
+    {
+      "code": "licensed_seats",
+      "label": "Licensed seats",
+      "unit": "count"
+    },
+    {
+      "code": "arr",
+      "label": "Annual recurring revenue",
+      "unit": "money",
+      "currency": "GBP"
+    },
+    {
+      "code": "phishing_takeovers_enrolled",
+      "label": "Successful phishing takeovers of enrolled accounts",
+      "unit": "count"
+    }
+  ],
+  "openingBalances": {
+    "asOf": "2025-04-30",
+    "cash": 228310,
+    "receivables": 16200,
+    "deferredRevenue": 0,
+    "otherPayablesAndAccruals": 22000,
+    "capitalRaisedToDate": 600000
+  },
+  "customers": [
+    {
+      "id": "HS-C01",
+      "label": "Customer 1",
+      "segment": "NHS acute trust",
+      "goLiveOn": "2024-03-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": null,
+      "contractSignedOn": "2024-02-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C02",
+      "label": "Customer 2",
+      "segment": "Scottish health board",
+      "goLiveOn": "2024-09-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": null,
+      "contractSignedOn": "2024-08-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C03",
+      "label": "Customer 3",
+      "segment": "Metropolitan borough council",
+      "goLiveOn": "2025-01-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": null,
+      "contractSignedOn": "2024-12-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C04",
+      "label": "Customer 4",
+      "segment": "NHS community trust",
+      "goLiveOn": "2025-08-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 8500,
+      "contractSignedOn": "2025-07-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C05",
+      "label": "Customer 5",
+      "segment": "NHS acute trust",
+      "goLiveOn": "2025-11-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 8500,
+      "contractSignedOn": "2025-10-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed",
+      "licensedUsersAtFullRollout": 9800,
+      "rolloutNote": "Licences activate in waves; 9,800 licensed users reached in June 2026",
+      "goLiveSupportWeeks": 6
+    },
+    {
+      "id": "HS-C06",
+      "label": "Customer 6",
+      "segment": "County council",
+      "goLiveOn": "2026-03-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 7000,
+      "contractSignedOn": "2026-02-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C07",
+      "label": "Customer 7",
+      "segment": "NHS mental health trust",
+      "goLiveOn": "2026-05-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 8500,
+      "contractSignedOn": "2026-04-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C08",
+      "label": "Customer 8",
+      "segment": "City council",
+      "goLiveOn": "2026-07-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 7000,
+      "contractSignedOn": "2026-06-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C09",
+      "label": "Customer 9",
+      "segment": "NHS ambulance trust",
+      "goLiveOn": "2026-08-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 8500,
+      "contractSignedOn": "2026-07-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C10",
+      "label": "Customer 10",
+      "segment": "District council",
+      "goLiveOn": "2026-09-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 7000,
+      "contractSignedOn": "2026-08-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    },
+    {
+      "id": "HS-C11",
+      "label": "Customer 11",
+      "segment": "Unitary authority",
+      "goLiveOn": "2026-09-01",
+      "status": "LIVE",
+      "pricePerUserPerYear": 12,
+      "termMonths": 36,
+      "procurement": "Public-sector framework call-off",
+      "deploymentFee": 7000,
+      "contractSignedOn": "2026-08-15",
+      "dataProcessing": "Data processing agreement in place; no clinical data processed"
+    }
+  ],
+  "invoices": [
+    {
+      "number": "HS-INV-0001",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-04-30",
+      "dueOn": "2025-05-30",
+      "paidOn": "2025-05-28",
+      "serviceMonth": "2025-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-04: 8,000 seats at 1.00 per seat per month",
+      "amount": 8000
+    },
+    {
+      "number": "HS-INV-0002",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-04-30",
+      "dueOn": "2025-05-30",
+      "paidOn": "2025-05-28",
+      "serviceMonth": "2025-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-04: 5,600 seats at 1.00 per seat per month",
+      "amount": 5600
+    },
+    {
+      "number": "HS-INV-0003",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-04-30",
+      "dueOn": "2025-05-30",
+      "paidOn": "2025-05-28",
+      "serviceMonth": "2025-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-04: 2,600 seats at 1.00 per seat per month",
+      "amount": 2600
+    },
+    {
+      "number": "HS-INV-0004",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-05-31",
+      "dueOn": "2025-06-30",
+      "paidOn": "2025-06-28",
+      "serviceMonth": "2025-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-05: 8,255 seats at 1.00 per seat per month",
+      "amount": 8255
+    },
+    {
+      "number": "HS-INV-0005",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-05-31",
+      "dueOn": "2025-06-30",
+      "paidOn": "2025-06-28",
+      "serviceMonth": "2025-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-05: 5,818 seats at 1.00 per seat per month",
+      "amount": 5818
+    },
+    {
+      "number": "HS-INV-0006",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-05-31",
+      "dueOn": "2025-06-30",
+      "paidOn": "2025-06-28",
+      "serviceMonth": "2025-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-05: 2,727 seats at 1.00 per seat per month",
+      "amount": 2727
+    },
+    {
+      "number": "HS-INV-0007",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-06-30",
+      "dueOn": "2025-07-30",
+      "paidOn": "2025-07-28",
+      "serviceMonth": "2025-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-06: 8,722 seats at 1.00 per seat per month",
+      "amount": 8722
+    },
+    {
+      "number": "HS-INV-0008",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-06-30",
+      "dueOn": "2025-07-30",
+      "paidOn": "2025-07-28",
+      "serviceMonth": "2025-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-06: 6,218 seats at 1.00 per seat per month",
+      "amount": 6218
+    },
+    {
+      "number": "HS-INV-0009",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-06-30",
+      "dueOn": "2025-07-30",
+      "paidOn": "2025-07-28",
+      "serviceMonth": "2025-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-06: 2,960 seats at 1.00 per seat per month",
+      "amount": 2960
+    },
+    {
+      "number": "HS-INV-0010",
+      "customerId": "HS-C04",
+      "issuedOn": "2025-07-15",
+      "dueOn": "2025-08-14",
+      "paidOn": "2025-08-14",
+      "serviceMonth": "2025-08",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 8500
+    },
+    {
+      "number": "HS-INV-0011",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-07-31",
+      "dueOn": "2025-08-30",
+      "paidOn": "2025-08-28",
+      "serviceMonth": "2025-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-07: 9,358 seats at 1.00 per seat per month",
+      "amount": 9358
+    },
+    {
+      "number": "HS-INV-0012",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-07-31",
+      "dueOn": "2025-08-30",
+      "paidOn": "2025-08-28",
+      "serviceMonth": "2025-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-07: 6,764 seats at 1.00 per seat per month",
+      "amount": 6764
+    },
+    {
+      "number": "HS-INV-0013",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-07-31",
+      "dueOn": "2025-08-30",
+      "paidOn": "2025-08-28",
+      "serviceMonth": "2025-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-07: 3,278 seats at 1.00 per seat per month",
+      "amount": 3278
+    },
+    {
+      "number": "HS-INV-0014",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-08-31",
+      "dueOn": "2025-09-30",
+      "paidOn": "2025-09-28",
+      "serviceMonth": "2025-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-08: 9,443 seats at 1.00 per seat per month",
+      "amount": 9443
+    },
+    {
+      "number": "HS-INV-0015",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-08-31",
+      "dueOn": "2025-09-30",
+      "paidOn": "2025-09-28",
+      "serviceMonth": "2025-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-08: 6,837 seats at 1.00 per seat per month",
+      "amount": 6837
+    },
+    {
+      "number": "HS-INV-0016",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-08-31",
+      "dueOn": "2025-09-30",
+      "paidOn": "2025-09-28",
+      "serviceMonth": "2025-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-08: 3,320 seats at 1.00 per seat per month",
+      "amount": 3320
+    },
+    {
+      "number": "HS-INV-0017",
+      "customerId": "HS-C04",
+      "issuedOn": "2025-08-31",
+      "dueOn": "2025-09-30",
+      "paidOn": "2025-09-28",
+      "serviceMonth": "2025-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-08: 2,000 seats at 1.00 per seat per month",
+      "amount": 2000
+    },
+    {
+      "number": "HS-INV-0018",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-09-30",
+      "dueOn": "2025-10-30",
+      "paidOn": "2025-10-28",
+      "serviceMonth": "2025-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-09: 9,838 seats at 1.00 per seat per month",
+      "amount": 9838
+    },
+    {
+      "number": "HS-INV-0019",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-09-30",
+      "dueOn": "2025-10-30",
+      "paidOn": "2025-10-28",
+      "serviceMonth": "2025-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-09: 7,176 seats at 1.00 per seat per month",
+      "amount": 7176
+    },
+    {
+      "number": "HS-INV-0020",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-09-30",
+      "dueOn": "2025-10-30",
+      "paidOn": "2025-10-28",
+      "serviceMonth": "2025-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-09: 3,517 seats at 1.00 per seat per month",
+      "amount": 3517
+    },
+    {
+      "number": "HS-INV-0021",
+      "customerId": "HS-C04",
+      "issuedOn": "2025-09-30",
+      "dueOn": "2025-10-30",
+      "paidOn": "2025-10-28",
+      "serviceMonth": "2025-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-09: 2,169 seats at 1.00 per seat per month",
+      "amount": 2169
+    },
+    {
+      "number": "HS-INV-0022",
+      "customerId": "HS-C05",
+      "issuedOn": "2025-10-15",
+      "dueOn": "2025-11-14",
+      "paidOn": "2025-11-14",
+      "serviceMonth": "2025-11",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 8500
+    },
+    {
+      "number": "HS-INV-0023",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-10-31",
+      "dueOn": "2025-11-30",
+      "paidOn": "2025-11-28",
+      "serviceMonth": "2025-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-10: 10,305 seats at 1.00 per seat per month",
+      "amount": 10305
+    },
+    {
+      "number": "HS-INV-0024",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-10-31",
+      "dueOn": "2025-11-30",
+      "paidOn": "2025-11-28",
+      "serviceMonth": "2025-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-10: 7,576 seats at 1.00 per seat per month",
+      "amount": 7576
+    },
+    {
+      "number": "HS-INV-0025",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-10-31",
+      "dueOn": "2025-11-30",
+      "paidOn": "2025-11-28",
+      "serviceMonth": "2025-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-10: 3,750 seats at 1.00 per seat per month",
+      "amount": 3750
+    },
+    {
+      "number": "HS-INV-0026",
+      "customerId": "HS-C04",
+      "issuedOn": "2025-10-31",
+      "dueOn": "2025-11-30",
+      "paidOn": "2025-11-28",
+      "serviceMonth": "2025-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-10: 2,369 seats at 1.00 per seat per month",
+      "amount": 2369
+    },
+    {
+      "number": "HS-INV-0027",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-11-30",
+      "dueOn": "2025-12-30",
+      "paidOn": "2025-12-28",
+      "serviceMonth": "2025-11",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-11: 10,449 seats at 1.00 per seat per month",
+      "amount": 10449
+    },
+    {
+      "number": "HS-INV-0028",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-11-30",
+      "dueOn": "2025-12-30",
+      "paidOn": "2025-12-28",
+      "serviceMonth": "2025-11",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-11: 7,699 seats at 1.00 per seat per month",
+      "amount": 7699
+    },
+    {
+      "number": "HS-INV-0029",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-11-30",
+      "dueOn": "2025-12-30",
+      "paidOn": "2025-12-28",
+      "serviceMonth": "2025-11",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-11: 3,822 seats at 1.00 per seat per month",
+      "amount": 3822
+    },
+    {
+      "number": "HS-INV-0030",
+      "customerId": "HS-C04",
+      "issuedOn": "2025-11-30",
+      "dueOn": "2025-12-30",
+      "paidOn": "2025-12-28",
+      "serviceMonth": "2025-11",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-11: 2,430 seats at 1.00 per seat per month",
+      "amount": 2430
+    },
+    {
+      "number": "HS-INV-0031",
+      "customerId": "HS-C05",
+      "issuedOn": "2025-11-30",
+      "dueOn": "2025-12-30",
+      "paidOn": "2025-12-28",
+      "serviceMonth": "2025-11",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-11: 2,600 seats at 1.00 per seat per month",
+      "amount": 2600
+    },
+    {
+      "number": "HS-INV-0032",
+      "customerId": "HS-C01",
+      "issuedOn": "2025-12-31",
+      "dueOn": "2026-01-30",
+      "paidOn": "2026-01-28",
+      "serviceMonth": "2025-12",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-12: 10,748 seats at 1.00 per seat per month",
+      "amount": 10748
+    },
+    {
+      "number": "HS-INV-0033",
+      "customerId": "HS-C02",
+      "issuedOn": "2025-12-31",
+      "dueOn": "2026-01-30",
+      "paidOn": "2026-01-28",
+      "serviceMonth": "2025-12",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-12: 7,955 seats at 1.00 per seat per month",
+      "amount": 7955
+    },
+    {
+      "number": "HS-INV-0034",
+      "customerId": "HS-C03",
+      "issuedOn": "2025-12-31",
+      "dueOn": "2026-01-30",
+      "paidOn": "2026-01-28",
+      "serviceMonth": "2025-12",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-12: 3,971 seats at 1.00 per seat per month",
+      "amount": 3971
+    },
+    {
+      "number": "HS-INV-0035",
+      "customerId": "HS-C04",
+      "issuedOn": "2025-12-31",
+      "dueOn": "2026-01-30",
+      "paidOn": "2026-01-28",
+      "serviceMonth": "2025-12",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-12: 2,558 seats at 1.00 per seat per month",
+      "amount": 2558
+    },
+    {
+      "number": "HS-INV-0036",
+      "customerId": "HS-C05",
+      "issuedOn": "2025-12-31",
+      "dueOn": "2026-01-30",
+      "paidOn": "2026-01-28",
+      "serviceMonth": "2025-12",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2025-12: 4,000 seats at 1.00 per seat per month",
+      "amount": 4000
+    },
+    {
+      "number": "HS-INV-0037",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-01-31",
+      "dueOn": "2026-03-02",
+      "paidOn": "2026-02-28",
+      "serviceMonth": "2026-01",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-01: 11,311 seats at 1.00 per seat per month",
+      "amount": 11311
+    },
+    {
+      "number": "HS-INV-0038",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-01-31",
+      "dueOn": "2026-03-02",
+      "paidOn": "2026-02-28",
+      "serviceMonth": "2026-01",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-01: 8,438 seats at 1.00 per seat per month",
+      "amount": 8438
+    },
+    {
+      "number": "HS-INV-0039",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-01-31",
+      "dueOn": "2026-03-02",
+      "paidOn": "2026-02-28",
+      "serviceMonth": "2026-01",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-01: 4,252 seats at 1.00 per seat per month",
+      "amount": 4252
+    },
+    {
+      "number": "HS-INV-0040",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-01-31",
+      "dueOn": "2026-03-02",
+      "paidOn": "2026-02-28",
+      "serviceMonth": "2026-01",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-01: 2,799 seats at 1.00 per seat per month",
+      "amount": 2799
+    },
+    {
+      "number": "HS-INV-0041",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-01-31",
+      "dueOn": "2026-03-02",
+      "paidOn": "2026-02-28",
+      "serviceMonth": "2026-01",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-01: 5,500 seats at 1.00 per seat per month",
+      "amount": 5500
+    },
+    {
+      "number": "HS-INV-0042",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-02-15",
+      "dueOn": "2026-03-17",
+      "paidOn": "2026-03-17",
+      "serviceMonth": "2026-03",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 7000
+    },
+    {
+      "number": "HS-INV-0043",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-02-28",
+      "dueOn": "2026-03-30",
+      "paidOn": "2026-03-28",
+      "serviceMonth": "2026-02",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-02: 12,030 seats at 1.00 per seat per month",
+      "amount": 12030
+    },
+    {
+      "number": "HS-INV-0044",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-02-28",
+      "dueOn": "2026-03-30",
+      "paidOn": "2026-03-28",
+      "serviceMonth": "2026-02",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-02: 9,055 seats at 1.00 per seat per month",
+      "amount": 9055
+    },
+    {
+      "number": "HS-INV-0045",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-02-28",
+      "dueOn": "2026-03-30",
+      "paidOn": "2026-03-28",
+      "serviceMonth": "2026-02",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-02: 4,612 seats at 1.00 per seat per month",
+      "amount": 4612
+    },
+    {
+      "number": "HS-INV-0046",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-02-28",
+      "dueOn": "2026-03-30",
+      "paidOn": "2026-03-28",
+      "serviceMonth": "2026-02",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-02: 3,107 seats at 1.00 per seat per month",
+      "amount": 3107
+    },
+    {
+      "number": "HS-INV-0047",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-02-28",
+      "dueOn": "2026-03-30",
+      "paidOn": "2026-03-28",
+      "serviceMonth": "2026-02",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-02: 6,800 seats at 1.00 per seat per month",
+      "amount": 6800
+    },
+    {
+      "number": "HS-INV-0048",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-03-31",
+      "dueOn": "2026-04-30",
+      "paidOn": "2026-04-28",
+      "serviceMonth": "2026-03",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-03: 12,280 seats at 1.00 per seat per month",
+      "amount": 12280
+    },
+    {
+      "number": "HS-INV-0049",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-03-31",
+      "dueOn": "2026-04-30",
+      "paidOn": "2026-04-28",
+      "serviceMonth": "2026-03",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-03: 9,269 seats at 1.00 per seat per month",
+      "amount": 9269
+    },
+    {
+      "number": "HS-INV-0050",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-03-31",
+      "dueOn": "2026-04-30",
+      "paidOn": "2026-04-28",
+      "serviceMonth": "2026-03",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-03: 4,737 seats at 1.00 per seat per month",
+      "amount": 4737
+    },
+    {
+      "number": "HS-INV-0051",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-03-31",
+      "dueOn": "2026-04-30",
+      "paidOn": "2026-04-28",
+      "serviceMonth": "2026-03",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-03: 3,214 seats at 1.00 per seat per month",
+      "amount": 3214
+    },
+    {
+      "number": "HS-INV-0052",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-03-31",
+      "dueOn": "2026-04-30",
+      "paidOn": "2026-04-28",
+      "serviceMonth": "2026-03",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-03: 7,900 seats at 1.00 per seat per month",
+      "amount": 7900
+    },
+    {
+      "number": "HS-INV-0053",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-03-31",
+      "dueOn": "2026-04-30",
+      "paidOn": "2026-04-28",
+      "serviceMonth": "2026-03",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-03: 2,400 seats at 1.00 per seat per month",
+      "amount": 2400
+    },
+    {
+      "number": "HS-INV-0054",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-04-15",
+      "dueOn": "2026-05-15",
+      "paidOn": "2026-05-15",
+      "serviceMonth": "2026-05",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 8500
+    },
+    {
+      "number": "HS-INV-0055",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-04-30",
+      "dueOn": "2026-05-30",
+      "paidOn": "2026-05-28",
+      "serviceMonth": "2026-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-04: 13,074 seats at 1.00 per seat per month",
+      "amount": 13074
+    },
+    {
+      "number": "HS-INV-0056",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-04-30",
+      "dueOn": "2026-05-30",
+      "paidOn": "2026-05-28",
+      "serviceMonth": "2026-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-04: 9,950 seats at 1.00 per seat per month",
+      "amount": 9950
+    },
+    {
+      "number": "HS-INV-0057",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-04-30",
+      "dueOn": "2026-05-30",
+      "paidOn": "2026-05-28",
+      "serviceMonth": "2026-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-04: 5,134 seats at 1.00 per seat per month",
+      "amount": 5134
+    },
+    {
+      "number": "HS-INV-0058",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-04-30",
+      "dueOn": "2026-05-30",
+      "paidOn": "2026-05-28",
+      "serviceMonth": "2026-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-04: 3,554 seats at 1.00 per seat per month",
+      "amount": 3554
+    },
+    {
+      "number": "HS-INV-0059",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-04-30",
+      "dueOn": "2026-05-30",
+      "paidOn": "2026-05-28",
+      "serviceMonth": "2026-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-04: 8,800 seats at 1.00 per seat per month",
+      "amount": 8800
+    },
+    {
+      "number": "HS-INV-0060",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-04-30",
+      "dueOn": "2026-05-30",
+      "paidOn": "2026-05-28",
+      "serviceMonth": "2026-04",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-04: 2,854 seats at 1.00 per seat per month",
+      "amount": 2854
+    },
+    {
+      "number": "HS-INV-0061",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 13,531 seats at 1.00 per seat per month",
+      "amount": 13531
+    },
+    {
+      "number": "HS-INV-0062",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 10,342 seats at 1.00 per seat per month",
+      "amount": 10342
+    },
+    {
+      "number": "HS-INV-0063",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 5,362 seats at 1.00 per seat per month",
+      "amount": 5362
+    },
+    {
+      "number": "HS-INV-0064",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 3,750 seats at 1.00 per seat per month",
+      "amount": 3750
+    },
+    {
+      "number": "HS-INV-0065",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 9,400 seats at 1.00 per seat per month",
+      "amount": 9400
+    },
+    {
+      "number": "HS-INV-0066",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 3,115 seats at 1.00 per seat per month",
+      "amount": 3115
+    },
+    {
+      "number": "HS-INV-0067",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-05-31",
+      "dueOn": "2026-06-30",
+      "paidOn": "2026-06-28",
+      "serviceMonth": "2026-05",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-05: 2,500 seats at 1.00 per seat per month",
+      "amount": 2500
+    },
+    {
+      "number": "HS-INV-0068",
+      "customerId": "HS-C08",
+      "issuedOn": "2026-06-15",
+      "dueOn": "2026-07-15",
+      "paidOn": "2026-07-15",
+      "serviceMonth": "2026-07",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 7000
+    },
+    {
+      "number": "HS-INV-0069",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 14,698 seats at 1.00 per seat per month",
+      "amount": 14698
+    },
+    {
+      "number": "HS-INV-0070",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 11,343 seats at 1.00 per seat per month",
+      "amount": 11343
+    },
+    {
+      "number": "HS-INV-0071",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 5,946 seats at 1.00 per seat per month",
+      "amount": 5946
+    },
+    {
+      "number": "HS-INV-0072",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 4,250 seats at 1.00 per seat per month",
+      "amount": 4250
+    },
+    {
+      "number": "HS-INV-0073",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 9,800 seats at 1.00 per seat per month",
+      "amount": 9800
+    },
+    {
+      "number": "HS-INV-0074",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 3,782 seats at 1.00 per seat per month",
+      "amount": 3782
+    },
+    {
+      "number": "HS-INV-0075",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-06-30",
+      "dueOn": "2026-07-30",
+      "paidOn": "2026-07-28",
+      "serviceMonth": "2026-06",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-06: 3,000 seats at 1.00 per seat per month",
+      "amount": 3000
+    },
+    {
+      "number": "HS-INV-0076",
+      "customerId": "HS-C09",
+      "issuedOn": "2026-07-15",
+      "dueOn": "2026-08-14",
+      "paidOn": "2026-08-14",
+      "serviceMonth": "2026-08",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 8500
+    },
+    {
+      "number": "HS-INV-0077",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 15,457 seats at 1.00 per seat per month",
+      "amount": 15457
+    },
+    {
+      "number": "HS-INV-0078",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 11,994 seats at 1.00 per seat per month",
+      "amount": 11994
+    },
+    {
+      "number": "HS-INV-0079",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 6,326 seats at 1.00 per seat per month",
+      "amount": 6326
+    },
+    {
+      "number": "HS-INV-0080",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 4,575 seats at 1.00 per seat per month",
+      "amount": 4575
+    },
+    {
+      "number": "HS-INV-0081",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 9,800 seats at 1.00 per seat per month",
+      "amount": 9800
+    },
+    {
+      "number": "HS-INV-0082",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 4,216 seats at 1.00 per seat per month",
+      "amount": 4216
+    },
+    {
+      "number": "HS-INV-0083",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 3,325 seats at 1.00 per seat per month",
+      "amount": 3325
+    },
+    {
+      "number": "HS-INV-0084",
+      "customerId": "HS-C08",
+      "issuedOn": "2026-07-31",
+      "dueOn": "2026-08-30",
+      "paidOn": "2026-08-28",
+      "serviceMonth": "2026-07",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-07: 2,600 seats at 1.00 per seat per month",
+      "amount": 2600
+    },
+    {
+      "number": "HS-INV-0085",
+      "customerId": "HS-C10",
+      "issuedOn": "2026-08-15",
+      "dueOn": "2026-09-14",
+      "paidOn": "2026-09-14",
+      "serviceMonth": "2026-09",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 7000
+    },
+    {
+      "number": "HS-INV-0086",
+      "customerId": "HS-C11",
+      "issuedOn": "2026-08-15",
+      "dueOn": "2026-09-14",
+      "paidOn": "2026-09-14",
+      "serviceMonth": "2026-09",
+      "kind": "DEPLOYMENT",
+      "description": "Deployment and go-live support fee (recognised at go-live)",
+      "amount": 7000
+    },
+    {
+      "number": "HS-INV-0087",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 16,179 seats at 1.00 per seat per month",
+      "amount": 16179
+    },
+    {
+      "number": "HS-INV-0088",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 12,612 seats at 1.00 per seat per month",
+      "amount": 12612
+    },
+    {
+      "number": "HS-INV-0089",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 6,687 seats at 1.00 per seat per month",
+      "amount": 6687
+    },
+    {
+      "number": "HS-INV-0090",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 4,884 seats at 1.00 per seat per month",
+      "amount": 4884
+    },
+    {
+      "number": "HS-INV-0091",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 9,800 seats at 1.00 per seat per month",
+      "amount": 9800
+    },
+    {
+      "number": "HS-INV-0092",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 4,628 seats at 1.00 per seat per month",
+      "amount": 4628
+    },
+    {
+      "number": "HS-INV-0093",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 3,634 seats at 1.00 per seat per month",
+      "amount": 3634
+    },
+    {
+      "number": "HS-INV-0094",
+      "customerId": "HS-C08",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 2,909 seats at 1.00 per seat per month",
+      "amount": 2909
+    },
+    {
+      "number": "HS-INV-0095",
+      "customerId": "HS-C09",
+      "issuedOn": "2026-08-31",
+      "dueOn": "2026-09-30",
+      "paidOn": "2026-09-28",
+      "serviceMonth": "2026-08",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-08: 3,000 seats at 1.00 per seat per month",
+      "amount": 3000
+    },
+    {
+      "number": "HS-INV-0096",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 16,763 seats at 1.00 per seat per month",
+      "amount": 16763
+    },
+    {
+      "number": "HS-INV-0097",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 13,112 seats at 1.00 per seat per month",
+      "amount": 13112
+    },
+    {
+      "number": "HS-INV-0098",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 6,979 seats at 1.00 per seat per month",
+      "amount": 6979
+    },
+    {
+      "number": "HS-INV-0099",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 5,134 seats at 1.00 per seat per month",
+      "amount": 5134
+    },
+    {
+      "number": "HS-INV-0100",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 9,800 seats at 1.00 per seat per month",
+      "amount": 9800
+    },
+    {
+      "number": "HS-INV-0101",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 4,961 seats at 1.00 per seat per month",
+      "amount": 4961
+    },
+    {
+      "number": "HS-INV-0102",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 3,884 seats at 1.00 per seat per month",
+      "amount": 3884
+    },
+    {
+      "number": "HS-INV-0103",
+      "customerId": "HS-C08",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 3,159 seats at 1.00 per seat per month",
+      "amount": 3159
+    },
+    {
+      "number": "HS-INV-0104",
+      "customerId": "HS-C09",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 3,208 seats at 1.00 per seat per month",
+      "amount": 3208
+    },
+    {
+      "number": "HS-INV-0105",
+      "customerId": "HS-C10",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 1,800 seats at 1.00 per seat per month",
+      "amount": 1800
+    },
+    {
+      "number": "HS-INV-0106",
+      "customerId": "HS-C11",
+      "issuedOn": "2026-09-30",
+      "dueOn": "2026-10-30",
+      "paidOn": "2026-10-28",
+      "serviceMonth": "2026-09",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-09: 2,200 seats at 1.00 per seat per month",
+      "amount": 2200
+    },
+    {
+      "number": "HS-INV-0107",
+      "customerId": "HS-C01",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 17,157 seats at 1.00 per seat per month",
+      "amount": 17157
+    },
+    {
+      "number": "HS-INV-0108",
+      "customerId": "HS-C02",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 13,450 seats at 1.00 per seat per month",
+      "amount": 13450
+    },
+    {
+      "number": "HS-INV-0109",
+      "customerId": "HS-C03",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 7,176 seats at 1.00 per seat per month",
+      "amount": 7176
+    },
+    {
+      "number": "HS-INV-0110",
+      "customerId": "HS-C04",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 5,303 seats at 1.00 per seat per month",
+      "amount": 5303
+    },
+    {
+      "number": "HS-INV-0111",
+      "customerId": "HS-C05",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 9,800 seats at 1.00 per seat per month",
+      "amount": 9800
+    },
+    {
+      "number": "HS-INV-0112",
+      "customerId": "HS-C06",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 5,186 seats at 1.00 per seat per month",
+      "amount": 5186
+    },
+    {
+      "number": "HS-INV-0113",
+      "customerId": "HS-C07",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 4,053 seats at 1.00 per seat per month",
+      "amount": 4053
+    },
+    {
+      "number": "HS-INV-0114",
+      "customerId": "HS-C08",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 3,328 seats at 1.00 per seat per month",
+      "amount": 3328
+    },
+    {
+      "number": "HS-INV-0115",
+      "customerId": "HS-C09",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 3,349 seats at 1.00 per seat per month",
+      "amount": 3349
+    },
+    {
+      "number": "HS-INV-0116",
+      "customerId": "HS-C10",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 1,885 seats at 1.00 per seat per month",
+      "amount": 1885
+    },
+    {
+      "number": "HS-INV-0117",
+      "customerId": "HS-C11",
+      "issuedOn": "2026-10-31",
+      "dueOn": "2026-11-30",
+      "paidOn": "2026-11-28",
+      "serviceMonth": "2026-10",
+      "kind": "LICENCE",
+      "description": "Passkey licences, 2026-10: 2,313 seats at 1.00 per seat per month",
+      "amount": 2313
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-05",
+      "revenue": {
+        "lines": {
+          "licences": 16800,
+          "deploymentFees": 0
+        },
+        "total": 16800
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hosting": 1680,
+          "authenticatorServices": 840,
+          "supportTooling": 504,
+          "deploymentTeamPayroll": 9600
+        },
+        "total": 12624
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 30000,
+          "payrollSales": 5600,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 57900
+      },
+      "headcount": {
+        "engineering": 5,
+        "deployment": 2,
+        "sales": 1,
+        "operations": 1,
+        "total": 9
+      },
+      "kpis": {
+        "organisations": 3,
+        "licensedSeats": 16800,
+        "arr": 201600,
+        "staffEnrolled": 9800,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 8255,
+          "HS-C02": 5818,
+          "HS-C03": 2727
+        }
+      },
+      "cash": {
+        "opening": 228310,
+        "receipts": 16200,
+        "fundingReceived": 0,
+        "payments": 70524,
+        "closing": 173986
+      },
+      "receivablesClosing": 16800,
+      "deferredRevenueClosing": 0,
+      "netBurn": 54324,
+      "runwayMonths": 3.2,
+      "grossProfit": 4176,
+      "netResult": -53724
+    },
+    {
+      "month": "2025-06",
+      "revenue": {
+        "lines": {
+          "licences": 17900,
+          "deploymentFees": 0
+        },
+        "total": 17900
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hosting": 1790,
+          "authenticatorServices": 895,
+          "supportTooling": 537,
+          "deploymentTeamPayroll": 9600
+        },
+        "total": 12822
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 30000,
+          "payrollSales": 5600,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 57900
+      },
+      "headcount": {
+        "engineering": 5,
+        "deployment": 2,
+        "sales": 1,
+        "operations": 1,
+        "total": 9
+      },
+      "kpis": {
+        "organisations": 3,
+        "licensedSeats": 17900,
+        "arr": 214800,
+        "staffEnrolled": 11000,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 8722,
+          "HS-C02": 6218,
+          "HS-C03": 2960
+        }
+      },
+      "cash": {
+        "opening": 173986,
+        "receipts": 16800,
+        "fundingReceived": 0,
+        "payments": 70722,
+        "closing": 120064
+      },
+      "receivablesClosing": 17900,
+      "deferredRevenueClosing": 0,
+      "netBurn": 53922,
+      "runwayMonths": 2.2,
+      "grossProfit": 5078,
+      "netResult": -52822
+    },
+    {
+      "month": "2025-07",
+      "revenue": {
+        "lines": {
+          "licences": 19400,
+          "deploymentFees": 0
+        },
+        "total": 19400
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 1940,
+          "authenticatorServices": 970,
+          "supportTooling": 582,
+          "deploymentTeamPayroll": 14400
+        },
+        "total": 17892
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 30000,
+          "payrollSales": 5600,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 57900
+      },
+      "headcount": {
+        "engineering": 5,
+        "deployment": 3,
+        "sales": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "organisations": 3,
+        "licensedSeats": 19400,
+        "arr": 232800,
+        "staffEnrolled": 12600,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 9358,
+          "HS-C02": 6764,
+          "HS-C03": 3278
+        }
+      },
+      "cash": {
+        "opening": 120064,
+        "receipts": 17900,
+        "fundingReceived": 1500000,
+        "payments": 75792,
+        "closing": 1562172
+      },
+      "receivablesClosing": 27900,
+      "deferredRevenueClosing": 8500,
+      "netBurn": 57892,
+      "runwayMonths": 27.0,
+      "grossProfit": 1508,
+      "netResult": -56392
+    },
+    {
+      "month": "2025-08",
+      "revenue": {
+        "lines": {
+          "licences": 21600,
+          "deploymentFees": 8500
+        },
+        "total": 30100
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 2160,
+          "authenticatorServices": 1080,
+          "supportTooling": 648,
+          "deploymentTeamPayroll": 14400
+        },
+        "total": 18288
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 36000,
+          "payrollSales": 11200,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 69500
+      },
+      "headcount": {
+        "engineering": 6,
+        "deployment": 3,
+        "sales": 2,
+        "operations": 1,
+        "total": 12
+      },
+      "kpis": {
+        "organisations": 4,
+        "licensedSeats": 21600,
+        "arr": 259200,
+        "staffEnrolled": 14500,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 9443,
+          "HS-C02": 6837,
+          "HS-C03": 3320,
+          "HS-C04": 2000
+        }
+      },
+      "cash": {
+        "opening": 1562172,
+        "receipts": 27900,
+        "fundingReceived": 0,
+        "payments": 87788,
+        "closing": 1502284
+      },
+      "receivablesClosing": 21600,
+      "deferredRevenueClosing": 0,
+      "netBurn": 59888,
+      "runwayMonths": 25.1,
+      "grossProfit": 11812,
+      "netResult": -57688
+    },
+    {
+      "month": "2025-09",
+      "revenue": {
+        "lines": {
+          "licences": 22700,
+          "deploymentFees": 0
+        },
+        "total": 22700
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hosting": 2270,
+          "authenticatorServices": 1135,
+          "supportTooling": 681,
+          "deploymentTeamPayroll": 14400
+        },
+        "total": 18486
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 36000,
+          "payrollSales": 11200,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 69500
+      },
+      "headcount": {
+        "engineering": 6,
+        "deployment": 3,
+        "sales": 2,
+        "operations": 1,
+        "total": 12
+      },
+      "kpis": {
+        "organisations": 4,
+        "licensedSeats": 22700,
+        "arr": 272400,
+        "staffEnrolled": 15800,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 9838,
+          "HS-C02": 7176,
+          "HS-C03": 3517,
+          "HS-C04": 2169
+        }
+      },
+      "cash": {
+        "opening": 1502284,
+        "receipts": 21600,
+        "fundingReceived": 0,
+        "payments": 87986,
+        "closing": 1435898
+      },
+      "receivablesClosing": 22700,
+      "deferredRevenueClosing": 0,
+      "netBurn": 66386,
+      "runwayMonths": 21.6,
+      "grossProfit": 4214,
+      "netResult": -65286
+    },
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "licences": 24000,
+          "deploymentFees": 0
+        },
+        "total": 24000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 2400,
+          "authenticatorServices": 1200,
+          "supportTooling": 720,
+          "deploymentTeamPayroll": 19200
+        },
+        "total": 23520
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 36000,
+          "payrollSales": 11200,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 69500
+      },
+      "headcount": {
+        "engineering": 6,
+        "deployment": 4,
+        "sales": 2,
+        "operations": 1,
+        "total": 13
+      },
+      "kpis": {
+        "organisations": 4,
+        "licensedSeats": 24000,
+        "arr": 288000,
+        "staffEnrolled": 17000,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 10305,
+          "HS-C02": 7576,
+          "HS-C03": 3750,
+          "HS-C04": 2369
+        }
+      },
+      "cash": {
+        "opening": 1435898,
+        "receipts": 22700,
+        "fundingReceived": 0,
+        "payments": 93020,
+        "closing": 1365578
+      },
+      "receivablesClosing": 32500,
+      "deferredRevenueClosing": 8500,
+      "netBurn": 70320,
+      "runwayMonths": 19.4,
+      "grossProfit": 480,
+      "netResult": -69020
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "licences": 27000,
+          "deploymentFees": 8500
+        },
+        "total": 35500
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 2700,
+          "authenticatorServices": 1350,
+          "supportTooling": 810,
+          "deploymentTeamPayroll": 19200
+        },
+        "total": 24060
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 42000,
+          "payrollSales": 11200,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 75500
+      },
+      "headcount": {
+        "engineering": 7,
+        "deployment": 4,
+        "sales": 2,
+        "operations": 1,
+        "total": 14
+      },
+      "kpis": {
+        "organisations": 5,
+        "licensedSeats": 27000,
+        "arr": 324000,
+        "staffEnrolled": 19200,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 10449,
+          "HS-C02": 7699,
+          "HS-C03": 3822,
+          "HS-C04": 2430,
+          "HS-C05": 2600
+        }
+      },
+      "cash": {
+        "opening": 1365578,
+        "receipts": 32500,
+        "fundingReceived": 0,
+        "payments": 99560,
+        "closing": 1298518
+      },
+      "receivablesClosing": 27000,
+      "deferredRevenueClosing": 0,
+      "netBurn": 67060,
+      "runwayMonths": 19.4,
+      "grossProfit": 11440,
+      "netResult": -64060
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "licences": 29232,
+          "deploymentFees": 0
+        },
+        "total": 29232
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hosting": 2923,
+          "authenticatorServices": 1462,
+          "supportTooling": 877,
+          "deploymentTeamPayroll": 19200
+        },
+        "total": 24462
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 42000,
+          "payrollSales": 11200,
+          "payrollOperations": 4800,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 75500
+      },
+      "headcount": {
+        "engineering": 7,
+        "deployment": 4,
+        "sales": 2,
+        "operations": 1,
+        "total": 14
+      },
+      "kpis": {
+        "organisations": 5,
+        "licensedSeats": 29232,
+        "arr": 350784,
+        "staffEnrolled": 21634,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 10748,
+          "HS-C02": 7955,
+          "HS-C03": 3971,
+          "HS-C04": 2558,
+          "HS-C05": 4000
+        }
+      },
+      "cash": {
+        "opening": 1298518,
+        "receipts": 27000,
+        "fundingReceived": 0,
+        "payments": 99962,
+        "closing": 1225556
+      },
+      "receivablesClosing": 29232,
+      "deferredRevenueClosing": 0,
+      "netBurn": 72962,
+      "runwayMonths": 16.8,
+      "grossProfit": 4770,
+      "netResult": -70730
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "licences": 32300,
+          "deploymentFees": 0
+        },
+        "total": 32300
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hosting": 3230,
+          "authenticatorServices": 1615,
+          "supportTooling": 969,
+          "deploymentTeamPayroll": 24000
+        },
+        "total": 29814
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 42000,
+          "payrollSales": 11200,
+          "payrollOperations": 9600,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 80300
+      },
+      "headcount": {
+        "engineering": 7,
+        "deployment": 5,
+        "sales": 2,
+        "operations": 2,
+        "total": 16
+      },
+      "kpis": {
+        "organisations": 5,
+        "licensedSeats": 32300,
+        "arr": 387600,
+        "staffEnrolled": 24400,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 11311,
+          "HS-C02": 8438,
+          "HS-C03": 4252,
+          "HS-C04": 2799,
+          "HS-C05": 5500
+        }
+      },
+      "cash": {
+        "opening": 1225556,
+        "receipts": 29232,
+        "fundingReceived": 0,
+        "payments": 110114,
+        "closing": 1144674
+      },
+      "receivablesClosing": 32300,
+      "deferredRevenueClosing": 0,
+      "netBurn": 80882,
+      "runwayMonths": 14.2,
+      "grossProfit": 2486,
+      "netResult": -77814
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "licences": 35604,
+          "deploymentFees": 0
+        },
+        "total": 35604
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -7000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 3560,
+          "authenticatorServices": 1780,
+          "supportTooling": 1068,
+          "deploymentTeamPayroll": 24000
+        },
+        "total": 30408
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 42000,
+          "payrollSales": 11200,
+          "payrollOperations": 9600,
+          "offices": 4200,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 2400,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 80300
+      },
+      "headcount": {
+        "engineering": 7,
+        "deployment": 5,
+        "sales": 2,
+        "operations": 2,
+        "total": 16
+      },
+      "kpis": {
+        "organisations": 5,
+        "licensedSeats": 35604,
+        "arr": 427248,
+        "staffEnrolled": 27530,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 12030,
+          "HS-C02": 9055,
+          "HS-C03": 4612,
+          "HS-C04": 3107,
+          "HS-C05": 6800
+        }
+      },
+      "cash": {
+        "opening": 1144674,
+        "receipts": 32300,
+        "fundingReceived": 0,
+        "payments": 110708,
+        "closing": 1066266
+      },
+      "receivablesClosing": 42604,
+      "deferredRevenueClosing": 7000,
+      "netBurn": 78408,
+      "runwayMonths": 13.6,
+      "grossProfit": 5196,
+      "netResult": -75104
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "licences": 39800,
+          "deploymentFees": 7000
+        },
+        "total": 46800
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 7000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 3980,
+          "authenticatorServices": 1990,
+          "supportTooling": 1194,
+          "deploymentTeamPayroll": 24000
+        },
+        "total": 31164
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 48000,
+          "payrollSales": 11200,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 90900
+      },
+      "headcount": {
+        "engineering": 8,
+        "deployment": 5,
+        "sales": 2,
+        "operations": 2,
+        "total": 17
+      },
+      "kpis": {
+        "organisations": 6,
+        "licensedSeats": 39800,
+        "arr": 477600,
+        "staffEnrolled": 31000,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 12280,
+          "HS-C02": 9269,
+          "HS-C03": 4737,
+          "HS-C04": 3214,
+          "HS-C05": 7900,
+          "HS-C06": 2400
+        }
+      },
+      "cash": {
+        "opening": 1066266,
+        "receipts": 42604,
+        "fundingReceived": 0,
+        "payments": 122064,
+        "closing": 986806
+      },
+      "receivablesClosing": 39800,
+      "deferredRevenueClosing": 0,
+      "netBurn": 79460,
+      "runwayMonths": 12.4,
+      "grossProfit": 15636,
+      "netResult": -75264
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "licences": 43366,
+          "deploymentFees": 0
+        },
+        "total": 43366
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 4337,
+          "authenticatorServices": 2168,
+          "supportTooling": 1301,
+          "deploymentTeamPayroll": 28800
+        },
+        "total": 36606
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 48000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 96500
+      },
+      "headcount": {
+        "engineering": 8,
+        "deployment": 6,
+        "sales": 3,
+        "operations": 2,
+        "total": 19
+      },
+      "kpis": {
+        "organisations": 6,
+        "licensedSeats": 43366,
+        "arr": 520392,
+        "staffEnrolled": 35034,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 13074,
+          "HS-C02": 9950,
+          "HS-C03": 5134,
+          "HS-C04": 3554,
+          "HS-C05": 8800,
+          "HS-C06": 2854
+        }
+      },
+      "cash": {
+        "opening": 986806,
+        "receipts": 39800,
+        "fundingReceived": 0,
+        "payments": 133106,
+        "closing": 893500
+      },
+      "receivablesClosing": 51866,
+      "deferredRevenueClosing": 8500,
+      "netBurn": 93306,
+      "runwayMonths": 9.6,
+      "grossProfit": 6760,
+      "netResult": -89740
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "licences": 48000,
+          "deploymentFees": 8500
+        },
+        "total": 56500
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 4800,
+          "authenticatorServices": 2400,
+          "supportTooling": 1440,
+          "deploymentTeamPayroll": 28800
+        },
+        "total": 37440
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 48000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 96500
+      },
+      "headcount": {
+        "engineering": 8,
+        "deployment": 6,
+        "sales": 3,
+        "operations": 2,
+        "total": 19
+      },
+      "kpis": {
+        "organisations": 7,
+        "licensedSeats": 48000,
+        "arr": 576000,
+        "staffEnrolled": 39600,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 13531,
+          "HS-C02": 10342,
+          "HS-C03": 5362,
+          "HS-C04": 3750,
+          "HS-C05": 9400,
+          "HS-C06": 3115,
+          "HS-C07": 2500
+        }
+      },
+      "cash": {
+        "opening": 893500,
+        "receipts": 51866,
+        "fundingReceived": 0,
+        "payments": 133940,
+        "closing": 811426
+      },
+      "receivablesClosing": 48000,
+      "deferredRevenueClosing": 0,
+      "netBurn": 82074,
+      "runwayMonths": 9.9,
+      "grossProfit": 19060,
+      "netResult": -77440
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "licences": 52819,
+          "deploymentFees": 0
+        },
+        "total": 52819
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -7000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 5282,
+          "authenticatorServices": 2641,
+          "supportTooling": 1585,
+          "deploymentTeamPayroll": 28800
+        },
+        "total": 38308
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 54000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 102500
+      },
+      "headcount": {
+        "engineering": 9,
+        "deployment": 6,
+        "sales": 3,
+        "operations": 2,
+        "total": 20
+      },
+      "kpis": {
+        "organisations": 7,
+        "licensedSeats": 52819,
+        "arr": 633828,
+        "staffEnrolled": 44582,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 14698,
+          "HS-C02": 11343,
+          "HS-C03": 5946,
+          "HS-C04": 4250,
+          "HS-C05": 9800,
+          "HS-C06": 3782,
+          "HS-C07": 3000
+        }
+      },
+      "cash": {
+        "opening": 811426,
+        "receipts": 48000,
+        "fundingReceived": 0,
+        "payments": 140808,
+        "closing": 718618
+      },
+      "receivablesClosing": 59819,
+      "deferredRevenueClosing": 7000,
+      "netBurn": 92808,
+      "runwayMonths": 7.7,
+      "grossProfit": 14511,
+      "netResult": -87989
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "licences": 58293,
+          "deploymentFees": 7000
+        },
+        "total": 65293
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -8500
+        },
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 7000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 5829,
+          "authenticatorServices": 2915,
+          "supportTooling": 1749,
+          "deploymentTeamPayroll": 33600
+        },
+        "total": 44093
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 54000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 102500
+      },
+      "headcount": {
+        "engineering": 9,
+        "deployment": 7,
+        "sales": 3,
+        "operations": 2,
+        "total": 21
+      },
+      "kpis": {
+        "organisations": 8,
+        "licensedSeats": 58293,
+        "arr": 699516,
+        "staffEnrolled": 50292,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 15457,
+          "HS-C02": 11994,
+          "HS-C03": 6326,
+          "HS-C04": 4575,
+          "HS-C05": 9800,
+          "HS-C06": 4216,
+          "HS-C07": 3325,
+          "HS-C08": 2600
+        }
+      },
+      "cash": {
+        "opening": 718618,
+        "receipts": 59819,
+        "fundingReceived": 0,
+        "payments": 146593,
+        "closing": 631844
+      },
+      "receivablesClosing": 66793,
+      "deferredRevenueClosing": 8500,
+      "netBurn": 86774,
+      "runwayMonths": 7.3,
+      "grossProfit": 21200,
+      "netResult": -81300
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "licences": 64333,
+          "deploymentFees": 8500
+        },
+        "total": 72833
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees invoiced at contract signature, recognised at go-live (deferred)",
+          "amount": -14000
+        },
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 8500
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 6433,
+          "authenticatorServices": 3217,
+          "supportTooling": 1930,
+          "deploymentTeamPayroll": 33600
+        },
+        "total": 45180
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 54000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 102500
+      },
+      "headcount": {
+        "engineering": 9,
+        "deployment": 7,
+        "sales": 3,
+        "operations": 2,
+        "total": 21
+      },
+      "kpis": {
+        "organisations": 9,
+        "licensedSeats": 64333,
+        "arr": 771996,
+        "staffEnrolled": 56734,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 16179,
+          "HS-C02": 12612,
+          "HS-C03": 6687,
+          "HS-C04": 4884,
+          "HS-C05": 9800,
+          "HS-C06": 4628,
+          "HS-C07": 3634,
+          "HS-C08": 2909,
+          "HS-C09": 3000
+        }
+      },
+      "cash": {
+        "opening": 631844,
+        "receipts": 66793,
+        "fundingReceived": 0,
+        "payments": 147680,
+        "closing": 550957
+      },
+      "receivablesClosing": 78333,
+      "deferredRevenueClosing": 14000,
+      "netBurn": 80887,
+      "runwayMonths": 6.8,
+      "grossProfit": 27653,
+      "netResult": -74847
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "licences": 71000,
+          "deploymentFees": 14000
+        },
+        "total": 85000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Deployment fees recognised at go-live (invoiced the month before)",
+          "amount": 14000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "hosting": 7100,
+          "authenticatorServices": 3550,
+          "supportTooling": 2130,
+          "deploymentTeamPayroll": 33600
+        },
+        "total": 46380
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 54000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 0,
+          "other": 1600
+        },
+        "total": 102500
+      },
+      "headcount": {
+        "engineering": 9,
+        "deployment": 7,
+        "sales": 3,
+        "operations": 2,
+        "total": 21
+      },
+      "kpis": {
+        "organisations": 11,
+        "licensedSeats": 71000,
+        "arr": 852000,
+        "staffEnrolled": 64000,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 16763,
+          "HS-C02": 13112,
+          "HS-C03": 6979,
+          "HS-C04": 5134,
+          "HS-C05": 9800,
+          "HS-C06": 4961,
+          "HS-C07": 3884,
+          "HS-C08": 3159,
+          "HS-C09": 3208,
+          "HS-C10": 1800,
+          "HS-C11": 2200
+        }
+      },
+      "cash": {
+        "opening": 550957,
+        "receipts": 78333,
+        "fundingReceived": 0,
+        "payments": 148880,
+        "closing": 480410
+      },
+      "receivablesClosing": 71000,
+      "deferredRevenueClosing": 0,
+      "netBurn": 70547,
+      "runwayMonths": 6.8,
+      "grossProfit": 38620,
+      "netResult": -63880
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "licences": 73000,
+          "deploymentFees": 0
+        },
+        "total": 73000
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "hosting": 7300,
+          "authenticatorServices": 3650,
+          "supportTooling": 2190,
+          "deploymentTeamPayroll": 43200
+        },
+        "total": 56340
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 54000,
+          "payrollSales": 16800,
+          "payrollOperations": 9600,
+          "offices": 5600,
+          "softwareAndTools": 2400,
+          "professionalFees": 4500,
+          "assuranceAndCertifications": 1500,
+          "insurance": 900,
+          "travelAndOnSite": 5600,
+          "recruitment": 4500,
+          "other": 1600
+        },
+        "total": 107000
+      },
+      "headcount": {
+        "engineering": 9,
+        "deployment": 9,
+        "sales": 3,
+        "operations": 2,
+        "total": 23
+      },
+      "kpis": {
+        "organisations": 11,
+        "licensedSeats": 73000,
+        "arr": 876000,
+        "staffEnrolled": 66900,
+        "phishingTakeoversEnrolled": 0,
+        "seatsByCustomer": {
+          "HS-C01": 17157,
+          "HS-C02": 13450,
+          "HS-C03": 7176,
+          "HS-C04": 5303,
+          "HS-C05": 9800,
+          "HS-C06": 5186,
+          "HS-C07": 4053,
+          "HS-C08": 3328,
+          "HS-C09": 3349,
+          "HS-C10": 1885,
+          "HS-C11": 2313
+        }
+      },
+      "cash": {
+        "opening": 480410,
+        "receipts": 71000,
+        "fundingReceived": 0,
+        "payments": 163340,
+        "closing": 388070
+      },
+      "receivablesClosing": 73000,
+      "deferredRevenueClosing": 0,
+      "netBurn": 92340,
+      "runwayMonths": 4.2,
+      "grossProfit": 16660,
+      "netResult": -90340
+    }
+  ],
+  "funding": [
+    {
+      "receivedOn": "2025-07-18",
+      "round": "Advance subscription (pre-seed extension)",
+      "instrument": "Advance subscription agreement (EIS); converts at the seed round at a 20% discount",
+      "amount": 1500000,
+      "conversionDiscountPercent": 20,
+      "investors": [
+        {
+          "name": "Leith Shore Angels",
+          "amount": 1000000
+        },
+        {
+          "name": "Scottish founder angels",
+          "amount": 500000
+        }
+      ]
+    }
+  ],
+  "fundingBeforeWindow": [
+    {
+      "receivedOn": "2023-05-22",
+      "round": "Pre-seed",
+      "instrument": "Ordinary shares (SEIS/EIS)",
+      "amount": 600000,
+      "pricePerShare": "0.50",
+      "sharesIssued": 1200000,
+      "investors": [
+        {
+          "name": "Leith Shore Angels",
+          "amount": 450000,
+          "shares": 900000
+        },
+        {
+          "name": "Scottish founder angels",
+          "amount": 150000,
+          "shares": 300000
+        }
+      ]
+    }
+  ],
+  "capTable": {
+    "asOf": "2026-10-31",
+    "basis": "Fully diluted: issued ordinary shares plus the EMI option pool. The 1,500,000 advance subscription is not yet shares; it converts at the seed round (see pro forma).",
+    "holders": [
+      {
+        "holder": "Callum Reid",
+        "class": "Ordinary shares (founder)",
+        "shares": 3800000
+      },
+      {
+        "holder": "Eilidh MacLeod",
+        "class": "Ordinary shares (founder)",
+        "shares": 3400000
+      },
+      {
+        "holder": "EMI option pool",
+        "class": "Options (granted and unallocated)",
+        "shares": 1000000
+      },
+      {
+        "holder": "Leith Shore Angels",
+        "class": "Ordinary shares",
+        "shares": 1300000
+      },
+      {
+        "holder": "Scottish founder angels",
+        "class": "Ordinary shares",
+        "shares": 500000
+      }
+    ],
+    "proForma": {
+      "description": "Illustrative, after the seed round at 1.00 per share (10,000,000 pre-money) and conversion of the advance subscription at a 20% discount (0.80 per share)",
+      "newHolder": "Seed investors (new money)",
+      "newShares": 3000000,
+      "conversions": [
+        {
+          "holder": "Leith Shore Angels",
+          "class": "Advance subscription converted",
+          "shares": 1250000
+        },
+        {
+          "holder": "Scottish founder angels",
+          "class": "Advance subscription converted",
+          "shares": 625000
+        }
+      ]
+    }
+  },
+  "raise": {
+    "roundName": "Seed",
+    "currency": "GBP",
+    "targetAmount": 3000000,
+    "instrument": "Priced equity (ordinary shares, SEIS/EIS eligible)",
+    "targetCloseOn": "2026-12-16",
+    "minimumCheque": 25000,
+    "useOfFunds": [
+      {
+        "line": "Deployment team for NHS trusts and councils",
+        "percent": 35,
+        "amount": 1050000
+      },
+      {
+        "line": "Product: shared workstation and lost-device flows",
+        "percent": 30,
+        "amount": 900000
+      },
+      {
+        "line": "Public-sector sales and framework listings",
+        "percent": 25,
+        "amount": 750000
+      },
+      {
+        "line": "Assurance (Cyber Essentials Plus, DSPT, ISO 27001) and G&A",
+        "percent": 10,
+        "amount": 300000
+      }
+    ],
+    "plannedMonthlyNetBurnPostRaise": 140000,
+    "preMoneyValuation": 10000000
+  },
+  "deckStatedFigures": {
+    "source": "Pitch deck and data-room summary sheets seeded on 6 Oct 2026",
+    "cash": 480000,
+    "cashAsOf": "2026-09-30",
+    "monthlyNetBurn": 70000,
+    "monthlyNetBurnAsOf": "2026-09-30",
+    "runwayMonths": 6.9,
+    "runwayMonthsPostRaise": 24.9,
+    "headcount": 21,
+    "previousRounds": [
+      {
+        "round": "Pre-seed",
+        "date": "2023-05-22",
+        "amount": 600000,
+        "currency": "GBP",
+        "instrument": "Priced equity (SEIS/EIS)",
+        "lead": "Leith Shore Angels"
+      }
+    ]
+  },
+  "team": {
+    "founders": [
+      {
+        "name": "Callum Reid",
+        "role": "Co-founder & CEO",
+        "summary": "Former incident responder at the national cyber security centre who led the response to two ransomware attacks on public bodies. Both started with a phished password."
+      },
+      {
+        "name": "Eilidh MacLeod",
+        "role": "Co-founder & CTO",
+        "summary": "Identity engineer; previously built single sign-on for a UK public cloud supplier. Leads the enrolment and recovery platform."
+      }
+    ],
+    "keyPeople": [
+      {
+        "name": "Jamie Fraser",
+        "role": "Head of Public Sector Partnerships",
+        "summary": "Ten years selling into NHS boards and councils. Manages framework listings and procurement."
+      }
+    ],
+    "hiringPlan": [
+      {
+        "role": "Deployment engineer",
+        "function": "Deployment",
+        "count": 6,
+        "startBy": "2027-Q2",
+        "fundedBy": "Deployment team for NHS trusts and councils"
+      },
+      {
+        "role": "Product engineer (shared workstations, lost devices)",
+        "function": "Engineering",
+        "count": 4,
+        "startBy": "2027-Q2",
+        "fundedBy": "Product: shared workstation and lost-device flows"
+      },
+      {
+        "role": "Public-sector account manager",
+        "function": "Sales",
+        "count": 3,
+        "startBy": "2027-Q1",
+        "fundedBy": "Public-sector sales and framework listings"
+      },
+      {
+        "role": "Information security and assurance manager",
+        "function": "Operations",
+        "count": 1,
+        "startBy": "2027-Q1",
+        "fundedBy": "Assurance (Cyber Essentials Plus, DSPT, ISO 27001) and G&A"
+      },
+      {
+        "role": "Finance and operations manager",
+        "function": "Operations",
+        "count": 1,
+        "startBy": "2027-Q3",
+        "fundedBy": "Assurance (Cyber Essentials Plus, DSPT, ISO 27001) and G&A"
+      }
+    ]
+  },
+  "projections": {
+    "label": "PROJECTION - not actual results",
+    "assumptions": [
+      "The 3,000,000 seed round closes in December 2026 (target close 16 Dec 2026); the advance subscription converts at the same time and brings no new cash.",
+      "Licensed seats grow from 73,000 to 158,334 by December 2027 (ARR 1,900,008), mostly through expansion at existing trusts and councils and about one new organisation a month.",
+      "Price stays at 12 per user per year (1.00 per seat per month); deployment fees of 7,500 to 8,500 per new organisation.",
+      "Planned net burn of about 140,000 a month after the raise as the deployment team grows.",
+      "Revenue is collected in the month billed for projection purposes."
+    ],
+    "months": [
+      {
+        "month": "2026-11",
+        "revenue": 76694,
+        "costs": 170000,
+        "netBurn": 93306,
+        "fundingReceived": 0,
+        "headcount": 23,
+        "licensedSeats": 76694,
+        "arr": 920328,
+        "cashOpening": 388070,
+        "cashClosing": 294764
+      },
+      {
+        "month": "2026-12",
+        "revenue": 88258,
+        "costs": 178000,
+        "netBurn": 89742,
+        "fundingReceived": 3000000,
+        "headcount": 23,
+        "licensedSeats": 80758,
+        "arr": 969096,
+        "cashOpening": 294764,
+        "cashClosing": 3205022
+      },
+      {
+        "month": "2027-01",
+        "revenue": 92691,
+        "costs": 205000,
+        "netBurn": 112309,
+        "fundingReceived": 0,
+        "headcount": 25,
+        "licensedSeats": 85191,
+        "arr": 1022292,
+        "cashOpening": 3205022,
+        "cashClosing": 3092713
+      },
+      {
+        "month": "2027-02",
+        "revenue": 98493,
+        "costs": 215000,
+        "netBurn": 116507,
+        "fundingReceived": 0,
+        "headcount": 27,
+        "licensedSeats": 89993,
+        "arr": 1079916,
+        "cashOpening": 3092713,
+        "cashClosing": 2976206
+      },
+      {
+        "month": "2027-03",
+        "revenue": 103665,
+        "costs": 225000,
+        "netBurn": 121335,
+        "fundingReceived": 0,
+        "headcount": 28,
+        "licensedSeats": 95165,
+        "arr": 1141980,
+        "cashOpening": 2976206,
+        "cashClosing": 2854871
+      },
+      {
+        "month": "2027-04",
+        "revenue": 108206,
+        "costs": 235000,
+        "netBurn": 126794,
+        "fundingReceived": 0,
+        "headcount": 30,
+        "licensedSeats": 100706,
+        "arr": 1208472,
+        "cashOpening": 2854871,
+        "cashClosing": 2728077
+      },
+      {
+        "month": "2027-05",
+        "revenue": 115117,
+        "costs": 245000,
+        "netBurn": 129883,
+        "fundingReceived": 0,
+        "headcount": 31,
+        "licensedSeats": 106617,
+        "arr": 1279404,
+        "cashOpening": 2728077,
+        "cashClosing": 2598194
+      },
+      {
+        "month": "2027-06",
+        "revenue": 121397,
+        "costs": 255000,
+        "netBurn": 133603,
+        "fundingReceived": 0,
+        "headcount": 32,
+        "licensedSeats": 112897,
+        "arr": 1354764,
+        "cashOpening": 2598194,
+        "cashClosing": 2464591
+      },
+      {
+        "month": "2027-07",
+        "revenue": 127046,
+        "costs": 262000,
+        "netBurn": 134954,
+        "fundingReceived": 0,
+        "headcount": 33,
+        "licensedSeats": 119546,
+        "arr": 1434552,
+        "cashOpening": 2464591,
+        "cashClosing": 2329637
+      },
+      {
+        "month": "2027-08",
+        "revenue": 135065,
+        "costs": 270000,
+        "netBurn": 134935,
+        "fundingReceived": 0,
+        "headcount": 34,
+        "licensedSeats": 126565,
+        "arr": 1518780,
+        "cashOpening": 2329637,
+        "cashClosing": 2194702
+      },
+      {
+        "month": "2027-09",
+        "revenue": 142453,
+        "costs": 278000,
+        "netBurn": 135547,
+        "fundingReceived": 0,
+        "headcount": 35,
+        "licensedSeats": 133953,
+        "arr": 1607436,
+        "cashOpening": 2194702,
+        "cashClosing": 2059155
+      },
+      {
+        "month": "2027-10",
+        "revenue": 149211,
+        "costs": 286000,
+        "netBurn": 136789,
+        "fundingReceived": 0,
+        "headcount": 36,
+        "licensedSeats": 141711,
+        "arr": 1700532,
+        "cashOpening": 2059155,
+        "cashClosing": 1922366
+      },
+      {
+        "month": "2027-11",
+        "revenue": 158338,
+        "costs": 294000,
+        "netBurn": 135662,
+        "fundingReceived": 0,
+        "headcount": 37,
+        "licensedSeats": 149838,
+        "arr": 1798056,
+        "cashOpening": 1922366,
+        "cashClosing": 1786704
+      },
+      {
+        "month": "2027-12",
+        "revenue": 166834,
+        "costs": 300000,
+        "netBurn": 133166,
+        "fundingReceived": 0,
+        "headcount": 38,
+        "licensedSeats": 158334,
+        "arr": 1900008,
+        "cashOpening": 1786704,
+        "cashClosing": 1653538
+      }
+    ]
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "hs-gross-margin",
+      "topic": "Gross margin",
+      "deckStatement": "Gross margin 82%.",
+      "accountsStatement": "Gross margin in the management accounts for the 12 months to October 2026 is 29.3%; licence gross margin (licence revenue less hosting, authenticator services and support tooling) is 82.0%.",
+      "reason": "The deck quotes licence gross margin. The management accounts put the deployment team's payroll in cost of sales, and deployment fees do not cover it yet.",
+      "evidence": [
+        {
+          "documentId": "hs-management-accounts",
+          "text": "29.3%"
+        },
+        {
+          "documentId": "hs-kpi-pack",
+          "text": "29.3%"
+        }
+      ],
+      "deliberate": true
+    },
+    {
+      "id": "hs-burn-runway",
+      "topic": "Monthly net burn and runway",
+      "deckStatement": "Net burn today about 70,000 a month; cash 480,000 at 30 Sep 2026; runway 6.9 months.",
+      "accountsStatement": "October 2026 net burn 92,340 and cash 388,070 at 31 Oct 2026: runway 4.2 months at the October burn.",
+      "reason": "The deck uses September 2026. October adds two deployment engineers (headcount 21 to 23) and a recruitment fee (4,500), and no deployment-fee receipts arrived in October (September received 14,000).",
+      "evidence": [
+        {
+          "documentId": "hs-management-accounts",
+          "text": "92,340"
+        },
+        {
+          "documentId": "hs-monthly-actuals",
+          "text": "92340"
+        },
+        {
+          "documentId": "hs-kpi-pack",
+          "text": "92,340"
+        }
+      ],
+      "deliberate": true
+    },
+    {
+      "id": "hs-funding-history",
+      "topic": "Funding history",
+      "deckStatement": "Previous rounds: one pre-seed of 600,000 (May 2023).",
+      "accountsStatement": "An advance subscription of 1,500,000 was received on 18 Jul 2025 and converts at the seed round.",
+      "reason": "The 6 Oct seed profile lists only the 2023 pre-seed, which cannot fund the costs to the stated September cash. The advance subscription is not yet shares, so the current cap table is unchanged; it appears in the pro forma.",
+      "evidence": [
+        {
+          "documentId": "hs-management-accounts",
+          "text": "Advance subscription"
+        },
+        {
+          "documentId": "hs-cap-table",
+          "text": "Advance subscription"
+        },
+        {
+          "documentId": "hs-raise-terms",
+          "text": "Advance subscription"
+        }
+      ],
+      "deliberate": false
+    }
+  ],
+  "sharingPlan": {
+    "investor": "Thames Arc",
+    "investorFictional": true,
+    "note": "Fictional GBP investor (mandate 150k-2M GBP) with a gateway and no relationship yet. A grant needs a relationship first; planned grants go through the data-room approval or diligence-share workflow."
+  }
+}

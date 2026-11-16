@@ -1,0 +1,1861 @@
+{
+  "schemaVersion": 1,
+  "key": "tensorgate",
+  "idPrefix": "tg",
+  "seedSource": {
+    "file": "docs/seed/tavus-20/companies-full.json",
+    "company": "Tensorgate"
+  },
+  "company": {
+    "name": "Tensorgate",
+    "legalName": "Tensorgate, Inc.",
+    "website": "https://tensorgate.example",
+    "headquarters": "Austin, Texas, United States",
+    "foundedOn": "2024-02-05",
+    "stage": "seed",
+    "sector": "AI infrastructure / Cybersecurity",
+    "oneLiner": "A confidential-computing gateway that lets regulated enterprises run LLMs on sensitive data.",
+    "businessModel": "B2B SaaS, usage-based with an enterprise floor"
+  },
+  "currency": "USD",
+  "documentDefaults": {
+    "issuedOn": "2026-11-12",
+    "version": "1.0",
+    "preparedBy": "Prepared by the company with its outsourced bookkeeper; unaudited"
+  },
+  "periods": {
+    "firstActualMonth": "2025-05",
+    "lastActualMonth": "2026-10",
+    "projectionFirstMonth": "2026-11",
+    "projectionLastMonth": "2027-12"
+  },
+  "bank": {
+    "name": "Quillfeather Commercial Bank",
+    "fictitious": true,
+    "accountName": "Tensorgate, Inc. - operating account",
+    "accountMasked": "XXXX XXXX 4417",
+    "statementFrom": "2026-08-01",
+    "statementTo": "2026-10-31"
+  },
+  "kpiDefinitions": [
+    {
+      "code": "requests_served_m",
+      "label": "Requests served, cumulative (millions)",
+      "unit": "count_millions"
+    },
+    {
+      "code": "design_partners",
+      "label": "Design partners",
+      "unit": "count"
+    },
+    {
+      "code": "paid_contracts",
+      "label": "Paid contracts",
+      "unit": "count"
+    },
+    {
+      "code": "contracted_arr",
+      "label": "Contracted ARR",
+      "unit": "money",
+      "currency": "USD"
+    },
+    {
+      "code": "median_overhead_ms",
+      "label": "Median enclave overhead per request",
+      "unit": "milliseconds"
+    }
+  ],
+  "openingBalances": {
+    "asOf": "2025-04-30",
+    "cash": 902340,
+    "receivables": 0,
+    "deferredRevenue": 0,
+    "otherPayablesAndAccruals": 18000,
+    "capitalRaisedToDate": 1200000
+  },
+  "customers": [
+    {
+      "id": "TG-C01",
+      "label": "Customer A",
+      "segment": "Regional US bank",
+      "designPartnerSince": "2025-02-10",
+      "contractSignedOn": "2026-03-20",
+      "goLiveOn": "2026-04-01",
+      "billingStartOn": "2026-04-01",
+      "status": "PAID",
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "annualFloor": 180000,
+      "includedRequestsPerYearThousands": 40000,
+      "overagePricePerMillion": 4500,
+      "implementationFee": 9000,
+      "deployment": "Customer's own cloud account; Tensorgate has no access to plaintext"
+    },
+    {
+      "id": "TG-C02",
+      "label": "Customer B",
+      "segment": "Community bank group",
+      "designPartnerSince": "2025-08-04",
+      "status": "DESIGN_PARTNER",
+      "pilotTerms": "Unpaid pilot; commercial proposal sent 2026-10-08"
+    },
+    {
+      "id": "TG-C03",
+      "label": "Customer C",
+      "segment": "US health system",
+      "designPartnerSince": "2025-11-17",
+      "contractSignedOn": "2026-08-14",
+      "goLiveOn": "2026-09-26",
+      "billingStartOn": "2026-10-01",
+      "status": "PAID",
+      "termMonths": 12,
+      "renewal": "Auto-renews for 12 months",
+      "annualFloor": 180000,
+      "includedRequestsPerYearThousands": 40000,
+      "overagePricePerMillion": 4500,
+      "implementationFee": 0,
+      "deployment": "Customer's own cloud account; billing starts after deployment acceptance"
+    },
+    {
+      "id": "TG-C04",
+      "label": "Customer D",
+      "segment": "Regional health insurer",
+      "designPartnerSince": "2026-03-09",
+      "status": "DESIGN_PARTNER",
+      "pilotTerms": "Unpaid pilot; evaluation ends 2026-12-31"
+    }
+  ],
+  "invoices": [
+    {
+      "number": "TG-INV-0001",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-03-24",
+      "dueOn": "2026-04-23",
+      "paidOn": "2026-04-17",
+      "serviceMonth": "2026-04",
+      "kind": "IMPLEMENTATION",
+      "description": "Implementation and onboarding fee (earned April to June 2026)",
+      "amount": 9000
+    },
+    {
+      "number": "TG-INV-0002",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-04-01",
+      "dueOn": "2026-05-01",
+      "paidOn": "2026-04-25",
+      "serviceMonth": "2026-04",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-04 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0003",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-05-01",
+      "dueOn": "2026-05-31",
+      "paidOn": "2026-05-25",
+      "serviceMonth": "2026-05",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-05 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0004",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-06-01",
+      "dueOn": "2026-07-01",
+      "paidOn": "2026-06-25",
+      "serviceMonth": "2026-06",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-06 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0005",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-07-01",
+      "dueOn": "2026-07-31",
+      "paidOn": "2026-07-25",
+      "serviceMonth": "2026-07",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-07 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0006",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-08-01",
+      "dueOn": "2026-08-31",
+      "paidOn": "2026-08-25",
+      "serviceMonth": "2026-08",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-08 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0007",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-09-01",
+      "dueOn": "2026-10-01",
+      "paidOn": "2026-09-25",
+      "serviceMonth": "2026-09",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-09 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0008",
+      "customerId": "TG-C01",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-10-25",
+      "serviceMonth": "2026-10",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-10 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    },
+    {
+      "number": "TG-INV-0009",
+      "customerId": "TG-C03",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "paidOn": "2026-10-25",
+      "serviceMonth": "2026-10",
+      "kind": "PLATFORM_FLOOR",
+      "description": "Platform floor, 2026-10 (annual floor 180,000 billed monthly)",
+      "amount": 15000
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-05",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 9000
+        },
+        "total": 9000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 41400,
+          "payrollGoToMarket": 7000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 67400
+      },
+      "headcount": {
+        "engineering": 6,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 8
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 600,
+        "requestsServedInMonthThousands": 300,
+        "requestsByCustomerThousands": {
+          "TG-C01": 300
+        },
+        "designPartners": 1,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 420
+      },
+      "cash": {
+        "opening": 902340,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 76400,
+        "closing": 825940
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 76400,
+      "runwayMonths": 10.8,
+      "grossProfit": -9000,
+      "netResult": -76400
+    },
+    {
+      "month": "2025-06",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 9500
+        },
+        "total": 9500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 41400,
+          "payrollGoToMarket": 7000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 67400
+      },
+      "headcount": {
+        "engineering": 6,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 8
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 1000,
+        "requestsServedInMonthThousands": 400,
+        "requestsByCustomerThousands": {
+          "TG-C01": 400
+        },
+        "designPartners": 1,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 360
+      },
+      "cash": {
+        "opening": 825940,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 76900,
+        "closing": 749040
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 76900,
+      "runwayMonths": 9.7,
+      "grossProfit": -9500,
+      "netResult": -76900
+    },
+    {
+      "month": "2025-07",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 10200
+        },
+        "total": 10200
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 48300,
+          "payrollGoToMarket": 7000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 74300
+      },
+      "headcount": {
+        "engineering": 7,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 9
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 1500,
+        "requestsServedInMonthThousands": 500,
+        "requestsByCustomerThousands": {
+          "TG-C01": 500
+        },
+        "designPartners": 1,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 310
+      },
+      "cash": {
+        "opening": 749040,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 84500,
+        "closing": 664540
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 84500,
+      "runwayMonths": 7.9,
+      "grossProfit": -10200,
+      "netResult": -84500
+    },
+    {
+      "month": "2025-08",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 11000
+        },
+        "total": 11000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 48300,
+          "payrollGoToMarket": 7000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 74300
+      },
+      "headcount": {
+        "engineering": 7,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 9
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 2000,
+        "requestsServedInMonthThousands": 500,
+        "requestsByCustomerThousands": {
+          "TG-C01": 357,
+          "TG-C02": 143
+        },
+        "designPartners": 2,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 270
+      },
+      "cash": {
+        "opening": 664540,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 85300,
+        "closing": 579240
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 85300,
+      "runwayMonths": 6.8,
+      "grossProfit": -11000,
+      "netResult": -85300
+    },
+    {
+      "month": "2025-09",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 11800
+        },
+        "total": 11800
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 55200,
+          "payrollGoToMarket": 7000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 81200
+      },
+      "headcount": {
+        "engineering": 8,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 2500,
+        "requestsServedInMonthThousands": 500,
+        "requestsByCustomerThousands": {
+          "TG-C01": 357,
+          "TG-C02": 143
+        },
+        "designPartners": 2,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 240
+      },
+      "cash": {
+        "opening": 579240,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 93000,
+        "closing": 486240
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 93000,
+      "runwayMonths": 5.2,
+      "grossProfit": -11800,
+      "netResult": -93000
+    },
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 12600
+        },
+        "total": 12600
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 55200,
+          "payrollGoToMarket": 7000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 81200
+      },
+      "headcount": {
+        "engineering": 8,
+        "goToMarket": 1,
+        "operations": 1,
+        "total": 10
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 3100,
+        "requestsServedInMonthThousands": 600,
+        "requestsByCustomerThousands": {
+          "TG-C01": 429,
+          "TG-C02": 171
+        },
+        "designPartners": 2,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 210
+      },
+      "cash": {
+        "opening": 486240,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 93800,
+        "closing": 392440
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 93800,
+      "runwayMonths": 4.2,
+      "grossProfit": -12600,
+      "netResult": -93800
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 14000
+        },
+        "total": 14000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 55200,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 88200
+      },
+      "headcount": {
+        "engineering": 8,
+        "goToMarket": 2,
+        "operations": 1,
+        "total": 11
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 4000,
+        "requestsServedInMonthThousands": 900,
+        "requestsByCustomerThousands": {
+          "TG-C01": 450,
+          "TG-C02": 180,
+          "TG-C03": 270
+        },
+        "designPartners": 3,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 185
+      },
+      "cash": {
+        "opening": 392440,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 102200,
+        "closing": 290240
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 102200,
+      "runwayMonths": 2.8,
+      "grossProfit": -14000,
+      "netResult": -102200
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 15200
+        },
+        "total": 15200
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 55200,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3100,
+          "officeAustin": 2600,
+          "professionalFees": 11400,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 95700
+      },
+      "headcount": {
+        "engineering": 8,
+        "goToMarket": 2,
+        "operations": 1,
+        "total": 11
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 5000,
+        "requestsServedInMonthThousands": 1000,
+        "requestsByCustomerThousands": {
+          "TG-C01": 500,
+          "TG-C02": 200,
+          "TG-C03": 300
+        },
+        "designPartners": 3,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 160
+      },
+      "cash": {
+        "opening": 290240,
+        "receipts": 0,
+        "fundingReceived": 2000000,
+        "payments": 110900,
+        "closing": 2179340
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 110900,
+      "runwayMonths": 19.7,
+      "grossProfit": -15200,
+      "netResult": -110900
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 17000
+        },
+        "total": 17000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 62100,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 95900
+      },
+      "headcount": {
+        "engineering": 9,
+        "goToMarket": 2,
+        "operations": 1,
+        "total": 12
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 6400,
+        "requestsServedInMonthThousands": 1400,
+        "requestsByCustomerThousands": {
+          "TG-C01": 700,
+          "TG-C02": 280,
+          "TG-C03": 420
+        },
+        "designPartners": 3,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 138
+      },
+      "cash": {
+        "opening": 2179340,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 112900,
+        "closing": 2066440
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 112900,
+      "runwayMonths": 18.3,
+      "grossProfit": -17000,
+      "netResult": -112900
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 18400
+        },
+        "total": 18400
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 62100,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 95900
+      },
+      "headcount": {
+        "engineering": 9,
+        "goToMarket": 2,
+        "operations": 1,
+        "total": 12
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 7900,
+        "requestsServedInMonthThousands": 1500,
+        "requestsByCustomerThousands": {
+          "TG-C01": 750,
+          "TG-C02": 300,
+          "TG-C03": 450
+        },
+        "designPartners": 3,
+        "paidContracts": 0,
+        "contractedArr": 0,
+        "medianOverheadMs": 118
+      },
+      "cash": {
+        "opening": 2066440,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 114300,
+        "closing": 1952140
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 114300,
+      "runwayMonths": 17.1,
+      "grossProfit": -18400,
+      "netResult": -114300
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "platformFloor": 0,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 0
+      },
+      "reconcilingItems": [
+        {
+          "description": "Implementation fee invoiced in March, earned April to June (deferred)",
+          "amount": -9000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 20500
+        },
+        "total": 20500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 62100,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 6000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 95900
+      },
+      "headcount": {
+        "engineering": 9,
+        "goToMarket": 2,
+        "operations": 1,
+        "total": 12
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 9900,
+        "requestsServedInMonthThousands": 2000,
+        "requestsByCustomerThousands": {
+          "TG-C01": 834,
+          "TG-C02": 333,
+          "TG-C03": 500,
+          "TG-C04": 333
+        },
+        "designPartners": 4,
+        "paidContracts": 1,
+        "contractedArr": 180000,
+        "medianOverheadMs": 100
+      },
+      "cash": {
+        "opening": 1952140,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 116400,
+        "closing": 1835740
+      },
+      "receivablesClosing": 9000,
+      "deferredRevenueClosing": 9000,
+      "netBurn": 116400,
+      "runwayMonths": 15.8,
+      "grossProfit": -20500,
+      "netResult": -116400
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "platformFloor": 15000,
+          "usageAboveFloor": 0,
+          "implementation": 3000
+        },
+        "total": 18000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred implementation fee (one third)",
+          "amount": 3000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 23000
+        },
+        "total": 23000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 62100,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 101900
+      },
+      "headcount": {
+        "engineering": 9,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 13
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 12000,
+        "requestsServedInMonthThousands": 2100,
+        "requestsByCustomerThousands": {
+          "TG-C01": 875,
+          "TG-C02": 350,
+          "TG-C03": 525,
+          "TG-C04": 350
+        },
+        "designPartners": 4,
+        "paidContracts": 1,
+        "contractedArr": 180000,
+        "medianOverheadMs": 85
+      },
+      "cash": {
+        "opening": 1835740,
+        "receipts": 24000,
+        "fundingReceived": 0,
+        "payments": 124900,
+        "closing": 1734840
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 6000,
+      "netBurn": 100900,
+      "runwayMonths": 17.2,
+      "grossProfit": -5000,
+      "netResult": -106900
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "platformFloor": 15000,
+          "usageAboveFloor": 0,
+          "implementation": 3000
+        },
+        "total": 18000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred implementation fee (one third)",
+          "amount": 3000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 26000
+        },
+        "total": 26000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 62100,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 101900
+      },
+      "headcount": {
+        "engineering": 9,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 13
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 14700,
+        "requestsServedInMonthThousands": 2700,
+        "requestsByCustomerThousands": {
+          "TG-C01": 1125,
+          "TG-C02": 450,
+          "TG-C03": 675,
+          "TG-C04": 450
+        },
+        "designPartners": 4,
+        "paidContracts": 1,
+        "contractedArr": 180000,
+        "medianOverheadMs": 70
+      },
+      "cash": {
+        "opening": 1734840,
+        "receipts": 15000,
+        "fundingReceived": 0,
+        "payments": 127900,
+        "closing": 1621940
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 3000,
+      "netBurn": 112900,
+      "runwayMonths": 14.4,
+      "grossProfit": -8000,
+      "netResult": -109900
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "platformFloor": 15000,
+          "usageAboveFloor": 0,
+          "implementation": 3000
+        },
+        "total": 18000
+      },
+      "reconcilingItems": [
+        {
+          "description": "Release of deferred implementation fee (one third)",
+          "amount": 3000
+        }
+      ],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 28500
+        },
+        "total": 28500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 62100,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 14000,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 115900
+      },
+      "headcount": {
+        "engineering": 9,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 13
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 17600,
+        "requestsServedInMonthThousands": 2900,
+        "requestsByCustomerThousands": {
+          "TG-C01": 1208,
+          "TG-C02": 484,
+          "TG-C03": 725,
+          "TG-C04": 483
+        },
+        "designPartners": 4,
+        "paidContracts": 1,
+        "contractedArr": 180000,
+        "medianOverheadMs": 58
+      },
+      "cash": {
+        "opening": 1621940,
+        "receipts": 15000,
+        "fundingReceived": 0,
+        "payments": 144400,
+        "closing": 1492540
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 129400,
+      "runwayMonths": 11.5,
+      "grossProfit": -10500,
+      "netResult": -126400
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "platformFloor": 15000,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 15000
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 32000
+        },
+        "total": 32000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 69000,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 108800
+      },
+      "headcount": {
+        "engineering": 10,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 14
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 21200,
+        "requestsServedInMonthThousands": 3600,
+        "requestsByCustomerThousands": {
+          "TG-C01": 1500,
+          "TG-C02": 600,
+          "TG-C03": 900,
+          "TG-C04": 600
+        },
+        "designPartners": 4,
+        "paidContracts": 1,
+        "contractedArr": 180000,
+        "medianOverheadMs": 49
+      },
+      "cash": {
+        "opening": 1492540,
+        "receipts": 15000,
+        "fundingReceived": 0,
+        "payments": 140800,
+        "closing": 1366740
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 125800,
+      "runwayMonths": 10.9,
+      "grossProfit": -17000,
+      "netResult": -125800
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "platformFloor": 15000,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 15000
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 36500
+        },
+        "total": 36500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 69000,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 108800
+      },
+      "headcount": {
+        "engineering": 10,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 14
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 25800,
+        "requestsServedInMonthThousands": 4600,
+        "requestsByCustomerThousands": {
+          "TG-C01": 1917,
+          "TG-C02": 767,
+          "TG-C03": 1150,
+          "TG-C04": 766
+        },
+        "designPartners": 4,
+        "paidContracts": 2,
+        "contractedArr": 360000,
+        "medianOverheadMs": 43
+      },
+      "cash": {
+        "opening": 1366740,
+        "receipts": 15000,
+        "fundingReceived": 0,
+        "payments": 145300,
+        "closing": 1236440
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 130300,
+      "runwayMonths": 9.5,
+      "grossProfit": -21500,
+      "netResult": -130300
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "platformFloor": 15000,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 15000
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 41000
+        },
+        "total": 41000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 69000,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 3900,
+          "securityAndAssurance": 0,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 108800
+      },
+      "headcount": {
+        "engineering": 10,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 14
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 31000,
+        "requestsServedInMonthThousands": 5200,
+        "requestsByCustomerThousands": {
+          "TG-C01": 2166,
+          "TG-C02": 867,
+          "TG-C03": 1300,
+          "TG-C04": 867
+        },
+        "designPartners": 4,
+        "paidContracts": 2,
+        "contractedArr": 360000,
+        "medianOverheadMs": 40
+      },
+      "cash": {
+        "opening": 1236440,
+        "receipts": 15000,
+        "fundingReceived": 0,
+        "payments": 149800,
+        "closing": 1101640
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 134800,
+      "runwayMonths": 8.2,
+      "grossProfit": -26000,
+      "netResult": -134800
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "platformFloor": 30000,
+          "usageAboveFloor": 0,
+          "implementation": 0
+        },
+        "total": 30000
+      },
+      "reconcilingItems": [],
+      "cogs": {
+        "lines": {
+          "cloudAndGpuEnclaveCapacity": 46500
+        },
+        "total": 46500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 69000,
+          "payrollGoToMarket": 14000,
+          "payrollOperations": 12000,
+          "softwareAndTools": 3900,
+          "officeAustin": 2600,
+          "professionalFees": 12900,
+          "securityAndAssurance": 18500,
+          "insurance": 1300,
+          "travelAndEvents": 1600,
+          "other": 500
+        },
+        "total": 136300
+      },
+      "headcount": {
+        "engineering": 10,
+        "goToMarket": 2,
+        "operations": 2,
+        "total": 14
+      },
+      "kpis": {
+        "requestsServedCumulativeThousands": 36900,
+        "requestsServedInMonthThousands": 5900,
+        "requestsByCustomerThousands": {
+          "TG-C01": 2459,
+          "TG-C02": 983,
+          "TG-C03": 1475,
+          "TG-C04": 983
+        },
+        "designPartners": 4,
+        "paidContracts": 2,
+        "contractedArr": 360000,
+        "medianOverheadMs": 40
+      },
+      "cash": {
+        "opening": 1101640,
+        "receipts": 30000,
+        "fundingReceived": 0,
+        "payments": 182800,
+        "closing": 948840
+      },
+      "receivablesClosing": 0,
+      "deferredRevenueClosing": 0,
+      "netBurn": 152800,
+      "runwayMonths": 6.2,
+      "grossProfit": -16500,
+      "netResult": -152800
+    }
+  ],
+  "funding": [
+    {
+      "receivedOn": "2025-12-04",
+      "round": "Pre-seed extension",
+      "instrument": "SAFE (post-money)",
+      "amount": 2000000,
+      "valuationCap": 25000000,
+      "investors": [
+        {
+          "name": "Bastion Hill Ventures",
+          "amount": 1250000
+        },
+        {
+          "name": "Lone Oak Angels",
+          "amount": 500000
+        },
+        {
+          "name": "Two security founders (angels)",
+          "amount": 250000
+        }
+      ]
+    }
+  ],
+  "fundingBeforeWindow": [
+    {
+      "receivedOn": "2024-05-08",
+      "round": "Pre-seed",
+      "instrument": "SAFE (post-money)",
+      "amount": 1200000,
+      "valuationCap": 15000000,
+      "investors": [
+        {
+          "name": "Bastion Hill Ventures",
+          "amount": 900000
+        },
+        {
+          "name": "Lone Oak Angels",
+          "amount": 225000
+        },
+        {
+          "name": "Two security founders (angels)",
+          "amount": 75000
+        }
+      ]
+    }
+  ],
+  "capTable": {
+    "asOf": "2026-10-31",
+    "basis": "Fully diluted. Both SAFEs are shown as converted at their post-money valuation caps; the actual conversion happens at the next priced round.",
+    "holders": [
+      {
+        "holder": "Daniel Park",
+        "class": "Common stock (founder)",
+        "shares": 3600000
+      },
+      {
+        "holder": "Laura Bennett",
+        "class": "Common stock (founder)",
+        "shares": 3600000
+      },
+      {
+        "holder": "Employee option pool",
+        "class": "Options (granted and unallocated)",
+        "shares": 1200000
+      },
+      {
+        "holder": "Bastion Hill Ventures",
+        "class": "SAFEs as converted",
+        "shares": 1100000
+      },
+      {
+        "holder": "Lone Oak Angels",
+        "class": "SAFEs as converted",
+        "shares": 350000
+      },
+      {
+        "holder": "Two security founders (angels)",
+        "class": "SAFEs as converted",
+        "shares": 150000
+      }
+    ],
+    "proForma": {
+      "description": "Illustrative, after the seed SAFE converts at its 30,000,000 post-money cap",
+      "newHolder": "Seed SAFE investors",
+      "newShares": 1538462
+    }
+  },
+  "raise": {
+    "roundName": "Seed",
+    "currency": "USD",
+    "targetAmount": 4000000,
+    "instrument": "SAFE (post-money)",
+    "targetCloseOn": "2027-01-29",
+    "minimumCheque": 100000,
+    "useOfFunds": [
+      {
+        "line": "Engineering: GPU enclave support and SDKs",
+        "percent": 45,
+        "amount": 1800000
+      },
+      {
+        "line": "Security certifications (SOC 2, HITRUST)",
+        "percent": 15,
+        "amount": 600000
+      },
+      {
+        "line": "Go-to-market: two enterprise AEs and a solutions engineer",
+        "percent": 30,
+        "amount": 1200000
+      },
+      {
+        "line": "G&A and legal",
+        "percent": 10,
+        "amount": 400000
+      }
+    ],
+    "plannedMonthlyNetBurnPostRaise": 220000,
+    "valuationCap": 30000000
+  },
+  "deckStatedFigures": {
+    "source": "Pitch deck and data-room summary sheets seeded on 6 Oct 2026",
+    "cash": 1100000,
+    "cashAsOf": "2026-09-30",
+    "monthlyNetBurn": 135000,
+    "monthlyNetBurnAsOf": "2026-09-30",
+    "runwayMonths": 8.1,
+    "runwayMonthsPostRaise": 23.2,
+    "headcount": 14,
+    "previousRounds": [
+      {
+        "round": "Pre-seed",
+        "date": "2024-05-08",
+        "amount": 1200000,
+        "currency": "USD",
+        "instrument": "SAFE (post-money)",
+        "lead": "Bastion Hill Ventures"
+      }
+    ]
+  },
+  "team": {
+    "founders": [
+      {
+        "name": "Daniel Park",
+        "role": "Co-founder & CTO",
+        "summary": "Built secure-enclave infrastructure at a hyperscaler and published research on side-channel attacks. Leads Tensorgate's enclave runtime and attestation pipeline."
+      },
+      {
+        "name": "Laura Bennett",
+        "role": "Co-founder & CEO",
+        "summary": "Previously VP of sales at a data-security company selling to US banks and health systems. Runs fundraising and enterprise sales."
+      }
+    ],
+    "keyPeople": [
+      {
+        "name": "Marcus Delgado",
+        "role": "Head of Applied Cryptography",
+        "summary": "Former cryptography engineer at a payments network. Owns the attestation format and key management."
+      },
+      {
+        "name": "Jordan Whitfield",
+        "role": "Founding Solutions Engineer",
+        "summary": "Deploys Tensorgate into design partners' cloud accounts and writes the integration guides."
+      }
+    ],
+    "hiringPlan": [
+      {
+        "role": "Enterprise account executive",
+        "function": "Go-to-market",
+        "count": 2,
+        "startBy": "2027-Q1",
+        "fundedBy": "Go-to-market: two enterprise AEs and a solutions engineer"
+      },
+      {
+        "role": "Solutions engineer",
+        "function": "Go-to-market",
+        "count": 1,
+        "startBy": "2027-Q2",
+        "fundedBy": "Go-to-market: two enterprise AEs and a solutions engineer"
+      },
+      {
+        "role": "Enclave runtime engineer (GPU)",
+        "function": "Engineering",
+        "count": 3,
+        "startBy": "2027-Q2",
+        "fundedBy": "Engineering: GPU enclave support and SDKs"
+      },
+      {
+        "role": "SDK engineer",
+        "function": "Engineering",
+        "count": 1,
+        "startBy": "2027-Q3",
+        "fundedBy": "Engineering: GPU enclave support and SDKs"
+      },
+      {
+        "role": "Compliance lead (SOC 2, HITRUST)",
+        "function": "Operations",
+        "count": 1,
+        "startBy": "2027-Q1",
+        "fundedBy": "Security certifications (SOC 2, HITRUST)"
+      }
+    ]
+  },
+  "projections": {
+    "label": "PROJECTION - not actual results",
+    "assumptions": [
+      "Seed SAFE of 4,000,000 closes in January 2027 (target close 29 Jan 2027).",
+      "Customer B and Customer D convert from pilot to the 180,000 annual floor in January and March 2027.",
+      "New enterprise contracts from the second quarter of 2027 as the two account executives ramp.",
+      "Costs rise to a planned net burn of about 220,000 a month after the raise.",
+      "Revenue is collected in the month billed; no usage above the floor is assumed."
+    ],
+    "months": [
+      {
+        "month": "2026-11",
+        "revenue": 30000,
+        "costs": 183000,
+        "netBurn": 153000,
+        "fundingReceived": 0,
+        "headcount": 14,
+        "contractedArr": 360000,
+        "cashOpening": 948840,
+        "cashClosing": 795840
+      },
+      {
+        "month": "2026-12",
+        "revenue": 30000,
+        "costs": 184000,
+        "netBurn": 154000,
+        "fundingReceived": 0,
+        "headcount": 14,
+        "contractedArr": 360000,
+        "cashOpening": 795840,
+        "cashClosing": 641840
+      },
+      {
+        "month": "2027-01",
+        "revenue": 50000,
+        "costs": 200000,
+        "netBurn": 150000,
+        "fundingReceived": 4000000,
+        "headcount": 15,
+        "contractedArr": 540000,
+        "cashOpening": 641840,
+        "cashClosing": 4491840
+      },
+      {
+        "month": "2027-02",
+        "revenue": 60000,
+        "costs": 270000,
+        "netBurn": 210000,
+        "fundingReceived": 0,
+        "headcount": 16,
+        "contractedArr": 540000,
+        "cashOpening": 4491840,
+        "cashClosing": 4281840
+      },
+      {
+        "month": "2027-03",
+        "revenue": 75000,
+        "costs": 290000,
+        "netBurn": 215000,
+        "fundingReceived": 0,
+        "headcount": 17,
+        "contractedArr": 720000,
+        "cashOpening": 4281840,
+        "cashClosing": 4066840
+      },
+      {
+        "month": "2027-04",
+        "revenue": 85000,
+        "costs": 305000,
+        "netBurn": 220000,
+        "fundingReceived": 0,
+        "headcount": 18,
+        "contractedArr": 900000,
+        "cashOpening": 4066840,
+        "cashClosing": 3846840
+      },
+      {
+        "month": "2027-05",
+        "revenue": 95000,
+        "costs": 315000,
+        "netBurn": 220000,
+        "fundingReceived": 0,
+        "headcount": 19,
+        "contractedArr": 1080000,
+        "cashOpening": 3846840,
+        "cashClosing": 3626840
+      },
+      {
+        "month": "2027-06",
+        "revenue": 105000,
+        "costs": 325000,
+        "netBurn": 220000,
+        "fundingReceived": 0,
+        "headcount": 19,
+        "contractedArr": 1260000,
+        "cashOpening": 3626840,
+        "cashClosing": 3406840
+      },
+      {
+        "month": "2027-07",
+        "revenue": 115000,
+        "costs": 335000,
+        "netBurn": 220000,
+        "fundingReceived": 0,
+        "headcount": 20,
+        "contractedArr": 1440000,
+        "cashOpening": 3406840,
+        "cashClosing": 3186840
+      },
+      {
+        "month": "2027-08",
+        "revenue": 125000,
+        "costs": 345000,
+        "netBurn": 220000,
+        "fundingReceived": 0,
+        "headcount": 20,
+        "contractedArr": 1620000,
+        "cashOpening": 3186840,
+        "cashClosing": 2966840
+      },
+      {
+        "month": "2027-09",
+        "revenue": 135000,
+        "costs": 355000,
+        "netBurn": 220000,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "contractedArr": 1800000,
+        "cashOpening": 2966840,
+        "cashClosing": 2746840
+      },
+      {
+        "month": "2027-10",
+        "revenue": 160000,
+        "costs": 375000,
+        "netBurn": 215000,
+        "fundingReceived": 0,
+        "headcount": 21,
+        "contractedArr": 2160000,
+        "cashOpening": 2746840,
+        "cashClosing": 2531840
+      },
+      {
+        "month": "2027-11",
+        "revenue": 185000,
+        "costs": 395000,
+        "netBurn": 210000,
+        "fundingReceived": 0,
+        "headcount": 22,
+        "contractedArr": 2520000,
+        "cashOpening": 2531840,
+        "cashClosing": 2321840
+      },
+      {
+        "month": "2027-12",
+        "revenue": 210000,
+        "costs": 415000,
+        "netBurn": 205000,
+        "fundingReceived": 0,
+        "headcount": 22,
+        "contractedArr": 2880000,
+        "cashOpening": 2321840,
+        "cashClosing": 2116840
+      }
+    ]
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "tg-burn-runway",
+      "topic": "Monthly net burn and runway",
+      "deckStatement": "Net burn today about $135,000 a month; cash $1.1m at 30 Sep 2026; runway 8.1 months.",
+      "accountsStatement": "October 2026 net burn 152,800 and cash 948,840 at 31 Oct 2026: runway 6.2 months at the October burn.",
+      "reason": "The deck uses September 2026 figures. October adds the SOC 2 Type I audit fee (18,500), seed-round legal fees (9,000) and GPU capacity reserved for Customer C, partly offset by Customer C's first invoice.",
+      "evidence": [
+        {
+          "documentId": "tg-management-accounts",
+          "text": "152,800"
+        },
+        {
+          "documentId": "tg-monthly-actuals",
+          "text": "152800"
+        },
+        {
+          "documentId": "tg-kpi-pack",
+          "text": "152,800"
+        }
+      ],
+      "deliberate": true
+    },
+    {
+      "id": "tg-contracted-vs-billed",
+      "topic": "Contracted ARR against recognised revenue",
+      "deckStatement": "2 paid contracts; $360k contracted ARR.",
+      "accountsStatement": "Recognised revenue was 15,000 a month in August and September 2026 (one customer billed); 30,000 from October 2026.",
+      "reason": "Customer C signed on 14 Aug 2026, but billing starts only after deployment acceptance (26 Sep 2026), so the second 180,000 floor is contracted from August and billed from 1 Oct 2026.",
+      "evidence": [
+        {
+          "documentId": "tg-revenue-breakdown",
+          "text": "after deployment acceptance on 26 Sep 2026"
+        },
+        {
+          "documentId": "tg-customer-contracts",
+          "text": "after deployment acceptance on 26 Sep 2026"
+        },
+        {
+          "documentId": "tg-kpi-pack",
+          "text": "after deployment acceptance on 26 Sep 2026"
+        }
+      ],
+      "deliberate": true
+    },
+    {
+      "id": "tg-funding-history",
+      "topic": "Funding history",
+      "deckStatement": "Previous rounds: one pre-seed of $1.2m (May 2024).",
+      "accountsStatement": "A 2,000,000 pre-seed extension on a post-money SAFE was received on 4 Dec 2025.",
+      "reason": "The 6 Oct seed profile lists only the 2024 pre-seed, which cannot fund 18 months of costs to the stated September cash. The accounts record the December 2025 extension from the existing investors; the profile's round list is out of date.",
+      "evidence": [
+        {
+          "documentId": "tg-management-accounts",
+          "text": "Pre-seed extension"
+        },
+        {
+          "documentId": "tg-cap-table",
+          "text": "Pre-seed extension"
+        },
+        {
+          "documentId": "tg-raise-terms",
+          "text": "Pre-seed extension"
+        }
+      ],
+      "deliberate": false
+    }
+  ],
+  "sharingPlan": {
+    "investor": "Savanna Seed Partners",
+    "investorFictional": true,
+    "note": "Existing relationship (DISCOVERED). Planned grants go through the data-room approval or diligence-share workflow, never by widening visibility."
+  }
+}

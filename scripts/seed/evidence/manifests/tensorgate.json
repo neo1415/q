@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "company": "Tensorgate",
+  "companyKey": "tensorgate",
+  "fixture": "scripts/seed/evidence/fixtures/tensorgate.json",
+  "synthetic": true,
+  "sensitivityRule": "packages/evidence/src/domain/sensitivity.ts defaultDocumentSensitivity: FINANCIAL, MANAGEMENT_ACCOUNTS and FINANCIAL_MODEL are HIGHLY_CONFIDENTIAL; every other type is CONFIDENTIAL.",
+  "qReadRule": "HIGHLY_CONFIDENTIAL documents are held back from Q (packages/q-tools/src/tools/own-records.ts heldBackFromQ) even when shared; an investor's Q cannot read them under current rules.",
+  "plannedInvestor": "Savanna Seed Partners",
+  "plannedInvestorNote": "Existing relationship (DISCOVERED). Planned grants go through the data-room approval or diligence-share workflow, never by widening visibility.",
+  "documents": [
+    {
+      "id": "tg-management-accounts",
+      "fileName": "tg-management-accounts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Management accounts, May 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "management_accounts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-monthly-actuals",
+      "fileName": "tg-monthly-actuals.csv",
+      "mimeType": "text/csv",
+      "title": "Monthly actuals data, May 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "monthly_financials_24m",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "tg-revenue-breakdown",
+      "fileName": "tg-revenue-breakdown.pdf",
+      "mimeType": "application/pdf",
+      "title": "Monthly revenue by customer",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "revenue_by_customer",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-invoice-register",
+      "fileName": "tg-invoice-register.csv",
+      "mimeType": "text/csv",
+      "title": "Invoice register",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2026-03",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "tg-bank-statement",
+      "fileName": "tg-bank-statement.pdf",
+      "mimeType": "application/pdf",
+      "title": "Business account statement, Aug 2026 to Oct 2026, with monthly balances",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "tg-customer-contracts",
+      "fileName": "tg-customer-contracts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Customer contract summary",
+      "documentType": "CUSTOMER",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "commercial",
+      "checklistItem": "customer_contracts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-cohorts-retention",
+      "fileName": "tg-cohorts-retention.pdf",
+      "mimeType": "application/pdf",
+      "title": "Customer cohorts and retention",
+      "documentType": "CUSTOMER",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "unit_economics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "tg-customer-concentration",
+      "fileName": "tg-customer-concentration.pdf",
+      "mimeType": "application/pdf",
+      "title": "Customer concentration",
+      "documentType": "COMMERCIAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-11",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "commercial",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-cap-table",
+      "fileName": "tg-cap-table.pdf",
+      "mimeType": "application/pdf",
+      "title": "Capitalisation table and ownership",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "cap_table",
+      "checklistItem": "cap_table_full",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-raise-terms",
+      "fileName": "tg-raise-terms.pdf",
+      "mimeType": "application/pdf",
+      "title": "Seed round terms and use of funds",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-11",
+        "to": "2027-01"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "use_of_funds",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-projections-2027",
+      "fileName": "tg-projections-2027.pdf",
+      "mimeType": "application/pdf",
+      "title": "Projections to December 2027, with assumptions",
+      "documentType": "FINANCIAL_MODEL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2026-11",
+        "to": "2027-12"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "financial_model",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-kpi-pack",
+      "fileName": "tg-kpi-pack.pdf",
+      "mimeType": "application/pdf",
+      "title": "KPI and product metrics pack",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "key_metrics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "tg-team-hiring-plan",
+      "fileName": "tg-team-hiring-plan.pdf",
+      "mimeType": "application/pdf",
+      "title": "Team and hiring plan",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-05",
+        "to": "2027-12"
+      },
+      "issuedOn": "2026-11-12",
+      "version": "1.0",
+      "dataRoomFolder": "team",
+      "checklistItem": "team_bios",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    }
+  ]
+}
