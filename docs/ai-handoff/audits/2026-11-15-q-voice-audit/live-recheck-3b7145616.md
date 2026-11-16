@@ -58,3 +58,12 @@ Correctness, routing and navigation now hold for unseen wording. **Latency is st
 - the reader and a third classification call (2.0 s + 0.3 s + 1.4 s);
 - one answer call of 7.3–7.8 s, whose text is delivered only at `q.message.completed` (12.2 s and 14.5 s), not streamed.
   That is the next latency item (deliverable D).
+
+## Timing on `aa4f4158f` (16 Nov, 08:13 UTC; gate PASS 1810 s; Railway SUCCESS ×4 by 08:11 UTC)
+
+Investor `2ce90e2c`, unseen wording ("Show me my strongest fits" → "Why is the third one ranked there?" → "How come the first one leads?").
+
+- Both explanations were correct: Silo Credit third at 9.2; MedTrail "does not lead", tied at 9.2 with three others. Both used 0 tools and stayed in place.
+- Whole run, including the post-run summary call: **7.0 s and 4.4 s**, against 13–15 s on `6f9b63cc5`.
+- The answer call took 2.9 s and 1.6 s, against 7.3–7.8 s. No arrival skim or second document search ran.
+- The browser's first visible text arrives at about 2.6–2.8 s on every turn.
