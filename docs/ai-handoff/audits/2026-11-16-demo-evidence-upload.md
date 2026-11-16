@@ -110,3 +110,10 @@ node scripts/seed/evidence/upload.mjs negative    # Savanna Seed cannot list or 
 - Data-room placement: set the level, folder and checklist through `POST /v1/data-room/documents/:id/level`.
 - Grants: Tensorgate → Savanna Seed; Halyard → Thames Arc, once a relationship exists.
 - Decisions 5 (HIGHLY_CONFIDENTIAL financials held back from Q) and 6 (embeddings provider).
+
+## Nixo (16 Nov, 09:40 UTC)
+
+- **Sign-in:** the owner authorised it (decision 99). It used a one-time admin magic-link session as the Nixo founder (`cb2b58ab`): no password change and no email sent. The admin key was held in memory only.
+- **Upload:** all 14 `nx-*` documents (12 PDFs, including the generated pitch deck, and 2 CSVs) went through the normal founder upload route. All sessions completed, and `verify` shows 14/14 COMPLETED.
+- **Model calls:** 2, for deck reading, at USD 0.0096 (ledger `a25bd6c5`).
+- **Visibility:** every document is founder-private. The Savanna negative check covered all 40 seeded documents. Savanna sees exactly the 8 Tensorgate documents shared with it. No Nixo or Halyard document is listed or opens for Savanna.
