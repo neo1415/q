@@ -8938,6 +8938,10 @@ export function createModelGatewayQAnswer(
       // Gap 2 (12 Nov): the same facts, for code to set their figures
       // beside the public pages' (figure-conflicts.ts).
       let suppliedFacts: readonly ConflictFact[] = [];
+      // How many retrieved passages, and code's row facts beside them, the
+      // prompt carried: the claim check's diagnostic line (counts only).
+      let retrievedPassages = 0;
+      let documentRowFactCount = 0;
       const assemblePrompt = async (w: WideReads) => {
         /**
          * Live re-check of 6f9b63cc5 (Phase 3 latency, d): a follow-up
@@ -8957,6 +8961,9 @@ export function createModelGatewayQAnswer(
                 subjectDescription: CARD_FOLLOW_UP_SUBJECT,
               };
         const ownDocuments = await ownDocumentsRead;
+        const rowFacts = documentRowFacts(assembled.facts);
+        retrievedPassages = assembled.facts.length;
+        documentRowFactCount = rowFacts.length;
         const facts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
@@ -8987,7 +8994,7 @@ export function createModelGatewayQAnswer(
           ...assembled.facts,
           // A passage's count table, its rows read by code and said plainly
           // beside it (document-rows.ts; live run 91bb8564).
-          ...documentRowFacts(assembled.facts),
+          ...rowFacts,
         ];
         // D3 and slice 1: every fact citable by label, and what each is
         // (the prompt the model answers is the last one assembled).
@@ -9383,13 +9390,23 @@ export function createModelGatewayQAnswer(
        */
       const liveFindings = createPartialFindingsReader();
       const liveFindingIds = new Map<string, string>();
+      /** Findings held back from the live display by the count check. */
+      const liveWithheld = new Set<string>();
       const findingKey = (statement: string): string =>
         statement.trim().replace(/\s+/gu, " ").toLowerCase();
       const showLive = (raw: unknown): void => {
         const parsed = ModelFindingSchema.safeParse(raw);
         if (!parsed.success) return;
         const key = findingKey(parsed.data.statement);
-        if (liveFindingIds.has(key)) return;
+        if (liveFindingIds.has(key) || liveWithheld.has(key)) return;
+        // Live a1777c9a: "15 people ...: five in Q1, ..." was shown the
+        // moment it was written, before any check. A finding stating a
+        // count the document's rows contradict is not shown; the stored
+        // message leaves it out the same way.
+        if (claims.contradictsCounts(parsed.data.statement)) {
+          liveWithheld.add(key);
+          return;
+        }
         const id = randomUUID();
         const block = findingBlockOf(
           parsed.data,
@@ -9665,11 +9682,19 @@ export function createModelGatewayQAnswer(
        * a wrong count is not grounded by having been said before.
        */
       let claimEchoes: () => readonly string[] = () => [];
+      /** What the check's sources and echoes are, by kind (counts only). */
+      const claimSourceKinds = {
+        read: (): Readonly<Record<string, number>> => ({
+          facts: facts.length,
+        }),
+      };
       const claims = createClaimChecker(
         () => claimSources(),
         new Date(),
         () => claimEchoes(),
       );
+      /** Findings the count check examined and left out (diagnostic line). */
+      const findingsChecked = { examined: 0, dropped: 0 };
       /**
        * Live scenario F, defect 5: "GateQ" is said only about a GateQ
        * application reading this run holds (gateq-application-fact.ts);
@@ -11966,6 +11991,20 @@ export function createModelGatewayQAnswer(
         ...(earlyLead === null ? [] : [earlyLead]),
         ...(compareVerdict === null ? [] : [JSON.stringify(compareVerdict)]),
       ];
+      claimSourceKinds.read = () => ({
+        facts: facts.length,
+        retrieved: retrievedPassages,
+        documentRows: documentRowFactCount,
+        toolResults: messages.filter(
+          (message) =>
+            message.role === "TOOL" && !instructionMessages.has(message),
+        ).length,
+        ownWords: recalledOwnWords.length,
+        memory: memory.trim().length > 0 ? 1 : 0,
+        earlierReplies: earlier.filter((message) => message.role === "Q")
+          .length,
+        ownRecord: ownRecordNotes.size,
+      });
 
       // Owner 2026-10-22: typed answers have their findings and cards
       // written beside them (parallel-extras.ts). Not spoken (three
@@ -13617,12 +13656,28 @@ export function createModelGatewayQAnswer(
           );
           analyst = joined.value;
           extrasJoin = joined.join;
+          // Left out at the join: examined and dropped there.
+          findingsChecked.examined += joined.ungrounded;
+          findingsChecked.dropped += joined.ungrounded;
           if (joined.ungrounded > 0) {
             logger?.warn(
               { qRunId: request.runId, ungrounded: joined.ungrounded },
               "findings stating a number neither writer was given were left out",
             );
           }
+        }
+        // Whichever writer wrote them, findings are held to the document's
+        // rows and tables against this run's sources, Q's recalled and
+        // earlier words binding no count (live a1777c9a: the answer's own
+        // findings went unchecked when the extras did not join).
+        {
+          const before = analyst.findings.length;
+          const held = analyst.findings.filter(
+            (finding) => !claims.contradictsCounts(finding.statement),
+          );
+          findingsChecked.examined += before;
+          findingsChecked.dropped += before - held.length;
+          if (held.length !== before) analyst = { ...analyst, findings: held };
         }
         if (request.signal?.aborted === true) {
           return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
@@ -14385,6 +14440,37 @@ export function createModelGatewayQAnswer(
           ),
         );
         logUngrounded(answerClaims.ungrounded, "answer");
+        // Every answer says what its claim check did (live a1777c9a: three
+        // fixes passed their replays, and production showed no line at all
+        // when nothing was flagged). Counts and kinds only, no text.
+        {
+          const streamed = claims.stats();
+          logger?.info(
+            {
+              qRunId: request.runId,
+              sources: claimSourceKinds.read(),
+              corpus: streamed.corpus,
+              stream: {
+                sentences: streamed.sentences,
+                dropped: streamed.dropped,
+                rewritten: streamed.rewritten,
+                ...streamed.counts,
+              },
+              answer: {
+                sentences: answerClaims.stats.sentences,
+                dropped: answerClaims.stats.dropped,
+                rewritten: answerClaims.stats.rewritten,
+                ...answerClaims.stats.counts,
+              },
+              findings: {
+                examined: findingsChecked.examined,
+                dropped: findingsChecked.dropped,
+                withheldLive: liveWithheld.size,
+              },
+            },
+            "q claim check",
+          );
+        }
         // Step 8: the stored answer is held to the same promise check.
         const answerPromises = stageClock.time("promiseCheckAnswer", () =>
           checkPromises(answerClaims.text, promiseGrounds()),

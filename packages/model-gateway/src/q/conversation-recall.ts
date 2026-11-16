@@ -12,6 +12,7 @@ import {
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 import type { ModelGateway } from "../gateway.js";
+import { statesCounts } from "./claim-check.js";
 
 /**
  * Owner live 2026-10-17: a follow-up about what Q already said or showed,
@@ -109,7 +110,21 @@ export function createConversationRecall(dependencies: {
       );
       if (!read.success || !read.data.answerable) return null;
       const say = read.data.say?.trim() ?? "";
-      return say.length === 0 || CLAIMS_WORK.test(say) ? null : say;
+      if (say.length === 0 || CLAIMS_WORK.test(say)) return null;
+      // Live run 21272075 ("How many start in each quarter?" -> "five hires
+      // in Q1, ten in Q2, and one in Q3"; the plan's Q1 rows add up to 4):
+      // the record is Q's own earlier words, which bind no count, and this
+      // path had no claim check at all. A reply stating a count goes the
+      // full way, where the document's rows are read and the check holds
+      // it to them.
+      if (statesCounts(say)) {
+        dependencies.logger?.info(
+          { qRunId: request.runId },
+          "a follow-up stating counts goes the full way",
+        );
+        return null;
+      }
+      return say;
     } catch (error: unknown) {
       dependencies.logger?.warn(
         { err: error, qRunId: request.runId },
