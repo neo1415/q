@@ -172,3 +172,17 @@ The account was Halyard Security's seeded founder, with the `fictional_demo` and
 - **The scenario's main contradictions now surface.** Turn 3 brings out the margin, burn and runway differences, and list items are whole.
 - **Defect 6 is only half fixed.** Q is now allowed to read the documents, but it does not choose to. A founder's "what do my documents back up / contradict" question should list and read the HIGHLY_CONFIDENTIAL financial documents without being named. Until it does, Q will still say records are missing (turn 2) and ask for documents that are already uploaded.
 - **Suggested next fix:** for THEIR_OWN_RECORDS questions about figures or contradictions, plan `documents.uploaded.list` plus page reads of the MANAGEMENT_ACCOUNTS and FINANCIAL documents in the prepare phase.
+
+## Timing on `77187e4aa` (16 Nov, 17:02 UTC)
+
+The reasoning migration `20261231594500` was applied before the deploy (hosted 305 applied). Savanna, conversation `db74c76d`, new wording.
+
+| Turn                                  | Run total, before (`8647c718c`) | Run total, now | Browser settle, now |
+| ------------------------------------- | ------------------------------- | -------------- | ------------------- |
+| Figures                               | 17.8 s                          | 15.4 s         | 21.8 s              |
+| "Why is the deck's number different?" | 26.9 s                          | 11.3 s         | 17.7 s              |
+| Three-company comparison              | 27.8 s                          | 17.2 s         | 14.7 s              |
+
+**Answers:** all correct. The "why" turn now says the documents do not explain the difference, and labels its September-vs-October explanation as an inference.
+
+**Still open:** the turn reader makes up to four classification calls of 2.2–4.0 s each, and is now the largest share. q-api's database pool (`DATABASE_POOL_MAX=3`, session pooler) adds queueing; a decision on that is pending with the owner.
