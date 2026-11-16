@@ -6128,6 +6128,51 @@ export function createSpecialistQAnswer(
       page: screen?.route ?? null,
     });
 
+  /**
+   * The reader's situation header, by run: begun by the early read at
+   * message receipt and taken by the turn's own reading, so the turn's
+   * reading is asked as soon as the turn is (live 16 Nov 2026 on
+   * 77187e4aa: the turn's reading waited 0.19-0.41 s for this read after
+   * the turn began, when the early reading was absent or dropped). Taken
+   * only when the screen it was built from is the plan's own: the early
+   * read runs before the firewall, and the reader is told only what the
+   * firewall kept.
+   */
+  const situationsInRun = new Map<
+    string,
+    { readonly key: string; readonly text: Promise<string> }
+  >();
+  const situationKeyOf = (
+    screen: Parameters<typeof situationFor>[1],
+    spoken: boolean,
+  ): string =>
+    JSON.stringify([
+      screen?.route ?? null,
+      screen?.timeZone ?? null,
+      screen?.surface ?? null,
+      screen?.companyId ?? null,
+      screen?.investorOrganisationId ?? null,
+      spoken,
+    ]);
+  const situationOfRun = (
+    runId: string,
+    actor: ActorContext,
+    screen: Parameters<typeof situationFor>[1],
+    spoken: boolean,
+  ): Promise<string> => {
+    const key = situationKeyOf(screen, spoken);
+    const kept = situationsInRun.get(runId);
+    if (kept !== undefined && kept.key === key) return kept.text;
+    const text = situationFor(actor, screen, spoken);
+    situationsInRun.set(runId, { key, text });
+    while (situationsInRun.size > PREREADS_MAX) {
+      const oldest = situationsInRun.keys().next().value;
+      if (oldest === undefined) break;
+      situationsInRun.delete(oldest);
+    }
+    return text;
+  };
+
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
@@ -6181,6 +6226,21 @@ export function createSpecialistQAnswer(
           preskims.delete(oldest);
         }
       }
+      // The reading's own inputs, begun now whether or not it is read
+      // early: the turn's reading takes them up (situationOfRun, and the
+      // run's conversation state, read once per run).
+      const situation = situationOfRun(
+        input.runId,
+        input.actor,
+        input.situationScreen,
+        latest.utteranceRef !== undefined,
+      );
+      const who = {
+        tenantId: input.tenantId,
+        userId: input.actor.userId,
+        runId: input.runId,
+      };
+      void conversationStateOf(who, history);
       const key =
         lastActions.get(conversationId) ??
         lastActionsByActor.get(actorKeyOf(input.tenantId, input.actor.userId));
@@ -6205,19 +6265,8 @@ export function createSpecialistQAnswer(
               lastActed.get(conversationId) ?? null,
             ),
             input.screenControls,
-            await situationFor(
-              input.actor,
-              input.situationScreen,
-              latest.utteranceRef !== undefined,
-            ),
-            await conversationStateTextOf(
-              {
-                tenantId: input.tenantId,
-                userId: input.actor.userId,
-                runId: input.runId,
-              },
-              history,
-            ),
+            await situation,
+            await conversationStateTextOf(who, history),
           ),
         )
         .catch(() => null);
@@ -7469,7 +7518,10 @@ export function createSpecialistQAnswer(
     // Why this turn's latest reading failed: no reasoning route at all, or
     // a model that answered nothing usable (live 2026-10-31).
     const readFailure = { serviceUnavailable: false };
-    const situationText = situationFor(
+    // Begun at message receipt by the early read when it was built for the
+    // plan's own screen; otherwise built now.
+    const situationText = situationOfRun(
+      request.runId,
       request.actor,
       request.plan.screen,
       latest.utteranceRef !== undefined,
@@ -10874,6 +10926,7 @@ ${line}`;
     preread,
     discard: (runId: string) => {
       prereads.delete(runId);
+      situationsInRun.delete(runId);
       delegate.discard?.(runId);
     },
     failureNotice: (runId: string) => {
