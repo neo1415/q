@@ -118,3 +118,23 @@ Still open:
 - **Unneeded page moves:** each figures turn opened the company profile ("I've opened the company profile."), against decision 98.
 
 All three are in the scope of the worker fixing defects 2 and 7.
+
+## Rerun on `8647c718c` (14:13 UTC)
+
+Savanna, conversation `1e659dc4`; USD 0.06 (ledger `c0aa24a6`). All answers were correct.
+
+- **Figures:** burn and runway came from the shared accounts (p. 1). The KPI pack agrees, and the deck's figures were given alongside.
+- **"Why does the deck show a different number?":** Q said the deck is an earlier snapshot (Sep vs Oct), which explains the runway difference. It said the documents do not state why burn changed.
+- **"Line up Halyard Security, Tensorgate and Nixo":** all three companies appear. Mandate fit (Halyard 8.3, Tensorgate 8.0, Nixo's cheque fit untestable) is kept apart from how well each is evidenced. Q flagged Tensorgate's GateQ application asking for $1.5m against $4m in the deck.
+
+**Latency, from the q-api `q answer produced` logs:**
+
+| Run                                   | Total  | Answer call              | Prompt (chars) | Tools offered |
+| ------------------------------------- | ------ | ------------------------ | -------------- | ------------- |
+| Figures (`b0ea3d06`)                  | 17.8 s | 7.0 s, two model rounds  | 87k            | 112           |
+| "Why does the deck…" (`84be6936`)     | 26.9 s | 16.4 s, reasoning MEDIUM | 106k           | 100           |
+| Three-company comparison (`6497c94c`) | 27.8 s | 19.6 s, reasoning MEDIUM | 97k            | —             |
+
+The prepare phase took 3–9 s across the three runs. The worker cutting latency has the details.
+
+**Page moves:** company overview for the figures question, deck tab for the deck question. Both are within decision 98.
