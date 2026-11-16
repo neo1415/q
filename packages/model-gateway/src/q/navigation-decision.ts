@@ -1280,6 +1280,8 @@ export function gateByReading(
     readonly evaluative?: boolean | undefined;
     /** QPageMoveReading.meetingBooked: false holds a rehearsal move. */
     readonly meetingBooked?: boolean | undefined;
+    /** QPageMoveReading.fromShownCard: answered from a card Q showed. */
+    readonly fromShownCard?: boolean | undefined;
   } = {},
 ): QNavigationOutcome {
   const gated = gateByReadingAlone(outcome, navigation, context);
@@ -1329,6 +1331,7 @@ function gateByReadingAlone(
     readonly codeMoves?: boolean | undefined;
     readonly evaluative?: boolean | undefined;
     readonly meetingBooked?: boolean | undefined;
+    readonly fromShownCard?: boolean | undefined;
   },
 ): QNavigationOutcome {
   // Decision 98 (live recheck 651a3bd50 T5): "get me ready for my meeting
@@ -1337,6 +1340,18 @@ function gateByReadingAlone(
   // meeting: with none booked the brief is given in place (it carries its
   // own rehearsal offer), unless they asked to go there.
   const moveTo = outcome.target ?? outcome.remembered;
+  // Decision 98 (live re-check of 3b7145616, turn C: "Why is the first one
+  // there?" about Q's own shown list opened the company's profile): a
+  // follow-up answered from a card Q already showed needs no page; it is
+  // answered where they are unless they asked to go there -- whatever the
+  // reading's mode, and with no navigation reading at all.
+  if (
+    context.fromShownCard === true &&
+    moveTo !== null &&
+    !readsAsGo(navigation)
+  ) {
+    return STAY("ANSWERED_IN_PLACE");
+  }
   if (
     context.meetingBooked === false &&
     moveTo !== null &&
@@ -2052,6 +2067,13 @@ export type QPageMoveReading = {
    * 98). Undefined: not a meeting prep, or not known.
    */
   readonly meetingBooked?: boolean | undefined;
+  /**
+   * Live re-check of 3b7145616 (16 Nov 2026): the turn is a follow-up on
+   * one item of a list Q showed ("why is the first one there?"), answered
+   * from that item's card. No page is moved to unless they asked to go
+   * (decision 98; guard ANSWERED_IN_PLACE).
+   */
+  readonly fromShownCard?: boolean | undefined;
   /** A8: they asked to watch the company's pitch (companyMedia.pitch). */
   readonly pitch?: boolean | undefined;
   /**
@@ -2318,6 +2340,104 @@ export function pinnedOf(request: QAnswerRequest): boolean {
   return request.plan.screen?.workspace?.pinned === true;
 }
 
+/** "Clinicrest's", "Spheros'". */
+function possessive(name: string): string {
+  return /s$/iu.test(name) ? `${name}'` : `${name}'s`;
+}
+
+/** A title word as it reads mid-sentence: "Team" -> "team", "Q&A" kept. */
+function midSentence(title: string): string {
+  const [first = "", second = ""] = [...title];
+  return second !== "" && second === second.toLocaleLowerCase()
+    ? `${first.toLocaleLowerCase()}${title.slice(first.length)}`
+    : title;
+}
+
+/** The first letter capitalised, for a line that opens with the place. */
+export function sentenceStart(place: string): string {
+  const [first = ""] = [...place];
+  return `${first.toLocaleUpperCase()}${place.slice(first.length)}`;
+}
+
+const RELATIONSHIP_PAGES: ReadonlySet<string> = new Set([
+  "RELATIONSHIP_COMPANY",
+  "RELATIONSHIP_INVESTOR",
+]);
+const MESSAGES_PAGES: ReadonlySet<string> = new Set([
+  "RELATIONSHIP_COMPANY_MESSAGES",
+  "RELATIONSHIP_INVESTOR_MESSAGES",
+]);
+const REHEARSAL_PAGES: ReadonlySet<string> = new Set([
+  "COMPANY_REHEARSAL",
+  "INVESTOR_REHEARSAL",
+]);
+
+/**
+ * Live re-check of 3b7145616 (16 Nov 2026): a move's own message said the
+ * site map's raw page title ("I've opened Company profile.", "I've opened
+ * Relationship."). The place as Q says it, mid-sentence: the record by
+ * its name where this person's records name it ("Baridi's profile",
+ * "your relationship with Ajopot", "Clinicrest's team"); a record page
+ * whose record is not named here by its generic name, lower-cased ("the
+ * company profile"); one of their own screens by its title, a leading
+ * article or "Your" lower-cased ("the Q Daily", "Pipeline"). Wording only:
+ * what is opened, and when, is unchanged.
+ */
+export function spokenPlace(
+  target: QNavigateTarget,
+  records: QNavigationRecords,
+  map: QSiteMap = Q_SITE_MAP,
+): string {
+  const landing = qSiteMapLandingFor(map, target.page);
+  const pageTitle = landing?.page.title ?? "the page";
+  const tabId = target.tab ?? landing?.tab?.id ?? null;
+  const tab = landing?.page.tabs.find((one) => one.id === tabId) ?? null;
+  const recordId = target.recordId?.toLowerCase() ?? null;
+  const name =
+    recordId === null
+      ? null
+      : ([...records.companies, ...records.investors].find(
+          (one) => one.id.toLowerCase() === recordId,
+        )?.name ??
+        records.things.find((one) => one.id.toLowerCase() === recordId)
+          ?.title ??
+        (records.own?.id?.toLowerCase() === recordId
+          ? records.own.name
+          : null));
+  const generic = `the ${midSentence(pageTitle)}`;
+  const page = target.page as string;
+  let said: string;
+  if (recordId === null) {
+    // One of their own screens: its title (a tab's, else the page's).
+    said = (tab?.title ?? pageTitle).replace(/^(?:The|Your|A|An)\b/u, (word) =>
+      word.toLocaleLowerCase(),
+    );
+  } else if (page === "COMPANY" || page === "INVESTOR") {
+    said =
+      name === null
+        ? generic
+        : tab === null || tab.id === "overview"
+          ? `${possessive(name)} profile`
+          : `${possessive(name)} ${midSentence(tab.title)}`;
+  } else if (RELATIONSHIP_PAGES.has(page)) {
+    said =
+      name === null
+        ? generic
+        : tab === null || tab.id === "overview"
+          ? `your relationship with ${name}`
+          : tab.id === "messages"
+            ? `your messages with ${name}`
+            : `the ${midSentence(tab.title)} tab of your relationship with ${name}`;
+  } else if (MESSAGES_PAGES.has(page)) {
+    said = name === null ? "your messages" : `your messages with ${name}`;
+  } else if (REHEARSAL_PAGES.has(page)) {
+    said = name === null ? generic : `your rehearsal with ${name}`;
+  } else {
+    said = name ?? generic;
+  }
+  return said.slice(0, Q_NAVIGATION_OFFER_LABEL_MAX - 5);
+}
+
 /** What Q says when a pinned workspace kept the page where it is. */
 export function pinnedLine(title: string): string {
   return `Your workspace is pinned, so the page stays as it is. ${title} is ready when you want it.`;
@@ -2493,12 +2613,26 @@ export function createQPageMoves(dependencies: {
   const hearNothing = (runId: string): void => {
     readings.get(runId)?.hear(null);
   };
-  const lineFor = (outcome: QNavigationOutcome, title: string): string =>
-    outcome.guard === "PINNED" || outcome.unpin === true
-      ? pinnedLine(title)
+  // Each run's records as read for the decision: the names its move's own
+  // line says (spokenPlace).
+  const recordsInRun = new Map<string, QNavigationRecords>();
+  const lineFor = (
+    outcome: QNavigationOutcome,
+    target: QNavigateTarget,
+    runId: string,
+  ): string => {
+    const place = spokenPlace(
+      target,
+      recordsInRun.get(runId) ?? NO_RECORDS,
+      map,
+    );
+    const opening = sentenceStart(place);
+    return outcome.guard === "PINNED" || outcome.unpin === true
+      ? pinnedLine(opening)
       : outcome.decision === "OFFER"
-        ? `${title} is ready to open.`
-        : `I've opened ${title}.`;
+        ? `${opening} is ready to open.`
+        : `I've opened ${place}.`;
+  };
   const lateRuns = new Map<
     string,
     {
@@ -2590,6 +2724,9 @@ export function createQPageMoves(dependencies: {
         dependencies.records?.(request).catch(() => null),
         dependencies.situation?.(request).catch(() => null),
       ]);
+      void read.then(([listed]) => {
+        if (listed != null) recordsInRun.set(request.runId, listed);
+      });
       const deciding = (async () => {
         const [listed, situation] = await read;
         const records = listed ?? NO_RECORDS;
@@ -2683,6 +2820,7 @@ export function createQPageMoves(dependencies: {
               codeMoves: reading?.codeMoves,
               evaluative: reading?.evaluative,
               meetingBooked: reading?.meetingBooked,
+              fromShownCard: reading?.fromShownCard,
             },
           );
           // Fast GO: held, in case the answer stored moves nothing after all.
@@ -2789,6 +2927,7 @@ export function createQPageMoves(dependencies: {
           codeMoves: reading?.codeMoves,
           evaluative: reading?.evaluative,
           meetingBooked: reading?.meetingBooked,
+          fromShownCard: reading?.fromShownCard,
         });
         if (outcome.decision === "STAY") return null;
         dependencies.logger?.info(
@@ -2874,7 +3013,7 @@ export function createQPageMoves(dependencies: {
               "q page move refined to the decision's exact place",
             );
             const stored = await publish({
-              content: lineFor(outcome, placeTitle(target)),
+              content: lineFor(outcome, target, runId),
               blocks: moved,
             }).catch(() => undefined);
             return first ?? stored?.messageId ?? null;
@@ -2893,7 +3032,7 @@ export function createQPageMoves(dependencies: {
               consumed.add(runId);
               published.set(runId, moved);
               const stored = await publish({
-                content: lineFor(outcome, placeTitle(outcome.target)),
+                content: lineFor(outcome, outcome.target, runId),
                 blocks: moved,
               });
               dependencies.logger?.info(
@@ -2930,6 +3069,7 @@ export function createQPageMoves(dependencies: {
         readings.delete(request.runId);
         heardNow.delete(request.runId);
         heldForCode.delete(request.runId);
+        recordsInRun.delete(request.runId);
       }, 120_000).unref?.();
     },
     heard: (request, reading) => {
@@ -3178,7 +3318,7 @@ export function createQPageMoves(dependencies: {
     if (settled === tooLate || settled === null) return null;
     const moved = blocksOf(settled);
     if (moved === null || settled.target === null) return null;
-    const title = placeTitle(settled.target);
+    const target = settled.target;
     dependencies.logger?.info(
       {
         qRunId: request.runId,
@@ -3188,6 +3328,9 @@ export function createQPageMoves(dependencies: {
       },
       "q page move applied after the answer",
     );
-    return { content: lineFor(settled, title), blocks: moved };
+    return {
+      content: lineFor(settled, target, request.runId),
+      blocks: moved,
+    };
   }
 }

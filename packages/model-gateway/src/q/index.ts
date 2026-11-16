@@ -1713,8 +1713,16 @@ export function shownCompanyCard(
       const card = block.cards[at];
       if (card === undefined || card.fit === null || card.fit === undefined)
         continue;
+      // Live re-check of 3b7145616 (16 Nov 2026, turn C): a conditioned
+      // list's cards are stored best score first while its words rank them
+      // as asked ("weakest first: Baridi…"), and its title carries the
+      // stated conditions. The list as Q said it -- its conditions and its
+      // order -- goes with the card, so "why is the first one there?" is
+      // answered from the list they saw, not the cards' storage order.
       const statement = JSON.stringify({
-        shownAs: `#${String(at + 1)} in "${block.title}"`,
+        shownIn: block.title,
+        cardPosition: `${String(at + 1)} of ${String(block.cards.length)} cards (cards are stored best fit first)`,
+        listAsSaid: message.content.slice(0, 1_200),
         name: card.name,
         line: card.line,
         measures: card.measures,
@@ -7686,6 +7694,10 @@ export function createModelGatewayQAnswer(
         claimed: boolean;
       } | null =
         research?.mode === "EXPLICIT" &&
+        // Live re-check of 3b7145616 (turn C): a follow-up answered from
+        // the card Q showed is answered from that card alone -- the web
+        // search ran beside it all the same.
+        coveredFollowUp === null &&
         // Web discovery plans its own searches from the mandate (owner
         // 2026-11-06): one search on the person's words is not it.
         request.webDiscovery === undefined &&

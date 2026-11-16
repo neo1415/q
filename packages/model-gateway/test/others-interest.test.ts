@@ -30,6 +30,26 @@ describe("other investors' interest", () => {
     }
   });
 
+  // Live re-check of 3b7145616 (16 Nov 2026): a founder's own pipeline
+  // ("the ones we're already talking to") opened with the withholding
+  // line, though nothing asked about other investors' interest or cheques.
+  it("an ask about their own conversations or fit is not about others' interest", () => {
+    for (const asked of [
+      "Which investors suit us best, excluding the ones we're already talking to?",
+      "Which investors are a good fit for us, but skip the ones I'm already in conversation with?",
+      "Which funds would back us, leaving out those already talking to us?",
+      "Who else should we pitch, apart from the investors we're in talks with?",
+    ]) {
+      expect(asksAboutOthersInterest(asked), asked).toBe(false);
+    }
+    for (const asked of [
+      "Which other investors are talking to Maji Loop?",
+      "Which investors suit us best, and which other investors are interested in Maji Loop?",
+    ]) {
+      expect(asksAboutOthersInterest(asked), asked).toBe(true);
+    }
+  });
+
   it("replaces the live denial with the plain withholding line", () => {
     const said = withOthersInterestWithheld(
       "Maji Loop is a seed-stage company based in Nairobi, Kenya.\n\nNo other investors or proposed cheque sizes are recorded for Maji Loop. The public-web search also found nothing about this company.",

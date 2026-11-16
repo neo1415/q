@@ -6,7 +6,11 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
-import type { QTurnReader, QTurnSkimmer } from "@capital-q/model-gateway/q";
+import type {
+  QPageMovePort,
+  QTurnReader,
+  QTurnSkimmer,
+} from "@capital-q/model-gateway/q";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -154,6 +158,7 @@ function seam(
   reading: Record<string, unknown>,
   earlier: readonly QConversationMessage[],
   skimmed: Record<string, unknown> | null = null,
+  pageMoves?: QPageMovePort,
 ) {
   let reads = 0;
   const turns: QTurnReader = {
@@ -205,6 +210,7 @@ function seam(
     transactions: { run: (work) => work({} as never) },
     turns,
     turnSkim,
+    ...(pageMoves === undefined ? {} : { pageMoves }),
     recordRouting: ({ routing }) => {
       routings.push(routing);
       return Promise.resolve();
@@ -356,5 +362,98 @@ describe("live re-check T8: a place in Q's list only when the reading marks one"
     await s.answer.answer(investorRequest());
     expect(s.delegated[0]?.referenceLead?.name).toBe("MedTrail");
     expect(s.delegated[0]?.followUpCompanyId).toBe(MEDTRAIL);
+  });
+});
+
+/**
+ * Live re-check of 3b7145616 (16 Nov 2026), turn C: after two conditioned
+ * lists ("revenue on record", then "weakest fits outside my sectors"),
+ * "Why is the first one there?" was read ADVICE with research EXPLICIT,
+ * class COMPLEX_ANALYSIS, and answered with 8 reads, a web search and a
+ * move to the company's profile. A "why" about one item of Q's own shown
+ * list is answered from the card, in place, with no public web.
+ */
+describe("live re-check 3b7145616: a 'why' about a conditioned-list item is answered from its card", () => {
+  const BARIDI = "3ab2cc02-160f-4812-a6b1-000000000003";
+  const KESHO = "3ab2cc02-160f-4812-a6b1-000000000004";
+  const revenueList = cardsMessage(
+    "Of the five companies closest to your mandate that I checked, two have revenue on record. Ranked by fit with your mandate: MedTrail at 8.1 and Mizan at 7.4.",
+    "Fit against your mandate: revenue on record",
+    [
+      { name: "MedTrail", subject: { kind: "COMPANY", companyId: MEDTRAIL } },
+      { name: "Mizan", subject: { kind: "COMPANY", companyId: MIZAN } },
+    ],
+  );
+  // Cards are stored best score first; the words say weakest first.
+  const outsideList = cardsMessage(
+    "Of the ten companies on Capital Q I checked, two are outside your preferred sectors. The weakest fits against your mandate, weakest first: Baridi at 3.1 and Kesho at 4.0.",
+    "Weakest fits against your mandate: outside your preferred sectors",
+    [
+      { name: "Kesho", subject: { kind: "COMPANY", companyId: KESHO } },
+      { name: "Baridi", subject: { kind: "COMPANY", companyId: BARIDI } },
+    ],
+  );
+  const history = [
+    message(
+      "USER",
+      "Among my top-ranked companies, which have real revenue coming in?",
+    ),
+    revenueList,
+    message("USER", "Then the worst fits outside the sectors I invest in"),
+    outsideList,
+  ];
+  const liveReading = (text: string) => ({
+    kind: "QUESTION_TO_Q",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: { kind: "ADVICE", text },
+    aboutNamedOther: true,
+    namedOther: { kind: "COMPANY", name: "Baridi" },
+    navigation: { mode: "CONTEXT", negated: false, destination: null },
+    reference: {
+      open: null,
+      name: "Baridi",
+      shown: null,
+      retryLast: false,
+      sameFor: null,
+    },
+  });
+
+  it("stays a contextual follow-up on the card: no public web, recorded in routing", async () => {
+    const said = "Why is the first one there?";
+    const s = seam(said, liveReading(said), history);
+    await s.answer.answer(investorRequest());
+    const asked = s.delegated[0];
+    expect(asked?.executionClass).toBe("CONTEXTUAL_FOLLOW_UP");
+    expect(asked?.followUpCompanyId).toBe(BARIDI);
+    expect((await asked?.research)?.mode).toBe("NEVER");
+    expect(s.routings[0]).toMatchObject({
+      research: "NEVER",
+      researchGuard: "SHOWN_LIST_ITEM",
+      executionClass: "CONTEXTUAL_FOLLOW_UP",
+    });
+  });
+
+  it("the page stays in place: the move decision is told the answer comes from a shown card", async () => {
+    const said = "Why is the first one there?";
+    const heard: unknown[] = [];
+    const s = seam(said, liveReading(said), history, null, {
+      start: () => undefined,
+      heard: (_request, reading) => {
+        heard.push(reading);
+      },
+      settle: (_request, blocks) => Promise.resolve(blocks),
+    });
+    await s.answer.answer(investorRequest());
+    expect(heard).toHaveLength(1);
+    expect(await heard[0]).toMatchObject({ fromShownCard: true });
+  });
+
+  it("asking for the web keeps the research", async () => {
+    const said = "Why is the first one there? Anything in the press about it?";
+    const s = seam(said, liveReading(said), history);
+    await s.answer.answer(investorRequest());
+    expect((await s.delegated[0]?.research)?.mode).not.toBe("NEVER");
+    expect(s.routings[0]).toMatchObject({ researchGuard: null });
   });
 });

@@ -417,12 +417,20 @@ const SINGULAR: readonly (readonly [RegExp, string])[] = [
   [/^don't /u, "doesn't "],
 ];
 
-/** The predicates joined; for one item, "has" and "is" for "have", "are". */
+/**
+ * The predicates joined; for one item, "has" and "is" for "have", "are".
+ * Each predicate agrees on its own (live re-check of 3b7145616: "one has
+ * revenue on record and are outside your preferred sectors" -- only the
+ * joined sentence's first verb was made singular).
+ */
 export function predicate(words: readonly string[], one: boolean): string {
-  const said = listed(words);
-  return one
-    ? SINGULAR.reduce((text, [from, to]) => text.replace(from, to), said)
-    : said;
+  return listed(
+    one
+      ? words.map((word) =>
+          SINGULAR.reduce((text, [from, to]) => text.replace(from, to), word),
+        )
+      : words,
+  );
 }
 
 const DIMENSION_WORDS: Readonly<Record<Dimension, string>> = {

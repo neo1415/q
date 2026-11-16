@@ -28,6 +28,8 @@ import {
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import {
+  conditionWords,
+  predicate,
   revenueStateOf,
   runConditionedCompanyList,
   type ListConditions,
@@ -1296,5 +1298,114 @@ describe("live re-check T3: 'Why the first one?' is answered from the card Q sho
     expect(JSON.stringify(t3.modelCalls[0])).toContain(
       "Nixo matches your seed stage",
     );
+  });
+});
+
+/**
+ * Live re-check of 3b7145616 (16 Nov 2026), turns A-C: "Among my
+ * top-ranked companies, which have real revenue coming in?", "Then the
+ * worst fits outside the sectors I invest in", "Why is the first one
+ * there?" -- the third ran 8 reads, a public-web search and two model
+ * calls. The conditioned list's cards are shown cards like a fit list's:
+ * the follow-up is answered from the card and the list's stated
+ * conditions and order, with no web search, even when research was read
+ * EXPLICIT.
+ */
+describe("live re-check 3b7145616: a follow-up on a conditioned list is answered from its card", () => {
+  it("one answer call, no web search, and the list's own conditions and order as evidence", async () => {
+    const { turn } = conversationSeam({
+      execute: (proposal, context) =>
+        proposal.name === "research_public_web"
+          ? Promise.resolve(
+              ok(proposal, "public_web.search", { status: "OK", sources: [] }),
+            )
+          : investorExecute(proposal, context),
+      offered: [
+        ...INVESTOR_TOOLS,
+        ["get_company", "company.get"],
+        ["get_relationship", "relationship.get"],
+        ["list_schedule", "schedule.list"],
+        ["list_pending_approvals", "approvals.pending.list"],
+        ["list_q_work", "q.work.list"],
+        ["search_companies", "company.search"],
+        ["research_public_web", "public_web.search"],
+      ],
+      digest: digestOf("INVESTOR", []),
+      investor: true,
+    });
+    const aAsked =
+      "Among my top-ranked companies, which have real revenue coming in?";
+    await turn(aAsked, {
+      questionKind: "FIT",
+      fitQuestion: { text: aAsked, count: null },
+      listConditions: { ...NO_CONDITIONS, revenue: "HAS_REVENUE" },
+    });
+    const bAsked = "Then the worst fits outside the sectors I invest in";
+    const b = await turn(bAsked, {
+      questionKind: "FIT",
+      fitQuestion: { text: bAsked, count: null },
+      listConditions: {
+        ...NO_CONDITIONS,
+        sector: "OUTSIDE",
+        order: "WORST_FIRST",
+      },
+    });
+    const first = /weakest first: ([A-Z][A-Za-z ]+?) at /u.exec(b.text)?.[1];
+    const company = COMPANIES.find((one) => one.name === first);
+    expect(company).toBeDefined();
+    const c = await turn("Why is the first one there?", {
+      executionClass: "CONTEXTUAL_FOLLOW_UP",
+      followUpCompanyId: company?.id,
+      aboutNamedOther: true,
+      namedOther: { kind: "COMPANY", name: company?.name ?? "" },
+      research: Promise.resolve({
+        mode: "EXPLICIT",
+        announceSourceChange: false,
+      }),
+    });
+    expect(c.outcome.kind).toBe("ANSWERED");
+    expect(c.modelCalls).toHaveLength(1);
+    expect(c.tools).not.toContain("research_public_web");
+    expect(c.tools.length).toBeLessThanOrEqual(2);
+    const evidence = JSON.stringify(c.modelCalls[0]);
+    // The list as Q said it: its conditions and its order.
+    expect(evidence).toContain(`weakest first: ${company?.name ?? "-"}`);
+    expect(evidence).toContain("outside your preferred sectors");
+  });
+});
+
+// Live re-check of 3b7145616: "one has revenue on record and are outside
+// your preferred sectors" -- only the first predicate agreed with one.
+describe("conditioned-list sentence agreement", () => {
+  it("every predicate agrees with a count of one", () => {
+    expect(
+      predicate(
+        conditionWords(
+          { ...NO_CONDITIONS, revenue: "HAS_REVENUE", sector: "OUTSIDE" },
+          "INVESTOR",
+        ),
+        true,
+      ),
+    ).toBe("has revenue on record and is outside your preferred sectors");
+    expect(
+      predicate(
+        conditionWords(
+          { ...NO_CONDITIONS, sector: "INSIDE", geography: "OUTSIDE" },
+          "FOUNDER",
+        ),
+        true,
+      ),
+    ).toBe(
+      "publishes a sector that matches your company and doesn't publish your geography",
+    );
+    expect(
+      predicate(
+        conditionWords(
+          { ...NO_CONDITIONS, revenue: "HAS_REVENUE", sector: "OUTSIDE" },
+          "INVESTOR",
+        ),
+        false,
+      ),
+    ).toBe("have revenue on record and are outside your preferred sectors");
   });
 });

@@ -727,6 +727,163 @@ function readingMarksPlace(
 }
 
 /**
+ * Live re-check of 3b7145616 (16 Nov 2026, turn C): the companies Q showed
+ * on cards in this conversation (fit lists and conditioned lists alike),
+ * by lower-case id, with the name each card shows.
+ */
+function shownCardCompanies(
+  history: readonly {
+    readonly role: string;
+    readonly blocks?: readonly QResultBlock[] | null | undefined;
+  }[],
+): ReadonlyMap<string, string> {
+  const shown = new Map<string, string>();
+  for (const message of history) {
+    if (message.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (block.kind !== "ANSWER_CARDS") continue;
+      for (const card of block.cards) {
+        if (card.subject?.kind === "COMPANY")
+          shown.set(card.subject.companyId.toLowerCase(), card.name);
+      }
+    }
+  }
+  return shown;
+}
+
+/**
+ * The person's own words ask for the public web, the news or the press.
+ * A question about an item of Q's own list without any of these is
+ * answered from Capital Q's records (turn C: research was read EXPLICIT
+ * for "Why is the first one there?" because the item is another company).
+ */
+const WEB_WORDING =
+  /\b(?:web|online|internet|google|public(?:ly)?|news|press|headlines?|articles?|media|website|linkedin|crunchbase|search(?:es|ed|ing)?|look(?:ing)?\s+(?:it|them|this|that|him|her)\s+up|sources?|reported|reports?|announce(?:d|s|ments?)?|latest)\b/iu;
+
+/** "Why…", "how come…", "what puts/makes/got…": a reason for a place. */
+const ASKS_WHY =
+  /\b(?:why|how\s+come)\b|\bwhat\s+(?:puts?|makes?|made|got|gets|lands?|landed|earns?|earned)\b/iu;
+
+type ShownItemReading = {
+  readonly kind: string;
+  readonly addressedToQ?: boolean | undefined;
+  readonly asksForWeb?: boolean | undefined;
+  readonly appAction?: unknown;
+  readonly askedAction?: unknown;
+  readonly tool?: unknown;
+  readonly compare?: unknown;
+  readonly handOver?: unknown;
+  readonly meetingPrep?: unknown;
+  readonly teamJob?: boolean | undefined;
+  readonly planAsk?: unknown;
+  readonly parts?: readonly unknown[] | null | undefined;
+  readonly namedOther?:
+    { readonly kind: string; readonly name: string } | null | undefined;
+  readonly reference?:
+    | { readonly name?: string | null; readonly shown?: number | null }
+    | null
+    | undefined;
+  readonly fromShown?: unknown;
+};
+
+/**
+ * Turn C: a plain question to Q about one thing -- no action, tool, hand
+ * over, comparison, team job or compound ask, and not asking for the web.
+ */
+function plainQuestionToQ(read: ShownItemReading | null): boolean {
+  if (read === null || read.kind !== "QUESTION_TO_Q") return false;
+  if (read.addressedToQ === false || read.asksForWeb === true) return false;
+  const none = (value: unknown): boolean =>
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.length === 0);
+  return (
+    none(read.appAction) &&
+    none(read.askedAction) &&
+    none(read.tool) &&
+    none(read.compare) &&
+    none(read.handOver) &&
+    none(read.meetingPrep) &&
+    read.teamJob !== true &&
+    none(read.planAsk) &&
+    (read.parts?.length ?? 0) < 2
+  );
+}
+
+/**
+ * Turn C: the one company on a card Q showed that this turn is about --
+ * the bound company when it is on a shown card, else the company the
+ * reading itself names (its namedOther or its reference) when exactly one
+ * shown card carries that name, else code's place in Q's list when the
+ * reading marks one. Null: not about one shown card.
+ */
+function shownCardCompanyOf(input: {
+  readonly read: ShownItemReading | null;
+  readonly shown: ReadonlyMap<string, string>;
+  readonly bound: string | null;
+  readonly listPlace: { readonly id: string; readonly kind: string } | null;
+}): string | null {
+  const { read, shown, bound, listPlace } = input;
+  if (shown.size === 0 || read === null) return null;
+  if (bound !== null && shown.has(bound.toLowerCase())) return bound;
+  const names = [
+    read.namedOther?.kind === "COMPANY" ? read.namedOther.name : null,
+    read.reference?.name ?? null,
+  ].flatMap((name) =>
+    name === null || name.trim().length === 0
+      ? []
+      : [name.trim().toLocaleLowerCase()],
+  );
+  const byName = [
+    ...new Set(
+      [...shown].flatMap(([id, name]) =>
+        names.includes(name.trim().toLocaleLowerCase()) ? [id] : [],
+      ),
+    ),
+  ];
+  if (byName.length === 1) return byName[0] ?? null;
+  if (byName.length > 1) return null;
+  if (
+    listPlace !== null &&
+    listPlace.kind === "COMPANY" &&
+    shown.has(listPlace.id.toLowerCase()) &&
+    readingMarksPlace(read, listPlace.id, [])
+  )
+    return listPlace.id;
+  return null;
+}
+
+/**
+ * Live re-check of 3b7145616 (16 Nov 2026, turn C): "Why is the first one
+ * there?" after Q's conditioned list was read ADVICE with research
+ * EXPLICIT and class COMPLEX_ANALYSIS: 8 reads, a web search, two model
+ * calls and a move to the company's profile. A "why" about one company of
+ * Q's own shown list, with no web wording, is answered from its card:
+ * a contextual follow-up, no public web, no page. `why` is that shape;
+ * `aboutItem` (a pointer into the list, or the why) is the wider shape
+ * whose research is held to Capital Q's records. Code-level: the
+ * reading's structure plus the person's own words, never the prompt.
+ */
+function shownItemTurn(input: {
+  readonly read: ShownItemReading | null;
+  readonly utterance: string;
+  readonly company: string | null;
+}): { readonly aboutItem: boolean; readonly why: boolean } {
+  const { read, utterance, company } = input;
+  if (
+    company === null ||
+    !plainQuestionToQ(read) ||
+    WEB_WORDING.test(utterance)
+  )
+    return { aboutItem: false, why: false };
+  const why = ASKS_WHY.test(utterance);
+  const pointsIntoList =
+    (read?.reference?.shown ?? null) !== null ||
+    (read?.fromShown ?? null) !== null;
+  return { aboutItem: why || pointsIntoList, why };
+}
+
+/**
  * Live re-check 15 Nov 2026 (T1): lists a quick first read may not answer
  * before the full reading, whose list conditions it does not carry.
  */
@@ -942,6 +1099,12 @@ export type QRunRouting = {
   readonly confidence: string | null;
   readonly question: string | null;
   readonly research: string;
+  /**
+   * Live re-check of 3b7145616 (turn C): why code changed the reading's
+   * research ("SHOWN_LIST_ITEM": a follow-up on an item of Q's own shown
+   * list, no web wording, held to Capital Q's records); null: unchanged.
+   */
+  readonly researchGuard: string | null;
   readonly tool: string | null;
   readonly teamJob: boolean;
   readonly meetingPrep: boolean;
@@ -5178,6 +5341,7 @@ export function createSpecialistQAnswer(
       confidence: null,
       question: null,
       research: "NEVER",
+      researchGuard: null,
       tool: null,
       teamJob: false,
       meetingPrep: false,
@@ -7223,10 +7387,33 @@ export function createSpecialistQAnswer(
       const known = await booked(request, counterpart).catch(() => null);
       return known === null ? {} : { meetingBooked: known };
     };
+    // Turn C (live re-check of 3b7145616): the companies Q showed on cards,
+    // and code's place in Q's own list ("the first one"), for a follow-up
+    // answered from one of those cards.
+    const shownCards = shownCardCompanies(history);
+    const listPlace =
+      pointed !== null &&
+      pointed.ask?.kind === "ORDINAL" &&
+      pointed.resolved?.kind === "ONE" &&
+      pointed.resolved.via === "Q_ANSWER"
+        ? pointed.resolved.entity
+        : null;
     dependencies.pageMoves?.heard?.(
       request,
       Promise.all([readingFirst, fastGo]).then(
         async ([reading, go]) => ({
+          // Decision 98 (turn C): a "why" about one item of Q's own shown
+          // list is answered from its card, where they are.
+          fromShownCard: shownItemTurn({
+            read: reading,
+            utterance: latest.content,
+            company: shownCardCompanyOf({
+              read: reading,
+              shown: shownCards,
+              bound: null,
+              listPlace,
+            }),
+          }).why,
           // A pitch to watch is placed on the Elevator pitch tab, as in
           // placedNavigation (the decision is told the same tab).
           navigation:
@@ -7449,7 +7636,7 @@ export function createSpecialistQAnswer(
     if (read !== null && researchedMemo) {
       read = { ...read, teamJob: true, handOver: null };
     }
-    const research: Promise<QResearchDirective> = Promise.resolve(
+    let research: Promise<QResearchDirective> = Promise.resolve(
       read === null ||
         // Lane S / C10 (audit item 6): a turn the reader read as answered
         // from what Q already showed ("put those three in a table", v54
@@ -7495,35 +7682,49 @@ export function createSpecialistQAnswer(
         },
         "q turn read",
       );
-      if (dependencies.recordRouting !== undefined) {
-        routeRun(request, {
-          kind: read.kind,
-          confidence:
-            typeof read.confidence === "string" ? read.confidence : null,
-          question: read.question?.kind ?? null,
-          research: (await research).mode,
-          tool: read.tool?.kind ?? null,
-          teamJob: read.teamJob ?? false,
-          meetingPrep: read.meetingPrep != null,
-          aboutNamedOther: read.aboutNamedOther === true,
-          addressedToQ: read.addressedToQ ?? true,
-          navigation: read.navigation?.mode ?? null,
-          navigationDestination: read.navigation?.destination ?? null,
-          spoken,
-          lane: "READER",
-          // The class the answer path takes (below), kept on the run as
-          // well as in the log, for every path the reading routes to
-          // (meeting prep included).
-          executionClass: executionClassOfTurn({
-            read,
-            history,
-            latestId: latest.id,
-            carriesDocuments:
-              (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
-          }),
-        });
-      }
     }
+    /**
+     * The reading's routing, kept on the run once the turn's references
+     * are bound (turn C: a follow-up on a shown list item changes its
+     * research and class), or as the run asks which one they meant.
+     */
+    const routeReading = async (shownItem: {
+      readonly researchGuard: string | null;
+      readonly why: boolean;
+    }): Promise<void> => {
+      if (read === null || dependencies.recordRouting === undefined) return;
+      routeRun(request, {
+        kind: read.kind,
+        confidence:
+          typeof read.confidence === "string" ? read.confidence : null,
+        question: read.question?.kind ?? null,
+        research: (await research).mode,
+        // Turn C: code held the research to Capital Q's records (null: it
+        // is the reading's own).
+        researchGuard: shownItem.researchGuard,
+        tool: read.tool?.kind ?? null,
+        teamJob: read.teamJob ?? false,
+        meetingPrep: read.meetingPrep != null,
+        aboutNamedOther: read.aboutNamedOther === true,
+        addressedToQ: read.addressedToQ ?? true,
+        navigation: read.navigation?.mode ?? null,
+        navigationDestination: read.navigation?.destination ?? null,
+        spoken,
+        lane: "READER",
+        // The class the answer path takes (below), kept on the run as
+        // well as in the log, for every path the reading routes to
+        // (meeting prep included).
+        executionClass: shownItem.why
+          ? "CONTEXTUAL_FOLLOW_UP"
+          : executionClassOfTurn({
+              read,
+              history,
+              latestId: latest.id,
+              carriesDocuments:
+                (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
+            }),
+      });
+    };
     // TURN_READER v44 (Zino live 2026-10-08 11:13): garbled speech read by
     // sound. The likely words become their turn, recorded beside what the
     // recogniser heard (kept, never overwritten), and the turn is answered
@@ -7675,6 +7876,7 @@ export function createSpecialistQAnswer(
           },
           "q asked which one they meant",
         );
+        await routeReading({ researchGuard: null, why: false });
         return recordAnswer(request, conversationId, binding.question);
       }
       // Nothing bound and code already bound the words to their page: the
@@ -7733,13 +7935,7 @@ export function createSpecialistQAnswer(
     // only when the reading marks one -- a numbered pointer into what Q
     // showed (reference.shown), an answer from a shown turn (fromShown), or
     // its own reference to the same record -- never from the word alone.
-    const placeFromList =
-      pointed !== null &&
-      pointed.ask?.kind === "ORDINAL" &&
-      pointed.resolved?.kind === "ONE" &&
-      pointed.resolved.via === "Q_ANSWER"
-        ? pointed.resolved.entity
-        : null;
+    const placeFromList = listPlace;
     const placeMarked =
       placeFromList !== null &&
       readingMarksPlace(read, placeFromList.id, readerBoundIds);
@@ -7772,6 +7968,51 @@ export function createSpecialistQAnswer(
         "a place word the reading did not mark as a list reference; not bound",
       );
     }
+    // Live re-check of 3b7145616 (turn C): a follow-up on one company of
+    // Q's own shown list (a fit list or a conditioned one) with no web
+    // wording keeps to Capital Q's records, recorded in routing; a "why"
+    // about it is answered from its card as a contextual follow-up.
+    const shownItemCompany = shownCardCompanyOf({
+      read,
+      shown: shownCards,
+      bound: followUpCompany,
+      listPlace: placeFromList,
+    });
+    const shownItem = shownItemTurn({
+      read,
+      utterance: latest.content,
+      company: shownItemCompany,
+    });
+    let researchGuard: string | null = null;
+    if (shownItem.aboutItem && (await research).mode !== "NEVER") {
+      research = Promise.resolve(NO_RESEARCH);
+      researchGuard = "SHOWN_LIST_ITEM";
+    }
+    if (
+      shownItem.why &&
+      followUpCompany === null &&
+      shownItemCompany !== null &&
+      !followUpCompanyInRun.has(request.runId)
+    ) {
+      followUpCompanyInRun.set(request.runId, shownItemCompany);
+      while (followUpCompanyInRun.size > PREREADS_MAX) {
+        const oldest = followUpCompanyInRun.keys().next().value;
+        if (oldest === undefined) break;
+        followUpCompanyInRun.delete(oldest);
+      }
+    }
+    if (shownItem.aboutItem) {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          researchGuard,
+          why: shownItem.why,
+        },
+        "q follow-up on an item of its own shown list",
+      );
+    }
+    const answeredFromShownCard = shownItem.why;
+    await routeReading({ researchGuard, why: answeredFromShownCard });
     // A reading the speculation cannot be is known now: stop it at once
     // rather than at the end of the path.
     const misread = readingMisfit(read);
@@ -9345,13 +9586,19 @@ export function createSpecialistQAnswer(
     // RC3 (Q voice audit, 15 Nov 2026): the lane this turn takes, from the
     // reading's structure; a short contextual follow-up answers from this
     // conversation's evidence instead of a full investigation.
-    const executionClass = executionClassOfTurn({
-      read,
-      history,
-      latestId: latest.id,
-      carriesDocuments:
-        (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
-    });
+    // Turn C (live re-check of 3b7145616): a "why" about one item of Q's own
+    // shown list is a contextual follow-up answered from that item's card,
+    // whatever the reading's question kind made of it.
+    const executionClass: ReturnType<typeof executionClassOfTurn> =
+      answeredFromShownCard
+        ? "CONTEXTUAL_FOLLOW_UP"
+        : executionClassOfTurn({
+            read,
+            history,
+            latestId: latest.id,
+            carriesDocuments:
+              (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
+          });
     logger?.info(
       { qRunId: request.runId, executionClass },
       "q turn execution class",

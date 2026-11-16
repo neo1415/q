@@ -2887,6 +2887,92 @@ describe("C10: the decision is gated by the turn reader's navigation intent (v84
     }
   });
 
+  // Live re-check of 3b7145616 (16 Nov 2026): the move's own message read
+  // "I've opened Company profile." / "I've opened Relationship." -- the
+  // site map's raw page title. It names the record where it is known.
+  it.each([
+    [
+      place({ record: company("Clinicrest") }),
+      ["I've opened Clinicrest's profile."],
+    ],
+    [
+      place({ record: company("Clinicrest"), tab: "team" }),
+      ["I've opened Clinicrest's team."],
+    ],
+    [
+      place({
+        route: "/relationships/company/[companyId]",
+        record: company("Spheros"),
+      }),
+      ["I've opened your relationship with Spheros."],
+    ],
+    [
+      place({
+        route: "/relationships/company/[companyId]/messages",
+        record: company("Spheros"),
+      }),
+      ["I've opened your messages with Spheros."],
+    ],
+    [place({ route: "/daily" }), ["I've opened the Q Daily."]],
+  ] as const)("the move's line names the record: %o", async (where, said) => {
+    const published: string[] = [];
+    const moves = createQPageMoves({
+      decider: { decide: () => Promise.resolve(proposal({ place: where })) },
+      config: { movesAllowed: true },
+      records: () => Promise.resolve(RECORDS),
+    });
+    const r = request(`named-line-${JSON.stringify(where)}`);
+    moves.start(r, {
+      utterance: "-",
+      recentTurns: [],
+      pageText: null,
+      readingFollows: true,
+      publish: (move) => {
+        published.push(move.content);
+        return Promise.resolve({ messageId: "m" });
+      },
+    });
+    moves.heard?.(r, Promise.resolve({ navigation: nav("GO") }));
+    await moves.awaitPublished?.(r);
+    expect(published).toEqual(said);
+  });
+
+  // Live re-check of 3b7145616 (16 Nov 2026, turn C): "Why is the first one
+  // there?" about Q's own shown list opened the company's profile. An
+  // answer from a card Q showed needs no page (decision 98).
+  it("a follow-up answered from a shown card stays in place unless they asked to go", async () => {
+    const profile = proposal({
+      place: place({ record: company("Clinicrest") }),
+    });
+    for (const [navigation, stays] of [
+      [nav("CONTEXT"), true],
+      [null, true],
+      [nav("GO"), false],
+    ] as const) {
+      const moves = createQPageMoves({
+        decider: { decide: () => Promise.resolve(profile) },
+        config: { movesAllowed: true },
+        records: () => Promise.resolve(RECORDS),
+        settleWithinMs: 500,
+      });
+      const r = request(`shown-card-${String(navigation?.mode)}`);
+      moves.start(r, {
+        utterance: "-",
+        recentTurns: [],
+        pageText: null,
+        readingFollows: true,
+      });
+      moves.heard?.(
+        r,
+        Promise.resolve({ navigation, fromShownCard: true } as never),
+      );
+      const settled = await moves.settle(r, []);
+      expect(settled, String(navigation?.mode)).toEqual(
+        stays ? [] : opened({ kind: "OPEN_RECORD_PAGE", id: CLINICREST }),
+      );
+    }
+  });
+
   it("CONTEXT negatives: the decision's guards hold -- unsaved work, an ambiguous name, a page they cannot open, the same subject", async () => {
     const dataroom = place({ record: company("Silo Credit"), tab: "dataroom" });
     // Unsaved work in the pane: offered, never moved.

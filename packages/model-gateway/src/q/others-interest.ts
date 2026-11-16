@@ -11,9 +11,28 @@
 const OTHERS_INTEREST =
   /\b(?:other|which|what|any|how\s+many|who\s+else|anyone\s+else)\b[^.?!]*\b(?:investors?|funds?|vcs?|firms?|backers?|angels?)\b[^.?!]*\b(?:interest(?:ed)?|want|keen|looking\s+at|talking\s+to|in\s+talks|cheques?|checks?|committed|commitments?|backing|investing|invested|pipeline|competing|competition)\b|\bwho\s+else\b[^.?!]*\b(?:interested|investing|looking|talking|bidding)\b/iu;
 
+/**
+ * Live re-check of 3b7145616 (16 Nov 2026): "Which investors suit us best,
+ * excluding the ones we're already talking to?" opened with the
+ * withholding line, unasked (owner: no repetitive or unprompted
+ * disclosures). Talks, interest or fit whose other party is the asker
+ * ("we're talking to", "interested in us", "suit us") are their own
+ * pipeline and fit, not another investor's interest in a company: those
+ * spans are set aside before the question is read for others' interest.
+ */
+const ASKERS_OWN = [
+  /\b(?:we|i)(?:'re|'m|\s+are|\s+am|'ve\s+been|\s+have\s+been)?\s+(?:already\s+|currently\s+|now\s+|still\s+)?(?:talking|speaking|in\s+talks|in\s+touch|in\s+contact|in\s+conversation|meeting)\b/giu,
+  /\b(?:interest(?:ed)?\s+in|talking\s+(?:to|with)|speaking\s+(?:to|with)|in\s+talks\s+with|in\s+touch\s+with|backing|investing\s+in|invested\s+in|keen\s+on|looking\s+at|committed\s+to)\s+(?:us|me|our)\b/giu,
+  /\b(?:fit|fits|match|matches|suit|suits|suited\s+to)\s+(?:for\s+)?(?:me|my|us|our)\b/giu,
+  /\b(?:good|best|right|strong|great)\s+(?:fit|match)\s+for\s+(?:me|my|us|our)\b/giu,
+];
+
 /** They ask about other investors' interest in a company. */
 export function asksAboutOthersInterest(text: string): boolean {
-  const plain = text.replace(/[’]/gu, "'");
+  const plain = ASKERS_OWN.reduce(
+    (said, own) => said.replace(own, " "),
+    text.replace(/[’]/gu, "'"),
+  );
   return (
     OTHERS_INTEREST.test(plain) &&
     /\b(?:other|else|any(?:one)?|which|who|how\s+many)\b/iu.test(plain) &&
