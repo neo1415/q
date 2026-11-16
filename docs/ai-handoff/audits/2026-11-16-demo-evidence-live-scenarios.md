@@ -100,3 +100,21 @@ Conversation `f6415253`, run `b87ad973` (USD 0.0067), plus a delegated job (USD 
 6. **Founder's documents held back.** The founder's own HIGHLY_CONFIDENTIAL documents are held back from the founder's own Q job, so Q asks for evidence the founder already has (delegated job for `b87ad973`).
 7. **Needless web search.** `public_web.search` runs on own-records and diligence questions (`research: EXPLICIT`) in every investor run.
 8. **Truncated chat items.** The job summary in chat cuts list items mid-sentence.
+
+## Rerun on `a5f3d95e9` (13:03 UTC)
+
+Savanna, conversation `4b9a3278`, new wording. Answers were correct throughout:
+
+- burn of $152,800 for October from the shared accounts, set beside the deck's ~$135,000 for 30 September;
+- runway of 6.2 against 8.1 months;
+- both documents named, with the deck figures on p. 10.
+
+Still open:
+
+- **Turn 1 took 21.8 s.** All reads finished by 5.4 s. The time went to:
+  - three classification calls that hit their 2.5–3.0 s limits, then an 8.8 s fallback classification;
+  - two answer rounds, the second running `company.search` and `public_web.search` at 12.8 s.
+- **Reasons not given:** turn 2 still did not explain the reasons for the difference.
+- **Unneeded page moves:** each figures turn opened the company profile ("I've opened the company profile."), against decision 98.
+
+All three are in the scope of the worker fixing defects 2 and 7.
