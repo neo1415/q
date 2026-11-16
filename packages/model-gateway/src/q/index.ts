@@ -1124,6 +1124,26 @@ export const Q_TOOL_LOOP_MAX_ROUNDS = 2;
  */
 const USE_CAPABILITY_TOOL = "use_capability";
 
+/**
+ * Voice audit Phase 3: what an investor's figures answer over the documents
+ * a company shared with them is offered up front (the company, the
+ * relationship, its figures, deck, data room and pages, Q's card handle),
+ * with the loader for anything else the run may use. Narrows the offer;
+ * never what may execute (the executor authorises every call as before).
+ */
+const SHARED_FIGURES_TURN_TOOLS: ReadonlySet<string> = new Set([
+  USE_CAPABILITY_TOOL,
+  Q_CARD_CLAIM_TOOL,
+  "search_companies",
+  "get_company",
+  "get_relationship",
+  "list_my_relationships",
+  "read_company_figures",
+  "read_company_deck",
+  "read_company_data_room",
+  "read_document_pages",
+]);
+
 function loadCapabilities(
   data: unknown,
   available: readonly QOfferedTool[],
@@ -1434,15 +1454,22 @@ export function answerTaskClass(
  * code-side default; the routing policy's `reasoning_levels` (keyed by
  * `answerReasoningKey`) is the authority once its migration is applied.
  * Small talk and lookups think least, so follow-ups stay fast; a
- * comparison, analysis (diligence, memo, planning) or a document gets
- * room to think.
+ * comparison or an analysis (diligence, planning, "why does the deck
+ * differ") thinks at LOW, and a document keeps MEDIUM.
+ *
+ * Voice audit Phase 3 (live 16 Nov 2026, production 8647c718c): at MEDIUM a
+ * conversational comparison's or analysis's first words came 10.2 s and
+ * 15.3 s into a 19.6 s / 16.4 s answer call, almost all of it thinking, on
+ * evidence code had already read and put in front of the model. LOW keeps
+ * the reasoning step; what Q may see and say is unchanged (routing only,
+ * migration 20261231594500 writes the same levels to the policy).
  */
 export const ANSWER_REASONING_V1 = {
   CHAT: "NONE",
   LOOKUP: "NONE",
   FOLLOW_UP: "LOW",
-  COMPARISON: "MEDIUM",
-  ANALYSIS: "MEDIUM",
+  COMPARISON: "LOW",
+  ANALYSIS: "LOW",
   DOCUMENT: "MEDIUM",
 } as const satisfies Readonly<Record<TurnAnswerKind, ModelReasoningLevel>>;
 
@@ -4581,6 +4608,31 @@ export function createModelGatewayQAnswer(
       ));
     const conversationId = history[0]?.conversationId;
     /**
+     * Voice audit Phase 3 (live 16 Nov 2026, run 84be6936): the setup
+     * reminder's read began only after every prepared read had landed and
+     * then held the answer call for 2.0 s ("nudge"), queued behind the
+     * turn's other reads on the same small connection pool. It starts here,
+     * beside them, under the same own-only scope; whether the reminder is
+     * offered is still decided where it was (a natural pause, a read turn),
+     * and an answer that offers none never waits for it. A read only:
+     * peek changes nothing, and a failed read is simply no reminder. Null
+     * when not started here; the answer then reads it itself, as before.
+     */
+    const nudgePeek: Promise<QOnboardingNudge | null> | null =
+      dependencies.onboardingNudge !== undefined &&
+      conversationId !== undefined &&
+      // Known already (an answer's own prepare): never during a series of
+      // questions or on an unread turn, as below.
+      request.questionSequence === undefined &&
+      request.turnUnread !== true &&
+      plan.scopes.some(
+        (scope) =>
+          scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
+      )
+        ? dependencies.onboardingNudge.peek(request.actor, conversationId)
+        : null;
+    nudgePeek?.catch(() => undefined);
+    /**
      * The most recent document Q put in front of this person, from
      * their own turns. Used only to tell the model one exists; which
      * artifact a revision touches is resolved server-side again.
@@ -7315,6 +7367,7 @@ export function createModelGatewayQAnswer(
     return {
       wide,
       wideFor,
+      nudgePeek,
       settleEvidence: settleDigest,
       prepareMs,
       history,
@@ -8592,6 +8645,23 @@ export function createModelGatewayQAnswer(
         offered = offered.filter(
           (tool) => !PUBLIC_WEB_TOOLS.has(tool.definition.name),
         );
+        /**
+         * Voice audit Phase 3 (live 16 Nov 2026, run b0ea3d06): this
+         * figures answer was offered 112 tools, ~28k of its 53.9k input
+         * tokens, none of them cached, for an answer written from pages code
+         * had already read. It is offered the reads of that company and its
+         * documents, and the on-demand loader: any other tool this run may
+         * use (its purpose, plan and actor decide, unchanged) is still one
+         * use_capability call away. Only when the loader is in the offer, so
+         * nothing the run may use goes out of reach.
+         */
+        if (
+          offered.some((tool) => tool.definition.name === USE_CAPABILITY_TOOL)
+        ) {
+          offered = offered.filter((tool) =>
+            SHARED_FIGURES_TURN_TOOLS.has(tool.definition.name),
+          );
+        }
         logger?.info(
           { qRunId: request.runId, sinceStartMs: Date.now() - startedAt },
           "q early web search not waited on: answered from shared documents",
@@ -8658,10 +8728,9 @@ export function createModelGatewayQAnswer(
           )
         ) {
           try {
-            onboardingNudge = await dependencies.onboardingNudge.peek(
-              request.actor,
-              conversationId,
-            );
+            // Phase 3: begun with the prepared reads when it could be.
+            onboardingNudge = await (prepared.nudgePeek ??
+              dependencies.onboardingNudge.peek(request.actor, conversationId));
           } catch (error: unknown) {
             logger?.warn(
               { err: error, qRunId: request.runId },

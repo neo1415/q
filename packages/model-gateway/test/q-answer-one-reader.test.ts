@@ -237,8 +237,8 @@ describe("adaptive reasoning reaches the provider (step 7: the reader's answerKi
     ["CHAT", "NONE"],
     ["LOOKUP", "NONE"],
     ["FOLLOW_UP", "LOW"],
-    ["COMPARISON", "MEDIUM"],
-    ["ANALYSIS", "MEDIUM"],
+    ["COMPARISON", "LOW"],
+    ["ANALYSIS", "LOW"],
     ["DOCUMENT", "MEDIUM"],
   ] as const)(
     "answerKind %s: the answer call asks for %s",

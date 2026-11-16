@@ -6,7 +6,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(12);
+select plan(13);
 
 select has_column('ai_ops', 'routing_policies', 'reasoning_levels',
   'routing_policies has reasoning_levels');
@@ -17,8 +17,18 @@ select col_is_null('ai_ops', 'routing_policies', 'reasoning_levels',
 select is(
   (select reasoning_levels from ai_ops.routing_policies
     where code = 'normal_dialogue.v1' and status = 'ACTIVE'),
-  '{"ANSWER_CHAT":"NONE","ANSWER_LOOKUP":"NONE","ANSWER_FOLLOW_UP":"LOW","ANSWER_COMPARISON":"MEDIUM","ANSWER_ANALYSIS":"MEDIUM","ANSWER_DOCUMENT":"MEDIUM"}'::jsonb,
-  'dialogue: chat and lookups NONE, follow-ups LOW, comparison, analysis and documents MEDIUM');
+  '{"ANSWER_CHAT":"NONE","ANSWER_LOOKUP":"NONE","ANSWER_FOLLOW_UP":"LOW","ANSWER_COMPARISON":"LOW","ANSWER_ANALYSIS":"LOW","ANSWER_DOCUMENT":"MEDIUM"}'::jsonb,
+  'dialogue: chat and lookups NONE, follow-ups, comparison and analysis LOW (20261231594500), documents MEDIUM');
+
+select is(
+  (select count(*)::int from ai_ops.routing_policies
+    where status = 'ACTIVE'
+      and task_class in ('NORMAL_DIALOGUE', 'EVIDENCE_SYNTHESIS', 'COMPARISON')
+      and (reasoning_levels->>'ANSWER_COMPARISON' <> 'LOW'
+           or reasoning_levels->>'ANSWER_ANALYSIS' <> 'LOW'
+           or reasoning_levels->>'ANSWER_DOCUMENT' <> 'MEDIUM')),
+  0,
+  'phase 3: every active Q answer policy thinks at LOW for a comparison or analysis');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies

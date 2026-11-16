@@ -441,7 +441,9 @@ function analyst(
   };
 }
 
-function plan(): PermittedContextPlan {
+function plan(
+  options: { readonly ownOnboarding?: boolean } = {},
+): PermittedContextPlan {
   return {
     ...PermittedContextPlanSchema.parse({
       contractVersion: 1,
@@ -473,6 +475,7 @@ function plan(): PermittedContextPlan {
           investorOrganisationId: SAVANNA,
         },
       },
+      ...(options.ownOnboarding === true ? [{ kind: "OWN_ONBOARDING" }] : []),
     ],
   } as unknown as PermittedContextPlan;
 }
@@ -486,10 +489,14 @@ async function turn(options: {
   readonly room?: unknown;
   readonly questionKind?: string;
   readonly research?: "EXPLICIT" | "NEVER";
+  /** Production offers the on-demand loader (use_capability) too. */
+  readonly withLoader?: boolean;
   /** Production-shaped latencies on the virtual clock (timing replay). */
   readonly timing?: {
     readonly latencyMs: (proposal: QToolProposal) => number;
     readonly modelMs: number;
+    /** The setup reminder's read (onboarding nudge peek), when offered. */
+    readonly nudgeMs?: number;
   };
 }) {
   const traced: Traced[] = [];
@@ -575,16 +582,40 @@ async function turn(options: {
       },
     },
   } as unknown as QRuntimeRepositories;
-  const tools = toolsFor(
+  const roomTools = toolsFor(
     options.room ?? SAVANNA_ROOM,
     timing === undefined ? undefined : { latencyMs: timing.latencyMs, trace },
   );
+  const withLoader = [...TOOLS, offered("use_capability", "q.capability.use")];
+  const tools: typeof roomTools =
+    options.withLoader === true
+      ? {
+          ...roomTools,
+          offer: () => Promise.resolve(withLoader),
+          available: () => Promise.resolve(withLoader),
+        }
+      : roomTools;
   const seam = createModelGatewayQAnswer({
     gateway,
     repositories,
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools,
+    ...(timing?.nudgeMs === undefined
+      ? {}
+      : {
+          onboardingNudge: {
+            peek: async () => {
+              trace("start nudge");
+              await new Promise((resolve) =>
+                setTimeout(resolve, timing.nudgeMs),
+              );
+              trace("end nudge");
+              return null;
+            },
+            markShown: () => Promise.resolve(),
+          },
+        }),
   });
   const request = {
     runId: RUN,
@@ -600,7 +631,7 @@ async function turn(options: {
     capability: "ANSWER",
     subjects: [],
     retrieval: { kind: "NOT_CONFIGURED" },
-    plan: plan(),
+    plan: plan({ ownOnboarding: timing?.nudgeMs !== undefined }),
     turnKind: "QUESTION_TO_Q",
     questionKind: options.questionKind ?? "THEIR_OWN_RECORDS",
     aboutNamedOther: true,
@@ -615,7 +646,10 @@ async function turn(options: {
     .flatMap((call) => call.request.messages.map((m) => m.content))
     .join("\n");
   const said = completed.at(-1)?.message.text ?? "";
-  return { outcome, sent, said, executed: tools.executed, traced };
+  const toolsAsked = alpha.calls.map((call) =>
+    call.request.tools.map((tool) => tool.name),
+  );
+  return { outcome, sent, said, executed: tools.executed, traced, toolsAsked };
 }
 
 const ANSWER = (text: string): FakeBehaviour => ({
@@ -1045,5 +1079,110 @@ describe("live rerun bab915357: a figures question over shared documents is not 
       expect(args["fromPage"]).toBe(1);
       expect(typeof args["toPage"]).toBe("number");
     }
+  });
+});
+
+/**
+ * Voice audit Phase 3 (live 16 Nov 2026, production 8647c718c, run
+ * 84be6936 "Why does the deck show a different number?"): the setup
+ * reminder's read began only after every prepared read had landed and held
+ * the answer call 2.0 s ("nudge" phase), on a connection pool the turn's
+ * other reads were queued on. Replayed on the virtual clock with that 2 s
+ * read: it now starts beside the prepared reads, so the answer call is
+ * asked when the slowest read the answer needs lands, not 2 s after it.
+ */
+describe("phase 3: the setup reminder's read never holds the answer call", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "performance",
+        "Date",
+      ],
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("a 2 s reminder read overlaps the prepared reads; the answer is asked as they land", async () => {
+    const { traced, sent } = await onVirtualClock(() =>
+      turn({
+        earlier: [{ role: "Q", content: T1_ANSWER }],
+        said: "Why does the deck show a different number?",
+        script: [ANSWER(T2_ANSWER)],
+        // The web is not asked for here, so only the reads time the answer.
+        research: "NEVER",
+        timing: {
+          latencyMs: (proposal) => LATENCY[proposal.name] ?? 300,
+          modelMs: 1_000,
+          nudgeMs: 2_000,
+        },
+      }),
+    );
+    if (process.env["CQ_TIMING_DEBUG"] === "1") {
+      console.log(traced.map((t) => `${String(t.ms)} ${t.what}`).join("\n"));
+    }
+    const at = (what: string): number =>
+      traced.find((one) => one.what === what)?.ms ?? Number.POSITIVE_INFINITY;
+    const asked = at("model asked");
+    // Still right: the shared accounts reach the answer.
+    expect(sent).toContain("152,800");
+    // The reminder's read was made, and began with the turn's reads.
+    expect(at("start nudge")).toBeLessThanOrEqual(100);
+    expect(at("end nudge")).toBeLessThanOrEqual(2_100);
+    // The answer call is not pushed 2 s past the reads it needs.
+    const lastRead = Math.max(
+      ...traced
+        .filter((one) => one.what.startsWith("end ") && one.ms <= asked)
+        .filter((one) => one.what !== "end nudge")
+        .map((one) => one.ms),
+    );
+    expect(asked - lastRead).toBeLessThan(500);
+    expect(asked).toBeLessThanOrEqual(3_000);
+  });
+});
+
+/**
+ * Voice audit Phase 3 (live 16 Nov 2026, run b0ea3d06): the figures answer
+ * over the shared accounts was offered 112 tools (~28k of 53.9k input
+ * tokens). It is offered the company's and its documents' reads and the
+ * on-demand loader; everything else stays one use_capability call away.
+ */
+describe("phase 3: a figures answer over shared documents is offered only what it reads", () => {
+  it("the answer call carries the company and document reads and the loader, not the day's tools", async () => {
+    const { toolsAsked, sent } = await turn({
+      earlier: [],
+      said: "How much cash is Tensorgate burning each month, and how long will it last?",
+      script: [ANSWER(T1_ANSWER)],
+      withLoader: true,
+    });
+    expect(sent).toContain(
+      "Net burn (payments less customer receipts) | 152,800",
+    );
+    const asked = toolsAsked.at(-1) ?? [];
+    expect(asked).toContain("use_capability");
+    expect(asked).toContain("read_document_pages");
+    for (const name of [
+      "list_schedule",
+      "list_pending_approvals",
+      "list_q_work",
+      "research_public_web",
+      "diligence_documents",
+    ]) {
+      expect(asked).not.toContain(name);
+    }
+  });
+
+  it("without the loader in the offer nothing is narrowed (nothing goes out of reach)", async () => {
+    const { toolsAsked } = await turn({
+      earlier: [],
+      said: "How much cash is Tensorgate burning each month, and how long will it last?",
+      script: [ANSWER(T1_ANSWER)],
+    });
+    expect(toolsAsked.at(-1) ?? []).toContain("list_schedule");
   });
 });

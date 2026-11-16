@@ -25,13 +25,16 @@ import { IDS, request, testCatalog } from "./fixtures.js";
 
 const ANSWER = { capability: "ANSWER" as const };
 
-/** The routing config the step 7 migration writes (20261231260000). */
+/**
+ * The routing config: step 7 (20261231260000) as revised by the voice
+ * audit's Phase 3 (20261231594500: comparison and analysis MEDIUM -> LOW).
+ */
 const POLICY_LEVELS = {
   ANSWER_CHAT: "NONE",
   ANSWER_LOOKUP: "NONE",
   ANSWER_FOLLOW_UP: "LOW",
-  ANSWER_COMPARISON: "MEDIUM",
-  ANSWER_ANALYSIS: "MEDIUM",
+  ANSWER_COMPARISON: "LOW",
+  ANSWER_ANALYSIS: "LOW",
   ANSWER_DOCUMENT: "MEDIUM",
 } as const;
 
@@ -40,8 +43,8 @@ describe("the answer's reasoning level (step 7: the reader's answerKind only)", 
     ["CHAT", "NONE"],
     ["LOOKUP", "NONE"],
     ["FOLLOW_UP", "LOW"],
-    ["COMPARISON", "MEDIUM"],
-    ["ANALYSIS", "MEDIUM"],
+    ["COMPARISON", "LOW"],
+    ["ANALYSIS", "LOW"],
     ["DOCUMENT", "MEDIUM"],
   ] as const)("answerKind %s thinks at %s", (answerKind, level) => {
     expect(answerReasoning({ ...ANSWER, answerKind })).toEqual({
@@ -66,14 +69,25 @@ describe("the answer's reasoning level (step 7: the reader's answerKind only)", 
           { ask: "How does it compare with Ledgerfold's?", kind: "COMPARISON" },
         ],
       }),
-    ).toEqual({ reasoning: "MEDIUM", reasoningKey: "ANSWER_COMPARISON" });
+    ).toEqual({ reasoning: "LOW", reasoningKey: "ANSWER_COMPARISON" });
+    // A document thinks more than the analysis beside it.
+    expect(
+      answerReasoning({
+        ...ANSWER,
+        answerKind: "ANALYSIS",
+        askParts: [
+          { ask: "Draft the memo", kind: "DOCUMENT" },
+          { ask: "and assess the risks", kind: "ANALYSIS" },
+        ],
+      }),
+    ).toEqual({ reasoning: "MEDIUM", reasoningKey: "ANSWER_DOCUMENT" });
     // A tie in level is broken by a fixed order, so the key is stable.
     expect(
       answerReasoning({
         ...ANSWER,
-        answerKind: "DOCUMENT",
+        answerKind: "COMPARISON",
         askParts: [
-          { ask: "Draft the memo", kind: "DOCUMENT" },
+          { ask: "Line them up", kind: "COMPARISON" },
           { ask: "and assess the risks", kind: "ANALYSIS" },
         ],
       }).reasoningKey,
@@ -186,8 +200,8 @@ describe("the level reaches the provider request", () => {
     ["CHAT", "NONE"],
     ["LOOKUP", "NONE"],
     ["FOLLOW_UP", "LOW"],
-    ["COMPARISON", "MEDIUM"],
-    ["ANALYSIS", "MEDIUM"],
+    ["COMPARISON", "LOW"],
+    ["ANALYSIS", "LOW"],
     ["DOCUMENT", "MEDIUM"],
   ] as const)(
     "an answer read as %s asks the provider for %s (code default, no policy map)",
@@ -224,7 +238,23 @@ describe("the level reaches the provider request", () => {
         ...answerReasoning({ ...ANSWER, answerKind: "COMPARISON" }),
       }),
     );
+    expect(alpha.calls.at(-1)?.request.reasoning).toBe("LOW");
+    await gateway.execute(
+      request({
+        taskClass: "NORMAL_DIALOGUE",
+        ...answerReasoning({ ...ANSWER, answerKind: "DOCUMENT" }),
+      }),
+    );
     expect(alpha.calls.at(-1)?.request.reasoning).toBe("MEDIUM");
+  });
+
+  it("phase 3 (live 16 Nov): a conversational comparison or analysis never thinks above LOW", () => {
+    // At MEDIUM their first words came 10.2 s and 15.3 s into the answer
+    // call (runs 6497c94c, 84be6936); the evidence was already read.
+    for (const kind of ["COMPARISON", "ANALYSIS"] as const) {
+      expect(ANSWER_REASONING_V1[kind]).toBe("LOW");
+      expect(POLICY_LEVELS[`ANSWER_${kind}`]).toBe("LOW");
+    }
   });
 
   it("a model the catalogue does not mark as reasoning is asked for none", async () => {
