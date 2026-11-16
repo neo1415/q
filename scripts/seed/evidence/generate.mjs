@@ -37,7 +37,7 @@ for (const key of FIXTURE_KEYS) {
     mkdirSync(MANIFEST_DIR, { recursive: true });
     writeFileSync(committed, manifest);
   } else {
-    let current = "";
+    let current;
     try {
       current = readFileSync(committed, "utf8");
     } catch {

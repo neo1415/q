@@ -54,9 +54,9 @@ node --experimental-strip-types scripts/i18n/generate-ui-text-source.mts 2>&1 | 
 step "package builds (dist current for type-aware checks)"
 pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only >/dev/null 2>&1 || bad "package build"
 
-step "eslint (changed TS files, batches of 4)"
+step "eslint (changed TS and JS files, batches of 4)"
 lint=()
-for f in "${changed[@]}"; do case "$f" in *.ts|*.tsx|*.mts) [ -f "$f" ] && lint+=("$f");; esac; done
+for f in "${changed[@]}"; do case "$f" in *.ts|*.tsx|*.mts|*.mjs|*.js) [ -f "$f" ] && lint+=("$f");; esac; done
 for ((i = 0; i < ${#lint[@]}; i += 4)); do
   NODE_OPTIONS=--max-old-space-size=7168 npx eslint --max-warnings=0 "${lint[@]:i:4}" || bad "eslint ${lint[*]:i:4}"
 done
