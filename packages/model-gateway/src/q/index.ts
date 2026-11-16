@@ -212,6 +212,7 @@ import {
 import {
   capitalQAsCompanyAsked,
   companyFactAskOf,
+  followsReplyAboutACompany,
   companyNameCandidates,
   isCapitalQCompanyRead,
   itemsOf,
@@ -546,7 +547,10 @@ import {
 import { onScreenDocumentFact } from "./document-fact.js";
 import type { CheckedLineNeed } from "./uncertainty.js";
 import {
+  alreadyReadLine,
   alreadySharedLine,
+  documentsReadIn,
+  readDocumentFor,
   asksForFigures,
   asksToReconcile,
   documentDeckDifferenceFact,
@@ -6492,7 +6496,9 @@ export function createModelGatewayQAnswer(
           // it as one (live 2026-10-28: "My" was searched).
           heardNames(request),
         ),
-        ...lowercaseNameCandidates(latest.content),
+        ...(followsReplyAboutACompany(earlier)
+          ? []
+          : lowercaseNameCandidates(latest.content)),
       ].filter(
         (name, index, all) =>
           all.findIndex(
@@ -7674,7 +7680,9 @@ export function createModelGatewayQAnswer(
               2,
               heardNames(request),
             ),
-            ...lowercaseNameCandidates(prepared.latest.content),
+            ...(followsReplyAboutACompany(prepared.earlier)
+              ? []
+              : lowercaseNameCandidates(prepared.latest.content)),
           ].filter((name) => !cardNames.has(nameKey(name)));
           if (cardNames.size > 0 && candidates.length === 0) return undefined;
           if (
@@ -13873,8 +13881,9 @@ export function createModelGatewayQAnswer(
           about: string | null,
           asked: unknown,
         ): { readonly line: string } | null => {
-          const byCompany = sharedDocumentsByRun.get(request.runId);
-          if (byCompany === undefined || byCompany.size === 0) return null;
+          const byCompany =
+            sharedDocumentsByRun.get(request.runId) ??
+            new Map<string, readonly ListedDocument[]>();
           // The subject the answer is about; else the one company whose
           // documents this turn listed.
           const documents =
@@ -13883,7 +13892,17 @@ export function createModelGatewayQAnswer(
               : byCompany.size === 1
                 ? [...byCompany.values()][0]
                 : undefined;
-          if (documents === undefined) return null;
+          // Live b0a877f8: what this run read is checked too, listed or
+          // not (a document the model read in its tool round).
+          const readTitles = documentsReadIn({
+            facts: suppliedFacts,
+            toolResults: gateqToolResults(),
+          }).filter(
+            (title) =>
+              documents === undefined ||
+              documents.some((document) => document.title === title),
+          );
+          if (documents === undefined && readTitles.length === 0) return null;
           const backing = offerBacking(uncertainties, about);
           const said = [
             about ?? "",
@@ -13894,8 +13913,11 @@ export function createModelGatewayQAnswer(
                 ? ""
                 : JSON.stringify(asked).slice(0, 2_000),
           ].join(" ");
-          const document = sharedDocumentFor(said, documents);
-          if (document === null) return null;
+          const document =
+            documents === undefined ? null : sharedDocumentFor(said, documents);
+          const read =
+            document === null ? readDocumentFor(said, readTitles) : null;
+          if (document === null && read === null) return null;
           const name =
             subject?.name ??
             (subject === null
@@ -13905,7 +13927,10 @@ export function createModelGatewayQAnswer(
                   .companyNames.get(subject.companyId.toLowerCase()) ??
                 null)) ??
             "The company";
-          return { line: alreadySharedLine(name, document) };
+          if (document !== null) {
+            return { line: alreadySharedLine(name, document) };
+          }
+          return read === null ? null : { line: alreadyReadLine(name, read) };
         };
         /** Whom an offer to resolve the item goes to (D13, D14). */
         const counterpartyOf = (subject: {

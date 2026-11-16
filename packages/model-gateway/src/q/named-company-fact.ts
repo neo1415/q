@@ -636,6 +636,88 @@ const LIST_PLACE_WORDS = new Set([
 ]);
 
 /**
+ * Scenario D rerun on d252444b1 (run b0a877f8): "Break that down for me:
+ * how many people per role…" came right after Q's answer about Halyard
+ * Security, and code searched lowercase phrases of it as other companies.
+ * A turn that follows Q's reply about a company is about that company: a
+ * lowercase phrase is a guess at a name, not a name said, so it is not
+ * searched; a name they write as one (capitalised) still is, and the model
+ * can still look up anything it needs.
+ */
+export function followsReplyAboutACompany(
+  earlier: readonly {
+    readonly role: string;
+    readonly blocks?: readonly { readonly kind: string }[] | undefined;
+  }[],
+): boolean {
+  const lastQ = earlier.findLast((message) => message.role === "Q");
+  return (lastQ?.blocks ?? []).some(
+    (block) => block.kind === "COMPANY_REFERENCE",
+  );
+}
+
+/**
+ * Common words a question is built from: times and periods, quantities
+ * and the parts of a plan or a team. A lowercase phrase made only of these
+ * (and list places) names nothing; "each group start" is not a company.
+ */
+const COMMON_WORDS = new Set([
+  "each",
+  "every",
+  "many",
+  "much",
+  "few",
+  "several",
+  "per",
+  "how",
+  "when",
+  "what",
+  "which",
+  "day",
+  "days",
+  "week",
+  "weeks",
+  "month",
+  "months",
+  "quarter",
+  "quarters",
+  "year",
+  "years",
+  "time",
+  "times",
+  "date",
+  "dates",
+  "period",
+  "periods",
+  "people",
+  "person",
+  "role",
+  "roles",
+  "group",
+  "groups",
+  "hire",
+  "hires",
+  "hiring",
+  "plan",
+  "plans",
+  "number",
+  "numbers",
+  "figure",
+  "figures",
+  "total",
+  "head",
+  "headcount",
+  "starts",
+  "started",
+  "begin",
+  "begins",
+  "ends",
+  "happen",
+  "happens",
+  "breakdown",
+]);
+
+/**
  * Turn latency round 5: a company typed in lowercase ("risks with
  * northwind ledger") as candidates, when no capitalised name was found.
  * The phrase after a word such as "with", "about" or "compare", cut at
@@ -669,7 +751,15 @@ export function lowercaseNameCandidates(text: string, max = 2): string[] {
     if (name.length === 0 || name.length > 4) continue;
     // A place in a list ("at the top", "the first one") is a pointer into
     // what Q showed, never a company's name; "first bank" still is one.
-    if (name.every((word) => LIST_PLACE_WORDS.has(word))) continue;
+    // Scenario D rerun on d252444b1 (run b0a877f8): "in which quarter
+    // does each group start?" searched "quarter" and "each group start".
+    // A phrase of common words only -- a time, a quantity, a part of a
+    // plan -- is the question's grammar, never a company's name.
+    if (
+      name.every((word) => LIST_PLACE_WORDS.has(word) || COMMON_WORDS.has(word))
+    ) {
+      continue;
+    }
     const candidate = name.join(" ");
     if (candidate.length < 3 || found.includes(candidate)) continue;
     found.push(candidate);

@@ -201,6 +201,78 @@ describe("read_company_document", () => {
     });
   });
 
+  it("gives page cites for a document read by its text (live b0a877f8)", async () => {
+    // Scenario D rerun on d252444b1: Halyard's one-page "Team and hiring
+    // plan" came back with pageCount null (the data room counts a deck's
+    // pages only) and unmarked text, so the answer cited no page.
+    const PLAN = "00000000-0000-4000-8000-00000000c00a";
+    const PLAN_PAGE =
+      "Hiring plan funded by the seed round\nPublic-sector account manager | Sales | 3 2027-Q1";
+    const withPlan: ProfileMaterialPort = {
+      ...material,
+      documents: (_actor, companyId) =>
+        Promise.resolve(
+          companyId === COMPANY_B_NETWORK
+            ? [
+                ...ROOM,
+                {
+                  ...doc(PLAN, "Team and hiring plan", "Team", null, "OPEN"),
+                  pageCount: null,
+                },
+              ]
+            : null,
+        ),
+      documentText: (_actor, _companyId, documentId) =>
+        Promise.resolve(
+          documentId === PLAN
+            ? { text: PLAN_PAGE.replace("\n", " "), truncated: false }
+            : null,
+        ),
+      documentPages: (_actor, _companyId, documentId, range) =>
+        Promise.resolve(
+          documentId === PLAN
+            ? {
+                pageCount: 1,
+                pages: [{ page: 1, text: PLAN_PAGE }].filter(
+                  (one) => one.page >= range.from && one.page <= range.to,
+                ),
+              }
+            : null,
+        ),
+    };
+    const reader = createReadCompanyDocumentTool(fakePorts(), withPlan);
+    const decision = await reader.authorize(
+      { companyId: COMPANY_B_NETWORK, document: "Team and hiring plan" },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      documentId: PLAN,
+      pageCount: 1,
+      text: `[p. 1] ${PLAN_PAGE}`,
+      truncated: false,
+    });
+  });
+
+  it("keeps the text read when only part of a document has page text", async () => {
+    const decision = await createReadCompanyDocumentTool(fakePorts(), {
+      ...material,
+      documentPages: () =>
+        Promise.resolve({ pageCount: 3, pages: [{ page: 1, text: "One." }] }),
+    }).authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: CERT },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({
+      text: "This is to certify that Halyard Security Ltd is incorporated.",
+      pageCount: 3,
+    });
+  });
+
   it("never reads an on-request document", async () => {
     reads.length = 0;
     const decision = await tool.authorize(
@@ -421,7 +493,9 @@ describe("a shared highly confidential document (ADR 0078)", () => {
     expect(decision.sensitivity).toBe("CONFIDENTIAL");
     expect(decision.grant).toMatchObject({
       status: "READ",
-      text: "Cash $410,000; monthly burn $38,000.",
+      // The whole document has text by page: its page text, marked.
+      text: "[p. 1] Cash $410,000",
+      pageCount: 1,
       truthClass: "USER_CLAIM",
       evidenceStatus: "DOCUMENT_SUPPORTED",
       sharedUnder: { grantId: GRANT, expiresAt: share.expiresAt },

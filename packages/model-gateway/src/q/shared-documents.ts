@@ -258,6 +258,140 @@ export function alreadySharedLine(
 }
 
 /**
+ * Live scenario D rerun on d252444b1 (16 Nov 2026, run b0a877f8): Q read
+ * Halyard's "Team and hiring plan" for the answer, then closed with "Want
+ * me to ask Halyard Security for a document that would settle this?". The
+ * already-shared check matched the uncertainty against the listing by
+ * coverage of the uncertainty's own words, which a long statement never
+ * reaches; and a document the run actually read was never consulted.
+ *
+ * The documents this run read: code's page reads (their DATA ROOM DOCUMENT
+ * facts, `Data room: "<title>"`) and the model's own reads in the tool
+ * round (read_company_document / read_document_pages results that came
+ * back READ). Titles only; a title is the company's own label.
+ */
+const READ_TOOLS = new Set(["read_company_document", "read_document_pages"]);
+const READ_TITLE =
+  /"status":"READ","documentId":"[0-9a-f-]{36}","title":"((?:[^"\\]|\\.)*)"/u;
+
+export function documentsReadIn(input: {
+  readonly facts: readonly {
+    readonly statement: string;
+    readonly source?: string | undefined;
+  }[];
+  readonly toolResults: readonly {
+    readonly role: string;
+    readonly name?: string | undefined;
+    readonly content: string;
+  }[];
+}): readonly string[] {
+  const titles: string[] = [];
+  const add = (title: string | null): void => {
+    const clean = title?.trim() ?? "";
+    if (clean.length > 0 && !titles.includes(clean)) titles.push(clean);
+  };
+  for (const fact of input.facts) {
+    if (!fact.statement.startsWith("DATA ROOM DOCUMENT:")) continue;
+    add(/^Data room: "(.+)"$/u.exec(fact.source ?? "")?.[1] ?? null);
+  }
+  for (const message of input.toolResults) {
+    if (message.role !== "TOOL" || !READ_TOOLS.has(message.name ?? "")) {
+      continue;
+    }
+    const quoted = READ_TITLE.exec(message.content)?.[1];
+    if (quoted === undefined) continue;
+    try {
+      const title: unknown = JSON.parse(`"${quoted}"`);
+      add(typeof title === "string" ? title : null);
+    } catch {
+      // A malformed result names no document.
+    }
+  }
+  return titles;
+}
+
+/** Words of a title that do not say what the document is. */
+const TITLE_FILLER = new Set([
+  "a",
+  "an",
+  "and",
+  "the",
+  "of",
+  "to",
+  "for",
+  "with",
+  "by",
+  "from",
+  "on",
+  "in",
+  "at",
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "sept",
+  "oct",
+  "nov",
+  "dec",
+  "january",
+  "february",
+  "march",
+  "april",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+]);
+
+const titleWord = (word: string): string =>
+  word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
+    ? word.slice(0, -1)
+    : word;
+
+const wordsOf = (text: string): string[] =>
+  (text.toLowerCase().match(/\p{L}[\p{L}'-]*/gu) ?? []).flatMap((word) =>
+    word.split("-").map(titleWord),
+  );
+
+/**
+ * The read document an uncertainty or a request is about: most of its
+ * title's own words (at least two) are said in it ("the hiring plan gives
+ * quarters" for "Team and hiring plan"). Null when none is.
+ */
+export function readDocumentFor(
+  about: string,
+  titles: readonly string[],
+): string | null {
+  const said = new Set(wordsOf(about));
+  let best: { title: string; score: number } | null = null;
+  for (const title of titles) {
+    const own = [
+      ...new Set(wordsOf(title).filter((word) => !TITLE_FILLER.has(word))),
+    ];
+    if (own.length === 0) continue;
+    const found = own.filter((word) => said.has(word)).length;
+    const score = found / own.length;
+    if (found >= 2 && score >= 0.6 && (best === null || score > best.score)) {
+      best = { title, score };
+    }
+  }
+  return best?.title ?? null;
+}
+
+/** Code's line in place of an offer to request a document just read. */
+export function alreadyReadLine(company: string, title: string): string {
+  return `I read ${company}'s "${title}" for this answer, so there is no document to request for this; I can open it for you.`;
+}
+
+/**
  * Live rerun on bab915357 (16 Nov 2026, Savanna on Tensorgate, turn 1:
  * 23.1 s, 21 tools): a figures question about one company. The figures a
  * question asks for, as code reads the words: cash, burn, runway, revenue

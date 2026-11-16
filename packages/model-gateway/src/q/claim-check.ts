@@ -83,6 +83,11 @@ export interface ClaimCorpus {
   readonly ordinary: ReadonlySet<string>;
   /** The minutes of every clock time a source states ("56" of 08:56). */
   readonly minutes: ReadonlySet<string>;
+  /**
+   * Every source line, lower-cased (a JSON tool result's escaped line
+   * breaks count as breaks): what a count of a named item is bound to.
+   */
+  readonly segments: readonly string[];
 }
 
 export interface SentenceCheck {
@@ -243,11 +248,15 @@ function figuresIn(text: string): Figure[] {
 }
 
 /** A figure that states no checkable fact: a list position, a time, a span. */
-function isIncidental(sentence: string, figure: Figure): boolean {
+function isIncidental(
+  sentence: string,
+  figure: Figure,
+  loneDigit = true,
+): boolean {
   if (figure.kind !== "NUMBER") return false;
   const literal = figure.text.trim();
   // A lone digit (a list position, "one of 3").
-  if (/^\d$/u.test(literal)) return true;
+  if (loneDigit && /^\d$/u.test(literal)) return true;
   const before = sentence.slice(0, figure.index);
   const after = sentence.slice(figure.end);
   // "3pm", "10:30".
@@ -325,6 +334,7 @@ export function claimCorpus(
   const dates = new Set<string>();
   const ordinary = new Set<string>();
   const minutes = new Set<string>();
+  const segments: string[] = [];
   const iso = today.toISOString().slice(0, 10);
   const all = [...sources, iso];
   for (const source of all) {
@@ -332,6 +342,10 @@ export function claimCorpus(
     // companies") is the length of a list it holds.
     for (const length of listLengths(source)) {
       numbers.push({ value: length, currency: null });
+    }
+    for (const segment of source.split(SEGMENT_BREAK)) {
+      const trimmed = normaliseText(segment).trim();
+      if (trimmed.length > 0) segments.push(trimmed);
     }
     for (const line of source.split(/\n|(?<=[.;!?])\s+(?=[A-Z])/u)) {
       const own = figuresIn(line);
@@ -369,8 +383,15 @@ export function claimCorpus(
     dates,
     ordinary,
     minutes,
+    segments,
   };
 }
+
+/**
+ * A source's lines: real line breaks, a JSON tool result's escaped ones,
+ * and the boundary between two of its string values.
+ */
+const SEGMENT_BREAK = /\r?\n|\\n|\\r|(?<=")\s*,\s*(?=")/u;
 
 /** Does `source` round to `claim` at the claim's stated precision? */
 function roundsTo(claim: number, precision: number, source: number): boolean {
@@ -917,6 +938,393 @@ function afterClaim(sentence: string, claim: Claim): string {
   return at < 0 ? "" : sentence.slice(at + claim.text.length);
 }
 
+// --- Counts of a named item ---------------------------------------------
+
+/**
+ * Live scenario D rerun on d252444b1 (16 Nov 2026, run b0a877f8): Q said
+ * the hiring plan adds "4 public-sector account managers"; the plan it had
+ * just read says 3 ("Public-sector account manager | Sales | 3 2027-Q1"),
+ * so the parts summed to 16 against the stated 15. The check never looked:
+ * a lone digit is skipped as a list position, and matching by value alone
+ * finds a 4 somewhere in any long source.
+ *
+ * Principle: a count stated of a named item ("6 deployment engineers") is
+ * bound to that item. Where the sources name the same item on a short line
+ * that carries a count, the claimed count must be on one of the lines that
+ * name it (or be their total). A count of an item no source names, or
+ * names only on lines without a count, is left to the value check: the
+ * binding only ever narrows what the sources ground, so an item it cannot
+ * place never fails a sentence.
+ */
+
+/** Words that measure rather than name what is counted. */
+const MEASURE_WORDS = new Set([
+  "second",
+  "minute",
+  "hour",
+  "day",
+  "week",
+  "month",
+  "quarter",
+  "year",
+  "decade",
+  "time",
+  "percent",
+  "per",
+  "cent",
+  "point",
+  "basis",
+  "x",
+  "pound",
+  "dollar",
+  "euro",
+  "share",
+  "page",
+  "slide",
+  "item",
+  "thing",
+  "other",
+  "more",
+  "less",
+  "fewer",
+  "people",
+  "person",
+  "group",
+  "role",
+  "one",
+]);
+
+/** Words that end the item a count is of. */
+const ITEM_END = new Set([
+  "in",
+  "by",
+  "from",
+  "with",
+  "to",
+  "for",
+  "on",
+  "at",
+  "across",
+  "over",
+  "starting",
+  "each",
+  "per",
+  "a",
+  "an",
+  "the",
+  "of",
+  "is",
+  "are",
+  "was",
+  "were",
+  "will",
+  "would",
+  "who",
+  "which",
+  "that",
+  "than",
+  "as",
+  "plus",
+  "or",
+  "nor",
+  "but",
+  "if",
+  "when",
+  "while",
+  "after",
+  "before",
+  "during",
+  "until",
+  "between",
+  "under",
+  "into",
+  "out",
+  "up",
+  "this",
+  "these",
+  "those",
+  "their",
+  "its",
+  "his",
+  "her",
+  "our",
+  "your",
+  "it",
+  "they",
+  "there",
+  "so",
+  "not",
+  "no",
+  "all",
+  "both",
+  "only",
+  "also",
+  "about",
+  "around",
+  "approximately",
+  "roughly",
+  "nearly",
+  "almost",
+  "including",
+  "here",
+]);
+
+/** Small counts a source may write in words ("three account managers"). */
+const COUNT_WORDS: readonly string[] = [
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+];
+
+/** A line short enough that a count on it is the count of what it names. */
+const BOUND_SEGMENT_MAX = 300;
+
+const singular = (word: string): string =>
+  word.endsWith("ies") && word.length > 4
+    ? `${word.slice(0, -3)}y`
+    : word.endsWith("sses") || word.endsWith("ches") || word.endsWith("shes")
+      ? word.slice(0, -2)
+      : word.endsWith("s") && !word.endsWith("ss") && word.length > 3
+        ? word.slice(0, -1)
+        : word;
+
+const escapeRegExp = (text: string): string =>
+  text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+/** The item a count right before `after` is of: its words, or null. */
+function countedItem(after: string): readonly string[] | null {
+  const tokens = after
+    .replace(/[’‘`]/gu, "'")
+    .toLowerCase()
+    .split(/(\s+|[,;:.!?()"“”]|—|–)/u)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  const words: string[] = [];
+  for (const [index, token] of tokens.entries()) {
+    if (!/^[\p{L}][\p{L}'-]*$/u.test(token) && token !== "&") break;
+    if (token === "and" || token === "&") {
+      // "finance and operations manager" is one item; "managers and 1
+      // assurance manager" ends at the next count.
+      const next = tokens[index + 1];
+      if (next === undefined || !/^[\p{L}]/u.test(next)) break;
+      words.push("and");
+      continue;
+    }
+    if (ITEM_END.has(token)) break;
+    for (const part of token.split("-")) {
+      if (part.length > 0) words.push(part.replace(/'s$/u, ""));
+    }
+    if (words.length > 6) return null;
+  }
+  while (words.at(-1) === "and") words.pop();
+  const content = words.filter((word) => word !== "and");
+  if (content.length < 2) return null;
+  if (content.some((word) => MEASURE_WORDS.has(singular(word)))) return null;
+  return words;
+}
+
+/** A pattern for the item as a source may write it (either number, hyphens). */
+function itemPattern(words: readonly string[]): RegExp {
+  const body = words
+    .map((word) => {
+      if (word === "and") return "(?:and|&)";
+      const base = singular(word);
+      const forms = [`${escapeRegExp(base)}(?:s|es)?`];
+      if (base.endsWith("y")) {
+        forms.push(`${escapeRegExp(base.slice(0, -1))}ies`);
+      }
+      return `(?:${forms.join("|")})`;
+    })
+    .join("[\\s-]+");
+  return new RegExp(`(?<![\\p{L}])${body}(?![\\p{L}])`, "u");
+}
+
+const COUNT_WORD_PATTERNS = COUNT_WORDS.map(
+  (word) => new RegExp(`(?<![\\p{L}])${word}(?![\\p{L}])`, "u"),
+);
+
+/** The counts a source line states: whole numbers, not years. */
+function countsOn(segment: string): number[] {
+  const out: number[] = [];
+  for (const figure of figuresIn(segment)) {
+    if (figure.kind !== "NUMBER" || !Number.isInteger(figure.value)) continue;
+    if (isYear(figure)) continue;
+    out.push(figure.value);
+  }
+  for (const [value, pattern] of COUNT_WORD_PATTERNS.entries()) {
+    if (pattern.test(segment)) out.push(value);
+  }
+  return out;
+}
+
+const isYear = (figure: Figure): boolean =>
+  /^\d{4}$/u.test(figure.text.trim()) &&
+  figure.value >= 1900 &&
+  figure.value <= 2100;
+
+/** What the sources hold of a count of one item. */
+type CountBinding =
+  | { readonly kind: "GROUNDED" | "UNPLACED" }
+  /** Short lines name the item with counts, none of them this one. */
+  | { readonly kind: "CONTRADICTED"; readonly only: number | null };
+
+function bindCount(
+  value: number,
+  item: readonly string[],
+  corpus: ClaimCorpus,
+): CountBinding {
+  const pattern = itemPattern(item);
+  const naming = corpus.segments.filter((segment) => pattern.test(segment));
+  if (naming.length === 0) return { kind: "UNPLACED" };
+  if (naming.some((segment) => countsOn(segment).includes(value))) {
+    return { kind: "GROUNDED" };
+  }
+  const short = naming
+    .filter((segment) => segment.length <= BOUND_SEGMENT_MAX)
+    .map((segment) => ({ segment, counts: countsOn(segment) }))
+    .filter((entry) => entry.counts.length > 0);
+  if (short.length === 0) return { kind: "UNPLACED" };
+  // Their total ("10 engineers" over a line of 6 and a line of 4).
+  const distinct = [...new Set(short.map((entry) => entry.segment))];
+  if (
+    distinct.length >= 2 &&
+    short.every((entry) => entry.counts.length === 1) &&
+    distinct.reduce(
+      (sum, segment) =>
+        sum +
+        (short.find((entry) => entry.segment === segment)?.counts[0] ?? 0),
+      0,
+    ) === value
+  ) {
+    return { kind: "GROUNDED" };
+  }
+  // The one value the sources give, where every line naming it agrees.
+  const values = new Set(short.flatMap((entry) => entry.counts));
+  return {
+    kind: "CONTRADICTED",
+    only:
+      distinct.length === 1 && values.size === 1
+        ? ([...values][0] ?? null)
+        : null,
+  };
+}
+
+/** A sentence's counts of named items, held to the lines that name them. */
+type CountsChecked = {
+  /** The sentence, any count the sources settle put right. */
+  readonly text: string;
+  /** Counts put right. */
+  readonly corrected: number;
+  /** A count the sources contradict and do not settle, or parts off their total. */
+  readonly contradicted: boolean;
+  /**
+   * A stated total its listed parts add up to, each part grounded: the
+   * sum is the sentence's own arithmetic, visible to the reader.
+   */
+  readonly totals: readonly number[];
+};
+
+/** "15 people in total", "a total of 15": the stated total. */
+const TOTAL_AFTER = /^\s*(?:[\p{L}'-]+\s+){0,3}?in\s+total\b/iu;
+const TOTAL_BEFORE = /\b(?:a\s+)?total\s+of\s+$/iu;
+/** A list that is only part of the total ("including 3 …"). */
+const PART_OF =
+  /\b(?:including|includes|such as|among them|for example|e\.g\.|of which|at least|up to|about|around|roughly|approximately|others?|more|rest)\b/iu;
+
+function checkCounts(sentence: string, corpus: ClaimCorpus): CountsChecked {
+  const contradicted: CountsChecked = {
+    text: sentence,
+    corrected: 0,
+    contradicted: true,
+    totals: [],
+  };
+  let text = sentence;
+  let corrected = 0;
+  const counted = figuresIn(sentence).filter(
+    (figure) =>
+      figure.kind === "NUMBER" &&
+      Number.isInteger(figure.value) &&
+      !isYear(figure) &&
+      !isIncidental(sentence, figure, false),
+  );
+  // Right to left, so a correction never moves a figure still to check.
+  for (const figure of [...counted].reverse()) {
+    const item = countedItem(sentence.slice(figure.end));
+    if (item === null) continue;
+    const bound = bindCount(figure.value, item, corpus);
+    if (bound.kind !== "CONTRADICTED") continue;
+    if (bound.only === null || !/^\d+$/u.test(figure.text.trim())) {
+      return contradicted;
+    }
+    text = `${text.slice(0, figure.index)}${String(bound.only)}${text.slice(figure.end)}`;
+    corrected += 1;
+  }
+  const total = statedTotal(text, corpus);
+  if (total === "OFF") return contradicted;
+  // A count is put right only where two independent things agree: the one
+  // line that names the item, and the sentence's own total, which the
+  // parts then add up to. Otherwise the sentence goes (the claim check's
+  // rule), never a figure code chose alone: a count of another kind ("2
+  // deployment engineers joined in July") is not the plan's count.
+  if (corrected > 0 && total === null) return contradicted;
+  return {
+    text,
+    corrected,
+    contradicted: false,
+    totals: total === null ? [] : [total],
+  };
+}
+
+/**
+ * The total a sentence states before its colon, held to the parts it
+ * lists after it: "OFF" when they do not add up to it; the total when they
+ * do and each part is grounded (the sum is the sentence's own arithmetic);
+ * null when the sentence states no such total.
+ */
+function statedTotal(text: string, corpus: ClaimCorpus): number | "OFF" | null {
+  const colon = text.indexOf(":");
+  if (colon <= 0 || PART_OF.test(text)) return null;
+  const figures = figuresIn(text).filter(
+    (figure) =>
+      figure.kind === "NUMBER" &&
+      Number.isInteger(figure.value) &&
+      !isYear(figure),
+  );
+  const total = figures.find(
+    (figure) =>
+      figure.end <= colon &&
+      (TOTAL_AFTER.test(text.slice(figure.end, colon)) ||
+        TOTAL_BEFORE.test(text.slice(0, figure.index))),
+  );
+  const parts = figures.filter(
+    (figure) =>
+      figure.index > colon && countedItem(text.slice(figure.end)) !== null,
+  );
+  if (total === undefined || parts.length < 2) return null;
+  if (parts.reduce((sum, part) => sum + part.value, 0) !== total.value) {
+    return "OFF";
+  }
+  const grounded = parts.every((part) => {
+    const item = countedItem(text.slice(part.end));
+    return (
+      (item !== null &&
+        bindCount(part.value, item, corpus).kind === "GROUNDED") ||
+      directlyGrounded(part, corpus)
+    );
+  });
+  return grounded ? total.value : null;
+}
+
 /** How a sentence is checked; every default is the answer path's. */
 export interface SentenceCheckOptions {
   /** Check multi-word names too (default true). */
@@ -960,6 +1368,39 @@ function checkOne(
   said: Set<string>,
   options: SentenceCheckOptions,
 ): { readonly check: SentenceCheck; readonly figures: readonly Operand[] } {
+  const counts = checkCounts(sentence, corpus);
+  if (counts.contradicted) {
+    return { check: { text: null, ungrounded: ["NUMBER"] }, figures: [] };
+  }
+  const checked = checkClaims(
+    counts.text,
+    corpus,
+    said,
+    options,
+    counts.totals,
+  );
+  if (counts.corrected === 0) return checked;
+  // Logged as what was not grounded as written; the text is put right.
+  const corrected: ClaimKind[] = Array.from(
+    { length: counts.corrected },
+    () => "NUMBER",
+  );
+  return {
+    ...checked,
+    check: {
+      ...checked.check,
+      ungrounded: [...corrected, ...checked.check.ungrounded],
+    },
+  };
+}
+
+function checkClaims(
+  sentence: string,
+  corpus: ClaimCorpus,
+  said: Set<string>,
+  options: SentenceCheckOptions,
+  totals: readonly number[] = [],
+): { readonly check: SentenceCheck; readonly figures: readonly Operand[] } {
   const claims = extractClaims(sentence).filter(
     (claim) => options.names !== false || claim.kind !== "NAME",
   );
@@ -994,7 +1435,9 @@ function checkOne(
       claim.kind === "NAME"
         ? nameGrounded(claim.text, corpus)
         : Number.isFinite(claim.value)
-          ? (claim.kind === "NUMBER" && calendar.includes(claim.value)) ||
+          ? (claim.kind === "NUMBER" &&
+              (calendar.includes(claim.value) ||
+                totals.includes(claim.value))) ||
             figureGrounded(claim, corpus, inputs, afterClaim(sentence, claim))
           : claim.text.startsWith("time:")
             ? corpus.minutes.has(claim.text.slice("time:".length))
