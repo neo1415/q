@@ -979,8 +979,11 @@ async function gateqApplication(mode) {
     // The interview is already open on this draft; one turn, keyed so a
     // retry is the same turn and spends no second model call.
     const r = await applicant("POST", "/v1/gateq/apply/turn", {
-      message: GATEQ.correction,
-      clientTurnId: "cq-evidence-gateq-halyard-correct-margin",
+      // Second correction (decision 100): the first, sent before the
+      // supersession fix, stored no CORRECTS link; a new id is a new turn.
+      message:
+        "Correction: our management accounts for the 12 months to October 2026 show a gross margin of 29.3%, which replaces the two notes cut at the decimal point. The 82.0% in the pitch deck is licence margin, a different measure from gross margin.",
+      clientTurnId: "cq-evidence-gateq-halyard-correct-margin-2",
     });
     log.push({
       step: "founder.correct_margin",

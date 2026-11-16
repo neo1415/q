@@ -140,3 +140,14 @@ Halyard's application `0490be41` (`ga_1kqfa1zd54naktn20bgvn5n4sz`) was corrected
 - **Not superseded:** the split notes `311b5d8f` ("…gross margin of 29.") and `326b8d65` ("3%.") are still active in coverage, not history. Q's reply (`18acc1d3`, intent CORRECTION) says "I'll treat this as correcting the two partial notes", but no link was recorded. **Defect:** Q's words claim a correction that the record does not hold. The reader treated the correction as prose for `application.note` instead of `CORRECTS S<n>`. The founder applicant API has no other route that supersedes a statement.
 - **Submit withheld,** as instructed: the application is still IN_PROGRESS, so submitting would freeze both split notes into Thames Arc's dossier. The lead decides what comes next. Options: a reader fix so that an explicit correction of a note links CORRECTS (a single target, or both halves), then one more turn; or accept the notes as they stand.
 - **Cost:** 1 model call (NORMAL_DIALOGUE / ONBOARDING), $0.0019 (`ai_ops.model_usage`, PRICE_SNAPSHOT). Budget reserved $0.30 (`21dc58d3`), with the actual recorded.
+
+## 8. Second correction and submission (16 Nov, 15:43 UTC, production `5d08eaaa0`)
+
+- **Correction:** after fix `5d08eaaa0` was deployed, Halyard's founder sent one more correction turn (client turn id `…-correct-margin-2`).
+- **What was recorded:**
+  - Two CORRECTS links (origin MODEL_READING, turn `ab182746`) superseded both split notes: `311b5d8f` ("…29.") and `326b8d65` ("3%.").
+  - The new note carries "gross margin of 29.3%" whole.
+  - No current note is split at a decimal.
+  - The pre-seed → seed correction (`232b4645 → 6c25ff0a`) is still in place.
+- **Submission:** at 15:44:01 the application `0490be41` was SUBMITTED through `POST /v1/gateq/apply/submit`, and the dossier synthesis settled. Model cost was below USD 0.01 (ledger `c207e89c`).
+- **Known quirk:** the correction note is stored twice, identically, one copy linked to each half. That is harmless but visible in the history.
