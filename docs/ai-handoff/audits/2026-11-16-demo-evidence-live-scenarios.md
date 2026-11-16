@@ -138,3 +138,37 @@ Savanna, conversation `1e659dc4`; USD 0.06 (ledger `c0aa24a6`). All answers were
 The prepare phase took 3–9 s across the three runs. The worker cutting latency has the details.
 
 **Page moves:** company overview for the figures question, deck tab for the deck question. Both are within decision 98.
+
+## Scenario G rerun on `b156a9cd1` (15:04 UTC)
+
+The account was Halyard Security's seeded founder, with the `fictional_demo` and `synthetic` markers checked first. Conversation `d3d81729`. Decision 100 and ADR 0079 were live. Each ask was in new wording. Screenshots: `evidence/2026-11-16-scenario-g-b156a9cd1/G-t0…t4.jpg`.
+
+| Turn | Ask (abridged)                                                                           | Run        | Time | USD    | Document reads                                                                                                 |
+| ---- | ---------------------------------------------------------------------------------------- | ---------- | ---- | ------ | -------------------------------------------------------------------------------------------------------------- |
+| 1    | "what's most worth fixing first? Keep it short and prioritised"                          | `278141d8` | 22 s | 0.0054 | deck, figures, profile only                                                                                    |
+| 2    | "Which of the figures we're claiming do our own documents actually back up…?"            | `5f75f14f` | 30 s | 0.0246 | none (figures, deck, `records.own.read` readiness)                                                             |
+| 3    | "Does anything in our own documents contradict what the deck says? Margin, burn, runway" | `d178c978` | 15 s | 0.0154 | none by tool; it cites the KPI pack, p. 1 (CONFIDENTIAL)                                                       |
+| 4    | Probe: "What do our management accounts show…, and does the invoice register back up…?"  | `c5b0f789` | 33 s | 0.0292 | `document.pages.read` on management accounts `7d1605cc` and invoice register `5ce41404`, with `ownCompanyRead` |
+
+- **Routing:** no background job. Turn 1 was ADVICE with `research: EXPLICIT`, but no web search ran. Turns 2–4 were THEIR_OWN_RECORDS.
+- **Cost:** the total was USD 0.0746 across 25 model calls (ledger `2b934663`, reserved 0.60).
+
+**What worked**
+
+- **Turn 3 found every contradiction.** These are the 82% against 29.3% gross margin ("explicitly including the deployment team in cost of sales"), burn of £70k against £92,340, and runway of 6.9 against 4.2 months, plus cash of £480k against £388,070. Each came with a short three-step fix: one reporting date, one margin definition, and a Sept→Oct cash bridge. The list items were whole.
+- **Turn 1 was short and prioritised.** It had four whole items, with no mid-sentence cuts, which fixes defect 8.
+- **Turn 4 worked when the documents were named.** Q read the founder's HIGHLY_CONFIDENTIAL management accounts and invoice register under `ownCompanyRead` and cited p. 1. It reported the 29.3% gross margin against an 82.0% licence-only margin, and it explained that the deck's 82% is the licence margin. It also reported £92,340 burn and 4.2 months of runway. The invoices matched revenue: £73k in October and £85k in September, with £71k of October receipts. It called the figures unaudited and not verified, as ADR 0079 §5 requires.
+
+**What did not**
+
+- **Q did not open the strongest documents unprompted.** In the three scenario asks, no `company.data_room.document.read` or `document.pages.read` call ran. Q never opened the management accounts, invoice register, bank statement, monthly revenue or projections.
+- **Turn 2 contradicts the documents and the next turn.** It says the deck's cash, burn and runway have "no separate financial record here [that] corroborates them". Two management-accounts files, a bank statement and the KPI pack are all uploaded, and turn 3 then quotes the KPI pack. Turn 2 also asks for "signed contracts or invoices, … bank statements", which are already uploaded. Its answer runs to about 3.2k characters, so it is not short.
+- **Turn 1 asks for documents Q already has.** It says "the cap table … should follow" (two cap tables are uploaded) and asks for a cash bridge without opening the accounts.
+- **The contradiction came from a document Q could already read.** Turn 3's contradiction came from the CONFIDENTIAL KPI pack, which was readable before ADR 0079. It did not come from the newly unlocked accounts.
+
+**Verdict: PARTIAL.**
+
+- **The read path works.** Turn 4 shows that ADR 0079 works in production with correct provenance and wording.
+- **The scenario's main contradictions now surface.** Turn 3 brings out the margin, burn and runway differences, and list items are whole.
+- **Defect 6 is only half fixed.** Q is now allowed to read the documents, but it does not choose to. A founder's "what do my documents back up / contradict" question should list and read the HIGHLY_CONFIDENTIAL financial documents without being named. Until it does, Q will still say records are missing (turn 2) and ask for documents that are already uploaded.
+- **Suggested next fix:** for THEIR_OWN_RECORDS questions about figures or contradictions, plan `documents.uploaded.list` plus page reads of the MANAGEMENT_ACCOUNTS and FINANCIAL documents in the prepare phase.
