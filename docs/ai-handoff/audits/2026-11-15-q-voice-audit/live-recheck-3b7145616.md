@@ -27,3 +27,16 @@ Re-asked with new wording (investor `20b55202`, founder `2997ffe6`; USD 0.16, le
 - Count-one grammar: "one has revenue on record and is outside your preferred sectors". PASS.
 - Founder "Which investors match us best, not counting the ones we already have conversations with?": no unprompted withholding line. PASS.
 - The widened list no longer said "None of the … I just showed …, so I looked wider" on this run; this is being checked in the same fix.
+
+## Follow-up on `cb28c00e5` (16 Nov, 03:37 UTC; gate PASS 1422 s; Railway SUCCESS ×4 by 03:36 UTC)
+
+Investor `a7a6d845`, new wording; USD 0.19 (ledger `e3ba7982`).
+
+- Widened list: the "None of the ten … so I looked wider" preface was present. PASS.
+- "Why is it there?" (after the one-card list): the answer was correct, but the turn reader read "there" as a place. It routed `navigationDestination: DISCOVER` and `research: EXPLICIT`; the page moved to Discover with "I've opened For you."; 4 tools, 6 model calls, 14.5 s. **FAIL** (decision 98).
+- "And why is MedTrail ranked first in the earlier list?": the answer was correct (tied at 9.2, ordered by mandate fit, not revenue). It ran wide: 31 tools, 8 model calls, 12.3 s. **FAIL** on cost.
+- Cause: each fix covered the previous run's wording. The fix in progress enforces one principle in code after the reader:
+  - A "why/how is X placed" question about any list Q showed in the conversation is answered from that card and list.
+  - Such a question never researches unless the person asks about the web.
+  - It never navigates unless the person asks to open a page.
+  - The fix is tested on unseen paraphrases.
