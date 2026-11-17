@@ -825,3 +825,5 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - "leave out the ones in contact" refined that list.
   - Still open: pre-revenue is unknown for most companies. Revenue lives only in unextracted data-room text; the proposed fix is that the seed writes document-linked claims through the Write Gate.
 - **Gap found:** the drift rebuild rewrote only the companies in the new pool. Stale CURRENT snapshots for companies outside it (Zino: Tensorgate, Halyard, Ajopot, Shiftwell) keep thesis MISSING. A follow-up worker is computing it on read.
+- **20:20 UTC, `6b5588218` (rollback point `dee0da7f4`):** ci-local PASS (1607 s); all four services SUCCESS. Thesis and sector are now computed on read for stale CURRENT snapshots outside the latest pool (844 thesis and 82 sector snapshots network-wide). Nothing is written to the database.
+  - Live check (Savanna, fictional): Halyard Security and Clearwater Assurance had stale snapshots with thesis MISSING; Q now shows Thesis Partial for both, with 6 of 7 measures known.
