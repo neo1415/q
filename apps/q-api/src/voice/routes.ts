@@ -67,6 +67,8 @@ import type {
 import {
   SpeechSynthesisError,
   createSpeechThrottle,
+  SPEECH_PLATFORM_KEY,
+  speechDailyQuotaFrom,
   type SpeechSynthesisPort,
   type SpeechThrottle,
 } from "./synthesis.js";
@@ -223,6 +225,12 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly speech?: SpeechSynthesisPort | undefined;
   /** How often one person may ask for that; composed here so a test can drive it. */
   readonly speechThrottle?: SpeechThrottle | undefined;
+  /**
+   * Launch readiness 8: synthesised lines for the whole service per day
+   * (`CQ_SPEECH_DAILY_LINES`), charged to one platform key. Text-to-speech
+   * bills per character and is not on the model usage ledger.
+   */
+  readonly speechDailyThrottle?: SpeechThrottle | undefined;
   readonly now?: (() => number) | undefined;
   /**
    * When present, a person with no organisation yet may still talk with Q
@@ -290,6 +298,25 @@ export function registerQVoiceRoutes(
     description: "One-way spoken lines synthesised, by voice",
   });
   const throttle = dependencies.speechThrottle ?? createSpeechThrottle();
+  const speechToday =
+    dependencies.speechDailyThrottle ??
+    createSpeechThrottle({ quota: speechDailyQuotaFrom(process.env) });
+  /** One alert line when the service's daily speech cap is first met. */
+  let speechCapSaid = false;
+  const chargeSpeechToday = (log: FastifyRequest["log"]): boolean => {
+    if (speechToday.charge(SPEECH_PLATFORM_KEY)) {
+      speechCapSaid = false;
+      return true;
+    }
+    if (!speechCapSaid) {
+      speechCapSaid = true;
+      log.error(
+        { alert: "SPEECH_DAILY_CAP" },
+        "the daily cap on synthesised speech is reached; speech refused",
+      );
+    }
+    return false;
+  };
 
   /**
    * The line this voice session id names: held here, or restored from the
@@ -513,6 +540,15 @@ export function registerQVoiceRoutes(
           detail: "That is more speech than Q will read out just now.",
         });
       }
+      if (!chargeSpeechToday(request.log)) {
+        return reply.code(429).send({
+          type: "about:blank",
+          title: "Too Many Requests",
+          status: 429,
+          detail:
+            "Q has stopped reading aloud for today. Q's answers still appear on screen.",
+        });
+      }
       const voice = speech.voices.includes(input.voice)
         ? input.voice
         : "FEMALE";
@@ -614,6 +650,14 @@ export function registerQVoiceRoutes(
           title: "Bad Request",
           status: 400,
           detail: "There is nothing to say.",
+        });
+      }
+      if (!chargeSpeechToday(request.log)) {
+        return reply.code(429).send({
+          type: "about:blank",
+          title: "Too Many Requests",
+          status: 429,
+          detail: "Q has stopped reading aloud for today.",
         });
       }
       const query = request.query;

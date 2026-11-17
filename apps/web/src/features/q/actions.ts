@@ -106,7 +106,12 @@ function translate(error: unknown): QActionResult<never> {
       return failure("Your session ended. Sign in again to continue.");
     }
     if (error.status === 429) {
-      return failure("Q is handling a lot right now. Try again in a moment.");
+      // A person's own limit (per minute, per day) says which, in the
+      // server's plain words; anything else keeps the general line.
+      return failure(
+        error.problem?.detail ??
+          "Q is handling a lot right now. Try again in a moment.",
+      );
     }
     if (error.status >= 500) {
       return failure("I couldn't answer that right now. Try again.");

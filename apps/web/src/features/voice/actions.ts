@@ -68,7 +68,7 @@ function translate(error: unknown): VoiceActionResult<never> {
     }
     if (error.status === 429) {
       return failure(
-        "You already have a few voice sessions open. End one and try again.",
+        "You've started or opened several voice sessions just now. End one, or wait a few minutes.",
       );
     }
     if (error.status >= 500) {

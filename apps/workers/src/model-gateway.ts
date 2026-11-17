@@ -119,7 +119,7 @@ export function composeWorkerModelGateway(options: {
   // F-D8: one ceiling on everything the ledger counts, per UTC day. Read
   // here rather than in the worker config schema because every
   // deployable's gateway shares it; an invalid value fails startup.
-  // Unset: no aggregate cap, as before.
+  // Unset: the conservative default; `off` lifts it.
   const dailyCapUsd = parseDailySpendCapUsd(options.env ?? process.env);
   const spendCap =
     dailyCapUsd === undefined

@@ -126,6 +126,34 @@ export function speechQuotaFrom(
     : SPEECH_QUOTA;
 }
 
+/**
+ * Launch readiness 8: synthesised lines for the whole service per 24 hours
+ * (the one-way speech route and the voice line's speak relay together),
+ * whoever asks. About 50 narrated tours' worth; past it Q's words still
+ * appear on screen, unspoken.
+ */
+export const SPEECH_DAILY_LINES = 3_000;
+/** The one bucket the daily cap is charged to. */
+export const SPEECH_PLATFORM_KEY = "platform";
+
+/**
+ * `CQ_SPEECH_DAILY_LINES`: a whole number from 1 to 1,000,000 lines per
+ * 24 hours; anything else keeps the default, so a typo never lifts it.
+ */
+export function speechDailyQuotaFrom(
+  env: Readonly<Record<string, string | undefined>>,
+): { readonly limit: number; readonly windowMs: number } {
+  const raw = env.CQ_SPEECH_DAILY_LINES?.trim();
+  const value = raw !== undefined && /^\d+$/u.test(raw) ? Number(raw) : NaN;
+  return {
+    limit:
+      Number.isFinite(value) && value >= 1 && value <= 1_000_000
+        ? value
+        : SPEECH_DAILY_LINES,
+    windowMs: 86_400_000,
+  };
+}
+
 /** Beyond this many live buckets the oldest window is dropped. */
 const MAX_TRACKED = 10_000;
 

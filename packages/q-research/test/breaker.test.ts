@@ -4,8 +4,12 @@ import { ResearchProviderFailure } from "../src/ports.js";
 import type { PublicWebResearchProvider } from "../src/ports.js";
 import {
   BREAKER_COOL_OFF_MS,
+  createDailyCallCap,
+  DEFAULT_RESEARCH_DAILY_CALLS,
   isResting,
+  researchDailyCallsFrom,
   withCircuitBreaker,
+  withDailyCallCap,
   type BreakerTrip,
 } from "../src/providers/breaker.js";
 import { createFallbackResearchProvider } from "../src/providers/fallback.js";
@@ -136,5 +140,50 @@ describe("a refused or spent key rests, for the whole process", () => {
     }
     expect(dead.map((one) => one.calls())).toEqual([1, 1, 1, 1]);
     expect(logged).toHaveLength(firstTurn);
+  });
+});
+
+describe("a paid credential's daily call cap (launch readiness 8)", () => {
+  it("refuses past the cap without asking the provider, reports once, and starts again the next UTC day", async () => {
+    let clock = Date.UTC(2026, 10, 17, 10);
+    let asked = 0;
+    const provider: PublicWebResearchProvider = {
+      code: "serper",
+      search: () => {
+        asked += 1;
+        return Promise.resolve({ hits: [] } as never);
+      },
+      extract: () => Promise.reject(new Error("not used")),
+    };
+    const reports: number[] = [];
+    const capped = withDailyCallCap(
+      provider,
+      createDailyCallCap({
+        limit: 2,
+        now: () => clock,
+        onCapReached: (limit) => reports.push(limit),
+      }),
+    );
+    await capped.search(request, {});
+    await capped.search(request, {});
+    const refused = await capped.search(request, {}).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(ResearchProviderFailure);
+    expect(refused).toMatchObject({ failureClass: "UNAVAILABLE" });
+    await capped.search(request, {}).catch(() => undefined);
+    expect(asked).toBe(2);
+    expect(reports).toEqual([2]);
+    clock += 86_400_000;
+    await capped.search(request, {});
+    expect(asked).toBe(3);
+  });
+
+  it("reads CQ_RESEARCH_DAILY_CALLS within bounds", () => {
+    expect(researchDailyCallsFrom({})).toBe(DEFAULT_RESEARCH_DAILY_CALLS);
+    expect(researchDailyCallsFrom({ CQ_RESEARCH_DAILY_CALLS: "500" })).toBe(
+      500,
+    );
+    expect(researchDailyCallsFrom({ CQ_RESEARCH_DAILY_CALLS: "0" })).toBe(
+      DEFAULT_RESEARCH_DAILY_CALLS,
+    );
   });
 });

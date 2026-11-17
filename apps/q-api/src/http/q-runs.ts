@@ -35,6 +35,7 @@ import {
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import type { QRoomFeed } from "../room/feed.js";
+import type { QRunLimiter } from "./q-usage-limits.js";
 
 /**
  * `/v1/q/runs` — the Q run lifecycle at the HTTP boundary (doc 22 §66-68,
@@ -72,6 +73,11 @@ export type QRunRoutesDependencies = ActorContextDependencies & {
    * line), so every surface renders from the same feed.
    */
   readonly room?: Pick<QRoomFeed, "watchRun"> | undefined;
+  /**
+   * Launch readiness 9: per-person run limits, checked before a run is
+   * created. Absent (tests, local tools), no limit applies here.
+   */
+  readonly limiter?: QRunLimiter | undefined;
 };
 
 function correlation(): CorrelationId {
@@ -116,6 +122,9 @@ export function registerQRunRoutes(
       request.body,
       "The Q request is not valid.",
     );
+    // Refused before anything is stored or any model is asked; the problem
+    // handler turns it into a 429 with Retry-After and plain words.
+    await dependencies.limiter?.admit(actor);
 
     const correlationId = correlation();
     const result = await service.createRun({

@@ -130,3 +130,94 @@ export function withCircuitBreaker(
       : {}),
   };
 }
+
+/**
+ * A daily ceiling on one paid research credential's calls (launch
+ * readiness 8). The indexes bill per request and none of them is on the
+ * model usage ledger, so per-run search budgets alone do not bound a busy
+ * or looping day. Counted per UTC day in this process (a restart starts
+ * the day's count again: weaker than a shared bound, far stronger than
+ * none). Past the ceiling a call fails at once as UNAVAILABLE, the failure
+ * research already degrades through, and costs nothing; the first refusal
+ * of the day is reported once.
+ */
+export type DailyCallCap = {
+  /** True when one more call is allowed now, and counts it. */
+  readonly take: () => boolean;
+};
+
+export function createDailyCallCap(options: {
+  readonly limit: number;
+  readonly now?: (() => number) | undefined;
+  readonly onCapReached?: ((limit: number) => void) | undefined;
+}): DailyCallCap {
+  const now = options.now ?? Date.now;
+  let day = Math.floor(now() / 86_400_000);
+  let used = 0;
+  let reported = false;
+  return {
+    take: () => {
+      const today = Math.floor(now() / 86_400_000);
+      if (today !== day) {
+        day = today;
+        used = 0;
+        reported = false;
+      }
+      if (used >= options.limit) {
+        if (!reported) {
+          reported = true;
+          options.onCapReached?.(options.limit);
+        }
+        return false;
+      }
+      used += 1;
+      return true;
+    },
+  };
+}
+
+export function withDailyCallCap(
+  provider: PublicWebResearchProvider,
+  cap: DailyCallCap,
+): PublicWebResearchProvider {
+  const guard = <T>(call: () => Promise<T>): Promise<T> =>
+    cap.take()
+      ? call()
+      : Promise.reject(
+          new ResearchProviderFailure({
+            providerCode: provider.code,
+            failureClass: "UNAVAILABLE",
+          }),
+        );
+  return {
+    get code() {
+      return provider.code;
+    },
+    search: (request, context) =>
+      guard(() => provider.search(request, context)),
+    extract: (request, context) =>
+      guard(() => provider.extract(request, context)),
+    ...(provider.canSearch === false ? { canSearch: false as const } : {}),
+    ...(provider.canReadPages === false
+      ? { canReadPages: false as const }
+      : {}),
+  };
+}
+
+/** Calls per paid research credential per UTC day when none is set. */
+export const DEFAULT_RESEARCH_DAILY_CALLS = 2_000;
+
+/**
+ * `CQ_RESEARCH_DAILY_CALLS`: a whole number from 1 to 100000; anything
+ * else keeps the default, so a typo can never remove the bound.
+ */
+export function researchDailyCallsFrom(
+  env: Readonly<Record<string, string | undefined>>,
+): number {
+  const raw = env["CQ_RESEARCH_DAILY_CALLS"]?.trim();
+  if (raw === undefined || !/^\d+$/u.test(raw)) {
+    return DEFAULT_RESEARCH_DAILY_CALLS;
+  }
+  const value = Number(raw);
+  return value >= 1 && value <= 100_000 ? value : DEFAULT_RESEARCH_DAILY_CALLS;
+}

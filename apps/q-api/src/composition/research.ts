@@ -57,9 +57,16 @@ import {
   createBrightDataProfileLookup,
   createBrightDataResearchProvider,
 } from "@capital-q/q-research/providers/brightdata";
-import { withCircuitBreaker } from "@capital-q/q-research/providers/breaker";
+import {
+  withCircuitBreaker,
+  withDailyCallCap,
+} from "@capital-q/q-research/providers/breaker";
 
-import { credentialBreaker, type ResearchCredential } from "./breakers.js";
+import {
+  credentialBreaker,
+  credentialDailyCap,
+  type ResearchCredential,
+} from "./breakers.js";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
 import { createLastResortSearchProvider } from "@capital-q/q-research/providers/model-hosted-search";
@@ -318,10 +325,21 @@ export function composeResearch(
   const behind = (
     credential: ResearchCredential,
     index: PublicWebResearchProvider,
-  ): PublicWebResearchProvider =>
-    withCircuitBreaker(index, {
+  ): PublicWebResearchProvider => {
+    const rested = withCircuitBreaker(index, {
       breaker: credentialBreaker(credential, warn),
     });
+    // Launch readiness 8: a paid index stops for the day at its call cap
+    // (our own page reader costs nothing and is not capped).
+    return credential === "direct"
+      ? rested
+      : withDailyCallCap(
+          rested,
+          credentialDailyCap(credential, (fields, message) =>
+            logger?.error(fields, message),
+          ),
+        );
+  };
   const indexes = [
     ...(brightData !== undefined &&
     brightData.serpZone !== undefined &&

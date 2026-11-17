@@ -285,6 +285,34 @@ function createConnectionGate(size: number): ConnectionGate {
   };
 }
 
+/**
+ * Statements this process saw end in SQLSTATE 57014 (the server's
+ * statement timeout, or the client deadline shaped like it) since it
+ * started. A monotonic count with no ids or text, read by the workers'
+ * operational check, which compares two readings, so it never resets.
+ */
+let timeoutsObserved = 0;
+
+export function databaseTimeoutsObserved(): number {
+  return timeoutsObserved;
+}
+
+function isStatementTimeout(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "57014"
+  );
+}
+
+/** Counts the query's rejection when it is a timeout; the caller's await is untouched. */
+function observeTimeout(query: QueryLike): void {
+  // The native then: the driver's own `then` would hand the query over.
+  void Promise.prototype.then.call(query, undefined, (error: unknown) => {
+    if (isStatementTimeout(error)) timeoutsObserved += 1;
+  });
+}
+
 /** Resolves once a slot is held; rejects as 57014 after `deadlineMs`. */
 function acquireSlot(
   gate: ConnectionGate,
@@ -300,6 +328,7 @@ function acquireSlot(
     if (deadlineMs !== undefined) {
       timer = setTimeout(() => {
         leave();
+        timeoutsObserved += 1;
         reject(new QueryDeadlineError(deadlineMs));
       }, deadlineMs);
       timer.unref();
@@ -396,6 +425,7 @@ function track(
     query.handle = function (this: QueryLike, ...args: unknown[]) {
       if (this.executed !== true) {
         querySent(text, stack);
+        observeTimeout(this);
         if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
       }
       return handle.apply(this, args);
@@ -410,6 +440,7 @@ function track(
     if (started) return undefined;
     started = true;
     querySent(text, stack);
+    observeTimeout(this);
     if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
     let settled = false;
     let held = false;

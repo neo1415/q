@@ -97,16 +97,25 @@ export function createDailySpendCap(
 }
 
 /**
- * `CQ_MODEL_DAILY_SPEND_CAP_USD`: unset or empty means no aggregate cap
- * (the behaviour before this existed). Anything else must be a plain
- * non-negative number up to 1000, or startup fails: a typo must never
- * silently lift a cap the founder set.
+ * The aggregate ceiling when none is set (launch readiness, 17 Nov 2026):
+ * about five times the busiest day the ledger had recorded (USD 10.3 on
+ * 15 Nov), so ordinary use never meets it and a runaway loop stops the
+ * same day.
+ */
+export const DEFAULT_DAILY_SPEND_CAP_USD = 50;
+
+/**
+ * `CQ_MODEL_DAILY_SPEND_CAP_USD`: unset or empty means the default above;
+ * `off` is the owner's explicit choice of no aggregate cap. Anything else
+ * must be a plain non-negative number up to 1000, or startup fails: a typo
+ * must never silently lift a cap the founder set.
  */
 export function parseDailySpendCapUsd(
   env: Readonly<Record<string, string | undefined>>,
 ): number | undefined {
   const raw = env["CQ_MODEL_DAILY_SPEND_CAP_USD"]?.trim();
-  if (raw === undefined || raw === "") return undefined;
+  if (raw === undefined || raw === "") return DEFAULT_DAILY_SPEND_CAP_USD;
+  if (raw.toLowerCase() === "off") return undefined;
   if (!/^\d+(\.\d+)?$/.test(raw)) {
     throw new Error(
       "CQ_MODEL_DAILY_SPEND_CAP_USD must be a non-negative number of US dollars",

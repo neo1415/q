@@ -21,9 +21,11 @@ import { createApp, type QApiSecurityDependencies } from "../src/app.js";
 import { createVoiceSessionBindings } from "../src/voice/bindings.js";
 import { createDeepgramSpeechSynthesis } from "../src/voice/providers/deepgram-speak.js";
 import {
+  SPEECH_DAILY_LINES,
   SPEECH_QUOTA,
   SpeechSynthesisError,
   createSpeechThrottle,
+  speechDailyQuotaFrom,
   speechQuotaFrom,
   type SpeechSynthesisPort,
 } from "../src/voice/synthesis.js";
@@ -202,6 +204,47 @@ describe("Q-FIRST-RUN-TTS-001 · Q reads a line aloud", () => {
         SPEECH_QUOTA,
       );
     }
+  });
+
+  it("stops the whole service's speech at its daily cap, before any provider is asked (launch readiness 8)", async () => {
+    const synthesise = vi.fn(() =>
+      Promise.resolve({ audio: AUDIO, mediaType: "audio/mpeg" }),
+    );
+    const security: QApiSecurityDependencies = {
+      authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
+      resolver: {
+        resolveHumanContext: () =>
+          Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+      },
+    };
+    const app = createApp(parseQApiConfig({ NODE_ENV: "test" }), security, {
+      voice: {
+        bindings: createVoiceSessionBindings(),
+        speech: port(synthesise),
+        speechThrottle: createSpeechThrottle(),
+        speechDailyThrottle: createSpeechThrottle({
+          quota: { limit: 1, windowMs: 86_400_000 },
+        }),
+      },
+    }).app;
+    expect((await speak(app)).statusCode).toBe(200);
+    const refused = await speak(app);
+    expect(refused.statusCode).toBe(429);
+    expect(refused.json<{ detail: string }>().detail).toContain(
+      "stopped reading aloud for today",
+    );
+    expect(synthesise).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
+  it("reads CQ_SPEECH_DAILY_LINES, bounded, else the default", () => {
+    expect(speechDailyQuotaFrom({}).limit).toBe(SPEECH_DAILY_LINES);
+    expect(speechDailyQuotaFrom({ CQ_SPEECH_DAILY_LINES: "500" }).limit).toBe(
+      500,
+    );
+    expect(speechDailyQuotaFrom({ CQ_SPEECH_DAILY_LINES: "0" }).limit).toBe(
+      SPEECH_DAILY_LINES,
+    );
   });
 });
 

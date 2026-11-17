@@ -161,6 +161,7 @@ export {
 } from "./policy/balance-watch.js";
 export {
   createDailySpendCap,
+  DEFAULT_DAILY_SPEND_CAP_USD,
   parseDailySpendCapUsd,
   type DailySpendCapOptions,
   type ModelSpendCap,

@@ -12,7 +12,12 @@ import {
   resolveSqlTimeouts,
   transactionLimitsFor,
 } from "../src/internal/postgres.js";
-import { instrumentSql, QueryDeadlineError } from "../src/round-trips.js";
+import {
+  databaseTimeoutsObserved,
+  instrumentSql,
+  QueryDeadlineError,
+} from "../src/round-trips.js";
+import { watchDatabaseTimeouts } from "../src/timeout-watch.js";
 import { createTransactionManager } from "../src/transaction.js";
 
 /**
@@ -228,6 +233,27 @@ describe("the client deadline on every query (fake clock)", () => {
     expect(toDatabaseError(error).kind).toBe("TIMEOUT");
     // Never the statement's text.
     expect(String((error as Error).message)).not.toMatch(/select/i);
+  });
+
+  it("counts each timed-out statement once, for the operational check", async () => {
+    const before = databaseTimeoutsObserved();
+    const { client } = fakeClient(null);
+    const sql = instrumentSql(client, { queryDeadlineMs: 1_000 });
+    const outcome = (sql() as Promise<unknown>).then(
+      () => "answered",
+      (error: unknown) => error,
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await outcome).toBeInstanceOf(QueryDeadlineError);
+    expect(databaseTimeoutsObserved()).toBe(before + 1);
+    // An answered statement is not counted.
+    const answered = instrumentSql(fakeClient(10).client, {
+      queryDeadlineMs: 1_000,
+    });
+    const ok = (answered() as Promise<unknown>).then((rows) => rows);
+    await vi.advanceTimersByTimeAsync(10);
+    await ok;
+    expect(databaseTimeoutsObserved()).toBe(before + 1);
   });
 
   it("an answer inside the deadline is untouched and leaves no timer", async () => {
@@ -477,5 +503,24 @@ describe("SET LOCAL at the start of each transaction", () => {
         limits: { statementTimeoutMs: 10_000, lockTimeoutMs: 5_000 },
       }).run(() => Promise.resolve("never kept")),
     ).rejects.toMatchObject({ kind: "UNEXPECTED", sqlState: "25P02" });
+  });
+});
+
+describe("watchDatabaseTimeouts (launch readiness 7)", () => {
+  it("logs one alert line when the count since the last look crosses the threshold", () => {
+    let count = 5;
+    const lines: Record<string, unknown>[] = [];
+    const watch = watchDatabaseTimeouts({
+      logger: { error: (fields) => lines.push(fields) },
+      threshold: 3,
+      observed: () => count,
+    });
+    count += 2;
+    expect(watch.check()).toBe(2);
+    expect(lines).toEqual([]);
+    count += 4;
+    expect(watch.check()).toBe(4);
+    expect(lines).toEqual([{ alert: "DB_TIMEOUTS", dbTimeouts: 4 }]);
+    watch.stop();
   });
 });

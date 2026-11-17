@@ -7,6 +7,7 @@ import {
   createModelGateway,
   createModelProviderRegistry,
   createStaticModelCatalog,
+  DEFAULT_DAILY_SPEND_CAP_USD,
   ModelGatewayError,
   parseDailySpendCapUsd,
 } from "../src/index.js";
@@ -92,10 +93,14 @@ describe("the daily spend cap", () => {
   });
 
   it("reads CQ_MODEL_DAILY_SPEND_CAP_USD strictly", () => {
-    expect(parseDailySpendCapUsd({})).toBeUndefined();
+    // Unset is a conservative default, never "no cap"; only `off` lifts it.
+    expect(parseDailySpendCapUsd({})).toBe(DEFAULT_DAILY_SPEND_CAP_USD);
     expect(parseDailySpendCapUsd({ CQ_MODEL_DAILY_SPEND_CAP_USD: " " })).toBe(
-      undefined,
+      DEFAULT_DAILY_SPEND_CAP_USD,
     );
+    expect(
+      parseDailySpendCapUsd({ CQ_MODEL_DAILY_SPEND_CAP_USD: "off" }),
+    ).toBeUndefined();
     expect(parseDailySpendCapUsd({ CQ_MODEL_DAILY_SPEND_CAP_USD: "2.5" })).toBe(
       2.5,
     );

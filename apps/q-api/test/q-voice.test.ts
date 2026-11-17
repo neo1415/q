@@ -21,6 +21,8 @@ import {
   createVoiceSessionBindings,
   VOICE_CONNECT_WINDOW_MS,
   VOICE_SESSIONS_PER_USER_MAX,
+  VOICE_STARTS_QUOTA,
+  voiceStartQuotaFrom,
   type VoiceSessionBindings,
 } from "../src/voice/bindings.js";
 import type {
@@ -647,6 +649,53 @@ describe("voice session bindings", () => {
     bindings.release("conv_a");
     expect(bindings.get("conv_a")).toBeNull();
     expect(bindings.connect("conv_unknown")).toBeNull();
+  });
+
+  it("limits how many sessions one person may start per window, ended or not (launch readiness 9)", () => {
+    let clock = 1_000;
+    const bindings = createVoiceSessionBindings({
+      now: () => clock,
+      startQuota: { limit: 2, windowMs: 60_000 },
+    });
+    const issue = (id: string, actor: ActorContext = CONTEXT) =>
+      bindings.issue({
+        voiceSessionId: `vs-${id}`,
+        providerConversationId: id,
+        actor,
+        accessToken: BEARER,
+        voice: "FEMALE",
+        thread: {
+          conversationId: undefined,
+          subjects: undefined,
+          onboarding: undefined,
+        },
+        issuedAt: clock,
+        connectBy: clock + VOICE_CONNECT_WINDOW_MS,
+        connectedAt: undefined,
+      });
+    expect(issue("s1")).toBe(true);
+    bindings.release("s1");
+    expect(issue("s2")).toBe(true);
+    bindings.release("s2");
+    // Nothing is open, but two starts in the window is the allowance.
+    expect(issue("s3")).toBe(false);
+    // Someone else has their own allowance.
+    expect(issue("o1", OTHER)).toBe(true);
+    clock += 60_001;
+    expect(issue("s4")).toBe(true);
+  });
+
+  it("reads CQ_VOICE_STARTS_PER_10MIN within bounds", () => {
+    expect(voiceStartQuotaFrom({})).toEqual(VOICE_STARTS_QUOTA);
+    expect(voiceStartQuotaFrom({ CQ_VOICE_STARTS_PER_10MIN: "5" }).limit).toBe(
+      5,
+    );
+    expect(voiceStartQuotaFrom({ CQ_VOICE_STARTS_PER_10MIN: "0" })).toEqual(
+      VOICE_STARTS_QUOTA,
+    );
+    expect(voiceStartQuotaFrom({ CQ_VOICE_STARTS_PER_10MIN: "x" })).toEqual(
+      VOICE_STARTS_QUOTA,
+    );
   });
 });
 

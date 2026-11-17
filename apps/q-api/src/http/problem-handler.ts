@@ -29,6 +29,7 @@ import {
 
 import { VoiceSessionLimitError } from "../voice/bindings.js";
 import { QStreamLimitError } from "./q-events.js";
+import { QUsageLimitError } from "./q-usage-limits.js";
 import {
   QActionAlreadyCompletedError,
   QActionNotFoundError,
@@ -270,7 +271,8 @@ function toProblem(error: unknown, requestId: string): ProblemDetails {
 
   if (
     error instanceof QStreamLimitError ||
-    error instanceof VoiceSessionLimitError
+    error instanceof VoiceSessionLimitError ||
+    error instanceof QUsageLimitError
   ) {
     return createProblemDetails({
       code: "RATE_LIMITED",
@@ -361,6 +363,9 @@ export function registerProblemHandling(
       return;
     }
     const problem = toProblem(error, request.id);
+    if (error instanceof QUsageLimitError) {
+      void reply.header("Retry-After", String(error.retryAfterSeconds));
+    }
 
     if (problem.status >= 500) {
       // Diagnostics stay server-side. The client gets the request id and

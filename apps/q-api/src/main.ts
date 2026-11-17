@@ -24,6 +24,11 @@ import { modelHostedSearchPort } from "./composition/model-hosted-search.js";
 import { createWebsiteIdentityReader } from "@capital-q/q-research/website-identity";
 import { webOriginFrom } from "./composition/web-origin.js";
 import { namedPictureOf } from "./http/q-approvals.js";
+import {
+  createPostgresRunsSinceCounter,
+  createQRunLimiter,
+  parseQUsageLimits,
+} from "./http/q-usage-limits.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
 import { createCapitalQRecords } from "./composition/workforce/capital-q-records.js";
@@ -405,6 +410,7 @@ import {
   cachedInRun,
   checkDatabaseReadiness,
   createRequestDatabaseClient,
+  watchDatabaseTimeouts,
 } from "@capital-q/database";
 import {
   withRunCachedDiligenceViews,
@@ -769,7 +775,10 @@ import {
 } from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
-import { createVoiceSessionBindings } from "./voice/bindings.js";
+import {
+  createVoiceSessionBindings,
+  voiceStartQuotaFrom,
+} from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
 import { createHeldWritesStore } from "./voice/held-writes.js";
 import { createOnboardingConversation } from "./voice/onboarding-conversation.js";
@@ -1432,7 +1441,7 @@ const modelGateway = progressObservedGateway(
         sql: database.sql,
       }),
       // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
-      // counts, shared with the workers' gateway; unset means no cap.
+      // counts, shared with the workers' gateway; unset is the default.
       spendCap: (() => {
         const capUsd = parseDailySpendCapUsd(process.env);
         return capUsd === undefined
@@ -1460,6 +1469,9 @@ logger.info(
   { modelProviders: modelProviderConfigStatus(providerSecrets) },
   "model gateway composed",
 );
+// Launch readiness 7: this process's 57014 statements, as one
+// `alert: "DB_TIMEOUTS"` line a minute when they cross the threshold.
+watchDatabaseTimeouts({ logger });
 /**
  * Whether this deployment attested its material is invented, and on what
  * grounds (ADR 0014).
@@ -7785,6 +7797,7 @@ const voiceBindings = createVoiceSessionBindings({
   // A suspended account does not get its line back from a token.
   stillAllowed: async (actor) =>
     !(await isAccountSuspended(database.sql, actor.userId)),
+  startQuota: voiceStartQuotaFrom(process.env),
 });
 // The interview as a tool-calling Q run (ADR 0016): the same firewall,
 // tool pipeline and gateway as every Q answer.
@@ -8993,6 +9006,17 @@ const { app, logger: appLogger } = createApp(
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
+    // Launch readiness 9: CQ_Q_RUNS_PER_MINUTE / CQ_Q_RUNS_PER_DAY.
+    qRunLimiter: createQRunLimiter({
+      limits: parseQUsageLimits(process.env),
+      runsSince: createPostgresRunsSinceCounter({ sql: database.sql }),
+      onCountFailure: (error) => {
+        logger.warn(
+          { err: error },
+          "Q run daily limit could not count today's runs; admitted",
+        );
+      },
+    }),
     qActions,
     continueApproved,
     qStream: { service: qStream },

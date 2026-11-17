@@ -14,6 +14,7 @@ import {
   type VoiceSessionClaims,
   type VoiceSessionSealer,
 } from "./session-token.js";
+import { createSpeechThrottle } from "./synthesis.js";
 
 /**
  * Voice session bindings (CQ-Q-VOICE-001 C §34, §37; doc 15 §42).
@@ -136,10 +137,30 @@ export const VOICE_SESSIONS_PER_USER_MAX = 3;
 /** Process-local hygiene, never authorization. */
 export const VOICE_SESSIONS_MAX = 500;
 
+/** New voice sessions one person may start per ten minutes (launch readiness 9). */
+export const VOICE_STARTS_QUOTA = { limit: 20, windowMs: 10 * 60_000 } as const;
+
+/**
+ * `CQ_VOICE_STARTS_PER_10MIN`: a whole number from 1 to 600; anything else
+ * keeps the default, so a typo can never remove the bound.
+ */
+export function voiceStartQuotaFrom(
+  env: Readonly<Record<string, string | undefined>>,
+): { readonly limit: number; readonly windowMs: number } {
+  const raw = env["CQ_VOICE_STARTS_PER_10MIN"]?.trim();
+  if (raw === undefined || !/^\d+$/u.test(raw)) return VOICE_STARTS_QUOTA;
+  const limit = Number(raw);
+  return limit >= 1 && limit <= 600
+    ? { limit, windowMs: VOICE_STARTS_QUOTA.windowMs }
+    : VOICE_STARTS_QUOTA;
+}
+
 export class VoiceSessionLimitError extends Error {
   readonly errorCode = "Q_VOICE_SESSION_LIMIT" as const;
   constructor() {
-    super("Too many voice sessions are open for this person.");
+    super(
+      "Too many voice sessions for this person just now. End one, or wait a few minutes.",
+    );
     this.name = "VoiceSessionLimitError";
   }
 }
@@ -159,9 +180,20 @@ export function createVoiceSessionBindings(
      */
     readonly stillAllowed?:
       ((actor: ActorContext) => Promise<boolean>) | undefined;
+    /**
+     * Launch readiness 9: how many new voice sessions one person may start
+     * per window, whatever they end in between (each start mints provider
+     * credentials). Defaults to VOICE_STARTS_QUOTA.
+     */
+    readonly startQuota?:
+      { readonly limit: number; readonly windowMs: number } | undefined;
   } = {},
 ): VoiceSessionBindings {
   const now = options.now ?? Date.now;
+  const starts = createSpeechThrottle({
+    quota: options.startQuota ?? VOICE_STARTS_QUOTA,
+    clock: now,
+  });
   const bindings = new Map<string, VoiceSessionBinding>();
   const sealer =
     options.sealer ??
@@ -230,7 +262,8 @@ export function createVoiceSessionBindings(
       sweep();
       if (
         bindings.size >= VOICE_SESSIONS_MAX ||
-        countFor(binding.actor.userId) >= VOICE_SESSIONS_PER_USER_MAX
+        countFor(binding.actor.userId) >= VOICE_SESSIONS_PER_USER_MAX ||
+        !starts.charge(`${binding.actor.tenantId}:${binding.actor.userId}`)
       ) {
         return false;
       }

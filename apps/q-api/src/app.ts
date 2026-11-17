@@ -296,6 +296,8 @@ export type QApiModules = {
   readonly ownPictures?: QArtifactRoutesDependencies["ownPictures"];
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
+  /** Launch readiness 9: per-person Q run limits; absent, none. */
+  readonly qRunLimiter?: QRunRoutesDependencies["limiter"];
   /**
    * voice-cards: the person's Q room feed (every run's answer, any path);
    * absent means no room route and nothing published.
@@ -354,6 +356,7 @@ export type QApiModules = {
         | "live"
         | "speech"
         | "speechThrottle"
+        | "speechDailyThrottle"
         | "memory"
         | "ownNames"
         | "openerFacts"
@@ -470,6 +473,7 @@ export function createApp(
       qRuntime: modules.qRuntime,
       orchestration: modules.orchestration,
       room: modules.room,
+      limiter: modules.qRunLimiter,
     });
     if (modules.room !== undefined) {
       registerQRoomRoutes(app, {
@@ -864,6 +868,7 @@ export function createApp(
       deepgram: modules.voice.deepgram,
       speech: modules.voice.speech,
       speechThrottle: modules.voice.speechThrottle,
+      speechDailyThrottle: modules.voice.speechDailyThrottle,
       now: modules.voice.now,
       // Both were composed but never reached the route, so the recogniser
       // was told no remembered or recorded name (founder live, #6).

@@ -816,7 +816,7 @@ if (gateqProviderSecrets.anthropic !== undefined) {
 /**
  * F-D8 (RECOVERY F5): the same daily ceiling q-api and the workers use, on
  * the ledger every gateway writes to, so GateQ's calls count against it
- * too (they bypassed it). Unset means no cap.
+ * too (they bypassed it). Unset means the default; `off` means no cap.
  */
 const gateqSpendCap = (() => {
   const capUsd = parseDailySpendCapUsd(process.env);

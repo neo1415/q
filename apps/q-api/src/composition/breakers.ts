@@ -1,6 +1,9 @@
 import {
   createCircuitBreaker,
+  createDailyCallCap,
+  researchDailyCallsFrom,
   type CircuitBreaker,
+  type DailyCallCap,
 } from "@capital-q/q-research/providers/breaker";
 
 /**
@@ -41,4 +44,29 @@ export function credentialBreaker(
   });
   breakers.set(credential, breaker);
   return breaker;
+}
+
+const dailyCaps = new Map<ResearchCredential, DailyCallCap>();
+
+/**
+ * Launch readiness 8: one daily call ceiling per paid research credential,
+ * for the process (`CQ_RESEARCH_DAILY_CALLS`), shared like its breaker.
+ * Reaching it is one `alert: "RESEARCH_DAILY_CAP"` line a day.
+ */
+export function credentialDailyCap(
+  credential: ResearchCredential,
+  report?: Warn,
+): DailyCallCap {
+  const known = dailyCaps.get(credential);
+  if (known !== undefined) return known;
+  const cap = createDailyCallCap({
+    limit: researchDailyCallsFrom(process.env),
+    onCapReached: (limit) =>
+      report?.(
+        { alert: "RESEARCH_DAILY_CAP", credential, limit },
+        "public research credential reached its daily call cap; refused until 00:00 UTC",
+      ),
+  });
+  dailyCaps.set(credential, cap);
+  return cap;
 }

@@ -55,7 +55,10 @@ import {
   companyCardSharesRaise,
   createPostgresPublicIdentityRepository,
 } from "@capital-q/public-identity";
-import { createRequestDatabaseClient } from "@capital-q/database";
+import {
+  createRequestDatabaseClient,
+  databaseTimeoutsObserved,
+} from "@capital-q/database";
 import {
   createOutboxPublisher,
   createOutboxRetryPolicy,
@@ -143,6 +146,7 @@ import {
 import {
   createPostgresModelCatalog,
   createPostgresProviderSpendReader,
+  parseDailySpendCapUsd,
   parseProviderBalanceSettings,
   providerBlockedAlertText,
 } from "@capital-q/model-gateway";
@@ -265,6 +269,11 @@ import { runAutoVerificationRequests } from "./verification/auto-request.js";
 // end ADMIN-4 block
 import { composeDocumentJobs } from "./documents/composition.js";
 import { composeWorkerModelGateway } from "./model-gateway.js";
+import {
+  createPostgresOpsReader,
+  parseOpsThresholds,
+  runOpsWatch,
+} from "./reliability/ops-check.js";
 import { runProviderBalanceWatch } from "./reliability/provider-balance.js";
 import {
   composeRecommendationEmbedder,
@@ -1456,6 +1465,13 @@ if (providerBalances.invalid.length > 0) {
     "provider balance settings ignored: expected <usd>@<ISO time>",
   );
 }
+const opsThresholds = parseOpsThresholds(process.env);
+if (opsThresholds.invalid.length > 0) {
+  logger.error(
+    { invalid: opsThresholds.invalid },
+    "operational check settings out of bounds; defaults kept",
+  );
+}
 const schedule = composeSchedule({
   sql: database.sql,
   transactions: database.transactions,
@@ -1832,6 +1848,22 @@ await Promise.all([
         runProviderBalanceWatch({
           settings: providerBalances.settings,
           readSpend: createPostgresProviderSpendReader({ sql: database.sql }),
+          alert: (alert) => operatorAlert.send(alert),
+          signal: shutdownController.signal,
+          logger,
+        }),
+      ]),
+  // Launch readiness 7: stuck runs, failure rates, DB timeouts and spend
+  // against the daily cap, as one `alert: "OPS_CHECK"` line (runbook:
+  // docs/ai-handoff/OPS-ALERTS.md). Read-only; on unless turned off.
+  ...(process.env["CQ_OPS_CHECK"]?.trim().toLowerCase() === "off"
+    ? []
+    : [
+        runOpsWatch({
+          read: createPostgresOpsReader({ sql: database.sql }),
+          dbTimeouts: databaseTimeoutsObserved,
+          thresholds: opsThresholds.thresholds,
+          dailyCapUsd: parseDailySpendCapUsd(process.env),
           alert: (alert) => operatorAlert.send(alert),
           signal: shutdownController.signal,
           logger,

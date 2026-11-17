@@ -34,10 +34,12 @@ export {
   type DatabaseHealth,
 } from "./health.js";
 export { decodeJsonbString, jsonbParam } from "./jsonb.js";
+export { watchDatabaseTimeouts } from "./timeout-watch.js";
 export {
   countRoundTrip,
   createRoundTripCounter,
   currentRoundTripCounter,
+  databaseTimeoutsObserved,
   markRoundTrips,
   withRoundTripCounter,
   withRoundTripPhase,
