@@ -360,7 +360,7 @@ const D2_LIVE =
 const GAP =
   "The hiring plan gives quarters rather than exact start months or dates, so the timing within each quarter is not established.";
 
-async function d2Turn() {
+async function d2Turn(spoken?: string) {
   const fake = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -378,6 +378,7 @@ async function d2Turn() {
         kind: "TEXT",
         text: JSON.stringify(
           analyst(D2_LIVE, {
+            ...(spoken === undefined ? {} : { spoken }),
             uncertainties: [
               {
                 statement: GAP,
@@ -431,7 +432,9 @@ async function d2Turn() {
         createdAt: new Date(started + index * 25_000).toISOString(),
       }) as unknown as QConversationMessage,
   );
-  const completed: { message: { text: string } }[] = [];
+  const completed: {
+    message: { text: string; spoken?: { text: string } };
+  }[] = [];
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
@@ -458,7 +461,11 @@ async function d2Turn() {
         input: { eventType?: string; payload?: unknown },
       ) => {
         if (input.eventType === "q.message.completed") {
-          completed.push(input.payload as { message: { text: string } });
+          completed.push(
+            input.payload as {
+              message: { text: string; spoken?: { text: string } };
+            },
+          );
         }
         return Promise.resolve({});
       },
@@ -499,6 +506,7 @@ async function d2Turn() {
   return {
     outcome,
     said: completed.at(-1)?.message.text ?? "",
+    spokenForm: completed.at(-1)?.message.spoken?.text ?? null,
     executed: tools.executed,
   };
 }
@@ -529,6 +537,26 @@ describe("scenario D rerun on d252444b1: Thames Arc on Halyard's newly shared hi
       .map((call) => (call.arguments as Record<string, unknown>)["query"]);
     expect(searched).not.toContain("quarter");
     expect(searched).not.toContain("each group start");
+  });
+});
+
+describe("voice directive 15 Nov: the spoken form is held to the answer's claim check", () => {
+  it("a wrong count in the spoken form is spoken as the plan states it", async () => {
+    const { said, spokenForm } = await d2Turn(
+      "The plan starts 4 public-sector account managers in Q1. Then 6 deployment engineers and 4 product engineers start in Q2.",
+    );
+    expect(said).toContain("3 public-sector account managers");
+    // Without the check this passed spokenFormWithin: the answer holds a 4.
+    expect(spokenForm).not.toBeNull();
+    expect(spokenForm).toContain("3 public-sector account managers");
+    expect(spokenForm).not.toContain("4 public-sector account managers");
+  });
+
+  it("a sentence the claim check drops is not spoken; the rest is", async () => {
+    const { spokenForm } = await d2Turn(
+      "The plan adds 16 people in total: 6 deployment engineers and 4 product engineers in Q2. The plan gives quarters only.",
+    );
+    expect(spokenForm).toBe("The plan gives quarters only.");
   });
 });
 

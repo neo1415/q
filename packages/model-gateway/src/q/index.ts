@@ -288,6 +288,7 @@ import {
   checkAnswer,
   claimCorpus,
   createClaimChecker,
+  NOTHING_SOURCED,
   recheckCounts,
   statedNumbers,
   templateValues,
@@ -2490,6 +2491,80 @@ const NO_OFFER_QUESTIONS: ReadonlySet<string> = new Set([
 export function analystSpokenOf(analyst: object): string | null {
   const spoken: unknown = Reflect.get(analyst, "spoken");
   return typeof spoken === "string" && spoken.trim().length > 0 ? spoken : null;
+}
+
+/** What the answer's sentence guards held the answer to, for the spoken form. */
+export interface SpokenFormGuardInputs {
+  readonly actionTalk: readonly string[];
+  readonly requestedValues: readonly string[];
+  /** Null: this turn started what was asked, so no offer is held back. */
+  readonly deferred: {
+    readonly asked: Parameters<typeof withoutDeferredWork>[1];
+    readonly previous: string | null;
+  } | null;
+  readonly staleFailures: boolean;
+  readonly investor: boolean;
+  readonly gateqHeld: boolean;
+  readonly publicSources: readonly PublicSourceLike[];
+  readonly grounds: RecommendationGrounds | null;
+  readonly documents: readonly ReadDocument[];
+  readonly corpus: () => ReturnType<typeof claimCorpus>;
+  readonly promiseGrounds: PromiseGrounds;
+}
+
+/**
+ * Owner voice directive 15 Nov 2026: the voice introduces no new facts; it
+ * says one authoritative Q result in its spoken form. The spoken form is
+ * written by the model beside the answer, so it is held to the same
+ * sentence guards, in the same order and with the same sources, as the
+ * answer: a count or period the claim check corrects is spoken corrected,
+ * a sentence a guard drops is not spoken, and a figure a document read this
+ * turn states is never spoken as unknown. What survives is still held to the
+ * final answer by spokenFormWithin; an empty result is no spoken form (the
+ * voice then derives its words from the answer, as before). Figures stay
+ * digits here; the voice speaks them as words by its own number rules.
+ */
+export function spokenHeldToAnswerGuards(
+  spoken: string | null,
+  inputs: SpokenFormGuardInputs,
+): { readonly text: string | null; readonly changed: number } {
+  if (spoken === null) return { text: null, changed: 0 };
+  let text = withoutActionTalk(
+    spoken,
+    inputs.actionTalk,
+    inputs.requestedValues,
+  ).text;
+  if (inputs.deferred !== null) {
+    text = withoutDeferredWork(
+      text,
+      inputs.deferred.asked,
+      inputs.deferred.previous,
+    ).text;
+  }
+  if (inputs.staleFailures) text = withoutStaleFailures(text).text;
+  text = withoutUnsourcedGateqLabels(
+    text,
+    inputs.investor,
+    inputs.gateqHeld,
+  ).text;
+  text = withoutRecommendationClaims(
+    withOneCaveat(
+      inFirstPerson(withoutPublicSourceLabels(text, inputs.publicSources)).text,
+    ).text,
+    inputs.grounds,
+    { fallback: false },
+  ).text;
+  text = correctDocumentDenials(text, inputs.documents).text;
+  // Nothing grounded is no spoken form, not the could-not line.
+  const claimed =
+    text.trim().length === 0 ? "" : checkAnswer(text, inputs.corpus()).text;
+  text = claimed === NOTHING_SOURCED ? "" : claimed;
+  text = checkPromises(text, inputs.promiseGrounds).text;
+  const out = text.replace(/\s+/gu, " ").trim();
+  const before = spoken.replace(/\s+/gu, " ").trim();
+  return out.length === 0
+    ? { text: null, changed: 1 }
+    : { text: out, changed: out === before ? 0 : 1 };
 }
 
 export function nextStepTurn(request: {
@@ -10635,8 +10710,26 @@ export function createModelGatewayQAnswer(
         await stages.queue;
         // W4: the page pane's move joins the answer before it is stored.
         const blocks = await movedBlocks(request, answerBlocks);
+        // Voice directive 15 Nov: the spoken form goes through the same
+        // sentence rewrites the answer just did (failure lines, person,
+        // others' interest, relationship stages) before it is held to it.
+        let spokenHeld: string | null = null;
+        if (spokenCandidate !== undefined && spokenCandidate !== null) {
+          let said = inSecondPerson(
+            withoutInternalFailureLines(spokenCandidate),
+          );
+          if (asksAboutOthersInterest(latest.content)) {
+            said = withOthersInterestWithheld(said);
+          }
+          said = withRelationshipStagesChecked(
+            said,
+            await accountDigest,
+            latest.content,
+          ).content;
+          spokenHeld = said.trim().length === 0 ? null : said;
+        }
         const spokenForm: QSpokenForm | null = spokenFormWithin(
-          spokenCandidate,
+          spokenHeld,
           content,
         );
         if (
@@ -14851,6 +14944,52 @@ export function createModelGatewayQAnswer(
             "recommendation claims removed from a Q answer",
           );
         }
+        // Owner directive 15 Nov (voice): one authoritative result, with a
+        // spoken form. The spoken form is held to the same sentence guards,
+        // with the same sources, as the answer above, so a figure the
+        // answer corrects is said corrected, a sentence it drops is not
+        // said, and "unknown" is never said of a figure a document read
+        // this turn states. spokenFormWithin then holds it to the final
+        // answer (persistAnswer). Applied once the model's reply is whole,
+        // before anything is handed to the voice: no first-audio cost.
+        const spokenChecked = spokenHeldToAnswerGuards(
+          analystSpokenOf(analyst),
+          {
+            actionTalk: [...analyst.actionTalk, ...offerRemoved],
+            requestedValues: requestedChangeValues(analyst, latest.content),
+            deferred: startedThisTurn
+              ? null
+              : {
+                  asked: askedOf(latest.content, earlier),
+                  previous:
+                    [...earlier].reverse().find((m) => m.role === "Q")
+                      ?.content ?? null,
+                },
+            staleFailures:
+              request.turnKind !== "TOOL_REQUEST" &&
+              toolCalls.every(
+                (call) =>
+                  offeredByName.get(call.providerName)?.classification ===
+                    "READ_ONLY" ||
+                  offeredByName.get(call.providerName)?.classification ===
+                    "ANALYTICAL",
+              ),
+            investor: askerSideOf(request) === "INVESTOR",
+            gateqHeld: gateqHeld(),
+            publicSources,
+            grounds: groundsNow(),
+            documents: documentsThisTurn,
+            corpus: () =>
+              claimCorpus(claimSources(), new Date(), claimEchoes()),
+            promiseGrounds: promiseGrounds(),
+          },
+        );
+        if (spokenChecked.changed > 0) {
+          logger?.info(
+            { qRunId: request.runId, changed: spokenChecked.changed },
+            "q spoken form held to the answer's guards; sentences corrected or left out",
+          );
+        }
         // What the person stated about their own company, recorded as their
         // claim through the knowledge gate — only when the quote is their own
         // words and the conversation is about a company they own
@@ -15790,7 +15929,7 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
               ],
           gesturesForReply(reply, analyst.gestures),
           // A revised document's reply is code's own words: no spoken form.
-          revisedArtifact === null ? analystSpokenOf(analyst) : null,
+          revisedArtifact === null ? spokenChecked.text : null,
         );
         last = {
           result: analyst,

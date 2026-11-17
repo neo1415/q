@@ -86,6 +86,16 @@ describe("spoken form within the full answer", () => {
     );
   });
 
+  it("reads a quarter as one word, so one the answer says is not an unknown name", () => {
+    const plan = "Three account managers start in Q1 and six engineers in Q2.";
+    expect(
+      spokenOnlyFacts("Account managers start in Q1.", plan).names,
+    ).toEqual([]);
+    expect(spokenOnlyFacts("Engineers start in Q3.", plan).names).toEqual([
+      "Q3",
+    ]);
+  });
+
   it("drops markdown, a list or more than three sentences", () => {
     expect(spokenFormWithin("**Tensorgate** leads.", answer)).toBeNull();
     expect(

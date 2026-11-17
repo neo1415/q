@@ -165,7 +165,9 @@ const OPENERS: ReadonlySet<string> = new Set(
   ].map((word) => word.toLowerCase()),
 );
 
-const WORD = /[\p{Lu}][\p{L}\p{M}'’.-]*/gu;
+// Digits belong to the word ("Q1", "H2"), so a quarter the answer says is
+// matched whole, never read as an unknown name "Q".
+const WORD = /[\p{Lu}][\p{L}\p{M}\d'’.-]*/gu;
 
 function words(text: string): string {
   return ` ${text

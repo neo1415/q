@@ -250,11 +250,17 @@ function recordingLogger(into: Logged[]): Logger {
   return logger;
 }
 
-async function live() {
+async function live(spoken?: string) {
   const fake = createFakeModelProvider({
     code: "alpha",
     script: [
-      { kind: "JSON", value: analyst(LIVE_ANSWER) },
+      {
+        kind: "JSON",
+        value:
+          spoken === undefined
+            ? analyst(LIVE_ANSWER)
+            : { ...analyst(LIVE_ANSWER), spoken },
+      },
       {
         kind: "JSON",
         value: {
@@ -371,7 +377,12 @@ async function live() {
   const outcome = await seam.answer(request);
   const completed = events
     .filter((event) => event.type === "q.message.completed")
-    .map((event) => event.payload as { message: { text: string } })
+    .map(
+      (event) =>
+        event.payload as {
+          message: { text: string; spoken?: { text: string } };
+        },
+    )
     .at(-1);
   const deltas = events
     .filter((event) => event.type === "q.message.delta")
@@ -383,6 +394,7 @@ async function live() {
   return {
     outcome,
     said: completed?.message.text ?? "",
+    spokenForm: completed?.message.spoken?.text ?? null,
     deltas,
     sent,
     logged,
@@ -433,6 +445,20 @@ describe("live 13279c88 on be260a584: Nixo's burn and runway, stated by the page
           "a figure the documents read this turn state was said to be unknown; said as they state it",
       ),
     ).toBe(true);
+  });
+});
+
+describe("voice directive 15 Nov: the spoken form says what the checked answer says", () => {
+  it("a spoken form calling burn and runway unknown is said as the document states them, its repeat not said", async () => {
+    const { said, spokenForm } = await live(
+      "Nixo's monthly burn and runway aren't established in what I have. The profile does not state either figure, so I can't give you a reliable runway.",
+    );
+    expect(said).toContain("net burn of USD 125,800");
+    expect(spokenForm).not.toBeNull();
+    expect(spokenForm).not.toMatch(DENIAL);
+    expect(spokenForm).not.toMatch(/can['’]t give you a reliable runway/u);
+    expect(spokenForm).toContain("125,800");
+    expect(spokenForm).toContain("8.8 months");
   });
 });
 
