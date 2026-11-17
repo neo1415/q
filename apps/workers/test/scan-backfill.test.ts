@@ -247,4 +247,41 @@ describe("scanning the versions recorded NOT_SCANNED", () => {
       "evidence.documents.not_scanned_scan_failed",
     );
   });
+  it("at start: drains the whole backlog in batches, and stops on a scanner failure", async () => {
+    const many = Array.from({ length: 450 }, (_, i) => ({
+      ...version(1),
+      documentVersionId: `e0000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      key: `uploads/many-${String(i)}.pdf`,
+    }));
+    const logger = { info: () => undefined, warn: () => undefined };
+    const world = memoryStore(many);
+    await scanNotScannedDocumentsAtStart({
+      store: world.store,
+      scanner: scannerBy({}),
+      logger,
+      pauseMs: 0,
+    });
+    expect(world.limits).toEqual([200, 200, 200]);
+    expect([...world.status.values()].every((s) => s === "CLEAN")).toBe(true);
+
+    const capped = memoryStore(many);
+    await scanNotScannedDocumentsAtStart({
+      store: capped.store,
+      scanner: scannerBy({}),
+      logger,
+      pauseMs: 0,
+      maxBatches: 2,
+    });
+    expect(capped.limits).toEqual([200, 200]);
+
+    // A batch with a scanner error leaves those NOT_SCANNED: no retry loop.
+    const flaky = memoryStore(many);
+    await scanNotScannedDocumentsAtStart({
+      store: flaky.store,
+      scanner: scannerBy({ "uploads/many-3.pdf": "THROW" }),
+      logger,
+      pauseMs: 0,
+    });
+    expect(flaky.limits).toEqual([200]);
+  });
 });

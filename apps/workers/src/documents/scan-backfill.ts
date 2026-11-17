@@ -248,7 +248,11 @@ export function createPostgresScanBackfillStore(dependencies: {
 
 /**
  * At worker start, only when a scanner is attached (the hosted worker has
- * no shell): one bounded run in the background, one log line, never fatal.
+ * no shell): bounded runs in the background, one log line each, never fatal.
+ * It repeats while a full batch made progress, so the whole NOT_SCANNED
+ * backlog drains without a shell (live 17 Nov: 2,045 left after the first
+ * 200), and stops on the first batch with a scanner failure (those stay
+ * NOT_SCANNED and would be selected again) or after `maxBatches`.
  * Ids and counts only; never a title or a byte of a document.
  */
 export async function scanNotScannedDocumentsAtStart(options: {
@@ -258,13 +262,41 @@ export async function scanNotScannedDocumentsAtStart(options: {
     readonly info: (fields: Record<string, unknown>, message: string) => void;
     readonly warn: (fields: Record<string, unknown>, message: string) => void;
   };
+  /** Upper bound on batches per start (default 30, i.e. 6,000 versions). */
+  readonly maxBatches?: number | undefined;
+  /** Pause between batches, so the scanner and database are not hammered. */
+  readonly pauseMs?: number | undefined;
 }): Promise<void> {
   if (options.scanner.id === "none") return;
+  const maxBatches = Math.max(1, Math.trunc(options.maxBatches ?? 30));
+  const pauseMs = Math.max(0, Math.trunc(options.pauseMs ?? 2000));
+  for (let batch = 1; batch <= maxBatches; batch += 1) {
+    const more = await scanOneStartBatch(options, batch);
+    if (!more) return;
+    if (pauseMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, pauseMs));
+    }
+  }
+}
+
+/** One batch; true when another batch should follow. */
+async function scanOneStartBatch(
+  options: {
+    readonly store: ScanBackfillStore;
+    readonly scanner: MalwareScanner;
+    readonly logger: {
+      readonly info: (fields: Record<string, unknown>, message: string) => void;
+      readonly warn: (fields: Record<string, unknown>, message: string) => void;
+    };
+  },
+  batch: number,
+): Promise<boolean> {
   try {
     const result = await scanNotScannedDocuments({ ...options, apply: true });
-    if (result.kind === "REFUSED") return;
+    if (result.kind === "REFUSED") return false;
     options.logger.info(
       {
+        batch,
         selected: result.selected,
         clean: result.clean,
         infected: result.infected,
@@ -284,10 +316,16 @@ export async function scanNotScannedDocumentsAtStart(options: {
         "evidence.documents.quarantined_infected",
       );
     }
+    return (
+      result.selected >= SCAN_BACKFILL_DEFAULT_LIMIT &&
+      result.failed === 0 &&
+      result.clean + result.infected > 0
+    );
   } catch (error: unknown) {
     options.logger.warn(
-      { error: error instanceof Error ? error.name : "UNKNOWN" },
+      { batch, error: error instanceof Error ? error.name : "UNKNOWN" },
       "evidence.documents.not_scanned_scan_failed",
     );
+    return false;
   }
 }
