@@ -165,6 +165,9 @@ function seam(input: {
     context: 0,
   };
   const stored: string[] = [];
+  // Stage order, not wall-clock time: a timing bound flakes under a loaded
+  // machine (release gate 17 Nov: 59 ms against < 56), order never does.
+  const events: string[] = [];
   const logged: { message: string; context: Record<string, unknown> }[] = [];
   const logger = {
     debug: () => undefined,
@@ -185,7 +188,9 @@ function seam(input: {
   const turns: QTurnReader = {
     read: async () => {
       calls.reader += 1;
+      events.push("reader:start");
       await delay(MS.reader);
+      events.push("reader:end");
       return {
         kind: input.kind ?? "QUESTION_TO_Q",
         confidence: "HIGH",
@@ -206,7 +211,9 @@ function seam(input: {
   const gateway = {
     execute: async () => {
       calls.context += 1;
+      events.push("context:start");
       await delay(MS.context);
+      events.push("context:end");
       return {
         output: {
           kind: "STRUCTURED",
@@ -279,7 +286,7 @@ function seam(input: {
   /** The fast path's own line: its outcome, and whether it began early. */
   const followUp = () =>
     logged.find((line) => line.message === "q context follow-up")?.context;
-  return { answer, calls, stored, followUp };
+  return { answer, calls, stored, followUp, events };
 }
 
 function keptFor(conversationId: string): ConversationEvidence {
@@ -339,8 +346,14 @@ describe("contextual follow-up fast path: stage counts (DECISIONS 104)", () => {
       context: 1,
     });
     expect(after.stored).toEqual([ANSWER]);
-    // reader + context (56 ms scaled) against reader + recall + full (95).
-    expect(now.ms).toBeLessThan(was.ms - 25);
+    // The saving is structural: the recall and the full path never ran
+    // (counts above), and the one call followed the reading.
+    expect(after.events).toEqual([
+      "reader:start",
+      "reader:end",
+      "context:start",
+      "context:end",
+    ]);
   });
 
   it("a spoken follow-up starts its one call beside the reading, and adopts it once read", async () => {
@@ -362,10 +375,12 @@ describe("contextual follow-up fast path: stage counts (DECISIONS 104)", () => {
       context: 1,
     });
     expect(s.stored).toEqual([ANSWER]);
-    // Overlapped: begun after the skim (13), adopted once read (26), so
-    // the turn takes skim + context (43) rather than reader + context (56).
+    // Overlapped: the call began before the reading finished, and was
+    // adopted once read.
     expect(s.followUp()).toMatchObject({ outcome: "ANSWERED", early: true });
-    expect(turn.ms).toBeLessThan(MS.reader + MS.context);
+    expect(s.events.indexOf("context:start")).toBeLessThan(
+      s.events.indexOf("reader:end"),
+    );
   });
 
   it("an early call is never used when the reading is not a follow-up", async () => {
