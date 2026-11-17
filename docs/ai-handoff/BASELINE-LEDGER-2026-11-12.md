@@ -797,3 +797,11 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Request latency did not improve: POST /runs took 4.7 s, workforce/overview 4.2 s.
 - **Rollback:** at 20:46 UTC to port 5432, `session_pooler`, pool 3. Redeployed SUCCESS at 20:53. A smoke turn then completed in 11.4 s, and the hung run was recovered as FAILED.
 - **Cause:** not yet known. It needs an offline investigation before another attempt; candidates are a statement or transaction pattern unsafe under transaction pooling, or an await on a connection-scoped setting. Until then q-api stays on the session pooler.
+
+## Transaction pooler retry on q-api: holding (17 Nov, 09:58 Lagos)
+
+- **Production:** `e5bc4200c` (gate PASS 1430 s). It adds the transaction-pooler connection gate, proven locally against Supavisor (`scripts/db/pooler-proof/`, runbook `runbooks/transaction-pooler-retry.md`). It also carries the decision-102 voice room layout (`9fb8590a0`).
+- **Before the switch:** smoke test on the session pooler: one turn, 13.8 s, COMPLETED.
+- **The switch:** at 08:49 UTC q-api moved to the transaction pooler (port 6543, `DATABASE_POOL_MAX=6`). The URL was edited without printing it, and the previous values are kept for rollback.
+- **After the switch:** three timed turns (figures, "why differs", three-company compare) all COMPLETED, in 12.6 s, 14.4 s and 20.1 s. First browser text came at about 2.6 s. No stuck runs and no failures since the switch.
+- **Assessment:** stable, but no clear speed gain yet at pool 6. Per the runbook, hold for an hour, then raise to pool 10 and re-time.
