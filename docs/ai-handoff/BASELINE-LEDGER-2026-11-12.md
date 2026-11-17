@@ -827,3 +827,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **Gap found:** the drift rebuild rewrote only the companies in the new pool. Stale CURRENT snapshots for companies outside it (Zino: Tensorgate, Halyard, Ajopot, Shiftwell) keep thesis MISSING. A follow-up worker is computing it on read.
 - **20:20 UTC, `6b5588218` (rollback point `dee0da7f4`):** ci-local PASS (1607 s); all four services SUCCESS. Thesis and sector are now computed on read for stale CURRENT snapshots outside the latest pool (844 thesis and 82 sector snapshots network-wide). Nothing is written to the database.
   - Live check (Savanna, fictional): Halyard Security and Clearwater Assurance had stale snapshots with thesis MISSING; Q now shows Thesis Partial for both, with 6 of 7 measures known.
+- **20:35–21:47 UTC, ClamAV live (decision 104, ADR 0080):**
+  - Railway service `clamav` (id `349c58cb…`) was created in the Q project: europe-west4, built from `infra/clamav/Dockerfile` on `recovery/2026-09-12`, volume `/var/lib/clamav`, no public domain. clamd is up with current signatures.
+  - Workers: `CLAMAV_HOST=clamav.railway.internal`. The first start scanned 200, all clean. `468194291` (gated, PASS 1545 s; workers only) makes the start-up backfill drain in batches. All 2,245 document versions are CLEAN and 0 infected.
+  - `CQ_MALWARE_POLICY` changed from `ALLOW_UNSCANNED_WITH_WARNING` to `REQUIRE_CLEAN` on workers and api. Both redeployed SUCCESS. ADR 0042 is superseded.
+  - Railway no longer accepts a config-file path (`railway.json` is deprecated), so the Dockerfile path and watch pattern are set on the service instance itself.

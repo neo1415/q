@@ -1,6 +1,6 @@
 # ADR 0042: Unscanned documents, interim (no malware scanner yet)
 
-- Status: Accepted (founder decision, 2026-10-03)
+- Status: Superseded by ADR 0080 (2026-11-17); was Accepted (founder decision, 2026-10-03)
 - Amends: ADR 0008 §6 ("No scanner means blocked, not clean") for hosted
   environments, while no scanner is attached; ADR 0041 §2 (the deck
   download's "scanner-CLEAN" condition)
