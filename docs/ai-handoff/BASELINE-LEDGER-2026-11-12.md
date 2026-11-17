@@ -808,3 +808,20 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **10:01 UTC:** the watch hour was clean (0 stuck, 0 failed), so q-api's `DATABASE_POOL_MAX` went from 6 to 10 and q-api redeployed SUCCESS at 10:06. A smoke turn COMPLETED in 12.8 s. The transaction pooler stays on.
 - **Found by that smoke turn:** "What's Nixo's monthly burn and runway?" was answered "not established" although Nixo's shared management accounts give them. Correction (fix `a29364f02`): page 1 did carry the figures. The cause was a code-written limits fact that told the model burn and runway were unknown beyond published figures and the deck. That fact now names the shared documents read, and pages are also chosen by content.
 - **13:35 UTC, `cd8bc49b7`:** model-hosted web search fallback (decision 103) deployed; migration `20261231597000` applied (hosted 308). First live check (Savanna, "Flutterwave's latest funding"): Serper 402 and Tavily 432, then the fallback ran once and failed TRANSIENT after 5.85 s with 0 tokens and no detail logged. Q said public search was unavailable. A fix is in progress: error logging and a request/model check against the current API spec.
+- **19:21 UTC, `dee0da7f4` (rollback point `270aa69c9`):** one gated batch (ci-local PASS, 1782 s); all four services SUCCESS; no migration. It contains:
+  - privacy egress filter `1bf8a7905`;
+  - web search parse fix `265c2b8ba`;
+  - alerts, caps and per-person limits `52b7cef61` (model spend now defaults to $50/day; see `OPS-ALERTS.md`);
+  - ClamAV service and adapter `354024425` (inactive until a `clamav` Railway service exists and `CLAMAV_HOST` is set);
+  - root-cause fixes from the owner's voice test, conversation `9995dcca`:
+    - `f2a9d6fa4`: question cards no longer expire while awaiting approval; questions are addressed to the company; status claims come from the records; "send it"/"I approved" resolves to the pending card;
+    - `2f6068529`: thesis similarity is scored for every admitted candidate; a tie is never cut; "why" answers the reasons; no false "no source documents";
+    - `5b4bd13a2`: revenue also read from the confirmed deck; conditions carry over only when refining the shown list (TURN_READER v91); sector overlap kept; consistent universe.
+  - The first gate on `5b4bd13a2` failed two integration tests that asserted the old missing-similarity behaviour; they were updated (`dee0da7f4`).
+- **Live recheck (Savanna, fictional, conversation `1b509e50`, $0.047):**
+  - all four tied companies named, with Thesis Strong/Partial on the cards;
+  - "why" answered with each company's measures and no re-rank;
+  - "outside my sectors" was a new list, with no pre-revenue carry-over;
+  - "leave out the ones in contact" refined that list.
+  - Still open: pre-revenue is unknown for most companies. Revenue lives only in unextracted data-room text; the proposed fix is that the seed writes document-linked claims through the Write Gate.
+- **Gap found:** the drift rebuild rewrote only the companies in the new pool. Stale CURRENT snapshots for companies outside it (Zino: Tensorgate, Halyard, Ajopot, Shiftwell) keep thesis MISSING. A follow-up worker is computing it on read.
