@@ -174,10 +174,69 @@ function weightOf(document: ListedDocument): number {
   return 0;
 }
 
+/** A word's stem: "hires", "hiring", "hire" → "hir"; "planned" → "plan". */
+function stem(word: string): string {
+  const cut = word.replace(/(?:ing|ed|es|s|e)$/u, "");
+  return /([b-df-hj-np-tv-z])\1$/u.test(cut) ? cut.slice(0, -1) : cut;
+}
+
+const STEM_FILLER = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "what",
+  "how",
+  "many",
+  "much",
+  "their",
+  "they",
+  "this",
+  "that",
+  "from",
+  "about",
+  "break",
+  "down",
+  "tell",
+  "show",
+  "give",
+  "does",
+  "have",
+  "has",
+  "of",
+]);
+
+const stemsOf = (text: string): ReadonlySet<string> =>
+  new Set(
+    (text.toLowerCase().match(/\p{L}{3,}/gu) ?? [])
+      .filter((word) => !STEM_FILLER.has(word))
+      .map(stem)
+      .filter((word) => word.length >= 3),
+  );
+
+/**
+ * How many content words of the question the document's title shares, by
+ * stem. Live run 434ead80 (Thames Arc, 17 Nov 2026): "Break down Halyard
+ * Security's planned 2027 hires" read the management accounts and the KPI
+ * pack (KINDS weights) and never "Team and hiring plan", the one document
+ * that answers it ("hires"/"hiring", "planned"/"plan" share no word), so
+ * the answer was built from Q's own recalled earlier words.
+ */
+function titleStems(question: string, document: ListedDocument): number {
+  const asked = stemsOf(question);
+  let shared = 0;
+  for (const word of stemsOf(document.title)) if (asked.has(word)) shared += 1;
+  return shared;
+}
+
+/** A title naming what was asked outranks any KINDS weight. */
+const TITLE_MATCH = 1;
+
 /**
  * Which documents open to them to read for this turn: never a deck, never
- * one already read this turn, the most evidential first (KINDS), the
- * question breaking ties, at most SHARED_READS_MAX.
+ * one already read this turn; a document whose title names what was asked
+ * first (titleStems), then the most evidential (KINDS), the question
+ * breaking ties, at most SHARED_READS_MAX.
  */
 export function sharedDocumentReads(input: {
   readonly documents: readonly ListedDocument[];
@@ -195,6 +254,9 @@ export function sharedDocumentReads(input: {
     .map((document) => ({
       document,
       score:
+        (titleStems(input.question, document) >= 2
+          ? TITLE_MATCH + 0.1 * titleStems(input.question, document)
+          : 0) +
         weightOf(document) +
         documentScore(input.question, {
           title: document.title,

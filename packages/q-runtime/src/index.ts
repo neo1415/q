@@ -70,6 +70,14 @@ export {
   SUMMARY_MAX_CHARS,
   type SummaryGateOutcome,
 } from "./domain/conversation-summary-gate.js";
+export {
+  planSummarySupersession,
+  SUMMARY_CORRECTION_GATE_VERSION,
+  supersedeConversationSummary,
+  type SummarySupersession,
+  type SummarySupersessionDependencies,
+  type SummarySupersessionOutcome,
+} from "./application/summary-supersession.js";
 
 export {
   QConversationArchivedError,

@@ -328,6 +328,7 @@ export {
   NO_REHEARSALS_LINE,
   REHEARSALS_LABEL,
   RELEVANT_LABEL,
+  Q_SAID_EARLIER,
   renderMemoryBundle,
   PAST_TURNS_LABEL,
   renderPastTurns,
@@ -335,6 +336,7 @@ export {
 export {
   createMemoryRecall,
   type MemoryRecalled,
+  type RecalledSummary,
   type MemoryRecallInput,
 } from "./memory/recall-port.js";
 export {
@@ -342,6 +344,8 @@ export {
   memoryTruthClass,
   Q_READING_LABEL,
   Q_READING_SUFFIX,
+  Q_SAID_EARLIER_LABEL,
+  recalledLineTruthClass,
   type MemoryTruthClass,
 } from "./memory/provenance.js";
 export {

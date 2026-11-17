@@ -288,6 +288,8 @@ import {
   checkAnswer,
   claimCorpus,
   createClaimChecker,
+  recheckCounts,
+  statedNumbers,
   templateValues,
   type ClaimKind,
 } from "./claim-check.js";
@@ -3185,6 +3187,35 @@ export type QMemoryRecall = {
     readonly plan?: Pick<PermittedContextPlan, "scopes"> | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<string | QMemoryRecalled>;
+  /**
+   * Supersede earlier conversations' summaries whose counts this run's
+   * documents contradict, each with a new revision holding the counts put
+   * right (append-only; the stale revision stays as history). Called
+   * detached after the answer; a failure costs the correction, never the
+   * answer. Absent: nothing is superseded.
+   */
+  readonly supersedeSummaries?: (input: {
+    readonly actor: ActorContext;
+    readonly runId: string;
+    readonly corrections: readonly QSummaryCorrection[];
+  }) => Promise<void>;
+};
+
+/**
+ * One recalled summary of another conversation, its counts held to this
+ * run's documents: `from` is the summary as recalled (so a summary that
+ * moved on since is left alone), `summary` the same text with the
+ * contradicted counts put right or their sentences left out, and
+ * `grounds` the run's source lines that state the counts it now carries
+ * (for the summary gate).
+ */
+export type QSummaryCorrection = {
+  readonly conversationId: string;
+  readonly from: string;
+  readonly summary: string;
+  readonly corrected: number;
+  readonly dropped: number;
+  readonly grounds: readonly string[];
 };
 
 /**
@@ -3195,7 +3226,62 @@ export type QMemoryRecall = {
 export type QMemoryRecalled = {
   readonly text: string;
   readonly ownWords: readonly string[];
+  /** Recalled summaries of other conversations: Q's own words, an echo. */
+  readonly earlierSummaries?:
+    | readonly { readonly conversationId: string; readonly summary: string }[]
+    | undefined;
 };
+
+/** A stated summary with nothing left once its contradicted counts go. */
+const SUMMARY_COUNTS_WITHDRAWN =
+  "Q's earlier summary of this conversation stated counts the document contradicts; they were withdrawn.";
+
+/**
+ * Recalled summaries of other conversations whose counts this run's
+ * sources contradict, put right (claim-check `recheckCounts`). Only a
+ * count a document row or table contradicts moves anything; a count no
+ * row names is left as written.
+ */
+export function summaryCorrections(
+  summaries: readonly {
+    readonly conversationId: string;
+    readonly summary: string;
+  }[],
+  sources: readonly string[],
+  echoes: readonly string[],
+  today: Date = new Date(),
+): readonly QSummaryCorrection[] {
+  if (summaries.length === 0) return [];
+  // Each summary is an echo too: its own words never bind its counts.
+  // Only a count a source row contradicts moves anything here: one only
+  // the echoes name is left as written (echoOnlyWithheld off).
+  const corpus = claimCorpus(
+    sources,
+    today,
+    [...echoes, ...summaries.map((s) => s.summary)],
+    { echoOnlyWithheld: false },
+  );
+  return summaries.flatMap((recalled) => {
+    const checked = recheckCounts(recalled.summary, corpus);
+    if (checked.corrected === 0 && checked.dropped === 0) return [];
+    const summary =
+      checked.text.length === 0 ? SUMMARY_COUNTS_WITHDRAWN : checked.text;
+    const stated = statedNumbers(summary).flat();
+    return [
+      {
+        conversationId: recalled.conversationId,
+        from: recalled.summary,
+        summary,
+        corrected: checked.corrected,
+        dropped: checked.dropped,
+        grounds: sources
+          .filter((source) => stated.some((n) => source.includes(n)))
+          .slice(0, 20)
+          .map((source) => source.slice(0, 4_000)),
+      },
+    ];
+  });
+}
 
 /** The recall's text, whichever shape the port returned. */
 export function recalledText(recalled: string | QMemoryRecalled): string {
@@ -4500,6 +4586,8 @@ export function createModelGatewayQAnswer(
       return {
         text: text.length === 0 ? NOTHING_REMEMBERED : text.slice(0, 4_000),
         ownWords: typeof recalled === "string" ? [] : recalled.ownWords,
+        earlierSummaries:
+          typeof recalled === "string" ? [] : (recalled.earlierSummaries ?? []),
       };
     } catch (error: unknown) {
       logger?.warn(
@@ -5731,6 +5819,9 @@ export function createModelGatewayQAnswer(
     const memory = recalled.text;
     // Step 9: their own past words recall found, for the claim check.
     const recalledOwnWords = recalled.ownWords;
+    // Q's own summaries of other conversations recall rendered: echoes,
+    // held to this run's documents after the answer (summaryCorrections).
+    const recalledSummaries = recalled.earlierSummaries ?? [];
     const { arrivalAnswer, names: prefetchTools } = await prefetchToolsRead;
 
     /**
@@ -7398,6 +7489,7 @@ export function createModelGatewayQAnswer(
       availableForRun,
       memory,
       recalledOwnWords,
+      recalledSummaries,
       ownProfile,
       ownProfileCall,
       ownMandateData: (): unknown => ownMandateData,
@@ -7861,6 +7953,7 @@ export function createModelGatewayQAnswer(
         availableForRun,
         memory,
         recalledOwnWords,
+        recalledSummaries,
         ownProfile,
         ownCompany,
         ownFigures,
@@ -14470,6 +14563,43 @@ export function createModelGatewayQAnswer(
             },
             "q claim check",
           );
+        }
+        // Thames Arc, 16 Nov 2026: Q's wrong counts sat in earlier
+        // conversations' summaries and were recalled into later ones. A
+        // recalled summary whose counts this run's documents contradict is
+        // superseded by a new revision with them put right (the stale one
+        // stays as history). Detached; counts only in the log, no text.
+        {
+          const supersede = dependencies.memory?.supersedeSummaries;
+          const corrections =
+            supersede === undefined
+              ? []
+              : summaryCorrections(
+                  recalledSummaries,
+                  claimSources(),
+                  claimEchoes(),
+                );
+          if (supersede !== undefined && corrections.length > 0) {
+            logger?.info(
+              {
+                qRunId: request.runId,
+                summaries: corrections.length,
+                corrected: corrections.reduce((n, c) => n + c.corrected, 0),
+                dropped: corrections.reduce((n, c) => n + c.dropped, 0),
+              },
+              "q earlier summaries superseded",
+            );
+            void supersede({
+              actor: request.actor,
+              runId: request.runId,
+              corrections,
+            }).catch((error: unknown) => {
+              logger?.warn(
+                { err: error, qRunId: request.runId },
+                "earlier summaries were not superseded",
+              );
+            });
+          }
         }
         // Step 8: the stored answer is held to the same promise check.
         const answerPromises = stageClock.time("promiseCheckAnswer", () =>

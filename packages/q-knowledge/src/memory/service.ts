@@ -19,6 +19,7 @@ import {
   type MemoryWriteMode,
   type MemoryWriteResult,
 } from "./contracts.js";
+import { figuresNotInQuote } from "./figures.js";
 import type { MemoryRepository } from "./postgres-memory-repository.js";
 import {
   connectedRecallWithin,
@@ -552,6 +553,17 @@ export function createMemoryService(
         if (!said) {
           return { outcome: "REFUSED", reason: "QUOTE_NOT_IN_TURNS" };
         }
+      }
+      // A model's sentence states no figure the person's quote does not:
+      // a count or amount only Q's own answer said is Q's earlier
+      // statement, never a fact they told Q (Thames Arc, 16 Nov 2026:
+      // Q's wrong "4 account managers" recalled as if it were the plan's).
+      if (
+        (command.writeMode === "Q_PROPOSED" ||
+          command.writeMode === "DERIVED") &&
+        figuresNotInQuote(candidate.content, candidate.quote).length > 0
+      ) {
+        return { outcome: "REFUSED", reason: "UNGROUNDED_FIGURE" };
       }
       if (
         looksLikeSecret(candidate.content) ||

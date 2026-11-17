@@ -97,6 +97,13 @@ export interface ClaimCorpus {
    * of a quarter ("5 in Q1") is bound to.
    */
   readonly periodCounts: ReadonlyMap<string, readonly number[]>;
+  /**
+   * Q's own earlier words (lower-cased), so a count only they name is
+   * withheld: live run 434ead80 (Thames Arc, 17 Nov 2026) said "4
+   * public-sector account managers" with no document read at all, from
+   * recalled memory and Q's earlier replies. Empty: the rule is off.
+   */
+  readonly echoText: string;
 }
 
 export interface SentenceCheck {
@@ -344,6 +351,12 @@ export function claimCorpus(
    * document says, and a wrong count repeated is still wrong.
    */
   echoes: readonly string[] = [],
+  /**
+   * Whether a count of an item only the echoes name is withheld (default
+   * true). Off where the text checked is itself an echo (a recalled
+   * summary held to the documents: summaryCorrections).
+   */
+  options: { readonly echoOnlyWithheld?: boolean } = {},
 ): ClaimCorpus {
   const numbers: SourceNumber[] = [];
   const lines: Operand[][] = [];
@@ -424,6 +437,10 @@ export function claimCorpus(
     minutes,
     sourceLines,
     periodCounts,
+    echoText:
+      options.echoOnlyWithheld === false
+        ? ""
+        : normaliseText(echoes.join("\n")),
   };
 }
 
@@ -1418,13 +1435,45 @@ type CountBinding =
       readonly sources: ReadonlySet<number>;
     };
 
+/**
+ * A head count's noun ("15 planned hires", "5 people"): a total the
+ * sentence's own arithmetic may ground (statedTotal), never a named item.
+ */
+const HEAD_COUNT_NOUNS: ReadonlySet<string> = new Set([
+  "hire",
+  "people",
+  "person",
+  "role",
+  "employee",
+  "staff",
+  "position",
+  "headcount",
+  "member",
+]);
+
+/** Q's own earlier words name the item, as a whole phrase. */
+function echoNames(item: readonly string[], corpus: ClaimCorpus): boolean {
+  if (corpus.echoText.length === 0) return false;
+  if (HEAD_COUNT_NOUNS.has(singular(item.at(-1) ?? ""))) return false;
+  return new RegExp(`(?<![\\p{L}])${itemBody(item)}(?![\\p{L}])`, "u").test(
+    corpus.echoText,
+  );
+}
+
 function bindCount(
   value: number,
   item: readonly string[],
   corpus: ClaimCorpus,
 ): CountBinding {
   const rows = itemRows(item, corpus);
-  if (rows.length === 0) return { kind: "UNPLACED" };
+  if (rows.length === 0) {
+    // Named only in Q's own earlier words (recalled memory, its earlier
+    // replies): no source holds this count, and a count Q said before is
+    // not one a document said. Withheld, never put right.
+    return echoNames(item, corpus)
+      ? { kind: "CONTRADICTED", only: null, sources: new Set<number>() }
+      : { kind: "UNPLACED" };
+  }
   const matching = rows.filter((row) => row.value === value);
   if (matching.length > 0) {
     return {
@@ -1751,6 +1800,53 @@ function countsContradicted(text: string, corpus: ClaimCorpus): boolean {
       bindCount(figure.value, item, corpus).kind === "CONTRADICTED"
     );
   });
+}
+
+/**
+ * Text Q wrote earlier (a stored summary of another conversation), its
+ * counts held to this run's sources: each sentence's counts put right
+ * under the answer's rule (the rows agree and the sentence recites them),
+ * or the sentence left out when a count the rows contradict cannot be.
+ * Counts only: nothing else in the text is checked or rewritten, and a
+ * count no row names is left as written (unplaced is not contradicted).
+ * The corpus must hold the text itself only as an echo, so its own words
+ * never bind its counts.
+ */
+export function recheckCounts(
+  text: string,
+  corpus: ClaimCorpus,
+): {
+  readonly text: string;
+  readonly corrected: number;
+  readonly dropped: number;
+} {
+  let corrected = 0;
+  let dropped = 0;
+  const lines = text.split("\n").map((line) => {
+    if (line.trim().length === 0) return line;
+    const sentences = line.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"“(*])/u);
+    const kept: string[] = [];
+    let previous = "";
+    for (const sentence of sentences) {
+      const counts = checkCounts(sentence, corpus, previous);
+      previous = sentence;
+      if (counts.contradicted || countsContradicted(counts.text, corpus)) {
+        dropped += 1;
+        continue;
+      }
+      corrected += counts.corrected;
+      kept.push(counts.text);
+    }
+    return kept.length === 0 ? null : kept.join(" ");
+  });
+  return {
+    text: lines
+      .filter((line): line is string => line !== null)
+      .join("\n")
+      .trim(),
+    corrected,
+    dropped,
+  };
 }
 
 /**

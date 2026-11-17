@@ -16,7 +16,7 @@ import {
   type TruthClass,
 } from "@capital-q/contracts";
 import { withRoundTripPhase } from "@capital-q/database";
-import { Q_READING_LABEL } from "@capital-q/q-knowledge";
+import { recalledLineTruthClass } from "@capital-q/q-knowledge";
 import type {
   QToolCallOutcome,
   QToolExecutionContext,
@@ -442,11 +442,10 @@ export function createSituationAssembler(
         .filter((line) => line.length > 0 && !/:\s*$/u.test(line))
         .map((line) => ({
           statement: `Remembered: ${line.slice(0, 980)}`,
-          // Step 9: Q's reading of their words is Q's inference, never
-          // their claim. Told apart by the recall's own label.
-          truthClass: line.replace(/^-\s*/u, "").startsWith(Q_READING_LABEL)
-            ? ("Q_INFERENCE" as const)
-            : ("USER_CLAIM" as const),
+          // Step 9: Q's reading of their words, Q's own summary of a
+          // conversation and Q's own past turns are Q's inference, never
+          // their claim. Told apart by the recall's own labels.
+          truthClass: recalledLineTruthClass(line),
           evidenceStatus: "SELF_REPORTED",
           label: "personal_private",
           category: "PERSONAL_CONTEXT",

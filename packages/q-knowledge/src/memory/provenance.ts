@@ -61,6 +61,32 @@ export function memoryTruthClass(
  */
 export const Q_READING_LABEL = "Q's reading";
 export const Q_READING_SUFFIX = "not their words";
+/** The label of Q's own summary of a conversation, when recalled (render.ts). */
+export const Q_SAID_EARLIER_LABEL = "Q said earlier";
+
+const SUMMARY_LINE = new RegExp(
+  `^\\d{4}-\\d{2}-\\d{2}\\b[^:\\n]{0,200}:\\s*${Q_SAID_EARLIER_LABEL}\\b`,
+  "u",
+);
+const Q_PAST_TURN_LINE = /^\d{4}-\d{2}-\d{2}\b[^:\n]{0,200}, Q said:/u;
+
+/**
+ * Whose words a rendered recall line is, by Capital Q's own labels (never
+ * by reading the person's words): Q's reading of their words, Q's own
+ * summary of a conversation ("Q said earlier", render.ts) and a past turn
+ * of Q's ("…, Q said: …") are Q_INFERENCE; everything else is theirs.
+ * Thames Arc, 16 Nov 2026: a summary line carrying Q's wrong count was
+ * typed USER_CLAIM by the situation's memory section.
+ */
+export function recalledLineTruthClass(line: string): MemoryTruthClass {
+  const text = line.trim().replace(/^-\s*/u, "");
+  return text.startsWith(Q_READING_LABEL) ||
+    text.startsWith(Q_SAID_EARLIER_LABEL) ||
+    SUMMARY_LINE.test(text) ||
+    Q_PAST_TURN_LINE.test(text)
+    ? "Q_INFERENCE"
+    : "USER_CLAIM";
+}
 
 /**
  * Wording that presents something as the person's own statement. Used only

@@ -172,6 +172,7 @@ export const MEMORY_WRITE_REASONS = [
   "INVALID_CANDIDATE",
   "SENSITIVE_CONTENT",
   "NOT_ALLOWED",
+  "UNGROUNDED_FIGURE",
 ] as const;
 export type MemoryWriteReason = (typeof MEMORY_WRITE_REASONS)[number];
 

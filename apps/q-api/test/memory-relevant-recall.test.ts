@@ -223,7 +223,7 @@ describe("relevant recall across the person's own conversations", () => {
     );
     expect(text.startsWith(RELEVANT_LABEL)).toBe(true);
     expect(text).toContain(
-      "- 2026-08-14 Tensorgate runway: They asked about Tensorgate's runway and the bridge round.",
+      "- 2026-08-14 Tensorgate runway: Q said earlier (its summary, not a source) — They asked about Tensorgate's runway and the bridge round.",
     );
     expect(text).not.toContain("Another investor's");
     expect(text).not.toContain("Another tenant's");

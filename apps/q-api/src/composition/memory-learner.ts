@@ -33,6 +33,7 @@ import {
 import {
   CONVERSATION_SUMMARY_GATE_VERSION,
   gateConversationSummary,
+  supersedeConversationSummary,
   type QConversationMessage,
   type QOrchestrator,
   type QRuntimeRepositories,
@@ -265,7 +266,51 @@ export function createMemoryLearner(
   // Step 9: one composition of recall (q-knowledge), with the person's own
   // past turns searched only when the run's plan admits their own
   // conversations.
-  const recall: QMemoryRecall = createMemoryRecall(memory);
+  const summaryStates = repositories.conversationStates;
+  const recall: QMemoryRecall = {
+    ...createMemoryRecall(memory),
+    // A recalled summary whose counts the answer's documents contradict
+    // is superseded by a corrected revision (the stale one stays as
+    // history). Only the actor's own conversations: tenant and owner come
+    // from the actor, never from the correction.
+    ...(summaryStates === undefined
+      ? {}
+      : {
+          supersedeSummaries: async ({ actor, runId, corrections }) => {
+            for (const correction of corrections) {
+              const id = QConversationIdSchema.safeParse(
+                correction.conversationId,
+              );
+              if (!id.success) continue;
+              const outcome = await supersedeConversationSummary(
+                {
+                  sql,
+                  transactions,
+                  conversations: repositories.conversations,
+                  states: summaryStates,
+                },
+                {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  conversationId: id.data,
+                  from: correction.from,
+                  summary: correction.summary,
+                  grounds: correction.grounds,
+                  runId,
+                },
+              );
+              logger.info(
+                {
+                  qRunId: runId,
+                  qConversationId: id.data,
+                  outcome: outcome.kind,
+                },
+                "q earlier summary supersession",
+              );
+            }
+          },
+        }),
+  };
 
   async function extract(
     actor: ActorContext,

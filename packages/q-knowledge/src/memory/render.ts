@@ -10,6 +10,7 @@ import {
   memoryTruthClass,
   Q_READING_LABEL,
   Q_READING_SUFFIX,
+  Q_SAID_EARLIER_LABEL,
 } from "./provenance.js";
 
 /**
@@ -74,6 +75,19 @@ function line(item: MemoryItem): string {
 
 export const RELEVANT_LABEL =
   "Earlier conversations about what they asked (what was discussed, not verified evidence):";
+
+/**
+ * A conversation summary is Q's own record of what was said, written by a
+ * model from the turns, Q's answers included: at most Q's inference, never
+ * a fact (truth class Q_INFERENCE). Thames Arc, 16 Nov 2026: Q's wrong "4
+ * public-sector account managers" (the plan's row says 3) sat in three
+ * summaries and was recalled into later conversations reading as the
+ * plan's. Every recalled summary now says whose words it is, line by line,
+ * so no consumer (the answer, the situation's memory section) can take a
+ * figure in it for the document's.
+ */
+export const Q_SAID_EARLIER = Q_SAID_EARLIER_LABEL;
+const SUMMARY_LEAD = `${Q_SAID_EARLIER} (its summary, not a source) —`;
 /** Per relevant summary: four of them stay well inside MEMORY_TEXT_MAX. */
 const RELEVANT_SUMMARY_MAX = 600;
 
@@ -87,7 +101,7 @@ function digestLine(
       : c.summary;
   return `${c.lastMessageAt.slice(0, 10)}${
     c.title === null ? "" : ` ${c.title}`
-  }: ${summary}`;
+  }: ${SUMMARY_LEAD} ${summary}`;
 }
 
 export const PAST_TURNS_LABEL =
@@ -239,7 +253,7 @@ export function renderMemoryBundle(
         bundle.thisConversation.title === null
           ? ""
           : ` (${bundle.thisConversation.title})`
-      }:\n${bundle.thisConversation.summary}`,
+      }:\n${SUMMARY_LEAD} ${bundle.thisConversation.summary}`,
     );
   }
   // Asked "last time", the connected section lists them, dated, with jobs.

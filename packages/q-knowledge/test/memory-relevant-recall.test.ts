@@ -197,7 +197,7 @@ describe("rendering the relevant section", () => {
     expect(text.startsWith(RELEVANT_LABEL)).toBe(true);
     expect(RELEVANT_LABEL).toContain("not verified evidence");
     expect(text).toContain(
-      "- 2026-09-01 Tensorgate runway: Asked about Tensorgate's runway.",
+      "- 2026-09-01 Tensorgate runway: Q said earlier (its summary, not a source) — Asked about Tensorgate's runway.",
     );
     expect(text.indexOf(RELEVANT_LABEL)).toBeLessThan(
       text.indexOf("Earlier in this conversation"),

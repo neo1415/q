@@ -29,7 +29,16 @@ import {
 } from "../src/index.js";
 import { checkAnswer, claimCorpus } from "../src/q/claim-check.js";
 import { documentRowFacts, documentTables } from "../src/q/document-rows.js";
-import { createModelGatewayQAnswer } from "../src/q/index.js";
+import {
+  listedDocumentsOf,
+  sharedDocumentReads,
+} from "../src/q/shared-documents.js";
+import {
+  createModelGatewayQAnswer,
+  type QMemoryRecall,
+  type QMemoryRecalled,
+  type QSummaryCorrection,
+} from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import {
   BANK_STATEMENT_READ,
@@ -104,6 +113,18 @@ const EARLIER_SUMMARIES = [
   "Amelia asked which quarter each planned Halyard Security hiring group starts. Q reported that the 15 planned hires are scheduled for Q1, Q2 and Q3 of 2027: Q1 includes four public-sector account managers and one information security and assurance manager; Q2 includes six deployment engineers and four product engineers; Q3 includes one finance and operations manager. The plan is conditional on the seed round closing and does not specify individual months or days.",
   "Amelia asked how Halyard Security’s 2027 hiring plan breaks down by role and start quarter. The plan projects 15 hires if the seed round closes: 4 public-sector account managers and 1 information security and assurance manager in Q1; 6 deployment engineers and 4 product engineers in Q2; and 1 finance and operations manager in Q3. It does not specify months or days, and the hires are projections rather than actual results. Amelia has not yet decided whether to request further documentation.",
 ];
+
+/** The plan read as pages, as the shared-document read returns it. */
+const PLAN_READ = {
+  ...MANAGEMENT_ACCOUNTS_READ,
+  pages: [{ page: 1, text: PLAN_CHUNKS.join("\n") }],
+  title: "Team and hiring plan",
+  folder: "Team",
+  pageCount: 1,
+  documentId: "c0d522b1-ca99-4e7d-ad83-cb99ba7326ef",
+};
+/** Which documents a turn read as pages, in order. */
+const pagesRead: string[] = [];
 
 const clip = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
@@ -223,9 +244,12 @@ function toolsFor(): QToolPort {
       case "read_company_data_room":
         return DATA_ROOM_READ;
       case "read_document_pages":
-        return args["documentId"] === BANK_STATEMENT_READ.documentId
-          ? BANK_STATEMENT_READ
-          : MANAGEMENT_ACCOUNTS_READ;
+        pagesRead.push(String(args["documentId"]));
+        return args["documentId"] === PLAN_READ.documentId
+          ? PLAN_READ
+          : args["documentId"] === BANK_STATEMENT_READ.documentId
+            ? BANK_STATEMENT_READ
+            : MANAGEMENT_ACCOUNTS_READ;
       case "list_schedule":
         return { items: [] };
       case "list_pending_approvals":
@@ -294,8 +318,11 @@ function plan(): PermittedContextPlan {
 async function turn(
   history: readonly { readonly role: "USER" | "Q"; readonly content: string }[],
   modelSays: string,
-  memory: string,
+  memory: string | QMemoryRecalled,
   executionClass?: "ANSWER_FROM_CONTEXT",
+  supersedeSummaries?: QMemoryRecall["supersedeSummaries"],
+  /** What retrieval held (live 434ead80: nothing). */
+  retrieved: readonly AuthorisedFact[] = RETRIEVED,
 ) {
   const fake = createFakeModelProvider({
     code: "alpha",
@@ -371,13 +398,16 @@ async function turn(
     transactions: { run: (work) => work({} as never) },
     tools: toolsFor(),
     // What recall handed the live prompt: Q's own earlier words.
-    memory: { recall: () => Promise.resolve(memory) },
+    memory: {
+      recall: () => Promise.resolve(memory),
+      ...(supersedeSummaries === undefined ? {} : { supersedeSummaries }),
+    },
     // The plan's text reached the live answers as retrieved passages.
     context: {
       assemble: () =>
         Promise.resolve({
-          facts: RETRIEVED,
-          subjectDescription: `${String(RETRIEVED.length)} passage(s) retrieved from source documents you are authorised to use; each is source material, not verified fact`,
+          facts: [...retrieved],
+          subjectDescription: `${String(retrieved.length)} passage(s) retrieved from source documents you are authorised to use; each is source material, not verified fact`,
         }),
     },
   });
@@ -532,5 +562,213 @@ describe("the table's rows, read by code", () => {
         corpus,
       ).text,
     ).toContain("three public-sector");
+  });
+});
+
+/**
+ * Thames Arc, 16 Nov 2026, after 827cc7763: Q's wrong counts still sat in
+ * the earlier conversations' stored summaries (8811f9c7, e7e3c866: "4" and
+ * "four public-sector account managers"; 28071f0c: "five in Q1") and were
+ * recalled into later conversations. Recall now labels each summary as
+ * what Q said earlier; the answer still takes the row's count; and every
+ * recalled summary the plan's rows contradict is handed back to be
+ * superseded, with its counts put right, while one that agrees with the
+ * plan is left alone.
+ */
+const STALE_FIVE =
+  "Amelia asked for a role-by-role walkthrough of Halyard Security’s planned 2027 hiring. Q reported 15 conditional hires, dependent on the seed round closing: five in Q1, ten in Q2, and one in Q3 2027. Specific months and days remain unspecified.";
+const AGREEING =
+  "Amelia asked when each planned Halyard Security hiring group would start. Q clarified that the public-sector account managers and information security and assurance manager are planned for Q1 2027, deployment and product engineers for Q2 2027, and the finance and operations manager for Q3 2027, conditional on the seed round closing. Specific months and days remain unspecified.";
+const RECALLED_SUMMARIES = [
+  {
+    conversationId: "8811f9c7-9d7a-42f6-9cae-4ae22c069a08",
+    summary: EARLIER_SUMMARIES[1] ?? "",
+  },
+  {
+    conversationId: "e7e3c866-46d4-4982-a799-d839c6ab2fed",
+    summary: EARLIER_SUMMARIES[0] ?? "",
+  },
+  {
+    conversationId: "28071f0c-b1e1-45c6-b68c-2e089c5a385b",
+    summary: STALE_FIVE,
+  },
+  {
+    conversationId: "2a26d43b-a752-4888-a8e4-b4997feea592",
+    summary: AGREEING,
+  },
+];
+/** Recall's rendering now: each summary says it is what Q said earlier. */
+const MEMORY_LABELLED = [
+  "Earlier conversations about what they asked (what was discussed, not verified evidence):",
+  ...RECALLED_SUMMARIES.map(
+    (s) =>
+      `- 2026-11-16 Halyard Security hiring plan: Q said earlier (its summary, not a source) — ${clip(s.summary, 600)}`,
+  ),
+].join("\n");
+const RECALLED: QMemoryRecalled = {
+  text: MEMORY_LABELLED,
+  ownWords: [],
+  earlierSummaries: RECALLED_SUMMARIES,
+};
+
+describe("Thames Arc: an earlier summary holding Q's wrong count is Q's earlier statement, and is superseded", () => {
+  it("the answer uses the row's 3, and each contradicted summary comes back put right", async () => {
+    const superseded: QSummaryCorrection[] = [];
+    const { outcome, said } = await turn(
+      T1_HISTORY,
+      T1_LIVE,
+      RECALLED,
+      undefined,
+      ({ corrections }) => {
+        superseded.push(...corrections);
+        return Promise.resolve();
+      },
+    );
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(said).toContain("3 public-sector account managers");
+    expect(said).not.toContain("4 public-sector account managers");
+
+    const byId = new Map(superseded.map((c) => [c.conversationId, c]));
+    expect([...byId.keys()].sort()).toEqual([
+      "28071f0c-b1e1-45c6-b68c-2e089c5a385b",
+      "8811f9c7-9d7a-42f6-9cae-4ae22c069a08",
+      "e7e3c866-46d4-4982-a799-d839c6ab2fed",
+    ]);
+    for (const correction of superseded) {
+      const stale = RECALLED_SUMMARIES.find(
+        (s) => s.conversationId === correction.conversationId,
+      );
+      // What it was computed from, so a summary that moved on is left alone.
+      expect(correction.from).toBe(stale?.summary);
+      expect(correction.summary).not.toMatch(/\b(?:4|four) public-sector/iu);
+      expect(correction.summary).not.toMatch(/\bfive in Q1\b/iu);
+    }
+    expect(byId.get("8811f9c7-9d7a-42f6-9cae-4ae22c069a08")?.summary).toContain(
+      "3 public-sector account managers",
+    );
+    // "five in Q1" is put right or its sentence goes (checked above); the
+    // rest of the summary stays.
+    expect(byId.get("28071f0c-b1e1-45c6-b68c-2e089c5a385b")?.summary).toContain(
+      "Specific months and days remain unspecified.",
+    );
+  });
+
+  it("a summary that agrees with the plan is never superseded", async () => {
+    const superseded: QSummaryCorrection[] = [];
+    await turn(
+      T2_HISTORY,
+      T2_LIVE,
+      RECALLED,
+      "ANSWER_FROM_CONTEXT",
+      ({ corrections }) => {
+        superseded.push(...corrections);
+        return Promise.resolve();
+      },
+    );
+    expect(superseded.map((c) => c.conversationId)).not.toContain(
+      "2a26d43b-a752-4888-a8e4-b4997feea592",
+    );
+  });
+});
+
+/**
+ * Live on 827cc7763 (17 Nov 2026), Thames Arc, new conversation 1de1cf20:
+ *
+ *   run 434ead80 "Break down Halyard Security's planned 2027 hires for me"
+ *     -> "Q1 2027: 4 public-sector account managers and 1 information
+ *        security and assurance manager — 5 hires." The claim check:
+ *        sources {facts 44, retrieved 0, documentRows 0, memory 1,
+ *        earlierReplies 1}, corpus {tables 0}, answer {examined 5, bound 0,
+ *        unplaced 5}. The data room listing held "Team and hiring plan"
+ *        (shared with you), but the turn read the management accounts and
+ *        the KPI pack; no passage of the plan was retrieved.
+ *   run 2b4011a0 "So how many join in Q1?" -> "Five ... four public-sector
+ *     account managers", again with no table in any source.
+ *
+ * The answer was built from recall alone: the four earlier conversations'
+ * summaries and Q's earlier replies (stored, read-only, above). Now the
+ * turn reads the plan, whose rows settle the counts; and where no source
+ * names an item, a count only Q's own earlier words name is withheld.
+ */
+const Q_434 = "Break down Halyard Security's planned 2027 hires for me";
+const LIVE_434 =
+  "Halyard Security’s planned 2027 hiring is conditional on the seed round closing: 15 roles in total.\n\n- Q1 2027: 4 public-sector account managers and 1 information security and assurance manager — 5 hires.\n- Q2 2027: 6 deployment engineers and 4 product engineers — 10 hires.\n- Q3 2027: 1 finance and operations manager — 1 hire.\n\nThe plan gives quarters, not specific months or days. These are planned hires, not confirmed appointments.";
+const LIVE_2B40 =
+  "Five planned hires join Halyard Security in Q1 2027: four public-sector account managers and one information security and assurance manager. The plan is conditional on the seed round closing, and it gives the quarter rather than specific start dates.";
+/** What recall held for 434ead80: Q's earlier replies and the summaries. */
+const MEMORY_434 = [
+  'Their own earlier conversations, word for word (what was said, not verified evidence; "they said" lines are their own words, "Q said" lines are Q\'s):',
+  ...EARLIER_Q_REPLIES.map(
+    (reply) =>
+      `- 2026-11-16 (in "Halyard Security hiring plan"), Q said: "${clip(reply.replace(/\s+/gu, " ").trim(), 320)}"`,
+  ),
+  "",
+  MEMORY_LABELLED,
+].join("\n");
+const RECALLED_434: QMemoryRecalled = {
+  text: MEMORY_434,
+  ownWords: [],
+  earlierSummaries: RECALLED_SUMMARIES,
+};
+
+describe("live 434ead80: nothing retrieved, the answer built from Q's recalled earlier words", () => {
+  it("the turn reads the shared hiring plan, and its count is the row's", async () => {
+    pagesRead.length = 0;
+    const superseded: QSummaryCorrection[] = [];
+    const { outcome, said } = await turn(
+      [
+        { role: "Q", content: GREETING },
+        { role: "USER", content: Q_434 },
+      ],
+      LIVE_434,
+      RECALLED_434,
+      undefined,
+      ({ corrections }) => {
+        superseded.push(...corrections);
+        return Promise.resolve();
+      },
+      [],
+    );
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(pagesRead).toContain(PLAN_READ.documentId);
+    expect(said).not.toMatch(/\b(?:4|four) public-sector/iu);
+    // The stale summaries are superseded once the plan's rows are read.
+    expect(superseded.map((c) => c.conversationId)).toContain(
+      "8811f9c7-9d7a-42f6-9cae-4ae22c069a08",
+    );
+  });
+
+  it("the document whose title names what was asked is read first", () => {
+    const listed = listedDocumentsOf(DATA_ROOM_READ) ?? [];
+    const reads = sharedDocumentReads({
+      documents: listed,
+      question: Q_434,
+      alreadyRead: new Set(),
+    });
+    expect(reads[0]?.title).toBe("Team and hiring plan");
+    // A figures question still reads the accounts first.
+    expect(
+      sharedDocumentReads({
+        documents: listed,
+        question: "What is Halyard Security's burn and runway?",
+        alreadyRead: new Set(),
+      })[0]?.title,
+    ).toBe("Management accounts, May 2025 to Oct 2026");
+  });
+
+  it("with no source naming the roles, a count only Q's earlier words name is withheld", () => {
+    const corpus = claimCorpus(
+      [GREETING, "So how many join in Q1?"],
+      new Date("2026-11-17T00:17:00Z"),
+      [MEMORY_434, LIVE_434],
+    );
+    const checked = checkAnswer(LIVE_2B40, corpus);
+    expect(checked.text).not.toMatch(/\b(?:4|four) public-sector/iu);
+    // Q's earlier words alone never stand in for the document.
+    const unrelated = checkAnswer(
+      "Halyard Security has 4 public-sector account managers.",
+      claimCorpus(["Halyard Security has 4 public-sector account managers."]),
+    );
+    expect(unrelated.text).toContain("4 public-sector account managers");
   });
 });
