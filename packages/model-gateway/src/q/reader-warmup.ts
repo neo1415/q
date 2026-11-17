@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { z } from "zod";
+
 import type {
   ModelDataPosture,
   ModelGatewayRequestInput,
@@ -45,6 +47,14 @@ const READER_TASK_CLASS = "FAST_CLASSIFICATION" as const;
 const WARMUP_SYSTEM =
   'This is a connection check. Answer with the JSON object {"ok": true}.';
 const WARMUP_USER = "Ready?";
+
+/**
+ * The gateway refuses a STRUCTURED request that brings no validation
+ * schema, before any attempt (INVALID_REQUEST): live on cdb2dd74e the
+ * warm-up failed that way in 4 ms on every arrival and never warmed the
+ * route. Lenient: any answer at all has warmed it.
+ */
+const WarmupAnswerSchema = z.object({ ok: z.boolean() }).passthrough();
 
 /**
  * Exactly one attempt, no hedge and no fallback: the point is the reader's
@@ -156,7 +166,9 @@ export function createReaderWarmup(dependencies: {
     // Deferred past this call so nothing in the gateway, even a
     // synchronous throw, can hold up the page that triggered it.
     void Promise.resolve()
-      .then(() => dependencies.gateway.execute(request))
+      .then(() =>
+        dependencies.gateway.execute(request, { schema: WarmupAnswerSchema }),
+      )
       .then(
         () => {
           dependencies.logger?.info(

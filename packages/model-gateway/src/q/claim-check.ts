@@ -847,6 +847,12 @@ function namesIn(sentence: string): string[] {
     run = [];
   };
   for (const said of raw) {
+    // An opening quotation mark or bracket starts a new name: a document's
+    // title quoted after a name is not part of it. Live run 82b3f4ac
+    // (17 Nov 2026): 'the Halyard Security "Team and hiring plan" ...' read
+    // "Halyard Security Team" as an invented name and lost the sentence
+    // that answered "how many in Q1".
+    if (/^[("“‘[]/u.test(said)) flush();
     const token = cleanToken(said);
     const bare = token.replace(/['’]s$/u, "");
     const possessive = bare !== token;
@@ -927,6 +933,37 @@ function nameGrounded(name: string, corpus: ClaimCorpus): boolean {
       KNOWN_PHRASES.has(word) ||
       corpus.ordinary.has(word),
   );
+}
+
+/**
+ * A name made of a sourced name of two or more words and ordinary words
+ * beside it, on either side: "Halyard Security Hiring Plan" is Halyard
+ * Security and words the sources write in lower case. A one-word part is
+ * never the sourced name: parts of two names put together ("Kora Credit")
+ * stay a name no source states. Used only where the sentence's counts are
+ * bound to the sources' rows (SentenceCheckOptions.rowBound).
+ */
+function nameGroundedInParts(name: string, corpus: ClaimCorpus): boolean {
+  const words = name.split(/\s+/u).filter((word) => word.length > 0);
+  const ordinary = (part: readonly string[]): boolean =>
+    part.every((word) => {
+      const lower = normaliseText(word);
+      return (
+        CONNECTOR.test(lower) ||
+        NOT_NAME_WORDS.has(lower) ||
+        KNOWN_PHRASES.has(lower) ||
+        corpus.ordinary.has(lower)
+      );
+    });
+  const sourced = (part: readonly string[]): boolean =>
+    part.length >= 2 && corpus.text.includes(normaliseText(part.join(" ")));
+  for (let cut = 1; cut < words.length; cut += 1) {
+    const head = words.slice(0, cut);
+    const tail = words.slice(cut);
+    if (sourced(head) && ordinary(tail)) return true;
+    if (ordinary(head) && sourced(tail)) return true;
+  }
+  return false;
 }
 
 // --- Claims and the sentence check -------------------------------------
@@ -1753,6 +1790,201 @@ function checkCounts(
   };
 }
 
+// --- The period a figure is said to cover ---------------------------------
+
+/**
+ * "for the 12 months to October 2026": a trailing period said of the
+ * figures before it in the same clause.
+ */
+const TRAILING_PERIOD =
+  /,?\s*\b(?:for|over|in|across)\s+the\s+(?:last\s+|trailing\s+)?(?<n>\d{1,2}|twelve|six|three)\s+months\s+(?:to|ending|ended)\s+(?:\d{1,2}\s+)?(?<m>[A-Za-z]{3,9})\.?,?\s+(?<y>(?:19|20)\d{2})\b/giu;
+
+const PERIOD_WORDS: Readonly<Record<string, number>> = {
+  twelve: 12,
+  six: 6,
+  three: 3,
+};
+
+/** A period a source line states for the figures on it or under it. */
+type PeriodLabel =
+  | { readonly kind: "TRAILING"; readonly months: number; readonly ym: string }
+  | { readonly kind: "MONTH"; readonly ym: string }
+  | { readonly kind: "OTHER" };
+
+const SOURCE_TRAILING =
+  /\b(?<n>\d{1,2}|twelve|six|three)\s+months\s+(?:to|ending|ended)\s+(?:\d{1,2}\s+)?(?<m>[a-z]{3,9})\.?,?\s+(?<y>(?:19|20)\d{2})\b/iu;
+const SOURCE_RANGE =
+  /\b[a-z]{3,9}\.?\s+(?:19|20)\d{2}\s+(?:to|-|–|—)\s+[a-z]{3,9}\.?\s+(?:19|20)\d{2}\b/iu;
+
+function yearMonth(month: string, year: string): string | null {
+  const index = MONTH_INDEX.get(month.toLowerCase());
+  return index === undefined
+    ? null
+    : `${year}-${String(index).padStart(2, "0")}`;
+}
+
+function periodLabelOf(line: string): PeriodLabel | null {
+  const trailing = SOURCE_TRAILING.exec(line);
+  if (trailing !== null) {
+    const groups = trailing.groups ?? {};
+    const n = groups["n"] ?? "";
+    const months = PERIOD_WORDS[n.toLowerCase()] ?? Number(n);
+    const ym = yearMonth(groups["m"] ?? "", groups["y"] ?? "");
+    return ym === null ? { kind: "OTHER" } : { kind: "TRAILING", months, ym };
+  }
+  if (SOURCE_RANGE.test(line)) return { kind: "OTHER" };
+  const months = new Set(
+    dateKeysIn(line)
+      .map(({ key }) => key.slice(0, 7))
+      .filter((key) => /^\d{4}-\d{2}$/u.test(key)),
+  );
+  if (months.size > 1) return { kind: "OTHER" };
+  const [ym] = [...months];
+  return ym === undefined ? null : { kind: "MONTH", ym };
+}
+
+/** A heading: a period and no figure of its own ("Summary for October 2026"). */
+function isPeriodHeading(line: string): boolean {
+  const withoutDates = line
+    .replace(SOURCE_TRAILING, " ")
+    .replace(/\b(?:19|20)\d{2}(?:-\d{2}(?:-\d{2})?)?\b/gu, " ")
+    .replace(/\b\d{1,2}(?:st|nd|rd|th)?\s+(?=[a-z]{3,9})/giu, " ");
+  return !/\d/u.test(withoutDates) && line.length <= 80;
+}
+
+const HEADING_LOOKBACK = 15;
+
+/**
+ * The periods the sources state for a figure: each source line holding a
+ * value it rounds to, labelled by its own period, else by the nearest
+ * period heading above it in the same source.
+ */
+function periodsOfFigure(figure: Figure, corpus: ClaimCorpus): PeriodLabel[] {
+  const labels: PeriodLabel[] = [];
+  for (const lines of corpus.sourceLines) {
+    lines.forEach((line, at) => {
+      const holds = figuresIn(line).some(
+        (found) =>
+          (figure.kind !== "PERCENT" || found.kind === "PERCENT") &&
+          roundsTo(figure.value, figure.precision, found.value),
+      );
+      if (!holds) return;
+      const own = periodLabelOf(line);
+      if (own !== null) {
+        labels.push(own);
+        return;
+      }
+      for (let up = at - 1; up >= 0 && up >= at - HEADING_LOOKBACK; up -= 1) {
+        const above = lines[up] ?? "";
+        if (!isPeriodHeading(above)) continue;
+        const heading = periodLabelOf(above);
+        if (heading !== null) {
+          labels.push(heading);
+          return;
+        }
+      }
+    });
+  }
+  return labels;
+}
+
+function monthName(ym: string): string {
+  const [year, month] = ym.split("-");
+  const name = MONTHS[Number(month) - 1] ?? "";
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year ?? ""}`;
+}
+
+/**
+ * Live run a4b412eb (Halyard's founder, 17 Nov 2026): "£92,340 net burn
+ * and 4.2 months of runway for the 12 months to October 2026" -- the
+ * management accounts give both for October 2026 alone ("Summary for
+ * October 2026"); only the 29.3% gross margin is for the 12 months. A
+ * count check reads no period, so the phrase went out as written.
+ *
+ * A trailing period said of a clause's figures is held to the period the
+ * sources label each figure with (its own line, else the period heading
+ * above it). Where a figure's sources label it only as one month, never
+ * the trailing period: when every figure the phrase covers is that same
+ * month, the phrase is put right ("for October 2026"); otherwise it is
+ * taken out, and the figures stand without a period the sources do not
+ * give them. A figure no source labels decides nothing.
+ */
+function checkPeriods(
+  sentence: string,
+  corpus: ClaimCorpus,
+  tally: CountTally,
+): { readonly text: string; readonly corrected: number } {
+  let text = sentence;
+  let corrected = 0;
+  const phrases = [...sentence.matchAll(TRAILING_PERIOD)].reverse();
+  for (const phrase of phrases) {
+    const groups = phrase.groups ?? {};
+    const n = groups["n"] ?? "";
+    const months = PERIOD_WORDS[n.toLowerCase()] ?? Number(n);
+    const ym = yearMonth(groups["m"] ?? "", groups["y"] ?? "");
+    if (ym === null) continue;
+    const start = phrase.index;
+    const clauseStart = Math.max(
+      sentence.lastIndexOf(":", start),
+      sentence.lastIndexOf(";", start),
+      sentence.lastIndexOf("(", start),
+      0,
+    );
+    const clause = sentence.slice(clauseStart, start);
+    const covered = figuresIn(clause).filter(
+      (figure) =>
+        !isIncidental(clause, figure) &&
+        figure.precision >= 2 &&
+        !/^(?:19|20)\d{2}$/u.test(figure.text.trim()) &&
+        dateKeysIn(clause.slice(figure.index, figure.end + 9)).length === 0,
+    );
+    if (covered.length === 0) continue;
+    const verdicts = covered.map((figure) => {
+      const labels = periodsOfFigure(figure, corpus).filter(
+        (label) => label.kind !== "OTHER",
+      );
+      if (
+        labels.some(
+          (label) =>
+            label.kind === "TRAILING" &&
+            label.months === months &&
+            label.ym === ym,
+        )
+      ) {
+        return { kind: "SAID" as const };
+      }
+      const monthly = new Set(
+        labels.flatMap((label) => (label.kind === "MONTH" ? [label.ym] : [])),
+      );
+      return labels.length > 0 &&
+        labels.every((label) => label.kind === "MONTH") &&
+        monthly.size === 1
+        ? { kind: "MONTH" as const, ym: [...monthly][0] ?? "" }
+        : { kind: "UNKNOWN" as const };
+    });
+    if (!verdicts.some((verdict) => verdict.kind === "MONTH")) continue;
+    tally.examined += 1;
+    tally.contradicted += 1;
+    const [first] = verdicts;
+    const oneMonth =
+      first?.kind === "MONTH" &&
+      verdicts.every(
+        (verdict) => verdict.kind === "MONTH" && verdict.ym === first.ym,
+      )
+        ? first.ym
+        : null;
+    const end = start + phrase[0].length;
+    const lead = /^,?\s*/u.exec(phrase[0])?.[0] ?? "";
+    text =
+      oneMonth === null
+        ? `${text.slice(0, start)}${text.slice(end)}`
+        : `${text.slice(0, start)}${lead.includes(",") ? ", " : " "}for ${monthName(oneMonth)}${text.slice(end)}`;
+    corrected += 1;
+    tally.corrected += 1;
+  }
+  return { text, corrected };
+}
+
 /**
  * A head count this sentence states that the next sentence's parts,
  * each bound to its source row (as put right), add up to: the sum is the
@@ -1920,6 +2152,14 @@ export interface SentenceCheckOptions {
    * up to it.
    */
   readonly next?: string | undefined;
+  /**
+   * Set by the check itself: the sentence's counts were bound to the
+   * sources' rows, none contradicted. A name there that is a sourced name
+   * run together with ordinary words ("Halyard Security Hiring Plan") is
+   * grounded (nameGroundedInParts), so the sentence that answers a count
+   * is not lost over how a sourced name was written.
+   */
+  readonly rowBound?: boolean | undefined;
 }
 
 /**
@@ -1963,20 +2203,41 @@ function checkOneCounted(
   options: SentenceCheckOptions,
   tally: CountTally | undefined,
 ): { readonly check: SentenceCheck; readonly figures: readonly Operand[] } {
-  const counts = checkCounts(sentence, corpus, options.previous, tally);
+  // This sentence's own tally, so whether its counts were bound to the
+  // sources' rows is known here; added to the answer's tally below.
+  const own = emptyCountTally();
+  const merge = (): void => {
+    if (tally === undefined) return;
+    tally.examined += own.examined;
+    tally.bound += own.bound;
+    tally.contradicted += own.contradicted;
+    tally.corrected += own.corrected;
+    tally.unplaced += own.unplaced;
+  };
+  const counts = checkCounts(sentence, corpus, options.previous, own);
   if (counts.contradicted) {
+    merge();
     return { check: { text: null, ungrounded: ["NUMBER"] }, figures: [] };
   }
-  const checked = checkClaims(counts.text, corpus, said, options, [
-    ...counts.totals,
-    ...headCountListedNext(counts.text, options.next, corpus),
-  ]);
-  if (counts.corrected === 0) return checked;
-  // Logged as what was not grounded as written; the text is put right.
-  const corrected: ClaimKind[] = Array.from(
-    { length: counts.corrected },
-    () => "NUMBER",
+  const rowBound = own.bound > 0 && own.contradicted === 0;
+  const period = checkPeriods(counts.text, corpus, own);
+  merge();
+  const checked = checkClaims(
+    period.text,
+    corpus,
+    said,
+    { ...options, rowBound },
+    [
+      ...counts.totals,
+      ...headCountListedNext(counts.text, options.next, corpus),
+    ],
   );
+  if (counts.corrected === 0 && period.corrected === 0) return checked;
+  // Logged as what was not grounded as written; the text is put right.
+  const corrected: ClaimKind[] = [
+    ...Array.from({ length: counts.corrected }, (): ClaimKind => "NUMBER"),
+    ...Array.from({ length: period.corrected }, (): ClaimKind => "DATE"),
+  ];
   return {
     ...checked,
     check: {
@@ -2025,7 +2286,8 @@ function checkClaims(
   for (const claim of claims) {
     const ok =
       claim.kind === "NAME"
-        ? nameGrounded(claim.text, corpus)
+        ? nameGrounded(claim.text, corpus) ||
+          (options.rowBound === true && nameGroundedInParts(claim.text, corpus))
         : Number.isFinite(claim.value)
           ? (claim.kind === "NUMBER" &&
               (calendar.includes(claim.value) ||

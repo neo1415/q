@@ -7805,6 +7805,12 @@ export function createSpecialistQAnswer(
           // for that?"): a follow-up on Q's own answer is answered in place;
           // no unasked "the company profile is ready to open".
           followUp: reading?.answerKind === "FOLLOW_UP",
+          // Live re-run on cdb2dd74e (runs 48402c75, e7191400): a question
+          // Q answers in its reply gets no unasked "is ready to open" above
+          // the figures (the reader's kind and answerKind, never the words).
+          question:
+            reading?.kind === "QUESTION_TO_Q" &&
+            reading.answerKind !== "DOCUMENT",
           // Decision 98 (live recheck 651a3bd50 T5): a meeting prep opens
           // the rehearsal only toward a meeting actually booked with them.
           ...(await meetingBookedFor(reading)),

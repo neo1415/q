@@ -1290,12 +1290,18 @@ export function gateByReading(
     readonly fromShownCard?: boolean | undefined;
     /** QPageMoveReading.followUp: a follow-up on Q's own last answer. */
     readonly followUp?: boolean | undefined;
+    /** QPageMoveReading.question: a question Q answers in its reply. */
+    readonly question?: boolean | undefined;
   } = {},
 ): QNavigationOutcome {
-  const gated = holdProfileOffer(
-    gateByReadingAlone(outcome, navigation, context),
+  const gated = holdUnaskedOffer(
+    holdProfileOffer(
+      gateByReadingAlone(outcome, navigation, context),
+      navigation,
+      context.followUp === true,
+    ),
     navigation,
-    context.followUp === true,
+    context.question === true,
   );
   return context.pane?.pinned === true ? holdForPin(gated, navigation) : gated;
 }
@@ -1327,6 +1333,44 @@ function holdProfileOffer(
     target.threadId == null &&
     target.itemId == null;
   return bare ? STAY("ANSWERED_IN_PLACE") : outcome;
+}
+
+/**
+ * Decision 98, extended (live re-run on cdb2dd74e, 17 Nov 2026, runs
+ * 48402c75 and e7191400): "what is Tensorgate's monthly burn and runway?"
+ * and "why don't the two line up?" were each preceded by a separate
+ * message, "The relationship is ready to open." / "The company profile is
+ * ready to open.", above the figures that answered them. The reading was
+ * CONTEXT (nobody asked to go anywhere) and the decision's samples split
+ * (one STAY, one OFFER of the diligence tab): an offer the decision itself
+ * was not sure advances anything.
+ *
+ * A question Q answers in its reply is answered where they are: an unasked
+ * offer of a page (reading CONTEXT) whose only reason is the decision's
+ * own vote -- proposed as an offer, a split vote, unsure, or a lookalike
+ * name -- is held. A move the reading allows still moves (the page the
+ * conversation turns to advances the task), an offer standing in for a
+ * move the pane could not take (unsaved work, a busy or pinned pane, the
+ * moves gate) stands, and so do GO ("open their data room") and an
+ * OFFER_ONLY reading.
+ */
+const VOTED_OFFER_GUARDS: ReadonlySet<QNavigationGuard | null> = new Set([
+  null,
+  "SPLIT_VOTE",
+  "UNSURE",
+  "INEXACT_NAME",
+]);
+
+function holdUnaskedOffer(
+  outcome: QNavigationOutcome,
+  navigation: TurnNavigationIntentV84 | null,
+  question: boolean,
+): QNavigationOutcome {
+  if (!question || outcome.decision !== "OFFER") return outcome;
+  if (!readsAsContext(navigation)) return outcome;
+  return VOTED_OFFER_GUARDS.has(outcome.guard ?? null)
+    ? STAY("ANSWERED_IN_PLACE")
+    : outcome;
 }
 
 /**
@@ -2121,6 +2165,13 @@ export type QPageMoveReading = {
    * bare profile is held (holdProfileOffer).
    */
   readonly followUp?: boolean | undefined;
+  /**
+   * Live re-run on cdb2dd74e (runs 48402c75, e7191400): the reader read a
+   * question Q answers in its reply (kind QUESTION_TO_Q, not a document to
+   * write). An unasked offer the decision only voted for is held
+   * (holdUnaskedOffer).
+   */
+  readonly question?: boolean | undefined;
   /** A8: they asked to watch the company's pitch (companyMedia.pitch). */
   readonly pitch?: boolean | undefined;
   /**
@@ -2963,6 +3014,7 @@ export function createQPageMoves(dependencies: {
               meetingBooked: reading?.meetingBooked,
               fromShownCard: reading?.fromShownCard,
               followUp: reading?.followUp,
+              question: reading?.question,
             },
           );
           // Fast GO: held, in case the answer stored moves nothing after all.
@@ -3071,6 +3123,7 @@ export function createQPageMoves(dependencies: {
           meetingBooked: reading?.meetingBooked,
           fromShownCard: reading?.fromShownCard,
           followUp: reading?.followUp,
+          question: reading?.question,
         });
         if (outcome.decision === "STAY") return null;
         dependencies.logger?.info(

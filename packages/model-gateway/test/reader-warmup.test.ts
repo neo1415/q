@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ModelGatewayRequestSchema } from "@capital-q/contracts";
+import type { Logger } from "@capital-q/observability";
 
+import {
+  createFakeModelProvider,
+  createModelGateway,
+  createModelProviderRegistry,
+  createStaticModelCatalog,
+} from "../src/index.js";
 import type { ModelGateway } from "../src/gateway.js";
 import type { ModelUsageEntry } from "../src/ports.js";
 import {
@@ -13,6 +20,7 @@ import {
   TURN_READER_REASONING,
   TURN_READER_REASONING_KEY,
 } from "../src/q/turn-reader.js";
+import { TENANT as FIXTURE_TENANT, testCatalog } from "./fixtures.js";
 
 /**
  * DECISIONS 101: the reader warm-up. Virtual clock throughout; the gateway
@@ -251,5 +259,66 @@ describe("reader warm-up", () => {
     });
     rejecting.warmup.onArrival(ARRIVING);
     await rejecting.settle();
+  });
+});
+
+describe("live re-run on cdb2dd74e: the warm-up through the real gateway", () => {
+  it("reaches the reader's route and is recorded as WARMUP (it was refused as INVALID_REQUEST)", async () => {
+    // q-api log, 17 Nov 2026 04:26:59 UTC, the arrival before run 48402c75:
+    // "q reader route warm-up did not answer" {ms: 4, failure:
+    // "INVALID_REQUEST"}, and no WARMUP row in ai_ops.model_usage, ever.
+    // The warm-up asks for STRUCTURED output, and the gateway refuses a
+    // structured request that brings no validation schema before any
+    // attempt. The recorder above never ran the gateway's own checks.
+    // That turn's reader then lost three attempts to the cold route's cuts
+    // (TIMEOUT at 3005, 3001 and 4003 ms) before the hedge answered.
+    const fake = createFakeModelProvider({
+      code: "alpha",
+      script: [{ kind: "JSON", value: { ok: true } }],
+    });
+    const recorded: ModelUsageEntry[] = [];
+    const activity = createReaderRouteActivity(() => 1_000_000);
+    const gateway = createModelGateway({
+      catalog: createStaticModelCatalog(testCatalog()),
+      registry: createModelProviderRegistry([fake]),
+      usage: activity.observe({
+        record: (entry) => {
+          recorded.push(entry);
+          return Promise.resolve();
+        },
+      }),
+      sleep: () => Promise.resolve(),
+    });
+    const said: string[] = [];
+    const note =
+      () =>
+      (_fields: unknown, msg?: string): void => {
+        said.push(msg ?? "");
+      };
+    const logger = {
+      info: note(),
+      warn: note(),
+      error: note(),
+      debug: note(),
+      trace: note(),
+      fatal: note(),
+      child: () => logger,
+    } as unknown as Logger;
+    createReaderWarmup({
+      gateway,
+      activity,
+      logger,
+      now: () => 1_000_000,
+    }).onArrival({ tenantId: FIXTURE_TENANT });
+    await vi.waitFor(() => {
+      expect(said).toContain("q reader route warmed");
+    });
+    expect(said).not.toContain("q reader route warm-up did not answer");
+    expect(fake.calls).toHaveLength(1);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.taskClass).toBe("FAST_CLASSIFICATION");
+    expect(recorded[0]?.purpose).toBe("WARMUP");
+    expect(recorded[0]?.success).toBe(true);
+    expect(activity.lastUsedAt()).toBe(1_000_000);
   });
 });
