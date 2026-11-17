@@ -832,3 +832,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Workers: `CLAMAV_HOST=clamav.railway.internal`. The first start scanned 200, all clean. `468194291` (gated, PASS 1545 s; workers only) makes the start-up backfill drain in batches. All 2,245 document versions are CLEAN and 0 infected.
   - `CQ_MALWARE_POLICY` changed from `ALLOW_UNSCANNED_WITH_WARNING` to `REQUIRE_CLEAN` on workers and api. Both redeployed SUCCESS. ADR 0042 is superseded.
   - Railway no longer accepts a config-file path (`railway.json` is deprecated), so the Dockerfile path and watch pattern are set on the service instance itself.
+- **23:32 UTC, `8ef954671` (rollback point `468194291`):** this release adds the contextual follow-up fast path (`0301b26f7`; its timing test was made order-based in `8ef954671` after a flaky gate) and the revenue-claims seed script (`2b62a0088`). The seed's production dry run writes 0: every revenue document is organisation-private, so publishing Ajopot/Watchly revenue awaits an owner decision. ci-local PASS (1349 s); all four services SUCCESS.
+- **Live check (Savanna, conversation `ff20af7e`, $0.084) found three defects. A worker is fixing them:**
+  - (1) The question "What does Halyard do and how is it doing commercially?" got an unrequested Express Interest card (approval-gated, nothing sent) instead of an answer. It is the first such proposal from QUESTION_TO_Q routing in 10 days.
+  - (2) Same-subject follow-ups were routed COMPLEX_ANALYSIS, so the fast path was not taken: 15.9 s and 13.3 s.
+  - (3) Each follow-up made a paid PUBLIC_WEB_SEARCH call.
