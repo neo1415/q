@@ -13,6 +13,8 @@ import type { DeclaredFitFacts, FitFeatureSource } from "../fit/observe.js";
 import type { FitCompanyInputs, FitInputSource } from "../fit/service.js";
 import type { FitStatedEvidence } from "../fit/stated.js";
 import type { FxReferenceRates } from "../fx/ecb.js";
+import { scoredMandateSimilarityFeature } from "../features/policy.js";
+import type { SemanticProvenance } from "../semantic/contracts.js";
 import type { FilterMoney } from "../slates/filters.js";
 
 import { readCurrentFeatureSnapshots } from "./postgres-feature-snapshot-store.js";
@@ -90,7 +92,71 @@ export type FitInputSourceDependencies = {
         readonly companyIds: readonly string[];
       }) => Promise<ReadonlyMap<string, FitFeatureSource>>)
     | undefined;
+  /**
+   * Live 17 Nov 2026 (Zino): REC-003's mandate similarity for exactly the
+   * given companies (SemanticCandidateService.scoreCompanies: the same
+   * cosine, model, configuration and dimension guards, CURRENT and
+   * discoverable vectors only; read-only, never embeds). Keyed by
+   * lower-case company id; a company absent from the map stays unknown.
+   * Absent: such a snapshot's thesis stays as persisted.
+   */
+  readonly mandateSimilarities?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly mandateId: string;
+        readonly companyIds: readonly string[];
+      }) => Promise<ReadonlyMap<string, SemanticProvenance>>)
+    | undefined;
 };
+
+const SIMILARITY_FEATURE = "semantic_fit.mandate_similarity";
+const TAXONOMY_FEATURE = "declared_fit.taxonomy";
+
+/**
+ * A snapshot persisted before the thesis was scored outside top-K (before
+ * semantic-mandate.v2): its similarity is MISSING with
+ * SEMANTIC_NOT_RETRIEVED although both vectors may exist. Under v2 the
+ * builder scores every admitted candidate, so a v2 snapshot names this
+ * only when a vector was missing at build time; asking again is one
+ * bounded read and finds a vector that has since been made.
+ */
+function thesisNotScored(source: FitFeatureSource | undefined): boolean {
+  const f = source?.features.find((v) => v.featureId === SIMILARITY_FEATURE);
+  return (
+    f !== undefined &&
+    f.status === "MISSING" &&
+    f.missingReason === "SEMANTIC_NOT_RETRIEVED"
+  );
+}
+
+/**
+ * A snapshot persisted before the sector overlap was kept on a MISSING
+ * category (5b4bd13a2): the category is unknown and no `sectorOverlap` was
+ * recorded, so the fit read "Sector not set" for a company that declares
+ * one. (A mandate that names no sector also records none; recomputing it
+ * gives the same answer.)
+ */
+function sectorNotRecorded(source: FitFeatureSource | undefined): boolean {
+  const f = source?.features.find((v) => v.featureId === TAXONOMY_FEATURE);
+  return (
+    f !== undefined &&
+    f.status === "MISSING" &&
+    f.missingReason === "COMPANY_TAXONOMY_UNKNOWN" &&
+    f.provenance["sectorOverlap"] === undefined
+  );
+}
+
+/** The source with one feature value replaced; never persisted. */
+function withFeature(
+  source: FitFeatureSource,
+  value: FitFeatureSource["features"][number],
+): FitFeatureSource {
+  return {
+    features: source.features.map((f) =>
+      f.featureId === value.featureId ? value : f,
+    ),
+  };
+}
 
 /**
  * At most this many companies of one read are computed on read: a profile,
@@ -152,7 +218,7 @@ export function createFitInputSource(
           : dependencies.fxRates().catch(() => null),
       ]);
       const unscored = ids.filter((id) => !persisted.has(id));
-      const snapshots: ReadonlyMap<string, FitFeatureSource> =
+      const read: ReadonlyMap<string, FitFeatureSource> =
         dependencies.viewFeatures === undefined ||
         query.purpose === "RANK" ||
         unscored.length === 0 ||
@@ -169,6 +235,7 @@ export function createFitInputSource(
                 .catch(() => new Map<string, FitFeatureSource>())),
               ...persisted,
             ]);
+      const snapshots = await refreshStale(dependencies, query, read);
       const fromMandate =
         mandate.kind === "FOUND" ? mandateFacts(mandate.mandate) : {};
       // The mandate's business-model taxonomy preferences (b2b_saas, …) are
@@ -247,6 +314,95 @@ export function createFitInputSource(
       return out;
     },
   };
+}
+
+/**
+ * Live 17 Nov 2026 (Zino): a slate rebuild rewrites only the companies in
+ * the new pool, so a CURRENT snapshot for a company outside it (one the
+ * investor is already in contact with) keeps what it said when it was
+ * built. Rather than rebuild snapshots no slate needs, the two measures a
+ * later fix changed are computed on read for exactly those companies, by
+ * the same code, and never written:
+ *
+ *   THESIS  a similarity MISSING with SEMANTIC_NOT_RETRIEVED: REC-003's
+ *           scoreCompanies, one bounded read (unknown when either vector
+ *           is missing, never zero);
+ *   SECTOR  a category MISSING with no recorded sector overlap: the
+ *           declared features computed on read (computeForView), only the
+ *           category is taken, at most FIT_VIEW_FEATURES_MAX companies.
+ *
+ * Both are read-only and keyed to this mandate; a failed read leaves the
+ * snapshot as persisted (unknown), never worse.
+ */
+async function refreshStale(
+  dependencies: FitInputSourceDependencies,
+  query: {
+    readonly actor: ActorContext;
+    readonly mandateId: string;
+  },
+  read: ReadonlyMap<string, FitFeatureSource>,
+): Promise<ReadonlyMap<string, FitFeatureSource>> {
+  const thesisIds = [...read]
+    .filter(([, source]) => thesisNotScored(source))
+    .map(([id]) => id);
+  const sectorIds = [...read]
+    .filter(([, source]) => sectorNotRecorded(source))
+    .map(([id]) => id)
+    .slice(0, FIT_VIEW_FEATURES_MAX);
+  const scoring = dependencies.mandateSimilarities;
+  const viewing = dependencies.viewFeatures;
+  if (
+    (thesisIds.length === 0 || scoring === undefined) &&
+    (sectorIds.length === 0 || viewing === undefined)
+  ) {
+    return read;
+  }
+  const [similarities, recomputed] = await Promise.all([
+    thesisIds.length === 0 || scoring === undefined
+      ? Promise.resolve(new Map<string, SemanticProvenance>())
+      : scoring({
+          actor: query.actor,
+          mandateId: query.mandateId,
+          companyIds: thesisIds,
+        }).catch(() => new Map<string, SemanticProvenance>()),
+    sectorIds.length === 0 || viewing === undefined
+      ? Promise.resolve(new Map<string, FitFeatureSource>())
+      : viewing({
+          actor: query.actor,
+          mandateId: query.mandateId,
+          companyIds: sectorIds,
+        }).catch(() => new Map<string, FitFeatureSource>()),
+  ]);
+  const out = new Map(read);
+  for (const id of thesisIds) {
+    const similarity = similarities.get(id.toLowerCase());
+    const source = out.get(id);
+    if (similarity === undefined || source === undefined) continue;
+    out.set(
+      id,
+      withFeature(
+        source,
+        scoredMandateSimilarityFeature({
+          sourceClass: "SEMANTIC_CANDIDATE_PROVENANCE",
+          generatorVersion: similarity.generatorVersion,
+          companyRepresentationVersion: similarity.companyRepresentationVersion,
+          investorRepresentationVersion:
+            similarity.investorRepresentationVersion,
+          configurationVersion: similarity.configurationVersion,
+          similarity: similarity.similarity,
+        }),
+      ),
+    );
+  }
+  for (const id of sectorIds) {
+    const category = recomputed
+      .get(id)
+      ?.features.find((f) => f.featureId === TAXONOMY_FEATURE);
+    const source = out.get(id);
+    if (category === undefined || source === undefined) continue;
+    out.set(id, withFeature(source, category));
+  }
+  return out;
 }
 
 function mandateFacts(mandate: {

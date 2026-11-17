@@ -61,6 +61,7 @@ import {
   createPitchReintroductions,
   type PublishablePitchTimesPort,
 } from "../rerank/pitch-reintroductions.js";
+import type { SemanticProvenance } from "../semantic/contracts.js";
 import type { SemanticEmbedder } from "../semantic/ports.js";
 import {
   createSemanticCandidateService,
@@ -268,6 +269,13 @@ export type SlateReadPipelineDependencies = {
   readonly materialChanges?: MaterialChangePort | undefined;
   /** Read-time re-check of the feed's playable-pitch rule. */
   readonly playablePitches?: PlayablePitchPort | undefined;
+  /**
+   * Live 17 Nov 2026 (Zino): the embedding configuration the workers build
+   * vectors under, so a fit read can score the mandate similarity a stale
+   * snapshot lacks (REC-003 scoreCompanies, READ_ONLY: it reads stored
+   * vectors and never embeds). Absent: such a thesis stays unknown.
+   */
+  readonly embedder?: SemanticEmbedder | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -290,6 +298,17 @@ export type SlateReadPipeline = {
     readonly mandateId: string;
     readonly companyIds: readonly string[];
   }) => Promise<ReadonlyMap<string, ViewFeatures>>;
+  /**
+   * REC-003's mandate similarity for exactly these companies, read-only
+   * (scoreCompanies), for the fit read's `mandateSimilarities`. Empty when
+   * no embedder is composed, no mandate vector exists yet, or the mandate
+   * scored is not the one asked about: unknown, never zero.
+   */
+  readonly mandateSimilarities: (input: {
+    readonly actor: ActorContext;
+    readonly mandateId: string;
+    readonly companyIds: readonly string[];
+  }) => Promise<ReadonlyMap<string, SemanticProvenance>>;
 };
 
 /**
@@ -325,6 +344,30 @@ export function createSlateReadPipeline(
     clock,
     logger,
   });
+  // Scoring only: never `generate` or a refresh here, so nothing embeds.
+  const semanticPorts =
+    dependencies.embedder === undefined
+      ? undefined
+      : createDomainSemanticPorts({
+          sql,
+          companies: marketplace,
+          assignments,
+          taxonomy,
+          mandates: createPostgresInvestorMandateRepository(),
+        });
+  const scoring =
+    dependencies.embedder === undefined || semanticPorts === undefined
+      ? undefined
+      : createSemanticCandidateService({
+          ports: eligibilityPorts,
+          facts: semanticPorts.facts,
+          narratives: semanticPorts.narratives,
+          vocabulary: semanticPorts.vocabulary,
+          store: createPostgresSemanticRepresentationStore({ sql }),
+          embeddings: dependencies.embedder,
+          eligibility,
+          logger,
+        });
   const slates = createPostgresSlateRepository({ sql });
   const refreshRequests = createPostgresRefreshRequestStore({ sql });
   const requester =
@@ -384,6 +427,14 @@ export function createSlateReadPipeline(
         ...input,
         mode: "INVESTOR_DISCOVER",
       })) ?? new Map(),
+    mandateSimilarities: async (input) => {
+      if (scoring?.scoreCompanies === undefined) return new Map();
+      const result = await scoring.scoreCompanies(input);
+      // Only the mandate asked about: another mandate's cosine is not this fit.
+      return result.kind === "SCORED" && result.mandateId === input.mandateId
+        ? result.similarities
+        : new Map();
+    },
   };
 }
 

@@ -724,47 +724,67 @@ function computeOne(
       }
       break;
     }
-    case "semantic_fit.mandate_similarity": {
-      // Retrieved first; otherwise the same cosine computed directly for an
-      // admitted candidate outside top-K (live 17 Nov 2026). Neither: unknown.
-      const retrieved = input.candidate.semantic;
-      const semantic = retrieved ?? input.candidate.scored ?? null;
-      if (semantic === null) {
-        return {
-          value: absent(d, "MISSING", "SEMANTIC_NOT_RETRIEVED", [
-            "SEMANTIC_CANDIDATE_PROVENANCE",
-          ]),
-          scopeViolation: false,
-        };
-      }
-      if (!authorised(d, [semantic.sourceClass])) {
-        return {
-          value: absent(d, "MISSING", "SOURCE_NOT_AUTHORISED", []),
-          scopeViolation: true,
-        };
-      }
-      return {
-        value: present(
-          d,
-          semantic.similarity,
-          ["SEMANTIC_CANDIDATE_PROVENANCE"],
-          {
-            generatorVersion: semantic.generatorVersion,
-            companyRepresentationVersion: semantic.companyRepresentationVersion,
-            investorRepresentationVersion:
-              semantic.investorRepresentationVersion,
-            configurationVersion: semantic.configurationVersion,
-            // Only a computed one says so, so a retrieved value's
-            // provenance (and fingerprint) is unchanged.
-            ...(retrieved === null ? { similarityBasis: "SCORED" } : {}),
-          },
-        ),
-        scopeViolation: false,
-      };
-    }
+    case "semantic_fit.mandate_similarity":
+      return mandateSimilarityValue(d, input.candidate);
     default:
       throw new Error(`no computation registered for feature ${d.id}`);
   }
+}
+
+/**
+ * Retrieved first; otherwise the same cosine computed directly for an
+ * admitted candidate outside top-K (live 17 Nov 2026). Neither: unknown.
+ */
+function mandateSimilarityValue(
+  d: RecommendationFeatureDefinition,
+  candidate: Pick<CandidateProvenanceProjection, "semantic" | "scored">,
+): ComputedFeature {
+  const retrieved = candidate.semantic;
+  const semantic = retrieved ?? candidate.scored ?? null;
+  if (semantic === null) {
+    return {
+      value: absent(d, "MISSING", "SEMANTIC_NOT_RETRIEVED", [
+        "SEMANTIC_CANDIDATE_PROVENANCE",
+      ]),
+      scopeViolation: false,
+    };
+  }
+  if (!authorised(d, [semantic.sourceClass])) {
+    return {
+      value: absent(d, "MISSING", "SOURCE_NOT_AUTHORISED", []),
+      scopeViolation: true,
+    };
+  }
+  return {
+    value: present(d, semantic.similarity, ["SEMANTIC_CANDIDATE_PROVENANCE"], {
+      generatorVersion: semantic.generatorVersion,
+      companyRepresentationVersion: semantic.companyRepresentationVersion,
+      investorRepresentationVersion: semantic.investorRepresentationVersion,
+      configurationVersion: semantic.configurationVersion,
+      // Only a computed one says so, so a retrieved value's
+      // provenance (and fingerprint) is unchanged.
+      ...(retrieved === null ? { similarityBasis: "SCORED" } : {}),
+    }),
+    scopeViolation: false,
+  };
+}
+
+/**
+ * Live 17 Nov 2026 (Zino): the mandate-similarity value for a company whose
+ * persisted snapshot predates scoring outside top-K, computed on read from
+ * REC-003's `scoreCompanies` by the same rule the feature service applies
+ * (SCORED basis). The caller never persists it. `null` stays unknown.
+ */
+export function scoredMandateSimilarityFeature(
+  scored: NonNullable<CandidateProvenanceProjection["scored"]> | null,
+): FeatureValue {
+  const definition = RECOMMENDATION_FEATURES.find(
+    (d) => d.id === "semantic_fit.mandate_similarity",
+  );
+  if (definition === undefined) {
+    throw new Error("semantic_fit.mandate_similarity is not registered");
+  }
+  return mandateSimilarityValue(definition, { semantic: null, scored }).value;
 }
 
 /**

@@ -115,6 +115,8 @@ export type FitCompositionDependencies = {
   readonly viewer: FitQViewer;
   /** Declared-fit features on read for companies never ranked (live e11). */
   readonly viewFeatures?: FitInputSourceDependencies["viewFeatures"];
+  /** Thesis similarity on read for snapshots built before it was scored (17 Nov). */
+  readonly mandateSimilarities?: FitInputSourceDependencies["mandateSimilarities"];
   readonly logger?: Logger | undefined;
 };
 
@@ -256,6 +258,7 @@ export function createFitComposition(
   const inputs = createFitInputSource({
     fxRates,
     viewFeatures: dependencies.viewFeatures,
+    mandateSimilarities: dependencies.mandateSimilarities,
     sql: dependencies.sql,
     eligibilityPorts: dependencies.eligibilityPorts,
     identities: async (companyIds, options) => {

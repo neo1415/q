@@ -40,6 +40,10 @@ export const SEMANTIC_GENERATOR_ID = "SEMANTIC_MANDATE" as const;
  * candidates outside top-K (`scoreCompanies`, hybrid `mandateSimilarity`).
  * The bump is the backfill: at worker start every CURRENT slate built under
  * v1 is rebuilt (requestRebuildsForVersionDrift), so its snapshots carry it.
+ * A rebuild rewrites only the companies in the new pool; a CURRENT snapshot
+ * of a company outside it (one already in contact) keeps its old MISSING
+ * value, and the fit read scores that on read (infrastructure/fit-inputs.ts,
+ * refreshStale), never persisting it.
  */
 export const SEMANTIC_GENERATOR_VERSION = "semantic-mandate.v2" as const;
 /** Every semantic generator version a persisted artifact may name. Append, never remove. */

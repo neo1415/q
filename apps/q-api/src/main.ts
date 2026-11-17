@@ -1682,7 +1682,28 @@ const unicornDiscover = {
   },
 };
 // end BILLING-2 block
+// (Composed before the slate read pipeline, which reads its configuration
+// to score thesis similarity on read; see below.)
+//
+// The query-embedding runtime holds confidential document text and lives on
+// a private network. It is composed unconditionally: when it cannot be
+// reached, retrieval runs lexically and says so in its own diagnostics,
+// which is an honest degradation rather than a silent one.
+const embeddings = createProductionEmbeddingService({
+  // Decision 99: Q_EMBEDDING_PROVIDER=openai uses the reviewed OpenAI key
+  // this service already holds, under the workers' configuration.
+  openaiApiKey: providerSecrets.openai?.reveal(),
+  onMissing: (missing) => {
+    logger.warn(
+      { missing },
+      "embedding runtime not configured: semantic retrieval disabled",
+    );
+  },
+});
 const slateRead = createSlateReadPipeline({
+  // Live 17 Nov 2026: the configuration only, for the fit read's thesis
+  // similarity on stale snapshots (stored vectors; it never embeds).
+  embedder: embeddings,
   unicornPotential: unicornDiscover,
   sql: database.sql,
   disclosure,
@@ -3125,6 +3146,7 @@ const fitComposition = createFitComposition({
   eligibilityPorts: slateRead.eligibilityPorts,
   eligibility: slateRead.eligibility,
   viewFeatures: slateRead.viewFeatures,
+  mandateSimilarities: slateRead.mandateSimilarities,
   companies,
   capital,
   disclosure,
@@ -4993,23 +5015,8 @@ const qActionPort = createQActionPort({
 // takes. Until this packet the service wired an unconfigured retrieval and
 // no context port, so Q answered production questions with zero authorised
 // facts while every layer sat verified and unreachable — the finding C5
-// exists to catch.
-//
-// The query-embedding runtime holds confidential document text and lives on
-// a private network. It is composed unconditionally: when it cannot be
-// reached, retrieval runs lexically and says so in its own diagnostics,
-// which is an honest degradation rather than a silent one.
-const embeddings = createProductionEmbeddingService({
-  // Decision 99: Q_EMBEDDING_PROVIDER=openai uses the reviewed OpenAI key
-  // this service already holds, under the workers' configuration.
-  openaiApiKey: providerSecrets.openai?.reveal(),
-  onMissing: (missing) => {
-    logger.warn(
-      { missing },
-      "embedding runtime not configured: semantic retrieval disabled",
-    );
-  },
-});
+// exists to catch. The query embedder (`embeddings`) is composed above,
+// before the slate read pipeline.
 const embeddingDescriptor = embeddings.describe();
 // Decision 99: a hosted embedder is sent a question only when the plan's
 // ceiling is within the provider's reviewed ceiling (the gateway's record).
