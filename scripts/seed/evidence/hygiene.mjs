@@ -22,6 +22,8 @@
 //   node scripts/seed/evidence/hygiene.mjs plan     # read-only: what would change
 //   node scripts/seed/evidence/hygiene.mjs apply    # make the changes
 //   node scripts/seed/evidence/hygiene.mjs restore <documentId>  # undo one withdrawal
+//   ... plan|apply|investor-check pass2      # only the pass-2 companies
+//   ... plan|apply|investor-check <key> ...  # only the named companies
 //
 // Safety: only the companies named in TARGETS. Each must have only current
 // members whose auth accounts carry app_metadata.fictional_demo = synthetic =
@@ -100,6 +102,130 @@ const TARGETS = {
     },
   },
   watchly: { name: "Watchly", slug: "watchly", withdraw: {} },
+
+  // Pass 2 (17 Nov 2026): the remaining imitation certificates on seeded demo
+  // companies ("Certified copy ... This is to certify that ... Certified true
+  // copy"). Withdraw only: titles and legal names on these companies are left
+  // as they are. Ledgerline and Baridi are excluded by instruction.
+  akshar: {
+    name: "Akshar",
+    slug: "akshar",
+    withdrawOnly: true,
+    withdraw: {
+      "1a56de97-e2e5-4119-b991-3b952d853fef": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  "clearwater-assurance": {
+    name: "Clearwater Assurance",
+    slug: "clearwater-assurance",
+    withdrawOnly: true,
+    withdraw: {
+      "03741cbc-c5e4-42fc-a582-6e195d898305": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  "cosecha-labs": {
+    name: "Cosecha Labs",
+    slug: "cosecha-labs",
+    withdrawOnly: true,
+    withdraw: {
+      "60d01b12-0f56-45ed-88ff-53a875e63000": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  "drishti-health": {
+    name: "Drishti Health",
+    slug: "drishti-health",
+    withdrawOnly: true,
+    withdraw: {
+      "6e07a3e6-3a15-4484-a4d5-93c2d972ac6d": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  ferrolith: {
+    name: "Ferrolith",
+    slug: "ferrolith",
+    withdrawOnly: true,
+    withdraw: {
+      "afabbe8c-0f72-4e6a-9a84-20f74306ab79": CERTIFICATE, // Certificate of Incorporation
+      "05e9e258-182c-4340-92fe-6c1ebf5b3fc4": CERTIFICATE, // Tax clearance certificate (Unbedenklichkeitsbescheinigung)
+    },
+  },
+  hui: {
+    name: "Hui",
+    slug: "hui",
+    withdrawOnly: true,
+    withdraw: {
+      "b2059fbe-9e4d-4998-9251-4389ad07495b": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  "orphea-genomics": {
+    name: "Orphéa Genomics",
+    slug: "orphea-genomics",
+    withdrawOnly: true,
+    withdraw: {
+      "9eb88054-0ea3-4a65-92a3-2bc2940fe23f": CERTIFICATE, // Attestation de régularité fiscale and URSSAF certificate
+      "79202d1c-611b-43bc-a606-0cce19363ce6": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  portside: {
+    name: "Portside",
+    slug: "portside",
+    withdrawOnly: true,
+    withdraw: {
+      "fed9cb4e-9fcd-4506-84f7-3f5515113c7a": CERTIFICATE, // Certificate of Incorporation
+      "01c81d0d-719a-4a62-8718-4d4ada2bee6c": CERTIFICATE, // FIRS Tax Clearance Certificate (2026)
+    },
+  },
+  prumo: {
+    name: "Prumo",
+    slug: "prumo",
+    withdrawOnly: true,
+    withdraw: {
+      "4f661872-66b7-440c-bf4c-355deb053c02": CERTIFICATE, // Federal tax clearance (CND) and FGTS certificate
+      "e7e7ea38-2084-4d5f-96d0-36f829673c1a": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  "railhead-robotics": {
+    name: "Railhead Robotics",
+    slug: "railhead-robotics",
+    withdrawOnly: true,
+    withdraw: {
+      "b26c27c5-db33-455d-a65b-a1bf8cfaebaa": CERTIFICATE, // Certificate of Incorporation
+      "ed4cc963-41a1-4382-9e88-2106338f6444": CERTIFICATE, // Tax filings and certificates of good standing
+    },
+  },
+  "rand-treasury": {
+    name: "Rand Treasury",
+    slug: "rand-treasury",
+    withdrawOnly: true,
+    withdraw: {
+      "12f37cf5-e93c-49fa-b4b8-1a2cbb8b97cd": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
+  shiftwell: {
+    name: "Shiftwell",
+    slug: "shiftwell",
+    withdrawOnly: true,
+    withdraw: {
+      "6cdcf26b-6e5a-4f77-add0-dd4d4288e098": CERTIFICATE, // Certificate of Incorporation
+      "16f916e8-4f09-4bf8-b5bb-9ba70304c07f": CERTIFICATE, // Tax filings and certificates of good standing
+    },
+  },
+  "silo-credit": {
+    name: "Silo Credit",
+    slug: "silo-credit",
+    withdrawOnly: true,
+    withdraw: {
+      "24dd8f38-0b36-437f-b4ad-0ccbde80b9a6": CERTIFICATE, // FIRS Tax Clearance Certificate (2026)
+    },
+  },
+  termly: {
+    name: "Termly",
+    slug: "termly",
+    withdrawOnly: true,
+    withdraw: {
+      "a4c02e54-23c4-419d-aeb5-341a99504da7": CERTIFICATE, // FIRS Tax Clearance Certificate (2026)
+      "732217a3-5916-45a9-8be2-7f5ab8229b84": CERTIFICATE, // Certificate of Incorporation
+    },
+  },
 };
 
 const FICTIONAL = /\s*\((?:fictional|Fictional)\)/g;
@@ -286,7 +412,9 @@ async function runCompany(key, apply) {
   const got = await call(session.token, "GET", `/v1/companies/${company.id}`);
   if (!ok(got)) throw new Error(`${key}: company ${brief(got)}`);
   const before = got.body.legalName;
-  if (before && clean(before) !== before) {
+  if (spec.withdrawOnly) {
+    out.legalName = { before, after: before, action: "not-in-scope" };
+  } else if (before && clean(before) !== before) {
     const change = { before, after: clean(before), action: "planned" };
     if (apply) {
       const r = await call(
@@ -340,7 +468,7 @@ async function runCompany(key, apply) {
     }
     out.withdraw.push(entry);
   }
-  for (const doc of listed) {
+  for (const doc of spec.withdrawOnly ? [] : listed) {
     if (withdrawIds.includes(doc.id) || doc.status === "ARCHIVED") continue;
     if (clean(doc.title) === doc.title) continue;
     const entry = {
@@ -390,7 +518,7 @@ async function restore(documentId) {
  * A fictional investor's view after withdrawal: each withdrawn document is
  * absent from the company's data room and does not open. Read-only.
  */
-async function investorCheck() {
+async function investorCheck(keys) {
   const [rep] = await sql(
     `select u.id as auth_id, u.email from core.investor_representatives r
        join identity.user_profiles p on p.id = r.user_id
@@ -402,7 +530,7 @@ async function investorCheck() {
   );
   const session = await signIn(rep.email);
   const results = [];
-  for (const key of Object.keys(TARGETS)) {
+  for (const key of keys) {
     const company = await resolveCompany(TARGETS[key]);
     const room = await call(
       session.token,
@@ -431,17 +559,28 @@ async function investorCheck() {
   return results;
 }
 
-const [mode = "plan", arg] = process.argv.slice(2);
+const [mode = "plan", arg, ...rest] = process.argv.slice(2);
+// Optional company keys after the mode (plan/apply/investor-check), e.g.
+// "apply pass2" runs only the pass-2 withdraw-only companies.
+const pick = (args) => {
+  if (args.length === 0) return Object.keys(TARGETS);
+  if (args.length === 1 && args[0] === "pass2")
+    return Object.keys(TARGETS).filter((k) => TARGETS[k].withdrawOnly);
+  for (const k of args)
+    if (!TARGETS[k]) throw new Error(`unknown company ${k}`);
+  return args;
+};
+const keys = mode === "restore" ? [] : pick([arg, ...rest].filter(Boolean));
 if (mode === "restore") {
   await restore(arg);
 } else if (mode === "investor-check") {
   writeFileSync(
-    `${HERE}out/hygiene-investor-check.json`,
-    JSON.stringify(await investorCheck(), null, 2),
+    `${HERE}out/hygiene-investor-check${arg ? `-${arg}` : ""}.json`,
+    JSON.stringify(await investorCheck(keys), null, 2),
   );
 } else if (mode === "plan" || mode === "apply") {
   const results = [];
-  for (const key of Object.keys(TARGETS)) {
+  for (const key of keys) {
     const r = await runCompany(key, mode === "apply");
     results.push(r);
     console.log(

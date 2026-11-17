@@ -67,7 +67,7 @@ Text inside the files themselves (for example "Ajopot acceptance note (fictional
 
 ### For the lead (not touched, out of scope)
 
-1. **Imitation certificates on other tavus-20 companies.** 24 active documents have certificate text ("This is to certify that"):
+1. **Imitation certificates on other tavus-20 companies.** 24 active documents (25 on a recount; 21 withdrawn in §4) have certificate text ("This is to certify that"):
    - Akshar, Clearwater Assurance, Cosecha Labs, Drishti Health, Hui and Rand Treasury: 1 each.
    - Ferrolith, Orphéa Genomics, Portside, Prumo, Railhead Robotics, Shiftwell and Termly: 2 each.
    - Silo Credit: 1.
@@ -118,3 +118,93 @@ Kept private (no policy, not listed, 404 for Savanna): `nx-bank-statement`, whic
 - Reserved 0.30 USD (ledger id 9a8b314c). Recorded actual: **0.0068 USD**.
 - `ai_ops.model_usage` since the reservation (19:01 UTC), across the touched tenants and the two investors: 12 STRUCTURED_EXTRACTION system calls in Nixo's tenant at 19:09:06–19:09:37 UTC, just after the share step.
 - Hygiene made no model calls.
+
+## 4. Pass 2 (17 Nov 2026, 03:04–03:20 UTC)
+
+Same method as §1: every write went through the product API as the company's own seeded fictional founder, after the marker check (every current member carries `fictional_demo = synthetic = true`; 0 unmarked on all 14 companies). Read-only SQL through the management API. No email, password or key was printed or written to disk.
+
+### 4.1 Remaining imitation certificates withdrawn
+
+Found read-only: ACTIVE documents whose current version's page text contains "This is to certify that". There were 25, not 24 as §1 said. Each reads "Certified copy … This is to certify that … Certified true copy (specimen)".
+
+- 21 were withdrawn on 14 companies, with `hygiene.mjs apply pass2` (`POST /v1/documents/:id/archive {archived:true}`, each HTTP 2xx).
+- Before the writes, none had a live disclosure policy, a GateQ disclosure or application link, or a diligence fulfilment.
+- Titles and legal names on these companies were **not** changed: the pass-2 targets are `withdrawOnly`.
+
+| Company              | Document | Title                                                      | Imitates                                                          | Before → after                 |
+| -------------------- | -------- | ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------ |
+| Akshar               | 1a56de97 | Certificate of Incorporation                               | Registrar of Companies, Bengaluru (Ministry of Corporate Affairs) | ACTIVE (PUBLIC) → ARCHIVED     |
+| Clearwater Assurance | 03741cbc | Certificate of Incorporation                               | Companies House  England and Wales)                              | ACTIVE (PUBLIC) → ARCHIVED     |
+| Cosecha Labs         | 60d01b12 | Certificate of Incorporation                               | Registro Público de Comercio, Guadalajara (Jalisco)               | ACTIVE (PUBLIC) → ARCHIVED     |
+| Drishti Health       | 6e07a3e6 | Certificate of Incorporation                               | Registrar of Companies, Pune (Ministry of Corporate Affairs)      | ACTIVE (PUBLIC) → ARCHIVED     |
+| Ferrolith            | afabbe8c | Certificate of Incorporation                               | Commercial register, Amtsgericht München                          | ACTIVE (PUBLIC) → ARCHIVED     |
+| Ferrolith            | 05e9e258 | Tax clearance certificate (Unbedenklichkeitsbescheinigung) | Tax compliance certificate, Finanzamt München                     | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Hui                  | b2059fbe | Certificate of Incorporation                               | Business Registration Office, Ho Chi Minh City                    | ACTIVE (PUBLIC) → ARCHIVED     |
+| Orphéa Genomics      | 9eb88054 | Attestation de régularité fiscale and URSSAF certificate   | Tax compliance and URSSAF certificates                            | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Orphéa Genomics      | 79202d1c | Certificate of Incorporation                               | Registre du Commerce et des Sociétés  RCS) de Paris              | ACTIVE (PUBLIC) → ARCHIVED     |
+| Portside             | fed9cb4e | Certificate of Incorporation                               | Corporate Affairs Commission (CAC), Nigeria                       | ACTIVE (PUBLIC) → ARCHIVED     |
+| Portside             | 01c81d0d | FIRS Tax Clearance Certificate (2026)                      | FIRS tax clearance certificate                                    | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Prumo                | 4f661872 | Federal tax clearance (CND) and FGTS certificate           | Certidão Negativa de Débitos and FGTS certificate                 | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Prumo                | e7e7ea38 | Certificate of Incorporation                               | Junta Comercial do Estado de São Paulo  JUCESP)                  | ACTIVE (PUBLIC) → ARCHIVED     |
+| Railhead Robotics    | b26c27c5 | Certificate of Incorporation                               | Delaware Division of Corporations                                 | ACTIVE (PUBLIC) → ARCHIVED     |
+| Railhead Robotics    | ed4cc963 | Tax filings and certificates of good standing              | Delaware and Washington certificates of good standing             | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Rand Treasury        | 12f37cf5 | Certificate of Incorporation                               | Companies and Intellectual Property Commission (CIPC)             | ACTIVE (PUBLIC) → ARCHIVED     |
+| Shiftwell            | 6cdcf26b | Certificate of Incorporation                               | Delaware Division of Corporations                                 | ACTIVE (PUBLIC) → ARCHIVED     |
+| Shiftwell            | 16f916e8 | Tax filings and certificates of good standing              | Delaware certificate of good standing                             | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Silo Credit          | 24dd8f38 | FIRS Tax Clearance Certificate (2026)                      | FIRS tax clearance certificate                                    | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Termly               | a4c02e54 | FIRS Tax Clearance Certificate (2026)                      | FIRS tax clearance certificate                                    | ACTIVE (ON_REQUEST) → ARCHIVED |
+| Termly               | 732217a3 | Certificate of Incorporation                               | Corporate Affairs Commission (CAC), Nigeria                       | ACTIVE (PUBLIC) → ARCHIVED     |
+
+- Restorable one at a time: `hygiene.mjs restore <id>`.
+- Idempotency: a second `plan pass2` reports all 21 as `already-withdrawn`.
+- Investor check (Savanna, `investor-check pass2`): every data room answers 200 with none of the 21 listed, and `open` answers 404 for all 21. SQL: 21/21 ARCHIVED.
+
+**For the lead (not touched, by instruction):** Ledgerline `b216ac68` (Certificate of Incorporation, "Corporate Affairs Commission (CAC), Nigeria") and `1d69a69b` (FIRS Tax Clearance Certificate (2026)). Baridi `dd08b4e0` (Certificate of Incorporation, "Business Registration Service (BRS), Kenya") and `3fbcb6c9` (KRA Tax Compliance Certificate). All 4 are still ACTIVE.
+
+### 4.2 Maji Loop claims from the archived "deck QA 14 Nov" decks
+
+Read-only trace, in this order:
+
+- **Document to source.** `evidence.sources` rows with `metadata.via = document_claims`: `c1cbeb09` for "deck QA 14 Nov" (version `3faa90d1`), and `10009a2b` for "deck QA 14 Nov b" (version `21c9f0be`).
+- **Source to evidence item.** Only `10009a2b` produced one: "MRR of USD 42,000 as at 31 October 2026".
+- **Evidence item to claims.** It links to 2 claims:
+
+| Claim                                  | What it says                                                                                                                  | Axes                                                                     | Link to the QA deck    | Other evidence                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------- | --------------------------------------------- |
+| `23cad797-7c66-4293-8648-b3109b4ed509` | "MRR of USD 42,000 for October 2026, as stated in its own document 'Maji Loop deck QA 14 Nov b' and confirmed by the founder" | USER_CLAIM · DOCUMENT_SUPPORTED · CURRENT, `organisation_private`, rev 1 | SUPPORTS (only source) | none                                          |
+| `1c56393d-a3e2-44f2-a7f2-037fa883fafc` | "MRR of USD 120,000 for October 2026, as the founder told Q (self-reported)"                                                  | USER_CLAIM · SELF_REPORTED · CURRENT, `organisation_private`             | CONTRADICTS            | a conversation: "we hit $120k MRR in October" |
+
+Claim cards (`q_runtime.actions`, `app.company.figure.record`):
+
+- EXECUTED: 42,000 for October, from deck b. This is the approval that created `23cad797`.
+- REJECTED: 37,500 for September, from deck b.
+- EXPIRED: 2 cards from the first deck.
+- No card or onboarding suggestion from these decks is pending, so there is nothing to dismiss.
+
+**No supported withdraw route exists, so nothing was changed.**
+
+- The evidence package has `reviseClaim`, which creates a revision with history, but no HTTP route, app action or Q tool calls it.
+- The only figure action is `app.company.figure.record`.
+- Lead action:
+  - `23cad797` should become SUPERSEDED or withdrawn, with history, once a route exists.
+  - `1c56393d` is backed by the founder's own words, not by a document, so it stays. Its CONTRADICTS link now points at an archived document.
+- Both claims are `organisation_private`, so investors do not see them.
+
+### 4.3 Watchly onboarding suggestions (read, left PENDING)
+
+Watchly's founder onboarding session (COMPLETED) has 3 PENDING suggestions, created at 02:32 UTC from "Management accounts, Apr 2026 to Oct 2026" (document `23e7b1b0`). They were read by deterministic code, with no model.
+
+| Suggestion | Field           | Value   | Fixture (`watchly.json`, October 2026) | Confirmed answer (15 Oct) |
+| ---------- | --------------- | ------- | -------------------------------------- | ------------------------- |
+| `35ea2425` | monthly revenue | 8,500   | revenue 8,500 ✔                        | none                      |
+| `cc01f46b` | monthly burn    | 173,500 | net burn 173,500 ✔                     | 175,000 (September)       |
+| `5b2c90ad` | runway (months) | 18.0    | runway 18.0 (3,126,500 / 173,500) ✔    | 20 (the deck's figure)    |
+
+- All 3 are correct figures for October from the synthetic accounts, and none duplicates a confirmed figure.
+- Burn and runway are newer than the confirmed September answers. Runway also corrects the deck's 20, which is the pack's deliberate discrepancy.
+- Accepting a suggestion supersedes the earlier response, which keeps history. This is the product working, so the 3 are left for the founder to confirm.
+
+### 4.4 Cost
+
+- Reserved 0.10 USD (ledger `fce042e9`). Recorded actual: **0.00 USD**.
+- `ai_ops.model_usage` since 03:04 UTC, across the 16 touched tenants: 0 rows.

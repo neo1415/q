@@ -116,7 +116,7 @@ node scripts/seed/evidence/upload.mjs negative    # Savanna Seed cannot list or 
 - **Sign-in:** the owner authorised it (decision 99). It used a one-time admin magic-link session as the Nixo founder (`cb2b58ab`): no password change and no email sent. The admin key was held in memory only.
 - **Upload:** all 14 `nx-*` documents (12 PDFs, including the generated pitch deck, and 2 CSVs) went through the normal founder upload route. All sessions completed, and `verify` shows 14/14 COMPLETED.
 - **Model calls:** 2, for deck reading, at USD 0.0096 (ledger `a25bd6c5`).
-- **Visibility:** every document is founder-private. The Savanna negative check covered all 40 seeded documents. Savanna sees exactly the 8 Tensorgate documents shared with it. No Nixo or Halyard document is listed or opens for Savanna.
+- **Visibility:** every document is founder-private. The Savanna negative check covered all 40 seeded documents. At upload time (16 Nov, 09:40 UTC) Savanna saw exactly the 8 Tensorgate documents shared with it, and no Nixo or Halyard document. **Superseded later on 16 Nov:** 10 Nixo documents are now shared with Savanna through the relationship workflow (decision 99; see [`2026-11-16-demo-evidence-hygiene-nixo.md`](2026-11-16-demo-evidence-hygiene-nixo.md) §2). The 4 `nx-*` documents kept private, and every Halyard document, are still not listed and do not open for Savanna.
 
 ## Compact packs: MedTrail, Mizan, Ajopot, Watchly, Maji Loop (17 Nov, 02:30 UTC)
 
