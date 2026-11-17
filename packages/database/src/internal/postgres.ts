@@ -107,6 +107,22 @@ export function transactionLimitsFor(
 }
 
 /**
+ * Behind the transaction pooler, the most statements and transactions the
+ * client hands the driver at once: one per pooled connection, so the
+ * driver never writes a query behind another (see ConnectionGate in
+ * round-trips.ts). Undefined elsewhere: no gate.
+ */
+export function connectionSlotsFor(
+  config: DatabaseConfig,
+  accessClass: DatabaseAccessClass,
+): number | undefined {
+  return config.connectionMode === "transaction_pooler" &&
+    accessClass !== "MIGRATION"
+    ? config.poolMax
+    : undefined;
+}
+
+/**
  * Pure mapping from validated config to driver options. Separated from the
  * constructor so it can be unit-tested without opening a socket.
  */
@@ -123,9 +139,13 @@ export function resolvePostgresOptions(
     // statements stay on for direct and session-mode connections.
     prepare: config.connectionMode !== "transaction_pooler",
     // Transaction mode hands the server connection to another client after
-    // each transaction; postgres.js would otherwise write up to 100 queries
-    // down one client connection before the first answers, and a pooler
-    // that stalls on one stalls them all. One at a time there.
+    // each transaction. max_pipeline 1 is the driver's least pipelining,
+    // but it still writes a query behind one in flight when no connection
+    // is free, and Supavisor never answers that second query (17 Nov
+    // 2026, scripts/db/pooler-proof). 0 is not an option (BEGIN would
+    // never reserve its connection); the request client's connection
+    // gate (round-trips.ts, `connectionSlots`) keeps the driver from ever
+    // needing to pipeline instead.
     ...(config.connectionMode === "transaction_pooler"
       ? { max_pipeline: 1 }
       : {}),
@@ -155,6 +175,7 @@ export function createPostgresClient(
     postgres(connectionString, resolvePostgresOptions(config, accessClass)),
     {
       queryDeadlineMs: resolveSqlTimeouts(config, accessClass).queryDeadlineMs,
+      connectionSlots: connectionSlotsFor(config, accessClass),
     },
   );
 }

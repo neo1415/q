@@ -227,7 +227,98 @@ export type SqlInstrumentOptions = {
    * Undefined: no deadline.
    */
   readonly queryDeadlineMs?: number | undefined;
+  /**
+   * Transaction pooler only: the most statements and transactions handed
+   * to the driver at once, which is the pool size (ConnectionGate).
+   * Undefined: no gate.
+   */
+  readonly connectionSlots?: number | undefined;
 };
+
+/**
+ * At most one statement in flight per connection behind Supavisor's
+ * transaction mode (17 Nov 2026, scripts/db/pooler-proof).
+ *
+ * When no connection is free, postgres.js writes a query onto a connection
+ * whose current query has not answered yet (its `max_pipeline`, which
+ * cannot be 0: a transaction's BEGIN then never reserves its connection).
+ * Supavisor releases the server connection at the first query's
+ * ReadyForQuery and never answers the one written behind it, so that
+ * await hangs. So the driver is never handed more work than it has
+ * connections: each statement outside a transaction, and each transaction
+ * as a whole, holds one slot from before the driver sees it until it
+ * settles; the driver then always finds a free or unopened connection.
+ * A statement waiting for a slot is already under its client deadline; a
+ * transaction waits at most that long for one.
+ */
+type ConnectionGate = {
+  /** True when a slot was free and is now held. */
+  readonly tryAcquire: () => boolean;
+  /** Queue for the next slot; returns a function that leaves the queue. */
+  readonly wait: (grant: () => void) => () => void;
+  readonly release: () => void;
+};
+
+function createConnectionGate(size: number): ConnectionGate {
+  let free = size;
+  const waiters: (() => void)[] = [];
+  return {
+    tryAcquire: () => {
+      if (free <= 0) return false;
+      free -= 1;
+      return true;
+    },
+    wait: (grant) => {
+      waiters.push(grant);
+      return () => {
+        const index = waiters.indexOf(grant);
+        if (index >= 0) waiters.splice(index, 1);
+      };
+    },
+    release: () => {
+      // The slot passes straight to the next waiter, so a newcomer's
+      // tryAcquire cannot overtake the queue.
+      const next = waiters.shift();
+      if (next === undefined) free += 1;
+      else next();
+    },
+  };
+}
+
+/** Resolves once a slot is held; rejects as 57014 after `deadlineMs`. */
+function acquireSlot(
+  gate: ConnectionGate,
+  deadlineMs: number | undefined,
+): Promise<void> {
+  if (gate.tryAcquire()) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const leave = gate.wait(() => {
+      if (timer !== undefined) clearTimeout(timer);
+      resolve();
+    });
+    if (deadlineMs !== undefined) {
+      timer = setTimeout(() => {
+        leave();
+        reject(new QueryDeadlineError(deadlineMs));
+      }, deadlineMs);
+      timer.unref();
+    }
+  });
+}
+
+async function withSlot<T>(
+  gate: ConnectionGate,
+  deadlineMs: number | undefined,
+  work: () => Promise<T>,
+): Promise<T> {
+  await acquireSlot(gate, deadlineMs);
+  try {
+    return await work();
+  } finally {
+    gate.release();
+  }
+}
 
 /**
  * The error a query's await rejects with when its client deadline passes:
@@ -293,6 +384,7 @@ function track(
   value: unknown,
   first: unknown,
   options: SqlInstrumentOptions,
+  gate?: ConnectionGate,
 ): unknown {
   if (!isQuery(value)) return value;
   const query = value;
@@ -300,12 +392,53 @@ function track(
   const text = statementText(first);
   const stack = TRACE ? new Error().stack : undefined;
   const deadlineMs = options.queryDeadlineMs;
+  if (gate === undefined) {
+    query.handle = function (this: QueryLike, ...args: unknown[]) {
+      if (this.executed !== true) {
+        querySent(text, stack);
+        if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
+      }
+      return handle.apply(this, args);
+    };
+    return query;
+  }
+  // Gated (transaction pooler): the driver's own handle runs only once a
+  // slot is held, and the slot is released when the query settles. The
+  // deadline is armed first, so it bounds the wait for a slot too.
+  let started = false;
   query.handle = function (this: QueryLike, ...args: unknown[]) {
-    if (this.executed !== true) {
-      querySent(text, stack);
-      if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
+    if (started) return undefined;
+    started = true;
+    querySent(text, stack);
+    if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
+    let settled = false;
+    let held = false;
+    const settle = () => {
+      settled = true;
+      if (held) {
+        held = false;
+        gate.release();
+      }
+    };
+    // The native then: the driver's own `then` would hand the query over.
+    void Promise.prototype.then.call(this, settle, settle);
+    const run = () => {
+      // Rejected while it waited (its deadline): never handed to the
+      // driver, which would park a connection on a cancelled query.
+      if (settled) {
+        gate.release();
+        return;
+      }
+      held = true;
+      handle.apply(this, args);
+    };
+    if (gate.tryAcquire()) {
+      run();
+      return undefined;
     }
-    return handle.apply(this, args);
+    const leave = gate.wait(run);
+    void Promise.prototype.then.call(this, leave, leave);
+    return undefined;
   };
   return query;
 }
@@ -320,16 +453,27 @@ export function instrumentSql<T extends object>(
   sql: T,
   options: SqlInstrumentOptions = {},
 ): T {
+  // Only the pool itself is gated: the statements of a transaction or a
+  // reserved connection run on the connection its slot already holds.
+  const gate =
+    options.connectionSlots === undefined
+      ? undefined
+      : createConnectionGate(options.connectionSlots);
+  const inner: SqlInstrumentOptions = {
+    queryDeadlineMs: options.queryDeadlineMs,
+  };
+  const deadlineMs = options.queryDeadlineMs;
   const wrapFunction =
     (fn: Fn, target: object): Fn =>
     (...args: unknown[]) =>
-      track(fn.apply(target, args), args[0], options);
+      track(fn.apply(target, args), args[0], options, gate);
   return new Proxy(sql, {
     apply(target, thisArg, args: unknown[]) {
       return track(
         Reflect.apply(target as Fn, thisArg, args),
         args[0],
         options,
+        gate,
       );
     },
     get(target, property, receiver) {
@@ -341,19 +485,56 @@ export function instrumentSql<T extends object>(
           const last = args.length - 1;
           const work = args[last];
           if (typeof work === "function") {
-            args[last] = (inner: object) =>
-              (work as Fn)(instrumentSql(inner, options));
+            args[last] = (transaction: object) =>
+              (work as Fn)(instrumentSql(transaction, inner));
           }
-          querySent(property === "begin" ? "begin" : "savepoint", undefined);
-          const done = fn.apply(target, args) as Promise<unknown>;
-          return done.finally(() => {
-            querySent("commit", undefined);
-          });
+          const run = () => {
+            querySent(property === "begin" ? "begin" : "savepoint", undefined);
+            const done = fn.apply(target, args) as Promise<unknown>;
+            return done.finally(() => {
+              querySent("commit", undefined);
+            });
+          };
+          return gate === undefined ? run() : withSlot(gate, deadlineMs, run);
         };
       }
       if (property === "reserve") {
-        return async (...args: unknown[]) =>
-          instrumentSql((await fn.apply(target, args)) as object, options);
+        return async (...args: unknown[]) => {
+          if (gate === undefined) {
+            return instrumentSql(
+              (await fn.apply(target, args)) as object,
+              inner,
+            );
+          }
+          // The slot is held until the caller releases the connection.
+          await acquireSlot(gate, deadlineMs);
+          let reserved: { release: () => void };
+          try {
+            reserved = (await fn.apply(target, args)) as {
+              release: () => void;
+            };
+          } catch (error) {
+            gate.release();
+            throw error;
+          }
+          const free = reserved.release.bind(reserved);
+          let released = false;
+          reserved.release = () => {
+            free();
+            if (!released) {
+              released = true;
+              gate.release();
+            }
+          };
+          return instrumentSql(reserved, inner);
+        };
+      }
+      if (property === "notify" && gate !== undefined) {
+        // The driver sends pg_notify through its own pool, uninstrumented.
+        return (...args: unknown[]) =>
+          withSlot(gate, deadlineMs, () =>
+            Promise.resolve(fn.apply(target, args)),
+          );
       }
       return wrapFunction(fn, target);
     },

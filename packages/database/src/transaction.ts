@@ -87,8 +87,10 @@ export function createTransactionManager(
         const { value } = await sql.begin(async (transactionSql) => {
           // Sent ahead of the work's first statement on the same
           // connection, in order, without waiting for it: no extra round
-          // trip before the work starts. Its own failure still fails the
-          // unit (the work's statements then fail as aborted too).
+          // trip before the work starts (pipelining inside a transaction
+          // is safe behind the pooler: it keeps the server connection
+          // until COMMIT). Its own failure still fails the unit (the
+          // work's statements then fail as aborted too).
           const applied =
             limits === undefined
               ? undefined

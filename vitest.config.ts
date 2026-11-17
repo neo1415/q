@@ -71,6 +71,8 @@ const TEST_EXCLUDE = [
   "**/*.integration.test.ts",
   // Real model calls run only via `pnpm test:live-model` (CQ-Q-005).
   "**/*.live.test.ts",
+  // Need a transaction-mode pooler: scripts/db/pooler-proof/run.sh only.
+  "**/*.pooler-proof.test.ts",
 ];
 
 /**
