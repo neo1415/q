@@ -5193,6 +5193,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "This email has already applied to this organisation. They have your application.",
   "This feed shows only companies with a pitch you can play. The others pass your hard rules and are in Search and Explore; they join the feed when they add a pitch.",
   "This file can't be shown here. Save a copy to open it.",
+  "This file was blocked by the virus check",
   "This investor couldn't load.",
   "This investor isn’t taking requests from founders right now.",
   "This invitation has expired",

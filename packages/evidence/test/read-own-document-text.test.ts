@@ -53,6 +53,7 @@ function world(options: {
   owner?: string | null;
   body?: Buffer;
   recordedSha?: string;
+  malwareScanStatus?: string;
 }) {
   const body = options.body ?? artifactBody();
   const opened: string[] = [];
@@ -74,6 +75,14 @@ function world(options: {
     repositories: {
       documentExtractions: {
         listByVersion: () => Promise.resolve([extraction]),
+      },
+      documentVersions: {
+        findById: () =>
+          Promise.resolve({
+            id: VERSION,
+            tenantId: TENANT,
+            malwareScanStatus: options.malwareScanStatus ?? "NOT_SCANNED",
+          }),
       },
     } as never,
     storage: {
@@ -132,6 +141,12 @@ describe("reading an organisation's own unpaged document", () => {
       }),
     });
     await expect(read(query)).resolves.toBe("");
+  });
+
+  it("decision 104: never opens the extraction of a version the virus check blocked", async () => {
+    const { read, opened } = world({ malwareScanStatus: "BLOCKED" });
+    await expect(read(query)).resolves.toBe("");
+    expect(opened).toEqual([]);
   });
 
   it("refuses an artifact that does not match its recorded hash", async () => {

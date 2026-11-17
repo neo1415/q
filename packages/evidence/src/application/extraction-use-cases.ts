@@ -302,6 +302,13 @@ export function createReadOwnDocumentText(
     );
     const newest = own.at(-1);
     if (newest === undefined) return "";
+    // Decision 104: a version the virus check blocked is never read.
+    const version = await dependencies.repositories.documentVersions.findById(
+      dependencies.sql,
+      query.tenantId as TenantId,
+      DocumentVersionIdSchema.parse(query.documentVersionId),
+    );
+    if (version === null || version.malwareScanStatus === "BLOCKED") return "";
     const artifact = await readExtractionArtifact(storage, newest);
     if (
       artifact.documentId !== query.documentId ||

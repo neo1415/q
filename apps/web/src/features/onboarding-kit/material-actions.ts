@@ -15,6 +15,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import { DocumentTypeSchema } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
+import { VIRUS_BLOCKED_TEXT } from "@/features/documents/library-model";
 
 import type { ActionResult } from "./api-actions";
 import type { MaterialFileView, MaterialState } from "./materials";
@@ -198,16 +199,14 @@ function stateOf(document: {
   if (version === null) {
     return { state: "uploading", label: "Uploading" };
   }
+  // Decision 104: BLOCKED is only ever written from the virus check's
+  // INFECTED verdict. Checked first: a file found infected after it was
+  // read (a NOT_SCANNED file scanned later) is closed all the same.
+  if (version.malwareScanStatus === "BLOCKED") {
+    return { state: "unreadable", label: VIRUS_BLOCKED_TEXT };
+  }
   if (version.processingStatus === "FAILED") {
     return { state: "unreadable", label: "We couldn't read this file" };
-  }
-  if (version.malwareScanStatus === "BLOCKED") {
-    // Honest, and does not accuse the founder of anything: the file was not
-    // shown to be safe, which is not the same as being dangerous.
-    return {
-      state: "unreadable",
-      label: "We couldn't check this file, so we haven't opened it",
-    };
   }
   if (version.textExtractionStatus === "COMPLETED") {
     // ADR 0042: read and shareable, but no scanner has looked at it.

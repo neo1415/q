@@ -85,7 +85,7 @@ const DONE = new Set(["COMPLETED", "FAILED"]);
 /** Why a file has no text, in words a person can act on. */
 export function unreadableReason(version: Version): string | null {
   if (version.malwareScanStatus === "BLOCKED") {
-    return "The file was stopped by the security check, so it was not opened.";
+    return "The file was blocked by the virus check, so it was not opened.";
   }
   const mime = version.mimeType.toLowerCase();
   if (mime.startsWith("image/")) {

@@ -69,7 +69,10 @@ When a scanner is attached:
 
 1. Set `CQ_MALWARE_POLICY=REQUIRE_CLEAN` (or remove it) on workers and API:
    `NOT_SCANNED` files stop being served at once.
-2. TODO: scan every `NOT_SCANNED` version (`selectNotScannedForScan` in
-   `apps/workers/src/documents/redrive.ts`, tested) and record each
-   scanner's verdict; only that verdict may write `CLEAN`.
+2. Scan every `NOT_SCANNED` version and record each scanner's verdict; only
+   that verdict may write `CLEAN`. Built for decision 104:
+   `apps/workers/src/documents/scan-backfill.ts` (CLI
+   `scan-not-scanned-documents`; also once at worker start when
+   `CLAMAV_HOST` is set). INFECTED becomes `BLOCKED` and the version's
+   chunk sets are revoked. The service: `infra/clamav/README.md`.
 3. This ADR is then superseded, and ADR 0008 §6 holds again in full.

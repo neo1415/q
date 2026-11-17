@@ -233,6 +233,12 @@ export function createPostgresDocumentPageTextReader() {
          where p.tenant_id = ${tenantId}
            and p.document_id = ${document.documentId}
            and p.owner_organisation_id = ${document.ownerOrganisationId}
+           -- Decision 104: a version the virus check blocked is never read.
+           and not exists (
+             select 1 from evidence.document_versions v
+              where v.id = ${document.documentVersionId}
+                and v.tenant_id = ${tenantId}
+                and v.malware_scan_status = 'BLOCKED')
          order by p.page_number`;
       return rows.map((row) => PageTextRow.parse(row));
     },

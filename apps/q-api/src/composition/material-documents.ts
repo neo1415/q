@@ -408,6 +408,10 @@ export function createMaterialDocumentReads(dependencies: {
               on p.document_id = d.id
              and p.document_version_id = d.current_version_id
             join evidence.document_extractions x on x.id = p.extraction_id
+            -- Decision 104: a version the virus check blocked is never read.
+            join evidence.document_versions v
+              on v.id = d.current_version_id
+             and v.malware_scan_status <> 'BLOCKED'
            where d.company_id = ${companyId} and d.id = ${id}
            order by x.created_at desc, x.id desc
            limit 1)

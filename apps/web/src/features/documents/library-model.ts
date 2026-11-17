@@ -7,6 +7,12 @@ import type {
 import { artifactTypeLabel } from "@/features/q/artifact-type";
 
 /**
+ * Decision 104: what the owner sees beside a file the virus check found
+ * something in. Plain, and the file is never opened, shared or read by Q.
+ */
+export const VIRUS_BLOCKED_TEXT = "This file was blocked by the virus check";
+
+/**
  * The documents page's one list (P3): what Q made for them and what they
  * uploaded, as one kind of item. Pure, so the page's sorting, filtering
  * and paging are tested without a browser.
@@ -30,7 +36,14 @@ export type LibraryItem = {
   readonly sharing: string;
   readonly shared: boolean;
   /** Q's read of an upload; null for what Q wrote itself. */
-  readonly qRead: "READ" | "READING" | "UNREADABLE" | "WAITING" | null;
+  readonly qRead:
+    | "READ"
+    | "READING"
+    | "UNREADABLE"
+    | "WAITING"
+    /** Decision 104: the virus check found something; never opened. */
+    | "BLOCKED"
+    | null;
   /** For Q's documents: still being written, or failed. */
   readonly state: "READY" | "PREPARING" | "FAILED";
   readonly version: number;
@@ -88,14 +101,16 @@ export function fromUpload(document: DocumentDto): LibraryItem {
   const qRead =
     version === null
       ? ("WAITING" as const)
-      : version.textExtractionStatus === "COMPLETED"
-        ? ("READ" as const)
-        : version.processingStatus === "FAILED" ||
-            version.textExtractionStatus === "FAILED"
-          ? ("UNREADABLE" as const)
-          : version.processingStatus === "PROCESSING"
-            ? ("READING" as const)
-            : ("WAITING" as const);
+      : version.malwareScanStatus === "BLOCKED"
+        ? ("BLOCKED" as const)
+        : version.textExtractionStatus === "COMPLETED"
+          ? ("READ" as const)
+          : version.processingStatus === "FAILED" ||
+              version.textExtractionStatus === "FAILED"
+            ? ("UNREADABLE" as const)
+            : version.processingStatus === "PROCESSING"
+              ? ("READING" as const)
+              : ("WAITING" as const);
   const investors =
     document.documentType === "PITCH_DECK" &&
     document.downloadAudience === "INVESTORS";
@@ -292,4 +307,5 @@ export const Q_READ_LABEL: Readonly<
   READING: "Q is reading",
   WAITING: "Waiting for Q",
   UNREADABLE: "Q couldn't read it",
+  BLOCKED: VIRUS_BLOCKED_TEXT,
 };

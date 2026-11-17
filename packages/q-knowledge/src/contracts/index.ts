@@ -93,6 +93,8 @@ export const CHUNK_SET_STATUS_REASONS = [
   "NEWER_EXTRACTION",
   "SOURCE_REVOKED",
   "DOCUMENT_REVOKED",
+  /** Decision 104: the version's scanner verdict was INFECTED. */
+  "MALWARE_DETECTED",
 ] as const;
 export const ChunkSetStatusReasonSchema = z.enum(CHUNK_SET_STATUS_REASONS);
 export type ChunkSetStatusReason = z.infer<typeof ChunkSetStatusReasonSchema>;

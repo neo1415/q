@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type {
   PrivateDocumentStorageProvider,
@@ -19,6 +19,7 @@ import {
   type MalwareScanner,
   type MalwareVerdictStatus,
 } from "../src/documents/malware.js";
+import { createClamdScanner } from "../src/documents/clamd.js";
 import type { ParserResult, ParserSandbox } from "../src/parser/sandbox.js";
 import type { QueueMessage } from "../src/queue/pgmq.js";
 import {
@@ -29,6 +30,12 @@ import {
   TENANT_A,
   TENANT_B,
 } from "./support/fakes.js";
+import {
+  closeFakeClamds,
+  EICAR,
+  fakeClamd,
+  type FakeClamdBehaviour,
+} from "./support/fake-clamd.js";
 
 /**
  * The pipeline's decisions, isolated from the database, storage, the scanner
@@ -1063,5 +1070,111 @@ describe("low-text pages are transcribed, or recorded as unread", () => {
     expect(failed.completed?.provenance.metadata).toMatchObject({
       unreadPages: 2,
     });
+  });
+});
+
+describe("decision 104: the pipeline with the ClamAV scanner attached", () => {
+  afterEach(closeFakeClamds);
+
+  async function withClamd(behaviour: FakeClamdBehaviour, body: string) {
+    const clamd = await fakeClamd(behaviour);
+    const version = makeVersion({ sizeBytes: Buffer.byteLength(body) });
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes, body);
+    let parsed = false;
+    let chunked = false;
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      // The interim policy stays set until the backfill is done: a real
+      // verdict must still decide everything.
+      malwarePolicy: "ALLOW_UNSCANNED_WITH_WARNING",
+      scanner: createClamdScanner({
+        host: "127.0.0.1",
+        port: clamd.port,
+        timeoutMs: 1_000,
+        maxBytes: 1_000_000,
+        openObject: async (target) =>
+          (
+            await storage.provider.openObjectStream({
+              bucket: target.bucket,
+              key: target.key,
+            })
+          ).body,
+      }),
+      sandbox: {
+        run: () => {
+          parsed = true;
+          return Promise.resolve(successfulParse);
+        },
+      },
+      knowledge: {
+        buildChunkSet: () => {
+          chunked = true;
+          return Promise.resolve({
+            outcome: "BUILT",
+            chunkSet: {
+              chunkingVersion: "q-chunking-v1",
+              chunkingStrategy: "narrative",
+              chunkCount: 1,
+            } as never,
+            plan: {
+              strategy: "narrative",
+              truncated: false,
+              tokenEstimate: 12,
+            },
+            chunkCount: 1,
+            supersededSetIds: [],
+          });
+        },
+      },
+    });
+    const outcome = await handle(jobMessage({ documentVersionId: version.id }));
+    return { outcome, evidence, parsed: () => parsed, chunked: () => chunked };
+  }
+
+  it("an infected upload is blocked before parsing: no extraction, no chunks, version BLOCKED", async () => {
+    const run = await withClamd("answer", EICAR);
+
+    expect(run.outcome).toEqual({ kind: "DONE" });
+    expect(run.parsed()).toBe(false);
+    expect(run.chunked()).toBe(false);
+    const names = run.evidence.calls.map((call) => call.name);
+    expect(names).not.toContain("recordDocumentExtraction");
+    expect(names).not.toContain("completeDocumentProcessing");
+    expect(
+      run.evidence.calls.findLast(
+        (call) => call.name === "advanceVersionProcessingState",
+      )?.input,
+    ).toMatchObject({ malwareScanStatus: "BLOCKED" });
+    expect(run.evidence.status()).toBe("BLOCKED");
+  });
+
+  it("a clean upload is read and recorded CLEAN, never NOT_SCANNED", async () => {
+    const run = await withClamd("answer", "an ordinary deck");
+
+    expect(run.parsed()).toBe(true);
+    const completion = run.evidence.calls.find(
+      (call) => call.name === "completeDocumentProcessing",
+    );
+    expect(completion?.input).toMatchObject({ scannedClean: true });
+    expect(completion?.input).not.toMatchObject({ notScanned: true });
+    expect(run.chunked()).toBe(true);
+  });
+
+  it("a scanner that does not answer is retried, not read and not recorded unscanned", async () => {
+    const run = await withClamd("silent", "an ordinary deck");
+
+    expect(run.outcome).toEqual({
+      kind: "RETRY",
+      errorCode: "SCANNER_UNAVAILABLE",
+    });
+    expect(run.parsed()).toBe(false);
+    expect(run.evidence.calls.map((call) => call.name)).not.toContain(
+      "completeDocumentProcessing",
+    );
   });
 });

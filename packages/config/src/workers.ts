@@ -81,6 +81,19 @@ const workerEnvSchema = z.object({
   CQ_PARSER_MAX_OUTPUT_BYTES: boundedInt(16 * 1024 * 1024, 65_536, 67_108_864),
   CQ_PARSER_MAX_OLD_SPACE_MB: boundedInt(512, 128, 4_096),
   CQ_DOCUMENT_MAX_BYTES: boundedInt(52_428_800, 1_024, 52_428_800),
+  // Decision 104: the ClamAV service on the private network. Unset, no
+  // scanner is attached and the malware gate answers UNAVAILABLE (ADR 0042).
+  CLAMAV_HOST: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9.-]{1,253}$/u, "expected a host name")
+      .optional(),
+  ),
+  CLAMAV_PORT: boundedInt(3310, 1, 65_535),
+  CLAMAV_TIMEOUT_MS: boundedInt(120_000, 1_000, 600_000),
 });
 
 export type OutboxRunnerConfig = {
@@ -115,6 +128,12 @@ export type DocumentProcessingConfig = {
   readonly parserMaxOutputBytes: number;
   readonly parserMaxOldSpaceMb: number;
   readonly maxDocumentBytes: number;
+  /** Decision 104: clamd on the private network; null when not attached. */
+  readonly clamav: {
+    readonly host: string;
+    readonly port: number;
+    readonly timeoutMs: number;
+  } | null;
 };
 
 /**
@@ -167,6 +186,14 @@ export function parseWorkerConfig(env: EnvironmentInput): WorkerConfig {
       parserMaxOutputBytes: parsed.CQ_PARSER_MAX_OUTPUT_BYTES,
       parserMaxOldSpaceMb: parsed.CQ_PARSER_MAX_OLD_SPACE_MB,
       maxDocumentBytes: parsed.CQ_DOCUMENT_MAX_BYTES,
+      clamav:
+        parsed.CLAMAV_HOST === undefined
+          ? null
+          : {
+              host: parsed.CLAMAV_HOST,
+              port: parsed.CLAMAV_PORT,
+              timeoutMs: parsed.CLAMAV_TIMEOUT_MS,
+            },
     },
     public: { supabaseUrl: parsed.SUPABASE_URL },
     secrets: {

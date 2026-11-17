@@ -50,7 +50,9 @@ describe("document page text reader", () => {
     expect(sql).toContain("limit 1");
     expect(sql).not.toContain("q_knowledge");
     expect(call?.values.filter((value) => value === FIRM)).toHaveLength(2);
-    expect(call?.values.filter((value) => value === TENANT)).toHaveLength(2);
+    // Decision 104: a version the virus check blocked reads nothing.
+    expect(sql).toContain("v.malware_scan_status = 'BLOCKED'");
+    expect(call?.values.filter((value) => value === TENANT)).toHaveLength(3);
   });
 
   it("rejects a row that is not page text", async () => {

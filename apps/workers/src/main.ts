@@ -175,7 +175,11 @@ import {
 
 import { createDocumentProcessingPipeline } from "./documents/pipeline.js";
 import { createPipelineMetrics } from "./documents/metrics.js";
-import { createUnavailableMalwareScanner } from "./documents/malware.js";
+import { createClamdScanner } from "./documents/clamd.js";
+import {
+  createUnavailableMalwareScanner,
+  type MalwareScanner,
+} from "./documents/malware.js";
 import { createDomainEventHandler } from "./events/document-processing-handler.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { WORKER_DATABASE_DEFAULTS } from "./statement-budget.js";
@@ -188,6 +192,10 @@ import { withReadinessAfterVerification } from "./verification/readiness-handler
 import { withRelationshipProjection } from "./network/relationship-projection-handler.js";
 import { rebuildRelationshipStatesAtStart } from "./network/relationship-rebuild-at-start.js";
 import { redriveBlockedDocumentsAtStart } from "./documents/redrive.js";
+import {
+  createPostgresScanBackfillStore,
+  scanNotScannedDocumentsAtStart,
+} from "./documents/scan-backfill.js";
 import { backfillDocumentPagesAtStart } from "./documents/page-backfill.js";
 import { withQWorkWake } from "./network/q-work-wake-handler.js";
 import { withPlanWake } from "./network/plan-wake-handler.js";
@@ -1274,6 +1282,25 @@ const storage =
       })
     : undefined;
 
+/**
+ * The malware scanner (decision 104): ClamAV on the private network when
+ * CLAMAV_HOST is set, reading the object straight from private storage,
+ * bounded by the upload ceiling. Unset: the unavailable scanner, unchanged.
+ */
+function documentScanner(from: NonNullable<typeof storage>): MalwareScanner {
+  const clamav = config.documents.clamav;
+  if (clamav === null) return createUnavailableMalwareScanner();
+  return createClamdScanner({
+    host: clamav.host,
+    port: clamav.port,
+    timeoutMs: clamav.timeoutMs,
+    maxBytes: config.documents.maxDocumentBytes,
+    openObject: async (target) =>
+      (await from.openObjectStream({ bucket: target.bucket, key: target.key }))
+        .body,
+  });
+}
+
 const documents =
   storage === undefined
     ? undefined
@@ -1369,9 +1396,10 @@ const documents =
             transactions: database.transactions,
             storage,
           }),
-          // No scanner exists yet. Under the default policy this blocks
-          // processing; it never reports a document clean.
-          scanner: createUnavailableMalwareScanner(),
+          // Decision 104: clamd when CLAMAV_HOST is set; otherwise no
+          // scanner, which under the default policy blocks processing and
+          // never reports a document clean (ADR 0042).
+          scanner: documentScanner(storage),
           malwarePolicy: config.documents.malwarePolicy,
           sandbox: createParserSandbox({
             timeoutMs: config.documents.parserTimeoutMs,
@@ -1693,6 +1721,21 @@ void redriveBlockedDocumentsAtStart({
   malwarePolicy: config.documents.malwarePolicy,
   logger,
 });
+
+// Decision 104: with ClamAV attached, versions recorded NOT_SCANNED under
+// ADR 0042 are scanned once in the background: CLEAN on a clean verdict,
+// quarantined on an infected one. Bounded, compare-and-set, never fatal;
+// the CLI (scan-not-scanned-documents) does the same by hand.
+if (storage !== undefined && config.documents.clamav !== null) {
+  void scanNotScannedDocumentsAtStart({
+    store: createPostgresScanBackfillStore({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
+    scanner: documentScanner(storage),
+    logger,
+  });
+}
 
 // F26: readings stored before the deck figure check get it once at start:
 // deterministic, no model; a corrected copy is appended, never a rewrite.

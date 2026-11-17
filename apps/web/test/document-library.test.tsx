@@ -117,6 +117,22 @@ describe("the library model", () => {
     expect(model.sizeLabel(2_400_000)).toBe("2.3 MB");
   });
 
+  it("decision 104: a file the virus check blocked says so, even after it was read", () => {
+    const blocked = model.fromUpload(
+      upload(3, {
+        currentVersion: {
+          ...(upload(3).currentVersion ?? ({} as never)),
+          malwareScanStatus: "BLOCKED",
+          textExtractionStatus: "COMPLETED",
+        },
+      }),
+    );
+    expect(blocked.qRead).toBe("BLOCKED");
+    expect(model.Q_READ_LABEL.BLOCKED).toBe(
+      "This file was blocked by the virus check",
+    );
+  });
+
   it("filters, searches and sorts by recent, name and type", () => {
     const items = [
       model.fromUpload(upload(3, { title: "Zebra model" })),

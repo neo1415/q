@@ -86,6 +86,7 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   "Waiting for Q": "بانتظار Q",
   "Q couldn't read it": "تعذّر على Q قراءته",
   "Not virus-scanned yet": "لم يُفحص من الفيروسات بعد",
+  "This file was blocked by the virus check": "حُظر هذا الملف في فحص الفيروسات",
   // Document types
   "Pitch deck": "العرض التقديمي",
   "Financial model": "النموذج المالي",

@@ -79,9 +79,9 @@ export async function selectBlockedForRedrive(
 }
 
 /**
- * TODO (ADR 0042, reversal): when a real scanner is attached, every
- * NOT_SCANNED version is scanned. This is that selection; the scan job
- * that consumes it arrives with the scanner.
+ * ADR 0042, reversal: every NOT_SCANNED version, oldest first. The scan
+ * itself (decision 104) is documents/scan-backfill.ts, which selects the
+ * same rows with their storage identity.
  */
 export async function selectNotScannedForScan(
   sql: DatabaseExecutor,
