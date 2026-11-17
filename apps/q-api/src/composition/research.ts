@@ -543,7 +543,10 @@ export function composeResearch(
             }),
         }),
   });
-  const personSearch = createPersonSearch({ providers: personProviders });
+  const personSearch = createPersonSearch({
+    providers: personProviders,
+    ...(logger === undefined ? {} : { logger }),
+  });
   const people = createPersonLookup({
     known: knownIndex,
     search: {
@@ -600,6 +603,7 @@ export function composeResearch(
     providers: personProviders,
     // A web-found investor is stored for this asker so its Rehearse link opens.
     persist: (scope, input) => researched.remember(scope, input),
+    ...(logger === undefined ? {} : { logger }),
   });
 
   return {

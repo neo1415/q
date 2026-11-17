@@ -4,8 +4,10 @@ import type {
   IdentityCard,
 } from "@capital-q/contracts/q";
 import { NO_EXTERNAL_ENTITY_IMAGE } from "@capital-q/contracts/q";
+import type { Logger } from "@capital-q/observability";
 
 import type { PublicWebSearchHit } from "../contracts.js";
+import { carriesPrivateWord, privateOnlyTokens } from "../domain/egress.js";
 import {
   countryName,
   mentionedCountries,
@@ -60,6 +62,14 @@ export type CounterpartAsk = {
    * networks", "VCs"); empty: any kind. Public words, checked like regions.
    */
   readonly kinds?: readonly string[] | undefined;
+  /**
+   * The member's message that asked, and private material the run holds
+   * (documents, notes, memory it read). A term carrying a word only the
+   * private material holds is not sent (`privateOnlyTokens`); a word the
+   * member typed in this message stays.
+   */
+  readonly userText?: string | undefined;
+  readonly privateText?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -591,6 +601,8 @@ export function createCounterpartDiscovery(dependencies: {
   readonly persist?: DiscoveryPersist | undefined;
   readonly clock?: (() => number) | undefined;
   readonly webBudgetMs?: number | undefined;
+  /** Count-only notes (private terms withheld); never the words. */
+  readonly logger?: Logger | undefined;
 }): CounterpartDiscoverer {
   const now = dependencies.clock ?? (() => Date.now());
   const web =
@@ -609,8 +621,23 @@ export function createCounterpartDiscovery(dependencies: {
         DISCOVERY_COUNT.max,
         Math.max(1, Math.trunc(ask.count ?? DISCOVERY_COUNT.default)),
       );
+      // The narrow firewall on top of publicTerm: a free-text region or kind
+      // term carrying a word only private material this run holds never leaves.
+      const privateOnly = privateOnlyTokens({
+        userText: ask.userText ?? "",
+        privateText: ask.privateText,
+      });
+      let withheldPrivate = 0;
+      const termOf = (word: string | null | undefined): string | null => {
+        const term = publicTerm(word);
+        if (term !== null && carriesPrivateWord(term, privateOnly)) {
+          withheldPrivate += 1;
+          return null;
+        }
+        return term;
+      };
       const regionWords = ask.regions
-        .map((word) => publicTerm(word))
+        .map((word) => termOf(word))
         .filter((word): word is string => word !== null)
         .slice(0, 4);
       const countries = regionCountries(regionWords.join(" "));
@@ -618,14 +645,22 @@ export function createCounterpartDiscovery(dependencies: {
       // set cannot be filtered honestly, so only the web is asked.
       const unresolved = regionWords.length > 0 && countries.length === 0;
       const filter = countries.length > 0;
+      // Sector and stage are taxonomy reference values, public by what they
+      // are; a private document naming the same sector does not make it private.
       const sector = publicTerm(ask.sector);
       const stage = publicTerm(ask.stage);
       const regionAsked = regionWords.length > 0;
       const kindWords = (ask.kinds ?? [])
-        .map((word) => publicTerm(word))
+        .map((word) => termOf(word))
         .filter((word): word is string => word !== null)
         .slice(0, 3);
       const stems = kindStems(kindWords);
+      if (withheldPrivate > 0) {
+        dependencies.logger?.info(
+          { privateTerms: withheldPrivate },
+          "counterpart discovery terms withheld as private",
+        );
+      }
 
       const drafts = unresolved
         ? []

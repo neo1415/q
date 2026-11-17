@@ -127,6 +127,8 @@ export type DeepResearchCommand = {
    * Nigeria). Their words, never Q's.
    */
   readonly earlierUserText?: readonly string[] | undefined;
+  /** Private material the run holds; its private-only words never leave. */
+  readonly privateText?: readonly string[] | undefined;
   /** Epoch ms after which no new question starts. */
   readonly deadlineAt: number;
   readonly signal?: AbortSignal | undefined;
@@ -299,6 +301,9 @@ export function createDeepResearch(dependencies: {
               ...(command.earlierUserText === undefined
                 ? {}
                 : { earlierUserText: command.earlierUserText }),
+              ...(command.privateText === undefined
+                ? {}
+                : { privateText: command.privateText }),
               subject: null,
               freshness,
               extractCount: pages,

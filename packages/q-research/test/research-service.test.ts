@@ -140,8 +140,14 @@ describe("public web research service", () => {
       return;
     }
     // Egress: the marker never reached the provider in any form.
-    expect(provider.egressed()).not.toContain(PRIVATE_MARKER);
-    expect(outcome.query).not.toContain(PRIVATE_MARKER);
+    // Case-insensitive: tokenisation lowercases, so a lowercased marker is
+    // the same leak.
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      PRIVATE_MARKER.toLowerCase(),
+    );
+    expect(outcome.query.toLowerCase()).not.toContain(
+      PRIVATE_MARKER.toLowerCase(),
+    );
     expect(outcome.queryMinimised).toBe(true);
     // Budget (production 2026-10-25): what the question needs -- two
     // searches up front, each composed; three extracted (as asked), at
@@ -149,7 +155,9 @@ describe("public web research service", () => {
     expect(provider.searches.map((s) => s.freshness)).toEqual(["ANY", "ANY"]);
     expect(outcome.queries).toHaveLength(2);
     for (const search of provider.searches) {
-      expect(search.query).not.toContain(PRIVATE_MARKER);
+      expect(search.query.toLowerCase()).not.toContain(
+        PRIVATE_MARKER.toLowerCase(),
+      );
     }
     expect(outcome.entityResolution.status).toBe("RESOLVED");
     expect(outcome.budget).toEqual({

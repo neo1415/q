@@ -1082,6 +1082,12 @@ type AttachedNow = {
   readonly state: AttachedDocumentState;
 };
 
+/** A fact scope that is not private (ADR-001 network_visible, public_external). */
+const PUBLIC_FACT_SCOPE = /network_visible|public/iu;
+/** Bounds on the private text a run keeps for the outbound firewall. */
+const PRIVATE_READS_PER_RUN = 64;
+const PRIVATE_READ_CHARS = 20_000;
+
 /** The tools that reach the public web; a re-render ask is offered none. */
 const PUBLIC_WEB_TOOLS: ReadonlySet<string> = new Set([
   "research_public_web",
@@ -4344,6 +4350,32 @@ export function createModelGatewayQAnswer(
   const turnReads = new Map<string, Map<string, QToolCallOutcome>>();
   const turnReadKey = (proposal: { name: string; arguments: unknown }) =>
     `${proposal.name}|${canonical(proposal.arguments ?? {})}`;
+  /**
+   * Context Firewall, outbound (CQ-Q-RESEARCH-001 §9-§10): what this run
+   * read that is not public (anything above NETWORK_VISIBLE), as text.
+   * Never sent anywhere: the tools that search outside Capital Q use it
+   * only to withhold a word that only private material holds.
+   */
+  const privateReadsByRun = new Map<string, string[]>();
+  const notePrivateRead = (runId: string, outcome: QToolCallOutcome): void => {
+    if (
+      !outcome.result.ok ||
+      outcome.sensitivity === null ||
+      outcome.sensitivity === "PUBLIC" ||
+      outcome.sensitivity === "NETWORK_VISIBLE"
+    ) {
+      return;
+    }
+    const text = JSON.stringify(outcome.result.data ?? null);
+    const reads = privateReadsByRun.get(runId) ?? [];
+    if (reads.length >= PRIVATE_READS_PER_RUN) return;
+    reads.push(text.slice(0, PRIVATE_READ_CHARS));
+    privateReadsByRun.set(runId, reads);
+    if (privateReadsByRun.size > 256) {
+      const oldest = privateReadsByRun.keys().next().value;
+      if (oldest !== undefined) privateReadsByRun.delete(oldest);
+    }
+  };
   const tools: QToolPort = {
     offer: async (toolContext) => {
       const offered = await baseTools.offer(toolContext);
@@ -4519,6 +4551,7 @@ export function createModelGatewayQAnswer(
         );
         runCompanies.note(toolContext.runId, kept);
         runFits.note(toolContext.runId, kept);
+        notePrivateRead(toolContext.runId, kept);
         return aboutThemOnly(
           proposal,
           toolContext.runId,
@@ -4554,6 +4587,7 @@ export function createModelGatewayQAnswer(
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
       runActions.note(toolContext.runId, proposal.name, outcome);
+      notePrivateRead(toolContext.runId, outcome);
       if (
         outcome.result.ok &&
         (outcome.result.data as { readonly status?: unknown } | null)
@@ -4939,6 +4973,8 @@ export function createModelGatewayQAnswer(
       history: earlier,
       fetched: request.fetchedInConversation ?? [],
     });
+    // Filled once the run's context is assembled (below).
+    const privateContextText: string[] = [];
     const toolContext: QToolExecutionContext = {
       actor: request.actor,
       runId: request.runId,
@@ -4963,6 +4999,14 @@ export function createModelGatewayQAnswer(
           .filter((message) => message.role === "Q")
           .slice(-3)
           .map((message) => message.content),
+        // Private material this run holds (facts assembled for it beyond
+        // network-visible, recalled memory, private reads): read when a
+        // tool composes an outgoing search, so a word only it holds is
+        // withheld. Never sent.
+        privateText: () => [
+          ...privateContextText,
+          ...(privateReadsByRun.get(request.runId) ?? []),
+        ],
       },
       // What the turn is about, read by code (lead 2026-10-02): the offer
       // narrows to it; absent, the purpose's list as before.
@@ -5922,6 +5966,14 @@ export function createModelGatewayQAnswer(
             ),
       ]);
     const memory = recalled.text;
+    for (const fact of assembled.facts) {
+      if (!PUBLIC_FACT_SCOPE.test(fact.scope)) {
+        privateContextText.push(fact.statement);
+      }
+    }
+    if (typeof memory === "string" && memory.length > 0) {
+      privateContextText.push(memory);
+    }
     // Step 9: their own past words recall found, for the claim check.
     const recalledOwnWords = recalled.ownWords;
     // Q's own summaries of other conversations recall rendered: echoes,
@@ -8876,6 +8928,7 @@ export function createModelGatewayQAnswer(
                   earlierUserText:
                     toolContext.conversation?.earlierUserText ?? [],
                   shownText: toolContext.conversation?.earlierQText ?? [],
+                  privateText: toolContext.conversation?.privateText?.() ?? [],
                   signal: request.signal,
                   runId: request.runId,
                 })
@@ -11013,6 +11066,8 @@ export function createModelGatewayQAnswer(
                     earlierUserText:
                       toolContext.conversation?.earlierUserText ?? [],
                     shownText: toolContext.conversation?.earlierQText ?? [],
+                    privateText:
+                      toolContext.conversation?.privateText?.() ?? [],
                     signal: request.signal,
                     runId: request.runId,
                   })
@@ -11134,6 +11189,8 @@ export function createModelGatewayQAnswer(
                     earlierUserText:
                       toolContext.conversation?.earlierUserText ?? [],
                     shownText: toolContext.conversation?.earlierQText ?? [],
+                    privateText:
+                      toolContext.conversation?.privateText?.() ?? [],
                     signal: request.signal,
                     runId: request.runId,
                   }),
@@ -15680,6 +15737,7 @@ export function createModelGatewayQAnswer(
                 earlierUserText:
                   toolContext.conversation?.earlierUserText ?? [],
                 withheld: namesReadByRun(companiesRead),
+                privateText: toolContext.conversation?.privateText?.() ?? [],
                 signal: request.signal,
               });
         // Owner 23 Oct 2026: "compare them side by side" is a table, built

@@ -927,6 +927,13 @@ export type QToolExecutionContext = {
          * ("the top one"), checked against these words; nothing else.
          */
         readonly earlierQText?: readonly string[] | undefined;
+        /**
+         * Private material this run holds (facts beyond network-visible,
+         * recalled memory, private tool reads), as text, read when a tool
+         * composes a request that leaves Capital Q. Never sent: a word only
+         * it holds is withheld from that request (q-research egress).
+         */
+        readonly privateText?: (() => readonly string[]) | undefined;
       }
     | undefined;
   /**

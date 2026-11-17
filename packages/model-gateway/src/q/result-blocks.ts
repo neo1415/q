@@ -1425,6 +1425,8 @@ export type QPicturePort = {
      * person typed it: a picture search carries no identity.
      */
     readonly withheld?: readonly string[] | undefined;
+    /** Private material the run holds; its private-only words never leave. */
+    readonly privateText?: readonly string[] | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<QPictureBlock | null>;
 };
@@ -1444,6 +1446,8 @@ export type QPublicPicturePort = {
     readonly earlierUserText: readonly string[];
     /** What Q said to them: a name in it they pointed at may be searched. */
     readonly shownText?: readonly string[] | undefined;
+    /** Private material the run holds; its private-only words never leave. */
+    readonly privateText?: readonly string[] | undefined;
     readonly signal?: AbortSignal | undefined;
     /** The run asking: one image search a run (spend rule 2026-10-25). */
     readonly runId?: string | undefined;
@@ -1517,6 +1521,7 @@ export async function pictureBlock(input: {
   readonly userText: string;
   readonly earlierUserText: readonly string[];
   readonly withheld?: readonly string[] | undefined;
+  readonly privateText?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly waitMs?: number | undefined;
 }): Promise<QPictureBlock | null> {
@@ -1544,6 +1549,7 @@ export async function pictureBlock(input: {
         userText: input.userText,
         earlierUserText: input.earlierUserText,
         withheld: input.withheld ?? [],
+        privateText: input.privateText ?? [],
         signal,
       }),
       aborted,

@@ -118,6 +118,7 @@ export function createBriefPublicEntityTool(
         externalPersonId: input.externalPersonId,
         refresh: input.refresh,
         userText: context.conversation?.latestUserText,
+        privateText: context.conversation?.privateText?.(),
         signal: context.signal,
       });
       if (outcome.status !== "OK") {

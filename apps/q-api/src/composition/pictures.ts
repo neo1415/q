@@ -44,6 +44,7 @@ export function createQPictures(
         userText: input.userText,
         earlierUserText: input.earlierUserText,
         publicIdentity: [],
+        privateText: input.privateText,
       });
       if (!egress.ok) return null;
       const withheld = new Set(

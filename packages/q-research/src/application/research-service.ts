@@ -110,6 +110,12 @@ export type ResearchCommand = {
    */
   readonly earlierUserText?: readonly string[] | undefined;
   /**
+   * Private material this run holds (documents, figures, claims, memory,
+   * internal notes it read), as text. Never sent: a word only it holds is
+   * withheld from every query (`EgressInput.privateText`).
+   */
+  readonly privateText?: readonly string[] | undefined;
+  /**
    * What Q said to the person earlier in this conversation (a few messages,
    * most recent last). Only a name in it of whom the turn is about may leave
    * (`namesShown`), when they point back at it; never Q's other words.
@@ -494,6 +500,7 @@ function namedEntityOf(command: ResearchCommand): NamedEntity | null {
     earlierUserText: command.earlierUserText,
     publicIdentity: [],
     shownNames: namesShown([named], command.shownText),
+    privateText: command.privateText,
   });
   return composed.ok && composed.droppedTokens === 0
     ? { name: composed.query, domain: null, country: null }
@@ -888,6 +895,7 @@ export function createPublicWebResearchService(
           publicTerms: discoveryTerms,
           researchVocabulary:
             command.researchVocabulary === true || discovering,
+          privateText: command.privateText,
         });
       const egress = compose(command.requestedQuery);
       // Plan 2-4 differently-worded queries (web search 2026-10-06: one
@@ -898,11 +906,13 @@ export function createPublicWebResearchService(
       // country. Nothing here can add a word the policy would not.
       const planned: string[] = [];
       let dropped = 0;
+      let withheldPrivate = 0;
       let fellBack = false;
       const plan = (candidate: string, prepend = leadWithSubject) => {
         if (planned.length >= RESEARCH_BOUNDS.maxPlannedQueries) return;
         if (candidate.trim().length === 0) return;
         const composed = compose(candidate, prepend);
+        withheldPrivate += composed.privateTokens;
         if (!composed.ok) return;
         if (
           planned.some(
@@ -963,6 +973,13 @@ export function createPublicWebResearchService(
       // first round already (owner's spend rule, 2026-10-25).
       if (!focused && admittedNames.length === 0)
         plan(searchPhrase(command.userText), false);
+      if (withheldPrivate > 0) {
+        // Count only: the withheld words are private and are never logged.
+        logger?.info(
+          { runId: command.runId, privateTokens: withheldPrivate },
+          "research query words withheld as private",
+        );
+      }
       const primary = planned[0];
       if (primary === undefined) {
         return { status: "NO_PUBLIC_IDENTITY", message: NO_IDENTITY_MESSAGE };

@@ -73,6 +73,18 @@ export type EgressInput = {
    * query informative.
    */
   readonly researchVocabulary?: boolean | undefined;
+  /**
+   * Private material available to this run: what the run read under the
+   * person's authority that is not public (documents, management accounts,
+   * claims, memory, internal notes, other private reads), as text. Never
+   * sent and never a source of query words: it only lets composition
+   * recognise a word that is provably private. A word in it is withheld
+   * unless a public-eligible source also holds it (the person's own words
+   * this turn, the public identity, a name Q showed, public pages this run
+   * read, the research vocabulary, place names). Ambiguous words stay:
+   * this is a narrow firewall on top of the allowlist, not a second strip.
+   */
+  readonly privateText?: readonly string[] | undefined;
 };
 
 export type EgressOutcome =
@@ -83,11 +95,17 @@ export type EgressOutcome =
       readonly droppedTokens: number;
       /** True when the requested query could not be used and the identity alone was sent. */
       readonly fellBackToIdentity: boolean;
+      /**
+       * Of `droppedTokens`, how many were withheld because only private
+       * material this run holds contains them. A count, never the words.
+       */
+      readonly privateTokens: number;
     }
   | {
       readonly ok: false;
       readonly reason: "NOTHING_SAFE_TO_SEND";
       readonly droppedTokens: number;
+      readonly privateTokens: number;
     };
 
 /** Words that carry no information and may always travel. */
@@ -371,6 +389,78 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
 }
 
 /**
+ * Words only private material holds (`EgressInput.privateText`): in the
+ * run's private text and in no public-eligible source. Case-insensitive
+ * (tokenise lowercases both sides). A figure in private text is covered
+ * twice over: composition never sends a figure outside a public identity.
+ */
+export type PrivateWordsInput = Pick<
+  EgressInput,
+  | "userText"
+  | "privateText"
+  | "shownNames"
+  | "publicTerms"
+  | "researchVocabulary"
+> & { readonly publicIdentity?: readonly string[] | undefined };
+
+export function privateOnlyTokens(
+  input: PrivateWordsInput,
+): ReadonlySet<string> {
+  const texts = input.privateText ?? [];
+  if (texts.length === 0) return new Set();
+  const variants =
+    input.researchVocabulary === true
+      ? numberVariants
+      : (token: string): readonly string[] => [token];
+  const publicEligible = new Set<string>([
+    ...CONNECTIVES,
+    ...FILLER,
+    ...PRONOUNS,
+    ...RESEARCH_VOCABULARY,
+  ]);
+  const admit = (token: string) => {
+    for (const variant of numberVariants(token)) publicEligible.add(variant);
+  };
+  // The person's own words in the message that asked: theirs to search.
+  for (const token of tokenise(input.userText)) admit(token);
+  for (const term of [
+    ...(input.publicIdentity ?? []),
+    ...(input.shownNames ?? []),
+  ])
+    for (const token of tokenise(term)) admit(token);
+  for (const token of (input.publicTerms ?? []).flatMap((text) =>
+    tokenise(text),
+  ))
+    admit(token);
+  // Place names are public reference data, never a private fact.
+  for (const entry of COUNTRIES)
+    for (const term of [entry.name, ...entry.aliases])
+      for (const token of tokenise(term)) admit(token);
+  const withheld = new Set<string>();
+  for (const token of texts.flatMap((text) => tokenise(text))) {
+    if (publicEligible.has(token)) continue;
+    withheld.add(token);
+    // Its plural or singular too, unless a public source holds that form.
+    for (const variant of variants(token))
+      if (!publicEligible.has(variant)) withheld.add(variant);
+  }
+  return withheld;
+}
+
+/**
+ * True when any word of `text` is one only private material holds
+ * (`privateOnlyTokens`). For a caller that sends fixed public terms (a
+ * region, a sector) rather than a composed query.
+ */
+export function carriesPrivateWord(
+  text: string,
+  privateOnly: ReadonlySet<string>,
+): boolean {
+  if (privateOnly.size === 0) return false;
+  return tokenise(text).some((token) => privateOnly.has(token));
+}
+
+/**
  * The names among `candidates` that Q itself showed the person: every word
  * of the name is in Q's earlier messages in this conversation. A name the
  * reader resolved from "the top one" passes; one nobody said does not.
@@ -506,9 +596,17 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
     ),
   );
   const requested = tokenise(input.requestedQuery);
+  const privateOnly = privateOnlyTokens(input);
   const survivors: string[] = [];
   let dropped = 0;
+  let privateTokens = 0;
   for (const token of requested) {
+    if (privateOnly.has(token)) {
+      // Provably private: only private material this run holds says it.
+      dropped += 1;
+      privateTokens += 1;
+      continue;
+    }
     if (
       allowed.has(token) &&
       !identityTokens.has(token) &&
@@ -549,6 +647,7 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
         ok: false,
         reason: "NOTHING_SAFE_TO_SEND",
         droppedTokens: dropped,
+        privateTokens,
       };
     }
     parts = [...input.publicIdentity];
@@ -569,7 +668,13 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, RESEARCH_BOUNDS.maxQueryChars);
-  return { ok: true, query, droppedTokens: dropped, fellBackToIdentity };
+  return {
+    ok: true,
+    query,
+    droppedTokens: dropped,
+    fellBackToIdentity,
+    privateTokens,
+  };
 }
 
 /**

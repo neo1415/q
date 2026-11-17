@@ -61,6 +61,8 @@ export type PublicPictureSearch = {
      * whom they pointed at may be searched (`namesShown`).
      */
     readonly shownText?: readonly string[] | undefined;
+    /** Private material the run holds; its private-only words never leave. */
+    readonly privateText?: readonly string[] | undefined;
     readonly max?: number | undefined;
     readonly signal?: AbortSignal | undefined;
     /**
@@ -194,6 +196,7 @@ export function createPublicPictureSearch(input: {
       userText,
       earlierUserText,
       shownText,
+      privateText,
       max,
       signal,
       runId,
@@ -205,6 +208,7 @@ export function createPublicPictureSearch(input: {
         earlierUserText,
         publicIdentity: org.length > 0 ? [org] : [],
         shownNames: namesShown([name], shownText),
+        privateText,
       });
       // Only a name made wholly of the person's own words, or one Q showed
       // them and they pointed at, is searched.

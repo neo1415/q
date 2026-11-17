@@ -80,6 +80,7 @@ describe("composeEgressQuery", () => {
       query: "Kibo Health Systems",
       droppedTokens: 1,
       fellBackToIdentity: true,
+      privateTokens: 0,
     });
   });
 
@@ -93,6 +94,7 @@ describe("composeEgressQuery", () => {
       ok: false,
       reason: "NOTHING_SAFE_TO_SEND",
       droppedTokens: 3,
+      privateTokens: 0,
     });
   });
 

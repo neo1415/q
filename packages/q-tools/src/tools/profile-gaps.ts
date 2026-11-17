@@ -474,6 +474,7 @@ export function createFillProfileGapsTool(
           persistAsEvidence: true,
         },
         extractCount: 5,
+        privateText: context.conversation?.privateText?.(),
         signal: context.signal,
       });
       if (outcome.status !== "OK" || outcome.sources.length === 0) {

@@ -84,13 +84,16 @@ export {
 } from "./domain/url-safety.js";
 export {
   RESEARCH_VOCABULARY,
+  carriesPrivateWord,
   composeEgressQuery,
   containsAny,
   isConnective,
   namesShown,
+  privateOnlyTokens,
   searchPhrase,
   tokenise,
   type EgressInput,
+  type PrivateWordsInput,
   type EgressOutcome,
 } from "./domain/egress.js";
 export {

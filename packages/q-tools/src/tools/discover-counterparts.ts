@@ -166,6 +166,8 @@ export function createDiscoverCounterpartsTool(
         stage: input.stage,
         count: input.count,
         kinds: input.kinds,
+        userText: context.conversation?.latestUserText,
+        privateText: context.conversation?.privateText?.(),
         signal: context.signal,
       });
       return {

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import type { Logger } from "@capital-q/observability";
 import {
   NO_EXTERNAL_ENTITY_IMAGE,
   type ExternalPersonSource,
@@ -139,6 +140,12 @@ export type PersonSearchCommand = {
   readonly userText: string;
   readonly earlierUserText?: readonly string[] | undefined;
   /**
+   * Private material the run holds (documents, notes, memory it read): a
+   * word only it holds never leaves (`EgressInput.privateText`). A name the
+   * member typed in this message is theirs to search and stays.
+   */
+  readonly privateText?: readonly string[] | undefined;
+  /**
    * What Q said to them earlier in this conversation: a name in it of
    * whom they pointed at may be searched (`namesShown`).
    */
@@ -183,6 +190,8 @@ export type PersonSearchDependencies = {
   readonly clock?: (() => number) | undefined;
   /** A variant source; default is the local hook until the name module lands. */
   readonly variantsOf?: ((name: string) => readonly string[]) | undefined;
+  /** Count-only notes (private words withheld); never the words. */
+  readonly logger?: Logger | undefined;
 };
 
 /** A stable id per asker and person, so a repeat search finds the same record. */
@@ -334,6 +343,7 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
       const providers = dependencies.providers;
       // Every query leaves through the same egress allowlist as any other
       // research: only the member's own words and their spellings of the name.
+      let withheldPrivate = 0;
       const composed = planPersonQueries(
         spec,
         command.budget?.maxQueries ?? PERSON_SEARCH_BUDGET.maxQueries,
@@ -349,7 +359,9 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
           ],
           publicIdentity: [],
           shownNames: namesShown([spec.name], command.shownText),
+          privateText: command.privateText,
         });
+        withheldPrivate += egress.privateTokens;
         return egress.ok
           ? [
               {
@@ -359,6 +371,12 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
             ]
           : [];
       });
+      if (withheldPrivate > 0) {
+        dependencies.logger?.info(
+          { privateTokens: withheldPrivate },
+          "person search query words withheld as private",
+        );
+      }
       const overall = new AbortController();
       const stop = () => overall.abort();
       if (command.signal?.aborted === true) stop();

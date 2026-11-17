@@ -501,6 +501,7 @@ export function createResearchPublicWebTool(
         entityName: input.entityName,
         userText: context.conversation?.latestUserText ?? "",
         earlierUserText: context.conversation?.earlierUserText,
+        privateText: context.conversation?.privateText?.(),
         shownText: context.conversation?.earlierQText,
         subject: grant.subject,
         freshness: input.freshness,

@@ -295,9 +295,15 @@ describe("public_web.search", () => {
     expect(JSON.stringify(provider.searches)).not.toContain(
       "alpharobotics.example",
     );
-    expect(provider.egressed()).not.toContain(COMPANY_A);
-    expect(provider.egressed()).not.toContain(MARKERS.founder);
-    expect(provider.egressed()).not.toContain(FOUNDER_MARKER);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      COMPANY_A.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      MARKERS.founder.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      FOUNDER_MARKER.toLowerCase(),
+    );
     expect(data["entityResolution"]).toEqual({
       status: "NOT_APPLICABLE",
       candidates: [],
@@ -380,6 +386,38 @@ describe("public_web.search", () => {
     expect(provider.searches).toHaveLength(0);
   });
 
+  it("A2: a word only the run's private material holds never leaves, even from their earlier messages", async () => {
+    const { port: p, provider } = harness({
+      companies: companiesWithWebsite(),
+    });
+    const base = contextFor(actorA, founderPlan);
+    const outcome = await search(
+      {
+        query: "Alpha Robotics AMINA okafor Runway Bluefinch funding news",
+        companyId: COMPANY_A,
+      },
+      {
+        ...base,
+        conversation: {
+          latestUserText: "Any funding news on us online?",
+          earlierUserText: [
+            "Our runway is 7 months; Amina Okafor joins as CFO; Project Bluefinch",
+          ],
+          privateText: () => [
+            "Board pack: Amina Okafor joins as CFO. Runway 7 months. Internal note: Project Bluefinch.",
+          ],
+        },
+      },
+      p,
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    const sent = provider.egressed().toLowerCase();
+    for (const word of ["amina", "okafor", "runway", "bluefinch"])
+      expect(sent).not.toContain(word);
+    expect(sent).toContain("alpha robotics");
+    expect(sent).toContain("funding news");
+  });
+
   it("A: the founder's private words in the model's query never leave; the query is the person's words plus the declared identity", async () => {
     const {
       port: p,
@@ -409,15 +447,23 @@ describe("public_web.search", () => {
     const query = result.data["query"] as string;
     expect(query).toContain("alpha robotics");
     expect(query).toContain("markets");
-    expect(query).not.toContain(FOUNDER_MARKER);
+    expect(query.toLowerCase()).not.toContain(FOUNDER_MARKER.toLowerCase());
     expect(query).not.toContain("2.4m");
-    expect(query).not.toContain("Dangote");
+    expect(query.toLowerCase()).not.toContain("dangote");
     expect(query).not.toContain("revenue");
-    expect(provider.egressed()).not.toContain(FOUNDER_MARKER);
-    expect(provider.egressed()).not.toContain("Dangote");
-    expect(provider.egressed()).not.toContain(MARKERS.founder);
-    expect(provider.egressed()).not.toContain(COMPANY_A);
-    expect(provider.egressed()).not.toContain(actorA.tenantId);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      FOUNDER_MARKER.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain("dangote");
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      MARKERS.founder.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      COMPANY_A.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      actorA.tenantId.toLowerCase(),
+    );
     // Sources read about the founder's own company are the company's evidence.
     const sources = result.data["sources"] as { recordedAsEvidence: boolean }[];
     expect(sources.length).toBeGreaterThan(0);
@@ -496,9 +542,15 @@ describe("public_web.search", () => {
     expect(result.data["status"]).toBe("OK");
     expect(provider.searches.length).toBeGreaterThan(0);
     expect(provider.egressed().toLowerCase()).toContain("alpha robotics");
-    expect(provider.egressed()).not.toContain(FOUNDER_MARKER);
-    expect(provider.egressed()).not.toContain(MARKERS.founder);
-    expect(provider.egressed()).not.toContain(COMPANY_A);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      FOUNDER_MARKER.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      MARKERS.founder.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      COMPANY_A.toLowerCase(),
+    );
     // Read about their own company: its evidence, as with a website.
     expect(evidence.sources.every((s) => s.companyId === COMPANY_A)).toBe(true);
   });
@@ -522,7 +574,9 @@ describe("public_web.search", () => {
     expect(result.data["queries"]).toContain(
       "warehouse robotics market nigeria",
     );
-    expect(provider.egressed()).not.toContain(MARKERS.founder);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      MARKERS.founder.toLowerCase(),
+    );
   });
 
   it("B: an investor about its own organisation sends the public display name and never its private constraints", async () => {
@@ -544,10 +598,16 @@ describe("public_web.search", () => {
     };
     expect(result.data["status"]).toBe("OK");
     expect(result.data["query"]).toContain("beacon ventures");
-    expect(provider.egressed()).not.toContain(INVESTOR_MARKER);
-    expect(provider.egressed()).not.toContain("250k");
-    expect(provider.egressed()).not.toContain(MARKERS.investor);
-    expect(provider.egressed()).not.toContain(INVESTOR_B);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      INVESTOR_MARKER.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain("250k");
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      MARKERS.investor.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      INVESTOR_B.toLowerCase(),
+    );
   });
 
   // Owner live test 7 Nov (R3; CQ-Q-RESEARCH-001 §9 amended, DECISIONS
@@ -572,8 +632,12 @@ describe("public_web.search", () => {
     expect(outcome.status).toBe("SUCCEEDED");
     const sent = provider.egressed().toLowerCase();
     expect(sent).toContain("ama mensah beacon ventures ghana");
-    expect(provider.egressed()).not.toContain(INVESTOR_MARKER);
-    expect(provider.egressed()).not.toContain(MARKERS.investor);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      INVESTOR_MARKER.toLowerCase(),
+    );
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      MARKERS.investor.toLowerCase(),
+    );
   });
 
   it("R3: about someone else, their own name never leaves", async () => {
@@ -600,7 +664,7 @@ describe("public_web.search", () => {
     expect(outcome.failureCode).toBe("NOT_AVAILABLE");
     expect(JSON.stringify(outcome)).not.toContain(MARKERS.crossTenant);
     expect(provider.searches).toHaveLength(0);
-    expect(provider.egressed()).not.toContain("Hidden");
+    expect(provider.egressed().toLowerCase()).not.toContain("hidden");
   });
 
   it("C: a company that does not exist reads exactly like one that is not disclosed", async () => {
@@ -639,7 +703,9 @@ describe("public_web.search", () => {
     const sources = result.data["sources"] as { recordedAsEvidence: boolean }[];
     expect(sources.every((s) => !s.recordedAsEvidence)).toBe(true);
     expect(evidence.sources).toHaveLength(0);
-    expect(provider.egressed()).not.toContain(COMPANY_B_NETWORK);
+    expect(provider.egressed().toLowerCase()).not.toContain(
+      COMPANY_B_NETWORK.toLowerCase(),
+    );
   });
 
   it("D: an instruction inside a page comes back as a quoted excerpt with a risk count, never as a call", async () => {

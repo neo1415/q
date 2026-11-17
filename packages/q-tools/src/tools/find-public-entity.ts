@@ -145,6 +145,7 @@ export function createFindPublicEntityTool(
         role: input.role,
         userText: context.conversation?.latestUserText ?? "",
         earlierUserText: context.conversation?.earlierUserText,
+        privateText: context.conversation?.privateText?.(),
         shownText: context.conversation?.earlierQText,
         freshSearch: input.freshSearch,
         signal: context.signal,

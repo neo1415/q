@@ -49,6 +49,8 @@ export type PersonBriefRequest = {
   /** Search again and build a new brief version. */
   readonly refresh?: boolean | undefined;
   readonly userText?: string | undefined;
+  /** Private material the run holds; its private-only words never leave. */
+  readonly privateText?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -212,6 +214,7 @@ export function createPersonLookup(dependencies: {
         userId: scope.userId,
         name: request.name,
         userText: request.userText ?? request.name,
+        privateText: request.privateText,
         freshSearch: true,
         signal: request.signal,
       });

@@ -718,11 +718,17 @@ describe("answer seam: public-web research", () => {
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
     expect(tools.executed).toHaveLength(1);
-    expect(modelCalls(tools.executed)[0]?.context.conversation).toEqual({
+    const { privateText, ...conversation } = modelCalls(tools.executed)[0]
+      ?.context.conversation ?? {
+      latestUserText: "",
+    };
+    expect(conversation).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
       earlierUserText: [],
       earlierQText: [],
     });
+    // Read only to withhold private-only words from outgoing searches.
+    expect(typeof privateText).toBe("function");
     expect(stages).toEqual([
       "PREPARING_ANALYSIS",
       "SEARCHING_PUBLIC_SOURCES",
