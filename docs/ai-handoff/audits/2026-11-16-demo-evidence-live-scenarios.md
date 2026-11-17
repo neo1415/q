@@ -335,3 +335,19 @@ Read-only SQL afterwards:
 2. **Stray navigation offers** on A and B ("The relationship / company profile is ready to open"), runs `48402c75`, `e7191400`.
 3. **G contradiction left uncorrected** (run `a4b412eb`: contradicted 1, corrected 0); the visible answer attributes £92,340 burn and 4.2 months to "the 12 months to October 2026".
 4. **Classification fallback** still occurs (1–3 failed model calls in `48402c75`, `2c18f531`, `a7d36d00`, `2a37c265`, `ecc1adf8`, `a4b412eb`).
+
+## Check on `2fb61c5dc` (17 Nov, 05:33 UTC)
+
+**Warm-up:** confirmed. A `WARMUP` row now appears in `ai_ops.model_usage`.
+
+**Hiring plan: REGRESSION (gutted, not wrong).** Thames Arc, conversation `fecf46ac`.
+
+- "List Halyard Security's 2027 hiring plan by role" (run `f65877e3`) showed only "That is 15 planned hires in total…".
+- The claim check found tables 4, but bound 0, contradicted 1, unplaced 4, with 1 sentence dropped. It counted `toolResults 0, documentRows 0` although code had pre-read the plan (`company.data_room.document.pages.read` on `c0d522b1`).
+- The follow-up (run `7e866011`) was also dropped to boilerplate.
+
+**Fix in progress:**
+
+- every document the run read counts as a source and gets the rows fact before the model answers;
+- binding works on page-read layouts;
+- an unambiguous contradicted count is corrected, not dropped.
