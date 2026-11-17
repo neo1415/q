@@ -7,6 +7,7 @@ import {
   DILIGENCE_QUESTIONS_PATH,
   DiligenceRequestAboutSchema,
   diligenceQuestionsText,
+  questionToCompany,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyKeyHeaderSchema,
   InvestorMandateDtoSchema,
@@ -281,12 +282,30 @@ const SEND_QUESTIONS = defineAppAction<
       ],
       names: "RELATIONSHIP",
     },
-    toCanonical: (tool, context) =>
-      Promise.resolve({
+    toCanonical: (tool, context) => {
+      // What the company receives is a question to them, never Q's own
+      // finding about its records (live 17 Nov 2026, run a3ea0ea5: "The
+      // records do not establish exactly who pays Ajopot's 1% payout fee."
+      // was put on the card word for word). A finding that names what is
+      // unknown becomes that question; one that cannot is refused back to
+      // Q, so the card only ever shows what would really be sent.
+      const questions = tool.questions.map(questionToCompany);
+      const asked = questions.flatMap((question) =>
+        question === null ? [] : [question],
+      );
+      if (asked.length !== questions.length) {
+        return Promise.resolve(
+          refusal(
+            'Each question is sent to the company word for word. Write it as a question to them about what is unknown (for example "Who pays the 1% payout fee?"), never as your own finding about the records.',
+            { forModel: true },
+          ),
+        );
+      }
+      return Promise.resolve({
         relationshipId: tool.relationship,
         idempotencyKey: context.idempotencyKey,
         input: {
-          questions: tool.questions,
+          questions: asked,
           ...(tool.resolves === undefined ? {} : { resolves: tool.resolves }),
           ...(tool.about === undefined
             ? {}
@@ -299,7 +318,8 @@ const SEND_QUESTIONS = defineAppAction<
                 }),
               }),
         },
-      }),
+      });
+    },
   },
 });
 

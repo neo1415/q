@@ -97,6 +97,10 @@ export type PendingDecisionPort = {
       readonly status: PendingDecisionStatus;
       /** The other side receives it: waiting reads "ready to send". */
       readonly outward?: boolean | undefined;
+      /** The provider tool that prepares this kind of change, if any. */
+      readonly tool?: string | undefined;
+      /** What the card showed would be sent or changed, word for word. */
+      readonly preview?: string | undefined;
     }[]
   >;
   /** Whether the words decide the question asked (DECISION_READER). */
@@ -169,7 +173,48 @@ export type PendingTurnReading = {
       }
     | null
     | undefined;
+  /** The action the reader named (a provider tool name), if any. */
+  readonly askedAction?: string | null | undefined;
+  /** The kind of hand the reader read (NAVIGATE, …), if any. */
+  readonly hand?: string | null | undefined;
 };
+
+/**
+ * A turn the reader read as a request in its own right (a TOOL_REQUEST, a
+ * named action or a hand) rather than a reply.
+ */
+function asRequest(turn: PendingTurnReading): boolean {
+  return turn.namesAction || !REPLY_KINDS.has(turn.kind);
+}
+
+/**
+ * Live 17 Nov 2026 (conversation 9995dcca, Zino Aviation x Ajopot): with
+ * Q's card to send a question on screen, "Yeah, I approved what he wanted
+ * to send" and "please go ahead and ask that question and send it to them"
+ * were read as requests in their own right -- the second as a move to the
+ * CRM -- so the card was never consulted: Q said "I didn't prepare that",
+ * then opened the pipeline. An affirmative follow-up to Q's own card is
+ * about that card. A request may still be one when it asks for nothing
+ * but that card's own action: no hand but a guessed page move, and no
+ * action named but the card's own. Whether it points at the card is the
+ * decision reader's reading of meaning (restatesCard), never words.
+ */
+export function followsUpCard(
+  turn: PendingTurnReading | null | undefined,
+  card: { readonly tool?: string | undefined },
+): boolean {
+  if (turn === null || turn === undefined || !turn.addressedToQ) return false;
+  const hand = turn.hand ?? null;
+  if (hand !== null && hand !== "NAVIGATE") return false;
+  const asked = turn.askedAction ?? null;
+  // It names an action this reading does not say: not known to be this one.
+  if (turn.namesAction && asked === null && hand === null) return false;
+  return asked === null || (card.tool !== undefined && asked === card.tool);
+}
+
+/** Q's own offer to prepare an ended card again, word for word. */
+export const PREPARE_AGAIN_OFFER =
+  "Want me to prepare it again for your approval?";
 
 /** The turn kinds that answer what Q asked; anything else is its own turn. */
 const REPLY_KINDS: ReadonlySet<string> = new Set([
@@ -231,11 +276,15 @@ export function aboutTheCard(
   read: DecisionReading,
   turn: PendingTurnReading | null | undefined,
   utterance: string,
-  card: { readonly summary: string },
+  card: { readonly summary: string; readonly tool?: string | undefined },
 ): boolean {
   if (namedIn(utterance, [card]) !== null) return true;
   if (turn === undefined || turn === null) return true;
-  if (turn.namesAction || !REPLY_KINDS.has(turn.kind)) return false;
+  // A request is about the card only when it asks for nothing but it and
+  // the reading says it points at it (live 17 Nov 2026, 9995dcca).
+  if (asRequest(turn)) {
+    return followsUpCard(turn, card) && restatesCard(read);
+  }
   return (
     read.pointsAtIt === true ||
     read.onlyDecision === true ||
@@ -282,7 +331,21 @@ export type PendingDecisionOutcome =
   /** Nothing to decide here: answer the turn as any other. */
   | { readonly kind: "NONE" }
   /** Decided, or a question back: this line is the whole reply. */
-  | { readonly kind: "REPLY"; readonly line: string }
+  | {
+      readonly kind: "REPLY";
+      readonly line: string;
+      /**
+       * The one offer the line closes with, to be recorded with the reply
+       * so the next yes binds to it (preparedAgain). Absent: none.
+       */
+      readonly offer?:
+        | {
+            readonly action: string;
+            readonly request: string;
+            readonly said: string;
+          }
+        | undefined;
+    }
   /**
    * Answer the turn as any other, then say this: the real status of a
    * change the person spoke to without it being decided (or a decline
@@ -364,6 +427,8 @@ type DecisionProposal = {
   readonly summary: string;
   readonly status: PendingDecisionStatus;
   readonly outward?: boolean | undefined;
+  readonly tool?: string | undefined;
+  readonly preview?: string | undefined;
 };
 
 /**
@@ -536,10 +601,20 @@ export function startPendingDecision(
       // The reading decides by meaning (v65); the words are the fallback
       // when the turn was not read.
       const reply = turn?.replyTo ?? null;
+      // A request that asks for nothing but the one waiting card's own
+      // action goes to the readings of meaning below (live 17 Nov 2026,
+      // 9995dcca: "please go ahead and … send it to them" opened the CRM).
+      const followUp =
+        stage.only !== undefined &&
+        turn !== null &&
+        turn !== undefined &&
+        asRequest(turn) &&
+        followsUpCard(turn, stage.only);
       if (
-        reply !== null
+        !followUp &&
+        (reply !== null
           ? reply.kind !== "WAITING_CARD"
-          : !aboutWaitingCards(input, stage.allPending)
+          : !aboutWaitingCards(input, stage.allPending))
       ) {
         controller.abort();
         return { kind: "NONE" };
@@ -975,28 +1050,97 @@ async function answeredAlready(
   readFor: (question: string) => Promise<DecisionReading | null>,
 ): Promise<PendingDecisionOutcome> {
   const latest = stage.latest;
-  // A request of its own is answered as one, never as "already done".
-  if (
-    turn !== undefined &&
-    turn !== null &&
-    (!turn.addressedToQ || turn.namesAction || !REPLY_KINDS.has(turn.kind))
-  ) {
+  if (turn !== undefined && turn !== null && !turn.addressedToQ) {
     return { kind: "NONE" };
   }
+  // A request of its own is answered as one, never as "already done";
+  // unless it asks for nothing but this card's own action (followsUpCard),
+  // when what became of the card is the answer (live 17 Nov 2026).
+  const request = turn !== undefined && turn !== null && asRequest(turn);
+  if (request && !followsUpCard(turn, latest)) return { kind: "NONE" };
+  // Q's last line offered to prepare this card again: their yes is that
+  // offer's, bound by the conversation core, not this card's status again.
+  const lastQ =
+    [...input.recentTurns].reverse().find((t) => t.role === "Q")?.text ?? "";
+  if (lastQ.trim().endsWith(PREPARE_AGAIN_OFFER)) return { kind: "NONE" };
   const read = await readFor(stage.question);
-  if (!approvesByWords(read) || read?.remainder != null) {
-    return { kind: "NONE" };
-  }
+  const takesIt = request
+    ? read?.decision === "YES" && restatesCard(read)
+    : approvesByWords(read) && read?.remainder == null;
+  if (!takesIt) return { kind: "NONE" };
   const progress =
     port.progress === undefined
       ? null
       : await port.progress(input.context, latest.proposalId).catch(() => null);
+  if (progress !== null) return { kind: "REPLY", line: progress };
+  const again = preparedAgain(latest);
+  if (again !== null) return again;
   return {
     kind: "REPLY",
     line:
-      progress ??
-      (latest.status === "SAVED"
+      latest.status === "SAVED"
         ? `Already approved and done: ${named(latest.summary)}.`
-        : statusLine(latest.status, latest.summary, latest.outward === true)),
+        : statusLine(latest.status, latest.summary, latest.outward === true),
+  };
+}
+
+/**
+ * A card that ended without going through (expired, declined, altered, or
+ * approved and failed), followed up with a yes: what the record says
+ * became of it, and one offer to prepare exactly what it showed again, for
+ * a new approval. The offer is recorded with the reply, so the next yes
+ * prepares that card through its own tool and Approval Engine; nothing is
+ * prepared, approved or sent by this line. Null: not such a card, or what
+ * it showed is not known.
+ */
+export function preparedAgain(card: {
+  readonly summary: string;
+  readonly status: PendingDecisionStatus;
+  readonly outward?: boolean | undefined;
+  readonly tool?: string | undefined;
+  readonly preview?: string | undefined;
+}): Extract<PendingDecisionOutcome, { kind: "REPLY" }> | null {
+  if (
+    card.tool === undefined ||
+    card.preview === undefined ||
+    card.preview.trim().length === 0
+  ) {
+    return null;
+  }
+  const what = named(card.summary);
+  const nothing =
+    card.outward === true ? "nothing was sent" : "nothing changed";
+  let happened: string;
+  switch (card.status) {
+    case "EXPIRED":
+      happened = `That card expired before it was approved, so ${nothing}: ${what}.`;
+      break;
+    case "DECLINED":
+      happened = `That card was declined, so ${nothing}: ${what}.`;
+      break;
+    case "CHANGED":
+      happened = `That card was altered after it was prepared, so it was not approved and ${nothing}: ${what}.`;
+      break;
+    case "NOT_SAVED":
+      happened = `That card was approved but didn't go through, so ${nothing}: ${what}.`;
+      break;
+    case "PENDING":
+    case "SAVING":
+    case "SAVED":
+    case "CARD_ONLY":
+      return null;
+  }
+  const preview = card.preview.replace(/\s+/gu, " ").trim();
+  return {
+    kind: "REPLY",
+    line: `${happened} ${PREPARE_AGAIN_OFFER}`,
+    offer: {
+      action: card.tool,
+      request: `${what}, exactly as the card showed it: ${preview}`.slice(
+        0,
+        400,
+      ),
+      said: PREPARE_AGAIN_OFFER,
+    },
   };
 }

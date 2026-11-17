@@ -169,7 +169,11 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import { createPartialFindingsReader } from "../policy/partial-findings.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
-import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
+import {
+  claimsChangeStatus,
+  withoutActionTalk,
+  withoutStatusTalk,
+} from "./action-talk.js";
 import { createSubjectAnnouncer } from "./artifact-preview.js";
 import {
   createRunCompanies,
@@ -987,6 +991,7 @@ import {
   codeUncertaintyOffer,
   existingRequestFor,
   offerBacking,
+  offerRequestFor,
   requestStateLine,
   stageLimitNote,
   stageLimitOf,
@@ -9802,7 +9807,11 @@ export function createModelGatewayQAnswer(
         // moment it was written, before any check. A finding stating a
         // count the document's rows contradict is not shown; the stored
         // message leaves it out the same way.
-        if (claims.contradictsCounts(parsed.data.statement)) {
+        if (
+          claims.contradictsCounts(parsed.data.statement) ||
+          // A change's fate is the record's to say (live 17 Nov 2026).
+          claimsChangeStatus(parsed.data.statement)
+        ) {
           liveWithheld.add(key);
           return;
         }
@@ -14115,8 +14124,13 @@ export function createModelGatewayQAnswer(
         // findings went unchecked when the extras did not join).
         {
           const before = analyst.findings.length;
+          // What became of one of Q's own changes is never a finding (live
+          // 17 Nov 2026: "The question … was approved and sent.", truth
+          // class Q_INFERENCE, no evidence): the record says it.
           const held = analyst.findings.filter(
-            (finding) => !claims.contradictsCounts(finding.statement),
+            (finding) =>
+              !claims.contradictsCounts(finding.statement) &&
+              !claimsChangeStatus(finding.statement),
           );
           findingsChecked.examined += before;
           findingsChecked.dropped += before - held.length;
@@ -14582,6 +14596,12 @@ export function createModelGatewayQAnswer(
                   kind: "BOUND",
                   offer: {
                     ...bound,
+                    request: offerRequestFor({
+                      tool: bound.action,
+                      request: bound.request,
+                      about: decision.about,
+                      company: subject?.name ?? null,
+                    }),
                     about: decision.about,
                     ...(subject === null
                       ? {}
@@ -14596,7 +14616,12 @@ export function createModelGatewayQAnswer(
                   kind: "BOUND",
                   offer: {
                     action: decision.tool,
-                    request: bound.request,
+                    request: offerRequestFor({
+                      tool: decision.tool,
+                      request: bound.request,
+                      about: decision.about,
+                      company: subject?.name ?? null,
+                    }),
                     said: decision.said,
                     about: decision.about,
                     ...(subject === null
@@ -15229,8 +15254,25 @@ export function createModelGatewayQAnswer(
               receipt.kind !== "ACTION" ||
               receipt.actionType.startsWith("app.diligence."),
           );
+        // Live 17 Nov 2026 (conversation 9995dcca, runs 6e9480e3 and
+        // 2402ea97): the model's own proposalStatus flag was not set, so
+        // "it was approved and sent" and, two minutes later, "the fee
+        // question was never sent" both stood, from inference, about one
+        // card. Whether a change of Q's was prepared, approved or sent is
+        // said from the records this turn read (receipts), whenever the
+        // draft says it at all -- never from the model's flag alone.
+        const claimsRecordStatus =
+          !preparedThisTurn &&
+          receipts.some((receipt) => receipt.kind === "ACTION") &&
+          claimsChangeStatus(guarded.text);
+        if (claimsRecordStatus) {
+          logger?.info(
+            { qRunId: request.runId },
+            "q's draft said what became of a change; the record says it instead",
+          );
+        }
         const statusLine =
-          analyst.proposalStatus &&
+          (analyst.proposalStatus || claimsRecordStatus) &&
           approvalLine === null &&
           !preparedThisTurn &&
           !onlyDiligence &&
@@ -15312,6 +15354,10 @@ export function createModelGatewayQAnswer(
         const askedChart = chartAsked ? chartAskOutcome([]) : null;
         const couldNot =
           parityGap !== null &&
+          // The record's status line answers a turn about one of Q's own
+          // changes; "I didn't prepare that" beside it contradicted a card
+          // Q had prepared (live 17 Nov 2026, run a7ea1414).
+          !(claimsRecordStatus && statusLine !== null) &&
           actedLines.length === 0 &&
           madeLines.length === 0 &&
           gapsSaid === null &&

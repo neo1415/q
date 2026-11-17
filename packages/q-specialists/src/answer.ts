@@ -7026,7 +7026,19 @@ export function createSpecialistQAnswer(
                 );
                 return { kind: "NONE" } as const;
               });
-            if (decided.kind === "REPLY") return decided.line;
+            if (decided.kind === "REPLY") {
+              // The line's one offer (prepare an ended card again) is
+              // recorded with this run, so the next yes binds to exactly
+              // it (C3), and is kept durable with the core.
+              if (decided.offer !== undefined) {
+                recordOffer(conversationId, {
+                  kind: "ACTION",
+                  runId: request.runId,
+                  ...decided.offer,
+                });
+              }
+              return decided.line;
+            }
             if (decided.kind === "ANSWER_THEN") {
               if (decided.before !== null) {
                 await recordAnswer(request, conversationId, decided.before);
@@ -8616,6 +8628,20 @@ export function createSpecialistQAnswer(
                 (read.handOver ?? null) !== null,
               // v65: whether it decides a waiting card at all, by meaning.
               replyTo: read.replyTo ?? null,
+              // Live 17 Nov 2026: which action or hand made it a request,
+              // so a follow-up asking for nothing but the card's own action
+              // is resolved to the card (followsUpCard).
+              askedAction:
+                typeof read.askedAction === "string" &&
+                read.askedAction.length > 0
+                  ? read.askedAction
+                  : (appActionOf(read)?.tool ?? null),
+              hand:
+                (read.tool ?? null) !== null
+                  ? (read.tool?.kind ?? null)
+                  : (read.handOver ?? null) !== null
+                    ? "HAND_OVER"
+                    : null,
             },
       );
       if (line !== null) return recordAnswer(request, conversationId, line);

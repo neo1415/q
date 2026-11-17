@@ -206,3 +206,34 @@ describe("send_questions_to_founder carries what the questions resolve (slice 5)
     });
   });
 });
+
+describe("send_questions_to_founder sends a question to the company, never Q's finding (replay 9995dcca)", () => {
+  // Production card c02fa2c8 (run a3ea0ea5, 17 Nov 2026) carried exactly
+  // this as the question to Ajopot.
+  const STORED =
+    "The records do not establish exactly who pays Ajopot's 1% payout fee.";
+
+  it("turns the stored finding into the open question it names", async () => {
+    const { ports } = portsWith({ side: "INVESTOR", open: false });
+    const parsed = questionsTool.input.parse({
+      relationship: RELATIONSHIP,
+      questions: [STORED],
+    });
+    expect(await questionsTool.toCanonical(parsed, context, ports)).toEqual({
+      relationshipId: RELATIONSHIP,
+      idempotencyKey: context.idempotencyKey,
+      input: { questions: ["Who pays Ajopot's 1% payout fee?"] },
+    });
+  });
+
+  it("refuses, back to Q, a finding that names no question to ask", async () => {
+    const { ports } = portsWith({ side: "INVESTOR", open: false });
+    const parsed = questionsTool.input.parse({
+      relationship: RELATIONSHIP,
+      questions: ["Ajopot's payout fee is not evidenced in the records."],
+    });
+    const out = await questionsTool.toCanonical(parsed, context, ports);
+    expect(out).toMatchObject({ forModel: true });
+    expect(JSON.stringify(out)).toMatch(/question to them/u);
+  });
+});

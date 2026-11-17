@@ -145,6 +145,17 @@ export const OUTWARD_ACTION_TYPES: ReadonlySet<string> = new Set([
   "meeting.cancel",
 ]);
 
+/**
+ * The provider tool that prepares a declared app action's card ("app.
+ * diligence.questions.send" -> send_questions_to_founder). Undefined: not
+ * a declared app action with a tool of its own.
+ */
+export function preparingToolOf(actionType: string): string | undefined {
+  if (!actionType.startsWith("app.")) return undefined;
+  const name = actionType.slice("app.".length);
+  return DECLARED.find((candidate) => candidate.name === name)?.tool?.name;
+}
+
 function cardOnlyAction(action: DeclaredAction): boolean {
   return (
     (action.consequence !== undefined &&
@@ -716,7 +727,22 @@ export function createPendingDecisionPort(dependencies: {
   return {
     ...(recentElsewhere === undefined ? {} : { recentElsewhere }),
     ...(progress === undefined ? {} : { progress }),
-    proposals: (context) => proposals.inConversation(context),
+    // Each card with the tool that prepares its kind and what it showed,
+    // so an ended card followed up with a yes can be offered again exactly
+    // (pending-decision preparedAgain; live 17 Nov 2026, 9995dcca).
+    proposals: async (context) =>
+      (await proposals.inConversation(context)).map((one) => {
+        const tool =
+          one.proposal === undefined
+            ? undefined
+            : preparingToolOf(one.proposal.actionType);
+        const preview = one.proposal?.preview;
+        return {
+          ...one,
+          ...(tool === undefined ? {} : { tool }),
+          ...(preview === undefined ? {} : { preview }),
+        };
+      }),
     read: (input) =>
       decisions.read({
         question: input.question,

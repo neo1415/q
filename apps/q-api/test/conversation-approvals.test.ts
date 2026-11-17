@@ -16,8 +16,18 @@ import {
   type DecisionRelay,
   keepsItsCard,
   plainProposalStatus,
+  preparingToolOf,
   type ConversationApprovalDependencies,
 } from "../src/composition/conversation-approvals.js";
+
+describe("the tool that prepares a card's kind (replay 9995dcca)", () => {
+  it("names the questions card's tool, and nothing for an undeclared kind", () => {
+    expect(preparingToolOf("app.diligence.questions.send")).toBe(
+      "send_questions_to_founder",
+    );
+    expect(preparingToolOf("q.instruction.grant")).toBeUndefined();
+  });
+});
 
 /**
  * The port behind approval by conversation (live test 2026-09-27 #1, #2).

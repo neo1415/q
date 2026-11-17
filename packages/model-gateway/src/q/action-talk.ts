@@ -128,6 +128,25 @@ export function withoutActionTalk(
  */
 const STATUS_TALK =
   /\b(?:approv\w*|pending|waiting for (?:you|your)|saved yet|not (?:been )?saved|(?:is|was|has been|have been) (?:saved|applied|updated|changed|done)|needs? your (?:ok|okay|yes|go-ahead|confirmation|sign-off))\b/iu;
+
+/**
+ * A sentence in Q's own drafted answer that says whether one of its
+ * changes was prepared, approved or sent (live 17 Nov 2026, conversation
+ * 9995dcca): "I can see it was approved and sent" at 15:08 and "No--I
+ * didn't send that question… the fee question was never sent" at 15:10,
+ * both written by the model from inference (Q_INFERENCE, no evidence)
+ * about the same card. Only what Q did with something of its own is
+ * matched -- a question, message, request, card or "it" -- or Q in
+ * the first person; a company fact ("the term sheet was sent in March")
+ * is not.
+ */
+const CHANGE_STATUS_CLAIM =
+  /\b(?:it\s+(?:was|has been|got|is)\s+(?:(?:already|now|just|never|not)\s+)*(?:been\s+)?(?:sent|approved|delivered)|(?:question|questions|message|request|card)\b[^.;:!?\n]{0,80}?\b(?:(?:was|were|has been|have been|got|is|are)\s+(?:(?:already|now|just|never|not)\s+)*(?:been\s+)?|(?:wasn['’]t|weren['’]t|hasn['’]t been|haven['’]t been)\s+)(?:sent|approved|delivered)|I\s+(?:(?:didn['’]?t|did not|never|haven['’]?t|have not|have|already|just)\s+)*(?:send|sent|prepare|prepared|approve|approved))\b/iu;
+
+/** Q's draft says what became of one of its changes (CHANGE_STATUS_CLAIM). */
+export function claimsChangeStatus(answer: string): boolean {
+  return CHANGE_STATUS_CLAIM.test(answer);
+}
 const OFFER =
   /^(?:(?:do you )?want me to|shall i|should i|would you like me to|can i)\b[^?]*\?$/iu;
 
@@ -151,7 +170,7 @@ export function withoutStatusTalk(answer: string): StatusTalkResult {
           removed += 1;
           return "";
         }
-        if (STATUS_TALK.test(trimmed)) {
+        if (STATUS_TALK.test(trimmed) || CHANGE_STATUS_CLAIM.test(trimmed)) {
           removed += 1;
           return "";
         }

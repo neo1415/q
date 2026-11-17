@@ -203,3 +203,50 @@ export function diligenceQuestionsText(questions: readonly string[]): {
       .join("\n"),
   };
 }
+
+/**
+ * A question to a company, as it will receive it (live 17 Nov 2026,
+ * conversation 9995dcca, run a3ea0ea5). Q offered to "put this question to
+ * Ajopot" and the card read "1. The records do not establish exactly who
+ * pays Ajopot's 1% payout fee.": Q's own finding about its records, sent
+ * word for word to the founder. What goes to them is the open question
+ * itself ("Who pays Ajopot's 1% payout fee?").
+ *
+ * Deterministic and model-free. A finding that names what is not known
+ * ("…do not establish who pays X", "it is unclear whether X") becomes that
+ * question; anything already put as a question or an ask is kept as
+ * written. Null: the text is still Q's own account of its evidence ("the
+ * records…", "not evidenced"), which no company is ever sent.
+ */
+const ASKED_WORD = "(who|whom|whose|what|which|whether|how|when|where|why)";
+const NOT_ESTABLISHED =
+  "(?:it\\s+is\\s+(?:not\\s+(?:yet\\s+)?(?:clear|known|established|evidenced|recorded|stated)|unclear|unknown)" +
+  "|(?:(?:the|our|available|existing|current)\\s+)*(?:records?|evidence|documents?|materials?|data(?:\\s+room)?|deck|sources?|filings?|disclosures?)" +
+  "\\s+(?:do(?:es)?\\s+not|don['’]t|doesn['’]t)\\s+(?:yet\\s+)?(?:establish|show|confirm|say|state|specify|indicate|evidence|explain|record|make\\s+clear))";
+const FINDING_AS_QUESTION = new RegExp(
+  `^(?:.*?[,;]\\s*(?:but|and|yet|though)\\s+)?${NOT_ESTABLISHED}\\s+(?:exactly\\s+|clearly\\s+|precisely\\s+)?${ASKED_WORD}\\b\\s*(.+?)[\\s.!]*$`,
+  "iu",
+);
+/** Q describing its own evidence: never a question to anyone. */
+const FINDING_VOICE =
+  /\b(?:(?:the|our|available|capital q['’]s|q['’]s)\s+(?:records?|evidence|materials|sources)\b|not\s+(?:yet\s+)?(?:established|evidenced|verified)\b|(?:is|are|remains?)\s+(?:unverified|unclear|unknown)\b)/iu;
+
+export function questionToCompany(text: string): string | null {
+  const said = text
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/^\d{1,2}[.)]\s+/u, "")
+    .replace(/^["“'‘]+|["”]+$/gu, "")
+    .trim();
+  if (said.length === 0) return null;
+  const found = FINDING_AS_QUESTION.exec(said);
+  const asked = found?.[1]?.toLowerCase();
+  const rest = found?.[2]?.trim();
+  if (asked !== undefined && rest !== undefined && rest.length > 0) {
+    return asked === "whether"
+      ? `Can you confirm whether ${rest}?`
+      : `${asked.charAt(0).toUpperCase()}${asked.slice(1)} ${rest}?`;
+  }
+  if (said.endsWith("?")) return said;
+  return FINDING_VOICE.test(said) ? null : said;
+}

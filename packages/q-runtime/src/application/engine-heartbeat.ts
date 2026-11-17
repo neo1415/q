@@ -145,14 +145,64 @@ export function createRunEngineHeartbeat(options: {
     expire: tracked(inner.expire),
   };
 
+  /**
+   * Of these runs, the ones whose durable status says no engine holds them
+   * any more: paused for a person, or ended. Live 17 Nov 2026 (run
+   * a3ea0ea5, conversation 9995dcca): the Approval Engine moves a run to
+   * AWAITING_APPROVAL inside its own proposal transaction, not through
+   * this tracked runtime, so the run stayed held and watched; 99 s after
+   * its card was shown it was failed as RUN_EXPIRED, which withdrew the
+   * proposal and revoked its approval while the card was still on screen.
+   * The record, not this process's memory, says whether a run is in flight.
+   * A read that fails says nothing: the run is treated as before.
+   */
+  async function notInFlight(
+    runIds: readonly string[],
+  ): Promise<ReadonlySet<string>> {
+    if (runIds.length === 0) return new Set();
+    try {
+      const rows = await sql<{ id: string; status: string }[]>`
+        select id::text as id, status
+          from q_runtime.runs
+         where id = any(${runIds as string[]}::uuid[])`;
+      return new Set(
+        rows
+          .filter((row) => NOT_IN_FLIGHT.has(row.status))
+          .map((row) => row.id),
+      );
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, runs: runIds.length },
+        "q run status not read before the progress deadline; treated as in flight",
+      );
+      return new Set();
+    }
+  }
+
   /** Fails each held, watched run that has stopped making progress. */
   async function failStalled(): Promise<void> {
     if (stall === undefined) return;
     const afterMs = stall.afterMs ?? RUN_STALL_AFTER_MS;
-    for (const { runId, silentMs } of stall.progress.stalled(afterMs)) {
+    const stalled = stall.progress.stalled(afterMs);
+    const paused = await notInFlight(
+      stalled.flatMap(({ runId }) => (held.has(runId) ? [runId] : [])),
+    );
+    for (const { runId, silentMs } of stalled) {
       const ref = held.get(runId);
       if (ref === undefined) {
         stall.progress.release(runId);
+        continue;
+      }
+      if (paused.has(runId)) {
+        // Waiting on a person (or already ended): nothing is stuck. It is
+        // released, so it is neither heartbeated nor watched; a resume
+        // through the runtime takes it up again.
+        held.delete(runId);
+        stall.progress.release(runId);
+        logger?.info(
+          { qRunId: runId, silentMs },
+          "q run past its progress deadline is paused or ended by its record; released, not failed",
+        );
         continue;
       }
       if (failing.has(runId)) continue;

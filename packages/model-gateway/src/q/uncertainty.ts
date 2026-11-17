@@ -1,5 +1,6 @@
 import {
   isMatchedRelationshipState,
+  questionToCompany,
   UNCERTAINTY_STANDINGS,
 } from "@capital-q/contracts";
 import {
@@ -747,6 +748,23 @@ export function decideUncertaintyOffer(input: {
       };
 }
 
+/**
+ * The request a kept or re-bound offer carries. An offer to put a question
+ * to the company that resolves a recorded open item asks code's question,
+ * derived from that item, never the analyst's wording of its own finding
+ * (live 17 Nov 2026, run 9c6688a0). Any other offer keeps its request.
+ */
+export function offerRequestFor(input: {
+  readonly tool: string;
+  readonly request: string;
+  readonly about: UncertaintyAbout | undefined;
+  readonly company: string | null;
+}): string {
+  return input.tool === SEND_QUESTIONS_TOOL && input.about !== undefined
+    ? vehicleRequest(input.tool, input.company, input.about.statement)
+    : input.request;
+}
+
 /** What code's own offer through a vehicle asks of the company. */
 function vehicleRequest(
   tool: string,
@@ -754,13 +772,26 @@ function vehicleRequest(
   statement: string,
 ): string {
   const them = company ?? "the company";
+  const open = statement.replace(/\s+/gu, " ").trim();
+  if (tool === SEND_QUESTIONS_TOOL) {
+    // Live 17 Nov 2026 (run 9c6688a0, then a3ea0ea5): this request read
+    // "Put this question to Ajopot: The records do not establish exactly
+    // who pays Ajopot's 1% payout fee." and the yes sent that finding as
+    // the question. The question offered is the one addressed to them,
+    // derived from the open item; one that cannot be derived is asked for
+    // in those terms, never handed over as Q's finding.
+    const question = questionToCompany(open);
+    return (
+      question !== null && question.endsWith("?")
+        ? `Put this question to ${them}: "${question}"`
+        : `Put a question to ${them}, addressed to them, that asks what this leaves open (never this finding itself): ${open}`
+    ).slice(0, 300);
+  }
   const what =
     tool === DILIGENCE_DOCUMENTS_TOOL
       ? `Ask ${them} for a document that would settle this`
-      : tool === DATA_ROOM_REQUEST_TOOL
-        ? `Ask ${them} for the on-request data-room document that would settle this`
-        : `Put this question to ${them}`;
-  return `${what}: ${statement.replace(/\s+/gu, " ").trim()}`.slice(0, 300);
+      : `Ask ${them} for the on-request data-room document that would settle this`;
+  return `${what}: ${open}`.slice(0, 300);
 }
 
 /**
