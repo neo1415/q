@@ -360,3 +360,7 @@ Thames Arc, conversation `c5147662`. Screenshots: `evidence/2026-11-17-check-4d7
 - "And how many start in the first quarter?": "Four … three public-sector account managers and one information security and assurance manager." Examined 2, bound 2, contradicted 0.
 
 With the document rows in front of the model, it now writes the right counts itself. Nothing needed correcting or dropping.
+
+## Nixo figures on `d9d2e2f42` (17 Nov, 12:14 UTC): PASS
+
+Savanna, new wording. "What's Nixo burning each month, and what runway does that leave?" → "Nixo's monthly burn is $125,800 for October 2026, according to its management accounts and KPI pack. At that month's burn, the same documents report 8.8 months of runway from $1,107,750 of month-end cash. These are unaudited company management figures, not independently verified." The run took 12.0 s, on the transaction pooler at pool 10. On `be260a584` the same question had been answered "not established".
