@@ -296,6 +296,9 @@ export function companyDeckFiguresFacts(
   return facts;
 }
 
+const FIGURES_LIMIT_SOURCE =
+  "Capital Q's record of what Q read for this answer";
+
 /**
  * A4: what an unlisted figure means. Q is given the figures it could read
  * for this person; one it was not given is unknown to Q, never absent from
@@ -315,11 +318,31 @@ export function companyFiguresLimitFact(
      * and refused or failed), or NOT_ASKED (not offered to this run).
      */
     readonly deck: "READ" | "NOT_AVAILABLE" | "NOT_ASKED";
+    /**
+     * Live 17 Nov 2026 (Savanna on Nixo): the titles of documents the
+     * company shared with them whose pages were read for this turn. Without
+     * them this fact told the model that any figure not in the profile or
+     * deck (burn, runway) was unknown to Q, beside the management accounts
+     * that state both; the answer said "not established".
+     */
+    readonly documents?: readonly string[] | undefined;
   },
 ): AuthorisedFact {
+  const documents = (reads.documents ?? []).filter(
+    (title) => title.trim().length > 0,
+  );
   const read = [
     ...(reads.published ? ["its published figures on Capital Q"] : []),
     ...(reads.deck === "READ" ? ["the figures its pitch deck states"] : []),
+    ...(documents.length === 0
+      ? []
+      : [
+          `the pages read of the documents ${companyName} shared with them (${documents
+            .map((title) => `"${title.slice(0, 120)}"`)
+            .join(
+              ", ",
+            )}; DATA ROOM DOCUMENT facts: answer a figure they state from them first)`,
+        ]),
   ];
   const what =
     read.length === 0
@@ -334,6 +357,48 @@ export function companyFiguresLimitFact(
     statement: `${what} Any figure about ${companyName} not given here (burn, runway, payroll or any other) is unknown to Q, not absent: say you can't see or verify it, and never that ${companyName}, its profile or its deck has no such figure.${deck}`,
     truthClass: "UNKNOWN",
     evidenceStatus: "NO_EVIDENCE",
-    source: "Capital Q's record of what Q read for this answer",
+    source: FIGURES_LIMIT_SOURCE,
   };
+}
+
+/**
+ * Live 17 Nov 2026 (Savanna on Nixo): the limit fact is written when a
+ * company's profile, figures and deck land, before (or beside) the reads
+ * of the documents it shared with them. Once those reads land, each limit
+ * fact of a company whose shared pages were read is written again naming
+ * them, so the facts never say a figure the documents state is unknown.
+ * Code's own fact, matched by its own source and wording; nothing else is
+ * touched.
+ */
+export function withSharedDocumentsInLimits(
+  facts: readonly AuthorisedFact[],
+  documentsRead: ReadonlyMap<string, readonly string[]>,
+): readonly AuthorisedFact[] {
+  if (documentsRead.size === 0) return facts;
+  return facts.map((fact) => {
+    if (
+      fact.source !== FIGURES_LIMIT_SOURCE ||
+      fact.scope !== "COMPANY_FIGURES"
+    ) {
+      return fact;
+    }
+    const match =
+      /^(?:What Q could read of|Q could not read) (.+?)'s figures for this person\b/u.exec(
+        fact.statement,
+      );
+    const name = match?.[1];
+    if (name === undefined) return fact;
+    const documents = documentsRead.get(name.toLowerCase());
+    if (documents === undefined || documents.length === 0) return fact;
+    if (fact.statement.includes("DATA ROOM DOCUMENT facts")) return fact;
+    return companyFiguresLimitFact(name, {
+      published: fact.statement.includes("its published figures on Capital Q"),
+      deck: fact.statement.includes("the figures its pitch deck states")
+        ? "READ"
+        : fact.statement.includes("Its pitch deck was not available to Q")
+          ? "NOT_AVAILABLE"
+          : "NOT_ASKED",
+      documents,
+    });
+  });
 }

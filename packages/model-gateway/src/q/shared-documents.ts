@@ -501,6 +501,125 @@ export function sharedPageRange(input: {
   return null;
 }
 
+/**
+ * Live 17 Nov 2026 (production 4f542f5f6, Savanna on Nixo): "What's Nixo's
+ * monthly burn and runway?" read page 1 of Nixo's management accounts and
+ * of its revenue breakdown, then answered "not established". Which pages
+ * carry an asked figure is a property of the document, not of page 1: a
+ * pack may open with its summary (Tensorgate's, Halyard's, Nixo's do) or
+ * with a basis-of-preparation note, and a balance sheet sits on its last
+ * page. So after the bounded first read, code looks for each asked measure
+ * in the text it read; a measure found on none of those pages sends the
+ * read on, a bounded few pages further in the same document, and only the
+ * pages that carry a missing measure are added. A measure still on no page
+ * read is then genuinely not in what was read (said so, never guessed).
+ *
+ * Each measure is a question word and the words a page states it with.
+ * Code's own reading of the text, any layout; never a value.
+ */
+const MEASURES: readonly {
+  readonly asked: RegExp;
+  readonly stated: RegExp;
+}[] = [
+  { asked: /\bburn(?:s|ing|ed|\s+rate)?\b/iu, stated: /\bburn\b/iu },
+  { asked: /\brunway\b/iu, stated: /\brunway\b/iu },
+  { asked: /\bcash\b/iu, stated: /\bcash\b/iu },
+  {
+    asked: /\b(?:revenue|mrr|arr|sales|turnover)\b/iu,
+    stated: /\b(?:revenue|mrr|arr|sales|turnover)\b/iu,
+  },
+  { asked: /\bmargins?\b/iu, stated: /\bmargins?\b/iu },
+  {
+    asked: /\b(?:profit|loss(?:es)?|p&l|net\s+result)\b/iu,
+    stated: /\b(?:profit|loss|net\s+result)\b/iu,
+  },
+  {
+    asked: /\b(?:expenses?|costs?|spend(?:ing)?|opex)\b/iu,
+    stated: /\b(?:expenses?|costs?|payments)\b/iu,
+  },
+  { asked: /\bpayroll\b/iu, stated: /\bpayroll\b/iu },
+  { asked: /\bebitda\b/iu, stated: /\bebitda\b/iu },
+  { asked: /\bheadcount\b/iu, stated: /\bheadcount\b/iu },
+  {
+    asked:
+      /\b(?:balance\s+sheet|assets|liabilit(?:y|ies)|equity|receivables|payables)\b/iu,
+    stated:
+      /\b(?:balance\s+sheet|assets|liabilit(?:y|ies)|equity|receivables|payables)\b/iu,
+  },
+];
+
+/** The measures a question asks for, by index into MEASURES. */
+export function askedMeasures(question: string): readonly number[] {
+  return MEASURES.flatMap((measure, index) =>
+    measure.asked.test(question) ? [index] : [],
+  );
+}
+
+/** The asked measures no page read states (by index into MEASURES). */
+export function measuresMissing(
+  question: string,
+  pages: readonly { readonly text: string }[],
+): readonly number[] {
+  return askedMeasures(question).filter(
+    (index) =>
+      !pages.some((page) => MEASURES[index]?.stated.test(page.text) === true),
+  );
+}
+
+/** The pages that state at least one of these measures. */
+export function pagesCarrying<P extends { readonly text: string }>(
+  pages: readonly P[],
+  measures: readonly number[],
+): readonly P[] {
+  return pages.filter((page) =>
+    measures.some((index) => MEASURES[index]?.stated.test(page.text) === true),
+  );
+}
+
+/** At most this many further pages of one document, once per turn. */
+export const FIGURES_FURTHER_PAGES = 3;
+
+/**
+ * The further pages to read of a document whose first read carried none
+ * of the missing measures; null when the document has no further page.
+ */
+export function furtherPageRange(input: {
+  readonly readTo: number;
+  readonly pageCount: number | null;
+}): { readonly fromPage: number; readonly toPage: number } | null {
+  if (input.pageCount === null || input.pageCount <= input.readTo) return null;
+  return {
+    fromPage: input.readTo + 1,
+    toPage: Math.min(input.pageCount, input.readTo + FIGURES_FURTHER_PAGES),
+  };
+}
+
+/** A read_document_pages result's pages and page count, as data. */
+export function pagesOfRead(data: unknown): {
+  readonly pages: readonly { readonly page: number; readonly text: string }[];
+  readonly pageCount: number | null;
+} {
+  if (typeof data !== "object" || data === null) {
+    return { pages: [], pageCount: null };
+  }
+  const raw: unknown = Reflect.get(data, "pages");
+  const count: unknown = Reflect.get(data, "pageCount");
+  const pages = Array.isArray(raw)
+    ? (raw as readonly unknown[]).flatMap((page) => {
+        if (typeof page !== "object" || page === null) return [];
+        const number: unknown = Reflect.get(page, "page");
+        const words: unknown = Reflect.get(page, "text");
+        return typeof number === "number" && typeof words === "string"
+          ? [{ page: number, text: words }]
+          : [];
+      })
+    : [];
+  return {
+    pages,
+    pageCount: typeof count === "number" ? count : null,
+  };
+}
+
 /** A sentence that explains a movement, in the document's own words. */
 const EXPLAINS =
   /\b(?:adds?|added|includ(?:es?|ed|ing)|due\s+to|because|reflects?|reflecting|one[-\s]off|reserved|offset|driven|higher|lower|increase[sd]?|decrease[sd]?|rose|fell|timing|deferred|non[-\s]recurring|note)\b/iu;

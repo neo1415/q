@@ -552,6 +552,7 @@ import {
   companyFiguresLimitFact,
   onScreenCompanyFact,
   ownCompanySnapshotFact,
+  withSharedDocumentsInLimits,
 } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import type { CheckedLineNeed } from "./uncertainty.js";
@@ -563,7 +564,11 @@ import {
   asksForFigures,
   asksToReconcile,
   documentDeckDifferenceFact,
+  furtherPageRange,
   listedDocumentsOf,
+  measuresMissing,
+  pagesCarrying,
+  pagesOfRead,
   readableListed,
   sharedDocumentFor,
   sharedDocumentReads,
@@ -4651,6 +4656,13 @@ export function createModelGatewayQAnswer(
      * with them was read for this turn (the answer is drawn from it).
      */
     readonly sharedRead?: boolean | undefined;
+    /**
+     * Live 17 Nov 2026 (Savanna on Nixo): by company name (lower case),
+     * the titles of the shared documents whose pages were read for this
+     * turn, so the figures-limit fact names them (company-fact.ts).
+     */
+    readonly sharedReadTitles?:
+      readonly (readonly [string, readonly string[]])[] | undefined;
   };
   const NO_WIDE_READS: WideReads = {
     namedCompanies: [],
@@ -6822,12 +6834,25 @@ export function createModelGatewayQAnswer(
       readonly reads: readonly {
         readonly document: ListedDocument;
         readonly outcome: QToolCallOutcome | null;
+        /**
+         * Live 17 Nov 2026 (Savanna on Nixo): the further pages read when
+         * no page of the first read stated an asked measure, and which
+         * measures were still missing then (shared-documents.ts MEASURES).
+         */
+        readonly further?:
+          | {
+              readonly outcome: QToolCallOutcome | null;
+              readonly missing: readonly number[];
+            }
+          | undefined;
       }[];
     };
     const sharedStarted = new Map<string, Promise<SharedRead>>();
     /** The deck each company's read gave (for the difference fact). */
     const deckByCompany = new Map<string, unknown>();
     let sharedWasRead = false;
+    /** By company name (lower case): the shared documents read for it. */
+    const sharedReadTitles = new Map<string, string[]>();
     const sharedReconcile =
       asksToReconcile(latest.content) || readAsComparison(request);
     const sharedRange = sharedPageRange({
@@ -6915,7 +6940,61 @@ export function createModelGatewayQAnswer(
                 .catch(() => null),
             })),
           );
-          return { listing, documents, reads };
+          // Live 17 Nov 2026 (Savanna on Nixo): a figures read is bounded
+          // to the first pages; an asked measure none of the pages read
+          // states sends the read on, a few pages further into the most
+          // evidential document that has more (once per company), before
+          // anything is said to be not established.
+          if (sharedRange === null) return { listing, documents, reads };
+          const firstRead = reads.map((read) =>
+            read.outcome !== null && read.outcome.result.ok
+              ? pagesOfRead(read.outcome.result.data)
+              : { pages: [], pageCount: null },
+          );
+          const missing = measuresMissing(
+            latest.content,
+            firstRead.flatMap((read) => read.pages),
+          );
+          if (missing.length === 0) return { listing, documents, reads };
+          const at = firstRead.findIndex(
+            (read) =>
+              furtherPageRange({
+                readTo: sharedRange.toPage,
+                pageCount: read.pageCount,
+              }) !== null,
+          );
+          const target = reads[at];
+          const further =
+            target === undefined
+              ? null
+              : furtherPageRange({
+                  readTo: sharedRange.toPage,
+                  pageCount: firstRead[at]?.pageCount ?? null,
+                });
+          if (target === undefined || further === null) {
+            return { listing, documents, reads };
+          }
+          const outcome = await tools
+            .execute(
+              {
+                callId: `q-shared-document-${String(index)}-further`,
+                name: "read_document_pages",
+                arguments: {
+                  companyId,
+                  documentId: target.document.documentId,
+                  ...further,
+                },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          return {
+            listing,
+            documents,
+            reads: reads.map((read, readAt) =>
+              readAt === at ? { ...read, further: { outcome, missing } } : read,
+            ),
+          };
         })(),
       );
     };
@@ -6981,7 +7060,7 @@ export function createModelGatewayQAnswer(
           DATA_ROOM_FACTS_MAX_CHARS / (reads.length * started.length),
         );
         let differenceGiven = false;
-        for (const { document, outcome } of reads) {
+        for (const { document, outcome, further } of reads) {
           if (outcome === null) continue;
           namedCompanyCalls.push({
             toolName: outcome.toolName,
@@ -7004,6 +7083,46 @@ export function createModelGatewayQAnswer(
           if (facts.length === 0) continue;
           sharedWasRead = true;
           namedCompanies.push(...facts);
+          const titles = sharedReadTitles.get(name.toLowerCase()) ?? [];
+          if (!titles.includes(document.title)) titles.push(document.title);
+          sharedReadTitles.set(name.toLowerCase(), titles);
+          // Live 17 Nov 2026 (Savanna on Nixo): the further pages read for
+          // a measure the first pages did not state; only the pages that
+          // state one are given (the rest stay one read away).
+          if (further !== undefined && further.outcome !== null) {
+            namedCompanyCalls.push({
+              toolName: further.outcome.toolName,
+              providerName: "read_document_pages",
+              status: further.outcome.status,
+              failureCode: further.outcome.failureCode,
+              latencyMs: further.outcome.latencyMs,
+            });
+            if (further.outcome.result.ok) {
+              const data = further.outcome.result.data;
+              const carried = pagesCarrying(
+                pagesOfRead(data).pages,
+                further.missing,
+              );
+              if (
+                carried.length > 0 &&
+                typeof data === "object" &&
+                data !== null
+              ) {
+                namedCompanies.push(
+                  ...dataRoomDocumentFacts(
+                    { ...data, pages: carried },
+                    {
+                      companyId,
+                      documentId: document.documentId,
+                      open: false,
+                      shared: true,
+                    },
+                    share,
+                  ),
+                );
+              }
+            }
+          }
           // Live rerun on bab915357 (turn 2): the deck's figures and the
           // document's, side by side with their periods and the document's
           // own notes, so a difference is explained from the document.
@@ -7420,6 +7539,7 @@ export function createModelGatewayQAnswer(
             ...(sharedDocumentsByRun.get(request.runId) ?? new Map()),
           ],
           sharedRead: sharedWasRead,
+          sharedReadTitles: [...sharedReadTitles],
         };
         // RC3: kept for a short follow-up of this conversation, with the
         // reads that produced it (provenance); facts keep their own.
@@ -9068,35 +9188,41 @@ export function createModelGatewayQAnswer(
               };
         const ownDocuments = await ownDocumentsRead;
         retrievedPassages = assembled.facts.length;
-        const heldFacts: readonly AuthorisedFact[] = [
-          // Their readiness first when it leads this answer.
-          ...(ownReadiness === null ? [] : [ownReadiness]),
-          ...(ownHeldBack === null ? [] : [ownHeldBack]),
-          ...ownDocuments,
-          ...(ownTeam === null ? [] : [ownTeam]),
-          ...w.onboardingFacts,
-          ...(ownProfile === null ? [] : [ownProfile]),
-          ...(ownCompany === null ? [] : [ownCompany]),
-          ...ownFigures,
-          ...(onScreenCompany === null ? [] : [onScreenCompany]),
-          ...onScreenCompanyFigures,
-          ...w.namedCompanies,
-          ...(onScreenDaily === null ? [] : [onScreenDaily]),
-          ...(onScreenDocument === null ? [] : [onScreenDocument]),
-          ...attachedDocuments,
-          ...compareFacts,
-          ...(chartFact === null ? [] : [chartFact]),
-          ...dataRoomFacts,
-          ...gateqFacts,
-          ...onScreenPage,
-          ...(w.ownDay === null ? [] : [w.ownDay]),
-          ...(w.arrival === null ? [] : [w.arrival]),
-          ...(relationship === null ? [] : [relationship]),
-          ...(w.ownStanding === null ? [] : [w.ownStanding]),
-          ...(w.ownIndex === null ? [] : [w.ownIndex]),
-          ...(pitchMoment === null ? [] : [pitchMoment]),
-          ...assembled.facts,
-        ];
+        // Live 17 Nov 2026 (Savanna on Nixo): a figures-limit fact names
+        // the shared documents read for its company (company-fact.ts).
+        const heldFacts: readonly AuthorisedFact[] =
+          withSharedDocumentsInLimits(
+            [
+              // Their readiness first when it leads this answer.
+              ...(ownReadiness === null ? [] : [ownReadiness]),
+              ...(ownHeldBack === null ? [] : [ownHeldBack]),
+              ...ownDocuments,
+              ...(ownTeam === null ? [] : [ownTeam]),
+              ...w.onboardingFacts,
+              ...(ownProfile === null ? [] : [ownProfile]),
+              ...(ownCompany === null ? [] : [ownCompany]),
+              ...ownFigures,
+              ...(onScreenCompany === null ? [] : [onScreenCompany]),
+              ...onScreenCompanyFigures,
+              ...w.namedCompanies,
+              ...(onScreenDaily === null ? [] : [onScreenDaily]),
+              ...(onScreenDocument === null ? [] : [onScreenDocument]),
+              ...attachedDocuments,
+              ...compareFacts,
+              ...(chartFact === null ? [] : [chartFact]),
+              ...dataRoomFacts,
+              ...gateqFacts,
+              ...onScreenPage,
+              ...(w.ownDay === null ? [] : [w.ownDay]),
+              ...(w.arrival === null ? [] : [w.arrival]),
+              ...(relationship === null ? [] : [relationship]),
+              ...(w.ownStanding === null ? [] : [w.ownStanding]),
+              ...(w.ownIndex === null ? [] : [w.ownIndex]),
+              ...(pitchMoment === null ? [] : [pitchMoment]),
+              ...assembled.facts,
+            ],
+            new Map(w.sharedReadTitles ?? []),
+          );
         // Live f65877e3 / 7e866011 (17 Nov 2026): every document text the
         // run holds -- a retrieved passage, code's own pre-read of a shared
         // or on-screen document, an attached one, and the pages an earlier
