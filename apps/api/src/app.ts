@@ -829,6 +829,9 @@ export function createApp(
         : {
             deckAudience: deckAudiencePort(modules.evidence),
             documentChanges: documentChangePort(modules.evidence),
+            // A founder withdraws one of their company's claims: Evidence
+            // authorises (their organisation's subject, evidence.record).
+            claimWithdrawals: modules.evidence,
           }),
       ...(modules.qWork === undefined ? {} : { qWork: modules.qWork }),
       ...(modules.workforceJobs === undefined

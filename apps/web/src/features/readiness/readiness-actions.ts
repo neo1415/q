@@ -7,6 +7,7 @@ import {
   answerReadinessQuestion,
   dismissReadinessQuestion,
   setReadinessActionState,
+  withdrawClaim,
   type ApiSession,
 } from "@capital-q/api-client";
 
@@ -105,5 +106,30 @@ export async function setAsideQuestionAction(
   return run(
     (session) => dismissReadinessQuestion(session, questionId, key),
     (out) => ({ ok: true, remaining: out.remaining }),
+  );
+}
+
+const Reason = z.string().trim().min(1).max(400);
+
+/**
+ * Withdraw one of their company's claims, with their reason: a new
+ * revision marked withdrawn, never a delete. The API decides whose claim
+ * it is; the key is made once per confirm, so a retry withdraws once.
+ */
+export async function withdrawClaimAction(
+  claimId: string,
+  reason: string,
+  key: string,
+): Promise<ReadinessResult> {
+  const why = Reason.safeParse(reason);
+  if (!Id.safeParse(claimId).success || !Key.safeParse(key).success) {
+    return { ok: false, message: "That claim isn't on your record any more." };
+  }
+  if (!why.success) {
+    return { ok: false, message: "Say why you're withdrawing it." };
+  }
+  return run(
+    (session) => withdrawClaim(session, claimId, { reason: why.data }, key),
+    () => ({ ok: true }),
   );
 }

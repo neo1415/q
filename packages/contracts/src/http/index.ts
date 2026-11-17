@@ -1618,3 +1618,5 @@ export * from "./unicorn-potential.js";
 // ANALYTICS block (Q Workspace §8)
 export * from "./engagement.js";
 // end ANALYTICS block
+// 2026-11-17: a founder withdraws one of their company's claims.
+export * from "./claims.js";

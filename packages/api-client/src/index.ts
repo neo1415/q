@@ -134,6 +134,7 @@ export {
   getDocumentFile,
   renameDocument,
 } from "./documents.js";
+export { withdrawClaim } from "./claim-withdrawal.js";
 
 export {
   authorisePitchDownload,

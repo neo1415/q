@@ -40,6 +40,7 @@ import { INVESTOR_PROMISE_ACTIONS } from "./actions/investor-promises.js";
 import { DEAL_CLOSE_ACTIONS } from "./actions/deal-close.js";
 import { ENGAGEMENT_ACTIONS } from "./actions/engagement.js";
 import { COMPANY_FIGURE_ACTIONS } from "./actions/company-figures.js";
+import { CLAIM_WITHDRAW_ACTIONS } from "./actions/claim-withdraw.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -88,6 +89,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...DEAL_CLOSE_ACTIONS,
   // A8 (13 Nov 2026): a figure a founder tells Q, recorded on approval.
   ...COMPANY_FIGURE_ACTIONS,
+  // 17 Nov 2026: a founder withdraws one of their company's claims.
+  ...CLAIM_WITHDRAW_ACTIONS,
 ]);
 
 /**

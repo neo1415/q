@@ -24,6 +24,7 @@ import type {
 } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type {
+  ClaimWithdrawalEvidence,
   DocumentFigureEvidence,
   EvidenceService,
   StatedFigureEvidence,
@@ -204,6 +205,12 @@ export type AppActionPorts = {
    * provenance (the Evidence services).
    */
   readonly webFigures?: WebFigureEvidence | undefined;
+  /**
+   * A founder withdraws one of their company's claims, with a reason: a
+   * new SUPERSEDED revision, never a delete (the Evidence services).
+   */
+  readonly claimWithdrawals?:
+    (ClaimWithdrawalEvidence & Pick<EvidenceService, "listClaims">) | undefined;
   /** Q.03/Q.04: their own company's readiness, plan and follow-ups (founder-private). */
   readonly readiness?: ReadinessService | undefined;
   /** G1/G2: the person's company or firm as a team (invitations, roles). */

@@ -79,6 +79,7 @@ export {
   documentFigureCardInput,
   webFigureCardInput,
 } from "./actions/company-figures.js";
+export { WITHDRAW_CLAIM } from "./actions/claim-withdraw.js";
 export { scheduleProblem } from "./actions/schedule.js";
 export {
   OWN_READ_KINDS,

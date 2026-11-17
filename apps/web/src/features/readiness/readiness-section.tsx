@@ -15,6 +15,7 @@ import { AskQChips } from "@/features/capital/ask-q-chips";
 import { QControl } from "@/features/q/control/q-control";
 import { crmButton, CrmSheet, QLine } from "@/features/relationships/crm-kit";
 
+import { ClaimWithdraw } from "./claim-withdraw";
 import { ReadinessStatusBadge } from "./readiness-status";
 import { useT } from "@/features/i18n/language";
 
@@ -252,7 +253,7 @@ export function ReadinessSection({
                 {pillar.evidence.map((line, index) => (
                   <li
                     key={`${line.label}-${String(index)}`}
-                    className="flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2 text-sm first:border-t-0"
+                    className="flex flex-wrap justify-between gap-3 border-t border-(--cq-border-subtle) py-2 text-sm first:border-t-0"
                   >
                     <span className="text-(--cq-text-primary)">
                       {t(line.label)}
@@ -260,6 +261,11 @@ export function ReadinessSection({
                     <span className="shrink-0 rounded-full bg-(--cq-surface-strong) px-2 py-0.5 text-xs text-(--cq-text-secondary)">
                       {t(evidenceTag(line))}
                     </span>
+                    {/* Their own recorded claim: theirs to withdraw, with a
+                        reason (a new revision; nothing is deleted). */}
+                    {line.source === "CLAIM" && line.ref?.kind === "CLAIM" ? (
+                      <ClaimWithdraw claimId={line.ref.claimId} />
+                    ) : null}
                   </li>
                 ))}
               </ul>

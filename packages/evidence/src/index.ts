@@ -197,6 +197,14 @@ export {
   type WebFigureSource,
 } from "./interpretation/web-figure.js";
 export {
+  claimWithdrawalReason,
+  ClaimWithdrawalReasonSchema,
+  withdrawableFigureClaims,
+  withdrawClaim,
+  type ClaimWithdrawalEvidence,
+  type ClaimWithdrawalOutcome,
+} from "./interpretation/claim-withdrawal.js";
+export {
   adoptableMetric,
   linkResearchReadings,
   listResearchReadings,

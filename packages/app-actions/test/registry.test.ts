@@ -380,6 +380,12 @@ describe("the action registry", () => {
       ["relationship.deal.status", "relationship_deal_status", "READ"],
       // A8: a figure a founder tells Q, recorded on their approval.
       ["company.figure.record", "propose_company_figure", "CONSEQUENTIAL"],
+      // 17 Nov 2026: a founder withdraws one of their company's claims.
+      [
+        "company.claim.withdraw",
+        "propose_withdraw_company_claim",
+        "CONSEQUENTIAL",
+      ],
     ]);
   });
 });

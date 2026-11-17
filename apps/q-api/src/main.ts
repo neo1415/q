@@ -3370,6 +3370,8 @@ const appActionPorts: OwnReadPorts = {
   documentFigures: researchComposition.evidence,
   // A8: a figure a public page states about their company, kept on their approval.
   webFigures: researchComposition.evidence,
+  // A founder withdraws one of their company's claims, on their approval.
+  claimWithdrawals: researchComposition.evidence,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
   // B6/B7: their gateway's look, embed sites, paused or open.

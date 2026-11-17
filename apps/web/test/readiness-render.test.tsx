@@ -16,6 +16,7 @@ vi.mock("../src/features/readiness/readiness-actions", () => ({
   setAsideQuestionAction: vi.fn(() =>
     Promise.resolve({ ok: true, remaining: 0 }),
   ),
+  withdrawClaimAction: vi.fn(() => Promise.resolve({ ok: true })),
 }));
 
 import { ActionPlanBoard } from "../src/features/readiness/action-plan-board";
@@ -37,6 +38,17 @@ const READINESS: ReadinessDto = {
       status: "STRONG",
       summary: "On record: Founders named, Founder identity verified.",
       evidence: [
+        {
+          label: "MRR of USD 42,000 for October 2026",
+          source: "CLAIM",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "DOCUMENT_SUPPORTED",
+          note: null,
+          ref: {
+            kind: "CLAIM",
+            claimId: "33333333-3333-4333-8333-333333333333",
+          },
+        },
         {
           label: "2 founders, 2 full-time",
           source: "PROFILE",
@@ -148,6 +160,32 @@ describe("readiness on screen", () => {
         "22222222-2222-4222-8222-222222222222",
         { kind: "QUICK", index: 1 },
         expect.stringMatching(/^fu-/u),
+      );
+    });
+  });
+
+  it("lets the founder withdraw their own recorded claim, with a reason, only after confirming", async () => {
+    const actions = await import("../src/features/readiness/readiness-actions");
+    const { container } = render(<ReadinessSection readiness={READINESS} />);
+    const team = container.querySelector('[data-readiness-pillar="FOUNDER"]');
+    if (!(team instanceof HTMLElement)) throw new Error("no Team pillar");
+    fireEvent.click(team);
+    // Only the claim line offers it; the profile line does not.
+    const offers = screen.getAllByRole("button", { name: "Withdraw" });
+    expect(offers).toHaveLength(1);
+    fireEvent.click(offers[0] as HTMLElement);
+    const confirm = screen.getByRole("button", { name: "Withdraw claim" });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    expect(actions.withdrawClaimAction).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Why are you withdrawing it?"), {
+      target: { value: "Its only evidence was a QA deck." },
+    });
+    fireEvent.click(confirm);
+    await vi.waitFor(() => {
+      expect(actions.withdrawClaimAction).toHaveBeenCalledWith(
+        "33333333-3333-4333-8333-333333333333",
+        "Its only evidence was a QA deck.",
+        expect.stringMatching(/^withdraw-/u),
       );
     });
   });

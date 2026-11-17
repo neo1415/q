@@ -915,4 +915,13 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   // W5.4: leaving unsaved work
   "You have changes that aren't saved. Leave this page anyway?":
     "لديك تغييرات غير محفوظة. هل تريد مغادرة هذه الصفحة على أي حال؟",
+  // 17 Nov 2026: a founder withdraws one of their company's claims.
+  "Why are you withdrawing it?": "لماذا تسحبه؟",
+  "It stays in your company's history as withdrawn, with your reason. Investors stop seeing it. Nothing is deleted.":
+    "يبقى في سجل شركتك مسحوبًا، مع السبب الذي ذكرته. لن يراه المستثمرون بعد الآن. لا يُحذف أي شيء.",
+  "Withdraw claim": "سحب الادعاء",
+  "Withdrawn. It stays in your history; investors no longer see it.":
+    "تم السحب. يبقى في سجلك، ولم يعد المستثمرون يرونه.",
+  "That claim isn't on your record any more.": "هذا الادعاء لم يعد في سجلك.",
+  "Say why you're withdrawing it.": "اذكر سبب سحبه.",
 };
