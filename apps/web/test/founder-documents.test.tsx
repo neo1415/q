@@ -233,7 +233,7 @@ describe("the Requested tab", () => {
   // ADR 0078 (decision 99): answering a request with a highly confidential
   // document says, once, that the investor's Q can read it, as the access
   // sheet does; any other document keeps the short confirmation.
-  const answerWith = async (investorQReads: boolean) => {
+  const answerWith = (investorQReads: boolean): string => {
     actions.fulfil.mockResolvedValueOnce({
       ok: true,
       value: { investorQReads },
@@ -264,7 +264,7 @@ describe("the Requested tab", () => {
   };
 
   it("says the investor's Q can read a highly confidential document it shared", async () => {
-    const who = await answerWith(true);
+    const who = answerWith(true);
     expect(
       await screen.findByText(
         `Shared with ${who}. They and their Q will be able to read it until you stop sharing. They've been told.`,
@@ -274,7 +274,7 @@ describe("the Requested tab", () => {
   });
 
   it("keeps the short confirmation when the shared document is not one their Q reads", async () => {
-    const who = await answerWith(false);
+    const who = answerWith(false);
     expect(
       await screen.findByText(`Shared with ${who}. They've been told.`),
     ).toBeTruthy();
