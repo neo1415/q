@@ -25,15 +25,19 @@ import { useT } from "@/features/i18n/language";
 import { resultCue, scrollerOf, type ResultCue } from "./follow-newest";
 
 /**
- * The voice room's layout (owner audit 2026-11-15, Phase 4A-C).
+ * The voice room's layout (owner audit 2026-11-15, Phase 4A-C; decision
+ * 102, owner 2026-11-17).
  *
  * - Q's presence is large only while nothing substantive is shown. Once
  *   Q shows something (cards, a table, a comparison, a document), the
- *   presence moves aside -- a side column from the desktop breakpoint, a
- *   compact dock at the foot of the stage on a phone -- and the content
- *   leads. The presence is the same element throughout (never remounted:
- *   the swarm's loop keeps running), so the change is one smooth layout
- *   animation, and none under reduced motion.
+ *   content takes the whole stage: Q's presence becomes a small element
+ *   in the stage's bottom corner and the captions float at the bottom,
+ *   both in a zero-height overlay that takes no layout width or height.
+ *   The content keeps room at its end for the overlay (measured), so the
+ *   last card's buttons are never under it. The presence is the same
+ *   element throughout (never remounted: the swarm's loop keeps
+ *   running), so the change is one smooth layout animation, and none
+ *   under reduced motion.
  * - Nothing here ever moves the scroll. A result that lands out of view
  *   gets a quiet "New result" control instead.
  * - The speaking light is driven per frame from a ref, never React state,
@@ -187,9 +191,10 @@ export function VoiceRoomPresence({
 
 /**
  * The room: an aside (presence, state, captions) and the content. Large
- * presence: the aside's parts stack above the content as before. Compact:
- * the aside is a side column (desktop) or a dock at the stage's foot
- * (phone), and the content leads.
+ * presence: the aside's parts stack above the content as before. Compact
+ * (decision 102): the content takes the stage, and the aside is a
+ * floating overlay at the stage's foot -- the presence small in the
+ * corner, the captions at the bottom -- that takes no layout space.
  */
 export function VoiceRoom({
   compact,
@@ -205,6 +210,67 @@ export function VoiceRoom({
 }) {
   const t = useT();
   const contentRef = useRef<HTMLDivElement>(null);
+  const roomRef = useRef<HTMLDivElement>(null);
+  const asideRef = useRef<HTMLDivElement>(null);
+  // Decision 102: the overlay floats over the content, so the content
+  // keeps its height free at the end -- the last card's buttons can always
+  // be scrolled clear of the captions and the presence. Measured from
+  // layout offsets (never transforms), and written to a CSS variable, not
+  // React state, so a growing caption re-renders nothing.
+  useLayoutEffect(() => {
+    const room = roomRef.current;
+    const aside = asideRef.current;
+    if (room === null || aside === null) return;
+    if (!compact) {
+      room.style.removeProperty("--cq-voice-overlay-h");
+      room.style.removeProperty("--cq-voice-presence-w");
+      room.style.removeProperty("--cq-voice-bleed");
+      return;
+    }
+    const scroller = scrollerOf(room);
+    const measure = () => {
+      // Q sits in the stage's corner, past the content column's edge on a
+      // wide screen: how far the stage's content box reaches beyond the
+      // (centred) room on each side.
+      if (scroller !== document.scrollingElement) {
+        const style = getComputedStyle(scroller);
+        const inner =
+          scroller.clientWidth -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight);
+        room.style.setProperty(
+          "--cq-voice-bleed",
+          `${String(Math.max(0, Math.floor((inner - room.offsetWidth) / 2)))}px`,
+        );
+      }
+      let height = 0;
+      for (const child of Array.from(aside.children)) {
+        if (!(child instanceof HTMLElement) || child.offsetHeight <= 1) {
+          continue;
+        }
+        // The aside is zero-height; its parts hang above it.
+        height = Math.max(height, -child.offsetTop);
+        // The captions sit beside Q, never under it.
+        if (child.matches("[data-q-presence]")) {
+          room.style.setProperty(
+            "--cq-voice-presence-w",
+            `${String(child.offsetWidth)}px`,
+          );
+        }
+      }
+      room.style.setProperty(
+        "--cq-voice-overlay-h",
+        `${String(Math.ceil(height))}px`,
+      );
+    };
+    measure();
+    if (typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(measure);
+    for (const child of Array.from(aside.children)) observer.observe(child);
+    observer.observe(room);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [compact]);
   // The cue belongs to one result: another result (or none) shows none.
   const [cueFor, setCueFor] = useState<{
     readonly key: string;
@@ -258,16 +324,17 @@ export function VoiceRoom({
   return (
     <LazyMotion features={loadFeatures} strict>
       <div
+        ref={roomRef}
         className={cx(
           "cq-voice-room w-full",
           compact
-            ? "flex flex-col gap-4 lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:gap-8"
+            ? "flex flex-1 flex-col gap-4"
             : "flex flex-col items-center gap-4",
         )}
         data-q-voice-room
         data-q-voice-compact={compact ? "" : undefined}
       >
-        <div className="cq-voice-aside" data-q-voice-aside>
+        <div ref={asideRef} className="cq-voice-aside" data-q-voice-aside>
           {aside}
         </div>
         <div

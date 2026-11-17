@@ -435,10 +435,10 @@ describe("the Q view in a conversation is the voice room (owner 2026-11-06, live
       document.querySelector("[data-q-voice-stage-body]")?.textContent ?? "";
     expect(body).not.toContain("Earlier question 1");
     expect(body).not.toContain("Earlier answer 5");
-    // Their last line and Q's reply as a caption, as plain words.
-    expect(
-      document.querySelector("[data-q-exchange-person]")?.textContent,
-    ).toContain("Find me founders raising in fintech");
+    // Q's reply as a caption, as plain words. Decision 102: with cards up
+    // the caption floats over them, at most two lines, so their settled
+    // question is not repeated there (it is in the list below and Chat).
+    expect(document.querySelector("[data-q-exchange-person]")).toBeNull();
     expect(
       document.querySelector("[data-q-exchange-caption]")?.textContent,
     ).toContain("I found five founders raising now.");

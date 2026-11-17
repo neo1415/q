@@ -1,5 +1,7 @@
 "use client";
 
+import { History, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
+
 import { useT } from "@/features/i18n/language";
 
 import type { QTurn } from "./conversation";
@@ -93,14 +95,18 @@ export function QCurrentExchange({
   /**
    * Phase 4A (owner audit 2026-11-15): Q is showing something, so the
    * words are a discreet caption beside the compact presence -- smaller,
-   * fewer lines, aligned with it -- and the content leads.
+   * fewer lines, aligned with it -- and the content leads. Decision 102
+   * (owner 2026-11-17): the caption floats over the content, so it is at
+   * most two lines: the person's words while they speak, else Q's, with
+   * "Earlier" beside them rather than under them. The settled question
+   * is in Chat and in the screen-reader list.
    */
   readonly compact?: boolean | undefined;
 }) {
   const t = useT();
   const person = lines.findLast((line) => line.role === "person");
   const reply = lines.findLast((line) => line.role === "q");
-  const said = live ?? person?.text ?? null;
+  const said = compact ? live : (live ?? person?.text ?? null);
   const caption =
     qSaying !== null && qSaying.length > 0
       ? qSaying
@@ -114,7 +120,7 @@ export function QCurrentExchange({
     <div
       className={
         compact
-          ? "flex w-full min-w-0 flex-col items-start gap-1 text-start"
+          ? "flex w-full min-w-0 flex-row items-center gap-3 text-start"
           : "flex w-full max-w-2xl flex-col items-center gap-3 text-center"
       }
       data-q-current-exchange
@@ -124,7 +130,7 @@ export function QCurrentExchange({
         <p
           className={
             compact
-              ? "cq-caption m-0 line-clamp-1 text-(--cq-text-secondary)"
+              ? "cq-body-sm m-0 line-clamp-2 min-w-0 flex-1 text-(--cq-text-secondary)"
               : "cq-body m-0 line-clamp-2 text-(--cq-text-secondary)"
           }
           aria-hidden={announce ? undefined : true}
@@ -134,11 +140,11 @@ export function QCurrentExchange({
           {said}
         </p>
       )}
-      {captions && caption !== null ? (
+      {captions && caption !== null && !(compact && said !== null) ? (
         <p
           className={
             compact
-              ? "cq-body-sm m-0 line-clamp-2 text-(--cq-text-primary)"
+              ? "cq-body-sm m-0 line-clamp-2 min-w-0 flex-1 text-(--cq-text-primary)"
               : "cq-body m-0 line-clamp-3 text-(--cq-text-primary)"
           }
           aria-live={announce ? "polite" : undefined}
@@ -184,7 +190,24 @@ export function QCurrentExchange({
           ) : null}
         </ul>
       )}
-      {earlier ? (
+      {earlier && compact ? (
+        // Decision 102: beside the floating words, an icon the size of a
+        // touch target, so the caption stays at most two lines.
+        <button
+          type="button"
+          className="cq-stage-quiet size-11 flex-none justify-center p-0"
+          onClick={onOpenChat}
+          aria-label={t("Earlier in this conversation")}
+          title={t("Earlier in this conversation")}
+          data-q-earlier
+        >
+          <History
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+        </button>
+      ) : earlier ? (
         <button
           type="button"
           className="cq-stage-quiet min-h-11"

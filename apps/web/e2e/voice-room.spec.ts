@@ -93,14 +93,16 @@ test("2. a result appears: compact presence, the content leads, captions cover n
   await expect(page.locator("[data-q-new-result]")).toHaveCount(0);
   await snap(page, info, "2-result-compact-presence");
 
-  // At any scroll end, no control of the result sits under the aside.
+  // Decision 102: the captions and Q float over the content, and at the
+  // end of the stage no control of the result sits under them.
   const body = page.locator("[data-q-voice-stage-body]");
   for (const where of ["top", "bottom"] as const) {
     await body.evaluate((element, end) => {
       element.scrollTop = end === "top" ? 0 : element.scrollHeight;
     }, where);
     await page.waitForTimeout(150);
-    const aside = await boxOf(page, "[data-q-voice-aside]");
+    const caption = await boxOf(page, "[data-q-voice-caption]");
+    const corner = await boxOf(page, "[data-q-voice-presence-box]");
     const buttons = page.locator("[data-q-voice-content] button:visible");
     const count = await buttons.count();
     for (let n = 0; n < count; n += 1) {
@@ -112,10 +114,11 @@ test("2. a result appears: compact presence, the content leads, captions cover n
         button.y > stage.y + stage.height
       )
         continue;
-      if (where === "bottom" || info.project.name === "desktop") {
-        expect(overlaps(aside, button), `button ${String(n)} at ${where}`).toBe(
-          false,
-        );
+      if (where === "bottom") {
+        expect(
+          overlaps(caption, button) || overlaps(corner, button),
+          `button ${String(n)} at ${where}`,
+        ).toBe(false);
       }
     }
   }

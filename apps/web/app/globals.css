@@ -5968,68 +5968,79 @@
 }
 
 /*
- * Owner audit 2026-11-15 (Phase 4A): once Q shows something, the room's
- * presence, state and captions move aside and the content leads. Before
- * that the aside is no box at all, so the pinned presence above keeps the
- * room as its sticky container.
+ * Owner audit 2026-11-15 (Phase 4A), corrected by decision 102 (owner,
+ * 2026-11-17): once Q shows something, the content takes the stage. Q's
+ * presence (small, in the corner) and the captions (at the bottom) float
+ * over it in an aside of zero height: it takes no layout width or height
+ * and never pushes the content. Before that the aside and the caption
+ * group are no boxes at all, so the pinned presence above keeps the room
+ * as its sticky container and the large layout is unchanged.
  */
-.cq-voice-aside {
+.cq-voice-aside,
+.cq-voice-caption {
   display: contents;
 }
-/* Phone: a compact dock at the stage's foot, presence beside the words. */
 [data-q-voice-compact] > .cq-voice-aside {
   order: 99;
   position: sticky;
-  bottom: 0;
+  bottom: 12px;
   z-index: var(--cq-z-sticky);
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 12px;
-  row-gap: 2px;
-  align-items: center;
-  margin-inline: -20px;
-  padding-block: 8px;
-  padding-inline: max(20px, env(safe-area-inset-left))
-    max(20px, env(safe-area-inset-right));
-  background: var(--cq-stage-canvas);
-  border-top: 1px solid var(--cq-border-subtle);
+  display: block;
+  height: 0;
+  /* With little content the overlay still sits at the stage's foot. */
+  margin-top: auto;
+  /* Only the caption's own controls take the pointer. */
+  pointer-events: none;
 }
+/* The content's end keeps the overlay's height free (measured), so the
+   last card's buttons always scroll clear of the captions and Q. */
+[data-q-voice-compact] > [data-q-voice-content] {
+  padding-bottom: calc(var(--cq-voice-overlay-h, 96px) + 12px);
+}
+/* Q, small, in the stage's bottom corner. */
 [data-q-voice-compact] > .cq-voice-aside > .cq-voice-room-presence {
-  grid-row: 1 / span 2;
-  position: static;
+  position: absolute;
+  /* The pinned rule's top: 0 would stretch it to the aside's zero height. */
+  top: auto;
+  bottom: 0;
+  inset-inline-end: calc(-1 * var(--cq-voice-bleed, 0px));
   width: auto;
   margin: 0;
   padding: 0;
   background: none;
+  pointer-events: none;
 }
-@media (min-width: 640px) {
-  [data-q-voice-compact] > .cq-voice-aside {
-    margin-inline: -32px;
-    padding-inline: max(32px, env(safe-area-inset-left))
-      max(32px, env(safe-area-inset-right));
-  }
+/* The captions float at the bottom, on the stage's veil for contrast,
+   beside Q and never under it; centred in what is left of the width. */
+[data-q-voice-compact] > .cq-voice-aside > .cq-voice-caption {
+  position: absolute;
+  bottom: 0;
+  inset-inline-start: 0;
+  inset-inline-end: max(
+    0px,
+    calc(var(--cq-voice-presence-w, 48px) + 12px - var(--cq-voice-bleed, 0px))
+  );
+  max-width: 40rem;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 14px;
+  border: 1px solid var(--cq-stage-border);
+  border-radius: var(--cq-radius-lg);
+  background: var(--cq-stage-veil);
+  box-shadow: var(--cq-shadow-sm);
+  pointer-events: none;
 }
-/* Desktop: a side column, pinned while the content scrolls. */
-@media (min-width: 1024px) {
-  [data-q-voice-compact] > .cq-voice-aside {
-    order: 0;
-    top: 0;
-    bottom: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-    margin-inline: 0;
-    padding: 24px 0 0;
-    border-top: 0;
-    background: none;
-  }
+[data-q-voice-compact] .cq-voice-caption :is(button, a) {
+  pointer-events: auto;
 }
 /* A new result out of view: a quiet way to it, never a scroll. */
 .cq-voice-new-result {
   order: 98;
   position: sticky;
-  bottom: 88px;
+  bottom: 16px;
   z-index: var(--cq-z-sticky);
   align-self: center;
   display: inline-flex;
@@ -6042,15 +6053,9 @@
   background: var(--cq-surface);
   color: var(--cq-text-primary);
 }
-.cq-voice-room:not([data-q-voice-compact]) > .cq-voice-new-result {
-  bottom: 16px;
-}
-@media (min-width: 1024px) {
-  [data-q-voice-compact] > .cq-voice-new-result {
-    grid-column: 2;
-    justify-self: center;
-    bottom: 16px;
-  }
+/* Above the floating captions. */
+[data-q-voice-compact] > .cq-voice-new-result {
+  bottom: calc(var(--cq-voice-overlay-h, 96px) + 24px);
 }
 
 /*

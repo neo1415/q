@@ -1465,7 +1465,7 @@ export function QConversationPanel({
                 // A restored conversation is shown once settled (CLS).
                 style={settling ? { visibility: "hidden" } : undefined}
                 data-q-settling={settling ? "" : undefined}
-                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : room.filled && stageMode === "FULL" ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl"}`}
+                className={`mx-auto flex w-full flex-col gap-5 py-6 ${bigPresence && roomCompact ? "min-h-full" : ""} transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : room.filled && stageMode === "FULL" ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl"}`}
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >
                 {bigPresence ? (
@@ -1519,31 +1519,49 @@ export function QConversationPanel({
                             </VoiceRoomPresence>
                           </ViewTransition>
                         </div>
-                        <div
-                          className={
-                            roomCompact
-                              ? "flex min-h-6 min-w-0 flex-col items-start gap-1"
-                              : "flex min-h-6 flex-col items-center gap-2"
-                          }
-                          data-q-voice-status
-                        >
-                          {stateLabel === null ? null : (
-                            <span
-                              className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
-                              role="status"
-                              data-q-state-pill
-                            >
+                        {/* Decision 102: once Q shows something, the state
+                            and the captions float together at the stage's
+                            foot; before that this group is no box. */}
+                        <div className="cq-voice-caption" data-q-voice-caption>
+                          <div
+                            className={
+                              roomCompact
+                                ? "flex min-h-6 min-w-0 flex-col items-start gap-1"
+                                : "flex min-h-6 flex-col items-center gap-2"
+                            }
+                            data-q-voice-status
+                          >
+                            {stateLabel === null ? null : (
                               <span
-                                aria-hidden="true"
-                                className={cx(
-                                  "size-2 rounded-full bg-(--cq-accent)",
-                                  voice.active && "motion-safe:animate-pulse",
-                                )}
-                              />
-                              {t(stateLabel)}
-                            </span>
-                          )}
-                          <StageLine current={presence.stage} reserve />
+                                className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                                role="status"
+                                data-q-state-pill
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={cx(
+                                    "size-2 rounded-full bg-(--cq-accent)",
+                                    voice.active && "motion-safe:animate-pulse",
+                                  )}
+                                />
+                                {t(stateLabel)}
+                              </span>
+                            )}
+                            <StageLine current={presence.stage} reserve />
+                          </div>
+                          <QCurrentExchange
+                            announce={false}
+                            lines={latestExchange(thread)}
+                            live={liveIsPerson ? live.text : null}
+                            qSaying={voice.active ? qSaying : null}
+                            captions={captions || voice.active}
+                            onOpenChat={() => chooseView("chat")}
+                            earlier={
+                              thread.length > latestExchange(thread).length
+                            }
+                            cardLines={false}
+                            compact={roomCompact}
+                          />
                         </div>
                         {/* The exchange for a screen reader, each turn with
                         its id and disposition (G-R3; audit 06 §9). Text
@@ -1585,19 +1603,6 @@ export function QConversationPanel({
                             </li>
                           ) : null}
                         </ol>
-                        <QCurrentExchange
-                          announce={false}
-                          lines={latestExchange(thread)}
-                          live={liveIsPerson ? live.text : null}
-                          qSaying={voice.active ? qSaying : null}
-                          captions={captions || voice.active}
-                          onOpenChat={() => chooseView("chat")}
-                          earlier={
-                            thread.length > latestExchange(thread).length
-                          }
-                          cardLines={false}
-                          compact={roomCompact}
-                        />
                       </>
                     }
                   >
@@ -2277,5 +2282,6 @@ function latestExchange<T extends { readonly role: string }>(
 }
 
 /** Phase 4A: the room presence's compact size, desktop and phone. */
-const ROOM_COMPACT_WIDE = 112;
-const ROOM_COMPACT_PHONE = 56;
+// Decision 102 (owner 2026-11-17): small, in the stage's corner.
+const ROOM_COMPACT_WIDE = 72;
+const ROOM_COMPACT_PHONE = 48;

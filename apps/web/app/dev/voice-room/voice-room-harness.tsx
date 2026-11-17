@@ -93,7 +93,7 @@ export function VoiceRoomHarness({
     : null;
   const compact = objectShown;
   const pixels = wide ? 280 : 200;
-  const shown = compact ? (wide ? 112 : 56) : pixels;
+  const shown = compact ? (wide ? 72 : 48) : pixels;
   const state = speaking ? "SPEAKING" : "LISTENING";
   return (
     <div
@@ -108,7 +108,7 @@ export function VoiceRoomHarness({
         data-q-voice-stage-body
       >
         <div
-          className={`mx-auto flex w-full flex-col gap-5 py-6 ${objectShown ? "max-w-[1180px]" : "max-w-3xl"}`}
+          className={`mx-auto flex w-full flex-col gap-5 py-6 ${objectShown ? "min-h-full max-w-[1180px]" : "max-w-3xl"}`}
         >
           <VoiceRoom
             compact={compact}
@@ -136,35 +136,37 @@ export function VoiceRoomHarness({
                     />
                   </VoiceRoomPresence>
                 </div>
-                <div
-                  className={
-                    compact
-                      ? "flex min-h-6 min-w-0 flex-col items-start gap-1"
-                      : "flex min-h-6 flex-col items-center gap-2"
-                  }
-                  data-q-voice-status
-                >
-                  <span
-                    className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
-                    role="status"
+                <div className="cq-voice-caption" data-q-voice-caption>
+                  <div
+                    className={
+                      compact
+                        ? "flex min-h-6 min-w-0 flex-col items-start gap-1"
+                        : "flex min-h-6 flex-col items-center gap-2"
+                    }
+                    data-q-voice-status
                   >
                     <span
-                      aria-hidden="true"
-                      className="size-2 rounded-full bg-(--cq-accent)"
-                    />
-                    {speaking ? "Speaking" : "Listening"}
-                  </span>
+                      className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                      role="status"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="size-2 rounded-full bg-(--cq-accent)"
+                      />
+                      {speaking ? "Speaking" : "Listening"}
+                    </span>
+                  </div>
+                  <QCurrentExchange
+                    lines={[{ id: "p-1", role: "person", text: ASKED }]}
+                    live={null}
+                    qSaying={qSaying}
+                    captions
+                    earlier
+                    onOpenChat={() => undefined}
+                    cardLines={false}
+                    compact={compact}
+                  />
                 </div>
-                <QCurrentExchange
-                  lines={[{ id: "p-1", role: "person", text: ASKED }]}
-                  live={null}
-                  qSaying={qSaying}
-                  captions
-                  earlier={false}
-                  onOpenChat={() => undefined}
-                  cardLines={false}
-                  compact={compact}
-                />
               </>
             }
           >
