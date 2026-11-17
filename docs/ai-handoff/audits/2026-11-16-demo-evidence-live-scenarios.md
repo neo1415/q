@@ -283,3 +283,19 @@ The fix in progress:
 - a document-backed question whose only figure sources are memory or earlier replies reads the document first;
 - counts that nothing binds are withheld;
 - stale memory is superseded.
+
+## Scenario D on `f410019c4` (17 Nov, 01:06 UTC): PASS
+
+Thames Arc, conversation `0121ed1e`, new wording. Screenshots: `evidence/2026-11-17-scenario-d-f410019c4/`.
+
+**Answers:**
+
+- "What roles is Halyard Security planning to hire in 2027?": 15 hires, including "3 public-sector account managers and 1 information security and assurance manager in Q1", all correct.
+- "How many in the first quarter?": "4 people in Q1 2027: 3 public-sector account managers and 1 …", correct.
+
+**Claim-check line:**
+
+- Run `32f7b9b4`: tables 4, quarters 3; 5 counts examined, 4 bound, 1 contradicted, which was corrected and rewritten.
+- Run `687e5136`: 3 examined, 3 bound, 0 contradicted.
+
+**Memory supersession:** `q earlier summaries superseded {summaries 4, corrected 3, dropped 1}`. `summary-correction-v1` revisions were written for conversations 8811f9c7, e7e3c866, 28071f0c and 1de1cf20, so the stale "4 account managers" summaries are now superseded with history kept.
