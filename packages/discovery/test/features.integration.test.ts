@@ -612,15 +612,19 @@ describe("@capital-q/discovery recommendation features against local PostgreSQL"
       expect(featureOf(haulr, "semantic_fit.mandate_similarity")).toMatchObject(
         { status: "PRESENT" },
       );
-      // structured-only: no fake semantic zero; a known non-overlap is a value
+      // structured-only: retrieval did not find it, but both sides have a
+      // current vector, so its similarity is scored, not reported unknown
+      // (owner voice test 2026-11-17: "thesis isn't known" for top fits).
       expect(bakehouse.candidateProvenance.semantic).toBeNull();
-      expect(
-        featureOf(bakehouse, "semantic_fit.mandate_similarity"),
-      ).toMatchObject({
-        status: "MISSING",
-        value: null,
-        missingReason: "SEMANTIC_NOT_RETRIEVED",
+      const bakehouseSimilarity = featureOf(
+        bakehouse,
+        "semantic_fit.mandate_similarity",
+      );
+      expect(bakehouseSimilarity).toMatchObject({
+        status: "PRESENT",
+        missingReason: null,
       });
+      expect(typeof bakehouseSimilarity?.value).toBe("number");
       expect(featureOf(bakehouse, "declared_fit.taxonomy")).toMatchObject({
         status: "PRESENT",
         value: "NO_OVERLAP",

@@ -173,12 +173,13 @@ describe("@capital-q/discovery deterministic ranking against local PostgreSQL", 
       expect(at("Haulr").candidateProvenance.structured).toBeNull();
       expect(at("Bakehouse").candidateProvenance.semantic).toBeNull();
       expect(at("PetPal").candidateProvenance.semantic).toBeNull();
-      // A structured-only candidate has no semantic zero.
+      // A structured-only candidate with vectors on both sides is scored on
+      // similarity too; retrieval top-K only decides who is found.
       expect(
         at("Bakehouse").factors.find(
           (f) => f.featureId === "semantic_fit.mandate_similarity",
         ),
-      ).toMatchObject({ outcome: "MISSING", contribution: null });
+      ).toMatchObject({ outcome: "SCORED" });
       // A weaker declared fit sits below a stronger one of the same pool shape.
       expect(order.indexOf("PetPal")).toBeGreaterThan(
         order.indexOf("Bakehouse"),
