@@ -86,8 +86,10 @@ describe("G-D17: a card says mandate fit, how it was made, and its tie", () => {
     expect(fitWords(ajopot)).toBe(
       "Mandate fit 8.0 out of 10, from 5 of 7 measures known",
     );
-    expect(fitProvenance(ajopot)).toBe(
-      "5 of 7 measures known · no source documents yet",
+    // Owner live 17 Nov 2026: an uncounted 0 never claims "no documents".
+    expect(fitProvenance(ajopot)).toBe("5 of 7 measures known");
+    expect(fitProvenance({ ...ajopot, sourceCount: 2 })).toBe(
+      "5 of 7 measures known · 2 sources",
     );
     expect(tieLine(TOP, ajopot)).toBe(
       "Tied with Ledgerfold on mandate fit (8.0).",
@@ -110,7 +112,7 @@ describe("G-D17: a card says mandate fit, how it was made, and its tie", () => {
     const text = document.querySelector("[data-ac-cards]")?.textContent ?? "";
     expect(text).toMatch(/mandate fit, out of 10/u);
     expect(text).toContain("5 of 7 measures known");
-    expect(text).toContain("no source documents yet");
+    expect(text).not.toContain("no source documents");
     expect(text).toContain("Tied with Ajopot on mandate fit (8.0).");
     expect(text).not.toMatch(/\d+ ?%/u);
   });

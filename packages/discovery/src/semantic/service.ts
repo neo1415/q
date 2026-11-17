@@ -8,8 +8,14 @@ import {
 import type { ActorContext } from "@capital-q/security";
 
 import { deriveStructuredIntent } from "../candidates/structured.js";
-import { ELIGIBILITY_POLICY_VERSION } from "../eligibility/contracts.js";
-import type { EligibilityPorts } from "../eligibility/ports.js";
+import {
+  ELIGIBILITY_POLICY_VERSION,
+  type RecommendationContext,
+} from "../eligibility/contracts.js";
+import type {
+  EligibilityPorts,
+  MandateSnapshotForEligibility,
+} from "../eligibility/ports.js";
 import type { EligibilityService } from "../eligibility/service.js";
 import {
   COMPANY_REPRESENTATION_VERSION,
@@ -23,6 +29,7 @@ import {
   type RepresentationRefreshReport,
   type SemanticCandidate,
   type SemanticCandidateResult,
+  type SemanticProvenance,
 } from "./contracts.js";
 import type {
   CompanyInvestmentFactsPort,
@@ -88,7 +95,41 @@ export type SemanticCandidateService = {
   readonly refreshCompanyRepresentations: (
     input?: RefreshCompanyRepresentationsInput,
   ) => Promise<RepresentationRefreshReport>;
+  /**
+   * Live 17 Nov 2026 (Zino, conversation 9995dcca): 56 of 96 candidates,
+   * the top structured fits among them, came from the structured generator
+   * only, so their THESIS read "not known" although both vectors existed.
+   * Top-K is a candidate generator, not the only place the similarity may
+   * be computed: this computes the same cosine, in the same space and
+   * under the same versions, for exactly the companies given (already
+   * admitted by REC-001 for this actor and mandate), in one bounded read.
+   * Never writes, never embeds: no current mandate vector, or no current
+   * company vector, is unknown, never zero. Optional so a test double
+   * without it still fits; absent, every such similarity stays unknown.
+   */
+  readonly scoreCompanies?: (
+    query: ScoreSemanticCandidatesQuery,
+  ) => Promise<SemanticScoreResult>;
 };
+
+export type ScoreSemanticCandidatesQuery = {
+  readonly actor: ActorContext;
+  readonly mandateId?: string | null | undefined;
+  /** Bounded by the caller's pool (CANDIDATE_POOL_MAX). */
+  readonly companyIds: readonly string[];
+};
+
+export type SemanticScoreResult =
+  | {
+      readonly kind: "SCORED";
+      readonly mandateId: string;
+      /** By lower-case company id; a company absent here is unknown. */
+      readonly similarities: ReadonlyMap<string, SemanticProvenance>;
+    }
+  | {
+      readonly kind: "NOT_SCORED";
+      readonly reason: "NO_ACTIVE_MANDATE" | "MANDATE_VECTOR_NOT_READY";
+    };
 
 export type SemanticCandidateServiceDependencies = {
   /** The investor subject and ACTIVE mandate resolution REC-001 already defines. */
@@ -186,6 +227,218 @@ export function createSemanticCandidateService(
         },
       ]),
     );
+  }
+
+  /** The one provenance a similarity carries, retrieved or scored. */
+  function provenanceOf(similarity: number): SemanticProvenance {
+    if (!Number.isFinite(similarity) || similarity < -1 || similarity > 1) {
+      throw new RangeError(
+        "the vector store returned a cosine distance outside its range",
+      );
+    }
+    return {
+      generatorId: SEMANTIC_GENERATOR_ID,
+      generatorVersion: SEMANTIC_GENERATOR_VERSION,
+      metric: SEMANTIC_SIMILARITY_METRIC,
+      similarity,
+      companyRepresentationVersion: COMPANY_REPRESENTATION_VERSION,
+      investorRepresentationVersion: INVESTOR_REPRESENTATION_VERSION,
+      configurationVersion: configuration.configurationVersion,
+      documentInstructionVersion: EMBEDDING_DOCUMENT_INSTRUCTION_VERSION,
+      queryInstructionVersion,
+    };
+  }
+
+  type PreparedQuery =
+    | {
+        readonly kind: "NO_ACTIVE_MANDATE";
+        readonly context: RecommendationContext;
+      }
+    /** Read-only: the mandate's current text has no stored vector yet. */
+    | { readonly kind: "NOT_READY"; readonly context: RecommendationContext }
+    | {
+        readonly kind: "UNAVAILABLE";
+        readonly context: RecommendationContext;
+        readonly failureClass: string;
+        readonly retryable: boolean;
+      }
+    | {
+        readonly kind: "READY";
+        readonly context: RecommendationContext;
+        readonly mandate: MandateSnapshotForEligibility;
+        readonly queryVector: readonly number[];
+        readonly queryVectorSource: "COMPUTED" | "REUSED";
+        readonly investorRepresentation: "BUILT" | "UNCHANGED";
+        readonly queryDurationMs: number;
+      };
+
+  /**
+   * The actor's ACTIVE mandate and its query vector, resolved one way for
+   * retrieval and for scoring. "WRITE" (retrieval) rebuilds a changed
+   * representation and embeds it when it has no vector; "READ_ONLY"
+   * (scoring) writes nothing and embeds nothing: a mandate whose current
+   * text has no stored vector is NOT_READY, and its similarities stay
+   * unknown.
+   */
+  async function prepareQuery(
+    query: {
+      readonly actor: ActorContext;
+      readonly mandateId?: string | null | undefined;
+    },
+    mode: "WRITE" | "READ_ONLY",
+  ): Promise<PreparedQuery> {
+    const subject = await ports.investorSubject.investorOrganisationFor(
+      query.actor,
+    );
+    if (subject === null) {
+      throw new Error(
+        "the acting organisation has no canonical investor organisation",
+      );
+    }
+    const investorOrganisationId = subject.investorOrganisationId;
+    const [lookup, taxonomyVersion] = await Promise.all([
+      ports.mandates.activeMandate({
+        tenantId: query.actor.tenantId,
+        investorOrganisationId,
+        mandateId: query.mandateId ?? null,
+      }),
+      ports.taxonomyVersions?.currentVersions() ?? Promise.resolve(null),
+    ]);
+    const context = (mandateId: string | null) => ({
+      tenantId: query.actor.tenantId,
+      investorOrganisationId,
+      mode: "INVESTOR_DISCOVER" as const,
+      mandateId,
+      taxonomyVersion,
+      eligibilityPolicyVersion: ELIGIBILITY_POLICY_VERSION,
+    });
+
+    // ACTIVE only; never a DRAFT, never the newest, never a guess.
+    if (
+      lookup.kind !== "FOUND" ||
+      lookup.mandate.status !== "ACTIVE" ||
+      lookup.mandate.investorOrganisationId !== investorOrganisationId
+    ) {
+      return { kind: "NO_ACTIVE_MANDATE", context: context(null) };
+    }
+    const mandate = lookup.mandate;
+    const narrative = await narratives.narrativeFor({
+      tenantId: query.actor.tenantId,
+      investorOrganisationId,
+      mandateId: mandate.mandateId,
+    });
+    if (narrative === null) {
+      return { kind: "NO_ACTIVE_MANDATE", context: context(null) };
+    }
+
+    // Positive intent only, exactly as the structured generator reads it.
+    const intent = deriveStructuredIntent(mandate);
+    const named = await describeClassifications(intent.taxonomyNodeIds);
+    const representation = buildInvestorMandateRepresentation({
+      mandateId: mandate.mandateId,
+      mandateVersion: narrative.version,
+      name: narrative.name,
+      rawMandateText: narrative.rawMandateText,
+      stageCodes: intent.stageCodes,
+      countryCodes: intent.countryCodes,
+      preferences: intent.taxonomyNodeIds.flatMap((nodeId) => {
+        const described = named.get(nodeId);
+        return described === undefined ? [] : [described];
+      }),
+    });
+
+    const current = await store.currentMandateRepresentation({
+      mandateId: mandate.mandateId,
+      purpose: REPRESENTATION_PURPOSE,
+      representationVersion: INVESTOR_REPRESENTATION_VERSION,
+    });
+    let row = current;
+    let investorRepresentation: "BUILT" | "UNCHANGED" = "UNCHANGED";
+    const stale =
+      current === null ||
+      current.contentSha256 !== representation.contentSha256;
+    // Scoring never writes: a mandate text not yet stored has no vector.
+    if (stale && mode === "READ_ONLY") {
+      return { kind: "NOT_READY", context: context(mandate.mandateId) };
+    }
+    if (stale) {
+      if (current !== null) {
+        await store.supersedeMandateRepresentation(current.id);
+      }
+      row = await store.insertMandateRepresentation({
+        tenantId: query.actor.tenantId,
+        investorOrganisationId,
+        mandateId: mandate.mandateId,
+        mandateVersion: narrative.version,
+        purpose: REPRESENTATION_PURPOSE,
+        representationVersion: INVESTOR_REPRESENTATION_VERSION,
+        sourceFingerprint: representation.sourceFingerprint,
+        contentSha256: representation.contentSha256,
+        content: representation.text,
+      });
+      investorRepresentation = "BUILT";
+    }
+    if (row === null) throw new Error("mandate representation not stored");
+
+    const queryIdentity: VectorIdentity = {
+      ...documentIdentity,
+      instructionVersion: queryInstructionVersion,
+    };
+    const queryStarted = performance.now();
+    let queryVector = await store.findMandateVector({
+      representationId: row.id,
+      identity: queryIdentity,
+    });
+    let queryVectorSource: "COMPUTED" | "REUSED" = "REUSED";
+    if (queryVector === null && mode === "READ_ONLY") {
+      return { kind: "NOT_READY", context: context(mandate.mandateId) };
+    }
+    if (queryVector === null) {
+      try {
+        const result = await embeddings.embedQuery(
+          representation.text,
+          MANDATE_TASK,
+        );
+        queryVector = result.vector;
+        await store.insertMandateEmbedding({
+          tenantId: query.actor.tenantId,
+          representationId: row.id,
+          investorOrganisationId,
+          contentSha256: representation.contentSha256,
+          identity: identityOf(result),
+          vector: result.vector,
+        });
+        queryVectorSource = "COMPUTED";
+      } catch (error: unknown) {
+        if (error instanceof EmbeddingProviderFailure) {
+          logger?.warn(
+            {
+              generatorVersion: SEMANTIC_GENERATOR_VERSION,
+              failureClass: error.failureClass,
+              retryable: error.retryable,
+            },
+            "semantic candidates unavailable",
+          );
+          return {
+            kind: "UNAVAILABLE",
+            context: context(mandate.mandateId),
+            failureClass: error.failureClass,
+            retryable: error.retryable,
+          };
+        }
+        throw error;
+      }
+    }
+    const queryDurationMs = Math.round(performance.now() - queryStarted);
+    return {
+      kind: "READY",
+      context: context(mandate.mandateId),
+      mandate,
+      queryVector,
+      queryVectorSource,
+      investorRepresentation,
+      queryDurationMs,
+    };
   }
 
   return {
@@ -350,161 +603,86 @@ export function createSemanticCandidateService(
       return report;
     },
 
+    scoreCompanies: async (query) => {
+      const ids = [
+        ...new Set(query.companyIds.map((id) => id.toLowerCase())),
+      ].sort();
+      const prepared = await prepareQuery(query, "READ_ONLY");
+      if (prepared.kind === "NO_ACTIVE_MANDATE") {
+        return { kind: "NOT_SCORED", reason: "NO_ACTIVE_MANDATE" };
+      }
+      if (prepared.kind !== "READY") {
+        return { kind: "NOT_SCORED", reason: "MANDATE_VECTOR_NOT_READY" };
+      }
+      const similarities = new Map<string, SemanticProvenance>();
+      if (ids.length > 0) {
+        const hits = await store.distancesToCompanies({
+          queryVector: prepared.queryVector,
+          companyIds: ids,
+          purpose: REPRESENTATION_PURPOSE,
+          representationVersion: COMPANY_REPRESENTATION_VERSION,
+          identity: documentIdentity,
+        });
+        const asked = new Set(ids);
+        for (const hit of hits) {
+          const key = hit.companyId.toLowerCase();
+          // Only what was asked: the store can never widen the set.
+          if (!asked.has(key)) continue;
+          similarities.set(key, provenanceOf(1 - hit.distance));
+        }
+      }
+      logger?.debug(
+        {
+          generatorVersion: SEMANTIC_GENERATOR_VERSION,
+          configurationVersion: configuration.configurationVersion,
+          asked: ids.length,
+          scored: similarities.size,
+        },
+        "semantic similarity scored for admitted candidates",
+      );
+      return {
+        kind: "SCORED",
+        mandateId: prepared.mandate.mandateId,
+        similarities,
+      };
+    },
+
     generate: async (query) => {
       const started = performance.now();
       const topK = Math.max(
         1,
         Math.min(SEMANTIC_TOP_K, Math.trunc(query.topK ?? SEMANTIC_TOP_K)),
       );
-
-      const subject = await ports.investorSubject.investorOrganisationFor(
-        query.actor,
-      );
-      if (subject === null) {
-        throw new Error(
-          "the acting organisation has no canonical investor organisation",
-        );
-      }
-      const investorOrganisationId = subject.investorOrganisationId;
-      const [lookup, taxonomyVersion] = await Promise.all([
-        ports.mandates.activeMandate({
-          tenantId: query.actor.tenantId,
-          investorOrganisationId,
-          mandateId: query.mandateId ?? null,
-        }),
-        ports.taxonomyVersions?.currentVersions() ?? Promise.resolve(null),
-      ]);
-      const context = (mandateId: string | null) => ({
-        tenantId: query.actor.tenantId,
-        investorOrganisationId,
-        mode: "INVESTOR_DISCOVER" as const,
-        mandateId,
-        taxonomyVersion,
-        eligibilityPolicyVersion: ELIGIBILITY_POLICY_VERSION,
-      });
-
-      // ACTIVE only; never a DRAFT, never the newest, never a guess.
+      const prepared = await prepareQuery(query, "WRITE");
       if (
-        lookup.kind !== "FOUND" ||
-        lookup.mandate.status !== "ACTIVE" ||
-        lookup.mandate.investorOrganisationId !== investorOrganisationId
+        prepared.kind === "NO_ACTIVE_MANDATE" ||
+        prepared.kind === "NOT_READY"
       ) {
         return {
           kind: "NO_ACTIVE_MANDATE",
           generatorId: SEMANTIC_GENERATOR_ID,
           generatorVersion: SEMANTIC_GENERATOR_VERSION,
-          context: context(null),
+          context: prepared.context,
         };
       }
-      const mandate = lookup.mandate;
-      const narrative = await narratives.narrativeFor({
-        tenantId: query.actor.tenantId,
-        investorOrganisationId,
-        mandateId: mandate.mandateId,
-      });
-      if (narrative === null) {
+      if (prepared.kind === "UNAVAILABLE") {
         return {
-          kind: "NO_ACTIVE_MANDATE",
+          kind: "UNAVAILABLE",
           generatorId: SEMANTIC_GENERATOR_ID,
           generatorVersion: SEMANTIC_GENERATOR_VERSION,
-          context: context(null),
+          context: prepared.context,
+          failureClass: prepared.failureClass,
+          retryable: prepared.retryable,
         };
       }
-
-      // Positive intent only, exactly as the structured generator reads it.
-      const intent = deriveStructuredIntent(mandate);
-      const named = await describeClassifications(intent.taxonomyNodeIds);
-      const representation = buildInvestorMandateRepresentation({
-        mandateId: mandate.mandateId,
-        mandateVersion: narrative.version,
-        name: narrative.name,
-        rawMandateText: narrative.rawMandateText,
-        stageCodes: intent.stageCodes,
-        countryCodes: intent.countryCodes,
-        preferences: intent.taxonomyNodeIds.flatMap((nodeId) => {
-          const described = named.get(nodeId);
-          return described === undefined ? [] : [described];
-        }),
-      });
-
-      const current = await store.currentMandateRepresentation({
-        mandateId: mandate.mandateId,
-        purpose: REPRESENTATION_PURPOSE,
-        representationVersion: INVESTOR_REPRESENTATION_VERSION,
-      });
-      let row = current;
-      let investorRepresentation: "BUILT" | "UNCHANGED" = "UNCHANGED";
-      if (
-        current === null ||
-        current.contentSha256 !== representation.contentSha256
-      ) {
-        if (current !== null) {
-          await store.supersedeMandateRepresentation(current.id);
-        }
-        row = await store.insertMandateRepresentation({
-          tenantId: query.actor.tenantId,
-          investorOrganisationId,
-          mandateId: mandate.mandateId,
-          mandateVersion: narrative.version,
-          purpose: REPRESENTATION_PURPOSE,
-          representationVersion: INVESTOR_REPRESENTATION_VERSION,
-          sourceFingerprint: representation.sourceFingerprint,
-          contentSha256: representation.contentSha256,
-          content: representation.text,
-        });
-        investorRepresentation = "BUILT";
-      }
-      if (row === null) throw new Error("mandate representation not stored");
-
-      const queryIdentity: VectorIdentity = {
-        ...documentIdentity,
-        instructionVersion: queryInstructionVersion,
-      };
-      const queryStarted = performance.now();
-      let queryVector = await store.findMandateVector({
-        representationId: row.id,
-        identity: queryIdentity,
-      });
-      let queryVectorSource: "COMPUTED" | "REUSED" = "REUSED";
-      if (queryVector === null) {
-        try {
-          const result = await embeddings.embedQuery(
-            representation.text,
-            MANDATE_TASK,
-          );
-          queryVector = result.vector;
-          await store.insertMandateEmbedding({
-            tenantId: query.actor.tenantId,
-            representationId: row.id,
-            investorOrganisationId,
-            contentSha256: representation.contentSha256,
-            identity: identityOf(result),
-            vector: result.vector,
-          });
-          queryVectorSource = "COMPUTED";
-        } catch (error: unknown) {
-          if (error instanceof EmbeddingProviderFailure) {
-            logger?.warn(
-              {
-                generatorVersion: SEMANTIC_GENERATOR_VERSION,
-                failureClass: error.failureClass,
-                retryable: error.retryable,
-              },
-              "semantic candidates unavailable",
-            );
-            return {
-              kind: "UNAVAILABLE",
-              generatorId: SEMANTIC_GENERATOR_ID,
-              generatorVersion: SEMANTIC_GENERATOR_VERSION,
-              context: context(mandate.mandateId),
-              failureClass: error.failureClass,
-              retryable: error.retryable,
-            };
-          }
-          throw error;
-        }
-      }
-      const queryDurationMs = Math.round(performance.now() - queryStarted);
+      const {
+        context,
+        mandate,
+        queryVector,
+        queryVectorSource,
+        investorRepresentation,
+        queryDurationMs,
+      } = prepared;
 
       const hits = await store.nearestCompanies({
         queryVector,
@@ -549,25 +727,9 @@ export function createSemanticCandidateService(
           undetermined += 1;
           continue;
         }
-        const similarity = 1 - hit.distance;
-        if (!Number.isFinite(similarity) || similarity < -1 || similarity > 1) {
-          throw new RangeError(
-            "the vector store returned a cosine distance outside its range",
-          );
-        }
         candidates.push({
           companyId: hit.companyId,
-          provenance: {
-            generatorId: SEMANTIC_GENERATOR_ID,
-            generatorVersion: SEMANTIC_GENERATOR_VERSION,
-            metric: SEMANTIC_SIMILARITY_METRIC,
-            similarity,
-            companyRepresentationVersion: COMPANY_REPRESENTATION_VERSION,
-            investorRepresentationVersion: INVESTOR_REPRESENTATION_VERSION,
-            configurationVersion: configuration.configurationVersion,
-            documentInstructionVersion: EMBEDDING_DOCUMENT_INSTRUCTION_VERSION,
-            queryInstructionVersion,
-          },
+          provenance: provenanceOf(1 - hit.distance),
           eligibility: result,
         });
       }
@@ -609,7 +771,7 @@ export function createSemanticCandidateService(
         generatorId: SEMANTIC_GENERATOR_ID,
         generatorVersion: SEMANTIC_GENERATOR_VERSION,
         eligibilityPolicyVersion: ELIGIBILITY_POLICY_VERSION,
-        context: context(mandate.mandateId),
+        context,
         candidates,
         diagnostics,
       };

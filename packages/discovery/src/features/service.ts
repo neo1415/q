@@ -316,6 +316,22 @@ export function createFeatureService(
                   configurationVersion: candidate.semantic.configurationVersion,
                   similarity: candidate.semantic.similarity,
                 },
+          scored:
+            candidate.mandateSimilarity === null ||
+            candidate.mandateSimilarity === undefined
+              ? null
+              : {
+                  sourceClass: "SEMANTIC_CANDIDATE_PROVENANCE",
+                  generatorVersion:
+                    candidate.mandateSimilarity.generatorVersion,
+                  companyRepresentationVersion:
+                    candidate.mandateSimilarity.companyRepresentationVersion,
+                  investorRepresentationVersion:
+                    candidate.mandateSimilarity.investorRepresentationVersion,
+                  configurationVersion:
+                    candidate.mandateSimilarity.configurationVersion,
+                  similarity: candidate.mandateSimilarity.similarity,
+                },
         };
         const computed = computeFeatureValues(definitions, {
           mandate: { ...mandate, sourceClass: "DECLARED_MANDATE" },

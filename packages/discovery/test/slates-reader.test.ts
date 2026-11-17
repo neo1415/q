@@ -73,7 +73,7 @@ const KEY: SlateKey = {
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v6" as const,
   structuredGeneratorVersion: "structured-mandate.v7" as const,
-  semanticGeneratorVersion: "semantic-mandate.v1" as const,
+  semanticGeneratorVersion: "semantic-mandate.v2" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
   rankingConfigVersion: "ranking-config.v1",

@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  factsForVoice,
   requestedCount,
+  SPOKEN_RANKED_MAX,
+  spokenCount,
   spokenFactsOf,
   spokenFidelityIssues,
   type SpokenFacts,
 } from "../src/index.js";
+import { ZINO_ASKED, ZINO_RANKED_BLOCK } from "./fixtures/voice-9995dcca.js";
 import {
   C10B_CARDS,
   C10B_FIT_BLOCKS,
@@ -187,5 +191,85 @@ describe("answers a model wrote", () => {
         blocks: [],
       }),
     ).toBeNull();
+  });
+});
+
+/**
+ * Replay: owner live 17 Nov 2026 (Zino, conversation 9995dcca). "Find the
+ * strongest companies…" names no number; the stored cards had a four-way
+ * tie at 10, and the voice said three names "and one more". With no number
+ * asked, a tie is never cut: all four are said, and nothing is left as an
+ * unnamed "one more".
+ */
+describe("9995dcca: the strongest companies, a four-way tie at the top", () => {
+  const facts = (blocks = [ZINO_RANKED_BLOCK]) => {
+    const made = spokenFactsOf({ asked: ZINO_ASKED, text: "", blocks });
+    if (made === null) throw new Error("no facts for the ranking");
+    return made;
+  };
+  const withScores = (scores: readonly number[]) => ({
+    ...ZINO_RANKED_BLOCK,
+    cards: ZINO_RANKED_BLOCK.cards.map((card, at) => ({
+      ...card,
+      fit:
+        card.fit === null
+          ? null
+          : { ...card.fit, score: scores[at] ?? card.fit.score },
+    })),
+  });
+
+  it("says every company in the tie, and none level beyond it", () => {
+    const said = facts();
+    expect(said.requested).toBeNull();
+    expect(said.items.map((item) => item.name)).toEqual([
+      "Nixo",
+      "Halyard Security",
+      "Tensorgate",
+      "Shiftwell",
+    ]);
+    expect(said.ties).toEqual([
+      ["Nixo", "Halyard Security", "Tensorgate", "Shiftwell"],
+    ]);
+    expect(said.alsoLevel).toBe(0);
+    expect(factsForVoice(said)).not.toHaveProperty("moreOnTheSameScore");
+  });
+
+  it("its own fallback names all four, never 'one more', and passes every check", () => {
+    const said = facts();
+    expect(said.fallback).not.toMatch(/\bone more\b|\bmore is\b/iu);
+    for (const name of said.items.map((item) => item.name)) {
+      expect(said.fallback).toContain(name);
+    }
+    expect(spokenFidelityIssues(said.fallback, said)).toEqual([]);
+  });
+
+  it("a tie running past the cap by one names that one too", () => {
+    const said = facts([
+      withScores([10, 10, 10, 10, 10, 10, 10, 9.4, 9.4, 8.8]),
+    ]);
+    expect(said.items).toHaveLength(SPOKEN_RANKED_MAX + 1);
+    expect(said.alsoLevel).toBe(0);
+  });
+
+  it("a tie running further past the cap says the rest are on screen, never a count of unnamed ones", () => {
+    const said = facts([withScores([10, 10, 10, 10, 10, 10, 10, 10, 10, 8.8])]);
+    expect(said.items).toHaveLength(SPOKEN_RANKED_MAX);
+    expect(said.alsoLevel).toBe(3);
+    expect(said.fallback).toContain("The others on that score are on screen");
+    expect(said.fallback).not.toMatch(/\b(?:one|two|three) more\b/iu);
+    expect(spokenFidelityIssues(said.fallback, said)).toEqual([]);
+  });
+
+  it("no tie at the cut: the usual three", () => {
+    const said = facts([
+      withScores([10, 9.6, 9.5, 9.4, 9.4, 9, 8.8, 8.6, 8.2, 8]),
+    ]);
+    expect(said.items).toHaveLength(3);
+    expect(said.alsoLevel).toBe(0);
+  });
+
+  it("a number they asked for is still exactly that many", () => {
+    expect(spokenCount(ZINO_RANKED_BLOCK.cards, 2)).toBe(2);
+    expect(spokenCount(ZINO_RANKED_BLOCK.cards, null)).toBe(4);
   });
 });

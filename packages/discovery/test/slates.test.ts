@@ -129,7 +129,7 @@ function pool(
     kind: "GENERATED",
     poolVersion: "hybrid-candidate-pool.v1",
     structuredGeneratorVersion: "structured-mandate.v7",
-    semanticGeneratorVersion: "semantic-mandate.v1",
+    semanticGeneratorVersion: "semantic-mandate.v2",
     eligibilityPolicyVersion: "eligibility.v6",
     context: {
       tenantId: TENANT,
@@ -436,7 +436,7 @@ describe("slate builder (CQ-REC-006)", () => {
     expect(result.slate.status).toBe("CURRENT");
     expect(result.slate.itemCount).toBe(3);
     expect(result.slate.generationFingerprint).toMatch(/^[0-9a-f]{64}$/);
-    expect(result.slate.semanticGeneratorVersion).toBe("semantic-mandate.v1");
+    expect(result.slate.semanticGeneratorVersion).toBe("semantic-mandate.v2");
     expect(result.slate.rankingConfigVersion).toBe("ranking-config.v1");
     expect(result.slate.taxonomyVersion).toEqual({ industry: 2 });
     expect(result.slate.expiresAt).toBe(
@@ -640,7 +640,7 @@ describe("slate builder (CQ-REC-006)", () => {
       versions: {
         eligibilityPolicyVersion: "eligibility.v6",
         structuredGeneratorVersion: "structured-mandate.v7",
-        semanticGeneratorVersion: "semantic-mandate.v1",
+        semanticGeneratorVersion: "semantic-mandate.v2",
         featureSchemaVersion: FEATURE_SCHEMA_VERSION,
         rankerVersion: RANKER_VERSION,
         rankingConfigVersion: "ranking-config.v1",
@@ -674,7 +674,7 @@ describe("slate builder (CQ-REC-006)", () => {
     const versions = {
       eligibilityPolicyVersion: "eligibility.v6" as const,
       structuredGeneratorVersion: "structured-mandate.v7" as const,
-      semanticGeneratorVersion: "semantic-mandate.v1" as const,
+      semanticGeneratorVersion: "semantic-mandate.v2" as const,
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,
       rankerVersion: RANKER_VERSION,
       rankingConfigVersion: "ranking-config.v1",

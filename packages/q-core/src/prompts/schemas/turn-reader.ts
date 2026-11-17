@@ -1626,3 +1626,24 @@ export const TurnReaderV89ResultSchema = TurnReaderV88ResultSchema.extend({
   question: TurnQuestionV89Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV89Result = z.infer<typeof TurnReaderV89ResultSchema>;
+
+/**
+ * v90 (owner live 17 Nov 2026, conversation 9995dcca, run 333d9645): "So,
+ * why are they the strongest fits? Don't just repeat the descriptions"
+ * came back as the same ranked list and the same tie line again: the
+ * reading said FIT about the companies just shown, and nothing more, so
+ * code ranked them again. The reading now says, by meaning and in any
+ * language, that they ask WHY those companies fit or rank as they do --
+ * the reasons, not the list (`question.fitReasons`). Which measures
+ * matched stays code's, from the stored fit profiles. Lenient: a malformed
+ * value reads as false and never costs the reading.
+ */
+export const TURN_READER_V90_SCHEMA_VERSION = 90;
+export const TurnQuestionV90Schema = TurnQuestionV89Schema.extend({
+  fitReasons: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnQuestionV90 = z.infer<typeof TurnQuestionV90Schema>;
+export const TurnReaderV90ResultSchema = TurnReaderV89ResultSchema.extend({
+  question: TurnQuestionV90Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV90Result = z.infer<typeof TurnReaderV90ResultSchema>;

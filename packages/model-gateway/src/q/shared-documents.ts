@@ -94,6 +94,60 @@ export const readableListed = (
     (document) => document.access === "SHARED" || document.access === "OPEN",
   );
 
+/** Companies whose rooms are counted for one list of cards, at most. */
+export const READABLE_COUNT_MAX = 10;
+/** Each room read is waited for at most this long. */
+export const READABLE_COUNT_TIMEOUT_MS = 1_500;
+
+/**
+ * Owner live 17 Nov 2026 (conversation 9995dcca): a ranked list said "no
+ * source documents yet" for Halyard, Tensorgate and Shiftwell, each with
+ * documents open to the investor, because a ranking run never counted
+ * them. What each listed company's data room holds open to this reader
+ * (shared with them, or open in the room), through the room's own
+ * projection as them -- read_company_data_room, authorised per company,
+ * so no other investor's grant and nothing founder-private is counted.
+ * Bounded to the listed companies, read side by side. A room that could
+ * not be read, or is not open to them, is absent: unknown, never zero.
+ */
+export async function readableDocumentCounts(input: {
+  readonly companyIds: readonly string[];
+  readonly read: (
+    companyId: string,
+    index: number,
+  ) => Promise<{
+    readonly result: { readonly ok: boolean; readonly data?: unknown };
+  } | null>;
+  readonly timeoutMs?: number | undefined;
+}): Promise<ReadonlyMap<string, number>> {
+  const ids = [
+    ...new Set(input.companyIds.map((id) => id.toLowerCase())),
+  ].slice(0, READABLE_COUNT_MAX);
+  const counts = new Map<string, number>();
+  // A slow room never holds the answer: past the bound it is uncounted.
+  const bound = input.timeoutMs ?? READABLE_COUNT_TIMEOUT_MS;
+  const outcomes = await Promise.all(
+    ids.map((id, index) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), bound);
+      });
+      return Promise.race([
+        input.read(id, index).catch(() => null),
+        late,
+      ]).finally(() => clearTimeout(timer));
+    }),
+  );
+  outcomes.forEach((outcome, at) => {
+    const id = ids[at];
+    if (id === undefined || outcome === null || !outcome.result.ok) return;
+    const documents = listedDocumentsOf(outcome.result.data);
+    if (documents === null) return;
+    counts.set(id, readableListed(documents).length);
+  });
+  return counts;
+}
+
 const quoted = (document: ListedDocument): string =>
   `"${document.title}"${document.folder.length === 0 ? "" : ` (${document.folder})`}`;
 

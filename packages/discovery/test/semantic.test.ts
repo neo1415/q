@@ -21,6 +21,12 @@ import type {
   MandateSnapshotForEligibility,
 } from "../src/eligibility/ports.js";
 import type { EligibilityService } from "../src/eligibility/service.js";
+import { createFeatureRegistry } from "../src/features/policy.js";
+import type { CompanyFeatureProjection } from "../src/features/ports.js";
+import { createFeatureService } from "../src/features/service.js";
+import { FIT_CONFIG_CURRENT } from "../src/fit/config.js";
+import { observeFit } from "../src/fit/observe.js";
+import { HybridCandidatePoolSchema } from "../src/hybrid/contracts.js";
 import { createHybridCandidateService } from "../src/hybrid/service.js";
 import {
   SEMANTIC_TOP_K,
@@ -741,6 +747,40 @@ function memoryStore(w: World) {
         .slice(0, i.limit);
       return Promise.resolve(hits);
     },
+    distancesToCompanies: (i) => {
+      w.queries.push("store.distancesToCompanies");
+      const asked = new Set(i.companyIds);
+      const hits = companyVectors
+        .filter((v) => asked.has(v.subjectId) && same(v.identity, i.identity))
+        .flatMap((v) => {
+          const row = companyRows.find((r) => r.id === v.representationId);
+          const c = w.companies.find((x) => x.id === v.subjectId);
+          if (
+            row === undefined ||
+            row.status !== "CURRENT" ||
+            row.purpose !== i.purpose ||
+            row.version !== i.representationVersion ||
+            c === undefined ||
+            !discoverable(c)
+          ) {
+            return [];
+          }
+          const dot = v.vector.reduce(
+            (s, x, k) => s + x * (i.queryVector[k] ?? 0),
+            0,
+          );
+          return [
+            {
+              companyId: c.id,
+              tenantId: c.tenantId,
+              organisationId: c.organisationId,
+              distance: 1 - dot,
+            },
+          ];
+        })
+        .sort((a, b) => a.companyId.localeCompare(b.companyId));
+      return Promise.resolve(hits);
+    },
   };
   return {
     store,
@@ -1346,6 +1386,128 @@ describe("hybrid pool over the same world", () => {
     );
     expect(pool.diagnostics).toMatchObject({ both: 1, semanticOnly: 1 });
     expect(pool.diagnostics.structuredOnly).toBeGreaterThanOrEqual(1);
+  });
+
+  it("live 17 Nov 2026 (Zino): a top structural fit outside semantic top-K gets its similarity computed, a THESIS outcome, and keeps its structured-only provenance", async () => {
+    const h = harness();
+    await h.semantic.refreshCompanyRepresentations();
+    // Top-K of one: the semantic generator retrieves only the closest.
+    const pool = await h.hybrid.generate({ actor: ACTOR, topK: 1 });
+    if (pool.kind !== "GENERATED") throw new Error(pool.kind);
+    // Bakehouse: seed, NG -- a structured fit the retrieval did not reach.
+    const bakehouse = pool.candidates.find((c) => c.companyId === companyId(3));
+    expect(bakehouse?.structured).not.toBeNull();
+    expect(bakehouse?.semantic).toBeNull();
+    // The same cosine retrieval computes for it with room enough.
+    const wide = await generated(h, { topK: SEMANTIC_TOP_K });
+    const retrieved = similarityOf(wide, 3);
+    expect(retrieved).toBeDefined();
+    expect(bakehouse?.mandateSimilarity?.similarity).toBeCloseTo(
+      retrieved ?? Number.NaN,
+      12,
+    );
+    expect(bakehouse?.mandateSimilarity).toMatchObject({
+      configurationVersion: CONFIGURATION.configurationVersion,
+      documentInstructionVersion: EMBEDDING_DOCUMENT_INSTRUCTION_VERSION,
+      queryInstructionVersion:
+        instructionFor("MANDATE_MATCHING").instructionVersion,
+    });
+    // One bounded read for the structured-only candidates, never a scan.
+    expect(
+      h.w.queries.filter((q) => q === "store.distancesToCompanies"),
+    ).toHaveLength(1);
+    expect(HybridCandidatePoolSchema.parse(pool)).toEqual(pool);
+
+    // Through the feature service and the fit model: THESIS is known.
+    const features = createFeatureService({
+      registry: createFeatureRegistry(),
+      ports: eligibilityPorts(h.w),
+      companies: {
+        projectMany: (ids) =>
+          Promise.resolve(
+            new Map<string, CompanyFeatureProjection>(
+              h.w.companies
+                .filter((c) => ids.includes(c.id))
+                .map((c) => [
+                  c.id,
+                  {
+                    state: {
+                      sourceClass: "CANONICAL_COMPANY_STATE",
+                      companyId: c.id,
+                      tenantId: c.tenantId,
+                      currentStageCode: c.stage,
+                      headquartersCountry: c.country,
+                      version: c.version,
+                    },
+                    taxonomy: {
+                      sourceClass: "CANONICAL_TAXONOMY",
+                      classifications: c.nodes.map((n) => ({
+                        nodeId: n.nodeId,
+                        vocabularyCode: n.vocabularyCode,
+                        source: "user_selected",
+                      })),
+                    },
+                  },
+                ]),
+            ),
+          ),
+      },
+      hierarchy: {
+        expand: () =>
+          Promise.resolve({
+            sourceClass: "TAXONOMY_REFERENCE_HIERARCHY",
+            nodes: [],
+          }),
+      },
+      store: {
+        currentFor: () => Promise.resolve(new Map()),
+        supersede: () => Promise.resolve(),
+        insertMany: () => Promise.resolve([]),
+      },
+    });
+    const computed = await features.computeForCandidates({
+      actor: ACTOR,
+      mode: "INVESTOR_DISCOVER",
+      candidates: pool.candidates.filter((c) => c.companyId === companyId(3)),
+      persist: false,
+    });
+    if (computed.kind !== "COMPUTED") throw new Error(computed.kind);
+    const snapshot = computed.snapshots[0];
+    if (snapshot === undefined) throw new Error("no snapshot");
+    expect(snapshot.candidateProvenance.semantic).toBeNull();
+    expect(
+      snapshot.features.find(
+        (f) => f.featureId === "semantic_fit.mandate_similarity",
+      ),
+    ).toMatchObject({
+      status: "PRESENT",
+      provenance: { similarityBasis: "SCORED" },
+    });
+    const observed = observeFit({
+      companyId: companyId(3),
+      snapshot,
+      declared: {},
+      eligibilityReasons: [],
+      config: FIT_CONFIG_CURRENT,
+      now: new Date("2026-11-17T14:52:41.000Z"),
+    });
+    expect(observed.observations.THESIS.outcome).not.toBe("UNKNOWN");
+  });
+
+  it("a company with no current vector stays unknown: never a zero similarity", async () => {
+    const h = harness();
+    await h.semantic.refreshCompanyRepresentations();
+    // Bakehouse's vector is gone (a configuration it was never embedded in).
+    h.memory.companyVectors.splice(
+      0,
+      h.memory.companyVectors.length,
+      ...h.memory.companyVectors.filter((v) => v.subjectId !== companyId(3)),
+    );
+    const pool = await h.hybrid.generate({ actor: ACTOR, topK: 1 });
+    if (pool.kind !== "GENERATED") throw new Error(pool.kind);
+    const bakehouse = pool.candidates.find((c) => c.companyId === companyId(3));
+    expect(bakehouse?.semantic).toBeNull();
+    expect(bakehouse?.mandateSimilarity).toBeUndefined();
   });
 
   it("M: a semantic outage leaves the structured pool exactly as the structured generator produced it", async () => {

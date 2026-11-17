@@ -239,6 +239,46 @@ function runsOf(items: readonly SpokenItem[]): SpokenItem[][] {
   return runs;
 }
 
+/**
+ * At most this many names in one ranked answer, ties included (a tie
+ * extends the default three, or the number asked for, to its end).
+ */
+export const SPOKEN_RANKED_MAX = 6;
+
+/**
+ * How many ranked cards are said (owner live 17 Nov 2026, conversation
+ * 9995dcca: "find the strongest companies" -- no number -- had a four-way
+ * tie at 10 said as three names "and one more"). With no number asked,
+ * never cut inside a tie: the set runs to the last card at the score of
+ * the last one said, up to SPOKEN_RANKED_MAX; a single card left at that
+ * score past the cap is named too. Only a tie of two or more past the cap,
+ * or past the number they asked for, stays on screen, said as such.
+ */
+export function spokenCount(
+  scored: readonly Pick<QAnswerCard, "fit">[],
+  requested: number | null,
+): number {
+  const scoreAt = (at: number): string | null => {
+    const fit = scored[at]?.fit ?? null;
+    return fit === null ? null : scoreWords(fit.score);
+  };
+  // A number they asked for is exactly that many (founder live 2026-10-08,
+  // c10b845f: "top three" is three); the rest at that score are said to
+  // be on screen.
+  if (requested !== null) return Math.min(requested, scored.length);
+  let n = Math.min(3, scored.length);
+  const last = n === 0 ? null : scoreAt(n - 1);
+  if (last === null) return n;
+  while (n < scored.length && n < SPOKEN_RANKED_MAX && scoreAt(n) === last) {
+    n += 1;
+  }
+  let left = 0;
+  for (let at = n; at < scored.length && scoreAt(at) === last; at += 1) {
+    left += 1;
+  }
+  return left === 1 ? n + 1 : n;
+}
+
 function sharedUnknown(items: readonly SpokenItem[]): string | null {
   const first = items[0]?.unknowns[0];
   if (first === undefined) return null;
@@ -287,9 +327,11 @@ function rankedFallback(
             seed,
           );
   const first = runWords.join("; ");
+  // A tie past the number asked for, or two or more past the cap
+  // (spokenCount): said as on screen, never an unnamed "one more".
   const more =
     alsoLevel > 0
-      ? ` ${capitalised(sayNumber(alsoLevel))} more ${alsoLevel === 1 ? "is" : "are"} on the same score${runs.length === 1 ? ", so it's close at the top" : ""}.`
+      ? ` The others on that score are on screen${runs.length === 1 ? ", so it's close at the top" : ""}.`
       : "";
   const caveat = facts.caveat === null ? "" : ` ${facts.caveat}`;
   const door = pick(
@@ -455,12 +497,13 @@ export function spokenFactsOf(input: {
       input.requested === undefined || input.requested === null
         ? requestedCount(input.asked)
         : input.requested;
-    const n = Math.min(requested ?? 3, scored.length);
+    const n = spokenCount(scored, requested);
     const said = scored.slice(0, n).map(itemOf);
     const lastScore = said[said.length - 1]?.score ?? null;
     const rest = ranked.cards.filter(
       (card) => !said.some((item) => item.name === card.name),
     );
+    // Only when a tie runs past the cap (never just one: that one is named).
     const alsoLevel =
       lastScore === null
         ? 0

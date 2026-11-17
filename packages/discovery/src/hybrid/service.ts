@@ -9,7 +9,11 @@ import type { StructuredCandidateService } from "../candidates/service.js";
 import { ELIGIBILITY_POLICY_VERSION } from "../eligibility/contracts.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
 import type { SemanticCandidateService } from "../semantic/service.js";
-import { HYBRID_POOL_VERSION, type HybridCandidatePool } from "./contracts.js";
+import {
+  HYBRID_POOL_VERSION,
+  type HybridCandidate,
+  type HybridCandidatePool,
+} from "./contracts.js";
 import { mergeCandidatePools } from "./merge.js";
 
 /**
@@ -53,7 +57,64 @@ export function createHybridCandidateService(
     degraded: meter.createCounter(
       "discovery.candidates.hybrid.semantic_unavailable",
     ),
+    scored: meter.createHistogram(
+      "discovery.candidates.hybrid.similarity_scored",
+    ),
   };
+
+  /**
+   * Live 17 Nov 2026 (Zino): a structured-only candidate carried no mandate
+   * similarity, so its THESIS read unknown although both vectors existed.
+   * Every admitted candidate the semantic generator did not retrieve gets
+   * the same cosine computed directly, in one bounded read; top-K stays a
+   * candidate generator only. A failure here changes nothing else: the
+   * similarity stays unknown and the pool is exactly as merged.
+   */
+  async function withMandateSimilarity(
+    merged: readonly HybridCandidate[],
+    query: GenerateHybridCandidatesQuery,
+    mandateId: string | null,
+  ): Promise<HybridCandidate[]> {
+    const unscored = merged.filter(
+      (one) => one.semantic === null && one.eligibility.decision === "ELIGIBLE",
+    );
+    if (
+      unscored.length === 0 ||
+      mandateId === null ||
+      semantic.scoreCompanies === undefined
+    ) {
+      return [...merged];
+    }
+    const scored = await semantic
+      .scoreCompanies({
+        actor: query.actor,
+        mandateId,
+        companyIds: unscored.map((one) => one.companyId),
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          {
+            poolVersion: HYBRID_POOL_VERSION,
+            error: error instanceof Error ? error.name : "UNKNOWN",
+          },
+          "mandate similarity for structured candidates not computed",
+        );
+        return null;
+      });
+    if (scored?.kind !== "SCORED" || scored.mandateId !== mandateId) {
+      return [...merged];
+    }
+    metrics.scored.record(scored.similarities.size, {
+      pool: HYBRID_POOL_VERSION,
+    });
+    return merged.map((one) => {
+      if (one.semantic !== null) return one;
+      const similarity = scored.similarities.get(one.companyId.toLowerCase());
+      return similarity === undefined
+        ? one
+        : { ...one, mandateSimilarity: similarity };
+    });
+  }
 
   return {
     generate: async (query) => {
@@ -94,6 +155,11 @@ export function createHybridCandidateService(
         semantic: semanticCandidates,
         poolMax,
       });
+      const candidates = await withMandateSimilarity(
+        merged.candidates,
+        query,
+        structuredResult.context.mandateId,
+      );
       const semanticUnavailable =
         semanticResult.kind === "UNAVAILABLE"
           ? {
@@ -132,7 +198,7 @@ export function createHybridCandidateService(
         eligibilityPolicyVersion: ELIGIBILITY_POLICY_VERSION,
         context: structuredResult.context,
         semanticUnavailable,
-        candidates: [...merged.candidates],
+        candidates,
         diagnostics: {
           structured: structuredResult.diagnostics,
           semantic:

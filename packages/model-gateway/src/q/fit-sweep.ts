@@ -208,6 +208,8 @@ export function fitSweepAskOfReading(
     readonly excludeShown?: boolean | undefined;
     /** v88: and other than those they are already in contact with. */
     readonly excludeRelationships?: boolean | undefined;
+    /** v90: they ask why the companies just shown fit: those companies. */
+    readonly reasons?: boolean | undefined;
   },
   previous: readonly string[] = [],
   named: readonly string[] = [],
@@ -261,7 +263,9 @@ export function fitSweepAskOfReading(
   }
   if (
     previous.length > 0 &&
-    (question.previous === true || refersToShown(words))
+    (question.previous === true ||
+      question.reasons === true ||
+      refersToShown(words))
   ) {
     return {
       scope: "PREVIOUS",

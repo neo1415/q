@@ -34,10 +34,17 @@ import {
 
 export const SEMANTIC_GENERATOR_ID = "SEMANTIC_MANDATE" as const;
 
-/** Bumped when retrieval, the merge or the provenance shape changes. */
-export const SEMANTIC_GENERATOR_VERSION = "semantic-mandate.v1" as const;
+/**
+ * Bumped when retrieval, the merge or the provenance shape changes. v2
+ * (live 17 Nov 2026): the same similarity is also computed for admitted
+ * candidates outside top-K (`scoreCompanies`, hybrid `mandateSimilarity`).
+ * The bump is the backfill: at worker start every CURRENT slate built under
+ * v1 is rebuilt (requestRebuildsForVersionDrift), so its snapshots carry it.
+ */
+export const SEMANTIC_GENERATOR_VERSION = "semantic-mandate.v2" as const;
 /** Every semantic generator version a persisted artifact may name. Append, never remove. */
 export const SEMANTIC_GENERATOR_VERSIONS = [
+  "semantic-mandate.v1",
   SEMANTIC_GENERATOR_VERSION,
 ] as const;
 

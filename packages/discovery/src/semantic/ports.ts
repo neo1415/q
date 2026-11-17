@@ -190,6 +190,25 @@ export type SemanticRepresentationStore = {
     readonly documentInstructionVersion: string;
     readonly limit: number;
   }) => Promise<readonly SemanticNearestHit[]>;
+
+  /**
+   * Live 17 Nov 2026 (Zino): the cosine distance from one query vector to
+   * the CURRENT vectors of exactly these companies, under the same guards
+   * as `nearestCompanies` plus the vector's model and dimension: the same
+   * purpose and representation version, the same embedding configuration
+   * and document instruction, the same model and dimension as the query,
+   * and the company discoverable NOW. Bounded by the ids given (one query,
+   * never a scan). A company with no current vector in that space is
+   * simply absent: its similarity stays unknown, never zero.
+   */
+  readonly distancesToCompanies: (input: {
+    readonly queryVector: readonly number[];
+    readonly companyIds: readonly string[];
+    readonly purpose: string;
+    readonly representationVersion: string;
+    /** The document-side identity every company vector is stored under. */
+    readonly identity: VectorIdentity;
+  }) => Promise<readonly SemanticNearestHit[]>;
 };
 
 /**

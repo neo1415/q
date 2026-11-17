@@ -600,6 +600,11 @@ export {
   readsAsGo,
   readsAsNoNavigation,
   readsAsContext,
+  TURN_READER_V90_SCHEMA_VERSION,
+  TurnQuestionV90Schema,
+  type TurnQuestionV90,
+  TurnReaderV90ResultSchema,
+  type TurnReaderV90Result,
   TURN_READER_V89_SCHEMA_VERSION,
   TurnListConditionsV89Schema,
   type TurnListConditionsV89,
@@ -2037,7 +2042,9 @@ export {
   SPOKEN_FACTS_VERSION,
   SPOKEN_FACTS_WORDS_MAX,
   SPOKEN_FIDELITY_ISSUES,
+  SPOKEN_RANKED_MAX,
   naturalPlaceLine,
+  spokenCount,
   spokenFactsOf,
   spokenFactsOfAttention,
   spokenFactsOfAttentionOnScreen,
@@ -2299,6 +2306,10 @@ export {
   TURN_READER_V89,
   V89_LIST_CONDITIONS,
 } from "./prompts/tasks/turn-reader.v89.js";
+export {
+  TURN_READER_V90,
+  V90_FIT_REASONS,
+} from "./prompts/tasks/turn-reader.v90.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

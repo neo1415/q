@@ -35,6 +35,14 @@ export const HybridCandidateSchema = z
     structured: CandidateProvenanceSchema.nullable(),
     /** Present when the semantic generator found the company. */
     semantic: SemanticProvenanceSchema.nullable(),
+    /**
+     * Live 17 Nov 2026: the same mandate similarity, computed directly for
+     * a candidate the semantic generator did not retrieve (outside its
+     * top-K), under the same versions. Retrieval provenance (`semantic`)
+     * still says only who FOUND the company. Absent or null: not computed
+     * (no vector on one side), which is unknown, never zero.
+     */
+    mandateSimilarity: SemanticProvenanceSchema.nullable().optional(),
     /** REC-001's word, identical under either generator (same policy, same run). */
     eligibility: EligibilityResultSchema,
   })

@@ -202,10 +202,13 @@ export function mandateFitProvenance(card: {
   if (card.fit === null) return null;
   const { score, measured, of } = card.fit;
   const name = card.name.slice(0, 60);
+  // Owner live 17 Nov 2026: a card's 0 is "not counted" as often as
+  // "none" (no ranking run counted them), so zero is never claimed; a
+  // count is said only when documents were counted.
   const sources =
     card.sourceCount === 0
-      ? "No source documents yet."
-      : `${String(card.sourceCount)} source${card.sourceCount === 1 ? "" : "s"}.`;
+      ? ""
+      : ` ${String(card.sourceCount)} source${card.sourceCount === 1 ? "" : "s"}.`;
   const label = `${card.platform === true ? "Capital Q" : "Q's reading:"} mandate fit ${String(score)} out of 10, ${String(measured)} of ${String(of)} measures known; not a quality score.`;
   const scale = `(${card.platform === true ? PLATFORM_SCALE : READING_SCALE}.)`;
   const insight = measuresInsight(name, card.measures ?? []);
@@ -214,10 +217,10 @@ export function mandateFitProvenance(card: {
     whole.length <= 170
       ? whole
       : `${whole.slice(0, 169).replace(/[\s,;]+\S*$/u, "")}…`;
-  const full = `${lead} ${label} ${sources} ${scale}`;
+  const full = `${lead} ${label}${sources} ${scale}`;
   if (full.length <= SAID_MAX) return full;
   // The scale is the first thing to go; the insight and number never do.
-  return `${lead} ${label} ${sources}`.slice(0, SAID_MAX);
+  return `${lead} ${label}${sources}`.slice(0, SAID_MAX);
 }
 
 /** Words that ask for companies side by side, not in order. */
@@ -294,8 +297,10 @@ export function tieLine(block: QAnswerCardsBlock): string | null {
     measured.size === 1
       ? `${[...measured][0] ?? ""} measures known for each`
       : "different measures known for each";
-  const noSources = cards.every((card) => card.sourceCount === 0);
-  return `${listed} are tied on mandate fit at ${String(score)}: ${known}${noSources ? ", and no source documents yet" : ""}. That's how well they match your mandate, not a judgement of quality.`;
+  // Owner live 17 Nov 2026 (conversation 9995dcca): "and no source
+  // documents yet" was said of four companies, three with documents open
+  // to the investor; a card's 0 may be uncounted. Zero is never claimed.
+  return `${listed} are tied on mandate fit at ${String(score)}: ${known}. That's how well they match your mandate, not a judgement of quality.`;
 }
 
 /**

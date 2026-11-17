@@ -10287,6 +10287,8 @@ export function createSpecialistQAnswer(
               excludeShown: read.question.excludeShown === true,
               // Ranked against their mandate, as the reader understood it.
               mandateRelevant: read.question.discover?.mandateRelevant === true,
+              // v90: they asked why these fit, not for the list again.
+              ...(read.question.fitReasons === true ? { reasons: true } : {}),
             },
           }
         : {}),

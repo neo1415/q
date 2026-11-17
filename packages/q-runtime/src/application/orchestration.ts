@@ -556,6 +556,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
          * mandate"). Absent is false.
          */
         readonly mandateRelevant?: boolean | undefined;
+        /**
+         * TURN_READER v90 (owner live 17 Nov 2026, run 333d9645): they ask
+         * why companies fit or rank as they do -- answered with each one's
+         * measures from its fit profile, never the same list again.
+         * Absent is false.
+         */
+        readonly reasons?: boolean | undefined;
       }
     | undefined;
   /**

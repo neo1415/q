@@ -67,7 +67,7 @@ const semantic = (n: number, similarity: number): SemanticCandidate => ({
   companyId: id(n),
   provenance: {
     generatorId: "SEMANTIC_MANDATE",
-    generatorVersion: "semantic-mandate.v1",
+    generatorVersion: "semantic-mandate.v2",
     metric: "COSINE",
     similarity,
     companyRepresentationVersion: "company-investment-representation.v1",
@@ -178,7 +178,7 @@ describe("hybrid candidate service", () => {
         Promise.resolve({
           kind: "UNAVAILABLE",
           generatorId: "SEMANTIC_MANDATE",
-          generatorVersion: "semantic-mandate.v1",
+          generatorVersion: "semantic-mandate.v2",
           context,
           failureClass: "UNAVAILABLE",
           retryable: true,
@@ -207,7 +207,7 @@ describe("hybrid candidate service", () => {
         Promise.resolve({
           kind: "GENERATED",
           generatorId: "SEMANTIC_MANDATE",
-          generatorVersion: "semantic-mandate.v1",
+          generatorVersion: "semantic-mandate.v2",
           eligibilityPolicyVersion: "eligibility.v6",
           context,
           candidates: [semantic(2, 0.8), semantic(3, 0.6)],

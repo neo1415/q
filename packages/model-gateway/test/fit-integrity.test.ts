@@ -323,7 +323,7 @@ describe("score integrity (INC-1)", () => {
       expect(card.fit).toEqual({ score: 8.8, measured: 5, of: 7 });
       expect(card.said).toBe(
         // D2: the insight leads; the platform scale has no Good 7.5.
-        `${card.name} is strong on stage, sector, geography and business model, partial on traction; cheque compatibility and round terms not known yet. Capital Q mandate fit 8.8 out of 10, 5 of 7 measures known; not a quality score. No source documents yet. (Capital Q scale: strong 10, partial 4, mismatch 0.)`,
+        `${card.name} is strong on stage, sector, geography and business model, partial on traction; cheque compatibility and round terms not known yet. Capital Q mandate fit 8.8 out of 10, 5 of 7 measures known; not a quality score. (Capital Q scale: strong 10, partial 4, mismatch 0.)`,
       );
     }
   });
@@ -335,7 +335,7 @@ describe("score integrity (INC-1)", () => {
     if (out?.kind !== "ANSWER_CARDS") throw new Error("no cards");
     const names = out.cards.map((card) => card.name);
     expect(tieLine(out)).toBe(
-      `${names[0] ?? ""}, ${names[1] ?? ""} and ${names[2] ?? ""} are tied on mandate fit at 8.8: 5 of 7 measures known for each, and no source documents yet. That's how well they match your mandate, not a judgement of quality.`,
+      `${names[0] ?? ""}, ${names[1] ?? ""} and ${names[2] ?? ""} are tied on mandate fit at 8.8: 5 of 7 measures known for each. That's how well they match your mandate, not a judgement of quality.`,
     );
   });
 

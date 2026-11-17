@@ -261,5 +261,47 @@ export function createPostgresSemanticRepresentationStore(options: {
         };
       });
     },
+
+    distancesToCompanies: async (
+      input,
+    ): Promise<readonly SemanticNearestHit[]> => {
+      const ids = [...new Set(input.companyIds.map((id) => id.toLowerCase()))];
+      if (ids.length === 0) return [];
+      const p = identityPredicate(input.identity);
+      // The same space as nearestCompanies (configuration + instruction),
+      // pinned further to the vector's model and dimension, over exactly
+      // these companies' CURRENT representations, discoverable now. One
+      // row per company at most (one CURRENT representation, one vector
+      // per identity); a company without one is absent, never zero.
+      const rows = await sql`
+        select r.company_id, c.tenant_id, c.organisation_id,
+               (e.embedding <=> ${toVectorLiteral(input.queryVector)}::extensions.vector) as distance
+          from recommendation.company_embeddings e
+          join recommendation.company_representations r
+            on r.id = e.representation_id and r.tenant_id = e.tenant_id
+          join core.companies c
+            on c.id = r.company_id and c.tenant_id = r.tenant_id
+         where r.company_id = any(${ids}::uuid[])
+           and e.model_code = ${p.modelCode}
+           and e.embedding_dimension = ${p.dimension}
+           and e.configuration_version = ${p.configurationVersion}
+           and e.instruction_version = ${p.instructionVersion}
+           and r.status = 'CURRENT'
+           and r.purpose = ${input.purpose}
+           and r.representation_version = ${input.representationVersion}
+           and c.company_status = 'active'
+           and c.marketplace_visibility = any(${[...DISCOVERABLE]}::text[])
+         order by r.company_id asc
+         limit ${ids.length}`;
+      return rows.map((row) => {
+        const r = NearestRowSchema.parse(row);
+        return {
+          companyId: r.company_id,
+          tenantId: r.tenant_id,
+          organisationId: r.organisation_id,
+          distance: r.distance,
+        };
+      });
+    },
   };
 }

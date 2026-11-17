@@ -18,11 +18,13 @@ import {
  * (`question.listConditions`); code applies them from the records.
  */
 describe("TURN_READER v89", () => {
-  it("is active: v88 with one LIST CONDITIONS paragraph after LEAVE OUT THEIR OWN, on v89's schema", () => {
+  it("is v88 with one LIST CONDITIONS paragraph after LEAVE OUT THEIR OWN, on v89's schema (deprecated by v90)", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
+    const active = { ...TURN_READER_V89 };
     expect(active.version).toBe(89);
-    expect(active.status).toBe("ACTIVE");
+    expect(registry.get("TURN_READER", 89)?.definition.status).toBe(
+      "DEPRECATED",
+    );
     expect(registry.get("TURN_READER", 88)?.definition.status).toBe(
       "DEPRECATED",
     );

@@ -207,6 +207,7 @@ import {
   type FitSweepAsk,
   type FitSweepResult,
 } from "./fit-sweep.js";
+import { fitReasonsAnswer, reasonSubjects } from "./fit-reasons.js";
 import {
   runCompanyDiscovery,
   type DiscoverAsk,
@@ -581,6 +582,7 @@ import {
   measuresMissing,
   pagesCarrying,
   pagesOfRead,
+  readableDocumentCounts,
   readableListed,
   sharedDocumentFor,
   sharedDocumentReads,
@@ -6081,8 +6083,12 @@ export function createModelGatewayQAnswer(
                 namedComparison,
                 shownInConversation,
               )
-            : request.fitQuestion?.excludeShown === true &&
-                shownInConversation.length > 0
+            : // v90: "why do they fit?" is about the companies just shown,
+              // as the reading read it, whatever the words' cue would pick.
+              (request.fitQuestion?.excludeShown === true &&
+                  shownInConversation.length > 0) ||
+                (request.fitQuestion?.reasons === true &&
+                  shownBefore.length > 0)
               ? fitSweepAskOfReading(
                   request.fitQuestion,
                   shownBefore,
@@ -6115,6 +6121,7 @@ export function createModelGatewayQAnswer(
       readonly previous?: boolean | undefined;
       readonly excludeShown?: boolean | undefined;
       readonly excludeRelationships?: boolean | undefined;
+      readonly reasons?: boolean | undefined;
     }): Promise<FitSweepResult | null> =>
       sweepable
         ? sweepFor(
@@ -10896,6 +10903,35 @@ export function createModelGatewayQAnswer(
         );
         return persistAnswer(prose, blocks);
       };
+      // Owner live 17 Nov 2026 (conversation 9995dcca): a ranked list said
+      // "no source documents yet" for companies with documents open to the
+      // investor. Each company card a code-composed list shows counts what
+      // its data room holds open to them, read as them; a room not read
+      // stays uncounted, and nothing claims zero.
+      const withReaderSourceCounts = async (
+        block: QAnswerCardsBlock,
+      ): Promise<QAnswerCardsBlock> =>
+        askerSideOf(request) !== "INVESTOR"
+          ? block
+          : withReadableSourceCounts(
+              block,
+              await readableDocumentCounts({
+                companyIds: block.cards.flatMap((card) =>
+                  card.subject?.kind === "COMPANY"
+                    ? [card.subject.companyId]
+                    : [],
+                ),
+                read: (companyId, index) =>
+                  tools.execute(
+                    {
+                      callId: `q-list-documents-${String(index)}`,
+                      name: "read_company_data_room",
+                      arguments: { companyId },
+                    },
+                    toolContext,
+                  ),
+              }),
+            );
       // A fit question over a set they own (lead live replay 2026-10-07:
       // 36 s and "I can't provide mandate scores"): the fits were computed
       // by code beside the reads above, and the answer is the cards plus a
@@ -11769,7 +11805,9 @@ export function createModelGatewayQAnswer(
               : null;
           const message = await persistCodeAnswer(
             namedLine === null ? found.text : `${found.text}\n\n${namedLine}`,
-            found.block === null ? [] : [found.block],
+            found.block === null
+              ? []
+              : [await withReaderSourceCounts(found.block)],
           );
           logger?.info(
             {
@@ -11841,9 +11879,16 @@ export function createModelGatewayQAnswer(
               excludeRelationships: true,
             }
           : readFit;
+      // v90: "why do they fit?" is about the companies just shown; a sweep
+      // warmed on the words alone may have read another set.
+      const reasonsElsewhere =
+        request.fitQuestion?.reasons === true &&
+        shownBefore.length > 0 &&
+        (await fitSweep)?.ask.scope !== "PREVIOUS";
       const swept = listConditionsUnhonoured
         ? null
-        : (pastShown || pastRelationships) && readSweepFit !== undefined
+        : (pastShown || pastRelationships || reasonsElsewhere) &&
+            readSweepFit !== undefined
           ? await sweepForReading(readSweepFit)
           : recommendAll && readSweepFit !== undefined
             ? // The reading decides: the words' sweep may have read
@@ -11972,6 +12017,40 @@ export function createModelGatewayQAnswer(
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
       }
+      // TURN_READER v90 (owner live 17 Nov 2026, run 333d9645): "why are
+      // they the strongest fits?" about the list just shown is answered
+      // with the reasons from their fit profiles: no re-ranking, no tie
+      // line and no card set again (the cards are on screen), so the
+      // voice says the reasons too, never the list.
+      const reasons =
+        !comparing &&
+        request.fitQuestion?.reasons === true &&
+        request.questionKind === "FIT" &&
+        sweep !== null &&
+        sweep.ask.scope === "PREVIOUS" &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+          ? fitReasonsAnswer(sweep.fits)
+          : null;
+      if (reasons !== null && sweep !== null) {
+        const message = await persistCodeAnswer(reasons);
+        logger?.info(
+          {
+            qRunId: request.runId,
+            explained: reasonSubjects(sweep.fits).length,
+            fitCalls: sweep.calls.length,
+            totalMs: Date.now() - startedAt,
+          },
+          "q answered why the companies shown fit, from their fit profiles",
+        );
+        return {
+          kind: "ANSWERED",
+          messageId: message.id,
+          modelPolicyVersion: "none",
+          promptBundleVersion: rendered.bundle.bundleVersion,
+        };
+      }
       if (
         !comparing &&
         sweep !== null &&
@@ -12014,8 +12093,10 @@ export function createModelGatewayQAnswer(
         );
         // D7: "compare Ledgerfold and F2" is the comparison table, in the
         // order named, and is said as a comparison, never "ranked".
-        const block =
+        const shaped =
           swept === null ? null : asComparison(swept, latest.content);
+        const block =
+          shaped === null ? null : await withReaderSourceCounts(shaped);
         if (block !== null) {
           const summary = fitSweepSummary({
             block,

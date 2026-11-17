@@ -43,6 +43,8 @@ import {
   CandidateNotRankableError,
   createFeatureService,
 } from "../src/features/service.js";
+import { FIT_CONFIG_CURRENT } from "../src/fit/config.js";
+import { observeFit } from "../src/fit/observe.js";
 
 /**
  * The feature registry, the pure computations and the service over a fake
@@ -265,7 +267,7 @@ function inputs(
           ? null
           : {
               sourceClass: "SEMANTIC_CANDIDATE_PROVENANCE",
-              generatorVersion: "semantic-mandate.v1",
+              generatorVersion: "semantic-mandate.v2",
               companyRepresentationVersion:
                 "company-investment-representation.v1",
               investorRepresentationVersion:
@@ -454,7 +456,7 @@ describe("feature computation (pure)", () => {
       status: "PRESENT",
       value: 0.73,
       provenance: {
-        generatorVersion: "semantic-mandate.v1",
+        generatorVersion: "semantic-mandate.v2",
         configurationVersion: "capital-q-qwen3-embedding-0-6b-1024-v1",
       },
     });
@@ -1298,7 +1300,7 @@ const candidate = (
       ? null
       : {
           generatorId: "SEMANTIC_MANDATE",
-          generatorVersion: "semantic-mandate.v1",
+          generatorVersion: "semantic-mandate.v2",
           metric: "COSINE",
           similarity: semantic,
           companyRepresentationVersion: "company-investment-representation.v1",
@@ -1371,7 +1373,7 @@ describe("feature service", () => {
         reasonCodes: ["STAGE_OVERLAP"],
       },
       semantic: {
-        generatorVersion: "semantic-mandate.v1",
+        generatorVersion: "semantic-mandate.v2",
         companyRepresentationVersion: "company-investment-representation.v1",
         investorRepresentationVersion: "investor-mandate-representation.v1",
         configurationVersion: "capital-q-qwen3-embedding-0-6b-1024-v1",
@@ -1806,5 +1808,111 @@ describe("features on read for a company the ranker never scored (live e11)", ()
       });
     expect((await ask(ACTIVE_MANDATE, 1)).size).toBe(0);
     expect((await ask(DRAFT_MANDATE, 2)).size).toBe(0);
+  });
+});
+
+/**
+ * Replay of production, live 17 Nov 2026 (Zino Aviation, conversation
+ * 9995dcca, mandate 3fb15755 v23): Nixo was a top structural fit outside
+ * semantic top-K, so its stored snapshot held semantic_fit.mandate_similarity
+ * MISSING (SEMANTIC_NOT_RETRIEVED) and Q said "thesis isn't known" although
+ * both CURRENT vectors existed under capital-q-openai-te3-small-1024-v1.
+ * Fixture values are that snapshot's own and the cosine those two stored
+ * vectors give (0.4261, read-only); nothing here calls a live service.
+ */
+describe("Zino replay: a structured-only candidate's thesis is computed, not unknown", () => {
+  const ZINO_CONFIGURATION = "capital-q-openai-te3-small-1024-v1";
+  const NIXO_COSINE = 0.4261;
+  const STORED_NIXO_SIMILARITY = {
+    value: null,
+    status: "MISSING",
+    featureId: "semantic_fit.mandate_similarity",
+    provenance: {},
+    sensitivity: "CONFIDENTIAL",
+    missingReason: "SEMANTIC_NOT_RETRIEVED",
+    sourceClasses: ["SEMANTIC_CANDIDATE_PROVENANCE"],
+    featureVersion: "v1",
+  } as const;
+  const scoredNixo = (): HybridCandidate => ({
+    ...candidate(1, null),
+    mandateSimilarity: {
+      generatorId: "SEMANTIC_MANDATE",
+      generatorVersion: "semantic-mandate.v2",
+      metric: "COSINE",
+      similarity: NIXO_COSINE,
+      companyRepresentationVersion: "company-investment-representation.v1",
+      investorRepresentationVersion: "investor-mandate-representation.v1",
+      configurationVersion: ZINO_CONFIGURATION,
+      documentInstructionVersion: "none-v1",
+      queryInstructionVersion: "capital-q-mandate-matching-v1",
+    },
+  });
+  const thesisOf = (features: RecommendationFeatureSnapshot["features"]) =>
+    observeFit({
+      companyId: companyId(1),
+      snapshot: { features },
+      declared: {},
+      eligibilityReasons: [],
+      config: FIT_CONFIG_CURRENT,
+      now: new Date("2026-11-17T14:52:41.000Z"),
+    }).observations.THESIS.outcome;
+
+  it("the stored production value reads UNKNOWN (the defect)", () => {
+    expect(thesisOf([FeatureValueSchema.parse(STORED_NIXO_SIMILARITY)])).toBe(
+      "UNKNOWN",
+    );
+  });
+
+  it("with the similarity computed for it, the snapshot holds it (SCORED) and THESIS is PARTIAL", async () => {
+    const { snapshots } = await computed(harness(), [scoredNixo()]);
+    const snapshot = snapshots[0];
+    if (snapshot === undefined) throw new Error("no snapshot");
+    // Who found it is unchanged: the structured generator alone.
+    expect(snapshot.candidateProvenance.semantic).toBeNull();
+    expect(snapshot.candidateProvenance.structured).not.toBeNull();
+    const similarity = snapshot.features.find(
+      (f) => f.featureId === "semantic_fit.mandate_similarity",
+    );
+    expect(similarity).toMatchObject({
+      status: "PRESENT",
+      value: NIXO_COSINE,
+      missingReason: null,
+      provenance: {
+        similarityBasis: "SCORED",
+        configurationVersion: ZINO_CONFIGURATION,
+      },
+    });
+    // 0.25 <= 0.4261 < 0.5 under the current comparators.
+    expect(thesisOf(snapshot.features)).toBe("PARTIAL");
+  });
+
+  it("a retrieved similarity is read exactly as before (no new provenance key, same fingerprint)", async () => {
+    const before = await computed(harness(), [candidate(1, 0.73)]);
+    const withScored = await computed(harness(), [
+      {
+        ...candidate(1, 0.73),
+        mandateSimilarity: scoredNixo().mandateSimilarity,
+      },
+    ]);
+    const value = before.snapshots[0]?.features.find(
+      (f) => f.featureId === "semantic_fit.mandate_similarity",
+    );
+    expect(value?.provenance).not.toHaveProperty("similarityBasis");
+    expect(withScored.snapshots[0]?.fingerprint).toBe(
+      before.snapshots[0]?.fingerprint,
+    );
+  });
+
+  it("no similarity on either path stays MISSING: never a zero", async () => {
+    const { snapshots } = await computed(harness(), [candidate(1, null)]);
+    expect(
+      snapshots[0]?.features.find(
+        (f) => f.featureId === "semantic_fit.mandate_similarity",
+      ),
+    ).toMatchObject({
+      status: "MISSING",
+      value: null,
+      missingReason: "SEMANTIC_NOT_RETRIEVED",
+    });
   });
 });

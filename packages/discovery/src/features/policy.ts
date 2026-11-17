@@ -231,6 +231,23 @@ export type CandidateProvenanceProjection = {
     readonly configurationVersion: string;
     readonly similarity: number;
   } | null;
+  /**
+   * Live 17 Nov 2026: the same mandate similarity, computed by REC-003 for
+   * a candidate it did not retrieve (outside top-K), under the same
+   * versions. Read only when `semantic` is null; never in the snapshot's
+   * candidate provenance, which still says only who found the company.
+   */
+  readonly scored?:
+    | {
+        readonly sourceClass: "SEMANTIC_CANDIDATE_PROVENANCE";
+        readonly generatorVersion: string;
+        readonly companyRepresentationVersion: string;
+        readonly investorRepresentationVersion: string;
+        readonly configurationVersion: string;
+        readonly similarity: number;
+      }
+    | null
+    | undefined;
 };
 
 /**
@@ -697,7 +714,10 @@ function computeOne(
       break;
     }
     case "semantic_fit.mandate_similarity": {
-      const semantic = input.candidate.semantic;
+      // Retrieved first; otherwise the same cosine computed directly for an
+      // admitted candidate outside top-K (live 17 Nov 2026). Neither: unknown.
+      const retrieved = input.candidate.semantic;
+      const semantic = retrieved ?? input.candidate.scored ?? null;
       if (semantic === null) {
         return {
           value: absent(d, "MISSING", "SEMANTIC_NOT_RETRIEVED", [
@@ -723,6 +743,9 @@ function computeOne(
             investorRepresentationVersion:
               semantic.investorRepresentationVersion,
             configurationVersion: semantic.configurationVersion,
+            // Only a computed one says so, so a retrieved value's
+            // provenance (and fingerprint) is unchanged.
+            ...(retrieved === null ? { similarityBasis: "SCORED" } : {}),
           },
         ),
         scopeViolation: false,

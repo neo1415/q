@@ -438,7 +438,7 @@ export const RECOMMENDATION_FEATURES: readonly RecommendationFeatureDefinition[]
         sensitivity: "CONFIDENTIAL",
         missingPolicy: "PRESERVE_MISSING",
         description:
-          "The cosine similarity REC-003 computed between the investor's mandate representation and the company's investment representation, in [-1, 1], under the versions its provenance names. Reused, never recomputed. PRESENT only when the semantic generator retrieved the company; otherwise MISSING with SEMANTIC_NOT_RETRIEVED. An internal retrieval number, not a match percentage, a probability or a quality.",
+          "The cosine similarity REC-003 computed between the investor's mandate representation and the company's investment representation, in [-1, 1], under the versions its provenance names. Reused from retrieval when the semantic generator retrieved the company; otherwise the same cosine REC-003 computed directly for the admitted candidate under the same versions (provenance similarityBasis SCORED). MISSING with SEMANTIC_NOT_RETRIEVED only when no current vector exists on one side. An internal similarity, not a match percentage, a probability or a quality.",
         categories: [],
         range: { min: -1, max: 1, direction: "HIGHER_IS_CLOSER" },
       },

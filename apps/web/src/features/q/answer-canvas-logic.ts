@@ -74,17 +74,17 @@ export function fitWords(card: QAnswerCard): string | null {
 
 /**
  * How the card's mandate fit was made, on the card (G-D17): how many of
- * its measures were known, and what it rests on. No sources is said, never
- * left blank.
+ * its measures were known, and the documents it rests on when they were
+ * counted. Owner live 17 Nov 2026: a card's 0 is as often "not counted"
+ * as "none", so zero is never claimed ("no source documents yet" was
+ * shown for companies with documents open to the investor).
  */
 export function fitProvenance(card: QAnswerCard): string | null {
   if (card.fit === null) return null;
   const known = `${String(card.fit.measured)} of ${String(card.fit.of)} measures known`;
-  const sources =
-    card.sourceCount > 0
-      ? `${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}`
-      : "no source documents yet";
-  return `${known} · ${sources}`;
+  return card.sourceCount > 0
+    ? `${known} · ${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}`
+    : known;
 }
 
 /**
