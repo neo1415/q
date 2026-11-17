@@ -293,7 +293,13 @@ import {
   templateValues,
   type ClaimKind,
 } from "./claim-check.js";
-import { documentRowFacts } from "./document-rows.js";
+import {
+  distinctFacts,
+  documentRowFacts,
+  fetchedDocumentRowFacts,
+  fetchedDocumentTexts,
+  pagesReadRows,
+} from "./document-rows.js";
 import {
   checkPromises,
   createPromiseChecker,
@@ -3670,10 +3676,15 @@ function toolResultBody(outcome: QToolCallOutcome): string {
   const screenAct =
     outcome.result.ok &&
     QClientActionToolResultSchema.safeParse(outcome.result.data).success;
+  // Live f65877e3 (17 Nov 2026): a document's pages, read by a tool, carry
+  // their count table's rows as code read them, ahead of the pages (which
+  // the bound below may cut), so the model counts from the rows.
+  const rows = outcome.result.ok ? pagesReadRows(outcome.result.data) : null;
   const body = JSON.stringify(
     outcome.result.ok
       ? {
           ok: true,
+          ...(rows === null ? {} : { tableRows: rows }),
           data: outcome.result.data,
           ...(screenAct ? { tellThem: SCREEN_ACT_TELL_THEM } : {}),
         }
@@ -9035,6 +9046,8 @@ export function createModelGatewayQAnswer(
       // prompt carried: the claim check's diagnostic line (counts only).
       let retrievedPassages = 0;
       let documentRowFactCount = 0;
+      // How many document texts (passages, pages reads) the run held.
+      let documentTextCount = 0;
       const assemblePrompt = async (w: WideReads) => {
         /**
          * Live re-check of 6f9b63cc5 (Phase 3 latency, d): a follow-up
@@ -9054,10 +9067,8 @@ export function createModelGatewayQAnswer(
                 subjectDescription: CARD_FOLLOW_UP_SUBJECT,
               };
         const ownDocuments = await ownDocumentsRead;
-        const rowFacts = documentRowFacts(assembled.facts);
         retrievedPassages = assembled.facts.length;
-        documentRowFactCount = rowFacts.length;
-        const facts: readonly AuthorisedFact[] = [
+        const heldFacts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
           ...(ownHeldBack === null ? [] : [ownHeldBack]),
@@ -9085,8 +9096,29 @@ export function createModelGatewayQAnswer(
           ...(w.ownIndex === null ? [] : [w.ownIndex]),
           ...(pitchMoment === null ? [] : [pitchMoment]),
           ...assembled.facts,
-          // A passage's count table, its rows read by code and said plainly
-          // beside it (document-rows.ts; live run 91bb8564).
+        ];
+        // Live f65877e3 / 7e866011 (17 Nov 2026): every document text the
+        // run holds -- a retrieved passage, code's own pre-read of a shared
+        // or on-screen document, an attached one, and the pages an earlier
+        // turn of this conversation read -- has its count table's rows read
+        // by code and said plainly beside it (document-rows.ts), so the
+        // model answers from the rows, not from what Q said before.
+        const rowFacts = distinctFacts([
+          ...documentRowFacts(heldFacts),
+          ...fetchedDocumentRowFacts(request.fetchedInConversation ?? []),
+        ]);
+        documentRowFactCount = rowFacts.length;
+        documentTextCount =
+          heldFacts.filter(
+            (fact) =>
+              fact.scope === "DATA_ROOM" || fact.scope === "OWN_DOCUMENT",
+          ).length +
+          assembled.facts.length +
+          fetchedDocumentTexts(request.fetchedInConversation ?? []).length;
+        const facts: readonly AuthorisedFact[] = [
+          ...heldFacts,
+          // A document's count table, its rows read by code and said plainly
+          // beside it (document-rows.ts; live runs 91bb8564, f65877e3).
           ...rowFacts,
         ];
         // D3 and slice 1: every fact citable by label, and what each is
@@ -12067,6 +12099,9 @@ export function createModelGatewayQAnswer(
         latest.content,
         // Step 9: their own words from earlier conversations, verbatim.
         ...recalledOwnWords,
+        // The pages earlier turns of this conversation read: the document
+        // a follow-up's counts are held to (live 7e866011).
+        ...fetchedDocumentTexts(request.fetchedInConversation ?? []),
         ...earlier
           .filter((message) => message.role !== "Q")
           .map((message) => message.content),
@@ -12088,6 +12123,12 @@ export function createModelGatewayQAnswer(
         facts: facts.length,
         retrieved: retrievedPassages,
         documentRows: documentRowFactCount,
+        documents:
+          documentTextCount +
+          messages.filter(
+            (message) =>
+              message.role === "TOOL" && message.content.includes('"pages":['),
+          ).length,
         toolResults: messages.filter(
           (message) =>
             message.role === "TOOL" && !instructionMessages.has(message),
@@ -13771,6 +13812,24 @@ export function createModelGatewayQAnswer(
           findingsChecked.examined += before;
           findingsChecked.dropped += before - held.length;
           if (held.length !== before) analyst = { ...analyst, findings: held };
+          // Live 7e866011: an UNCERTAINTY card said "four public-sector
+          // account managers" beside the answer. What it says is held to
+          // the same rows (missing evidence and contradictions alike).
+          const contradictions = (analyst.contradictions ?? []).filter(
+            (statement) => !claims.contradictsCounts(statement),
+          );
+          const missingEvidence = (analyst.missingEvidence ?? []).filter(
+            (statement) => !claims.contradictsCounts(statement),
+          );
+          const said =
+            (analyst.contradictions ?? []).length +
+            (analyst.missingEvidence ?? []).length;
+          const cut = said - contradictions.length - missingEvidence.length;
+          findingsChecked.examined += said;
+          findingsChecked.dropped += cut;
+          if (cut > 0) {
+            analyst = { ...analyst, contradictions, missingEvidence };
+          }
         }
         if (request.signal?.aborted === true) {
           return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };

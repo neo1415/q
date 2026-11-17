@@ -165,7 +165,11 @@ export function documentTables(text: string): DocumentTable[] {
 }
 
 /** The rows a fact's text holds, said plainly; null when it holds no count table. */
-export function documentRowsStatement(text: string): string | null {
+export function documentRowsStatement(
+  text: string,
+  /** The document's title, when the text is a read of one. */
+  title?: string,
+): string | null {
   const tables = documentTables(text);
   if (tables.length === 0) return null;
   const lines: string[] = [];
@@ -193,7 +197,11 @@ export function documentRowsStatement(text: string): string | null {
       lines.push(`These rows add up to ${String(sum)}`);
     }
   }
-  return `The table's rows, read one by one by Capital Q from the passage (each count belongs to its own row only):\n${lines.join("\n")}`;
+  const from =
+    title === undefined || title.trim().length === 0
+      ? "the passage"
+      : `"${title.trim().slice(0, 160)}"`;
+  return `The table's rows, read one by one by Capital Q from ${from} (each count belongs to its own row only; these rows, not anything said earlier, are the counts):\n${lines.join("\n")}`;
 }
 
 /**
@@ -208,7 +216,10 @@ export function documentRowFacts(
   const out: AuthorisedFact[] = [];
   for (const fact of facts) {
     if (!fact.statement.includes("|")) continue;
-    const statement = documentRowsStatement(fact.statement);
+    const statement = documentRowsStatement(
+      fact.statement,
+      titleOfSource(fact.source),
+    );
     if (statement === null || seen.has(statement)) continue;
     seen.add(statement);
     out.push({
@@ -221,4 +232,93 @@ export function documentRowFacts(
     });
   }
   return out;
+}
+
+/** "Team and hiring plan" from a fact's source label ('Data room: "Team and hiring plan"'). */
+function titleOfSource(source: string | undefined): string | undefined {
+  if (source === undefined) return undefined;
+  return /"([^"]{1,160})"/u.exec(source)?.[1];
+}
+
+/** A pages read's title and page texts; null when the value is not one. */
+export function pagesReadOf(value: unknown): {
+  readonly title: string | null;
+  readonly texts: readonly string[];
+} | null {
+  if (typeof value !== "object" || value === null) return null;
+  const pages: unknown = Reflect.get(value, "pages");
+  if (!Array.isArray(pages)) return null;
+  const texts = pages.flatMap((page: unknown) => {
+    if (typeof page !== "object" || page === null) return [];
+    const words: unknown = Reflect.get(page, "text");
+    return typeof words === "string" && words.length > 0 ? [words] : [];
+  });
+  if (texts.length === 0) return null;
+  const title: unknown = Reflect.get(value, "title");
+  return { title: typeof title === "string" ? title : null, texts };
+}
+
+/**
+ * Live f65877e3 (17 Nov 2026, production 2fb61c5dc): the plan's page text
+ * reached the answer through code's own pre-read of a shared document, and
+ * no row fact was made of it (only retrieved passages had one), so the
+ * model repeated a count Q had said before. The rows of any pages read,
+ * said plainly; null when its pages hold no count table.
+ */
+export function pagesReadRows(value: unknown): string | null {
+  const read = pagesReadOf(value);
+  if (read === null) return null;
+  const text = read.texts.join("\n");
+  if (!text.includes("|")) return null;
+  return documentRowsStatement(text, read.title ?? undefined);
+}
+
+/**
+ * The rows of documents earlier turns of this conversation read as pages
+ * (q_runtime.conversation_tool_results: already the owner's, within the
+ * run's ceiling, and in front of the model in the conversation's record),
+ * so a follow-up ("how many of those start in Q1?") is answered from the
+ * document's rows, never from what Q said of them (live 7e866011).
+ */
+export function fetchedDocumentRowFacts(
+  fetched: readonly { readonly result: unknown }[],
+): AuthorisedFact[] {
+  const out: AuthorisedFact[] = [];
+  for (const fetch of fetched) {
+    const read = pagesReadOf(fetch.result);
+    const statement = pagesReadRows(fetch.result);
+    if (read === null || statement === null) continue;
+    out.push({
+      scope: "DATA_ROOM",
+      statement,
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+      ...(read.title === null
+        ? {}
+        : { source: `Data room: "${read.title}"`.slice(0, 200) }),
+    });
+  }
+  return out;
+}
+
+/** The page texts of documents earlier turns read: sources for the claim check. */
+export function fetchedDocumentTexts(
+  fetched: readonly { readonly result: unknown }[],
+): string[] {
+  return fetched.flatMap((fetch) => {
+    const read = pagesReadOf(fetch.result);
+    return read === null ? [] : [read.texts.join("\n")];
+  });
+}
+
+/** Facts said once each, in order (a document read twice has one rows fact). */
+export function distinctFacts(
+  facts: readonly AuthorisedFact[],
+): AuthorisedFact[] {
+  const seen = new Set<string>();
+  return facts.filter((fact) => {
+    if (seen.has(fact.statement)) return false;
+    seen.add(fact.statement);
+    return true;
+  });
 }

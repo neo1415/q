@@ -550,13 +550,23 @@ describe("the principles, by themselves", () => {
     ).toContain("3 public-sector account managers");
   });
 
-  it("without a total to agree with, a contradicted count drops the sentence; nothing is invented", () => {
+  // Superseded by live f65877e3 (17 Nov 2026): the table's row is the
+  // authority, so a count it settles is put right even with no total to
+  // agree with; the sentence goes only where the rows do not settle it.
+  it("without a total to agree with, a count the table settles is put right; nothing is invented", () => {
     const out = checkAnswer(
       "Halyard plans 4 public-sector account managers in Q1.",
       corpus(),
     );
-    expect(out.text).not.toContain("4 public-sector");
-    expect(out.text).not.toContain("3 public-sector");
+    expect(out.text).toBe(
+      "Halyard plans 3 public-sector account managers in Q1.",
+    );
+    const past = checkAnswer(
+      "Halyard hired 4 public-sector account managers in July.",
+      corpus(),
+    );
+    expect(past.text).not.toContain("4 public-sector");
+    expect(past.text).not.toContain("3 public-sector");
   });
 
   it("a count the row states is kept", () => {

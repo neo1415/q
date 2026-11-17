@@ -33,7 +33,7 @@
 
 import { countryOfName } from "@capital-q/taxonomy/countries";
 
-import { documentTables } from "./document-rows.js";
+import { documentTables, type TableRow } from "./document-rows.js";
 
 export type ClaimKind = "NUMBER" | "MONEY" | "PERCENT" | "DATE" | "NAME";
 
@@ -97,6 +97,13 @@ export interface ClaimCorpus {
    * of a quarter ("5 in Q1") is bound to.
    */
   readonly periodCounts: ReadonlyMap<string, readonly number[]>;
+  /**
+   * Every row of the sources' count tables (document-rows.ts), its label
+   * lower-cased: where a table names an item, its rows are the item's
+   * count, whatever a prose line (Q's earlier record of this
+   * conversation, a summary) says (live 7e866011).
+   */
+  readonly tableRows: readonly TableRow[];
   /**
    * Q's own earlier words (lower-cased), so a count only they name is
    * withheld: live run 434ead80 (Thames Arc, 17 Nov 2026) said "4
@@ -376,9 +383,11 @@ export function claimCorpus(
   // Each table's rows starting in a quarter, added up (document-rows.ts);
   // from the sources only, never from Q's own earlier words.
   const periodCounts = new Map<string, number[]>();
+  const tableRows: TableRow[] = [];
   for (const own of sourceLines) {
     if (!own.some((line) => line.includes("|"))) continue;
     for (const table of documentTables(own.join("\n"))) {
+      tableRows.push(...table.rows);
       const sums = new Map<string, number>();
       for (const row of table.rows) {
         if (row.period === null) continue;
@@ -437,6 +446,7 @@ export function claimCorpus(
     minutes,
     sourceLines,
     periodCounts,
+    tableRows,
     echoText:
       options.echoOnlyWithheld === false
         ? ""
@@ -1223,6 +1233,8 @@ const escapeRegExp = (text: string): string =>
 function countedItem(after: string): readonly string[] | null {
   const tokens = after
     .replace(/[’‘`]/gu, "'")
+    // A model's non-breaking or Unicode hyphen ("public‑sector") is a hyphen.
+    .replace(/[\u2010\u2011\u2012]/gu, "-")
     .toLowerCase()
     .split(/(\s+|[,;:.!?()"“”]|—|–)/u)
     .map((token) => token.trim())
@@ -1470,7 +1482,22 @@ type CountBinding =
       /** The one count every such row gives, or null where they differ. */
       readonly only: number | null;
       readonly sources: ReadonlySet<number>;
+      /**
+       * A document's count table names the item and gives this one count:
+       * the rows settle it, and the count is put right (checkCounts).
+       */
+      readonly tabled?: true;
     };
+
+/** The count tables' rows that name the item (their labels hold it whole). */
+function tableRowsFor(
+  item: readonly string[],
+  corpus: ClaimCorpus,
+): readonly TableRow[] {
+  if (corpus.tableRows.length === 0) return [];
+  const whole = new RegExp(`(?<![\\p{L}])${itemBody(item)}(?![\\p{L}])`, "u");
+  return corpus.tableRows.filter((row) => whole.test(row.label));
+}
 
 /**
  * A head count's noun ("15 planned hires", "5 people"): a total the
@@ -1503,6 +1530,35 @@ function bindCount(
   corpus: ClaimCorpus,
 ): CountBinding {
   const rows = itemRows(item, corpus);
+  // Live 7e866011: where a document's count table names the item, its rows
+  // are the count. A prose line naming it (Q's earlier reply in this
+  // conversation's record, a recalled summary) neither grounds another
+  // count nor makes the rows' one count ambiguous.
+  const tabled = tableRowsFor(item, corpus);
+  if (tabled.length > 0) {
+    const sources = new Set(rows.map((row) => row.source));
+    const counts = new Set(tabled.map((row) => row.count));
+    const sum = [...new Set(tabled.map((row) => row.label))]
+      .map((label) => tabled.find((row) => row.label === label)?.count ?? 0)
+      .reduce((all, one) => all + one, 0);
+    if (counts.has(value) || (counts.size > 1 && sum === value)) {
+      const matching = rows.filter((row) => row.value === value);
+      return {
+        kind: "GROUNDED",
+        sources: new Set(
+          (matching.length > 0 ? matching : rows).map((row) => row.source),
+        ),
+      };
+    }
+    return counts.size === 1
+      ? {
+          kind: "CONTRADICTED",
+          only: [...counts][0] ?? null,
+          sources,
+          tabled: true,
+        }
+      : { kind: "CONTRADICTED", only: null, sources };
+  }
   if (rows.length === 0) {
     // Named only in Q's own earlier words (recalled memory, its earlier
     // replies): no source holds this count, and a count Q said before is
@@ -1560,6 +1616,13 @@ type CountsChecked = {
   readonly totals: readonly number[];
 };
 
+/**
+ * A sentence about what already happened: a count in it is not a plan's
+ * row, so a contradicted count is never put right to one.
+ */
+const PAST_EVENT =
+  /\b(?:joined|hired|recruited|onboarded|left|departed|was|were|had|did|grew|employed|took\s+on)\b/iu;
+
 /** "15 people in total", "a total of 15": the stated total. */
 const TOTAL_AFTER = /^\s*(?:[\p{L}'-]+\s+){0,3}?in\s+total\b/iu;
 const TOTAL_BEFORE = /\b(?:a\s+)?total\s+of\s+$/iu;
@@ -1600,7 +1663,7 @@ function totalsStatedIn(previous: string): readonly number[] {
  * its year is bound only where the tables give it in one year.
  */
 const PERIOD_AFTER =
-  /^\s+(?:(?:new\s+)?(?:people|persons|hires|roles|staff|employees|heads)\s+)?(?:in|by|during|from|for|starting(?:\s+in)?)\s+(?:the\s+)?(?:(?<y1>(?:19|20)\d{2})\s?-\s?q(?<q1>[1-4])|q(?<q2>[1-4])(?:\s+(?:of\s+)?(?<y2>(?:19|20)\d{2}))?)(?![\p{L}\p{N}])/iu;
+  /^\s+(?:(?:new\s+|planned\s+|additional\s+)?(?:people|persons|hires|roles|staff|employees|heads|positions)\s+)?(?:(?:will\s+|are\s+set\s+to\s+|are\s+planned\s+to\s+)?(?:start|starts|join|joins|begin|begins)\s+)?(?:in|by|during|from|for|starting(?:\s+in)?)\s+(?:the\s+)?(?:(?<y1>(?:19|20)\d{2})\s?-\s?q(?<q1>[1-4])|q(?<q2>[1-4])(?:\s+(?:of\s+)?(?<y2>(?:19|20)\d{2}))?)(?![\p{L}\p{N}])/iu;
 
 type PeriodPart = {
   readonly figure: Figure;
@@ -1700,12 +1763,20 @@ function checkCounts(
   };
   let text = sentence;
   const grounded = new Set<number>();
-  const corrections: { readonly sources: ReadonlySet<number> }[] = [];
+  const corrections: {
+    readonly sources: ReadonlySet<number>;
+    readonly tabled: boolean;
+  }[] = [];
   let periodCorrections = 0;
   const periodValues: number[] = [];
   const periods = periodPartsIn(sentence);
+  // A count said of a quarter is checked as that ("Five planned hires
+  // start in Q1"), never again as a count of an item.
+  const atPeriod = new Set(periods.map((period) => period.figure.index));
   const parts = [
-    ...listedParts(sentence).map((figure) => ({ figure, period: null })),
+    ...listedParts(sentence)
+      .filter((figure) => !atPeriod.has(figure.index))
+      .map((figure) => ({ figure, period: null })),
     ...periods.map((period) => ({ figure: period.figure, period })),
   ].sort((left, right) => right.figure.index - left.figure.index);
   // Right to left, so a correction never moves a figure still to check.
@@ -1739,20 +1810,31 @@ function checkCounts(
       return contradicted;
     }
     text = `${text.slice(0, figure.index)}${String(bound.only)}${text.slice(figure.end)}`;
-    corrections.push({ sources: bound.sources });
+    corrections.push({ sources: bound.sources, tabled: bound.tabled === true });
   }
   if (periodCorrections > 0) {
     // A quarter's count is put right only where the sentence's quarters,
     // as put right, add up to the head count it (or the sentence before)
     // states, each of them on the tables: "15 people ...: 4 in Q1, 10 in
     // Q2 and 1 in Q3". Otherwise the sentence goes.
+    //
+    // Live 7e866011 (17 Nov 2026): the tables are the authority. Where the
+    // sentence states no head count to agree with, a quarter's count is
+    // put right to the rows starting then ("Five planned hires start in
+    // Q1 2027" -> 4); it goes only where what it says is ambiguous: a
+    // stated head count the quarters do not then add up to, or a count of
+    // what already happened, which the plan's rows do not hold.
     const after = periodPartsIn(text);
     const sum = after.reduce((all, part) => all + part.figure.value, 0);
     const stated = [...totalsStatedIn(text), ...totalsStatedIn(previous)];
     const placed = after.every(
       (part) => bindPeriod(part, corpus).kind === "GROUNDED",
     );
-    if (after.length < 2 || !placed || !stated.includes(sum)) {
+    if (
+      !placed ||
+      PAST_EVENT.test(sentence) ||
+      (after.length >= 2 && stated.length > 0 && !stated.includes(sum))
+    ) {
       return contradicted;
     }
   }
@@ -1777,7 +1859,17 @@ function checkCounts(
     const recited = corrections.every((correction) =>
       [...correction.sources].some((source) => grounded.has(source)),
     );
-    if (!addsUp && !recited) return contradicted;
+    // Live f65877e3 (17 Nov 2026): "4 public-sector account managers" in
+    // a list whose other counts no row placed dropped the whole list. A
+    // count a document's table settles (every row naming the item gives
+    // one count) is put right whether or not the sentence restates a head
+    // count: the rows are the authority. Not a count of what already
+    // happened ("2 deployment engineers joined in July"): the plan's row
+    // is not that count, so the sentence goes.
+    const settled =
+      corrections.every((correction) => correction.tabled) &&
+      !PAST_EVENT.test(sentence);
+    if (!addsUp && !recited && !settled) return contradicted;
   }
   if (tally !== undefined) {
     tally.corrected += corrections.length + periodCorrections;
