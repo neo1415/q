@@ -265,3 +265,21 @@ Q's earlier wrong answers were persisted to memory and recalled into new convers
 - mandatory claim-check diagnostics;
 - a replay built from this run's real stored data;
 - memory integrity: Q's own answers are never recalled as figure evidence, and corrections supersede the stored item.
+
+## Scenario D recheck on `827cc7763` (17 Nov, 00:16 UTC): root cause visible
+
+Thames Arc, conversation `1de1cf20`. Q still said "4 public-sector account managers … 5 hires" in Q1.
+
+The new `q claim check` log line shows why. Run `434ead80` had:
+
+- sources `facts 44, retrieved 0, documentRows 0, toolResults 0, memory 1, earlierReplies 1`;
+- `tables 0`;
+- answer `examined 5, bound 0, unplaced 5`.
+
+So the hiring plan was not retrieved or read at all: the answer came from recalled memory of Q's own earlier wrong answers. The follow-up `2b4011a0` was the same: memory 1, earlier replies 2, tables 0.
+
+The fix in progress:
+
+- a document-backed question whose only figure sources are memory or earlier replies reads the document first;
+- counts that nothing binds are withheld;
+- stale memory is superseded.
