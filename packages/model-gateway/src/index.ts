@@ -128,6 +128,25 @@ export {
   createPostgresModelUsageRepository,
 } from "./infrastructure/postgres-usage.js";
 export { createPostgresDailySpendReader } from "./infrastructure/postgres-daily-spend.js";
+export {
+  createHostedWebSearch,
+  hostedSearchCostUsd,
+  HostedWebSearchUnavailable,
+  HOSTED_WEB_SEARCH_FEE_USD,
+  HOSTED_WEB_SEARCH_INSTRUCTION,
+  HOSTED_WEB_SEARCH_MAX_USES,
+  judgeHostedSearchRoute,
+  parseModelSearchDailyCapUsd,
+  type HostedWebSearch,
+  type HostedWebSearchAdapter,
+  type HostedWebSearchAdapterRequest,
+  type HostedWebSearchAdapterResult,
+  type HostedWebSearchDependencies,
+  type HostedWebSearchRefusal,
+  type HostedWebSearchRequest,
+  type HostedWebSearchResult,
+  type HostedWebSource,
+} from "./web-search.js";
 export { createPostgresProviderSpendReader } from "./infrastructure/postgres-provider-spend.js";
 export {
   assessProviderBalance,

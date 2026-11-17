@@ -166,6 +166,8 @@ export const RESEARCH_PROVIDER_CODES = [
   "scrapingbee",
   "brave",
   "direct",
+  // DECISIONS 103: the Claude API's own web search, the last fallback.
+  "model_hosted_web_search",
   "fake",
 ] as const;
 export type ResearchProviderCode = (typeof RESEARCH_PROVIDER_CODES)[number];

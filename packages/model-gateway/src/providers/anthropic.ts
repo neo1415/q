@@ -89,6 +89,13 @@ const THINKING_OFF: Readonly<Record<string, ThinkingConfigParam>> = {
 
 export const ANTHROPIC_MODELS: readonly string[] = Object.keys(THINKING_OFF);
 
+/** How a permitted model turns thinking off; undefined for any other model. */
+export function thinkingOffFor(
+  modelCode: string,
+): ThinkingConfigParam | undefined {
+  return THINKING_OFF[modelCode];
+}
+
 /**
  * The caller's reasoning level as this vendor spells it. These models take
  * no thinking budget at all (`budget_tokens` is a 400 on both); depth is

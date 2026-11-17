@@ -49,6 +49,10 @@
       "types": "./dist/providers/breaker.d.ts",
       "default": "./dist/providers/breaker.js"
     },
+    "./providers/model-hosted-search": {
+      "types": "./dist/providers/model-hosted-search.d.ts",
+      "default": "./dist/providers/model-hosted-search.js"
+    },
     "./providers/fallback": {
       "types": "./dist/providers/fallback.d.ts",
       "default": "./dist/providers/fallback.js"

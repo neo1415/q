@@ -536,6 +536,9 @@ export const MODEL_USAGE_PURPOSES = [
   // DECISIONS 101: one tiny call that warms the turn reader's route after
   // an idle spell. Carries nothing about anyone; told apart from real work.
   "WARMUP",
+  // DECISIONS 103: the Claude API's own web search, the last fallback of
+  // public research when every configured index is spent; its own daily cap.
+  "PUBLIC_WEB_SEARCH",
   "OTHER",
 ] as const;
 export const ModelUsagePurposeSchema = z.enum(MODEL_USAGE_PURPOSES);

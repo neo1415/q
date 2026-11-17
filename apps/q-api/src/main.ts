@@ -20,6 +20,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createEvidenceWatermark } from "./composition/evidence-watermark.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
+import { modelHostedSearchPort } from "./composition/model-hosted-search.js";
 import { createWebsiteIdentityReader } from "@capital-q/q-research/website-identity";
 import { webOriginFrom } from "./composition/web-origin.js";
 import { namedPictureOf } from "./http/q-approvals.js";
@@ -489,8 +490,10 @@ import {
 import {
   createDailySpendCap,
   createModelGateway,
+  createHostedWebSearch,
   createPostgresDailySpendReader,
   parseDailySpendCapUsd,
+  parseModelSearchDailyCapUsd,
   createModelProviderRegistry,
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
@@ -531,7 +534,12 @@ import {
   geminiEnabled,
 } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
-import { createAnthropicModelProvider } from "@capital-q/model-gateway/providers/anthropic";
+import {
+  ANTHROPIC_FAST_MODEL,
+  createAnthropicModelProvider,
+} from "@capital-q/model-gateway/providers/anthropic";
+import { createAnthropicHostedWebSearch } from "@capital-q/model-gateway/providers/anthropic-web-search";
+import { createModelHostedSearchProvider } from "@capital-q/q-research/providers/model-hosted-search";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
   createCorrelationId,
@@ -1488,7 +1496,50 @@ const keptReadings: {
     kept: readonly KeptReading[],
   ) => Promise<unknown>;
 } = {};
+/**
+ * DECISIONS 103: when every configured search index is spent or down, Q's
+ * public research may ask the Claude API's own web search, through the
+ * gateway's hosted search (catalogue eligibility, PUBLIC only, one ledger
+ * row per call). Bounded to one call a research turn and by its own daily
+ * cap, Q_MODEL_SEARCH_DAILY_USD_CAP (USD 2 unless set; 0 turns it off).
+ * The model is the catalogued one Q_MODEL_SEARCH_MODEL names, else the
+ * fast one. Absent without the Anthropic key.
+ */
+const modelHostedSearch = (() => {
+  const capUsd = parseModelSearchDailyCapUsd(process.env);
+  if (providerSecrets.anthropic === undefined || capUsd <= 0) return undefined;
+  const configuredModel = process.env["Q_MODEL_SEARCH_MODEL"]?.trim() ?? "";
+  const hosted = createHostedWebSearch({
+    catalog: modelCatalog,
+    adapter: createAnthropicHostedWebSearch({
+      apiKey: providerSecrets.anthropic.reveal(),
+    }),
+    usage: createPostgresModelUsageRepository({ sql: database.sql }),
+    modelCode:
+      configuredModel.length > 0 ? configuredModel : ANTHROPIC_FAST_MODEL,
+    caps: [
+      createDailySpendCap({
+        capUsd,
+        readSpentSinceUsd: createPostgresDailySpendReader({
+          sql: database.sql,
+          purpose: "PUBLIC_WEB_SEARCH",
+        }),
+        onReadFailure: (error) => {
+          logger.warn(
+            { err: error, spendCap: "PUBLIC_WEB_SEARCH" },
+            "model-hosted search cap could not read the ledger; using the last total",
+          );
+        },
+      }),
+    ],
+    logger,
+  });
+  return createModelHostedSearchProvider({
+    search: modelHostedSearchPort(hosted),
+  });
+})();
 const researchComposition = composeResearch({
+  modelHostedSearch,
   sql: database.sql,
   transactions: database.transactions,
   authorization,

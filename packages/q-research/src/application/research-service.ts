@@ -1007,6 +1007,12 @@ export function createPublicWebResearchService(
       const context = {
         signal: command.signal,
         freshRead: command.freshRead === true,
+        attribution: {
+          tenantId: command.actor.tenantId,
+          userId: command.actor.userId,
+          runId: command.runId,
+          correlationId: command.correlationId,
+        },
       };
 
       const freshness = command.freshness ?? "ANY";

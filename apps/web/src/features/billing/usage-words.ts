@@ -18,6 +18,7 @@ const TASK_NAMES: Readonly<
   DOCUMENT: "Documents",
   VOICE_REALTIME: "Live voice",
   WARMUP: "Getting ready to answer",
+  PUBLIC_WEB_SEARCH: "Public web search",
   OTHER: "Other",
 };
 

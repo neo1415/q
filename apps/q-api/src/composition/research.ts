@@ -62,6 +62,7 @@ import { withCircuitBreaker } from "@capital-q/q-research/providers/breaker";
 import { credentialBreaker, type ResearchCredential } from "./breakers.js";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
+import { createLastResortSearchProvider } from "@capital-q/q-research/providers/model-hosted-search";
 import { createBraveResearchProvider } from "@capital-q/q-research/providers/brave";
 import { createDirectPageReader } from "@capital-q/q-research/providers/direct-read";
 import { createScrapingBeeResearchProvider } from "@capital-q/q-research/providers/scrapingbee";
@@ -130,6 +131,11 @@ export type ResearchCompositionDependencies = {
   readonly provider?: PublicWebResearchProvider | undefined;
   /** A planned job's page-read budget (Q_RESEARCH_PLANNED_EXTRACT_MS). */
   readonly plannedExtractBudgetMs?: number | undefined;
+  /**
+   * DECISIONS 103: the model-hosted web search, asked only when every
+   * configured index failed. Absent: no last resort, as before.
+   */
+  readonly modelHostedSearch?: PublicWebResearchProvider | undefined;
 };
 
 const COMPANY = "COMPANY" as const;
@@ -389,27 +395,45 @@ export function composeResearch(
     // is read even when every paid reader is spent (live 2026-10-23).
     behind("direct", createDirectPageReader()),
   ];
+  const lastResort = dependencies.modelHostedSearch;
+  // DECISIONS 103: after every configured index, and outside their short
+  // memory, the model-hosted search; only when all of them failed.
+  const withLastResort = (
+    primary: PublicWebResearchProvider,
+  ): PublicWebResearchProvider =>
+    lastResort === undefined
+      ? primary
+      : createLastResortSearchProvider({
+          primary,
+          lastResort,
+          onFallback: (event) =>
+            event.outcome === "FAILED"
+              ? logger?.warn(event, "public research last resort")
+              : logger?.info(event, "public research last resort"),
+        });
   const provider =
     dependencies.provider ??
     // No index that searches (only the page reader): no research at all.
     (indexes.every((index) => index.canSearch === false)
       ? undefined
-      : createCachedResearchProvider({
-          provider: createFallbackResearchProvider({
-            providers: indexes,
-            parallelSearch: true,
-            // Every index's outcome, each search and page read: a fan-out
-            // that failed everywhere names every provider that failed.
-            ...(logger === undefined
-              ? {}
-              : {
-                  observe: (call) =>
-                    call.outcome === "FAILED"
-                      ? logger.warn(call, "public research provider call")
-                      : logger.info(call, "public research provider call"),
-                }),
+      : withLastResort(
+          createCachedResearchProvider({
+            provider: createFallbackResearchProvider({
+              providers: indexes,
+              parallelSearch: true,
+              // Every index's outcome, each search and page read: a fan-out
+              // that failed everywhere names every provider that failed.
+              ...(logger === undefined
+                ? {}
+                : {
+                    observe: (call) =>
+                      call.outcome === "FAILED"
+                        ? logger.warn(call, "public research provider call")
+                        : logger.info(call, "public research provider call"),
+                  }),
+            }),
           }),
-        }));
+        ));
   const profiles =
     brightData === undefined
       ? undefined

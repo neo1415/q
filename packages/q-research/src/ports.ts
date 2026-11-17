@@ -55,6 +55,20 @@ export type ResearchExecutionContext = {
   readonly signal?: AbortSignal | undefined;
   /** The person asked for a fresh read: any short memory of this query is bypassed and replaced. */
   readonly freshRead?: boolean | undefined;
+  /**
+   * Who is asking and in which turn: identifiers only, never content. A
+   * provider that bills per caller (the model-hosted fallback, DECISIONS
+   * 103) needs it for its ledger row and its per-turn bound; every index
+   * ignores it, and nothing of it is ever sent to a vendor.
+   */
+  readonly attribution?:
+    | {
+        readonly tenantId: string;
+        readonly userId?: string | undefined;
+        readonly runId?: string | undefined;
+        readonly correlationId: string;
+      }
+    | undefined;
 };
 
 /**
