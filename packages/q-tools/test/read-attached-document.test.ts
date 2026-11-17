@@ -81,6 +81,42 @@ describe("read_attached_document", () => {
     });
   });
 
+  // ADR 0079: their own company's highly confidential file, read under a
+  // membership, carries that membership and the own-company wording.
+  it("carries the membership an own-company highly confidential read was under", async () => {
+    const tool = createReadAttachedDocumentTool({
+      read: () =>
+        Promise.resolve({
+          document: {
+            ...identity,
+            state: "READ",
+            pageCount: 1,
+            whole: true,
+            pages: [{ page: 1, text: "Gross margin 29.3%." }],
+            ownCompanyRead: {
+              companyId: "c0000000-0000-4000-8000-000000000001",
+              membershipId: "f0000000-0000-4000-8000-000000000001",
+            },
+          },
+          others: [],
+        }),
+    });
+    const out = await tool.execute(
+      { documentId: DOC },
+      contextFor(actorA, ownPlan()),
+      null,
+    );
+    expect(tool.output.parse(out)).toMatchObject({
+      status: "READ",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+      ownCompanyRead: {
+        companyId: "c0000000-0000-4000-8000-000000000001",
+        membershipId: "f0000000-0000-4000-8000-000000000001",
+        say: expect.stringMatching(/own company/u) as unknown,
+      },
+    });
+  });
+
   it("is refused outside the person's own conversation", async () => {
     const tool = createReadAttachedDocumentTool({
       read: () => Promise.reject(new Error("never called")),

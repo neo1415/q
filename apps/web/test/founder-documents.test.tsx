@@ -24,7 +24,7 @@ const actions = vi.hoisted(() => ({
     Promise.resolve({ ok: true, value: undefined }),
   ),
   fulfil: vi.fn((..._args: unknown[]) =>
-    Promise.resolve({ ok: true, value: undefined }),
+    Promise.resolve({ ok: true, value: { investorQReads: false } }),
   ),
   answer: vi.fn((..._args: unknown[]) =>
     Promise.resolve({ ok: true, value: undefined }),
@@ -228,6 +228,57 @@ describe("the Requested tab", () => {
       accessLevel: "view_download",
       days: 14,
     });
+  });
+
+  // ADR 0078 (decision 99): answering a request with a highly confidential
+  // document says, once, that the investor's Q can read it, as the access
+  // sheet does; any other document keeps the short confirmation.
+  const answerWith = async (investorQReads: boolean) => {
+    actions.fulfil.mockResolvedValueOnce({
+      ok: true,
+      value: { investorQReads },
+    });
+    render(
+      <RequestsInbox
+        companyId={fixtures.REVIEW_COMPANY}
+        initial={fixtures.reviewInbox()}
+        documents={documents}
+      />,
+    );
+    const card = document.querySelector(
+      `[data-request-item="${fixtures.REQUEST_ACCOUNTS}"]`,
+    ) as HTMLElement;
+    fireEvent.click(
+      within(card).getByRole("button", { name: "Share a document you have" }),
+    );
+    fireEvent.change(card.querySelector("[data-request-pick]") as HTMLElement, {
+      target: { value: fixtures.MANAGEMENT_ACCOUNTS },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "Share" }));
+    const who =
+      fixtures
+        .reviewInbox()
+        .items.find((item) => item.itemId === fixtures.REQUEST_ACCOUNTS)
+        ?.investorOrganisationName ?? "this investor";
+    return who;
+  };
+
+  it("says the investor's Q can read a highly confidential document it shared", async () => {
+    const who = await answerWith(true);
+    expect(
+      await screen.findByText(
+        `Shared with ${who}. They and their Q will be able to read it until you stop sharing. They've been told.`,
+      ),
+    ).toBeTruthy();
+    expect(document.body.textContent?.split("their Q").length).toBe(2);
+  });
+
+  it("keeps the short confirmation when the shared document is not one their Q reads", async () => {
+    const who = await answerWith(false);
+    expect(
+      await screen.findByText(`Shared with ${who}. They've been told.`),
+    ).toBeTruthy();
+    expect(document.body.textContent).not.toContain("their Q");
   });
 
   it("answers a question in the founder's words, with a document as support", async () => {

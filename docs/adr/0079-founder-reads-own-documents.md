@@ -44,7 +44,7 @@ ADR 0078 grants access through a disclosure the founder made to one investor. De
   - `createOwnCompanyMembership` (the membership check);
   - `ownReadOf` (OWNER entries and HIGHLY_CONFIDENTIAL only);
   - `documents`, `documentText` and `documentPages`, each re-checked at the read.
-- `apps/q-api/src/main.ts`: `ownMember` is given to exactly two compositions, the chat document reads and the founder's analysis job's data-room reads.
+- `apps/q-api/src/main.ts`: `ownMember` is given to exactly three compositions: the chat document reads, a file attached to a Q chat (`attached-documents.ts`, added 17 Nov 2026) and the founder's analysis job's data-room reads.
 - `packages/q-tools/src/tools/company-documents.ts`: `read_company_document` and `read_document_pages` return `ownCompanyRead` provenance and the evidence wording.
 - `packages/q-tools/src/tools/own-records.ts`:
   - `heldBackFromQ` holds back RESTRICTED only;
@@ -72,4 +72,4 @@ No SQL, RLS or migration change. No prompt or tool-schema version bump: the tool
 ## Consequences
 
 - Asked "which of our documents back up the numbers?", a founder's Q and analysis job can read their own management accounts, invoice register and bank statement. They can then find the deck's 82% against the accounts' 29.3% gross margin, instead of asking for evidence the founder has already uploaded.
-- One follow-up is not done here: a file the founder attaches to a Q chat (`attached-documents.ts`) is still held back when it is highly confidential. Aligning it with this decision is a separate, small change.
+- Follow-up, done 17 Nov 2026: a highly confidential file the founder attaches to a Q chat (`attached-documents.ts`) is read for a current member of its own company under the same membership check, re-checked at the read, and `read_attached_document` carries `ownCompanyRead`. RESTRICTED stays held. Tests: `apps/q-api/test/attached-documents.test.ts` and `packages/q-tools/test/read-attached-document.test.ts`.

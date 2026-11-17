@@ -1362,6 +1362,14 @@ export type AttachedDocumentsPort = {
                   readonly page: number;
                   readonly text: string;
                 }[];
+                /**
+                 * ADR 0079: the membership their own company's highly
+                 * confidential file was read under, checked at the read.
+                 */
+                readonly ownCompanyRead?: {
+                  readonly companyId: string;
+                  readonly membershipId: string;
+                };
               }
           ))
       | null;

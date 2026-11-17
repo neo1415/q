@@ -479,6 +479,7 @@ describe("founder requests: upload and share", () => {
       value: {
         requestId: "00000000-0000-4000-8000-0000000009d7",
         status: "SHARED",
+        investorQReads: false,
       },
     });
     expect(levels).toEqual([
@@ -520,6 +521,32 @@ describe("founder requests: upload and share", () => {
       days: 30,
     });
     expect(again).toEqual({ outcome: "REFUSED", code: "ALREADY_ANSWERED" });
+  });
+
+  // ADR 0078 (decision 99): answering a request with a highly confidential
+  // document says, once, that the investor's Q can read it; the answer
+  // carries that, from the stored sensitivity. RESTRICTED never unlocks.
+  it("says whether the investor's Q reads the document it shared (ADR 0078)", async () => {
+    for (const [sensitivityClass, reads] of [
+      ["HIGHLY_CONFIDENTIAL", true],
+      ["RESTRICTED", false],
+      ["CONFIDENTIAL", false],
+    ] as const) {
+      const { service, documents } = world();
+      documents[1] = { ...FILED, sensitivityClass };
+      const out = await service.fulfil({
+        actor: founder,
+        source: "DILIGENCE",
+        requestId: "00000000-0000-4000-8000-0000000009d8",
+        documentId: FILED.documentId,
+        accessLevel: "view",
+        days: 30,
+      });
+      expect(out).toMatchObject({
+        outcome: "OK",
+        value: { status: "SHARED", investorQReads: reads },
+      });
+    }
   });
 
   it("keeps an already filed document's level and folder", async () => {

@@ -292,6 +292,12 @@ export const DocumentRequestResultSchema = z
   .object({
     requestId: UuidSchema,
     status: z.enum(["SHARED", "DECLINED"]),
+    /**
+     * ADR 0078 (decision 99): the shared document is HIGHLY_CONFIDENTIAL, so
+     * the investor's Q can read it for them; the founder is told so, once,
+     * as the access sheet's investorQReads does. False for a decline.
+     */
+    investorQReads: z.boolean().default(false),
   })
   .strict();
 export type DocumentRequestResult = z.infer<typeof DocumentRequestResultSchema>;

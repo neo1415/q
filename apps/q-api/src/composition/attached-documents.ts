@@ -2,6 +2,8 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import type { AttachedDocumentsPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
+import type { OwnCompanyRead } from "./material-documents.js";
+
 /**
  * Lane 8 (owner 2026-10-22): a document the person attached to Q, read for
  * them at once and found again later.
@@ -40,8 +42,13 @@ type Held = {
     readonly id: string;
     readonly title: string;
     readonly status: string;
-    /** Evidence's own classification; HIGHLY_CONFIDENTIAL is never read. */
+    /**
+     * Evidence's own classification: RESTRICTED is never read, and
+     * HIGHLY_CONFIDENTIAL only by a current member of its own company.
+     */
     readonly sensitivityClass?: string | undefined;
+    /** The company it belongs to, if any (Evidence's own column). */
+    readonly companyId?: string | null | undefined;
   };
   readonly currentVersion: Version | null;
 };
@@ -60,6 +67,17 @@ export type AttachedDocumentReadsDependencies = {
   readonly pollMs?: number | undefined;
   readonly sleep?: ((ms: number) => Promise<void>) | undefined;
   readonly now?: (() => number) | undefined;
+  /**
+   * ADR 0079 (owner decision 100): the actor's current membership of the
+   * company's owning organisation (the material reads' one lookup), or null.
+   * Absent: a highly confidential file stays held back.
+   */
+  readonly ownMember?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<OwnCompanyRead | null>)
+    | undefined;
 };
 
 const DONE = new Set(["COMPLETED", "FAILED"]);
@@ -136,7 +154,10 @@ export function bestByName<T extends Held>(
 
 /** Under the tool's 300-character reason; the policy is heldBackFromQ's. */
 const HELD_BACK =
-  "It is classified highly confidential (financial material), so Q never reads its contents or sends them to a model. Its key figures, stated by them, become their own stated figures Q can use.";
+  "It is classified highly confidential (financial material), and Q reads that only for a current member of the company it belongs to, so its contents were not read or sent to a model. Its key figures, stated by them, become their own stated figures Q can use.";
+/** RESTRICTED (identity artefacts): never read, for anyone (ADR 0079). */
+const RESTRICTED_HELD =
+  "It is classified restricted (identity material), so Q never reads its contents or sends them to a model.";
 
 export function createAttachedDocumentReads(
   dependencies: AttachedDocumentReadsDependencies,
@@ -148,6 +169,21 @@ export function createAttachedDocumentReads(
   const sleep =
     dependencies.sleep ??
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  /** A failed lookup, another company or no company: no read. */
+  const ownReadOf = async (
+    actor: ActorContext,
+    companyId: string | null | undefined,
+  ): Promise<OwnCompanyRead | null> => {
+    const member = dependencies.ownMember;
+    if (member === undefined || companyId === null || companyId === undefined) {
+      return null;
+    }
+    const read = await member(actor, companyId).catch(() => null);
+    return read !== null && read.companyId === companyId.toLowerCase()
+      ? read
+      : null;
+  };
 
   const pagesOf = async (
     actor: ActorContext,
@@ -287,16 +323,27 @@ export function createAttachedDocumentReads(
       if (version === null) {
         return { document: { ...identity, state: "READING" }, others };
       }
-      // Stress 2026-10-28 (item 2): a HIGHLY_CONFIDENTIAL document (management
-      // accounts, a financial model) is outside every firewall plan, and no
-      // model provider may receive it. This read handed its pages to the
-      // model for any of their own files; it no longer does, and says why.
-      if (
-        held.document.sensitivityClass === "HIGHLY_CONFIDENTIAL" ||
-        held.document.sensitivityClass === "RESTRICTED"
-      ) {
+      // Stress 2026-10-28 (item 2) held every HIGHLY_CONFIDENTIAL or
+      // RESTRICTED file back from the model. ADR 0079 (decision 100): a
+      // highly confidential file of their own company is read for a member
+      // whose membership is active now, checked here at the read, never
+      // cached. RESTRICTED stays held for everyone.
+      let ownCompanyRead: OwnCompanyRead | null = null;
+      if (held.document.sensitivityClass === "HIGHLY_CONFIDENTIAL") {
+        ownCompanyRead = await ownReadOf(actor, held.document.companyId);
+        if (ownCompanyRead === null) {
+          return {
+            document: { ...identity, state: "UNREADABLE", reason: HELD_BACK },
+            others,
+          };
+        }
+      } else if (held.document.sensitivityClass === "RESTRICTED") {
         return {
-          document: { ...identity, state: "UNREADABLE", reason: HELD_BACK },
+          document: {
+            ...identity,
+            state: "UNREADABLE",
+            reason: RESTRICTED_HELD,
+          },
           others,
         };
       }
@@ -329,7 +376,15 @@ export function createAttachedDocumentReads(
           others,
         };
       }
-      return { document: { ...identity, state: "READ", ...read }, others };
+      return {
+        document: {
+          ...identity,
+          state: "READ",
+          ...read,
+          ...(ownCompanyRead === null ? {} : { ownCompanyRead }),
+        },
+        others,
+      };
     },
   };
 }

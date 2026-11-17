@@ -215,7 +215,14 @@ function DocumentRequestCard({
       "That wasn't shared. Try again.",
     );
     setBusy(null);
-    if (out.ok) onChanged(`Shared with ${who}. They've been told.`);
+    if (out.ok)
+      onChanged(
+        // ADR 0078 (decision 99): a highly confidential document is one the
+        // investor's Q reads for them once shared; the founder is told once.
+        out.value.investorQReads
+          ? `Shared with ${who}. They and their Q will be able to read it until you stop sharing. They've been told.`
+          : `Shared with ${who}. They've been told.`,
+      );
     else setError(out.message);
   };
 

@@ -627,6 +627,7 @@ export function createFounderRequestsService(
       FounderRequestsOutcome<{
         readonly requestId: string;
         readonly status: "SHARED";
+        readonly investorQReads: boolean;
       }>
     > => {
       const own = await ownDocument(command.actor, command.documentId);
@@ -788,7 +789,11 @@ export function createFounderRequestsService(
       });
       return {
         outcome: "OK",
-        value: { requestId: request.id, status: "SHARED" },
+        value: {
+          requestId: request.id,
+          status: "SHARED",
+          investorQReads: investorQReads(document),
+        },
       };
     },
 

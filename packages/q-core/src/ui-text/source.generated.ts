@@ -4532,6 +4532,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Shared with you",
   "Shared with {investors}",
   "Shared with {name}",
+  "Shared with {name}. They and their Q will be able to read it until you stop sharing. They've been told.",
   "Shared with {name}. They've been told.",
   "Shared with {name}: view only, for 30 days.",
   "Shared with {name}: view only, for 30 days. They and their Q will be able to read it until you stop sharing.",

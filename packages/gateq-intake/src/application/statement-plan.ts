@@ -1368,6 +1368,29 @@ export function planReading(input: PlanInput): PlanOutcome {
       )
     )
       return;
+    // One correction of several statements is one statement (live
+    // 0490be41 §8: the reader named both halves of a cut note, one CORRECTS
+    // each, in the same words, and the note was stored twice). A correction
+    // this turn already wrote, in the same words and value, is linked to
+    // this target too; nothing is written again.
+    if (related !== null && op.op === "CORRECTS" && turn.id !== null) {
+      const already = newStatements.find(
+        (s) =>
+          s.sourceTurnId === turn.id &&
+          s.dimension === dimension &&
+          s.quantity === quantity &&
+          s.asOf === op.asOf &&
+          sameWords(s.words, words) &&
+          canonical(s.value) === canonical(value),
+      );
+      if (already !== undefined) {
+        link("CORRECTS", already.id, related, "MODEL_READING", turn.id);
+        const targetStatement = byId.get(related);
+        if (targetStatement !== undefined)
+          touched.add(targetStatement.dimension);
+        return;
+      }
+    }
     const statedAt = tick();
     const parsed = ApplicationStatementSchema.safeParse({
       id: randomUUID(),

@@ -4211,6 +4211,9 @@ const qTools = createQTools({
           actor,
           page: { limit },
         }),
+      // ADR 0079 (decision 100): their own company's highly confidential
+      // file, for a current member's own Q.
+      ownMember: createOwnCompanyMembership(database.sql),
     }),
     relationshipMail: createRelationshipMailPort(integrations),
     ...(inboundEmailService === undefined

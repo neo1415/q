@@ -14,6 +14,7 @@ import {
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
 import type { AttachedDocumentsPort } from "../ports.js";
+import { OWN_COMPANY_READ_LINE } from "./company-documents.js";
 
 /**
  * Lane 8 (owner 2026-10-22): a document the person attached in Q's
@@ -107,6 +108,15 @@ export const ReadAttachedDocumentOutputSchema = z
       .max(10),
     truthClass: z.literal("USER_CLAIM"),
     evidenceStatus: z.literal("DOCUMENT_SUPPORTED"),
+    /** ADR 0079: the membership an own-company read was under. */
+    ownCompanyRead: z
+      .object({
+        companyId: z.string().min(1).max(64),
+        membershipId: z.string().min(1).max(64),
+        say: z.string().max(800),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ReadAttachedDocumentOutput = z.infer<
@@ -240,6 +250,15 @@ export function createReadAttachedDocumentTool(
         pageCount: Math.min(document.pageCount, 10_000),
         whole: document.whole && !cut,
         pages,
+        ...(document.ownCompanyRead === undefined
+          ? {}
+          : {
+              ownCompanyRead: {
+                companyId: document.ownCompanyRead.companyId,
+                membershipId: document.ownCompanyRead.membershipId,
+                say: OWN_COMPANY_READ_LINE,
+              },
+            }),
       };
     },
   });

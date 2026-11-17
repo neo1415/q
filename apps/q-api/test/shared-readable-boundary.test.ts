@@ -57,16 +57,17 @@ describe("shared means readable stays on the chat read path (ADR 0078)", () => {
   });
 
   // ADR 0079 (owner decision 100): the owner's own read is resolved in one
-  // place (createOwnCompanyMembership) and given to exactly two
-  // compositions: the chat document reads and the founder's own analysis
-  // job's data-room reads. Neither feeds ranking, discovery or memory.
-  it("the owner's own read has one lookup and two compositions", () => {
+  // place (createOwnCompanyMembership) and given to exactly three
+  // compositions: the chat document reads, a file attached to the chat
+  // (the ADR's follow-up) and the founder's own analysis job's data-room
+  // reads. None feeds ranking, discovery or memory.
+  it("the owner's own read has one lookup and three compositions", () => {
     expect(using(/\bcreateOwnCompanyMembership\b/u)).toEqual([
       "apps/q-api/src/composition/material-documents.ts",
       "apps/q-api/src/main.ts",
     ]);
     const main = readFileSync(join(ROOT, "apps/q-api/src/main.ts"), "utf8");
-    expect(main.match(/\bownMember:/gu)?.length).toBe(2);
+    expect(main.match(/\bownMember:/gu)?.length).toBe(3);
   });
 
   it("no ranking, discovery, retrieval or memory code reads an owner's highly confidential document", () => {

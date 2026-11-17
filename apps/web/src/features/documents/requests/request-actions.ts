@@ -81,15 +81,17 @@ export async function loadInboxAction(
 export async function fulfilRequestAction(
   rawRequestId: string,
   raw: unknown,
-): Promise<RequestResult> {
+): Promise<RequestResult<{ readonly investorQReads: boolean }>> {
   const requestId = Id.safeParse(rawRequestId);
   const body = FulfilDocumentRequestSchema.safeParse(raw);
   const api = await session();
   if (!requestId.success || !body.success || api === null)
     return failed("That wasn't shared. Try again.");
   try {
-    await fulfilDocumentRequest(api, requestId.data, body.data);
-    return done();
+    const out = await fulfilDocumentRequest(api, requestId.data, body.data);
+    done();
+    // ADR 0078: the server's word on whether the investor's Q reads it.
+    return { ok: true, value: { investorQReads: out.investorQReads } };
   } catch {
     return failed(
       "That wasn't shared. It may have been answered already; refresh and try again.",

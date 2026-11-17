@@ -159,6 +159,8 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
     "تمت المشاركة. سيتمكن {name} ومعه Q الخاص به من قراءته إلى أن توقف المشاركة. أُبلغوا بذلك.",
   "Shared with {name}. They've been told.":
     "تمت المشاركة مع {name}. أُبلغوا بذلك.",
+  "Shared with {name}. They and their Q will be able to read it until you stop sharing. They've been told.":
+    "تمت المشاركة مع {name}. سيتمكنون هم وQ الخاص بهم من قراءته إلى أن توقف المشاركة. أُبلغوا بذلك.",
   "That wasn't shared. Try again.": "لم تتم المشاركة. حاول مرة أخرى.",
   Decline: "اعتذار",
   "Decline request": "اعتذر عن الطلب",

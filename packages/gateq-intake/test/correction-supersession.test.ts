@@ -191,6 +191,97 @@ describe("the live correction turn, replayed with its stored reading", () => {
   });
 });
 
+// Live §8 (production 5d08eaaa0, audit 2026-11-16): the reader named both
+// halves, one CORRECTS each, carrying the same correction words; the note
+// was stored twice, identically, one copy linked to each half. One
+// statement, linked to every statement it supersedes.
+describe("one correction of two statements", () => {
+  const NOTE =
+    "Our management accounts for the 12 months to October 2026 show a gross margin of 29.3%, not 29 and 3% as two notes.";
+
+  it("stores the correction once and links it to each statement it supersedes", async () => {
+    const { world, say, left, right } = await halyard();
+    world.scripts.push((prompt) =>
+      reading({
+        reply: "Understood: 29.3% is one figure.",
+        intent: "CORRECTION",
+        statements: [CUT_LEFT, CUT_RIGHT].map((cut) =>
+          st({
+            op: "CORRECTS",
+            target: prompt.statement(cut),
+            dimension: "application.note",
+            value: { kind: "TEXT", text: NOTE },
+            words: NOTE,
+          }),
+        ),
+      }),
+    );
+    await say("halyard-t8", CORRECTION);
+
+    const store = world.store();
+    const turn = store.turnRows.find((t) => t.text === CORRECTION);
+    const stored = store.statementRows.filter(
+      (s) => s.sourceTurnId === turn?.id && s.words === NOTE,
+    );
+    expect(stored).toHaveLength(1);
+    const corrects = store.linkRows.filter((l) => l.kind === "CORRECTS");
+    expect(
+      corrects
+        .filter((l) => l.fromStatementId === stored[0]?.id)
+        .map((l) => l.toStatementId)
+        .sort(),
+    ).toEqual([left, right].sort());
+    const now = current(world);
+    expect(now.has(left)).toBe(false);
+    expect(now.has(right)).toBe(false);
+    expect([...now].some((id) => id === stored[0]?.id)).toBe(true);
+  });
+
+  it("two corrections saying different things are still two statements", async () => {
+    const { world, say, left, right } = await halyard();
+    const OTHER = "The 82.0% in the pitch deck is licence margin.";
+    world.scripts.push((prompt) =>
+      reading({
+        reply: "Understood.",
+        intent: "CORRECTION",
+        statements: [
+          st({
+            op: "CORRECTS",
+            target: prompt.statement(CUT_LEFT),
+            dimension: "application.note",
+            value: { kind: "TEXT", text: NOTE },
+            words: NOTE,
+          }),
+          st({
+            op: "CORRECTS",
+            target: prompt.statement(CUT_RIGHT),
+            dimension: "application.note",
+            value: { kind: "TEXT", text: OTHER },
+            words: OTHER,
+          }),
+        ],
+      }),
+    );
+    await say("halyard-t8", CORRECTION);
+    const store = world.store();
+    const turn = store.turnRows.find((t) => t.text === CORRECTION);
+    const fresh = store.statementRows.filter(
+      (s) =>
+        s.sourceTurnId === turn?.id && (s.words === NOTE || s.words === OTHER),
+    );
+    expect(fresh).toHaveLength(2);
+    const targets = store.linkRows
+      .filter(
+        (l) =>
+          l.kind === "CORRECTS" &&
+          fresh.some((f) => f.id === l.fromStatementId),
+      )
+      .map((l) => l.toStatementId)
+      .sort();
+    expect(targets).toEqual([left, right].sort());
+  });
+});
+
 describe("Q's words about a correction are held to the record", () => {
   it("drops the claim and says plainly what it stored when nothing was corrected", async () => {
     const { world, say, left, right } = await halyard();

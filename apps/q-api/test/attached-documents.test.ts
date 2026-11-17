@@ -125,6 +125,123 @@ describe("attached document reads", () => {
     expect(calls).toHaveLength(0);
   });
 
+  // ADR 0079 (owner decision 100): the founder's own Q reads their own
+  // company's highly confidential file attached to the chat, under a
+  // membership checked at the read. RESTRICTED stays held.
+  describe("their own company's highly confidential file (ADR 0079)", () => {
+    const COMPANY = "c0000000-0000-4000-8000-000000000001";
+    const MEMBERSHIP = "f0000000-0000-4000-8000-000000000001";
+    const accounts =
+      (sensitivityClass: string, companyId: string | null = COMPANY) =>
+      () =>
+        Promise.resolve({
+          document: {
+            id: DOC,
+            title: "LedgerBridge management accounts Sept 2026",
+            status: "ACTIVE",
+            sensitivityClass,
+            companyId,
+          },
+          currentVersion: version(),
+        });
+    const page = [
+      { page_number: 1, text: "Gross margin 29.3%.", chars: 19, rank: 0 },
+    ];
+
+    it("reads it for a current member, with the membership as provenance", async () => {
+      const { sql, calls } = fakeSql([page]);
+      const asked: string[] = [];
+      const reads = createAttachedDocumentReads({
+        sql,
+        get: accounts("HIGHLY_CONFIDENTIAL"),
+        list: () => Promise.resolve([]),
+        ownMember: (actor, companyId) => {
+          asked.push(`${actor.userId}:${companyId}`);
+          return Promise.resolve({ companyId, membershipId: MEMBERSHIP });
+        },
+      });
+      const out = await reads.read(actorA, { documentId: DOC });
+      expect(out?.document).toMatchObject({
+        state: "READ",
+        pages: [{ page: 1, text: "Gross margin 29.3%." }],
+        ownCompanyRead: { companyId: COMPANY, membershipId: MEMBERSHIP },
+      });
+      expect(asked).toEqual([`u-a:${COMPANY}`]);
+      expect(calls).toHaveLength(1);
+    });
+
+    it("stays held back without a current membership", async () => {
+      const { sql, calls } = fakeSql([page]);
+      const reads = createAttachedDocumentReads({
+        sql,
+        get: accounts("HIGHLY_CONFIDENTIAL"),
+        list: () => Promise.resolve([]),
+        ownMember: () => Promise.resolve(null),
+      });
+      const out = await reads.read(actorA, { documentId: DOC });
+      expect(out?.document).toMatchObject({ state: "UNREADABLE" });
+      expect(calls).toHaveLength(0);
+    });
+
+    it("stays held back when the membership is another company's, or the lookup fails", async () => {
+      for (const ownMember of [
+        () =>
+          Promise.resolve({
+            companyId: "c0000000-0000-4000-8000-000000000999",
+            membershipId: MEMBERSHIP,
+          }),
+        () => Promise.reject(new Error("db down")),
+      ]) {
+        const { sql, calls } = fakeSql([page]);
+        const reads = createAttachedDocumentReads({
+          sql,
+          get: accounts("HIGHLY_CONFIDENTIAL"),
+          list: () => Promise.resolve([]),
+          ownMember,
+        });
+        const out = await reads.read(actorA, { documentId: DOC });
+        expect(out?.document).toMatchObject({ state: "UNREADABLE" });
+        expect(calls).toHaveLength(0);
+      }
+    });
+
+    it("a file with no company is never unlocked, and the lookup is not asked", async () => {
+      const { sql, calls } = fakeSql([page]);
+      let asked = 0;
+      const reads = createAttachedDocumentReads({
+        sql,
+        get: accounts("HIGHLY_CONFIDENTIAL", null),
+        list: () => Promise.resolve([]),
+        ownMember: (_actor, companyId) => {
+          asked += 1;
+          return Promise.resolve({ companyId, membershipId: MEMBERSHIP });
+        },
+      });
+      const out = await reads.read(actorA, { documentId: DOC });
+      expect(out?.document).toMatchObject({ state: "UNREADABLE" });
+      expect(asked).toBe(0);
+      expect(calls).toHaveLength(0);
+    });
+
+    it("RESTRICTED stays held back even for a current member", async () => {
+      const { sql, calls } = fakeSql([page]);
+      let asked = 0;
+      const reads = createAttachedDocumentReads({
+        sql,
+        get: accounts("RESTRICTED"),
+        list: () => Promise.resolve([]),
+        ownMember: (_actor, companyId) => {
+          asked += 1;
+          return Promise.resolve({ companyId, membershipId: MEMBERSHIP });
+        },
+      });
+      const out = await reads.read(actorA, { documentId: DOC });
+      expect(out?.document).toMatchObject({ state: "UNREADABLE" });
+      expect(asked).toBe(0);
+      expect(calls).toHaveLength(0);
+    });
+  });
+
   it("another tenant's person gets nothing, and no page is read", async () => {
     const { sql, calls } = fakeSql([]);
     const reads = createAttachedDocumentReads({
