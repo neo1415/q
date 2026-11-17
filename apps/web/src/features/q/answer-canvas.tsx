@@ -4,6 +4,7 @@ import "./answer-canvas.css";
 
 import { AnimatePresence, LazyMotion, m, useReducedMotion } from "motion/react";
 import {
+  useContext,
   useLayoutEffect,
   useRef,
   useState,
@@ -34,6 +35,7 @@ import {
 import {
   canvasLayout,
   comparesAsTable,
+  FullCardsContext,
   compareRows,
   fitNumber,
   fitExplanation,
@@ -979,7 +981,8 @@ export function AnswerCanvas({
     answerCardRef(answerKey ?? block.title, card),
   );
   const shown = unhidden.filter((card) => dismissed?.has(card.key) !== true);
-  const { layout, tiles } = canvasLayout(shown.length, wide);
+  const fullCards = useContext(FullCardsContext);
+  const { layout, tiles } = canvasLayout(shown.length, wide, fullCards);
   const table = comparesAsTable(block) && shown.length === block.cards.length;
   const spotKey = spotlight === null ? undefined : block.cards[spotlight]?.key;
   const spotCard = shown.find((card) => card.key === spotKey);

@@ -1,3 +1,5 @@
+import { createContext } from "react";
+
 import type {
   QAnswerCard,
   QAnswerCardLevel,
@@ -27,14 +29,23 @@ export type CanvasLayout = {
  * focused card beside a grid of the rest (live 23 Oct: five in a row left
  * the rest about 170px wide, names broke mid-word). Phone: one column; from four
  * cards, the rest become half-width tiles so the focused card is never
- * pushed off a 390px screen.
+ * pushed off a 390px screen. In the voice room (owner 2026-11-17) the
+ * cards are the whole stage, so a phone shows them as one full-width
+ * column instead: each keeps its line, measures and "out of 10" label.
  */
-export function canvasLayout(count: number, wide: boolean): CanvasLayout {
+export function canvasLayout(
+  count: number,
+  wide: boolean,
+  fullCards = false,
+): CanvasLayout {
   return {
     layout: wide && count > 4 ? "grid" : "row",
-    tiles: !wide && count >= 4,
+    tiles: !wide && count >= 4 && !fullCards,
   };
 }
+
+/** True where cards should never shrink to phone tiles (the voice room). */
+export const FullCardsContext = createContext(false);
 
 /** How a measure's level reads: a word, always beside its shape. */
 export const LEVEL_WORD: Readonly<Record<QAnswerCardLevel, string>> = {

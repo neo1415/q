@@ -90,6 +90,13 @@ describe("layout for 1, 3, 5 and 10 cards (C1)", () => {
     ]);
   });
 
+  it("never makes tiles in the voice room: a phone shows one full column", () => {
+    expect(
+      [1, 3, 5, 10].map((n) => canvasLayout(n, false, true).tiles),
+    ).toEqual([false, false, false, false]);
+    expect(canvasLayout(5, true, true).layout).toBe("grid");
+  });
+
   it("shows a comparison with shared measures as one table", () => {
     expect(comparesAsTable(DEMO_COMPARE)).toBe(true);
     expect(comparesAsTable(demoTop(3))).toBe(false);

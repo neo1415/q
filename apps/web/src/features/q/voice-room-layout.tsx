@@ -22,6 +22,7 @@ import { createLevelEnvelope } from "@/features/q-aperture/level-envelope";
 import { useQMotion } from "@/features/q-aperture";
 import { useT } from "@/features/i18n/language";
 
+import { FullCardsContext } from "./answer-canvas-logic";
 import { resultCue, scrollerOf, type ResultCue } from "./follow-newest";
 
 /**
@@ -342,7 +343,10 @@ export function VoiceRoom({
           className="flex w-full min-w-0 flex-col items-center gap-4"
           data-q-voice-content
         >
-          {children}
+          {/* The cards are the stage here: never phone tiles (owner 11-17). */}
+          <FullCardsContext.Provider value={true}>
+            {children}
+          </FullCardsContext.Provider>
         </div>
         {cue === null ? null : (
           <button

@@ -6020,7 +6020,9 @@
     0px,
     calc(var(--cq-voice-presence-w, 48px) + 12px - var(--cq-voice-bleed, 0px))
   );
-  max-width: 40rem;
+  /* A subtitle's measure (owner 2026-11-17): about 600 px on desktop; a
+     phone's narrower stage keeps it full width minus the gutters. */
+  max-width: 37.5rem;
   margin-inline: auto;
   display: flex;
   flex-direction: column;

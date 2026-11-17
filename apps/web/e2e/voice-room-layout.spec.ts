@@ -194,6 +194,77 @@ test("at the end of the stage the last card's buttons sit clear of the overlay",
   expect(hit).toBe(true);
 });
 
+test("phone: the cards are one full-width column and keep their words", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "phone", "phone layout");
+  await open(page, "?speaking=1", "light");
+  await showResult(page);
+  const content = await boxOf(page, "[data-q-voice-content]");
+  const cards = page.locator("[data-q-voice-content] [data-ac-card]");
+  const count = await cards.count();
+  expect(count).toBeGreaterThanOrEqual(4);
+  // Owner 2026-11-17: never two-up tiles in the voice room.
+  await expect(page.locator("[data-q-voice-content] [data-tiles]")).toHaveCount(
+    0,
+  );
+  for (let n = 0; n < count; n += 1) {
+    const card = cards.nth(n);
+    const box = await card.boundingBox();
+    if (box === null) throw new Error(`no box for card ${String(n)}`);
+    expect(box.width, `card ${String(n)} width`).toBeGreaterThan(
+      content.width - 2,
+    );
+    // Its one-line description, the measures line and the score label.
+    await expect(card.locator(".cq-ac-line").first()).toBeVisible();
+    await expect(
+      card.locator(".cq-ac-line", { hasText: "of 6 measures known" }),
+    ).toBeVisible();
+    await expect(card.locator(".cq-ac-score .of")).toHaveText(
+      "mandate fit, out of 10",
+    );
+    await expect(card.locator(".cq-ac-score .of")).toBeVisible();
+    // Targets stay at least 44 px: the card's own button and its close.
+    const main = await card.locator(".cq-ac-head-main").boundingBox();
+    const close = await card.locator(".cq-ac-x").first().boundingBox();
+    if (main === null || close === null) throw new Error("no target box");
+    expect(main.height).toBeGreaterThanOrEqual(44);
+    expect(close.width).toBeGreaterThanOrEqual(44);
+    expect(close.height).toBeGreaterThanOrEqual(44);
+  }
+  // One column: every card starts at the same x.
+  const xs = await cards.evaluateAll((elements) =>
+    elements.map((element) => Math.round(element.getBoundingClientRect().x)),
+  );
+  expect(new Set(xs).size).toBe(1);
+});
+
+test("the caption reads like a subtitle: about 600 px, centred, clear of Q", async ({
+  page,
+}, info) => {
+  await open(page, "?speaking=1", "light");
+  await showResult(page);
+  // Let the caption grow to its two lines.
+  await page.waitForTimeout(3000);
+  const caption = await boxOf(page, "[data-q-voice-caption]");
+  const presence = await boxOf(page, "[data-q-voice-presence-box]");
+  const stage = await boxOf(page, "[data-q-voice-stage-body]");
+  expect(overlaps(caption, presence)).toBe(false);
+  if (info.project.name === "desktop") {
+    expect(caption.width).toBeLessThanOrEqual(601);
+    expect(caption.width).toBeGreaterThan(400);
+    // Centred at the bottom (the corner presence's reserve shifts it a little).
+    const middle = caption.x + caption.width / 2;
+    const stageMiddle = stage.x + stage.width / 2;
+    expect(Math.abs(middle - stageMiddle)).toBeLessThanOrEqual(48);
+  } else {
+    // Phone: the full width left of Q, minus the gutters.
+    expect(caption.x).toBeGreaterThanOrEqual(stage.x + 16);
+    expect(caption.x).toBeLessThanOrEqual(stage.x + 24);
+    expect(caption.x + caption.width).toBeLessThanOrEqual(presence.x);
+  }
+});
+
 test("the voice room passes axe (WCAG 2.2 AA), light and dark", async ({
   page,
 }) => {

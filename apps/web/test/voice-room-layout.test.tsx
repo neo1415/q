@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, render } from "@testing-library/react";
+import { useContext } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FullCardsContext } from "@/features/q/answer-canvas-logic";
 import { QCurrentExchange } from "@/features/q/q-current-exchange";
 import { VoiceRoom } from "@/features/q/voice-room-layout";
 
@@ -88,6 +90,22 @@ describe("the voice room once Q shows something (decision 102)", () => {
     expect(element?.style.getPropertyValue("--cq-voice-presence-w")).toBe(
       "72px",
     );
+  });
+
+  it("tells its cards never to become phone tiles (owner 2026-11-17)", () => {
+    function Probe() {
+      return <div data-full-cards={String(useContext(FullCardsContext))} />;
+    }
+    render(
+      <VoiceRoom compact resultKey={null} aside={null}>
+        <Probe />
+      </VoiceRoom>,
+    );
+    expect(
+      document
+        .querySelector("[data-full-cards]")
+        ?.getAttribute("data-full-cards"),
+    ).toBe("true");
   });
 
   it("with nothing shown it reserves nothing", () => {
