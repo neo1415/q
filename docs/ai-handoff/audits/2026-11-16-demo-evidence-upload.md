@@ -117,3 +117,29 @@ node scripts/seed/evidence/upload.mjs negative    # Savanna Seed cannot list or 
 - **Upload:** all 14 `nx-*` documents (12 PDFs, including the generated pitch deck, and 2 CSVs) went through the normal founder upload route. All sessions completed, and `verify` shows 14/14 COMPLETED.
 - **Model calls:** 2, for deck reading, at USD 0.0096 (ledger `a25bd6c5`).
 - **Visibility:** every document is founder-private. The Savanna negative check covered all 40 seeded documents. Savanna sees exactly the 8 Tensorgate documents shared with it. No Nixo or Halyard document is listed or opens for Savanna.
+
+## Compact packs: MedTrail, Mizan, Ajopot, Watchly, Maji Loop (17 Nov, 02:30 UTC)
+
+Phase 2's smaller packages (`scripts/seed/evidence/compact.mjs`, fixtures `medtrail|mizan|ajopot|watchly|maji-loop.json`). Each fixture keeps the figures production records for the company, read read-only on 17 Nov 2026: identity, founders, team size, the raise in `core.capital_objectives` (amount, currency, instrument, close date, use-of-funds lines), and the deck and claim figures. For example, Watchly's existing management-accounts CSV records cash of 3,300,000 and burn of 175,000. Every invented field is listed under `assumptions`. Each pack has exactly one deliberate deck discrepancy:
+
+- MedTrail: gross margin, 72% against 42.3%.
+- Mizan: runway, 10 months against 7.6 at October's burn.
+- Ajopot: 18,700 active users against 14,960 contributing members.
+- Watchly: about 20 months of runway against 18.9.
+- Maji Loop: 96 kiosks at the end of 2025 against 88 dispensing.
+
+No new deck was generated. Validator: `bash scripts/heavy.sh npx vitest run apps/workers/test/demo-evidence-fixtures.test.ts` gives 131 passed and 23 skipped, where the skips are runIf cases that apply only to particular companies.
+
+- **Upload:** 31 documents went up through the normal founder route. Each was uploaded as the company's marked fictional founder, and the marker check was unchanged. Each declared its manifest type. Prefixes: MedTrail `b5280fd1` (7, founder `969cb8b0`), Mizan `d9c03bb4` (6, `2371a60b`), Ajopot `91de2a77` (6, `3acf2825`), Watchly `526c2d72` (6, `ea854270`), Maji Loop `01c554bf` (6, `2ba89060`). Every upload session reached COMPLETED on the first attempt, and no filename clashed with the companies' existing documents.
+- **Verify:** 31/31 COMPLETED/COMPLETED. All 31 passed every per-document check listed above:
+  - company, tenant and organisation match;
+  - private bucket and tenant-scoped key;
+  - extraction in `cq-extractions-private`, run COMPLETED;
+  - chunk set ACTIVE at `organisation_private`;
+  - `download_audience` ORGANISATION, with 0 data-room entries and 0 disclosure policies;
+  - listed in the founder's API and data-room outline.
+  - Sensitivity follows the type defaults: management accounts, revenue builds, invoice registers and the Ajopot payout ledger are HIGHLY_CONFIDENTIAL; the rest are CONFIDENTIAL.
+  - Claim readings: 0. Watchly: 3 onboarding suggestions were offered from the new documents, deterministically.
+- **Model calls:** 0 (`ai_ops.model_usage` since 02:30:52Z). Ledger `7f344ea3`: reserved $0.20, actual $0.00.
+- **Negative check (Savanna Seed Partners):** 71 seeded documents were checked. **0 of the 31 new documents are visible**: list and data room answer 200 without them, and get, file, open and access answer 404. The only visible documents are the 8 Tensorgate and 10 Nixo documents already shared with Savanna through the workflow by earlier lanes. This slice shared nothing, granted nothing and set no data-room level.
+- The report JSON and the 0600 public-key file stayed in the session scratchpad. The key file was shredded.

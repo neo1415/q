@@ -21,6 +21,7 @@ import {
   SYNTHETIC_HEADER,
   WATERMARK_TEXT,
 } from "./documents.mjs";
+import { buildCompactDocuments } from "./compact.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -315,7 +316,8 @@ export async function renderPdf(doc, fx, pdfLib) {
 
 /** Every file for one company: PDFs rendered, CSVs as UTF-8 text. */
 export async function renderCompany(fx, pdfLib) {
-  const docs = buildDocuments(fx);
+  const docs =
+    fx.pack === "compact" ? buildCompactDocuments(fx) : buildDocuments(fx);
   const files = [];
   for (const doc of docs) {
     const bytes =

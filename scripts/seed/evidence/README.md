@@ -1,4 +1,4 @@
-# Synthetic demo evidence: Tensorgate, Halyard Security and Nixo
+# Synthetic demo evidence: showcase and compact packs
 
 Phases 2 and 3 of the owner directive of 16 Nov 2026 (`docs/ai-handoff/directives/2026-11-16-demo-evidence-data-room-seeding.md`). This folder builds a deterministic evidence pack for the three showcase companies: the two fictional tavus-20 companies, and Nixo (decision 99: the owner's own account, seeded like the fictional ones with the same synthetic marking). It works locally and offline: nothing here uploads, seeds, writes to a database or calls a model.
 
@@ -13,6 +13,7 @@ Phases 2 and 3 of the owner directive of 16 Nov 2026 (`docs/ai-handoff/directive
 | `render.mjs`                                       | Renders text-native PDFs with `pdf-lib`, the library the memo and deck export already uses. It is resolved from `packages/deck-render`, so no dependency was added. Every page carries the synthetic header line, a light diagonal watermark, and a footer with the company, title, version, period, issue date and page n/m. |
 | `generate.mjs`                                     | Writes the files to `out/<company>/`, which is gitignored, and checks the committed manifests.                                                                                                                                                                                                                                |
 | `manifests/<company>.json`                         | One entry per document: stable id, file name, title, document type code, default sensitivity, whether an investor's Q can read it under current rules, period, issue date, version, data-room folder and checklist item, intended level (PRIVATE), and the planned fictional investor share.                                  |
+| `compact.mjs`                                      | Builds the compact packs (5-7 documents) for MedTrail, Mizan, Ajopot, Watchly and Maji Loop from `fixtures/<company>.json` (`"pack": "compact"`). Pure, same header, watermark and footer through `render.mjs`.                                                                                                               |
 | `apps/workers/test/demo-evidence-fixtures.test.ts` | The consistency validator.                                                                                                                                                                                                                                                                                                    |
 
 ```bash
@@ -62,6 +63,22 @@ Nixo is not in the tavus-20 seed and had no documents or claims. The fixture kee
   - **Team size.** The profile records a team of 12; payroll shows 10 employees at 30 Sep 2026, because the founder counted two contract forward-deployed engineers.
   - **Contracted against billed.** Contracted ARR is 1,080,000, against 864,000 of annualised billed subscriptions. Customer F signed in October 2026 and is billed only from 1 Jan 2027.
 - **Deck.** Nixo has no deck, so `nx-pitch-deck.pdf` (PITCH_DECK, landscape, one slide per page) is generated from the fixture. Its figures are the accounts' figures, and the plan slide is labelled PROJECTION.
+
+## Compact packs (`mt-*`, `mz-*`, `aj-*`, `wl-*`, `ml-*`)
+
+Phase 2's "smaller packages" for the five fictional companies investors meet next. Each fixture keeps every figure production records for the company (read read-only on 17 Nov 2026: identity, founders, team size, raise, deck and claim figures) and lists each invented field, with its value and reason, under `assumptions`. MedTrail and Mizan also keep their tavus-20 seed (KPI points, cap-table summary, deck cash, burn and runway), checked against `docs/seed/tavus-20/companies-full.json`. No deck is generated: each already has one.
+
+| Company   | Currency, bank (fictitious) | Documents                                                                                                           | Deliberate discrepancy                                                                                   |
+| --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| MedTrail  | NGN, Lagoon Crest Bank      | management accounts, revenue build, invoice register (CSV), distributor contracts, cap table, raise terms, KPI pack | Gross margin: the deck's 72% leaves out field operations; the accounts show 42.3%.                       |
+| Mizan     | EGP, Delta Meridian Bank    | management accounts, revenue build by partner, bank-partner contracts, cap table, raise terms, KPI pack             | Burn and runway: the deck's USD 60,000 a month and 10 months against October's accounts.                 |
+| Ajopot    | NGN, Ebute Trust Bank       | management accounts, revenue build, payout ledger (CSV), cap table, raise terms, KPI pack                           | Active users: the deck's 18,700 (app opens) against 14,960 members who paid in March 2026.               |
+| Watchly   | USD, Volta Harbour Bank     | management accounts, invoice register (CSV), customers/pilots/LOIs, cap table, raise terms, KPI pack                | Runway: the deck's about 20 months against 18.9 in the accounts (plus a forced pipeline reconciliation). |
+| Maji Loop | KES, Rift Crescent Bank     | management accounts, revenue build, utility contract and sites, cap table, raise terms, KPI pack                    | Kiosks: the deck's 96 at end 2025 against 88 dispensing.                                                 |
+
+The validator checks for each: recorded figures kept exactly, every invented field listed, contiguous months, line totals, driver × price revenue, cash roll-forward with burn and runway derived from it, ownership at 100.00% now and pro forma, identical raise terms, exactly one deliberate deck discrepancy in exactly the stated documents, 5-7 text-native files with every page marked, no "(fictional)" titles or imitation records, byte-identical rendering and a matching committed manifest.
+
+Upload is founder-private through `upload.mjs` as each company's marked fictional founder (the marker check is unchanged). None is a PITCH_DECK or COMPANY_PROFILE and every PDF has a text layer, so no model call is expected. See `docs/ai-handoff/audits/2026-11-16-demo-evidence-upload.md`.
 
 ## What the upload step will need
 

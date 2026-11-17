@@ -1,0 +1,1235 @@
+{
+  "schemaVersion": 1,
+  "pack": "compact",
+  "synthetic": true,
+  "key": "ajopot",
+  "idPrefix": "aj",
+  "company": {
+    "name": "Ajopot",
+    "legalName": "Ajopot Digital Savings Ltd",
+    "website": "https://ajopot.example",
+    "foundedOn": "2024-03-18",
+    "headquarters": "Lagos, Nigeria",
+    "stage": "seed",
+    "oneLiner": "A consumer app that digitises ajo — rotating savings circles — for gig workers and young professionals, with funds held at a licensed partner bank."
+  },
+  "seedSource": {
+    "kind": "recorded-profile",
+    "companyId": "91de2a77-fe47-4af0-8534-d9abf9c55949",
+    "readOn": "2026-11-17",
+    "decision": "fictional-world dev seed (apps/q-api/src/dev/fictional-world/companies.ts), read read-only from production on 17 Nov 2026"
+  },
+  "recordedProfile": {
+    "canonicalName": "Ajopot",
+    "legalName": "Ajopot Digital Savings Ltd",
+    "websiteUrl": "https://ajopot.example",
+    "foundedDate": "2024-03-18",
+    "headquartersCity": "Lagos",
+    "stage": "seed",
+    "shortDescription": "A consumer app that digitises ajo — rotating savings circles — for gig workers and young professionals, with funds held at a licensed partner bank.",
+    "founders": [
+      {
+        "name": "Temitope Alade",
+        "title": "Co-founder and CEO"
+      },
+      {
+        "name": "Yusuf Danladi",
+        "title": "Co-founder and CTO"
+      }
+    ],
+    "teamSize": 14,
+    "raise": {
+      "currency": "NGN",
+      "targetAmount": 1200000000,
+      "instrument": "safe",
+      "useOfFundsSummary": "Sales and go-to-market; Product and engineering; Runway and operations",
+      "targetCloseDate": null,
+      "valuation": null,
+      "minimumCheque": null
+    },
+    "figures": [
+      {
+        "what": "monthly active users, Sep 2025 (deck)",
+        "month": "2025-09",
+        "kpi": "monthlyActiveUsers",
+        "value": 4200
+      },
+      {
+        "what": "monthly active users, Dec 2025 (deck)",
+        "month": "2025-12",
+        "kpi": "monthlyActiveUsers",
+        "value": 11300
+      },
+      {
+        "what": "active users, Mar 2026 (claim and deck)",
+        "month": "2026-03",
+        "kpi": "monthlyActiveUsers",
+        "value": 18700
+      },
+      {
+        "what": "registered users, Mar 2026 (claim)",
+        "month": "2026-03",
+        "kpi": "registeredUsers",
+        "value": 52000
+      },
+      {
+        "what": "circles, Mar 2026 (overview and deck)",
+        "month": "2026-03",
+        "kpi": "circlesActive",
+        "value": 3900
+      }
+    ],
+    "approximateFigures": [
+      {
+        "what": "about NGN 610m monthly contributions, Mar 2026 (claim)",
+        "month": "2026-03",
+        "kpi": "contributions",
+        "value": 610000000,
+        "tolerance": 0.005
+      }
+    ],
+    "unknownClaims": ["financial.cac", "risk.default_rate"]
+  },
+  "currency": "NGN",
+  "fx": {
+    "usd": 1520,
+    "note": "USD equivalents use a management rate of NGN 1,520 per USD."
+  },
+  "collection": "same-month",
+  "documentDefaults": {
+    "issuedOn": "2026-11-14",
+    "version": "1.0",
+    "preparedBy": "Prepared by Temitope Alade, Co-founder and CEO, from the company's ledgers and app records; unaudited"
+  },
+  "bank": {
+    "name": "Ebute Trust Bank",
+    "accountMasked": "operating account ending ****6218"
+  },
+  "periods": {
+    "firstActualMonth": "2025-09",
+    "lastActualMonth": "2026-10"
+  },
+  "basis": [
+    "Revenue: a fee of 1% of each payout, deducted when the pot is paid out. Every circle pays out each month's pot in the same month, so payouts equal contributions and fees are received in the month earned.",
+    "Members' contributions are held in a ring-fenced account at the partner bank, Ebute Trust Bank, and are not Ajopot's cash or revenue. When a member misses a contribution, Ajopot advances the payout from its guarantee reserve and recovers most of it; the net loss is reported in cost of revenue."
+  ],
+  "revenueModel": {
+    "components": [
+      {
+        "line": "payoutFees",
+        "label": "Payouts x 1%",
+        "kpi": "payouts",
+        "unitPrice": 0.01
+      }
+    ]
+  },
+  "lineLabels": {
+    "payoutFees": "Payout fees (1%)",
+    "partnerBankAndPaymentFees": "Partner bank and payment fees",
+    "payoutGuaranteeNetLosses": "Payout guarantee net losses",
+    "kycAndSms": "KYC checks and SMS",
+    "payrollEngineering": "Payroll - engineering",
+    "payrollProductAndGrowth": "Payroll - product and growth",
+    "payrollOperationsAndSupport": "Payroll - operations and support",
+    "paidAcquisition": "Paid acquisition",
+    "officeLagos": "Office (Lagos)",
+    "cloudAndSoftware": "Cloud and software",
+    "legalAndCompliance": "Legal and compliance",
+    "other": "Other"
+  },
+  "kpiDefinitions": [
+    {
+      "key": "registeredUsers",
+      "label": "Registered users (month end)",
+      "unit": "count"
+    },
+    {
+      "key": "monthlyActiveUsers",
+      "label": "Monthly active users (opened the app)",
+      "unit": "count"
+    },
+    {
+      "key": "contributingMembers",
+      "label": "Contributing members (paid in the month)",
+      "unit": "count"
+    },
+    {
+      "key": "circlesActive",
+      "label": "Circles",
+      "unit": "count"
+    },
+    {
+      "key": "contributions",
+      "label": "Contributions (NGN)",
+      "unit": "money"
+    },
+    {
+      "key": "missedContributionPercent",
+      "label": "Contributions missed after 7 days (%)",
+      "unit": "percent"
+    },
+    {
+      "key": "blendedCac",
+      "label": "Paid acquisition per new registration (NGN)",
+      "unit": "money"
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-09",
+      "revenue": {
+        "lines": {
+          "payoutFees": 1370880
+        },
+        "total": 1370880
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 342720,
+          "payoutGuaranteeNetLosses": 534643,
+          "kycAndSms": 674400
+        },
+        "total": 1551763
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 12000000,
+          "payrollProductAndGrowth": 6600000,
+          "payrollOperationsAndSupport": 2600000,
+          "paidAcquisition": 10080000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 39480000
+      },
+      "grossProfit": -180883,
+      "netResult": -39660883,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 219360796,
+        "receipts": 1370880,
+        "fundingReceived": 0,
+        "payments": 41031763,
+        "closing": 179699913
+      },
+      "receivablesClosing": 0,
+      "netBurn": 39660883,
+      "runwayMonths": 4.5,
+      "headcount": {
+        "engineering": 5,
+        "productAndGrowth": 3,
+        "operationsAndSupport": 2,
+        "total": 10
+      },
+      "kpis": {
+        "registeredUsers": 14800,
+        "newRegistrations": 3600,
+        "monthlyActiveUsers": 4200,
+        "contributingMembers": 3360,
+        "circlesActive": 1110,
+        "contributions": 137088000,
+        "payouts": 137088000,
+        "missedContributionPercent": 2.6,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "payoutFees": 1925760
+        },
+        "total": 1925760
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 481440,
+          "payoutGuaranteeNetLosses": 722160,
+          "kycAndSms": 743800
+        },
+        "total": 1947400
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 12000000,
+          "payrollProductAndGrowth": 6600000,
+          "payrollOperationsAndSupport": 2600000,
+          "paidAcquisition": 10360000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 39760000
+      },
+      "grossProfit": -21640,
+      "netResult": -39781640,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 179699913,
+        "receipts": 1925760,
+        "fundingReceived": 0,
+        "payments": 41707400,
+        "closing": 139918273
+      },
+      "receivablesClosing": 0,
+      "netBurn": 39781640,
+      "runwayMonths": 3.5,
+      "headcount": {
+        "engineering": 5,
+        "productAndGrowth": 3,
+        "operationsAndSupport": 2,
+        "total": 10
+      },
+      "kpis": {
+        "registeredUsers": 18500,
+        "newRegistrations": 3700,
+        "monthlyActiveUsers": 5900,
+        "contributingMembers": 4720,
+        "circlesActive": 1388,
+        "contributions": 192576000,
+        "payouts": 192576000,
+        "missedContributionPercent": 2.5,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "payoutFees": 2643840
+        },
+        "total": 2643840
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 660960,
+          "payoutGuaranteeNetLosses": 951782,
+          "kycAndSms": 1114200
+        },
+        "total": 2726942
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 12000000,
+          "payrollProductAndGrowth": 6600000,
+          "payrollOperationsAndSupport": 2600000,
+          "paidAcquisition": 15960000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 45360000
+      },
+      "grossProfit": -83102,
+      "netResult": -45443102,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 139918273,
+        "receipts": 2643840,
+        "fundingReceived": 0,
+        "payments": 48086942,
+        "closing": 94475171
+      },
+      "receivablesClosing": 0,
+      "netBurn": 45443102,
+      "runwayMonths": 2.1,
+      "headcount": {
+        "engineering": 5,
+        "productAndGrowth": 3,
+        "operationsAndSupport": 2,
+        "total": 10
+      },
+      "kpis": {
+        "registeredUsers": 24200,
+        "newRegistrations": 5700,
+        "monthlyActiveUsers": 8100,
+        "contributingMembers": 6480,
+        "circlesActive": 1815,
+        "contributions": 264384000,
+        "payouts": 264384000,
+        "missedContributionPercent": 2.4,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "payoutFees": 3688320
+        },
+        "total": 3688320
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 922080,
+          "payoutGuaranteeNetLosses": 1327795,
+          "kycAndSms": 1381600
+        },
+        "total": 3631475
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 14400000,
+          "payrollProductAndGrowth": 6600000,
+          "payrollOperationsAndSupport": 2600000,
+          "paidAcquisition": 19040000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 50840000
+      },
+      "grossProfit": 56845,
+      "netResult": -50783155,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 94475171,
+        "receipts": 3688320,
+        "fundingReceived": 750000000,
+        "payments": 54471475,
+        "closing": 793692016
+      },
+      "receivablesClosing": 0,
+      "netBurn": 50783155,
+      "runwayMonths": 15.6,
+      "headcount": {
+        "engineering": 6,
+        "productAndGrowth": 3,
+        "operationsAndSupport": 2,
+        "total": 11
+      },
+      "kpis": {
+        "registeredUsers": 31000,
+        "newRegistrations": 6800,
+        "monthlyActiveUsers": 11300,
+        "contributingMembers": 9040,
+        "circlesActive": 2325,
+        "contributions": 368832000,
+        "payouts": 368832000,
+        "missedContributionPercent": 2.4,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "payoutFees": 4439040
+        },
+        "total": 4439040
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 1109760,
+          "payoutGuaranteeNetLosses": 1531469,
+          "kycAndSms": 1425200
+        },
+        "total": 4066429
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 14400000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 2600000,
+          "paidAcquisition": 18480000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 52480000
+      },
+      "grossProfit": 372611,
+      "netResult": -52107389,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 793692016,
+        "receipts": 4439040,
+        "fundingReceived": 0,
+        "payments": 56546429,
+        "closing": 741584627
+      },
+      "receivablesClosing": 0,
+      "netBurn": 52107389,
+      "runwayMonths": 14.2,
+      "headcount": {
+        "engineering": 6,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 2,
+        "total": 12
+      },
+      "kpis": {
+        "registeredUsers": 37600,
+        "newRegistrations": 6600,
+        "monthlyActiveUsers": 13600,
+        "contributingMembers": 10880,
+        "circlesActive": 2820,
+        "contributions": 443904000,
+        "payouts": 443904000,
+        "missedContributionPercent": 2.3,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "payoutFees": 5222400
+        },
+        "total": 5222400
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 1305600,
+          "payoutGuaranteeNetLosses": 1723392,
+          "kycAndSms": 1547000
+        },
+        "total": 4575992
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 14400000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 19320000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 54620000
+      },
+      "grossProfit": 646408,
+      "netResult": -53973592,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 741584627,
+        "receipts": 5222400,
+        "fundingReceived": 0,
+        "payments": 59195992,
+        "closing": 687611035
+      },
+      "receivablesClosing": 0,
+      "netBurn": 53973592,
+      "runwayMonths": 12.7,
+      "headcount": {
+        "engineering": 6,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 13
+      },
+      "kpis": {
+        "registeredUsers": 44500,
+        "newRegistrations": 6900,
+        "monthlyActiveUsers": 16000,
+        "contributingMembers": 12800,
+        "circlesActive": 3338,
+        "contributions": 522240000,
+        "payouts": 522240000,
+        "missedContributionPercent": 2.2,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "payoutFees": 6103680
+        },
+        "total": 6103680
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 1525920,
+          "payoutGuaranteeNetLosses": 1922659,
+          "kycAndSms": 1723400
+        },
+        "total": 5171979
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 14400000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 21000000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 56300000
+      },
+      "grossProfit": 931701,
+      "netResult": -55368299,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 687611035,
+        "receipts": 6103680,
+        "fundingReceived": 0,
+        "payments": 61471979,
+        "closing": 632242736
+      },
+      "receivablesClosing": 0,
+      "netBurn": 55368299,
+      "runwayMonths": 11.4,
+      "headcount": {
+        "engineering": 6,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 13
+      },
+      "kpis": {
+        "registeredUsers": 52000,
+        "newRegistrations": 7500,
+        "monthlyActiveUsers": 18700,
+        "contributingMembers": 14960,
+        "circlesActive": 3900,
+        "contributions": 610368000,
+        "payouts": 610368000,
+        "missedContributionPercent": 2.1,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "payoutFees": 6691200
+        },
+        "total": 6691200
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 1672800,
+          "payoutGuaranteeNetLosses": 2107728,
+          "kycAndSms": 1541000
+        },
+        "total": 5321528
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 16520000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 54220000
+      },
+      "grossProfit": 1369672,
+      "netResult": -52850328,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 632242736,
+        "receipts": 6691200,
+        "fundingReceived": 0,
+        "payments": 59541528,
+        "closing": 579392408
+      },
+      "receivablesClosing": 0,
+      "netBurn": 52850328,
+      "runwayMonths": 11,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 57900,
+        "newRegistrations": 5900,
+        "monthlyActiveUsers": 20500,
+        "contributingMembers": 16400,
+        "circlesActive": 4343,
+        "contributions": 669120000,
+        "payouts": 669120000,
+        "missedContributionPercent": 2.1,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "payoutFees": 7311360
+        },
+        "total": 7311360
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 1827840,
+          "payoutGuaranteeNetLosses": 2193408,
+          "kycAndSms": 1556800
+        },
+        "total": 5578048
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 15680000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 53380000
+      },
+      "grossProfit": 1733312,
+      "netResult": -51646688,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 579392408,
+        "receipts": 7311360,
+        "fundingReceived": 0,
+        "payments": 58958048,
+        "closing": 527745720
+      },
+      "receivablesClosing": 0,
+      "netBurn": 51646688,
+      "runwayMonths": 10.2,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 63500,
+        "newRegistrations": 5600,
+        "monthlyActiveUsers": 22400,
+        "contributingMembers": 17920,
+        "circlesActive": 4763,
+        "contributions": 731136000,
+        "payouts": 731136000,
+        "missedContributionPercent": 2,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "payoutFees": 7866240
+        },
+        "total": 7866240
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 1966560,
+          "payoutGuaranteeNetLosses": 2359872,
+          "kycAndSms": 1716200
+        },
+        "total": 6042632
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 17640000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 55340000
+      },
+      "grossProfit": 1823608,
+      "netResult": -53516392,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 527745720,
+        "receipts": 7866240,
+        "fundingReceived": 0,
+        "payments": 61382632,
+        "closing": 474229328
+      },
+      "receivablesClosing": 0,
+      "netBurn": 53516392,
+      "runwayMonths": 8.9,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 69800,
+        "newRegistrations": 6300,
+        "monthlyActiveUsers": 24100,
+        "contributingMembers": 19280,
+        "circlesActive": 5235,
+        "contributions": 786624000,
+        "payouts": 786624000,
+        "missedContributionPercent": 2,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "payoutFees": 8453760
+        },
+        "total": 8453760
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 2113440,
+          "payoutGuaranteeNetLosses": 2409322,
+          "kycAndSms": 1698800
+        },
+        "total": 6221562
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 16240000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 53940000
+      },
+      "grossProfit": 2232198,
+      "netResult": -51707802,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 474229328,
+        "receipts": 8453760,
+        "fundingReceived": 0,
+        "payments": 60161562,
+        "closing": 422521526
+      },
+      "receivablesClosing": 0,
+      "netBurn": 51707802,
+      "runwayMonths": 8.2,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 75600,
+        "newRegistrations": 5800,
+        "monthlyActiveUsers": 25900,
+        "contributingMembers": 20720,
+        "circlesActive": 5670,
+        "contributions": 845376000,
+        "payouts": 845376000,
+        "missedContributionPercent": 1.9,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "payoutFees": 9008640
+        },
+        "total": 9008640
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 2252160,
+          "payoutGuaranteeNetLosses": 2567462,
+          "kycAndSms": 1738200
+        },
+        "total": 6557822
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 15960000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 53660000
+      },
+      "grossProfit": 2450818,
+      "netResult": -51209182,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 422521526,
+        "receipts": 9008640,
+        "fundingReceived": 0,
+        "payments": 60217822,
+        "closing": 371312344
+      },
+      "receivablesClosing": 0,
+      "netBurn": 51209182,
+      "runwayMonths": 7.3,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 81300,
+        "newRegistrations": 5700,
+        "monthlyActiveUsers": 27600,
+        "contributingMembers": 22080,
+        "circlesActive": 6098,
+        "contributions": 900864000,
+        "payouts": 900864000,
+        "missedContributionPercent": 1.9,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "payoutFees": 9563520
+        },
+        "total": 9563520
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 2390880,
+          "payoutGuaranteeNetLosses": 2582150,
+          "kycAndSms": 1927600
+        },
+        "total": 6900630
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 18480000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 56180000
+      },
+      "grossProfit": 2662890,
+      "netResult": -53517110,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 371312344,
+        "receipts": 9563520,
+        "fundingReceived": 0,
+        "payments": 63080630,
+        "closing": 317795234
+      },
+      "receivablesClosing": 0,
+      "netBurn": 53517110,
+      "runwayMonths": 5.9,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 87900,
+        "newRegistrations": 6600,
+        "monthlyActiveUsers": 29300,
+        "contributingMembers": 23440,
+        "circlesActive": 6593,
+        "contributions": 956352000,
+        "payouts": 956352000,
+        "missedContributionPercent": 1.8,
+        "blendedCac": 2800
+      }
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "payoutFees": 10183680
+        },
+        "total": 10183680
+      },
+      "cogs": {
+        "lines": {
+          "partnerBankAndPaymentFees": 2545920,
+          "payoutGuaranteeNetLosses": 2749594,
+          "kycAndSms": 1943400
+        },
+        "total": 7238914
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 16800000,
+          "payrollProductAndGrowth": 8800000,
+          "payrollOperationsAndSupport": 3900000,
+          "paidAcquisition": 17640000,
+          "officeLagos": 2500000,
+          "cloudAndSoftware": 3000000,
+          "legalAndCompliance": 1500000,
+          "other": 1200000
+        },
+        "total": 55340000
+      },
+      "grossProfit": 2944766,
+      "netResult": -52395234,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 317795234,
+        "receipts": 10183680,
+        "fundingReceived": 0,
+        "payments": 62578914,
+        "closing": 265400000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 52395234,
+      "runwayMonths": 5.1,
+      "headcount": {
+        "engineering": 7,
+        "productAndGrowth": 4,
+        "operationsAndSupport": 3,
+        "total": 14
+      },
+      "kpis": {
+        "registeredUsers": 94200,
+        "newRegistrations": 6300,
+        "monthlyActiveUsers": 31200,
+        "contributingMembers": 24960,
+        "circlesActive": 7065,
+        "contributions": 1018368000,
+        "payouts": 1018368000,
+        "missedContributionPercent": 1.8,
+        "blendedCac": 2800
+      }
+    }
+  ],
+  "team": {
+    "founders": [
+      {
+        "name": "Temitope Alade",
+        "title": "Co-founder and CEO"
+      },
+      {
+        "name": "Yusuf Danladi",
+        "title": "Co-founder and CTO"
+      }
+    ],
+    "keyPeople": []
+  },
+  "capTable": {
+    "asOf": "2026-10-31",
+    "basis": "Fully diluted, with the SAFEs shown as converted at their caps.",
+    "holders": [
+      {
+        "name": "Temitope Alade",
+        "class": "Ordinary",
+        "shares": 4400000
+      },
+      {
+        "name": "Yusuf Danladi",
+        "class": "Ordinary",
+        "shares": 3000000
+      },
+      {
+        "name": "Employee option pool",
+        "class": "Options",
+        "shares": 1000000
+      },
+      {
+        "name": "Ikoyi Circle Angels",
+        "class": "Preferred (as converted)",
+        "shares": 900000
+      },
+      {
+        "name": "Harbour Lane Pre-seed Fund",
+        "class": "Preferred (as converted)",
+        "shares": 700000
+      }
+    ]
+  },
+  "funding": [
+    {
+      "receivedOn": "2024-06-20",
+      "round": "Pre-seed",
+      "instrument": "SAFE (post-money)",
+      "currency": "NGN",
+      "amount": 450000000,
+      "investors": "Ikoyi Circle Angels"
+    },
+    {
+      "receivedOn": "2025-12-16",
+      "round": "Pre-seed extension",
+      "instrument": "SAFE (post-money)",
+      "currency": "NGN",
+      "amount": 750000000,
+      "investors": "Harbour Lane Pre-seed Fund and Ikoyi Circle Angels"
+    }
+  ],
+  "raise": {
+    "currency": "NGN",
+    "targetAmount": 1200000000,
+    "instrument": "SAFE (post-money)",
+    "valuationCap": 9000000000,
+    "minimumCheque": 30000000,
+    "targetCloseOn": "2027-03-31",
+    "useOfFunds": [
+      {
+        "line": "Sales and go-to-market",
+        "percent": 45,
+        "amount": 540000000
+      },
+      {
+        "line": "Product and engineering",
+        "percent": 35,
+        "amount": 420000000
+      },
+      {
+        "line": "Runway and operations",
+        "percent": 20,
+        "amount": 240000000
+      }
+    ]
+  },
+  "deckStatedFigures": {
+    "source": "Ajopot investor deck",
+    "monthlyActiveUsersMar2026": 18700,
+    "registeredUsersMar2026": 52000,
+    "circlesMar2026": 3900
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "active-users-definition",
+      "deliberate": true,
+      "title": "Active users: deck 18,700 against 14,960 contributing members",
+      "deck": "monthly active users of 18,700 in March 2026",
+      "accounts": "14,960",
+      "derivation": {
+        "kind": "kpi",
+        "month": "2026-03",
+        "key": "contributingMembers"
+      },
+      "note": "The deck's 18,700 monthly active users in March 2026 counts every member who opened the app that month. The ledger shows 14,960 members who paid a contribution in March 2026; the others opened the app between circle cycles or after missing a payment.",
+      "evidence": [
+        {
+          "documentId": "aj-kpi-pack",
+          "text": "The deck's 18,700 monthly active users in March 2026"
+        },
+        {
+          "documentId": "aj-revenue-breakdown",
+          "text": "The deck's 18,700 monthly active users in March 2026"
+        }
+      ]
+    }
+  ],
+  "sharingPlan": {
+    "investor": "Savanna Seed Partners",
+    "note": "Savanna Seed Partners is in diligence with Ajopot (relationship IN_DILIGENCE); a share would go through the data-room approval or diligence-share workflow once the owner decides."
+  },
+  "documents": [
+    "management-accounts",
+    "revenue-breakdown",
+    "payout-ledger",
+    "cap-table",
+    "raise-terms",
+    "kpi-pack"
+  ],
+  "assumptions": [
+    {
+      "field": "actuals",
+      "value": "Sep 2025 to Oct 2026 management accounts",
+      "note": "No financial statements are recorded; revenue follows the recorded 1% payout fee."
+    },
+    {
+      "field": "kpis.monthsBetweenDeckPoints",
+      "value": "MAU and registrations for months the deck does not state",
+      "note": "Interpolated; every recorded point is kept exactly."
+    },
+    {
+      "field": "kpis.contributingMembers",
+      "value": "80% of monthly active users",
+      "note": "Invented to explain the recorded active-user figure."
+    },
+    {
+      "field": "kpis.contributions",
+      "value": "NGN 40,800 per contributing member a month",
+      "note": "Gives NGN 610,368,000 in March 2026, the recorded 'about NGN 610m'."
+    },
+    {
+      "field": "kpis.missedContributionPercent",
+      "value": "1.8% to 2.6%",
+      "note": "The default rate is recorded as unknown; this is synthetic evidence for it."
+    },
+    {
+      "field": "kpis.blendedCac",
+      "value": "NGN 2,800 per new registration",
+      "note": "Customer acquisition cost is recorded as undisclosed; this is synthetic evidence for it."
+    },
+    {
+      "field": "funding",
+      "value": "pre-seed NGN 450m (Jun 2024) and extension NGN 750m (Dec 2025)",
+      "note": "No funding history is recorded."
+    },
+    {
+      "field": "capTable",
+      "value": "founders 44% and 30%, pool 10%, two SAFE investors",
+      "note": "No cap table is recorded."
+    },
+    {
+      "field": "raise.valuationCap",
+      "value": "NGN 9,000,000,000 post-money",
+      "note": "Not recorded."
+    },
+    {
+      "field": "raise.minimumCheque",
+      "value": "NGN 30,000,000",
+      "note": "Not recorded."
+    },
+    {
+      "field": "raise.targetCloseOn",
+      "value": "2027-03-31",
+      "note": "Recorded timeframe is 3 to 6 months from 27 Sep 2026."
+    },
+    {
+      "field": "raise.useOfFunds",
+      "value": "45% / 35% / 20% across the three recorded lines",
+      "note": "Only the line names are recorded."
+    },
+    {
+      "field": "headcount",
+      "value": "14 at Sep 2026 by function",
+      "note": "The recorded team size is 14; the split is invented."
+    },
+    {
+      "field": "bank",
+      "value": "Ebute Trust Bank",
+      "note": "Fictitious bank standing in for the recorded licensed partner bank."
+    }
+  ]
+}

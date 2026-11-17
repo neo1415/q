@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "company": "MedTrail",
+  "companyKey": "medtrail",
+  "fixture": "scripts/seed/evidence/fixtures/medtrail.json",
+  "synthetic": true,
+  "pack": "compact",
+  "companyId": "b5280fd1-c2ee-4824-8658-09529453f7be",
+  "seedSource": "tavus-20",
+  "inventedFields": [
+    "actuals.costLines",
+    "actuals.october2026",
+    "actuals.oddMonths",
+    "fx.usd",
+    "funding.preSeedExtension",
+    "capTable.shares",
+    "invoices",
+    "contracts",
+    "bank",
+    "collection",
+    "openingReceivable"
+  ],
+  "sensitivityRule": "packages/evidence/src/domain/sensitivity.ts defaultDocumentSensitivity: FINANCIAL, MANAGEMENT_ACCOUNTS and FINANCIAL_MODEL are HIGHLY_CONFIDENTIAL; every other type is CONFIDENTIAL.",
+  "qReadRule": "HIGHLY_CONFIDENTIAL documents are held back from an investor's Q (packages/q-tools/src/tools/own-records.ts heldBackFromQ) even when shared; the founder's own Q may read them (decision 100).",
+  "plannedInvestor": null,
+  "plannedInvestorNote": "No fictional investor has a relationship with MedTrail yet; nothing is planned for sharing until the owner decides.",
+  "documents": [
+    {
+      "id": "mt-management-accounts",
+      "fileName": "mt-management-accounts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Management accounts, Oct 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "management_accounts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mt-revenue-breakdown",
+      "fileName": "mt-revenue-breakdown.pdf",
+      "mimeType": "application/pdf",
+      "title": "Monthly revenue build",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "revenue_by_customer",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mt-invoice-register",
+      "fileName": "mt-invoice-register.csv",
+      "mimeType": "text/csv",
+      "title": "Invoice register",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2026-09",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mt-customer-contracts",
+      "fileName": "mt-customer-contracts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Distributor contract summary",
+      "documentType": "CUSTOMER",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "commercial",
+      "checklistItem": "customer_contracts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mt-cap-table",
+      "fileName": "mt-cap-table.pdf",
+      "mimeType": "application/pdf",
+      "title": "Capitalisation table and ownership",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-09",
+        "to": "2026-09"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "cap_table",
+      "checklistItem": "cap_table_full",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mt-raise-terms",
+      "fileName": "mt-raise-terms.pdf",
+      "mimeType": "application/pdf",
+      "title": "Seed round terms and use of funds",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-11",
+        "to": "2027-01"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "use_of_funds",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mt-kpi-pack",
+      "fileName": "mt-kpi-pack.pdf",
+      "mimeType": "application/pdf",
+      "title": "KPI and operating metrics pack",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "key_metrics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    }
+  ]
+}

@@ -1,0 +1,2116 @@
+{
+  "schemaVersion": 1,
+  "pack": "compact",
+  "synthetic": true,
+  "key": "medtrail",
+  "idPrefix": "mt",
+  "contractsTitle": "Distributor contract summary",
+  "contractsDocumentType": "CUSTOMER",
+  "contractColumns": [
+    {
+      "key": "warehousesSep2026",
+      "label": "Warehouses Sep 2026"
+    },
+    {
+      "key": "warehousesOct2026",
+      "label": "Warehouses Oct 2026"
+    }
+  ],
+  "company": {
+    "name": "MedTrail",
+    "legalName": "MedTrail Health Systems Limited",
+    "website": "https://medtrail.example",
+    "foundedOn": "2023-01-17",
+    "headquarters": "Lagos, Nigeria",
+    "stage": "seed",
+    "oneLiner": "MedTrail serialises medicine packs at Nigerian distributors and tracks each one, so a recall finds every pack in hours, not weeks."
+  },
+  "seedSource": {
+    "kind": "tavus-20",
+    "file": "docs/seed/tavus-20/companies-full.json",
+    "company": "MedTrail",
+    "companyId": "b5280fd1-c2ee-4824-8658-09529453f7be",
+    "readOn": "2026-11-17"
+  },
+  "currency": "NGN",
+  "fx": {
+    "usd": 1520,
+    "note": "USD equivalents use the company's management rate of NGN 1,520 per USD, the rate behind the deck's USD figures."
+  },
+  "collection": "next-month",
+  "openingReceivable": 10980000,
+  "documentDefaults": {
+    "issuedOn": "2026-11-14",
+    "version": "1.0",
+    "preparedBy": "Prepared by Vikram Chandiramani, Co-founder & CEO, from the company's ledgers; unaudited"
+  },
+  "bank": {
+    "name": "Lagoon Crest Bank",
+    "accountMasked": "account ending ****4471"
+  },
+  "periods": {
+    "firstActualMonth": "2025-10",
+    "lastActualMonth": "2026-10"
+  },
+  "basis": [
+    "Revenue: each live warehouse pays a subscription of NGN 350,000 a month, and each pack scan is billed at NGN 3. Distributors are invoiced on the first day of the following month and pay within 30 days, so each month's receipts are the previous month's invoices.",
+    "Scanner kits (NGN 1,080,000 a warehouse) are capitalised and depreciated straight line over three years (NGN 30,000 a warehouse a month). The field installation and support team and scanner depreciation are reported in cost of revenue."
+  ],
+  "revenueModel": {
+    "components": [
+      {
+        "line": "warehouseSubscriptions",
+        "label": "Warehouses live x NGN 350,000",
+        "kpi": "warehouses",
+        "unitPrice": 350000
+      },
+      {
+        "line": "scanFees",
+        "label": "Packs scanned x NGN 3",
+        "kpi": "packsMonth",
+        "unitPrice": 3
+      }
+    ]
+  },
+  "lineLabels": {
+    "warehouseSubscriptions": "Warehouse subscriptions",
+    "scanFees": "Per-scan fees",
+    "hostingAndSms": "Cloud hosting and SMS",
+    "labelsAndConsumables": "Serial labels and consumables",
+    "fieldTeamPayroll": "Field installation and support team",
+    "scannerDepreciation": "Scanner depreciation",
+    "payrollEngineering": "Payroll - engineering",
+    "payrollRegulatoryAndCommercial": "Payroll - regulatory and commercial",
+    "officeLagos": "Office (Lagos)",
+    "softwareAndTools": "Software and tools",
+    "fieldLogisticsAndTravel": "Field logistics and travel",
+    "professionalFees": "Professional fees",
+    "insurance": "Insurance",
+    "regulatoryCompliance": "Regulatory and data-protection compliance",
+    "marketingAndEvents": "Marketing and distributor events",
+    "other": "Other"
+  },
+  "kpiDefinitions": [
+    {
+      "key": "distributors",
+      "label": "Distributors live",
+      "unit": "count",
+      "seedCode": "distributors"
+    },
+    {
+      "key": "warehouses",
+      "label": "Warehouses live",
+      "unit": "count",
+      "seedCode": "warehouses"
+    },
+    {
+      "key": "packsMonth",
+      "label": "Packs serialised in month",
+      "unit": "count",
+      "seedCode": "packs_month"
+    },
+    {
+      "key": "packsCumulative",
+      "label": "Packs serialised, cumulative",
+      "unit": "count",
+      "seedCode": "packs_cumulative"
+    },
+    {
+      "key": "monthlyRevenue",
+      "label": "Monthly revenue (NGN)",
+      "unit": "money",
+      "seedCode": "mrr"
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 9100000,
+          "scanFees": 2700000
+        },
+        "total": 11800000
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 1416000,
+          "labelsAndConsumables": 2160000,
+          "fieldTeamPayroll": 3750000,
+          "scannerDepreciation": 780000
+        },
+        "total": 8106000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 12500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 2080000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 34280000
+      },
+      "grossProfit": 3694000,
+      "netResult": -30586000,
+      "depreciation": 780000,
+      "capex": 2160000,
+      "cash": {
+        "opening": 813898446,
+        "receipts": 10980000,
+        "fundingReceived": 0,
+        "payments": 43766000,
+        "closing": 781112446
+      },
+      "receivablesClosing": 11800000,
+      "netBurn": 32786000,
+      "runwayMonths": 23.8,
+      "headcount": {
+        "engineering": 5,
+        "fieldOperations": 5,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 14
+      },
+      "kpis": {
+        "distributors": 12,
+        "warehouses": 26,
+        "packsMonth": 900000,
+        "packsCumulative": 3510067,
+        "monthlyRevenue": 11800000
+      }
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 9800000,
+          "scanFees": 2868255
+        },
+        "total": 12668255
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 1520191,
+          "labelsAndConsumables": 2294604,
+          "fieldTeamPayroll": 3750000,
+          "scannerDepreciation": 840000
+        },
+        "total": 8404795
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 12500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 2240000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 34440000
+      },
+      "grossProfit": 4263460,
+      "netResult": -30176540,
+      "depreciation": 840000,
+      "capex": 2160000,
+      "cash": {
+        "opening": 781112446,
+        "receipts": 11800000,
+        "fundingReceived": 0,
+        "payments": 44164795,
+        "closing": 748747651
+      },
+      "receivablesClosing": 12668255,
+      "netBurn": 32364795,
+      "runwayMonths": 23.1,
+      "headcount": {
+        "engineering": 5,
+        "fieldOperations": 5,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 14
+      },
+      "kpis": {
+        "distributors": 13,
+        "warehouses": 28,
+        "packsMonth": 956085,
+        "packsCumulative": 4466152,
+        "monthlyRevenue": 12668255
+      }
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 10850000,
+          "scanFees": 3046998
+        },
+        "total": 13896998
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 1667640,
+          "labelsAndConsumables": 2437598,
+          "fieldTeamPayroll": 4500000,
+          "scannerDepreciation": 930000
+        },
+        "total": 9535238
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 12500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 2480000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 34680000
+      },
+      "grossProfit": 4361760,
+      "netResult": -30318240,
+      "depreciation": 930000,
+      "capex": 3240000,
+      "cash": {
+        "opening": 748747651,
+        "receipts": 12668255,
+        "fundingReceived": 0,
+        "payments": 46525238,
+        "closing": 714890668
+      },
+      "receivablesClosing": 13896998,
+      "netBurn": 33856983,
+      "runwayMonths": 21.1,
+      "headcount": {
+        "engineering": 5,
+        "fieldOperations": 6,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 15
+      },
+      "kpis": {
+        "distributors": 14,
+        "warehouses": 31,
+        "packsMonth": 1015666,
+        "packsCumulative": 5481818,
+        "monthlyRevenue": 13896998
+      }
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 11550000,
+          "scanFees": 3236877
+        },
+        "total": 14786877
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 1774425,
+          "labelsAndConsumables": 2589502,
+          "fieldTeamPayroll": 4500000,
+          "scannerDepreciation": 990000
+        },
+        "total": 9853927
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 15000000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 2640000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 37340000
+      },
+      "grossProfit": 4932950,
+      "netResult": -32407050,
+      "depreciation": 990000,
+      "capex": 2160000,
+      "cash": {
+        "opening": 714890668,
+        "receipts": 13896998,
+        "fundingReceived": 0,
+        "payments": 48363927,
+        "closing": 680423739
+      },
+      "receivablesClosing": 14786877,
+      "netBurn": 34466929,
+      "runwayMonths": 19.7,
+      "headcount": {
+        "engineering": 6,
+        "fieldOperations": 6,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 16
+      },
+      "kpis": {
+        "distributors": 15,
+        "warehouses": 33,
+        "packsMonth": 1078959,
+        "packsCumulative": 6560777,
+        "monthlyRevenue": 14786877
+      }
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 12250000,
+          "scanFees": 3438588
+        },
+        "total": 15688588
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 1882631,
+          "labelsAndConsumables": 2750870,
+          "fieldTeamPayroll": 4500000,
+          "scannerDepreciation": 1050000
+        },
+        "total": 10183501
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 15000000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 2800000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 37500000
+      },
+      "grossProfit": 5505087,
+      "netResult": -31994913,
+      "depreciation": 1050000,
+      "capex": 2160000,
+      "cash": {
+        "opening": 680423739,
+        "receipts": 14786877,
+        "fundingReceived": 0,
+        "payments": 48793501,
+        "closing": 646417115
+      },
+      "receivablesClosing": 15688588,
+      "netBurn": 34006624,
+      "runwayMonths": 19,
+      "headcount": {
+        "engineering": 6,
+        "fieldOperations": 6,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 16
+      },
+      "kpis": {
+        "distributors": 16,
+        "warehouses": 35,
+        "packsMonth": 1146196,
+        "packsCumulative": 7706973,
+        "monthlyRevenue": 15688588
+      }
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 12950000,
+          "scanFees": 3652872
+        },
+        "total": 16602872
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 1992345,
+          "labelsAndConsumables": 2922298,
+          "fieldTeamPayroll": 5250000,
+          "scannerDepreciation": 1110000
+        },
+        "total": 11274643
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 15000000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 2960000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 37660000
+      },
+      "grossProfit": 5328229,
+      "netResult": -32331771,
+      "depreciation": 1110000,
+      "capex": 2160000,
+      "cash": {
+        "opening": 646417115,
+        "receipts": 15688588,
+        "fundingReceived": 0,
+        "payments": 49984643,
+        "closing": 612121060
+      },
+      "receivablesClosing": 16602872,
+      "netBurn": 34296055,
+      "runwayMonths": 17.8,
+      "headcount": {
+        "engineering": 6,
+        "fieldOperations": 7,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 17
+      },
+      "kpis": {
+        "distributors": 17,
+        "warehouses": 37,
+        "packsMonth": 1217624,
+        "packsCumulative": 8924597,
+        "monthlyRevenue": 16602872
+      }
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 14000000,
+          "scanFees": 3880509
+        },
+        "total": 17880509
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 2145661,
+          "labelsAndConsumables": 3104407,
+          "fieldTeamPayroll": 5250000,
+          "scannerDepreciation": 1200000
+        },
+        "total": 11700068
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 15000000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 3200000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 37900000
+      },
+      "grossProfit": 6180441,
+      "netResult": -31719559,
+      "depreciation": 1200000,
+      "capex": 3240000,
+      "cash": {
+        "opening": 612121060,
+        "receipts": 16602872,
+        "fundingReceived": 0,
+        "payments": 51640068,
+        "closing": 577083864
+      },
+      "receivablesClosing": 17880509,
+      "netBurn": 35037196,
+      "runwayMonths": 16.5,
+      "headcount": {
+        "engineering": 6,
+        "fieldOperations": 7,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 17
+      },
+      "kpis": {
+        "distributors": 18,
+        "warehouses": 40,
+        "packsMonth": 1293503,
+        "packsCumulative": 10218100,
+        "monthlyRevenue": 17880509
+      }
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 15050000,
+          "scanFees": 4122330
+        },
+        "total": 19172330
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 2300680,
+          "labelsAndConsumables": 3297864,
+          "fieldTeamPayroll": 5250000,
+          "scannerDepreciation": 1290000
+        },
+        "total": 12138544
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 15000000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 3440000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 38140000
+      },
+      "grossProfit": 7033786,
+      "netResult": -31106214,
+      "depreciation": 1290000,
+      "capex": 3240000,
+      "cash": {
+        "opening": 577083864,
+        "receipts": 17880509,
+        "fundingReceived": 0,
+        "payments": 52228544,
+        "closing": 542735829
+      },
+      "receivablesClosing": 19172330,
+      "netBurn": 34348035,
+      "runwayMonths": 15.8,
+      "headcount": {
+        "engineering": 6,
+        "fieldOperations": 7,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 17
+      },
+      "kpis": {
+        "distributors": 19,
+        "warehouses": 43,
+        "packsMonth": 1374110,
+        "packsCumulative": 11592210,
+        "monthlyRevenue": 19172330
+      }
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 16100000,
+          "scanFees": 4379220
+        },
+        "total": 20479220
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 2457506,
+          "labelsAndConsumables": 3503376,
+          "fieldTeamPayroll": 5250000,
+          "scannerDepreciation": 1380000
+        },
+        "total": 12590882
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 17500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 3680000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 40880000
+      },
+      "grossProfit": 7888338,
+      "netResult": -32991662,
+      "depreciation": 1380000,
+      "capex": 3240000,
+      "cash": {
+        "opening": 542735829,
+        "receipts": 19172330,
+        "fundingReceived": 0,
+        "payments": 55330882,
+        "closing": 506577277
+      },
+      "receivablesClosing": 20479220,
+      "netBurn": 36158552,
+      "runwayMonths": 14,
+      "headcount": {
+        "engineering": 7,
+        "fieldOperations": 7,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 18
+      },
+      "kpis": {
+        "distributors": 21,
+        "warehouses": 46,
+        "packsMonth": 1459740,
+        "packsCumulative": 13051950,
+        "monthlyRevenue": 20479220
+      }
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 17850000,
+          "scanFees": 4652121
+        },
+        "total": 22502121
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 2700255,
+          "labelsAndConsumables": 3721697,
+          "fieldTeamPayroll": 6000000,
+          "scannerDepreciation": 1530000
+        },
+        "total": 13951952
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 17500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 4080000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 41280000
+      },
+      "grossProfit": 8550169,
+      "netResult": -32729831,
+      "depreciation": 1530000,
+      "capex": 5400000,
+      "cash": {
+        "opening": 506577277,
+        "receipts": 20479220,
+        "fundingReceived": 0,
+        "payments": 59101952,
+        "closing": 467954545
+      },
+      "receivablesClosing": 22502121,
+      "netBurn": 38622732,
+      "runwayMonths": 12.1,
+      "headcount": {
+        "engineering": 7,
+        "fieldOperations": 8,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 19
+      },
+      "kpis": {
+        "distributors": 23,
+        "warehouses": 51,
+        "packsMonth": 1550707,
+        "packsCumulative": 14602657,
+        "monthlyRevenue": 22502121
+      }
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 19250000,
+          "scanFees": 4942029
+        },
+        "total": 24192029
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 2903043,
+          "labelsAndConsumables": 3953623,
+          "fieldTeamPayroll": 6000000,
+          "scannerDepreciation": 1650000
+        },
+        "total": 14506666
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 17500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 4400000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 41600000
+      },
+      "grossProfit": 9685363,
+      "netResult": -31914637,
+      "depreciation": 1650000,
+      "capex": 4320000,
+      "cash": {
+        "opening": 467954545,
+        "receipts": 22502121,
+        "fundingReceived": 0,
+        "payments": 58776666,
+        "closing": 431680000
+      },
+      "receivablesClosing": 24192029,
+      "netBurn": 36274545,
+      "runwayMonths": 11.9,
+      "headcount": {
+        "engineering": 7,
+        "fieldOperations": 8,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 19
+      },
+      "kpis": {
+        "distributors": 25,
+        "warehouses": 55,
+        "packsMonth": 1647343,
+        "packsCumulative": 16250000,
+        "monthlyRevenue": 24192029
+      }
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 21000000,
+          "scanFees": 5250000
+        },
+        "total": 26250000
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 3150000,
+          "labelsAndConsumables": 4200000,
+          "fieldTeamPayroll": 6000000,
+          "scannerDepreciation": 1800000
+        },
+        "total": 15150000
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 17500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 4800000,
+          "professionalFees": 2000000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 222029
+        },
+        "total": 41922029
+      },
+      "grossProfit": 11100000,
+      "netResult": -30822029,
+      "depreciation": 1800000,
+      "capex": 5400000,
+      "cash": {
+        "opening": 431680000,
+        "receipts": 24192029,
+        "fundingReceived": 0,
+        "payments": 60672029,
+        "closing": 395200000
+      },
+      "receivablesClosing": 26250000,
+      "netBurn": 36480000,
+      "runwayMonths": 10.8,
+      "headcount": {
+        "engineering": 7,
+        "fieldOperations": 8,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 19
+      },
+      "kpis": {
+        "distributors": 27,
+        "warehouses": 60,
+        "packsMonth": 1750000,
+        "packsCumulative": 18000000,
+        "monthlyRevenue": 26250000
+      }
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "warehouseSubscriptions": 22050000,
+          "scanFees": 5553600
+        },
+        "total": 27603600
+      },
+      "cogs": {
+        "lines": {
+          "hostingAndSms": 3312432,
+          "labelsAndConsumables": 4442880,
+          "fieldTeamPayroll": 6000000,
+          "scannerDepreciation": 1890000
+        },
+        "total": 15645312
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 17500000,
+          "payrollRegulatoryAndCommercial": 8800000,
+          "officeLagos": 3500000,
+          "softwareAndTools": 1800000,
+          "fieldLogisticsAndTravel": 5040000,
+          "professionalFees": 3400000,
+          "insurance": 600000,
+          "regulatoryCompliance": 1200000,
+          "marketingAndEvents": 1500000,
+          "other": 300000
+        },
+        "total": 43640000
+      },
+      "grossProfit": 11958288,
+      "netResult": -31681712,
+      "depreciation": 1890000,
+      "capex": 3240000,
+      "cash": {
+        "opening": 395200000,
+        "receipts": 26250000,
+        "fundingReceived": 0,
+        "payments": 60635312,
+        "closing": 360814688
+      },
+      "receivablesClosing": 27603600,
+      "netBurn": 34385312,
+      "runwayMonths": 10.5,
+      "headcount": {
+        "engineering": 7,
+        "fieldOperations": 8,
+        "regulatory": 2,
+        "commercial": 2,
+        "total": 19
+      },
+      "kpis": {
+        "distributors": 28,
+        "warehouses": 63,
+        "packsMonth": 1851200,
+        "packsCumulative": 19851200,
+        "monthlyRevenue": 27603600
+      }
+    }
+  ],
+  "invoices": [
+    {
+      "number": "MT-INV-202609-001",
+      "customerId": "MT-D01",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 9,
+      "scans": 421500,
+      "subscription": 3150000,
+      "scanFees": 1264500,
+      "amount": 4414500
+    },
+    {
+      "number": "MT-INV-202609-002",
+      "customerId": "MT-D02",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 5,
+      "scans": 130200,
+      "subscription": 1750000,
+      "scanFees": 390600,
+      "amount": 2140600
+    },
+    {
+      "number": "MT-INV-202609-003",
+      "customerId": "MT-D03",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 4,
+      "scans": 104100,
+      "subscription": 1400000,
+      "scanFees": 312300,
+      "amount": 1712300
+    },
+    {
+      "number": "MT-INV-202609-004",
+      "customerId": "MT-D04",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 3,
+      "scans": 78100,
+      "subscription": 1050000,
+      "scanFees": 234300,
+      "amount": 1284300
+    },
+    {
+      "number": "MT-INV-202609-005",
+      "customerId": "MT-D05",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 3,
+      "scans": 78100,
+      "subscription": 1050000,
+      "scanFees": 234300,
+      "amount": 1284300
+    },
+    {
+      "number": "MT-INV-202609-006",
+      "customerId": "MT-D06",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-007",
+      "customerId": "MT-D07",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-008",
+      "customerId": "MT-D08",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-009",
+      "customerId": "MT-D09",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-010",
+      "customerId": "MT-D10",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-011",
+      "customerId": "MT-D11",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-012",
+      "customerId": "MT-D12",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-013",
+      "customerId": "MT-D13",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-014",
+      "customerId": "MT-D14",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-015",
+      "customerId": "MT-D15",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-016",
+      "customerId": "MT-D16",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-017",
+      "customerId": "MT-D17",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-018",
+      "customerId": "MT-D18",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-019",
+      "customerId": "MT-D19",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 2,
+      "scans": 52000,
+      "subscription": 700000,
+      "scanFees": 156000,
+      "amount": 856000
+    },
+    {
+      "number": "MT-INV-202609-020",
+      "customerId": "MT-D20",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-021",
+      "customerId": "MT-D21",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-022",
+      "customerId": "MT-D22",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-023",
+      "customerId": "MT-D23",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-024",
+      "customerId": "MT-D24",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-025",
+      "customerId": "MT-D25",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-026",
+      "customerId": "MT-D26",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 26000,
+      "subscription": 350000,
+      "scanFees": 78000,
+      "amount": 428000
+    },
+    {
+      "number": "MT-INV-202609-027",
+      "customerId": "MT-D27",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-30",
+      "warehouses": 1,
+      "scans": 28000,
+      "subscription": 350000,
+      "scanFees": 84000,
+      "amount": 434000
+    },
+    {
+      "number": "MT-INV-202610-001",
+      "customerId": "MT-D01",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 9,
+      "scans": 438000,
+      "subscription": 3150000,
+      "scanFees": 1314000,
+      "amount": 4464000
+    },
+    {
+      "number": "MT-INV-202610-002",
+      "customerId": "MT-D02",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 6,
+      "scans": 157000,
+      "subscription": 2100000,
+      "scanFees": 471000,
+      "amount": 2571000
+    },
+    {
+      "number": "MT-INV-202610-003",
+      "customerId": "MT-D03",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 4,
+      "scans": 104600,
+      "subscription": 1400000,
+      "scanFees": 313800,
+      "amount": 1713800
+    },
+    {
+      "number": "MT-INV-202610-004",
+      "customerId": "MT-D04",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 3,
+      "scans": 78500,
+      "subscription": 1050000,
+      "scanFees": 235500,
+      "amount": 1285500
+    },
+    {
+      "number": "MT-INV-202610-005",
+      "customerId": "MT-D05",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 3,
+      "scans": 78500,
+      "subscription": 1050000,
+      "scanFees": 235500,
+      "amount": 1285500
+    },
+    {
+      "number": "MT-INV-202610-006",
+      "customerId": "MT-D06",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 3,
+      "scans": 78500,
+      "subscription": 1050000,
+      "scanFees": 235500,
+      "amount": 1285500
+    },
+    {
+      "number": "MT-INV-202610-007",
+      "customerId": "MT-D07",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-008",
+      "customerId": "MT-D08",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-009",
+      "customerId": "MT-D09",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-010",
+      "customerId": "MT-D10",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-011",
+      "customerId": "MT-D11",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-012",
+      "customerId": "MT-D12",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-013",
+      "customerId": "MT-D13",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-014",
+      "customerId": "MT-D14",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-015",
+      "customerId": "MT-D15",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-016",
+      "customerId": "MT-D16",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-017",
+      "customerId": "MT-D17",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-018",
+      "customerId": "MT-D18",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-019",
+      "customerId": "MT-D19",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 2,
+      "scans": 52300,
+      "subscription": 700000,
+      "scanFees": 156900,
+      "amount": 856900
+    },
+    {
+      "number": "MT-INV-202610-020",
+      "customerId": "MT-D20",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-021",
+      "customerId": "MT-D21",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-022",
+      "customerId": "MT-D22",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-023",
+      "customerId": "MT-D23",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-024",
+      "customerId": "MT-D24",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-025",
+      "customerId": "MT-D25",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-026",
+      "customerId": "MT-D26",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-027",
+      "customerId": "MT-D27",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 26100,
+      "subscription": 350000,
+      "scanFees": 78300,
+      "amount": 428300
+    },
+    {
+      "number": "MT-INV-202610-028",
+      "customerId": "MT-D28",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "warehouses": 1,
+      "scans": 27400,
+      "subscription": 350000,
+      "scanFees": 82200,
+      "amount": 432200
+    }
+  ],
+  "contracts": [
+    {
+      "id": "MT-D01",
+      "label": "Distributor 01",
+      "segment": "National distributor",
+      "status": "LIVE",
+      "signedOn": "2026-01-20",
+      "startOn": "2026-02-01",
+      "termMonths": 24,
+      "warehousesSep2026": 9,
+      "warehousesOct2026": 9
+    },
+    {
+      "id": "MT-D02",
+      "label": "Distributor 02",
+      "segment": "Regional distributor (South-West)",
+      "status": "LIVE",
+      "signedOn": "2025-06-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 5,
+      "warehousesOct2026": 6
+    },
+    {
+      "id": "MT-D03",
+      "label": "Distributor 03",
+      "segment": "Regional distributor (North)",
+      "status": "LIVE",
+      "signedOn": "2025-11-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 4,
+      "warehousesOct2026": 4
+    },
+    {
+      "id": "MT-D04",
+      "label": "Distributor 04",
+      "segment": "Hospital supply distributor",
+      "status": "LIVE",
+      "signedOn": "2025-04-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 3,
+      "warehousesOct2026": 3
+    },
+    {
+      "id": "MT-D05",
+      "label": "Distributor 05",
+      "segment": "Regional distributor (South-East)",
+      "status": "LIVE",
+      "signedOn": "2025-09-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 3,
+      "warehousesOct2026": 3
+    },
+    {
+      "id": "MT-D06",
+      "label": "Distributor 06",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-02-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 3
+    },
+    {
+      "id": "MT-D07",
+      "label": "Distributor 07",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-07-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D08",
+      "label": "Distributor 08",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-12-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D09",
+      "label": "Distributor 09",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-05-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D10",
+      "label": "Distributor 10",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-10-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D11",
+      "label": "Distributor 11",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-03-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D12",
+      "label": "Distributor 12",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2025-08-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D13",
+      "label": "Distributor 13",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-01-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D14",
+      "label": "Distributor 14",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-06-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D15",
+      "label": "Distributor 15",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-11-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D16",
+      "label": "Distributor 16",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-04-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D17",
+      "label": "Distributor 17",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-09-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D18",
+      "label": "Distributor 18",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-02-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D19",
+      "label": "Distributor 19",
+      "segment": "Regional distributor",
+      "status": "LIVE",
+      "signedOn": "2026-07-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 2,
+      "warehousesOct2026": 2
+    },
+    {
+      "id": "MT-D20",
+      "label": "Distributor 20",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-12-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D21",
+      "label": "Distributor 21",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-05-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D22",
+      "label": "Distributor 22",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-10-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D23",
+      "label": "Distributor 23",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-03-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D24",
+      "label": "Distributor 24",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-08-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D25",
+      "label": "Distributor 25",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-01-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D26",
+      "label": "Distributor 26",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-06-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D27",
+      "label": "Distributor 27",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-11-10",
+      "startOn": null,
+      "termMonths": 12,
+      "warehousesSep2026": 1,
+      "warehousesOct2026": 1
+    },
+    {
+      "id": "MT-D28",
+      "label": "Distributor 28",
+      "segment": "Single-site distributor",
+      "status": "LIVE",
+      "signedOn": "2026-09-22",
+      "startOn": "2026-10-01",
+      "termMonths": 12,
+      "warehousesSep2026": 0,
+      "warehousesOct2026": 1
+    }
+  ],
+  "contractNotes": [
+    "Distributor 01 (national distributor) has nine warehouses on subscription and scanned 421,500 packs in September 2026. Its contract runs for two years from 1 Feb 2026, with a recall service level of a holder list within 60 minutes of a recall notice. Each distributor owns its trade data under a data processing agreement.",
+    "Every other distributor is on the standard twelve-month subscription that renews automatically. No distributor has left since the first contract."
+  ],
+  "team": {
+    "founders": [
+      {
+        "name": "Vikram Chandiramani",
+        "title": "Co-founder & CEO"
+      },
+      {
+        "name": "Ngozi Okeke",
+        "title": "Co-founder & CTO"
+      }
+    ],
+    "keyPeople": [
+      {
+        "name": "Yetunde Fashola",
+        "title": "Head of Regulatory Affairs"
+      },
+      {
+        "name": "Samuel Etim",
+        "title": "Field Operations Lead"
+      }
+    ]
+  },
+  "capTable": {
+    "asOf": "2026-09-30",
+    "basis": "Fully diluted, with the pre-seed SAFEs shown as converted at their cap.",
+    "holders": [
+      {
+        "name": "Vikram Chandiramani",
+        "class": "Ordinary",
+        "shares": 4800000
+      },
+      {
+        "name": "Ngozi Okeke",
+        "class": "Ordinary",
+        "shares": 2700000
+      },
+      {
+        "name": "Employee option pool",
+        "class": "Options (8 holders)",
+        "shares": 1000000
+      },
+      {
+        "name": "Broad Street Health Angels",
+        "class": "Preferred (as converted)",
+        "shares": 1100000
+      },
+      {
+        "name": "Angels",
+        "class": "Preferred (as converted)",
+        "shares": 400000
+      }
+    ]
+  },
+  "funding": [
+    {
+      "receivedOn": "2023-06-14",
+      "round": "Pre-seed",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 300000,
+      "investors": "Broad Street Health Angels"
+    },
+    {
+      "receivedOn": "2025-08-11",
+      "round": "Pre-seed extension",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 450000,
+      "investors": "Broad Street Health Angels and two pharmaceutical industry executives"
+    }
+  ],
+  "raise": {
+    "currency": "USD",
+    "targetAmount": 1500000,
+    "instrument": "SAFE (post-money)",
+    "valuationCap": 10000000,
+    "minimumCheque": 40000,
+    "targetCloseOn": "2027-01-22",
+    "useOfFunds": [
+      {
+        "line": "Distributor onboarding and scanning hardware",
+        "percent": 35,
+        "amount": 525000
+      },
+      {
+        "line": "Engineering: recall console and regulator reporting",
+        "percent": 30,
+        "amount": 450000
+      },
+      {
+        "line": "Manufacturer and hospital integrations",
+        "percent": 20,
+        "amount": 300000
+      },
+      {
+        "line": "Working capital and G&A",
+        "percent": 15,
+        "amount": 225000
+      }
+    ],
+    "plannedMonthlyNetBurnPostRaise": 62000,
+    "runwayMonthsPostRaise": 28.4
+  },
+  "deckStatedFigures": {
+    "source": "MedTrail seed deck (Oct 2026)",
+    "cash": 260000,
+    "cashAsOf": "2026-09-30",
+    "monthlyNetBurn": 24000,
+    "runwayMonths": 10.8,
+    "currency": "USD",
+    "grossMarginPercent": 72,
+    "headcount": 19
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "gross-margin-definition",
+      "deliberate": true,
+      "title": "Gross margin: deck 72% against 42.3% in the accounts",
+      "deck": "gross margin 72% (September 2026)",
+      "accounts": "42.3%",
+      "derivation": {
+        "kind": "grossMargin",
+        "month": "2026-09"
+      },
+      "note": "The deck's 72% gross margin for September 2026 counts only cloud hosting, SMS and serial labels as cost of revenue. These accounts also put the field installation and support team and scanner depreciation in cost of revenue, which gives a gross margin of 42.3% for September 2026.",
+      "evidence": [
+        {
+          "documentId": "mt-management-accounts",
+          "text": "The deck's 72% gross margin for September 2026"
+        },
+        {
+          "documentId": "mt-kpi-pack",
+          "text": "The deck's 72% gross margin for September 2026"
+        }
+      ]
+    }
+  ],
+  "sharingPlan": {
+    "investor": null,
+    "note": "No fictional investor has a relationship with MedTrail yet; nothing is planned for sharing until the owner decides."
+  },
+  "documents": [
+    "management-accounts",
+    "revenue-breakdown",
+    "invoice-register",
+    "customer-contracts",
+    "cap-table",
+    "raise-terms",
+    "kpi-pack"
+  ],
+  "assumptions": [
+    {
+      "field": "actuals.costLines",
+      "value": "cost of revenue and operating cost lines, Oct 2025 to Oct 2026",
+      "note": "The seed records revenue, KPIs, cash, burn and headcount only; the cost lines are built to reproduce the deck's September cash, burn and 72% hosting-and-labels margin."
+    },
+    {
+      "field": "actuals.october2026",
+      "value": "28 distributors, 63 warehouses, 1,851,200 packs",
+      "note": "The seed ends at September 2026; October continues the trend."
+    },
+    {
+      "field": "actuals.oddMonths",
+      "value": "Nov 2025, Jan, Mar and May 2026 KPIs",
+      "note": "The seed records alternate months to June 2026; the months between are interpolated and the cumulative pack counts still tie to every seeded point."
+    },
+    {
+      "field": "fx.usd",
+      "value": "NGN 1,520 per USD",
+      "note": "Management rate chosen so the seeded USD cash (260,000) and burn (24,000) sit in naira accounts."
+    },
+    {
+      "field": "funding.preSeedExtension",
+      "value": "USD 450,000, Aug 2025",
+      "note": "Forced reconciliation: the seeded USD 300,000 pre-seed of 2023 cannot fund the costs to the seeded September cash."
+    },
+    {
+      "field": "capTable.shares",
+      "value": "10,000,000 fully diluted",
+      "note": "The seed records percentages only (48/27/10/11/4)."
+    },
+    {
+      "field": "invoices",
+      "value": "one invoice per distributor for Sep and Oct 2026",
+      "note": "Distributor split invented; Distributor 01 keeps the seeded nine warehouses and about 420,000 scans a month."
+    },
+    {
+      "field": "contracts",
+      "value": "28 anonymised distributors",
+      "note": "Only the key national distributor contract is in the seed."
+    },
+    {
+      "field": "bank",
+      "value": "Lagoon Crest Bank",
+      "note": "Fictitious bank."
+    },
+    {
+      "field": "collection",
+      "value": "invoiced on the 1st of the next month, paid within 30 days",
+      "note": "Payment terms are not in the seed."
+    },
+    {
+      "field": "openingReceivable",
+      "value": "NGN 10,980,000 for September 2025 (24 warehouses, 860,000 scans)",
+      "note": "September 2025 is before the seeded series."
+    }
+  ]
+}

@@ -306,7 +306,7 @@ export type Manifest = {
   readonly companyId?: string;
   readonly seedAuthority?: string;
   readonly inventedFields?: readonly string[];
-  readonly plannedInvestor: string;
+  readonly plannedInvestor: string | null;
   readonly documents: readonly ManifestEntry[];
 };
 
@@ -341,7 +341,18 @@ export function subscriptionMarginTwelve(fx: Fixture): {
   readonly revenue: Money;
   readonly cost: Money;
 };
-export function raiseTermsLine(fx: Fixture): string;
+export function raiseTermsLine(fx: {
+  readonly raise: Pick<
+    Fixture["raise"],
+    | "currency"
+    | "targetAmount"
+    | "instrument"
+    | "valuationCap"
+    | "preMoneyValuation"
+    | "minimumCheque"
+    | "targetCloseOn"
+  >;
+}): string;
 export function revenueByCustomer(
   fx: Fixture,
   month: string,

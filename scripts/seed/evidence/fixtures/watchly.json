@@ -1,0 +1,838 @@
+{
+  "schemaVersion": 1,
+  "pack": "compact",
+  "synthetic": true,
+  "key": "watchly",
+  "idPrefix": "wl",
+  "contractsTitle": "Customer, pilot and letter-of-intent summary",
+  "contractsDocumentType": "CUSTOMER",
+  "contractColumns": [
+    {
+      "key": "monthlyFee",
+      "label": "Monthly fee (USD)"
+    }
+  ],
+  "company": {
+    "name": "Watchly",
+    "legalName": "Watchly Limited",
+    "website": "https://watchly.example",
+    "foundedOn": "2025-06-28",
+    "headquarters": "Accra, Ghana",
+    "stage": "seed",
+    "oneLiner": "Transaction fraud detection for banks and payment processors in Ghana: Watchly scores transactions in real time with models trained on regional fraud patterns."
+  },
+  "seedSource": {
+    "kind": "recorded-profile",
+    "companyId": "526c2d72-9142-4e48-b106-ee4910f19318",
+    "readOn": "2026-11-17",
+    "decision": "fictional-bulk seed (docs/seed/fictional-bulk), read read-only from production on 17 Nov 2026"
+  },
+  "recordedProfile": {
+    "canonicalName": "Watchly",
+    "legalName": "Watchly Limited",
+    "websiteUrl": "https://watchly.example",
+    "foundedDate": "2025-06-28",
+    "headquartersCity": "Accra",
+    "stage": "seed",
+    "shortDescription": "Transaction fraud detection for banks and payment processors in Ghana: Watchly scores transactions in real time with models trained on regional fraud patterns.",
+    "founders": [
+      {
+        "name": "Ama Okafor",
+        "title": "Co-founder and COO"
+      },
+      {
+        "name": "Kelechi Nwosu",
+        "title": "Co-founder and CTO"
+      }
+    ],
+    "keyPeople": [
+      {
+        "name": "Segun Nwosu",
+        "title": "Head of Product"
+      }
+    ],
+    "teamSize": 8,
+    "raise": {
+      "currency": "USD",
+      "targetAmount": 1000000,
+      "instrument": "safe",
+      "useOfFundsSummary": "Key hires; Runway; New markets",
+      "targetCloseDate": "2027-03-31",
+      "valuation": null,
+      "minimumCheque": null
+    },
+    "figures": [
+      {
+        "what": "cash at 30 Sep 2026 (management accounts summary)",
+        "month": "2026-09",
+        "field": "cash.closing",
+        "value": 3300000
+      },
+      {
+        "what": "monthly net burn, Sep 2026 (summary and deck)",
+        "month": "2026-09",
+        "field": "netBurn",
+        "value": 175000
+      },
+      {
+        "what": "pilots running (overview and deck)",
+        "month": "2026-10",
+        "kpi": "contractedPilots",
+        "value": 2
+      },
+      {
+        "what": "live customers billing (pipeline export)",
+        "month": "2026-10",
+        "kpi": "liveCustomers",
+        "value": 1
+      }
+    ],
+    "pipelineExport": {
+      "liveCustomers": 1,
+      "pilots": 13,
+      "signedNotLive": 22,
+      "qualifiedPipeline": 7
+    },
+    "deckRunwayMonths": 20
+  },
+  "currency": "USD",
+  "fx": null,
+  "collection": "next-month",
+  "openingReceivable": 0,
+  "documentDefaults": {
+    "issuedOn": "2026-11-14",
+    "version": "1.0",
+    "preparedBy": "Prepared by Ama Okafor, Co-founder and COO, from the company's ledgers; unaudited"
+  },
+  "bank": {
+    "name": "Volta Harbour Bank",
+    "accountMasked": "account ending ****8805"
+  },
+  "periods": {
+    "firstActualMonth": "2026-04",
+    "lastActualMonth": "2026-10"
+  },
+  "basis": [
+    "Revenue: the one live customer pays a platform fee of USD 8,500 a month from 1 Sep 2026, invoiced monthly in arrears and paid the following month. Pilots are unpaid.",
+    "Cloud and GPU capacity and licensed transaction data used to train and run the scoring models are reported in cost of revenue."
+  ],
+  "revenueModel": {
+    "components": [
+      {
+        "line": "platformFees",
+        "label": "Live customers x USD 8,500",
+        "kpi": "liveCustomers",
+        "unitPrice": 8500
+      }
+    ]
+  },
+  "lineLabels": {
+    "platformFees": "Platform fees",
+    "cloudAndGpu": "Cloud and GPU capacity",
+    "transactionDataLicences": "Transaction data licences",
+    "payroll": "Payroll",
+    "integrationContractors": "Integration contractors",
+    "securityAndPciAssessments": "Security and PCI DSS assessments",
+    "officeAccra": "Office (Accra)",
+    "travel": "Travel",
+    "professionalFees": "Professional fees",
+    "other": "Other"
+  },
+  "kpiDefinitions": [
+    {
+      "key": "liveCustomers",
+      "label": "Live customers (billing)",
+      "unit": "count"
+    },
+    {
+      "key": "contractedPilots",
+      "label": "Pilots under a signed pilot agreement",
+      "unit": "count"
+    },
+    {
+      "key": "transactionsScoredMillions",
+      "label": "Transactions scored (millions)",
+      "unit": "decimal"
+    },
+    {
+      "key": "sandboxApiKeys",
+      "label": "Sandbox API keys issued (cumulative)",
+      "unit": "count"
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "platformFees": 0
+        },
+        "total": 0
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 14000,
+          "transactionDataLicences": 0
+        },
+        "total": 14000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 54000,
+          "integrationContractors": 12000,
+          "securityAndPciAssessments": 6000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 3000
+        },
+        "total": 92000
+      },
+      "grossProfit": -14000,
+      "netResult": -106000,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 4191000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 106000,
+        "closing": 4085000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 106000,
+      "runwayMonths": 38.5,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 3,
+        "total": 6
+      },
+      "kpis": {
+        "liveCustomers": 0,
+        "contractedPilots": 0,
+        "transactionsScoredMillions": 0.4,
+        "sandboxApiKeys": 3
+      }
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "platformFees": 0
+        },
+        "total": 0
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 16000,
+          "transactionDataLicences": 0
+        },
+        "total": 16000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 54000,
+          "integrationContractors": 15000,
+          "securityAndPciAssessments": 6000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 3000
+        },
+        "total": 95000
+      },
+      "grossProfit": -16000,
+      "netResult": -111000,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 4085000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 111000,
+        "closing": 3974000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 111000,
+      "runwayMonths": 35.8,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 3,
+        "total": 6
+      },
+      "kpis": {
+        "liveCustomers": 0,
+        "contractedPilots": 0,
+        "transactionsScoredMillions": 0.9,
+        "sandboxApiKeys": 5
+      }
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "platformFees": 0
+        },
+        "total": 0
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 19000,
+          "transactionDataLicences": 22000
+        },
+        "total": 41000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 63000,
+          "integrationContractors": 18000,
+          "securityAndPciAssessments": 6000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 3000
+        },
+        "total": 107000
+      },
+      "grossProfit": -41000,
+      "netResult": -148000,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 3974000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 148000,
+        "closing": 3826000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 148000,
+      "runwayMonths": 25.9,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 4,
+        "total": 7
+      },
+      "kpis": {
+        "liveCustomers": 0,
+        "contractedPilots": 0,
+        "transactionsScoredMillions": 1.6,
+        "sandboxApiKeys": 6
+      }
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "platformFees": 0
+        },
+        "total": 0
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 22000,
+          "transactionDataLicences": 22000
+        },
+        "total": 44000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 72000,
+          "integrationContractors": 20000,
+          "securityAndPciAssessments": 18000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 3000
+        },
+        "total": 130000
+      },
+      "grossProfit": -44000,
+      "netResult": -174000,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 3826000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 174000,
+        "closing": 3652000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 174000,
+      "runwayMonths": 21,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 5,
+        "total": 8
+      },
+      "kpis": {
+        "liveCustomers": 0,
+        "contractedPilots": 0,
+        "transactionsScoredMillions": 2.4,
+        "sandboxApiKeys": 8
+      }
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "platformFees": 0
+        },
+        "total": 0
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 25000,
+          "transactionDataLicences": 22000
+        },
+        "total": 47000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 72000,
+          "integrationContractors": 20000,
+          "securityAndPciAssessments": 18000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 3000
+        },
+        "total": 130000
+      },
+      "grossProfit": -47000,
+      "netResult": -177000,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 3652000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 177000,
+        "closing": 3475000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 177000,
+      "runwayMonths": 19.6,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 5,
+        "total": 8
+      },
+      "kpis": {
+        "liveCustomers": 0,
+        "contractedPilots": 1,
+        "transactionsScoredMillions": 3.1,
+        "sandboxApiKeys": 9
+      }
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "platformFees": 8500
+        },
+        "total": 8500
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 28000,
+          "transactionDataLicences": 22000
+        },
+        "total": 50000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 72000,
+          "integrationContractors": 16000,
+          "securityAndPciAssessments": 18000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 2000
+        },
+        "total": 125000
+      },
+      "grossProfit": -41500,
+      "netResult": -166500,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 3475000,
+        "receipts": 0,
+        "fundingReceived": 0,
+        "payments": 175000,
+        "closing": 3300000
+      },
+      "receivablesClosing": 8500,
+      "netBurn": 175000,
+      "runwayMonths": 18.9,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 5,
+        "total": 8
+      },
+      "kpis": {
+        "liveCustomers": 1,
+        "contractedPilots": 2,
+        "transactionsScoredMillions": 4.8,
+        "sandboxApiKeys": 11
+      }
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "platformFees": 8500
+        },
+        "total": 8500
+      },
+      "cogs": {
+        "lines": {
+          "cloudAndGpu": 28000,
+          "transactionDataLicences": 22000
+        },
+        "total": 50000
+      },
+      "opex": {
+        "lines": {
+          "payroll": 72000,
+          "integrationContractors": 22000,
+          "securityAndPciAssessments": 18000,
+          "officeAccra": 4000,
+          "travel": 6000,
+          "professionalFees": 7000,
+          "other": 3000
+        },
+        "total": 132000
+      },
+      "grossProfit": -41500,
+      "netResult": -173500,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 3300000,
+        "receipts": 8500,
+        "fundingReceived": 0,
+        "payments": 182000,
+        "closing": 3126500
+      },
+      "receivablesClosing": 8500,
+      "netBurn": 173500,
+      "runwayMonths": 18,
+      "headcount": {
+        "founders": 2,
+        "product": 1,
+        "engineering": 5,
+        "total": 8
+      },
+      "kpis": {
+        "liveCustomers": 1,
+        "contractedPilots": 2,
+        "transactionsScoredMillions": 6.2,
+        "sandboxApiKeys": 12
+      }
+    }
+  ],
+  "invoices": [
+    {
+      "number": "WL-INV-0001",
+      "customerId": "WL-C01",
+      "serviceMonth": "2026-09",
+      "issuedOn": "2026-10-01",
+      "dueOn": "2026-10-31",
+      "amount": 8500
+    },
+    {
+      "number": "WL-INV-0002",
+      "customerId": "WL-C01",
+      "serviceMonth": "2026-10",
+      "issuedOn": "2026-11-01",
+      "dueOn": "2026-11-30",
+      "amount": 8500
+    }
+  ],
+  "contracts": [
+    {
+      "id": "WL-C01",
+      "label": "Customer 01",
+      "segment": "Ghanaian commercial bank",
+      "status": "LIVE",
+      "signedOn": "2026-07-14",
+      "startOn": "2026-09-01",
+      "termMonths": 12,
+      "monthlyFee": 8500
+    },
+    {
+      "id": "WL-C02",
+      "label": "Pilot 02",
+      "segment": "Payment processor",
+      "status": "PILOT",
+      "signedOn": "2026-07-28",
+      "startOn": "2026-08-01",
+      "termMonths": 3,
+      "monthlyFee": 0
+    },
+    {
+      "id": "WL-C03",
+      "label": "Pilot 03",
+      "segment": "Ghanaian savings and loans bank",
+      "status": "PILOT",
+      "signedOn": "2026-09-02",
+      "startOn": "2026-09-15",
+      "termMonths": 3,
+      "monthlyFee": 0
+    },
+    {
+      "id": "WL-L04",
+      "label": "Prospect 04",
+      "segment": "Mobile money operator",
+      "status": "LOI",
+      "signedOn": "2026-08-19",
+      "startOn": null,
+      "termMonths": null,
+      "monthlyFee": 0
+    },
+    {
+      "id": "WL-L05",
+      "label": "Prospect 05",
+      "segment": "Ghanaian commercial bank",
+      "status": "LOI",
+      "signedOn": "2026-09-09",
+      "startOn": null,
+      "termMonths": null,
+      "monthlyFee": 0
+    },
+    {
+      "id": "WL-L06",
+      "label": "Prospect 06",
+      "segment": "Payment processor (Nigeria)",
+      "status": "LOI",
+      "signedOn": "2026-10-06",
+      "startOn": null,
+      "termMonths": null,
+      "monthlyFee": 0
+    }
+  ],
+  "contractNotes": [
+    "Pilots run for 90 days without charge; conversion is to the standard platform fee."
+  ],
+  "team": {
+    "founders": [
+      {
+        "name": "Ama Okafor",
+        "title": "Co-founder and COO"
+      },
+      {
+        "name": "Kelechi Nwosu",
+        "title": "Co-founder and CTO"
+      }
+    ],
+    "keyPeople": [
+      {
+        "name": "Segun Nwosu",
+        "title": "Head of Product"
+      }
+    ]
+  },
+  "capTable": {
+    "asOf": "2026-10-31",
+    "basis": "Fully diluted, with the pre-seed SAFE shown as converted at its cap.",
+    "holders": [
+      {
+        "name": "Ama Okafor",
+        "class": "Ordinary",
+        "shares": 3400000
+      },
+      {
+        "name": "Kelechi Nwosu",
+        "class": "Ordinary",
+        "shares": 3400000
+      },
+      {
+        "name": "Employee option pool",
+        "class": "Options",
+        "shares": 1200000
+      },
+      {
+        "name": "Kwahu Ridge Ventures",
+        "class": "Preferred (as converted)",
+        "shares": 1400000
+      },
+      {
+        "name": "Angels",
+        "class": "Preferred (as converted)",
+        "shares": 600000
+      }
+    ]
+  },
+  "funding": [
+    {
+      "receivedOn": "2025-08-05",
+      "round": "Angel",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 600000,
+      "investors": "Angels"
+    },
+    {
+      "receivedOn": "2026-03-20",
+      "round": "Pre-seed",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 4000000,
+      "investors": "Kwahu Ridge Ventures"
+    }
+  ],
+  "raise": {
+    "currency": "USD",
+    "targetAmount": 1000000,
+    "instrument": "SAFE (post-money)",
+    "valuationCap": 24000000,
+    "minimumCheque": 50000,
+    "targetCloseOn": "2027-03-31",
+    "useOfFunds": [
+      {
+        "line": "Key hires",
+        "percent": 50,
+        "amount": 500000
+      },
+      {
+        "line": "Runway",
+        "percent": 30,
+        "amount": 300000
+      },
+      {
+        "line": "New markets",
+        "percent": 20,
+        "amount": 200000
+      }
+    ]
+  },
+  "deckStatedFigures": {
+    "source": "Watchly investor deck",
+    "monthlyNetBurn": 175000,
+    "runwayMonths": 20,
+    "currency": "USD",
+    "pilots": 2,
+    "headcount": 8
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "runway",
+      "deliberate": true,
+      "title": "Runway: deck about 20 months against 18.9 in the accounts",
+      "deck": "about 20 months of runway",
+      "accounts": "18.9",
+      "derivation": {
+        "kind": "runway",
+        "month": "2026-09"
+      },
+      "note": "The deck's 'about 20 months of runway' rounds up: cash of 3,300,000 at 30 Sep 2026 over September's net burn of 175,000 gives 18.9 months.",
+      "evidence": [
+        {
+          "documentId": "wl-management-accounts",
+          "text": "The deck's 'about 20 months of runway'"
+        },
+        {
+          "documentId": "wl-raise-terms",
+          "text": "The deck's 'about 20 months of runway'"
+        }
+      ]
+    },
+    {
+      "id": "crm-pipeline-counts",
+      "deliberate": false,
+      "title": "Pipeline export counts against signed contracts",
+      "deck": "2 pilots running",
+      "accounts": "2",
+      "derivation": {
+        "kind": "kpi",
+        "month": "2026-10",
+        "key": "contractedPilots"
+      },
+      "note": "Reconciliation to the CRM pipeline export of 15 Oct 2026: its 1 live customer is Customer 01. Its 13 pilots are the 2 pilots under a signed pilot agreement plus 11 institutions holding a sandbox API key without one. Its 22 signed-not-live are the 3 letters of intent plus 19 mutual non-disclosure agreements. Its 7 qualified pipeline are prospects with no signed paper.",
+      "evidence": [
+        {
+          "documentId": "wl-customer-contracts",
+          "text": "Reconciliation to the CRM pipeline export of 15 Oct 2026"
+        }
+      ]
+    }
+  ],
+  "sharingPlan": {
+    "investor": "Savanna Seed Partners",
+    "note": "Savanna Seed Partners is connected with Watchly (relationship CONNECTED); a share would go through the data-room approval or diligence-share workflow once the owner decides."
+  },
+  "documents": [
+    "management-accounts",
+    "invoice-register",
+    "customer-contracts",
+    "cap-table",
+    "raise-terms",
+    "kpi-pack"
+  ],
+  "assumptions": [
+    {
+      "field": "actuals",
+      "value": "Apr to Oct 2026 management accounts",
+      "note": "Only September's cash and burn are recorded; the cost lines reproduce them."
+    },
+    {
+      "field": "revenue",
+      "value": "one live customer at USD 8,500 a month from Sep 2026",
+      "note": "The overview lists revenue as not yet known; the recorded pipeline export shows one live customer billing."
+    },
+    {
+      "field": "contracts",
+      "value": "1 live customer, 2 pilots, 3 letters of intent",
+      "note": "Reconciles the recorded '2 pilots' with the recorded CRM export."
+    },
+    {
+      "field": "funding",
+      "value": "angels USD 600,000 (Aug 2025) and pre-seed USD 4,000,000 (Mar 2026)",
+      "note": "Forced reconciliation: the recorded USD 3.3m cash at 30 Sep 2026 needs funding; no rounds are recorded."
+    },
+    {
+      "field": "capTable",
+      "value": "founders 34% each, pool 12%, SAFE investors 20%",
+      "note": "No cap table is recorded."
+    },
+    {
+      "field": "raise.valuationCap",
+      "value": "USD 24,000,000 post-money",
+      "note": "Not recorded."
+    },
+    {
+      "field": "raise.minimumCheque",
+      "value": "USD 50,000",
+      "note": "Not recorded."
+    },
+    {
+      "field": "raise.useOfFunds",
+      "value": "50% / 30% / 20% across the three recorded lines",
+      "note": "Only the line names are recorded."
+    },
+    {
+      "field": "headcount",
+      "value": "8 from July 2026 by function",
+      "note": "The recorded team is 8 people."
+    },
+    {
+      "field": "kpis",
+      "value": "transactions scored and sandbox keys",
+      "note": "Not recorded."
+    },
+    {
+      "field": "bank",
+      "value": "Volta Harbour Bank",
+      "note": "Fictitious bank."
+    }
+  ]
+}

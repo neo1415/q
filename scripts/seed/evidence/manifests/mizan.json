@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "company": "Mizan",
+  "companyKey": "mizan",
+  "fixture": "scripts/seed/evidence/fixtures/mizan.json",
+  "synthetic": true,
+  "pack": "compact",
+  "companyId": "d9c03bb4-fa9b-4c55-8924-038d386cc8a8",
+  "seedSource": "tavus-20",
+  "inventedFields": [
+    "actuals.costLines",
+    "actuals.october2026",
+    "actuals.oddMonths",
+    "kpis.originatedByPartner",
+    "revenue.productSetupFees",
+    "fx.usd",
+    "funding.bridge",
+    "capTable.shares",
+    "contracts.bankPartner02And03",
+    "openingReceivable",
+    "bank"
+  ],
+  "sensitivityRule": "packages/evidence/src/domain/sensitivity.ts defaultDocumentSensitivity: FINANCIAL, MANAGEMENT_ACCOUNTS and FINANCIAL_MODEL are HIGHLY_CONFIDENTIAL; every other type is CONFIDENTIAL.",
+  "qReadRule": "HIGHLY_CONFIDENTIAL documents are held back from an investor's Q (packages/q-tools/src/tools/own-records.ts heldBackFromQ) even when shared; the founder's own Q may read them (decision 100).",
+  "plannedInvestor": null,
+  "plannedInvestorNote": "No fictional investor is in diligence with Mizan; nothing is planned for sharing until the owner decides.",
+  "documents": [
+    {
+      "id": "mz-management-accounts",
+      "fileName": "mz-management-accounts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Management accounts, Oct 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "management_accounts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mz-revenue-breakdown",
+      "fileName": "mz-revenue-breakdown.pdf",
+      "mimeType": "application/pdf",
+      "title": "Monthly revenue build by bank partner",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "revenue_by_customer",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mz-customer-contracts",
+      "fileName": "mz-customer-contracts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Bank partner contract summary",
+      "documentType": "CUSTOMER",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "commercial",
+      "checklistItem": "customer_contracts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mz-cap-table",
+      "fileName": "mz-cap-table.pdf",
+      "mimeType": "application/pdf",
+      "title": "Capitalisation table and ownership",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-09",
+        "to": "2026-09"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "cap_table",
+      "checklistItem": "cap_table_full",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mz-raise-terms",
+      "fileName": "mz-raise-terms.pdf",
+      "mimeType": "application/pdf",
+      "title": "Seed round terms and use of funds",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-11",
+        "to": "2027-02"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "use_of_funds",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "mz-kpi-pack",
+      "fileName": "mz-kpi-pack.pdf",
+      "mimeType": "application/pdf",
+      "title": "KPI and operating metrics pack",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "key_metrics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    }
+  ]
+}

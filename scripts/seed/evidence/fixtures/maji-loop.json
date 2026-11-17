@@ -1,0 +1,1794 @@
+{
+  "schemaVersion": 1,
+  "pack": "compact",
+  "synthetic": true,
+  "key": "maji-loop",
+  "idPrefix": "ml",
+  "contractsTitle": "Utility service contract and kiosk sites summary",
+  "contractsDocumentType": "COMMERCIAL",
+  "contractColumns": [
+    {
+      "key": "revenueSharePercent",
+      "label": "Revenue share (%)"
+    }
+  ],
+  "company": {
+    "name": "Maji Loop",
+    "legalName": "Maji Loop Water Ltd",
+    "website": "https://majiloop.example",
+    "foundedOn": "2022-05-09",
+    "headquarters": "Nairobi, Kenya",
+    "stage": "seed",
+    "oneLiner": "Solar-pumped, IoT-metered water kiosks in Nairobi's informal settlements, selling clean water by the litre via M-Pesa tokens."
+  },
+  "seedSource": {
+    "kind": "recorded-profile",
+    "companyId": "01c554bf-8bf1-4eb7-b460-5d841764c40b",
+    "readOn": "2026-11-17",
+    "decision": "fictional-world dev seed (apps/q-api/src/dev/fictional-world/companies.ts), read read-only from production on 17 Nov 2026"
+  },
+  "recordedProfile": {
+    "canonicalName": "Maji Loop",
+    "legalName": "Maji Loop Water Ltd",
+    "websiteUrl": "https://majiloop.example",
+    "foundedDate": "2022-05-09",
+    "headquartersCity": "Nairobi",
+    "stage": "seed",
+    "shortDescription": "Solar-pumped, IoT-metered water kiosks in Nairobi's informal settlements, selling clean water by the litre via M-Pesa tokens.",
+    "founders": [
+      {
+        "name": "Wanjiru Kamau",
+        "title": "Founder and CEO"
+      },
+      {
+        "name": "Otieno Ouma",
+        "title": "Co-founder and CTO"
+      }
+    ],
+    "teamSize": 22,
+    "raise": {
+      "currency": "USD",
+      "targetAmount": 1500000,
+      "instrument": "priced_equity",
+      "useOfFundsSummary": "New markets; Product and engineering",
+      "targetCloseDate": null,
+      "valuation": null,
+      "minimumCheque": null
+    },
+    "figures": [
+      {
+        "what": "kiosks live, end of 2025 (claim and deck)",
+        "month": "2025-12",
+        "kpi": "kiosksInstalled",
+        "value": 96
+      },
+      {
+        "what": "households a month, end of 2025 (claim)",
+        "month": "2025-12",
+        "kpi": "householdsServed",
+        "value": 38000
+      }
+    ],
+    "yearTotals": [
+      {
+        "what": "litres sold in 2025 (claim)",
+        "year": "2025",
+        "kpi": "litresSold",
+        "value": 41000000
+      },
+      {
+        "what": "revenue in 2025 (claim)",
+        "year": "2025",
+        "field": "revenue.total",
+        "value": 58000000
+      }
+    ],
+    "notReproduced": [
+      "financial.mrr USD 120,000 for October 2026 (a QA-session claim, 'as the founder told Q'); the accounts show USD 42,000"
+    ],
+    "octoberRevenueUsd": 42000,
+    "deckKiosks": {
+      "2023": 38,
+      "2024": 64,
+      "2025": 96
+    },
+    "unknownClaims": ["financial.kiosk_margin"]
+  },
+  "currency": "KES",
+  "fx": {
+    "usd": 129,
+    "note": "USD equivalents use a management rate of KES 129.00 per USD."
+  },
+  "collection": "same-month",
+  "documentDefaults": {
+    "issuedOn": "2026-11-14",
+    "version": "1.0",
+    "preparedBy": "Prepared by Wanjiru Kamau, Founder and CEO, from the company's ledgers and kiosk meter records; unaudited"
+  },
+  "bank": {
+    "name": "Rift Crescent Bank",
+    "accountMasked": "account ending ****3350"
+  },
+  "periods": {
+    "firstActualMonth": "2025-01",
+    "lastActualMonth": "2026-10"
+  },
+  "basis": [
+    "Revenue: water sold by the litre at KES 1.40, paid by M-Pesa or a prepaid tag at the kiosk, plus tag card sales and service fees. Sales settle the same day, so receipts equal revenue.",
+    "Kiosk-level costs (the utility's 22% revenue share on water sales, filtration consumables, attendant commissions, M-Pesa fees and kiosk maintenance) are reported in cost of revenue, so gross profit is the kiosk-level margin after the utility's share. Kiosks (KES 420,000 each) are capitalised and depreciated over five years (KES 7,000 a kiosk a month)."
+  ],
+  "revenueModel": {
+    "components": [
+      {
+        "line": "waterSales",
+        "label": "Litres sold x KES 1.40",
+        "kpi": "litresSold",
+        "unitPrice": 1.4
+      }
+    ]
+  },
+  "lineLabels": {
+    "waterSales": "Water sales",
+    "tagCardsAndServiceFees": "Tag cards and service fees",
+    "utilityRevenueShare": "Utility revenue share (22%)",
+    "filtrationConsumables": "Filtration consumables",
+    "attendantCommissions": "Kiosk attendant commissions",
+    "mpesaFees": "M-Pesa fees",
+    "kioskMaintenance": "Kiosk maintenance",
+    "payrollFieldTechnicians": "Payroll - field technicians",
+    "payrollEngineering": "Payroll - engineering",
+    "payrollOperationsAndAdmin": "Payroll - operations and admin",
+    "kioskDepreciation": "Kiosk depreciation",
+    "iotConnectivityAndSoftware": "IoT connectivity and software",
+    "vehiclesAndFieldLogistics": "Vehicles and field logistics",
+    "vandalismRepairsAndSecurity": "Vandalism repairs and security",
+    "officeAndWorkshop": "Office and workshop",
+    "professionalFees": "Professional fees",
+    "insurance": "Insurance",
+    "other": "Other"
+  },
+  "kpiDefinitions": [
+    {
+      "key": "kiosksInstalled",
+      "label": "Kiosks installed (month end)",
+      "unit": "count"
+    },
+    {
+      "key": "kiosksDispensing",
+      "label": "Kiosks dispensing (month end)",
+      "unit": "count"
+    },
+    {
+      "key": "kiosksOffline",
+      "label": "Kiosks offline (month end)",
+      "unit": "count"
+    },
+    {
+      "key": "litresSold",
+      "label": "Litres sold (metered)",
+      "unit": "count"
+    },
+    {
+      "key": "householdsServed",
+      "label": "Households served in month",
+      "unit": "count"
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-01",
+      "revenue": {
+        "lines": {
+          "waterSales": 4145400,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4195400
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 911988,
+          "filtrationConsumables": 236880,
+          "attendantCommissions": 331632,
+          "mpesaFees": 22800,
+          "kioskMaintenance": 220500
+        },
+        "total": 1723800
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1100000,
+          "payrollEngineering": 780000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 462000,
+          "iotConnectivityAndSoftware": 79200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4006200
+      },
+      "grossProfit": 2471600,
+      "netResult": -1534600,
+      "depreciation": 462000,
+      "capex": 840000,
+      "cash": {
+        "opening": 19655162,
+        "receipts": 4195400,
+        "fundingReceived": 0,
+        "payments": 6108000,
+        "closing": 17742562
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1912600,
+      "runwayMonths": 9.3,
+      "headcount": {
+        "fieldTechnicians": 10,
+        "engineering": 3,
+        "operationsAndAdmin": 4,
+        "total": 17
+      },
+      "kpis": {
+        "kiosksInstalled": 66,
+        "kiosksDispensing": 63,
+        "kiosksOffline": 3,
+        "litresSold": 2961000,
+        "householdsServed": 27216
+      }
+    },
+    {
+      "month": "2025-02",
+      "revenue": {
+        "lines": {
+          "waterSales": 4481400,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4531400
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 985908,
+          "filtrationConsumables": 256080,
+          "attendantCommissions": 358512,
+          "mpesaFees": 24648,
+          "kioskMaintenance": 231000
+        },
+        "total": 1856148
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1100000,
+          "payrollEngineering": 780000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 476000,
+          "iotConnectivityAndSoftware": 81600,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 50000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 3997600
+      },
+      "grossProfit": 2675252,
+      "netResult": -1322348,
+      "depreciation": 476000,
+      "capex": 840000,
+      "cash": {
+        "opening": 17742562,
+        "receipts": 4531400,
+        "fundingReceived": 0,
+        "payments": 6217748,
+        "closing": 16056214
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1686348,
+      "runwayMonths": 9.5,
+      "headcount": {
+        "fieldTechnicians": 10,
+        "engineering": 3,
+        "operationsAndAdmin": 4,
+        "total": 17
+      },
+      "kpis": {
+        "kiosksInstalled": 68,
+        "kiosksDispensing": 66,
+        "kiosksOffline": 2,
+        "litresSold": 3201000,
+        "householdsServed": 28512
+      }
+    },
+    {
+      "month": "2025-03",
+      "revenue": {
+        "lines": {
+          "waterSales": 4455500,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4505500
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 980210,
+          "filtrationConsumables": 254600,
+          "attendantCommissions": 356440,
+          "mpesaFees": 24505,
+          "kioskMaintenance": 234500
+        },
+        "total": 1850255
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1100000,
+          "payrollEngineering": 780000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 497000,
+          "iotConnectivityAndSoftware": 85200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4072200
+      },
+      "grossProfit": 2655245,
+      "netResult": -1416955,
+      "depreciation": 497000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 16056214,
+        "receipts": 4505500,
+        "fundingReceived": 15000000,
+        "payments": 6685455,
+        "closing": 28876259
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2179955,
+      "runwayMonths": 13.2,
+      "headcount": {
+        "fieldTechnicians": 10,
+        "engineering": 3,
+        "operationsAndAdmin": 4,
+        "total": 17
+      },
+      "kpis": {
+        "kiosksInstalled": 71,
+        "kiosksDispensing": 67,
+        "kiosksOffline": 4,
+        "litresSold": 3182500,
+        "householdsServed": 28944
+      }
+    },
+    {
+      "month": "2025-04",
+      "revenue": {
+        "lines": {
+          "waterSales": 4018000,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4068000
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 883960,
+          "filtrationConsumables": 229600,
+          "attendantCommissions": 321440,
+          "mpesaFees": 22099,
+          "kioskMaintenance": 245000
+        },
+        "total": 1702099
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1100000,
+          "payrollEngineering": 780000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 511000,
+          "iotConnectivityAndSoftware": 87600,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4063600
+      },
+      "grossProfit": 2365901,
+      "netResult": -1697699,
+      "depreciation": 511000,
+      "capex": 840000,
+      "cash": {
+        "opening": 28876259,
+        "receipts": 4068000,
+        "fundingReceived": 0,
+        "payments": 6094699,
+        "closing": 26849560
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2026699,
+      "runwayMonths": 13.2,
+      "headcount": {
+        "fieldTechnicians": 10,
+        "engineering": 3,
+        "operationsAndAdmin": 4,
+        "total": 17
+      },
+      "kpis": {
+        "kiosksInstalled": 73,
+        "kiosksDispensing": 70,
+        "kiosksOffline": 3,
+        "litresSold": 2870000,
+        "householdsServed": 30240
+      }
+    },
+    {
+      "month": "2025-05",
+      "revenue": {
+        "lines": {
+          "waterSales": 4139100,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4189100
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 910602,
+          "filtrationConsumables": 236520,
+          "attendantCommissions": 331128,
+          "mpesaFees": 22765,
+          "kioskMaintenance": 255500
+        },
+        "total": 1756515
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1100000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 532000,
+          "iotConnectivityAndSoftware": 91200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4348200
+      },
+      "grossProfit": 2432585,
+      "netResult": -1915615,
+      "depreciation": 532000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 26849560,
+        "receipts": 4189100,
+        "fundingReceived": 0,
+        "payments": 6832715,
+        "closing": 24205945
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2643615,
+      "runwayMonths": 9.2,
+      "headcount": {
+        "fieldTechnicians": 10,
+        "engineering": 4,
+        "operationsAndAdmin": 4,
+        "total": 18
+      },
+      "kpis": {
+        "kiosksInstalled": 76,
+        "kiosksDispensing": 73,
+        "kiosksOffline": 3,
+        "litresSold": 2956500,
+        "householdsServed": 31536
+      }
+    },
+    {
+      "month": "2025-06",
+      "revenue": {
+        "lines": {
+          "waterSales": 4599000,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4649000
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1011780,
+          "filtrationConsumables": 262800,
+          "attendantCommissions": 367920,
+          "mpesaFees": 25295,
+          "kioskMaintenance": 255500
+        },
+        "total": 1923295
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1100000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 546000,
+          "iotConnectivityAndSoftware": 93600,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 125000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4414600
+      },
+      "grossProfit": 2725705,
+      "netResult": -1688895,
+      "depreciation": 546000,
+      "capex": 840000,
+      "cash": {
+        "opening": 24205945,
+        "receipts": 4649000,
+        "fundingReceived": 0,
+        "payments": 6631895,
+        "closing": 22223050
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1982895,
+      "runwayMonths": 11.2,
+      "headcount": {
+        "fieldTechnicians": 10,
+        "engineering": 4,
+        "operationsAndAdmin": 4,
+        "total": 18
+      },
+      "kpis": {
+        "kiosksInstalled": 78,
+        "kiosksDispensing": 73,
+        "kiosksOffline": 5,
+        "litresSold": 3285000,
+        "householdsServed": 31536
+      }
+    },
+    {
+      "month": "2025-07",
+      "revenue": {
+        "lines": {
+          "waterSales": 5120500,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 5170500
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1126510,
+          "filtrationConsumables": 292600,
+          "attendantCommissions": 409640,
+          "mpesaFees": 28163,
+          "kioskMaintenance": 269500
+        },
+        "total": 2126413
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 567000,
+          "iotConnectivityAndSoftware": 97200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4524200
+      },
+      "grossProfit": 3044087,
+      "netResult": -1480113,
+      "depreciation": 567000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 22223050,
+        "receipts": 5170500,
+        "fundingReceived": 0,
+        "payments": 7343613,
+        "closing": 20049937
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2173113,
+      "runwayMonths": 9.2,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 4,
+        "total": 19
+      },
+      "kpis": {
+        "kiosksInstalled": 81,
+        "kiosksDispensing": 77,
+        "kiosksOffline": 4,
+        "litresSold": 3657500,
+        "householdsServed": 33264
+      }
+    },
+    {
+      "month": "2025-08",
+      "revenue": {
+        "lines": {
+          "waterSales": 5443200,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 5493200
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1197504,
+          "filtrationConsumables": 311040,
+          "attendantCommissions": 435456,
+          "mpesaFees": 29938,
+          "kioskMaintenance": 283500
+        },
+        "total": 2257438
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 600000,
+          "kioskDepreciation": 588000,
+          "iotConnectivityAndSoftware": 100800,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4523800
+      },
+      "grossProfit": 3235762,
+      "netResult": -1288038,
+      "depreciation": 588000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 20049937,
+        "receipts": 5493200,
+        "fundingReceived": 0,
+        "payments": 7453238,
+        "closing": 18089899
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1960038,
+      "runwayMonths": 9.2,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 4,
+        "total": 19
+      },
+      "kpis": {
+        "kiosksInstalled": 84,
+        "kiosksDispensing": 81,
+        "kiosksOffline": 3,
+        "litresSold": 3888000,
+        "householdsServed": 34992
+      }
+    },
+    {
+      "month": "2025-09",
+      "revenue": {
+        "lines": {
+          "waterSales": 5461400,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 5511400
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1201508,
+          "filtrationConsumables": 312080,
+          "attendantCommissions": 436912,
+          "mpesaFees": 30038,
+          "kioskMaintenance": 290500
+        },
+        "total": 2271038
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 609000,
+          "iotConnectivityAndSoftware": 104400,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4723400
+      },
+      "grossProfit": 3240362,
+      "netResult": -1483038,
+      "depreciation": 609000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 18089899,
+        "receipts": 5511400,
+        "fundingReceived": 0,
+        "payments": 7645438,
+        "closing": 15955861
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2134038,
+      "runwayMonths": 7.5,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 5,
+        "total": 20
+      },
+      "kpis": {
+        "kiosksInstalled": 87,
+        "kiosksDispensing": 83,
+        "kiosksOffline": 4,
+        "litresSold": 3901000,
+        "householdsServed": 35856
+      }
+    },
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "waterSales": 4938500,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 4988500
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1086470,
+          "filtrationConsumables": 282200,
+          "attendantCommissions": 395080,
+          "mpesaFees": 27162,
+          "kioskMaintenance": 297500
+        },
+        "total": 2088412
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 630000,
+          "iotConnectivityAndSoftware": 108000,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 125000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4773000
+      },
+      "grossProfit": 2900088,
+      "netResult": -1872912,
+      "depreciation": 630000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 15955861,
+        "receipts": 4988500,
+        "fundingReceived": 0,
+        "payments": 7491412,
+        "closing": 13452949
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2502912,
+      "runwayMonths": 5.4,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 5,
+        "total": 20
+      },
+      "kpis": {
+        "kiosksInstalled": 90,
+        "kiosksDispensing": 85,
+        "kiosksOffline": 5,
+        "litresSold": 3527500,
+        "householdsServed": 36720
+      }
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "waterSales": 4993800,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 5043800
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1098636,
+          "filtrationConsumables": 285360,
+          "attendantCommissions": 399504,
+          "mpesaFees": 27466,
+          "kioskMaintenance": 304500
+        },
+        "total": 2115466
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 651000,
+          "iotConnectivityAndSoftware": 111600,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 150000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4822600
+      },
+      "grossProfit": 2928334,
+      "netResult": -1894266,
+      "depreciation": 651000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 13452949,
+        "receipts": 5043800,
+        "fundingReceived": 0,
+        "payments": 7547066,
+        "closing": 10949683
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2503266,
+      "runwayMonths": 4.4,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 5,
+        "total": 20
+      },
+      "kpis": {
+        "kiosksInstalled": 93,
+        "kiosksDispensing": 87,
+        "kiosksOffline": 6,
+        "litresSold": 3567000,
+        "householdsServed": 37584
+      }
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "waterSales": 5604200,
+          "tagCardsAndServiceFees": 50000
+        },
+        "total": 5654200
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1232924,
+          "filtrationConsumables": 320240,
+          "attendantCommissions": 448336,
+          "mpesaFees": 30823,
+          "kioskMaintenance": 308000
+        },
+        "total": 2340323
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 672000,
+          "iotConnectivityAndSoftware": 115200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 200000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4897200
+      },
+      "grossProfit": 3313877,
+      "netResult": -1583323,
+      "depreciation": 672000,
+      "capex": 1260000,
+      "cash": {
+        "opening": 10949683,
+        "receipts": 5654200,
+        "fundingReceived": 0,
+        "payments": 7825523,
+        "closing": 8778360
+      },
+      "receivablesClosing": 0,
+      "netBurn": 2171323,
+      "runwayMonths": 4,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 5,
+        "total": 20
+      },
+      "kpis": {
+        "kiosksInstalled": 96,
+        "kiosksDispensing": 88,
+        "kiosksOffline": 8,
+        "litresSold": 4003000,
+        "householdsServed": 38000
+      }
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "waterSales": 5796000,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 5852000
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1275120,
+          "filtrationConsumables": 331200,
+          "attendantCommissions": 463680,
+          "mpesaFees": 31878,
+          "kioskMaintenance": 315000
+        },
+        "total": 2416878
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 672000,
+          "iotConnectivityAndSoftware": 115200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 150000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4847200
+      },
+      "grossProfit": 3435122,
+      "netResult": -1412078,
+      "depreciation": 672000,
+      "capex": 0,
+      "cash": {
+        "opening": 8778360,
+        "receipts": 5852000,
+        "fundingReceived": 0,
+        "payments": 6592078,
+        "closing": 8038282
+      },
+      "receivablesClosing": 0,
+      "netBurn": 740078,
+      "runwayMonths": 10.9,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 5,
+        "total": 20
+      },
+      "kpis": {
+        "kiosksInstalled": 96,
+        "kiosksDispensing": 90,
+        "kiosksOffline": 6,
+        "litresSold": 4140000,
+        "householdsServed": 38880
+      }
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "waterSales": 6053600,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 6109600
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1331792,
+          "filtrationConsumables": 345920,
+          "attendantCommissions": 484288,
+          "mpesaFees": 33295,
+          "kioskMaintenance": 322000
+        },
+        "total": 2517295
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1040000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 679000,
+          "iotConnectivityAndSoftware": 116400,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 125000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 4830400
+      },
+      "grossProfit": 3592305,
+      "netResult": -1238095,
+      "depreciation": 679000,
+      "capex": 420000,
+      "cash": {
+        "opening": 8038282,
+        "receipts": 6109600,
+        "fundingReceived": 25800000,
+        "payments": 7088695,
+        "closing": 32859187
+      },
+      "receivablesClosing": 0,
+      "netBurn": 979095,
+      "runwayMonths": 33.6,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 4,
+        "operationsAndAdmin": 5,
+        "total": 20
+      },
+      "kpis": {
+        "kiosksInstalled": 97,
+        "kiosksDispensing": 92,
+        "kiosksOffline": 5,
+        "litresSold": 4324000,
+        "householdsServed": 39744
+      }
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "waterSales": 6053600,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 6109600
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1331792,
+          "filtrationConsumables": 345920,
+          "attendantCommissions": 484288,
+          "mpesaFees": 33295,
+          "kioskMaintenance": 329000
+        },
+        "total": 2524295
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 686000,
+          "iotConnectivityAndSoftware": 117600,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5073600
+      },
+      "grossProfit": 3585305,
+      "netResult": -1488295,
+      "depreciation": 686000,
+      "capex": 420000,
+      "cash": {
+        "opening": 32859187,
+        "receipts": 6109600,
+        "fundingReceived": 0,
+        "payments": 7331895,
+        "closing": 31636892
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1222295,
+      "runwayMonths": 25.9,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 21
+      },
+      "kpis": {
+        "kiosksInstalled": 98,
+        "kiosksDispensing": 94,
+        "kiosksOffline": 4,
+        "litresSold": 4324000,
+        "householdsServed": 40608
+      }
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "waterSales": 5253500,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 5309500
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1155770,
+          "filtrationConsumables": 300200,
+          "attendantCommissions": 420280,
+          "mpesaFees": 28894,
+          "kioskMaintenance": 332500
+        },
+        "total": 2237644
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 693000,
+          "iotConnectivityAndSoftware": 118800,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5081800
+      },
+      "grossProfit": 3071856,
+      "netResult": -2009944,
+      "depreciation": 693000,
+      "capex": 420000,
+      "cash": {
+        "opening": 31636892,
+        "receipts": 5309500,
+        "fundingReceived": 0,
+        "payments": 7046444,
+        "closing": 29899948
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1736944,
+      "runwayMonths": 17.2,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 21
+      },
+      "kpis": {
+        "kiosksInstalled": 99,
+        "kiosksDispensing": 95,
+        "kiosksOffline": 4,
+        "litresSold": 3752500,
+        "householdsServed": 41040
+      }
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "waterSales": 5296200,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 5352200
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1165164,
+          "filtrationConsumables": 302640,
+          "attendantCommissions": 423696,
+          "mpesaFees": 29129,
+          "kioskMaintenance": 339500
+        },
+        "total": 2260129
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1210000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 700000,
+          "iotConnectivityAndSoftware": 120000,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5065000
+      },
+      "grossProfit": 3092071,
+      "netResult": -1972929,
+      "depreciation": 700000,
+      "capex": 420000,
+      "cash": {
+        "opening": 29899948,
+        "receipts": 5352200,
+        "fundingReceived": 0,
+        "payments": 7045129,
+        "closing": 28207019
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1692929,
+      "runwayMonths": 16.7,
+      "headcount": {
+        "fieldTechnicians": 11,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 21
+      },
+      "kpis": {
+        "kiosksInstalled": 100,
+        "kiosksDispensing": 97,
+        "kiosksOffline": 3,
+        "litresSold": 3783000,
+        "householdsServed": 41904
+      }
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "waterSales": 5839400,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 5895400
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1284668,
+          "filtrationConsumables": 333680,
+          "attendantCommissions": 467152,
+          "mpesaFees": 32117,
+          "kioskMaintenance": 339500
+        },
+        "total": 2457117
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1320000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 707000,
+          "iotConnectivityAndSoftware": 121200,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5208200
+      },
+      "grossProfit": 3438283,
+      "netResult": -1769917,
+      "depreciation": 707000,
+      "capex": 420000,
+      "cash": {
+        "opening": 28207019,
+        "receipts": 5895400,
+        "fundingReceived": 0,
+        "payments": 7378317,
+        "closing": 26724102
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1482917,
+      "runwayMonths": 18,
+      "headcount": {
+        "fieldTechnicians": 12,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 22
+      },
+      "kpis": {
+        "kiosksInstalled": 101,
+        "kiosksDispensing": 97,
+        "kiosksOffline": 4,
+        "litresSold": 4171000,
+        "householdsServed": 41904
+      }
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "waterSales": 6237000,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 6293000
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1372140,
+          "filtrationConsumables": 356400,
+          "attendantCommissions": 498960,
+          "mpesaFees": 34304,
+          "kioskMaintenance": 346500
+        },
+        "total": 2608304
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1320000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 714000,
+          "iotConnectivityAndSoftware": 122400,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5191400
+      },
+      "grossProfit": 3684696,
+      "netResult": -1506704,
+      "depreciation": 714000,
+      "capex": 420000,
+      "cash": {
+        "opening": 26724102,
+        "receipts": 6293000,
+        "fundingReceived": 0,
+        "payments": 7505704,
+        "closing": 25511398
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1212704,
+      "runwayMonths": 21,
+      "headcount": {
+        "fieldTechnicians": 12,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 22
+      },
+      "kpis": {
+        "kiosksInstalled": 102,
+        "kiosksDispensing": 99,
+        "kiosksOffline": 3,
+        "litresSold": 4455000,
+        "householdsServed": 42768
+      }
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "waterSales": 6306300,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 6362300
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1387386,
+          "filtrationConsumables": 360360,
+          "attendantCommissions": 504504,
+          "mpesaFees": 34685,
+          "kioskMaintenance": 346500
+        },
+        "total": 2633435
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1320000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 714000,
+          "iotConnectivityAndSoftware": 122400,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5191400
+      },
+      "grossProfit": 3728865,
+      "netResult": -1462535,
+      "depreciation": 714000,
+      "capex": 0,
+      "cash": {
+        "opening": 25511398,
+        "receipts": 6362300,
+        "fundingReceived": 0,
+        "payments": 7110835,
+        "closing": 24762863
+      },
+      "receivablesClosing": 0,
+      "netBurn": 748535,
+      "runwayMonths": 33.1,
+      "headcount": {
+        "fieldTechnicians": 12,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 22
+      },
+      "kpis": {
+        "kiosksInstalled": 102,
+        "kiosksDispensing": 99,
+        "kiosksOffline": 3,
+        "litresSold": 4504500,
+        "householdsServed": 42768
+      }
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "waterSales": 6167700,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 6223700
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1356894,
+          "filtrationConsumables": 352440,
+          "attendantCommissions": 493416,
+          "mpesaFees": 33922,
+          "kioskMaintenance": 346500
+        },
+        "total": 2583172
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1320000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 721000,
+          "iotConnectivityAndSoftware": 123600,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 100000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5224600
+      },
+      "grossProfit": 3640528,
+      "netResult": -1584072,
+      "depreciation": 721000,
+      "capex": 420000,
+      "cash": {
+        "opening": 24762863,
+        "receipts": 6223700,
+        "fundingReceived": 0,
+        "payments": 7506772,
+        "closing": 23479791
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1283072,
+      "runwayMonths": 18.3,
+      "headcount": {
+        "fieldTechnicians": 12,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 22
+      },
+      "kpis": {
+        "kiosksInstalled": 103,
+        "kiosksDispensing": 99,
+        "kiosksOffline": 4,
+        "litresSold": 4405500,
+        "householdsServed": 42768
+      }
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "waterSales": 5362000,
+          "tagCardsAndServiceFees": 56000
+        },
+        "total": 5418000
+      },
+      "cogs": {
+        "lines": {
+          "utilityRevenueShare": 1179640,
+          "filtrationConsumables": 306400,
+          "attendantCommissions": 428960,
+          "mpesaFees": 29491,
+          "kioskMaintenance": 353500
+        },
+        "total": 2297991
+      },
+      "opex": {
+        "lines": {
+          "payrollFieldTechnicians": 1320000,
+          "payrollEngineering": 1300000,
+          "payrollOperationsAndAdmin": 750000,
+          "kioskDepreciation": 728000,
+          "iotConnectivityAndSoftware": 124800,
+          "vehiclesAndFieldLogistics": 300000,
+          "vandalismRepairsAndSecurity": 75000,
+          "officeAndWorkshop": 250000,
+          "professionalFees": 150000,
+          "insurance": 90000,
+          "other": 120000
+        },
+        "total": 5207800
+      },
+      "grossProfit": 3120009,
+      "netResult": -2087791,
+      "depreciation": 728000,
+      "capex": 420000,
+      "cash": {
+        "opening": 23479791,
+        "receipts": 5418000,
+        "fundingReceived": 0,
+        "payments": 7197791,
+        "closing": 21700000
+      },
+      "receivablesClosing": 0,
+      "netBurn": 1779791,
+      "runwayMonths": 12.2,
+      "headcount": {
+        "fieldTechnicians": 12,
+        "engineering": 5,
+        "operationsAndAdmin": 5,
+        "total": 22
+      },
+      "kpis": {
+        "kiosksInstalled": 104,
+        "kiosksDispensing": 101,
+        "kiosksOffline": 3,
+        "litresSold": 3830000,
+        "householdsServed": 43632
+      }
+    }
+  ],
+  "contracts": [
+    {
+      "id": "ML-U01",
+      "label": "County water utility (name withheld)",
+      "segment": "Water service provider",
+      "status": "LIVE",
+      "signedOn": "2023-02-14",
+      "startOn": "2023-03-01",
+      "termMonths": 60,
+      "revenueSharePercent": 22
+    }
+  ],
+  "contractNotes": [
+    "Service contract with the county water utility: Maji Loop operates kiosks on utility mains connections and pays the utility 22% of water sales each month as its revenue share, which covers the bulk water. Five-year term from 1 Mar 2023, renewable from 28 Feb 2028.",
+    "The kiosk meters are reconciled with the utility's meter reads each month. For 2025, metered sales were 41,000,000 litres and the utility's reads differed by less than 0.5%.",
+    "Kiosk sites are held under site agreements with landowners and community water committees, typically three years with a monthly site fee included in kiosk maintenance."
+  ],
+  "team": {
+    "founders": [
+      {
+        "name": "Wanjiru Kamau",
+        "title": "Founder and CEO"
+      },
+      {
+        "name": "Otieno Ouma",
+        "title": "Co-founder and CTO"
+      }
+    ],
+    "keyPeople": []
+  },
+  "capTable": {
+    "asOf": "2026-10-31",
+    "basis": "Fully diluted, with the angel SAFEs shown as converted.",
+    "holders": [
+      {
+        "name": "Wanjiru Kamau",
+        "class": "Ordinary",
+        "shares": 4600000
+      },
+      {
+        "name": "Otieno Ouma",
+        "class": "Ordinary",
+        "shares": 2400000
+      },
+      {
+        "name": "Employee option pool",
+        "class": "Options",
+        "shares": 1000000
+      },
+      {
+        "name": "Kilimani Angels",
+        "class": "Preferred (as converted)",
+        "shares": 1200000
+      },
+      {
+        "name": "Diaspora angels",
+        "class": "Preferred (as converted)",
+        "shares": 800000
+      }
+    ]
+  },
+  "funding": [
+    {
+      "receivedOn": "2023-01-30",
+      "round": "Angel",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 750000,
+      "investors": "Kilimani Angels"
+    },
+    {
+      "receivedOn": "2025-03-12",
+      "round": "Grant",
+      "instrument": "Non-dilutive grant",
+      "currency": "KES",
+      "amount": 15000000,
+      "investors": "Clean water innovation grant (programme name withheld)"
+    },
+    {
+      "receivedOn": "2026-02-17",
+      "round": "Angel extension",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 200000,
+      "investors": "Diaspora angels"
+    }
+  ],
+  "raise": {
+    "currency": "USD",
+    "targetAmount": 1500000,
+    "instrument": "Priced equity",
+    "preMoneyValuation": 6000000,
+    "minimumCheque": 50000,
+    "targetCloseOn": "2027-03-31",
+    "useOfFunds": [
+      {
+        "line": "New markets",
+        "percent": 70,
+        "amount": 1050000
+      },
+      {
+        "line": "Product and engineering",
+        "percent": 30,
+        "amount": 450000
+      }
+    ]
+  },
+  "deckStatedFigures": {
+    "source": "Maji Loop investor deck",
+    "kiosks": {
+      "2023": 38,
+      "2024": 64,
+      "2025": 96
+    }
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "kiosks-live",
+      "deliberate": true,
+      "title": "Kiosks live: deck 96 at the end of 2025 against 88 dispensing",
+      "deck": "96 kiosks live in 2025",
+      "accounts": "88",
+      "derivation": {
+        "kind": "kpi",
+        "month": "2025-12",
+        "key": "kiosksDispensing"
+      },
+      "note": "The deck's 96 kiosks live in 2025 counts kiosks installed at 31 Dec 2025. 8 were offline that day (vandalism and pump or controller faults), so 88 were dispensing water; litres and revenue come from the kiosks dispensing.",
+      "evidence": [
+        {
+          "documentId": "ml-kpi-pack",
+          "text": "The deck's 96 kiosks live in 2025"
+        },
+        {
+          "documentId": "ml-management-accounts",
+          "text": "The deck's 96 kiosks live in 2025"
+        }
+      ]
+    }
+  ],
+  "sharingPlan": {
+    "investor": "Savanna Seed Partners",
+    "note": "Savanna Seed Partners is connected with Maji Loop (relationship CONNECTED); a share would go through the data-room approval or diligence-share workflow once the owner decides."
+  },
+  "documents": [
+    "management-accounts",
+    "revenue-breakdown",
+    "customer-contracts",
+    "cap-table",
+    "raise-terms",
+    "kpi-pack"
+  ],
+  "assumptions": [
+    {
+      "field": "actuals",
+      "value": "Jan 2025 to Oct 2026 management accounts",
+      "note": "Only 2025 revenue and litres are recorded; both are reproduced exactly."
+    },
+    {
+      "field": "revenue.pricePerLitre",
+      "value": "KES 1.40",
+      "note": "Not recorded; with tag fees it gives the recorded KES 58m for 2025 from the recorded 41m litres."
+    },
+    {
+      "field": "revenue.october2026",
+      "value": "KES 5,418,000 (USD 42,000 at KES 129.00)",
+      "note": "Matches the USD 42,000 October MRR in the archived 'deck QA 14 Nov b' claim; the 120,000 'told Q' claim is not reproduced."
+    },
+    {
+      "field": "kpis.kiosksMonthly",
+      "value": "monthly installed, dispensing and offline counts",
+      "note": "The deck records year-end installed counts only (38, 64, 96)."
+    },
+    {
+      "field": "kpis.litresPerKiosk",
+      "value": "seasonal: lower in the April-May and October-November rains",
+      "note": "Invented so that 2025 totals 41,000,000 litres and October 2026 gives the USD 42,000 month."
+    },
+    {
+      "field": "costs",
+      "value": "utility share 22% and kiosk-level costs",
+      "note": "Kiosk-level margin is recorded as unknown; these are synthetic evidence for it."
+    },
+    {
+      "field": "funding",
+      "value": "angels USD 750,000 (2023), grant KES 15m (2025), angel extension USD 200,000 (2026)",
+      "note": "No funding history is recorded."
+    },
+    {
+      "field": "capTable",
+      "value": "founders 46% and 24%, pool 10%, angels 20%",
+      "note": "No cap table is recorded."
+    },
+    {
+      "field": "raise.preMoneyValuation",
+      "value": "USD 6,000,000",
+      "note": "Not recorded."
+    },
+    {
+      "field": "raise.minimumCheque",
+      "value": "USD 50,000",
+      "note": "Not recorded."
+    },
+    {
+      "field": "raise.targetCloseOn",
+      "value": "2027-03-31",
+      "note": "Recorded timeframe is 3 to 6 months from 27 Sep 2026."
+    },
+    {
+      "field": "raise.useOfFunds",
+      "value": "70% / 30% across the two recorded lines",
+      "note": "Only the line names are recorded."
+    },
+    {
+      "field": "headcount",
+      "value": "22 at Sep 2026 by function",
+      "note": "The recorded team is 22; the split is invented."
+    },
+    {
+      "field": "contracts",
+      "value": "utility service contract terms",
+      "note": "The recorded storyline names a utility service contract without terms."
+    },
+    {
+      "field": "bank",
+      "value": "Rift Crescent Bank",
+      "note": "Fictitious bank."
+    }
+  ]
+}

@@ -1,0 +1,1262 @@
+{
+  "schemaVersion": 1,
+  "pack": "compact",
+  "synthetic": true,
+  "key": "mizan",
+  "idPrefix": "mz",
+  "contractsTitle": "Bank partner contract summary",
+  "contractsDocumentType": "CUSTOMER",
+  "contractColumns": [
+    {
+      "key": "feePercent",
+      "label": "Fee (%)",
+      "format": "decimal"
+    }
+  ],
+  "company": {
+    "name": "Mizan",
+    "legalName": "Mizan Financial Technologies S.A.E.",
+    "website": "https://mizan-finance.example",
+    "foundedOn": "2023-02-20",
+    "headquarters": "Cairo, Egypt",
+    "stage": "seed",
+    "oneLiner": "An API that lets Egyptian banks and fintechs offer Shariah-compliant SME financing: structuring, Shariah review, documents and repayments."
+  },
+  "seedSource": {
+    "kind": "tavus-20",
+    "file": "docs/seed/tavus-20/companies-full.json",
+    "company": "Mizan",
+    "companyId": "d9c03bb4-fa9b-4c55-8924-038d386cc8a8",
+    "readOn": "2026-11-17"
+  },
+  "currency": "EGP",
+  "fx": {
+    "usd": 48.5,
+    "note": "USD equivalents use the company's management rate of EGP 48.50 per USD, the rate behind the deck's USD figures."
+  },
+  "collection": "next-month",
+  "openingReceivable": 364000,
+  "documentDefaults": {
+    "issuedOn": "2026-11-14",
+    "version": "1.0",
+    "preparedBy": "Prepared by Youssef Kamal, Co-founder & CEO, from the company's ledgers; unaudited"
+  },
+  "bank": {
+    "name": "Delta Meridian Bank",
+    "accountMasked": "account ending ****2093"
+  },
+  "periods": {
+    "firstActualMonth": "2025-10",
+    "lastActualMonth": "2026-10"
+  },
+  "basis": [
+    "Revenue: a fee of 1.4% of each financing originated through Mizan, paid by the lender (EGP 14,000 for each EGP 1 million originated), plus a one-off set-up fee of EGP 250,000 when a partner launches a new product. Partners settle each month's fees in the following month.",
+    "Financings sit on the partner banks' balance sheets, not Mizan's; Mizan carries no credit risk. Non-performing rates are as reported by the partner banks."
+  ],
+  "revenueModel": {
+    "components": [
+      {
+        "line": "originationFees",
+        "label": "EGP millions originated x EGP 14,000 (1.4%)",
+        "kpi": "originatedMonthEgpM",
+        "unitPrice": 14000
+      }
+    ],
+    "byPartner": {
+      "kpi": "originatedByPartnerEgpM",
+      "unitPrice": 14000
+    }
+  },
+  "lineLabels": {
+    "originationFees": "Origination fees (1.4%)",
+    "productSetupFees": "Product set-up fees",
+    "cloudHostingEgypt": "Cloud hosting (in Egypt)",
+    "shariahCaseReviews": "Shariah case reviews",
+    "collectionAndPaymentCosts": "Collection and payment costs",
+    "payrollEngineering": "Payroll - engineering",
+    "payrollPartnershipsAndOperations": "Payroll - partnerships and operations",
+    "payrollCompliance": "Payroll - compliance",
+    "payrollGeneralAndAdmin": "Payroll - general and admin",
+    "officeCairo": "Office (Cairo)",
+    "softwareAndTools": "Software and tools",
+    "shariahBoardRetainer": "Shariah board retainer",
+    "professionalFees": "Professional fees",
+    "travelNewMarkets": "Travel (new markets)",
+    "insurance": "Insurance",
+    "marketing": "Marketing",
+    "other": "Other"
+  },
+  "kpiDefinitions": [
+    {
+      "key": "bankPartnersLive",
+      "label": "Bank partners live",
+      "unit": "count",
+      "seedCode": "bank_partners_live"
+    },
+    {
+      "key": "originatedMonthEgpM",
+      "label": "Originated in month (EGP millions)",
+      "unit": "count",
+      "seedCode": "originated_month_egp_m"
+    },
+    {
+      "key": "originatedCumulativeEgpM",
+      "label": "Originated, cumulative (EGP millions)",
+      "unit": "count",
+      "seedCode": "originated_cumulative_egp_m"
+    },
+    {
+      "key": "nplPercent",
+      "label": "Non-performing rate, 90+ days (%)",
+      "unit": "percent",
+      "seedCode": "npl_pct"
+    },
+    {
+      "key": "feeRevenueMonth",
+      "label": "Origination fee revenue in month (EGP)",
+      "unit": "money",
+      "seedCode": "fee_revenue_month"
+    }
+  ],
+  "actuals": [
+    {
+      "month": "2025-10",
+      "revenue": {
+        "lines": {
+          "originationFees": 392000,
+          "productSetupFees": 0
+        },
+        "total": 392000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 28000,
+          "collectionAndPaymentCosts": 26600
+        },
+        "total": 124600
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 960000,
+          "payrollPartnershipsAndOperations": 380000,
+          "payrollCompliance": 300000,
+          "payrollGeneralAndAdmin": 240000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 2900000
+      },
+      "grossProfit": 267400,
+      "netResult": -2632600,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 62100750,
+        "receipts": 364000,
+        "fundingReceived": 0,
+        "payments": 3024600,
+        "closing": 59440150
+      },
+      "receivablesClosing": 392000,
+      "netBurn": 2660600,
+      "runwayMonths": 22.3,
+      "headcount": {
+        "engineering": 8,
+        "partnershipsAndOperations": 4,
+        "compliance": 3,
+        "generalAndAdmin": 3,
+        "total": 18
+      },
+      "kpis": {
+        "bankPartnersLive": 1,
+        "originatedMonthEgpM": 28,
+        "originatedCumulativeEgpM": 61,
+        "nplPercent": 0.6,
+        "feeRevenueMonth": 392000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 28,
+          "MZ-B02": 0,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2025-11",
+      "revenue": {
+        "lines": {
+          "originationFees": 434000,
+          "productSetupFees": 0
+        },
+        "total": 434000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 31000,
+          "collectionAndPaymentCosts": 29450
+        },
+        "total": 130450
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 960000,
+          "payrollPartnershipsAndOperations": 380000,
+          "payrollCompliance": 300000,
+          "payrollGeneralAndAdmin": 240000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 2900000
+      },
+      "grossProfit": 303550,
+      "netResult": -2596450,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 59440150,
+        "receipts": 392000,
+        "fundingReceived": 0,
+        "payments": 3030450,
+        "closing": 56801700
+      },
+      "receivablesClosing": 434000,
+      "netBurn": 2638450,
+      "runwayMonths": 21.5,
+      "headcount": {
+        "engineering": 8,
+        "partnershipsAndOperations": 4,
+        "compliance": 3,
+        "generalAndAdmin": 3,
+        "total": 18
+      },
+      "kpis": {
+        "bankPartnersLive": 1,
+        "originatedMonthEgpM": 31,
+        "originatedCumulativeEgpM": 92,
+        "nplPercent": 0.6,
+        "feeRevenueMonth": 434000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 31,
+          "MZ-B02": 0,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2025-12",
+      "revenue": {
+        "lines": {
+          "originationFees": 476000,
+          "productSetupFees": 0
+        },
+        "total": 476000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 34000,
+          "collectionAndPaymentCosts": 32300
+        },
+        "total": 136300
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 960000,
+          "payrollPartnershipsAndOperations": 380000,
+          "payrollCompliance": 300000,
+          "payrollGeneralAndAdmin": 240000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 2900000
+      },
+      "grossProfit": 339700,
+      "netResult": -2560300,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 56801700,
+        "receipts": 434000,
+        "fundingReceived": 0,
+        "payments": 3036300,
+        "closing": 54199400
+      },
+      "receivablesClosing": 476000,
+      "netBurn": 2602300,
+      "runwayMonths": 20.8,
+      "headcount": {
+        "engineering": 8,
+        "partnershipsAndOperations": 4,
+        "compliance": 3,
+        "generalAndAdmin": 3,
+        "total": 18
+      },
+      "kpis": {
+        "bankPartnersLive": 1,
+        "originatedMonthEgpM": 34,
+        "originatedCumulativeEgpM": 126,
+        "nplPercent": 0.7,
+        "feeRevenueMonth": 476000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 34,
+          "MZ-B02": 0,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-01",
+      "revenue": {
+        "lines": {
+          "originationFees": 532000,
+          "productSetupFees": 0
+        },
+        "total": 532000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 38000,
+          "collectionAndPaymentCosts": 36100
+        },
+        "total": 144100
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1080000,
+          "payrollPartnershipsAndOperations": 380000,
+          "payrollCompliance": 300000,
+          "payrollGeneralAndAdmin": 240000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3020000
+      },
+      "grossProfit": 387900,
+      "netResult": -2632100,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 54199400,
+        "receipts": 476000,
+        "fundingReceived": 0,
+        "payments": 3164100,
+        "closing": 51511300
+      },
+      "receivablesClosing": 532000,
+      "netBurn": 2688100,
+      "runwayMonths": 19.2,
+      "headcount": {
+        "engineering": 9,
+        "partnershipsAndOperations": 4,
+        "compliance": 3,
+        "generalAndAdmin": 3,
+        "total": 19
+      },
+      "kpis": {
+        "bankPartnersLive": 1,
+        "originatedMonthEgpM": 38,
+        "originatedCumulativeEgpM": 164,
+        "nplPercent": 0.7,
+        "feeRevenueMonth": 532000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 38,
+          "MZ-B02": 0,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-02",
+      "revenue": {
+        "lines": {
+          "originationFees": 574000,
+          "productSetupFees": 250000
+        },
+        "total": 824000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 41000,
+          "collectionAndPaymentCosts": 38950
+        },
+        "total": 149950
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1080000,
+          "payrollPartnershipsAndOperations": 380000,
+          "payrollCompliance": 300000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3100000
+      },
+      "grossProfit": 674050,
+      "netResult": -2425950,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 51511300,
+        "receipts": 532000,
+        "fundingReceived": 0,
+        "payments": 3249950,
+        "closing": 48793350
+      },
+      "receivablesClosing": 824000,
+      "netBurn": 2717950,
+      "runwayMonths": 18,
+      "headcount": {
+        "engineering": 9,
+        "partnershipsAndOperations": 4,
+        "compliance": 3,
+        "generalAndAdmin": 4,
+        "total": 20
+      },
+      "kpis": {
+        "bankPartnersLive": 2,
+        "originatedMonthEgpM": 41,
+        "originatedCumulativeEgpM": 205,
+        "nplPercent": 0.8,
+        "feeRevenueMonth": 574000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 35,
+          "MZ-B02": 6,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-03",
+      "revenue": {
+        "lines": {
+          "originationFees": 644000,
+          "productSetupFees": 0
+        },
+        "total": 644000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 46000,
+          "collectionAndPaymentCosts": 43700
+        },
+        "total": 159700
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1080000,
+          "payrollPartnershipsAndOperations": 380000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3200000
+      },
+      "grossProfit": 484300,
+      "netResult": -2715700,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 48793350,
+        "receipts": 824000,
+        "fundingReceived": 0,
+        "payments": 3359700,
+        "closing": 46257650
+      },
+      "receivablesClosing": 644000,
+      "netBurn": 2535700,
+      "runwayMonths": 18.2,
+      "headcount": {
+        "engineering": 9,
+        "partnershipsAndOperations": 4,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 21
+      },
+      "kpis": {
+        "bankPartnersLive": 2,
+        "originatedMonthEgpM": 46,
+        "originatedCumulativeEgpM": 251,
+        "nplPercent": 0.8,
+        "feeRevenueMonth": 644000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 37,
+          "MZ-B02": 9,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-04",
+      "revenue": {
+        "lines": {
+          "originationFees": 700000,
+          "productSetupFees": 0
+        },
+        "total": 700000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 50000,
+          "collectionAndPaymentCosts": 47500
+        },
+        "total": 167500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1200000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3415000
+      },
+      "grossProfit": 532500,
+      "netResult": -2882500,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 46257650,
+        "receipts": 644000,
+        "fundingReceived": 0,
+        "payments": 3582500,
+        "closing": 43319150
+      },
+      "receivablesClosing": 700000,
+      "netBurn": 2938500,
+      "runwayMonths": 14.7,
+      "headcount": {
+        "engineering": 10,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 23
+      },
+      "kpis": {
+        "bankPartnersLive": 2,
+        "originatedMonthEgpM": 50,
+        "originatedCumulativeEgpM": 301,
+        "nplPercent": 0.8,
+        "feeRevenueMonth": 700000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 39,
+          "MZ-B02": 11,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-05",
+      "revenue": {
+        "lines": {
+          "originationFees": 770000,
+          "productSetupFees": 0
+        },
+        "total": 770000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 55000,
+          "collectionAndPaymentCosts": 52250
+        },
+        "total": 177250
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1200000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3415000
+      },
+      "grossProfit": 592750,
+      "netResult": -2822250,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 43319150,
+        "receipts": 700000,
+        "fundingReceived": 0,
+        "payments": 3592250,
+        "closing": 40426900
+      },
+      "receivablesClosing": 770000,
+      "netBurn": 2892250,
+      "runwayMonths": 14,
+      "headcount": {
+        "engineering": 10,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 23
+      },
+      "kpis": {
+        "bankPartnersLive": 2,
+        "originatedMonthEgpM": 55,
+        "originatedCumulativeEgpM": 356,
+        "nplPercent": 0.8,
+        "feeRevenueMonth": 770000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 42,
+          "MZ-B02": 13,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-06",
+      "revenue": {
+        "lines": {
+          "originationFees": 854000,
+          "productSetupFees": 0
+        },
+        "total": 854000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 61000,
+          "collectionAndPaymentCosts": 57950
+        },
+        "total": 188950
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1200000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 90000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3415000
+      },
+      "grossProfit": 665050,
+      "netResult": -2749950,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 40426900,
+        "receipts": 770000,
+        "fundingReceived": 0,
+        "payments": 3603950,
+        "closing": 37592950
+      },
+      "receivablesClosing": 854000,
+      "netBurn": 2833950,
+      "runwayMonths": 13.3,
+      "headcount": {
+        "engineering": 10,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 23
+      },
+      "kpis": {
+        "bankPartnersLive": 2,
+        "originatedMonthEgpM": 61,
+        "originatedCumulativeEgpM": 417,
+        "nplPercent": 0.9,
+        "feeRevenueMonth": 854000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 46,
+          "MZ-B02": 15,
+          "MZ-B03": 0
+        }
+      }
+    },
+    {
+      "month": "2026-07",
+      "revenue": {
+        "lines": {
+          "originationFees": 938000,
+          "productSetupFees": 250000
+        },
+        "total": 1188000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 67000,
+          "collectionAndPaymentCosts": 63650
+        },
+        "total": 200650
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1320000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 160000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3605000
+      },
+      "grossProfit": 987350,
+      "netResult": -2617650,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 37592950,
+        "receipts": 854000,
+        "fundingReceived": 0,
+        "payments": 3805650,
+        "closing": 34641300
+      },
+      "receivablesClosing": 1188000,
+      "netBurn": 2951650,
+      "runwayMonths": 11.7,
+      "headcount": {
+        "engineering": 11,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 24
+      },
+      "kpis": {
+        "bankPartnersLive": 3,
+        "originatedMonthEgpM": 67,
+        "originatedCumulativeEgpM": 484,
+        "nplPercent": 0.9,
+        "feeRevenueMonth": 938000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 47,
+          "MZ-B02": 17,
+          "MZ-B03": 3
+        }
+      }
+    },
+    {
+      "month": "2026-08",
+      "revenue": {
+        "lines": {
+          "originationFees": 1036000,
+          "productSetupFees": 0
+        },
+        "total": 1036000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 74000,
+          "collectionAndPaymentCosts": 70300
+        },
+        "total": 214300
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1320000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 160000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 3605000
+      },
+      "grossProfit": 821700,
+      "netResult": -2783300,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 34641300,
+        "receipts": 1188000,
+        "fundingReceived": 0,
+        "payments": 3819300,
+        "closing": 32010000
+      },
+      "receivablesClosing": 1036000,
+      "netBurn": 2631300,
+      "runwayMonths": 12.2,
+      "headcount": {
+        "engineering": 11,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 24
+      },
+      "kpis": {
+        "bankPartnersLive": 3,
+        "originatedMonthEgpM": 74,
+        "originatedCumulativeEgpM": 558,
+        "nplPercent": 0.9,
+        "feeRevenueMonth": 1036000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 49,
+          "MZ-B02": 19,
+          "MZ-B03": 6
+        }
+      }
+    },
+    {
+      "month": "2026-09",
+      "revenue": {
+        "lines": {
+          "originationFees": 1148000,
+          "productSetupFees": 0
+        },
+        "total": 1148000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 82000,
+          "collectionAndPaymentCosts": 77900
+        },
+        "total": 229900
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1320000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 200000,
+          "travelNewMarkets": 160000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 261100
+        },
+        "total": 3716100
+      },
+      "grossProfit": 918100,
+      "netResult": -2798000,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 32010000,
+        "receipts": 1036000,
+        "fundingReceived": 0,
+        "payments": 3946000,
+        "closing": 29100000
+      },
+      "receivablesClosing": 1148000,
+      "netBurn": 2910000,
+      "runwayMonths": 10,
+      "headcount": {
+        "engineering": 11,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 24
+      },
+      "kpis": {
+        "bankPartnersLive": 3,
+        "originatedMonthEgpM": 82,
+        "originatedCumulativeEgpM": 640,
+        "nplPercent": 0.9,
+        "feeRevenueMonth": 1148000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 52,
+          "MZ-B02": 21,
+          "MZ-B03": 9
+        }
+      }
+    },
+    {
+      "month": "2026-10",
+      "revenue": {
+        "lines": {
+          "originationFees": 1260000,
+          "productSetupFees": 0
+        },
+        "total": 1260000
+      },
+      "cogs": {
+        "lines": {
+          "cloudHostingEgypt": 70000,
+          "shariahCaseReviews": 90000,
+          "collectionAndPaymentCosts": 85500
+        },
+        "total": 245500
+      },
+      "opex": {
+        "lines": {
+          "payrollEngineering": 1320000,
+          "payrollPartnershipsAndOperations": 475000,
+          "payrollCompliance": 400000,
+          "payrollGeneralAndAdmin": 320000,
+          "officeCairo": 180000,
+          "softwareAndTools": 120000,
+          "shariahBoardRetainer": 150000,
+          "professionalFees": 880000,
+          "travelNewMarkets": 160000,
+          "insurance": 40000,
+          "marketing": 90000,
+          "other": 150000
+        },
+        "total": 4285000
+      },
+      "grossProfit": 1014500,
+      "netResult": -3270500,
+      "depreciation": 0,
+      "capex": 0,
+      "cash": {
+        "opening": 29100000,
+        "receipts": 1148000,
+        "fundingReceived": 0,
+        "payments": 4530500,
+        "closing": 25717500
+      },
+      "receivablesClosing": 1260000,
+      "netBurn": 3382500,
+      "runwayMonths": 7.6,
+      "headcount": {
+        "engineering": 11,
+        "partnershipsAndOperations": 5,
+        "compliance": 4,
+        "generalAndAdmin": 4,
+        "total": 24
+      },
+      "kpis": {
+        "bankPartnersLive": 3,
+        "originatedMonthEgpM": 90,
+        "originatedCumulativeEgpM": 730,
+        "nplPercent": 0.9,
+        "feeRevenueMonth": 1260000,
+        "originatedByPartnerEgpM": {
+          "MZ-B01": 55,
+          "MZ-B02": 23,
+          "MZ-B03": 12
+        }
+      }
+    }
+  ],
+  "contracts": [
+    {
+      "id": "MZ-B01",
+      "label": "Bank partner 01",
+      "segment": "Egyptian commercial bank (SME division)",
+      "status": "LIVE",
+      "signedOn": "2024-05-12",
+      "startOn": "2024-06-01",
+      "termMonths": 36,
+      "products": "Murabaha and ijara SME financing",
+      "feePercent": 1.4
+    },
+    {
+      "id": "MZ-B02",
+      "label": "Bank partner 02",
+      "segment": "Egyptian Islamic bank",
+      "status": "LIVE",
+      "signedOn": "2025-12-08",
+      "startOn": "2026-02-01",
+      "termMonths": 36,
+      "products": "Murabaha working-capital financing",
+      "feePercent": 1.4
+    },
+    {
+      "id": "MZ-B03",
+      "label": "Bank partner 03",
+      "segment": "Egyptian private bank",
+      "status": "LIVE",
+      "signedOn": "2026-05-19",
+      "startOn": "2026-07-01",
+      "termMonths": 24,
+      "products": "Ijara equipment financing",
+      "feePercent": 1.4
+    }
+  ],
+  "contractNotes": [
+    "Each bank makes every credit decision and holds every financing on its own balance sheet; Mizan provides structuring, the Shariah review workflow, documents and repayment collection. Data is hosted in Egypt in line with Central Bank of Egypt rules.",
+    "Each launch of a new product with a partner carries a one-off set-up fee of EGP 250,000 (Bank partner 02 in February 2026, Bank partner 03 in July 2026)."
+  ],
+  "team": {
+    "founders": [
+      {
+        "name": "Youssef Kamal",
+        "title": "Co-founder & CEO"
+      },
+      {
+        "name": "Nour El-Sayed",
+        "title": "Co-founder & CTO"
+      }
+    ],
+    "keyPeople": [
+      {
+        "name": "Omar Farouk",
+        "title": "Head of Bank Partnerships"
+      },
+      {
+        "name": "Mariam Hassan",
+        "title": "Head of Compliance and Shariah Governance"
+      }
+    ]
+  },
+  "capTable": {
+    "asOf": "2026-09-30",
+    "basis": "Fully diluted, with the SAFEs shown as converted.",
+    "holders": [
+      {
+        "name": "Youssef Kamal",
+        "class": "Ordinary",
+        "shares": 4200000
+      },
+      {
+        "name": "Nour El-Sayed",
+        "class": "Ordinary",
+        "shares": 2600000
+      },
+      {
+        "name": "Zamalek Angels",
+        "class": "Preferred (as converted)",
+        "shares": 1200000
+      },
+      {
+        "name": "Employee option pool",
+        "class": "Options",
+        "shares": 1000000
+      },
+      {
+        "name": "Nile Delta Ventures",
+        "class": "Preferred (as converted)",
+        "shares": 600000
+      },
+      {
+        "name": "Gulf family-office angel A",
+        "class": "Preferred (as converted)",
+        "shares": 200000
+      },
+      {
+        "name": "Gulf family-office angel B",
+        "class": "Preferred (as converted)",
+        "shares": 200000
+      }
+    ]
+  },
+  "funding": [
+    {
+      "receivedOn": "2023-07-19",
+      "round": "Pre-seed",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 750000,
+      "investors": "Zamalek Angels"
+    },
+    {
+      "receivedOn": "2025-03-24",
+      "round": "Bridge",
+      "instrument": "SAFE (post-money)",
+      "currency": "USD",
+      "amount": 1600000,
+      "investors": "Nile Delta Ventures and two Gulf family-office angels"
+    }
+  ],
+  "raise": {
+    "currency": "USD",
+    "targetAmount": 4000000,
+    "instrument": "Priced equity",
+    "preMoneyValuation": 16000000,
+    "minimumCheque": 100000,
+    "targetCloseOn": "2027-02-05",
+    "useOfFunds": [
+      {
+        "line": "Launch in Morocco and Saudi Arabia",
+        "percent": 40,
+        "amount": 1600000
+      },
+      {
+        "line": "Engineering: API, structuring engine and repayments",
+        "percent": 25,
+        "amount": 1000000
+      },
+      {
+        "line": "New bank and fintech partners in Egypt",
+        "percent": 20,
+        "amount": 800000
+      },
+      {
+        "line": "Shariah governance, compliance and licensing",
+        "percent": 15,
+        "amount": 600000
+      }
+    ],
+    "plannedMonthlyNetBurnPostRaise": 160000,
+    "runwayMonthsPostRaise": 28.8
+  },
+  "deckStatedFigures": {
+    "source": "Mizan seed deck (Oct 2026)",
+    "cash": 600000,
+    "cashAsOf": "2026-09-30",
+    "monthlyNetBurn": 60000,
+    "runwayMonths": 10,
+    "currency": "USD",
+    "grossMarginPercent": 80,
+    "headcount": 24
+  },
+  "knownDiscrepancies": [
+    {
+      "id": "burn-and-runway",
+      "deliberate": true,
+      "title": "Burn and runway: deck USD 60,000 and 10 months against October's accounts",
+      "deck": "net burn about USD 60,000 a month; runway 10 months (30 Sep 2026)",
+      "accounts": "7.6",
+      "derivation": {
+        "kind": "runway",
+        "month": "2026-10"
+      },
+      "note": "The deck's net burn of about USD 60,000 a month and 10 months of runway are September 2026 figures. October 2026 carried Moroccan counsel, Saudi licensing advisers and the annual Shariah audit fee (EGP 680,000 above the usual professional fees), so runway at October's net burn is 7.6 months.",
+      "evidence": [
+        {
+          "documentId": "mz-management-accounts",
+          "text": "The deck's net burn of about USD 60,000 a month and 10 months of runway"
+        },
+        {
+          "documentId": "mz-raise-terms",
+          "text": "The deck's net burn of about USD 60,000 a month and 10 months of runway"
+        }
+      ]
+    }
+  ],
+  "sharingPlan": {
+    "investor": null,
+    "note": "No fictional investor is in diligence with Mizan; nothing is planned for sharing until the owner decides."
+  },
+  "documents": [
+    "management-accounts",
+    "revenue-breakdown",
+    "customer-contracts",
+    "cap-table",
+    "raise-terms",
+    "kpi-pack"
+  ],
+  "assumptions": [
+    {
+      "field": "actuals.costLines",
+      "value": "cost of revenue and operating cost lines, Oct 2025 to Oct 2026",
+      "note": "Built to reproduce the deck's September cash (USD 600,000), burn (USD 60,000) and 80% gross margin."
+    },
+    {
+      "field": "actuals.october2026",
+      "value": "EGP 90m originated in October 2026",
+      "note": "The seed ends at September 2026."
+    },
+    {
+      "field": "actuals.oddMonths",
+      "value": "Nov 2025, Jan, Mar and May 2026",
+      "note": "Interpolated from the seeded cumulative originations, which they reproduce exactly."
+    },
+    {
+      "field": "kpis.originatedByPartner",
+      "value": "split across three bank partners",
+      "note": "The seed gives totals only."
+    },
+    {
+      "field": "revenue.productSetupFees",
+      "value": "EGP 250,000 per product launch",
+      "note": "The deck names a set-up fee without an amount."
+    },
+    {
+      "field": "fx.usd",
+      "value": "EGP 48.50 per USD",
+      "note": "Management rate for the deck's USD figures."
+    },
+    {
+      "field": "funding.bridge",
+      "value": "USD 1,600,000, Mar 2025",
+      "note": "Forced reconciliation: the seeded USD 750,000 pre-seed cannot fund three years of costs; Nile Delta Ventures and the Gulf angels are seeded investors with no recorded round."
+    },
+    {
+      "field": "capTable.shares",
+      "value": "10,000,000 fully diluted; remaining 4% split between two angels",
+      "note": "The seed records percentages only."
+    },
+    {
+      "field": "contracts.bankPartner02And03",
+      "value": "go-live February and July 2026",
+      "note": "Dated from the seeded partner counts (2 from February, 3 from July)."
+    },
+    {
+      "field": "openingReceivable",
+      "value": "EGP 364,000 of September 2025 fees (EGP 26m originated)",
+      "note": "September 2025 is before the seeded series."
+    },
+    {
+      "field": "bank",
+      "value": "Delta Meridian Bank",
+      "note": "Fictitious bank."
+    }
+  ]
+}

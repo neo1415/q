@@ -1,7 +1,9 @@
 // Phase 5 of the owner directive of 16 Nov 2026
 // (docs/ai-handoff/directives/2026-11-16-demo-evidence-data-room-seeding.md):
 // upload the synthetic evidence pack for Tensorgate (`tg-*`), Halyard
-// Security (`hs-*`) and Nixo (`nx-*`) through the product's normal founder
+// Security (`hs-*`) and Nixo (`nx-*`), and the compact packs for MedTrail
+// (`mt-*`), Mizan (`mz-*`), Ajopot (`aj-*`), Watchly (`wl-*`) and Maji Loop
+// (`ml-*`), through the product's normal founder
 // document API, as each company's own founder, and verify ingestion.
 //
 // Nixo (decision 99, 2026-11-16): the owner confirmed the Nixo founder
@@ -27,8 +29,8 @@
 // on sharing.
 //
 //   node scripts/seed/evidence/generate.mjs              # build out/ first
-//   node scripts/seed/evidence/upload.mjs upload [tensorgate|halyard|nixo]
-//   node scripts/seed/evidence/upload.mjs verify [tensorgate|halyard|nixo]
+//   node scripts/seed/evidence/upload.mjs upload [<company key>]
+//   node scripts/seed/evidence/upload.mjs verify [<company key>]
 //   node scripts/seed/evidence/upload.mjs negative       # investor cannot see them
 //
 // Environment (names only; never printed): SUPABASE_ACCESS_TOKEN (read-only
@@ -50,7 +52,8 @@
 // Tensorgate and Halyard none is a PITCH_DECK or COMPANY_PROFILE, so no model
 // call is expected. Nixo's pack includes a generated PITCH_DECK
 // (`nx-pitch-deck`), so its upload triggers deck reading, about 4 model calls,
-// which the owner approved (decision 99, paid calls). `verify` reports
+// which the owner approved (decision 99, paid calls). The compact packs hold
+// no PITCH_DECK or COMPANY_PROFILE, so they too expect zero model calls. `verify` reports
 // ai_ops.model_usage rows for the founders' tenants since the upload began,
 // so any call is visible.
 //
@@ -69,6 +72,33 @@ const COMPANIES = {
     name: "Nixo",
     slug: "nixo",
     id: "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+  },
+  // Compact packs (compact.mjs, 17 Nov 2026): fictional companies with
+  // marked founders; the marker check applies unchanged.
+  medtrail: {
+    name: "MedTrail",
+    slug: "medtrail",
+    id: "b5280fd1-c2ee-4824-8658-09529453f7be",
+  },
+  mizan: {
+    name: "Mizan",
+    slug: "mizan",
+    id: "d9c03bb4-fa9b-4c55-8924-038d386cc8a8",
+  },
+  ajopot: {
+    name: "Ajopot",
+    slug: "ajopot",
+    id: "91de2a77-fe47-4af0-8534-d9abf9c55949",
+  },
+  watchly: {
+    name: "Watchly",
+    slug: "watchly",
+    id: "526c2d72-9142-4e48-b106-ee4910f19318",
+  },
+  "maji-loop": {
+    name: "Maji Loop",
+    slug: "maji-loop",
+    id: "01c554bf-8bf1-4eb7-b460-5d841764c40b",
   },
 };
 

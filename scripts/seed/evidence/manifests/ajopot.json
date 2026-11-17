@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "company": "Ajopot",
+  "companyKey": "ajopot",
+  "fixture": "scripts/seed/evidence/fixtures/ajopot.json",
+  "synthetic": true,
+  "pack": "compact",
+  "companyId": "91de2a77-fe47-4af0-8534-d9abf9c55949",
+  "seedSource": "recorded-profile",
+  "inventedFields": [
+    "actuals",
+    "kpis.monthsBetweenDeckPoints",
+    "kpis.contributingMembers",
+    "kpis.contributions",
+    "kpis.missedContributionPercent",
+    "kpis.blendedCac",
+    "funding",
+    "capTable",
+    "raise.valuationCap",
+    "raise.minimumCheque",
+    "raise.targetCloseOn",
+    "raise.useOfFunds",
+    "headcount",
+    "bank"
+  ],
+  "sensitivityRule": "packages/evidence/src/domain/sensitivity.ts defaultDocumentSensitivity: FINANCIAL, MANAGEMENT_ACCOUNTS and FINANCIAL_MODEL are HIGHLY_CONFIDENTIAL; every other type is CONFIDENTIAL.",
+  "qReadRule": "HIGHLY_CONFIDENTIAL documents are held back from an investor's Q (packages/q-tools/src/tools/own-records.ts heldBackFromQ) even when shared; the founder's own Q may read them (decision 100).",
+  "plannedInvestor": "Savanna Seed Partners",
+  "plannedInvestorNote": "Savanna Seed Partners is in diligence with Ajopot (relationship IN_DILIGENCE); a share would go through the data-room approval or diligence-share workflow once the owner decides.",
+  "documents": [
+    {
+      "id": "aj-management-accounts",
+      "fileName": "aj-management-accounts.pdf",
+      "mimeType": "application/pdf",
+      "title": "Management accounts, Sep 2025 to Oct 2026",
+      "documentType": "MANAGEMENT_ACCOUNTS",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-09",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "management_accounts",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "aj-revenue-breakdown",
+      "fileName": "aj-revenue-breakdown.pdf",
+      "mimeType": "application/pdf",
+      "title": "Monthly revenue build",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-09",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": "revenue_by_customer",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "aj-payout-ledger",
+      "fileName": "aj-payout-ledger.csv",
+      "mimeType": "text/csv",
+      "title": "Monthly payouts and fee ledger",
+      "documentType": "FINANCIAL",
+      "defaultSensitivity": "HIGHLY_CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": false,
+      "period": {
+        "from": "2025-09",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "financials",
+      "checklistItem": null,
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": null,
+      "plannedGrant": null
+    },
+    {
+      "id": "aj-cap-table",
+      "fileName": "aj-cap-table.pdf",
+      "mimeType": "application/pdf",
+      "title": "Capitalisation table and ownership",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-10",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "cap_table",
+      "checklistItem": "cap_table_full",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "aj-raise-terms",
+      "fileName": "aj-raise-terms.pdf",
+      "mimeType": "application/pdf",
+      "title": "Seed round terms and use of funds",
+      "documentType": "CORPORATE",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2026-11",
+        "to": "2027-03"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "use_of_funds",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    },
+    {
+      "id": "aj-kpi-pack",
+      "fileName": "aj-kpi-pack.pdf",
+      "mimeType": "application/pdf",
+      "title": "KPI and operating metrics pack",
+      "documentType": "OPERATIONAL",
+      "defaultSensitivity": "CONFIDENTIAL",
+      "readableByInvestorQUnderCurrentRules": true,
+      "period": {
+        "from": "2025-09",
+        "to": "2026-10"
+      },
+      "issuedOn": "2026-11-14",
+      "version": "1.0",
+      "dataRoomFolder": "fundraising",
+      "checklistItem": "key_metrics",
+      "intendedDataRoomLevel": "PRIVATE",
+      "intendedVisibilityScope": "organisation_private",
+      "plannedShareWith": "Savanna Seed Partners",
+      "plannedGrant": "relationship_shared view grant with an expiry, through the data-room approval or diligence-share workflow"
+    }
+  ]
+}

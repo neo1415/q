@@ -1,6 +1,7 @@
-// Writes the synthetic evidence files for Tensorgate and Halyard Security
-// into scripts/seed/evidence/out/<company>/ (gitignored), and checks or
-// rewrites the committed manifests.
+// Writes the synthetic evidence files for the three showcase companies
+// (Tensorgate, Halyard Security, Nixo) and the five compact packs (MedTrail,
+// Mizan, Ajopot, Watchly, Maji Loop) into scripts/seed/evidence/out/<company>/
+// (gitignored), and checks or rewrites the committed manifests.
 //
 //   node scripts/seed/evidence/generate.mjs                 write files, check manifests
 //   node scripts/seed/evidence/generate.mjs --write-manifest  also rewrite manifests
@@ -16,6 +17,11 @@ import {
   loadFixture,
   MANIFEST_DIR,
 } from "./documents.mjs";
+import {
+  buildCompactManifest,
+  COMPACT_KEYS,
+  loadCompactFixture,
+} from "./compact.mjs";
 import { loadPdfLib, renderCompany } from "./render.mjs";
 
 const OUT = new URL("./out/", import.meta.url).pathname;
@@ -23,14 +29,25 @@ const writeManifest = process.argv.includes("--write-manifest");
 const pdfLib = await loadPdfLib();
 let stale = 0;
 
-for (const key of FIXTURE_KEYS) {
-  const fx = loadFixture(key);
+const packs = [
+  ...FIXTURE_KEYS.map((key) => ({
+    key,
+    fx: loadFixture(key),
+    build: buildManifest,
+  })),
+  ...COMPACT_KEYS.map((key) => ({
+    key,
+    fx: loadCompactFixture(key),
+    build: buildCompactManifest,
+  })),
+];
+for (const { key, fx, build } of packs) {
   const { docs, files } = await renderCompany(fx, pdfLib);
   const dir = join(OUT, key);
   mkdirSync(dir, { recursive: true });
   for (const { doc, bytes } of files)
     writeFileSync(join(dir, doc.fileName), bytes);
-  const manifest = `${JSON.stringify(buildManifest(fx, docs), null, 2)}\n`;
+  const manifest = `${JSON.stringify(build(fx, docs), null, 2)}\n`;
   writeFileSync(join(dir, "manifest.json"), manifest);
   const committed = join(MANIFEST_DIR, `${key}.json`);
   if (writeManifest) {
