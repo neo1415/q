@@ -351,3 +351,12 @@ Read-only SQL afterwards:
 - every document the run read counts as a source and gets the rows fact before the model answers;
 - binding works on page-read layouts;
 - an unambiguous contradicted count is corrected, not dropped.
+
+## Check on `4d7b9f23c` (17 Nov, 06:33 UTC): hiring plan PASS at source
+
+Thames Arc, conversation `c5147662`. Screenshots: `evidence/2026-11-17-check-4d7b9f23c/`.
+
+- "What does Halyard Security plan to hire in 2027, role by role?": "15 hires … 3 public-sector account managers and 1 information security and assurance manager in Q1; 6 deployment engineers and 4 product engineers in Q2; and 1 finance and operations manager in Q3." Claim check: examined 5, bound 5, contradicted 0, dropped 0.
+- "And how many start in the first quarter?": "Four … three public-sector account managers and one information security and assurance manager." Examined 2, bound 2, contradicted 0.
+
+With the document rows in front of the model, it now writes the right counts itself. Nothing needed correcting or dropping.
