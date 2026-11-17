@@ -10266,6 +10266,15 @@ export function createSpecialistQAnswer(
       read.question.listConditions !== undefined
         ? { listConditions: { ...read.question.listConditions } }
         : {}),
+      // v91 (owner live 17 Nov 2026): whether this list ask refines the
+      // list just shown (its conditions carry) or asks for a new one.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      (read.question?.kind === "FIT" ||
+        read.question?.kind === "DISCOVER_COMPANIES" ||
+        read.question?.kind === "INVESTOR_PROSPECTS") &&
+      typeof read.question.refinesShownList === "boolean"
+        ? { listRefinesShown: read.question.refinesShownList }
+        : {}),
       // v62: a comparison as the reader understood it (never recall: the
       // reader drops fromShown when compare is set), so the answer builds
       // the comparison table whatever words asked for it.

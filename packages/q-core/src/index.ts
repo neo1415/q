@@ -605,6 +605,11 @@ export {
   type TurnQuestionV90,
   TurnReaderV90ResultSchema,
   type TurnReaderV90Result,
+  TURN_READER_V91_SCHEMA_VERSION,
+  TurnQuestionV91Schema,
+  type TurnQuestionV91,
+  TurnReaderV91ResultSchema,
+  type TurnReaderV91Result,
   TURN_READER_V89_SCHEMA_VERSION,
   TurnListConditionsV89Schema,
   type TurnListConditionsV89,
@@ -2310,6 +2315,10 @@ export {
   TURN_READER_V90,
   V90_FIT_REASONS,
 } from "./prompts/tasks/turn-reader.v90.js";
+export {
+  TURN_READER_V91,
+  V91_REFINES_SHOWN_LIST,
+} from "./prompts/tasks/turn-reader.v91.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

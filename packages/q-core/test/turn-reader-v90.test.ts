@@ -18,15 +18,14 @@ import {
  * answers from the fit profiles.
  */
 describe("TURN_READER v90", () => {
-  it("is active: v89 with one WHY THEY FIT paragraph after LIST CONDITIONS, on v90's schema", () => {
+  it("was active (v91 now): v89 with one WHY THEY FIT paragraph after LIST CONDITIONS, on v90's schema", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(90);
-    expect(active.status).toBe("ACTIVE");
+    const v90 = registry.get("TURN_READER", 90)?.definition;
+    expect(v90?.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 89)?.definition.status).toBe(
       "DEPRECATED",
     );
-    expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
+    expect(v90?.output.kind === "STRUCTURED" && v90.output.schema).toBe(
       TurnReaderV90ResultSchema,
     );
     expect(TURN_READER_V90.variables).toEqual(TURN_READER_V89.variables);

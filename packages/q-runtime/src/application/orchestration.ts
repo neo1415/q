@@ -538,6 +538,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly order: "BEST_FIRST" | "WORST_FIRST";
       }
     | undefined;
+  /**
+   * TURN_READER v91 (owner live 17 Nov 2026): true when this list ask
+   * narrows or trims the list Q just showed, so that list's conditions
+   * still hold; false when it asks for a new or separate list. Absent: not
+   * stated (code then reads `previous`).
+   */
+  readonly listRefinesShown?: boolean | undefined;
   readonly fitQuestion?:
     | {
         readonly text: string;

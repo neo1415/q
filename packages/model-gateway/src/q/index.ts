@@ -408,6 +408,7 @@ import {
 import {
   carriedListConditions,
   listConditionsOf,
+  refinesShownList,
   needsConditionedLane,
   hasAnyCondition,
   runConditionedCompanyList,
@@ -11519,14 +11520,17 @@ export function createModelGatewayQAnswer(
         request.fitQuestion !== undefined ||
         request.discoverCompanies !== undefined ||
         request.investorProspects !== undefined;
+      // Owner live 17 Nov 2026 (9995dcca): only a refinement of the list
+      // just shown keeps its conditions; a new list ("outside my sectors,
+      // keep them separate") starts from what it states (v91).
+      const conditionsCarried =
+        listAskThisTurn &&
+        carriedConditions?.side === listSide &&
+        refinesShownList(request);
       const listConditions = carriedListConditions(
         listConditionsOf(request),
-        listAskThisTurn && carriedConditions?.side === listSide
-          ? carriedConditions.conditions
-          : null,
+        conditionsCarried ? (carriedConditions?.conditions ?? null) : null,
       );
-      const conditionsCarried =
-        listAskThisTurn && carriedConditions?.side === listSide;
       const conditionedTurn =
         request.writingDocument !== true &&
         request.askedAction === undefined &&

@@ -1647,3 +1647,27 @@ export const TurnReaderV90ResultSchema = TurnReaderV89ResultSchema.extend({
   question: TurnQuestionV90Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV90Result = z.infer<typeof TurnReaderV90ResultSchema>;
+
+/**
+ * v91 (owner live 17 Nov 2026, conversation 9995dcca, Zino Aviation): a
+ * condition the person put on one list was carried into the next list they
+ * asked for. "Pre-revenue but unusually strong" (14:57) was applied again
+ * to "any promising opportunities outside my preferred sectors... keep them
+ * separate from my normal matches" (14:58), a new list, and again a turn
+ * later: code carried the conditions of the list just shown to every list
+ * ask. The reading now says, by meaning and in any language, whether this
+ * list ask refines the list Q just showed (`question.refinesShownList`):
+ * true for "leave out the ones we're in contact with", "only the
+ * pre-revenue ones", "and the weakest first?" right after a list; false for
+ * a new, different or separate list. Only a refinement keeps the earlier
+ * list's conditions. Lenient: a malformed value reads as not stated (null).
+ */
+export const TURN_READER_V91_SCHEMA_VERSION = 91;
+export const TurnQuestionV91Schema = TurnQuestionV90Schema.extend({
+  refinesShownList: z.boolean().nullable().default(null).catch(null),
+}).strict();
+export type TurnQuestionV91 = z.infer<typeof TurnQuestionV91Schema>;
+export const TurnReaderV91ResultSchema = TurnReaderV90ResultSchema.extend({
+  question: TurnQuestionV91Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV91Result = z.infer<typeof TurnReaderV91ResultSchema>;

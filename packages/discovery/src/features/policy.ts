@@ -639,8 +639,19 @@ function computeOne(
         (v) => !knownVocabularies.has(v),
       );
       if (unanswered) {
+        // Owner live 17 Nov 2026 (9995dcca): a company that declares its
+        // industry but no business model read "Sector not set" against a
+        // mandate naming both, so "outside my preferred sectors" called
+        // its sector unknown. The category stays unknown (the ranking is
+        // unchanged); how its own declared sector stands is kept beside it.
         return {
-          value: absent(d, "MISSING", "COMPANY_TAXONOMY_UNKNOWN", sources),
+          value: absent(
+            d,
+            "MISSING",
+            "COMPANY_TAXONOMY_UNKNOWN",
+            sources,
+            sectorOverlap,
+          ),
           scopeViolation: false,
         };
       }

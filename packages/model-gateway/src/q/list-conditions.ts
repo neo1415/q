@@ -75,6 +75,33 @@ export function carriedListConditions(
   };
 }
 
+/**
+ * Owner live 17 Nov 2026 (conversation 9995dcca, Zino Aviation): the
+ * earlier list's conditions carried into every list ask. "Pre-revenue"
+ * (14:57) was applied to "any promising opportunities outside my preferred
+ * sectors... keep them separate from my normal matches" (14:58), a NEW
+ * list, and again a turn later. A list's conditions carry only when the
+ * turn reader read this ask as refining the list just shown (TURN_READER
+ * v91 `refinesShownList`): "leave out the ones we're in contact with"
+ * right after a list trims that list, so its conditions hold; a new or
+ * separate list starts from only what it states. A reading that does not
+ * say (null, or an older reading) falls back to `previous` -- the reader
+ * read the ask as about the companies Q just showed -- and otherwise does
+ * not carry: an unstated condition is never assumed.
+ */
+export function refinesShownList(
+  request: Pick<
+    QAnswerRequest,
+    "listRefinesShown" | "fitQuestion" | "discoverCompanies"
+  >,
+): boolean {
+  if (request.listRefinesShown !== undefined) return request.listRefinesShown;
+  return (
+    request.fitQuestion?.previous === true ||
+    request.discoverCompanies?.previous === true
+  );
+}
+
 /** Any condition at all, the relationship exclusion included. */
 export function hasAnyCondition(conditions: ListConditions | null): boolean {
   return (
@@ -274,6 +301,64 @@ export function revenueStateOf(figuresData: unknown): RevenueState {
   return positive ? "HAS_REVENUE" : zero ? "PRE_REVENUE" : "UNKNOWN";
 }
 
+/** Deck labels that name revenue itself (a figure the company earns). */
+const DECK_REVENUE_LABEL = /\b(?:revenue|mrr|arr|sales|gmv)\b/iu;
+/**
+ * Deck labels that name a plan, a target, a scenario, a model or a ratio,
+ * not revenue earned: "ARR target", "2027 revenue plan", "Net revenue
+ * retention", "Revenue model", "Revenue source", "Blended revenue per".
+ */
+const DECK_NOT_REVENUE =
+  /target|plan|project|forecast|scenario|model|source|stream|retention|nrr|margin|growth|per\b|blended|potential|expected|goal|fy\s?\d|date/iu;
+/** A deck value that says there is no revenue yet, in the deck's words. */
+const DECK_PRE_REVENUE =
+  /\bpre[-\s]?revenue\b|\bno revenue\b|\bzero revenue\b|\bnot (?:yet )?(?:generating|earning|making) (?:any )?(?:revenue|money)\b/iu;
+/** A deck value that denies or withholds a figure. */
+const DECK_NEGATED = /\b(?:none|not|no|nil|zero|unknown|n\/a)\b/iu;
+/** A deck value that names a figure above zero ("£2.4m", "USD 46,800"). */
+const DECK_POSITIVE_FIGURE = /(?:^|[^\d.])0*[1-9][\d,]*(?:\.\d+)?/u;
+
+/**
+ * Whether the company has revenue, from the founder-confirmed reading of
+ * its deck as this reader's Pitch deck tab shows it (read_company_deck's
+ * output; unconfirmed sections reach an investor as unknown, with no
+ * facts). A traction or financials fact that names revenue with a figure
+ * above zero is revenue; one stated as pre-revenue is pre-revenue. "Not in
+ * the deck", "not yet reported", a target, a plan or a model is UNKNOWN,
+ * and so is a deck that says both (never resolved by picking one).
+ */
+export function revenueStateOfDeck(deckData: unknown): RevenueState {
+  const sections = (deckData as { sections?: unknown } | null)?.sections;
+  if (!Array.isArray(sections)) return "UNKNOWN";
+  let positive = false;
+  let zero = false;
+  for (const raw of sections as unknown[]) {
+    const section = raw as { section?: unknown; facts?: unknown };
+    if (section.section !== "TRACTION" && section.section !== "FINANCIALS")
+      continue;
+    if (!Array.isArray(section.facts)) continue;
+    for (const one of section.facts as unknown[]) {
+      const fact = one as {
+        label?: unknown;
+        value?: unknown;
+        truthClass?: unknown;
+      };
+      if (typeof fact.label !== "string" || typeof fact.value !== "string")
+        continue;
+      // Q's own derivation is not the company's statement.
+      if (fact.truthClass !== "USER_CLAIM") continue;
+      if (!DECK_REVENUE_LABEL.test(fact.label)) continue;
+      if (DECK_NOT_REVENUE.test(fact.label)) continue;
+      if (DECK_PRE_REVENUE.test(fact.value)) zero = true;
+      // "None reported in 2025" names a year, not revenue.
+      else if (DECK_NEGATED.test(fact.value)) continue;
+      else if (DECK_POSITIVE_FIGURE.test(fact.value)) positive = true;
+    }
+  }
+  if (positive && zero) return "UNKNOWN";
+  return positive ? "HAS_REVENUE" : zero ? "PRE_REVENUE" : "UNKNOWN";
+}
+
 // ---------------------------------------------------------------------
 // The investor lane: companies, judged on the investor's own fit.
 // ---------------------------------------------------------------------
@@ -440,7 +525,16 @@ const DIMENSION_WORDS: Readonly<Record<Dimension, string>> = {
   geography: "geography",
 };
 
-/** "For X and Y, whether they have revenue isn't on record, so I left them out." */
+/**
+ * "For X and Y, whether they have revenue isn't on record; for Z, its
+ * sector isn't on record against this, so I've left them out."
+ *
+ * Owner live 17 Nov 2026 (9995dcca): the dimensions of every item were
+ * pooled and said of the first six names ("For Abodely, Abodely Hub, ...,
+ * their revenue and sector aren't on record") when Abodely's sector was
+ * on record as outside the mandate and only its revenue was unknown. Each
+ * group of names is said with exactly the dimensions unknown for them.
+ */
 export function unknownLine(
   unknown: readonly {
     readonly name: string;
@@ -448,17 +542,37 @@ export function unknownLine(
   }[],
 ): string {
   if (unknown.length === 0) return "";
-  const dims = [...new Set(unknown.flatMap((one) => one.dimensions))].map(
-    (dimension) => DIMENSION_WORDS[dimension],
+  const groups = new Map<string, { dims: Dimension[]; names: string[] }>();
+  for (const one of unknown) {
+    const dims = DIMENSIONS.filter((d) => one.dimensions.includes(d));
+    const key = dims.join(",");
+    const group = groups.get(key) ?? { dims, names: [] };
+    group.names.push(one.name);
+    groups.set(key, group);
+  }
+  // Largest group first; at most three named groups, the rest counted.
+  const ordered = [...groups.values()].sort(
+    (a, b) => b.names.length - a.names.length,
   );
-  const names = unknown.slice(0, 6).map((one) => one.name);
-  const more = unknown.length - names.length;
-  const who = `${listed(names)}${more > 0 ? ` and ${counted(more)} more` : ""}`;
-  const what =
-    dims.length === 1 && dims[0] === "revenue"
-      ? "whether they have revenue isn't on record"
-      : `their ${listed(dims)} ${dims.length === 1 ? "isn't" : "aren't"} on record against this`;
-  return ` For ${who}, ${what}, so I've left ${unknown.length === 1 ? "it" : "them"} out rather than guess; unknown isn't the same as no.`;
+  const named = ordered.slice(0, 3);
+  const rest = ordered.slice(3).reduce((n, g) => n + g.names.length, 0);
+  const clauses = named.map((group, at) => {
+    const shown = group.names.slice(0, at === 0 ? 6 : 3);
+    const more = group.names.length - shown.length;
+    const who = `${listed(shown)}${more > 0 ? ` and ${counted(more)} more` : ""}`;
+    const one = group.names.length === 1;
+    const words = group.dims.map((dimension) => DIMENSION_WORDS[dimension]);
+    const what =
+      words.length === 1 && words[0] === "revenue"
+        ? `whether ${one ? "it has" : "they have"} revenue isn't on record`
+        : `${one ? "its" : "their"} ${listed(words)} ${words.length === 1 ? "isn't" : "aren't"} on record against this`;
+    return `${at === 0 ? "For" : "for"} ${who}, ${what}`;
+  });
+  const others =
+    rest > 0
+      ? `; for ${counted(rest)} more, what you asked isn't on record`
+      : "";
+  return ` ${clauses.join("; ")}${others}, so I've left ${unknown.length === 1 ? "it" : "them"} out rather than guess; unknown isn't the same as no.`;
 }
 
 function scoreOf(fit: RunFit): number {
@@ -649,19 +763,29 @@ async function conditionedCompanyListOnce(
       if (!pool.includes(row.id)) pool.push(row.id);
     }
   }
+  /*
+   * Owner live 17 Nov 2026 (9995dcca): "outside my preferred sectors"
+   * checked 47 companies and, a turn later, "leave out the ones we're in
+   * contact with" checked 23 -- the exclusion ran before the pool was cut,
+   * so the second list was drawn from another set of companies. The pool
+   * is cut first, so a refinement is judged over the same companies, and
+   * the ones left out for contact are counted within them.
+   */
+  pool = [...new Set(pool)].slice(0, poolMax);
+  // The companies checked: the whole pool, those left out for contact
+  // included, so a refinement names the same number as the list it trims.
+  const checked = pool.length;
   const excludedInContact =
     conditions.relationship === "EXCLUDE_IN_CONTACT"
       ? pool.filter((id) => inContact.has(id)).length
       : 0;
-  pool = [...new Set(pool)]
-    .filter((id) =>
-      conditions.relationship === "EXCLUDE_IN_CONTACT"
-        ? !inContact.has(id)
-        : conditions.relationship === "ONLY_IN_CONTACT"
-          ? inContact.has(id)
-          : true,
-    )
-    .slice(0, poolMax);
+  pool = pool.filter((id) =>
+    conditions.relationship === "EXCLUDE_IN_CONTACT"
+      ? !inContact.has(id)
+      : conditions.relationship === "ONLY_IN_CONTACT"
+        ? inContact.has(id)
+        : true,
+  );
   const outcomes = await readFitSets({
     ids: pool,
     read,
@@ -679,8 +803,12 @@ async function conditionedCompanyListOnce(
   }
   const fits = [...byId.values()];
   if (fits.length === 0 && pool.length > 0) return null;
-  // Revenue, from each company's own published figures, as this reader
-  // may see them (read_company_figures' admission is get_company's).
+  // Revenue, from every source this reader may see, in Q's authority
+  // order: the company's published figures (read_company_figures, whose
+  // admission is get_company's), then -- only where those leave it
+  // unknown -- the founder-confirmed reading of its deck exactly as their
+  // Pitch deck tab shows it (read_company_deck). Code reads stored
+  // records only: no document text is read and no model is called here.
   const revenue = new Map<string, RevenueState>();
   if (conditions.revenue !== null) {
     const states = await Promise.all(
@@ -690,10 +818,21 @@ async function conditionedCompanyListOnce(
           { companyId: fit.companyId },
           `q-conditions-figures-${String(at)}`,
         );
-        return [
-          fit.companyId,
+        const published =
           outcome !== null && outcome.result.ok
             ? revenueStateOf(outcome.result.data)
+            : "UNKNOWN";
+        if (published !== "UNKNOWN" || !available.has("read_company_deck"))
+          return [fit.companyId, published] as const;
+        const deck = await read(
+          "read_company_deck",
+          { companyId: fit.companyId },
+          `q-conditions-deck-${String(at)}`,
+        );
+        return [
+          fit.companyId,
+          deck !== null && deck.result.ok
+            ? revenueStateOfDeck(deck.result.data)
             : "UNKNOWN",
         ] as const;
       }),
@@ -743,8 +882,8 @@ async function conditionedCompanyListOnce(
       : conditions.relationship === "ONLY_IN_CONTACT"
         ? `Of the ${counted(pool.length)} companies you're in touch with`
         : widePool
-          ? `Of the ${counted(fits.length)} companies on Capital Q I checked`
-          : `Of the ${counted(fits.length)} companies closest to your mandate that I checked`;
+          ? `Of the ${counted(checked)} companies on Capital Q I checked`
+          : `Of the ${counted(checked)} companies closest to your mandate that I checked`;
   const unknown = unknownLine(
     applied.unknown.map((one) => ({
       name: one.item.name,
@@ -787,7 +926,7 @@ async function conditionedCompanyListOnce(
           : `${scope}, ranked by fit with your mandate: ${listed(named)}.`;
   const revenueNote =
     conditions.revenue !== null && shown.length > 0
-      ? " Revenue is as each company states it on Capital Q, not verified."
+      ? " Revenue is as each company states it on Capital Q, in its published figures or its confirmed deck, not verified."
       : "";
   const onScreen =
     shown.length === 0

@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV90ResultSchema,
+  TurnReaderV91ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -28,7 +28,7 @@ import {
   type TurnReaderV86Result,
   type TurnReaderV87Result,
   type TurnListConditionsV89,
-  type TurnReaderV90Result,
+  type TurnReaderV91Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -148,6 +148,12 @@ export type QTurnReading = Omit<
          * again. Absent is false.
          */
         readonly fitReasons?: boolean | undefined;
+        /**
+         * v91 (owner live 17 Nov 2026): the list ask narrows or trims the
+         * list Q just showed (true) or asks for a new one (false). Absent
+         * or null: not stated.
+         */
+        readonly refinesShownList?: boolean | null | undefined;
       })
     | null;
   /** v15: false when spoken words were plainly for someone else. */
@@ -673,8 +679,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV90Result>> =>
-          gateway.execute<TurnReaderV90Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV91Result>> =>
+          gateway.execute<TurnReaderV91Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -689,7 +695,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV90ResultSchema,
+              schema: TurnReaderV91ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -744,7 +750,7 @@ export function createQTurnReader(dependencies: {
           );
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV90ResultSchema.safeParse(
+        const parsed = TurnReaderV91ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;

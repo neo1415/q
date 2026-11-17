@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -28,10 +29,15 @@ import {
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import {
+  carriedListConditions,
   conditionWords,
+  listConditionsOf,
   predicate,
+  refinesShownList,
   revenueStateOf,
+  revenueStateOfDeck,
   runConditionedCompanyList,
+  unknownLine,
   type ListConditions,
 } from "../src/q/list-conditions.js";
 import { fitFixture } from "./fit-fixture.js";
@@ -479,7 +485,7 @@ describe("RC2 investor lane: the stated condition is applied before ranking", ()
     expect(text).not.toMatch(/^Ranked by fit with your mandate, the top/u);
     // Unknown is said as unknown, never as no revenue.
     expect(text).toContain(
-      "For Halyard Security, whether they have revenue isn't on record",
+      "For Halyard Security, whether it has revenue isn't on record",
     );
     expect(text).not.toContain("Tensorgate");
   });
@@ -1231,6 +1237,8 @@ describe("live re-check T7: conditions stated in the conversation carry to the f
       executionClass: "CONTEXTUAL_FOLLOW_UP",
       // The reading carries the order only; the exclusion is not restated.
       listConditions: { ...NO_CONDITIONS, order: "WORST_FIRST" },
+      // v91: the follow-up trims the list just shown.
+      listRefinesShown: true,
     });
     expect(t7.modelCalls).toHaveLength(0);
     // Chidi, whom they are talking to, is never named -- not even as unknown.
@@ -1453,6 +1461,8 @@ describe("live re-check 9913a5b64: 'that one' on a one-company conditioned list 
             sector: "OUTSIDE",
             order: "WORST_FIRST",
           },
+          // v91: read as narrowing the revenue list just shown.
+          listRefinesShown: true,
         },
         undefined,
         { warm: true },
@@ -1606,5 +1616,412 @@ describe("conditioned-list sentence agreement", () => {
         false,
       ),
     ).toBe("have revenue on record and are outside your preferred sectors");
+  });
+});
+
+/**
+ * Owner live 17 Nov 2026, production conversation 9995dcca (investor Zino
+ * Aviation). The stored tool results of runs 38dc48e6 (14:57), 07151854
+ * (14:58:02) and 17e4b5e1 (14:58:49) -- fit sets, catalog reads, published
+ * figures, their own relationships -- and the deck facts, read read-only,
+ * replayed with no live call (live-replays/zino-9995dcca.json).
+ */
+type ZinoFixture = {
+  readonly own: unknown;
+  readonly discovery: Readonly<Record<string, unknown>>;
+  readonly entries: Readonly<
+    Record<string, { name: string; line: string | null; profile: unknown }>
+  >;
+  readonly figures: Readonly<Record<string, unknown>>;
+  readonly deckFacts: readonly {
+    readonly company: string;
+    readonly section: string;
+    readonly label: string;
+    readonly value: string | null;
+    readonly unknownReason: string | null;
+    readonly kind: string;
+  }[];
+};
+const LIVE = JSON.parse(
+  readFileSync(
+    new URL("./live-replays/zino-9995dcca.json", import.meta.url),
+    "utf8",
+  ),
+) as ZinoFixture;
+const zinoId = (name: string): string => {
+  const found = Object.entries(LIVE.entries).find(([, e]) => e.name === name);
+  if (found === undefined) throw new Error(`no ${name} in the fixture`);
+  return found[0];
+};
+/** Decks whose reading the founder confirmed (deck_extraction_confirmations). */
+const CONFIRMED_DECKS = new Set([
+  "Baridi",
+  "Capital Q",
+  "Clearwater Assurance",
+  "Halyard Security",
+  "Ledgerline",
+  "Shiftwell",
+  "SongScribe AI",
+  "Tensorgate",
+]);
+/** read_company_deck as an investor's Pitch deck tab shows it. */
+function deckAsInvestorSees(company: string) {
+  const confirmed = CONFIRMED_DECKS.has(company);
+  const facts = confirmed
+    ? LIVE.deckFacts.filter((fact) => fact.company === company)
+    : [];
+  return {
+    viewer: "INVESTOR",
+    deck: null,
+    sections: ["TRACTION", "FINANCIALS", "BUSINESS_MODEL"].map((section) => ({
+      section,
+      facts: facts
+        .filter((fact) => fact.section === section)
+        .map((fact) => ({
+          label: fact.label,
+          value: fact.value,
+          unknownReason: fact.unknownReason,
+          kind: fact.kind,
+          truthClass: "USER_CLAIM",
+        })),
+    })),
+    confirmedByFounder: confirmed,
+    truthClass: "USER_CLAIM",
+  };
+}
+/** The ten companies Q showed at 14:52 and 14:54. */
+const ZINO_SHOWN = [
+  "Nixo",
+  "Halyard Security",
+  "Tensorgate",
+  "Shiftwell",
+  "Clearwater Assurance",
+  "Tangible",
+  "F2",
+  "Ajopot",
+  "Spheros",
+  "Watchly",
+];
+
+function zinoExecute(
+  run: "pre" | "outside" | "leaveOut",
+  figures: Readonly<Record<string, unknown>> = LIVE.figures,
+): QToolPort["execute"] {
+  return (proposal) => {
+    const args = proposal.arguments as {
+      readonly order?: string;
+      readonly companyIds?: readonly string[];
+      readonly companyId?: string;
+    };
+    if (proposal.name === "discover_companies") {
+      const order = args.order ?? "FIT";
+      const stored =
+        LIVE.discovery[`${run}:${order}`] ?? LIVE.discovery[`outside:${order}`];
+      return Promise.resolve(ok(proposal, "discovery.companies", stored));
+    }
+    if (proposal.name === "fit_top_candidates") {
+      const entries = (args.companyIds ?? []).flatMap((id) => {
+        const entry = LIVE.entries[id];
+        return entry === undefined ? [] : [{ companyId: id, ...entry }];
+      });
+      return Promise.resolve(
+        ok(proposal, "fit.top_candidates", {
+          status: "OK",
+          comparison: { entries },
+        }),
+      );
+    }
+    if (proposal.name === "read_company_figures") {
+      const id = args.companyId ?? "";
+      return Promise.resolve(
+        ok(
+          proposal,
+          "company.figures.read",
+          figures[id] ?? { companyId: id, status: "NONE", figures: [] },
+        ),
+      );
+    }
+    if (proposal.name === "read_company_deck") {
+      const name = LIVE.entries[args.companyId ?? ""]?.name ?? "";
+      return Promise.resolve(
+        ok(proposal, "company.deck.read", deckAsInvestorSees(name)),
+      );
+    }
+    if (proposal.name === "list_my_relationships") {
+      return Promise.resolve(ok(proposal, "relationship.list_mine", LIVE.own));
+    }
+    return Promise.resolve(ok(proposal, "unused", null));
+  };
+}
+const ZINO_TOOLS: readonly (readonly [string, string])[] = [
+  ...INVESTOR_TOOLS,
+  ["read_company_deck", "company.deck.read"],
+];
+const zinoInContact = (): ReadonlySet<string> =>
+  new Set(
+    (
+      LIVE.own as {
+        relationships: { counterpart: { id: string } }[];
+      }
+    ).relationships.map((row) => row.counterpart.id),
+  );
+const zinoSector = (name: string): string | undefined =>
+  (
+    LIVE.entries[zinoId(name)]?.profile as {
+      parameters: { parameter: string; outcome: string }[];
+    }
+  ).parameters.find((row) => row.parameter === "SECTOR")?.outcome;
+
+describe("live 9995dcca (Zino, 17 Nov): revenue standing from every source the reader may see", () => {
+  it("14:57 'pre-revenue but unusually strong' replayed: the same 23 companies, revenue known for eight, the rest named as unknown", async () => {
+    const deckReads: string[] = [];
+    const result = await runConditionedCompanyList({
+      conditions: { ...NO_CONDITIONS, revenue: "PRE_REVENUE" },
+      within: ZINO_SHOWN.map(zinoId),
+      count: null,
+      discover: { sectors: [], countries: [], stages: [] },
+      tools: {
+        execute: (proposal, context) => {
+          if (proposal.name === "read_company_deck")
+            deckReads.push(
+              (proposal.arguments as { companyId: string }).companyId,
+            );
+          return zinoExecute("pre")(proposal, context);
+        },
+      },
+      context: {} as Parameters<typeof runConditionedCompanyList>[0]["context"],
+      available: new Set(ZINO_TOOLS.map(([name]) => name)),
+      own: Promise.resolve(LIVE.own),
+      inTouch: Promise.resolve(new Set<string>()),
+    });
+    expect(result?.considered).toBe(23);
+    expect(result?.shown).toEqual([]);
+    expect(result?.text).toMatch(
+      /^None of the ten companies I just showed are pre-revenue, so I looked wider\. Of the 24 companies closest to your mandate that I checked, I can't show you any that are pre-revenue\./u,
+    );
+    // Unknown is said as unknown, never as "no revenue".
+    // As live: fifteen unknown (six named, "nine more"), revenue only.
+    expect(result?.unknown).toBe(15);
+    expect(result?.text).toMatch(
+      /and nine more, whether they have revenue isn't on record, so I've left them out/u,
+    );
+    for (const name of [
+      "Nixo",
+      "Tangible",
+      "F2",
+      "Ajopot",
+      "Spheros",
+      "Watchly",
+    ])
+      expect(result?.text).toContain(name);
+    // A deck is read only where the published figures leave it unknown.
+    expect(deckReads.length).toBeGreaterThan(0);
+    for (const id of deckReads) {
+      expect(revenueStateOf(LIVE.figures[id] ?? null)).toBe("UNKNOWN");
+    }
+  });
+
+  it("a company whose revenue is only in its confirmed deck is judged by the deck, not left unknown", async () => {
+    // The same turn with Clearwater's and Halyard's published figures gone:
+    // their founder-confirmed decks state ARR, so they still fail
+    // "pre-revenue" -- they are never named as unknown.
+    const figures: Record<string, unknown> = { ...LIVE.figures };
+    delete figures[zinoId("Clearwater Assurance")];
+    delete figures[zinoId("Halyard Security")];
+    const result = await runConditionedCompanyList({
+      conditions: { ...NO_CONDITIONS, revenue: "PRE_REVENUE" },
+      within: null,
+      count: null,
+      discover: { sectors: [], countries: [], stages: [] },
+      tools: { execute: zinoExecute("pre", figures) },
+      context: {} as Parameters<typeof runConditionedCompanyList>[0]["context"],
+      available: new Set(ZINO_TOOLS.map(([name]) => name)),
+      own: Promise.resolve(LIVE.own),
+      inTouch: Promise.resolve(new Set<string>()),
+    });
+    expect(result?.text).not.toContain("Clearwater Assurance");
+    expect(result?.text).not.toContain("Halyard Security");
+    expect(result?.text).toContain("Nixo");
+  });
+
+  it("the deck reading: earned revenue counts; targets, plans, scenarios and 'not yet reported' stay unknown", () => {
+    const state = (company: string) =>
+      revenueStateOfDeck(deckAsInvestorSees(company));
+    expect(state("Clearwater Assurance")).toBe("HAS_REVENUE");
+    expect(state("Halyard Security")).toBe("HAS_REVENUE");
+    expect(state("Tensorgate")).toBe("HAS_REVENUE");
+    expect(state("Ledgerline")).toBe("HAS_REVENUE");
+    expect(state("Baridi")).toBe("HAS_REVENUE");
+    // Only scenarios ("5,000 subscribers at $15/month implies $0.9M ARR")
+    // and "not in the deck": unknown, never revenue.
+    expect(state("SongScribe AI")).toBe("UNKNOWN");
+    // An unconfirmed reading never reaches an investor.
+    expect(state("Nixo")).toBe("UNKNOWN");
+    // Basketari's own reading, as if confirmed: "Not yet reported", "Not
+    // yet paying; revenue not reported" -- unknown, not pre-revenue.
+    const basketari = LIVE.deckFacts
+      .filter((fact) => fact.company === "Basketari")
+      .map((fact) => ({ ...fact, truthClass: "USER_CLAIM" }));
+    expect(
+      revenueStateOfDeck({
+        sections: [
+          { section: "TRACTION", facts: basketari },
+          { section: "FINANCIALS", facts: basketari },
+        ],
+      }),
+    ).toBe("UNKNOWN");
+    expect(
+      revenueStateOfDeck({
+        sections: [
+          {
+            section: "TRACTION",
+            facts: [
+              {
+                label: "Revenue",
+                value: "Pre-revenue",
+                truthClass: "USER_CLAIM",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe("PRE_REVENUE");
+  });
+});
+
+describe("live 9995dcca (Zino, 17 Nov): a list's conditions carry only to a refinement of it", () => {
+  const PRE: ListConditions = { ...NO_CONDITIONS, revenue: "PRE_REVENUE" };
+  const OUTSIDE: ListConditions = { ...NO_CONDITIONS, sector: "OUTSIDE" };
+
+  it("14:58:02 'outside my preferred sectors... keep them separate' is a new list: pre-revenue is not carried", () => {
+    const request = {
+      fitQuestion: { text: "outside my sectors", count: null },
+      listConditions: OUTSIDE,
+      listRefinesShown: false,
+    } as unknown as QAnswerRequest;
+    expect(refinesShownList(request)).toBe(false);
+    expect(
+      carriedListConditions(
+        listConditionsOf(request),
+        refinesShownList(request) ? PRE : null,
+      ),
+    ).toEqual(OUTSIDE);
+  });
+
+  it("14:58:49 'leave out the ones we're in contact with' trims the list just shown: its sector condition holds", () => {
+    const request = {
+      fitQuestion: { text: "leave them out", count: null },
+      excludeRelationships: true,
+      listConditions: { ...NO_CONDITIONS, relationship: "EXCLUDE_IN_CONTACT" },
+      listRefinesShown: true,
+    } as unknown as QAnswerRequest;
+    expect(
+      carriedListConditions(
+        listConditionsOf(request),
+        refinesShownList(request) ? OUTSIDE : null,
+      ),
+    ).toEqual({ ...OUTSIDE, relationship: "EXCLUDE_IN_CONTACT" });
+  });
+
+  it("a reading that does not say falls back to `previous`, and otherwise never assumes a carried condition", () => {
+    expect(
+      refinesShownList({
+        fitQuestion: { text: "x", count: null, previous: true },
+      }),
+    ).toBe(true);
+    expect(
+      refinesShownList({
+        fitQuestion: { text: "x", count: null },
+      }),
+    ).toBe(false);
+  });
+
+  it("through the answer seam: the three live turns in order", async () => {
+    const executeFor = { run: "pre" as "pre" | "outside" | "leaveOut" };
+    const { turn } = conversationSeam({
+      execute: (proposal, context) =>
+        zinoExecute(executeFor.run)(proposal, context),
+      offered: ZINO_TOOLS,
+      digest: digestOf("INVESTOR", [...zinoInContact()]),
+      investor: true,
+    });
+    const pre =
+      "Show me the ones that are pre-revenue, but have like unusually strong reasons to be interesting";
+    const t1 = await turn(
+      pre,
+      {
+        questionKind: "FIT",
+        fitQuestion: { text: pre, count: null, previous: true },
+        listConditions: PRE,
+        listRefinesShown: true,
+      },
+      shownRanking(
+        ZINO_SHOWN.map((name) => ({
+          id: zinoId(name),
+          name,
+          sector: "STRONG" as const,
+          stage: "STRONG" as const,
+          revenue: null,
+        })),
+      ),
+    );
+    expect(t1.text).toMatch(/pre-revenue/u);
+    executeFor.run = "outside";
+    const outside =
+      "So, are there any promising opportunities outside my preferred sectors worth a look? You can keep them separate from my normal matches";
+    const t2 = await turn(outside, {
+      questionKind: "FIT",
+      fitQuestion: { text: outside, count: null },
+      listConditions: OUTSIDE,
+      listRefinesShown: false,
+    });
+    // The new list carries only what it states: never "pre-revenue".
+    expect(t2.text).not.toMatch(/revenue/u);
+    expect(t2.text).toMatch(/outside your preferred sectors/u);
+    expect(t2.cards.length).toBeGreaterThan(0);
+    for (const name of t2.cards) expect(zinoSector(name)).toBe("MISMATCH");
+    const checked = /Of the (\w+) companies on Capital Q I checked/u.exec(
+      t2.text,
+    )?.[1];
+    expect(checked).toBeDefined();
+    executeFor.run = "leaveOut";
+    const leave =
+      "So, which one of these companies are they in contact with us? You can leave them out; we want new opportunity recommendations.";
+    const t3 = await turn(leave, {
+      questionKind: "FIT",
+      fitQuestion: { text: leave, count: null },
+      excludeRelationships: true,
+      listConditions: { ...NO_CONDITIONS, relationship: "EXCLUDE_IN_CONTACT" },
+      listRefinesShown: true,
+    });
+    // The refinement keeps "outside my sectors" and adds the exclusion;
+    // pre-revenue, from two lists back, is gone.
+    expect(t3.text).not.toMatch(/revenue/u);
+    expect(t3.text).toMatch(/outside your preferred sectors/u);
+    expect(t3.text).toMatch(/you're already in touch with/u);
+    const inContact = zinoInContact();
+    expect(t3.cards.length).toBeGreaterThan(0);
+    for (const name of t3.cards) {
+      expect(inContact.has(zinoId(name))).toBe(false);
+      expect(zinoSector(name)).toBe("MISMATCH");
+    }
+    // The same companies were checked both times; the exclusion is counted
+    // within them, never a different universe.
+    expect(
+      /Of the (\w+) companies on Capital Q I checked/u.exec(t3.text)?.[1],
+    ).toBe(checked);
+  });
+});
+
+describe("live 9995dcca (Zino, 17 Nov): each unknown is named with only its own dimensions", () => {
+  it("'For Abodely... their revenue and sector aren't on record' is now said per group", () => {
+    const line = unknownLine([
+      { name: "Abodely", dimensions: ["revenue"] },
+      { name: "Abodely Hub", dimensions: ["revenue"] },
+      { name: "Afyascan", dimensions: ["revenue", "sector"] },
+    ]);
+    expect(line).toBe(
+      " For Abodely and Abodely Hub, whether they have revenue isn't on record; for Afyascan, its revenue and sector aren't on record against this, so I've left them out rather than guess; unknown isn't the same as no.",
+    );
   });
 });

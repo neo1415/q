@@ -470,6 +470,37 @@ describe("comparators", () => {
     expect(sector("EXACT")).toBe("STRONG");
   });
 
+  it("live 9995dcca: a declared sector stands when another named vocabulary is unanswered (Kivu Traceworks read 'Sector not set')", () => {
+    // Kivu declares industry (agriculture, supply chain) but no business
+    // model; the mandate names both. The category stays unknown, the
+    // sector against the mandate's sectors does not.
+    const missing = (provenance: Record<string, string>) => {
+      const snapshot = snapshotWith(
+        {},
+        { "declared_fit.taxonomy": "COMPANY_TAXONOMY_UNKNOWN" },
+      );
+      return {
+        ...snapshot,
+        features: snapshot.features.map((feature) =>
+          feature.featureId === "declared_fit.taxonomy"
+            ? { ...feature, provenance }
+            : feature,
+        ),
+      };
+    };
+    const sector = (provenance: Record<string, string>) =>
+      observe({}, [], missing(provenance)).observations.SECTOR;
+    expect(sector({ sectorOverlap: "NONE" }).outcome).toBe("MISMATCH");
+    expect(sector({ sectorOverlap: "NONE" }).evidenceStatus).toBe(
+      "SELF_REPORTED",
+    );
+    expect(sector({ sectorOverlap: "EXACT" }).outcome).toBe("STRONG");
+    expect(sector({ sectorOverlap: "DESCENDANT" }).outcome).toBe("PARTIAL");
+    // No declared sector at all, or a snapshot from before: unknown.
+    expect(sector({ sectorOverlap: "UNKNOWN" }).outcome).toBe("UNKNOWN");
+    expect(sector({}).outcome).toBe("UNKNOWN");
+  });
+
   it("a hard rule comes only from a declared mandate rule, and names it", () => {
     expect(
       observe({}, ["COMPANY_STAGE_UNKNOWN", "RELATIONSHIP_CLOSED"]).hardRule,

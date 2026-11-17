@@ -301,11 +301,32 @@ export function observeFit(input: ObserveFitInput): FitInputs {
   const sectorObservation = (): FitObservation => {
     const f = feature("declared_fit.taxonomy");
     // A snapshot from before `sectorOverlap` (or a bare one) has none.
+    // Owner live 17 Nov 2026 (9995dcca): the category is unknown when the
+    // company declares no answer in another vocabulary the mandate names
+    // (a business model), yet its declared sector against the mandate's
+    // sectors is known; that overlap is kept on the MISSING feature too.
     const provenance: Readonly<Record<string, unknown>> | undefined =
-      f?.status === "PRESENT" ? f.provenance : undefined;
+      f?.status === "PRESENT" ||
+      (f?.status === "MISSING" &&
+        f.missingReason === "COMPANY_TAXONOMY_UNKNOWN")
+        ? f.provenance
+        : undefined;
     const sector = provenance?.["sectorOverlap"];
     const facts = { companySector: d.companySector };
     if (sector === "UNKNOWN") return unknownObservation(facts);
+    if (
+      f?.status === "MISSING" &&
+      (sector === "EXACT" || sector === "DESCENDANT" || sector === "NONE")
+    ) {
+      return {
+        outcome: SECTOR_OUTCOME[sector],
+        applicable: true,
+        // The company's own declared taxonomy.
+        evidenceStatus: "SELF_REPORTED",
+        stale: false,
+        facts,
+      };
+    }
     if (sector === "EXACT" || sector === "DESCENDANT" || sector === "NONE") {
       return fromCategory(
         "declared_fit.taxonomy",
