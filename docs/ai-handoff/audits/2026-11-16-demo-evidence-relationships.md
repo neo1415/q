@@ -151,3 +151,24 @@ Halyard's application `0490be41` (`ga_1kqfa1zd54naktn20bgvn5n4sz`) was corrected
   - The pre-seed → seed correction (`232b4645 → 6c25ff0a`) is still in place.
 - **Submission:** at 15:44:01 the application `0490be41` was SUBMITTED through `POST /v1/gateq/apply/submit`, and the dossier synthesis settled. Model cost was below USD 0.01 (ledger `c207e89c`).
 - **Known quirk:** the correction note is stored twice, identically, one copy linked to each half. That is harmless but visible in the history.
+
+## 9. Compact-pack shares to Savanna (17 Nov 2026, 03:33 UTC)
+
+Final report §11 item 10. Done with `relationships.mjs seed|verify ajopot|watchly|maji-loop`, through the product API, acting as each seeded fictional founder and Savanna's fictional representative. Every marker check passed. No SQL writes were made.
+
+| Company   | Relationship                                                | Requests (answered / pending)                                                             | Shared with Savanna (view only)                           | Kept private          |
+| --------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------- |
+| Ajopot    | `3fa64633`, already IN_DILIGENCE                            | `4c9499ef` cap table, FULFILLED / `652263ed` bank statements, OPEN                        | 5: management accounts, revenue, cap table, terms, KPIs   | `aj-payout-ledger`    |
+| Watchly   | `3b5b294f`, CONNECTED → IN_DILIGENCE (Savanna, `DILIGENCE`) | `182e01cb` customer, pilot and LOI summary, FULFILLED / `49ebc53a` bank statements, OPEN  | 5: management accounts, customers, cap table, terms, KPIs | `wl-invoice-register` |
+| Maji Loop | `fc01d0fc`, CONNECTED → IN_DILIGENCE (Savanna, `DILIGENCE`) | `a8b3c962` utility contract and kiosk sites, FULFILLED / `53a2b520` bank statements, OPEN | 6: all six planned                                        | none planned          |
+
+- **How it was shared.** The answered request's document was shared when the founder fulfilled it (relationship_shared, view, no expiry). Every other planned document was shared through the founder's data-room grant (relationship_shared, view, 90-day expiry, filed SHARED_ONLY in the manifest folder).
+- **Pending requests.** The compact packs hold no bank statement, so the pending request stays OPEN.
+- **Not seeded.** MedTrail and Mizan plan no investor, so nothing was done for them.
+- **Changed relationships.** Watchly and Maji Loop moved from CONNECTED to IN_DILIGENCE, because document requests need diligence to have started (`DILIGENCE_REQUEST_NOT_OPEN`).
+- **Verified (`verify`):**
+  - Savanna lists, opens (200) and downloads (200) all 16 planned documents.
+  - The 2 unplanned documents return 404 to Savanna.
+  - Thames Arc gets 404 on open and on `GET /v1/documents/:id` for all 18 documents. None appear in its data-room list, and they carry no foreign policies.
+  - Leaks: 0.
+- **Cost.** 19 STRUCTURED_EXTRACTION calls ran inside the product, USD 0.0095 (`ai_ops.model_usage`). Budget: $0.20 reserved (`5de7437f`); actual recorded.

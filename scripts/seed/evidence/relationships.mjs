@@ -5,13 +5,13 @@
 // product's own HTTP API, each step as the seeded fictional person whose
 // action it is (investor or founder). Nothing here writes SQL.
 //
-//   node scripts/seed/evidence/relationships.mjs seed     [halyard|tensorgate|nixo]
+//   node scripts/seed/evidence/relationships.mjs seed     [halyard|tensorgate|nixo|ajopot|watchly|maji-loop]
 //   node scripts/seed/evidence/relationships.mjs mandates
 //   node scripts/seed/evidence/relationships.mjs gateq-form       # no model call
 //   node scripts/seed/evidence/relationships.mjs gateq-interview  # paid: 3 turns
 //   node scripts/seed/evidence/relationships.mjs gateq-correct    # paid: 1 turn
 //   node scripts/seed/evidence/relationships.mjs gateq-submit     # paid: synthesis
-//   node scripts/seed/evidence/relationships.mjs verify   [halyard|tensorgate|nixo]
+//   node scripts/seed/evidence/relationships.mjs verify   [halyard|tensorgate|nixo|ajopot|watchly|maji-loop]
 //
 // Pairs (scripts/seed/evidence/manifests/*.json `plannedShareWith`):
 //   Halyard Security <-> Thames Arc Capital: the investor expresses interest,
@@ -153,6 +153,78 @@ const PAIRS = {
       about: null,
     },
     mustStayPrivate: ["nx-bank-statement"],
+  },
+  // The compact packs (compact.mjs, 17 Nov 2026): each manifest plans its
+  // shares for Savanna; MedTrail and Mizan plan none and are not listed.
+  // Ajopot is already IN_DILIGENCE; Watchly and Maji Loop are CONNECTED, so
+  // Savanna records that diligence started (document requests need it).
+  // The packs hold no bank statement: the pending request asks for one and
+  // stays OPEN. Unplanned documents stay founder-private.
+  ajopot: {
+    company: {
+      name: "Ajopot",
+      slug: "ajopot",
+      id: "91de2a77-fe47-4af0-8534-d9abf9c55949",
+    },
+    investorId: SAVANNA,
+    interestNote:
+      "Digitised rotating savings circles fit our seed thesis. We'd like to understand the fee take and the payouts before the round closes.",
+    answered: {
+      title: "Capitalisation table and ownership",
+      note: "The current cap table and the option pool before the seed.",
+      documentId: "aj-cap-table",
+      about: null,
+    },
+    pending: {
+      title: "Business bank statements, Aug to Oct 2026",
+      note: "To tie the 31 Oct 2026 cash in the management accounts to the bank.",
+      about: null,
+    },
+    mustStayPrivate: ["aj-payout-ledger"],
+  },
+  watchly: {
+    company: {
+      name: "Watchly",
+      slug: "watchly",
+      id: "526c2d72-9142-4e48-b106-ee4910f19318",
+    },
+    investorId: SAVANNA,
+    interestNote:
+      "Watchly fits our seed thesis. We'd like to understand the pilots and letters of intent against billed revenue.",
+    answered: {
+      title: "Customer, pilot and letter-of-intent summary",
+      note: "Each paying customer, pilot and letter of intent, with start dates and value.",
+      documentId: "wl-customer-contracts",
+      about: null,
+    },
+    pending: {
+      title: "Business bank statements, Aug to Oct 2026",
+      note: "To tie the October cash and burn in the management accounts to the bank.",
+      about: null,
+    },
+    mustStayPrivate: ["wl-invoice-register"],
+  },
+  "maji-loop": {
+    company: {
+      name: "Maji Loop",
+      slug: "maji-loop",
+      id: "01c554bf-8bf1-4eb7-b460-5d841764c40b",
+    },
+    investorId: SAVANNA,
+    interestNote:
+      "Maji Loop fits our seed thesis. We'd like to understand the utility contract and the kiosk economics.",
+    answered: {
+      title: "Utility service contract and kiosk sites summary",
+      note: "The utility contract terms and the live kiosk sites.",
+      documentId: "ml-customer-contracts",
+      about: null,
+    },
+    pending: {
+      title: "Business bank statements, Aug to Oct 2026",
+      note: "To tie the 31 Oct 2026 cash in the management accounts to the bank.",
+      about: null,
+    },
+    mustStayPrivate: [],
   },
 };
 
@@ -1176,6 +1248,9 @@ if (mode === "seed") {
     halyard: SAVANNA,
     tensorgate: THAMES_ARC,
     nixo: THAMES_ARC,
+    ajopot: THAMES_ARC,
+    watchly: THAMES_ARC,
+    "maji-loop": THAMES_ARC,
   };
   report.verify ??= {};
   for (const key of keys)
