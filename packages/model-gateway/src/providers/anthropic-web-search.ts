@@ -74,10 +74,67 @@ export function createAnthropicHostedWebSearch(options: {
           signal: context.signal,
         });
       } catch (error: unknown) {
-        throw normalizeError(error);
+        throw hostedSearchFailure(normalizeError(error));
       }
-      return webSearchResult(message);
+      try {
+        return webSearchResult(message);
+      } catch {
+        // The vendor answered (and billed) but the body is not the shape
+        // read here. The usage still prices the call; the sources do not
+        // exist. Never thrown as a bare error: that was recorded as a
+        // TRANSIENT failure with no tokens and no price (2026-11-17).
+        return unreadableResult(message);
+      }
     },
+  };
+}
+
+/**
+ * Nothing is retried on this path, and a request the vendor calls
+ * malformed (400/404/413/422) will not succeed by asking again: it is
+ * PERMANENT here, with the status, error type and request id kept.
+ */
+function hostedSearchFailure(
+  failure: ModelProviderFailure,
+): ModelProviderFailure {
+  if (
+    failure.failureClass !== "INVALID_REQUEST" &&
+    failure.failureClass !== "CONTEXT_LIMIT"
+  ) {
+    return failure;
+  }
+  return new ModelProviderFailure(failure.message, {
+    failureClass: "PERMANENT",
+    providerCode: failure.providerCode,
+    providerStatus: failure.providerStatus,
+    retryAfterMs: failure.retryAfterMs,
+    vendorErrorCode: failure.vendorErrorCode,
+    providerRequestId: failure.providerRequestId,
+    accountExhausted: failure.accountExhausted,
+    cause: failure.cause,
+  });
+}
+
+/** What is still known of a response whose content could not be read. */
+function unreadableResult(
+  message: Pick<Message, "usage" | "model" | "id">,
+): HostedWebSearchAdapterResult {
+  let usage: HostedWebSearchAdapterResult["usage"];
+  let searchRequests = 0;
+  try {
+    usage = toUsage(message);
+    searchRequests = message.usage.server_tool_use?.web_search_requests ?? 0;
+  } catch {
+    usage = undefined;
+  }
+  return {
+    sources: [],
+    searchRequests,
+    usage,
+    modelCode: typeof message.model === "string" ? message.model : "",
+    providerReference: typeof message.id === "string" ? message.id : undefined,
+    searchErrorCode: null,
+    unreadable: true,
   };
 }
 
@@ -115,9 +172,12 @@ export function webSearchResult(
 ): HostedWebSearchAdapterResult {
   const quoted = new Map<string, string[]>();
   for (const block of message.content) {
-    if (block.type !== "text" || block.citations === null) continue;
+    // The API omits `citations` on a text block that cites nothing, though
+    // the SDK types it `| null`: both mean none.
+    if (block.type !== "text" || !Array.isArray(block.citations)) continue;
     for (const citation of block.citations) {
       if (citation.type !== "web_search_result_location") continue;
+      if (typeof citation.cited_text !== "string") continue;
       const text = citation.cited_text.trim();
       if (text.length === 0) continue;
       const list = quoted.get(citation.url) ?? [];
@@ -141,15 +201,16 @@ export function webSearchResult(
       continue;
     }
     for (const result of block.content) {
-      if (seen.has(result.url)) continue;
+      if (typeof result.url !== "string" || seen.has(result.url)) continue;
       seen.add(result.url);
+      const title = typeof result.title === "string" ? result.title.trim() : "";
       sources.push({
         url: result.url,
-        title: result.title.trim().length > 0 ? result.title.trim() : null,
+        title: title.length > 0 ? title : null,
         quotedText: (quoted.get(result.url) ?? [])
           .join(" … ")
           .slice(0, QUOTED_TEXT_MAX_CHARS),
-        pageAge: result.page_age ?? null,
+        pageAge: typeof result.page_age === "string" ? result.page_age : null,
       });
     }
   }
@@ -166,5 +227,6 @@ export function webSearchResult(
     modelCode: message.model,
     providerReference: message.id,
     searchErrorCode: ordered.length === 0 ? searchErrorCode : null,
+    unreadable: false,
   };
 }

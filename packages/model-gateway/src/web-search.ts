@@ -94,6 +94,11 @@ export type HostedWebSearchAdapterResult = {
   readonly providerReference: string | undefined;
   /** The vendor's search error token when the search itself failed. */
   readonly searchErrorCode: string | null;
+  /**
+   * The vendor answered but its content could not be read: the usage is
+   * still priced and recorded; no source is returned.
+   */
+  readonly unreadable: boolean;
 };
 
 export type HostedWebSearchAdapterRequest = {
@@ -252,6 +257,56 @@ export function judgeHostedSearchRoute(input: {
   return { ok: true, provider, model, price };
 }
 
+/** An error's class name and system code, when they are plain tokens. */
+function tokenOf(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Za-z0-9_.:-]{1,64}$/u.test(value)
+    ? value
+    : undefined;
+}
+
+/** An error's class: its `name`, or its constructor's when that is generic. */
+function nameOf(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return tokenOf(error.name === "Error" ? error.constructor.name : error.name);
+}
+
+/**
+ * The structured fields of one failed hosted search: the class it was
+ * recorded under, the vendor's HTTP status, error type and request id,
+ * and the names of the errors underneath (a connection failure's
+ * system code, for instance). Never a message, the query or a key.
+ */
+export function hostedSearchFailureFields(
+  providerCode: ModelProviderCode,
+  failureClass: ModelFailureClass,
+  error: unknown,
+  startedAtMs: number,
+): Record<string, string | number | boolean | undefined> {
+  const failure = error instanceof ModelProviderFailure ? error : undefined;
+  const cause: unknown = failure === undefined ? error : failure.cause;
+  const nested: unknown = cause instanceof Error ? cause.cause : undefined;
+  // A connection failure's system code sits a level or two further down
+  // (SDK error -> fetch TypeError -> socket error).
+  let causeCode: string | undefined;
+  let link: unknown = nested;
+  for (let depth = 0; depth < 3 && link instanceof Error; depth += 1) {
+    causeCode = tokenOf((link as { code?: unknown }).code) ?? causeCode;
+    link = link.cause;
+  }
+  return {
+    provider: providerCode,
+    failureClass,
+    httpStatus: failure?.providerStatus,
+    errorType: failure?.vendorErrorCode,
+    providerRequestId: failure?.providerRequestId,
+    accountExhausted: failure?.accountExhausted,
+    errorName: nameOf(cause),
+    causeName: nameOf(nested),
+    causeCode,
+    latencyMs: Math.max(0, Date.now() - startedAtMs),
+  };
+}
+
 /** Token cost from the price snapshot plus the per-search fee, in USD. */
 export function hostedSearchCostUsd(
   usage: ModelUsage | undefined,
@@ -400,10 +455,16 @@ export function createHostedWebSearch(
           { signal },
         );
       } catch (error: unknown) {
+        // The adapter rejects only with ModelProviderFailure; anything else
+        // is a fault of ours that asking again will not cure.
         const failureClass =
           error instanceof ModelProviderFailure
             ? error.failureClass
-            : "TRANSIENT";
+            : "PERMANENT";
+        dependencies.logger?.warn(
+          hostedSearchFailureFields(adapter.code, failureClass, error, started),
+          "model-hosted web search failed",
+        );
         await record({
           usage: undefined,
           costUsd: undefined,
@@ -422,11 +483,16 @@ export function createHostedWebSearch(
         route.price,
       );
       const searchFailed =
-        answer.sources.length === 0 && answer.searchErrorCode !== null;
+        answer.unreadable ||
+        (answer.sources.length === 0 && answer.searchErrorCode !== null);
       await record({
         usage: answer.usage,
         costUsd,
-        errorCode: searchFailed ? "PROVIDER_OUTAGE" : undefined,
+        errorCode: answer.unreadable
+          ? "INVALID_MODEL_OUTPUT"
+          : searchFailed
+            ? "PROVIDER_OUTAGE"
+            : undefined,
       });
       dependencies.logger?.info(
         {
@@ -436,6 +502,8 @@ export function createHostedWebSearch(
           sources: answer.sources.length,
           costUsd,
           searchError: answer.searchErrorCode,
+          unreadable: answer.unreadable,
+          messageId: answer.providerReference,
         },
         "model-hosted web search",
       );

@@ -839,6 +839,9 @@ export function normalizeError(error: unknown): ModelProviderFailure {
         ...(retryAfter === undefined ? {} : { retryAfterMs: retryAfter }),
         // The vendor's error TYPE token, never its message.
         ...(refused.type === null ? {} : { vendorErrorCode: refused.type }),
+        ...(typeof refused.requestID === "string"
+          ? { providerRequestId: refused.requestID }
+          : {}),
         cause: refused,
       },
     );

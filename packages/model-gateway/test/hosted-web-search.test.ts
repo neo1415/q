@@ -1,3 +1,4 @@
+import type { Logger } from "@capital-q/observability";
 import { describe, expect, it } from "vitest";
 
 import type { ModelCatalogSnapshot } from "../src/catalog.js";
@@ -506,5 +507,202 @@ describe("hosted search cost and cap configuration", () => {
     expect(() =>
       parseModelSearchDailyCapUsd({ Q_MODEL_SEARCH_DAILY_USD_CAP: "500" }),
     ).toThrow();
+  });
+});
+
+describe("hosted web search: recorded failure shapes (2026-11-17)", () => {
+  const adapterRequest: HostedWebSearchAdapterRequest = {
+    modelCode: ANTHROPIC_FAST_MODEL,
+    query: "Kibo Health Systems Kenya",
+    allowedDomains: [],
+    maxUses: 3,
+    maxOutputTokens: 1_024,
+    instruction: "return the sources found",
+  };
+
+  function capturingLogger() {
+    const lines: {
+      context: Readonly<Record<string, unknown>>;
+      message: string;
+    }[] = [];
+    const push = (
+      context: Readonly<Record<string, unknown>>,
+      message: string,
+    ): void => {
+      lines.push({ context, message });
+    };
+    const logger: Logger = {
+      debug: push,
+      info: push,
+      warn: push,
+      error: push,
+      child: () => logger,
+    };
+    return { logger, lines };
+  }
+
+  function gatewayOver(client: AnthropicWebSearchClient, logger: Logger) {
+    const usage = createInMemoryModelUsageRepository();
+    const hosted = createHostedWebSearch({
+      catalog: createStaticModelCatalog(snapshot()),
+      adapter: createAnthropicHostedWebSearch({ apiKey: "x", client }),
+      usage,
+      modelCode: ANTHROPIC_FAST_MODEL,
+      caps: [fixedCap(2)],
+      now: () => NOW,
+      logger,
+    });
+    return { hosted, usage };
+  }
+
+  it("sends the request body the web search tool spec documents", async () => {
+    const { client, bodies } = scriptedClient(() =>
+      Promise.resolve(recordedMessage()),
+    );
+    const adapter = createAnthropicHostedWebSearch({ apiKey: "x", client });
+    await adapter.search(adapterRequest, {
+      signal: new AbortController().signal,
+    });
+    expect(bodies[0]).toEqual({
+      model: ANTHROPIC_FAST_MODEL,
+      max_tokens: 1_024,
+      system: "return the sources found",
+      // The fast model takes `disabled` at effort high or below.
+      thinking: { type: "disabled" },
+      output_config: { effort: "low" },
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
+      messages: [{ role: "user", content: "Kibo Health Systems Kenya" }],
+    });
+  });
+
+  it("reads a text block that has no citations key at all (the API omits it)", async () => {
+    const message = recordedMessage();
+    const withBareText = {
+      ...message,
+      content: [
+        // Recorded shape: prose before and between searches has no key.
+        { type: "text", text: "I'll search for that." },
+        ...message.content,
+        { type: "text", text: "Based on the search results, " },
+      ],
+    } as unknown as Message;
+    const { client } = scriptedClient(() => Promise.resolve(withBareText));
+    const { logger } = capturingLogger();
+    const { hosted, usage } = gatewayOver(client, logger);
+    const result = await hosted.search({
+      query: "Kibo Health Systems Kenya",
+      includeDomains: [],
+      attribution,
+    });
+    expect(result.sources).toHaveLength(3);
+    expect(usage.entries[0]).toMatchObject({
+      success: true,
+      costBasis: "PRICE_SNAPSHOT",
+      inputTokens: 9_000,
+    });
+  });
+
+  it("records a 400 invalid_request as PERMANENT and logs status, type and request id", async () => {
+    const { client } = scriptedClient(() =>
+      Promise.reject(
+        AnthropicAPIError.generate(
+          400,
+          {
+            type: "error",
+            error: {
+              type: "invalid_request_error",
+              message: "tools.0: something about the query Kibo",
+            },
+          },
+          "tools.0: something about the query Kibo",
+          new Headers({ "request-id": "req_011recorded" }),
+        ),
+      ),
+    );
+    const { logger, lines } = capturingLogger();
+    const { hosted, usage } = gatewayOver(client, logger);
+    await expect(
+      hosted.search({
+        query: "Kibo Health Systems Kenya",
+        includeDomains: [],
+        attribution,
+      }),
+    ).rejects.toMatchObject({
+      refusal: "PROVIDER_FAILED",
+      failureClass: "PERMANENT",
+    });
+    expect(usage.entries[0]).toMatchObject({
+      success: false,
+      errorCode: "PERMANENT",
+      purpose: "PUBLIC_WEB_SEARCH",
+    });
+    const failed = lines.find(
+      (line) => line.message === "model-hosted web search failed",
+    );
+    expect(failed?.context).toMatchObject({
+      provider: "anthropic",
+      failureClass: "PERMANENT",
+      httpStatus: 400,
+      errorType: "invalid_request_error",
+      providerRequestId: "req_011recorded",
+    });
+    // No vendor message, no query text, no key.
+    const logged = JSON.stringify(lines);
+    expect(logged).not.toContain("Kibo");
+    expect(logged).not.toContain("something about");
+  });
+
+  it("logs a connection failure's error names and system code, still TRANSIENT", async () => {
+    const socket = Object.assign(new Error("socket hang up"), {
+      code: "ECONNRESET",
+    });
+    const fetchFailure = new TypeError("fetch failed", { cause: socket });
+    const connection = new Error("Connection error.", { cause: fetchFailure });
+    connection.name = "APIConnectionError";
+    const { client } = scriptedClient(() =>
+      Promise.reject(
+        new ModelProviderFailure("anthropic connection failed", {
+          failureClass: "TRANSIENT",
+          providerCode: "anthropic",
+          cause: connection,
+        }),
+      ),
+    );
+    const { logger, lines } = capturingLogger();
+    const { hosted } = gatewayOver(client, logger);
+    await expect(
+      hosted.search({ query: "q", includeDomains: [], attribution }),
+    ).rejects.toMatchObject({ failureClass: "TRANSIENT" });
+    expect(
+      lines.find((line) => line.message === "model-hosted web search failed")
+        ?.context,
+    ).toMatchObject({
+      failureClass: "TRANSIENT",
+      errorName: "APIConnectionError",
+      causeName: "TypeError",
+      causeCode: "ECONNRESET",
+    });
+  });
+
+  it("prices an answer whose content cannot be read, instead of an unpriced TRANSIENT row", async () => {
+    const unreadable = {
+      ...recordedMessage(),
+      content: null,
+    } as unknown as Message;
+    const { client } = scriptedClient(() => Promise.resolve(unreadable));
+    const { logger } = capturingLogger();
+    const { hosted, usage } = gatewayOver(client, logger);
+    await expect(
+      hosted.search({ query: "q", includeDomains: [], attribution }),
+    ).rejects.toMatchObject({ refusal: "SEARCH_FAILED" });
+    expect(usage.entries[0]).toMatchObject({
+      success: false,
+      errorCode: "INVALID_MODEL_OUTPUT",
+      costBasis: "PRICE_SNAPSHOT",
+      inputTokens: 9_000,
+      outputTokens: 400,
+    });
+    // 9,000 x 0.10/M + 400 x 0.50/M + 2 searches x 0.01.
+    expect(usage.entries[0]?.costUsd).toBeCloseTo(0.0211, 8);
   });
 });

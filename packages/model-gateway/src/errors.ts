@@ -24,6 +24,8 @@ export type ModelProviderFailureOptions = {
   readonly retryAfterMs?: number | undefined;
   /** The vendor's stable error code token (e.g. `tool_use_failed`), never its message. */
   readonly vendorErrorCode?: string | undefined;
+  /** The vendor's request id header, for matching a failure in its console. */
+  readonly providerRequestId?: string | undefined;
   /**
    * The provider ACCOUNT cannot serve anything until a person acts (credit
    * or quota exhausted, billing limit hit). Not retried on the same model,
@@ -39,6 +41,7 @@ export class ModelProviderFailure extends Error {
   readonly providerStatus: number | undefined;
   readonly retryAfterMs: number | undefined;
   readonly vendorErrorCode: string | undefined;
+  readonly providerRequestId: string | undefined;
   readonly accountExhausted: boolean;
 
   constructor(message: string, options: ModelProviderFailureOptions) {
@@ -49,6 +52,7 @@ export class ModelProviderFailure extends Error {
     this.providerStatus = options.providerStatus;
     this.retryAfterMs = options.retryAfterMs;
     this.vendorErrorCode = options.vendorErrorCode;
+    this.providerRequestId = options.providerRequestId;
     this.accountExhausted = options.accountExhausted === true;
   }
 }
