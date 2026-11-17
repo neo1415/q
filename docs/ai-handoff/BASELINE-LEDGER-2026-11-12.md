@@ -805,3 +805,5 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **The switch:** at 08:49 UTC q-api moved to the transaction pooler (port 6543, `DATABASE_POOL_MAX=6`). The URL was edited without printing it, and the previous values are kept for rollback.
 - **After the switch:** three timed turns (figures, "why differs", three-company compare) all COMPLETED, in 12.6 s, 14.4 s and 20.1 s. First browser text came at about 2.6 s. No stuck runs and no failures since the switch.
 - **Assessment:** stable, but no clear speed gain yet at pool 6. Per the runbook, hold for an hour, then raise to pool 10 and re-time.
+- **10:01 UTC:** the watch hour was clean (0 stuck, 0 failed), so q-api's `DATABASE_POOL_MAX` went from 6 to 10 and q-api redeployed SUCCESS at 10:06. A smoke turn COMPLETED in 12.8 s. The transaction pooler stays on.
+- **Found by that smoke turn:** "What's Nixo's monthly burn and runway?" was answered "not established" although Nixo's shared management accounts give them. Only page 1 was pre-read, and the figures sit on a later page. A fix is in progress: pages are chosen by content.
