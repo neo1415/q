@@ -373,6 +373,7 @@ import {
   evidenceScopeOf,
   type ConversationEvidence,
 } from "./conversation-evidence.js";
+import { keepAnswerContext } from "./context-follow-up.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 // RC3: conversation-scoped evidence reuse, composed with its watermark.
 export {
@@ -526,6 +527,17 @@ export {
   type ConversationRecall,
   type ConversationRecallTurn,
 } from "./conversation-recall.js";
+export {
+  answerContextOf,
+  CONTEXT_EVIDENCE_CHARS_MAX,
+  createContextFollowUp,
+  keepAnswerContext,
+  type AnswerContext,
+  type ContextFollowUp,
+  type ContextFollowUpInput,
+  type ContextFollowUpMiss,
+  type ContextFollowUpOutcome,
+} from "./context-follow-up.js";
 export {
   conversationContextOf,
   reshownBlocks,
@@ -7753,6 +7765,14 @@ export function createModelGatewayQAnswer(
       wideFor,
       nudgePeek,
       settleEvidence: settleDigest,
+      /**
+       * DECISIONS 104: the sources this turn's full answer was given, kept
+       * for this conversation's contextual follow-ups (same person, access
+       * context and conversation; TTL and watermark as above).
+       */
+      keepAnswerContext: (sources: readonly string[]): void => {
+        keepAnswerContext(evidence, evidenceScope, request.runId, sources);
+      },
       prepareMs,
       history,
       conversationId,
@@ -15028,6 +15048,10 @@ export function createModelGatewayQAnswer(
           ),
         );
         logUngrounded(answerClaims.ungrounded, "answer");
+        // DECISIONS 104: what this answer was given, for a follow-up of
+        // this conversation to answer from (context-follow-up.ts). A run
+        // aborted before here has already returned.
+        prepared.keepAnswerContext(claimSources());
         // Every answer says what its claim check did (live a1777c9a: three
         // fixes passed their replays, and production showed no line at all
         // when nothing was flagged). Counts and kinds only, no text.

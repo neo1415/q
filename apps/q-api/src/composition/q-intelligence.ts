@@ -19,6 +19,7 @@ import {
   createQPageMoves,
   runSituation,
   createConversationRecall,
+  createContextFollowUp,
   createQTurnReader,
   createSmallTalkReply,
   createCallPrepWriter,
@@ -766,6 +767,21 @@ export function composeQIntelligence(
         : { dataPosture: dependencies.dataPosture }),
       ...(logger === undefined ? {} : { logger }),
     }),
+    // DECISIONS 104: a contextual follow-up answered from the previous full
+    // answer's kept sources (the same evidence store, TTL and watermark as
+    // the answer's own reuse) in one tool-free, claim-checked call.
+    ...(dependencies.conversationEvidence === undefined
+      ? {}
+      : {
+          contextFollowUp: createContextFollowUp({
+            gateway,
+            evidence: dependencies.conversationEvidence,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+            ...(logger === undefined ? {} : { logger }),
+          }),
+        }),
     // RECOVERY B5: small talk in one short tool-free call.
     smallTalk: createSmallTalkReply({
       gateway,

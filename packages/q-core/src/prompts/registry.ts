@@ -252,6 +252,7 @@ import { PLAN_REVIEW_V6 } from "./tasks/plan.v6.js";
 import { PLAN_REVIEW_V7, PLAN_WRITE_V5 } from "./tasks/plan.v7.js";
 import { PLAN_REVIEW_V8 } from "./tasks/plan.v8.js";
 import { CONVERSATION_RECALL_V1 } from "./tasks/conversation-recall.v1.js";
+import { CONVERSATION_RECALL_V2 } from "./tasks/conversation-recall.v2.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
 import { TURN_SKIM_V3 } from "./tasks/turn-skim.v3.js";
@@ -998,7 +999,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PLAN_WRITE_V5,
     { ...PLAN_REVIEW_V7, status: "DEPRECATED" },
     PLAN_REVIEW_V8,
-    CONVERSATION_RECALL_V1,
+    // v1 stays the record-only recall (pinned by its caller); v2 is the
+    // contextual follow-up fast path (DECISIONS 104).
+    { ...CONVERSATION_RECALL_V1, status: "DEPRECATED" },
+    CONVERSATION_RECALL_V2,
     TURN_SKIM_V1,
     TURN_SKIM_V2,
     TURN_SKIM_V3,

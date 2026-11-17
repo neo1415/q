@@ -1925,13 +1925,20 @@ export {
   type CallPrepVariables,
 } from "./prompts/schemas/call-prep.js";
 export { CONVERSATION_RECALL_V1 } from "./prompts/tasks/conversation-recall.v1.js";
+export { CONVERSATION_RECALL_V2 } from "./prompts/tasks/conversation-recall.v2.js";
 export {
   CONVERSATION_RECALL_SCHEMA_NAME,
   CONVERSATION_RECALL_SCHEMA_VERSION,
   CONVERSATION_RECALL_UNTRUSTED,
+  CONVERSATION_RECALL_V2_SCHEMA_VERSION,
+  CONVERSATION_RECALL_V2_UNTRUSTED,
   ConversationRecallResultSchema,
+  ConversationRecallV2ResultSchema,
+  ConversationRecallV2VariablesSchema,
   ConversationRecallVariablesSchema,
   type ConversationRecallResult,
+  type ConversationRecallV2Result,
+  type ConversationRecallV2Variables,
   type ConversationRecallVariables,
 } from "./prompts/schemas/conversation-recall.js";
 export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";

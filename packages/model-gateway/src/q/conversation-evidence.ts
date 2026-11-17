@@ -36,8 +36,12 @@ import type { ActorContext } from "@capital-q/security";
 export const CONVERSATION_EVIDENCE_TTL_MS = 3 * 60_000;
 const ENTRIES_MAX = 1_000;
 
-/** What is kept: the account digest, and the turn's wide reads. */
-export type EvidenceSlot = "DIGEST" | "WIDE";
+/**
+ * What is kept: the account digest, the turn's wide reads, and (DECISIONS
+ * 104) the sources the last full answer was given, for the contextual
+ * follow-up fast path (context-follow-up.ts).
+ */
+export type EvidenceSlot = "DIGEST" | "WIDE" | "ANSWER";
 
 export type EvidenceScope = {
   readonly tenantId: string;

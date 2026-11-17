@@ -62,6 +62,9 @@ export function createConversationRecall(dependencies: {
     try {
       const rendered = renderPrompt<ConversationRecallVariables>(registry, {
         task: "CONVERSATION_RECALL",
+        // The record-only recall; v2 is the context fast path's
+        // (context-follow-up.ts).
+        taskVersion: 1,
         operatingMode: "DEBRIEF",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
         environmentNotes:

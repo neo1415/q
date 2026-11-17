@@ -640,6 +640,8 @@ import {
   asksToOpenAPage,
   cardNamesInWords,
   sameCompanyName as sameCardName,
+  type ContextFollowUp,
+  type ContextFollowUpOutcome,
 } from "@capital-q/model-gateway/q";
 
 /**
@@ -1470,6 +1472,16 @@ export type SpecialistQAnswerDependencies = {
         readonly runId: string;
       }) => Promise<readonly QConversationFetch[]>)
     | undefined;
+  /**
+   * DECISIONS 104 (owner, 2026-11-17): a turn the reader classes
+   * CONTEXTUAL_FOLLOW_UP, answered from what the previous full answer of
+   * this conversation was given (kept conversation evidence: same person,
+   * access context and conversation, inside its TTL and unchanged) and
+   * what Q showed, in one tool-free call held to the claim check
+   * (model-gateway createContextFollowUp). A MISS: the full path answers.
+   * Absent: the full path, as before.
+   */
+  readonly contextFollowUp?: ContextFollowUp | undefined;
   readonly conversationRecall?:
     | ((
         request: QAnswerRequest,
@@ -3176,6 +3188,25 @@ export function createSpecialistQAnswer(
   const lastActed = new Map<string, LastAction>();
   /** What each run's person said, for the action a run notes. */
   const saidInRun = new Map<string, string>();
+  /**
+   * DECISIONS 104: a spoken turn's context follow-up, started beside the
+   * full reading once the skim agrees it is no app query, while evidence
+   * is held. Adopted only if the reading classes the turn
+   * CONTEXTUAL_FOLLOW_UP for the same words; otherwise aborted. Nothing of
+   * it is said or stored before the reading decides.
+   */
+  const contextEarly = new Map<
+    string,
+    {
+      readonly messageId: string;
+      readonly outcome: Promise<ContextFollowUpOutcome>;
+      readonly abort: AbortController;
+    }
+  >();
+  const dropContextEarly = (runId: string): void => {
+    contextEarly.get(runId)?.abort.abort();
+    contextEarly.delete(runId);
+  };
   const noteAction = (
     request: QAnswerRequest,
     conversationId: string,
@@ -7078,6 +7109,8 @@ export function createSpecialistQAnswer(
       // Any path that did not adopt the speculation drops it (a no-op once
       // adopted): nothing of it is said, stored or done.
       speculative.current?.cancel("ACTED");
+      // The same for an early context follow-up (DECISIONS 104).
+      dropContextEarly(request.runId);
     });
     await persistCore(request.runId);
     // One status per card per answer: a card this turn handed to the
@@ -7580,6 +7613,49 @@ export function createSpecialistQAnswer(
     };
     // No skim composed: nothing to gate on, so it starts at once.
     if (speculate && dependencies.turnSkim === undefined) startSpoken();
+    // DECISIONS 104: the context follow-up overlaps the full reading (it
+    // takes ~2.6 s live), only for a spoken turn whose skim reads no app
+    // query, and only while this conversation's evidence is held. It is a
+    // read of their own kept evidence and one tool-free call; the reading
+    // still decides whether it is used.
+    const startContextEarly = (): void => {
+      const follow = dependencies.contextFollowUp;
+      if (
+        follow === undefined ||
+        contextEarly.has(request.runId) ||
+        request.capability !== "ANSWER" ||
+        !follow.holds(request, conversationId)
+      ) {
+        return;
+      }
+      const abort = new AbortController();
+      const outcome = follow
+        .answer(
+          request,
+          {
+            conversationId,
+            history,
+            latestId: latest.id,
+            said: latest.content,
+            spoken: true,
+          },
+          { signal: abort.signal },
+        )
+        .catch((): ContextFollowUpOutcome => ({
+          kind: "MISS",
+          reason: "FAILED",
+        }));
+      contextEarly.set(request.runId, {
+        messageId: latest.id,
+        outcome,
+        abort,
+      });
+      while (contextEarly.size > PREREADS_MAX) {
+        const oldest = contextEarly.keys().next().value;
+        if (oldest === undefined) break;
+        dropContextEarly(oldest);
+      }
+    };
     // K6: the full reading is dropped (its provider call aborted) when the
     // fast lane's skim answers the turn first; the run's own abort still
     // reaches it.
@@ -7903,6 +7979,16 @@ export function createSpecialistQAnswer(
         skimming.catch(() => null),
       ]);
       const lane = fastLaneOf(skimmed, latest.content);
+      // DECISIONS 104: a spoken turn the skim reads as no app query starts
+      // its context follow-up now, beside the reading (held evidence only).
+      if (
+        spoken &&
+        lane === null &&
+        skimmed?.kind === "OTHER" &&
+        !readerAbort.signal.aborted
+      ) {
+        startContextEarly();
+      }
       if (speculate && lane === null) {
         if (skimmed?.kind === "OTHER" && !readerAbort.signal.aborted) {
           startSpoken();
@@ -8790,6 +8876,71 @@ export function createSpecialistQAnswer(
     // person was already shown, on their own conversation; a request to
     // act, or a reading the record cannot answer, takes the path below.
     const fromShown = read?.fromShown ?? null;
+    // DECISIONS 104 (owner, 2026-11-17): a same-subject follow-up is
+    // answered at once from what this conversation already read and
+    // showed -- no tools, pre-readers, retrieval or ranking -- when the
+    // reading classes it CONTEXTUAL_FOLLOW_UP. Its evidence is reused only
+    // for the same person, access context and conversation, fresh and
+    // unchanged; its words are held to the claim check; anything its
+    // sources do not hold is a miss, and the turn goes the full way below
+    // (the record-only recall is then not asked again: it holds less).
+    let contextTried = false;
+    {
+      const early = contextEarly.get(request.runId);
+      contextEarly.delete(request.runId);
+      const follow = dependencies.contextFollowUp;
+      const fastPath =
+        follow !== undefined &&
+        read !== null &&
+        read.confidence !== "LOW" &&
+        request.capability === "ANSWER" &&
+        (read.tool ?? null) === null &&
+        fromShown?.reshow !== true &&
+        !leadInRun.has(request.runId) &&
+        !sequences.has(conversationId) &&
+        executionClassOfTurn({
+          read,
+          history,
+          latestId: latest.id,
+          carriesDocuments:
+            (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
+        }) === "CONTEXTUAL_FOLLOW_UP";
+      const adoptable = early !== undefined && early.messageId === latest.id;
+      if (!fastPath || !adoptable) early?.abort.abort();
+      if (fastPath) {
+        const startedAt = Date.now();
+        const outcome = adoptable
+          ? await early.outcome
+          : await follow.answer(request, {
+              conversationId,
+              history,
+              latestId: latest.id,
+              said: latest.content,
+              spoken,
+            });
+        logger?.info(
+          {
+            qRunId: request.runId,
+            outcome: outcome.kind,
+            reason: outcome.kind === "MISS" ? outcome.reason : null,
+            early: adoptable,
+            waitedMs: Date.now() - startedAt,
+          },
+          "q context follow-up",
+        );
+        if (outcome.kind === "ANSWERED") {
+          speculative.current?.cancel("ACTED");
+          return recordAnswer(request, conversationId, outcome.text);
+        }
+        // The sources could not answer it: the record-only recall holds
+        // less, so only a call that never decided (no evidence, a failed
+        // call, a revocation) leaves it to try.
+        contextTried =
+          outcome.reason === "NOT_ANSWERABLE" ||
+          outcome.reason === "UNGROUNDED" ||
+          outcome.reason === "CLAIMS_WORK";
+      }
+    }
     const shownTurn =
       fromShown === null ? null : shownTurnOf(context, fromShown.turn);
     if (
@@ -8828,6 +8979,7 @@ export function createSpecialistQAnswer(
       if (
         !fromShown.reshow &&
         !asksToAct &&
+        !contextTried &&
         (read.tool ?? null) === null &&
         dependencies.conversationRecall !== undefined
       ) {
