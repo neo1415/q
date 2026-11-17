@@ -555,6 +555,13 @@ import {
   withSharedDocumentsInLimits,
 } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
+import {
+  correctDocumentDenials,
+  createDocumentDenialGuard,
+  documentsReadOf,
+  supersededByDocuments,
+  type ReadDocument,
+} from "./document-stated-figures.js";
 import type { CheckedLineNeed } from "./uncertainty.js";
 import {
   alreadyReadLine,
@@ -9162,6 +9169,10 @@ export function createModelGatewayQAnswer(
       // Gap 2 (12 Nov): the same facts, for code to set their figures
       // beside the public pages' (figure-conflicts.ts).
       let suppliedFacts: readonly ConflictFact[] = [];
+      // The documents read for this turn, as the last prompt carried them:
+      // a sentence calling a figure they state unknown is said as they
+      // state it (document-stated-figures.ts; live 13279c88).
+      let documentsThisTurn: readonly ReadDocument[] = [];
       // How many retrieved passages, and code's row facts beside them, the
       // prompt carried: the claim check's diagnostic line (counts only).
       let retrievedPassages = 0;
@@ -9252,6 +9263,12 @@ export function createModelGatewayQAnswer(
         const citable = withFactLabels(facts);
         suppliedStandings = suppliedStandingsOf(citable);
         suppliedFacts = citable;
+        // Live 13279c88 (17 Nov 2026): what Q said before ("burn and runway
+        // aren't established") never outweighs a page read this turn that
+        // states the figure; such a sentence is labelled as superseded by
+        // that read (document-stated-figures.ts). As said, label added.
+        const documentsNow = documentsReadOf(facts);
+        documentsThisTurn = documentsNow;
 
         const variables: Omit<
           CompanyAnalystV4Variables,
@@ -9264,14 +9281,17 @@ export function createModelGatewayQAnswer(
           userMessage: latest.content,
           conversation: earlier.map((m) => ({
             role: m.role,
-            content: m.content,
+            content:
+              m.role === "Q"
+                ? supersededByDocuments(m.content, documentsNow)
+                : m.content,
           })),
           authorisedFacts: [...citable],
           subjectDescription: assembled.subjectDescription,
           institutionalNotes:
             assembled.institutionalNotes ??
             "Nothing was established in advance for this request.",
-          memory,
+          memory: supersededByDocuments(memory, documentsNow),
           // Filled below, once the notes are composed.
           turnNotes: "",
         };
@@ -9944,6 +9964,15 @@ export function createModelGatewayQAnswer(
         new Date(),
         () => claimEchoes(),
       );
+      /**
+       * Live 13279c88 (17 Nov 2026): a sentence that says a figure is
+       * unknown, not established or not stated, when a document read for
+       * this turn states it, is said as the document states it (title,
+       * page, figure, period); a second such sentence is not said again.
+       */
+      const documentDenials = createDocumentDenialGuard(
+        () => documentsThisTurn,
+      );
       /** Findings the count check examined and left out (diagnostic line). */
       const findingsChecked = { examined: 0, dropped: 0 };
       /**
@@ -10039,10 +10068,14 @@ export function createModelGatewayQAnswer(
         const caveatedRaw = guarded === null ? null : caveats.sentence(guarded);
         // No figure, date or name the run was not given is said aloud or
         // shown (step 6); checked before publish, so voice never speaks it.
-        const claimed =
+        const restated =
           caveatedRaw === null || caveatedRaw.length === 0
             ? null
-            : stageClock.time("claimCheck", () => claims.sentence(caveatedRaw));
+            : documentDenials.sentence(caveatedRaw);
+        const claimed =
+          restated === null || restated.length === 0
+            ? null
+            : stageClock.time("claimCheck", () => claims.sentence(restated));
         if (claimed !== null) logUngrounded(claimed.ungrounded, "stream");
         // No action is said done that no tool of this run did (step 8).
         const claimedText = claimed?.text;
@@ -14709,11 +14742,28 @@ export function createModelGatewayQAnswer(
           ).text,
           groundsNow(),
         );
+        // Live 13279c88: the stored answer is held to the documents read
+        // as the streamed sentences were (document-stated-figures.ts).
+        const restated = correctDocumentDenials(
+          recommendationGuarded.text,
+          documentsThisTurn,
+        );
+        if (restated.corrected > 0 || documentDenials.corrected() > 0) {
+          logger?.warn(
+            {
+              qRunId: request.runId,
+              stream: documentDenials.corrected(),
+              answer: restated.corrected,
+              documents: documentsThisTurn.length,
+            },
+            "a figure the documents read this turn state was said to be unknown; said as they state it",
+          );
+        }
         // Step 6: the stored answer is held to the same check the streamed
         // sentences were, so the screen never shows what voice withheld.
         const answerClaims = stageClock.time("claimCheckAnswer", () =>
           checkAnswer(
-            recommendationGuarded.text,
+            restated.text,
             claimCorpus(claimSources(), new Date(), claimEchoes()),
           ),
         );

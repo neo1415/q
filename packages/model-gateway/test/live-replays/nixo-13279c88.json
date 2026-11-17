@@ -1,0 +1,474 @@
+{
+  "_note": "Stored tool results of live run 13279c88 (production be260a584, 17 Nov 2026 11:17 UTC, investor Savanna Seed Partners on Nixo; both fictional/synthetic, decision 99): q_runtime.conversation_tool_results call_index 5-9, 11, 13, 14. No private data.",
+  "figures": {
+    "status": "NONE",
+    "figures": [],
+    "companyId": "d48c26d2-5aca-4788-9033-073b0f9d08ec"
+  },
+  "company": {
+    "team": [
+      {
+        "name": "Priya Khandelwal",
+        "shortBio": null,
+        "isFounder": true,
+        "businessTitle": null,
+        "relationshipType": "team_member"
+      }
+    ],
+    "companyId": "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+    "legalName": "Nixo Inc.",
+    "truthClass": "USER_CLAIM",
+    "websiteUrl": "https://withnixo.com",
+    "foundedDate": "2025-01-01",
+    "canonicalName": "Nixo",
+    "companyStatus": "active",
+    "relationToYou": "SHARED",
+    "currentStageCode": "seed",
+    "headquartersCity": "San Francisco",
+    "shortDescription": "Helping AI companies achieve SaaS-level margins from custom deployments and services work.",
+    "primaryDescription": "Nixo helps AI companies improve the margins and operational visibility of custom deployments and services work through software for forward-deployed engineering teams.",
+    "headquartersCountry": "US"
+  },
+  "dataRoom": {
+    "viewer": "INVESTOR",
+    "documents": [
+      {
+        "title": "Seed pitch deck",
+        "folder": "Fundraising summary",
+        "status": "shared with you",
+        "documentId": "77297b2b-3d40-4812-a626-097f4c36fbf5"
+      },
+      {
+        "title": "Management accounts, May 2025 to Oct 2026",
+        "folder": "Financials",
+        "status": "shared with you",
+        "documentId": "e375caf2-9fec-4fed-8985-b6604d40d8b2"
+      },
+      {
+        "title": "Monthly revenue by customer",
+        "folder": "Financials",
+        "status": "shared with you",
+        "documentId": "21e261d8-a877-420d-ac40-ff7b35b8839f"
+      },
+      {
+        "title": "Customer contract summary",
+        "folder": "Other documents",
+        "status": "shared with you",
+        "documentId": "b33ad427-2246-4eab-85b9-2ea25a047546"
+      },
+      {
+        "title": "Customer cohorts and retention",
+        "folder": "Financials",
+        "status": "shared with you",
+        "documentId": "a6d551b6-38bb-4f3e-95c0-f23641a8682c"
+      },
+      {
+        "title": "Customer concentration",
+        "folder": "Customers and contracts",
+        "status": "shared with you",
+        "documentId": "5eb20621-b106-42cd-b0f4-71ffb78015b7"
+      },
+      {
+        "title": "Capitalisation table and ownership",
+        "folder": "Cap table and equity",
+        "status": "shared with you",
+        "documentId": "dcf2ea78-a7cf-453d-afbd-3a81043b1e40"
+      },
+      {
+        "title": "Seed round terms and use of funds",
+        "folder": "Fundraising summary",
+        "status": "shared with you",
+        "documentId": "16f453df-698a-40ef-a542-368360bbe19b"
+      },
+      {
+        "title": "Projections to December 2027, with assumptions",
+        "folder": "Financials",
+        "status": "shared with you",
+        "documentId": "a7426006-872b-452e-a2b3-d5e8e46611f5"
+      },
+      {
+        "title": "KPI and product metrics pack",
+        "folder": "Fundraising summary",
+        "status": "shared with you",
+        "documentId": "e704cde9-0ffc-4163-b6e2-5a5cc5ef5fee"
+      }
+    ],
+    "openRequests": 0
+  },
+  "deck": {
+    "deck": {
+      "title": "Seed pitch deck",
+      "scanned": false,
+      "pageCount": 12,
+      "documentId": "77297b2b-3d40-4812-a626-097f4c36fbf5",
+      "uploadedAt": "2026-11-16T09:03:32.672Z",
+      "downloadable": false,
+      "versionNumber": 1
+    },
+    "viewer": "INVESTOR",
+    "sections": [],
+    "truthClass": "USER_CLAIM",
+    "confirmedByFounder": false
+  },
+  "relationship": {
+    "brief": {
+      "facts": [
+        "Relationship with Nixo: IN_DILIGENCE since 2026-11-16 19:08 UTC.",
+        "Nixo shared \"Customer cohorts and retention\" on 2026-11-16 19:09 UTC.",
+        "Nixo shared \"Customer concentration\" on 2026-11-16 19:09 UTC.",
+        "Nixo shared \"Capitalisation table and ownership\" on 2026-11-16 19:09 UTC.",
+        "Nixo shared \"Seed round terms and use of funds\" on 2026-11-16 19:09 UTC.",
+        "Nixo shared \"Projections to December 2027, with assumptions\" on 2026-11-16 19:09 UTC.",
+        "Nixo shared \"KPI and product metrics pack\" on 2026-11-16 19:09 UTC.",
+        "No messages have been sent in the chat with Nixo.",
+        "No call has been booked with Nixo.",
+        "Open diligence requests: Business bank statements, Aug to Oct 2026.",
+        "Answered diligence request \"Customer contract summary\": \"Customer contract summary\" was shared for it on 2026-11-16 19:08 UTC (a shared document; not verification). It was asked about: \"Contracted ARR of $1.08m against $864k of annualised billed subscriptions\" (then REPORTED).",
+        "Waiting on you: DECIDE_NEXT_STEP (since 2026-11-16 19:08 UTC)."
+      ],
+      "detail": {
+        "state": {
+          "state": "IN_DILIGENCE",
+          "nextStep": "DECIDE_NEXT_STEP",
+          "milestones": [
+            {
+              "at": "2026-11-16T19:08:40.646Z",
+              "state": "DISCOVERED"
+            },
+            {
+              "at": "2026-11-16T19:08:41.124Z",
+              "state": "INTEREST_EXPRESSED"
+            },
+            {
+              "at": "2026-11-16T19:08:46.767Z",
+              "state": "CONNECTED"
+            },
+            {
+              "at": "2026-11-16T19:08:51.913Z",
+              "state": "IN_DILIGENCE"
+            }
+          ],
+          "stateSince": "2026-11-16T19:08:51.913Z"
+        },
+        "history": [
+          {
+            "at": "2026-11-16T19:08:41.124Z",
+            "by": "YOUR_SIDE",
+            "kind": "INTEREST_EXPRESSED",
+            "note": "Tooling for forward-deployed engineering teams fits our seed thesis. We'd like to understand contracted against billed revenue and the team plan before the round closes.",
+            "document": null
+          },
+          {
+            "at": "2026-11-16T19:08:46.767Z",
+            "by": "OTHER_SIDE",
+            "kind": "CONNECTION_ACCEPTED",
+            "note": null,
+            "document": null
+          },
+          {
+            "at": "2026-11-16T19:08:58.410Z",
+            "by": "YOUR_SIDE",
+            "kind": "DOCUMENT_REQUESTED",
+            "note": null,
+            "document": null
+          },
+          {
+            "at": "2026-11-16T19:08:59.453Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Customer contract summary"
+          },
+          {
+            "at": "2026-11-16T19:09:00.171Z",
+            "by": "YOUR_SIDE",
+            "kind": "DOCUMENT_REQUESTED",
+            "note": null,
+            "document": null
+          },
+          {
+            "at": "2026-11-16T19:09:01.292Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Seed pitch deck"
+          },
+          {
+            "at": "2026-11-16T19:09:02.088Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Management accounts, May 2025 to Oct 2026"
+          },
+          {
+            "at": "2026-11-16T19:09:02.829Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Monthly revenue by customer"
+          },
+          {
+            "at": "2026-11-16T19:09:03.872Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Customer cohorts and retention"
+          },
+          {
+            "at": "2026-11-16T19:09:04.727Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Customer concentration"
+          },
+          {
+            "at": "2026-11-16T19:09:05.459Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Capitalisation table and ownership"
+          },
+          {
+            "at": "2026-11-16T19:09:06.193Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Seed round terms and use of funds"
+          },
+          {
+            "at": "2026-11-16T19:09:06.925Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "Projections to December 2027, with assumptions"
+          },
+          {
+            "at": "2026-11-16T19:09:07.689Z",
+            "by": "OTHER_SIDE",
+            "kind": "DOCUMENT_SHARED",
+            "note": null,
+            "document": "KPI and product metrics pack"
+          }
+        ],
+        "noShows": [],
+        "meetings": {
+          "items": [],
+          "status": "OK",
+          "nextScheduled": null
+        },
+        "messages": {
+          "count": 0,
+          "latest": {
+            "status": "OK",
+            "message": null,
+            "fromThem": null
+          }
+        },
+        "yourSide": "INVESTOR",
+        "documents": {
+          "items": [
+            {
+              "id": "b33ad427-2246-4eab-85b9-2ea25a047546",
+              "title": "Customer contract summary",
+              "openedByYourSide": true
+            },
+            {
+              "id": "77297b2b-3d40-4812-a626-097f4c36fbf5",
+              "title": "Seed pitch deck",
+              "openedByYourSide": true
+            },
+            {
+              "id": "e375caf2-9fec-4fed-8985-b6604d40d8b2",
+              "title": "Management accounts, May 2025 to Oct 2026",
+              "openedByYourSide": true
+            },
+            {
+              "id": "21e261d8-a877-420d-ac40-ff7b35b8839f",
+              "title": "Monthly revenue by customer",
+              "openedByYourSide": true
+            },
+            {
+              "id": "a6d551b6-38bb-4f3e-95c0-f23641a8682c",
+              "title": "Customer cohorts and retention",
+              "openedByYourSide": true
+            },
+            {
+              "id": "5eb20621-b106-42cd-b0f4-71ffb78015b7",
+              "title": "Customer concentration",
+              "openedByYourSide": true
+            },
+            {
+              "id": "dcf2ea78-a7cf-453d-afbd-3a81043b1e40",
+              "title": "Capitalisation table and ownership",
+              "openedByYourSide": true
+            },
+            {
+              "id": "16f453df-698a-40ef-a542-368360bbe19b",
+              "title": "Seed round terms and use of funds",
+              "openedByYourSide": true
+            },
+            {
+              "id": "a7426006-872b-452e-a2b3-d5e8e46611f5",
+              "title": "Projections to December 2027, with assumptions",
+              "openedByYourSide": true
+            },
+            {
+              "id": "e704cde9-0ffc-4163-b6e2-5a5cc5ef5fee",
+              "title": "KPI and product metrics pack",
+              "openedByYourSide": true
+            }
+          ],
+          "status": "OK"
+        },
+        "generatedAt": "2026-11-17T11:17:05.572Z",
+        "obligations": {
+          "status": "OK",
+          "answered": [
+            {
+              "id": "8e150286-ee16-4be7-8b6b-9394a65799c9",
+              "about": {
+                "standing": "REPORTED",
+                "statement": "Contracted ARR of $1.08m against $864k of annualised billed subscriptions"
+              },
+              "title": "Customer contract summary",
+              "answers": [],
+              "document": "Customer contract summary",
+              "fulfilledAt": "2026-11-16T19:08:59.384Z"
+            }
+          ],
+          "openRequests": [
+            {
+              "id": "224a0b21-a8d2-4071-a225-8caab13ba753",
+              "title": "Business bank statements, Aug to Oct 2026"
+            }
+          ],
+          "answeredCount": 1
+        },
+        "counterparty": {
+          "id": "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+          "kind": "COMPANY",
+          "name": "Nixo"
+        },
+        "relationshipId": "9c43e508-433d-4e3c-9b36-721bb044bcee",
+        "sourceVersions": {
+          "brief": "relationship-brief.v1",
+          "projector": "relationship-state.v2",
+          "historySequence": 16
+        },
+        "pendingDecisions": {
+          "items": [
+            {
+              "kind": "DECIDE_NEXT_STEP",
+              "owner": "YOU",
+              "since": "2026-11-16T19:08:51.913Z"
+            }
+          ],
+          "complete": true
+        }
+      },
+      "status": "OK"
+    },
+    "source": "Capital Q relationship history",
+    "yourSide": "INVESTOR",
+    "diligence": {
+      "followUps": [
+        {
+          "about": {
+            "standing": "REPORTED",
+            "statement": "Contracted ARR of $1.08m against $864k of annualised billed subscriptions"
+          },
+          "title": "Customer contract summary",
+          "status": "FULFILLED",
+          "answers": [],
+          "document": {
+            "title": "Customer contract summary",
+            "summary": "Customer contract summary · 2 pages · Period May 2025–Oct 2026 · 5 live customers; 1 signed, not billing (self-reported) · $1,200/seat/month (self-reported)"
+          },
+          "declineNote": null,
+          "fulfilledAt": "2026-11-16T19:08:59.384Z",
+          "requestedAt": "2026-11-16T19:08:58.326Z"
+        }
+      ],
+      "openRequests": ["Business bank statements, Aug to Oct 2026"],
+      "sharedDocuments": [
+        "Customer contract summary",
+        "Seed pitch deck",
+        "Management accounts, May 2025 to Oct 2026",
+        "Monthly revenue by customer",
+        "Customer cohorts and retention",
+        "Customer concentration",
+        "Capitalisation table and ownership",
+        "Seed round terms and use of funds",
+        "Projections to December 2027, with assumptions",
+        "KPI and product metrics pack"
+      ],
+      "answeredRequests": ["Customer contract summary"]
+    },
+    "truthClass": "VERIFIED",
+    "counterpart": {
+      "id": "d48c26d2-5aca-4788-9033-073b0f9d08ec",
+      "kind": "COMPANY",
+      "name": "Nixo"
+    },
+    "relationship": {
+      "state": "IN_DILIGENCE",
+      "nextStep": "DECIDE_NEXT_STEP",
+      "milestones": [
+        {
+          "at": "2026-11-16T19:08:40.646Z",
+          "state": "DISCOVERED"
+        },
+        {
+          "at": "2026-11-16T19:08:41.124Z",
+          "state": "INTEREST_EXPRESSED"
+        },
+        {
+          "at": "2026-11-16T19:08:46.767Z",
+          "state": "CONNECTED"
+        },
+        {
+          "at": "2026-11-16T19:08:51.913Z",
+          "state": "IN_DILIGENCE"
+        }
+      ],
+      "stateSince": "2026-11-16T19:08:51.913Z"
+    }
+  },
+  "kpiPack": {
+    "pages": [
+      {
+        "page": 1,
+        "text": "SYNTHETIC DEMO DOCUMENT - NOT A REAL FINANCIAL OR OFFICIAL RECORD\nKPI and product metrics pack\nNixo Inc. | Period: May 2025 to Oct 2026 | Version 1.0 | Issued 16 Nov 2026\nDefinitions\nBilled seats: forward-deployed engineering seats invoiced in the month. Contracted ARR: seats under signed contracts x 1,200 x 12, including seats not yet billed. Annualised subscription revenue: the month's recognised subscription revenue x 12. Paid contracts: signed subscription agreements. Customer deployments tracked on the platform at month end.\nProduct and commercial metrics: May 2025 to Oct 2025\nMay 2025 | Jun 2025 | Jul 2025 | Aug 2025 | Sep 2025 | Oct 2025\nBilled seats | 0 | 0 | 8 | 8 | 8 | 18\nPaid contracts | 0 | 1 | 1 | 1 | 2 | 2\nDesign partners | 2 | 2 | 2 | 2 | 3 | 3\nAnnualised subscription revenue (USD) | 0 | 0 | 115,200 | 115,200 | 115,200 | 259,200\nContracted ARR (USD) | 0 | 0 | 115,200 | 115,200 | 115,200 | 259,200\nDeployments tracked | 0 | 0 | 12 | 12 | 12 | 27\nEmployees (month end) | 4 | 4 | 4 | 6 | 7 | 7\nContract forward-deployed engineers | 0 | 0 | 0 | 0 | 0 | 0\nProduct and commercial metrics: Nov 2025 to Apr 2026\nNov 2025 | Dec 2025 | Jan 2026 | Feb 2026 | Mar 2026 | Apr 2026\nBilled seats | 18 | 18 | 23 | 27 | 31 | 41\nPaid contracts | 2 | 3 | 3 | 3 | 4 | 4\nDesign partners | 3 | 4 | 4 | 4 | 5 | 5\nAnnualised subscription revenue (USD) | 259,200 | 259,200 | 331,200 | 388,800 | 446,400 | 590,400\nContracted ARR (USD) | 259,200 | 259,200 | 331,200 | 388,800 | 446,400 | 590,400\nDeployments tracked | 27 | 27 | 35 | 41 | 47 | 62\nEmployees (month end) | 7 | 8 | 8 | 9 | 9 | 10\nContract forward-deployed engineers | 0 | 0 | 0 | 0 | 0 | 0\nProduct and commercial metrics: May 2026 to Oct 2026\nMay 2026 | Jun 2026 | Jul 2026 | Aug 2026 | Sep 2026 | Oct 2026\nBilled seats | 41 | 44 | 54 | 60 | 60 | 60\nPaid contracts | 4 | 5 | 5 | 5 | 5 | 6\nDesign partners | 5 | 6 | 6 | 6 | 6 | 6\nAnnualised subscription revenue (USD) | 590,400 | 633,600 | 777,600 | 864,000 | 864,000 | 864,000\nContracted ARR (USD) | 590,400 | 633,600 | 777,600 | 864,000 | 864,000 | 1,080,000\nDeployments tracked | 62 | 66 | 81 | 90 | 90 | 90\nEmployees (month end) | 10 | 10 | 10 | 10 | 10 | 11\nContract forward-deployed engineers | 2 | 2 | 2 | 2 | 2 | 2\nFinancial position, October 2026\nContracted ARR USD 1,080,000; annualised subscription revenue USD 864,000. Customer F (AI voice-agents company (Series B)) signed on 07 Oct 2026 for 15 seats, with billing from 01 Jan 2027. Gross margin, 12 months to Oct 2026: 65.3% with onboarding delivery in cost of revenue; subscription gross margin 84.4%. Net burn USD 125,800; cash USD 1,107,750; runway 8.8 months at this burn.\nTeam\n10 employees and 2 contract forward-deployed engineers at 30 Sep 2026. Headcount figures in this pack count employees only.\nSYNTHETIC DEMO DOCUMENT\nNixo Inc. | KPI and product metrics pack Version 1.0 | Period: May 2025 to Oct 2026 | Issued 16 Nov 2026 | Page 1/1"
+      }
+    ],
+    "title": "KPI and product metrics pack",
+    "folder": "Fundraising summary",
+    "status": "READ",
+    "pageCount": 1,
+    "truncated": false,
+    "documentId": "e704cde9-0ffc-4163-b6e2-5a5cc5ef5fee",
+    "truthClass": "USER_CLAIM",
+    "evidenceStatus": "DOCUMENT_SUPPORTED"
+  },
+  "managementAccounts": {
+    "pages": [
+      {
+        "page": 1,
+        "text": "SYNTHETIC DEMO DOCUMENT - NOT A REAL FINANCIAL OR OFFICIAL RECORD\nManagement accounts, May 2025 to Oct 2026\nNixo Inc. | Period: May 2025 to Oct 2026 | Version 1.0 | Issued 16 Nov 2026\nBasis of preparation\nPrepared by the company with its outsourced accountant; unaudited. Accrual basis. Amounts in USD, whole units. Revenue recognition: platform subscriptions at 1,200 per forward-deployed engineering seat per month are invoiced monthly in advance and recognised in the month of service. Onboarding and integration fees are invoiced at contract signature and recognised in thirds over the first three months from go-live. Hosting, model inference and the contract forward-deployed engineers who deliver onboarding are reported in cost of revenue.\nSummary for October 2026\nOct 2026\nRevenue | 72,000\nGross profit | 39,500\nNet result for the month | -155,800\nCash at month end | 1,107,750\nNet burn (payments less customer receipts) | 125,800\nRunway at this month's net burn (months) | 8.8\nHeadcount at month end | 11\nGross margin, 12 months to Oct 2026: 65.3% (revenue 638,400, cost of revenue 221,550). Subscription gross margin, 12 months to Oct 2026: 84.4% (subscription revenue 572,400 less hosting and model inference 89,550; excludes onboarding fees and the contract forward-deployed engineers).\nProfit and loss: May 2025 to Oct 2025\nMay 2025 | Jun 2025 | Jul 2025 | Aug 2025 | Sep 2025 | Oct 2025\nPlatform subscriptions | 0 | 0 | 9,600 | 9,600 | 9,600 | 21,600\nOnboarding and integration services | 0 | 0 | 6,000 | 6,000 | 6,000 | 6,000\nTotal revenue | 0 | 0 | 15,600 | 15,600 | 15,600 | 27,600\nHosting and model inference | 1,500 | 1,500 | 2,700 | 2,700 | 2,700 | 4,200\nContract forward-deployed engineers | 0 | 0 | 0 | 0 | 0 | 0\nTotal cost of revenue | 1,500 | 1,500 | 2,700 | 2,700 | 2,700 | 4,200\nGross profit | -1,500 | -1,500 | 12,900 | 12,900 | 12,900 | 23,400\nPayroll - engineering | 45,000 | 45,000 | 45,000 | 60,000 | 60,000 | 60,000\nPayroll - product | 13,000 | 13,000 | 13,000 | 13,000 | 13,000 | 13,000\nPayroll - go-to-market | 0 | 0 | 0 | 0 | 13,000 | 13,000\nPayroll - operations | 0 | 0 | 0 | 10,000 | 10,000 | 10,000\nSoftware and tools | 1,800 | 1,800 | 1,800 | 2,100 | 2,250 | 2,250\nOffice (San Francisco) | 1,200 | 1,200 | 1,200 | 1,200 | 4,800 | 4,800\nProfessional fees | 2,500 | 2,500 | 2,500 | 2,500 | 2,500 | 2,500\nInsurance | 850 | 850 | 850 | 850 | 850 | 850\nTravel and events | 1,500 | 1,500 | 1,500 | 1,500 | 1,500 | 1,500\nRecruitment | 0 | 0 | 0 | 9,000 | 0 | 0\nOther | 300 | 300 | 300 | 300 | 300 | 300\nTotal operating expenses | 66,150 | 66,150 | 66,150 | 100,450 | 108,200 | 108,200\nNet result | -67,650 | -67,650 | -53,250 | -87,550 | -95,300 | -84,800\nHeadcount (month end) | 4 | 4 | 4 | 6 | 7 | 7\nProfit and loss: Nov 2025 to Apr 2026\nSYNTHETIC DEMO DOCUMENT\nNixo Inc. | Management accounts, May 2025 to Oct 2026 Version 1.0 | Period: May 2025 to Oct 2026 | Issued 16 Nov 2026 | Page 1/3"
+      }
+    ],
+    "title": "Management accounts, May 2025 to Oct 2026",
+    "folder": "Financials",
+    "status": "READ",
+    "pageCount": 3,
+    "truncated": false,
+    "documentId": "e375caf2-9fec-4fed-8985-b6604d40d8b2",
+    "truthClass": "USER_CLAIM",
+    "sharedUnder": {
+      "say": "The founder shared this document with their organisation, so Q may read it for them. It is the company's own management material: say what it states as the company's figures (for example 'their management accounts show...'), not as independently verified, and never pass it on to anyone else.",
+      "grantId": "08606945-37ff-4a08-9385-8d4985556cd5",
+      "expiresAt": "2027-02-14T19:09:01.911Z"
+    },
+    "evidenceStatus": "DOCUMENT_SUPPORTED"
+  }
+}
