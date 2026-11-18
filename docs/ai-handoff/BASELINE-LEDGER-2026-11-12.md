@@ -844,3 +844,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
     - Follow-up 1 took the fast path: 7.8 s (was 15.9 s), 4 calls, no web search.
     - Follow-up 2 missed the fast path (`NO_EVIDENCE`) and took the full path: 11.5 s (was 13.3 s), no web search. Fast-path answers don't carry their sources forward; a worker is fixing this.
   - Note: Tavily, SerpAPI and Brave are out of credit, so web research falls back to the paid model-hosted search (capped at $2/day).
+- **18 Nov 01:24 UTC, `05c068296` (rollback point `240e0b9a0`):** ci-local PASS (1404 s); all four services SUCCESS.
+  - ANSWER evidence is matched by access coverage: same tenant, actor, ceiling and constraints, and every scope it was read under still permitted. Its read time and TTL carry forward unchanged.
+  - Live chain (Savanna, conversation at 01:35, $0.049): the question took 15.0 s; follow-up 1 took 7.1 s and follow-up 2 took 7.4 s, both on the fast path (`ANSWERED`). No web search, no actions.
+  - Before today: 15.9 s and 13.3 s.
+- **Decision 105 recorded:** Ajopot/Watchly revenue goes public; a founder's own spoken figure needs no card. Two workers are on it. A container restart at about 01:30 interrupted both; their work was kept (WIP commit `7cf4956d5`, local commit `993bccb21`) and they were resumed.
