@@ -430,6 +430,7 @@ import {
 import {
   composeChat,
   composeSchedule,
+  meetingBotAttendeeFrom,
   createMeetingProposalPort,
   createPushSubscriptionStore,
   // AUTO block (2026-10-02)
@@ -909,6 +910,7 @@ import { createTavusClient } from "./composition/tavus/client.js";
 import {
   createMeetingFace,
   createPostgresMeetingFaceStore,
+  meetingFaceConfigFrom,
   meetingFaceModeFrom,
   meetingFaceSecondsFrom,
 } from "./composition/meeting-face.js";
@@ -2553,6 +2555,7 @@ const schedule = composeSchedule({
   onJoinRequested: (meetingId) => {
     joinCallNow.book(meetingId);
   },
+  qAttendee: meetingBotAttendeeFrom(process.env.CQ_MEETING_BOT_INVITE_EMAIL),
 });
 // Handles and the Q Card (BIZ-004), composed as the application API
 // composes them: the same service, the same allowlisted subject facts.
@@ -6363,6 +6366,14 @@ const recallBots = createRecallBots({
   apiKey: recallKey,
   region: process.env.RECALL_REGION ?? "eu-central-1",
   transcriber: transcriberOf(process.env.RECALL_TRANSCRIBER),
+  // S1 (2026-11-18): every hosted bot signs in as Capital Q's Workspace
+  // account, so with that account on the invite Meet admits it without a
+  // knock. Owner-supplied: CQ_MEETING_BOT_SIGN_IN=on with
+  // RECALL_GOOGLE_LOGIN_GROUP_ID; off, the bot joins as a guest as before.
+  googleLoginGroupId:
+    process.env.CQ_MEETING_BOT_SIGN_IN === "on"
+      ? process.env.RECALL_GOOGLE_LOGIN_GROUP_ID
+      : undefined,
   camera:
     meetingFacePage === undefined
       ? undefined
@@ -6401,16 +6412,32 @@ const meetingFaceKey = tavusKeysFrom({
   CQ_TAVUS_API_KEYS: process.env.CQ_TAVUS_API_KEYS,
   TAVUS_API_KEY: process.env.TAVUS_API_KEY,
 })[0];
+// S3 / decision 106: one Q in the call. The face runs only as the
+// note-taker's camera page (CAMERA), where it says Q's lines with lip sync
+// through the provider's echo interaction; without the page there is no
+// face, never a second participant in Meet (MEET only if asked by name).
+const meetingFaceConfig = meetingFaceConfigFrom(
+  process.env,
+  meetingFacePage !== undefined,
+);
 const meetingFace = createMeetingFace({
-  enabled: process.env.CQ_MEETING_FACE === "on",
+  enabled: meetingFaceConfig.enabled,
   client:
     meetingFaceKey === undefined
       ? null
       : createTavusClient({ apiKey: meetingFaceKey }),
   faceId: process.env.CQ_MEETING_FACE_ID?.trim() || null,
   maxSeconds: meetingFaceSecondsFrom(process.env.CQ_MEETING_FACE_MAX_SECONDS),
-  // Camera only when its page exists; otherwise the face joins Meet itself.
-  mode: meetingFacePage === undefined ? "MEET" : "CAMERA",
+  mode: meetingFaceConfig.mode,
+  ...(meetingFacePage === undefined
+    ? {}
+    : {
+        echo: {
+          say: (meetingId: string, text: string) =>
+            meetingFacePage.speak(meetingId, { kind: "ECHO", text }),
+          open: (meetingId: string) => meetingFacePage.open(meetingId),
+        },
+      }),
   publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
   bridgePath: qMeetingFaceBridgeBasePath,
   store: createPostgresMeetingFaceStore(database.sql),
@@ -6586,8 +6613,31 @@ const meetingAssistant = createMeetingAssistantService({
     });
   },
   composer: meetingNotes,
-  // ADR 0027: the call is marked on the relationship's history once its
-  // record exists, through Network's own appender.
+  // ADR 0027 / S8: the call is marked held on the relationship's history
+  // once the provider reports it took place (people heard), through
+  // Network's own appender, whether or not Q's notes then compose.
+  tookPlace: async (held) => {
+    // meet2-64: a call's record may be settled again (a backfill, a retry
+    // after a failed step); the history marks the call held once.
+    const alreadyHeld = await database.sql<{ one: number }[]>`
+      select 1 as one from network.relationship_events
+       where relationship_id = ${held.relationshipId}
+         and event_type = 'meeting_held'
+         and source_id = ${held.meetingId}
+       limit 1`;
+    if (alreadyHeld.length === 0) {
+      const writer = createNetworkMeetingActivityWriter();
+      await database.transactions.run((tx) =>
+        writer.record(tx, {
+          relationshipId: held.relationshipId,
+          eventType: "meeting_held",
+          meetingId: held.meetingId,
+          actorUserId: held.organiserUserId,
+          correlationId: `cor_${randomUUID()}`,
+        }),
+      );
+    }
+  },
   onHeld: async (held) => {
     // meet-47: after the call Q works in the app -- each person's own
     // approval cards from what was agreed, and any standing instruction or
@@ -6617,26 +6667,6 @@ const meetingAssistant = createMeetingAssistantService({
         );
       });
     void instructionTriggers.wake(held.relationshipId).catch(() => undefined);
-    // meet2-64: a call's record may be settled again (a backfill, a retry
-    // after a failed step); the history marks the call held once.
-    const alreadyHeld = await database.sql<{ one: number }[]>`
-      select 1 as one from network.relationship_events
-       where relationship_id = ${held.relationshipId}
-         and event_type = 'meeting_held'
-         and source_id = ${held.meetingId}
-       limit 1`;
-    if (alreadyHeld.length === 0) {
-      const writer = createNetworkMeetingActivityWriter();
-      await database.transactions.run((tx) =>
-        writer.record(tx, {
-          relationshipId: held.relationshipId,
-          eventType: "meeting_held",
-          meetingId: held.meetingId,
-          actorUserId: held.organiserUserId,
-          correlationId: `cor_${randomUUID()}`,
-        }),
-      );
-    }
     // Founder direction 2026-09-30: money said in the call is filed by Q
     // for both sides to adopt or dispute; it never counts until confirmed.
     for (const [index, signal] of held.commitments.entries()) {

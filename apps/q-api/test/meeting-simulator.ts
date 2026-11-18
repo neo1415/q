@@ -2,12 +2,17 @@ import { vi } from "vitest";
 
 import {
   buildMeetingSnapshot,
+  calendarAttendees,
+  createMeetingAssistantService,
+  meetingBotAttendeeFrom,
+  type MeetingBotProvider,
   type HostParty,
   type MeetingContextSnapshot,
   type MeetingEvent,
   type RosterEntry,
   type SnapshotFact,
 } from "@capital-q/communication";
+import type { DatabaseExecutor } from "@capital-q/database";
 import type { TavusClient } from "@capital-q/integrations";
 import type { MeetingHostResultV3 as MeetingHostResult } from "@capital-q/q-core";
 
@@ -104,6 +109,17 @@ export type SimScenario = {
   readonly parties: readonly HostParty[];
   /** Earlier held meetings in this relationship (the history both sides see). */
   readonly priorMeetings: number;
+  /** S2: the relationship is in diligence (shared history). */
+  readonly inDiligence?: boolean;
+  /**
+   * S1: the owner-supplied sign-in (the Workspace account and Recall's
+   * login group). With both, the bot signs in and is on the invite, so
+   * Meet admits it without a knock.
+   */
+  readonly botAccount?: {
+    readonly loginGroupId: string;
+    readonly inviteEmail: string;
+  };
   readonly snapshot: {
     readonly shared: readonly SnapshotFact[];
     readonly disclosed: readonly SnapshotFact[];
@@ -141,6 +157,22 @@ export type BridgeTurn = {
 
 export type SimResult = {
   readonly scenario: SimScenario;
+  /** Who the booking's calendar invite names (S1). */
+  readonly invite: readonly string[];
+  /** Whether the bot waited in the lobby for someone to let it in. */
+  readonly knocked: boolean;
+  /**
+   * Decision 106: each line the face said through the provider's echo
+   * interaction (lip-synced), when it was handed over.
+   */
+  readonly faceSpeech: readonly {
+    readonly at: number;
+    readonly text: string;
+  }[];
+  /** Notices written to everyone on the booking, by dedupe key (S1). */
+  readonly notices: readonly { readonly at: number; readonly key: string }[];
+  /** Held meetings on the relationship after this one settled (S8). */
+  readonly heldMeetings: number;
   /** The create-bot body Recall would receive. */
   readonly botRequest: Record<string, unknown>;
   readonly admission: {
@@ -174,6 +206,8 @@ export type SimResult = {
   readonly screenNotes: readonly string[];
   readonly faceCalls: readonly string[];
   readonly logs: readonly string[];
+  /** When Q's bot left the call by its own leave call (ms), or null. */
+  readonly botLeftAt: number | null;
   /** Per SAY step: when its last word was said (ms from the start). */
   readonly lastWordAt: ReadonlyMap<SimStep, number>;
   /** Q's first spoken words after a step's last word that come from `answer`. */
@@ -202,6 +236,7 @@ export async function simulateMeeting(
   const BOT = `bot-${scenario.meetingId.slice(0, 8)}`;
 
   const spoken: SpokenLine[] = [];
+  let botLeftAt: number | null = null;
   const bridgeTurns: BridgeTurn[] = [];
   const modelCalls: {
     at: number;
@@ -225,8 +260,31 @@ export async function simulateMeeting(
     },
   };
 
+  // --- The booking's invite, built by the real code (S1). ----------------
+  const invite = calendarAttendees(
+    {
+      participants: scenario.parties.map((p) => ({
+        participantTenantId: "t-sim",
+        userId: p.userId,
+        role:
+          p.userId === scenario.organiserUserId
+            ? ("ORGANISER" as const)
+            : ("ATTENDEE" as const),
+        displayName: p.name,
+        email: p.email ?? "",
+      })),
+    },
+    meetingBotAttendeeFrom(scenario.botAccount?.inviteEmail),
+  ).map((a) => a.email);
+
   // --- Recall: the create-bot body, built by the real code. ---------------
   const request = botRequest({
+    ...(scenario.botAccount === undefined
+      ? {}
+      : { googleLoginGroupId: scenario.botAccount.loginGroupId }),
+    ...(scenario.face === "CAMERA"
+      ? { camera: { pageUrl: "https://q-api.example/v1/q/meetings/face/page" } }
+      : {}),
     meetingUrl: "https://meet.google.com/sim-ulat-ion",
     joinAt: new Date(start),
     botName: BOT_NAME,
@@ -344,6 +402,8 @@ export async function simulateMeeting(
         tenantId: "t-sim",
         organiserUserId: scenario.organiserUserId,
         declined: false,
+        priorMeetings: scenario.priorMeetings,
+        inDiligence: scenario.inDiligence === true,
       }),
     snapshotContext: () => Promise.resolve(snapshotContext),
     roster: (_m, _t, entry) => {
@@ -373,9 +433,12 @@ export async function simulateMeeting(
     deliveries.splice(i, 0, [at, body]);
   };
   let bridgeSession: { id: string; token: string } | null = null;
+  const faceSpeech: { at: number; text: string }[] = [];
   const fakeTavus: TavusClient = {
     createPal: (input) => {
-      faceCalls.push("createPal");
+      faceCalls.push(
+        input.pipelineMode === "echo" ? "createPal:echo" : "createPal",
+      );
       const match = /\/([^/]+)$/u.exec(input.layers.llm.base_url);
       bridgeSession = {
         id: match?.[1] ?? "",
@@ -402,10 +465,12 @@ export async function simulateMeeting(
     },
     createMeetingRoom: (input) => {
       faceCalls.push("createMeetingRoom");
-      deliver(clock.at - start + 1_000, {
-        kind: "FACE_GREETING",
-        text: input.greeting ?? "",
-      });
+      if ((input.greeting ?? "") !== "") {
+        deliver(clock.at - start + 1_000, {
+          kind: "FACE_GREETING",
+          text: input.greeting ?? "",
+        });
+      }
       return Promise.resolve({
         conversationId: "conv-sim",
         conversationUrl: "https://tavus.daily.co/sim",
@@ -425,6 +490,7 @@ export async function simulateMeeting(
   const organiser = scenario.parties.find(
     (p) => p.userId === scenario.organiserUserId,
   );
+  const organiserName = organiser?.name ?? null;
   const faceStore: MeetingFaceStore = {
     meeting: () =>
       Promise.resolve({
@@ -454,6 +520,15 @@ export async function simulateMeeting(
           store: faceStore,
           now: () => clock.at,
           mode: scenario.face,
+          // Decision 106: the camera page carries Q's lines to the face as
+          // the provider's echo; the fake records each, lip-synced at once.
+          echo: {
+            say: (_meetingId: string, text: string) => {
+              faceSpeech.push({ at: clock.at - start, text });
+              return true;
+            },
+            open: () => true,
+          },
           logger,
         });
 
@@ -505,7 +580,11 @@ export async function simulateMeeting(
         return Promise.resolve(new Uint8Array([1, 2, 3]));
       },
       play: () => Promise.resolve(),
-      leave: () => Promise.resolve(),
+      leave: () => {
+        // The bot's leave call: Recall stops recording and sends nothing more.
+        botLeftAt ??= clock.at - start;
+        return Promise.resolve();
+      },
       stop: () => Promise.resolve(),
     },
     ...(face === undefined
@@ -553,10 +632,104 @@ export async function simulateMeeting(
   const lastWordAt = new Map<SimStep, number>();
   const tavusTurns: { at: number; heard: string }[] = [];
   const present = new Set<string>();
-  const admitted = scenario.admittedAt;
+  // Recall: the waiting room is bypassed only for a signed-in bot whose
+  // account is on the event; otherwise it knocks and waits to be let in.
+  const signedIn =
+    JSON.stringify(request).includes('"google_login_group_id"') &&
+    invite.includes(scenario.botAccount?.inviteEmail.toLowerCase() ?? "-");
+  const admitted = signedIn ? 0 : scenario.admittedAt;
   const lobbyEnds = scenario.lobbyTimeoutMs;
-  const statusCodes: string[] = ["joining_call", "in_waiting_room"];
-  const subCodes: (string | null)[] = [null, null];
+  const statusCodes: string[] = ["joining_call"];
+  const subCodes: (string | null)[] = [null];
+  let knocked = false;
+  let stateWhileScripted: string | undefined;
+  let inCall = false;
+  let gaveUp = false;
+
+  // --- The meeting assistant (the record, the lobby notice, held), real,
+  // over a fake executor; Recall's status webhook settles it. ------------
+  const notices: { at: number; key: string }[] = [];
+  const held = new Set<string>();
+  const assistantRow = {
+    id: "00000000-0000-4000-8000-0000000005a1",
+    meeting_id: scenario.meetingId,
+    tenant_id: "00000000-0000-4000-8000-0000000005d1",
+    user_id: scenario.organiserUserId,
+    provider_bot_id: BOT,
+    status: "SCHEDULED",
+    failure: null,
+    summary: null,
+    flags: null,
+    follow_ups: null,
+    transcript: null,
+    attendees: null,
+    agreements: null,
+    commitments: null,
+    declined_by_user_id: null,
+    declined_by_name: null,
+    declined_at: null,
+    updated_at: new Date(start),
+    relationship_id: "00000000-0000-4000-8000-0000000005e1",
+    organiser_user_id: scenario.organiserUserId,
+    organiser_tenant_id: "00000000-0000-4000-8000-0000000005d1",
+    purpose: scenario.purpose,
+    starts_at: new Date(start),
+    ends_at: new Date(start + scenario.minutes * 60_000),
+    meeting_status: "SCHEDULED",
+    meet_link: "https://meet.google.com/sim-ulat-ion",
+  };
+  const assistantSql = ((
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => {
+    const text = strings.join("?");
+    if (text.includes("insert into communication.notifications")) {
+      for (const value of values) {
+        if (typeof value === "string" && /^meeting-[a-z-]+:/u.test(value)) {
+          notices.push({ at: clock.at - start, key: value });
+        }
+      }
+    }
+    const rows = /from communication\.meeting_assistants a/u.test(text)
+      ? [assistantRow]
+      : [];
+    return Object.assign(Promise.resolve(rows), {
+      catch: (f: (e: unknown) => unknown) => Promise.resolve(rows).catch(f),
+    });
+  }) as unknown as DatabaseExecutor;
+  Object.assign(assistantSql, { json: (value: unknown) => value });
+  const heardLines: { at: number; speaker: string; text: string }[] = [];
+  const assistantBots: MeetingBotProvider = {
+    create: () => Promise.resolve({ botId: BOT }),
+    read: () => {
+      const state = stateOf(statusCodes);
+      return Promise.resolve({
+        state,
+        transcript:
+          state === "ENDED" && admitted !== null && !gaveUp
+            ? heardLines
+                .filter((l) => botLeftAt === null || l.at <= botLeftAt)
+                .map((l) => ({ speaker: l.speaker, text: l.text }))
+            : null,
+        ...(gaveUp ? { ended: endOf(subCodes) } : {}),
+      });
+    },
+    cancel: () => Promise.resolve(),
+  };
+  const assistant = createMeetingAssistantService({
+    sql: assistantSql,
+    bots: assistantBots,
+    composer: { compose: () => Promise.resolve(null) },
+    nameOf: () => Promise.resolve(organiserName),
+    now: () => new Date(clock.at),
+    tookPlace: (meeting) => {
+      held.add(meeting.meetingId);
+      return Promise.resolve();
+    },
+  });
+  const statusWebhook = () => {
+    void assistant.settleBot(BOT);
+  };
   for (const step of scenario.steps) {
     switch (step.kind) {
       case "JOIN":
@@ -589,6 +762,7 @@ export async function simulateMeeting(
         });
         break;
       case "SAY": {
+        heardLines.push({ at: step.at, speaker: step.who, text: step.text });
         const said = words(step.text);
         const last = step.at + (said.length - 1) * WORD_MS;
         lastWordAt.set(step, last);
@@ -639,9 +813,7 @@ export async function simulateMeeting(
   );
   const until = lastStep + (scenario.tailMs ?? 15_000);
   const tavusHeard: string[] = [];
-  let inCall = false;
-  let gaveUp = false;
-  const held: [number, unknown][] = [];
+  const waiting: [number, unknown][] = [];
 
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   try {
@@ -650,25 +822,35 @@ export async function simulateMeeting(
     for (let t = -60_000; t <= until; t += STEP_MS) {
       clock.at = start + t;
       vi.advanceTimersByTime(STEP_MS);
+      // The bot reaches the call at its join time: let straight in when
+      // signed in and invited, else it knocks (Recall's status webhook).
+      if (t >= 0 && !knocked && !inCall && !gaveUp && admitted !== 0) {
+        knocked = true;
+        statusCodes.push("in_waiting_room");
+        subCodes.push(null);
+        statusWebhook();
+      }
       // Admission: Recall streams nothing until the bot is in the call.
-      if (!inCall && !gaveUp) {
+      if (t >= 0 && !inCall && !gaveUp) {
         if (admitted !== null && t >= admitted) {
           inCall = true;
           statusCodes.push("in_call_not_recording", "in_call_recording");
           subCodes.push(null, null);
+          statusWebhook();
           qParticipants.push(BOT_NAME);
           // Recall reports Q itself, then everyone already present.
           void runtime.receive(
             scenario.meetingId,
             recall("participant_events.join", BOT_NAME),
           );
-          for (const [, body] of held.splice(0)) {
+          for (const [, body] of waiting.splice(0)) {
             void runtime.receive(scenario.meetingId, body);
           }
         } else if (t >= lobbyEnds) {
           gaveUp = true;
           statusCodes.push("call_ended");
           subCodes.push("timeout_exceeded_waiting_room");
+          statusWebhook();
         }
       }
       while (deliveries.length > 0 && (deliveries[0]?.[0] ?? Infinity) <= t) {
@@ -704,10 +886,12 @@ export async function simulateMeeting(
             body.event?.startsWith("participant_events.") === true &&
             !body.event.startsWith("participant_events.speech")
           ) {
-            held.push(next);
+            waiting.push(next);
           }
           continue;
         }
+        // Once Q's bot has left, Recall delivers nothing more.
+        if (botLeftAt !== null) continue;
         void runtime.receive(scenario.meetingId, next[1]);
       }
       // Tavus' own turn detector: it asks the bridge after each turn.
@@ -768,6 +952,17 @@ export async function simulateMeeting(
       }
     }
     await vision.idle(scenario.meetingId);
+    // Everyone left: Recall ends the call; its status webhook settles it.
+    // The state while the script ran (before the call's end below).
+    stateWhileScripted = stateOf(statusCodes);
+    if (inCall) {
+      statusCodes.push("call_ended");
+      subCodes.push(null);
+      await assistant.settleBot(BOT);
+    }
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((done) => setImmediate(done));
+    }
   } finally {
     vi.useRealTimers();
   }
@@ -783,6 +978,9 @@ export async function simulateMeeting(
           l.at >= heard &&
           answer.includes(l.text.slice(0, 20)),
       ),
+      ...faceSpeech.filter(
+        (l) => l.at >= heard && answer.includes(l.text.slice(0, 20)),
+      ),
       ...bridgeTurns
         .filter((b) => b.at >= heard && b.said.includes(head))
         .map((b) => ({ at: b.resolvedAt })),
@@ -792,9 +990,14 @@ export async function simulateMeeting(
 
   return {
     scenario,
+    invite,
+    knocked,
+    faceSpeech,
+    notices,
+    heldMeetings: scenario.priorMeetings + held.size,
     botRequest: request,
     admission: {
-      state: stateOf(statusCodes),
+      state: stateWhileScripted ?? stateOf(statusCodes),
       end: gaveUp ? endOf(subCodes) : null,
       admittedAt: inCall ? admitted : null,
     },
@@ -806,6 +1009,7 @@ export async function simulateMeeting(
           (l) => l.channel === "VOICE" || l.source === "PROVIDER_GREETING",
         )
         .map((l) => ({ at: l.at, text: l.text })),
+      ...faceSpeech,
       ...bridgeTurns
         .filter((b) => b.said.length > 0)
         .map((b) => ({ at: b.resolvedAt, text: b.said })),
@@ -818,6 +1022,7 @@ export async function simulateMeeting(
     screenNotes,
     faceCalls,
     logs,
+    botLeftAt,
     lastWordAt,
     answerLatency,
   };

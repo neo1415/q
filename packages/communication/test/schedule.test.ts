@@ -57,6 +57,8 @@ function world(
     calendarsOf?: Partial<Record<string, CalendarFixture>>;
     /** Each person's profile time zone, where set. */
     zones?: Readonly<Record<string, string>>;
+    /** S1: Capital Q's own account on the invite. */
+    qAttendee?: { email: string; displayName: string } | null;
   } = {},
 ) {
   const stateOf = (userId: string): CalendarFixture =>
@@ -87,9 +89,19 @@ function world(
   };
   let ids = 0;
   const service = createScheduleService({
-    store,
+    store: {
+      ...store,
+      // S8: the history this world's activity writer kept.
+      meetingHeldRecorded: (_relationshipId, meetingId) =>
+        Promise.resolve(
+          activity.recorded.some(
+            (r) => r.eventType === "meeting_held" && r.meetingId === meetingId,
+          ),
+        ),
+    },
     transactions: inlineScheduleTransactions,
     parties,
+    qAttendee: options.qAttendee ?? null,
     directory: createStaticMeetingDirectory({
       relationshipTenant: COMPANY_TENANT,
       people: {
@@ -458,7 +470,7 @@ describe("schedule, reschedule, cancel", () => {
     expect(w.investorCalendar.inserted).toHaveLength(0);
   });
 
-  it("marks a booked call held once it has ended, for either side, only while still CONNECTED (no bot)", async () => {
+  it("marks a booked call held once it has ended, for either side (no bot)", async () => {
     const w = world({ state: "CONNECTED" });
     const scheduled = await w.service.schedule(SCHEDULE);
     if (scheduled.outcome !== "OK") throw new Error("not scheduled");
@@ -491,22 +503,74 @@ describe("schedule, reschedule, cancel", () => {
     ).toEqual([{ eventType: "meeting_held", meetingId: id }]);
   });
 
-  it("does not record a second held call once the match has moved past CONNECTED", async () => {
+  it("S8: counts a later held call too (past CONNECTED), and each call once", async () => {
     const w = world({ state: "MEETING_HELD" });
     const scheduled = await w.service.schedule(SCHEDULE);
     if (scheduled.outcome !== "OK") throw new Error("not scheduled");
     w.advance(new Date("2026-10-06T10:00:00Z"));
-    expect(
-      await w.service.confirmHeld({
-        actor: INVESTOR,
+    const confirm = (who: ActorContext) =>
+      w.service.confirmHeld({
+        actor: who,
         relationshipId: REL,
         meetingId: scheduled.meeting.id,
         correlationId: SCHEDULE.correlationId,
-      }),
-    ).toEqual({ outcome: "OK", alreadyDone: true });
+      });
+    expect(await confirm(INVESTOR)).toEqual({
+      outcome: "OK",
+      alreadyDone: false,
+    });
+    // The other side confirming the same call does not count it twice.
+    expect(await confirm(FOUNDER)).toEqual({
+      outcome: "OK",
+      alreadyDone: true,
+    });
     expect(
-      w.activity.recorded.some((r) => r.eventType === "meeting_held"),
-    ).toBe(false);
+      w.activity.recorded.filter((r) => r.eventType === "meeting_held"),
+    ).toEqual([{ eventType: "meeting_held", meetingId: scheduled.meeting.id }]);
+  });
+
+  it("S1: one call per relationship and time (4 Oct): the other side's overlapping booking is refused, the organiser's own is returned", async () => {
+    const w = world();
+    const first = await w.service.schedule(SCHEDULE);
+    if (first.outcome !== "OK") throw new Error("not scheduled");
+    // The founder books an overlapping half hour, from another card and key.
+    expect(
+      await w.service.schedule({
+        ...SCHEDULE,
+        actor: FOUNDER,
+        idempotencyKey: "q-action:0002-founder-overlap",
+        startsAt: new Date(SCHEDULE.startsAt.getTime() + 10 * 60_000),
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "ALREADY_BOOKED" });
+    // The organiser approving again from another key gets the one booking.
+    const again = await w.service.schedule({
+      ...SCHEDULE,
+      idempotencyKey: "q-action:0003-investor-again",
+      startsAt: new Date(SCHEDULE.startsAt.getTime() + 5 * 60_000),
+    });
+    expect(again).toMatchObject({
+      outcome: "OK",
+      alreadyScheduled: true,
+      meeting: { id: first.meeting.id },
+    });
+    expect(w.store.meetings).toHaveLength(1);
+    expect(w.investorCalendar.inserted).toHaveLength(1);
+    expect(w.founderCalendar.inserted).toHaveLength(0);
+  });
+
+  it("S1: puts Capital Q's own account on the invite when configured", async () => {
+    const w = world({
+      qAttendee: {
+        email: "q@capitalq.example.test",
+        displayName: "Q (Capital Q)",
+      },
+    });
+    const scheduled = await w.service.schedule(SCHEDULE);
+    expect(scheduled.outcome).toBe("OK");
+    expect(w.investorCalendar.inserted[0]?.attendees).toContainEqual({
+      email: "q@capitalq.example.test",
+      displayName: "Q (Capital Q)",
+    });
   });
 
   it("lets only the organiser move or cancel; cancel deletes the event and records meeting_cancelled once", async () => {

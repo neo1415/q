@@ -67,6 +67,33 @@ export function meetingFacePageHtml(nonce: string): string {
   let mic = null;
   let call = null;
   let joining = false;
+  let conversationId = null;
+  let joined = false;
+  // Q's lines for the face, said the moment the room is joined (kept a
+  // few seconds while it joins; never a backlog).
+  const echoes = [];
+  function interaction(eventType, properties) {
+    if (call === null || !joined || conversationId === null) return false;
+    try {
+      call.sendAppMessage({
+        message_type: "conversation",
+        event_type: eventType,
+        conversation_id: conversationId,
+        properties: properties,
+      }, "*");
+      return true;
+    } catch (error) { return false; }
+  }
+  function flushEchoes() {
+    while (echoes.length > 0) {
+      const line = echoes.shift();
+      if (Date.now() - line.at > 8000) continue;
+      if (!interaction("conversation.echo", { modality: "text", text: line.text })) {
+        echoes.unshift(line);
+        return;
+      }
+    }
+  }
 
   const show = (live) => document.body.classList.toggle("live", live);
 
@@ -93,6 +120,7 @@ export function meetingFacePageHtml(nonce: string): string {
   async function leave() {
     const current = call;
     call = null;
+    joined = false;
     show(false);
     if (current === null) return;
     try { await current.leave(); } catch (error) { /* already gone */ }
@@ -108,7 +136,10 @@ export function meetingFacePageHtml(nonce: string): string {
     if (room && call === null && !joining) {
       joining = true;
       try {
-        const audio = await microphone();
+        // Decision 106: an echo face speaks only Q's text; it is sent no
+        // call audio, so it has nothing to take a turn on.
+        const audio = room.echo === true ? null : await microphone();
+        conversationId = typeof room.conversationId === "string" ? room.conversationId : null;
         call = window.Daily.createCallObject({
           audioSource: audio === null ? false : audio,
           videoSource: false,
@@ -118,7 +149,8 @@ export function meetingFacePageHtml(nonce: string): string {
         call.on("participant-left", (event) => {
           if (event && event.participant && !event.participant.local) show(false);
         });
-        call.on("left-meeting", () => { call = null; show(false); });
+        call.on("left-meeting", () => { call = null; joined = false; show(false); });
+        call.on("joined-meeting", () => { joined = true; flushEchoes(); });
         call.on("error", () => { void leave(); });
         await call.join({ url: room.url, token: room.token });
       } catch (error) {
@@ -148,7 +180,15 @@ export function meetingFacePageHtml(nonce: string): string {
   voice.onmessage = (message) => {
     let event = null;
     try { event = JSON.parse(message.data); } catch (error) { return; }
+    if (event.kind === "ECHO" && typeof event.text === "string") {
+      echoes.push({ text: event.text, at: Date.now() });
+      if (echoes.length > 4) echoes.shift();
+      flushEchoes();
+      return;
+    }
     if (event.kind === "STOP") {
+      echoes.length = 0;
+      interaction("conversation.interrupt", {});
       lines.length = 0;
       if (playing !== null) { playing.pause(); playing = null; }
       return;

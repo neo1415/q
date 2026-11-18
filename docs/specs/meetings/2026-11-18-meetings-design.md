@@ -298,3 +298,40 @@ The simulator grows with each slice: a slice turns its `it.todo` into assertions
   - today's face-in-Meet mode, with an unnamed follow-up and a misheard "Q";
   - a second meeting nobody admits Q to.
 - **Not covered yet.** The post-call settle (notes, cards, emails) needs a database. S5–S8 add it on the pgTAP database, not on a provider.
+
+## 8. Built (2026-11-18): S1, S2, S3, S8
+
+**Decision 106 replaces R3's silent face.** The face must move its lips when Q speaks. So the face runs only as the note-taker's camera page (CAMERA, the default; MEET only when `CQ_MEETING_FACE_MODE=meet` is set by name). The provider PAL runs in its echo pipeline. Each Q line (opening, introductions, answers) is sent by the page to the face's room as `conversation.echo` the moment Q's host releases it, so it is said with lip sync. Nothing waits for the provider's turn detector, and there is no 20 s drop. The face hears no call audio, its bridge always answers SILENT and it has no greeting or spoken disclosure, so Q's host alone decides what is said. When someone talks over Q, the page sends `conversation.interrupt`. There is one Capital Q participant: the Recall bot carries the face as its camera and its audio.
+
+- **S1.**
+  - A booked (not joined) call that overlaps an open booked call on the same relationship is not created. This is decided under a per-relationship advisory lock in the claim transaction, using the existing `(relationship_id, starts_at)` index. The organiser gets their booking back; the other side is refused with `ALREADY_BOOKED`.
+  - The lobby notice already existed (`meeting-lobby:<meetingId>`, once per meeting, through the status webhook); the simulator now asserts it.
+  - Sign-in and the invite stay behind config.
+- **S2.** One opening per meeting: who Q is, plus "This meeting is being recorded and transcribed for both sides." Introductions use `priorMeetings` (shared `meeting_held` events) and `inDiligence`.
+- **S3.**
+  - After an answer, only the same person's follow-up within 8 s that leads with "and"/"what about" or is a question still reaches Q.
+  - `spokenLine` splits only before a capital or figure after a space.
+- **S8.**
+  - A call is held when the provider reports it ended with people heard (`tookPlace`, before the notes are composed).
+  - `confirmHeld` counts every meeting, once each.
+  - `communication.meetings.status` is **not** widened to `HELD`. More than 15 readers treat a past `SCHEDULED` call as one that happened, so held lives in `meeting_held`. Widening the status is left for an owner decision.
+
+**Owner-supplied configuration (names only):**
+
+| Variable                       | What it does                                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `CQ_MEETING_BOT_SIGN_IN=on`    | Signs the bot in                                                                                          |
+| `RECALL_GOOGLE_LOGIN_GROUP_ID` | The Recall login group the bot signs in with                                                              |
+| `CQ_MEETING_BOT_INVITE_EMAIL`  | The Workspace account put on booked invites                                                               |
+| `CQ_MEETING_FACE=on`           | Turns the face on                                                                                         |
+| `CQ_MEETING_FACE_ID`           | Which face to use                                                                                         |
+| `CQ_MEETING_FACE_PAGE_SECRET`  | The camera page's secret                                                                                  |
+| `Q_API_PUBLIC_URL`             | The public URL the camera page is served from                                                             |
+| `CQ_MEETING_FACE_MAX_SECONDS`  | How long the face may stay; set it to cover the booking, together with the ledger's `meeting_max_seconds` |
+
+**Asked to leave (owner, 2026-11-18): Q stays.** When someone asks Q to leave or to stop recording, code reads it from a line addressed to Q (`asksQToLeave`), and no model is asked. The ask is recorded on the meeting each time (`LEAVE_REQUESTED`). Q answers once, briefly: it keeps notes for both sides as part of Capital Q, and the organiser can remove it. Then it is quiet, though it still answers a question put to it by name. Only the organiser removes Q, from Capital Q (ADR 0039).
+
+**Latency.** In the simulator, an answer starts 1.0–1.8 s after the question's last word, on the voice and on the face alike. Minutes-long waits had two causes, and both are removed:
+
+- **Turn-taking face.** A line handed to the face waited for the provider's turn detector, and was dropped after 20 s. Fixed by echo.
+- **The 20 s conversation window.** It sent unaddressed lines to the model, one answer at a time, so a question put to Q queued behind answers nobody asked for. Fixed by S3.

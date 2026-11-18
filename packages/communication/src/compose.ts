@@ -155,6 +155,8 @@ export function composeSchedule(options: {
   readonly logger?: ScheduleServiceDependencies["logger"];
   /** meet-47: book Q's bot at once when someone asks Q to join a call. */
   readonly onJoinRequested?: ScheduleServiceDependencies["onJoinRequested"];
+  /** S1: Capital Q's own account on every booked call's invite. */
+  readonly qAttendee?: ScheduleServiceDependencies["qAttendee"];
 }): ScheduleService {
   return createScheduleService({
     store: createPostgresScheduleStore({
@@ -171,5 +173,20 @@ export function composeSchedule(options: {
     appOrigin: options.appOrigin ?? null,
     logger: options.logger,
     onJoinRequested: options.onJoinRequested,
+    qAttendee: options.qAttendee,
   });
+}
+
+/**
+ * S1 (2026-11-18): the account the signed-in meeting bot uses, put on the
+ * invite of calls booked on Capital Q. Owner-supplied
+ * (CQ_MEETING_BOT_INVITE_EMAIL); absent or malformed: none.
+ */
+export function meetingBotAttendeeFrom(
+  raw: string | undefined,
+): { readonly email: string; readonly displayName: string } | null {
+  const email = raw?.trim().toLowerCase() ?? "";
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(email)
+    ? { email, displayName: "Q (Capital Q)" }
+    : null;
 }

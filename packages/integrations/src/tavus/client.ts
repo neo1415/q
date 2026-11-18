@@ -212,6 +212,12 @@ export type TavusClient = {
           readonly allowlist: readonly string[];
         }
       | undefined;
+    /**
+     * "echo" (2026-11-18, owner decision 106): the PAL runs no model of its
+     * own; it says, with lip sync, exactly the text sent to it through the
+     * room's `conversation.echo` interaction. Default "full".
+     */
+    readonly pipelineMode?: "full" | "echo" | undefined;
   }) => Promise<{ readonly palId: string }>;
   readonly deletePal: (palId: string) => Promise<void>;
   readonly createConversation: (input: {
@@ -339,7 +345,7 @@ export function createTavusClient(dependencies: {
       const raw = await call("create PAL", "POST", "/v2/pals", {
         pal_name: input.name,
         system_prompt: input.systemPrompt,
-        pipeline_mode: "full",
+        pipeline_mode: input.pipelineMode ?? "full",
         default_face_id: input.faceId,
         ...(input.disclosure === undefined
           ? {}

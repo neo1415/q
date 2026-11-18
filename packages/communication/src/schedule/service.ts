@@ -153,6 +153,16 @@ export type ScheduleServiceDependencies = {
    * without the bot provider): the collector books it within its tick.
    */
   readonly onJoinRequested?: ((meetingId: string) => void) | undefined;
+  /**
+   * S1 (2026-11-18): Capital Q's own Workspace account, added to the
+   * calendar invite of every call booked on Capital Q, so the signed-in
+   * bot is on the event and Meet admits it without a knock (Recall: the
+   * waiting room is bypassed only for a signed-in bot whose account is on
+   * the event). Null: not configured (CQ_MEETING_BOT_INVITE_EMAIL unset);
+   * the invite names the people only, as before.
+   */
+  readonly qAttendee?:
+    { readonly email: string; readonly displayName: string } | null | undefined;
 };
 
 /** meet-47: what a joined call's other side reads, and the record's consent line. */
@@ -176,7 +186,13 @@ export type ScheduleRefusal =
   /** An idempotency key already used for a different request. */
   | "KEY_REUSED"
   /** meet-47: Q joins Google Meet links only. */
-  | "NOT_A_MEET_LINK";
+  | "NOT_A_MEET_LINK"
+  /**
+   * S1 (2026-11-18, the 4 Oct double meeting): another open call on this
+   * relationship already overlaps that time, booked by someone else. One
+   * call per relationship and time; Q never joins two.
+   */
+  | "ALREADY_BOOKED";
 
 export type ScheduleOutcome<T> =
   | ({ readonly outcome: "OK" } & T)
@@ -549,6 +565,32 @@ const EMAIL_RETRY_WINDOW_MS = 60 * 60_000;
 /** How far in the past a reminder may still be set (a form left open). */
 const REMINDER_PAST_GRACE_MS = 5 * 60_000;
 
+/**
+ * Who the calendar invite names: the attendees, and Capital Q's own
+ * account when configured (S1), so the signed-in bot is on the event.
+ */
+export function calendarAttendees(
+  record: Pick<MeetingRecord, "participants">,
+  qAttendee?: { readonly email: string; readonly displayName: string } | null,
+): { readonly email: string; readonly displayName: string }[] {
+  const people = record.participants
+    .filter((participant) => participant.role === "ATTENDEE")
+    .map((participant) => ({
+      email: participant.email,
+      displayName: participant.displayName,
+    }));
+  const email = qAttendee?.email.trim().toLowerCase() ?? "";
+  if (
+    qAttendee === null ||
+    qAttendee === undefined ||
+    !/^[^@\s]+@[^@\s]+$/u.test(email) ||
+    people.some((person) => person.email === email)
+  ) {
+    return people;
+  }
+  return [...people, { email, displayName: qAttendee.displayName }];
+}
+
 function refusal(code: ScheduleRefusal) {
   return { outcome: "REFUSED" as const, code };
 }
@@ -644,6 +686,26 @@ export function createScheduleService(
         record.participants.some((p) => p.userId === viewerUserId)) &&
       record.prepBriefAt !== null;
     return view(record, viewerUserId, brief);
+  }
+
+  /**
+   * S1: the claim found another open call on this relationship at that
+   * time. The organiser's own booking is returned as already done (one
+   * invite, whatever card or key asked); anyone else is refused.
+   */
+  function clashOutcome(record: MeetingRecord, actor: ActorContext) {
+    if (record.organiserUserId !== actor.userId) {
+      return refusal("ALREADY_BOOKED");
+    }
+    logger?.info(
+      { meetingId: record.id, relationshipId: record.relationshipId },
+      "an open call already overlaps this time; no second booking",
+    );
+    return {
+      outcome: "OK" as const,
+      meeting: viewFor(record, actor.userId),
+      alreadyScheduled: true,
+    };
   }
 
   async function counterpartOf(actor: ActorContext, relationshipId: string) {
@@ -1212,6 +1274,7 @@ export function createScheduleService(
         participants,
       });
       const record = claim.record;
+      if (claim.clash === true) return clashOutcome(record, actor);
       if (record.organiserUserId !== actor.userId) {
         return refusal("NOT_ORGANISER");
       }
@@ -1233,12 +1296,7 @@ export function createScheduleService(
           start: record.startsAt,
           end: record.endsAt,
           timeZone: record.timeZone,
-          attendees: record.participants
-            .filter((participant) => participant.role === "ATTENDEE")
-            .map((participant) => ({
-              email: participant.email,
-              displayName: participant.displayName,
-            })),
+          attendees: calendarAttendees(record, dependencies.qAttendee),
         }));
       } catch (error: unknown) {
         await store.markMeetingFailed(record.id);
@@ -1345,6 +1403,23 @@ export function createScheduleService(
         ],
       });
       const record = claim.record;
+      if (claim.clash === true) {
+        if (record.organiserUserId !== actor.userId) {
+          return refusal("ALREADY_BOOKED");
+        }
+        return {
+          outcome: "OK",
+          meeting: viewFor(record, actor.userId),
+          alreadyScheduled: true,
+          organiser: { name: self.name, email: self.email },
+          invitees: record.participants
+            .filter((participant) => participant.role === "ATTENDEE")
+            .map((participant) => ({
+              name: participant.displayName,
+              email: participant.email,
+            })),
+        };
+      }
       if (record.organiserUserId !== actor.userId) {
         return refusal("NOT_ORGANISER");
       }
@@ -1590,9 +1665,12 @@ export function createScheduleService(
       if (record.endsAt.getTime() > now().getTime()) {
         return refusal("INVALID_TIME");
       }
-      // Already past its first meeting (held, in diligence, paused...): a
-      // later call is activity the person has no need to mark.
-      if (party.state !== "CONNECTED") {
+      // S8 (2026-11-18): every call held counts, not only the first (this
+      // returned early once the relationship was past CONNECTED, so a
+      // second meeting Q missed was never counted). A later meeting_held
+      // is activity the state projector accepts without a move. Once per
+      // meeting: Q's own record, or an earlier confirmation, already did.
+      if (await store.meetingHeldRecorded?.(record.relationshipId, record.id)) {
         return { outcome: "OK", alreadyDone: true };
       }
       await transactions.run((tx) =>

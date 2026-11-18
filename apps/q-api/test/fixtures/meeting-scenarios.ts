@@ -1,5 +1,6 @@
 import type { HostParty } from "@capital-q/communication";
 
+import { meetingFaceConfigFrom } from "../../src/composition/meeting-face.js";
 import type { SimScenario } from "../meeting-simulator.js";
 
 /**
@@ -167,12 +168,13 @@ export const FIRST_MEETING_SOFT_COMMITMENT: SimScenario = {
 };
 
 /**
- * Today's face configuration (CQ_MEETING_FACE=on without the camera page):
- * the Tavus face joins Meet as its own participant beside the note-taker,
- * and a follow-up that does not say "Q" (Tavus also hears "Q" as "Cue").
+ * The face as configured by default (CQ_MEETING_FACE=on with the camera
+ * page; decision 106): the note-taker shows it as its camera and it says
+ * Q's lines with lip sync. A follow-up that does not say "Q" (Tavus would
+ * hear "Q" as "Cue"; with echo it no longer listens at all).
  */
 export const FACE_IN_MEET_FOLLOW_UP: SimScenario = {
-  name: "face joins Meet itself; an unnamed follow-up",
+  name: "the face is the note-taker's camera; an unnamed follow-up",
   meetingId: "5b2a0c5e-8f6e-4a39-9c51-0d7c1c1b2f12",
   purpose: "Nixo Labs seed round",
   startsAt: "2026-11-21T10:00:00Z",
@@ -181,7 +183,7 @@ export const FACE_IN_MEET_FOLLOW_UP: SimScenario = {
   parties: [FOUNDER, INVESTOR],
   priorMeetings: 0,
   snapshot: SNAPSHOT,
-  face: "MEET",
+  face: meetingFaceConfigFrom({ CQ_MEETING_FACE: "on" }, true).mode,
   screens: false,
   admittedAt: 10_000,
   lobbyTimeoutMs: 600_000,
@@ -196,7 +198,7 @@ export const FACE_IN_MEET_FOLLOW_UP: SimScenario = {
       text: "Q how much is Nixo raising in this round?",
       tavusHears: "Cue how much is Nixo raising in this round?",
     },
-    { at: 55_000, kind: "SAY", who: "Bayo Ade", text: "And what about churn?" },
+    { at: 49_000, kind: "SAY", who: "Bayo Ade", text: "And what about churn?" },
     { at: 75_000, kind: "LEAVE", who: "Adaeze Okafor" },
     { at: 76_000, kind: "LEAVE", who: "Bayo Ade" },
   ],
@@ -229,5 +231,86 @@ export const SECOND_MEETING_NOT_ADMITTED: SimScenario = {
     },
     { at: 150_000, kind: "LEAVE", who: "Adaeze Okafor" },
     { at: 151_000, kind: "LEAVE", who: "Bayo Ade" },
+  ],
+};
+
+/**
+ * A second meeting with the owner's sign-in configured (S1): the bot is
+ * Capital Q's Workspace account and on the invite, so it is let straight
+ * in; Q's opening and introductions know the sides have met before (S2).
+ */
+export const SECOND_MEETING_SIGNED_IN: SimScenario = {
+  name: "second meeting: signed in, on the invite, 'again'",
+  meetingId: "5b2a0c5e-8f6e-4a39-9c51-0d7c1c1b2f14",
+  purpose: "Nixo Labs diligence follow-up",
+  startsAt: "2026-11-28T10:00:00Z",
+  minutes: 30,
+  organiserUserId: FOUNDER.userId,
+  parties: [FOUNDER, INVESTOR],
+  priorMeetings: 1,
+  inDiligence: true,
+  botAccount: {
+    loginGroupId: "login-group-sim-0001",
+    inviteEmail: "q@capitalq.example.test",
+  },
+  snapshot: SNAPSHOT,
+  face: "NONE",
+  screens: false,
+  admittedAt: null,
+  lobbyTimeoutMs: 600_000,
+  answers: ANSWERS,
+  steps: [
+    { at: 4_000, kind: "JOIN", who: "Adaeze Okafor" },
+    { at: 9_000, kind: "JOIN", who: "Bayo Ade" },
+    {
+      at: 40_000,
+      kind: "SAY",
+      who: "Bayo Ade",
+      text: "Q what's the churn now?",
+    },
+    { at: 70_000, kind: "LEAVE", who: "Adaeze Okafor" },
+    { at: 71_000, kind: "LEAVE", who: "Bayo Ade" },
+  ],
+};
+
+/** A participant asks Q to leave mid-call (owner 2026-11-18): Q goes. */
+export const ASKED_TO_LEAVE: SimScenario = {
+  name: "a participant asks Q to leave",
+  meetingId: "5b2a0c5e-8f6e-4a39-9c51-0d7c1c1b2f15",
+  purpose: "Nixo Labs seed round",
+  startsAt: "2026-11-29T10:00:00Z",
+  minutes: 30,
+  organiserUserId: INVESTOR.userId,
+  parties: [FOUNDER, INVESTOR],
+  priorMeetings: 0,
+  snapshot: SNAPSHOT,
+  face: "NONE",
+  screens: false,
+  admittedAt: 5_000,
+  lobbyTimeoutMs: 600_000,
+  answers: ANSWERS,
+  steps: [
+    { at: 1_000, kind: "JOIN", who: "Bayo Ade" },
+    { at: 2_000, kind: "JOIN", who: "Adaeze Okafor" },
+    {
+      at: 40_000,
+      kind: "SAY",
+      who: "Adaeze Okafor",
+      text: "We'd rather keep the rest of this between us.",
+    },
+    {
+      at: 45_000,
+      kind: "SAY",
+      who: "Bayo Ade",
+      text: "Q, please leave the call now.",
+    },
+    {
+      at: 55_000,
+      kind: "SAY",
+      who: "Adaeze Okafor",
+      text: "Our runway is seven months at current burn.",
+    },
+    { at: 80_000, kind: "LEAVE", who: "Adaeze Okafor" },
+    { at: 81_000, kind: "LEAVE", who: "Bayo Ade" },
   ],
 };

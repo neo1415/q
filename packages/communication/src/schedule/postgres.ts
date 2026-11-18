@@ -162,6 +162,34 @@ export function createPostgresScheduleStore(options: {
     claimMeeting: async (input) =>
       options.transactions
         .run(async (tx) => {
+          if ((input.origin ?? "BOOKED") === "BOOKED") {
+            // S1: one open call per relationship and time, decided under a
+            // lock on the relationship so concurrent claims are serial.
+            await tx.sql`
+              select pg_advisory_xact_lock(
+                hashtextextended(${`communication.meeting-slot:${input.relationshipId}`}, 0))`;
+            const clash = await tx.sql<{ id: string }[]>`
+              select id from communication.meetings
+               where relationship_id = ${input.relationshipId}
+                 and idempotency_key <> ${input.idempotencyKey}
+                 and (${input.qActionId}::uuid is null
+                      or q_action_id is distinct from ${input.qActionId}::uuid)
+                 and origin = 'BOOKED'
+                 and status in ('SCHEDULING', 'SCHEDULED')
+                 and starts_at < ${input.endsAt}
+                 and ends_at > ${input.startsAt}
+               order by starts_at
+               limit 1`;
+            const already = await tx.sql<{ id: string }[]>`
+              select id from communication.meetings
+               where idempotency_key = ${input.idempotencyKey}
+                  or (${input.qActionId}::uuid is not null and q_action_id = ${input.qActionId}::uuid)
+               limit 1`;
+            const other = clash[0]?.id;
+            if (other !== undefined && already.length === 0) {
+              return { id: other, created: false, clash: true };
+            }
+          }
           const inserted = await tx.sql<{ id: string }[]>`
           insert into communication.meetings
             (id, tenant_id, relationship_id, organiser_user_id, organiser_tenant_id, purpose,
@@ -188,13 +216,23 @@ export function createPostgresScheduleStore(options: {
            limit 1`;
           const id = existing[0]?.id;
           if (id === undefined) throw new Error("meeting claim found nothing");
-          return { id, created: inserted.length === 1 };
+          return { id, created: inserted.length === 1, clash: false };
         })
-        .then(async ({ id, created }) => {
+        .then(async ({ id, created, clash }) => {
           const record = await findMeeting(id);
           if (record === null) throw new Error("claimed meeting not found");
-          return { record, created };
+          return clash ? { record, created, clash } : { record, created };
         }),
+
+    meetingHeldRecorded: async (relationshipId, meetingId) =>
+      (
+        await sql<{ one: number }[]>`
+          select 1 as one from network.relationship_events
+           where relationship_id = ${relationshipId}
+             and event_type = 'meeting_held'
+             and source_id = ${meetingId}
+           limit 1`
+      ).length > 0,
 
     findMeeting,
 

@@ -697,6 +697,7 @@ describe("owner decision 2026-10-21: one Q in the call (CAMERA), and a face sent
     expect(face.room(MEETING)).toEqual({
       url: "https://tavus.daily.co/room1",
       token: "room-token-1",
+      conversationId: "room1",
     });
     face.end(MEETING, "CALL_ENDED");
     expect(face.room(MEETING)).toBeNull();

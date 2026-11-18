@@ -127,6 +127,12 @@ export type MeetingFacePort = {
    * named or not (a conversation's follow-up never says "Q").
    */
   readonly expect?: (meetingId: string) => void;
+  /**
+   * Decision 106 (2026-11-18): the face says each line the moment it is
+   * handed over (the provider's echo interaction), so it takes no turns:
+   * the host times Q's lines as it does for its own voice.
+   */
+  readonly echoes?: boolean;
 };
 
 export type MeetingFaceService = MeetingFacePort & {
@@ -153,6 +159,23 @@ export type MeetingFaceService = MeetingFacePort & {
 export type MeetingFaceRoom = {
   readonly url: string;
   readonly token: string;
+  /** For the page's echo and interrupt messages to the face. */
+  readonly conversationId?: string;
+  /**
+   * Decision 106: the face speaks only what Q sends it; the page sends the
+   * room no call audio, so the provider has nothing to take a turn on.
+   */
+  readonly echo?: boolean;
+};
+
+/**
+ * Decision 106: how Q's text reaches the face in the camera page's room
+ * (the page sends it as the provider's `conversation.echo`). `open` is
+ * whether a page is connected to carry it.
+ */
+export type MeetingFaceEcho = {
+  readonly say: (meetingId: string, text: string) => boolean;
+  readonly open: (meetingId: string) => boolean;
 };
 
 /**
@@ -163,8 +186,33 @@ export type MeetingFaceRoom = {
  */
 export type MeetingFaceMode = "MEET" | "CAMERA";
 
+/**
+ * One Q in the call (S3, owner 2026-11-18). CAMERA unless MEET is asked for
+ * by name: by default the face never joins Meet as a second Capital Q
+ * participant. MEET stays only as an explicit, legacy opt-in.
+ */
 export function meetingFaceModeFrom(raw: string | undefined): MeetingFaceMode {
-  return raw?.trim().toLowerCase() === "camera" ? "CAMERA" : "MEET";
+  return raw?.trim().toLowerCase() === "meet" ? "MEET" : "CAMERA";
+}
+
+/**
+ * Whether the face runs, from the environment; one place for main.ts and
+ * the meeting simulator. CQ_MEETING_FACE=on, and in CAMERA mode only when
+ * the note-taker's camera page is configured (`cameraPage`): without the
+ * page there is no face at all, never a second participant in Meet.
+ */
+export function meetingFaceConfigFrom(
+  env: {
+    readonly CQ_MEETING_FACE?: string | undefined;
+    readonly CQ_MEETING_FACE_MODE?: string | undefined;
+  },
+  cameraPage: boolean,
+): { readonly enabled: boolean; readonly mode: MeetingFaceMode } {
+  const mode = meetingFaceModeFrom(env.CQ_MEETING_FACE_MODE);
+  return {
+    enabled: env.CQ_MEETING_FACE === "on" && (mode === "MEET" || cameraPage),
+    mode,
+  };
 }
 
 /** The face is sent this long before the call starts, not earlier. */
@@ -299,6 +347,15 @@ export function createMeetingFace(dependencies: {
   readonly answerWaitMs?: number;
   readonly expectGraceMs?: number;
   readonly mode?: MeetingFaceMode;
+  /**
+   * Decision 106 (owner 2026-11-18: the face must move its lips when Q
+   * speaks). In CAMERA mode with this port, Q's lines are spoken by the
+   * face at once through the provider's echo interaction, lip-synced, with
+   * no turn to wait for: the 20 s drop of a line handed over with no turn
+   * open is gone. The face's own model never runs (echo pipeline) and the
+   * bridge always answers SILENT: Q alone decides what is said.
+   */
+  readonly echo?: MeetingFaceEcho;
   readonly logger?: Logger;
 }): MeetingFaceService {
   const now = dependencies.now ?? (() => Date.now());
@@ -323,6 +380,7 @@ export function createMeetingFace(dependencies: {
   const byId = new Map<string, Session>();
   const starting = new Map<string, Promise<void>>();
   const mode = dependencies.mode ?? "MEET";
+  const echo = mode === "CAMERA" ? dependencies.echo : undefined;
   /** A start waiting for the call's time: called to go now, or to drop it. */
   const early = new Map<string, (go: boolean) => void>();
 
@@ -469,7 +527,11 @@ export function createMeetingFace(dependencies: {
         name: MEETING_FACE_NAME,
         systemPrompt: FACE_PROMPT,
         faceId,
-        disclosure: FACE_DISCLOSURE,
+        // Echo: Q's own opening says who Q is and that the call is
+        // recorded (S2); the provider speaks nothing of its own.
+        ...(echo === undefined
+          ? { disclosure: FACE_DISCLOSURE }
+          : { pipelineMode: "echo" as const }),
         layers: {
           llm: {
             model: "capital-q-meeting",
@@ -493,10 +555,13 @@ export function createMeetingFace(dependencies: {
       // Recorded before the paid call: from here the time counts.
       await store.requested(id, palId, new Date(now()));
       if (ended()) throw new TavusError("ended", 499);
-      const greeting = meetingFaceGreeting({
-        organiserName: meeting.organiserName ?? null,
-        purpose: meeting.purpose ?? null,
-      });
+      const greeting =
+        echo === undefined
+          ? meetingFaceGreeting({
+              organiserName: meeting.organiserName ?? null,
+              purpose: meeting.purpose ?? null,
+            })
+          : null;
       let conversation: { readonly conversationId: string };
       if (mode === "CAMERA") {
         const room = await client.createMeetingRoom({
@@ -510,7 +575,12 @@ export function createMeetingFace(dependencies: {
         if (room.conversationUrl === null || room.meetingToken === null) {
           throw new TavusError("meeting room", 502);
         }
-        session.room = { url: room.conversationUrl, token: room.meetingToken };
+        session.room = {
+          url: room.conversationUrl,
+          token: room.meetingToken,
+          conversationId: room.conversationId,
+          ...(echo === undefined ? {} : { echo: true }),
+        };
         conversation = room;
       } else {
         conversation = await client.joinMeeting({
@@ -602,13 +672,19 @@ export function createMeetingFace(dependencies: {
         .finally(() => starting.delete(meetingId));
       starting.set(meetingId, run);
     },
-    live: (meetingId) => byMeeting.get(meetingId)?.state === "LIVE",
+    echoes: echo !== undefined,
+    // Echo: live once a page is there to carry the line to the face;
+    // until then Q's lines stay on its own voice, never dropped.
+    live: (meetingId) =>
+      byMeeting.get(meetingId)?.state === "LIVE" &&
+      (echo === undefined || echo.open(meetingId)),
     // Waiting for the call's time is not "being sent": Q's voice does not
     // hold its lines for a face that will come only at the start.
     starting: (meetingId) =>
       (starting.has(meetingId) && !early.has(meetingId)) ||
       byMeeting.get(meetingId)?.state === "STARTING",
     expect: (meetingId) => {
+      if (echo !== undefined) return;
       const session = byMeeting.get(meetingId);
       if (session?.state !== "LIVE") return;
       session.expectedAt = now();
@@ -617,6 +693,12 @@ export function createMeetingFace(dependencies: {
     say: (meetingId, text, more = false) => {
       const session = byMeeting.get(meetingId);
       if (session?.state !== "LIVE") return;
+      if (echo !== undefined) {
+        // Said now, lip-synced; the rest of a streamed answer follows as
+        // its own echo. Nothing waits for a turn.
+        echo.say(meetingId, text);
+        return;
+      }
       // The rest of an answer whose first sentence the face is saying.
       if (session.stream?.open === true) {
         session.stream.parts.push(text);
@@ -661,7 +743,12 @@ export function createMeetingFace(dependencies: {
       if (isTavusConnectivityCheck(userLines)) {
         return { kind: "LINE", text: TAVUS_CONNECTIVITY_REPLY };
       }
-      if (session.state !== "LIVE" || now() >= session.endsAt) {
+      // Echo: the face's own turns never speak; Q's lines arrive by echo.
+      if (
+        echo !== undefined ||
+        session.state !== "LIVE" ||
+        now() >= session.endsAt
+      ) {
         return { kind: "SILENT" };
       }
       // Words from the call are data: they only decide whether to wait.

@@ -135,11 +135,28 @@ export type NotificationRecord = {
 };
 
 export type ScheduleStore = {
-  /** One row per idempotency key; `created` false returns the existing one. */
+  /**
+   * One row per idempotency key; `created` false returns the existing one.
+   * S1 (2026-11-18, the 4 Oct double meeting): one open call per
+   * relationship and time. A booked (not joined) call whose time overlaps
+   * an open one on the same relationship is not inserted; `clash` true
+   * returns that open call instead. Decided under a per-relationship lock
+   * in the claim's own transaction, so two approvals seconds apart cannot
+   * both insert.
+   */
   readonly claimMeeting: (input: NewMeeting) => Promise<{
     readonly record: MeetingRecord;
     readonly created: boolean;
+    readonly clash?: boolean;
   }>;
+  /**
+   * S8: whether the relationship history already marks this call held
+   * (Q's record, or a confirmation), so it counts once.
+   */
+  readonly meetingHeldRecorded?: (
+    relationshipId: string,
+    meetingId: string,
+  ) => Promise<boolean>;
   readonly findMeeting: (meetingId: string) => Promise<MeetingRecord | null>;
   readonly listMeetingsForRelationship: (
     relationshipId: string,

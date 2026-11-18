@@ -589,7 +589,7 @@ describe("meeting host in a call", () => {
     expect(said.at(-1)).toBe(HOST_REFUSAL);
   });
 
-  it("asked to leave in the call: Q stays, says why, and the ask is recorded -- never removed by a word (ADR 0039)", async () => {
+  it("asked to leave in the call: Q stays, says why once, and the ask is recorded -- never removed by a word (ADR 0039, owner 2026-11-18)", async () => {
     const { said, left, removed, notes, send } = setup({
       reply: { kind: "LEAVE_REQUEST", line: "Okay, bye!" },
     });

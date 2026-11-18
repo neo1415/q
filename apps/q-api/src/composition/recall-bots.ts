@@ -221,11 +221,24 @@ export function botRequest(input: {
     readonly pageUrl: string;
     readonly googleLoginGroupId?: string | null | undefined;
   };
+  /**
+   * S1 (2026-11-18): sign every hosted bot in to Google Meet, whatever the
+   * face mode, so it joins as Capital Q's Workspace account. With that
+   * account on the calendar invite, Meet admits it without a knock. Set
+   * only when the owner has configured it (CQ_MEETING_BOT_SIGN_IN=on and
+   * RECALL_GOOGLE_LOGIN_GROUP_ID).
+   */
+  readonly googleLoginGroupId?: string | null | undefined;
 }): Record<string, unknown> {
   const hosting = input.hosting;
   // The page only for a bot Q hosts (a silent note-taker shows nothing).
   const camera = hosting === undefined ? undefined : input.camera;
-  const loginGroup = camera?.googleLoginGroupId?.trim() ?? "";
+  const loginGroup =
+    hosting === undefined
+      ? ""
+      : ([input.googleLoginGroupId, camera?.googleLoginGroupId]
+          .map((group) => group?.trim() ?? "")
+          .find((group) => group !== "") ?? "");
   const seconds = (ms: number) => Math.max(30, Math.round(ms / 1_000));
   return {
     meeting_url: input.meetingUrl,
@@ -335,6 +348,8 @@ export function createRecallBots(options: {
   readonly transcriber?: RecallTranscriber;
   readonly fetch?: typeof fetch;
   readonly camera?: RecallCamera | undefined;
+  /** S1: the login group every hosted bot signs in with (see botRequest). */
+  readonly googleLoginGroupId?: string | null | undefined;
 }): MeetingBotProvider | undefined {
   const key = options.apiKey;
   if (key === undefined || key.length < 20 || key.startsWith("disabled")) {
@@ -399,6 +414,7 @@ export function createRecallBots(options: {
           body: botRequest({
             ...input,
             transcriber: options.transcriber ?? "meeting_captions",
+            googleLoginGroupId: options.googleLoginGroupId,
             ...(camera === undefined || meetingId === undefined
               ? {}
               : {

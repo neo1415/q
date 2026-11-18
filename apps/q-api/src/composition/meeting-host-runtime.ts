@@ -992,8 +992,12 @@ export function createMeetingHostRuntime(dependencies: {
    * it is, the face takes the turn and Q's answers go to it at once.
    */
   function hostHandle(session: Session, event: HostEvent): HostAction[] {
+    // Decision 106: an echo face says each line when handed it, so Q's
+    // lines are timed as for its own voice; only a turn-taking face (the
+    // legacy MEET mode) takes the turn.
     session.host.faceTakesTurns(
-      dependencies.face?.live(session.meetingId) === true,
+      dependencies.face?.live(session.meetingId) === true &&
+        dependencies.face.echoes !== true,
     );
     const dropped = session.host.stats().droppedAnswers;
     const actions = session.host.handle(event);
@@ -1545,8 +1549,8 @@ export function createMeetingHostRuntime(dependencies: {
             dependencies.face?.finish?.(session.meetingId);
           }
         } else if (result?.kind === "LEAVE_REQUEST") {
-          // Q is the record for both sides: it stays, says why, and the
-          // ask is recorded (ADR 0039). Only the organiser removes Q.
+          // Q is the record for both sides: it stays, says why once, goes
+          // quiet, and the ask is recorded (ADR 0039; owner 2026-11-18).
           for (const next of session.host.leaveRequested(
             action.speaker,
             session.host.userIdOf(action.speaker),
@@ -1824,9 +1828,14 @@ export function createMeetingHostRuntime(dependencies: {
  */
 export function spokenLine(line: string, maxChars = 520): string {
   const text = line.replace(/\s+/g, " ").trim();
-  const sentences = text.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [
-    text,
-  ];
+  // S3 (2026-11-18): a sentence ends only at ., ! or ? followed by a space
+  // and a capital (or a quote, a bracket or a figure starting the next),
+  // never inside a number: "$1.5m" was said as "$1. 5m" and counted as two
+  // of the three sentences kept.
+  const sentences = text
+    .split(/(?<=[.!?]["')\]]*)\s+(?=["'([]?[A-Z0-9$£€])/u)
+    .filter((sentence) => sentence.length > 0);
+  if (sentences.length === 0) sentences.push(text);
   let out = "";
   for (const sentence of sentences.slice(0, 3)) {
     const next = `${out}${out === "" ? "" : " "}${sentence.trim()}`;
@@ -1943,10 +1952,24 @@ export function createPostgresMeetingHostStore(sql: Sql): MeetingHostStore {
           organiser_user_id: string;
           bot_id: string | null;
           status: string | null;
+          prior_meetings: number;
+          in_diligence: boolean;
         }[]
       >`
         select m.purpose, m.starts_at, m.ends_at, m.organiser_tenant_id as tenant_id,
-               m.organiser_user_id, a.provider_bot_id as bot_id, a.status
+               m.organiser_user_id, a.provider_bot_id as bot_id, a.status,
+               -- S2: the relationship's history as both sides see it (shared
+               -- events only): earlier calls held, and whether diligence began.
+               (select count(distinct e.source_id)::int
+                  from network.relationship_events e
+                 where e.relationship_id = m.relationship_id
+                   and e.event_type = 'meeting_held'
+                   and e.visibility_scope = 'relationship_shared'
+                   and e.source_id is distinct from m.id::text) as prior_meetings,
+               exists (select 1 from network.relationship_events e
+                        where e.relationship_id = m.relationship_id
+                          and e.event_type = 'diligence_started'
+                          and e.visibility_scope = 'relationship_shared') as in_diligence
           from communication.meetings m
           left join communication.meeting_assistants a on a.meeting_id = m.id
          where m.id = ${meetingId}
@@ -1968,6 +1991,8 @@ export function createPostgresMeetingHostStore(sql: Sql): MeetingHostStore {
         tenantId: meeting.tenant_id,
         organiserUserId: meeting.organiser_user_id,
         declined: meeting.status === "DECLINED",
+        priorMeetings: meeting.prior_meetings,
+        inDiligence: meeting.in_diligence,
       };
     },
     roster: async (meetingId, tenantId, entry) => {

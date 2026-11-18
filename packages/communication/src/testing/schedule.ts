@@ -70,6 +70,25 @@ export function createInMemoryScheduleStore(
       if (existing !== undefined) {
         return Promise.resolve({ record: copy(existing), created: false });
       }
+      // S1: one open call per relationship and time (as the Postgres claim).
+      const clash =
+        (input.origin ?? "BOOKED") === "BOOKED"
+          ? meetings.find(
+              (m) =>
+                m.relationshipId === input.relationshipId &&
+                (m.origin ?? "BOOKED") === "BOOKED" &&
+                (m.status === "SCHEDULING" || m.status === "SCHEDULED") &&
+                m.startsAt < input.endsAt &&
+                m.endsAt > input.startsAt,
+            )
+          : undefined;
+      if (clash !== undefined) {
+        return Promise.resolve({
+          record: copy(clash),
+          created: false,
+          clash: true,
+        });
+      }
       const record: MutableMeeting = {
         ...input,
         status: "SCHEDULING",

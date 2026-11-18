@@ -94,6 +94,11 @@ const REFUSALS: Readonly<
     code: "RESOURCE_CONFLICT",
     detail: "That request key was already used for something else. Try again.",
   },
+  ALREADY_BOOKED: {
+    code: "RESOURCE_CONFLICT",
+    detail:
+      "There's already a call booked on this relationship at that time. Choose another time, or join that call.",
+  },
   NOT_A_MEET_LINK: {
     code: "VALIDATION_FAILED",
     detail:

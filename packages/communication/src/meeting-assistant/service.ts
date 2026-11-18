@@ -426,7 +426,19 @@ export function createMeetingAssistantService(dependencies: {
         | null
       >)
     | undefined;
-  /** The call happened: marked on the relationship's history. */
+  /**
+   * S8 (2026-11-18): the provider reports the call ended with people heard
+   * in it, so it was held, whether or not Q's notes then compose. Marked
+   * on the relationship's history once per meeting (the held count).
+   */
+  readonly tookPlace?:
+    | ((meeting: {
+        readonly relationshipId: string;
+        readonly meetingId: string;
+        readonly organiserUserId: string;
+      }) => Promise<void>)
+    | undefined;
+  /** Q's record of the call is written: what follows from it. */
   readonly onHeld?:
     | ((meeting: {
         readonly relationshipId: string;
@@ -926,6 +938,20 @@ export function createMeetingAssistantService(dependencies: {
     partial: { readonly failure: string; readonly why: string } | null,
   ): Promise<void> {
     const transcript = transcriptText(transcriptLines);
+    // S8: people were heard in a call that ended: it was held. Counted
+    // before the notes, so a note that fails never uncounts the meeting.
+    await dependencies
+      .tookPlace?.({
+        relationshipId: row.relationship_id,
+        meetingId: row.meeting_id,
+        organiserUserId: row.organiser_user_id,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, meetingId: row.meeting_id },
+          "the held meeting was not marked",
+        );
+      });
     // 2026-10-20: the name is read while the status is written.
     const [, organiserName] = await Promise.all([
       update(row.id, {

@@ -363,6 +363,7 @@ import {
   composeChat,
   composeChatSafety,
   composeSchedule,
+  meetingBotAttendeeFrom,
   createCounterpartNotices,
   createMeetingProposalPort,
   createPushSubscriptionStore,
@@ -2815,6 +2816,8 @@ const schedule = composeSchedule({
   calendars: (userId) => integrations.calendarOf(userId),
   calendarState: (userId) => integrations.calendarState(userId),
   email: unavailableAppEmailSender,
+  // S1: Capital Q's account on the invite, so its signed-in bot is let in.
+  qAttendee: meetingBotAttendeeFrom(process.env.CQ_MEETING_BOT_INVITE_EMAIL),
 });
 
 /**

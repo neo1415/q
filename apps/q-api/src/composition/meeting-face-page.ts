@@ -17,6 +17,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type MeetingFacePageVoice =
   | { readonly kind: "AUDIO"; readonly mp3Base64: string }
+  /**
+   * Decision 106: a line for the face to say with lip sync (the page sends
+   * it to the face's room as the provider's echo interaction). STOP also
+   * interrupts the face.
+   */
+  | { readonly kind: "ECHO"; readonly text: string }
   | { readonly kind: "STOP" };
 
 export type MeetingFacePageHub = {
@@ -25,6 +31,8 @@ export type MeetingFacePageHub = {
   readonly verify: (meetingId: string, key: string) => boolean;
   /** A line Q decided to say, for the page to play; false: no page open. */
   readonly speak: (meetingId: string, voice: MeetingFacePageVoice) => boolean;
+  /** Whether a page is connected for this meeting now. */
+  readonly open: (meetingId: string) => boolean;
   /** The page listens; returns how to stop listening. */
   readonly listen: (
     meetingId: string,
@@ -90,6 +98,7 @@ export function createMeetingFacePageHub(options: {
       }
       return false;
     },
+    open: (meetingId) => (listeners.get(meetingId)?.size ?? 0) > 0,
     listen: (meetingId, listener) => {
       const open = listeners.get(meetingId) ?? new Set();
       open.add(listener);

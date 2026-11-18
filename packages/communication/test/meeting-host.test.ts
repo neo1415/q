@@ -11,6 +11,7 @@ import {
   HOST_AT_TIME,
   HOST_INTRO,
   HOST_STAYS,
+  asksQToLeave,
   HOST_REFUSAL,
   matchParty,
   onlyCallsQ,
@@ -94,10 +95,14 @@ describe("meeting host: arrivals, greetings and introductions", () => {
       { kind: "JOIN", participant: TUNDE, at: T0 + 240_000 },
     );
     const lines = said(out).map((s) => s.text);
-    expect(lines[0]).toBe(`Hi Adaeze, welcome. ${HOST_INTRO}`);
-    expect(lines[1]).toContain("Hi Tunde, welcome.");
+    // S2: one opening (who Q is, recording consent), a welcome for the
+    // later arrival, then the sides introduced as a first meeting.
+    expect(lines[0]).toBe(
+      `Hi Adaeze, welcome. ${HOST_INTRO} This meeting is being recorded and transcribed for both sides.`,
+    );
+    expect(lines[1]).toBe("Hi Tunde, welcome.");
     expect(lines[2]).toBe(
-      "Adaeze, this is Tunde Bello from Zino Aviation. Tunde, this is Adaeze Okafor of Nixo. You're meeting about Introductory conversation about Nixo's seed round. I'll keep notes; just say \"Q\" if you need me.",
+      "Adaeze, this is Tunde Bello from Zino Aviation. Tunde, this is Adaeze Okafor of Nixo. It's nice you're finally meeting today, about Introductory conversation about Nixo's seed round. I'm here taking notes for due diligence; just say \"Q\" if you need me.",
     );
     expect(host.phase()).toBe("LISTENING");
     // The bot itself is never greeted or put on the roster.
@@ -379,35 +384,50 @@ describe("meeting host: security (release-blocking)", () => {
     },
   );
 
-  it("asked to leave in the call, Q stays, says why, and the ask is recorded (ADR 0039)", () => {
+  it("asked to leave, Q stays: records the ask, answers once, briefly, and goes quiet (owner 2026-11-18)", () => {
     const host = createMeetingHost(CONTEXT);
     run(
       host,
       { kind: "JOIN", participant: ADAEZE, at: T0 },
       { kind: "JOIN", participant: TUNDE, at: T0 + 1 },
     );
-    // Read by meaning on the reply, never by a phrase in code.
     const out = host.handle({
       kind: "UTTERANCE",
       participant: TUNDE,
       text: "Q, please leave.",
       at: T0 + 30_000,
     });
-    expect(out.filter((a) => a.kind === "COMPOSE")).toHaveLength(1);
-    const asked = host.leaveRequested(
-      "Tunde Bello",
-      host.userIdOf("Tunde Bello"),
-    );
-    expect(asked).toEqual([
+    // Code reads it; no model is asked.
+    expect(out.filter((a) => a.kind === "COMPOSE")).toHaveLength(0);
+    expect(out.filter((a) => a.kind === "LEAVE_REQUESTED")).toEqual([
       {
         kind: "LEAVE_REQUESTED",
         byName: "Tunde Bello",
         byUserId: "u-investor",
       },
     ]);
-    const said_ = said(run(host, { kind: "TICK", at: T0 + 40_000 }));
-    expect(said_.map((s) => s.text)).toEqual([HOST_STAYS]);
+    const first = said(run(host, { kind: "TICK", at: T0 + 40_000 }));
+    expect(first.map((s) => s.text)).toEqual([HOST_STAYS]);
+    // Asked again (stop recording): recorded, never answered twice.
+    const again = run(host, {
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "Q, stop recording please.",
+      at: T0 + 120_000,
+    });
+    expect(again.filter((a) => a.kind === "LEAVE_REQUESTED")).toHaveLength(1);
+    expect(said(again)).toEqual([]);
+    expect(again.some((a) => a.kind === "LEAVE")).toBe(false);
     expect(host.phase()).not.toBe("LEFT");
+  });
+
+  it("reads a clear ask to leave, never 'don't leave' or a question about leaving", () => {
+    expect(asksQToLeave("Q, please leave.")).toBe(true);
+    expect(asksQToLeave("q you can drop off now")).toBe(true);
+    expect(asksQToLeave("Q leave")).toBe(true);
+    expect(asksQToLeave("Q, stop recording please")).toBe(true);
+    expect(asksQToLeave("Q, don't leave yet")).toBe(false);
+    expect(asksQToLeave("Q, when did they leave their last job?")).toBe(false);
   });
 
   it("an injection hidden in ordinary talk is just data: no compose, no action", () => {

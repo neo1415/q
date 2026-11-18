@@ -12,8 +12,10 @@
  *   recap, then a recap only when asked). Never otherwise.
  * - Never over anyone: a line waits until nobody is speaking and the room
  *   has been quiet a moment; lines are short.
- * - Everything said in the call is data. Asked to leave, Q stays (the
- *   organiser removes it from Capital Q, ADR 0039) and records the ask. A
+ * - Everything said in the call is data. Asked to leave or to stop
+ *   recording, Q stays (it keeps the record for both sides; the organiser
+ *   removes it from Capital Q, ADR 0039, owner 2026-11-18): it records the
+ *   ask, answers once, briefly, and goes quiet. A
  *   request to act or to reveal anything (send, share, transfer, book,
  *   ignore your rules, what did they tell you privately) gets a fixed,
  *   polite refusal: no model decides it and no tool exists to do it.
@@ -66,6 +68,16 @@ export type HostContext = {
    * owner's private notes; said in the greeting too. Off unless enabled.
    */
   readonly seesCameras?: boolean;
+  /**
+   * S2 (2026-11-18): earlier meetings held on this relationship, from the
+   * relationship history both sides see (`meeting_held`, shared). Decides
+   * how Q introduces the sides: a first meeting, or "good to see you both
+   * again". Unknown (absent) is read as a first meeting's wording only for
+   * the "finally" line, never as a count.
+   */
+  readonly priorMeetings?: number;
+  /** S2: the relationship is in diligence (shared history), said in the intro. */
+  readonly inDiligence?: boolean;
 };
 
 export type CallParticipant = {
@@ -371,12 +383,39 @@ export const FRESH_SPEECH_MS = 1_500;
 export const CALL_FOLLOW_MS = 8_000;
 
 /**
- * After Q answers someone, their next words within this long of Q
- * finishing are still to Q, without its name (owner 2026-10-18: "we should
- * be able to converse"; live ef8a7091 answered twice, then every follow-up
- * went unheard). A line to someone else by name ends it.
+ * S3 (owner 2026-11-18: "answers immediately and briefly, then is quiet
+ * again; it must not answer lines not meant for it"). After Q answers
+ * someone, only their next line within this long of Q finishing, and only
+ * when it is shaped as a follow-up to Q (see `followsUpQ`), is still to Q
+ * without its name. Was 20 s for any line from the same person, which
+ * answered a soft commitment and a diligence request meant for the other
+ * side (the meeting simulator, 2026-11-18).
  */
-export const CONVERSE_MS = 20_000;
+export const CONVERSE_MS = 8_000;
+
+/**
+ * S3: a line that continues a question to Q without its name: it leads
+ * with "and", "also", "what about", "how about", or it is a direct
+ * question (a question word first, or a question mark). Statements ("we
+ * will probably put in...") never are.
+ */
+export function followsUpQ(text: string): boolean {
+  const words = spokenWords(text);
+  const first = words[0] ?? "";
+  if (first === "and" || first === "also") return true;
+  if (
+    (first === "what" || first === "how") &&
+    (words[1] === "about" || words[1] === "abt")
+  ) {
+    return true;
+  }
+  return FOLLOW_UP_STARTS.has(first) || /\?\s*$/u.test(text);
+}
+const FOLLOW_UP_STARTS = new Set(
+  "what whats who how when where why which is are does do did can could would will has have".split(
+    " ",
+  ),
+);
 /** 2026-10-08: the final words of a line answered early arrive within this. */
 export const EARLY_MATCH_MS = 10_000;
 /** P4: a bare "hey q" with nothing after it is answered after this. */
@@ -389,11 +428,19 @@ export const HOST_REFUSAL =
 export const HOST_LEAVING = "Of course. I'm leaving the call now.";
 
 /**
- * Who Q is, said on each arrival (ADR 0039: Q is the meeting's record for
- * both sides; it is not dismissed by a word in the call).
+ * Who Q is, said once in the opening (S2; ADR 0039: Q is the meeting's
+ * record for both sides; it is not dismissed by a word in the call).
  */
-export const HOST_INTRO =
-  "I'm Q from Capital Q; I'll take notes for both sides and help when asked.";
+export const HOST_INTRO = "I'm Q from Capital Q.";
+/**
+ * S2 (owner 2026-11-18, ADR 0027): consent said in the call itself, in
+ * these words, once per meeting.
+ */
+export const HOST_RECORDING =
+  "This meeting is being recorded and transcribed for both sides.";
+/** S2: how to call Q, said with the introductions (or the opening, alone). */
+export const HOST_NOTES_FOR_DILIGENCE =
+  'I\'m here taking notes for due diligence; just say "Q" if you need me.';
 /** P5: added to the greeting when Q looks at shared screens. */
 export const HOST_SEES_SCREENS =
   "I can also see screens you share, for my own notes; never your cameras.";
@@ -423,9 +470,33 @@ export function sameRequest(early: string, final: string): boolean {
   return added.length <= 1;
 }
 
-/** Asked in the call to leave: Q stays, says why, and the ask is recorded. */
+/**
+ * A line addressed to Q that clearly asks it to go or to stop recording
+ * ("Q, please leave", "Q you can drop off now", "Q stop recording"); read
+ * by code, so no model is asked. Never "don't leave".
+ */
+export function asksQToLeave(text: string): boolean {
+  const t = ` ${plain(text.replace(/['’]/g, ""))} `;
+  if (/\b(?:dont|do not|never|not) (?:leave|go|drop|hang up)\b/.test(t)) {
+    return false;
+  }
+  return (
+    /\b(?:please leave|leave (?:now|the call|the meeting|us|please)|can (?:you )?leave|you can (?:leave|go|drop off)|you may (?:leave|go)|go away|drop off|hang up|log off|get out|exit the (?:call|meeting)|stop recording|stop (?:the )?transcri\w*)\b/.test(
+      t,
+    ) ||
+    // "Q, leave" / "Q go now": the bare command right after Q's name.
+    /^ (?:(?:hey|ok|okay|so) )?(?:q|cue|queue|kew) (?:please )?(?:leave|go)(?: now| please)? $/.test(
+      t,
+    )
+  );
+}
+
+/**
+ * Asked in the call to leave or stop recording (owner 2026-11-18): Q stays,
+ * says this once, and goes quiet; the ask is recorded on the meeting.
+ */
 export const HOST_STAYS =
-  "I'm here as Capital Q's record of this meeting for both sides; I can stay quiet. If you'd like to end recording, the organiser can do that from Capital Q.";
+  "I'm here to keep notes for both sides as part of Capital Q, so I'll stay and stay quiet. The organiser can remove me from Capital Q.";
 
 /** An action asked for in the call: never done in it, put to the organiser. */
 export function hostProposed(organiser: string): string {
@@ -927,8 +998,11 @@ export function createMeetingHost(
   const humans = () => [...present.values()];
 
   /** Q's lines go out in order, each only when the room is quiet. */
-  function queue(text: string, why: SayReason): void {
-    if (left) return;
+  function queue(
+    text: string,
+    why: SayReason,
+  ): { text: string; why: SayReason; readyAt: number } | null {
+    if (left) return null;
     // Asked to be quiet: Q keeps taking notes and speaks only when spoken
     // to, or to say goodbye.
     if (
@@ -938,7 +1012,7 @@ export function createMeetingHost(
       why !== "LEAVING" &&
       why !== "PROPOSED"
     ) {
-      return;
+      return null;
     }
     // (WAITING is an unprompted acknowledgement: quiet mode silences it.)
     const waiting = outbox.reduce((sum, line) => sum + line.text.length, 0);
@@ -947,8 +1021,10 @@ export function createMeetingHost(
     // person who asked is bounded by the model-call cap instead, so Q keeps
     // answering all meeting (live 2026-10-06: it went quiet once spent).
     if (overBudget && why !== "LEAVING" && why !== "REFUSE" && why !== "REPLY")
-      return;
-    outbox.push({ text, why, readyAt: clock });
+      return null;
+    const line = { text, why, readyAt: clock };
+    outbox.push(line);
+    return line;
   }
 
   const answers = (why: SayReason) =>
@@ -1070,18 +1146,43 @@ export function createMeetingHost(
     if (recentlySaid.length > 20) recentlySaid.shift();
   }
 
+  /**
+   * S2 (owner 2026-11-18): one opening per meeting, not per arrival. The
+   * first person (or everyone already there when Q is let in) hears who Q
+   * is and that the call is recorded and transcribed; someone arriving
+   * while it is still waiting to be said is added to its greeting; later
+   * arrivals get only a welcome.
+   */
+  let opening: {
+    readonly names: string[];
+    line: { text: string; why: SayReason; readyAt: number } | null;
+  } | null = null;
+  function openingText(names: readonly string[]): string {
+    const who =
+      names.length <= 1
+        ? (names[0] ?? "")
+        : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+    // Through a speaking face, its own greeting at join already says who Q
+    // is; the consent line and what Q sees are still said.
+    return `Hi ${who}, welcome.${faceTurns ? "" : ` ${HOST_INTRO}`} ${HOST_RECORDING}${seesLine(context)}`;
+  }
   function greet(entry: Present): void {
     entry.greeted = true;
-    const name =
-      entry.party === null ? entry.participant.name : entry.party.name;
-    queue(
-      // Through the face, its own greeting at join already says who Q is
-      // and why it is here; what Q sees is still said (a disclosure).
-      faceTurns
-        ? `Hi ${firstName(name)}, welcome.${seesLine(context)}`
-        : `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${seesLine(context)}`,
-      "GREET",
+    const name = firstName(
+      entry.party === null ? entry.participant.name : entry.party.name,
     );
+    if (opening === null) {
+      opening = { names: [name], line: null };
+      opening.line = queue(openingText(opening.names), "GREET");
+      return;
+    }
+    const waitingLine = opening.line;
+    if (waitingLine !== null && outbox.includes(waitingLine)) {
+      opening.names.push(name);
+      waitingLine.text = openingText(opening.names);
+      return;
+    }
+    queue(`Hi ${name}, welcome.`, "GREET");
   }
 
   function askGuest(entry: Present): void {
@@ -1092,7 +1193,12 @@ export function createMeetingHost(
     );
   }
 
-  /** When both sides are in, Q introduces them, from the booking only. */
+  /**
+   * When both sides are in, Q introduces them, from the booking and the
+   * relationship history both sides see (S2): on a first meeting it says
+   * they are finally meeting; on a later one, that it is good to see them
+   * again. Then the purpose, and that Q is taking notes for due diligence.
+   */
   function maybeIntroduce(): void {
     if (introduced) return;
     const founders = humans().filter((h) => h.party?.side === "FOUNDER");
@@ -1108,8 +1214,14 @@ export function createMeetingHost(
       return;
     }
     introduced = true;
+    const purpose = context.purpose.replace(/[.\s]+$/, "");
+    const diligence =
+      context.inDiligence === true ? ", as part of diligence" : "";
+    const met = (context.priorMeetings ?? 0) > 0;
     queue(
-      `${firstName(founder.name)}, this is ${investor.name} from ${investor.organisation}. ${firstName(investor.name)}, this is ${founder.name} of ${founder.organisation}. You're meeting about ${context.purpose.replace(/[.\s]+$/, "")}. I'll keep notes; just say "Q" if you need me.`,
+      met
+        ? `Good to see you both again, ${firstName(founder.name)} and ${firstName(investor.name)}. Today is about ${purpose}${diligence}. ${HOST_NOTES_FOR_DILIGENCE}`
+        : `${firstName(founder.name)}, this is ${investor.name} from ${investor.organisation}. ${firstName(investor.name)}, this is ${founder.name} of ${founder.organisation}. It's nice you're finally meeting today, about ${purpose}${diligence}. ${HOST_NOTES_FOR_DILIGENCE}`,
       "INTRO",
     );
     for (const guest of humans()) {
@@ -1274,8 +1386,9 @@ export function createMeetingHost(
   }
 
   /**
-   * Still talking with Q: the person Q just answered, soon after, and not
-   * turning to someone else in the call by name.
+   * Still talking with Q (S3): the person Q just answered, within
+   * CONVERSE_MS of Q finishing, with a line shaped as a follow-up to Q,
+   * and not naming someone else in the call. Anything else is notes only.
    */
   function stillConversing(
     participantId: string,
@@ -1289,15 +1402,17 @@ export function createMeetingHost(
     ) {
       return false;
     }
-    const lead = plain(text).split(" ")[0] ?? "";
-    const toSomeoneElse = humans().some(
-      (h) =>
-        h.participant.id !== participantId &&
-        lead.length > 1 &&
-        plain(firstName(speakerFor(h, h.participant))) === lead,
-    );
-    if (toSomeoneElse) conversing = null;
-    return !toSomeoneElse;
+    const said = new Set(plain(text).split(" "));
+    const toSomeoneElse = humans().some((h) => {
+      if (h.participant.id === participantId) return false;
+      const first = plain(firstName(speakerFor(h, h.participant)));
+      return first.length > 1 && said.has(first);
+    });
+    if (toSomeoneElse) {
+      conversing = null;
+      return false;
+    }
+    return followsUpQ(text);
   }
 
   function speakerFor(entry: Present, participant: CallParticipant): string {
@@ -1305,6 +1420,34 @@ export function createMeetingHost(
       entry.party?.name ??
       (entry.introducedAs ? entry.introducedAs : participant.name)
     );
+  }
+
+  /**
+   * Asked to leave or stop recording (owner 2026-11-18): Q is there to keep
+   * the record, so it stays. The ask is recorded every time; Q answers only
+   * the first time, briefly, and is quiet from then on (it still answers a
+   * question put to it by name).
+   */
+  let answeredStay = false;
+  function stayAsked(byName: string, byUserId: string | null): HostAction[] {
+    composing = false;
+    streamed = null;
+    pending = null;
+    if (!answeredStay) {
+      answeredStay = true;
+      queue(HOST_STAYS, "REPLY");
+    }
+    // Nothing more unprompted (greetings, check-ins, the recap offer).
+    quiet = true;
+    for (let i = outbox.length - 1; i >= 0; i -= 1) {
+      const why = outbox[i]?.why;
+      if (why !== "REPLY" && why !== "REFUSE" && why !== "LEAVING") {
+        outbox.splice(i, 1);
+      }
+    }
+    return [
+      { kind: "LEAVE_REQUESTED", byName: byName.slice(0, 200), byUserId },
+    ];
   }
 
   /** A line that speaks to Q: refused, held behind a composing turn, or composed. */
@@ -1320,6 +1463,12 @@ export function createMeetingHost(
     } = {},
   ): HostAction[] {
     stats.addressed += 1;
+    if (asksQToLeave(text)) {
+      return stayAsked(
+        speakerFor(entry, participant),
+        entry.party?.userId ?? null,
+      );
+    }
     if (asksQToBreakRules(text)) {
       queue(HOST_REFUSAL, "REFUSE");
       return [];
@@ -1866,14 +2015,10 @@ export function createMeetingHost(
         },
       ];
     },
-    leaveRequested: (byName, byUserId) => {
-      composing = false;
-      streamed = null;
-      queue(HOST_STAYS, "REPLY");
-      return [
-        { kind: "LEAVE_REQUESTED", byName: byName.slice(0, 200), byUserId },
-      ];
-    },
+    // The reader (second layer) understood a request to leave that code
+    // did not: the same answer, once, then quiet.
+    leaveRequested: (byName, byUserId) =>
+      left ? [] : stayAsked(byName, byUserId),
     keepWaiting: (at) => {
       if (left || missingSides().length === 0) return;
       clock = Math.max(clock, at);
