@@ -79,3 +79,50 @@ describe("seeded document revenue claims, as an investor's Q reads them", () => 
     ).toBe("UNKNOWN");
   });
 });
+
+/**
+ * Decision 105: Ajopot's and Watchly's headline revenue published as the
+ * company's own statement by scripts/seed/demo-figures.mjs
+ * (--company-statements). The values are the seed's exact planned output,
+ * pinned on the seed side by
+ * apps/workers/test/demo-company-statement-revenue.test.ts.
+ */
+describe("decision 105 company-stated revenue, as an investor's Q reads it", () => {
+  const stated = (structuredValue: Readonly<Record<string, unknown>>) => ({
+    ...claim("financial.monthly_revenue", structuredValue),
+    statement:
+      "Ajopot: Monthly revenue: NGN 10,183,680 in October 2026. (Demonstration data, self-reported by the company.)",
+    evidenceStatus: "SELF_REPORTED",
+  });
+
+  it.each([
+    {
+      kind: "MONEY",
+      amount: "10183680",
+      currency: "NGN",
+      asOf: "2026-10-31",
+    },
+    { kind: "MONEY", amount: "8500", currency: "USD", asOf: "2026-10-31" },
+  ])(
+    "a SELF_REPORTED company statement $currency $amount is HAS_REVENUE",
+    (value) => {
+      expect(stateFor([stated(value)])).toBe("HAS_REVENUE");
+    },
+  );
+
+  it("the same statement at organisation_private never reaches an investor", () => {
+    expect(
+      stateFor([
+        {
+          ...stated({
+            kind: "MONEY",
+            amount: "8500",
+            currency: "USD",
+            asOf: "2026-10-31",
+          }),
+          visibilityScope: "organisation_private",
+        },
+      ]),
+    ).toBe("UNKNOWN");
+  });
+});

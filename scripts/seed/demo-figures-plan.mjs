@@ -35,6 +35,10 @@
  *   month), visibility network_visible, sensitivity NETWORK_VISIBLE;
  * - the statement says "Demonstration data, self-reported by the company",
  *   and the source row and audit metadata carry the provenance;
+ * - a third, narrowly scoped source (decision 105): the company-stated
+ *   headline revenue of exactly the allowlisted companies in
+ *   `COMPANY_STATEMENTS`, never derived from or linked to their
+ *   organisation-private documents;
  * - a figure already published for the same key and date is left alone
  *   when equal, and reported (never overwritten, never "resolved") when it
  *   differs: contradictions coexist until reconciled by a person.
@@ -42,6 +46,10 @@
 import { createHash } from "node:crypto";
 
 import { refusalsFor } from "./demo-activate-plan.mjs";
+import {
+  MONTHLY_REVENUE_KEY,
+  revenueFigureOf,
+} from "./evidence/revenue-claims-plan.mjs";
 
 export const SEED_KEY = "demo-figures.v1";
 export const TAVUS_SOURCE_FILE = "docs/seed/tavus-20/companies-full.json";
@@ -326,6 +334,100 @@ export function devWorldFigures(company) {
   return { figures, skipped };
 }
 
+// ------------------------------------------------------------ company statements (decision 105)
+
+export const COMPANY_STATEMENT_DECISION =
+  "docs/ai-handoff/DECISIONS.md decision 105 (owner, 2026-11-18)";
+export const COMPANY_STATEMENT_FIXTURE_DIR = "scripts/seed/evidence/fixtures";
+
+/**
+ * Decision 105's allowlist, and nothing else: the fictional companies whose
+ * headline revenue the owner made public as the company's OWN statement,
+ * with the exact figure the decision names. Any other key (Nixo, the
+ * owner's account under decision 99, included), a different company id, or
+ * a fixture whose latest actual month no longer states this figure is
+ * refused. Widening it is a new owner decision, not a code change.
+ */
+export const COMPANY_STATEMENTS = Object.freeze({
+  ajopot: Object.freeze({
+    companyId: "91de2a77-fe47-4af0-8534-d9abf9c55949",
+    name: "Ajopot",
+    period: "2026-10",
+    amount: "10183680",
+    currency: "NGN",
+  }),
+  watchly: Object.freeze({
+    companyId: "526c2d72-9142-4e48-b106-ee4910f19318",
+    name: "Watchly",
+    period: "2026-10",
+    amount: "8500",
+    currency: "USD",
+  }),
+});
+
+/**
+ * One allowlisted company's headline revenue as a company-stated figure:
+ * the same figure spec the other sources produce, so it is published in
+ * exactly the demo-figures shape (USER_STATEMENT source, USER_CLAIM /
+ * SELF_REPORTED, network_visible). Its value is the fixture's latest actual
+ * month, read by revenue-claims-plan's own rule, and must equal the figure
+ * decision 105 names.
+ *
+ * The company's documents stay organisation_private and are never
+ * referenced: no document id, version or title reaches the claim, its
+ * source, its evidence item or its audit row. The fixture path in the
+ * provenance is the checked-in synthetic seed, not an uploaded document.
+ */
+export function companyStatementFigures(key, fixture, companyId) {
+  const allowed = Object.hasOwn(COMPANY_STATEMENTS, key)
+    ? COMPANY_STATEMENTS[key]
+    : undefined;
+  if (allowed === undefined)
+    return {
+      figures: [],
+      skipped: [],
+      refused: [`${key}: not in ${COMPANY_STATEMENT_DECISION}'s allowlist`],
+    };
+  const refused = [];
+  if (companyId !== allowed.companyId)
+    refused.push(
+      `company id ${companyId} is not ${key}'s ${allowed.companyId}`,
+    );
+  if (fixture?.synthetic !== true) refused.push("fixture is not synthetic");
+  if (fixture?.key !== key) refused.push(`fixture key is not ${key}`);
+  if (fixture?.company?.name !== allowed.name)
+    refused.push(`fixture company is not ${allowed.name}`);
+  const figure = revenueFigureOf(fixture);
+  if (
+    figure?.key !== MONTHLY_REVENUE_KEY ||
+    figure.period !== allowed.period ||
+    figure.value.amount !== allowed.amount ||
+    figure.value.currency !== allowed.currency
+  )
+    refused.push(
+      `the fixture's latest actual month is not decision 105's ${allowed.currency} ${allowed.amount} (${allowed.period})`,
+    );
+  if (refused.length > 0) return { figures: [], skipped: [], refused };
+  const file = `${COMPANY_STATEMENT_FIXTURE_DIR}/${key}.json`;
+  return {
+    figures: [
+      {
+        key: MONTHLY_REVENUE_KEY,
+        type: "financial",
+        label: "Monthly revenue",
+        kind: "MONEY",
+        currency: allowed.currency,
+        sourceFile: file,
+        points: [
+          { period: figure.period, asOf: figure.asOf, decimal: allowed.amount },
+        ],
+        provenance: `company-stated headline revenue published under ${COMPANY_STATEMENT_DECISION}: the company's own statement of its latest actual month (${figure.period}), as recorded in its synthetic seed ${file}; not derived from or linked to any of its documents, which stay organisation_private`,
+      },
+    ],
+    skipped: [],
+  };
+}
+
 // ------------------------------------------------------------ the plan
 
 function statementFor(company, figure, point) {
@@ -384,7 +486,10 @@ export function planCompanyFigures(entry, snapshot, sourced) {
     name: entry.name,
     source: entry.source,
   };
-  const refusals = refusalsFor(entry, snapshot);
+  const refusals = [
+    ...(sourced.refused ?? []),
+    ...refusalsFor(entry, snapshot),
+  ];
   if (snapshot?.company) {
     const live = String(snapshot.company.canonical_name ?? "").trim();
     if (live.toLowerCase() !== entry.name.trim().toLowerCase())

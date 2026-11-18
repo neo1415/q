@@ -8,6 +8,7 @@
  *
  *   node scripts/seed/demo-figures.mjs                 # dry run (default): read-only SQL, prints the plan
  *   node scripts/seed/demo-figures.mjs --only <companyId> [--only …]
+ *   node scripts/seed/demo-figures.mjs --company-statements   # only decision 105's allowlist (Ajopot, Watchly)
  *   node scripts/seed/demo-figures.mjs --apply         # writes; a separate step the owner approves
  *
  * Sources (checked in, never a query): the tavus-20 seed's dated metric
@@ -26,6 +27,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  COMPANY_STATEMENT_FIXTURE_DIR,
+  COMPANY_STATEMENTS,
+  companyStatementFigures,
   devWorldFigures,
   planCompanyFigures,
   renderFiguresPlan,
@@ -40,6 +44,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const argv = process.argv.slice(2);
 const APPLY = argv.includes("--apply");
 const only = argv.flatMap((a, i) => (a === "--only" ? [argv[i + 1]] : []));
+const STATEMENTS_ONLY = argv.includes("--company-statements");
 
 async function query(text, readOnly) {
   const token = process.env.SUPABASE_ACCESS_TOKEN?.trim();
@@ -105,9 +110,56 @@ async function sources() {
       sourced: devWorldFigures(company),
     });
   }
+  for (const statement of companyStatementSources(manifest)) {
+    const same = out.find(
+      (s) => s.entry.companyId === statement.entry.companyId,
+    );
+    if (same === undefined) {
+      out.push(statement);
+      continue;
+    }
+    // One plan (one transaction) per company.
+    same.entry.source = `${same.entry.source} + ${statement.entry.source}`;
+    same.sourced = {
+      figures: [...same.sourced.figures, ...statement.sourced.figures],
+      skipped: [...same.sourced.skipped, ...statement.sourced.skipped],
+      refused: [
+        ...(same.sourced.refused ?? []),
+        ...(statement.sourced.refused ?? []),
+      ],
+    };
+  }
   return only.length === 0
     ? out
     : out.filter((s) => only.includes(s.entry.companyId));
+}
+
+/**
+ * Decision 105's company-stated headline revenue, for exactly the
+ * allowlisted companies (COMPANY_STATEMENTS). The fixture is read only for
+ * its latest actual month; its documents are never read or referenced.
+ */
+function companyStatementSources(manifest) {
+  return Object.entries(COMPANY_STATEMENTS).map(([key, allowed]) => {
+    const listed = manifest.companies.find(
+      (c) => c.companyId === allowed.companyId,
+    );
+    const fixture = readJson(`${COMPANY_STATEMENT_FIXTURE_DIR}/${key}.json`);
+    const sourced = companyStatementFigures(key, fixture, allowed.companyId);
+    if (listed === undefined)
+      sourced.refused = [
+        ...(sourced.refused ?? []),
+        "not in docs/seed/demo-activation-manifest.json",
+      ];
+    return {
+      entry: {
+        ...(listed ?? { companyId: allowed.companyId }),
+        name: allowed.name,
+        source: `company statement ${key} (decision 105)`,
+      },
+      sourced,
+    };
+  });
 }
 
 const SNAPSHOT_SQL = (ids) => `
@@ -149,7 +201,11 @@ async function snapshots(ids) {
 }
 
 async function main() {
-  const wanted = await sources();
+  const wanted = STATEMENTS_ONLY
+    ? companyStatementSources(
+        readJson("docs/seed/demo-activation-manifest.json"),
+      )
+    : await sources();
   const snaps = await snapshots(wanted.map((w) => w.entry.companyId));
   const plans = wanted.map((w) =>
     planCompanyFigures(
