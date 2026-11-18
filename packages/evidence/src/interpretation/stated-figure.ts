@@ -4,7 +4,11 @@ import type { CorrelationId } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import type { EvidenceService } from "../application/service.js";
-import type { Claim, StructuredValue } from "../contracts/index.js";
+import {
+  ClaimIdSchema,
+  type Claim,
+  type StructuredValue,
+} from "../contracts/index.js";
 import { excerptIsPresent } from "./policy.js";
 
 /**
@@ -334,7 +338,11 @@ export async function statedFigureClashes(
 }
 
 export type StatedFigureOutcome = {
-  readonly outcome: "RECORDED" | "ALREADY_RECORDED";
+  /**
+   * CORRECTED (ADR 0081): a figure Q recorded from the founder's own words
+   * in this conversation, corrected by them: a new revision of that claim.
+   */
+  readonly outcome: "RECORDED" | "ALREADY_RECORDED" | "CORRECTED";
   readonly claimId: string;
   /** Earlier figures for the same metric and date that disagree; both stay. */
   readonly conflicts: number;
@@ -352,6 +360,13 @@ export async function recordStatedFigure(
     readonly figure: StatedFigure;
     readonly idempotencyKey: string;
     readonly correlationId: CorrelationId;
+    /**
+     * ADR 0081 (owner decision 105): OWN_STATEMENT when Q recorded the
+     * founder's own statement at once, under that scoped delegation, with
+     * no card. The claim is the same; the source says how it was taken.
+     * Absent: an approved card, as before.
+     */
+    readonly recordedBy?: "APPROVED_CARD" | "OWN_STATEMENT" | undefined;
   },
 ): Promise<StatedFigureOutcome> {
   const { actor, companyId, correlationId } = command;
@@ -386,7 +401,9 @@ export async function recordStatedFigure(
       reliabilityClass: "USER_STATEMENT",
       metadata: {
         via: "q_conversation",
-        approvedCard: true,
+        ...(command.recordedBy === "OWN_STATEMENT"
+          ? { approvedCard: false, delegation: "ADR-0081" }
+          : { approvedCard: true }),
         idempotencyKey: command.idempotencyKey.slice(0, 200),
       },
     },
@@ -398,7 +415,7 @@ export async function recordStatedFigure(
       subject,
       claimType: metric.claimType,
       claimKey: metric.claimKey,
-      statement: `The company's ${statedFigureWords(figure)}, as the founder told Q (self-reported).`,
+      statement: statedFigureStatement(figure),
       structuredValue,
       truthClass: "USER_CLAIM",
       evidenceStatus: "SELF_REPORTED",
@@ -444,4 +461,134 @@ export async function recordStatedFigure(
     });
   }
   return { outcome: "RECORDED", claimId: claim.id, conflicts: clashes.length };
+}
+
+/** The statement a figure the founder told Q is recorded with. */
+export function statedFigureStatement(figure: StatedFigure): string {
+  return `The company's ${statedFigureWords(figure)}, as the founder told Q (self-reported).`;
+}
+
+const STATED_STATEMENT =
+  /^The company's (.+), as the founder told Q \(self-reported\)\.$/u;
+
+/**
+ * The words ("MRR of USD 120,000 for October 2026") of a claim recorded
+ * from the founder's own statement, as Q said them back; null for any
+ * other claim (a document's, a page's, a revision with other words).
+ */
+export function statedFigureClaimWords(claim: {
+  readonly statement: string;
+}): string | null {
+  return STATED_STATEMENT.exec(claim.statement)?.[1] ?? null;
+}
+
+export type StatedFigureCorrectionEvidence = StatedFigureEvidence &
+  Pick<EvidenceService, "getClaim" | "reviseClaim">;
+
+/**
+ * ADR 0081 (owner decision 105): the founder corrects a figure Q recorded
+ * from their own words in this conversation ("actually it was $110k"). The
+ * correction is the next revision of that claim (reviseClaim: revision row,
+ * projection, audit and claim.changed in one transaction), never an
+ * overwrite: the earlier value stays in its history, with their corrected
+ * words as the new evidence and the reason on the revision. Safe to
+ * repeat: a claim already holding the value answers ALREADY_RECORDED.
+ * Authority stays with Evidence (evidence.record on the subject).
+ */
+export async function correctStatedFigure(
+  evidence: StatedFigureCorrectionEvidence,
+  command: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+    readonly claimId: string;
+    readonly figure: StatedFigure;
+    readonly idempotencyKey: string;
+    readonly correlationId: CorrelationId;
+  },
+): Promise<StatedFigureOutcome> {
+  const { actor, companyId, correlationId } = command;
+  const figure = StatedFigureSchema.parse(command.figure);
+  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const subject = { subjectType: "COMPANY" as const, subjectId: companyId };
+  const { claim } = await evidence.getClaim({
+    actor,
+    claimId: ClaimIdSchema.parse(command.claimId),
+  });
+  if (
+    claim.subjectType !== "COMPANY" ||
+    claim.subjectId !== companyId ||
+    claim.claimKey !== metric.claimKey
+  ) {
+    throw new Error("STATED_FIGURE_CORRECTION_SUBJECT");
+  }
+  if (
+    claimDate(claim) === figure.asOf &&
+    sameValue(claim.structuredValue, figure.value)
+  ) {
+    return { outcome: "ALREADY_RECORDED", claimId: claim.id, conflicts: 0 };
+  }
+  const structuredValue = statedFigureStructuredValue(figure);
+  const validFrom =
+    figure.asOf === null ? null : `${figure.asOf}T00:00:00.000Z`;
+  const source = await evidence.registerEvidenceSource({
+    actor,
+    correlationId,
+    input: {
+      sourceType: "CONVERSATION",
+      subject,
+      title: "Corrected in conversation with Q",
+      reliabilityClass: "USER_STATEMENT",
+      metadata: {
+        via: "q_conversation",
+        approvedCard: false,
+        delegation: "ADR-0081",
+        corrects: claim.id,
+        idempotencyKey: command.idempotencyKey.slice(0, 200),
+      },
+    },
+  });
+  const revised = await evidence.reviseClaim({
+    actor,
+    correlationId,
+    input: {
+      claimId: claim.id,
+      expectedRevisionNumber: claim.currentRevisionNumber,
+      statement: statedFigureStatement(figure),
+      structuredValue,
+      validFrom,
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      lifecycleStatus: "CURRENT",
+      changeReason:
+        `Corrected by the founder in conversation: ${figure.said}`.slice(
+          0,
+          500,
+        ),
+      sourceId: source.id,
+    },
+  });
+  const item = await evidence.createEvidenceItem({
+    actor,
+    correlationId,
+    input: {
+      sourceId: source.id,
+      evidenceType: `${metric.claimType}.stated`,
+      summary: figure.said,
+      structuredValue,
+      locator: { kind: "statement" },
+      validFrom,
+      evidenceStatus: "SELF_REPORTED",
+      reliabilityClass: "USER_STATEMENT",
+    },
+  });
+  await evidence.linkClaimEvidence({
+    actor,
+    correlationId,
+    input: {
+      claimId: revised.id,
+      evidenceItemId: item.id,
+      relationship: "SUPPORTS",
+    },
+  });
+  return { outcome: "CORRECTED", claimId: revised.id, conflicts: 0 };
 }

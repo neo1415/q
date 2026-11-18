@@ -124,3 +124,32 @@ export function asksNoActionOf(read: QTurnReading | null): boolean {
     read.replyTo?.kind === "WAITING_CARD";
   return !asked && !takesUp;
 }
+
+/**
+ * ADR 0081 (owner decision 105): whether this turn's words may be taken as
+ * the person's own statement, so a founder's figure about their own
+ * company can be recorded at once with no card. From the reading's fields
+ * only, never its words: a reading exists, it is not at LOW confidence, the
+ * words came through (not UNCLEAR_TRANSCRIPT, not a FRAGMENT; a spoken
+ * turn only when its transcript is CLEAR and it was not re-heard by sound
+ * -- the `:heard` message holds Q's guess, not their words), it was said
+ * to Q, and it is about no named other company or person. Anything else
+ * is false, and the card stays.
+ */
+export function ownStatementClearOf(
+  read: QTurnReading | null,
+  latest: { readonly utteranceRef?: string | undefined },
+): boolean {
+  if (read === null || read.confidence === "LOW") return false;
+  if (read.kind === "UNCLEAR_TRANSCRIPT" || read.transcript === "FRAGMENT") {
+    return false;
+  }
+  if (read.addressedToQ === false) return false;
+  if (read.aboutNamedOther || (read.namedOther ?? null) !== null) return false;
+  const spoken = latest.utteranceRef !== undefined;
+  if (!spoken) return true;
+  return (
+    read.transcript === "CLEAR" &&
+    !(latest.utteranceRef ?? "").endsWith(":heard")
+  );
+}

@@ -26,7 +26,7 @@ import {
 } from "@capital-q/contracts";
 import { CompanyIdSchema } from "@capital-q/companies";
 import type { QToolExecutionContext } from "@capital-q/q-runtime";
-import type { ActorContext } from "@capital-q/security";
+import { capability, type ActorContext } from "@capital-q/security";
 
 import {
   allow,
@@ -123,7 +123,128 @@ type Grant = {
   readonly context: AppActionContext;
   /** Said before the card: the document it holds was the closest match. */
   readonly closest?: string | undefined;
+  /**
+   * ADR 0081: every scope check of the founder's-own-statement delegation
+   * passed, so it runs at once (no card) under this context, whose
+   * idempotency key comes from the conversation, the message and the
+   * statement.
+   */
+  readonly ownStatement?: AppActionContext | undefined;
 };
+
+/**
+ * ADR 0081 (owner decision 105): the actor is a member of the
+ * organisation that owns this company, in its tenant, holding
+ * evidence.record on it -- checked on the server, never read from the
+ * model or the client. An investor, a member of another organisation or a
+ * person without that capability is not.
+ */
+async function founderMemberOf(
+  ports: QToolPorts,
+  actor: ActorContext,
+  companyId: string,
+): Promise<boolean> {
+  if (
+    actor.actorType !== "HUMAN" ||
+    actor.organisationId === undefined ||
+    actor.membershipId === undefined
+  ) {
+    return false;
+  }
+  const parsed = CompanyIdSchema.safeParse(companyId);
+  if (!parsed.success) return false;
+  const profile = await ports.companies
+    .findCanonicalCompanyProfile(parsed.data)
+    .catch(() => null);
+  if (
+    profile === null ||
+    profile.tenantId !== actor.tenantId ||
+    profile.organisationId !== actor.organisationId
+  ) {
+    return false;
+  }
+  const decision = await ports.authorization
+    .authorize({
+      actor,
+      capability: capability("evidence.record"),
+      resource: {
+        kind: "RESOURCE",
+        tenantId: profile.tenantId,
+        organisationId: profile.organisationId,
+        resourceType: "company",
+        resourceId: profile.id,
+      },
+    })
+    .catch(() => null);
+  return decision?.outcome === "ALLOW";
+}
+
+/**
+ * ADR 0081 (owner decision 105): the context a declared action runs under
+ * at once, with no card, when the founder's own statement about their own
+ * company is in scope; null in every other case, and the card is prepared
+ * as before. In scope only when all hold:
+ * - the action declares the delegation (its `ownStatement`);
+ * - the turn reader read the turn clearly as their own words
+ *   (`ownStatementClear`: not a low-confidence or garbled transcript);
+ * - the conversation and the message are known (the idempotency key);
+ * - the actor is a founder member of that company (server-checked);
+ * - the action's own check: the value is in this turn's own words (and,
+ *   for an undo or a correction, bound to what Q said it recorded here).
+ */
+async function ownStatementContext(
+  action: AnyAppAction,
+  canonical: unknown,
+  toolInput: unknown,
+  execution: QToolExecutionContext,
+  context: AppActionContext,
+  ports: QToolPorts,
+  own: OwnReadPorts,
+): Promise<AppActionContext | null> {
+  const delegation = action.ownStatement;
+  if (delegation === undefined || action.classification !== "CONSEQUENTIAL") {
+    return null;
+  }
+  if (execution.ownStatementClear !== true) return null;
+  const conversation = execution.conversation;
+  const conversationId = conversation?.conversationId;
+  const messageId = conversation?.messageId;
+  if (
+    conversation === undefined ||
+    conversationId === undefined ||
+    messageId === undefined
+  ) {
+    return null;
+  }
+  const companyId = delegation.companyOf(canonical);
+  if (companyId === null) return null;
+  if (!(await founderMemberOf(ports, execution.actor, companyId))) {
+    return null;
+  }
+  const qWords = conversation.earlierQText ?? [];
+  const scoped: AppActionContext = {
+    ...context,
+    qWords,
+    ownStatement: true,
+    idempotencyKey: `q-own-${createHash("sha1")
+      .update(
+        `${conversationId}|${messageId}|${action.name}|${stableJson(
+          delegation.keyOf(canonical),
+        )}`,
+      )
+      .digest("hex")}`,
+  };
+  const stated = await delegation
+    .stated(
+      canonical,
+      toolInput,
+      { latestUserText: conversation.latestUserText, qWords },
+      own,
+      scoped,
+    )
+    .catch(() => false);
+  return stated ? scoped : null;
+}
 
 /**
  * Stress 2026-10-28 (S05): "send the confidential financial model to Aster
@@ -395,12 +516,18 @@ export async function unmatchedWords(
   return parts.join(" ").slice(0, 1_000);
 }
 
+/** The action's own tool input has a `reason` field of its own. */
+function ownReason(input: z.ZodType): boolean {
+  return input instanceof z.ZodObject && Object.hasOwn(input.shape, "reason");
+}
+
 function toolFor(
   action: AnyAppAction,
   own: OwnReadPorts,
   candidates: ReferenceCandidates,
   approvals: AppApprovalPort | undefined,
   companyName: (companyId: string) => Promise<string>,
+  ports: QToolPorts,
 ): AnyQToolDefinition | null {
   const declared = action.tool;
   if (declared === undefined) return null;
@@ -440,9 +567,13 @@ function toolFor(
       action.classification === "CONSEQUENTIAL" ? "WAITING_FOR_APPROVAL" : null,
     // A change for their approval may say why (the card's "Why: …"); the
     // reason never enters the payload the approval binds to.
+    // An action whose own input has a reason (a withdrawal's) keeps it:
+    // the action's own reason wins (card-reason.ts). Stripping it left
+    // the withdrawal with none, so Q could never prepare one.
     input:
       action.classification === "CONSEQUENTIAL" &&
-      declared.input instanceof z.ZodObject
+      declared.input instanceof z.ZodObject &&
+      !ownReason(declared.input)
         ? declared.input.extend({ reason: CardReasonSchema })
         : declared.input,
     output: AppToolOutputSchema,
@@ -466,7 +597,13 @@ function toolFor(
       const { actor, plan } = execution;
       if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
       // Names to ids, by the one coercion; anything unclear is not acted on.
-      const { reason: _reason, ...given } = input as Record<string, unknown>;
+      const { reason: _reason, ...withoutReason } = input as Record<
+        string,
+        unknown
+      >;
+      const given: Record<string, unknown> = ownReason(declared.input)
+        ? { ...(input as Record<string, unknown>) }
+        : withoutReason;
       const resolved: Record<string, unknown> = { ...given };
       const names: Record<string, string> = {};
       const references: Readonly<Record<string, ReferenceKind | undefined>> =
@@ -606,14 +743,38 @@ function toolFor(
           ? deny("NOT_AVAILABLE", verdict.reason)
           : deny("NOT_AVAILABLE");
       }
+      // ADR 0081: the founder's own statement about their own company runs
+      // at once, with no card, when every scope check holds.
+      const ownStatement = await ownStatementContext(
+        action,
+        parsed.data,
+        given,
+        execution,
+        context,
+        ports,
+        own,
+      );
       return allow("CONFIDENTIAL", {
         canonical: parsed.data,
         names,
         context,
         ...(closest === undefined ? {} : { closest }),
+        ...(ownStatement === null ? {} : { ownStatement }),
       });
     },
     execute: async (_input, execution, grant) => {
+      const delegation = action.ownStatement;
+      if (grant.ownStatement !== undefined && delegation !== undefined) {
+        // ADR 0081: recorded now, through the same declaration the
+        // approved card runs (its Write Gate, audit and history).
+        const out = await action.run(own, grant.ownStatement, grant.canonical);
+        const said = delegation.recorded(out, grant.canonical);
+        return {
+          status: "DONE",
+          says: said.length <= 600 ? said : `${said.slice(0, 597)}...`,
+          ...(ownOrganisationTool(declared) ? { ownRecord: true } : {}),
+        };
+      }
       if (
         action.classification === "CONSEQUENTIAL" &&
         approvals !== undefined
@@ -801,6 +962,7 @@ export function createAppActionTools(
         candidates,
         ports.appApprovals,
         companyName,
+        ports,
       );
       return tool === null ? [] : [tool];
     }),

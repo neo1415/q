@@ -5007,6 +5007,10 @@ export function createModelGatewayQAnswer(
       // from authorised public identity, never from a model argument.
       conversation: {
         latestUserText: latest.content,
+        // ADR 0081: the key of a statement recorded at once is this
+        // conversation's, this message's and the statement's.
+        conversationId,
+        messageId: latest.id,
         // Their own earlier words, for a look-up that refers back ("look
         // her up" after naming her): never Q's words.
         earlierUserText: earlier
@@ -8485,10 +8489,15 @@ export function createModelGatewayQAnswer(
       // Live 17 Nov 2026 (run 0f483277): the reading decides whether this
       // turn asks for any action; a warmed prepare began before it was
       // read, so the turn's own answer carries it into every tool call.
-      let toolContext: QToolExecutionContext =
-        request.asksNoAction === true
-          ? { ...preparedToolContext, asksNoAction: true }
-          : preparedToolContext;
+      let toolContext: QToolExecutionContext = {
+        ...preparedToolContext,
+        ...(request.asksNoAction === true ? { asksNoAction: true } : {}),
+        // ADR 0081: likewise whether this turn's words may be taken as
+        // their own statement (decided from the reading, never the model).
+        ...(request.ownStatementClear === true
+          ? { ownStatementClear: true }
+          : {}),
+      };
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
       // The person's settings for this answer, read side by side with the
       // reading wait, the setup reminder and the readiness read below (L1
@@ -14340,6 +14349,22 @@ export function createModelGatewayQAnswer(
             }
             figureCardLine = line;
             const own = ownRecordOf(outcome.result.data);
+            if (own !== null) ownRecordsOnly = (ownRecordsOnly ?? true) && own;
+          }
+          // ADR 0081: their own statement, recorded at once (no card): the
+          // tool's own line says what was recorded and how to undo it.
+          const recordedNow = outcome.result.ok
+            ? appActionLineOf(outcome.result.data)
+            : null;
+          if (
+            !prepared &&
+            recordedNow !== null &&
+            !actedLines.includes(recordedNow)
+          ) {
+            figureCardLine = recordedNow;
+            const own = outcome.result.ok
+              ? ownRecordOf(outcome.result.data)
+              : null;
             if (own !== null) ownRecordsOnly = (ownRecordsOnly ?? true) && own;
           }
           logger?.info(

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
+  correctStatedFigure,
   DocumentFigureSourceSchema,
   documentFigureWords,
   recordDocumentFigure,
@@ -12,6 +13,7 @@ import {
   STATED_FIGURE_METRICS,
   statedFigureClashes,
   statedFigureAmountWords,
+  statedFigureClaimWords,
   statedFigureDateWords,
   statedFigurePeriod,
   StatedFigureSchema,
@@ -19,6 +21,7 @@ import {
   WebFigureSourceSchema,
   webFigureWords,
   type StatedFigure,
+  type StatedFigureCorrectionEvidence,
   type StatedFigureOutcome,
   type StatedFigureValue,
 } from "@capital-q/evidence";
@@ -29,6 +32,7 @@ import {
   refusal,
   type AnyAppAction,
   type AppActionContext,
+  type OwnStatementDelegation,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
@@ -117,6 +121,12 @@ const RecordTool = z
       .describe(
         "Their own words that state it, copied exactly from their message (never your words, never translated).",
       ),
+    statedNow: z
+      .boolean()
+      .optional()
+      .describe(
+        "True only when they state this figure themselves in their latest message, about their own company, and `said` is copied from that message. False for a figure from an earlier message, a document, a page, your own reading or anyone else.",
+      ),
   })
   .strict();
 type RecordToolInput = z.infer<typeof RecordTool>;
@@ -168,6 +178,9 @@ function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
   if (out.outcome === "ALREADY_RECORDED") {
     return `Your ${what} was already recorded, so nothing changed.${conflict}`;
   }
+  if (out.outcome === "CORRECTED") {
+    return `Corrected: your ${what}, as your own statement (self-reported). The earlier value stays in its history. It's private to your company; investors don't see it.`;
+  }
   if (input.web !== undefined) {
     return `Recorded your ${what} as your company's own figure, confirmed by you; "${input.web.title}" is kept as where it was first reported. It's private to your company; investors don't see it.${conflict}`;
   }
@@ -214,13 +227,15 @@ const RECORD = defineAppAction<
           correlationId: context.correlationId,
         })
       : input.document === undefined
-        ? recordStatedFigure(figures(ports), {
-            actor: context.actor,
-            companyId: input.companyId,
-            figure: input.figure,
-            idempotencyKey: context.idempotencyKey,
-            correlationId: context.correlationId,
-          })
+        ? context.ownStatement === true
+          ? recordOwnStatement(ports, context, input)
+          : recordStatedFigure(figures(ports), {
+              actor: context.actor,
+              companyId: input.companyId,
+              figure: input.figure,
+              idempotencyKey: context.idempotencyKey,
+              correlationId: context.correlationId,
+            })
         : recordDocumentFigure(
             ports.documentFigures ?? portMissing("documentFigures"),
             {
@@ -248,10 +263,11 @@ const RECORD = defineAppAction<
             preview: `Your document says: "${input.figure.said}". ${DOCUMENT_NOTE}${alongsideWords(input.alongside)}`,
           },
   done: (out, input) => outcomeWords(out, input),
+  ownStatement: ownFigureStatement(),
   tool: {
     name: "propose_company_figure",
     description:
-      'For a founder, about their own company: whenever their message states a figure the company has reached -- MRR, ARR, revenue, burn, cash, runway, gross margin, customers, active users or churn, in any words or language, even in passing, as news, a reply or inside a question ("Good news: we hit $120k MRR in October") -- call this in that same turn to prepare it for their approval as their dated, self-reported figure. A correction ("Actually October MRR was $110k") is prepared the same way, even with another figure on record for that date: the card names it. Remembering what they said does not record it; only this card does. One figure per turn: prepare the first and say you\'ll record the next once they answer. Never for a figure you read in a document or found yourself, a target, a forecast or another company\'s figure. Nothing is recorded until they approve exactly this card: until then never say or imply it is recorded, corrected, kept or on file.',
+      'For a founder, about their own company: whenever their message states a figure the company has reached -- MRR, ARR, revenue, burn, cash, runway, gross margin, customers, active users or churn, in any words or language, even in passing, as news, a reply or inside a question ("Good news: we hit $120k MRR in October") -- call this in that same turn to prepare it for their approval as their dated, self-reported figure. A correction ("Actually October MRR was $110k") is prepared the same way, even with another figure on record for that date: the card names it. Remembering what they said does not record it; only this card does. One figure per turn: prepare the first and say you\'ll record the next once they answer. Never for a figure you read in a document or found yourself, a target, a forecast or another company\'s figure. Nothing is recorded until they approve exactly this card: until then never say or imply it is recorded, corrected, kept or on file. If DONE, say just what it returned.',
     input: RecordTool,
     references: {},
     scopes: ["COMPANY_PROFILE"],
@@ -322,6 +338,184 @@ const RECORD = defineAppAction<
     },
   },
 });
+
+/**
+ * ADR 0081 (owner decision 105): the numbers written in their words, each
+ * in every reading its separators allow ("120,000", "$120k", "1,5 Mio.",
+ * "3.5%"), for the check that the recorded value is one they said. Digits
+ * only: a number said in words ("fourteen") is not found, and the figure
+ * then comes as a card. It reads numerals, never a keyword list.
+ */
+const SCALES: Readonly<Record<string, number>> = {
+  k: 1e3,
+  thousand: 1e3,
+  m: 1e6,
+  mm: 1e6,
+  mn: 1e6,
+  mio: 1e6,
+  million: 1e6,
+  b: 1e9,
+  bn: 1e9,
+  billion: 1e9,
+};
+const SCALE = "(k|thousand|mm|mn|mio|million|m|bn|billion|b)?(?![\\p{L}\\d])";
+const NUMERALS: readonly RegExp[] = [
+  // Grouped digits: "120,000", "1 500 000", "1,5".
+  new RegExp(`(\\d(?:[\\d,.'’ ]*\\d)?)\\s?${SCALE}`, "giu"),
+  // Each run alone, so "October 2026 42" still finds 42.
+  new RegExp(`(\\d+(?:[.,]\\d+)?)\\s?${SCALE}`, "giu"),
+];
+const SEPARATORS = /[,.'’ ]/gu;
+
+function readingsOf(digits: string): number[] {
+  const whole = Number(digits.replace(SEPARATORS, ""));
+  const last = Math.max(digits.lastIndexOf(","), digits.lastIndexOf("."));
+  const decimal =
+    last < 0
+      ? whole
+      : Number(
+          `${digits.slice(0, last).replace(SEPARATORS, "")}.${digits
+            .slice(last + 1)
+            .replace(SEPARATORS, "")}`,
+        );
+  return [whole, decimal].filter((n) => Number.isFinite(n));
+}
+
+export function numbersInWords(words: string): readonly number[] {
+  const found: number[] = [];
+  for (const pattern of NUMERALS) {
+    for (const match of words.matchAll(pattern)) {
+      const scale = SCALES[(match[2] ?? "").toLowerCase()] ?? 1;
+      for (const reading of readingsOf(match[1] ?? "")) {
+        found.push(reading * scale);
+      }
+    }
+  }
+  return found;
+}
+
+/** The value is a number written in their own words. */
+export function valueInWords(words: string, value: StatedFigureValue): boolean {
+  const amount = value.kind === "MONEY" ? Number(value.amount) : value.value;
+  return numbersInWords(words).some(
+    (n) => Math.abs(n - amount) <= Math.abs(amount) * 1e-9,
+  );
+}
+
+/** How Q opens its line for a figure it recorded at once (ADR 0081). */
+export const RECORDED_PREFIX = "Recorded your ";
+
+/**
+ * The figure Q said it recorded in this conversation from their own words
+ * (its "Recorded your ..." line) for the same metric and date: the one a
+ * correction revises. Read from Q's stored words, never the model's.
+ */
+async function recordedHere(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  companyId: string,
+  figure: StatedFigure,
+): Promise<string | null> {
+  const qWords = context.qWords ?? [];
+  if (qWords.length === 0) return null;
+  const { clashes } = await statedFigureClashes(
+    figures(ports),
+    context.actor,
+    companyId,
+    figure,
+  ).catch(() => ({ clashes: [] }));
+  const ours = clashes.filter((claim) => {
+    const words = statedFigureClaimWords(claim);
+    return (
+      words !== null &&
+      qWords.some((said) => said.includes(`${RECORDED_PREFIX}${words}`))
+    );
+  });
+  // One, or none: between two, code does not choose.
+  const [only] = ours;
+  return ours.length === 1 && only !== undefined ? only.id : null;
+}
+
+async function recordOwnStatement(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  input: RecordInput,
+): Promise<StatedFigureOutcome> {
+  const correctable = ports.claimWithdrawals;
+  const corrects =
+    correctable === undefined
+      ? null
+      : await recordedHere(ports, context, input.companyId, input.figure);
+  if (corrects !== null && correctable !== undefined) {
+    // A correction of what Q recorded here: the next revision of it.
+    const evidence: StatedFigureCorrectionEvidence = {
+      ...figures(ports),
+      getClaim: correctable.getClaim,
+      reviseClaim: correctable.reviseClaim,
+    };
+    return correctStatedFigure(evidence, {
+      actor: context.actor,
+      companyId: input.companyId,
+      claimId: corrects,
+      figure: input.figure,
+      idempotencyKey: context.idempotencyKey,
+      correlationId: context.correlationId,
+    });
+  }
+  return recordStatedFigure(figures(ports), {
+    actor: context.actor,
+    companyId: input.companyId,
+    figure: input.figure,
+    idempotencyKey: context.idempotencyKey,
+    correlationId: context.correlationId,
+    recordedBy: "OWN_STATEMENT",
+  });
+}
+
+const UNDO_WORDS =
+  "If that's not right, tell me the right figure and I'll correct it, or say undo and I'll withdraw it.";
+
+function ownFigureStatement(): OwnStatementDelegation<
+  RecordInput,
+  StatedFigureOutcome,
+  RecordToolInput
+> {
+  return {
+    companyOf: (input) => input.companyId,
+    // Their own statement, in this turn: the run says so (statedNow), and
+    // code checks it -- the quote is in their latest message itself, and
+    // the value is a number written in those words. A document's or a
+    // page's figure never qualifies.
+    stated: (input, tool, turn) =>
+      Promise.resolve(
+        tool.statedNow === true &&
+          input.document === undefined &&
+          input.web === undefined &&
+          saidByThem(input.figure.said, [turn.latestUserText]) &&
+          valueInWords(input.figure.said, input.figure.value),
+      ),
+    keyOf: (input) => ({
+      companyId: input.companyId,
+      metric: input.figure.metric,
+      value: input.figure.value,
+      asOf: input.figure.asOf,
+    }),
+    recorded: (out, input) => {
+      const what = statedFigureWords(input.figure);
+      if (out.outcome === "ALREADY_RECORDED") {
+        return `Your ${what} was already recorded, so nothing changed.`;
+      }
+      if (out.outcome === "CORRECTED") {
+        return `${RECORDED_PREFIX}${what}, correcting the figure I recorded earlier (it stays in its history), as your own statement (self-reported), private to your company. ${UNDO_WORDS}`;
+      }
+      const conflict =
+        out.conflicts === 0
+          ? ""
+          : " A different figure is recorded for that date too: both are kept, marked as conflicting, until you settle it.";
+      return `${RECORDED_PREFIX}${what}, as your own statement (self-reported), private to your company: investors don't see it.${conflict} ${UNDO_WORDS}`;
+    },
+  };
+}
 
 function valueWords(stored: {
   readonly [key: string]: unknown;

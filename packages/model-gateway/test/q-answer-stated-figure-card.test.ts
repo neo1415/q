@@ -261,6 +261,7 @@ describe("a figure the run read reaches the approval card (A8, live 14 Nov)", ()
       currency: "USD",
       period: "2026-10",
       said: SAID,
+      statedNow: true,
     });
     const said = stored.at(-1) ?? "";
     // Prepared, never done: the claim of a correction is the honest line.
@@ -331,6 +332,7 @@ describe("statedFigureCard: the decision alone", () => {
         currency: "USD",
         period: "2026-10",
         said: SAID,
+        statedNow: true,
       },
     });
   });
@@ -378,6 +380,7 @@ describe("statedFigureCard: the decision alone", () => {
         amount: 42,
         period: "2026-10",
         said: "42 paying customers",
+        statedNow: true,
       },
     });
   });

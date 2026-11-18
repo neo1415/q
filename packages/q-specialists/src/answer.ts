@@ -12,6 +12,7 @@ import {
   asksNoActionOf,
   executionClassOfTurn,
   followsUpAnswer,
+  ownStatementClearOf,
 } from "./execution-reading.js";
 import {
   namesWebAddress,
@@ -10254,6 +10255,10 @@ export function createSpecialistQAnswer(
       // Live 17 Nov 2026 (run 0f483277): a question that asks for no action
       // and takes up no offer is answered; no approval card is prepared.
       ...(asksNoActionOf(read) ? { asksNoAction: true } : {}),
+      // ADR 0081 (owner decision 105): the reading lets their words be
+      // taken as their own statement (clear, not low-confidence, not
+      // re-heard); otherwise a figure they state still comes as a card.
+      ...(ownStatementClearOf(read, latest) ? { ownStatementClear: true } : {}),
       // Live 2026-10-30 (founder.ledgerbridge, "What should I do today?",
       // run 2c8fd21b): code's priorities lead this answer from their own
       // records, yet the reading's EXPLICIT research started the public web

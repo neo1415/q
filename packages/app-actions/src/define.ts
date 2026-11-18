@@ -79,6 +79,54 @@ export type AppActionContext = {
    * no conversation (a screen, or code acting on its own).
    */
   readonly theirWords?: readonly string[] | undefined;
+  /**
+   * ADR 0081 (owner decision 105): set only by q-tools, when this action
+   * runs at once under the founder's-own-statement delegation (no card),
+   * after every scope check there passed. Absent: an approved card or the
+   * screen, as before.
+   */
+  readonly ownStatement?: true | undefined;
+  /**
+   * What Q itself said earlier in this conversation (a few messages, most
+   * recent last), verbatim from the stored messages; set only by trusted
+   * server code. ADR 0081: binds "undo that" or a correction to the
+   * figure Q said it recorded here, never to a model's account of it.
+   */
+  readonly qWords?: readonly string[] | undefined;
+};
+
+/**
+ * ADR 0081 (owner decision 105), narrowing CLAUDE.md's "material
+ * Q-extracted facts require confirmation" and Prepare -> Recommend ->
+ * Human Approval -> Execute for one case only: the founder's own direct
+ * statement, in this turn, about their own company. A CONSEQUENTIAL action
+ * that declares this may run at once, with no card, when q-tools has
+ * checked the rest of the scope (a clear reading of the turn, a founder
+ * member of that company, server-side) and `stated` holds for this exact
+ * input. Anything else falls back to the card.
+ */
+export type OwnStatementDelegation<In, Out, ToolIn> = {
+  /** The company the statement is about (the founder-member check's). */
+  readonly companyOf: (input: In) => string | null;
+  /**
+   * Whether this input is the person's own statement in this turn's own
+   * words (and, for an undo or correction, bound to what Q said it
+   * recorded here). Code's check, never the model's word alone.
+   */
+  readonly stated: (
+    input: In,
+    tool: ToolIn,
+    turn: {
+      readonly latestUserText: string;
+      readonly qWords: readonly string[];
+    },
+    ports: AppActionPorts,
+    context: AppActionContext,
+  ) => Promise<boolean>;
+  /** What identifies the statement for its idempotency key. */
+  readonly keyOf: (input: In) => unknown;
+  /** Q's line once it ran: what was recorded, exactly, and how to undo it. */
+  readonly recorded: (out: Out, input: In) => string;
 };
 
 export type AppActionVerdict =
@@ -337,6 +385,8 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   readonly tool?: AppActionTool<In, ToolIn> | undefined;
   /** The hand-written Q tool that still does this for Q, until migrated. */
   readonly legacyTool?: string | undefined;
+  /** ADR 0081: the one scoped delegation that runs it with no card. */
+  readonly ownStatement?: OwnStatementDelegation<In, Out, ToolIn> | undefined;
   /**
    * The generated tool of the family this action belongs to: one tool for
    * one form's operations (create, update, close...), each still its own

@@ -680,6 +680,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly asksNoAction?: boolean | undefined;
   /**
+   * ADR 0081 (owner decision 105): the reading lets this turn's words be
+   * taken as the person's own statement (QToolExecutionContext
+   * .ownStatementClear). Absent: not so, and any statement is a card.
+   */
+  readonly ownStatementClear?: boolean | undefined;
+  /**
    * This answer was started before its turn was read (voice speculation,
    * latency2). Until `decided` settles true nothing it produces may leave
    * the answer: live text is held, nothing is stored, and only READ_ONLY
@@ -935,6 +941,16 @@ export type QToolExecutionContext = {
    */
   readonly asksNoAction?: boolean | undefined;
   /**
+   * ADR 0081 (owner decision 105): the turn reader read this turn clearly
+   * as the person's own words to Q -- a typed message, or a voice
+   * transcript it read as clear, not at low confidence, not re-heard by
+   * sound, addressed to Q and about no named other company or person. Only
+   * then may a founder's own statement about their own company be recorded
+   * at once, with no card. Decided by code from the reading's fields,
+   * never by the model. Absent: not clear, and the card stays.
+   */
+  readonly ownStatementClear?: boolean | undefined;
+  /**
    * The person's latest message in this run, verbatim (CQ-Q-RESEARCH-001
    * §9). A tool that sends anything outside Capital Q composes its request
    * from these words and from authorised public identity — never from a
@@ -943,6 +959,13 @@ export type QToolExecutionContext = {
   readonly conversation?:
     | {
         readonly latestUserText: string;
+        /**
+         * ADR 0081: the conversation and the stored message the latest
+         * words are, for the idempotency key of a statement recorded at
+         * once. Absent: no such key, and no record without a card.
+         */
+        readonly conversationId?: string | undefined;
+        readonly messageId?: string | undefined;
         /**
          * The person's own earlier messages, most recent last (at most a
          * few): their words too, for a look-up that refers back ("look

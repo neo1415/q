@@ -27,6 +27,7 @@ export {
   type AppActionHttp,
   type AppActionTool,
   type AppActionVerdict,
+  type OwnStatementDelegation,
 } from "./define.js";
 export type { AppActionPorts } from "./ports.js";
 export {

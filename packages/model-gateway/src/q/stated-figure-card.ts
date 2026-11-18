@@ -33,6 +33,7 @@ export type StatedFigureToolArguments = {
   readonly currency?: string;
   readonly period: string;
   readonly said: string;
+  readonly statedNow?: boolean;
 };
 
 export type StatedFigureCardDecision =
@@ -100,6 +101,10 @@ export function statedFigureCard(input: {
           : {}),
         period: reading.period,
         said: reading.quote,
+        // statedFigures holds only what they state in THIS message (the
+        // analyst's schema); the tool checks it against that message again
+        // before ADR 0081's record without a card.
+        statedNow: true,
       },
     };
   }

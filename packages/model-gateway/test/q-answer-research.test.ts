@@ -722,7 +722,12 @@ describe("answer seam: public-web research", () => {
       ?.context.conversation ?? {
       latestUserText: "",
     };
-    expect(conversation).toEqual({
+    // ADR 0081: the conversation and message ids key a statement recorded
+    // at once.
+    const { conversationId, messageId, ...words } = conversation;
+    expect(typeof conversationId).toBe("string");
+    expect(typeof messageId).toBe("string");
+    expect(words).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
       earlierUserText: [],
       earlierQText: [],

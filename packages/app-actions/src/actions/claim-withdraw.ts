@@ -8,6 +8,7 @@ import {
 import {
   ClaimIdSchema,
   STATED_FIGURE_METRIC_CODES,
+  statedFigureClaimWords,
   statedFigurePeriod,
   withdrawableFigureClaims,
   withdrawClaim,
@@ -20,6 +21,7 @@ import {
   portMissing,
   refusal,
   type AppActionContext,
+  type OwnStatementDelegation,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
@@ -85,6 +87,12 @@ const WithdrawTool = z
       .min(1)
       .max(400)
       .describe("Why they are withdrawing it, in their own words."),
+    undoesRecorded: z
+      .boolean()
+      .optional()
+      .describe(
+        "True only when their latest message asks to undo or take back a figure you said you recorded from their own words earlier in this conversation.",
+      ),
   })
   .strict();
 type WithdrawToolInput = z.infer<typeof WithdrawTool>;
@@ -135,6 +143,67 @@ const quoted = (statement: string | null | undefined) =>
     ? "this claim"
     : `"${statement.length > 140 ? `${statement.slice(0, 137)}...` : statement}"`;
 
+/** How Q opens its line for a figure it recorded at once (ADR 0081). */
+const RECORDED_PREFIX = "Recorded your ";
+
+/**
+ * ADR 0081 (owner decision 105): "undo" right after Q recorded the
+ * founder's own figure with no card. Only that figure: a claim of their
+ * own company, still current, recorded from their statement, which Q's
+ * own stored words in this conversation say it recorded ("Recorded your
+ * MRR of USD 120,000 for October 2026"). It is withdrawn through the same
+ * path as the card's (a SUPERSEDED revision with their reason, audited);
+ * any other claim is withdrawn on a card, as before.
+ */
+function undoOwnStatement(): OwnStatementDelegation<
+  WithdrawInput,
+  ClaimWithdrawalOutcome,
+  WithdrawToolInput
+> {
+  return {
+    companyOf: (input) => input.companyId ?? null,
+    stated: async (input, tool, turn, ports, context) => {
+      if (tool.undoesRecorded !== true || turn.qWords.length === 0) {
+        return false;
+      }
+      const port = ports.claimWithdrawals;
+      if (port === undefined) return false;
+      const claim = await Promise.resolve()
+        .then(() =>
+          port.getClaim({
+            actor: context.actor,
+            claimId: ClaimIdSchema.parse(input.claimId),
+          }),
+        )
+        .then((found) => found.claim)
+        .catch(() => null);
+      if (
+        claim === null ||
+        claim.subjectType !== "COMPANY" ||
+        claim.subjectId !== input.companyId ||
+        claim.lifecycleStatus !== "CURRENT" ||
+        claim.truthClass !== "USER_CLAIM" ||
+        claim.evidenceStatus !== "SELF_REPORTED"
+      ) {
+        return false;
+      }
+      const words = statedFigureClaimWords(claim);
+      return (
+        words !== null &&
+        turn.qWords.some((said) => said.includes(`${RECORDED_PREFIX}${words}`))
+      );
+    },
+    keyOf: (input) => ({ claimId: input.claimId, undo: true }),
+    recorded: (out) => {
+      const words = statedFigureClaimWords({ statement: out.statement });
+      const what = words === null ? "that figure" : `your ${words}`;
+      return out.outcome === "ALREADY_WITHDRAWN"
+        ? `${what[0]?.toUpperCase() ?? ""}${what.slice(1)} was already withdrawn, so nothing changed.`
+        : `Undone: ${what} is withdrawn. It stays in your company's history as withdrawn, with your reason; it is no longer treated as your company's figure.`;
+    },
+  };
+}
+
 export const WITHDRAW_CLAIM = defineAppAction<
   WithdrawInput,
   ClaimWithdrawalOutcome,
@@ -173,6 +242,7 @@ export const WITHDRAW_CLAIM = defineAppAction<
     out.outcome === "ALREADY_WITHDRAWN"
       ? "That claim was already withdrawn, so nothing changed."
       : "Withdrawn. It stays in your history with your reason; investors no longer see it.",
+  ownStatement: undoOwnStatement(),
   http: {
     method: "POST",
     path: "/v1/claims/:claimId/withdraw",
@@ -185,7 +255,7 @@ export const WITHDRAW_CLAIM = defineAppAction<
   tool: {
     name: "propose_withdraw_company_claim",
     description:
-      'For a founder, about their own company: when they ask to withdraw, retract or take back a figure on their company\'s record ("withdraw the October MRR of 42,000, it came from a test deck"), prepare it for their approval with their reason. Never for a figure they are correcting with a new value (use propose_company_figure for that), never for another company. Nothing changes until they approve exactly this card; it is never deleted, only marked withdrawn.',
+      'For a founder, about their own company: when they ask to withdraw, retract or take back a figure on their company\'s record ("withdraw the October MRR of 42,000, it came from a test deck"), prepare it for their approval with their reason. Never for a figure they are correcting with a new value (use propose_company_figure for that), never for another company. Nothing changes until they approve exactly this card; it is never deleted, only marked withdrawn. When they say undo (or take back) a figure you said you recorded from their words in this conversation, set undoesRecorded: Capital Q may then withdraw it at once (status DONE); say only what the tool returned.',
     input: WithdrawTool,
     references: {},
     scopes: ["COMPANY_PROFILE"],
