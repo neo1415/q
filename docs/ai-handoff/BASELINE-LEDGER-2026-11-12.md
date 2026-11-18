@@ -861,3 +861,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Projected saving: about $0.0024 per run (about 11%).
   - Scale report: `audits/2026-11-18-scale-ceilings.md`.
   - Open: the first answer call misses the cache 72% of the time. Its cache key includes the per-person tool list, a privacy choice that needs an owner decision.
+- **18 Nov 07:18 UTC, `fb32830d9` (rollback point `34b1f0d4b`):** audit item 17. TURN_READER v93 reads others' interest by meaning, OR'd with the word rule. No server-side leak was found; the protection is RLS plus company-side authorisation. ci-local PASS (1299 s); all four services SUCCESS.
+  - Live (Savanna): "Who else is circling Halyard Security at the moment?" was answered "I can't share other investors' interest or cheque sizes"; the follow-up "where do we stand with them?" gave her own status.
+  - Note: Savanna still has the unrequested Express Interest card from 17 Nov 23:42 waiting for approval (from the bug fixed in `240e0b9a0`). It is fictional and harmless, but it shows as "one thing needs you".
