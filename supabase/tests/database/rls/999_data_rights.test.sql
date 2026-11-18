@@ -15,7 +15,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(20);
+select plan(21);
 
 -- Ledgers ------------------------------------------------------------------------
 
@@ -114,6 +114,15 @@ select is((select body from communication.meeting_events where speaker_user_id =
 select lives_ok(
   $$ delete from communication.meeting_private_observations where owner_user_id = pg_temp.rls_id('user_a') $$,
   'in erasure mode the person''s private observation can be deleted');
+select set_config('cq.data_rights_erasure', '', true);
+
+-- A browser role can never use erasure mode, even if it sets the flag.
+select set_config('cq.data_rights_erasure', 'on', true);
+set local role authenticated;
+select throws_ok(
+  $$ select private.data_rights_erasure_active() $$,
+  '42501', null, 'a browser role cannot even call the erasure check, flag set or not');
+reset role;
 select set_config('cq.data_rights_erasure', '', true);
 
 -- Notice and bucket --------------------------------------------------------------

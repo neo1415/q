@@ -164,7 +164,12 @@ language sql
 stable
 set search_path = ''
 as $$
+  -- Defence in depth: a custom setting can be set by any session, so the
+  -- erasure branch also requires a server role. A browser request (anon or
+  -- authenticated, switched to by the REST gateway's authenticator) never
+  -- qualifies, even if it could set the flag.
   select coalesce(current_setting('cq.data_rights_erasure', true), '') = 'on'
+     and current_user not in ('anon', 'authenticated', 'authenticator')
 $$;
 
 revoke all on function private.data_rights_erasure_active() from public, anon, authenticated;
