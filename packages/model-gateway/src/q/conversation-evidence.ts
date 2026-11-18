@@ -52,6 +52,21 @@ export type EvidenceScope = {
   readonly conversationId: string;
   /** Hash of the run's access context (`accessContextKeyOf`). */
   readonly access: string;
+  /**
+   * The same access context, split so ANSWER evidence can be matched by
+   * coverage (`accessGrantsOf`). Absent: exact `access` equality only.
+   */
+  readonly grants?: AccessGrants | undefined;
+};
+
+/**
+ * A run's access context as the firewall granted it: everything but the
+ * permitted scopes (policy version, tenant, actor, ceiling, combination
+ * constraints), and each permitted scope, canonical.
+ */
+export type AccessGrants = {
+  readonly base: string;
+  readonly scopes: readonly string[];
 };
 
 export type EvidenceProvenance = {
@@ -134,6 +149,36 @@ export function accessContextKeyOf(plan: PermittedContextPlan): string {
   ]);
 }
 
+export function accessGrantsOf(plan: PermittedContextPlan): AccessGrants {
+  return {
+    base: canonical([
+      plan.policyVersion,
+      plan.tenantId,
+      plan.actor,
+      plan.maxSensitivity,
+      plan.combinationConstraints,
+    ]),
+    scopes: [...plan.scopes].map((scope) => canonical(scope)).sort(),
+  };
+}
+
+/**
+ * Whether a run granted `current` may be given what was read under `kept`:
+ * the same policy, tenant, actor, ceiling and combination constraints, and
+ * every scope the evidence was read under still permitted. A run whose
+ * plan also permits more (live 18 Nov: a follow-up asked from the company
+ * page adds COMPANY_PROFILE) is still covered; a revoked or narrowed scope,
+ * a changed ceiling or a new combination constraint is not.
+ */
+export function grantsCover(
+  kept: AccessGrants,
+  current: AccessGrants,
+): boolean {
+  if (kept.base !== current.base) return false;
+  const permitted = new Set(current.scopes);
+  return kept.scopes.every((scope) => permitted.has(scope));
+}
+
 export function evidenceScopeOf(input: {
   readonly actor: ActorContext;
   readonly plan: PermittedContextPlan;
@@ -147,10 +192,42 @@ export function evidenceScopeOf(input: {
     actorType: input.actor.actorType,
     conversationId: input.conversationId,
     access: accessContextKeyOf(input.plan),
+    grants: accessGrantsOf(input.plan),
   };
 }
 
-type Entry = KeptEvidence<unknown>;
+type Entry = KeptEvidence<unknown> & {
+  /** The access context it was read under: never refreshed by reuse. */
+  readonly access: string;
+  readonly grants: AccessGrants | undefined;
+};
+
+/**
+ * Live 18 Nov 2026 (conversation 9ec5e264): a chain of follow-ups got the
+ * fast path once. Turn 1's full answer kept its sources under a key that
+ * hashed every permitted scope; turn 2 answered from them and moved the
+ * person to the company page, so turn 3's plan also permitted
+ * COMPANY_PROFILE, its key differed and the lookup missed (NO_EVIDENCE)
+ * although nothing the sources came from had been withdrawn. ANSWER
+ * evidence is therefore held once per person and conversation (the newest
+ * full answer replaces it) with the access context it was read under, and
+ * served only to a run whose grants cover that context (`grantsCover`).
+ * Its read time, and so its TTL, carry forward unchanged through every
+ * follow-up answered from it. DIGEST and WIDE keep exact access keys.
+ */
+const COVERED_SLOTS: ReadonlySet<EvidenceSlot> = new Set(["ANSWER"]);
+
+function served(
+  entry: Entry,
+  scope: EvidenceScope,
+  slot: EvidenceSlot,
+): boolean {
+  if (!COVERED_SLOTS.has(slot)) return true;
+  if (entry.grants !== undefined && scope.grants !== undefined) {
+    return grantsCover(entry.grants, scope.grants);
+  }
+  return entry.access === scope.access;
+}
 
 export function createConversationEvidence(
   options: {
@@ -175,7 +252,8 @@ export function createConversationEvidence(
       scope.membershipId,
       scope.actorType,
       scope.conversationId,
-      scope.access,
+      // ANSWER: one per conversation, matched by coverage in `served`.
+      COVERED_SLOTS.has(slot) ? null : scope.access,
       slot,
     ]);
   const drop = (key: string) => {
@@ -192,6 +270,8 @@ export function createConversationEvidence(
           reads: [...provenance.reads],
         },
         readAt: now(),
+        access: scope.access,
+        grants: scope.grants,
       });
       const person = personOf(scope);
       const keys = byPerson.get(person) ?? new Set<string>();
@@ -207,6 +287,8 @@ export function createConversationEvidence(
       const key = keyOf(scope, slot);
       const entry = entries.get(key);
       if (entry === undefined) return null;
+      // Not covered: kept for a run it may serve, never served to this one.
+      if (!served(entry, scope, slot)) return null;
       if (now() - entry.readAt > ttl) {
         drop(key);
         return null;
@@ -229,7 +311,11 @@ export function createConversationEvidence(
         // Dropped while the watermark was asked (a write of theirs).
         if (entries.get(key) !== entry) return null;
       }
-      return entry as KeptEvidence<T>;
+      return {
+        value: entry.value as T,
+        provenance: entry.provenance,
+        readAt: entry.readAt,
+      };
     },
     forgetPerson: (actor) => {
       const person = personOf(actor);
@@ -238,7 +324,11 @@ export function createConversationEvidence(
     },
     holds: (scope, slot) => {
       const entry = entries.get(keyOf(scope, slot));
-      return entry !== undefined && now() - entry.readAt <= ttl;
+      return (
+        entry !== undefined &&
+        served(entry, scope, slot) &&
+        now() - entry.readAt <= ttl
+      );
     },
   };
 }

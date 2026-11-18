@@ -335,6 +335,10 @@ export function createContextFollowUp(dependencies: {
       if (still === null || still.provenance.runId !== kept.provenance.runId) {
         return miss(request, "REVOKED");
       }
+      // Nothing is kept again: the same sources stay for the next
+      // follow-up with their original read time, access context and
+      // provenance (conversation-evidence.ts), so a chain of follow-ups
+      // ends at that read + TTL, a write of theirs or a withdrawn grant.
       logger?.info(
         {
           qRunId: request.runId,
