@@ -16,6 +16,7 @@ import {
 import { excerptIsPresent } from "./policy.js";
 import {
   STATED_FIGURE_METRICS,
+  statedFigureKey,
   statedFigureClashes,
   statedFigureStructuredValue,
   statedFigureWords,
@@ -208,7 +209,7 @@ export async function recordDocumentFigure(
   ) {
     throw new EvidenceSourceNotFoundError();
   }
-  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const metric = statedFigureKey(figure);
   const subject = { subjectType: "COMPANY" as const, subjectId: companyId };
   const { same, clashes } = await statedFigureClashes(
     evidence,

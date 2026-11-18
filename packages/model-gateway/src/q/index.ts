@@ -172,6 +172,7 @@ import { acceptStructuredOutput } from "../policy/structured.js";
 import {
   claimsChangeStatus,
   withoutActionTalk,
+  withoutRestatedLines,
   withoutStatusTalk,
 } from "./action-talk.js";
 import { createSubjectAnnouncer } from "./artifact-preview.js";
@@ -15167,9 +15168,21 @@ export function createModelGatewayQAnswer(
           checkPromises(answerClaims.text, promiseGrounds()),
         );
         logUnbacked(answerPromises.unbacked, "answer");
+        // Live 18 Nov 2026 (run 82921afe): code says what an action did,
+        // once; the model's own restatement of that line is not said too.
+        const unrestated = withoutRestatedLines(answerPromises.text, [
+          ...actedLines,
+          ...(figureCardLine === null ? [] : [figureCardLine]),
+        ]);
+        if (unrestated.removed > 0) {
+          logger?.info(
+            { qRunId: request.runId, removed: unrestated.removed },
+            "sentences restating code's own action line were not said twice",
+          );
+        }
         const guarded = {
           ...recommendationGuarded,
-          text: answerPromises.text,
+          text: unrestated.text,
         };
         if (guarded.removed > 0) {
           logger?.warn(

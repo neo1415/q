@@ -6,12 +6,14 @@ import {
   type WithdrawClaimResponse,
 } from "@capital-q/contracts";
 import {
+  claimDate,
   ClaimIdSchema,
   STATED_FIGURE_METRIC_CODES,
   statedFigureClaimWords,
   statedFigurePeriod,
   withdrawableFigureClaims,
   withdrawClaim,
+  type Claim,
   type ClaimWithdrawalOutcome,
 } from "@capital-q/evidence";
 import type { ActorContext } from "@capital-q/security";
@@ -147,6 +149,47 @@ const quoted = (statement: string | null | undefined) =>
 const RECORDED_PREFIX = "Recorded your ";
 
 /**
+ * The company's current figures Q's stored words in this conversation say
+ * it recorded ("Recorded your licensed seats of 74,000 ..."), for the date
+ * and value when given. Read from Q's own words, never the model's.
+ */
+async function recordedHere(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  companyId: string,
+  asOf: string | null,
+  amount: number | undefined,
+): Promise<readonly Claim[] | null> {
+  const qWords = context.qWords ?? [];
+  if (qWords.length === 0) return null;
+  const claims = await withdrawals(ports)
+    .listClaims({
+      actor: context.actor,
+      subject: { subjectType: "COMPANY", subjectId: companyId },
+    })
+    .catch(() => null);
+  if (claims === null) return null;
+  return claims.filter((claim) => {
+    if (claim.lifecycleStatus !== "CURRENT") return false;
+    const words = statedFigureClaimWords(claim);
+    if (
+      words === null ||
+      !qWords.some((said) => said.includes(`${RECORDED_PREFIX}${words}`))
+    ) {
+      return false;
+    }
+    if (asOf !== null && claimDate(claim) !== asOf) return false;
+    if (amount === undefined) return true;
+    const raw =
+      claim.structuredValue?.["amount"] ?? claim.structuredValue?.["value"];
+    return (
+      (typeof raw === "string" || typeof raw === "number") &&
+      Number(raw) === amount
+    );
+  });
+}
+
+/**
  * ADR 0081 (owner decision 105): "undo" right after Q recorded the
  * founder's own figure with no card. Only that figure: a claim of their
  * own company, still current, recorded from their statement, which Q's
@@ -274,12 +317,22 @@ export const WITHDRAW_CLAIM = defineAppAction<
       if (tool.period !== null && asOf === null) {
         return refusal("Which month is that figure for?");
       }
-      const found = await withdrawableFigureClaims(
-        withdrawals(ports),
-        context.actor,
-        companyId,
-        { metric: tool.metric, asOf, amount: tool.amount },
-      ).catch(() => null);
+      // ADR 0081 undo: the figure Q's own words say it recorded here, on
+      // whichever key it went (a company's own, such as licensed seats,
+      // which no listed metric names). Otherwise the metric's claims.
+      const recorded =
+        tool.undoesRecorded === true
+          ? await recordedHere(ports, context, companyId, asOf, tool.amount)
+          : null;
+      const found =
+        recorded !== null && recorded.length > 0
+          ? recorded
+          : await withdrawableFigureClaims(
+              withdrawals(ports),
+              context.actor,
+              companyId,
+              { metric: tool.metric, asOf, amount: tool.amount },
+            ).catch(() => null);
       if (found === null || found.length === 0) {
         return refusal(
           "I couldn't find that figure on your company's record, so there is nothing to withdraw.",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
+  companyFigureKeys,
   correctStatedFigure,
   DocumentFigureSourceSchema,
   documentFigureWords,
@@ -15,6 +16,8 @@ import {
   statedFigureAmountWords,
   statedFigureClaimWords,
   statedFigureDateWords,
+  statedFigureKey,
+  statedFigureKeyChoice,
   statedFigurePeriod,
   StatedFigureSchema,
   statedFigureWords,
@@ -189,6 +192,31 @@ function outcomeWords(out: StatedFigureOutcome, input: RecordInput): string {
     : `Recorded your ${what} as your company's figure, supported by "${input.document.title}". It's private to your company; investors don't see it.${conflict}`;
 }
 
+/**
+ * Which claim key their quote names (statedFigureKeyChoice), against the
+ * keys their company already publishes. A failed read is no known keys:
+ * the metric's own key, and confident only if its name was said.
+ */
+async function keyChoiceOf(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  companyId: string,
+  metric: StatedFigure["metric"],
+  said: string,
+): Promise<ReturnType<typeof statedFigureKeyChoice>> {
+  const claims = await figures(ports)
+    .listClaims({
+      actor: context.actor,
+      subject: { subjectType: "COMPANY", subjectId: companyId },
+    })
+    .catch(() => []);
+  return statedFigureKeyChoice({
+    metric,
+    said,
+    companyKeys: companyFigureKeys(claims),
+  });
+}
+
 async function ownCompany(
   ports: AppActionPorts,
   context: AppActionContext,
@@ -310,11 +338,21 @@ const RECORD = defineAppAction<
             : "I couldn't place that figure. Give it as a number on its own.",
         );
       }
+      // Live 18 Nov 2026: "licensed seats" goes on the company's own
+      // licensed-seats series, never the nearest listed metric.
+      const { claimKey } = await keyChoiceOf(
+        ports,
+        context,
+        companyId,
+        tool.metric,
+        tool.said,
+      );
       const parsed = StatedFigureSchema.safeParse({
         metric: tool.metric,
         value,
         asOf,
         said: tool.said.trim(),
+        ...(claimKey === undefined ? {} : { claimKey }),
       });
       if (!parsed.success) return null;
       const figure: StatedFigure = parsed.data;
@@ -485,15 +523,35 @@ function ownFigureStatement(): OwnStatementDelegation<
     // Their own statement, in this turn: the run says so (statedNow), and
     // code checks it -- the quote is in their latest message itself, and
     // the value is a number written in those words. A document's or a
-    // page's figure never qualifies.
-    stated: (input, tool, turn) =>
-      Promise.resolve(
-        tool.statedNow === true &&
-          input.document === undefined &&
-          input.web === undefined &&
-          saidByThem(input.figure.said, [turn.latestUserText]) &&
-          valueInWords(input.figure.said, input.figure.value),
-      ),
+    // page's figure never qualifies. And their words name the figure: the
+    // key it goes on is one they said (live 18 Nov 2026: "licensed seats"
+    // recorded as "active users"); a label code cannot match comes as a
+    // card, for them to confirm.
+    stated: async (input, tool, turn, ports, context) => {
+      if (
+        tool.statedNow !== true ||
+        input.document !== undefined ||
+        input.web !== undefined ||
+        !saidByThem(input.figure.said, [turn.latestUserText]) ||
+        !valueInWords(input.figure.said, input.figure.value)
+      ) {
+        return false;
+      }
+      const choice = await keyChoiceOf(
+        ports,
+        context,
+        input.companyId,
+        input.figure.metric,
+        input.figure.said,
+      );
+      return (
+        choice.confident &&
+        statedFigureKey({
+          metric: input.figure.metric,
+          claimKey: choice.claimKey,
+        }).claimKey === statedFigureKey(input.figure).claimKey
+      );
+    },
     keyOf: (input) => ({
       companyId: input.companyId,
       metric: input.figure.metric,

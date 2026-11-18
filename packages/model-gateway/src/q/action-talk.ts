@@ -117,6 +117,66 @@ export function withoutActionTalk(
   return { text: tidy, removed };
 }
 
+/** Words of a sentence, for comparing two wordings of one line. */
+function wordsOf(sentence: string): Set<string> {
+  return new Set(
+    sentence
+      .toLowerCase()
+      .replace(/[’‘]/gu, "'")
+      .split(/[^\p{L}\p{N}']+/u)
+      .filter((word) => word.length > 0),
+  );
+}
+
+/** A sentence this short is not matched: too few words to be a restatement. */
+const MIN_RESTATED_WORDS = 5;
+/** Shared words over all words of both sentences, at or above which they are one line. */
+const RESTATED_OVERLAP = 0.7;
+
+/**
+ * Live 18 Nov 2026 (Halyard Security, run 82921afe): "Undo that" was
+ * answered with the withdrawal's line twice -- once as the model wrote it
+ * from the tool result ("...no longer treated as Halyard Security's
+ * figure."), once as code's own line after it. Code's line for what an
+ * action did is what is said; a sentence of the model's that restates one
+ * of code's sentences (most of the same words, either way round) goes.
+ * Compared with code's own sentences, never a list of words; a sentence
+ * that says anything else stays.
+ */
+export function withoutRestatedLines(
+  answer: string,
+  codeLines: readonly string[],
+): ActionTalkStripResult {
+  const theirs = codeLines
+    .flatMap((line) => line.split("\n"))
+    .flatMap((line) => line.match(SENTENCE) ?? [])
+    .map(wordsOf)
+    .filter((words) => words.size >= MIN_RESTATED_WORDS);
+  if (theirs.length === 0) return { text: answer, removed: 0 };
+  let removed = 0;
+  const kept = answer
+    .split("\n")
+    .map((line) =>
+      line.replace(SENTENCE, (sentence) => {
+        const words = wordsOf(sentence);
+        if (words.size < MIN_RESTATED_WORDS) return sentence;
+        const restates = theirs.some((code) => {
+          const shared = [...words].filter((word) => code.has(word)).length;
+          const all = new Set([...words, ...code]).size;
+          return shared / all >= RESTATED_OVERLAP;
+        });
+        if (!restates) return sentence;
+        removed += 1;
+        return "";
+      }),
+    )
+    .map((line) => line.replace(/[ \t]{2,}/gu, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+  return removed === 0 ? { text: answer, removed } : { text: kept, removed };
+}
+
 /**
  * When Capital Q says a change's status from the engine (proposalStatusLine),
  * the model's own status sentences go, and so does its offer, which moves

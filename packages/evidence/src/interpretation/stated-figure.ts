@@ -47,60 +47,70 @@ export const STATED_FIGURE_METRICS = {
     claimType: "financial",
     kind: "MONEY",
     label: "MRR",
+    names: ["MRR", "monthly recurring revenue"],
   },
   ARR: {
     claimKey: "financial.arr",
     claimType: "financial",
     kind: "MONEY",
     label: "ARR",
+    names: ["ARR", "annual recurring revenue"],
   },
   REVENUE: {
     claimKey: "financial.revenue",
     claimType: "financial",
     kind: "MONEY",
     label: "revenue",
+    names: ["revenue", "sales", "turnover"],
   },
   BURN: {
     claimKey: "financial.burn_rate",
     claimType: "financial",
     kind: "MONEY",
     label: "monthly burn",
+    names: ["burn"],
   },
   CASH: {
     claimKey: "financial.cash_balance",
     claimType: "financial",
     kind: "MONEY",
     label: "cash in the bank",
+    names: ["cash", "in the bank"],
   },
   RUNWAY: {
     claimKey: "financial.runway_months",
     claimType: "financial",
     kind: "COUNT",
     label: "runway (months)",
+    names: ["runway"],
   },
   GROSS_MARGIN: {
     claimKey: "financial.gross_margin",
     claimType: "financial",
     kind: "PERCENT",
     label: "gross margin",
+    names: ["gross margin"],
   },
   CUSTOMERS: {
     claimKey: "traction.customer_count",
     claimType: "traction",
     kind: "COUNT",
     label: "customers",
+    names: ["customers", "clients"],
   },
   USERS: {
     claimKey: "traction.active_users",
     claimType: "traction",
     kind: "COUNT",
     label: "active users",
+    names: ["users"],
   },
   CHURN: {
     claimKey: "traction.churn_rate",
     claimType: "traction",
     kind: "PERCENT",
     label: "churn",
+    names: ["churn"],
   },
 } as const satisfies Readonly<
   Record<
@@ -110,6 +120,12 @@ export const STATED_FIGURE_METRICS = {
       readonly claimType: string;
       readonly kind: "MONEY" | "COUNT" | "PERCENT";
       readonly label: string;
+      /**
+       * What the metric is called (ADR 0081 key check): a figure recorded
+       * with no card needs every word of one of these in the founder's own
+       * quote. English names; other wording comes as a card.
+       */
+      readonly names: readonly string[];
     }
   >
 >;
@@ -145,6 +161,9 @@ export const StatedFigureValueSchema = z.discriminatedUnion("kind", [
 ]);
 export type StatedFigureValue = z.infer<typeof StatedFigureValueSchema>;
 
+/** A company figure's claim key: "traction.licensed_seats", "financial.arr". */
+const COMPANY_FIGURE_KEY = /^(?:traction|financial)\.[a-z][a-z0-9_]{0,62}$/u;
+
 /** The exact figure the founder approves. Every field is on the card. */
 export const StatedFigureSchema = z
   .object({
@@ -154,6 +173,14 @@ export const StatedFigureSchema = z
     asOf: z.iso.date().nullable(),
     /** Their own words, verbatim from the conversation: the evidence. */
     said: z.string().trim().min(1).max(500),
+    /**
+     * The company's own published key for this figure, when it is not the
+     * metric's own ("traction.licensed_seats" for "our licensed seats",
+     * live 18 Nov 2026): set by code (statedFigureKeyChoice), never by a
+     * model, so a figure goes on the series the company already keeps.
+     * The metric still gives the value's kind. Absent: the metric's key.
+     */
+    claimKey: z.string().regex(COMPANY_FIGURE_KEY).optional(),
   })
   .strict()
   .refine(
@@ -161,6 +188,120 @@ export const StatedFigureSchema = z
     { message: "the value's kind does not fit the metric", path: ["value"] },
   );
 export type StatedFigure = z.infer<typeof StatedFigureSchema>;
+
+/** The claim key, type and words a stated figure is recorded and said under. */
+export function statedFigureKey(figure: {
+  readonly metric: StatedFigureMetric;
+  readonly claimKey?: string | undefined;
+}): {
+  readonly claimKey: string;
+  readonly claimType: string;
+  readonly label: string;
+} {
+  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const own = figure.claimKey;
+  if (own === undefined || own === metric.claimKey) return metric;
+  const listed = Object.values(STATED_FIGURE_METRICS).find(
+    (other) => other.claimKey === own,
+  );
+  if (listed !== undefined) return listed;
+  const [claimType = metric.claimType, tail = ""] = own.split(".");
+  return { claimKey: own, claimType, label: tail.replaceAll("_", " ") };
+}
+
+/** Lower-case word stems: "Licensed seats" -> licensed, seat. */
+function stemsOf(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length > 0)
+      .map((word) =>
+        word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word,
+      ),
+  );
+}
+
+const allSaid = (name: string, said: ReadonlySet<string>): boolean => {
+  const words = stemsOf(name);
+  return words.size > 0 && [...words].every((word) => said.has(word));
+};
+
+/** A company's published figure key: the series it already keeps. */
+export type CompanyFigureKey = {
+  readonly claimKey: string;
+  readonly kind: StatedFigureValue["kind"];
+};
+
+/**
+ * The company's published figure keys, from its current claims: each key
+ * with the one value kind all its figures hold (a key whose figures mix
+ * kinds, or hold none, is not one).
+ */
+export function companyFigureKeys(
+  claims: readonly Claim[],
+): readonly CompanyFigureKey[] {
+  const kinds = new Map<string, Set<unknown>>();
+  for (const claim of claims) {
+    if (claim.lifecycleStatus !== "CURRENT") continue;
+    if (!COMPANY_FIGURE_KEY.test(claim.claimKey)) continue;
+    const seen = kinds.get(claim.claimKey) ?? new Set<unknown>();
+    seen.add(claim.structuredValue?.["kind"]);
+    kinds.set(claim.claimKey, seen);
+  }
+  return [...kinds].flatMap(([claimKey, seen]) => {
+    const [kind] = [...seen];
+    return seen.size === 1 &&
+      (kind === "MONEY" || kind === "COUNT" || kind === "PERCENT")
+      ? [{ claimKey, kind }]
+      : [];
+  });
+}
+
+/**
+ * Live 18 Nov 2026 (Halyard Security, conversation 74a72a45): "our
+ * licensed seats are now 74000" was recorded with no card as "active
+ * users" -- the closed metric list has no seats, so the reading took the
+ * nearest -- while the company already publishes traction.licensed_seats.
+ *
+ * Which key the founder's own words name, decided by code from their
+ * quote, never from the model's choice of metric:
+ *   - a key the company already publishes, every word of its name in the
+ *     quote ("licensed seats"), with the metric's kind of value: that key,
+ *     reused. Exactly one such key; two is not a choice code makes.
+ *   - otherwise the metric's own key, when one of its names is said in
+ *     full ("MRR", "customers").
+ * `confident` is false when neither holds: the label is then unconfirmed,
+ * and ADR 0081's record without a card does not apply (the founder sees
+ * the label on a card). `claimKey` is the company's key to reuse, if any.
+ */
+export function statedFigureKeyChoice(input: {
+  readonly metric: StatedFigureMetric;
+  readonly said: string;
+  readonly companyKeys: readonly CompanyFigureKey[];
+}): {
+  readonly claimKey: string | undefined;
+  readonly confident: boolean;
+} {
+  const metric = STATED_FIGURE_METRICS[input.metric];
+  const said = stemsOf(input.said);
+  const named = input.companyKeys.filter(
+    (key) =>
+      key.kind === metric.kind &&
+      key.claimKey !== metric.claimKey &&
+      allSaid(key.claimKey.slice(key.claimKey.indexOf(".") + 1), said),
+  );
+  const [only] = named;
+  if (only !== undefined) {
+    return named.length === 1
+      ? { claimKey: only.claimKey, confident: true }
+      : { claimKey: undefined, confident: false };
+  }
+  return {
+    claimKey: undefined,
+    confident: metric.names.some((name) => allSaid(name, said)),
+  };
+}
 
 const DAY = /^(\d{4}-\d{2}-\d{2})/u;
 const dayOf = (raw: unknown): string | null =>
@@ -275,7 +416,7 @@ export function statedFigureDateWords(asOf: string | null): string {
 
 /** "MRR of USD 120,000 for October 2026" */
 export function statedFigureWords(figure: StatedFigure): string {
-  const label = STATED_FIGURE_METRICS[figure.metric].label;
+  const label = statedFigureKey(figure).label;
   const date = statedFigureDateWords(figure.asOf);
   return `${label} of ${statedFigureAmountWords(figure.value)}${date === "undated" ? "" : ` ${date}`}`;
 }
@@ -320,7 +461,7 @@ export async function statedFigureClashes(
   readonly same: Claim | null;
   readonly clashes: readonly Claim[];
 }> {
-  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const metric = statedFigureKey(figure);
   const claims = await evidence.listClaims({
     actor,
     subject: { subjectType: "COMPANY", subjectId: companyId },
@@ -371,7 +512,7 @@ export async function recordStatedFigure(
 ): Promise<StatedFigureOutcome> {
   const { actor, companyId, correlationId } = command;
   const figure = StatedFigureSchema.parse(command.figure);
-  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const metric = statedFigureKey(figure);
   const subject = { subjectType: "COMPANY" as const, subjectId: companyId };
   const { same, clashes } = await statedFigureClashes(
     evidence,
@@ -508,7 +649,7 @@ export async function correctStatedFigure(
 ): Promise<StatedFigureOutcome> {
   const { actor, companyId, correlationId } = command;
   const figure = StatedFigureSchema.parse(command.figure);
-  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const metric = statedFigureKey(figure);
   const subject = { subjectType: "COMPANY" as const, subjectId: companyId };
   const { claim } = await evidence.getClaim({
     actor,

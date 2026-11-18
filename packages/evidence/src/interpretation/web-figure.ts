@@ -16,7 +16,7 @@ import {
   ResearchReadingSchema,
 } from "./research-reading.js";
 import {
-  STATED_FIGURE_METRICS,
+  statedFigureKey,
   statedFigureClashes,
   statedFigureStructuredValue,
   statedFigureWords,
@@ -221,7 +221,7 @@ export async function recordWebFigure(
     source.metadata?.["subjectWebsite"] === true
       ? "COMPANY_OWN_SITE"
       : "THIRD_PARTY";
-  const metric = STATED_FIGURE_METRICS[figure.metric];
+  const metric = statedFigureKey(figure);
   const { same, clashes } = await statedFigureClashes(
     evidence,
     actor,

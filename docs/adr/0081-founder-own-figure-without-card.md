@@ -15,7 +15,8 @@ A founder who tells Q their own figure ("our MRR is now $120k", "we have 14 cust
 1. **Clear reading** (`ownStatementClear`, code from the turn reader's fields, `ownStatementClearOf`): a reading exists, confidence not LOW, not `UNCLEAR_TRANSCRIPT` or `FRAGMENT`; a spoken turn only with transcript `CLEAR` and not re-heard by sound (`:heard`); addressed to Q; no named other company or person.
 2. **Founder member** (server-side): human actor with a membership, in the organisation and tenant that own the company, holding `evidence.record` on it. Investors and other organisations never qualify.
 3. **Their own words, this turn**: the tool's `statedNow` flag, cross-checked by code. The quote must be in the latest user message itself (not earlier ones), and the value must be a numeral written in that quote. Figures from documents, pages or Q's inference never qualify (`document`/`web` inputs are refused).
-4. **Idempotency**: `q-own-sha1(conversationId | messageId | action | figure)`. A retry also hits Evidence's same-value check, so it is `ALREADY_RECORDED`.
+4. **Their words name the figure** (live 18 Nov 2026: "our licensed seats are now 74000" was recorded as "active users"). Code decides the claim key from the quote, never from the model's metric (`statedFigureKeyChoice`): a key the company already publishes, every word of its name in the quote and the same kind of value, is reused (`traction.licensed_seats`); otherwise the metric's own key, only when one of its registry names is said in full. No match, or two company keys, is an unconfirmed label: the card. A card also proposes the company's matching key.
+5. **Idempotency**: `q-own-sha1(conversationId | messageId | action | figure)`. A retry also hits Evidence's same-value check, so it is `ALREADY_RECORDED`.
 
 **Recording** goes through the same declaration and Evidence services the approved card runs (`recordStatedFigure`): USER_CLAIM / SELF_REPORTED, a CONVERSATION source with USER_STATEMENT reliability and the founder's words as evidence. It has the card's default visibility (`organisation_private`, never widened) and is audited with `claim.changed`. The source metadata says how it was taken: `approvedCard: false`, `delegation: "ADR-0081"`.
 
@@ -25,7 +26,8 @@ A founder who tells Q their own figure ("our MRR is now $120k", "we have 14 cust
 
 - Only for the figure Q's own stored words in this conversation say it recorded ("Recorded your …").
 - A correction is `correctStatedFigure`: the next revision of that claim through `reviseClaim`, carrying the new value, the founder's words as evidence and the change reason.
-- Undo is the existing withdrawal (`withdrawClaim`): a SUPERSEDED revision with their reason.
+- Undo is the existing withdrawal (`withdrawClaim`): a SUPERSEDED revision with their reason. The claim is found from Q's stored words, on whatever key it went.
+- Code's line says what was done, once: a sentence of the model's that restates it is not said too (`withoutRestatedLines`).
 - Neither overwrites anything. Any other withdrawal or correction keeps its card.
 
 Question turns (240e0b9a0) still withhold every other card-preparing tool.

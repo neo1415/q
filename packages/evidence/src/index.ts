@@ -157,6 +157,8 @@ export {
   proposeDeterministically,
 } from "./interpretation/deterministic.js";
 export {
+  claimDate,
+  companyFigureKeys,
   correctStatedFigure,
   recordStatedFigure,
   saidByThem,
@@ -166,6 +168,8 @@ export {
   statedFigureClaimWords,
   statedFigureClashes,
   statedFigureDateWords,
+  statedFigureKey,
+  statedFigureKeyChoice,
   statedFigurePeriod,
   statedFigureStatement,
   StatedFigureMetricSchema,
@@ -173,6 +177,7 @@ export {
   statedFigureStructuredValue,
   StatedFigureValueSchema,
   statedFigureWords,
+  type CompanyFigureKey,
   type StatedFigure,
   type StatedFigureCorrectionEvidence,
   type StatedFigureEvidence,

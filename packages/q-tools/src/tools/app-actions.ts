@@ -705,6 +705,9 @@ function toolFor(
                 execution.conversation.latestUserText,
                 ...(execution.conversation.earlierUserText ?? []).toReversed(),
               ],
+              // ADR 0081: Q's own stored words, so "undo that" finds the
+              // figure Q said it recorded, whatever key it went on.
+              qWords: execution.conversation.earlierQText ?? [],
             }),
       };
       const canonical = await declared

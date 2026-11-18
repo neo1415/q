@@ -452,6 +452,106 @@ describe("ADR 0081: the founder's own figure is recorded at once, with no card",
     });
   });
 
+  /** The company already publishes its licensed seats (Halyard's seed). */
+  const publishSeats = (store: ReturnType<typeof evidence>) => {
+    for (const [index, [asOf, value]] of [
+      ["2026-08-31", 64333],
+      ["2026-09-30", 71000],
+    ].entries()) {
+      const id = `fffa28c5-7e0f-4150-8000-00000000000${String(index)}`;
+      store.claims.set(id, {
+        id,
+        subjectType: "COMPANY",
+        subjectId: COMPANY_A,
+        claimKey: "traction.licensed_seats",
+        claimType: "traction",
+        statement: `Licensed seats: ${String(value)}.`,
+        structuredValue: { kind: "COUNT", value, asOf },
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        lifecycleStatus: "CURRENT",
+        validFrom: `${String(asOf)}T00:00:00.000Z`,
+        currentRevisionNumber: 1,
+      } as unknown as Claim);
+    }
+  };
+  const SEATS_SAID =
+    "Quick update: our licensed seats are now 74000 as of November 2026. What does that do to our seat growth?";
+  // The live reading (18 Nov 2026, Halyard Security, run 269fbb12): the
+  // closed metric list has no seats, so it read USERS.
+  const SEATS = {
+    metric: "USERS",
+    amount: 74000,
+    period: "2026-11",
+    said: "our licensed seats are now 74000 as of November 2026",
+    statedNow: true,
+  };
+
+  it("live 18 Nov replay: their licensed seats go on the company's own traction.licensed_seats, and undo finds it there", async () => {
+    const { executor, prepared, store } = world();
+    publishSeats(store);
+    const recorded = await executor.execute(figure(SEATS), turn(SEATS_SAID));
+    expect(dataOf(recorded)?.status).toBe("DONE");
+    const line = dataOf(recorded)?.says ?? "";
+    expect(line).toMatch(
+      /^Recorded your licensed seats of 74,000 for November 2026, as your own statement/u,
+    );
+    expect(line).not.toContain("active users");
+    expect(prepared).toEqual([]);
+    expect(
+      store.writes.find((write) => write.name === "claim")?.input,
+    ).toMatchObject({
+      claimKey: "traction.licensed_seats",
+      claimType: "traction",
+      structuredValue: { kind: "COUNT", value: 74000, asOf: "2026-11-30" },
+    });
+
+    // "Undo that": the model names USERS again; Q's own words find it.
+    const undo = await executor.execute(
+      {
+        callId: "c-undo",
+        name: "propose_withdraw_company_claim",
+        arguments: {
+          metric: "USERS",
+          period: "2026-11",
+          amount: 74000,
+          reason: "undo that",
+          undoesRecorded: true,
+        },
+      },
+      turn("Undo that", { message: MESSAGE_2, qWords: [line] }),
+    );
+    expect(dataOf(undo)?.status).toBe("DONE");
+    expect(dataOf(undo)?.says).toBe(
+      "Undone: your licensed seats of 74,000 for November 2026 is withdrawn. It stays in your company's history as withdrawn, with your reason; it is no longer treated as your company's figure.",
+    );
+    expect(prepared).toEqual([]);
+    expect(store.writes.filter((w) => w.name === "revise")).toHaveLength(1);
+  });
+
+  it("a figure whose name code cannot match to a key comes as a card, for them to confirm the label", async () => {
+    // No seats published, and "licensed seats" is not "active users".
+    const unmatched = world();
+    const outcome = await unmatched.executor.execute(
+      figure(SEATS),
+      turn(SEATS_SAID),
+    );
+    expect(dataOf(outcome)?.status).toBe("PREPARED");
+    expect(unmatched.prepared).toHaveLength(1);
+    expect(unmatched.store.writes).toEqual([]);
+
+    // On a card too, a key the company publishes is the one proposed.
+    const card = world();
+    publishSeats(card.store);
+    await card.executor.execute(
+      figure(SEATS),
+      turn(SEATS_SAID, { clear: false }),
+    );
+    expect(card.prepared[0]?.payload).toMatchObject({
+      figure: { metric: "USERS", claimKey: "traction.licensed_seats" },
+    });
+  });
+
   it("240e0b9a0 holds: on a question turn other card tools stay withheld; their own figure is still recorded", async () => {
     const { executor, prepared, store } = world();
     const asked = "Our MRR is now $120k for October -- how does that compare?";

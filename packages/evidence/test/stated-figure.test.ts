@@ -8,6 +8,8 @@ import {
   recordStatedFigure,
   saidByThem,
   StatedFigureSchema,
+  statedFigureKey,
+  statedFigureKeyChoice,
   statedFigureWords,
   type Claim,
   type StatedFigure,
@@ -243,5 +245,58 @@ describe("their own words, compared, never read", () => {
     expect(saidByThem("we have 42 paying customers", theirs)).toBe(false);
     expect(saidByThem("we hit $150k MRR in October", theirs)).toBe(false);
     expect(saidByThem("anything", [])).toBe(false);
+  });
+});
+
+describe("live 18 Nov 2026: the key their words name (statedFigureKeyChoice)", () => {
+  const seats = [
+    { claimKey: "traction.licensed_seats", kind: "COUNT" as const },
+  ];
+
+  it("their licensed seats reuse the company's own key, whatever metric was read", () => {
+    expect(
+      statedFigureKeyChoice({
+        metric: "USERS",
+        said: "our licensed seats are now 74000 as of November 2026",
+        companyKeys: seats,
+      }),
+    ).toEqual({ claimKey: "traction.licensed_seats", confident: true });
+    expect(
+      statedFigureKey({ metric: "USERS", claimKey: "traction.licensed_seats" }),
+    ).toEqual({
+      claimKey: "traction.licensed_seats",
+      claimType: "traction",
+      label: "licensed seats",
+    });
+  });
+
+  it("seats are never active users: with no matching key, the label is unconfirmed", () => {
+    expect(
+      statedFigureKeyChoice({
+        metric: "USERS",
+        said: "our licensed seats are now 74000",
+        companyKeys: [],
+      }),
+    ).toEqual({ claimKey: undefined, confident: false });
+  });
+
+  it("a listed metric named in full is confident on its own key", () => {
+    expect(
+      statedFigureKeyChoice({
+        metric: "CUSTOMERS",
+        said: "we have 14 customers now",
+        companyKeys: seats,
+      }),
+    ).toEqual({ claimKey: undefined, confident: true });
+  });
+
+  it("a company key holding another kind of value is not reused", () => {
+    expect(
+      statedFigureKeyChoice({
+        metric: "REVENUE",
+        said: "licensed seats revenue is $40k",
+        companyKeys: seats,
+      }),
+    ).toEqual({ claimKey: undefined, confident: true });
   });
 });
