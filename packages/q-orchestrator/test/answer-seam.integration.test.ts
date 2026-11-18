@@ -69,6 +69,61 @@ const TEST_DATABASE_URL =
 
 const CORRELATION = (): CorrelationId => `cor_${randomUUID()}`;
 const PRIVATE_MARKER = "PRIVATE-MODEL-PROVIDER-ERROR-DO-NOT-EMIT";
+const USER_FENCE = '<<<UNTRUSTED_CONTENT source="userMessage">>>';
+
+type SentMessage = {
+  readonly role: string;
+  readonly content: string;
+  readonly shared?: true | undefined;
+};
+
+/**
+ * The prompt's layout invariants, not its positions (COMPANY_ANALYST v37
+ * moved the shared instructions ahead of the person's charter tail):
+ * - the shared, cacheable instructions lead, and only instructions are
+ *   shared;
+ * - the person's private charter tail follows them, still before the turn
+ *   (the OpenAI adapter sends it after the tool block);
+ * - the person's words travel once, fenced as untrusted, in a USER
+ *   message, never with system authority.
+ * Returns the index of that USER message.
+ */
+function expectPromptLayout(
+  messages: readonly SentMessage[] | undefined,
+  userText: string,
+): number {
+  const sent = messages ?? [];
+  const userAt = sent.findIndex((m) => m.role === "USER");
+  expect(userAt).toBeGreaterThan(0);
+  const user = sent[userAt];
+  expect(user?.content).toContain(USER_FENCE);
+  expect(user?.content).toContain(userText);
+  // The person's words and the fence appear in no other message, so no
+  // SYSTEM (instruction) message carries untrusted content.
+  for (const [index, message] of sent.entries()) {
+    if (index === userAt) continue;
+    expect(message.content).not.toContain(USER_FENCE);
+    expect(message.content).not.toContain(userText);
+  }
+  // Shared instructions first, contiguous, SYSTEM only; the charter's
+  // opening among them.
+  const lastShared = sent.findLastIndex((m) => m.shared === true);
+  expect(lastShared).toBeGreaterThanOrEqual(0);
+  for (const message of sent.slice(0, lastShared + 1)) {
+    expect(message.role).toBe("SYSTEM");
+    expect(message.shared).toBe(true);
+  }
+  expect(sent[0]?.content).toContain("You are Q");
+  // The private tail: unshared instructions after the shared ones and
+  // before the turn.
+  const tail = sent.slice(lastShared + 1, userAt);
+  expect(tail.length).toBeGreaterThan(0);
+  for (const message of tail) {
+    expect(message.role).toBe("SYSTEM");
+    expect(message.shared).toBeUndefined();
+  }
+  return userAt;
+}
 
 /** The structured analyst output the seam expects (CQ-Q-006). */
 function analystResult(answer: string) {
@@ -427,12 +482,8 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.promptBundleVersion).toBe(
         `q-system.v2_company-analyst.v${String(analyst)}_comm.v1`,
       );
-      expect(google.calls[0]?.request.messages[0]?.content).toContain(
-        "You are Q",
-      );
-      expect(google.calls[0]?.request.messages[1]?.content).toContain(
-        '<<<UNTRUSTED_CONTENT source="userMessage">>>',
-      );
+      const sent = google.calls[0]?.request.messages;
+      const userAt = expectPromptLayout(sent, "Say hello to the test.");
       expect(google.calls[0]?.request.output.kind).toBe("STRUCTURED");
       expect(final.messages.map((m) => m.role)).toEqual(["USER", "Q"]);
       expect(final.messages[1]?.content).toBe(
@@ -443,20 +494,18 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(google.calls).toHaveLength(1);
       expect(groq.calls).toHaveLength(0);
       expect(google.calls[0]?.request.modelCode).toBe("gemini-3.5-flash-lite");
-      // Charter, task, then what the run can do and has produced (the
+      // After the turn: what the run can do and has produced (the
       // capability note, a trusted SYSTEM message since CQ-QX-008), then
       // where findings go in a conversation (claim check, step 6).
-      expect(google.calls[0]?.request.messages.map((m) => m.role)).toEqual([
-        "SYSTEM",
-        "USER",
+      expect(sent?.slice(userAt + 1).map((m) => m.role)).toEqual([
         "SYSTEM",
         "SYSTEM",
       ]);
-      expect(google.calls[0]?.request.messages[3]?.content).toContain(
-        "IN THIS CONVERSATION put each evidence-backed point in findings",
-      );
-      expect(google.calls[0]?.request.messages[2]?.content).toContain(
+      expect(sent?.[userAt + 1]?.content).toContain(
         "You cannot end, clear or start a conversation",
+      );
+      expect(sent?.[userAt + 2]?.content).toContain(
+        "IN THIS CONVERSATION put each evidence-backed point in findings",
       );
 
       const ledger = await db.sql<
@@ -532,23 +581,24 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(google.calls[0]?.request.output.kind).toBe("STRUCTURED");
       // The tools-first note (a SYSTEM message) travels with every tool
       // round since 1e1c4e1, on every provider.
-      // Charter, task, the capability note (CQ-QX-008), the findings note
+      // After the turn: the capability note (CQ-QX-008), the findings note
       // (step 6), the tools-first note, then the tool round and its result.
-      expect(google.calls[1]?.request.messages.map((m) => m.role)).toEqual([
-        "SYSTEM",
-        "USER",
+      const round = google.calls[1]?.request.messages;
+      const turnAt = expectPromptLayout(
+        round,
+        "What does the platform know about my company?",
+      );
+      expect(round?.slice(turnAt + 1).map((m) => m.role)).toEqual([
         "SYSTEM",
         "SYSTEM",
         "SYSTEM",
         "ASSISTANT",
         "TOOL",
       ]);
-      expect(google.calls[1]?.request.messages[2]?.content).toContain(
+      expect(round?.[turnAt + 1]?.content).toContain(
         "You cannot end, clear or start a conversation",
       );
-      expect(google.calls[1]?.request.messages[4]?.content).toContain(
-        "LOOK IT UP FIRST.",
-      );
+      expect(round?.[turnAt + 3]?.content).toContain("LOOK IT UP FIRST.");
 
       const final = await world.service.getRun({
         actor: world.actor,

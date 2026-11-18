@@ -296,6 +296,9 @@ describe("the OpenAI adapter's order", () => {
       content: [{ type: "input_text", text: `ENVIRONMENT\n${PRIVATE_MARK}` }],
     });
     expect(JSON.stringify(input[1])).toContain("What does Halyard do?");
+    // The turn stays the person's own message, never an instruction.
+    expect(input[1]).toMatchObject({ role: "user" });
+    expect(input).toHaveLength(2);
   });
 
   it("is unchanged for messages with nothing marked shared", () => {
