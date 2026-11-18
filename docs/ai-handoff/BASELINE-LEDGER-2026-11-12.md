@@ -864,3 +864,16 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **18 Nov 07:18 UTC, `fb32830d9` (rollback point `34b1f0d4b`):** audit item 17. TURN_READER v93 reads others' interest by meaning, OR'd with the word rule. No server-side leak was found; the protection is RLS plus company-side authorisation. ci-local PASS (1299 s); all four services SUCCESS.
   - Live (Savanna): "Who else is circling Halyard Security at the moment?" was answered "I can't share other investors' interest or cheque sizes"; the follow-up "where do we stand with them?" gave her own status.
   - Note: Savanna still has the unrequested Express Interest card from 17 Nov 23:42 waiting for approval (from the bug fixed in `240e0b9a0`). It is fictional and harmless, but it shows as "one thing needs you".
+- **18 Nov 13:04 UTC, `2da3e3357` (rollback point `fb32830d9`):** one batch. ci-local PASS (1683 s); all four services SUCCESS.
+  - Contents:
+    - Daily lane `e7c988bb5`;
+    - first-answer cache `e986547f8` (COMPANY_ANALYST v37);
+    - voice speaks at the first guarded sentence and holds only real waits `774719d29`;
+    - GateQ inbox email and the stalled-stream catch-up `1cc516ae0` and `46ee5717f`;
+    - meetings S1, S2, S3 and S8 (one lip-synced Q, one opening, quiet after answering, no double booking) `98e2b816d`;
+    - CRM import `14add87a6`;
+    - test fix `2da3e3357`.
+  - Migrations `20261231598370` (pipeline imports) and `20261231598700` (GateQ deliveries) applied first; hosted is at 310.
+  - Set `CQ_MEETING_FACE_PAGE_SECRET` on q-api: random, never printed. Camera-mode face page enabled. Meeting bot sign-in still waits for the owner's Workspace account.
+  - Live (Savanna): no startup errors. Turns took 18.5 s (cold cache), 9.0 s (fast path) and 26.6 s.
+  - The 26.6 s turn: the fast path missed (UNGROUNDED), then there was a 19 s gap with no model call before the full answer, which needs investigating.
