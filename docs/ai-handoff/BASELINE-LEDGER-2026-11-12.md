@@ -877,3 +877,15 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Set `CQ_MEETING_FACE_PAGE_SECRET` on q-api: random, never printed. Camera-mode face page enabled. Meeting bot sign-in still waits for the owner's Workspace account.
   - Live (Savanna): no startup errors. Turns took 18.5 s (cold cache), 9.0 s (fast path) and 26.6 s.
   - The 26.6 s turn: the fast path missed (UNGROUNDED), then there was a 19 s gap with no model call before the full answer, which needs investigating.
+- **18 Nov 14:53 UTC, `b204eb954` (rollback point `2da3e3357`):** fixes the root causes of the owner's 11:13 voice session (`1bb8f196d`):
+  - one shared in-contact rule, with contacts excluded before the top-N cut;
+  - meeting times agreed in messages are recognised;
+  - the named-record lane uses cleaned speech, place qualifiers and waits for the reading;
+  - possessives are formed once;
+  - CALL_PREP v3;
+  - the refinement search is bounded to 1.5 s;
+  - the fast path accepts one rewritten sentence.
+
+  The rerank timing test now takes the fastest of five runs. ci-local PASS (1696 s); all four services SUCCESS.
+  - Live (Savanna): "Apart from the companies I'm in contact with, which three…" left out 15 and named Ledgerline, Brancheon Works and Baridi. That's correct.
+  - Defect: the follow-up "Am I in contact with any of those?" got a comparison instead of a contact answer. A worker is fixing it.
