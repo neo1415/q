@@ -87,7 +87,7 @@ describe("call prep through the real gateway (live 2026-10-23)", () => {
       said: "Help me prepare for a first call with Savanna Seed Partners",
     });
     expect(warned).toEqual([]);
-    expect(prep).toEqual({ ...PREP, theyWant: null });
+    expect(prep).toEqual({ ...PREP, theyWant: null, agreedInMessages: [] });
     expect(alpha.calls).toHaveLength(1);
     const prompt = (alpha.calls[0]?.request.messages ?? [])
       .map((message) => message.content)

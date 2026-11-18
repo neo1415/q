@@ -67,13 +67,19 @@ function fitTools(pool: number, readable: ReadonlySet<string> = new Set()) {
       } as const;
       if (proposal.name === "fit_top_candidates") {
         const limit = Number(args["limit"] ?? 3);
-        const entries = Array.from(
-          { length: Math.min(limit, pool) },
-          (_, i) => {
-            const fit = profileOf(i + 1);
-            return { name: fit.name, line: null, profile: fit.profile };
-          },
+        // The domain leaves excludeCompanyIds out before its window.
+        const leaveOut = new Set(
+          Array.isArray(args["excludeCompanyIds"])
+            ? (args["excludeCompanyIds"] as string[])
+            : [],
         );
+        const entries = Array.from({ length: pool }, (_, i) => i + 1)
+          .filter((n) => !leaveOut.has(ID(n)))
+          .slice(0, limit)
+          .map((n) => {
+            const fit = profileOf(n);
+            return { name: fit.name, line: null, profile: fit.profile };
+          });
         return Promise.resolve({
           ...base,
           toolName: "fit.top_candidates",
@@ -173,8 +179,14 @@ describe("v56: a fit question past the companies already shown", () => {
     expect(fits.map((fit) => fit.companyId)).toEqual([ID(4), ID(5), ID(6)]);
     expect(fits.some((fit) => SHOWN.includes(fit.companyId))).toBe(false);
     expect(result.excluded).toBe(3);
-    // The window widened by the three left out, so three still fill it.
-    expect(calls).toEqual([{ name: "fit_top_candidates", args: { limit: 6 } }]);
+    // Owner live 18 Nov 2026: the three shown are left out by the ranking
+    // itself, before its window, so three still fill it.
+    expect(calls).toEqual([
+      {
+        name: "fit_top_candidates",
+        args: { limit: 3, excludeCompanyIds: SHOWN },
+      },
+    ]);
     const block = fitSweepCardsBlock(fits, "Fit against your mandate");
     if (block === null) throw new Error("no block");
     const said = fitSweepSummary({

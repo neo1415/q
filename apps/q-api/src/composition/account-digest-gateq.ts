@@ -67,6 +67,14 @@ export function inboxDigestOf(inbox: GateqInboxDto): AccountDigestInbox {
       fit: item.fit,
       daysLeft: item.daysLeft,
     })),
+    // Every applicant, answered or not: an application is contact.
+    applicants: [
+      ...new Set(
+        inbox.items
+          .map((item) => clip(item.companyName, 120))
+          .filter((name) => name.length > 0),
+      ),
+    ].slice(0, 100),
   };
 }
 

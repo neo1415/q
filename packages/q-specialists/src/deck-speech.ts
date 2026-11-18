@@ -1,4 +1,5 @@
 import { DECK_SECTION_LABELS, type DeckSection } from "@capital-q/contracts";
+import { possessive } from "@capital-q/q-core/speech";
 
 /**
  * N2: what Q says as a company's pitch deck opens: the deck's own
@@ -44,7 +45,7 @@ function listed(words: readonly string[]): string {
 }
 
 export function deckSpeech(name: string | null, deck: DeckSpeech): string {
-  const who = name === null ? "the pitch deck" : `${name}'s pitch deck`;
+  const who = name === null ? "the pitch deck" : possessive(name, "pitch deck");
   const present = deck.sections.filter(
     (section) => section.status === "PRESENT" && section.summary !== null,
   );
@@ -92,7 +93,7 @@ export function deckSectionSpeech(
   code: DeckSection["section"],
   deck: DeckSpeech,
 ): string {
-  const who = name === null ? "the deck" : `${name}'s deck`;
+  const who = name === null ? "the deck" : possessive(name, "deck");
   const label = DECK_SECTION_LABELS[code];
   const section = deck.sections.find((one) => one.section === code);
   if (section?.status === "PRESENT" && section.summary !== null) {

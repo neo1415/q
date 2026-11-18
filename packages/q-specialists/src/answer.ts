@@ -7522,10 +7522,23 @@ export function createSpecialistQAnswer(
         onScreenTab.blocks,
       );
     }
-    const byName =
+    const byNameNow =
       NAMES_Q_CARD.test(latest.content) || continuesQ
         ? null
         : await namedRecordAnswer(request, latest.content);
+    // Audit item 1, option (c) (owner live 18 Nov 2026, run 658fd606: "The
+    // GateQ um... inbox for Nixo" answered at once "I can't find "GateQ
+    // um""): a spoken turn's "I can't find X" waits for the reader's
+    // reading, which hears the words cleaned (heardAs) and runs this lane
+    // again on them, or answers the turn itself. Only a record found opens
+    // before the reading.
+    const byName =
+      byNameNow !== null &&
+      byNameNow.log === "NOT_FOUND" &&
+      request.spoken === true &&
+      !reheard.has(request.runId)
+        ? null
+        : byNameNow;
     // W4: none of their relationships, but a researched entity they can
     // reach by name: its identity card in focus.
     if (!continuesQ && (byName === null || byName.log === "NOT_FOUND")) {

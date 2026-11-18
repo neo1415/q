@@ -214,7 +214,16 @@ export type FitService = {
     actor: ActorContext,
     companyIds: readonly string[],
   ) => Promise<FitProfilesResult>;
-  readonly top: (actor: ActorContext, limit: number) => Promise<FitTopResult>;
+  /**
+   * `exclude`: companies left out before the ranking's window is taken
+   * (owner live 18 Nov 2026: "apart from the companies I'm already in
+   * touch with" over 34 relationships found none in a ten-wide window).
+   */
+  readonly top: (
+    actor: ActorContext,
+    limit: number,
+    options?: { readonly exclude?: readonly string[] | undefined },
+  ) => Promise<FitTopResult>;
   /**
    * Owner 2026-10-23: companies of a kind (the catalog's matches, already
    * through hard eligibility and disclosure), every one scored on this
@@ -555,8 +564,11 @@ export function createFitService(
         }),
       };
     },
-    top: async (actor, limit) => {
-      const listed = await dependencies.candidates(actor);
+    top: async (actor, limit, options) => {
+      const leaveOut = new Set(options?.exclude ?? []);
+      const listed = (await dependencies.candidates(actor)).filter(
+        (candidate) => !leaveOut.has(candidate.companyId),
+      );
       const sources = new Map<string, Set<FitCandidateSource>>();
       for (const c of listed.slice(0, FIT_TOP_CANDIDATES_MAX)) {
         const set = sources.get(c.companyId) ?? new Set();

@@ -62,7 +62,7 @@ export const CALL_PREP_V2: PromptDefinition<
 > = {
   ...CALL_PREP_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Owner QA O-I12 (2026-10-24): the prep follows the asker's side. A founder gets the investor's likely questions with answers from their own record, weak spots and the ask; an investor gets questions to ask with what to verify, red flags with how to test them, what the founder will want from them (theyWant) and the next step, never the founder's voice or the company's figures as theirs.",
   effectiveFrom: "2026-10-24",

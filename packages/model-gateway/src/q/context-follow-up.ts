@@ -309,10 +309,16 @@ export function createContextFollowUp(dependencies: {
           qWords,
         ),
       );
+      // Live 18 Nov 2026 (run 7aac4d85, 2da3e3357): one figure the sources
+      // do not hold dropped the whole follow-up to the full path (26.6 s).
+      // When the check took out a single sentence and a substantive answer
+      // remains, that answer is given and the gap is said plainly.
+      const gapOnly = honestGapAnswer(checked);
       if (
-        checked.ungrounded.length > 0 ||
-        checked.stats.dropped > 0 ||
-        checked.stats.rewritten > 0
+        gapOnly === null &&
+        (checked.ungrounded.length > 0 ||
+          checked.stats.dropped > 0 ||
+          checked.stats.rewritten > 0)
       ) {
         // Kinds only: a figure the model wrote may itself be private.
         logger?.info(
@@ -348,9 +354,15 @@ export function createContextFollowUp(dependencies: {
         },
         "q answered a follow-up from this conversation's evidence",
       );
+      if (gapOnly !== null) {
+        logger?.info(
+          { qRunId: request.runId, ungrounded: checked.ungrounded },
+          "q context follow-up left out one figure its sources do not hold and said so",
+        );
+      }
       return {
         kind: "ANSWERED",
-        text: checked.text,
+        text: gapOnly ?? checked.text,
         readByRun: kept.provenance.runId,
         ageMs: now() - kept.readAt,
       };
@@ -368,4 +380,27 @@ function anySignal(
   if (present.length === 0) return undefined;
   if (present.length === 1) return present[0];
   return AbortSignal.any(present);
+}
+
+/**
+ * The checked follow-up answer when the claim check took out or rewrote
+ * exactly one sentence (a figure its sources do not hold) and a substantive
+ * answer of at least two sentences remains: that answer, with the gap said
+ * plainly. Null otherwise: the full path answers, as before.
+ */
+export function honestGapAnswer(checked: {
+  readonly text: string;
+  readonly stats: { readonly dropped: number; readonly rewritten: number };
+}): string | null {
+  if (checked.stats.dropped + checked.stats.rewritten !== 1) return null;
+  const text = checked.text.trim();
+  const sentences = text
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => sentence.trim().length > 0);
+  if (sentences.length < 2 || text.length < 120) return null;
+  // A rewritten sentence already says the gap ("Neither Capital Q's records
+  // nor the sources I read give a figure for ..."); a dropped one is said.
+  return checked.stats.rewritten === 1
+    ? text
+    : `${text}\n\nI left out one figure I can't find in what I can see for this.`;
 }

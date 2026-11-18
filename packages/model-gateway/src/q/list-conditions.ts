@@ -12,7 +12,9 @@ import {
   readFitSets,
   type RunFit,
 } from "./fit-cards.js";
+import { nameKey } from "./card-subjects.js";
 import { ownSetOf } from "./fit-sweep.js";
+import { asInContact, type InContact } from "./in-contact.js";
 
 /**
  * Audit 2026-11-15, RC2: ranking shortcuts dropped the person's stated
@@ -657,7 +659,7 @@ type ConditionedCompanyListInput = {
   /** Their own relationships and saves (list_my_relationships' data). */
   readonly own: Promise<unknown>;
   /** Whom the account digest says they are in touch with. */
-  readonly inTouch: Promise<ReadonlySet<string>>;
+  readonly inTouch: Promise<ReadonlySet<string> | InContact>;
 };
 
 async function conditionedCompanyListOnce(
@@ -692,12 +694,15 @@ async function conditionedCompanyListOnce(
   };
   const [ownData, digestInTouch] = await Promise.all([
     input.own.catch(() => null),
-    input.inTouch.catch(() => new Set<string>()),
+    input.inTouch.catch(() => null),
   ]);
   const own = ownSetOf(ownData);
+  // in-contact.ts: the one reading of who they are in touch with; GateQ
+  // applicants are known by name only.
+  const contact = asInContact(digestInTouch);
   const inContact = new Set([
     ...own.relationships.map((row) => row.id),
-    ...digestInTouch,
+    ...contact.ids,
   ]);
   // The pool, before any condition.
   let pool: string[];
@@ -861,8 +866,12 @@ async function conditionedCompanyListOnce(
   let shown = ranked.slice(0, count);
   // The last code check: nothing shown breaks a stated condition.
   const broken = new Set(
-    violatingItems(shown, conditions, judge, (fit) =>
-      inContact.has(fit.companyId),
+    violatingItems(
+      shown,
+      conditions,
+      judge,
+      (fit) =>
+        inContact.has(fit.companyId) || contact.names.has(nameKey(fit.name)),
     ).map((fit) => fit.companyId),
   );
   if (broken.size > 0)

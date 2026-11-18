@@ -38,6 +38,7 @@ const RESULT = {
   weakSpots: [{ spot: "No churn figure.", handle: "Say so." }],
   ask: "A second meeting.",
   theyWant: null,
+  agreedInMessages: [],
 };
 
 /** A prepared call, or null for none or an unresolved counterpart. */

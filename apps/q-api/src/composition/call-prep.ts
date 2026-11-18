@@ -140,6 +140,51 @@ export function nameIsSaid(recordName: string, said: string): boolean {
   );
 }
 
+/** Letters and digits only, lower case: how a quote is found in messages. */
+function wordsKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/gu, "'")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+/**
+ * Owner live 18 Nov 2026 (Zino x Tensorgate): the times the writer read as
+ * agreed in the messages, kept only when the words it quotes are in the
+ * messages it was given (nothing invented reaches the answer), its start
+ * is a real time, and the meetings record has not cancelled that start.
+ * Each says whether it has passed.
+ */
+export function agreedTimesChecked(input: {
+  readonly agreed: readonly {
+    readonly startsAt: string;
+    readonly quote: string;
+  }[];
+  readonly messages: string;
+  readonly cancelled: readonly string[];
+  readonly now: number;
+}): {
+  readonly startsAt: string;
+  readonly quote: string;
+  readonly passed: boolean;
+}[] {
+  const said = wordsKey(input.messages);
+  const cancelledAt = new Set(
+    input.cancelled.map((iso) => Date.parse(iso)).filter(Number.isFinite),
+  );
+  return input.agreed.flatMap((one) => {
+    const at = Date.parse(one.startsAt);
+    const quote = wordsKey(one.quote);
+    if (!Number.isFinite(at) || quote.length < 8) return [];
+    if (!said.includes(quote)) return [];
+    if (cancelledAt.has(at)) return [];
+    return [
+      { startsAt: one.startsAt, quote: one.quote, passed: at < input.now },
+    ];
+  });
+}
+
 /** Stages where a meeting with them is the next or a recent step. */
 const MEETING_STAGES = new Set(["CONNECTED", "MEETING_HELD", "IN_DILIGENCE"]);
 
@@ -315,6 +360,8 @@ export function createCallPrepPort(
             ? []
             : await cancelledMeetings(actor, relationshipId);
         const soFar = [
+          // Where a weekday in the messages falls, and whether it passed.
+          relationshipId === null ? null : `TODAY: ${new Date().toISOString()}`,
           them === null
             ? "Nothing about them is on record that they can see."
             : relationshipId === null
@@ -328,7 +375,7 @@ export function createCallPrepPort(
                   ...(cancelled.length === 0
                     ? []
                     : [`CANCELLED (not happening): ${cancelled.join(", ")}.`]),
-                  "A time named or proposed in the messages is not a booking: never say a meeting is booked, scheduled, confirmed or pending.",
+                  "A time named or proposed in the messages is not a calendar booking: never say a meeting is booked, scheduled or pending. A time both sides agreed in the messages goes in agreedInMessages, with the words that agree it.",
                 ].join("\n")
             : `MEETINGS BOOKED:\n${booked
                 .map((meeting) => `- ${meeting.startsAt}: ${meeting.purpose}`)
@@ -359,6 +406,16 @@ export function createCallPrepPort(
           skipped("NOT_WRITTEN");
           return null;
         }
+        const { agreedInMessages, ...written } = prep;
+        const agreed =
+          relationshipId === null || booked.length > 0
+            ? []
+            : agreedTimesChecked({
+                agreed: agreedInMessages,
+                messages,
+                cancelled,
+                now: Date.now(),
+              });
         const subjects =
           them === null || id === null
             ? []
@@ -374,7 +431,7 @@ export function createCallPrepPort(
         return {
           viewerRole: viewer.role,
           counterpartName: name,
-          ...prep,
+          ...written,
           waiting: related.about === "SAME_PEOPLE" ? related.waiting : [],
           ...(relationshipId === null
             ? {}
@@ -382,6 +439,7 @@ export function createCallPrepPort(
                 meetings: {
                   booked: booked.map((meeting) => meeting.startsAt),
                   cancelled,
+                  ...(agreed.length === 0 ? {} : { agreed }),
                 },
               }),
           // Only a record they could open: the rehearsal lobby for it.

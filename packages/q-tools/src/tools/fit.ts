@@ -130,6 +130,13 @@ export const FitTopCandidatesInputSchema = z
     source: FitCandidateSourceSchema.optional().describe(
       "With companyIds: where they came from (FEED for discover_companies, the default; RELATIONSHIP; SAVED; REQUEST).",
     ),
+    excludeCompanyIds: z
+      .array(UuidSchema)
+      .max(200)
+      .optional()
+      .describe(
+        "Without companyIds: companies to leave out of the ranking before the top N is taken (for example the ones they are already in touch with).",
+      ),
   })
   .strict();
 export type FitTopCandidatesInput = z.infer<typeof FitTopCandidatesInputSchema>;
@@ -337,7 +344,9 @@ export function createFitTopCandidatesTool(
       // each still authorised for VIEW under this reader before it is read.
       const result =
         input.companyIds === undefined
-          ? await fit.top(context.actor, input.limit ?? 3)
+          ? await fit.top(context.actor, input.limit ?? 3, {
+              exclude: input.excludeCompanyIds,
+            })
           : await fit.compare(
               context.actor,
               input.companyIds,

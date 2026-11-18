@@ -16,6 +16,7 @@ import {
   type AccountDigestRelationship,
   type AccountDigestRequest,
   type AccountDigestSection,
+  type AccountDigestStage,
   type AccountDigestWork,
   type QAccountDigest,
   type QAttentionReport,
@@ -181,6 +182,7 @@ export function digestRelationships(own: OwnRelationships | null): {
   readonly total: number;
   readonly byStage: Partial<Record<RelationshipStateV2, number>>;
   readonly counterpartIds: readonly string[];
+  readonly stages: readonly AccountDigestStage[];
 } {
   const rows = (own?.items ?? []).flatMap(
     (item): AccountDigestRelationship[] => {
@@ -215,6 +217,13 @@ export function digestRelationships(own: OwnRelationships | null): {
       0,
       200,
     ),
+    // Every relationship's stage, not only the listed few: what "in
+    // contact" and a stated stage are checked against (in-contact.ts).
+    stages: rows.slice(0, 200).map((row) => ({
+      counterpartId: row.counterpart.id,
+      name: clip(row.counterpart.name, 60) || "Unnamed",
+      stage: row.stage,
+    })),
   };
 }
 
@@ -551,6 +560,7 @@ export function createAccountDigestReader(
       relationshipsTotal: relationships.total,
       byStage: relationships.byStage,
       relationshipCounterpartIds: [...relationships.counterpartIds],
+      relationshipStages: [...relationships.stages],
       waiting: (report?.items ?? []).slice(0, ACCOUNT_DIGEST_WAITING_MAX),
       waitingTotal: report?.items.length ?? 0,
       meetings: schedule === null ? [] : [...upcomingMeetings(schedule, now)],

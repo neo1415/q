@@ -7,6 +7,9 @@ import type {
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
+import { nameKey } from "./card-subjects.js";
+import { inContactOf, inContactWith, type InContact } from "./in-contact.js";
+
 /**
  * Owner requirement 14 Nov 2026 ("every time you ask Q a question … you're
  * supposed to have context of everything that is already happening or that
@@ -274,11 +277,14 @@ function gateqLine(
     : `GateQ: ${parts.join("; ")}.`.slice(0, 500);
 }
 
-/** The digest's counterparts: whom "already in touch with" means. */
+/**
+ * The digest's counterparts in contact (in-contact.ts, the one rule):
+ * whom "already in touch with" means, by canonical id.
+ */
 export function relationshipCounterparts(
   digest: QAccountDigest | null,
 ): ReadonlySet<string> {
-  return new Set(digest?.relationshipCounterpartIds ?? []);
+  return inContactOf(digest).ids;
 }
 
 /**
@@ -289,12 +295,17 @@ export function relationshipCounterparts(
  */
 export function withoutExcludedCompanies(
   blocks: QResponseMessage["blocks"] | undefined,
-  excluded: ReadonlySet<string>,
+  excluded: ReadonlySet<string> | InContact,
 ): {
   readonly blocks: QResponseMessage["blocks"] | undefined;
   readonly dropped: readonly string[];
 } {
-  if (blocks === undefined || excluded.size === 0) {
+  const contact: InContact =
+    "ids" in excluded ? excluded : { ids: excluded, names: new Set() };
+  if (
+    blocks === undefined ||
+    (contact.ids.size === 0 && contact.names.size === 0)
+  ) {
     return { blocks, dropped: [] };
   }
   const dropped: string[] = [];
@@ -310,7 +321,7 @@ export function withoutExcludedCompanies(
       const out =
         subject !== null &&
         subject.kind === "COMPANY" &&
-        excluded.has(subject.companyId);
+        inContactWith(contact, { id: subject.companyId, name: card.name });
       if (out) dropped.push(card.name);
       return !out;
     });
@@ -318,6 +329,32 @@ export function withoutExcludedCompanies(
     else if (cards.length > 0) kept.push({ ...cardsBlock, cards });
   }
   return { blocks: kept, dropped: [...new Set(dropped)] };
+}
+
+/**
+ * Owner live 18 Nov 2026 (run 34f977c1): the answer named Halyard
+ * Security, Clearwater Assurance and Nixo as the matches, and the check's
+ * line then said it had left out those same three. Where the answer's own
+ * words name a company the check dropped, those words are not kept: the
+ * answer is the check's line alone, never a list contradicted a sentence
+ * later. Null when nothing was dropped.
+ */
+export function withExclusionChecked(
+  content: string,
+  dropped: readonly string[],
+  keptCards: number,
+): string | null {
+  const line = exclusionLine(dropped);
+  if (line === null) return null;
+  const words = nameKey(content);
+  const named = dropped.some((name) => {
+    const key = nameKey(name);
+    return key.length >= 3 && words.includes(key);
+  });
+  if (!named) return `${content}\n\n${line}`;
+  return keptCards > 0
+    ? `${line} The companies left on screen are the ones you're not in touch with.`
+    : `${line} I don't have another company ranked for your mandate that you're not already in touch with right now.`;
 }
 
 /** What the answer says when the check dropped companies. */

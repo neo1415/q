@@ -87,3 +87,4 @@ export {
   asksForMove,
   isDrawingObject,
 } from "../conversation/drawing-request.js";
+export { possessive } from "./possessive.js";

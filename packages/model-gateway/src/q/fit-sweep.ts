@@ -5,7 +5,9 @@ import type {
   QToolPort,
 } from "@capital-q/q-runtime";
 
+import { nameKey } from "./card-subjects.js";
 import { fitsInOutcome, readFitSets, type RunFit } from "./fit-cards.js";
+import { asInContact, type InContact } from "./in-contact.js";
 
 /**
  * Fit for a set of companies, computed by code before the model is asked
@@ -282,6 +284,8 @@ export function fitSweepAskOfReading(
 /** Companies computed at once, at most: the cards hold ten. */
 export const FIT_SWEEP_MAX = 24;
 export const FIT_SWEEP_CARDS_MAX = 10;
+/** At most this many companies are left out by the ranking itself. */
+export const FIT_EXCLUDE_MAX = 200;
 
 /**
  * The reader's count fills a count the words did not give (owner live
@@ -386,7 +390,7 @@ export async function runFitSweep(input: {
    * the ranking too, so the answer's final check (withoutExcludedCompanies)
    * finds nothing to drop after the summary is written.
    */
-  readonly inTouch?: Promise<ReadonlySet<string>> | undefined;
+  readonly inTouch?: Promise<ReadonlySet<string> | InContact> | undefined;
 }): Promise<FitSweepResult | null> {
   const { ask, tools, context, available } = input;
   if (!available.has("fit_profile")) return null;
@@ -418,14 +422,15 @@ export async function runFitSweep(input: {
   // v88 (D1): their relationships are left out, not added.
   const withoutRelationships =
     ask.scope === "CANDIDATES" && ask.excludeRelationships === true;
-  const inTouch = withoutRelationships
-    ? await (input.inTouch ?? Promise.resolve(new Set<string>())).catch(
-        () => new Set<string>(),
-      )
-    : new Set<string>();
+  // in-contact.ts: the one reading of who they are in touch with.
+  const contact = asInContact(
+    withoutRelationships
+      ? await (input.inTouch ?? Promise.resolve(null)).catch(() => null)
+      : null,
+  );
   const relationshipIds = new Set(
     withoutRelationships
-      ? [...own.relationships.map((row) => row.id), ...inTouch]
+      ? [...own.relationships.map((row) => row.id), ...contact.ids]
       : [],
   );
   for (const id of relationshipIds) excluded.add(id);
@@ -471,16 +476,25 @@ export async function runFitSweep(input: {
           // The domain ranks all eligible candidates before taking this
           // window. Fetch only the requested count when no place filter
           // needs a wider set; ten rich profiles can exceed the tool bound.
-          // v56: the window widens by the companies left out, so the next
-          // best still fill the asked count (the tool's own cap is ten).
+          // Owner live 18 Nov 2026 (Zino, 34 relationships): the companies
+          // left out are left out by the ranking itself, before its top-N
+          // window is taken (excludeCompanyIds); widening a ten-wide window
+          // by them returned only companies they were in touch with, and
+          // the answer fell to a model holding the unfiltered list. Only
+          // GateQ applicants, known by name, still widen the window.
           {
             limit:
               ask.place === null
                 ? Math.min(
-                    (ask.count ?? FIT_SWEEP_CARDS_MAX) + excluded.size,
+                    (ask.count ?? FIT_SWEEP_CARDS_MAX) + contact.names.size,
                     FIT_SWEEP_CARDS_MAX,
                   )
                 : FIT_SWEEP_CARDS_MAX,
+            ...(excluded.size === 0
+              ? {}
+              : {
+                  excludeCompanyIds: [...excluded].slice(0, FIT_EXCLUDE_MAX),
+                }),
           },
           "q-fit-sweep-top",
         )
@@ -510,7 +524,10 @@ export async function runFitSweep(input: {
   const leftOut = new Set<string>();
   const leftOutRelationships = new Set<string>();
   for (const fit of [...top, ...named]) {
-    if (relationshipIds.has(fit.companyId)) {
+    if (
+      relationshipIds.has(fit.companyId) ||
+      (withoutRelationships && contact.names.has(nameKey(fit.name)))
+    ) {
       leftOutRelationships.add(fit.companyId);
       continue;
     }
@@ -534,7 +551,15 @@ export async function runFitSweep(input: {
     ask,
     fits: ranked,
     considered: ask.scope === "CANDIDATES" ? all.length : wanted.size,
-    excluded: leftOut.size,
+    // The shown companies left out, whether the ranking left them out
+    // before its window (excludeCompanyIds) or they surfaced and were
+    // dropped here.
+    excluded: new Set(
+      [
+        ...leftOut,
+        ...(ask.scope === "CANDIDATES" ? (ask.exclude ?? []) : []),
+      ].filter((id) => !relationshipIds.has(id)),
+    ).size,
     // D17b (live 15 Nov 2026, run 99b213d4): every company they are in
     // touch with was left out, most before any fit row was read (`wanted`
     // skips them), so counting only those that surfaced said 0 and the

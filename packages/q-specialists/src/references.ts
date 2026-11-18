@@ -8,7 +8,7 @@ import {
   clipAtWord,
   type TurnReferenceV64 as TurnReference,
 } from "@capital-q/q-core";
-import { movePhaseLine } from "@capital-q/q-core/speech";
+import { movePhaseLine, possessive } from "@capital-q/q-core/speech";
 import type {
   ContextFirewallPort,
   QAnswerRequest,
@@ -535,18 +535,23 @@ function recordPlace(page: QRecordPage, what: string | null): string {
     case "EXTERNAL_REHEARSAL":
     case "WORK_ITEM":
     case "CAPITAL_ROUND":
-    case "GATEQ_APPLICATION":
       return what ?? "the page";
+    case "GATEQ_APPLICATION":
+      return what === null
+        ? "the GateQ application"
+        : possessive(what, "GateQ application");
     case "DAILY_EDITION":
       return what ?? "the Daily";
     case "COMPANY_ELEVATOR":
-      return what === null ? "the elevator pitch" : `${what}'s elevator pitch`;
+      return what === null
+        ? "the elevator pitch"
+        : possessive(what, "elevator pitch");
     case "COMPANY_DATA_ROOM":
-      return what === null ? "the data room" : `${what}'s data room`;
+      return what === null ? "the data room" : possessive(what, "data room");
     case "COMPANY_DECK":
-      return what === null ? "the pitch deck" : `${what}'s pitch deck`;
+      return what === null ? "the pitch deck" : possessive(what, "pitch deck");
     case "COMPANY_TEAM":
-      return what === null ? "the team" : `${what}'s team`;
+      return what === null ? "the team" : possessive(what, "team");
   }
 }
 

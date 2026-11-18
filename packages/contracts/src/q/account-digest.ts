@@ -61,6 +61,19 @@ export const AccountDigestOwedSchema = z.enum([
 ]);
 export type AccountDigestOwed = z.infer<typeof AccountDigestOwedSchema>;
 
+/**
+ * One relationship's stage, as the projection holds it: compact, since
+ * every relationship carries one (the listed few carry the full row).
+ */
+export const AccountDigestStageSchema = z
+  .object({
+    counterpartId: UuidSchema,
+    name: z.string().min(1).max(60),
+    stage: RelationshipStateV2Schema,
+  })
+  .strict();
+export type AccountDigestStage = z.infer<typeof AccountDigestStageSchema>;
+
 export const AccountDigestRelationshipSchema = z
   .object({
     relationshipId: UuidSchema,
@@ -157,6 +170,11 @@ export const AccountDigestInboxSchema = z
           .strict(),
       )
       .max(3),
+    /**
+     * Every applicant's company name in the inbox: a GateQ application is
+     * contact (owner 18 Nov 2026), named as the inbox names it.
+     */
+    applicants: z.array(z.string().min(1).max(120)).max(100).optional(),
   })
   .strict();
 export type AccountDigestInbox = z.infer<typeof AccountDigestInboxSchema>;
@@ -200,6 +218,14 @@ export const QAccountDigestSchema = z
      * "not the ones I'm already in touch with" excludes.
      */
     relationshipCounterpartIds: z.array(UuidSchema).max(200),
+    /**
+     * Owner live 18 Nov 2026 (conversation b0719e94): every relationship
+     * with its stage from the projection, not only the twelve listed, so
+     * "am I connected with Nixo?" and "leave out the ones I'm in touch
+     * with" read the same stage for every counterpart (Nixo, INVESTED, was
+     * not among the twelve listed).
+     */
+    relationshipStages: z.array(AccountDigestStageSchema).max(200).optional(),
     waiting: z.array(QAttentionItemSchema).max(ACCOUNT_DIGEST_WAITING_MAX),
     waitingTotal: z.number().int().min(0),
     meetings: z

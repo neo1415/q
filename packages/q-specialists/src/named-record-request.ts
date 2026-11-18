@@ -31,7 +31,14 @@ export { plausibleName };
 
 /** Which part of the record they asked for. */
 export type NamedRecordFacet =
-  "PAGE" | "RELATIONSHIP" | "CHAT" | "DATA_ROOM" | "DECK" | "TEAM" | "ELEVATOR";
+  | "PAGE"
+  | "RELATIONSHIP"
+  | "CHAT"
+  | "DATA_ROOM"
+  | "DECK"
+  | "TEAM"
+  | "ELEVATOR"
+  | "GATEQ";
 
 export type NamedRecordRequest = {
   /** The name as they said it ("Shiftwell"). */
@@ -57,7 +64,21 @@ type FacetWords = {
   readonly properOnly?: true;
 };
 
+/**
+ * Owner live 18 Nov 2026 (conversation b0719e94, 11:25): "Open the Nixo in
+ * GateQ" opened Nixo's profile, and "the GateQ inbox for Nixo" was looked
+ * up as a record called "GateQ um". A place said with the name -- "in
+ * GateQ", "in my pipeline", "the GateQ inbox for" -- is the surface whose
+ * item they mean: that surface's item opens, never the profile.
+ */
+const GATEQ_PLACE =
+  "(?:gate\\s*q|gate\\s*queue|gate\\s*cue)(?:\\s+(?:inbox|application|entry|item))?";
+
 const FACETS: readonly FacetWords[] = [
+  {
+    facet: "GATEQ",
+    words: `(?:(?:in|on|from)\\s+(?:the\\s+|my\\s+|our\\s+)?)?${GATEQ_PLACE}`,
+  },
   { facet: "DATA_ROOM", words: "data\\s*room|dataroom|diligence\\s+room" },
   // Owner 2026-10-15: "open Tensorgate's documents" opened the profile. A
   // company's documents are its data room (Q's own documents, "my
@@ -78,7 +99,7 @@ const FACETS: readonly FacetWords[] = [
   {
     facet: "RELATIONSHIP",
     words:
-      "relationship|deal|pipeline\\s+entry|crm\\s+(?:record|entry|page)|record\\s+in\\s+(?:the\\s+|my\\s+)?crm|(?:in|on)\\s+(?:the\\s+|my\\s+)?crm",
+      "relationship|deal|pipeline\\s+entry|crm\\s+(?:record|entry|page)|record\\s+in\\s+(?:the\\s+|my\\s+)?crm|(?:in|on|from)\\s+(?:the\\s+|my\\s+|our\\s+)?(?:crm|pipeline)",
   },
   { facet: "PAGE", words: "company|profile|page|investor\\s+page" },
 ];
@@ -88,13 +109,21 @@ const NOT_A_NAME =
   /^(?:it|that|this|them|those|these|one|(?:the\s+)?(?:first|second|third|fourth|fifth|last|next|previous)(?:\s+one)?|everything|anything|something|documents?|files?|my\s+documents?)$/iu;
 
 function clean(text: string): string {
-  return text
-    .replace(/[’]/gu, "'")
-    .replace(/\s+/gu, " ")
-    .replace(/^(?:the|my|our|a|an)\s+/iu, "")
-    .replace(/\s+(?:please|for me|now|again)$/iu, "")
-    .replace(/^["“]|["”]$/gu, "")
-    .trim();
+  return (
+    text
+      .replace(/[’]/gu, "'")
+      .replace(/\s+/gu, " ")
+      // "Nixo, that's what I asked you to open": the clause after the name
+      // says why, it is not part of the name.
+      .replace(
+        /,\s*(?:that'?s|that\s+is|this\s+is|which|as\s+i|like\s+i|please|thanks|thank\s+you)\b.*$/iu,
+        "",
+      )
+      .replace(/^(?:the|my|our|a|an)\s+/iu, "")
+      .replace(/\s+(?:please|for me|now|again)$/iu, "")
+      .replace(/^["“]|["”]$/gu, "")
+      .trim()
+  );
 }
 
 function asName(raw: string): string | null {
@@ -159,6 +188,25 @@ function fromObject(object: string): NamedRecordRequest | null {
   return { name, facet: "PAGE", explicit: proper };
 }
 
+/** Spoken fillers, never a word of a name. */
+const HESITATION =
+  /(^|[\s,;:])(?:u+m+|u+h+m*|e+r+m*|h+m+|m{2,})(?=[\s,.;:!?\u2026]|$)[\s,]*/giu;
+
+/**
+ * A spoken transcript's hesitations removed: fillers ("um", "uh", "erm")
+ * and the pauses written as "..." mid-sentence. A full stop stays a
+ * sentence end; only a pause is joined.
+ */
+export function withoutHesitations(text: string): string {
+  return text
+    .replace(HESITATION, "$1")
+    .replace(/\s*(?:\.{2,}|\u2026)\s*(?=\S)/gu, " ")
+    .replace(/\s*(?:\.{2,}|\u2026)\s*$/u, "")
+    .replace(/\s+([,.;:!?])/gu, "$1")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+}
+
 /** Filler a language request carries ("French please", "the Swahili language"). */
 const LANGUAGE_FILLER =
   /^(?:the\s+)?(.+?)(?:\s+(?:language|please|now|instead|for\s+me))*$/iu;
@@ -184,8 +232,11 @@ function namesLanguage(object: string): boolean {
  * to see the data room for Shiftwell." is the data room).
  */
 export function namedRecordRequestOf(text: string): NamedRecordRequest | null {
-  // A self-correction names only its last place (page-request.ts).
-  const sentences = selfCorrected(text)
+  // A self-correction names only its last place (page-request.ts). Spoken
+  // hesitations are read out first, so the transcript read is the cleaned
+  // one: "Open um... the Nixo... in gate queue" is "Open the Nixo in gate
+  // queue", never a record called "um" or "GateQ um" (live 18 Nov 2026).
+  const sentences = selfCorrected(withoutHesitations(text))
     .split(/(?<=[.!?])\s+/u)
     .map((sentence) => withoutLeadIn(sentence).replace(/[.!?]+$/u, ""))
     .filter((sentence) => sentence.length > 0 && sentence.length <= 160);
@@ -404,6 +455,8 @@ export function pagesFor(
     DECK: ["COMPANY_DECK"],
     TEAM: ["COMPANY_TEAM"],
     ELEVATOR: ["COMPANY_ELEVATOR"],
+    // An investor's GateQ inbox holds founders' applications, by company.
+    GATEQ: ["GATEQ_APPLICATION"],
   };
   // An investor organisation has no data room, deck or team tabs of its
   // own: the relationship (where diligence is shared) is its page for them.
@@ -415,6 +468,7 @@ export function pagesFor(
     DECK: [],
     TEAM: [],
     ELEVATOR: [],
+    GATEQ: [],
   };
   return side === "INVESTOR"
     ? [...company[facet], ...investor[facet]]
@@ -422,6 +476,7 @@ export function pagesFor(
 }
 
 const PART_WORDS: Readonly<Record<NamedRecordFacet, string>> = {
+  GATEQ: " GateQ application",
   PAGE: "",
   RELATIONSHIP: " relationship",
   CHAT: " chat",

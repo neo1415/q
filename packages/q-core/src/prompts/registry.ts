@@ -244,6 +244,7 @@ import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
 import { CALL_PREP_V1 } from "./tasks/call-prep.v1.js";
 import { CALL_PREP_V2 } from "./tasks/call-prep.v2.js";
+import { CALL_PREP_V3 } from "./tasks/call-prep.v3.js";
 import {
   PLAN_READ_V1,
   PLAN_REVIEW_V1,
@@ -1006,6 +1007,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     SMALL_TALK_V1,
     CALL_PREP_V1,
     CALL_PREP_V2,
+    CALL_PREP_V3,
     { ...PLAN_WRITE_V1, status: "DEPRECATED" },
     { ...PLAN_REVIEW_V1, status: "DEPRECATED" },
     PLAN_READ_V1,

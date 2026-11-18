@@ -165,26 +165,66 @@ function since(isoTime: string): string {
   }).format(at)}`;
 }
 
+/** What the stage check reads of one relationship. */
+type StageRow = Pick<AccountDigestRelationship, "relationshipId" | "stage"> & {
+  /** Absent for a relationship outside the listed few. */
+  readonly stageSince?: string | undefined;
+  readonly counterpart: { readonly name: string };
+};
+
+/**
+ * Owner live 18 Nov 2026 (run 001e5464): "You're connected with Clearwater
+ * Assurance, but not with Nixo" while Nixo was INVESTED. The check read
+ * only the twelve relationships the digest lists (Nixo was not among
+ * them); it reads every relationship's stage the digest carries.
+ */
+function stageRowsOf(digest: QAccountDigest): readonly StageRow[] {
+  const listed: StageRow[] = [...digest.relationships];
+  const seen = new Set(digest.relationships.map((row) => row.counterpart.id));
+  for (const row of digest.relationshipStages ?? []) {
+    if (seen.has(row.counterpartId)) continue;
+    seen.add(row.counterpartId);
+    // Keyed by the counterpart: one relationship per counterpart and side.
+    listed.push({
+      relationshipId: row.counterpartId,
+      stage: row.stage,
+      counterpart: { name: row.name },
+    });
+  }
+  return listed;
+}
+
 /** The stage as recorded, said plainly. */
-export function stageLine(row: AccountDigestRelationship): string {
-  return `From your records: ${plain(row.counterpart.name)} is ${STAGE_WORDS[row.stage]}${since(row.stageSince)}.`;
+export function stageLine(row: StageRow): string {
+  return `From your records: ${plain(row.counterpart.name)} is ${STAGE_WORDS[row.stage]}${row.stageSince === undefined ? "" : since(row.stageSince)}.`;
 }
 
 /** Their pipeline holds it, with the stage as recorded. */
-export function pipelineLine(row: AccountDigestRelationship): string {
-  return `From your records: ${plain(row.counterpart.name)} is in your pipeline, ${STAGE_WORDS[row.stage]}${since(row.stageSince)}.`;
+export function pipelineLine(row: StageRow): string {
+  return `From your records: ${plain(row.counterpart.name)} is in your pipeline, ${STAGE_WORDS[row.stage]}${row.stageSince === undefined ? "" : since(row.stageSince)}.`;
 }
 
 /** A stated stage that the projection contradicts, with the row it is about. */
 export type StageContradiction = {
   readonly sentence: string;
   readonly claim: StageClaim;
-  readonly row: AccountDigestRelationship;
+  readonly row: StageRow;
 };
 
 /** Sentences of an answer, each with its own end. */
 function sentencesOf(text: string): string[] {
   return text.split(/(?<=[.!?])\s+|\n+/u).filter((one) => one.trim() !== "");
+}
+
+/**
+ * A sentence naming several counterparts, cut where its clauses turn
+ * ("connected with Clearwater, but not with Nixo"): each clause is checked
+ * on its own when it names exactly one.
+ */
+function clausesOf(sentence: string): string[] {
+  return sentence
+    .split(/,?\s+(?=(?:but|while|whereas|although)\b)|;\s+/iu)
+    .filter((one) => one.trim() !== "");
 }
 
 /**
@@ -200,28 +240,44 @@ export function stageContradictions(
   digest: QAccountDigest | null,
   asked?: string,
 ): readonly StageContradiction[] {
-  if (digest === null || digest.relationships.length === 0) return [];
-  const rows = digest.relationships
+  if (digest === null) return [];
+  const rows = stageRowsOf(digest)
     .map((row) => ({ row, matcher: nameMatcher(row.counterpart.name) }))
     .filter(
       (
         entry,
       ): entry is {
-        readonly row: AccountDigestRelationship;
+        readonly row: StageRow;
         readonly matcher: RegExp;
       } => entry.matcher !== null,
     );
+  if (rows.length === 0) return [];
   const askedAbout =
     asked === undefined
       ? []
       : rows.filter((entry) => entry.matcher.test(asked));
   const [askedOnly] = askedAbout;
   const found: StageContradiction[] = [];
-  for (const sentence of sentencesOf(content)) {
+  const parts = sentencesOf(content).flatMap((sentence) =>
+    rows.filter((entry) => entry.matcher.test(sentence)).length > 1
+      ? clausesOf(sentence)
+      : [sentence],
+  );
+  for (const sentence of parts) {
     const named = rows.filter((entry) => entry.matcher.test(sentence));
     const [only] = named;
     if (named.length > 1) continue;
-    const words = sentence.replace(/[’]/gu, "'");
+    // A clause that leaves its verb in the clause before ("connected with
+    // Clearwater, but not with Nixo") is read with that verb restored.
+    const elided =
+      /^(?:but|while|whereas|although)\s+not\s+(?:with|to)\b/iu.test(sentence)
+        ? /\b(connected|in\s+touch)\b/iu.exec(content)?.[1]
+        : undefined;
+    const words = (
+      elided === undefined
+        ? sentence
+        : sentence.replace(/\bnot\s+(?=with|to)/iu, `not ${elided} `)
+    ).replace(/[’]/gu, "'");
     for (const [claim, pattern] of CLAIMS) {
       if (!pattern.test(words)) continue;
       const about =
@@ -260,6 +316,18 @@ export function withRelationshipStagesChecked(
         ? pipelineLine(one.row)
         : stageLine(one.row);
     said.add(id);
+    // A clause cut from a longer sentence ("but not with Nixo.") is taken
+    // out of it, and the stage as recorded follows that sentence.
+    const clause = /^(?:but|while|whereas|although)\b/iu.test(one.sentence);
+    if (clause) {
+      const at = text.indexOf(one.sentence);
+      if (at < 0) continue;
+      const before = text.slice(0, at).replace(/[,;]?\s*$/u, "");
+      const after = text.slice(at + one.sentence.length);
+      const ended = /[.!?]$/u.test(before) ? before : `${before}.`;
+      text = `${ended}${replacement.length === 0 ? "" : ` ${replacement}`}${/^\s/u.test(after) || after.length === 0 ? "" : " "}${after}`;
+      continue;
+    }
     text = text.replace(one.sentence, replacement);
   }
   return {

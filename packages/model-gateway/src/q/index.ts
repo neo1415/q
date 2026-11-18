@@ -198,13 +198,13 @@ import {
   groundedFitWords,
   hasOrphanListItems,
   spokenBeforeCards,
+  type RunFit,
 } from "./fit-cards.js";
 import {
   fitSweepAsk,
   fitSweepAskOfReading,
   withReadCount,
   isSingleCompanyQuestion,
-  ownSetOf,
   runFitSweep,
   type FitSweepAsk,
   type FitSweepResult,
@@ -674,11 +674,16 @@ import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import {
   ACCOUNT_DIGEST_BLOCK_MAX_CHARS,
   accountDigestBlock,
-  exclusionLine,
   relationshipCounterparts,
+  withExclusionChecked,
   withoutExcludedCompanies,
   type QAccountDigestPort,
 } from "./account-digest.js";
+import {
+  claimsLeftOutContacts,
+  inContactOf,
+  inContactWith,
+} from "./in-contact.js";
 import {
   asComparison,
   namedCardCompanyIds,
@@ -826,9 +831,17 @@ export {
   exclusionLine,
   localWhen,
   relationshipCounterparts,
+  withExclusionChecked,
   withoutExcludedCompanies,
   type QAccountDigestPort,
 } from "./account-digest.js";
+export {
+  asInContact,
+  claimsLeftOutContacts,
+  inContactOf,
+  inContactWith,
+  type InContact,
+} from "./in-contact.js";
 export {
   personTimeZone,
   situationHeader,
@@ -2621,6 +2634,26 @@ export function nextStepTurn(request: {
 }
 
 /**
+ * Owner live 18 Nov 2026 (run faecd30a): "I said I want three companies I
+ * have not been in contact with at all" -- a correction that restates the
+ * list it asked for -- was answered by a model holding the catalog, which
+ * named two of their relationships as having "no recorded contact". A
+ * correction the reader read as a fit list with their contacts left out is
+ * the same list ask, answered by the same code.
+ */
+export function restatedListAsk(request: {
+  readonly turnKind?: string | undefined;
+  readonly questionKind?: string | undefined;
+  readonly excludeRelationships?: boolean | undefined;
+}): boolean {
+  return (
+    request.turnKind === "CORRECTION" &&
+    request.questionKind === "FIT" &&
+    request.excludeRelationships === true
+  );
+}
+
+/**
  * D12 (live 78f8d72d5, run 5d5d7b24): "How solid is Ajopot's active users
  * figure?" was read THEIR_OWN_RECORDS with aboutNamedOther, so nextStepTurn
  * held back code's offer though a material uncertainty with an open route
@@ -2631,12 +2664,44 @@ export function nextStepTurn(request: {
  * progress check, a remark, a control word or an unclear transcript still
  * gets none, and the model's own next-step note is unchanged.
  */
+/** How long the reading's refined search may hold the prompt (ms). */
+export const REFINE_WAIT_MS = 1_500;
+
+/**
+ * The refined result when it lands within REFINE_WAIT_MS, else the warmed
+ * one already in hand (the refinement is left to finish unread).
+ */
+export function boundedRefinement<T>(
+  refined: Promise<T>,
+  warmed: T,
+  onSlow: () => void,
+  waitMs: number = REFINE_WAIT_MS,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      onSlow();
+      resolve(warmed);
+    }, waitMs);
+    timer.unref?.();
+  });
+  return Promise.race([refined, late]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
 export function uncertaintyOfferTurn(request: {
   readonly turnKind?: string | undefined;
   readonly questionKind?: string | undefined;
   readonly aboutNamedOther?: boolean | undefined;
   readonly namedOther?: { readonly kind: string } | null | undefined;
 }): boolean {
+  // Owner live 18 Nov 2026 (run 7d1019d6): "I am definitely connected with
+  // Nixo because I have invested in them" -- a correction of Q's own
+  // mistake -- ended "Want me to ask Nixo for a document that would settle
+  // this?". Nothing about the company is unsettled there: Q was wrong. A
+  // correction is answered with the correction, never an outreach offer.
+  if (request.turnKind === "CORRECTION") return false;
   if (nextStepTurn(request)) return true;
   if (request.turnKind !== undefined && NO_OFFER_TURNS.has(request.turnKind)) {
     return false;
@@ -6072,7 +6137,9 @@ export function createModelGatewayQAnswer(
       ownInvestor !== null &&
       !isSingleCompanyQuestion(latest.content) &&
       request.writingDocument !== true &&
-      (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
+      (request.turnKind === undefined ||
+        request.turnKind === "QUESTION_TO_Q" ||
+        restatedListAsk(request));
     // INC-1: "rank them" is the set the last answer showed.
     const shownBefore = previousCardCompanyIds(earlier);
     // v56: every company card this conversation showed, for "three new ones".
@@ -6094,7 +6161,8 @@ export function createModelGatewayQAnswer(
         ),
         // D17: whom the account digest says they are in touch with is left
         // out too, so the answer's final check has nothing left to drop.
-        inTouch: accountDigest.then(relationshipCounterparts),
+        // in-contact.ts is the one rule (GateQ applicants included).
+        inTouch: accountDigest.then((digest) => inContactOf(digest)),
       }).catch(() => null);
     // v56: when the reader read "companies other than those shown", its
     // reading decides over the words' sweep, which would rank the same
@@ -6358,7 +6426,7 @@ export function createModelGatewayQAnswer(
         own: (standingOf() ?? Promise.resolve(null)).then((outcome) =>
           outcome !== null && outcome.result.ok ? outcome.result.data : null,
         ),
-        inTouch: accountDigest.then(relationshipCounterparts),
+        inTouch: accountDigest.then((digest) => inContactOf(digest)),
       }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
@@ -8472,11 +8540,26 @@ export function createModelGatewayQAnswer(
       const assembledRead: Promise<typeof warmedAssembled> = refinesRetrieval
         ? (() => {
             const refineStarted = Date.now();
-            return phased("assemble-refined", () => context.assemble(request))
+            const refined = phased("assemble-refined", () =>
+              context.assemble(request),
+            )
               .catch(() => warmedAssembled)
               .finally(() => {
                 retrievalRefineMs = Date.now() - refineStarted;
               });
+            // Live 18 Nov 2026 (production 2da3e3357, run 7aac4d85,
+            // Savanna "And what is the biggest risk in that?"): the refined
+            // search was awaited without a bound after the reading; its
+            // hybrid retrieval took 5 s for no hits (lexical 4.2 s) and the
+            // whole assemble about 9 s, with no model call in that time.
+            // The warmed result is already in hand: the refinement gets a
+            // bounded wait, then the warmed one answers.
+            return boundedRefinement(refined, warmedAssembled, () =>
+              logger?.warn(
+                { qRunId: request.runId, waitedMs: REFINE_WAIT_MS },
+                "q refined retrieval was slow; the warmed retrieval answers",
+              ),
+            );
           })()
         : Promise.resolve(warmedAssembled);
       /** The selected company, for who "they" is in a research follow-up. */
@@ -10754,27 +10837,37 @@ export function createModelGatewayQAnswer(
         // answer says so -- the digest's relationships, and those this
         // turn's own read found, as them.
         let answerBlocks = carried.length === 0 ? undefined : carried;
-        if (request.excludeRelationships === true) {
+        // Owner live 18 Nov 2026 (run faecd30a): "the three best candidates
+        // with no recorded contact are Kazikit, Portside and Watchly" --
+        // two of them relationships. An answer that itself says it left
+        // out their contacts is held to it, as a stated exclusion is.
+        if (
+          request.excludeRelationships === true ||
+          claimsLeftOutContacts(content)
+        ) {
           const standing = await (standingOf() ?? Promise.resolve(null)).catch(
             () => null,
           );
-          const own = ownSetOf(
+          // in-contact.ts: the one rule, from the digest and this turn's
+          // own relationships read.
+          const inTouch = inContactOf(
+            await accountDigest,
             standing !== null && standing.result.ok
               ? standing.result.data
               : null,
           );
-          const inTouch = new Set([
-            ...relationshipCounterparts(await accountDigest),
-            ...own.relationships.map((row) => row.id),
-          ]);
           const checked = withoutExcludedCompanies(answerBlocks, inTouch);
           answerBlocks =
             checked.blocks === undefined || checked.blocks.length === 0
               ? undefined
               : checked.blocks;
-          const line = exclusionLine(checked.dropped);
-          if (line !== null) {
-            content = `${content}\n\n${line}`.slice(0, ANSWER_LIMIT_CHARS);
+          const said = withExclusionChecked(
+            content,
+            checked.dropped,
+            answerCardCompanies(answerBlocks ?? []).length,
+          );
+          if (said !== null) {
+            content = said.slice(0, ANSWER_LIMIT_CHARS);
             logger?.warn(
               { qRunId: request.runId, dropped: checked.dropped.length },
               "q answer listed companies the person asked to leave out; dropped by code",
@@ -10782,8 +10875,9 @@ export function createModelGatewayQAnswer(
           }
         }
         // A tie is said as a tie, with why (INC-1: three cards at 8.8 read
-        // as a ranking).
-        const ranked = carried.find(
+        // as a ranking) -- on the cards still shown after the check above
+        // (live 18 Nov 2026: a tie of the three companies it had dropped).
+        const ranked = (answerBlocks ?? []).find(
           (block): block is QAnswerCardsBlock =>
             block.kind === "ANSWER_CARDS" && block.shape === "RANKED",
         );
@@ -12054,7 +12148,10 @@ export function createModelGatewayQAnswer(
       const comparing = compareIds.length >= 2;
       if (
         !comparing &&
-        beyondShown !== undefined &&
+        // Owner live 18 Nov 2026: with their contacts left out and nothing
+        // left, the model was handed the unfiltered list; said by code.
+        (beyondShown !== undefined ||
+          sweep?.ask.excludeRelationships === true) &&
         sweep !== null &&
         sweep.fits.length === 0 &&
         sweep.calls.some((call) => call.result.ok) &&
@@ -12133,7 +12230,9 @@ export function createModelGatewayQAnswer(
         // warmed before the turn was read.
         request.writingDocument !== true &&
         request.askedAction === undefined &&
-        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q" ||
+          restatedListAsk(request))
       ) {
         // D17 (live 15 Nov 2026, run bef9a7f4): the card set is final
         // before a word of the summary is written. A company they asked to
@@ -12141,17 +12240,15 @@ export function createModelGatewayQAnswer(
         // last check has nothing to drop and nothing contradicts it.
         const inTouchNow =
           request.excludeRelationships === true
-            ? relationshipCounterparts(await accountDigest)
-            : new Set<string>();
+            ? inContactOf(await accountDigest)
+            : inContactOf(null);
+        const inTouchFit = (fit: RunFit) =>
+          inContactWith(inTouchNow, { id: fit.companyId, name: fit.name });
         const leftOutNow = new Set([
           ...sweep.excludedRelationships,
-          ...sweep.fits
-            .filter((fit) => inTouchNow.has(fit.companyId))
-            .map((fit) => fit.companyId),
+          ...sweep.fits.filter(inTouchFit).map((fit) => fit.companyId),
         ]);
-        const finalFits = sweep.fits.filter(
-          (fit) => !inTouchNow.has(fit.companyId),
-        );
+        const finalFits = sweep.fits.filter((fit) => !inTouchFit(fit));
         // voice-cards: "the top three" is three cards, not ten.
         const swept = fitSweepCardsBlock(
           sweep.ask.count === null
@@ -14432,6 +14529,22 @@ export function createModelGatewayQAnswer(
           holdsTool: (name) => classificationOf(name) !== undefined,
           documents: dependencies.artifacts !== undefined,
         });
+        // A correction of Q's own mistake (uncertaintyOfferTurn): the
+        // analyst's offer to ask the company something is not said either.
+        const correctionOutreach =
+          request.turnKind === "CORRECTION" &&
+          offerBinding.kind === "BOUND" &&
+          (UNCERTAINTY_VEHICLES.has(offerBinding.offer.action) ||
+            MESSAGE_TO_COMPANY_TOOLS.has(offerBinding.offer.action))
+            ? offerBinding.offer.said
+            : null;
+        if (correctionOutreach !== null) {
+          offerBinding = { kind: "NONE" };
+          logger?.info(
+            { qRunId: request.runId },
+            "an outreach offer on a correction of Q was not said",
+          );
+        }
         if (offerBinding.kind === "UNBOUND") {
           logger?.info(
             { qRunId: request.runId, action: offerBinding.action },
@@ -14447,7 +14560,11 @@ export function createModelGatewayQAnswer(
          */
         const uncertainties = uncertaintiesOf(analyst);
         const offerRemoved: string[] =
-          offerBinding.kind === "UNBOUND" ? [offerBinding.said] : [];
+          offerBinding.kind === "UNBOUND"
+            ? [offerBinding.said]
+            : correctionOutreach !== null
+              ? [correctionOutreach]
+              : [];
         const uncertaintyLines: string[] = [];
         /**
          * D11 (live 396ebc21): code closes with the stage line, so a

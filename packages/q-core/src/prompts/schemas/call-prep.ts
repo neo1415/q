@@ -94,3 +94,29 @@ export const CallPrepResultV2Schema = CallPrepResultSchema.extend({
   theyWant: z.string().trim().min(1).max(500).nullable().default(null),
 }).strict();
 export type CallPrepResultV2 = z.infer<typeof CallPrepResultV2Schema>;
+
+// ---------------------------------------------------------------------------
+// v3 (owner live 18 Nov 2026, Zino x Tensorgate): "I've missed the meeting
+// with these guys on Monday" was answered "No meeting is booked with
+// Tensorgate yet", though Daniel had confirmed Monday 16 November, 10:00
+// Africa/Lagos, in the messages. A time both sides agreed in the messages
+// is read out as such: its start, and the words that agree it copied
+// exactly, so code can check them against the messages before saying it.
+// ---------------------------------------------------------------------------
+
+export const CALL_PREP_V3_SCHEMA_VERSION = 3;
+
+export const CallPrepAgreedTimeSchema = z
+  .object({
+    /** The agreed start, with the offset of the time zone the messages name. */
+    startsAt: z.string().datetime({ offset: true }),
+    /** The words in the messages that agree or confirm it, copied exactly. */
+    quote: z.string().trim().min(1).max(300),
+  })
+  .strict();
+export type CallPrepAgreedTime = z.infer<typeof CallPrepAgreedTimeSchema>;
+
+export const CallPrepResultV3Schema = CallPrepResultV2Schema.extend({
+  agreedInMessages: z.array(CallPrepAgreedTimeSchema).max(3).default([]),
+}).strict();
+export type CallPrepResultV3 = z.infer<typeof CallPrepResultV3Schema>;

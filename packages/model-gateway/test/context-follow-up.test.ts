@@ -216,6 +216,23 @@ describe("the contextual follow-up fast path (DECISIONS 104)", () => {
     });
   });
 
+  it("live 7aac4d85: one ungrounded figure in a substantive answer is left out and said, not a full-path miss", async () => {
+    const { follow, evidence } = setup([
+      {
+        answerable: true,
+        say: "Their monthly burn is USD 180,000, which their management accounts put at 14 months of runway. The biggest risk is that runway depends on the burn holding steady. Customer concentration is at 62 percent.",
+      },
+    ]);
+    keep(evidence, requestFor());
+    const outcome = await follow.answer(requestFor(), input);
+    expect(outcome.kind).toBe("ANSWERED");
+    if (outcome.kind !== "ANSWERED") return;
+    expect(outcome.text).toContain("180,000");
+    expect(outcome.text).not.toContain("62 percent");
+    // The check said the gap in its own words.
+    expect(outcome.text).toMatch(/give a figure for/u);
+  });
+
   it("misses when the sources do not hold the answer", async () => {
     const { follow, evidence } = setup([{ answerable: false, say: null }]);
     keep(evidence, requestFor());

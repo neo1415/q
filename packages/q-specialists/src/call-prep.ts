@@ -52,6 +52,19 @@ export type CallPrep = {
     | {
         readonly booked: readonly string[];
         readonly cancelled: readonly string[];
+        /**
+         * Owner live 18 Nov 2026 (Zino x Tensorgate): times both sides
+         * agreed in the messages, each with the words that agree it (checked
+         * by code to be in the messages) and whether it has passed. Not a
+         * booking: said with the messages as its source.
+         */
+        readonly agreed?:
+          | readonly {
+              readonly startsAt: string;
+              readonly quote: string;
+              readonly passed: boolean;
+            }[]
+          | undefined;
       }
     | undefined;
   /**
@@ -157,10 +170,51 @@ export function meetingStatusLine(prep: CallPrep): string | null {
   if (meetings === undefined || meetings.booked.length > 0) return null;
   const name = prep.counterpartName.trim();
   const cancelled = daysOf(meetings.cancelled);
-  if (cancelled.length === 0) return `No meeting is booked with ${name} yet.`;
-  return cancelled.length === 1
-    ? `No meeting is booked with ${name}; the call on ${cancelled[0] ?? ""} was cancelled.`
-    : `No meeting is booked with ${name}; the calls on ${listed(cancelled)} were cancelled.`;
+  const calendar =
+    cancelled.length === 0
+      ? `No meeting is booked with ${name} yet.`
+      : cancelled.length === 1
+        ? `No meeting is booked with ${name}; the call on ${cancelled[0] ?? ""} was cancelled.`
+        : `No meeting is booked with ${name}; the calls on ${listed(cancelled)} were cancelled.`;
+  const agreed = agreedInMessagesLine(prep);
+  return agreed === null ? calendar : agreed;
+}
+
+/**
+ * Owner live 18 Nov 2026 (Zino x Tensorgate, 11:21): "No meeting is booked
+ * with Tensorgate yet", though Daniel had confirmed Monday 16 November at
+ * 10:00 in the messages. A time agreed in the messages is said with its
+ * source -- the messages, quoted -- and whether it has passed, beside the
+ * calendar's own state. Null when none was agreed there.
+ */
+export function agreedInMessagesLine(prep: CallPrep): string | null {
+  const agreed = prep.meetings?.agreed ?? [];
+  const latest = [...agreed].sort(
+    (a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt),
+  )[0];
+  if (latest === undefined) return null;
+  const name = prep.counterpartName.trim();
+  const quote = latest.quote.replace(/\s+/gu, " ").trim();
+  const said = `In your messages with ${name}, a call was agreed: "${quote}"`;
+  return latest.passed
+    ? `${said} That time has passed, and it was never put on your calendar, so there is no record of the call taking place.`
+    : `${said} It isn't on your calendar yet.`;
+}
+
+/**
+ * Owner live 18 Nov 2026: "led in the material by Daniel Park, its CTO".
+ * Where a fact was read is never part of who they are.
+ */
+export function withoutSourceAsides(text: string): string {
+  return text
+    .replace(
+      /\s+(?:in|from)\s+(?:the\s+)?(?:material|materials|documents?|records?)(?:\s+(?:given|provided|shared|available))?(?=\s+by\b)/giu,
+      "",
+    )
+    .replace(
+      /,?\s+(?:according\s+to|as\s+stated\s+in|per)\s+(?:the\s+)?(?:material|materials)\b/giu,
+      "",
+    );
 }
 
 /** A sentence that presents a meeting, call or slot as booked or pending. */
@@ -192,10 +246,11 @@ export function callPrepLine(prep: CallPrep): string {
   // model with their status, said by code; the writer's own wording of a
   // booking is left out when none is booked.
   const meetingLine = meetingStatusLine(prep);
-  const whoTheyAre =
+  const whoTheyAre = withoutSourceAsides(
     meetingLine === null
       ? prep.whoTheyAre
-      : withoutBookingClaims(prep.whoTheyAre);
+      : withoutBookingClaims(prep.whoTheyAre),
+  );
   const soFar =
     meetingLine === null ? prep.soFar : withoutBookingClaims(prep.soFar);
   const soFarLines = [
