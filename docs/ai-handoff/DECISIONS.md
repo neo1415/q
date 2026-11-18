@@ -465,3 +465,14 @@ Core Seven remains the governing assessment framework. The new directive authori
         - Scoped exception to CLAUDE.md's "material Q-extracted facts require confirmation": it covers only the founder's own direct statement about their own company, not figures Q extracts from documents or infers.
         - It is written as USER_CLAIM / SELF_REPORTED with the source being the founder's statement. It is audited and corrections create history, as with every claim.
         - Q says what it recorded and offers an immediate correct-or-undo. A low-confidence or garbled voice transcript still asks before recording.
+
+106.  **Plans, payments, admin account, CRM import and the meeting face** (owner, 2026-11-18).
+      - Plans use usage allowances only. Q answers and meetings are never locked behind a paywall; a plan sets how much is included, with top-ups and upgrades.
+      - Subscriptions take both an international and an African processor: Stripe plus Paystack (or Flutterwave). Capital Q is not a payment platform: it never holds or moves investment money. Money facilitated is recorded and evidenced, never processed.
+      - Zino Aviation is only the name of the owner's admin account; it does not invest. Admin can live there with no conflict of interest.
+      - CRM import: investors and founders can import their existing CRM or pipeline files, and Q reads them and maps them into Capital Q's own pipeline and relationships. Research real investor and founder CRMs to find fields Capital Q is missing.
+      - Cost: make it as cheap as possible without losing quality (database polling, calls, caching).
+      - Name: the new name must contain "Q". Qadence already exists.
+      - The meeting face must move its lips when Q speaks; a silent or non-lip-synced face is pointless. Q's voice is spoken through the face.
+      - GateQ and Q in meetings must respond immediately; minutes-long waits are defects.
+      - Everything the owner must supply goes into one document.
