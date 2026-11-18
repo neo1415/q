@@ -33,7 +33,7 @@ These unit costs drive everything else, including the plan prices in section 4.
 | One web search                              | $0.001 to $0.008, depending on provider. Our last-resort search through the AI provider costs about $0.01. | Price pages (Serper, Brave, Tavily, OpenAI and Anthropic).                                                                                                  |
 | One deep research job                       | **$0.25** (cautious estimate)                                                                              | Measured total: $4.15 for all delegated work in 30 days. The per-job figure can't be read cleanly from our records, so I've rounded it up.                  |
 
-One important point: the owner decided on 6 November (decision 73) that we cut costs only in ways that don't reduce Q's quality: saving repeated work, reusing what the AI has already read, and avoiding duplicate calls. No smaller models and no trimmed instructions. So these unit costs will fall a little over time, not dramatically. On 18 November one such fix cut about 11% from each question.
+One important point: we decided on 6 November that we cut costs only in ways that don't reduce Q's quality: saving repeated work, reusing what the AI has already read, and avoiding duplicate calls. No smaller models and no trimmed instructions. So these unit costs will fall a little over time, not dramatically. On 18 November one such fix cut about 11% from each question.
 
 ## 2. What we pay for, and the amounts
 
@@ -66,7 +66,7 @@ How to read the two totals:
 
 ### The database: production and staging
 
-On 17 November you decided (decision 104) that the current database becomes **staging** (our test copy) and **production** gets a brand-new project. That means paying for two projects.
+On 17 November we agreed that the current database becomes **staging** (our test copy) and **production** gets a brand-new project. That means paying for two projects.
 
 - Each Supabase project is billed separately. The Pro plan's $10 credit covers one small one.
 - **Can staging be made cheaper?** It already runs on the smallest paid size (Micro, $10 a month), so that's the floor for a paid project. A free project pauses itself after a week without use and has a 500 MB database limit. Our staging database is 620 MB, so it would not fit without deleting test data. I recommend keeping staging on Micro at $10 a month.
@@ -149,9 +149,9 @@ This covers the first month comfortably at today's traffic. The lawyer's fees ar
 
 These come from the locked product decisions, and the plans below follow them:
 
-- **The diagnosis is free.** A founder's full InvestIQ assessment (strengths, gaps, risks, readiness) is never put behind a paywall. Paid value comes from the deeper Readiness Blueprint, more Q, and human help (product decision log #105 and #106).
+- **The diagnosis is free.** A founder's full InvestIQ assessment (strengths, gaps, risks, readiness) is never put behind a paywall. Paid value comes from the deeper Readiness Blueprint, more Q, and human help.
 - **No paying to rank.** Nobody can pay to appear higher in investors' feeds.
-- **Investors never pay for visibility or anonymity.** They are the scarce side. Founders can pay, on mid tiers and up, to see which investors viewed them, but only investors who chose to be visible (decision 74).
+- **Investors never pay for visibility or anonymity.** They are the scarce side. Founders can pay, on mid tiers and up, to see which investors viewed them, but only investors who chose to be visible.
 - **Human execution is separate.** Specialist help (financial preparation, data room set-up, fundraising support) is quoted on its own, not hidden inside a plan.
 
 ### What comparable products charge
@@ -219,7 +219,7 @@ The working below uses the planning unit costs from section 1: $0.045 a question
 | **Flutterwave** | Wider African coverage                                                                           | 2% for local Nigerian payments; 4.8% for international cards; plus 7.5% VAT on fees.                                         |
 | **Stripe**      | International customers (Europe, US, UK)                                                         | 2.9% + 30¢ per card, plus 1.5% for international cards, plus 1% for currency conversion, plus 0.7% for subscription billing. |
 
-**My recommendation:** launch with **Paystack** only. It handles naira and international cards, and it supports subscriptions. Stripe owns Paystack. Stripe itself generally needs a company registered in one of its supported countries (for example the US or UK). Nigeria isn't one of them, so I'd add Stripe later, if most customers turn out to be abroad and you set up a foreign company. Flutterwave is a good second option if we need countries Paystack doesn't cover.
+**My recommendation:** launch with **Paystack** only. It handles naira and international cards, and it supports subscriptions. Stripe owns Paystack. Stripe itself generally needs a company registered in one of its supported countries (for example the US or UK). Nigeria isn't one of them, so I'd add Stripe later, if most customers turn out to be abroad and you set up a foreign company. Flutterwave is a good second option if we need countries Paystack doesn't cover. One practical note: our system already has a Stripe connection built, so if you already have, or set up, a US or UK company, Stripe would be the quickest to switch on. Connecting Paystack is a few days of extra work on my side.
 
 ### A fee on money raised (success fees)
 
