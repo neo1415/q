@@ -5,7 +5,7 @@ import {
   TURN_READER_V74,
   TURN_READER_V75,
   TurnReaderV75ResultSchema,
-  TurnReaderV93ResultSchema,
+  TurnReaderV94ResultSchema,
   V62_DEEP_WORK,
   V75_INVESTMENT_MEMO,
 } from "../src/index.js";
@@ -19,9 +19,9 @@ describe("TURN_READER v75", () => {
   it("is the active reader: v74 with one INVESTMENT MEMO rule after DEEP WORK, nothing else", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(93);
+    expect(active.version).toBe(94);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV93ResultSchema,
+      TurnReaderV94ResultSchema,
     );
     expect(
       TURN_READER_V75.template.replace(

@@ -681,6 +681,9 @@ import {
 } from "./account-digest.js";
 import {
   claimsLeftOutContacts,
+  contactStagesOf,
+  contactStatusAnswer,
+  contactSubjectsOf,
   inContactOf,
   inContactWith,
 } from "./in-contact.js";
@@ -840,6 +843,9 @@ export {
   claimsLeftOutContacts,
   inContactOf,
   inContactWith,
+  contactStagesOf,
+  contactStatusAnswer,
+  type ContactSubject,
   type InContact,
 } from "./in-contact.js";
 export {
@@ -5539,9 +5545,17 @@ export function createModelGatewayQAnswer(
       // first two): places code bound to the shown list come first, in the
       // order said. Only ids from cards Q showed this person.
       const shownCards = newestAnswerCards(earlier);
-      const placed = (placedIds ?? []).filter((id) =>
-        shownCards.some((card) => card.companyId === id),
-      );
+      // Live 18 Nov 2026 (fictional Savanna, run cce59657): "Am I in
+      // contact with any of those?" bound the three companies shown, and
+      // those bound places alone built a side-by-side table. Places decide
+      // which companies a comparison holds, never that there is one: only
+      // a comparison the reading heard (or, with no reading, the words).
+      const comparing = asked !== undefined || asksToCompare(latest.content);
+      const placed = comparing
+        ? (placedIds ?? []).filter((id) =>
+            shownCards.some((card) => card.companyId === id),
+          )
+        : [];
       const fromCards =
         placed.length >= 2
           ? [...new Set(placed)].slice(0, 4)
@@ -8436,14 +8450,35 @@ export function createModelGatewayQAnswer(
         placed.length >= 2 &&
         (preparedCompareIds.length !== placed.length ||
           preparedCompareIds.some((id, index) => id !== placed[index]));
-      const lateCompare = placedDiffers
-        ? await compareLate(request.compare, placed).catch(() => null)
-        : preparedCompareTable === null && request.compare !== undefined
-          ? await compareLate(request.compare).catch(() => null)
-          : null;
-      const compareFacts = lateCompare?.facts ?? preparedCompareFacts;
-      const compareIds = lateCompare?.ids ?? preparedCompareIds;
-      const compareTable = lateCompare?.table ?? preparedCompareTable;
+      // Live 18 Nov 2026 (run cce59657): bound places make a comparison
+      // only when one was asked for; "am I in contact with any of those?"
+      // binds the same places and asks something else. The reading decides
+      // (comparisonAsked): the words only when the turn was not read.
+      const askedToCompare = comparisonAsked(
+        request,
+        latest.content,
+        asksToCompare,
+      );
+      const lateCompare =
+        placedDiffers && askedToCompare
+          ? await compareLate(
+              request.compare ?? { count: null, names: [] },
+              placed,
+            ).catch(() => null)
+          : preparedCompareTable === null && request.compare !== undefined
+            ? await compareLate(request.compare).catch(() => null)
+            : null;
+      // TURN_READER v94: a question about their contact with these
+      // companies is answered from their relationships, never with a table
+      // a prepare warmed on the words; only a comparison also heard keeps it.
+      const keepsPrepared =
+        request.contactStatusAsked !== true || askedToCompare;
+      const compareFacts =
+        lateCompare?.facts ?? (keepsPrepared ? preparedCompareFacts : []);
+      const compareIds =
+        lateCompare?.ids ?? (keepsPrepared ? preparedCompareIds : []);
+      const compareTable =
+        lateCompare?.table ?? (keepsPrepared ? preparedCompareTable : null);
       // A8 (owner directive 13 Nov 2026, no keyword routing): the chart
       // asked for is the reader's typed intent (TURN_READER v82 `chart`).
       // Its companies are resolved by code (authorised exact search, the
@@ -8506,7 +8541,8 @@ export function createModelGatewayQAnswer(
             chartAskOutcome(compareTable === null ? [] : [compareTable]),
           )
         : null;
-      const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
+      const compareVerdict =
+        lateCompare?.verdict ?? (keepsPrepared ? preparedCompareVerdict : null);
       /**
        * Step 11 (A2): the warmed prepare searched the documents before the
        * turn was read, with the person's words alone. The reading's
@@ -11133,6 +11169,61 @@ export function createModelGatewayQAnswer(
           modelPolicyVersion: "none",
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
+      }
+      // TURN_READER v94 (live 18 Nov 2026, fictional Savanna, run
+      // cce59657): "Am I in contact with any of those?" is answered from
+      // their own relationships by the one in-contact rule, each company
+      // named with its stage -- never a comparison, never a model's word
+      // on who they are in touch with. A compound ask, an action or a
+      // comparison also heard takes the path below.
+      if (
+        request.contactStatusAsked === true &&
+        request.turnKind === "QUESTION_TO_Q" &&
+        compareIds.length < 2 &&
+        (request.askParts?.length ?? 0) <= 1 &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined
+      ) {
+        const digest = await accountDigest;
+        const standing = await (standingOf() ?? Promise.resolve(null)).catch(
+          () => null,
+        );
+        const own =
+          standing !== null && standing.result.ok ? standing.result.data : null;
+        const subjects = contactSubjectsOf({
+          referenced: request.referencedCompanyIds ?? [],
+          shown: newestAnswerCards(earlier),
+          namedOther: request.aboutNamedOther === true,
+          digest,
+          own,
+        });
+        const said =
+          subjects === null
+            ? null
+            : contactStatusAnswer(
+                subjects,
+                inContactOf(digest, own),
+                contactStagesOf(digest, own),
+              );
+        if (said !== null && subjects !== null) {
+          const message = await persistCodeAnswer(said);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              companies: subjects.length,
+              ownRead: own !== null,
+              digest: digest !== null,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered their contact with the companies meant, from the in-contact rule",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
       }
       // K6: "what is my mandate?" is a read of the person's own declared
       // record, already prepared: composed by code, no model round (the

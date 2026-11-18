@@ -382,6 +382,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly othersActivityAsked?: boolean | undefined;
   /**
+   * TURN_READER v94 (live 18 Nov 2026, run cce59657): the reader read the
+   * turn as asking whether the person is in contact or has a relationship
+   * with particular companies -- named, shown or referred to. The answer
+   * says each one's status from the shared in-contact rule, by code.
+   * Absent is false.
+   */
+  readonly contactStatusAsked?: boolean | undefined;
+  /**
    * Whom the turn is about, as the turn reader understood it (v58): the
    * only name the public web and its pictures are searched by -- never one
    * guessed from capital letters (production 2026-10-23: "Yes" was).

@@ -1691,3 +1691,23 @@ export const TurnReaderV93ResultSchema = TurnReaderV91ResultSchema.extend({
   othersActivity: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV93Result = z.infer<typeof TurnReaderV93ResultSchema>;
+
+/**
+ * v94 (live 18 Nov 2026, fictional Savanna, run cce59657). Right after Q
+ * ranked three companies "apart from the ones you're in contact with", "Am
+ * I in contact with any of those?" was read THEIR_OWN_RECORDS with the
+ * three bound as references, and nothing in the reading said what was
+ * asked about them: the bound references alone built a side-by-side
+ * comparison, and the contact status came last, in a model's words. The
+ * reading now says, by meaning and in any language, that the turn asks
+ * whether the person is in contact or has a relationship with particular
+ * companies -- ones named, or ones Q showed or referred to
+ * (`contactStatus`). Who is in contact stays code's: the one rule in
+ * in-contact.ts, over their own relationships. Lenient: a malformed value
+ * reads as false and never costs the reading.
+ */
+export const TURN_READER_V94_SCHEMA_VERSION = 94;
+export const TurnReaderV94ResultSchema = TurnReaderV93ResultSchema.extend({
+  contactStatus: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV94Result = z.infer<typeof TurnReaderV94ResultSchema>;

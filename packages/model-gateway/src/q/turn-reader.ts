@@ -6,7 +6,7 @@ import {
   orEmptyCase,
   PROMPT_EMPTY_CASES,
   renderPrompt,
-  TurnReaderV93ResultSchema,
+  TurnReaderV94ResultSchema,
   compareOverFromShown,
   type PromptRegistry,
   type QuestionKindV58,
@@ -28,7 +28,7 @@ import {
   type TurnReaderV86Result,
   type TurnReaderV87Result,
   type TurnListConditionsV89,
-  type TurnReaderV93Result,
+  type TurnReaderV94Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError, isModelServiceUnavailable } from "../errors.js";
@@ -162,6 +162,12 @@ export type QTurnReading = Omit<
    * Absent is false. Beside the word rule, never instead of it.
    */
   readonly othersActivity?: boolean | undefined;
+  /**
+   * v94 (live 18 Nov 2026, run cce59657): the turn asks whether the person
+   * is in contact or has a relationship with particular companies (named,
+   * shown or referred to). Absent is false; who is in contact is code's.
+   */
+  readonly contactStatus?: boolean | undefined;
   /** v15: false when spoken words were plainly for someone else. */
   readonly addressedToQ?: boolean | undefined;
   readonly moreDocuments?: TurnReaderV14Result["moreDocuments"] | undefined;
@@ -685,8 +691,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV93Result>> =>
-          gateway.execute<TurnReaderV93Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV94Result>> =>
+          gateway.execute<TurnReaderV94Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               reasoning: TURN_READER_REASONING,
@@ -701,7 +707,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV93ResultSchema,
+              schema: TurnReaderV94ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -756,7 +762,7 @@ export function createQTurnReader(dependencies: {
           );
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV93ResultSchema.safeParse(
+        const parsed = TurnReaderV94ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         if (!parsed.success) return null;

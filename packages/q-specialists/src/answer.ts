@@ -9033,6 +9033,9 @@ export function createSpecialistQAnswer(
         request.capability === "ANSWER" &&
         (read.tool ?? null) === null &&
         fromShown?.reshow !== true &&
+        // v94: their contact with the companies meant is code's answer,
+        // from their own relationships, never the kept sources' words.
+        read.contactStatus !== true &&
         !leadInRun.has(request.runId) &&
         !sequences.has(conversationId) &&
         // Live 17 Nov 2026 (conversation ff20af7e): also a question that
@@ -10547,6 +10550,11 @@ export function createSpecialistQAnswer(
       // v93 (audit 2026-11-13 item 17): other parties' interest or
       // activity, read by meaning; the answer withholds it.
       ...(read?.othersActivity === true ? { othersActivityAsked: true } : {}),
+      // v94 (live 18 Nov 2026, run cce59657): whether they are in contact
+      // with the companies meant; answered by code from in-contact.ts.
+      ...(read?.kind === "QUESTION_TO_Q" && read.contactStatus === true
+        ? { contactStatusAsked: true }
+        : {}),
       // v88 (owner live 14 Nov 2026, D1): companies other than those they
       // are already in contact with, on a FIT or catalog question.
       // v89 (audit 2026-11-15, RC2): a founder's investors too ("which

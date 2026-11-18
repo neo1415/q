@@ -170,6 +170,8 @@ export function speculationMisfit(input: {
     final.writingDocument === true ||
     // Others' interest is withheld; the speculation wrote without that note.
     final.othersActivityAsked === true ||
+    // Their contact with the companies meant is answered by code (v94).
+    final.contactStatusAsked === true ||
     final.questionSequence !== undefined ||
     final.questionKind === "ADVICE" ||
     final.questionKind === "THEIR_OWN_RECORDS" ||

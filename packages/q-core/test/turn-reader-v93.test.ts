@@ -54,14 +54,15 @@ const render = (version: number, vars: Variables) =>
   });
 
 describe("TURN_READER v93", () => {
-  it("is active on its own schema; v92 is deprecated and kept for rollback", () => {
+  it("is on its own schema; v92 and v93 are deprecated and kept for rollback (v94 is active)", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(93);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(94);
+    const v93 = registry.get("TURN_READER", 93)?.definition;
+    expect(v93?.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 92)?.definition.status).toBe(
       "DEPRECATED",
     );
-    expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
+    expect(v93?.output.kind === "STRUCTURED" && v93.output.schema).toBe(
       TurnReaderV93ResultSchema,
     );
     expect(TURN_READER_V93.variables).toEqual(TURN_READER_V92.variables);
