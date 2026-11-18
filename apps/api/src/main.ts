@@ -1692,6 +1692,10 @@ const gateqInboxService = createGateqInbox({
   ),
   founderMail: gateqFounderMail,
   onEmail: logGateqEmail,
+  // An applicant's answer reaches the approving member's own Q address
+  // (inbound email). Resolved at call time: the inbound service is
+  // composed further down this file.
+  replyToFor: (actor) => inboundEmail.currentAddress(actor),
   documents: sharedDocumentsPort({
     sql: database.sql,
     authorizeVersion:

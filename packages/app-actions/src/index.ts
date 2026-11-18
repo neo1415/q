@@ -42,6 +42,10 @@ export {
   type GateQPolicyExtractionPort,
   type GateqGatewayAdminPort,
 } from "./actions/gateq.js";
+export type {
+  GateqInboxPort,
+  GateqOutboundPreview,
+} from "./actions/gateq-inbox.js";
 export { delegableOnItsOwn, settleGrant } from "./delegation.js";
 export {
   REFERENCE_KINDS,

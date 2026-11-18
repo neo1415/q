@@ -87,6 +87,18 @@ const STREAM_BASE_URL = "/api/q-stream";
  */
 const DOCUMENT_WAIT_MS = 2_500;
 
+/**
+ * Decision 106: a reply shows within seconds even when the live stream does
+ * not carry it. Live 2026-11-18: GateQ runs wrote Q's answer in 8 s (p50) to
+ * 30 s (max), yet a person saw nothing for minutes while the stream's
+ * bounded reconnects (up to 20, 15 s apart) ran out before the record was
+ * read. Now the record is read as soon as the stream reconnects, or when it
+ * has been silent this long, and a finished run stops waiting.
+ */
+const STREAM_STALL_MS = 8_000;
+const STREAM_STALL_CHECK_MS = 2_000;
+const RECONNECT_READ_GAP_MS = 2_000;
+
 /** Something changed in this person's conversations: the list should be read again. */
 export const Q_CONVERSATIONS_CHANGED_EVENT = "cq:q-conversations-changed";
 
@@ -332,6 +344,10 @@ export function useQConversation(
   const recoverStreamRef = useRef<
     (run: string, controller: AbortController) => Promise<void>
   >(() => Promise.resolve());
+  /** Decision 106: the record, read while the stream is down or silent. */
+  const catchUpRef = useRef<
+    (run: string, controller: AbortController) => Promise<void>
+  >(() => Promise.resolve());
   const onConversation = useRef(options.onConversation);
   useEffect(() => {
     onConversation.current = options.onConversation;
@@ -356,6 +372,22 @@ export function useQConversation(
     // A5: what this stream could not carry, so its end re-reads the record.
     let unreadable = 0;
     let answered = false;
+    // Decision 106: never wait on a stalled stream for what the record has.
+    let lastHeard = Date.now();
+    let lastRead = 0;
+    let reading = false;
+    const catchUp = () => {
+      if (reading || controller.signal.aborted || finished.current) return;
+      reading = true;
+      lastRead = Date.now();
+      void catchUpRef.current(run, controller).finally(() => {
+        reading = false;
+        lastHeard = Date.now();
+      });
+    };
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastHeard >= STREAM_STALL_MS) catchUp();
+    }, STREAM_STALL_CHECK_MS);
     // The answer's cards arrive with its completed message and stay hidden
     // until their code and contracts are in. Those load as the run starts,
     // so a card shows the moment it lands, rather than after the stage's
@@ -371,11 +403,18 @@ export function useQConversation(
           signal: controller.signal,
           onStatus: (status) => {
             setTransport(status);
+            if (
+              status === "RECONNECTING" &&
+              Date.now() - lastRead >= RECONNECT_READ_GAP_MS
+            ) {
+              catchUp();
+            }
           },
           onUnreadable: () => {
             unreadable += 1;
           },
           onEvent: (event) => {
+            lastHeard = Date.now();
             if (event.type === "q.message.completed") answered = true;
             setRunState((current) => reduceQStream(current, event));
             if (isTerminalQStreamEvent(event)) {
@@ -442,6 +481,7 @@ export function useQConversation(
         },
       )
       .finally(() => {
+        clearInterval(watchdog);
         if (abort.current === controller) {
           setStreaming(false);
         }
@@ -989,6 +1029,28 @@ export function useQConversation(
   useEffect(() => {
     resyncRef.current = async (run, controller) => {
       await readBack(run, controller);
+    };
+    catchUpRef.current = async (run, controller) => {
+      const read = await readBack(run, controller);
+      if (read === null || abort.current !== controller) return;
+      const latest = read.latestRun;
+      if (
+        latest === null ||
+        latest.runId !== run ||
+        !FINISHED_STATUSES.has(latest.status)
+      ) {
+        // Still running: what it recorded so far is shown; keep following.
+        return;
+      }
+      // The run is over and its answer is now shown: stop waiting on a
+      // stream that could not carry it.
+      finished.current = true;
+      if (latest.status === "FAILED" || latest.status === "EXPIRED") {
+        setNotice("Q couldn't finish that answer. Ask again to retry.");
+      }
+      controller.abort();
+      setStreaming(false);
+      announceConversationsChanged();
     };
     recoverStreamRef.current = async (run, controller) => {
       const read = await readBack(run, controller);

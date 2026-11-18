@@ -13,12 +13,15 @@ import {
   useTransition,
 } from "react";
 
-import type {
-  GateqInboxDetailDto,
-  GateqInboxDto,
-  GateqInboxItemDto,
-  GateqPassReason,
-  QManifestRef,
+import {
+  GATEQ_OUTBOUND_SUBJECT_MAX,
+  gateqAnswerSubject,
+  type GateqInboxDetailDto,
+  type GateqInboxDto,
+  type GateqInboxItemDto,
+  type GateqOutboundDelivery,
+  type GateqPassReason,
+  type QManifestRef,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import {
@@ -986,13 +989,16 @@ export function InboxView({
               : `${ids.length} passes sent, each with your exact message.`,
           );
         }}
-        onReplied={(id, message, draft) => {
+        onReplied={(id, message, draft, bound) => {
           setSheet(null);
           run(
             () =>
               replyAction(gatewayId, id, {
                 message,
                 clientRequestId: key("reply"),
+                // The recipient and subject on screen bind the send.
+                ...(bound.to === null ? {} : { to: bound.to }),
+                subject: bound.subject,
               }),
             draft === "CALL"
               ? "Sent after your approval. They're asked for times for a call."
@@ -1241,6 +1247,26 @@ function Dossier({
             {passed.body}&rdquo;
           </span>
         </div>
+      )}
+
+      {(detail?.messages ?? []).length === 0 ? null : (
+        <section className="gq2-sec" aria-label={t("Emails to the founder")}>
+          <h3 className="gq2-h3">{t("Emails to the founder")}</h3>
+          <ul className="flex flex-col gap-2">
+            {(detail?.messages ?? []).map((message) => (
+              <li key={`${message.at}-${message.kind}`} className="cq-body-sm">
+                {message.subject === null ||
+                message.subject === undefined ? null : (
+                  <b className="block font-medium">{message.subject}</b>
+                )}
+                <span className="gq-t2">{message.body}</span>
+                <span className="cq-caption gq-t3 block">
+                  {t(DELIVERY_WORDS[message.delivery ?? "UNRECORDED"])}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="gq2-sec">
@@ -1544,13 +1570,24 @@ function Sheets({
     reason: GateqPassReason,
     messages: Readonly<Record<string, string>>,
   ) => void;
-  readonly onReplied: (id: string, message: string, draft: ReplyDraft) => void;
+  readonly onReplied: (
+    id: string,
+    message: string,
+    draft: ReplyDraft,
+    bound: { readonly to: string | null; readonly subject: string },
+  ) => void;
   readonly onAssigned: (ids: readonly string[], userId: string | null) => void;
   readonly onLabelled: (ids: readonly string[], label: string) => void;
   readonly onPreparePasses: (ids: readonly string[]) => void;
 }) {
   const t = useT();
 
+  const recipientOf = (id: string) => {
+    const contact = details[id]?.dossier?.contact ?? details[id]?.contact;
+    return contact === undefined || contact === null
+      ? null
+      : { name: contact.name, email: contact.email };
+  };
   const nameOf = (id: string) =>
     items.find((item) => item.applicationId === id)?.companyName ??
     "this company";
@@ -1638,8 +1675,14 @@ function Sheets({
                     ? "Approve and send"
                     : "Send"
               }
-              onSend={(message) =>
-                onReplied(sheet.id, message, sheet.draft ?? "REPLY")
+              to={recipientOf(sheet.id)}
+              initialSubject={gateqAnswerSubject({
+                kind: "REPLY",
+                fund,
+                companyName: nameOf(sheet.id),
+              })}
+              onSend={(message, bound) =>
+                onReplied(sheet.id, message, sheet.draft ?? "REPLY", bound)
               }
               onCancel={onClose}
             />
@@ -1891,24 +1934,77 @@ function TriageSheet({
   );
 }
 
+/** What became of an email to the founder, in plain words. */
+const DELIVERY_WORDS: Readonly<
+  Record<GateqOutboundDelivery | "UNRECORDED", string>
+> = {
+  SENT: "Emailed to the founder.",
+  SUPPRESSED: "Not emailed: a test address.",
+  UNAVAILABLE: "Not emailed: email isn't connected. It is kept here.",
+  NO_ADDRESS: "Not emailed: no email on the application. It is kept here.",
+  FAILED: "Not emailed: the email service refused it. Send it again if needed.",
+  UNRECORDED: "Recorded here.",
+};
+
 function ReplySheet({
   initial,
+  initialSubject,
+  to,
   note,
   sendLabel,
   onSend,
   onCancel,
 }: {
   readonly initial: string;
+  readonly initialSubject: string;
+  /** The application's contact; the email goes there and nowhere else. */
+  readonly to: {
+    readonly name: string | null;
+    readonly email: string | null;
+  } | null;
   readonly note: string;
   readonly sendLabel: string;
-  readonly onSend: (message: string) => void;
+  readonly onSend: (
+    message: string,
+    bound: { readonly to: string | null; readonly subject: string },
+  ) => void;
   readonly onCancel: () => void;
 }) {
   const t = useT();
 
   const [message, setMessage] = useState(initial);
+  const [subject, setSubject] = useState(initialSubject);
+  const email = to?.email ?? null;
   return (
     <div className="flex flex-col gap-3.5">
+      <p className="cq-body-sm">
+        <span className="gq-t2">{t("To")}</span>{" "}
+        {email === null ? (
+          <span className="gq-t2">
+            {t(
+              "No email on this application: it is kept in the inbox, but no email can be sent.",
+            )}
+          </span>
+        ) : (
+          <b className="font-medium">
+            {to?.name === null || to?.name === undefined
+              ? email
+              : `${to.name} <${email}>`}
+          </b>
+        )}
+      </p>
+      <div className="gq-field">
+        <label className="gq-label" htmlFor="gq-reply-subject">
+          {t("Subject")}
+        </label>
+        <input
+          id="gq-reply-subject"
+          className="gq-input"
+          maxLength={GATEQ_OUTBOUND_SUBJECT_MAX}
+          value={subject}
+          onChange={(e) => setSubject(e.target.value.replace(/[\r\n]/gu, " "))}
+        />
+      </div>
       <div className="gq-field">
         <label className="gq-label" htmlFor="gq-reply">
           {t("Message to the founder")}{" "}
@@ -1930,8 +2026,10 @@ function ReplySheet({
       <div className="flex gap-2">
         <Button
           variant="primary"
-          disabled={message.trim() === ""}
-          onClick={() => onSend(message.trim())}
+          disabled={message.trim() === "" || subject.trim() === ""}
+          onClick={() =>
+            onSend(message.trim(), { to: email, subject: subject.trim() })
+          }
         >
           {t(sendLabel)}
         </Button>

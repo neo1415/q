@@ -1399,4 +1399,23 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
     "Q مُحاور بالذكاء الاصطناعي. يُدوَّن ما تقوله في هذا الطلب؛ ولا يصل شيء إلى {fund} حتى تراجع وتقدّم.",
   "I understand Q is an AI interviewer, my microphone is used only while the voice line is open, and what I say is transcribed into this application. Nothing reaches {fund} until I review and submit.":
     "أفهم أن Q مُحاور بالذكاء الاصطناعي، وأن الميكروفون يُستخدم فقط أثناء فتح الخط الصوتي، وأن ما أقوله يُدوَّن في هذا الطلب. لا يصل شيء إلى {fund} حتى أراجع وأقدّم.",
+  // Email to an applicant from the inbox: recipient, subject, delivery.
+  "No email on this application: it is kept in the inbox, but no email can be sent.":
+    "لا يوجد بريد إلكتروني في هذا الطلب: يُحفظ في صندوق الوارد، لكن لا يمكن إرسال بريد.",
+  "Emails to the founder": "رسائل البريد إلى المؤسس",
+  "Emailed to the founder.": "أُرسل بالبريد إلى المؤسس.",
+  "Not emailed: a test address.": "لم يُرسل بالبريد: عنوان تجريبي.",
+  "Not emailed: email isn't connected. It is kept here.":
+    "لم يُرسل بالبريد: البريد غير متصل. محفوظ هنا.",
+  "Not emailed: no email on the application. It is kept here.":
+    "لم يُرسل بالبريد: لا يوجد بريد في الطلب. محفوظ هنا.",
+  "Not emailed: the email service refused it. Send it again if needed.":
+    "لم يُرسل بالبريد: رفضته خدمة البريد. أرسله مجدداً عند الحاجة.",
+  "Recorded here.": "مسجّل هنا.",
+  "The applicant's contact changed since you opened this. Nothing was sent; check the recipient and send again.":
+    "تغيّر عنوان التواصل لمقدّم الطلب منذ فتحت هذا. لم يُرسل شيء؛ تحقّق من المستلم وأرسل مجدداً.",
+  "That message was already sent with different words. Nothing new was sent.":
+    "أُرسلت هذه الرسالة من قبل بكلمات مختلفة. لم يُرسل شيء جديد.",
+  "Too many emails to applicants in a short time. Nothing was sent; try again later.":
+    "رسائل كثيرة إلى مقدّمي الطلبات في وقت قصير. لم يُرسل شيء؛ حاول لاحقاً.",
 };

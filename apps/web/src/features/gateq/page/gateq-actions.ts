@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import {
+  ApiProblemError,
   archiveGateqApplications,
   assignGateqApplications,
   getGateqInboxItem,
@@ -76,6 +77,37 @@ async function withSession<T>(
     return { ok: true, value: await work(session) };
   } catch {
     return { ok: false, message: FAILED };
+  }
+}
+
+/** Why an approved answer to an applicant did not go, in the person's words. */
+const ANSWER_REFUSALS: Readonly<Record<string, string>> = {
+  RESOURCE_CONFLICT:
+    "The applicant's contact changed since you opened this. Nothing was sent; check the recipient and send again.",
+  IDEMPOTENCY_CONFLICT:
+    "That message was already sent with different words. Nothing new was sent.",
+  RATE_LIMITED:
+    "Too many emails to applicants in a short time. Nothing was sent; try again later.",
+};
+
+/** A pass or a reply, with the API's reason when it refused one. */
+async function answered(
+  work: (
+    session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  ) => Promise<unknown>,
+): Promise<Done> {
+  const session = await apiSession();
+  if (session === null)
+    return { ok: false, message: "Sign in again to carry on." };
+  try {
+    await work(session);
+    return { ok: true, value: null };
+  } catch (error: unknown) {
+    const reason =
+      error instanceof ApiProblemError
+        ? ANSWER_REFUSALS[error.code]
+        : undefined;
+    return { ok: false, message: reason ?? FAILED };
   }
 }
 
@@ -187,11 +219,8 @@ export async function passAction(
   ) {
     return { ok: false, message: FAILED };
   }
-  return withSession(
-    async (s) => (
-      await passGateqApplication(s, gatewayId, applicationId, parsed.data),
-      null
-    ),
+  return answered((s) =>
+    passGateqApplication(s, gatewayId, applicationId, parsed.data),
   );
 }
 
@@ -208,11 +237,8 @@ export async function replyAction(
   ) {
     return { ok: false, message: FAILED };
   }
-  return withSession(
-    async (s) => (
-      await replyGateqApplication(s, gatewayId, applicationId, parsed.data),
-      null
-    ),
+  return answered((s) =>
+    replyGateqApplication(s, gatewayId, applicationId, parsed.data),
   );
 }
 

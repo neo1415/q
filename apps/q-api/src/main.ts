@@ -3327,6 +3327,12 @@ const gateqInbox = gateqInboxActionsPort(
       if (event.outcome === "SENT") logger.info(fields, "gateq email sent");
       else logger.warn(fields, "gateq email not sent");
     },
+    // An applicant's answer reaches the approving member's own Q address
+    // (inbound email), when this deployment receives email and they have one.
+    replyToFor: (actor) =>
+      inboundEmailService === undefined
+        ? Promise.resolve(null)
+        : inboundEmailService.currentAddress(actor),
   }),
   ownGatewayIdFrom({
     gateq: gateqForInbox,

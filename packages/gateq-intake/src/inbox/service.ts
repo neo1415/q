@@ -9,6 +9,7 @@ import {
   gateqDossierAsReadNow,
   GateqSynthesisSchema,
   GateqPassReasonSchema,
+  gateqAnswerSubject,
   type GateqInboxDetailDto,
   type GateqInboxDto,
   type GateqInboxItemDto,
@@ -21,6 +22,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import {
   draftPassMessage,
+  draftReplyMessage,
   fitBandOf,
   inboxOrder,
   initialsOf,
@@ -33,6 +35,7 @@ import {
   rulesOf,
   suggestedReason,
   triage,
+  type GateqReplyPurpose,
   type TriageProposal,
 } from "./domain.js";
 import { withDerivedAmountsMarked } from "../application/dossier.js";
@@ -50,8 +53,9 @@ import type {
   SubmittedDocumentTextPort,
 } from "./ports.js";
 import {
+  recipientDomain,
   renderGateqAnswerEmail,
-  sendLogged,
+  sendReported,
   type GateqEmailEvent,
   type GateqOutboundSender,
 } from "./founder-mail.js";
@@ -81,6 +85,43 @@ export type InboxChanged = {
   readonly deduplicated: boolean;
 };
 
+/**
+ * An answer to an applicant that was not sent, and why. Only ever after the
+ * gateway and application were authorised: no oracle for what exists.
+ */
+export type InboxAnswerRefused = {
+  readonly ok: false;
+  readonly reason: "RECIPIENT_CHANGED" | "KEY_REUSED" | "RATE_LIMITED";
+};
+export type InboxAnswered = InboxChanged | InboxRefused | InboxAnswerRefused;
+
+/** What an answer would carry besides its words; for a card or the screen. */
+export type OutboundPreview = {
+  readonly ok: true;
+  readonly companyName: string;
+  readonly fund: string;
+  readonly to: string | null;
+  readonly toName: string | null;
+  readonly subject: string;
+  readonly replyTo: string | null;
+  /** False: no contact email, or no email service here. */
+  readonly deliverable: boolean;
+};
+
+/**
+ * Bounds on email to applicants: a firm's answers per hour, and answers to
+ * one application per day. Enough for a busy inbox; a stop for a runaway
+ * loop or a mistaken bulk send.
+ */
+export type GateqOutboundLimits = {
+  readonly perTenantPerHour: number;
+  readonly perApplicationPerDay: number;
+};
+export const GATEQ_OUTBOUND_LIMITS: GateqOutboundLimits = {
+  perTenantPerHour: 60,
+  perApplicationPerDay: 10,
+};
+
 const ACTIVITY_WORDS: Readonly<Record<InboxActivityKind, string>> = {
   ASSIGNED: "Assigned to",
   UNASSIGNED: "Unassigned",
@@ -105,56 +146,77 @@ export function createInboxService(dependencies: {
   /** P14: the founder hears a pass or a reply by email (after commit). */
   readonly founderMail?: GateqOutboundSender | undefined;
   readonly onEmail?: ((event: GateqEmailEvent) => void) | undefined;
+  /**
+   * Where an applicant's answer to an email goes: the approving member's own
+   * Q address (inbound email), when they have one. Null or absent: no
+   * Reply-To, and the email says replies don't reach the firm.
+   */
+  readonly replyToFor?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /** Outbound bounds; the defaults are GATEQ_OUTBOUND_LIMITS. */
+  readonly outboundLimits?: GateqOutboundLimits | undefined;
 }) {
   const { repository, authority, transactions } = dependencies;
+  const limits = dependencies.outboundLimits ?? GATEQ_OUTBOUND_LIMITS;
 
   /**
-   * P14: after the answer committed, the founder's contact (from what they
-   * submitted) gets the approved words. A failed send never undoes the
-   * answer; it is logged with the recipient's domain only.
+   * P14: after the answer committed, the founder's contact (the one the
+   * person approved it for) gets the approved words under the approved
+   * subject, and the outcome is recorded against the message. A failed send
+   * never undoes the answer and is never retried on its own; the log holds
+   * the recipient's domain only.
    */
   const mailFounder = async (
     actor: ActorContext,
-    gateway: {
-      readonly tenantId: string;
-      readonly gatewayId: string;
-      readonly fund: string;
+    gateway: InboxGateway,
+    message: {
+      readonly messageId: string;
+      readonly applicationId: string;
+      readonly kind: "PASS" | "REPLY";
+      readonly body: string;
+      readonly subject: string;
+      readonly to: string | null;
+      readonly companyName: string;
+      readonly reference: string | null;
     },
-    applicationId: string,
-    kind: "PASS" | "REPLY",
-    body: string,
   ): Promise<void> => {
     if (dependencies.founderMail === undefined) return;
-    const row = await repository
-      .one({
-        tenantId: gateway.tenantId,
-        gatewayId: gateway.gatewayId,
-        userId: actor.userId,
-        applicationId,
-      })
-      .catch(() => null);
-    if (row === null) return;
-    const submitted = readSnapshot(row.snapshot);
-    const profile = profileOf(submitted);
+    const replyTo =
+      dependencies.replyToFor === undefined
+        ? null
+        : await dependencies.replyToFor(actor).catch(() => null);
     const rendered = renderGateqAnswerEmail({
-      kind,
+      kind: message.kind,
       fund: gateway.fund,
-      companyName: profile.companyName,
-      reference: submitted.reference === "" ? null : submitted.reference,
-      body,
+      companyName: message.companyName,
+      reference: message.reference,
+      body: message.body,
+      subject: message.subject,
+      repliesReachFirm: replyTo !== null,
     });
-    await sendLogged(
+    const outcome = await sendReported(
       dependencies.founderMail,
       dependencies.onEmail,
-      kind,
-      profile.contactEmail,
+      message.kind,
+      message.to,
       {
         subject: rendered.subject,
         text: rendered.text,
         html: rendered.html,
         fromName: `${gateway.fund} via Capital Q`,
+        ...(replyTo === null ? {} : { replyTo }),
       },
     );
+    await repository
+      .recordDelivery({
+        messageId: message.messageId,
+        applicationId: message.applicationId,
+        tenantId: gateway.tenantId,
+        outcome,
+        recipientDomain:
+          message.to === null ? null : recipientDomain(message.to),
+      })
+      .catch(() => undefined);
   };
   const clock = dependencies.clock ?? (() => new Date());
 
@@ -245,6 +307,148 @@ export function createInboxService(dependencies: {
 
   const digest = (text: string) =>
     createHash("sha256").update(text, "utf8").digest("hex");
+
+  /** Who an answer goes to: the same contact the detail screen shows. */
+  const founderOf = (row: InboxRow) => {
+    const submitted = readSnapshot(row.snapshot);
+    const profile = profileOf(submitted);
+    const dossier = GateqDossierSchema.safeParse(row.dossier ?? null);
+    const contact =
+      dossier.success && dossier.data.contact !== null
+        ? {
+            name: dossier.data.contact.name,
+            email: dossier.data.contact.email,
+          }
+        : { name: profile.contactName, email: profile.contactEmail };
+    const email =
+      contact.email === null || contact.email.trim() === ""
+        ? null
+        : contact.email.trim();
+    return {
+      name: contact.name,
+      email,
+      companyName: profile.companyName,
+      reference: submitted.reference === "" ? null : submitted.reference,
+    };
+  };
+
+  /**
+   * A pass or a reply: the exact words, subject and recipient a person who
+   * may decide approved, recorded once under their key, then emailed once.
+   *
+   *   - a recipient the person approved that is no longer the application's
+   *     contact is refused (RECIPIENT_CHANGED): they approve again;
+   *   - the same key with different words is refused (KEY_REUSED): an edit
+   *     is a new approval, never a silent replay of the old one;
+   *   - a new answer beyond the tenant's hourly or the application's daily
+   *     bound is refused (RATE_LIMITED); a replay of a recorded key is not.
+   */
+  const answer = async (
+    actor: ActorContext,
+    gatewayId: string,
+    applicationId: string,
+    kind: "PASS" | "REPLY",
+    input: {
+      readonly reasonCode: GateqPassReason | null;
+      readonly message: string;
+      readonly clientRequestId: string;
+      readonly to?: string | undefined;
+      readonly subject?: string | undefined;
+    },
+  ): Promise<InboxAnswered> => {
+    const granted = await scoped(actor, gatewayId, [applicationId], "DECIDE");
+    if (granted === null) return REFUSED;
+    const { gateway } = granted;
+    const row = await repository.one({
+      tenantId: gateway.tenantId,
+      gatewayId: gateway.gatewayId,
+      userId: actor.userId,
+      applicationId,
+    });
+    if (row === null) return REFUSED;
+    const founder = founderOf(row);
+    if (
+      input.to !== undefined &&
+      input.to.trim().toLowerCase() !== (founder.email ?? "").toLowerCase()
+    ) {
+      return { ok: false, reason: "RECIPIENT_CHANGED" };
+    }
+    const body = input.message.trim();
+    const bodySha256 = digest(body);
+    const subject =
+      input.subject?.trim() ??
+      gateqAnswerSubject({
+        kind,
+        fund: gateway.fund,
+        companyName: founder.companyName,
+      });
+    const counts = await repository.outboundCounts({
+      tenantId: gateway.tenantId,
+      applicationId,
+      clientRequestId: input.clientRequestId,
+      now: clock(),
+    });
+    if (
+      !counts.alreadyRecorded &&
+      (counts.tenantLastHour >= limits.perTenantPerHour ||
+        counts.applicationLastDay >= limits.perApplicationPerDay)
+    ) {
+      return { ok: false, reason: "RATE_LIMITED" };
+    }
+    const added = await transactions.run(async (tx) => {
+      const recorded = await repository.addMessage(tx, {
+        tenantId: gateway.tenantId,
+        applicationId,
+        kind,
+        reasonCode: input.reasonCode,
+        body,
+        bodySha256,
+        approvedByUserId: actor.userId,
+        clientRequestId: input.clientRequestId,
+        subject,
+        recipientSha256:
+          founder.email === null ? null : digest(founder.email.toLowerCase()),
+      });
+      if (!recorded.deduplicated) {
+        if (kind === "PASS") {
+          await repository.setFolder(tx, {
+            tenantId: gateway.tenantId,
+            gatewayId: gateway.gatewayId,
+            applicationIds: [applicationId],
+            folder: "PASSED",
+          });
+        }
+        await repository.record(tx, {
+          applicationId,
+          tenantId: gateway.tenantId,
+          actorUserId: actor.userId,
+          kind: kind === "PASS" ? "PASSED" : "REPLIED",
+          detail:
+            kind === "PASS" && input.reasonCode !== null
+              ? { reason: input.reasonCode }
+              : {},
+        });
+      }
+      return recorded;
+    });
+    if (added.deduplicated) {
+      return added.storedBodySha256 !== null &&
+        added.storedBodySha256 !== bodySha256
+        ? { ok: false, reason: "KEY_REUSED" }
+        : { ok: true, changed: 0, deduplicated: true };
+    }
+    await mailFounder(actor, gateway, {
+      messageId: added.messageId,
+      applicationId,
+      kind,
+      body,
+      subject,
+      to: founder.email,
+      companyName: founder.companyName,
+      reference: founder.reference,
+    });
+    return { ok: true, changed: 1, deduplicated: false };
+  };
 
   return {
     list: async (
@@ -453,6 +657,8 @@ export function createInboxService(dependencies: {
             GateqPassReasonSchema.safeParse(message.reasonCode).data ?? null,
           body: message.body,
           at: message.createdAt,
+          subject: message.subject,
+          delivery: message.delivery,
         })),
         // A frozen amount Q computed reads as Q's inference, not "you said".
         // A relation the current rule does not allow (a pre-fix "600 vs
@@ -660,7 +866,7 @@ export function createInboxService(dependencies: {
      * Pass, with a reason, sending exactly the approved words. Consequential:
      * the screen's Send press or an approved card is the approval.
      */
-    pass: async (
+    pass: (
       actor: ActorContext,
       gatewayId: string,
       applicationId: string,
@@ -668,89 +874,113 @@ export function createInboxService(dependencies: {
         readonly reasonCode: GateqPassReason;
         readonly message: string;
         readonly clientRequestId: string;
+        readonly to?: string | undefined;
+        readonly subject?: string | undefined;
       },
-    ): Promise<InboxChanged | InboxRefused> => {
-      const granted = await scoped(actor, gatewayId, [applicationId], "DECIDE");
-      if (granted === null) return REFUSED;
-      const { gateway } = granted;
-      const body = input.message.trim();
-      const result = await transactions.run(async (tx) => {
-        const added = await repository.addMessage(tx, {
-          tenantId: gateway.tenantId,
-          applicationId,
-          kind: "PASS",
-          reasonCode: input.reasonCode,
-          body,
-          bodySha256: digest(body),
-          approvedByUserId: actor.userId,
-          clientRequestId: input.clientRequestId,
-        });
-        if (!added.deduplicated) {
-          await repository.setFolder(tx, {
-            tenantId: gateway.tenantId,
-            gatewayId: gateway.gatewayId,
-            applicationIds: [applicationId],
-            folder: "PASSED",
-          });
-          await repository.record(tx, {
-            applicationId,
-            tenantId: gateway.tenantId,
-            actorUserId: actor.userId,
-            kind: "PASSED",
-            detail: { reason: input.reasonCode },
-          });
-        }
-        return added;
-      });
-      if (!result.deduplicated) {
-        await mailFounder(actor, gateway, applicationId, "PASS", body);
-      }
-      return {
-        ok: true,
-        changed: result.deduplicated ? 0 : 1,
-        deduplicated: result.deduplicated,
-      };
-    },
+    ): Promise<InboxAnswered> =>
+      answer(actor, gatewayId, applicationId, "PASS", input),
 
-    reply: async (
+    /** A reply to the applicant, exactly as approved. Consequential. */
+    reply: (
       actor: ActorContext,
       gatewayId: string,
       applicationId: string,
-      input: { readonly message: string; readonly clientRequestId: string },
-    ): Promise<InboxChanged | InboxRefused> => {
+      input: {
+        readonly message: string;
+        readonly clientRequestId: string;
+        readonly to?: string | undefined;
+        readonly subject?: string | undefined;
+      },
+    ): Promise<InboxAnswered> =>
+      answer(actor, gatewayId, applicationId, "REPLY", {
+        ...input,
+        reasonCode: null,
+      }),
+
+    /**
+     * What an answer to this applicant would carry besides the words: the
+     * recipient, the default subject and where their answer would go. For
+     * Q's approval card and the screen; sends nothing. Needs the right to
+     * decide, as sending does: no card the person cannot approve.
+     */
+    outboundPreview: async (
+      actor: ActorContext,
+      gatewayId: string,
+      applicationId: string,
+      kind: "PASS" | "REPLY",
+    ): Promise<OutboundPreview | InboxRefused> => {
       const granted = await scoped(actor, gatewayId, [applicationId], "DECIDE");
       if (granted === null) return REFUSED;
-      const { gateway } = granted;
-      const body = input.message.trim();
-      const result = await transactions.run(async (tx) => {
-        const added = await repository.addMessage(tx, {
-          tenantId: gateway.tenantId,
-          applicationId,
-          kind: "REPLY",
-          reasonCode: null,
-          body,
-          bodySha256: digest(body),
-          approvedByUserId: actor.userId,
-          clientRequestId: input.clientRequestId,
-        });
-        if (!added.deduplicated) {
-          await repository.record(tx, {
-            applicationId,
-            tenantId: gateway.tenantId,
-            actorUserId: actor.userId,
-            kind: "REPLIED",
-            detail: {},
-          });
-        }
-        return added;
+      const row = await repository.one({
+        tenantId: granted.gateway.tenantId,
+        gatewayId: granted.gateway.gatewayId,
+        userId: actor.userId,
+        applicationId,
       });
-      if (!result.deduplicated) {
-        await mailFounder(actor, gateway, applicationId, "REPLY", body);
-      }
+      if (row === null) return REFUSED;
+      const founder = founderOf(row);
+      const replyTo =
+        dependencies.replyToFor === undefined
+          ? null
+          : await dependencies.replyToFor(actor).catch(() => null);
       return {
         ok: true,
-        changed: result.deduplicated ? 0 : 1,
-        deduplicated: result.deduplicated,
+        companyName: founder.companyName,
+        fund: granted.gateway.fund,
+        to: founder.email,
+        toName: founder.name,
+        subject: gateqAnswerSubject({
+          kind,
+          fund: granted.gateway.fund,
+          companyName: founder.companyName,
+        }),
+        replyTo,
+        deliverable:
+          founder.email !== null &&
+          dependencies.founderMail !== undefined &&
+          dependencies.founderMail.available,
+      };
+    },
+
+    /**
+     * A first draft of a reply for a person to edit and approve: a call, a
+     * request for what is still open, or a plain thank-you. Never sent here.
+     */
+    draftReply: async (
+      actor: ActorContext,
+      gatewayId: string,
+      applicationId: string,
+      purpose: GateqReplyPurpose = "CALL",
+    ): Promise<
+      | {
+          readonly ok: true;
+          readonly purpose: GateqReplyPurpose;
+          readonly message: string;
+          readonly companyName: string;
+        }
+      | InboxRefused
+    > => {
+      const granted = await authority.authorise(actor, gatewayId);
+      if (granted === null) return REFUSED;
+      const row = await repository.one({
+        tenantId: granted.gateway.tenantId,
+        gatewayId: granted.gateway.gatewayId,
+        userId: actor.userId,
+        applicationId,
+      });
+      if (row === null) return REFUSED;
+      const founder = founderOf(row);
+      return {
+        ok: true,
+        purpose,
+        companyName: founder.companyName,
+        message: draftReplyMessage({
+          founderName: founder.name,
+          companyName: founder.companyName,
+          fund: granted.gateway.fund,
+          purpose,
+          openRules: rulesOf(readQualification(row.qualification)).unknown,
+        }),
       };
     },
 

@@ -55,6 +55,12 @@ export function createGateqInbox(options: {
   readonly synthesisMaxAttempts?: number | undefined;
   /** The submitted documents' text, for Q's reading of an application. */
   readonly documentText?: SubmittedDocumentTextPort | undefined;
+  /**
+   * The approving member's own Q address (inbound email), so an applicant's
+   * answer reaches them. Absent: no Reply-To, and the email says so.
+   */
+  readonly replyToFor?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 }): InboxService {
   return createInboxService({
     repository: createPostgresInboxRepository({
@@ -67,6 +73,7 @@ export function createGateqInbox(options: {
     documentText: options.documentText,
     founderMail: options.founderMail,
     onEmail: options.onEmail,
+    replyToFor: options.replyToFor,
   });
 }
 
@@ -93,6 +100,8 @@ export function gateqInboxActionsPort(
     detail: service.detail,
     submittedDocuments: service.submittedDocuments,
     draftPass: service.draftPass,
+    draftReply: service.draftReply,
+    outboundPreview: service.outboundPreview,
     findApplication: service.findApplication,
     findMember: service.findMember,
     ownGatewayId,

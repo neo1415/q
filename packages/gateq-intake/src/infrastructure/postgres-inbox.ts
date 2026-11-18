@@ -1,3 +1,4 @@
+import { GateqOutboundDeliverySchema } from "@capital-q/contracts";
 import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 
 import { GATEQ_SYNTHESIS_MAX_ATTEMPTS_DEFAULT } from "../application/dossier-synthesis.js";
@@ -288,12 +289,25 @@ export function createPostgresInboxRepository(options: {
     addMessage: async (tx, input) => {
       const rows = await tx.sql<{ id: string }[]>`
         insert into gateq.inbox_messages
-          (application_id, tenant_id, kind, reason_code, body, body_sha256, approved_by_user_id, client_request_id)
+          (application_id, tenant_id, kind, reason_code, body, body_sha256, approved_by_user_id,
+           client_request_id, subject, recipient_sha256)
         values (${input.applicationId}, ${input.tenantId}, ${input.kind}, ${input.reasonCode},
-                ${input.body}, ${input.bodySha256}, ${input.approvedByUserId}, ${input.clientRequestId})
+                ${input.body}, ${input.bodySha256}, ${input.approvedByUserId}, ${input.clientRequestId},
+                ${input.subject}, ${input.recipientSha256})
         on conflict (application_id, client_request_id) do nothing
         returning id`;
-      return { deduplicated: rows.length === 0 };
+      const created = rows[0];
+      if (created !== undefined) {
+        return { deduplicated: false as const, messageId: created.id };
+      }
+      const stored = await tx.sql<{ body_sha256: string }[]>`
+        select body_sha256 from gateq.inbox_messages
+         where application_id = ${input.applicationId}
+           and client_request_id = ${input.clientRequestId}`;
+      return {
+        deduplicated: true as const,
+        storedBodySha256: stored[0]?.body_sha256 ?? null,
+      };
     },
 
     messages: async (applicationId) => {
@@ -303,16 +317,55 @@ export function createPostgresInboxRepository(options: {
           reason_code: string | null;
           body: string;
           created_at: Date;
+          subject: string | null;
+          outcome: string | null;
         }[]
       >`
-        select kind, reason_code, body, created_at from gateq.inbox_messages
-         where application_id = ${applicationId} order by created_at limit 50`;
+        select m.kind, m.reason_code, m.body, m.created_at, m.subject, d.outcome
+          from gateq.inbox_messages m
+          left join gateq.inbox_message_deliveries d on d.message_id = m.id
+         where m.application_id = ${applicationId}
+         order by m.created_at limit 50`;
       return rows.map((row) => ({
         kind: row.kind,
         reasonCode: row.reason_code,
         body: row.body,
         createdAt: new Date(row.created_at).toISOString(),
+        subject: row.subject,
+        delivery:
+          GateqOutboundDeliverySchema.safeParse(row.outcome).data ?? null,
       }));
+    },
+
+    outboundCounts: async (input) => {
+      const hourAgo = new Date(input.now.getTime() - 60 * 60 * 1000);
+      const dayAgo = new Date(input.now.getTime() - 24 * 60 * 60 * 1000);
+      const rows = await sql<
+        { tenant_hour: number; application_day: number; recorded: boolean }[]
+      >`
+        select
+          (select count(*)::int from gateq.inbox_messages
+            where tenant_id = ${input.tenantId} and created_at > ${hourAgo}) as tenant_hour,
+          (select count(*)::int from gateq.inbox_messages
+            where application_id = ${input.applicationId} and created_at > ${dayAgo}) as application_day,
+          exists (select 1 from gateq.inbox_messages
+            where application_id = ${input.applicationId}
+              and client_request_id = ${input.clientRequestId}) as recorded`;
+      const row = rows[0];
+      return {
+        tenantLastHour: row?.tenant_hour ?? 0,
+        applicationLastDay: row?.application_day ?? 0,
+        alreadyRecorded: row?.recorded ?? false,
+      };
+    },
+
+    recordDelivery: async (input) => {
+      await sql`
+        insert into gateq.inbox_message_deliveries
+          (message_id, application_id, tenant_id, outcome, recipient_domain)
+        values (${input.messageId}, ${input.applicationId}, ${input.tenantId},
+                ${input.outcome}, ${input.recipientDomain})
+        on conflict (message_id) do nothing`;
     },
 
     record: async (tx, activity) => {

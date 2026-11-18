@@ -87,6 +87,12 @@ export const EMAIL_ARABIC: Readonly<Record<string, string>> = {
     "ردّ {fund} على طلبك لـ {company} على Capital Q. كلماتهم:",
   "You applied to {fund} through their GateQ link on Capital Q.":
     "تقدّمت إلى {fund} عبر رابط GateQ الخاص بهم على Capital Q.",
+  "You applied to {fund} through their GateQ link on Capital Q. This is a one-to-one message about that application, not a mailing list: you won't get marketing from it, and if you'd rather not hear more, tell {fund} and they can archive it.":
+    "تقدّمت إلى {fund} عبر رابط GateQ الخاص بهم على Capital Q. هذه رسالة فردية بشأن ذلك الطلب، وليست قائمة بريدية: لن تصلك منها رسائل تسويقية، وإن كنت تفضّل ألا تسمع المزيد فأخبر {fund} ويمكنهم أرشفته.",
+  "Reply to this email to answer {fund} directly.":
+    "ردّ على هذه الرسالة لتجيب {fund} مباشرة.",
+  "Replies to this email don't reach {fund}. To answer, use the contact details on their website.":
+    "الردود على هذه الرسالة لا تصل إلى {fund}. للإجابة، استخدم بيانات التواصل على موقعهم.",
   "Your code to claim {company} on Capital Q":
     "رمزك للمطالبة بـ {company} على Capital Q",
   "Enter {code} on Capital Q. It works for {n} minutes.":

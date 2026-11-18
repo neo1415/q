@@ -539,3 +539,33 @@ export function triage(
       };
     });
 }
+
+/** What a drafted reply is for: a call, more information, or a thank-you. */
+export type GateqReplyPurpose = "CALL" | "ASK" | "THANKS";
+
+/**
+ * A first draft of a reply to an applicant, in the house's plain, warm
+ * style. Q may rephrase it; whoever sends it approves the exact words. It
+ * promises nothing the firm has not decided: no interest, no terms.
+ */
+export function draftReplyMessage(input: {
+  readonly founderName: string | null;
+  readonly companyName: string;
+  readonly fund: string;
+  readonly purpose: GateqReplyPurpose;
+  /** How many of the gate's rules the application left unclear. */
+  readonly openRules: number;
+}): string {
+  const hello =
+    input.founderName === null
+      ? "Hi,"
+      : `Hi ${input.founderName.split(/\s+/)[0] ?? ""},`;
+  const thanks = `${hello} thank you for applying to ${input.fund} with ${input.companyName}.`;
+  if (input.purpose === "ASK") {
+    return `${thanks} Before we go further, could you tell us more about ${input.openRules > 0 ? "the points your application left open" : "your traction and how you'll use this round"}? A short note or a document is fine.`;
+  }
+  if (input.purpose === "THANKS") {
+    return `${thanks} We've received it and will come back to you once we've looked at it properly.`;
+  }
+  return `${thanks} We've read what you sent and would like to learn more. Could you share a few times for a 30-minute call next week?`;
+}

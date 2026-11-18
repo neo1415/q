@@ -234,9 +234,14 @@ export type {
 } from "./inbox/ports.js";
 export {
   createInboxService,
+  GATEQ_OUTBOUND_LIMITS,
+  type GateqOutboundLimits,
+  type InboxAnswered,
+  type InboxAnswerRefused,
   type InboxChanged,
   type InboxRefused,
   type InboxService,
+  type OutboundPreview,
 } from "./inbox/service.js";
 export { createPostgresInboxRepository } from "./infrastructure/postgres-inbox.js";
 export { createPostgresSynthesisStore } from "./infrastructure/postgres-syntheses.js";
@@ -265,6 +270,7 @@ export {
   renderClaimCodeEmail,
   renderGateqAnswerEmail,
   sendLogged as sendGateqEmailLogged,
+  sendReported as sendGateqEmailReported,
   type GateqEmailEvent,
   type GateqEmailKind,
   type GateqOutboundSender,

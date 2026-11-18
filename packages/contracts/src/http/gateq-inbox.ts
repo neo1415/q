@@ -298,6 +298,45 @@ export type GateqUnicornPotentialDto = z.infer<
   typeof GateqUnicornPotentialDtoSchema
 >;
 
+/** The longest subject an applicant email may carry (the column's bound). */
+export const GATEQ_OUTBOUND_SUBJECT_MAX = 150;
+export const GateqOutboundSubjectSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(GATEQ_OUTBOUND_SUBJECT_MAX)
+  .refine((value) => !/[\r\n]/u.test(value), "one line");
+
+/**
+ * What became of an approved email to an applicant. SENT: the provider took
+ * it. SUPPRESSED: a reserved test address, never delivered. UNAVAILABLE: no
+ * email service configured here. NO_ADDRESS: the application has no contact
+ * email. FAILED: the provider refused it; nothing is retried on its own.
+ */
+export const GateqOutboundDeliverySchema = z.enum([
+  "SENT",
+  "SUPPRESSED",
+  "UNAVAILABLE",
+  "NO_ADDRESS",
+  "FAILED",
+]);
+export type GateqOutboundDelivery = z.infer<typeof GateqOutboundDeliverySchema>;
+
+/** The subject an answer to an applicant carries unless the person changes it. */
+export function gateqAnswerSubject(input: {
+  readonly kind: "PASS" | "REPLY";
+  readonly fund: string;
+  readonly companyName: string;
+}): string {
+  const subject =
+    input.kind === "PASS"
+      ? `${input.fund}'s answer on ${input.companyName}`
+      : `${input.fund} replied about ${input.companyName}`;
+  return subject.length <= GATEQ_OUTBOUND_SUBJECT_MAX
+    ? subject
+    : `${subject.slice(0, GATEQ_OUTBOUND_SUBJECT_MAX - 1)}…`;
+}
+
 export const GateqInboxDetailDtoSchema = z
   .object({
     item: GateqInboxItemDtoSchema,
@@ -360,6 +399,17 @@ export const GateqInboxDetailDtoSchema = z
             reasonCode: GateqPassReasonSchema.nullable(),
             body: z.string().max(2000),
             at: z.string(),
+            /**
+             * The subject the person approved; null on a message sent before
+             * subjects were kept. Optional on the wire for older APIs.
+             */
+            subject: z
+              .string()
+              .max(GATEQ_OUTBOUND_SUBJECT_MAX)
+              .nullable()
+              .optional(),
+            /** What became of the email; null when nothing was recorded. */
+            delivery: GateqOutboundDeliverySchema.nullable().optional(),
           })
           .strict(),
       )
@@ -423,6 +473,17 @@ export const GateqInboxNoteRequestSchema = z
     clientRequestId: z.string().regex(/^[A-Za-z0-9:_-]{8,128}$/),
   })
   .strict();
+/**
+ * What a person approves when they answer an applicant by email, besides the
+ * words: who receives it and its subject line. Both optional on the wire so
+ * an older screen still sends; when present they bind the send. A recipient
+ * that no longer matches the application's contact refuses the send (the
+ * person approves again); a subject is sent exactly as approved.
+ */
+const OutboundBinding = {
+  to: z.email().max(254).optional(),
+  subject: GateqOutboundSubjectSchema.optional(),
+};
 export const GateqInboxPassRequestSchema = z
   .object({
     /** A pass always gives the founder a reason. */
@@ -430,12 +491,14 @@ export const GateqInboxPassRequestSchema = z
     /** Exactly the words approved; a changed word is a new approval. */
     message: z.string().trim().min(1).max(2000),
     clientRequestId: z.string().regex(/^[A-Za-z0-9:_-]{8,128}$/),
+    ...OutboundBinding,
   })
   .strict();
 export const GateqInboxReplyRequestSchema = z
   .object({
     message: z.string().trim().min(1).max(2000),
     clientRequestId: z.string().regex(/^[A-Za-z0-9:_-]{8,128}$/),
+    ...OutboundBinding,
   })
   .strict();
 export const GateqInboxSettingsRequestSchema = z

@@ -348,9 +348,10 @@ describe("the action registry", () => {
       ["gateq.inbox.note", "gateq_inbox_note", "INSTANT"],
       ["gateq.inbox.reply_promise", "gateq_reply_promise", "INSTANT"],
       ["gateq.inbox.pass", "offer.gateq_inbox", "CONSEQUENTIAL"],
-      ["gateq.inbox.reply", "offer.gateq_inbox", "CONSEQUENTIAL"],
+      ["gateq.inbox.reply", "gateq_inbox_reply", "CONSEQUENTIAL"],
       ["gateq.inbox.triage", "gateq_inbox_triage", "READ"],
       ["gateq.inbox.draft_pass", "gateq_inbox_draft_pass", "READ"],
+      ["gateq.inbox.draft_reply", "gateq_inbox_draft_reply", "READ"],
       ["gateq.inbox.summarise", "gateq_inbox_summarise", "READ"],
       // F3: find my startup (claim on screen) and a saved startup search.
       ["gateq.startup_alert.save", "save_startup_alert", "INSTANT"],

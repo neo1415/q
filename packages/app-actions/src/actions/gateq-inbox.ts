@@ -25,6 +25,7 @@ import {
   GateqInboxReplyRequestSchema,
   GateqInboxSettingsRequestSchema,
   GateqInboxStarRequestSchema,
+  GateqOutboundSubjectSchema,
   GateqPassReasonSchema,
   UuidSchema,
   type GateqInboxDetailDto,
@@ -37,6 +38,7 @@ import type { ActorContext } from "@capital-q/security";
 import {
   defineAppAction,
   portMissing,
+  readyToSendLine,
   refusal,
   type AnyAppAction,
   type AppActionContext,
@@ -62,6 +64,28 @@ type Changed = {
 };
 type Refused = { readonly ok: false };
 type Result = Changed | Refused;
+/** A pass or a reply not sent, after authorisation: why, for the person. */
+type AnswerRefused = {
+  readonly ok: false;
+  readonly reason: "RECIPIENT_CHANGED" | "KEY_REUSED" | "RATE_LIMITED";
+};
+type Answered = Changed | Refused | AnswerRefused;
+type Outbound = {
+  readonly to?: string | undefined;
+  readonly subject?: string | undefined;
+};
+/** What an answer would carry besides its words (the inbox service's read). */
+export type GateqOutboundPreview = {
+  readonly ok: true;
+  readonly companyName: string;
+  readonly fund: string;
+  readonly to: string | null;
+  readonly toName: string | null;
+  readonly subject: string;
+  readonly replyTo: string | null;
+  readonly deliverable: boolean;
+};
+export type GateqReplyPurpose = "CALL" | "ASK" | "THANKS";
 
 /** The inbox service, as the actions call it. The app composes it. */
 export type GateqInboxPort = {
@@ -112,14 +136,47 @@ export type GateqInboxPort = {
       readonly reasonCode: GateqPassReason;
       readonly message: string;
       readonly clientRequestId: string;
-    },
-  ) => Promise<Result>;
+    } & Outbound,
+  ) => Promise<Answered>;
   readonly reply: (
     actor: ActorContext,
     gatewayId: string,
     applicationId: string,
-    input: { readonly message: string; readonly clientRequestId: string },
-  ) => Promise<Result>;
+    input: {
+      readonly message: string;
+      readonly clientRequestId: string;
+    } & Outbound,
+  ) => Promise<Answered>;
+  /**
+   * The recipient, default subject and reply address an answer to this
+   * applicant would carry, for the approval card. Optional: older
+   * compositions lack it (and then Q offers the screen instead).
+   */
+  readonly outboundPreview?:
+    | ((
+        actor: ActorContext,
+        gatewayId: string,
+        applicationId: string,
+        kind: "PASS" | "REPLY",
+      ) => Promise<GateqOutboundPreview | Refused>)
+    | undefined;
+  /** A first draft of a reply, for a person to change. Sends nothing. */
+  readonly draftReply?:
+    | ((
+        actor: ActorContext,
+        gatewayId: string,
+        applicationId: string,
+        purpose?: GateqReplyPurpose,
+      ) => Promise<
+        | {
+            readonly ok: true;
+            readonly purpose: GateqReplyPurpose;
+            readonly message: string;
+            readonly companyName: string;
+          }
+        | Refused
+      >)
+    | undefined;
   readonly setReplyPromise: (
     actor: ActorContext,
     gatewayId: string,
@@ -241,6 +298,39 @@ const respond = (out: Result) =>
       : { changed: 0, deduplicated: false },
   );
 const notFound = (out: Result) => !out.ok;
+const answerNotFound = (out: Answered) => !out.ok && !("reason" in out);
+const ANSWER_PROBLEMS = {
+  RECIPIENT_CHANGED: {
+    code: "RESOURCE_CONFLICT",
+    detail:
+      "The applicant's contact changed since you approved this. Nothing was sent; check the recipient and approve again.",
+  },
+  KEY_REUSED: {
+    code: "IDEMPOTENCY_CONFLICT",
+    detail:
+      "This request was already used for different words. Nothing new was sent; approve the changed message as a new one.",
+  },
+  RATE_LIMITED: {
+    code: "RATE_LIMITED",
+    detail:
+      "Too many emails to applicants in a short time. Nothing was sent; try again later.",
+  },
+} as const;
+const answerProblem = (out: Answered) =>
+  !out.ok && "reason" in out ? ANSWER_PROBLEMS[out.reason] : null;
+const answerRespond = (out: Answered) =>
+  GateqInboxChangedDtoSchema.parse(
+    out.ok
+      ? { changed: out.changed, deduplicated: out.deduplicated }
+      : { changed: 0, deduplicated: false },
+  );
+/** Q's words for an answer that did not go. */
+const answerDone = (out: Answered, sent: string, refused: string) =>
+  out.ok
+    ? sent
+    : "reason" in out
+      ? ANSWER_PROBLEMS[out.reason].detail
+      : refused;
 
 const Gateway = { gatewayId: UuidSchema };
 const Application = { gatewayId: UuidSchema, applicationId: UuidSchema };
@@ -717,7 +807,7 @@ const Pass = z
   .strict();
 const PASS = defineAppAction<
   z.infer<typeof Pass>,
-  Result,
+  Answered,
   { company: string; reason: GateqPassReason; message?: string | undefined }
 >({
   name: "gateq.inbox.pass",
@@ -726,7 +816,7 @@ const PASS = defineAppAction<
   classification: "CONSEQUENTIAL",
   does: "Passes on an application in their GateQ inbox, sending the founder the approved message with a reason.",
   input: Pass,
-  output: z.custom<Result>(),
+  output: z.custom<Answered>(),
   authorize: serviceDecides,
   run: (ports, context, input) =>
     port(ports).pass(
@@ -738,12 +828,14 @@ const PASS = defineAppAction<
   targets: () => [],
   card: (input) => ({
     summary: "Pass, and send the founder this message",
-    preview: input.input.message,
+    preview: outboundPreviewText(input.input),
   }),
   done: (out) =>
-    out.ok
-      ? "Passed, and the founder has your message."
-      : "Only an admin of your firm can pass.",
+    answerDone(
+      out,
+      "Passed, and the founder has your message.",
+      "Only an admin of your firm can pass.",
+    ),
   succeeded: (out) => out.ok,
   http: {
     method: "POST",
@@ -751,8 +843,9 @@ const PASS = defineAppAction<
     fromRequest: (params, body) =>
       withParams(params, body, ["gatewayId", "applicationId"]),
     status: (out) => (out.ok && !out.deduplicated ? 201 : 200),
-    respond,
-    notFound,
+    respond: answerRespond,
+    problem: answerProblem,
+    notFound: answerNotFound,
     idempotencyKeyOf: (input) => input.input.clientRequestId,
   },
   // Words to a founder are approved on the inbox screen, exactly as
@@ -762,20 +855,29 @@ const PASS = defineAppAction<
 });
 
 const Reply = z
-  .object({ ...Application, input: GateqInboxReplyRequestSchema })
+  .object({
+    ...Application,
+    input: GateqInboxReplyRequestSchema,
+    /**
+     * Q's card only: the proposing person's own organisation, the gateway's
+     * owner, which the approval names as its subject. Set from the actor,
+     * never from a model or a request body; the service ignores it.
+     */
+    organisationId: UuidSchema.optional(),
+  })
   .strict();
 const REPLY = defineAppAction<
   z.infer<typeof Reply>,
-  Result,
-  { company: string; message: string }
+  Answered,
+  { company: string; message: string; subject?: string | undefined }
 >({
   name: "gateq.inbox.reply",
   short: "reply to a GateQ founder",
   area: "gateway",
   classification: "CONSEQUENTIAL",
-  does: "Sends the founder of an application in their GateQ inbox the approved reply.",
+  does: "Emails the founder of an application in their GateQ inbox the approved reply: the exact recipient, subject and words on the card. They need not be on Capital Q.",
   input: Reply,
-  output: z.custom<Result>(),
+  output: z.custom<Answered>(),
   authorize: serviceDecides,
   run: (ports, context, input) =>
     port(ports).reply(
@@ -784,12 +886,25 @@ const REPLY = defineAppAction<
       input.applicationId,
       input.input,
     ),
-  targets: () => [],
+  // The Approval Engine binds a proposal to its subject: the firm's own
+  // organisation, whose gateway it is.
+  targets: (input) =>
+    input.organisationId === undefined
+      ? []
+      : [{ kind: "ORGANISATION", organisationId: input.organisationId }],
+  // Who gets it, under what subject, and the words: the card is what they
+  // approve, and a changed word is a new card (the payload is the approval).
   card: (input) => ({
-    summary: "Send the founder this reply",
-    preview: input.input.message,
+    summary: "Email the founder this reply",
+    preview: outboundPreviewText(input.input),
   }),
-  done: (out) => (out.ok ? "Sent." : "Only an admin of your firm can reply."),
+  proposed: (input, summary) =>
+    readyToSendLine(
+      summary,
+      `${input.input.subject === undefined ? "" : `Subject: ${input.input.subject}\n\n`}${input.input.message}`,
+    ),
+  done: (out) =>
+    answerDone(out, "Sent.", "Only an admin of your firm can reply."),
   succeeded: (out) => out.ok,
   http: {
     method: "POST",
@@ -797,15 +912,99 @@ const REPLY = defineAppAction<
     fromRequest: (params, body) =>
       withParams(params, body, ["gatewayId", "applicationId"]),
     status: (out) => (out.ok && !out.deduplicated ? 201 : 200),
-    respond,
-    notFound,
+    respond: answerRespond,
+    problem: answerProblem,
+    notFound: answerNotFound,
     idempotencyKeyOf: (input) => input.input.clientRequestId,
   },
-  // Words to a founder are approved on the inbox screen, exactly as
-  // shown; Q drafts (gateq_inbox_draft_pass, gateq_inbox_summarise) and
-  // offers the screen.
-  qCapability: "offer.gateq_inbox",
+  tool: {
+    name: "gateq_inbox_reply",
+    description:
+      "Prepares an email to the founder of one application in the investor's own GateQ inbox (they may not be on Capital Q), for the investor to approve on a card: the recipient is the application's contact, the subject and words are exactly what they approve. Write the message in the investor's voice; gateq_inbox_draft_reply gives a first draft. Nothing is sent until they approve.",
+    input: z
+      .object({
+        company: CompanyTool,
+        message: z
+          .string()
+          .trim()
+          .min(1)
+          .max(2000)
+          .describe("The email's words, exactly as it should be sent."),
+        subject: GateqOutboundSubjectSchema.optional().describe(
+          "A subject line, if the investor asked for one; otherwise the usual one is used.",
+        ),
+      })
+      .strict(),
+    references: {},
+    purposes: PURPOSES,
+    eval: {
+      say: [
+        "Email Sunline and ask for a call next week.",
+        "Reply to Kora Health: thanks, we'll come back to them on Friday.",
+      ],
+    },
+    toCanonical: async (tool, context, ports) => {
+      const found = await resolveApplication(ports, context, tool.company);
+      if (isRefusal(found)) return found;
+      const inbox = port(ports);
+      if (inbox.outboundPreview === undefined) {
+        return refusal(
+          "Open the application in your GateQ inbox to reply; I can draft the words.",
+        );
+      }
+      const preview = await inbox.outboundPreview(
+        context.actor,
+        found.gatewayId,
+        found.applicationId,
+        "REPLY",
+      );
+      if (!preview.ok) return refusal("Only an admin of your firm can reply.");
+      if (preview.to === null) {
+        return refusal(
+          `${preview.companyName}'s application has no contact email, so there's no one to email.`,
+        );
+      }
+      if (!preview.deliverable) {
+        return refusal(
+          "Email to applicants isn't connected here, so nothing can be sent yet.",
+        );
+      }
+      const organisationId = context.actor.organisationId;
+      if (organisationId === undefined || organisationId === null) {
+        return refusal("Only an admin of your firm can reply.");
+      }
+      return {
+        gatewayId: found.gatewayId,
+        applicationId: found.applicationId,
+        organisationId,
+        input: {
+          message: tool.message,
+          clientRequestId: `q:${context.idempotencyKey}`
+            .slice(0, 128)
+            .replace(/[^A-Za-z0-9:_-]/g, "-"),
+          // The card binds who gets it and the subject, as well as the words.
+          to: preview.to,
+          subject: tool.subject ?? preview.subject,
+        },
+      };
+    },
+  },
 });
+
+/** The card's text: recipient and subject when bound, then the words. */
+function outboundPreviewText(input: {
+  readonly message: string;
+  readonly to?: string | undefined;
+  readonly subject?: string | undefined;
+}): string {
+  const head = [
+    input.to === undefined ? null : `To: ${input.to}`,
+    input.subject === undefined ? null : `Subject: ${input.subject}`,
+  ].filter((line) => line !== null);
+  return head.length === 0
+    ? input.message
+    : `${head.join("\n")}\n\n${input.message}`;
+}
 
 // ---------------------------------------------------------------------------
 // READ: Q's triage and drafts. Proposals, never decisions.
@@ -920,6 +1119,83 @@ const DRAFT_PASS = defineAppAction<
             gatewayId: found.gatewayId,
             applicationId: found.applicationId,
             ...(tool.reason === undefined ? {} : { reason: tool.reason }),
+          };
+    },
+  },
+});
+
+type DraftReplyOut =
+  | {
+      readonly ok: true;
+      readonly purpose: GateqReplyPurpose;
+      readonly message: string;
+      readonly companyName: string;
+    }
+  | Refused;
+const ReplyPurposeSchema = z.enum(["CALL", "ASK", "THANKS"]);
+const DraftReplyIn = z
+  .object({
+    gatewayId: UuidSchema,
+    applicationId: UuidSchema,
+    purpose: ReplyPurposeSchema.optional(),
+  })
+  .strict();
+const DRAFT_REPLY = defineAppAction<
+  z.infer<typeof DraftReplyIn>,
+  DraftReplyOut,
+  { company: string; purpose?: GateqReplyPurpose | undefined }
+>({
+  name: "gateq.inbox.draft_reply",
+  short: "draft a GateQ reply",
+  area: "gateway",
+  classification: "READ",
+  does: "Drafts a reply to the founder of one application (ask for a call, ask for more, or a thank-you). A draft only: nothing is sent.",
+  input: DraftReplyIn,
+  output: z.custom<DraftReplyOut>(),
+  authorize: serviceDecides,
+  run: (ports, context, input) => {
+    const inbox = port(ports);
+    return inbox.draftReply === undefined
+      ? Promise.resolve({ ok: false as const })
+      : inbox.draftReply(
+          context.actor,
+          input.gatewayId,
+          input.applicationId,
+          input.purpose,
+        );
+  },
+  targets: () => [],
+  card: () => ({ summary: "Draft", preview: "" }),
+  done: (out) =>
+    out.ok
+      ? `Draft reply to ${out.companyName}:\n${out.message}`
+      : "That isn't in your GateQ inbox.",
+  tool: {
+    name: "gateq_inbox_draft_reply",
+    description:
+      "Drafts a reply to the founder of one application in the investor's GateQ inbox: CALL asks for times for a call, ASK asks for what the application left open, THANKS acknowledges it. For them to read and change; sends nothing. To send, prepare it with gateq_inbox_reply.",
+    input: z
+      .object({
+        company: CompanyTool,
+        purpose: ReplyPurposeSchema.optional(),
+      })
+      .strict(),
+    references: {},
+    purposes: PURPOSES,
+    eval: {
+      say: [
+        "Draft a reply to Sunline asking for a call.",
+        "How would we ask Harvest Ledger for more information?",
+      ],
+    },
+    toCanonical: async (tool, context, ports) => {
+      const found = await resolveApplication(ports, context, tool.company);
+      return isRefusal(found)
+        ? found
+        : {
+            gatewayId: found.gatewayId,
+            applicationId: found.applicationId,
+            ...(tool.purpose === undefined ? {} : { purpose: tool.purpose }),
           };
     },
   },
@@ -1073,6 +1349,7 @@ export const GATEQ_INBOX_ACTIONS: readonly AnyAppAction[] = [
   REPLY,
   TRIAGE,
   DRAFT_PASS,
+  DRAFT_REPLY,
   SUMMARISE,
 ];
 

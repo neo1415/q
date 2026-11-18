@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Kilima Angel Network (fictional) · Apply</title>
+    <style>
+      /*
+       * A fictional investor's own website, for testing the GateQ embed from
+       * another origin. Its own look on purpose: nothing here comes from
+       * Capital Q, so a style leaking either way would show.
+       */
+      body {
+        margin: 0;
+        font:
+          16px/1.5 Georgia,
+          serif;
+        background: #fbf7ef;
+        color: #2b2116;
+      }
+      header,
+      main,
+      footer {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 16px;
+      }
+      h1 {
+        font-size: 32px;
+        margin: 0 0 8px;
+      }
+      .note {
+        font-size: 14px;
+        color: #6b5a44;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p class="note">FICTIONAL TEST SITE. No real fund, no real people.</p>
+      <h1>Kilima Angel Network (fictional)</h1>
+      <p>Early cheques for East African founders. Apply below.</p>
+    </header>
+    <main>
+      <h2>Apply to us</h2>
+      <p class="note" id="host-secret">
+        host-only text the embed must never read
+      </p>
+      <!-- Inline embed: the iframe is inserted right after this tag. -->
+      <script
+        src="__CAPITAL_Q_ORIGIN__/gateq-embed.js"
+        data-gateway="__GATEWAY__"
+        data-height="720px"
+        async
+      ></script>
+    </main>
+    <footer class="note">
+      <p>Or use the "Check your fit" button in the corner.</p>
+    </footer>
+    <!-- Launcher: one button in a closed shadow root, opens on press. -->
+    <script
+      src="__CAPITAL_Q_ORIGIN__/gateq.js"
+      data-gate="__GATEWAY__"
+      data-position="right"
+      async
+    ></script>
+  </body>
+</html>

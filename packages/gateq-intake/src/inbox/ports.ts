@@ -1,3 +1,4 @@
+import type { GateqOutboundDelivery } from "@capital-q/contracts";
 import type { TransactionContext } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
@@ -186,16 +187,52 @@ export type InboxRepository = {
       readonly bodySha256: string;
       readonly approvedByUserId: string;
       readonly clientRequestId: string;
+      /** The subject line the person approved. */
+      readonly subject: string;
+      /** sha256 of the lower-cased address it was approved for; null: none. */
+      readonly recipientSha256: string | null;
     },
-  ) => Promise<{ readonly deduplicated: boolean }>;
+  ) => Promise<
+    | { readonly deduplicated: false; readonly messageId: string }
+    | {
+        readonly deduplicated: true;
+        /** The body digest stored under that key, to tell a replay from a reuse. */
+        readonly storedBodySha256: string | null;
+      }
+  >;
   readonly messages: (applicationId: string) => Promise<
     readonly {
       readonly kind: "PASS" | "REPLY";
       readonly reasonCode: string | null;
       readonly body: string;
       readonly createdAt: string;
+      readonly subject: string | null;
+      readonly delivery: GateqOutboundDelivery | null;
     }[]
   >;
+  /**
+   * The outbound rate limit's counts, read before a new answer is recorded:
+   * the tenant's answers in the last hour, this application's in the last
+   * day, and whether this key is already recorded (a replay is never limited).
+   */
+  readonly outboundCounts: (input: {
+    readonly tenantId: string;
+    readonly applicationId: string;
+    readonly clientRequestId: string;
+    readonly now: Date;
+  }) => Promise<{
+    readonly tenantLastHour: number;
+    readonly applicationLastDay: number;
+    readonly alreadyRecorded: boolean;
+  }>;
+  /** What became of one message's email; recorded once, after commit. */
+  readonly recordDelivery: (input: {
+    readonly messageId: string;
+    readonly applicationId: string;
+    readonly tenantId: string;
+    readonly outcome: GateqOutboundDelivery;
+    readonly recipientDomain: string | null;
+  }) => Promise<void>;
   readonly record: (
     tx: TransactionContext,
     activity: InboxActivity,
