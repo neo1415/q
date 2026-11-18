@@ -299,7 +299,50 @@ export type PromptDefinition<V = unknown, O = unknown> = {
   readonly output: PromptOutputSpec<O>;
   /** Trusted instruction text with `{{variable}}` tokens. */
   readonly template: string;
+  /**
+   * Optional: a literal line of the template where its fixed rules end.
+   * Everything before it (which must hold no `{{token}}`) is sent as a
+   * second leading SYSTEM message beside the charter; the rest, where the
+   * variables are, stays the USER message.
+   *
+   * Why (ai_ops.model_usage, 11-18 Nov 2026): the provider's prompt cache
+   * matched the reader's prompt only up to the end of its instructions and
+   * output schema (a steady ~4.6k of ~22.7k input tokens), never into the
+   * ~14k tokens of fixed rules that opened its single user message, so
+   * every reading paid for those rules at the uncached rate. The words are
+   * unchanged; only where the fixed part travels moves. Absent: one USER
+   * message, as before.
+   */
+  readonly rulesEndBefore?: string | undefined;
 };
+
+/**
+ * The template's fixed rules, when the definition declares where they end
+ * (`rulesEndBefore`); null otherwise. Throws when the marker is missing or
+ * a token appears before it: rules sent as instructions never carry data.
+ */
+export function templateRulesHead(
+  definition: Pick<
+    PromptDefinition<unknown, unknown>,
+    "id" | "version" | "template" | "rulesEndBefore"
+  >,
+): string | null {
+  const marker = definition.rulesEndBefore;
+  if (marker === undefined) return null;
+  const at = marker.length === 0 ? -1 : definition.template.indexOf(marker);
+  if (at <= 0) {
+    throw new PromptRenderError(
+      `prompt ${promptVersionId(definition.id, definition.version)} declares rulesEndBefore, which its template does not contain`,
+    );
+  }
+  const head = definition.template.slice(0, at);
+  if (/\{\{/.test(head)) {
+    throw new PromptRenderError(
+      `prompt ${promptVersionId(definition.id, definition.version)} has a token before rulesEndBefore`,
+    );
+  }
+  return head;
+}
 
 export const UNTRUSTED_OPEN = "<<<UNTRUSTED_CONTENT";
 export const UNTRUSTED_CLOSE = "<<<END_UNTRUSTED_CONTENT>>>";
@@ -425,11 +468,19 @@ export function promptContentHash(
           definition.output.onlyWhatApplies === true ? "/only-what-applies" : ""
         }`
       : "text";
-  return createHash("sha256")
-    .update(promptVersionId(definition.id, definition.version))
-    .update("\n")
-    .update(output)
-    .update("\n")
-    .update(definition.template)
-    .digest("hex");
+  return (
+    createHash("sha256")
+      .update(promptVersionId(definition.id, definition.version))
+      .update("\n")
+      .update(output)
+      .update("\n")
+      .update(definition.template)
+      // Only when declared, so every earlier version keeps its locked hash.
+      .update(
+        definition.rulesEndBefore === undefined
+          ? ""
+          : `\nrules-end-before:${definition.rulesEndBefore}`,
+      )
+      .digest("hex")
+  );
 }

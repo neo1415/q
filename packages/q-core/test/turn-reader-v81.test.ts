@@ -20,7 +20,7 @@ describe("TURN_READER v81", () => {
   it("v80 with one sentence of the parts rule replaced (v82 is active)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(91);
+    expect(active.version).toBe(92);
     expect(registry.get("TURN_READER", 80)?.definition.status).toBe(
       "DEPRECATED",
     );

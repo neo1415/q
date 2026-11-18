@@ -21,6 +21,7 @@ import {
 } from "../etiquette/guidance.js";
 import {
   renderTemplate,
+  templateRulesHead,
   type PromptId,
   type PromptVersionId,
 } from "./definition.js";
@@ -36,7 +37,8 @@ import type { PromptRecord, PromptRegistry } from "./registry.js";
  * has no database, no ports and no way to reach context the caller did
  * not hand it. Output is a provider-neutral message list — the charter
  * with its communication guidance as the SYSTEM message, the task
- * rendering as the USER message — plus the gateway output spec and the
+ * rendering as the USER message (a task that declares `rulesEndBefore`
+ * sends its fixed rules as a second SYSTEM message) — plus the gateway output spec and the
  * bundle identity to persist on the run.
  */
 
@@ -197,10 +199,21 @@ export function renderPrompt<V>(
     .update(`comm.v${String(communicationRenderingVersion)}`)
     .digest("hex");
 
-  const messages: ModelMessage[] = [
-    { role: "SYSTEM", content: system },
-    { role: "USER", content: user },
-  ];
+  // A task that declares where its fixed rules end sends them as
+  // instructions beside the charter (cacheable from turn to turn); the
+  // head holds no token, so the rendered text begins with it verbatim.
+  const rules = templateRulesHead(task.definition);
+  const messages: ModelMessage[] =
+    rules === null || !user.startsWith(rules)
+      ? [
+          { role: "SYSTEM", content: system },
+          { role: "USER", content: user },
+        ]
+      : [
+          { role: "SYSTEM", content: system },
+          { role: "SYSTEM", content: rules.trimEnd() },
+          { role: "USER", content: user.slice(rules.length).trimStart() },
+        ];
   return {
     bundle: {
       bundleVersion,

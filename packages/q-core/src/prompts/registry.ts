@@ -15,6 +15,7 @@ import {
 import {
   promptContentHash,
   promptVersionId,
+  templateRulesHead,
   templateVariables,
   type PromptDefinition,
   type PromptId,
@@ -195,6 +196,7 @@ import { TURN_READER_V88 } from "./tasks/turn-reader.v88.js";
 import { TURN_READER_V89 } from "./tasks/turn-reader.v89.js";
 import { TURN_READER_V90 } from "./tasks/turn-reader.v90.js";
 import { TURN_READER_V91 } from "./tasks/turn-reader.v91.js";
+import { TURN_READER_V92 } from "./tasks/turn-reader.v92.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -507,6 +509,8 @@ function validate(definition: PromptDefinition<unknown, unknown>): void {
   if (!Number.isInteger(definition.version) || definition.version < 1) {
     throw new Error(`prompt ${definition.id} has an invalid version`);
   }
+  // A declared rules boundary must exist and hold no token before it.
+  templateRulesHead(definition);
 }
 
 export function createPromptRegistry(
@@ -819,7 +823,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...TURN_READER_V88, status: "DEPRECATED" },
     { ...TURN_READER_V89, status: "DEPRECATED" },
     { ...TURN_READER_V90, status: "DEPRECATED" },
-    TURN_READER_V91,
+    { ...TURN_READER_V91, status: "DEPRECATED" },
+    TURN_READER_V92,
     MEMORY_EXTRACTOR_V1,
     { ...MEMORY_EXTRACTOR_V2, status: "DEPRECATED" },
     // Decision 97: extraction lists with no count ceiling.

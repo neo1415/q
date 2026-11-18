@@ -15,7 +15,7 @@ describe("TURN_READER v35", () => {
   it("is superseded by v36, and v34 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(91);
+    ).toBe(92);
     expect(TURN_READER_V34.status).toBe("DEPRECATED");
   });
 

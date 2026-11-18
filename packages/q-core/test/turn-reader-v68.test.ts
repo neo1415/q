@@ -40,7 +40,7 @@ const render = () =>
 
 describe("TURN_READER v68: only what applies is written", () => {
   it("is the active reader, v67's rules kept whole and v67 kept for rollback", () => {
-    expect(registry.getActive("TURN_READER").definition.version).toBe(91);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(92);
     expect(TURN_READER_V67.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 67)).toBeDefined();
     // Undo the rearrangement and the one line: v67 exactly.
@@ -55,7 +55,11 @@ describe("TURN_READER v68: only what applies is written", () => {
   });
 
   it("puts every per-turn input after the rules", () => {
-    const user = render().messages.at(-1)?.content ?? "";
+    // v92 sends the rules as instructions; the order across the whole
+    // prompt is what this checks.
+    const user = render()
+      .messages.map((message) => message.content)
+      .join("\n\n");
     const controls = user.indexOf("tab-overview (TAB, Overview, selected)");
     expect(controls).toBeGreaterThan(user.length * 0.9);
     expect(user.indexOf("How do the top two stack up?")).toBeGreaterThan(

@@ -28,6 +28,7 @@ export {
   PromptRenderError,
   promptVersionId,
   renderTemplate,
+  templateRulesHead,
   templateVariables,
   UNTRUSTED_CLOSE,
   UNTRUSTED_OPEN,
@@ -2326,6 +2327,10 @@ export {
   TURN_READER_V91,
   V91_REFINES_SHOWN_LIST,
 } from "./prompts/tasks/turn-reader.v91.js";
+export {
+  TURN_READER_V92,
+  V92_RULES_END_BEFORE,
+} from "./prompts/tasks/turn-reader.v92.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

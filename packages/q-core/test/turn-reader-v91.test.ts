@@ -18,14 +18,14 @@ import {
  * (`question.refinesShownList`); code carries conditions only then.
  */
 describe("TURN_READER v91", () => {
-  it("is active: v90 with one REFINES THE LIST paragraph after WHY THEY FIT, on v91's schema", () => {
+  it("was active (v92 now): v90 with one REFINES THE LIST paragraph after WHY THEY FIT, on v91's schema", () => {
     const registry = createDefaultPromptRegistry();
-    const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(91);
+    const v91 = registry.get("TURN_READER", 91)?.definition;
+    expect(v91?.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 90)?.definition.status).toBe(
       "DEPRECATED",
     );
-    expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
+    expect(v91?.output.kind === "STRUCTURED" && v91.output.schema).toBe(
       TurnReaderV91ResultSchema,
     );
     expect(TURN_READER_V91.variables).toEqual(TURN_READER_V90.variables);
