@@ -408,16 +408,19 @@ function setup() {
 /**
  * The turn that reaches it: a tool offered only when named (a declared
  * app action such as set_gateway_open) is reached by a turn naming it,
- * so the walk names it; any other tool is reached unnamed.
+ * so the walk names it; so is one offered only on a turn about its area
+ * (a GateQ reply), never unfocused. Any other tool is reached unnamed.
  */
 function reaching(
   definition: {
     readonly providerName: string;
     readonly offeredWhenNamed?: boolean | undefined;
+    readonly offeredInArea?: boolean | undefined;
   },
   context: ReturnType<typeof contextFor>,
 ): ReturnType<typeof contextFor> {
-  return definition.offeredWhenNamed === true
+  return definition.offeredWhenNamed === true ||
+    definition.offeredInArea === true
     ? { ...context, focus: { areas: [], tools: [definition.providerName] } }
     : context;
 }

@@ -919,6 +919,9 @@ const REPLY = defineAppAction<
   },
   tool: {
     name: "gateq_inbox_reply",
+    // Offered on a turn about the GateQ inbox (its area, or named), never in
+    // the unfocused offer the model's tool bound cuts.
+    offeredInArea: true,
     description:
       "Prepares an email to the founder of one application in the investor's own GateQ inbox (they may not be on Capital Q), for the investor to approve on a card: the recipient is the application's contact, the subject and words are exactly what they approve. Write the message in the investor's voice; gateq_inbox_draft_reply gives a first draft. Nothing is sent until they approve.",
     input: z
@@ -1172,6 +1175,9 @@ const DRAFT_REPLY = defineAppAction<
       : "That isn't in your GateQ inbox.",
   tool: {
     name: "gateq_inbox_draft_reply",
+    // Offered on a turn about the GateQ inbox (its area, or named), never in
+    // the unfocused offer the model's tool bound cuts.
+    offeredInArea: true,
     description:
       "Drafts a reply to the founder of one application in the investor's GateQ inbox: CALL asks for times for a call, ASK asks for what the application left open, THANKS acknowledges it. For them to read and change; sends nothing. To send, prepare it with gateq_inbox_reply.",
     input: z

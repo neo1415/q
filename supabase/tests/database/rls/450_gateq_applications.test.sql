@@ -270,7 +270,8 @@ $$, '23001', null, 'once submitted, the draft selection is frozen');
 -- turn readings (20261231540000) belong to the application set; the
 -- gateway's appearance revisions (20261231570000) and its logo assets
 -- (20261231580000) to the gateway set; the draft document selection
--- (20261231590000) to the application set.
+-- (20261231590000) to the application set; the inbox's outbound email
+-- outcomes (20261231598700) to the inbox set.
 select is(
   array(select table_name::text from information_schema.tables
          where table_schema = 'gateq' order by 1),
@@ -279,7 +280,7 @@ select is(
         'application_turn_readings', 'application_turns', 'application_video_sessions', 'application_voice_sessions', 'applications',
         'contact_verification_limits', 'gateway_appearances', 'gateway_criteria', 'gateway_logo_assets', 'gateway_versions', 'gateways',
         'guest_throttle_buckets', 'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
-        'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
+        'inbox_message_deliveries', 'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
         'pass_reasons', 'policy_extractions', 'startup_alerts']::text[],
   'the gateq tables are exactly the gateway, application, mandate-reading provenance, inbox and startup-alert sets');
 

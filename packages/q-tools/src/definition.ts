@@ -128,6 +128,16 @@ export type QToolDefinition<I, O, G> = {
    */
   readonly offeredWhenNamed?: boolean | undefined;
   /**
+   * A declared app action offered only on a turn about it: one that names
+   * it, or whose focus holds its area -- never in the unfocused offer,
+   * which carries every tool of the purpose and is the one the model's
+   * bound cuts (GateQ inbox replies, 18 Nov: two new tools put the
+   * worst-case action offer past the bound and cut the purpose's own
+   * set_q_language). It executes exactly where it is offered. Absent:
+   * false.
+   */
+  readonly offeredInArea?: boolean | undefined;
+  /**
    * XLSX-001: ranked after every other tool of its purpose (but still
    * ahead of nothing the turn named or put in its areas), so a tool that
    * serves many purposes never pushes a purpose's own tool past the

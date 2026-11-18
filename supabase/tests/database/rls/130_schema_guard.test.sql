@@ -359,6 +359,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('gateq', 'inbox_item_labels', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'inbox_items', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'inbox_labels', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_message_deliveries', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'inbox_messages', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'inbox_notes', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'inbox_settings', 'INTERNAL_SERVER_ONLY', '{}'),

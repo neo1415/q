@@ -241,6 +241,13 @@ export type AppActionTool<In, ToolIn> = {
    */
   readonly offeredWhenNamed?: boolean | undefined;
   /**
+   * Offered only on a turn about it (named, or its area in the turn's
+   * focus), never in an offer the reader did not focus, so a tool that
+   * matters only where its screen's work is never pushes a purpose's own
+   * tool past the model's bound. Absent: false.
+   */
+  readonly offeredInArea?: boolean | undefined;
+  /**
    * How a person asks for it, for the parity eval (scripts/evals/q-parity):
    * two phrasings, `{name}` standing for the record it names. The eval adds
    * a misheard variant of the name itself.

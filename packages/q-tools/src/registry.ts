@@ -388,6 +388,10 @@ export function createQToolRegistry(
       directly(record) &&
       ownOrganisationAction(record) &&
       ownHeldFor(record);
+    const focusArea = (record: QToolRecord): boolean => {
+      const area = TOOL_AREAS.get(record.definition.providerName);
+      return area !== undefined && areas.has(area);
+    };
     const relevant = (record: QToolRecord): boolean => {
       const name = record.definition.providerName;
       if (workspace && record.definition.movesPagePane === true) return false;
@@ -426,6 +430,11 @@ export function createQToolRegistry(
       // schema is paid on every round); use_capability, in the core,
       // loads one the moment the answer needs it.
       if (readsOnly && !readOnly(record)) return false;
+      // A declared action kept to turns about its area: named (above) or
+      // its area in the focus; never unfocused, nor by a widened offer.
+      if (app && record.definition.offeredInArea === true) {
+        return focused && focusArea(record);
+      }
       if (!focused) return forPurpose;
       // Their own records, read as such: kept whatever the turn's areas.
       if (forOwn) return true;
@@ -436,10 +445,6 @@ export function createQToolRegistry(
       // a reader that named nothing left diligence_documents unreachable).
       if (!forPurpose) return app && inArea;
       return focus?.widen === true || area === undefined || inArea;
-    };
-    const focusArea = (record: QToolRecord): boolean => {
-      const area = TOOL_AREAS.get(record.definition.providerName);
-      return area !== undefined && areas.has(area);
     };
     return [...activeById.values()]
       .filter(relevant)

@@ -500,3 +500,62 @@ describe("tools offered by what the turn is about", () => {
     });
   });
 });
+
+describe("a GateQ reply is offered on a turn about the inbox, never in the unfocused offer (18 Nov)", () => {
+  const REPLY_TOOLS = ["gateq_inbox_draft_reply", "gateq_inbox_reply"];
+  const area = toolAreaOf("gateq_inbox_reply");
+
+  it("has an area the reader can put in a turn's focus", () => {
+    expect(area).not.toBeNull();
+    expect(toolAreaOf("gateq_inbox_draft_reply")).toBe(area);
+  });
+
+  it.each(Q_TASK_CLASSES)(
+    "%s: left out of the unfocused offer and the stable catalogue, so they never push a purpose's own tool past the bound",
+    (purpose) => {
+      const context = worstCase(purpose);
+      for (const list of [
+        registry.ranked(context),
+        registry.catalogue(context),
+      ]) {
+        for (const name of REPLY_TOOLS) expect(names(list)).not.toContain(name);
+      }
+    },
+  );
+
+  it("drafts and sends when asked: named, or the turn about the inbox, each is offered and executes", () => {
+    for (const purpose of [
+      "ACTION_PREPARATION",
+      "INVESTOR_QUESTION",
+    ] as const) {
+      for (const name of REPLY_TOOLS) {
+        for (const focus of [
+          { areas: [], tools: [name] },
+          { areas: [area ?? ""], tools: ["gateq_inbox_draft_pass"] },
+          { areas: [area ?? ""], tools: [] },
+        ]) {
+          const context = worstCase(purpose, focus);
+          const offered = names(registry.eligible(context));
+          expect(offered, `${purpose}: ${name}`).toContain(name);
+          expect(
+            registry.offeredByProviderName(context, name)?.definition
+              .providerName,
+            `${purpose}: ${name}`,
+          ).toBe(name);
+        }
+        // A turn about something else neither offers nor executes it.
+        const elsewhere = worstCase(purpose, {
+          areas: ["Research"],
+          tools: [],
+        });
+        expect(names(registry.eligible(elsewhere))).not.toContain(name);
+        expect(registry.offeredByProviderName(elsewhere, name)).toBeUndefined();
+      }
+    }
+  });
+
+  it("stays loadable on demand: use_capability's catalogue still lists both", () => {
+    const listed = names(registry.available(worstCase("ACTION_PREPARATION")));
+    for (const name of REPLY_TOOLS) expect(listed).toContain(name);
+  });
+});
