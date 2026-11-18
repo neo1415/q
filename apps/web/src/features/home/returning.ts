@@ -12,6 +12,46 @@ import type { OwnContext } from "@/features/q/context";
 
 export type Known = "YES" | "NO" | "UNKNOWN";
 
+/**
+ * The empty-page notes that say the slate itself is empty: nothing is
+ * discoverable, the declared rules or the mandate leave nothing, or
+ * nothing has a playable pitch. Only these let the welcome say "nothing
+ * matches".
+ */
+const EMPTY_SLATE_NOTES: ReadonlySet<string> = new Set([
+  "NO_DISCOVERABLE_COUNTERPARTS",
+  "NONE_PASS_HARD_RULES",
+  "NONE_MATCH_MANDATE",
+  "NONE_WITH_PLAYABLE_PITCH",
+]);
+
+/**
+ * Whether a first Discover page shows the slate holds anything. An empty
+ * page is not an empty slate: it is empty while a slate is rebuilt
+ * (RECOMMENDATIONS_REFRESHING, as after a slate's daily expiry), and a
+ * one-item page whose company was withheld at read time is empty with a
+ * cursor to more. Live 18 Nov 2026 (fictional Savanna, 19:46 UTC): her
+ * slate had expired at 19:28, the read asked for a rebuild that served 35
+ * companies nine seconds later, and the welcome said "nothing on Capital
+ * Q matches it yet". "NO" only when the reader said why it is empty.
+ */
+export function slateFact(
+  page:
+    | {
+        readonly items: readonly unknown[];
+        readonly notes: readonly string[];
+        readonly nextCursor: string | null;
+      }
+    | undefined,
+): Known {
+  if (page === undefined) return "UNKNOWN";
+  if (page.items.length > 0) return "YES";
+  if (page.nextCursor !== null) return "UNKNOWN";
+  return page.notes.some((note) => EMPTY_SLATE_NOTES.has(note))
+    ? "NO"
+    : "UNKNOWN";
+}
+
 /** The founder's deck, from whichever place Capital Q holds one. */
 export type DeckFact =
   /** A deck Q prepared, ready to open. */

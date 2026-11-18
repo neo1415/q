@@ -6,6 +6,7 @@ import {
   firstName,
   MAX_RETURNING_CARDS,
   returningGreeting,
+  slateFact,
   type ReturningCard,
   type ReturningFacts,
 } from "../src/features/home/returning";
@@ -349,6 +350,50 @@ describe("chooseReturningCards", () => {
           expect(each.action.artifactId).toBe(ARTIFACT);
         }
       }
+    }
+  });
+});
+
+describe("slateFact: an empty page is not an empty slate", () => {
+  const page = (
+    items: readonly unknown[],
+    notes: readonly string[] = [],
+    nextCursor: string | null = null,
+  ) => ({ items, notes, nextCursor });
+
+  it("is YES when the page holds a company", () => {
+    expect(slateFact(page([{}]))).toBe("YES");
+  });
+
+  it("is UNKNOWN when the read did not answer", () => {
+    expect(slateFact(undefined)).toBe("UNKNOWN");
+  });
+
+  it("is UNKNOWN while the slate is rebuilt (live 18 Nov, fictional Savanna)", () => {
+    const fact = slateFact(page([], ["RECOMMENDATIONS_REFRESHING"]));
+    expect(fact).toBe("UNKNOWN");
+    const question = returningGreeting({ ...investor, feed: fact }).question;
+    expect(question).not.toMatch(/nothing on Capital Q matches/i);
+  });
+
+  it("is UNKNOWN when the page's company was withheld and more follow", () => {
+    expect(slateFact(page([], [], "cursor-to-more"))).toBe("UNKNOWN");
+  });
+
+  it("is UNKNOWN for an empty page the reader gave no reason for", () => {
+    expect(slateFact(page([]))).toBe("UNKNOWN");
+    expect(slateFact(page([], ["NO_ACTIVE_MANDATE"]))).toBe("UNKNOWN");
+    expect(slateFact(page([], ["SLATE_RESTARTED"]))).toBe("UNKNOWN");
+  });
+
+  it("is NO only when the reader says the slate itself is empty", () => {
+    for (const note of [
+      "NO_DISCOVERABLE_COUNTERPARTS",
+      "NONE_PASS_HARD_RULES",
+      "NONE_MATCH_MANDATE",
+      "NONE_WITH_PLAYABLE_PITCH",
+    ]) {
+      expect(slateFact(page([], [note]))).toBe("NO");
     }
   });
 });

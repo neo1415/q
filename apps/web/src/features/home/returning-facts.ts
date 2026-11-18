@@ -22,7 +22,13 @@ import {
 } from "@/features/onboarding-conversation/conversation";
 import { apiSession, type OwnContext } from "@/features/q/context";
 
-import type { DeckFact, Known, ReturningFacts, SetupFacts } from "./returning";
+import {
+  slateFact,
+  type DeckFact,
+  type Known,
+  type ReturningFacts,
+  type SetupFacts,
+} from "./returning";
 
 /**
  * What Home knows about a returning person, read on the server under
@@ -60,13 +66,17 @@ async function feedFact(
   session: ApiSession,
   context: OwnContext,
 ): Promise<Known> {
+  // An empty page is not an empty slate (slateFact): only the reader's own
+  // reason for emptiness lets the welcome say nothing matches.
   if (context.kind === "INVESTOR") {
-    const slate = await within(() => discoverCompanies(session, { limit: 1 }));
-    return known(slate === undefined ? undefined : slate.items.length > 0);
+    return slateFact(
+      await within(() => discoverCompanies(session, { limit: 1 })),
+    );
   }
   if (context.kind === "FOUNDER") {
-    const slate = await within(() => discoverInvestors(session, { limit: 1 }));
-    return known(slate === undefined ? undefined : slate.items.length > 0);
+    return slateFact(
+      await within(() => discoverInvestors(session, { limit: 1 })),
+    );
   }
   return "UNKNOWN";
 }
