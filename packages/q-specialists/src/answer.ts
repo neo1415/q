@@ -6043,7 +6043,13 @@ export function createSpecialistQAnswer(
     // discover -- the place, kind and sector as said -- is the quick first
     // read's understanding (TURN_SKIM v8), never a list of place words,
     // which dropped "family offices" and "fintech" from the ask.
-    dailyLaneOf(utterance, lastAnswerShowedCards(history));
+    // Audit item 1: the Daily lane is instant only right after Q's own
+    // Daily line (or before Q has spoken); otherwise the reading decides.
+    dailyLaneOf(
+      utterance,
+      lastAnswerShowedCards(history),
+      [...history].reverse().find((m) => m.role === "Q")?.content ?? null,
+    );
 
   /**
    * The permitted plan binds their own investor mandate to this actor, run

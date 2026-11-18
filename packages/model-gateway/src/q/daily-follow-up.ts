@@ -1,5 +1,8 @@
 import type { ArrivalDailyStory, ArrivalSnapshot } from "@capital-q/contracts";
 import {
+  DAILY_GIST_CLOSING,
+  DAILY_OTHER_STORY_CLOSING,
+  DAILY_WHICH_OPENING,
   dailyFollowUpKind,
   dailyGistWords,
   dailyMoreWords,
@@ -183,14 +186,14 @@ export function dailyFollowUpAnswer(
           .replace(/ Want more.*$/u, "")
           .concat(
             other === undefined
-              ? " Want more, or shall I open it?"
-              : ` The other story was ${spokenHeadline(other.headline)}. Want that one, or shall I open this one?`,
+              ? ` ${DAILY_GIST_CLOSING}`
+              : ` The other story was ${spokenHeadline(other.headline)}. ${DAILY_OTHER_STORY_CLOSING}`,
           ),
       };
     }
     return {
       itemKey: "daily:ambiguous",
-      text: `Which one do you mean: ${names.slice(0, 2).join(", or ")}?`,
+      text: `${DAILY_WHICH_OPENING}${names.slice(0, 2).join(", or ")}?`,
     };
   }
   const story = referent.story;

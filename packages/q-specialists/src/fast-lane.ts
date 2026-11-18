@@ -1,4 +1,8 @@
-import type { TurnSkimV8Result as TurnSkimResult } from "@capital-q/q-core";
+import {
+  dailyFollowUpKind,
+  isQDailyLine,
+  type TurnSkimV8Result as TurnSkimResult,
+} from "@capital-q/q-core";
 
 type SkimInvestors = NonNullable<TurnSkimResult["investors"]>;
 
@@ -460,6 +464,17 @@ export function cardsLaneOf(
  * 2026-10-11: two classification calls, ~2.5 s, before a code answer).
  * Vague words ("open it", "tell me more") still go through the reader:
  * they can mean a card or a document.
+ *
+ * Audit 2026-11-13 item 1 (measured on 14 days of production turns): the
+ * lane answered before any reading, so nothing corrected it, and 3 of its
+ * 4 fires were misreads ("i want to read the news", a spoken fragment
+ * "...this section where there is listening", a bare "first" mid-call),
+ * each answered with no story bound and no reading. It is now kept for
+ * exact forms only: the words are one the Daily answer itself can answer
+ * (`dailyFollowUpKind`, or a bare ordinal), and Q's own last line was
+ * about the Daily (`isQDailyLine`) or Q has not spoken yet (the welcome
+ * named the stories). Everything else waits for the reading; the gateway
+ * still answers a Daily verb from the snapshot on that path.
  */
 const DAILY_ONLY =
   /\b(?:(?:the\s+)?gist|full\s+story|(?:that|this|the)\s+(?:story|article|section|news)|q\s+daily)\b/iu;
@@ -467,9 +482,12 @@ const DAILY_ONLY =
 export function dailyLaneOf(
   utterance: string,
   lastAnswerShowedCards = false,
+  /** Q's last line in this conversation; null when Q has not spoken yet. */
+  lastQLine: string | null = null,
 ): FastLane | null {
   const text = utterance.trim();
   if (text.length === 0 || text.length > 120) return null;
+  if (lastQLine !== null && !isQDailyLine(lastQLine)) return null;
   // "the other one" / "the first one" after Q talked about stories (not
   // after cards, where it means a card): the Daily lane, no first reads.
   const bareOrdinal =
@@ -477,7 +495,12 @@ export function dailyLaneOf(
     /^(?:and\s+)?(?:the\s+)?(?:first|second|other|last|latter|former)(?:\s+one)?(?:\s+please)?[.!?]*$/iu.test(
       text,
     );
-  if (!bareOrdinal && !DAILY_ONLY.test(text)) return null;
+  if (
+    !bareOrdinal &&
+    (!DAILY_ONLY.test(text) || dailyFollowUpKind(text) === null)
+  ) {
+    return null;
+  }
   // A request to act on something else is not a Daily follow-up.
   if (
     /\b(?:draft|email|send|schedule|delete|approve|decline|deck|pitch)\b/iu.test(

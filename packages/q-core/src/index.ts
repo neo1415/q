@@ -2128,8 +2128,12 @@ export {
 
 export {
   WELCOME_STORIES_MAX,
+  DAILY_GIST_CLOSING,
+  DAILY_OTHER_STORY_CLOSING,
+  DAILY_WHICH_OPENING,
   dailyFollowUpKind,
   dailyGistWords,
+  isQDailyLine,
   dailyMoreWords,
   editionDay,
   quietDayNewsWords,

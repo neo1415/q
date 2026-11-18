@@ -160,9 +160,35 @@ function sentence(text: string): string {
   return /[.!?…]$/u.test(flat) ? flat : `${flat}.`;
 }
 
+/** How Q's own gist of a Daily story ends (dailyGistWords). */
+export const DAILY_GIST_CLOSING = "Want more, or shall I open it?";
+/** How Q's own gist ends when a second story was in play. */
+export const DAILY_OTHER_STORY_CLOSING =
+  "Want that one, or shall I open this one?";
+/** How Q's own "which story?" line begins; the stories are joined by ", or ". */
+export const DAILY_WHICH_OPENING = "Which one do you mean: ";
+
+/**
+ * Audit 2026-11-13 item 1 (Daily lane): whether Q's own last line was
+ * about Q Daily stories -- a line Q's Daily code wrote (the fixed closings
+ * above) or one naming the Daily. This checks Q's output, never the
+ * person's words: only after such a line does a bare "the first one" or
+ * "give me the gist" mean a story, so only then may the instant Daily lane
+ * skip the turn reading. Anything else waits for the reading.
+ */
+export function isQDailyLine(said: string): boolean {
+  const line = said.trim();
+  return (
+    /\bDaily\b/u.test(line) ||
+    line.endsWith(DAILY_GIST_CLOSING) ||
+    line.endsWith(DAILY_OTHER_STORY_CLOSING) ||
+    (line.startsWith(DAILY_WHICH_OPENING) && line.includes(", or "))
+  );
+}
+
 /** The gist, spoken: the headline for reference and the prepared summary. */
 export function dailyGistWords(story: DailyNewsStory): string {
-  return `${spokenHeadline(story.headline)}. ${sentence(story.summary)}${attribution(story, story.summary)} Want more, or shall I open it?`;
+  return `${spokenHeadline(story.headline)}. ${sentence(story.summary)}${attribution(story, story.summary)} ${DAILY_GIST_CLOSING}`;
 }
 
 /** More: the prepared opening paragraphs (the summary when there is no more). */
