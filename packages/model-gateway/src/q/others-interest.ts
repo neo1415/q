@@ -42,6 +42,24 @@ export function asksAboutOthersInterest(text: string): boolean {
   );
 }
 
+/**
+ * Audit 2026-11-13 item 17: the turn asks about other parties' interest or
+ * activity when the reader read it so by meaning (TURN_READER v93
+ * `othersActivity`, carried as `othersActivityAsked`) OR the word rule
+ * above matches. The word rule stays as defence in depth: a reading that
+ * failed, or missed it, never lets a plain ask through. Either one only
+ * shapes how Q says it; the data itself is read solely through the Network
+ * context's party checks (respond-to-interest `authoriseForCompany`,
+ * relationship-status `requireRelationshipListingScope`), so no wording
+ * can reach another investor's relationship.
+ */
+export function othersInterestAsked(
+  request: { readonly othersActivityAsked?: boolean | undefined },
+  text: string,
+): boolean {
+  return request.othersActivityAsked === true || asksAboutOthersInterest(text);
+}
+
 export const OTHERS_INTEREST_LINE =
   "I can't share other investors' interest or cheque sizes: that's between them and the company.";
 

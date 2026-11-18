@@ -1671,3 +1671,23 @@ export const TurnReaderV91ResultSchema = TurnReaderV90ResultSchema.extend({
   question: TurnQuestionV91Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV91Result = z.infer<typeof TurnReaderV91ResultSchema>;
+
+/**
+ * v93 (audit 2026-11-13 item 17, privacy). Whether a turn asks about other
+ * parties' interest or activity on a company or relationship -- who else is
+ * interested, how many others are looking, who passed, who is in
+ * diligence, other cheques or commitments -- was decided by a word rule
+ * alone, so a paraphrase it missed ("is anybody else circling Kazikit?",
+ * "¿alguien más está mirando Kazikit?") was answered without the
+ * withholding note. The reading now says it by meaning, in any words and
+ * language, with the recent turns (`othersActivity`). The word rule stays
+ * as defence in depth; either one withholds. The data itself is never
+ * reachable: other parties' relationships are read only by the Network
+ * context's party checks. Lenient: a malformed value reads as false and
+ * never costs the reading.
+ */
+export const TURN_READER_V93_SCHEMA_VERSION = 93;
+export const TurnReaderV93ResultSchema = TurnReaderV91ResultSchema.extend({
+  othersActivity: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV93Result = z.infer<typeof TurnReaderV93ResultSchema>;

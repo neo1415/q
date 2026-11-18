@@ -373,6 +373,15 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**
+   * TURN_READER v93 (audit 2026-11-13 item 17): the reader read the turn as
+   * asking about other parties' interest or activity on a company or
+   * relationship. The answer then withholds it exactly as when the word
+   * rule fires; either one is enough. It changes only how Q says it: the
+   * data is never reachable past the Network context's party checks.
+   * Absent is false.
+   */
+  readonly othersActivityAsked?: boolean | undefined;
+  /**
    * Whom the turn is about, as the turn reader understood it (v58): the
    * only name the public web and its pictures are searched by -- never one
    * guessed from capital letters (production 2026-10-23: "Yes" was).

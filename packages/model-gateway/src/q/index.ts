@@ -616,9 +616,14 @@ import {
 } from "./attached-document-fact.js";
 import { asksChequeFit, chequeFitStatement } from "./cheque-fit-fact.js";
 import {
-  asksAboutOthersInterest,
+  othersInterestAsked,
   OTHERS_INTEREST_NOTE,
   withOthersInterestWithheld,
+} from "./others-interest.js";
+// Item 17: the word rule, for the reader eval's record of what it catches.
+export {
+  asksAboutOthersInterest,
+  othersInterestAsked,
 } from "./others-interest.js";
 import {
   asksToCompare,
@@ -9621,7 +9626,7 @@ export function createModelGatewayQAnswer(
             ].join(" "),
           };
         }
-        if (asksAboutOthersInterest(latest.content)) {
+        if (othersInterestAsked(request, latest.content)) {
           noteParts = {
             ...noteParts,
             turn: [noteParts.turn, OTHERS_INTEREST_NOTE].join(" "),
@@ -10669,7 +10674,7 @@ export function createModelGatewayQAnswer(
         // the answer speaks to them.
         content = inSecondPerson(content);
         // QA F-44: other investors' interest is withheld, never denied.
-        if (asksAboutOthersInterest(latest.content)) {
+        if (othersInterestAsked(request, latest.content)) {
           content = withOthersInterestWithheld(content).slice(
             0,
             ANSWER_LIMIT_CHARS,
@@ -10831,7 +10836,7 @@ export function createModelGatewayQAnswer(
           let said = inSecondPerson(
             withoutInternalFailureLines(spokenCandidate),
           );
-          if (asksAboutOthersInterest(latest.content)) {
+          if (othersInterestAsked(request, latest.content)) {
             said = withOthersInterestWithheld(said);
           }
           said = withRelationshipStagesChecked(

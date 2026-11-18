@@ -168,6 +168,8 @@ export function speculationMisfit(input: {
     final.leadLines !== undefined ||
     final.askedAction !== undefined ||
     final.writingDocument === true ||
+    // Others' interest is withheld; the speculation wrote without that note.
+    final.othersActivityAsked === true ||
     final.questionSequence !== undefined ||
     final.questionKind === "ADVICE" ||
     final.questionKind === "THEIR_OWN_RECORDS" ||

@@ -10439,6 +10439,9 @@ export function createSpecialistQAnswer(
             },
           }
         : {}),
+      // v93 (audit 2026-11-13 item 17): other parties' interest or
+      // activity, read by meaning; the answer withholds it.
+      ...(read?.othersActivity === true ? { othersActivityAsked: true } : {}),
       // v88 (owner live 14 Nov 2026, D1): companies other than those they
       // are already in contact with, on a FIT or catalog question.
       // v89 (audit 2026-11-15, RC2): a founder's investors too ("which
