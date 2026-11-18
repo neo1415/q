@@ -6,6 +6,10 @@ import {
   createMeetingAssistantService,
   meetingBotAttendeeFrom,
   type MeetingBotProvider,
+  type MeetingDigest,
+  type MeetingNotes,
+  type MeetingOutcomes,
+  type MeetingRecap,
   type HostParty,
   type MeetingContextSnapshot,
   type MeetingEvent,
@@ -137,6 +141,12 @@ export type SimScenario = {
   readonly steps: readonly SimStep[];
   /** How long after the last step to keep the clock running. */
   readonly tailMs?: number;
+  /**
+   * S5: what the scripted model writes as the record after the call
+   * (MEETING_NOTES' typed output). Absent: the model writes nothing and
+   * the record fails, as when the gateway is down.
+   */
+  readonly notes?: Omit<MeetingNotes, "composerVersion">;
 };
 
 export type SpokenLine = {
@@ -212,6 +222,14 @@ export type SimResult = {
   readonly lastWordAt: ReadonlyMap<SimStep, number>;
   /** Q's first spoken words after a step's last word that come from `answer`. */
   readonly answerLatency: (step: SimStep, answer: string) => number | null;
+  /** S5: Q's post-call reading, as written to the record. */
+  readonly outcomes: MeetingOutcomes | null;
+  /** S6: what Capital Q's admin received about the meeting. */
+  readonly digests: readonly MeetingDigest[];
+  /** S6: the recap email each person received (with the transcript). */
+  readonly recaps: readonly MeetingRecap[];
+  /** S5: when the post-call reading was written (ms from the start). */
+  readonly settledAt: number | null;
 };
 
 function words(text: string): string[] {
@@ -650,6 +668,11 @@ export async function simulateMeeting(
   // over a fake executor; Recall's status webhook settles it. ------------
   const notices: { at: number; key: string }[] = [];
   const held = new Set<string>();
+  let outcomes: MeetingOutcomes | null = null;
+  let settledAt: number | null = null;
+  const digests: MeetingDigest[] = [];
+  const recaps: MeetingRecap[] = [];
+  const recapClaimed = new Set<string>();
   const assistantRow = {
     id: "00000000-0000-4000-8000-0000000005a1",
     meeting_id: scenario.meetingId,
@@ -690,9 +713,39 @@ export async function simulateMeeting(
         }
       }
     }
-    const rows = /from communication\.meeting_assistants a/u.test(text)
+    if (text.includes("set outcomes =")) {
+      outcomes = values[0] as MeetingOutcomes;
+      settledAt = clock.at - start;
+    }
+    // The booking's people with their side (the real query's answer).
+    const participants =
+      text.includes("from communication.meeting_participants p") &&
+      text.includes("as side")
+        ? scenario.parties.map((p) => ({
+            user_id: p.userId,
+            display_name: p.name,
+            side: p.side,
+          }))
+        : null;
+    // The recap is claimed once per person on their own notice.
+    const claimed = text.includes("set emailed_at")
+      ? scenario.parties
+          .filter((p) => !recapClaimed.has(p.userId))
+          .map((p) => {
+            recapClaimed.add(p.userId);
+            return {
+              user_id: p.userId,
+              email: p.email,
+              display_name: p.name,
+              link_path: "/relationships",
+            };
+          })
+      : null;
+    const rows: unknown[] = /from communication\.meeting_assistants a/u.test(
+      text,
+    )
       ? [assistantRow]
-      : [];
+      : (participants ?? claimed ?? []);
     return Object.assign(Promise.resolve(rows), {
       catch: (f: (e: unknown) => unknown) => Promise.resolve(rows).catch(f),
     });
@@ -709,7 +762,11 @@ export async function simulateMeeting(
           state === "ENDED" && admitted !== null && !gaveUp
             ? heardLines
                 .filter((l) => botLeftAt === null || l.at <= botLeftAt)
-                .map((l) => ({ speaker: l.speaker, text: l.text }))
+                .map((l) => ({
+                  speaker: l.speaker,
+                  text: l.text,
+                  at: Math.round((l.at - (admitted ?? 0)) / 1_000),
+                }))
             : null,
         ...(gaveUp ? { ended: endOf(subCodes) } : {}),
       });
@@ -719,7 +776,23 @@ export async function simulateMeeting(
   const assistant = createMeetingAssistantService({
     sql: assistantSql,
     bots: assistantBots,
-    composer: { compose: () => Promise.resolve(null) },
+    // The model's record after the call: scripted, as its typed output.
+    composer: {
+      compose: () =>
+        Promise.resolve(
+          scenario.notes === undefined
+            ? null
+            : { ...scenario.notes, composerVersion: "meeting-notes.sim" },
+        ),
+    },
+    digest: (digest) => {
+      digests.push(digest);
+      return Promise.resolve();
+    },
+    recap: (recap) => {
+      recaps.push(recap);
+      return Promise.resolve();
+    },
     nameOf: () => Promise.resolve(organiserName),
     now: () => new Date(clock.at),
     tookPlace: (meeting) => {
@@ -1025,5 +1098,9 @@ export async function simulateMeeting(
     botLeftAt,
     lastWordAt,
     answerLatency,
+    outcomes,
+    digests,
+    recaps,
+    settledAt,
   };
 }

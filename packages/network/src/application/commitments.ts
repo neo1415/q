@@ -12,9 +12,15 @@ import type { ActorContext } from "@capital-q/security";
 
 import { RelationshipIdSchema } from "../contracts/index.js";
 import {
+  amountMismatch,
+  commitmentEvidenceStatus,
+  commitmentReviewFlags,
+} from "../domain/commitment-evidence.js";
+import {
   RELATIONSHIP_EVENT_COMMITMENT_CONFIRMED,
   RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
   RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+  RELATIONSHIP_EVENT_COMMITMENT_NOTE_ADDED,
   RELATIONSHIP_EVENT_COMMITMENT_RECEIVED,
   RELATIONSHIP_EVENT_COMMITMENT_STATED,
   RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT,
@@ -79,6 +85,10 @@ type Row = {
   transfer_reference: string | null;
   transfer_sent_at: Date | null;
   received_at: Date | null;
+  condition: string | null;
+  evidence_status:
+    "SELF_REPORTED" | "DOCUMENT_SUPPORTED" | "MULTI_SOURCE_SUPPORTED";
+  evidence_document_id: string | null;
 };
 
 const iso = (value: Date | null): string | null =>
@@ -129,6 +139,8 @@ function toDto(row: Row, side: "COMPANY" | "INVESTOR"): CommitmentDto {
     canConfirmReceived:
       (row.status === "CONFIRMED" || row.status === "TRANSFER_SENT") &&
       side === "COMPANY",
+    condition: row.condition,
+    evidenceStatus: row.evidence_status,
   };
 }
 
@@ -241,7 +253,7 @@ export function createCommitmentService(dependencies: {
       select id, relationship_id, amount::text as amount, currency_code, level,
              status, stated_by_side, source, quote, note, meeting_id, created_at,
              confirmed_at, round_id, transfer_reference, transfer_sent_at,
-             received_at
+             received_at, condition, evidence_status, evidence_document_id
         from network.commitments
        where relationship_id = ${relationshipId}
        order by created_at desc
@@ -253,7 +265,7 @@ export function createCommitmentService(dependencies: {
       select id, relationship_id, amount::text as amount, currency_code, level,
              status, stated_by_side, source, quote, note, meeting_id, created_at,
              confirmed_at, round_id, transfer_reference, transfer_sent_at,
-             received_at
+             received_at, condition, evidence_status, evidence_document_id
         from network.commitments
        where id = ${commitmentId}`;
     return rows[0] ?? null;
@@ -304,6 +316,51 @@ export function createCommitmentService(dependencies: {
     );
   }
 
+  /**
+   * S9: the latest step's corroboration grade, recomputed by code in the
+   * step's own transaction, and any disagreement flagged for the admin's
+   * review queue. Neither changes what either side said.
+   */
+  async function regrade(
+    tx: Parameters<Parameters<TransactionManager["run"]>[0]>[0],
+    commitmentId: string,
+  ): Promise<void> {
+    const rows = await tx.sql<
+      {
+        status: string;
+        relationship_id: string;
+        transfer_sent_at: Date | null;
+        transfer_reference: string | null;
+        evidence_document_id: string | null;
+        evidence_status: string;
+      }[]
+    >`
+      select status, relationship_id, transfer_sent_at, transfer_reference,
+             evidence_document_id, evidence_status
+        from network.commitments where id = ${commitmentId}`;
+    const row = rows[0];
+    if (row === undefined) return;
+    const facts = {
+      status: row.status,
+      transferSentAt: row.transfer_sent_at,
+      transferReference: row.transfer_reference,
+      evidenceDocumentId: row.evidence_document_id,
+    };
+    const grade = commitmentEvidenceStatus(facts);
+    if (grade !== row.evidence_status) {
+      await tx.sql`
+        update network.commitments set evidence_status = ${grade}
+         where id = ${commitmentId}`;
+    }
+    for (const flag of commitmentReviewFlags(facts)) {
+      await tx.sql`
+        insert into network.commitment_review_flags
+          (commitment_id, relationship_id, reason_code, detail)
+        values (${commitmentId}, ${row.relationship_id}, ${flag.reason}, ${flag.detail})
+        on conflict (commitment_id, reason_code) do nothing`;
+    }
+  }
+
   async function view(actor: ActorContext, relationshipId: string) {
     const party = await partyOf(actor, relationshipId);
     if (party === null) return null;
@@ -350,15 +407,18 @@ export function createCommitmentService(dependencies: {
       readonly statedBySide: "COMPANY" | "INVESTOR" | null;
       readonly quote: string;
       readonly key: string;
+      /** S5: the condition said with it ("if diligence checks out"). */
+      readonly condition?: string | null | undefined;
     }): Promise<boolean> =>
       transactions.run(async (tx) => {
         const inserted = await tx.sql<{ id: string }[]>`
           insert into network.commitments
             (tenant_id, relationship_id, amount, currency_code, level, status,
-             stated_by_side, source, quote, meeting_id, idempotency_key)
+             stated_by_side, source, quote, meeting_id, idempotency_key, condition)
           select r.tenant_id, r.id, ${input.amount}::numeric, ${input.currencyCode},
                  ${input.level}, 'DETECTED', ${input.statedBySide}, 'Q_MEETING',
-                 ${input.quote.slice(0, 300)}, ${input.meetingId}, ${input.key}
+                 ${input.quote.slice(0, 300)}, ${input.meetingId}, ${input.key},
+                 ${input.condition?.trim().slice(0, 200) || null}
             from network.relationships r
            where r.id = ${input.relationshipId}
           on conflict (relationship_id, idempotency_key) where source <> 'PERSON'
@@ -567,6 +627,7 @@ export function createCommitmentService(dependencies: {
             commitmentId,
             row.level,
           );
+          await regrade(tx, commitmentId);
           await announce(
             tx,
             actor,
@@ -674,6 +735,7 @@ export function createCommitmentService(dependencies: {
             commitmentId,
             row.level,
           );
+          await regrade(tx, commitmentId);
           await announce(
             tx,
             actor,
@@ -729,6 +791,7 @@ export function createCommitmentService(dependencies: {
             commitmentId,
             row.level,
           );
+          await regrade(tx, commitmentId);
           await announce(
             tx,
             actor,
@@ -743,6 +806,118 @@ export function createCommitmentService(dependencies: {
       return after === null
         ? { outcome: "REFUSED", code: "NOT_FOUND" }
         : { outcome: "OK", value: after };
+    },
+
+    /**
+     * S9: a clause, a change, a note or a document either side adds to a
+     * commitment. Appended, never overwriting: a changed amount is kept
+     * beside the stated one (and flagged for review) until the other side
+     * agrees through the usual confirm; a document raises the grade only
+     * when it is the company's own, on this relationship.
+     */
+    addNote: async (
+      actor: ActorContext,
+      commitmentId: string,
+      note: {
+        readonly kind: "NOTE" | "CLAUSE" | "CHANGE" | "EVIDENCE";
+        readonly body: string;
+        readonly proposed?:
+          | { readonly amount: string; readonly currencyCode: string }
+          | undefined;
+        readonly documentId?: string | undefined;
+      },
+      idempotencyKey: string,
+    ): Promise<
+      CommitmentOutcome<{
+        readonly noteId: string;
+        readonly flagged: boolean;
+      }>
+    > => {
+      const found = await detectedFor(actor, commitmentId);
+      if (found === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
+      const { row, party } = found;
+      const body = note.body.trim().slice(0, 1000);
+      if (body.length === 0) return { outcome: "REFUSED", code: "NOT_ALLOWED" };
+      if ((note.kind === "CHANGE") !== (note.proposed !== undefined)) {
+        return { outcome: "REFUSED", code: "NOT_ALLOWED" };
+      }
+      if (note.kind === "EVIDENCE" && note.documentId === undefined) {
+        return { outcome: "REFUSED", code: "NOT_ALLOWED" };
+      }
+      // A document is input, never proof: it must be an active document of
+      // this relationship's company, attached by the company's side.
+      let documentId: string | null = null;
+      if (note.documentId !== undefined) {
+        if (party.side !== "COMPANY") {
+          return { outcome: "REFUSED", code: "NOT_ALLOWED" };
+        }
+        const owned = await sql<{ id: string }[]>`
+          select d.id from evidence.documents d
+            join network.relationships r on r.company_id = d.company_id
+           where d.id = ${note.documentId} and r.id = ${row.relationship_id}
+             and d.status = 'ACTIVE'`;
+        if (owned.length === 0)
+          return { outcome: "REFUSED", code: "NOT_FOUND" };
+        documentId = note.documentId;
+      }
+      const mismatch =
+        note.proposed === undefined
+          ? null
+          : amountMismatch(
+              { amount: row.amount, currencyCode: row.currency_code },
+              note.proposed,
+            );
+      const noteId = await transactions.run(async (tx) => {
+        const inserted = await tx.sql<{ id: string }[]>`
+          insert into network.commitment_notes
+            (tenant_id, relationship_id, commitment_id, author_user_id, side, kind,
+             body, proposed_amount, proposed_currency_code, document_id, idempotency_key)
+          values (${party.tenantId}, ${row.relationship_id}, ${commitmentId},
+                  ${actor.userId}, ${party.side}, ${note.kind}, ${body},
+                  ${note.proposed?.amount ?? null}::numeric,
+                  ${note.proposed?.currencyCode ?? null}, ${documentId},
+                  ${idempotencyKey})
+          on conflict (commitment_id, idempotency_key) do nothing
+          returning id`;
+        const id = inserted[0]?.id;
+        if (id === undefined) {
+          const replay = await tx.sql<{ id: string }[]>`
+            select id from network.commitment_notes
+             where commitment_id = ${commitmentId}
+               and idempotency_key = ${idempotencyKey}`;
+          return replay[0]?.id ?? null;
+        }
+        if (documentId !== null) {
+          await tx.sql`
+            update network.commitments
+               set evidence_document_id = ${documentId}, updated_at = clock_timestamp()
+             where id = ${commitmentId}`;
+        }
+        if (mismatch !== null) {
+          await tx.sql`
+            insert into network.commitment_review_flags
+              (commitment_id, relationship_id, reason_code, detail)
+            values (${commitmentId}, ${row.relationship_id}, 'AMOUNT_MISMATCH',
+                    ${mismatch.slice(0, 500)})
+            on conflict (commitment_id, reason_code) do nothing`;
+        }
+        await appender.append(tx, {
+          relationshipId: RelationshipIdSchema.parse(row.relationship_id),
+          eventType: RELATIONSHIP_EVENT_COMMITMENT_NOTE_ADDED,
+          actor: { type: "HUMAN", id: actor.userId },
+          source: { type: "MANUAL", id },
+          visibilityScope: "relationship_shared",
+          payload: { commitmentId },
+          correlationId: dependencies.newCorrelationId(),
+        });
+        await regrade(tx, commitmentId);
+        return id;
+      });
+      if (noteId === null) return { outcome: "REFUSED", code: "NOT_FOUND" };
+      return {
+        outcome: "OK",
+        value: { noteId, flagged: mismatch !== null },
+      };
     },
 
     /** One commitment the actor may act on, with its relationship and their side. */

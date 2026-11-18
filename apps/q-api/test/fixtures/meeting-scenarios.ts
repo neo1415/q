@@ -165,6 +165,49 @@ export const FIRST_MEETING_SOFT_COMMITMENT: SimScenario = {
     { at: 150_000, kind: "LEAVE", who: "Adaeze Okafor" },
     { at: 151_000, kind: "LEAVE", who: "Bayo Ade" },
   ],
+  /**
+   * S5: the model's typed record after the call, as the gateway returns it.
+   * It over-reads the hedged figure as FIRM and writes a currency nobody
+   * said, misses "a quarter of the round", and adds a figure no line says.
+   */
+  notes: {
+    summary:
+      "A first call about Nixo Labs' seed round. Zino Capital asked for the cohort retention data and the cap table.",
+    flags: [],
+    followUps: [],
+    attendees: [
+      { name: "Bayo Ade", side: "INVESTOR" },
+      { name: "Adaeze Okafor", side: "FOUNDER" },
+    ],
+    agreements: [
+      "Adaeze will send the cohort retention data and the cap table by Friday.",
+    ],
+    commitments: [
+      {
+        party: "Bayo Ade",
+        amount: "$250,000",
+        firmness: "FIRM",
+        quote: "We will probably put in around two hundred and fifty thousand",
+      },
+      {
+        party: "Bayo Ade",
+        amount: "$1m",
+        firmness: "FIRM",
+        quote: "We are in for one million dollars",
+      },
+    ],
+    nextSteps: [
+      {
+        kind: "DOCUMENT_REQUEST",
+        what: "Adaeze sends the cohort retention data and the cap table",
+        owner: "Adaeze Okafor",
+        ownerSide: "FOUNDER",
+        dueDate: "2026-11-20",
+        callAt: null,
+        document: "cohort retention data and cap table",
+      },
+    ],
+  },
 };
 
 /**

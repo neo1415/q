@@ -1040,6 +1040,10 @@ export function registerQVoiceRoutes(
           facts !== null
             ? composeReturningOpener(name, facts, new Date())
             : plainOpener(name);
+        // S7: a meeting's follow-ups are said once; marked as they are.
+        if (facts?.meetingFollowUp?.seen !== undefined) {
+          void facts.meetingFollowUp.seen().catch(() => undefined);
+        }
       }
 
       // Names the person has taught Q to hear, before the recogniser

@@ -267,6 +267,18 @@ export function createDiligenceService(dependencies: {
     | undefined;
   /** A notice that could not be written: logged by the app, never silent. */
   readonly onNoticeFailure?: NoticeFailureReporter | undefined;
+  /**
+   * S6b: a document was shared by its owner (after the share committed),
+   * for a call in progress on the relationship to hear it. Absent: nothing.
+   */
+  readonly onShared?:
+    | ((input: {
+        readonly relationshipId: string;
+        readonly documentTitle: string;
+        readonly policyId: string;
+        readonly sharedByUserId: string;
+      }) => Promise<void>)
+    | undefined;
   readonly newCorrelationId: () => CorrelationId;
 }) {
   const { sql, transactions, requests, appender } = dependencies;
@@ -412,6 +424,17 @@ export function createDiligenceService(dependencies: {
         // An answer to their own request is theirs to open next.
         priority: request === null ? "UPDATE" : "NEEDS_YOU",
       });
+      // S6b: the owner shared it (their own click, or their approval of
+      // Q's card): a call in progress on this relationship hears it in
+      // its chat. Best effort, after the share committed.
+      await dependencies
+        .onShared?.({
+          relationshipId: party.relationshipId,
+          documentTitle: document.title,
+          policyId,
+          sharedByUserId: command.actor.userId,
+        })
+        .catch(() => undefined);
     }
     return { outcome: "OK", value: { policyId } };
   };
@@ -618,6 +641,71 @@ export function createDiligenceService(dependencies: {
         });
       }
       return { outcome: "OK", value: { requestId: made.id } };
+    },
+
+    /**
+     * S5 (2026-11-18): a request the investor made out loud in a call Q
+     * recorded, filed after the call as what it is -- the investor's
+     * request, heard in that meeting, with the line it rests on. Q is the
+     * recorder, so the history names Q (for this meeting) as the actor,
+     * and nobody is notified: both sides already read the meeting's record,
+     * and Q raises it with each of them the next time they talk to it.
+     * Only an open diligence counts, and only the investor's own side asks
+     * (the same checks as the request card).
+     */
+    recordFromMeeting: async (command: {
+      /** The investor who asked, resolved by the server from the booking. */
+      readonly actor: ActorContext;
+      readonly relationshipId: string;
+      readonly title: string;
+      readonly quote: string;
+      readonly meetingId: string;
+      readonly sourceEventId: string;
+      readonly dueText: string | null;
+    }): Promise<
+      DiligenceOutcome<{
+        readonly requestId: string;
+        readonly created: boolean;
+      }>
+    > => {
+      const party = await partyOf(command.actor, command.relationshipId);
+      if (party === null) return refused("NOT_FOUND");
+      if (party.side !== "INVESTOR") return refused("INVESTOR_ONLY");
+      if (!party.open) return refused("NOT_OPEN");
+      const title = command.title.trim().slice(0, 200);
+      if (title.length === 0) return refused("NOT_FOUND");
+      const correlationId = dependencies.newCorrelationId();
+      const made = await transactions.run(async (tx) => {
+        const inserted = await requests.insert(tx, {
+          tenantId: party.tenantId,
+          relationshipId: party.relationshipId,
+          userId: command.actor.userId,
+          title,
+          note: `Asked in the call: "${command.quote.trim().slice(0, 900)}"`,
+          idempotencyKey: `meeting:${command.meetingId}:${command.sourceEventId}`,
+          meeting: {
+            meetingId: command.meetingId,
+            sourceEventId: command.sourceEventId,
+            dueText: command.dueText,
+          },
+        });
+        if (inserted.created) {
+          await appender.append(tx, {
+            relationshipId: party.relationshipId,
+            eventType: RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
+            actor: { type: "Q", id: command.meetingId },
+            source: { type: "Q", id: inserted.id },
+            visibilityScope: "relationship_shared",
+            payload: { requestId: inserted.id },
+            correlationId,
+          });
+        }
+        return inserted;
+      });
+      return {
+        outcome: "OK",
+        value: { requestId: made.id, created: made.created },
+      };
     },
 
     /**

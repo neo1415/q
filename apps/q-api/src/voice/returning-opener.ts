@@ -38,6 +38,20 @@ export type OpenerFacts = {
    * "greet me according to the time"). Absent: a plain hello.
    */
   readonly timeZone?: string | null | undefined;
+  /**
+   * S7 (owner, 2026-11-18): their latest held meeting's follow-ups, once:
+   * how it went, what was asked of them, what they said they'd do.
+   * Composed by code from the meeting's post-call reading. `seen` marks
+   * it said, so Q opens with it only once; called by whoever said it.
+   */
+  readonly meetingFollowUp?:
+    | {
+        readonly meetingId: string;
+        readonly line: string;
+        readonly seen?: (() => Promise<void>) | undefined;
+      }
+    | null
+    | undefined;
 };
 
 /**
@@ -68,6 +82,11 @@ export function composeReturningOpener(
     : name === null
       ? "Welcome back."
       : `Hi ${name}.`;
+  // S7: the meeting comes first, said in full once (owner 2026-11-18:
+  // "How was your meeting? They asked for X. Shall I send it?"). This is
+  // the one exception to the "never the list" opener of 2026-10-16.
+  const meeting = facts.meetingFollowUp?.line.trim() ?? "";
+  if (meeting.length > 0) return `${hello} ${meeting}`;
   const scout = facts.scoutFinding?.trim() ?? "";
   // What Q did for them under a standing instruction is news, not
   // something waiting; its NEEDS_YOU notices are counted as notices.
@@ -97,6 +116,16 @@ export function createOpenerFacts(dependencies: {
   /** Default: the shared needs-you currency over the same sql. */
   readonly settledUnread?:
     ((userId: string) => Promise<ReadonlySet<string>>) | undefined;
+  /** S7: their latest held meeting's follow-ups (absent: none read). */
+  readonly meetingFollowUp?:
+    | ((actor: ActorContext) => Promise<{
+        readonly meetingId: string;
+        readonly line: string;
+      } | null>)
+    | undefined;
+  /** S7: marks a meeting's follow-ups said to this person. */
+  readonly meetingFollowUpSeen?:
+    ((actor: ActorContext, meetingId: string) => Promise<void>) | undefined;
 }): (actor: ActorContext) => Promise<OpenerFacts> {
   const { sql } = dependencies;
   const now = dependencies.now ?? (() => new Date());
@@ -110,6 +139,7 @@ export function createOpenerFacts(dependencies: {
     const settledIds = [
       ...(await settledUnread(actor.userId).catch(() => new Set<string>())),
     ];
+    const followUp = dependencies.meetingFollowUp?.(actor).catch(() => null);
     const [calls, reminders, notices, zone] = await Promise.all([
       sql<{ purpose: string; starts_at: Date }[]>`
         select m.purpose, m.starts_at
@@ -167,7 +197,19 @@ export function createOpenerFacts(dependencies: {
        order by i.updated_at desc
        limit 1`.catch(() => []);
     const latest = instruction[0];
+    const meeting = (await followUp) ?? null;
+    const markSeen = dependencies.meetingFollowUpSeen;
     return {
+      meetingFollowUp:
+        meeting === null
+          ? null
+          : {
+              meetingId: meeting.meetingId,
+              line: meeting.line,
+              ...(markSeen === undefined
+                ? {}
+                : { seen: () => markSeen(actor, meeting.meetingId) }),
+            },
       timeZone: zone[0]?.timezone ?? null,
       instructionNews:
         latest === undefined

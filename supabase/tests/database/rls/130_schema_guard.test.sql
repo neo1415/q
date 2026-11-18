@@ -277,6 +277,11 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('network', 'diligence_request_declines', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'diligence_questions',        'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'diligence_question_answers', 'INTERNAL_SERVER_ONLY', '{}'),
+  -- S9 (20261231599340): clauses, changes and evidence on a commitment;
+  -- server-only, append-only, read by both parties through the API.
+  ('network', 'commitment_notes',           'INTERNAL_SERVER_ONLY', '{}'),
+  -- S9: the admin's review queue of claims the two sides disagree on.
+  ('network', 'commitment_review_flags',    'INTERNAL_SERVER_ONLY', '{}'),
   ('identity', 'platform_admins',          'INTERNAL_SERVER_ONLY', '{}'),
   -- BIZ-007 integrations, guarded from the inbound email packet on: a
   -- person reads their own rows (suites 530 and 710); OAuth states are the

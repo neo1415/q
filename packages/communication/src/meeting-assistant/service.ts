@@ -12,6 +12,12 @@ import {
 } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
+import { meetingDigestOf, type MeetingDigest } from "./meeting-digest.js";
+import {
+  readMeetingOutcomes,
+  type MeetingOutcomes,
+  type OutcomeParty,
+} from "./meeting-outcomes.js";
 import { notesQuestions } from "./outcome-proposal.js";
 import type { MeetingRecap } from "./recap-email.js";
 
@@ -90,6 +96,11 @@ export const MEETING_BOT_END: Readonly<
 export type MeetingTranscriptLine = {
   readonly speaker: string | null;
   readonly text: string;
+  /**
+   * S5: seconds from the recording's start, when the provider gave it.
+   * Evidence for the post-call reading; not kept on the transcript.
+   */
+  readonly at?: number | null | undefined;
 };
 
 /**
@@ -124,6 +135,11 @@ export type MeetingBotProvider = {
   readonly stopSpeaking?: (botId: string) => Promise<void>;
   /** Leaves the call now (a participant asked Q to go). */
   readonly leave?: (botId: string) => Promise<void>;
+  /**
+   * S6b: posts one line in the call's chat, visible to everyone in it
+   * (a document's owner approved sharing it). Absent: nothing is posted.
+   */
+  readonly sendChat?: (botId: string, message: string) => Promise<void>;
   readonly read: (botId: string) => Promise<{
     readonly state: MeetingBotState;
     /** Present once the call has ended and its transcript is ready. */
@@ -452,8 +468,19 @@ export function createMeetingAssistantService(dependencies: {
         readonly startsAt: Date;
         readonly agreements: MeetingNotes["agreements"];
         readonly nextSteps: readonly MeetingNextStepNote[];
+        /**
+         * S5: Q's post-call reading, each item tied to a transcript line.
+         * Q_INFERENCE, SELF_REPORTED: material items wait for the relevant
+         * side's confirmation.
+         */
+        readonly outcomes: MeetingOutcomes;
       }) => Promise<void>)
     | undefined;
+  /**
+   * S6: the facilitation record for Capital Q's admin (never the
+   * transcript), once the record exists. Absent: none is written.
+   */
+  readonly digest?: ((digest: MeetingDigest) => Promise<void>) | undefined;
   /** A participant declined recording: marked on the relationship's history. */
   readonly onDeclined?:
     | ((meeting: {
@@ -865,6 +892,39 @@ export function createMeetingAssistantService(dependencies: {
     await failed(row, failure, why);
   }
 
+  /** The booking's people, each with their side by membership (S5). */
+  async function partiesOf(
+    meetingId: string,
+    relationshipId: string,
+  ): Promise<OutcomeParty[]> {
+    const rows = await sql<
+      { user_id: string; display_name: string | null; side: string }[]
+    >`
+      select p.user_id, p.display_name,
+             case when exists (
+                    select 1 from identity.organisation_memberships m
+                     where m.user_id = p.user_id
+                       and m.organisation_id = c.organisation_id
+                       and m.membership_status = 'active')
+                  then 'FOUNDER' else 'INVESTOR' end as side
+        from communication.meeting_participants p
+        join network.relationships r on r.id = ${relationshipId}
+        join core.companies c on c.id = r.company_id
+       where p.meeting_id = ${meetingId}
+       limit 20`;
+    return rows.flatMap((r): OutcomeParty[] =>
+      r.display_name === null || r.display_name.trim().length === 0
+        ? []
+        : [
+            {
+              name: r.display_name,
+              side: r.side === "FOUNDER" ? "FOUNDER" : "INVESTOR",
+              userId: r.user_id,
+            },
+          ],
+    );
+  }
+
   async function settle(row: AssistantRow & MeetingRow): Promise<void> {
     if (bots === undefined || row.provider_bot_id === null) return;
     const current = now();
@@ -992,6 +1052,50 @@ export function createMeetingAssistantService(dependencies: {
         );
       });
     };
+    // S5: what was said, read after the call (never in it): commitment
+    // signals, requests and promises, each tied to its transcript line.
+    // The people in the call are the booking's participants (with their
+    // side by membership); names only the notes knew keep no user.
+    const parties = await partiesOf(row.meeting_id, row.relationship_id).catch(
+      (): OutcomeParty[] => [],
+    );
+    const known = (name: string) =>
+      parties.some(
+        (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      );
+    const outcomes = readMeetingOutcomes({
+      meetingId: row.meeting_id,
+      lines: transcriptLines,
+      parties: [
+        ...parties,
+        ...notes.attendees
+          .filter((a) => !known(a.name))
+          .map((a) => ({ name: a.name, side: a.side, userId: null })),
+      ],
+      noted: notes.commitments,
+    });
+    await step("outcomes", async () => {
+      await sql`
+        update communication.meeting_assistants
+           set outcomes = ${jsonbParam(sql, outcomes)}::jsonb
+         where id = ${row.id}`;
+    });
+    // S6: the admin's facilitation record; counts and figures, no words.
+    const digest = dependencies.digest;
+    if (digest !== undefined) {
+      await step("digest", async () =>
+        digest(
+          meetingDigestOf({
+            meetingId: row.meeting_id,
+            relationshipId: row.relationship_id,
+            startsAt: row.starts_at,
+            outcomes,
+            lineTimes: transcriptLines.map((line) => line.at),
+            nextStep: notes.nextSteps?.[0]?.what ?? notes.agreements[0] ?? null,
+          }),
+        ),
+      );
+    }
     // Part of the call is missing: what Q heard is the record, and the
     // rest is said to be unrecorded rather than left to look complete.
     if (partial !== null) {
@@ -1017,6 +1121,7 @@ export function createMeetingAssistantService(dependencies: {
         startsAt: row.starts_at,
         agreements: notes.agreements,
         nextSteps: notes.nextSteps ?? [],
+        outcomes,
       }),
     );
     // "How did it go?" (2026-10-02): Q proposes what the call led to from

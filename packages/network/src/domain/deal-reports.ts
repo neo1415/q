@@ -180,6 +180,7 @@ const EVENT_WORDS: Readonly<Record<string, string>> = {
   commitment_withdrawn: "Commitment withdrawn",
   commitment_transfer_sent: "Funds marked sent",
   commitment_received: "Funds confirmed received",
+  commitment_note_added: "Commitment note added",
   deal_terms_recorded: "Terms recorded",
   deal_terms_signed: "Terms recorded as signed",
   deal_closed: "Investment closed",

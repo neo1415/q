@@ -67,7 +67,20 @@ const TranscriptSchema = z.array(
         .object({ name: z.string().nullish() })
         .passthrough()
         .nullish(),
-      words: z.array(z.object({ text: z.string() }).passthrough()).default([]),
+      words: z
+        .array(
+          z
+            .object({
+              text: z.string(),
+              // S5: when it was said (seconds from the recording's start).
+              start_timestamp: z
+                .object({ relative: z.number().nullish() })
+                .passthrough()
+                .nullish(),
+            })
+            .passthrough(),
+        )
+        .default([]),
     })
     .passthrough(),
 );
@@ -466,6 +479,13 @@ export function createRecallBots(options: {
         method: "POST",
       });
     },
+    // S6b: one line in the call's chat, after the owner approved a share.
+    sendChat: async (botId, message) => {
+      await request(`/bot/${encodeURIComponent(botId)}/send_chat_message/`, {
+        method: "POST",
+        body: { message: message.slice(0, 4_000) },
+      });
+    },
     read: async (botId) => {
       const bot = BotSchema.parse(
         await request(`/bot/${encodeURIComponent(botId)}/`, { method: "GET" }),
@@ -501,7 +521,12 @@ export function createRecallBots(options: {
       if (!parsed.success) return { state, transcript: [] };
       const transcript: MeetingTranscriptLine[] = parsed.data.map((part) => {
         const text = part.words.map((word) => word.text).join(" ");
-        return { speaker: speakerOf(part.participant?.name, text), text };
+        const at = part.words[0]?.start_timestamp?.relative;
+        return {
+          speaker: speakerOf(part.participant?.name, text),
+          text,
+          ...(typeof at === "number" && Number.isFinite(at) ? { at } : {}),
+        };
       });
       // Removed part-way (meet-47): the record is what Q heard until then.
       const end = endOf(

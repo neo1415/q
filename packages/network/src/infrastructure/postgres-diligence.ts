@@ -109,16 +109,27 @@ export function createPostgresDiligenceRequests() {
         readonly note: string | null;
         readonly idempotencyKey: string;
         readonly about?: DiligenceRequestAbout | null | undefined;
+        /** S5: asked in a call Q recorded: the meeting, the reading item, when. */
+        readonly meeting?:
+          | {
+              readonly meetingId: string;
+              readonly sourceEventId: string;
+              readonly dueText: string | null;
+            }
+          | undefined;
       },
     ): Promise<{ readonly id: string; readonly created: boolean }> => {
       const about = input.about ?? null;
+      const meeting = input.meeting ?? null;
       const made = await tx.sql<{ id: string }[]>`
         insert into network.diligence_requests
           (tenant_id, relationship_id, requested_by_user_id, title, note, idempotency_key,
-           about, about_standing)
+           about, about_standing, meeting_id, source_event_id, due_text)
         values (${input.tenantId}, ${input.relationshipId}, ${input.userId},
                 ${input.title}, ${input.note}, ${input.idempotencyKey},
-                ${about?.statement ?? null}, ${about?.standing ?? null})
+                ${about?.statement ?? null}, ${about?.standing ?? null},
+                ${meeting?.meetingId ?? null}, ${meeting?.sourceEventId ?? null},
+                ${meeting?.dueText?.trim().slice(0, 80) || null})
         on conflict (requested_by_user_id, idempotency_key) do nothing
         returning id`;
       const id = made[0]?.id;

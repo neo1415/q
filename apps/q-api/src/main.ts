@@ -206,6 +206,13 @@ import {
   ownCompanyOf,
   ownDeckFactsOf,
 } from "./composition/documents.js";
+import {
+  createActorForUser,
+  createInCallShareAnnouncer,
+  createMeetingDigestWriter,
+  createMeetingFollowUps,
+  createMeetingOutcomeFiler,
+} from "./composition/meeting-after-call.js";
 import { createMeetingFollowUpCards } from "./composition/meeting-follow-up-cards.js";
 import {
   createRecallBots,
@@ -478,9 +485,7 @@ import {
   createPostgresDiligenceRequests,
   createPostgresDiligenceQuestions,
   createRelationshipEventRegistry,
-  parseSpokenAmount,
   RELATIONSHIP_EVENT_DEFINITIONS,
-  sideOfParty,
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import { NETWORK_EVENTS } from "@capital-q/network/events";
@@ -2779,6 +2784,15 @@ const profileMaterial = createProfileMaterial({
  * the same service as the relationship page, approved on a card first. Q
  * never downloads a document.
  */
+// S6b: a share during a live call is announced in its chat; bound once
+// the meeting bots exist (below).
+const inCallShare: {
+  post?: (shared: {
+    readonly relationshipId: string;
+    readonly documentTitle: string;
+    readonly sharedByUserId: string;
+  }) => Promise<boolean>;
+} = {};
 const diligenceService = withRunCachedDiligenceViews(
   createDiligenceService({
     sql: database.sql,
@@ -2834,6 +2848,9 @@ const diligenceService = withRunCachedDiligenceViews(
         priority: input.actingSide === "INVESTOR" ? "NEEDS_YOU" : "UPDATE",
       }),
     onNoticeFailure,
+    onShared: async (shared) => {
+      await inCallShare.post?.(shared);
+    },
     newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
   }),
 );
@@ -6614,6 +6631,17 @@ const meetingScreens = createMeetingScreenVision({
   recentWords: (meetingId) => meetingHost.recentWords(meetingId),
   logger,
 });
+// S5: what Q read from a held call, filed as what it is (detected money,
+// the investor's requests) through each context's own service.
+const fileMeetingOutcomes = createMeetingOutcomeFiler({
+  actorFor: createActorForUser({
+    sql: database.sql,
+    resolver: actorContextResolver,
+  }),
+  detect: (input) => meetingCommitments.detect(input),
+  recordRequest: (input) => diligenceService.recordFromMeeting(input),
+  logger,
+});
 const meetingAssistant = createMeetingAssistantService({
   // J7: what a call led to, read by meaning from its agreed lines.
   outcomeReader: (who, lines) => wordsReaders.meetingOutcome(who, lines),
@@ -6640,6 +6668,8 @@ const meetingAssistant = createMeetingAssistantService({
     });
   },
   composer: meetingNotes,
+  // S6: the facilitation record for Capital Q's admin (never the transcript).
+  digest: createMeetingDigestWriter(database.sql),
   // ADR 0027 / S8: the call is marked held on the relationship's history
   // once the provider reports it took place (people heard), through
   // Network's own appender, whether or not Q's notes then compose.
@@ -6668,7 +6698,10 @@ const meetingAssistant = createMeetingAssistantService({
   onHeld: async (held) => {
     // meet-47: after the call Q works in the app -- each person's own
     // approval cards from what was agreed, and any standing instruction or
-    // errand waiting on this relationship continues now.
+    // errand waiting on this relationship continues now. S5: a document
+    // the investor asked for that Q read from the transcript is filed as
+    // their request below, so the model's own reading of it is no card.
+    const readRequests = held.outcomes.requests.some((r) => r.diligence);
     void meetingFollowUpCards
       .prepare({
         meetingId: held.meetingId,
@@ -6676,7 +6709,9 @@ const meetingAssistant = createMeetingAssistantService({
         purpose: held.purpose,
         startsAt: held.startsAt,
         agreements: held.agreements,
-        nextSteps: held.nextSteps,
+        nextSteps: readRequests
+          ? held.nextSteps.filter((step) => step.kind !== "DOCUMENT_REQUEST")
+          : held.nextSteps,
       })
       .then((proposed) => {
         logger.info(
@@ -6694,29 +6729,15 @@ const meetingAssistant = createMeetingAssistantService({
         );
       });
     void instructionTriggers.wake(held.relationshipId).catch(() => undefined);
-    // Founder direction 2026-09-30: money said in the call is filed by Q
-    // for both sides to adopt or dispute; it never counts until confirmed.
-    for (const [index, signal] of held.commitments.entries()) {
-      const money = parseSpokenAmount(signal.amount);
-      if (money === null) continue;
-      await meetingCommitments
-        .detect({
-          relationshipId: held.relationshipId,
-          meetingId: held.meetingId,
-          amount: money.amount,
-          currencyCode: money.currencyCode,
-          level: signal.firmness === "FIRM" ? "FIRM" : "SOFT",
-          statedBySide: sideOfParty(signal.party, held.attendees),
-          quote: signal.quote,
-          key: `meeting:${held.meetingId}:${String(index)}`,
-        })
-        .catch((error: unknown) => {
-          logger.warn(
-            { err: error, meetingId: held.meetingId },
-            "detected commitment not filed",
-          );
-        });
-    }
+    // Founder direction 2026-09-30, S5: money said in the call is filed by
+    // Q for both sides to adopt or dispute; it never counts until
+    // confirmed. Only what a transcript line says, at the level its words
+    // commit to, with a currency only when one was said.
+    await fileMeetingOutcomes({
+      relationshipId: held.relationshipId,
+      meetingId: held.meetingId,
+      outcomes: held.outcomes,
+    });
   },
   // A declined recording stays on the relationship's history.
   onDeclined: async (declined) => {
@@ -6738,6 +6759,16 @@ const meetingAssistant = createMeetingAssistantService({
     ),
   logger,
 });
+inCallShare.post = createInCallShareAnnouncer({
+  sql: database.sql,
+  bots: recallBots,
+  webUrl: process.env.RAILWAY_SERVICE__CAPITAL_Q_WEB_URL
+    ? `https://${process.env.RAILWAY_SERVICE__CAPITAL_Q_WEB_URL}`
+    : undefined,
+  logger,
+});
+// S7: the next conversation opens with the meeting's follow-ups, once.
+const meetingFollowUps = createMeetingFollowUps({ sql: database.sql });
 joinCallNow.book = (meetingId) => {
   void meetingAssistant.enlist().catch((error: unknown) => {
     logger.warn({ err: error, meetingId }, "joined call not booked at once");
@@ -9186,6 +9217,8 @@ const { app, logger: appLogger } = createApp(
             openerFacts: createOpenerFacts({
               sql: database.sql,
               settledUnread: needsYouCurrency.settledUnread,
+              meetingFollowUp: meetingFollowUps.next,
+              meetingFollowUpSeen: meetingFollowUps.seen,
             }),
             rehearsals: {
               opening: rehearsals.opening,

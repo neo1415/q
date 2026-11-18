@@ -128,6 +128,15 @@ export const CommitmentDtoSchema = z
     canMarkSent: z.boolean().optional(),
     /** The company's side, on confirmed or sent money. */
     canConfirmReceived: z.boolean().optional(),
+    /** S5: the condition said with the money ("if diligence checks out"). */
+    condition: z.string().nullable().optional(),
+    /**
+     * S9: how well the latest step is corroborated (ADR-001), apart from
+     * the status. Only MULTI_SOURCE_SUPPORTED counts toward a fee.
+     */
+    evidenceStatus: z
+      .enum(["SELF_REPORTED", "DOCUMENT_SUPPORTED", "MULTI_SOURCE_SUPPORTED"])
+      .optional(),
   })
   .strict();
 export type CommitmentDto = z.infer<typeof CommitmentDtoSchema>;

@@ -277,6 +277,17 @@ export {
   sideOfParty,
   type SpokenAmount,
 } from "./domain/commitment-signals.js";
+// S9 (2026-11-18): corroboration grades, review flags and the right prompt.
+export {
+  amountMismatch,
+  commitmentEvidenceStatus,
+  commitmentPrompt,
+  commitmentReviewFlags,
+  countsTowardFee,
+  type CommitmentEvidenceFacts,
+  type CommitmentEvidenceStatus,
+  type CommitmentReviewReason,
+} from "./domain/commitment-evidence.js";
 // Spec 6.6.14-6.6.15: commitments and the fundraising view.
 export {
   commitmentBucket,
@@ -310,6 +321,7 @@ export {
   CommitmentConfirmedRelationshipEvent,
   CommitmentDetectedRelationshipEvent,
   CommitmentDisputedRelationshipEvent,
+  CommitmentNoteAddedRelationshipEvent,
   CommitmentReceivedRelationshipEvent,
   CommitmentTransferSentRelationshipEvent,
   MeetingRecordingDeclinedRelationshipEvent,
@@ -317,6 +329,7 @@ export {
   RELATIONSHIP_EVENT_MEETING_NO_SHOW,
   RELATIONSHIP_EVENT_COMMITMENT_DETECTED,
   RELATIONSHIP_EVENT_COMMITMENT_DISPUTED,
+  RELATIONSHIP_EVENT_COMMITMENT_NOTE_ADDED,
   RELATIONSHIP_EVENT_COMMITMENT_RECEIVED,
   RELATIONSHIP_EVENT_COMMITMENT_TRANSFER_SENT,
   RELATIONSHIP_EVENT_MEETING_RECORDING_DECLINED,

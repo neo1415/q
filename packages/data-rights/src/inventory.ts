@@ -409,6 +409,12 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: COUNTERPART,
   },
   {
+    table: "communication.meeting_follow_up_seen",
+    class: "DELETE",
+    person: by("user_id"),
+    why: "That Q has told the person about a meeting's follow-ups (S7).",
+  },
+  {
     table: "communication.meeting_host_notes",
     class: "ANONYMISE",
     person: by("requested_by_user_id"),
@@ -1184,6 +1190,19 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
 
   // --- network --------------------------------------------------------------
   {
+    table: "network.commitment_notes",
+    class: "ANONYMISE",
+    person: by("author_user_id"),
+    export: true,
+    why: COUNTERPART,
+  },
+  {
+    table: "network.commitment_review_flags",
+    class: "ANONYMISE",
+    person: by("reviewed_by_user_id"),
+    why: "Capital Q's review of a commitment both parties hold; only the reviewing staff member is named.",
+  },
+  {
     table: "network.commitments",
     class: "ANONYMISE",
     person: by(
@@ -1500,6 +1519,10 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     retention: "Up to 13 months",
     why: "Delivery outcomes keyed by a hash of the address and its domain only.",
   },
+  N(
+    "platform_ops.meeting_digests",
+    "The facilitation record of a meeting: counts and figures keyed by the meeting and the relationship, no person.",
+  ),
   {
     table: "platform_ops.etiquette_guide_active",
     class: "ANONYMISE",

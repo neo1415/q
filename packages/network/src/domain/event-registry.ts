@@ -373,6 +373,22 @@ export const CommitmentReceivedRelationshipEvent = defineRelationshipEvent({
     "The company's side confirmed a commitment's money arrived: invested capital.",
 });
 
+/**
+ * S9 (2026-11-18): a clause, a change, a note or a document one side added
+ * to a commitment. Activity: it never moves the relationship's state, and
+ * a changed amount stands beside the stated one until the other side
+ * agrees through the usual confirm.
+ */
+export const RELATIONSHIP_EVENT_COMMITMENT_NOTE_ADDED =
+  "commitment_note_added" as const;
+export const CommitmentNoteAddedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_COMMITMENT_NOTE_ADDED,
+  payloadSchema: CommitmentActivityPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "A party added a clause, a change, a note or a document to a commitment.",
+});
+
 export type RelationshipEventRegistry = {
   readonly get: (eventType: string) => RelationshipEventDefinition | undefined;
   readonly types: () => readonly string[];
@@ -744,6 +760,7 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     CommitmentDisputedRelationshipEvent,
     CommitmentTransferSentRelationshipEvent,
     CommitmentReceivedRelationshipEvent,
+    CommitmentNoteAddedRelationshipEvent,
     MeetingNoShowRelationshipEvent,
     RelationshipPassedRelationshipEvent,
     RelationshipPausedRelationshipEvent,

@@ -166,6 +166,32 @@ export {
   type MeetingRecap,
   type MeetingRecapEmail,
 } from "./meeting-assistant/recap-email.js";
+// S5-S7 (2026-11-18): after the call, what was said; the admin's digest;
+// the next conversation's opener.
+export {
+  commitmentLevelOf,
+  readMeetingOutcomes,
+  spokenFigure,
+  MEETING_OUTCOMES_VERSION,
+  type MeetingCommitmentReading,
+  type MeetingOutcomes,
+  type MeetingPromiseReading,
+  type MeetingRequestReading,
+  type OutcomeEvidence,
+  type OutcomeLine,
+  type OutcomeParty,
+  type OutcomeSide,
+} from "./meeting-assistant/meeting-outcomes.js";
+export {
+  meetingDigestOf,
+  type MeetingDigest,
+} from "./meeting-assistant/meeting-digest.js";
+export {
+  itemParts,
+  meetingFollowUpOf,
+  type FollowUpDocument,
+  type MeetingFollowUp,
+} from "./meeting-assistant/follow-up-opener.js";
 
 // AUTO block: Web Push (VAPID) and notice delivery (ADR 0030).
 export {
