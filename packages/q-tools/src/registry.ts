@@ -102,6 +102,13 @@ export type QToolRegistry = {
   readonly available: (
     context: QToolExecutionContext,
   ) => readonly QToolRecord[];
+  /**
+   * The plan class's stable catalogue, sorted by provider name: sent to
+   * the model unchanged turn to turn; never authority to execute.
+   */
+  readonly catalogue: (
+    context: QToolExecutionContext,
+  ) => readonly QToolRecord[];
   /** Resolve a model's proposal to the record that was offered, if any. */
   readonly offeredByProviderName: (
     context: QToolExecutionContext,
@@ -479,6 +486,33 @@ export function createQToolRegistry(
   const eligible = (context: QToolExecutionContext): readonly QToolRecord[] =>
     ranked(context).slice(0, Math.min(Q_TURN_TOOLS_MAX, MODEL_TOOLS_MAX));
 
+  /**
+   * The plan class's catalogue (model spend, 18 Nov 2026): every tool this
+   * purpose, actor and plan may be offered on any turn, before a turn's
+   * focus, its holds or the screen narrow it, within what one request can
+   * carry, sorted by provider name. It is sent unchanged turn to turn, so
+   * the provider's prompt cache holds it; what a turn may call is decided
+   * in code (eligible, offeredByProviderName), never by what was sent.
+   * Only names, descriptions and input schemas, which are product code:
+   * nothing in it is a person's data.
+   */
+  const catalogue = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked({
+      ...context,
+      focus: undefined,
+      asksNoAction: undefined,
+      invokedBy: undefined,
+      plan: { ...context.plan, screen: undefined },
+    })
+      .slice(0, MODEL_TOOLS_MAX)
+      .sort((a, b) =>
+        a.definition.providerName < b.definition.providerName
+          ? -1
+          : a.definition.providerName > b.definition.providerName
+            ? 1
+            : 0,
+      );
+
   // What the run's purpose and plan allow, exactly as before a turn's focus
   // existed, within what one request can carry.
   const unfocused = (context: QToolExecutionContext): readonly QToolRecord[] =>
@@ -589,5 +623,6 @@ export function createQToolRegistry(
         : record;
     },
     available,
+    catalogue,
   };
 }

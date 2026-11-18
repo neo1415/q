@@ -10,6 +10,7 @@ import type {
   ResponseCreateParamsStreaming,
   ResponseInput,
   Tool as OpenAITool,
+  ToolChoiceAllowed,
 } from "openai/resources/responses/responses";
 
 import {
@@ -156,10 +157,25 @@ export function toInput(messages: readonly ModelMessage[]): {
   // where it was added, as a marked note in a user message, the way the
   // Google adapter places it.
   const leading = messages.findIndex((message) => message.role !== "SYSTEM");
-  const instructions = (leading === -1 ? messages : messages.slice(0, leading))
+  const head = leading === -1 ? messages : messages.slice(0, leading);
+  // Instructions marked shared (fixed product text, the same for everyone)
+  // lead alone; the vendor renders the tool catalogue right after them, so
+  // that prefix is shared across people. The leading instructions not so
+  // marked (a person's own charter tail) follow the tools as developer
+  // messages: still instructions, never in the shared prefix.
+  const firstUnshared = head.findIndex(
+    (message) => message.role !== "SYSTEM" || message.shared !== true,
+  );
+  const split = firstUnshared > 0;
+  const instructions = (split ? head.slice(0, firstUnshared) : head)
     .map((message) => message.content)
     .join("\n\n");
-  const input: ResponseInput = [];
+  const input: ResponseInput = split
+    ? head.slice(firstUnshared).map((message) => ({
+        role: "developer" as const,
+        content: [{ type: "input_text" as const, text: message.content }],
+      }))
+    : [];
   for (const [index, message] of messages.entries()) {
     if (message.role === "SYSTEM") {
       if (leading !== -1 && index >= leading) {
@@ -229,6 +245,18 @@ function toTools(
     parameters: tool.inputJsonSchema,
     strict: false,
   }));
+}
+
+/** This turn's allowance over the catalogue: none, or these names only. */
+export function toolChoiceOf(
+  allowed: readonly string[],
+): "none" | ToolChoiceAllowed {
+  if (allowed.length === 0) return "none";
+  return {
+    type: "allowed_tools",
+    mode: "auto",
+    tools: allowed.map((name) => ({ type: "function", name })),
+  };
 }
 
 function toUsage(response: OpenAIResponse): ModelUsage | undefined {
@@ -374,6 +402,7 @@ export function createOpenAIModelProvider(
       toolCalling: true,
       streaming: true,
       cancellation: true,
+      restrictsTools: true,
     }),
     generate: async (
       request: ModelProviderRequest,
@@ -402,6 +431,12 @@ export function createOpenAIModelProvider(
           ? {}
           : { temperature: request.temperature }),
         ...(tools === undefined ? {} : { tools: [...tools] }),
+        // The whole catalogue is sent unchanged turn to turn (so it stays in
+        // the vendor's prompt cache) and this turn's allowance says what may
+        // be called. The gateway refuses anything outside it regardless.
+        ...(tools === undefined || request.allowedTools === undefined
+          ? {}
+          : { tool_choice: toolChoiceOf(request.allowedTools) }),
         // No summary is asked for and none is read: a reasoning trace is
         // not something Capital Q surfaces or stores (doc 12).
         reasoning: { effort: OPENAI_REASONING_EFFORT[request.reasoning] },

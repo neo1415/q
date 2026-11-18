@@ -172,10 +172,15 @@ function build(options: {
   readonly said?: string | undefined;
   /** The asker is on an investor's side (their own mandate is in the plan). */
   readonly investor?: boolean | undefined;
+  /** The provider can be sent a catalogue with an allowance (OpenAI's). */
+  readonly restrictsTools?: boolean | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: options.script,
+    ...(options.restrictsTools === true
+      ? { capabilities: { restrictsTools: true } }
+      : {}),
   });
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(
@@ -1080,6 +1085,10 @@ describe("answer seam tool loop", () => {
     ]);
     const second = alpha.calls[1]?.request.messages ?? [];
     expect(second.map((m) => m.role)).toEqual([
+      // The charter's fixed head and the task's fixed rules (shared), then
+      // the charter's per-person tail (v37).
+      "SYSTEM",
+      "SYSTEM",
       "SYSTEM",
       "USER",
       // What this run can do, built by code (CQ-QX-008).
@@ -1091,10 +1100,10 @@ describe("answer seam tool loop", () => {
       "ASSISTANT",
       "TOOL",
     ]);
-    expect(second[2]?.content).toContain(
+    expect(second[4]?.content).toContain(
       "WHAT YOU CAN DO IN THIS CONVERSATION",
     );
-    const toolTurn = second[6];
+    const toolTurn = second[8];
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain('"ok":true');
     expect(toolTurn?.content).toContain("Northwind (synthetic)");
@@ -1388,7 +1397,9 @@ describe("answer seam tool loop", () => {
       tools,
     });
     await seam.answer(request);
-    const toolTurn = alpha.calls[1]?.request.messages[6];
+    const toolTurn = alpha.calls[1]?.request.messages.find(
+      (m) => m.role === "TOOL",
+    );
     expect(toolTurn?.content).toContain('"ok":false');
     expect(toolTurn?.content).toContain("NOT_AVAILABLE");
     expect(JSON.stringify(alpha.calls)).not.toContain(PRIVATE);
@@ -5533,5 +5544,69 @@ describe("root cause replays: the vehicle is code's, from the stage, whatever to
     expect(said.indexOf("wouldn't rely on it")).toBeLessThan(
       said.indexOf(LIMIT),
     );
+  });
+});
+
+describe("the answer sends its plan class's stable catalogue (model spend, 18 Nov 2026)", () => {
+  const FIT: QOfferedTool = {
+    toolName: "fit.profile",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    definition: {
+      name: "fit_profile",
+      description: "Reads a fit.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const withCatalogue = () => {
+    const port = toolPort([GET_COMPANY], (proposal) =>
+      succeeded(proposal, { name: "Northwind (synthetic)" }),
+    );
+    return Object.assign(port, {
+      catalogue: () => Promise.resolve([GET_COMPANY, FIT]),
+    });
+  };
+
+  it("sends the whole catalogue in name order with this turn's offer as the allowance", async () => {
+    const tools = withCatalogue();
+    const { seam, alpha, request } = build({
+      script: [
+        call("c1"),
+        { kind: "TEXT", text: JSON.stringify(analystResult("with tool")) },
+      ],
+      tools,
+      restrictsTools: true,
+    });
+    await seam.answer(request);
+    const [first, second] = alpha.calls.map((c) => c.request);
+    expect(first?.tools.map((t) => t.name)).toEqual([
+      "fit_profile",
+      "get_company",
+    ]);
+    expect(first?.allowedTools).toEqual(["get_company"]);
+    // The next round sends the same instructions and tool block.
+    expect(JSON.stringify(second?.tools)).toBe(JSON.stringify(first?.tools));
+    expect(JSON.stringify(second?.messages.slice(0, 3))).toBe(
+      JSON.stringify(first?.messages.slice(0, 3)),
+    );
+    expect(tools.executed.map((p) => p.name)).toEqual(["get_company"]);
+  });
+
+  it("never executes a catalogue tool this turn does not offer", async () => {
+    const tools = withCatalogue();
+    const { seam, request } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [{ callId: "c1", name: "fit_profile", arguments: {} }],
+        },
+        { kind: "TEXT", text: JSON.stringify(analystResult("answered")) },
+      ],
+      tools,
+      restrictsTools: true,
+    });
+    await seam.answer(request);
+    expect(tools.executed).toEqual([]);
   });
 });

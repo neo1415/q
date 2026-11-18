@@ -139,6 +139,7 @@ import {
   asksForOnePage,
   TurnAnswerKindSchema,
   type TurnAnswerKind,
+  templateRulesHead,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import { fittedVariables } from "./prompt-variables-fit.js";
@@ -446,7 +447,7 @@ import {
   readNamedGateqApplications,
   withoutUnsourcedGateqLabels,
 } from "./gateq-application-fact.js";
-import { stableToolOrder } from "./tool-order.js";
+import { notOfferedThisTurn, toolBlockFor } from "./tool-order.js";
 import {
   askedToOpen,
   createScreenClaimGuard,
@@ -4417,6 +4418,10 @@ export function createModelGatewayQAnswer(
             return all;
           },
         }),
+    // What is sent, not what is offered: noted by neither.
+    ...(baseTools.catalogue === undefined
+      ? {}
+      : { catalogue: baseTools.catalogue }),
     execute: async (asked, toolContext) => {
       /**
        * D13 (live 78f8d72d5, run c72a0fbe): the turn asked for the
@@ -8504,6 +8509,12 @@ export function createModelGatewayQAnswer(
           ? { ownStatementClear: true }
           : {}),
       };
+      // Model spend 18 Nov 2026: the plan class's stable catalogue, sent as
+      // the tool list so the provider's prompt cache holds it from turn to
+      // turn; this turn's offer stays what may be called. Not authority.
+      const catalogueRead: Promise<readonly QOfferedTool[] | null> = (
+        tools.catalogue?.(toolContext) ?? Promise.resolve(null)
+      ).catch(() => null);
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
       // The person's settings for this answer, read side by side with the
       // reading wait, the setup reminder and the readiness read below (L1
@@ -9117,6 +9128,7 @@ export function createModelGatewayQAnswer(
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
+      const catalogue = await catalogueRead;
       /**
        * Every tool call this answer makes. While the answer is speculative
        * only a READ_ONLY tool runs; any other (or one not known to be
@@ -12526,8 +12538,15 @@ export function createModelGatewayQAnswer(
       ]);
       // Step 10: the task message's template is instructions too; only
       // the values rendered into it are sources (templateValues).
+      // A task whose fixed rules travel as instructions (rulesEndBefore)
+      // renders its user message from the template's remainder.
+      const analystDefinition =
+        registry.getActive("COMPANY_ANALYST").definition;
+      const analystRules = templateRulesHead(analystDefinition);
       const taskTemplate =
-        registry.getActive("COMPANY_ANALYST").definition.template;
+        analystRules === null
+          ? analystDefinition.template
+          : analystDefinition.template.slice(analystRules.length).trimStart();
       gateqToolResults = () => messages;
       // Q's own record of this conversation (its summary and ledger): an
       // echo of what Q said, never a source a count is bound to.
@@ -12945,6 +12964,12 @@ export function createModelGatewayQAnswer(
            */
           const chainedReads = new Map<string, Promise<QToolCallOutcome>>();
           const runCall = (call: ModelToolCall): Promise<QToolCallOutcome> => {
+            // The model is sent its plan class's whole catalogue (cache);
+            // only what this turn offers runs. The gateway refuses anything
+            // else first; this is the same rule where the call executes.
+            if (!offeredByName.has(call.name)) {
+              return Promise.resolve(notOfferedThisTurn(call));
+            }
             // The model's first public-web call is the search already
             // running for this turn: answered by it, not asked again.
             if (
@@ -13114,8 +13139,10 @@ export function createModelGatewayQAnswer(
                   output: textRound
                     ? ({ kind: "TEXT" } as const)
                     : answerOutput(),
-                  // K7: one stable order, so the cached prefix holds.
-                  tools: stableToolOrder(offered),
+                  // K7 and model spend 18 Nov: the plan class's stable
+                  // catalogue in one order; this turn's offer is what may
+                  // be called.
+                  ...toolBlockFor(catalogue, offered, MODEL_TOOLS_MAX),
                 },
                 roundOptions(),
               );

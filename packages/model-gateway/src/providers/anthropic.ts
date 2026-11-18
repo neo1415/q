@@ -1260,7 +1260,7 @@ export function createAnthropicModelProvider(
             ? undefined
             : sectionOrder.order(
                 plainKey,
-                request.cacheKey ?? headKey,
+                request.personCacheKey ?? request.cacheKey ?? headKey,
                 original.content,
                 noteIndexes.map((at) => request.messages[at]?.content ?? ""),
               );

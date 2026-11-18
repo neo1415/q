@@ -20,6 +20,7 @@ import {
   type EtiquetteRequest,
 } from "../etiquette/guidance.js";
 import {
+  charterSharedHead,
   renderTemplate,
   templateRulesHead,
   type PromptId,
@@ -203,17 +204,37 @@ export function renderPrompt<V>(
   // instructions beside the charter (cacheable from turn to turn); the
   // head holds no token, so the rendered text begins with it verbatim.
   const rules = templateRulesHead(task.definition);
+  // A task that shares its instructions (`sharedInstructions`): the
+  // charter's fixed head and the task's fixed rules lead, marked shared,
+  // and the charter's per-person tail follows as its own instruction. Both
+  // heads hold no token, so neither can carry a person's data.
+  const charterHead =
+    task.definition.sharedInstructions === true
+      ? charterSharedHead(charter.definition)
+      : null;
   const messages: ModelMessage[] =
     rules === null || !user.startsWith(rules)
       ? [
           { role: "SYSTEM", content: system },
           { role: "USER", content: user },
         ]
-      : [
-          { role: "SYSTEM", content: system },
-          { role: "SYSTEM", content: rules.trimEnd() },
-          { role: "USER", content: user.slice(rules.length).trimStart() },
-        ];
+      : charterHead !== null &&
+          system.startsWith(charterHead) &&
+          system.length > charterHead.length
+        ? [
+            { role: "SYSTEM", content: charterHead.trimEnd(), shared: true },
+            { role: "SYSTEM", content: rules.trimEnd(), shared: true },
+            {
+              role: "SYSTEM",
+              content: system.slice(charterHead.length).trimStart(),
+            },
+            { role: "USER", content: user.slice(rules.length).trimStart() },
+          ]
+        : [
+            { role: "SYSTEM", content: system },
+            { role: "SYSTEM", content: rules.trimEnd() },
+            { role: "USER", content: user.slice(rules.length).trimStart() },
+          ];
   return {
     bundle: {
       bundleVersion,

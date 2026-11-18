@@ -314,7 +314,36 @@ export type PromptDefinition<V = unknown, O = unknown> = {
    * message, as before.
    */
   readonly rulesEndBefore?: string | undefined;
+  /**
+   * Optional, with `rulesEndBefore`: the charter's fixed head (everything
+   * before its first variable line) and this task's fixed rules lead the
+   * prompt as instructions marked shared, byte-identical for every person;
+   * the charter's per-person tail (operating mode, communication profile,
+   * environment) follows them as its own SYSTEM message.
+   *
+   * Why (ai_ops.model_usage, 11-18 Nov 2026): 73% of first answer calls
+   * read nothing from the provider's prompt cache, and the rest stopped
+   * near the end of the charter. Its per-person tail sat inside the
+   * instructions, ahead of the tools and of the task's ~2.9k tokens of
+   * fixed rules, so no prefix past ~1.4k tokens could be shared between
+   * people. Absent: as before.
+   */
+  readonly sharedInstructions?: true | undefined;
 };
+
+/**
+ * The charter's fixed head: its text before the line that holds its first
+ * `{{token}}`, or null when there is none. Holds no token, so the rendered
+ * charter begins with it verbatim.
+ */
+export function charterSharedHead(
+  definition: Pick<PromptDefinition<unknown, unknown>, "template">,
+): string | null {
+  const token = definition.template.indexOf("{{");
+  if (token === -1) return null;
+  const line = definition.template.lastIndexOf("\n", token) + 1;
+  return line <= 0 ? null : definition.template.slice(0, line);
+}
 
 /**
  * The template's fixed rules, when the definition declares where they end
@@ -480,6 +509,9 @@ export function promptContentHash(
         definition.rulesEndBefore === undefined
           ? ""
           : `\nrules-end-before:${definition.rulesEndBefore}`,
+      )
+      .update(
+        definition.sharedInstructions === true ? "\nshared-instructions" : "",
       )
       .digest("hex")
   );

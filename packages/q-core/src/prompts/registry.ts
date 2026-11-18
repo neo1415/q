@@ -91,6 +91,7 @@ import { COMPANY_ANALYST_V33 } from "./tasks/company-analyst.v33.js";
 import { COMPANY_ANALYST_V34 } from "./tasks/company-analyst.v34.js";
 import { COMPANY_ANALYST_V35 } from "./tasks/company-analyst.v35.js";
 import { COMPANY_ANALYST_V36 } from "./tasks/company-analyst.v36.js";
+import { COMPANY_ANALYST_V37 } from "./tasks/company-analyst.v37.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -512,6 +513,14 @@ function validate(definition: PromptDefinition<unknown, unknown>): void {
   }
   // A declared rules boundary must exist and hold no token before it.
   templateRulesHead(definition);
+  if (
+    definition.sharedInstructions === true &&
+    definition.rulesEndBefore === undefined
+  ) {
+    throw new Error(
+      `prompt ${promptVersionId(definition.id, definition.version)} shares its instructions but declares no rulesEndBefore`,
+    );
+  }
 }
 
 export function createPromptRegistry(
@@ -722,7 +731,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // Owner addendum (14 Nov): uncertainties[] and the offer's about.
     { ...COMPANY_ANALYST_V35, status: "DEPRECATED" },
     // RC3 (Q voice audit, 15 Nov): the concise spoken form.
-    COMPANY_ANALYST_V36,
+    { ...COMPANY_ANALYST_V36, status: "DEPRECATED" },
+    // Model spend (18 Nov): fixed instructions shared, private tail after tools.
+    COMPANY_ANALYST_V37,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,

@@ -4,6 +4,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
+  templateRulesHead,
 } from "@capital-q/q-core";
 
 import {
@@ -21,7 +22,11 @@ import {
  */
 describe("the claim check's sources leave out the task template's words", () => {
   const registry = createDefaultPromptRegistry();
-  const template = registry.getActive("COMPANY_ANALYST").definition.template;
+  const definition = registry.getActive("COMPANY_ANALYST").definition;
+  // v37 (model spend, 18 Nov): the fixed rules travel as an instruction;
+  // the task message renders the template's remainder, as the seam reads it.
+  const rules = templateRulesHead(definition) ?? "";
+  const template = definition.template.slice(rules.length).trimStart();
   const rendered = renderPrompt(registry, {
     task: "COMPANY_ANALYST",
     operatingMode: "DEBRIEF",
@@ -49,9 +54,15 @@ describe("the claim check's sources leave out the task template's words", () => 
   });
   const task = rendered.messages.find((m) => m.role !== "SYSTEM");
 
-  it("the template itself states 7.5 (the instruction that grounded the leak)", () => {
-    expect(template).toContain("7.5/10");
-    expect(task?.content).toContain("7.5/10");
+  it("the template itself states 7.5 (the instruction that grounded the leak); since v37 it travels as an instruction", () => {
+    expect(definition.template).toContain("7.5/10");
+    expect(rules).toContain("7.5/10");
+    expect(task?.content).not.toContain("7.5/10");
+    expect(
+      rendered.messages.some(
+        (m) => m.role === "SYSTEM" && m.content.includes("7.5/10"),
+      ),
+    ).toBe(true);
   });
 
   it("keeps every value rendered into the task and drops the template's own text", () => {
@@ -64,7 +75,8 @@ describe("the claim check's sources leave out the task template's words", () => 
     const sentence =
       "From the founder's private notes, Quaywise Freight's runway is 7.5 months.";
     expect(
-      checkSentence(sentence, claimCorpus([task?.content ?? ""])).ungrounded,
+      checkSentence(sentence, claimCorpus([`${rules}\n${task?.content ?? ""}`]))
+        .ungrounded,
     ).toEqual([]);
     expect(checkSentence(sentence, claimCorpus([values])).ungrounded).toContain(
       "NUMBER",

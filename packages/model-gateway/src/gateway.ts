@@ -313,16 +313,16 @@ function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * The prompt-cache routing key for a request: who is asking, for which kind
- * of task, with which tools on offer. Calls sharing all four share the long
- * system prefix, so steering them to the same cache shard is what lets a
- * first round hit a warm prefix. Hashed, because the key travels to the
- * vendor: no tenant id, user id or tool list leaves in clear. A user's key
- * is theirs alone, so a cache shard is never shared across users or
- * tenants on our account even though the vendor's cache is
- * prefix-exact anyway.
+ * The per-person prompt-cache key: who is asking, for which kind of task,
+ * with which tools on offer. The vendor's routing key for a request with no
+ * shared instructions (promptCacheKeyOf), and the key an adapter learns one
+ * person's prompts under. Hashed, because it may travel to the vendor: no
+ * tenant id, user id or tool list leaves in clear. A user's key is theirs
+ * alone, so such a request's cache shard is never shared across users or
+ * tenants on our account even though the vendor's cache is prefix-exact
+ * anyway.
  */
-export function promptCacheKeyOf(request: ModelGatewayRequest): string {
+export function personCacheKeyOf(request: ModelGatewayRequest): string {
   const tools = request.tools.map((tool) => tool.name).sort();
   return createHash("sha256")
     .update(
@@ -335,6 +335,56 @@ export function promptCacheKeyOf(request: ModelGatewayRequest): string {
     )
     .digest("hex")
     .slice(0, 32);
+}
+
+/**
+ * The vendor's prompt-cache routing key.
+ *
+ * A request that opens with instructions marked shared (fixed product text,
+ * the same bytes for everyone of its task) is keyed by that shared prefix
+ * alone: its task class and a hash of the shared instructions. No tenant,
+ * user, tool list or turn value goes into it, so every first call lands
+ * where that prefix is already warm (measured 11-18 Nov: with the person
+ * and the turn's tools in the key, 73% of first answer calls read nothing
+ * from the cache, not even the charter). The vendor's cache is
+ * exact-prefix: a person's private sections, which come after it, can only
+ * be matched by a request carrying those same bytes, which only that
+ * person's own requests do. The key steers routing; it grants nothing.
+ *
+ * Any other request keeps the per-person key (personCacheKeyOf).
+ */
+export function promptCacheKeyOf(request: ModelGatewayRequest): string {
+  const shared = sharedInstructionsOf(request);
+  if (shared === null) return personCacheKeyOf(request);
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        "shared-prefix",
+        request.taskClass,
+        createHash("sha256").update(shared).digest("hex"),
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 32);
+}
+
+/** The leading SYSTEM messages marked shared, in order; null when none. */
+function sharedInstructionsOf(request: ModelGatewayRequest): string | null {
+  const parts: string[] = [];
+  for (const message of request.messages) {
+    if (message.role !== "SYSTEM" || message.shared !== true) break;
+    parts.push(message.content);
+  }
+  return parts.length === 0 ? null : JSON.stringify(parts);
+}
+
+/** This attempt's allowance, when narrower than the tools sent. */
+function allowedToolsOf(
+  request: ModelGatewayRequest,
+): ReadonlySet<string> | undefined {
+  return request.allowedTools === undefined
+    ? undefined
+    : new Set(request.allowedTools);
 }
 
 function estimatedUsage(inputTokens: number, text: string): ModelUsage {
@@ -468,12 +518,25 @@ export function createModelGateway(
         let usage: ModelUsage | undefined;
         let cost: ModelCost | undefined;
         try {
+          const allowed = allowedToolsOf(request);
+          // A catalogue with a narrower allowance goes whole only to an
+          // adapter that can tell its vendor what may be called; any other
+          // is sent the allowed tools alone, as before.
+          const whole =
+            allowed === undefined ||
+            provider.capabilities().restrictsTools === true;
           const result = await provider.generate(
             {
               modelCode: candidate.model.modelCode,
               messages: request.messages,
               output: request.output,
-              tools: request.tools,
+              tools:
+                allowed === undefined || whole
+                  ? request.tools
+                  : request.tools.filter((tool) => allowed.has(tool.name)),
+              ...(allowed === undefined || !whole
+                ? {}
+                : { allowedTools: [...allowed] }),
               maxOutputTokens: outputTokens,
               temperature: request.temperature,
               // A level above NONE only reaches a model the catalogue marks
@@ -482,7 +545,10 @@ export function createModelGateway(
                 ? request.reasoning
                 : "NONE",
               ...(candidate.model.supportsPromptCache
-                ? { cacheKey: promptCacheKeyOf(request) }
+                ? {
+                    cacheKey: promptCacheKeyOf(request),
+                    personCacheKey: personCacheKeyOf(request),
+                  }
                 : {}),
             },
             {
@@ -513,7 +579,10 @@ export function createModelGateway(
             // A proposal is accepted only for a tool this request offered.
             // The registry validates arguments and authorises; the gateway
             // only refuses what could never have been offered.
-            const offered = new Set(request.tools.map((tool) => tool.name));
+            // Within this turn's allowance, whatever the provider was sent.
+            const offered =
+              allowedToolsOf(request) ??
+              new Set(request.tools.map((tool) => tool.name));
             const unoffered = proposedCalls.some(
               (call) => !offered.has(call.name),
             );

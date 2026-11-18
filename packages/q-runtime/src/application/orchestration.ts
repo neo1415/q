@@ -1110,6 +1110,17 @@ export type QToolPort = {
   readonly available?:
     | ((context: QToolExecutionContext) => Promise<readonly QOfferedTool[]>)
     | undefined;
+  /**
+   * The plan class's stable tool catalogue, sorted by name: every tool
+   * this purpose, actor and plan may be offered on any turn. Sent to the
+   * model unchanged from turn to turn so the provider's prompt cache holds
+   * it, with the turn's offer as what may be called. Never authority: a
+   * call is executed only through `execute`, which checks the run's offer.
+   * Absent: the offer is sent as the tool list, as before.
+   */
+  readonly catalogue?:
+    | ((context: QToolExecutionContext) => Promise<readonly QOfferedTool[]>)
+    | undefined;
   /** Validate → authorise → execute → validate output. Never throws for a bad proposal. */
   readonly execute: (
     proposal: QToolProposal,

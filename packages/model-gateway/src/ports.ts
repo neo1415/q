@@ -47,6 +47,18 @@ export type ModelProviderRequest = {
    * has no such hint ignores it.
    */
   readonly cacheKey?: string | undefined;
+  /**
+   * The per-person key (tenant, user, task class, tools), hashed: for what
+   * an adapter learns about one person's prompts (Anthropic's section
+   * order). Never sent to a vendor.
+   */
+  readonly personCacheKey?: string | undefined;
+  /**
+   * The names in `tools` the model may call on this attempt; absent, all.
+   * Only an adapter that declares `restrictsTools` receives the full
+   * catalogue with this set; any other is sent only the allowed tools.
+   */
+  readonly allowedTools?: readonly string[] | undefined;
 };
 
 export type ModelExecutionContext = {
@@ -97,6 +109,13 @@ export type ModelProviderCapabilities = {
   readonly toolCalling: boolean;
   readonly streaming: boolean;
   readonly cancellation: boolean;
+  /**
+   * The vendor can be sent a whole tool catalogue and told which of it may
+   * be called on this request, so a catalogue that holds still from turn
+   * to turn stays in its prompt cache. Absent or false: the gateway sends
+   * this adapter only the allowed tools.
+   */
+  readonly restrictsTools?: boolean | undefined;
 };
 
 export type ModelProvider = {

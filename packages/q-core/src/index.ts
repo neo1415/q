@@ -29,6 +29,7 @@ export {
   promptVersionId,
   renderTemplate,
   templateRulesHead,
+  charterSharedHead,
   templateVariables,
   UNTRUSTED_CLOSE,
   UNTRUSTED_OPEN,
@@ -2443,6 +2444,10 @@ export {
 export { COMPANY_ANALYST_V34 } from "./prompts/tasks/company-analyst.v34.js";
 export { COMPANY_ANALYST_V35 } from "./prompts/tasks/company-analyst.v35.js";
 export { COMPANY_ANALYST_V36 } from "./prompts/tasks/company-analyst.v36.js";
+export {
+  COMPANY_ANALYST_V37,
+  V37_RULES_END_BEFORE,
+} from "./prompts/tasks/company-analyst.v37.js";
 
 // RC3 (Q voice audit, 15 Nov 2026): turn execution classes and the spoken form.
 export {

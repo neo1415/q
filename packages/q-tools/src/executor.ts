@@ -531,6 +531,10 @@ export function createQToolExecutor(
       }
       return Promise.resolve(registry.eligible(context).map(toOfferedTool));
     },
+    // Sent to the model as the stable tool list; execution still goes
+    // through `execute` and the run's offer, never through this.
+    catalogue: (context) =>
+      Promise.resolve(registry.catalogue(context).map(toOfferedTool)),
     // The reader's list: every tool this purpose and plan allow, unfocused,
     // up to what one request can carry, exactly as the offer was before.
     // Declared app actions follow on any purpose: the reader may name one,

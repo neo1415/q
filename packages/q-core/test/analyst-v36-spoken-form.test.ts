@@ -26,9 +26,9 @@ describe("COMPANY_ANALYST v36: the spoken form", () => {
     recommendation: null,
   };
 
-  it("is active on schema v36, on v35's template, with v35 deprecated", () => {
+  it("was active on schema v36 (until v37), on v35's template, with v35 deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(36);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(37);
     expect(registry.get("COMPANY_ANALYST", 35)?.definition.status).toBe(
       "DEPRECATED",
     );

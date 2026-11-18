@@ -433,6 +433,15 @@ export const ModelTextMessageSchema = z
     content: z.string().min(1).max(MODEL_MESSAGE_MAX_CHARS),
     /** Images for a VISION model; read on USER messages only. */
     images: z.array(ModelImageSchema).min(1).max(2).optional(),
+    /**
+     * A leading SYSTEM message of fixed product text, byte-identical for
+     * every person of a task (the charter's fixed head, a task's fixed
+     * rules): it may open a prompt-cache prefix shared across people. Never
+     * set on anything rendered from a variable. Unmarked leading SYSTEM
+     * messages (the charter's per-person tail) are still instructions, sent
+     * after the tool catalogue so nothing private sits in the shared part.
+     */
+    shared: z.literal(true).optional(),
   })
   .strict();
 
@@ -621,6 +630,15 @@ export const ModelGatewayRequestSchema = z
      * schema and function calling on the same call.
      */
     tools: z.array(ModelToolDefinitionSchema).max(MODEL_TOOLS_MAX).default([]),
+    /**
+     * The names in `tools` the model may call on this attempt. Absent: all
+     * of them. Set when `tools` is a stable catalogue (sent unchanged turn
+     * to turn so the provider's prompt cache holds it) and this turn allows
+     * fewer: an adapter that can restrict calls says so to its provider,
+     * any other is sent only these, and the gateway refuses a proposal
+     * outside them whatever the provider did.
+     */
+    allowedTools: z.array(ModelToolNameSchema).max(MODEL_TOOLS_MAX).optional(),
     requiredCapabilities: z.array(ModelCapabilitySchema).max(8).default([]),
     qualityFloor: ModelQualityClassSchema.optional(),
     latencyTarget: ModelLatencyClassSchema.optional(),
@@ -644,6 +662,14 @@ export const ModelGatewayRequestSchema = z
       new Set(request.tools.map((tool) => tool.name)).size ===
       request.tools.length,
     { message: "tool names must be unique", path: ["tools"] },
+  )
+  .refine(
+    (request) =>
+      request.allowedTools === undefined ||
+      request.allowedTools.every((name) =>
+        request.tools.some((tool) => tool.name === name),
+      ),
+    { message: "an allowed tool must be in tools", path: ["allowedTools"] },
   );
 export type ModelGatewayRequest = z.infer<typeof ModelGatewayRequestSchema>;
 export type ModelGatewayRequestInput = z.input<
