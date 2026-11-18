@@ -1125,6 +1125,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "gateq_inbox_assign",
   "gateq_inbox_note",
   "gateq_reply_promise",
+  // Decision 107: the person's own data download, for themselves only and
+  // deleting nothing; deletion is never a Q action.
+  "request_my_data_download",
   // F3: a saved startup search; never a mandate change.
   "save_startup_alert",
   "save_company",

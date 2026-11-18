@@ -48,6 +48,9 @@ const REQUEST_EXPORT = defineAppAction<
   succeeded: (out) => out === "REQUESTED" || out === "ALREADY_REQUESTED",
   tool: {
     name: "request_my_data_download",
+    // Offered on a turn about the person's records or naming it, never in
+    // the unfocused offer the model's tool bound cuts (128).
+    offeredInArea: true,
     description:
       'When the person asks for a copy or download of their own data ("download my data", "export everything you have on me"), start it. It builds a ZIP they collect from Settings > Privacy > Your data. Never for anyone else\'s data. If they ask to delete their account, do not use this: explain that deleting is done on that same page, after they confirm it is them, with a 14-day grace period.',
     input: z.object({}).strict(),
