@@ -849,3 +849,5 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Live chain (Savanna, conversation at 01:35, $0.049): the question took 15.0 s; follow-up 1 took 7.1 s and follow-up 2 took 7.4 s, both on the fast path (`ANSWERED`). No web search, no actions.
   - Before today: 15.9 s and 13.3 s.
 - **Decision 105 recorded:** Ajopot/Watchly revenue goes public; a founder's own spoken figure needs no card. Two workers are on it. A container restart at about 01:30 interrupted both; their work was kept (WIP commit `7cf4956d5`, local commit `993bccb21`) and they were resumed.
+- **18 Nov ~01:45 UTC, decision 105 revenue applied:** `scripts/seed/demo-figures.mjs --company-statements --apply` (code `8bd229f64`) wrote 2 network-visible USER_CLAIM/SELF_REPORTED `financial.monthly_revenue` claims: Ajopot NGN 10,183,680 and Watchly USD 8,500, both for October 2026, with no document link. A re-run plans 0.
+  - Live check (Savanna): "Does Ajopot have revenue yet?" was answered "Yes … NGN 10,183,680 for October 2026, self-reported".
