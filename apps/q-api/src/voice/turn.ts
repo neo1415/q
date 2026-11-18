@@ -477,6 +477,28 @@ export const DURABLE_STAGES: ReadonlySet<string> = new Set([
   "CHECKING_DOCUMENT",
 ]);
 
+/**
+ * Stages that are work which takes a while: a record or tool read, a
+ * public search, documents, a plan. Reading the turn and starting the
+ * answer (UNDERSTANDING_REQUEST, PREPARING_ANALYSIS) are not: a turn
+ * answered from the conversation shows only those and is answered in a
+ * few seconds; an approval wait is the person's, not Q's (owner 18 Nov:
+ * no holding line on a turn that answers at once).
+ */
+export const WORKING_STAGES: ReadonlySet<string> = new Set([
+  "REVIEWING_COMPANY",
+  "CHECKING_EVIDENCE",
+  "SEARCHING_PUBLIC_SOURCES",
+  "REVIEWING_INVESTOR_CRITERIA",
+  "COMPARING_OPPORTUNITIES",
+  "REVIEWING_RELATIONSHIP",
+  "GATHERING_SITUATION",
+  "READING_DOCUMENTS",
+  "DRAFTING_PLAN",
+  "REVIEWING_PLAN",
+  "COMPLETING_APPROVED_ACTION",
+]);
+
 /** How long the room follows a document handed off by the line. */
 export const DURABLE_FOLLOW_MAX_MS = 15 * 60_000;
 
@@ -1440,7 +1462,12 @@ export function createVoiceTurnHandler(
               // code while the run works; this one would be heard after
               // the fact ("Looking into Zino Aviation now." before the
               // answer) and stack on top of that line.
-              if (speaker.deferred === true) break;
+              if (speaker.deferred === true) {
+                // The run itself says the wait is real (a public search
+                // started): the line may hold it, in its own words.
+                speaker.working?.();
+                break;
+              }
               if (holding.said) break;
               holding.said = true;
               // F-59: a holding line is not the answer. Counted as streamed,
@@ -1689,6 +1716,7 @@ export function createVoiceTurnHandler(
               live.handOff?.();
               return;
             }
+            if (WORKING_STAGES.has(event.data.stage)) speaker.working?.();
             // ADR 0062 (amends R38): the stage is what the silence ladder
             // may say while nothing of the answer has been heard; it is
             // never itself spoken as part of the answer.
@@ -1753,7 +1781,7 @@ export function createVoiceTurnHandler(
         const silenceFocus = dependencies.silenceFocus;
         await speaker.speak(
           withSilenceLadder(
-            tap(bySentence(answer(), signal), (part) => {
+            tap(bySentence(answer(), signal, { wholeDeltas: true }), (part) => {
               spokenSoFar += `${part} `;
               rememberSpoken(binding, part);
             }),

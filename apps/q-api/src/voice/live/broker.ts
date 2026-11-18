@@ -42,6 +42,10 @@ import {
 } from "../providers/gpt-live.js";
 import { spokenNumbers } from "../speech.js";
 import {
+  SPOKEN_REPEAT_WINDOW,
+  withoutRepeatedLines,
+} from "../spoken-repeats.js";
+import {
   APPROVAL_QUESTION,
   markApprovalUnheard,
   settledTurn,
@@ -240,6 +244,13 @@ type Delegation = {
   first: Promise<string | null>;
   /** What was handed to the voice early; null until then. */
   partialSent: string | null;
+  /**
+   * Resolves once the wait for this run's first words is a real one (see
+   * LIVE_HOLD_*): the line's one holding line may then be said.
+   */
+  holdDue: Promise<void>;
+  /** The holding line was handed over for this delegation. */
+  held: boolean;
   /** Everything the run said and the facts it held, when it ended. */
   ended: { readonly said: string; readonly facts: SpokenFacts | null } | null;
   /** The Q run this delegation started, once known (RC5). */
@@ -279,6 +290,12 @@ type LiveLine = {
   tail: Promise<unknown>;
   /** Names Q said on this line, most recent first (the context package). */
   referents: string[];
+  /** Q's words handed to the voice on this line, newest last (repeats). */
+  spoken: string[];
+  /** Holding lines handed on this line, and whether the last turn held. */
+  holds: number;
+  lastHold: string | null;
+  lastTurnHeld: boolean;
   /**
    * Set on a persona line (a rehearsal with a researched external person):
    * the voice plays the prepared persona with no tools, nothing is
@@ -420,6 +437,9 @@ export type LiveBrokerDependencies = {
       }
     | undefined;
   readonly now?: (() => number) | undefined;
+  /** When a wait earns the holding line (LIVE_HOLD_* by default). */
+  readonly holding?:
+    { readonly afterMs?: number; readonly longMs?: number } | undefined;
   /**
    * The trial's persisted use (q_runtime.voice_live_trial_usage). Absent,
    * a trial person's line is refused: their use could not be counted.
@@ -535,6 +555,8 @@ function collector(
   id: string,
   /** Called once, with the first words, while the run is still going. */
   onFirstWords?: (said: string, facts: SpokenFacts | null) => void,
+  /** Called when the run starts work that takes a while (see `working`). */
+  onWorking?: () => void,
 ): {
   readonly speaker: VoiceSpeaker;
   readonly said: () => string;
@@ -575,6 +597,7 @@ function collector(
       run: (id) => {
         runId ??= id;
       },
+      working: () => onWorking?.(),
     },
     said: () => text.slice(0, SPOKEN_MAX),
     held: () => held,
@@ -617,6 +640,55 @@ export function sayExactly(words: string): string {
 /** Said when an approval waits and Q's words said nothing else. */
 export const LIVE_APPROVAL_READY =
   "It's ready for you to approve on your screen.";
+/**
+ * The holding line (owner 18 Nov 2026: "it will first load, you need to be
+ * like working on it ... for every single question"). Production 11-18
+ * Nov: "Working on it." on 106 of 222 spoken turns, on two turns in a row
+ * 47 times, and always the same words. Now the line itself chooses it, by
+ * code, and only when the wait is real:
+ *
+ * - the run started work that takes a while (a tool or record stage, a
+ *   public search: WORKING_STAGES) and no words came within
+ *   LIVE_HOLD_AFTER_MS of the run starting; a turn answered from the
+ *   conversation never starts such work, so it is never held;
+ * - or no words came at all within LIVE_HOLD_LONG_MS;
+ * - right after a turn that held, only the long wait holds;
+ * - never the same words twice in a row; it claims nothing about the
+ *   answer and asks nothing.
+ */
+export const LIVE_HOLD_AFTER_MS = 3_000;
+export const LIVE_HOLD_LONG_MS = 9_000;
+export const LIVE_HOLDING_LINES = [
+  "Working on it.",
+  "On it.",
+  "Bear with me.",
+  "Sure, on it.",
+  "Right, working on it.",
+] as const;
+
+/** The next holding line on a line: rotating, never the last one again. */
+export function holdingLineFor(count: number, last: string | null): string {
+  const n = LIVE_HOLDING_LINES.length;
+  for (let step = 0; step < n; step += 1) {
+    const line = LIVE_HOLDING_LINES[(count + step) % n] ?? "On it.";
+    if (line !== last) return line;
+  }
+  return "On it.";
+}
+
+export function holdingCommentary(line: string): string {
+  return `Say only this short line aloud, once, in the language you are speaking with them, and nothing else: "${line}" Ask nothing, and say nothing about what the answer will be.`;
+}
+
+/**
+ * Early words that speak of the screen ("Ajopot is open on your screen
+ * now") wait for the whole run: its move is recorded only as it ends, and
+ * the client follows a move, and waits for its receipt, before the voice
+ * says it (R3). Only costs time: such words are then said with the rest.
+ */
+const SPEAKS_OF_SCREEN =
+  /\b(?:screen|open(?:s|ed|ing)?|taking you|bring(?:ing)? up|brought up|pull(?:ing|ed)? up|page|tab)\b/iu;
+
 /** Said when Q's run did not come back (code's words, never invented). */
 export const LIVE_NOT_FINISHED =
   "I couldn't get that done just now. Want me to try it again?";
@@ -646,6 +718,7 @@ export function liveSpoken(words: string): string {
 function restOf(
   running: Pick<Delegation, "partialSent" | "ended">,
   result: Omit<LiveDelegationResult, "stale">,
+  line: Pick<LiveLine, "spoken">,
 ): Omit<LiveDelegationResult, "stale"> {
   const ended = running.ended;
   const sent = running.partialSent ?? "";
@@ -659,9 +732,11 @@ function restOf(
         result.commentary === null ? null : `${already}${result.commentary}`,
     };
   }
-  const rest = ended.said.startsWith(sent)
+  const whole = ended.said.startsWith(sent)
     ? ended.said.slice(sent.length).trim()
     : ended.said;
+  const rest = freshOn(line, whole);
+  if (rest.length > 0) rememberOn(line, rest);
   const words = qSpokenWords({
     facts: null,
     said: rest,
@@ -689,6 +764,21 @@ export function qSpokenWords(input: {
   const say = liveSpoken(input.said);
   if (say.length > 0) return say;
   return input.approvalPending ? LIVE_APPROVAL_READY : null;
+}
+
+/**
+ * Q's words for the voice without the stock lines already said in them or
+ * on this line's last few answers (spoken-repeats.ts). Code's approval
+ * question is always kept: the next "yes" binds to it.
+ */
+function freshOn(line: Pick<LiveLine, "spoken">, words: string): string {
+  return withoutRepeatedLines(words, line.spoken, [APPROVAL_QUESTION]).text;
+}
+
+function rememberOn(line: Pick<LiveLine, "spoken">, words: string): void {
+  if (words.trim().length === 0) return;
+  line.spoken.push(words);
+  line.spoken.splice(0, Math.max(0, line.spoken.length - SPOKEN_REPEAT_WINDOW));
 }
 
 /** What one run verified, as content for `session.commentary.append`. */
@@ -722,6 +812,8 @@ function conversationLineOf(
 export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   const { config, provider, firewall, turn, spend, logger } = deps;
   const now = deps.now ?? Date.now;
+  const holdAfterMs = deps.holding?.afterMs ?? LIVE_HOLD_AFTER_MS;
+  const holdLongMs = deps.holding?.longMs ?? LIVE_HOLD_LONG_MS;
   const lines = new Map<string, LiveLine>();
   // A failed write leaves speech unaccounted for; this process must not
   // reopen that owner on a stale persisted balance.
@@ -1083,15 +1175,54 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     const first = new Promise<string | null>((resolve) => {
       releaseFirst = resolve;
     });
-    const speaker = collector(`live_${line.voiceSessionId}`, (said, facts) => {
-      // Early only for plain words the model wrote: code-built facts are
-      // said from the whole run, an approval question ends the answer, and
-      // a screen move is followed before the voice speaks at all.
-      const moved =
-        (deps.board?.read(line.voiceSessionId).sequence ?? 0) > sequenceBefore;
-      if (facts !== null || moved || said.includes(APPROVAL_QUESTION)) return;
-      releaseFirst(said);
+    let releaseHold: () => void = () => undefined;
+    const holdDue = new Promise<void>((resolve) => {
+      releaseHold = resolve;
     });
+    const holdTimers: ReturnType<typeof setTimeout>[] = [];
+    let runStartedAt: number | null = null;
+    let working = false;
+    const onWorking = () => {
+      // Right after a turn that held, only the long wait holds (see
+      // LIVE_HOLD_AFTER_MS): a holding line on every question is the
+      // robot. Runs on a line go one after another, so the turn before
+      // has settled by now.
+      if (working || runStartedAt === null || line.lastTurnHeld) return;
+      working = true;
+      holdTimers.push(
+        setTimeout(
+          releaseHold,
+          Math.max(0, holdAfterMs - (now() - runStartedAt)),
+        ),
+      );
+    };
+    const speaker = collector(
+      `live_${line.voiceSessionId}`,
+      (said, facts) => {
+        // Early only for plain words the model wrote: code-built facts are
+        // said from the whole run, an approval question ends the answer,
+        // and a screen move is followed before the voice speaks at all.
+        // Live 18 Nov: every run records its conversation on the board as
+        // it starts, which moved the sequence, so "moved" was true of
+        // every run and no first words were ever handed over early: the
+        // voice spoke at the run's end. A move is a route move the board
+        // holds (liveMoveOf), not any change of the sequence.
+        const board = deps.board?.read(line.voiceSessionId);
+        const moved =
+          board !== undefined &&
+          board.sequence > sequenceBefore &&
+          liveMoveOf(board) !== null;
+        if (
+          facts !== null ||
+          moved ||
+          said.includes(APPROVAL_QUESTION) ||
+          SPEAKS_OF_SCREEN.test(said)
+        )
+          return;
+        releaseFirst(said);
+      },
+      onWorking,
+    );
     const asked: VoiceTranscriptTurn = { role: "user", content: request };
     const startedAt = now();
     const delegation: Delegation = {
@@ -1101,6 +1232,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       settled: false,
       first,
       partialSent: null,
+      holdDue,
+      held: false,
       ended: null,
       runId: speaker.runId,
       merged: false,
@@ -1136,6 +1269,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           controller.abort();
         }, config.delegationDeadlineMs);
         sequenceBefore = deps.board?.read(line.voiceSessionId).sequence ?? 0;
+        runStartedAt = now();
+        holdTimers.push(setTimeout(releaseHold, holdLongMs));
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
@@ -1158,10 +1293,19 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         const facts = speaker.held();
         delegation.ended = { said, facts };
         const approvalPending = said.endsWith(APPROVAL_QUESTION);
+        const fresh = freshOn(line, facts?.fallback ?? said);
         const words =
           line.qBackedRehearsal === true
             ? null
-            : qSpokenWords({ facts, said, approvalPending });
+            : qSpokenWords({
+                facts: facts === null ? null : { ...facts, fallback: fresh },
+                said: facts === null ? fresh : said,
+                approvalPending,
+              });
+        // Handed over whole (no start went early): what the voice says.
+        if (delegation.partialSent === null && words !== null) {
+          rememberOn(line, fresh);
+        }
         const commentary =
           line.qBackedRehearsal === true
             ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(said)}`
@@ -1211,6 +1355,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         };
       } finally {
         if (deadline !== undefined) clearTimeout(deadline);
+        for (const timer of holdTimers) clearTimeout(timer);
+        if (!delegation.merged) line.lastTurnHeld = delegation.held;
         delegation.settled = true;
         // No early words came: whoever waits for them stops waiting.
         releaseFirst(null);
@@ -1447,6 +1593,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         finalReported: false,
         tail: Promise.resolve(),
         referents: carried === null ? [] : [...carried.referents],
+        spoken: [],
+        holds: 0,
+        lastHold: null,
+        lastTurnHeld: false,
         ...(persona === null || rehearsal === undefined
           ? {}
           : persona.qBacked === true
@@ -1701,9 +1851,47 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       // The first verified words, before the run ends, for a client that
       // asked for them. They go once; the same id asked again is the rest.
       if (delegation.early === true && running.partialSent === null) {
-        const words = await running.first;
-        if (words !== null && running.partialSent === null) {
-          running.partialSent = words;
+        const current = running;
+        // A wait that is real earns the line's one holding line (see
+        // LIVE_HOLD_AFTER_MS); the client says it and asks again, early,
+        // for the first words.
+        const waited = await Promise.race([
+          current.first.then((words) => ({ words })),
+          current.holdDue.then(() => null),
+        ]);
+        if (
+          waited === null &&
+          !current.held &&
+          !current.settled &&
+          current.partialSent === null &&
+          line.qBackedRehearsal !== true &&
+          line.rehearsalId === undefined
+        ) {
+          current.held = true;
+          const holding = holdingLineFor(line.holds, line.lastHold);
+          line.holds += 1;
+          line.lastHold = holding;
+          const runId = current.runId();
+          return {
+            delegationId: delegation.delegationId,
+            commentary: holdingCommentary(holding),
+            said: holding,
+            ...(runId === null ? {} : { runId }),
+            stale: line.latest !== delegation.delegationId,
+            approvalPending: false,
+            failed: false,
+            partial: true,
+            holding: true,
+          };
+        }
+        const first = waited === null ? await current.first : waited.words;
+        const words =
+          first === null || line.qBackedRehearsal === true
+            ? first
+            : freshOn(line, first);
+        if (words !== null && first !== null && running.partialSent === null) {
+          running.partialSent = first;
+          if (line.qBackedRehearsal !== true) rememberOn(line, words);
           const runId = running.runId();
           return {
             delegationId: delegation.delegationId,
@@ -1725,7 +1913,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const result = await running.result;
       const stale = line.latest !== delegation.delegationId;
       if (running.partialSent !== null && !result.failed) {
-        return { ...restOf(running, result), stale };
+        return { ...restOf(running, result, line), stale };
       }
       return { ...result, stale };
     },

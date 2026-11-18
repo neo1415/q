@@ -474,17 +474,18 @@ describe("a spoken sentence puts up the card it names (artifacts live, L-16)", (
 
     const naming = heard.find((one) => one.sentence === said);
     expect(naming?.previewed).toEqual(["Haly"]);
-    // At most one sentence early, never later: the speaker's sentence
-    // cutter (bySentence) holds a sentence until the next one begins, so
-    // the card is up from the sentence just before its name.
+    // With its own sentence, never later: a whole sentence reaches the
+    // speaker as it arrives (live 18 Nov), so the sentence before it is
+    // heard before the card exists, and the naming one with it up; the
+    // card stays up for the sentences after it until the answer lands.
     expect(heard.map((one) => one.previewed.length > 0)).toEqual([
-      true,
-      true,
       false,
+      true,
+      true,
     ]);
-    // The stream's last sentence is spoken once the answer is in (the
-    // speaker hears it only after the stream ends): its cards are up.
-    expect(heard.find((one) => one.sentence === last)?.answered).toBe(true);
+    // The stream's last sentence is heard as it arrives, before the
+    // answer is in, with its card still up.
+    expect(heard.find((one) => one.sentence === last)?.answered).toBe(false);
 
     // The answer has landed: its blocks win, the preview is gone.
     const after = await room.read({ actor: ACTOR, after: 0, wait: false });

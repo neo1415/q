@@ -9328,3 +9328,36 @@ describe("RC4 continuity and path capture (audit 15 Nov, founder turns)", () => 
     );
   });
 });
+
+// Live 17-18 Nov 2026: a garbled spoken turn read by sound was answered by a
+// second reader call over its likely words (about 2.6 s). A plain question's
+// first reading is reused for them; a reading bound to the garbled phrases
+// (an asked action here) is read again, as before.
+describe("garbled speech is answered from the first reading where safe", () => {
+  const heard = "how much are they raising?";
+  it("reads a plain question once", async () => {
+    const run = seam({
+      said: "how much uh they raisin",
+      spoken: true,
+      reading: () => Object.assign({}, advice, { heardAs: heard }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(1);
+  });
+
+  it("reads again when the reading is bound to the garbled words", async () => {
+    const run = seam({
+      said: "send uh the mail to them",
+      spoken: true,
+      reading: () =>
+        Object.assign({}, advice, {
+          heardAs: "send the email to them",
+          askedAction: "send the email",
+        }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(2);
+  });
+});

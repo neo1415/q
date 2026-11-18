@@ -179,9 +179,13 @@ describe("holding lines: one, code-chosen, only for a run still going (RC1)", ()
     h.advance(FINISHED);
     h.advance(10_000);
     // Holding for the first; the second came after they spoke again and
-    // gets its own, never two on top of each other.
-    const holdings = h.spoken().filter((line) => line === HOLDING_CONTENT);
+    // gets its own, never two on top of each other, and never the same
+    // words twice in a row (owner 18 Nov 2026).
+    const holdings = h
+      .spoken()
+      .filter((line) => line.startsWith("Say only this short line aloud"));
     expect(holdings.length).toBeLessThanOrEqual(2);
+    if (holdings.length === 2) expect(holdings[1]).not.toBe(holdings[0]);
     expect(
       h.bridge.takeHanded().filter((l) => l.kind === "HOLDING"),
     ).toHaveLength(holdings.length);

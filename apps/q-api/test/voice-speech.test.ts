@@ -124,6 +124,40 @@ describe("bySentence", () => {
     );
     expect(spoken).toEqual(["First sentence."]);
   });
+
+  it("with whole deltas, says a finished sentence before the next one exists (live 18 Nov)", async () => {
+    const order: string[] = [];
+    async function* answer(): AsyncGenerator<string> {
+      order.push("first written");
+      await Promise.resolve();
+      yield "Runway is 14 months. ";
+      order.push("second written");
+      yield "Burn is flat. ";
+    }
+    for await (const part of bySentence(answer(), undefined, {
+      wholeDeltas: true,
+    })) {
+      order.push(`said: ${part}`);
+    }
+    expect(order).toEqual([
+      "first written",
+      "said: Runway is 14 months.",
+      "second written",
+      "said: Burn is flat.",
+    ]);
+  });
+
+  it("without whole deltas, a sentence still waits for the next to prove its end", async () => {
+    const order: string[] = [];
+    async function* answer(): AsyncGenerator<string> {
+      await Promise.resolve();
+      yield "Dr. ";
+      order.push("next written");
+      yield "Okafor leads.";
+    }
+    for await (const part of bySentence(answer())) order.push(part);
+    expect(order).toEqual(["next written", "Dr.", "Okafor leads."]);
+  });
 });
 
 describe("natural delivery (RECOVERY A10, audit C-17)", () => {

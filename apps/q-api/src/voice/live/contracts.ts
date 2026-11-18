@@ -172,6 +172,12 @@ export const LiveDelegationResultSchema = z
      * same delegation id for the rest.
      */
     partial: z.boolean().optional(),
+    /**
+     * With `partial`: not the answer's start but the line's one holding
+     * line, chosen by code for a wait that is real. Say it, then ask
+     * again, early, for the first words.
+     */
+    holding: z.literal(true).optional(),
   })
   .strict();
 export type LiveDelegationResult = z.infer<typeof LiveDelegationResultSchema>;

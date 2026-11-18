@@ -39,6 +39,8 @@ function harness(options: { progressAfterMs?: number } = {}) {
       commentary: string | null;
       stale?: boolean;
       partial?: boolean;
+      said?: string;
+      holding?: true;
     }) => void
   >();
   const asked: { delegationId: string; request: string }[] = [];
@@ -168,6 +170,40 @@ describe("the GPT-Live delegation bridge", () => {
       "Start: Runway is 14 months.",
       "Rest: burn has been flat.",
     ]);
+  });
+
+  it("says the Q API's holding line, then asks again early for the first words (owner 18 Nov)", async () => {
+    const h = harness({ progressAfterMs: 60_000 });
+    h.heard("What does Halyard's latest filing say?");
+    h.delegation("dlg_1");
+    h.advance(400);
+    h.pending.get("dlg_1")?.({
+      commentary: 'Say only this short line aloud: "Bear with me."',
+      said: "Bear with me.",
+      partial: true,
+      holding: true,
+    });
+    await h.settle();
+    expect(h.sent.map((e) => e.content)).toEqual([
+      'Say only this short line aloud: "Bear with me."',
+    ]);
+    // Asked again under the same id, still for early words.
+    expect(h.earlies).toEqual([true, true]);
+    h.pending.get("dlg_1")?.({
+      commentary: "Start: Halyard filed in March.",
+      partial: true,
+    });
+    await h.settle();
+    expect(h.earlies).toEqual([true, true, undefined]);
+    h.pending.get("dlg_1")?.({ commentary: "Rest: nothing else changed." });
+    await h.settle();
+    expect(h.sent.map((e) => e.content)).toEqual([
+      'Say only this short line aloud: "Bear with me."',
+      "Start: Halyard filed in March.",
+      "Rest: nothing else changed.",
+    ]);
+    const handed = h.bridge.takeHanded();
+    expect(handed.filter((l) => l.kind === "HOLDING")).toHaveLength(1);
   });
 
   it("keeps the start of an older answer quiet when a newer request exists", async () => {

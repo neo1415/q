@@ -393,14 +393,26 @@ export function sentences(text: string): readonly string[] {
     .filter((part) => part.length > 0);
 }
 
+/** A buffer that ends at a sentence's end, its trailing space included. */
+const ENDS_SENTENCE = /[.!?\u2026]["'\u201D\u2019)\]]*\s+$/u;
+
 /**
  * Re-chunk a stream of arbitrary text deltas into sentences, yielding each
  * as soon as it is complete and flushing the remainder at the end. Stops
  * when the signal aborts: a chunk that was not yielded is never spoken.
+ *
+ * `wholeDeltas`: each delta already ends where its sentence ends (Q's
+ * stream hands over whole sentences that have been through the answer's
+ * guards). A delta that ends on a sentence's end is then yielded at once,
+ * instead of waiting for the next sentence's first letter to prove the
+ * boundary: live 18 Nov, the first sentence of a short spoken answer
+ * otherwise waited for the second, which on a tool turn only comes with
+ * the completed answer.
  */
 export async function* bySentence(
   deltas: AsyncIterable<string>,
   signal?: AbortSignal,
+  options: { readonly wholeDeltas?: boolean } = {},
 ): AsyncGenerator<string> {
   let buffer = "";
   for await (const delta of deltas) {
@@ -419,6 +431,11 @@ export async function* bySentence(
         yield part;
       }
       buffer = buffer.slice(cut);
+    }
+    if (options.wholeDeltas === true && ENDS_SENTENCE.test(buffer)) {
+      const whole = buffer.trim();
+      buffer = "";
+      if (whole.length > 0) yield whole;
     }
   }
   if (signal?.aborted !== true && buffer.trim().length > 0) {

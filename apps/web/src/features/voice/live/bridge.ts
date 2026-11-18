@@ -69,6 +69,12 @@ export type DelegationOutcome = {
    */
   readonly partial?: boolean | undefined;
   /**
+   * With `partial`: the line's one holding line, chosen by the Q API for a
+   * wait that is real (owner 18 Nov 2026), not the answer's start. Said,
+   * then the same delegation is asked again, early, for the first words.
+   */
+  readonly holding?: true | undefined;
+  /**
    * Q's exact words inside `commentary` (RC5). Present: the bridge says
    * them itself (so a move's receipt can edit them by code), replays them
    * for "say that again", and checks what the voice said against them.
@@ -338,7 +344,18 @@ export function sayExactly(words: string): string {
  * chooses it, it claims nothing about the result, and it asks nothing.
  */
 export const HOLDING_LINE = "Working on it.";
-export const HOLDING_CONTENT = `Say only this short line aloud, once, in the language you are speaking with them, and nothing else: "${HOLDING_LINE}" Ask nothing, and say nothing about what the answer will be.`;
+/** The fallback's other words, so the same line is never said twice in a row. */
+export const HOLDING_LINE_ALTERNATE = "On it.";
+export function holdingContentFor(line: string): string {
+  return `Say only this short line aloud, once, in the language you are speaking with them, and nothing else: "${line}" Ask nothing, and say nothing about what the answer will be.`;
+}
+export const HOLDING_CONTENT = holdingContentFor(HOLDING_LINE);
+/**
+ * The client's own holding line is a fallback for a very long silence only
+ * (owner 18 Nov 2026): the Q API chooses the line for a wait that is real
+ * (`holding` results) and never for a turn answered at once.
+ */
+export const PROGRESS_AFTER_MS = 12_000;
 
 /** What the voice says when Q's run did not come back. */
 export const NOT_FINISHED_LINE =
@@ -692,7 +709,7 @@ const defaultTimers: Timers = {
 export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const timers = deps.timers ?? defaultTimers;
   const settleMs = deps.settleMs ?? 400;
-  const progressAfterMs = deps.progressAfterMs ?? 5_000;
+  const progressAfterMs = deps.progressAfterMs ?? PROGRESS_AFTER_MS;
   const routeAfterMs = deps.routeAfterMs ?? ROUTE_AFTER_MS;
   const continueAfterMs = deps.continueAfterMs ?? CONTINUE_AFTER_MS;
   const mergeWithinMs = deps.mergeWithinMs ?? MERGE_WITHIN_MS;
@@ -701,6 +718,8 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   let routedCount = 0;
   // RC1: one holding line per utterance of theirs, never stacked.
   let heldSinceTheySpoke = false;
+  // The last holding words said, so the next is never the same.
+  let lastHoldWords: string | null = null;
   // RC5: the exact lines handed to the voice, until live-call takes them.
   const handedLog: HandedLine[] = [];
   // The last answer line handed, and what the voice has said of it, to
@@ -914,9 +933,16 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       // still going after the threshold and nothing of it was said yet;
       // never the result or a question, never on top of another.
       if (record.voiced === true || heldSinceTheySpoke) return;
+      const words =
+        lastHoldWords === HOLDING_LINE ? HOLDING_LINE_ALTERNATE : HOLDING_LINE;
       heldSinceTheySpoke = true;
-      send("session.commentary.append", record.providerId, HOLDING_CONTENT);
-      handWords(null, HOLDING_LINE, "HOLDING");
+      lastHoldWords = words;
+      send(
+        "session.commentary.append",
+        record.providerId,
+        holdingContentFor(words),
+      );
+      handWords(null, words, "HOLDING");
     }, progressAfterMs);
     const finish = async (outcome: DelegationOutcome) => {
       timers.clearTimeout(progress);
@@ -956,21 +982,49 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       ...(cut ? { lastLineCut: true } : {}),
       ...(replaces === undefined ? {} : { replaces: replaces.id }),
     };
-    void deps
-      .delegate({ ...base, early: true })
-      .then(async (outcome) => {
+    const askEarly = (): Promise<void> =>
+      deps.delegate({ ...base, early: true }).then(async (outcome) => {
         if (outcome.partial !== true) {
           await finish(outcome);
           return;
         }
-        // Q has verified the start of its answer: the voice says it now,
-        // and the rest is asked for under the same id.
         timers.clearTimeout(progress);
         progressed = true;
+        if (outcome.holding === true) {
+          // The Q API judged the wait real: its one holding line now,
+          // then the first words, still early, under the same id.
+          sayHolding(record, outcome);
+          await askEarly();
+          return;
+        }
+        // Q has verified the start of its answer: the voice says it now,
+        // and the rest is asked for under the same id.
         speakStart(record, outcome);
         await deps.delegate(base).then(finish, failed);
-      })
-      .catch(failed);
+      });
+    void askEarly().catch(failed);
+  };
+
+  /**
+   * The Q API's holding line for this request: said once per utterance of
+   * theirs, never over Q's words or a newer request, never twice the same.
+   */
+  const sayHolding = (record: DelegationRecord, outcome: DelegationOutcome) => {
+    const words = typeof outcome.said === "string" ? outcome.said : null;
+    if (
+      words === null ||
+      outcome.commentary === null ||
+      record.status !== "RUNNING" ||
+      record.voiced === true ||
+      heldSinceTheySpoke ||
+      words === lastHoldWords ||
+      newerRequests(record).length > 0
+    )
+      return;
+    heldSinceTheySpoke = true;
+    lastHoldWords = words;
+    send("session.commentary.append", record.providerId, outcome.commentary);
+    handWords(null, words, "HOLDING");
   };
 
   /**

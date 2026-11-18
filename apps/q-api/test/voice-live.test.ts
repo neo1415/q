@@ -25,7 +25,9 @@ import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import {
   coalescedSegments,
   createLiveBroker,
+  holdingLineFor,
   leadTurns,
+  LIVE_HOLDING_LINES,
   LIVE_INACTIVE_GRACE_MS,
   LIVE_SWEEP_MS,
   liveMoveOf,
@@ -147,7 +149,20 @@ function setup(
     answer?: string;
     hold?: boolean;
     /** Q says `first`, then waits for `until`, then `rest` (a streamed answer). */
-    stream?: { first: string; rest: string; until: Promise<void> };
+    stream?: {
+      first: string;
+      rest: string;
+      until: Promise<void>;
+      /** Nothing is said before this (a run still reading or working). */
+      start?: Promise<void>;
+    };
+    /** One answer per run, in order (the last one repeats). */
+    answers?: readonly string[];
+    /** The run starts work that takes a while (a tool stage). */
+    working?: boolean;
+    /** Each run records its conversation on the board first, as turn.ts does. */
+    recordsConversation?: boolean;
+    holding?: { afterMs?: number; longMs?: number };
     rehearsalLine?: Parameters<typeof createLiveBroker>[0]["rehearsalLine"];
     /** The provider's ceiling, as main.ts reads it from the review. */
     ceiling?: () => Promise<"PUBLIC" | "INTERNAL" | "CONFIDENTIAL">;
@@ -157,6 +172,7 @@ function setup(
   } = {},
 ) {
   let clock = 1_000_000;
+  let board = { sequence: 0, navigate: null as string | null };
   const runs: string[] = [];
   const runBindings: VoiceSessionBinding[] = [];
   const holds: Deferred[] = [];
@@ -186,6 +202,10 @@ function setup(
     const last = transcript[transcript.length - 1];
     runs.push(last?.content ?? "");
     runBindings.push(binding);
+    if (options.recordsConversation === true) {
+      board = { ...board, sequence: board.sequence + 1, navigate: null };
+    }
+    if (options.working === true) speaker.working?.();
     if (options.hold === true) {
       await new Promise<void>((resolve) => {
         holds.push({ resolve });
@@ -199,6 +219,7 @@ function setup(
     if (streamed !== undefined) {
       await speaker.speak(
         (async function* () {
+          await streamed.start;
           yield streamed.first;
           await streamed.until;
           yield streamed.rest;
@@ -206,7 +227,14 @@ function setup(
       );
       return { kind: "SPOKEN", path: "Q" };
     }
-    await speaker.speak(options.answer ?? `Answer to ${last?.content ?? ""}.`);
+    const answers = options.answers;
+    const scripted =
+      answers === undefined
+        ? undefined
+        : answers[Math.min(runs.length - 1, answers.length - 1)];
+    await speaker.speak(
+      scripted ?? options.answer ?? `Answer to ${last?.content ?? ""}.`,
+    );
     return { kind: "SPOKEN", path: "Q" };
   };
   const usage = createInMemoryModelUsageRepository();
@@ -221,6 +249,11 @@ function setup(
     syntheticDemo: options.synthetic === true,
     logger,
     now: () => clock,
+    ...(options.recordsConversation === true
+      ? { board: { read: () => board } }
+      : {}),
+    // Off unless a test asks: a hold is its own subject below.
+    holding: options.holding ?? { afterMs: 3_600_000, longMs: 3_600_000 },
     ...(options.rehearsalLine === undefined
       ? {}
       : { rehearsalLine: options.rehearsalLine }),
@@ -640,6 +673,233 @@ describe("GPT-Live line", () => {
     // What was already said is not handed over twice.
     expect(rest?.commentary).not.toContain("Runway is fourteen months.");
     expect(runs).toHaveLength(1);
+  });
+
+  it("hands over the first words early though the run recorded its conversation on the board (live 18 Nov)", async () => {
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const { broker } = setup({
+      recordsConversation: true,
+      stream: {
+        first: "Runway is 14 months. ",
+        rest: "Burn has been flat since March.",
+        until,
+      },
+    });
+    await open(broker);
+    const early = await broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: { delegationId: "dlg_1", request: "Runway?", early: true },
+    });
+    // Before the run ended: the board's new sequence is no move.
+    expect(early?.partial).toBe(true);
+    expect(early?.said).toBe("Runway is fourteen months.");
+    finish();
+    const rest = await ask(broker, "dlg_1", "Runway?");
+    expect(rest?.said).toBe("Burn has been flat since March.");
+    expect(rest?.move).toBeUndefined();
+  });
+
+  it("keeps first words about the screen for the whole run: its move is followed first", async () => {
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const { broker } = setup({
+      stream: {
+        first: "Ajopot is open on your screen now. ",
+        rest: "Their raise is on the right.",
+        until,
+      },
+    });
+    await open(broker);
+    const early = broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: {
+        delegationId: "dlg_1",
+        request: "Open Ajopot",
+        early: true,
+      },
+    });
+    finish();
+    const whole = await early;
+    expect(whole?.partial).toBeUndefined();
+    expect(whole?.said).toContain("Ajopot is open on your screen now.");
+  });
+
+  it("holds a real wait once (work started, no words yet), then hands over the first words", async () => {
+    let speak!: () => void;
+    const start = new Promise<void>((resolve) => {
+      speak = resolve;
+    });
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const { broker } = setup({
+      working: true,
+      holding: { afterMs: 0, longMs: 3_600_000 },
+      stream: {
+        first: "Halyard filed in March. ",
+        rest: "Nothing else changed.",
+        until,
+        start,
+      },
+    });
+    await open(broker);
+    const early = () =>
+      broker.delegate({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        delegation: {
+          delegationId: "dlg_1",
+          request: "What did Halyard file?",
+          early: true,
+        },
+      });
+    const held = await early();
+    expect(held?.holding).toBe(true);
+    expect(held?.partial).toBe(true);
+    expect(LIVE_HOLDING_LINES).toContain(held?.said);
+    expect(held?.commentary).toContain(`"${held?.said ?? ""}"`);
+    expect(held?.commentary).toMatch(/Ask nothing/u);
+    // Asked again, early: the hold is not said twice; the first words come.
+    const pending = early();
+    speak();
+    const start1 = await pending;
+    expect(start1?.holding).toBeUndefined();
+    expect(start1?.said).toBe("Halyard filed in March.");
+    finish();
+    const rest = await ask(broker, "dlg_1", "What did Halyard file?");
+    expect(rest?.said).toBe("Nothing else changed.");
+  });
+
+  it("never holds a turn that started no work: it is answered from the conversation", async () => {
+    let speak!: () => void;
+    const start = new Promise<void>((resolve) => {
+      speak = resolve;
+    });
+    const { broker } = setup({
+      working: false,
+      holding: { afterMs: 0, longMs: 3_600_000 },
+      stream: {
+        first: "They've raised $2 million so far. ",
+        rest: "",
+        until: Promise.resolve(),
+        start,
+      },
+    });
+    await open(broker);
+    const pending = broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: {
+        delegationId: "dlg_1",
+        request: "How much have they raised?",
+        early: true,
+      },
+    });
+    // Time passes with nothing said: still no holding line.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 5);
+    });
+    speak();
+    const first = await pending;
+    expect(first?.holding).toBeUndefined();
+    expect(first?.partial).toBe(true);
+  });
+
+  it("never holds two turns in a row for the same kind of wait, and never in the same words", () => {
+    const seen: string[] = [];
+    let last: string | null = null;
+    for (let count = 0; count < 12; count += 1) {
+      const line = holdingLineFor(count, last);
+      expect(line).not.toBe(last);
+      seen.push(line);
+      last = line;
+    }
+    expect(new Set(seen).size).toBeGreaterThan(3);
+  });
+
+  it("after a turn that held, the next turn's work is not held at the short wait", async () => {
+    let speak!: () => void;
+    let start = new Promise<void>((resolve) => {
+      speak = resolve;
+    });
+    const stream = {
+      first: "Halyard filed in March. ",
+      rest: "",
+      until: Promise.resolve(),
+      get start() {
+        return start;
+      },
+    };
+    const { broker } = setup({
+      working: true,
+      holding: { afterMs: 0, longMs: 3_600_000 },
+      stream,
+    });
+    await open(broker);
+    const early = (id: string) =>
+      broker.delegate({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        delegation: { delegationId: id, request: "And Zino?", early: true },
+      });
+    expect((await early("dlg_1"))?.holding).toBe(true);
+    speak();
+    await early("dlg_1");
+    await ask(broker, "dlg_1", "And Zino?");
+    start = new Promise<void>((resolve) => {
+      speak = resolve;
+    });
+    const second = early("dlg_2");
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 5);
+    });
+    speak();
+    const answer = await second;
+    expect(answer?.holding).toBeUndefined();
+    expect(answer?.partial).toBe(true);
+  });
+
+  it("does not say a stock line again on the next answer, nor twice in one (owner 18 Nov)", async () => {
+    const caveat =
+      "That's how well they match your mandate, not a judgement of quality.";
+    const { broker } = setup({
+      answers: [
+        `Halyard and Clearwater are tied at 8.8. ${caveat}`,
+        `Nixo leads at 9.1. ${caveat} This is missing information, not a negative finding. This is missing information, not a negative finding.`,
+      ],
+    });
+    await open(broker);
+    const first = await ask(broker, "dlg_1", "Top two?");
+    expect(first?.said).toContain(caveat);
+    const second = await ask(broker, "dlg_2", "And for fintech?");
+    expect(second?.said).toContain("Nixo leads at nine point one.");
+    expect(second?.said).not.toContain("judgement of quality");
+    expect(
+      second?.said?.match(/missing information, not a negative finding/gu),
+    ).toHaveLength(1);
+  });
+
+  it("keeps a sentence with a figure, and the approval question, however often said", async () => {
+    const { broker } = setup({
+      answers: [
+        `I've prepared the email to Ajopot. ${APPROVAL_QUESTION}`,
+        `I've prepared the email to Ajopot. ${APPROVAL_QUESTION}`,
+      ],
+    });
+    await open(broker);
+    await ask(broker, "dlg_1", "Email Ajopot");
+    const again = await ask(broker, "dlg_2", "Email Ajopot again");
+    // Nothing new at all: said whole, approval question included.
+    expect(again?.said).toContain(APPROVAL_QUESTION);
+    expect(again?.approvalPending).toBe(true);
   });
 
   it("returns the whole answer to a client that did not ask for early words", async () => {

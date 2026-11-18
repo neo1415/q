@@ -1025,7 +1025,9 @@ describe("a spoken question for Q", () => {
           event("q.message.delta", { messageId: "m1", text: "Third point." }),
           event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
         ],
-        { abortAfter: 1, controller },
+        // Cut once the first sentence is out: a whole sentence is said as
+        // soon as it arrives (live 18 Nov), so the cut comes after it.
+        { abortAfter: 0, controller },
       ),
       logger,
     });
@@ -1159,6 +1161,36 @@ describe("a spoken question for Q", () => {
       speaker,
     );
     expect(speaker.spoken).toEqual(["Paystack raised a Series A in 2018."]);
+  });
+
+  it("tells the line when real work starts, never for reading or starting the answer (owner 18 Nov)", async () => {
+    const run = async (stages: readonly string[]) => {
+      const runtime = fakeRuntime();
+      const handle = createVoiceTurnHandler({
+        qRuntime: runtime.service,
+        qStream: fakeStream([
+          ...stages.map((stage) => event("q.stage.changed", { stage })),
+          event("q.message.delta", { messageId: "m1", text: "Done here. " }),
+          event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+        ]),
+        logger,
+      });
+      let working = 0;
+      const speaker = { ...fakeSpeaker(), working: () => (working += 1) };
+      await handle(
+        binding({
+          conversationId: undefined,
+          subjects: undefined,
+          onboarding: undefined,
+        }),
+        [{ role: "user", content: "How much have they raised?" }],
+        new AbortController().signal,
+        speaker,
+      );
+      return working;
+    };
+    expect(await run(["UNDERSTANDING_REQUEST", "PREPARING_ANALYSIS"])).toBe(0);
+    expect(await run(["PREPARING_ANALYSIS", "REVIEWING_COMPANY"])).toBe(1);
   });
 
   it("never narrates progress once the answer has been said (directive I)", async () => {

@@ -90,6 +90,7 @@ const DelegateResult = z.object({
   ended: z.boolean().optional(),
   unheard: z.boolean().optional(),
   partial: z.boolean().optional(),
+  holding: z.literal(true).optional(),
   // Without it here the relay strips it, and the call never leaves.
   leave: z.literal(true).optional(),
   move: z

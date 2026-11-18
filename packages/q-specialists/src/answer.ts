@@ -1311,6 +1311,77 @@ async function rereadTurn<T>(
   }
 }
 
+/**
+ * Live 17-18 Nov 2026: a garbled spoken turn the reader read by sound
+ * (TURN_READER v44 heardAs) was answered by reading its likely words again
+ * from the start, a second reader call (about 2.6 s, in 7 of 20 spoken
+ * turns measured). The first reading already read those words for what
+ * they ask, so it is reused for them when nothing in it is bound to the
+ * phrases of the garbled text itself: a plain question to Q, with no tool,
+ * action, reference, part, control, reply, comparison, plan, sequence,
+ * named other, shown list, memory or hand-over. Anything else is read
+ * again, as before.
+ */
+export function heardReadingReusable(
+  read: Pick<
+    QTurnReading,
+    | "kind"
+    | "confidence"
+    | "addressedToQ"
+    | "tool"
+    | "askedAction"
+    | "appAction"
+    | "handOver"
+    | "reference"
+    | "references"
+    | "parts"
+    | "control"
+    | "remember"
+    | "replyTo"
+    | "compare"
+    | "planAsk"
+    | "sequence"
+    | "fromShown"
+    | "namedOther"
+    | "meetingPrep"
+    | "saveToOwnProfile"
+    | "acceptsOffer"
+    | "directsWork"
+    | "teamJob"
+    | "endVoice"
+  >,
+): boolean {
+  const none = (value: unknown) => value === undefined || value === null;
+  const empty = (value: readonly unknown[] | undefined | null) =>
+    value === undefined || value === null || value.length === 0;
+  return (
+    read.kind === "QUESTION_TO_Q" &&
+    read.confidence !== "LOW" &&
+    read.addressedToQ !== false &&
+    none(read.tool) &&
+    none(read.askedAction) &&
+    none(read.appAction) &&
+    none(read.handOver) &&
+    none(read.reference) &&
+    empty(read.references) &&
+    empty(read.parts) &&
+    none(read.control) &&
+    none(read.remember) &&
+    none(read.replyTo) &&
+    none(read.compare) &&
+    none(read.planAsk) &&
+    none(read.sequence) &&
+    none(read.fromShown) &&
+    none(read.namedOther) &&
+    none(read.meetingPrep) &&
+    read.saveToOwnProfile !== true &&
+    read.acceptsOffer !== true &&
+    read.directsWork !== true &&
+    read.teamJob !== true &&
+    read.endVoice !== true
+  );
+}
+
 /** The reader's routing decision for one run: closed codes, no words or ids. */
 export type QRunRouting = {
   readonly kind: string;
@@ -5711,6 +5782,8 @@ export function createSpecialistQAnswer(
   const unclearInARow = new Map<string, number>();
   /** Runs answering their likely words (TURN_READER v44): never twice. */
   const reheard = new Set<string>();
+  /** The first reading, reused for those words (heardReadingReusable). */
+  const heardReadings = new Map<string, QTurnReading>();
 
   /**
    * A series of questions the person asked Q to put to them, per
@@ -7813,6 +7886,15 @@ export function createSpecialistQAnswer(
       };
     };
     const readingFirst = (async () => {
+      const heard = heardReadings.get(request.runId);
+      if (heard !== undefined) {
+        heardReadings.delete(request.runId);
+        logger?.info(
+          { qRunId: request.runId },
+          "q likely words answered from the first reading",
+        );
+        return heldInPlace(heard);
+      }
       const ready = early === undefined ? null : await early;
       const earlyRead =
         ready !== null &&
@@ -8253,10 +8335,14 @@ export function createSpecialistQAnswer(
         "q read garbled speech by sound",
       );
       reheard.add(request.runId);
+      if (read !== null && heardReadingReusable(read)) {
+        heardReadings.set(request.runId, { ...read, heardAs: null });
+      }
       try {
         return await answerTurn(request);
       } finally {
         reheard.delete(request.runId);
+        heardReadings.delete(request.runId);
       }
     }
     // Q intelligence step 3: what their pointing words mean, read by the

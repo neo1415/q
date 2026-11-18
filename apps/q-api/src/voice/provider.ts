@@ -65,6 +65,13 @@ export type VoiceSpeaker = {
    * names the run it belongs to). Absent: nobody asks.
    */
   readonly run?: ((runId: string) => void) | undefined;
+  /**
+   * Told when the run starts work that takes a while (a tool or record
+   * stage, a public search), so a line that chooses its own holding line
+   * holds only a wait that is real (owner 18 Nov: no "working on it" on a
+   * turn answered from the conversation). Absent: nobody asks.
+   */
+  readonly working?: (() => void) | undefined;
 };
 
 export type VoiceChannelHandlers = {
