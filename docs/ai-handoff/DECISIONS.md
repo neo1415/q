@@ -476,3 +476,9 @@ Core Seven remains the governing assessment framework. The new directive authori
       - The meeting face must move its lips when Q speaks; a silent or non-lip-synced face is pointless. Q's voice is spoken through the face.
       - GateQ and Q in meetings must respond immediately; minutes-long waits are defects.
       - Everything the owner must supply goes into one document.
+
+107.  **Legal pages, a content editor, data rights, and pricing and FAQ pages** (owner, 2026-11-18).
+      - Legal: terms of service and terms of use, privacy policy, cookie policy, acceptable use, AI and investment disclaimers, and meeting recording consent. Industry-standard defaults, drafted to protect the company as far as the law allows, with a lawyer to review before launch. Linked from the home page and the footer.
+      - Data rights (GDPR and Nigeria's NDPA): every person can download their data and delete their account and data completely. Where the law or other people's records require keeping something (audit, a counterparty's relationship history, invoices), it is anonymised, not left identifying, and the person is told what is kept and why.
+      - A content editor (CMS) in the admin: a polished visual editor with drag-and-drop blocks, like WordPress, not plain forms. It edits the landing page sections, the pricing page (plans and perks), the FAQ and the legal pages, with versions and publish and preview.
+      - A pricing page and an FAQ page, with default content that matches what the product does today, styled with the existing design system.
