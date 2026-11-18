@@ -889,3 +889,13 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   The rerank timing test now takes the fastest of five runs. ci-local PASS (1696 s); all four services SUCCESS.
   - Live (Savanna): "Apart from the companies I'm in contact with, which three…" left out 15 and named Ledgerline, Brancheon Works and Baridi. That's correct.
   - Defect: the follow-up "Am I in contact with any of those?" got a comparison instead of a contact answer. A worker is fixing it.
+- **18 Nov 19:35 UTC, `dd18752b4` (rollback point `b204eb954`):** ci-local PASS (1707 s); all four services SUCCESS. Migrations `20261231598950` (site content) and `20261231599107` (data rights, with the erasure role guard added by the lead) were applied first; hosted is at 312.
+  - Contents:
+    - contact-status answers from the in-contact rule (TURN_READER v94);
+    - data rights: download my data, and account deletion with a 14-day grace period;
+    - the CMS block editor with public /pricing, /faq and /legal pages;
+    - the data-download tool made the person's own instant action, offered on records turns only.
+  - Live (Savanna): "Am I in contact with any of those?" now answers "No. You're not in contact with Ledgerline, Brancheon Works or Baridi". The exclusion list is correct (15 left out).
+  - Open:
+    - Site content is not seeded yet; the seed needs a management-API mode, which a worker is adding.
+    - The welcome said "nothing on Capital Q matches it yet" despite matches; under investigation.
