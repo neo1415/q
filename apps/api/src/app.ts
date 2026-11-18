@@ -356,6 +356,8 @@ export type ApiModules = {
   readonly outcomes?: NetworkInterestRoutesDependencies["outcomes"] | undefined;
   /** The work board (owner 2026-10-23). Absent: /v1/board does not register. */
   readonly board?: BoardRoutesDependencies["board"] | undefined;
+  /** Decision 106: CRM import. Absent: its routes answer not found. */
+  readonly pipelineImport?: AppActionPorts["pipelineImport"];
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
@@ -761,6 +763,9 @@ export function createApp(
         ? {}
         : { commitments: modules.commitments }),
       ...(modules.board === undefined ? {} : { board: modules.board }),
+      ...(modules.pipelineImport === undefined
+        ? {}
+        : { pipelineImport: modules.pipelineImport }),
       ...(modules.capitalRounds === undefined
         ? {}
         : { capitalRounds: modules.capitalRounds }),

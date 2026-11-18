@@ -110,6 +110,8 @@ describe("registry", () => {
         "NAVIGATION_CHOOSER",
         // 2026-10-04: Q's one line on a document shared in diligence.
         "DILIGENCE_DOCUMENT_SUMMARY",
+        // Decision 106 (2026-11-18): an imported pipeline file's columns.
+        "PIPELINE_COLUMN_MAPPING",
         // Overnight A5 2026-10-06: a pitch deck into twelve sections.
         "DECK_EXTRACTION",
         // Lane ov 2026-10-16: a pitch transcript into the profile's sections.

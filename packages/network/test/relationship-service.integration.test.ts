@@ -450,7 +450,11 @@ describe("@capital-q/network against local PostgreSQL", () => {
                                     -- only), the derived per-party read model, and
                                     -- one side's private notes
                                     'relationship_views', 'relationship_party_states',
-                                    'relationship_notes')`;
+                                    'relationship_notes',
+                                    -- CRM import (20261231598370, decision 106): a
+                                    -- staged import and its rows, never a deal,
+                                    -- match or parallel relationship record
+                                    'pipeline_imports', 'pipeline_import_rows')`;
         expect(tables).toEqual([]);
         // Ensuring a relationship expresses no interest.
         expect(

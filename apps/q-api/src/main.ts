@@ -56,6 +56,7 @@ import {
   watchPreparedEntities,
 } from "./composition/prepared-entities.js";
 import { createQApiBoard } from "./composition/board.js";
+import { createQApiPipelineImport } from "./composition/pipeline-import.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import {
   createArrivalSnapshots,
@@ -3485,6 +3486,23 @@ const appActionPorts: OwnReadPorts = {
   // when an action Q can take has no port here.
   interests: interestService,
   connections: connectionService,
+  // Decision 106: "import my pipeline", through the same Network service
+  // as the screen's routes (closures: the board is composed below).
+  pipelineImport: createQApiPipelineImport({
+    interests: interestServiceOptions,
+    evidence: () => researchComposition.evidence,
+    storage:
+      config.secrets.supabaseSecretKey === undefined
+        ? undefined
+        : createSupabaseDocumentStorageProvider({
+            supabaseUrl: supabaseAuth.url,
+            secretKey: config.secrets.supabaseSecretKey,
+          }),
+    gateway: providers.length === 0 ? undefined : modelGateway,
+    dataPosture: demoDataPosture,
+    board: () => qBoard,
+    logger,
+  }),
   chat,
   schedule,
   pitchUploads: pitchMedia,

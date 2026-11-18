@@ -16,6 +16,7 @@ import {
 } from "@capital-q/q-knowledge";
 
 import { createOnboardingCoverageReader } from "./onboarding-coverage.js";
+import { boardPipelineTasks } from "./pipeline-import.js";
 import {
   createCompanyClaims,
   createPlatformCompanyPublishing,
@@ -73,6 +74,7 @@ import {
   INVESTABILITY_BAND_LABELS,
   investabilityMethodLabel,
   SCORE_CONFIDENCE_LABELS,
+  PIPELINE_IMPORT_MAX_BYTES,
 } from "@capital-q/contracts";
 import {
   createBrandThemeStore,
@@ -173,6 +175,7 @@ import {
   createConnectionService,
   createInterestService,
   createNetworkService,
+  createPipelineImportService,
   createRelationshipEventAppender,
   createPostgresDiligenceRequests,
   createPostgresDiligenceQuestions,
@@ -278,7 +281,10 @@ import {
   createGoogleModelProvider,
   geminiEnabled,
 } from "@capital-q/model-gateway/providers/google";
-import { createWordsReaders } from "@capital-q/model-gateway/q";
+import {
+  createPipelineColumnMapper,
+  createWordsReaders,
+} from "@capital-q/model-gateway/q";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createAnthropicModelProvider } from "@capital-q/model-gateway/providers/anthropic";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
@@ -347,6 +353,7 @@ import {
   createEvidenceSubjectResolverRegistry,
   createCompanyEvidenceSubjectResolver,
   createEvidenceService,
+  createOwnScannedFileReader,
   createSupabaseDocumentStorageProvider,
   DOCUMENT_STORAGE_BUCKET,
   DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
@@ -1940,6 +1947,54 @@ const board = createBoardService({
 });
 
 /**
+ * CRM import (decision 106): an uploaded pipeline file, read only once its
+ * scan is CLEAN, mapped by Q (header synonyms when no model is
+ * configured), matched to the canonical counterparts and applied on the
+ * person's approval of the exact proposal. Without document storage the
+ * routes answer that importing is not available here.
+ */
+const pipelineImport = createPipelineImportService({
+  sql: database.sql,
+  transactions: database.transactions,
+  companies: createPostgresCompanyQueryPort({ sql: database.sql }),
+  investors: createPostgresInvestorOrganisationQueryPort({ sql: database.sql }),
+  outbox,
+  audit,
+  authorization,
+  investorSubject: slates.eligibilityPorts.investorSubject,
+  companyVisibility: { isVisibleToInvestor: isCompanyNetworkVisible },
+  files:
+    storage === undefined
+      ? undefined
+      : createOwnScannedFileReader({
+          getDocumentWithVersion: evidence.getDocumentWithVersion,
+          storage,
+          maxBytes: PIPELINE_IMPORT_MAX_BYTES,
+        }),
+  mapper:
+    gateqModelProviders.length === 0
+      ? undefined
+      : createPipelineColumnMapper({
+          gateway: createModelGateway({
+            catalog: createPostgresModelCatalog({ sql: database.sql }),
+            registry: createModelProviderRegistry(gateqModelProviders),
+            usage: createPostgresModelUsageRepository({ sql: database.sql }),
+            health: createProcessLocalProviderHealth(),
+            spendCap: gateqSpendCap,
+            syntheticSubject: gatewaySyntheticSubject,
+            syntheticDemo: createSyntheticDemoRoutingAllowance({
+              operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
+              environment: config.runtime.deploymentEnvironment,
+              databaseUrl: databaseConfig.secrets.url,
+            }),
+            logger: teamLogger,
+          }),
+          logger: teamLogger,
+        }),
+  tasks: boardPipelineTasks(board),
+});
+
+/**
  * Commitments (spec 6.6.14-6.6.15): stated by one side, confirmed by the
  * other, each relationship counted once; history through Network's own
  * appender.
@@ -3289,6 +3344,7 @@ const { app, logger } = createApp(config, security, {
   connections,
   commitments,
   board,
+  pipelineImport,
   capitalRounds,
   outcomes,
   deal,

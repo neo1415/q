@@ -237,6 +237,7 @@ import {
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
+import { PIPELINE_COLUMN_MAPPING_V1 } from "./tasks/pipeline-column-mapping.v1.js";
 import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
 import { PITCH_SECTION_EXTRACTION_V1 } from "./tasks/pitch-section-extraction.v1.js";
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
@@ -996,6 +997,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DAILY_STORY_WRITER_V1,
     DAILY_Q_TAKE_V1,
     DILIGENCE_DOCUMENT_SUMMARY_V1,
+    // Decision 106: an imported pipeline file's columns.
+    PIPELINE_COLUMN_MAPPING_V1,
     // PROFILE block (overnight A5)
     DECK_EXTRACTION_V1,
     PITCH_SECTION_EXTRACTION_V1,

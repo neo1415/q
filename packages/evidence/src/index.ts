@@ -419,3 +419,7 @@ export {
   type GateQFrozenApplicationDocument,
   type GateQSharedSubmittedDocument,
 } from "./application/gateq-application-document-port.js";
+export {
+  createOwnScannedFileReader,
+  type OwnScannedFile,
+} from "./application/own-scanned-file.js";

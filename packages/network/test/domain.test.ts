@@ -155,6 +155,7 @@ describe("relationship event registry", () => {
       "deal_terms_recorded",
       "deal_terms_signed",
       "deal_closed",
+      "crm_stage_imported",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",

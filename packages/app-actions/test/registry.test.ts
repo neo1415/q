@@ -279,6 +279,12 @@ describe("the action registry", () => {
       // CRM S3: the person's own side's private notes.
       ["crm.investor_note.add", "offer.crm_notes", "INSTANT"],
       ["crm.company_note.add", "offer.crm_notes", "INSTANT"],
+      // Decision 106: import an existing CRM or pipeline file; Q's side is
+      // import_my_pipeline (prepare, then the card).
+      ["crm.investor_import.prepare", "via:import_my_pipeline", "INSTANT"],
+      ["crm.company_import.prepare", "via:import_my_pipeline", "INSTANT"],
+      ["crm.investor_import.apply", "import_my_pipeline", "CONSEQUENTIAL"],
+      ["crm.company_import.apply", "via:import_my_pipeline", "CONSEQUENTIAL"],
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],

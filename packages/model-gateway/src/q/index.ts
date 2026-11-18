@@ -786,6 +786,12 @@ export {
   type DiligenceDocumentSummariser,
 } from "./diligence-summary.js";
 export {
+  createPipelineColumnMapper,
+  pipelineColumnsText,
+  pipelineMappingOf,
+  type PipelineColumnMapper,
+} from "./pipeline-column-mapper.js";
+export {
   createPitchSectionReader,
   normalisePitchSectionReading,
   PITCH_SECTION_READER_PROMPT_VERSION,

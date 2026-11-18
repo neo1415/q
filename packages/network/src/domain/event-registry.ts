@@ -682,6 +682,47 @@ export const DealClosedRelationshipEvent = defineRelationshipEvent({
  * Production registry: `discovered` (CQ-NET-001), `interest_expressed`
  * (CQ-NET-010), `connection_accepted` and `interest_declined` (CQ-NET-011).
  */
+/**
+ * CRM import (decision 106, 2026-11-18): a stage the importing side's own
+ * pipeline file recorded for this relationship ("Partner meeting",
+ * "Soft circled"), read onto Capital Q's pipeline vocabulary. The
+ * importer's claim, private to their side; activity only, never a state
+ * move: the shared relationship state changes only through the two
+ * parties' own actions. `stageDate` is the date the file gave, when it
+ * gave one exactly; the event's own time is when it was imported.
+ * `fingerprint` makes a re-import of the same row a no-op.
+ */
+export const CrmStageImportedPayloadSchema = z
+  .object({
+    importId: UuidSchema,
+    rowNumber: z.number().int().min(1).max(5000),
+    stage: z.enum([
+      "RESEARCH",
+      "CONTACTED",
+      "MEETING",
+      "DILIGENCE",
+      "TERM_SHEET",
+      "COMMITTED",
+      "CLOSED",
+      "PASSED",
+      "PAUSED",
+      "UNKNOWN",
+    ]),
+    label: z.string().trim().min(1).max(80),
+    stageDate: z.iso.date().nullable(),
+    fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_CRM_STAGE_IMPORTED =
+  "crm_stage_imported" as const;
+export const CrmStageImportedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_CRM_STAGE_IMPORTED,
+  payloadSchema: CrmStageImportedPayloadSchema,
+  allowedVisibilityScopes: ["investor_private", "founder_private"],
+  description:
+    "A stage the importing side's own pipeline file recorded. Private to that side; activity, never a state move.",
+});
+
 export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinition[] =
   [
     DiscoveredRelationshipEvent,
@@ -717,4 +758,5 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     DealTermsRecordedRelationshipEvent,
     DealTermsSignedRelationshipEvent,
     DealClosedRelationshipEvent,
+    CrmStageImportedRelationshipEvent,
   ];

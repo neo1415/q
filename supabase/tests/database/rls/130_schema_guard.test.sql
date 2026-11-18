@@ -94,6 +94,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('network', 'relationship_views',       'INTERNAL_SERVER_ONLY', '{}'),
   -- CRM S3 private notes (20261227140000); suite 952.
   ('network', 'relationship_notes',       'INTERNAL_SERVER_ONLY', '{}'),
+  -- CRM import (decision 106, 20261231598370); suite 999_network_pipeline_imports.
+  ('network', 'pipeline_imports',         'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'pipeline_import_rows',     'INTERNAL_SERVER_ONLY', '{}'),
   -- CRM pipeline read model (2026-10-15); suite 951.
   ('network', 'relationship_party_states', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationships',            'INTERNAL_SERVER_ONLY', '{}'),

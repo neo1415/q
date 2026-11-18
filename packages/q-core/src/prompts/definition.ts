@@ -99,6 +99,8 @@ export const PROMPT_IDS = [
   "NAVIGATION_CHOOSER",
   /** 2026-10-04: Q's one line on a document shared in diligence. */
   "DILIGENCE_DOCUMENT_SUMMARY",
+  /** Decision 106 (2026-11-18): an imported pipeline file's columns. */
+  "PIPELINE_COLUMN_MAPPING",
   /** Founder brief J1-J9 2026-10-06: Q's workforce of agents. */
   "DRAFT_REVIEW",
   "DRAFT_REDRAFT",
@@ -191,6 +193,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INVESTOR_RESEARCH_READER: "investor-research-reader",
   ERRAND_REPLY: "errand-reply",
   DILIGENCE_DOCUMENT_SUMMARY: "diligence-document-summary",
+  PIPELINE_COLUMN_MAPPING: "pipeline-column-mapping",
   DECK_EXTRACTION: "deck-extraction",
   PITCH_SECTION_EXTRACTION: "pitch-section-extraction",
   SPOKEN_REPLY: "spoken-reply",

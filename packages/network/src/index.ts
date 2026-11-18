@@ -399,3 +399,6 @@ export {
   type RelationshipPipelineQueryService,
 } from "./application/relationship-pipeline-query.js";
 export { createPostgresCompanyPipelineCounts } from "./infrastructure/postgres-relationship-party-states.js";
+// CRM import (decision 106): an uploaded pipeline file, read, matched to the
+// canonical counterparts and applied on approval.
+export * from "./pipeline-import/index.js";
