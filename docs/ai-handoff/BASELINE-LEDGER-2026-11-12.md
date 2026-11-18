@@ -837,3 +837,10 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - (1) The question "What does Halyard do and how is it doing commercially?" got an unrequested Express Interest card (approval-gated, nothing sent) instead of an answer. It is the first such proposal from QUESTION_TO_Q routing in 10 days.
   - (2) Same-subject follow-ups were routed COMPLEX_ANALYSIS, so the fast path was not taken: 15.9 s and 13.3 s.
   - (3) Each follow-up made a paid PUBLIC_WEB_SEARCH call.
+- **18 Nov 00:34 UTC, `240e0b9a0` (rollback point `8ef954671`):** ci-local PASS (1356 s); all four services SUCCESS.
+  - Fixes: a question turn never gets an approval card (approval-card tools are withheld and refused at execution); same-subject follow-ups try the fast path; a follow-up on Q's own answer does no web research.
+  - Live recheck (Savanna, $0.061):
+    - "What does Halyard do and how is it doing commercially?" was answered, with 0 actions.
+    - Follow-up 1 took the fast path: 7.8 s (was 15.9 s), 4 calls, no web search.
+    - Follow-up 2 missed the fast path (`NO_EVIDENCE`) and took the full path: 11.5 s (was 13.3 s), no web search. Fast-path answers don't carry their sources forward; a worker is fixing this.
+  - Note: Tavily, SerpAPI and Brave are out of credit, so web research falls back to the paid model-hosted search (capped at $2/day).
