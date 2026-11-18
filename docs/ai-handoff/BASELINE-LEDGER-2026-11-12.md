@@ -900,3 +900,5 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Open:
     - Site content is not seeded yet; the seed needs a management-API mode, which a worker is adding.
     - The welcome said "nothing on Capital Q matches it yet" despite matches; under investigation.
+- **18 Nov 22:32 UTC, `491ece443` (web only; the other services are unchanged on `dd18752b4`):** ci-local PASS (1676 s). The welcome says "nothing matches" only when the slate itself is empty, and is silent during a rebuild (`6fde24973`).
+  - Site content seeded through the management API with `--hold-pricing`: 21 pages. FAQ and the 12 landing sections are published; pricing is a draft until billing is live; the 7 legal pages are drafts pending lawyer review. A re-run writes 0.
