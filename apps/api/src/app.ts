@@ -185,6 +185,11 @@ import { registerRequestTiming } from "./http/request-timing.js";
 import type { BrandThemeStore } from "@capital-q/platform-admin";
 
 import { registerBrandThemeRoutes } from "./http/brand-theme.js";
+// DATA RIGHTS block (decision 107)
+import { dataExportPort, type DataRightsService } from "@capital-q/data-rights";
+import { freshAuthenticationOf } from "@capital-q/platform-admin";
+import { registerDataRightsRoutes } from "./http/data-rights.js";
+// end DATA RIGHTS block
 // ETIQUETTE block (ADR 0050)
 import type { EtiquetteGuidePort } from "@capital-q/app-actions";
 import type { EtiquetteGuideAdminStore } from "@capital-q/platform-admin";
@@ -332,6 +337,8 @@ export type ApiModules = {
   // end ADMIN-3 block
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
+  /** Decision 107: download my data, delete my account. Absent: not served. */
+  readonly dataRights?: DataRightsService | undefined;
   // ANALYTICS block (Q Workspace §8)
   readonly engagementNotices?: EngagementNotices | undefined;
   readonly engagement?:
@@ -568,6 +575,16 @@ export function createApp(
 
   registerMeRoute(app, security);
 
+  if (modules.dataRights !== undefined) {
+    registerDataRightsRoutes(app, {
+      authenticator: security.authenticator,
+      identities: security.identities,
+      dataRights: modules.dataRights,
+      freshTokens: modules.adminFreshTokens,
+      freshAuthenticationOf,
+    });
+  }
+
   if (modules.organisations !== undefined) {
     registerOrganisationRoutes(app, {
       authenticator: security.authenticator,
@@ -794,6 +811,9 @@ export function createApp(
       ...(modules.memoryCorrection === undefined
         ? {}
         : { memoryCorrection: modules.memoryCorrection }),
+      ...(modules.dataRights === undefined
+        ? {}
+        : { dataExports: dataExportPort(modules.dataRights) }),
       ...(push === undefined
         ? {}
         : {

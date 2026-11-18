@@ -578,6 +578,7 @@ function actionFor(
     case "VERIFICATION_DECIDED":
     case "VERIFICATION_REQUESTED":
     case "RELATIONSHIP_OUTCOME":
+    case "DATA_EXPORT_READY":
       return href === null
         ? { label: "Got it", href: null }
         : { label: "Open", href };

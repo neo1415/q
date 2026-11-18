@@ -80,6 +80,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@capital-q/data-rights':
+        specifier: workspace:*
+        version: link:../../packages/data-rights
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -213,6 +216,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@capital-q/data-rights':
+        specifier: workspace:*
+        version: link:../../packages/data-rights
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -494,6 +500,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@capital-q/data-rights':
+        specifier: workspace:*
+        version: link:../../packages/data-rights
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -892,6 +901,25 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/data-rights:
+    dependencies:
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      postgres:
+        specifier: 3.4.9
+        version: 3.4.9
       typescript:
         specifier: 5.9.3
         version: 5.9.3

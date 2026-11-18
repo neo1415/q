@@ -1,4 +1,5 @@
 import { createGateqUnicornReader } from "./gateq/unicorn.js";
+import { createDataRightsService } from "@capital-q/data-rights";
 import type { ActorContext } from "@capital-q/security";
 import { createNeedsYouCurrency } from "@capital-q/app-actions";
 /**
@@ -3427,6 +3428,12 @@ const { app, logger } = createApp(config, security, {
   engagement,
   engagementNotices: createEngagementNotices(database.sql),
   readiness,
+  // Decision 107: the person's data download and account deletion. The
+  // workers build downloads and run due deletions.
+  dataRights: createDataRightsService({
+    transactions: database.transactions,
+    storage,
+  }),
   adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
   adminVerificationDecider: createDecideByOperator({
     transactions: database.transactions,

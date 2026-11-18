@@ -1,3 +1,7 @@
+import {
+  createDataRightsService,
+  dataExportPort,
+} from "@capital-q/data-rights";
 import { notAssessedUnicornPotential } from "@capital-q/contracts";
 import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 /**
@@ -3476,6 +3480,11 @@ const appActionPorts: OwnReadPorts = {
   startupAlerts: createStartupAlerts({ sql: database.sql }),
   // ADR 0050: their own speaking guide, saved or removed by asking Q.
   etiquetteGuides,
+  // Decision 107: "download my data", the Your data page's own request
+  // (the workers build it; the link is collected on that page).
+  dataExports: dataExportPort(
+    createDataRightsService({ transactions: database.transactions }),
+  ),
   // G1/G2: inviting a colleague, changing a role, reading the team.
   team,
   media: pitchMedia,

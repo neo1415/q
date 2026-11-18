@@ -393,6 +393,8 @@ describe("the action registry", () => {
         "propose_withdraw_company_claim",
         "CONSEQUENTIAL",
       ],
+      // Decision 107: a download of their own data (deletion is page-only).
+      ["person.data.export.request", "request_my_data_download", "INSTANT"],
     ]);
   });
 });

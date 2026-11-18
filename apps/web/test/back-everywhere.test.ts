@@ -170,6 +170,10 @@ const INTERIOR: Readonly<Record<string, Interior>> = {
     parent: "/settings/team",
     via: ["features/organisation/admin-pages.tsx"],
   },
+  "settings/data": {
+    parent: "/settings",
+    via: ["features/settings/data-rights-view.tsx"],
+  },
   "settings/memory": {
     parent: "/settings",
     via: ["features/settings/memory-view.tsx"],

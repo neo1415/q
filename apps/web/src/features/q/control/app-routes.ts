@@ -104,6 +104,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/settings",
   "/settings/activity",
   "/settings/billing",
+  "/settings/data",
   "/settings/memory",
   "/settings/plan",
   "/settings/reconnect/google",

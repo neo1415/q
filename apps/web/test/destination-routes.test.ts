@@ -84,6 +84,10 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/documents/unavailable":
     "the not-found landing for a refused document link (J7); never a destination",
   "/admin": "platform operators only",
+  // Decision 107: Q starts a download with request_my_data_download and
+  // links here (site map route) for deletion, which only the page does.
+  "/settings/data":
+    "reached by Q through the site map route; deletion is the person's own act on the page",
   "/settings/security":
     "two-step sign-in: Q never opens it, so a secret or code never passes through Q",
   // Owner 2026-10-23: a Work tab (tab.work-board); Q reads and changes it

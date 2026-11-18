@@ -1621,3 +1621,5 @@ export * from "./engagement.js";
 // end ANALYTICS block
 // 2026-11-17: a founder withdraws one of their company's claims.
 export * from "./claims.js";
+// Decision 107: download my data, delete my account.
+export * from "./data-rights.js";

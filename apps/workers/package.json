@@ -19,6 +19,7 @@
     "@capital-q/companies": "workspace:*",
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
+    "@capital-q/data-rights": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/discovery": "workspace:*",
     "@capital-q/engagement": "workspace:*",

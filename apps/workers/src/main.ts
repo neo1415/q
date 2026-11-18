@@ -219,6 +219,11 @@ import { createPitchSectionsPort } from "./media/pitch-section-proposals.js";
 import { runPitchSectionSweep } from "./media/pitch-section-readings.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { runRetentionTicker } from "./retention/retention.js";
+import {
+  createDataRightsJobs,
+  createSupabaseAuthAccountRemover,
+} from "@capital-q/data-rights";
+import { runDataRightsTicker } from "./data-rights/ticker.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
 import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
@@ -1836,6 +1841,28 @@ await Promise.all([
     signal: shutdownController.signal,
     logger,
   }),
+  // Decision 107: data downloads and due account deletions. Needs private
+  // storage and the Auth admin key; without them nothing is built or
+  // deleted, and requests wait.
+  ...(storage === undefined ||
+  config.public.supabaseUrl === undefined ||
+  config.secrets.supabaseSecretKey === undefined
+    ? []
+    : [
+        runDataRightsTicker({
+          jobs: createDataRightsJobs({
+            transactions: database.transactions,
+            storage,
+            auth: createSupabaseAuthAccountRemover({
+              supabaseUrl: config.public.supabaseUrl,
+              secretKey: config.secrets.supabaseSecretKey,
+            }),
+            logger,
+          }),
+          signal: shutdownController.signal,
+          logger,
+        }),
+      ]),
   // DEF-A9 / F-D10: old run checkpoints and unlinked voice turns, hourly.
   runRetentionTicker({
     transactions: database.transactions,

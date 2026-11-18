@@ -408,6 +408,8 @@ export const NotificationKindSchema = z.enum([
   // Journey audit 2026-11-13 D1 (20261231510000): the side that expressed
   // interest hears that it was accepted.
   "INTEREST_ACCEPTED",
+  // Decision 107 (20261231599107): the person's data download is ready.
+  "DATA_EXPORT_READY",
 ]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 

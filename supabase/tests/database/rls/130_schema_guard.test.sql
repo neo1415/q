@@ -56,6 +56,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('identity', 'organisation_ownership_offers', 'RLS_REQUIRED',    '{SELECT}'),
   ('identity', 'membership_roles',         'RLS_REQUIRED',         '{SELECT}'),
   ('identity', 'organisation_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  -- Decision 107: data rights request ledgers, server-only (suite 999_data_rights).
+  ('identity', 'data_export_requests',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('identity', 'account_deletion_requests', 'INTERNAL_SERVER_ONLY', '{}'),
   ('core', 'companies',                    'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'company_creation_requests',    'INTERNAL_SERVER_ONLY', '{}'),
   -- F3 (Find my startup): server-only, suite 810.

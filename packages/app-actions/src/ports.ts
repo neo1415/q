@@ -400,6 +400,18 @@ export type AppActionPorts = {
    * memory Write Gate. Only the actor's own live memory.
    */
   readonly memoryCorrection?: MemoryCorrectionPort | undefined;
+  /** Decision 107: the person's own data download (the Your data page's service). */
+  readonly dataExports?: DataExportPort | undefined;
+};
+
+export type DataExportRequestOutcome =
+  "REQUESTED" | "ALREADY_REQUESTED" | "RATE_LIMITED" | "NOT_AVAILABLE";
+
+export type DataExportPort = {
+  readonly request: (input: {
+    readonly userId: string;
+    readonly idempotencyKey: string;
+  }) => Promise<DataExportRequestOutcome>;
 };
 
 /** The outcome of one correction, in the service's terms. */

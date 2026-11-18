@@ -984,6 +984,11 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       { id: "activity", title: "Your team's activity", kind: "OTHER" },
     ],
   },
+  "/settings/data": {
+    title: "Your data",
+    purpose: "Download or delete your data.",
+    audience: "ANY",
+  },
   "/settings/memory": {
     title: "Memory",
     purpose: "What Q remembers about you, and making it forget.",

@@ -186,9 +186,12 @@ select isnt(
   (select id from identity.user_profiles where auth_user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid,
   'UserId is generated independently of AuthUserId');
+-- Decision 107 (20261231599107): the foreign key now sets null, and the
+-- profile's closed-shape check refuses it unless the profile was closed by
+-- the account-deletion workflow first. Still refused for a live person.
 select throws_ok(
   $$ delete from auth.users where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' $$,
-  '23503', null, 'deleting an auth user with a profile is restricted');
+  '23514', null, 'deleting an auth user with a profile is restricted');
 
 insert into identity.tenants (id, name) values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', 'Synthetic Tenant A'),

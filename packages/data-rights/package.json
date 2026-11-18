@@ -1,0 +1,33 @@
+{
+  "name": "@capital-q/data-rights",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Data rights (owner decision 107): the personal-data inventory, the person's data export, and account deletion that anonymises what other parties' records keep.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "postgres": "3.4.9",
+    "typescript": "5.9.3"
+  }
+}

@@ -75,6 +75,10 @@ const EXEMPT: Readonly<Record<string, string>> = {
   "auth/two-step/page.tsx": AUTH,
   "settings/security/page.tsx":
     "two-step sign-in: Q is never told what it shows, so the secret and codes stay out of Q",
+  // Decision 107: the deletion form takes a password or emailed code to
+  // confirm it is them; like Security, Q is not told what the page shows.
+  "settings/data/page.tsx":
+    "account deletion asks for a password or code: Q is never told what it shows, so the re-authentication stays out of Q",
   "connected/google/page.tsx": CALLBACK,
   "settings/reconnect/google/page.tsx": CALLBACK,
   "settings/billing/page.tsx":

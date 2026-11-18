@@ -508,6 +508,19 @@ export function SettingsView({
                       {t("Open")}
                     </Link>
                   </SRow>
+                  <SRow
+                    title={t("Your data")}
+                    description={t(
+                      "Download a copy of your data, or delete your account.",
+                    )}
+                  >
+                    <Link
+                      href="/settings/data"
+                      className={accountButton("secondary", "sm")}
+                    >
+                      {t("Open")}
+                    </Link>
+                  </SRow>
                 </>,
               )}
             </div>

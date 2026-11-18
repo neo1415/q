@@ -578,3 +578,11 @@ export {
   addRelationshipNote,
   listRelationshipNotes,
 } from "./relationship-notes.js";
+// Decision 107: download my data, delete my account.
+export {
+  cancelAccountDeletion,
+  createDataExportLink,
+  getDataRights,
+  requestAccountDeletion,
+  requestDataExport,
+} from "./data-rights.js";

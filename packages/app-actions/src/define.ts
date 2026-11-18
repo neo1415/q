@@ -669,6 +669,7 @@ export function defineAppActionFamily<ToolIn>(definition: {
  */
 const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
   memoryCorrection: "Correcting what Q remembers",
+  dataExports: "Downloading your data",
   capital: "Your raise",
   capitalRounds: "Rounds",
   commitments: "Commitments",

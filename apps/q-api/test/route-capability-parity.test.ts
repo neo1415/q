@@ -524,6 +524,20 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/investors.ts GET `${byId}${INVESTOR_REPRESENTATIVE_ME_SUFFIX}`":
     cap("tool.read_my_record"),
 
+  // Decision 107: download my data, delete my account.
+  "api/http/data-rights.ts GET DATA_RIGHTS_PATH": cap(
+    "tool.request_my_data_download",
+  ),
+  "api/http/data-rights.ts POST DATA_EXPORTS_PATH": cap(
+    "tool.request_my_data_download",
+  ),
+  "api/http/data-rights.ts POST DATA_EXPORT_LINK_PATH": DOWNLOAD,
+  "api/http/data-rights.ts POST ACCOUNT_DELETION_PATH": exempt(
+    "deleting the account needs the person's own fresh re-authentication and typed words on the page (decision 107); Q explains and links, never executes",
+  ),
+  "api/http/data-rights.ts POST ACCOUNT_DELETION_CANCEL_PATH": exempt(
+    "cancelling the person's own scheduled deletion, on the page that scheduled it (decision 107)",
+  ),
   "api/http/me.ts GET ME_PROFILE_PATH": exempt(
     "the person's own profile is in every Q run's context already (CQ-QX-007)",
   ),
@@ -1221,6 +1235,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/join/[token]": cap("offer.team_join"),
   "/settings/memory": cap("navigate.MEMORY"),
+  "/settings/data": cap("tool.request_my_data_download"),
   "/settings/usage": cap("navigate.USAGE"),
   "/settings/billing": cap("tool.get_my_plan"),
   // meetfix-57: the reconnect link in Q's answers and notices; it only
@@ -1398,6 +1413,22 @@ const ANALYTICS_OBSERVATIONS: ReadonlySet<string> = new Set([
 const DRAFT_WORD_EDITS: ReadonlySet<string> = new Set([
   "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`",
   "q-api/http/q-approvals.ts POST `${approvalPath}${Q_APPROVAL_CHAT_DRAFT_SUFFIX}`",
+]);
+
+/**
+ * Decision 107 (GDPR/NDPA data rights): person-scoped routes served with
+ * or without an organisation, so not generated from the action registry
+ * (whose routes take an organisation's actor). The download request is
+ * the same service as Q's request_my_data_download action; the link is a
+ * file download; deletion and its cancel are the person's own legal act
+ * with re-authentication, never Q's. Named here rather than lifting the
+ * legacy ceiling.
+ */
+const DATA_RIGHTS_PERSON_ROUTES: ReadonlySet<string> = new Set([
+  "api/http/data-rights.ts POST DATA_EXPORTS_PATH",
+  "api/http/data-rights.ts POST DATA_EXPORT_LINK_PATH",
+  "api/http/data-rights.ts POST ACCOUNT_DELETION_PATH",
+  "api/http/data-rights.ts POST ACCOUNT_DELETION_CANCEL_PATH",
 ]);
 
 const Q_ROOM_DOCUMENT_DROPS: ReadonlySet<string> = new Set([
@@ -1606,6 +1637,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
         !GATEQ_GUEST_NOT_ACTIONS.has(key) &&
         !Q_ROOM_DOCUMENT_DROPS.has(key) &&
+        !DATA_RIGHTS_PERSON_ROUTES.has(key) &&
         !Q_STANDING_SETTINGS.has(key) &&
         !HELD_RETRY.has(key) &&
         !DRAFT_WORD_EDITS.has(key) &&

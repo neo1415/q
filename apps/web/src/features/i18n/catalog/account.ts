@@ -207,4 +207,96 @@ export const ACCOUNT_AR: Readonly<Record<string, string>> = {
     "أكّد بريدك الإلكتروني لإكمال تسجيل الدخول. يمكننا إرسال الرابط مجددًا.",
   "Send the confirmation link again": "أرسل رابط التأكيد مجددًا",
   "Enter your email.": "أدخل بريدك الإلكتروني.",
+
+  // Your data (decision 107)
+  "Your data": "بياناتك",
+  "Download a copy of your data, or delete your account.":
+    "نزّل نسخة من بياناتك، أو احذف حسابك.",
+  "Download a copy of the data Capital Q keeps as yours, or delete your account. Your rights are described in the Privacy Policy.":
+    "نزّل نسخة من البيانات التي يحتفظ بها Capital Q على أنها لك، أو احذف حسابك. حقوقك موضّحة في سياسة الخصوصية.",
+  "Your data couldn't be loaded just now. Reload in a moment.":
+    "تعذّر تحميل بياناتك الآن. أعد التحميل بعد لحظة.",
+  "Privacy Policy": "سياسة الخصوصية",
+  "a copy of your data to download": "نسخة من بياناتك للتنزيل",
+  "deleting your account, and what is kept": "حذف حسابك، وما يُحتفظ به",
+  "Download your data": "نزّل بياناتك",
+  "A ZIP file with your profile, what you wrote and uploaded, your conversations with Q, what Q remembers about you, and your activity. Other people's private notes are not included.":
+    "ملف ZIP يضم ملفك الشخصي وما كتبته ورفعته ومحادثاتك مع Q وما يتذكره Q عنك ونشاطك. لا تُضمَّن الملاحظات الخاصة بأشخاص آخرين.",
+  "available until": "متاح حتى",
+  "Being prepared. This usually takes a few minutes.":
+    "قيد التجهيز. يستغرق ذلك عادةً بضع دقائق.",
+  "The last download couldn't be prepared. Try again.":
+    "تعذّر تجهيز آخر تنزيل. حاول مرة أخرى.",
+  "Downloads stay available for 7 days.": "يبقى التنزيل متاحًا لمدة 7 أيام.",
+  "Prepare a download": "جهّز تنزيلًا",
+  "Prepare a new download": "جهّز تنزيلًا جديدًا",
+  "You can ask three times a day. Try again tomorrow.":
+    "يمكنك الطلب ثلاث مرات في اليوم. حاول غدًا.",
+  "Preparing your download. We'll let you know when it's ready.":
+    "نجهّز تنزيلك. سنُعلمك عندما يصبح جاهزًا.",
+  "Delete your account": "احذف حسابك",
+  "What is kept, and why": "ما يُحتفظ به، ولماذا",
+  "Deletion cancelled. Your account stays.": "أُلغي الحذف. يبقى حسابك.",
+  "Your account is being deleted.": "يجري حذف حسابك.",
+  "Your account will be deleted on": "سيُحذف حسابك في",
+  "It is waiting: make someone else an owner of your team first.":
+    "الحذف في الانتظار: اجعل شخصًا آخر مالكًا لفريقك أولًا.",
+  "It is waiting: your organisations changed. Cancel and ask again to review them.":
+    "الحذف في الانتظار: تغيّرت مؤسساتك. ألغِ الطلب واطلبه مجددًا لمراجعتها.",
+  "Until then you can keep using Capital Q and change your mind.":
+    "حتى ذلك الحين يمكنك مواصلة استخدام Capital Q وتغيير رأيك.",
+  "Keep my account": "أبقِ حسابي",
+  "Code sent to your email.": "أُرسل الرمز إلى بريدك الإلكتروني.",
+  "Deletion scheduled. You can cancel it on this page.":
+    "جُدول الحذف. يمكنك إلغاؤه من هذه الصفحة.",
+  "Your profile, documents, conversations with Q, what Q remembers about you and your other content are deleted. You are signed out everywhere. Records other people need are kept without your name.":
+    "يُحذف ملفك الشخصي ومستنداتك ومحادثاتك مع Q وما يتذكره Q عنك وسائر محتواك. ويُسجَّل خروجك من كل الأجهزة. أما السجلات التي يحتاجها آخرون فتُحفظ من دون اسمك.",
+  "Nothing happens for": "لن يحدث شيء لمدة",
+  "days, so you can change your mind. Download your data first if you want a copy.":
+    "يومًا، لتتمكن من تغيير رأيك. نزّل بياناتك أولًا إن أردت نسخة منها.",
+  "You are the only owner of": "أنت المالك الوحيد لـ",
+  "Make someone else an owner first, or remove the other members.":
+    "اجعل شخصًا آخر مالكًا أولًا، أو أزل الأعضاء الآخرين.",
+  "Open Team": "افتح الفريق",
+  "You are the only member of": "أنت العضو الوحيد في",
+  "It closes with your account: it leaves Discover and nobody can sign in to it. Other parties keep their own records of it.":
+    "تُغلق مع حسابك: تخرج من الاستكشاف ولا يمكن لأحد تسجيل الدخول إليها. ويحتفظ الآخرون بسجلاتهم الخاصة عنها.",
+  "You leave": "تغادر",
+  "Your team keeps its documents and records.":
+    "يحتفظ فريقك بمستنداته وسجلاته.",
+  "Confirm it's you": "أكّد أنك أنت",
+  "With my password": "بكلمة المرور",
+  "With a code by email": "برمز عبر البريد الإلكتروني",
+  Code: "الرمز",
+  "We email it to the address you sign in with.":
+    "نرسله إلى البريد الذي تسجّل الدخول به.",
+  "Send code": "أرسل الرمز",
+  Type: "اكتب",
+  "to confirm": "للتأكيد",
+  "I understand my account and content will be deleted after the grace period, and this cannot be undone after that.":
+    "أفهم أن حسابي ومحتواي سيُحذفان بعد فترة السماح، وأن ذلك لا يمكن التراجع عنه بعدها.",
+  "Delete my account": "احذف حسابي",
+  "Audit and security records": "سجلات التدقيق والأمان",
+  "They show what happened, and under whose authority, without saying who you were.":
+    "تُظهر ما حدث وبأي صلاحية، من دون أن تذكر من كنت.",
+  "Up to 2 years": "حتى سنتين",
+  "Other people's relationship history": "سجل العلاقات لدى الآخرين",
+  "An investor's or company's own record of meetings, interest and deals stays accurate. You appear as a former user.":
+    "يبقى سجل المستثمر أو الشركة للاجتماعات والاهتمام والصفقات دقيقًا. وتظهر فيه مستخدمًا سابقًا.",
+  "As long as their account keeps it": "طالما احتفظ به حسابهم",
+  "Messages you sent to others": "الرسائل التي أرسلتها إلى آخرين",
+  "They stay in the recipient's records, attributed to a former user.":
+    "تبقى في سجلات المستلم، منسوبة إلى مستخدم سابق.",
+  "As long as the recipient keeps them": "طالما احتفظ بها المستلم",
+  "Your organisation's documents and records": "مستندات مؤسستك وسجلاتها",
+  "Documents you uploaded for a team that continues belong to that team. An organisation you are the only member of closes with your account.":
+    "المستندات التي رفعتها لفريق مستمر تعود لذلك الفريق. أما المؤسسة التي أنت عضوها الوحيد فتُغلق مع حسابك.",
+  "As long as the organisation keeps them": "طالما احتفظت بها المؤسسة",
+  "Invoices, payments and usage": "الفواتير والمدفوعات والاستخدام",
+  "Tax and company law require them.": "يفرضها قانون الضرائب وقانون الشركات.",
+  "Typically 6 years": "عادةً 6 سنوات",
+  Backups: "النسخ الاحتياطية",
+  "Backups are overwritten on a rolling cycle; deleted data stays protected and unused until then.":
+    "تُستبدل النسخ الاحتياطية بشكل دوري، وتبقى البيانات المحذوفة محمية وغير مستخدمة حتى ذلك الحين.",
+  "Until the backup cycle overwrites them": "حتى تستبدلها دورة النسخ الاحتياطي",
 };
