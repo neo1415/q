@@ -6,6 +6,7 @@ import {
   ADMIN_PERMISSIONS,
   createPlatformAdmin,
   roleHolds,
+  type SiteContentStore,
   type AdminPermission,
   type AdminRole,
 } from "@capital-q/platform-admin";
@@ -165,8 +166,48 @@ function appFor(
           }),
       },
       // end BILLING block
+      // Decision 107: the site content editor's routes over a fake store.
+      siteContent: { content: fakeSiteContent() },
     },
   ).app;
+}
+
+function fakeSiteContent(): SiteContentStore {
+  const settings = {
+    settings: {
+      companyName: "Capital Q",
+      legalEntity: null,
+      registeredAddress: null,
+      contactEmail: null,
+      governingLawCity: null,
+    },
+    revision: 1,
+    updatedAt: "2026-11-18T09:00:00.000Z",
+  };
+  return {
+    publicPage: () => Promise.resolve(null),
+    publicLanding: () => Promise.resolve({ sections: [] }),
+    publicImage: () => Promise.resolve(null),
+    listPages: () => Promise.resolve({ pages: [], settings }),
+    pageDetail: () => Promise.resolve(null),
+    version: () => Promise.resolve(null),
+    saveDraft: () =>
+      Promise.resolve({
+        kind: "SAVED" as const,
+        revision: 2,
+        updatedAt: "2026-11-18T09:01:00.000Z",
+      }),
+    publish: () =>
+      Promise.resolve({
+        kind: "PUBLISHED" as const,
+        versionNumber: 2,
+        publishedAt: "2026-11-18T09:01:00.000Z",
+      }),
+    unpublish: () => Promise.resolve("UNPUBLISHED" as const),
+    restore: () => Promise.resolve({ kind: "RESTORED" as const, revision: 2 }),
+    readSettings: () => Promise.resolve(settings),
+    updateSettings: () => Promise.resolve("CHANGED" as const),
+  };
 }
 
 // BILLING block (ADR 0034)
@@ -386,6 +427,19 @@ const ROUTES: readonly Route[] = [
     url: "/v1/admin/analytics-settings",
     permission: "analytics_settings.read",
     listOk: true,
+  },
+  // Decision 107: the site content editor.
+  {
+    method: "GET",
+    url: "/v1/admin/site/pages",
+    permission: "content.read",
+    listOk: true,
+  },
+  {
+    method: "PUT",
+    url: "/v1/admin/site/pages/faq/draft",
+    permission: "content.write",
+    body: { title: "FAQ", summary: "", blocks: [], expectedRevision: 1 },
   },
   {
     method: "PUT",

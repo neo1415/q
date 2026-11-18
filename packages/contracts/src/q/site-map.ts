@@ -89,6 +89,8 @@ export const Q_SITE_MAP_INSTANCE_KINDS = [
   "TEAM_MEMBER",
   "FOUNDER",
   "INVITATION",
+  /** A page of the public site in the content editor (decision 107). */
+  "SITE_PAGE",
 ] as const;
 export const QSiteMapInstanceKindSchema = z.enum(Q_SITE_MAP_INSTANCE_KINDS);
 export type QSiteMapInstanceKind = z.infer<typeof QSiteMapInstanceKindSchema>;

@@ -1,0 +1,129 @@
+/*
+ * Site content (decision 107): the public pages and the editor's canvas.
+ * Tokens only (--cq-*); transform and opacity for motion; nothing moves
+ * for people who ask for reduced motion.
+ */
+
+.cq-site-prose {
+  line-height: 1.65;
+}
+.cq-site-prose p,
+.cq-site-prose li {
+  overflow-wrap: anywhere;
+}
+
+/* FAQ: a plus that turns into a minus, and an answer that settles in. */
+.cq-site-faq-mark::before,
+.cq-site-faq-mark::after {
+  content: "";
+  position: absolute;
+  inset-inline: 2px;
+  top: 50%;
+  height: 1.5px;
+  margin-top: -0.75px;
+  border-radius: 1px;
+  background: currentColor;
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.cq-site-faq-mark::after {
+  transform: rotate(90deg);
+}
+.cq-site-faq[open] .cq-site-faq-mark::after {
+  transform: rotate(0deg);
+}
+.cq-site-faq summary:focus-visible {
+  outline: 2px solid var(--cq-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--cq-radius-sm);
+}
+.cq-site-faq[open] .cq-site-faq-answer {
+  animation: cq-site-settle 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes cq-site-settle {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* The editor's canvas: hover and focus outlines, the insertion line. */
+.cq-cms-block {
+  transition:
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+.cq-cms-block[data-selected="true"] {
+  box-shadow: 0 0 0 1.5px var(--cq-accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .cq-cms-block:not([data-selected="true"]):hover {
+    box-shadow: 0 0 0 1px var(--cq-border-strong);
+  }
+  .cq-cms-block .cq-cms-handle {
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .cq-cms-block:hover .cq-cms-handle,
+  .cq-cms-block[data-selected="true"] .cq-cms-handle,
+  .cq-cms-block:focus-within .cq-cms-handle {
+    opacity: 1;
+  }
+}
+.cq-cms-editable {
+  outline: none;
+  border-radius: var(--cq-radius-xs);
+}
+.cq-cms-editable:focus-visible {
+  box-shadow: 0 0 0 2px var(--cq-accent-soft);
+}
+.cq-cms-editable[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--cq-text-tertiary);
+  pointer-events: none;
+}
+.cq-cms-dropzone {
+  height: 10px;
+  margin-block: -5px;
+  position: relative;
+}
+.cq-cms-dropzone::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--cq-accent);
+  transform: scaleX(0.6);
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.cq-cms-dropzone[data-over="true"]::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.cq-cms-press {
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.cq-cms-press:active {
+  transform: scale(0.97);
+}
+.cq-cms-placeholder-token {
+  border-radius: var(--cq-radius-xs);
+  background: var(--cq-accent-soft);
+  padding-inline: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cq-site-faq[open] .cq-site-faq-answer {
+    animation: none;
+  }
+  .cq-site-faq-mark::before,
+  .cq-site-faq-mark::after,
+  .cq-cms-dropzone::after,
+  .cq-cms-press {
+    transition: none;
+  }
+}

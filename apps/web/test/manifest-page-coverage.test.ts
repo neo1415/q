@@ -86,6 +86,10 @@ const EXEMPT: Readonly<Record<string, string>> = {
   "g/[publicId]/page.tsx": PUBLIC,
   "g/[publicId]/embed/page.tsx": PUBLIC,
   "u/[handle]/page.tsx": PUBLIC,
+  // Decision 107: the public site pages, rendered from published content.
+  "pricing/page.tsx": PUBLIC,
+  "faq/page.tsx": PUBLIC,
+  "legal/[slug]/page.tsx": PUBLIC,
   "onboarding/founder/page.tsx": ONBOARDING,
   "onboarding/investor/page.tsx": ONBOARDING,
   "crm/page.tsx": REDIRECT,
@@ -159,6 +163,10 @@ const OUTSIDE_THE_APP: Readonly<Record<string, string>> = {
   "g/[publicId]/page.tsx": PUBLIC,
   "g/[publicId]/embed/page.tsx": PUBLIC,
   "u/[handle]/page.tsx": PUBLIC,
+  // Decision 107: the public site pages, outside the signed-in app.
+  "pricing/page.tsx": PUBLIC,
+  "faq/page.tsx": PUBLIC,
+  "legal/[slug]/page.tsx": PUBLIC,
 };
 
 /**

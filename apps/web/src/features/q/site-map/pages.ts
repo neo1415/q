@@ -72,6 +72,7 @@ export const SITE_MAP_PARAMS: Readonly<Record<string, QSiteMapInstanceKind>> = {
   organisationId: "INVESTOR_ORGANISATION",
   runId: "WORK_ITEM",
   requestId: "WORK_ITEM",
+  slug: "SITE_PAGE",
 };
 
 /** The Overview's own sections, `?tab=overview&sub=<key>` (the founder profile's list). */
@@ -173,6 +174,11 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/admin/audit": ADMIN("Audit", "The audit history."),
   "/admin/billing": ADMIN("Billing", "Plans and billing across accounts."),
   "/admin/brand": ADMIN("Brand", "Capital Q's brand settings."),
+  "/admin/content": ADMIN(
+    "Site content",
+    "The public site's pages: landing, pricing, FAQ and legal.",
+  ),
+  "/admin/content/[slug]": ADMIN("Edit page", "One page of the public site."),
   "/admin/claims": ADMIN("Claims", "Verification claims to review."),
   "/admin/email": ADMIN("Email", "Outgoing email and templates."),
   "/admin/etiquette": ADMIN("Etiquette", "How Q speaks for people."),

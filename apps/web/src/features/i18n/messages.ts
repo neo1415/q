@@ -26,6 +26,7 @@ import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { SCORES_AR } from "./catalog/scores";
 import { SETUP_AR } from "./catalog/setup";
 import { SHELL_AR } from "./catalog/shell";
+import { SITE_CONTENT_AR } from "./catalog/site-content";
 import { SWEEP_AR } from "./catalog/sweep";
 import { TAXONOMY_AR } from "./catalog/taxonomy";
 import { WORK_AR } from "./catalog/work";
@@ -71,6 +72,9 @@ const ARABIC: Readonly<Record<string, string>> = {
   // Organisation roles and activity (2026-10-21): first, so every area's
   // own word for a shared one ("Admin", "Team") still wins.
   ...ORGANISATION_AR,
+  // Decision 107: the site content editor; first, so a shared word
+  // ("Publish", "History") keeps its area's own Arabic.
+  ...SITE_CONTENT_AR,
   ...ACCOUNT_AR,
   ...CRM_DESIGN_AR,
   ...DISCOVERY_PAGES_AR,

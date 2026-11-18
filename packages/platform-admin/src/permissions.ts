@@ -17,7 +17,8 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 // 2: BILLING permissions added (ADR 0034).
 // 4: P14 company claims and publishing (claims.read/decide, companies.publish).
 // 5: analytics privacy settings (owner 2026-11-06, Q Workspace §8).
-export const ADMIN_PERMISSIONS_VERSION = 5 as const;
+// 6: the site content editor (decision 107): content.read / content.write.
+export const ADMIN_PERMISSIONS_VERSION = 6 as const;
 
 const ALL: readonly AdminRole[] = ADMIN_ROLES;
 const OWNER_OPERATOR_TS: readonly AdminRole[] = [
@@ -118,6 +119,12 @@ export const ADMIN_PERMISSIONS = {
   },
   "claims.decide": { roles: OWNER_OPERATOR_TS, stepUp: true },
   "companies.publish": { roles: ["platform_owner", "operator"], stepUp: true },
+  // Decision 107: the site's public pages. Reading drafts is the console's
+  // (drafts are unpublished words, including lawyer notes); changing or
+  // publishing what the world reads is the owner's and operator's, with
+  // step-up, audited.
+  "content.read": { roles: ["platform_owner", "operator"], stepUp: false },
+  "content.write": { roles: ["platform_owner", "operator"], stepUp: true },
 } as const satisfies Record<
   string,
   { readonly roles: readonly AdminRole[]; readonly stepUp: boolean }

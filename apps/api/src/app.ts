@@ -1,3 +1,7 @@
+import {
+  registerSiteContentRoutes,
+  type SiteContentRoutesDependencies,
+} from "./http/site-content.js";
 import type { DatabaseHealth } from "@capital-q/database";
 import type { DealCloseService } from "@capital-q/network";
 import {
@@ -311,6 +315,13 @@ export type ApiModules = {
   readonly admin?: AdminRoutesDependencies["admin"] | undefined;
   /** P5: brand colour; registers only alongside `admin`. */
   readonly brand?: BrandThemeStore | undefined;
+  /** Decision 107: the site content editor and its public reads; alongside `admin`. */
+  readonly siteContent?:
+    | Omit<
+        SiteContentRoutesDependencies,
+        "authenticator" | "resolver" | "admin"
+      >
+    | undefined;
   /**
    * ADR 0050: business etiquette guides. A person's own guide always; the
    * platform's house guide in the console only alongside `admin`.
@@ -940,6 +951,14 @@ export function createApp(
       });
     }
     // end P5 block
+    if (modules.siteContent !== undefined) {
+      registerSiteContentRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        admin: modules.admin,
+        ...modules.siteContent,
+      });
+    }
     if (modules.adminBilling !== undefined) {
       registerAdminBillingRoutes(app, {
         authenticator: security.authenticator,

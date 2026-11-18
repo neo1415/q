@@ -13,16 +13,18 @@ import { GateQIsland } from "./gateq-island";
 import { GATE_START, GateQView, type GateRow } from "./gateq-view";
 import { HeroStage } from "./hero-stage";
 import {
-  CONVERGE,
-  FAQ,
   GATEQ_ANCHOR,
-  HERO,
   HOW_ANCHOR,
   INTRODUCTIONS,
   PITCHES,
   SIGN_IN_HREF,
   SIGN_UP_HREF,
 } from "./landing-content";
+import {
+  DEFAULT_LANDING_COPY,
+  type LandingCopy,
+  type LandingHead,
+} from "./landing-copy";
 import { PlanScene } from "./plan-scene";
 
 import "./landing.css";
@@ -48,7 +50,13 @@ const hanken = localFont({
  * parts are client islands, each starting when its section nears the
  * screen. Every illustration uses fictional names and says so.
  */
-export function LandingPage() {
+export function LandingPage({
+  copy = DEFAULT_LANDING_COPY,
+}: {
+  /** Decision 107: the published words, or today's copy as the fallback. */
+  readonly copy?: LandingCopy;
+}) {
+  const d = DEFAULT_LANDING_COPY;
   return (
     <div className={`lp cq-landing cq-cinema ${hanken.variable}`}>
       {/* An installed launch never sees this page (src/auth/landing-route.ts). */}
@@ -64,6 +72,7 @@ export function LandingPage() {
           <nav className="nav-links" aria-label="Primary">
             <a href={`#${GATEQ_ANCHOR}`}>Try GateQ</a>
             <a href={`#${HOW_ANCHOR}`}>How Q works</a>
+            <a href="/pricing">Pricing</a>
             <ThemeToggle display="icons" size="touch" />
             <a href={SIGN_IN_HREF}>Sign in</a>
             <a className="btn btn-primary" href={SIGN_UP_HREF}>
@@ -74,35 +83,40 @@ export function LandingPage() {
       </header>
 
       <main>
-        <Hero />
-        <Converge />
-        <HowQWorks />
-        <Claims />
+        <Hero copy={copy} />
+        <Converge copy={copy} />
+        <HowQWorks head={copy.how} />
+        <Claims head={copy.trust} />
         <section className="sec sec-tight">
           <PlanScene
             heading={
               <h2 className="d2">
-                Three steps.
-                <br />Q does the reading.
+                <Lines text={copy.steps.title} fallback={d.steps.title}>
+                  Three steps.
+                  <br />Q does the reading.
+                </Lines>
               </h2>
             }
             feed={<Feed />}
           />
         </section>
-        <TryGateQ />
-        <Rehearsal />
-        <Success />
-        <Questions />
+        <TryGateQ head={copy.gateq} />
+        <Rehearsal head={copy.rehearsal} />
+        <Success head={copy.leads} />
+        <Questions questions={copy.questions} />
         <section className="dark on-stage final">
           <div className="wrap">
-            <h2 className="d1">Bring the evidence. Q does the rest.</h2>
-            <p className="lede final-lede">With your approval, every time.</p>
+            <h2 className="d1">{copy.final.title}</h2>
+            <p className="lede final-lede">{copy.final.lede}</p>
             <div className="ctas">
-              <a className="btn btn-primary btn-light" href={SIGN_UP_HREF}>
-                Get started
+              <a
+                className="btn btn-primary btn-light"
+                href={copy.final.primary.href}
+              >
+                {copy.final.primary.label}
               </a>
-              <a className="btn btn-quiet" href={`#${GATEQ_ANCHOR}`}>
-                Try GateQ
+              <a className="btn btn-quiet" href={copy.final.secondary.href}>
+                {copy.final.secondary.label}
               </a>
             </div>
           </div>
@@ -110,9 +124,22 @@ export function LandingPage() {
       </main>
       <footer className="dark">
         <div className="wrap">
-          <span>Capital Q. Investment intelligence for private capital.</span>
-          <span>Illustrations use fictional names.</span>
+          <span>{copy.footer[0]}</span>
+          <nav aria-label="Site" className="foot-links">
+            <a href="/pricing">Pricing</a>
+            <a href="/faq">FAQ</a>
+            <a href="/legal/terms">Terms</a>
+            <a href="/legal/privacy">Privacy</a>
+            <a href="/legal/cookies">Cookies</a>
+          </nav>
         </div>
+        {copy.footer.length > 1 ? (
+          <div className="wrap foot-small">
+            {copy.footer.slice(1).map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+          </div>
+        ) : null}
       </footer>
     </div>
   );
@@ -126,24 +153,43 @@ function Icon({ id }: { readonly id: string }) {
   );
 }
 
-function Hero() {
+/**
+ * A heading in its designed line breaks while it reads as designed; the
+ * editor's own words when an admin has changed them.
+ */
+function Lines({
+  text,
+  fallback,
+  children,
+}: {
+  readonly text: string;
+  readonly fallback: string;
+  readonly children: ReactNode;
+}) {
+  return text === fallback ? children : text;
+}
+
+function Hero({ copy }: { readonly copy: LandingCopy }) {
+  const d = DEFAULT_LANDING_COPY;
   return (
     <section className="hero" id="hero">
       <div className="wrap">
         <div className="hero-top">
           <h1 className="d1 load">
-            Private capital,
-            <br />
-            on evidence.
+            <Lines text={copy.hero.title} fallback={d.hero.title}>
+              Private capital,
+              <br />
+              on evidence.
+            </Lines>
           </h1>
           <div className="hero-side">
-            <p className="lede load l2">{HERO.lede}</p>
+            <p className="lede load l2">{copy.hero.lede}</p>
             <div className="ctas load l3">
-              <a className="btn btn-primary" href={SIGN_UP_HREF}>
-                Get started
+              <a className="btn btn-primary" href={copy.hero.primary.href}>
+                {copy.hero.primary.label}
               </a>
-              <a className="btn btn-quiet" href={`#${GATEQ_ANCHOR}`}>
-                Try GateQ
+              <a className="btn btn-quiet" href={copy.hero.secondary.href}>
+                {copy.hero.secondary.label}
               </a>
             </div>
           </div>
@@ -293,7 +339,8 @@ function Frag({
   );
 }
 
-function Converge() {
+function Converge({ copy }: { readonly copy: LandingCopy }) {
+  const CONVERGE = copy.converge;
   return (
     <ConvergeScene>
       <div className="converge-pin">
@@ -366,20 +413,20 @@ function Converge() {
   );
 }
 
-function HowQWorks() {
+function HowQWorks({ head }: { readonly head: LandingHead }) {
+  const d = DEFAULT_LANDING_COPY.how;
   return (
     <section className="dark sec on-stage" id={HOW_ANCHOR}>
       <div className="wrap">
         <div className="sec-head">
           <h2 className="d2">
-            Say it once.
-            <br />
-            Approve what Q prepares.
+            <Lines text={head.title} fallback={d.title}>
+              Say it once.
+              <br />
+              Approve what Q prepares.
+            </Lines>
           </h2>
-          <p className="lede">
-            Q shows exactly what will be sent, and to whom. Nothing leaves until
-            you approve that exact message.
-          </p>
+          <p className="lede">{head.lede}</p>
         </div>
         <DemoScene>
           <svg className="cursor" viewBox="0 0 22 22" aria-hidden="true">
@@ -492,16 +539,13 @@ const TIMELINE = [
   ["27 Sep", "Qualified through GateQ", "Shared with both sides", false],
 ] as const;
 
-function Claims() {
+function Claims({ head }: { readonly head: LandingHead }) {
   return (
     <section className="sec">
       <div className="wrap">
         <div className="sec-head">
-          <h2 className="d2">Built so you can trust what you see.</h2>
-          <p className="lede">
-            Q does the analysis. You make the decisions. Capital Q keeps the
-            rules.
-          </p>
+          <h2 className="d2">{head.title}</h2>
+          <p className="lede">{head.lede}</p>
         </div>
         <div className="bento">
           <article className="tile t4">
@@ -665,7 +709,7 @@ function Feed() {
   );
 }
 
-function TryGateQ() {
+function TryGateQ({ head }: { readonly head: LandingHead }) {
   const rows: GateRow[] = DEMO_POLICY.criteria.map((c) => ({
     key: c.id,
     label: c.label,
@@ -676,11 +720,8 @@ function TryGateQ() {
     <section className="sec gateq-sec" id={GATEQ_ANCHOR}>
       <div className="wrap">
         <div className="sec-head">
-          <h2 className="d2">Try GateQ: am I a fit?</h2>
-          <p className="lede">
-            Check yourself against a fictional investor. Skip anything you like;
-            unknown is not a no.
-          </p>
+          <h2 className="d2">{head.title}</h2>
+          <p className="lede">{head.lede}</p>
         </div>
         <GateQIsland
           fallback={
@@ -704,20 +745,20 @@ const REVIEW = [
   ["Next ask", "Missing"],
 ] as const;
 
-function Rehearsal() {
+function Rehearsal({ head }: { readonly head: LandingHead }) {
+  const d = DEFAULT_LANDING_COPY.rehearsal;
   return (
     <section className="dark sec on-stage">
       <div className="wrap">
         <div className="sec-head">
           <h2 className="d2">
-            Rehearse the call
-            <br />
-            before it counts.
+            <Lines text={head.title} fallback={d.title}>
+              Rehearse the call
+              <br />
+              before it counts.
+            </Lines>
           </h2>
-          <p className="lede">
-            Pitch out loud to Q. It listens, pushes back, and reviews you
-            afterwards.
-          </p>
+          <p className="lede">{head.lede}</p>
         </div>
         <CallScene
           side={
@@ -794,16 +835,13 @@ const RELATIONSHIPS = [
   ],
 ] as const;
 
-function Success() {
+function Success({ head }: { readonly head: LandingHead }) {
   return (
     <section className="sec">
       <div className="wrap">
         <div className="sec-head">
-          <h2 className="d2">Where it leads.</h2>
-          <p className="lede">
-            Not months of outreach to investors who were never a fit. Not a
-            message you never saw.
-          </p>
+          <h2 className="d2">{head.title}</h2>
+          <p className="lede">{head.lede}</p>
         </div>
         <div
           className="work"
@@ -847,13 +885,17 @@ function Success() {
   );
 }
 
-function Questions() {
+function Questions({
+  questions,
+}: {
+  readonly questions: LandingCopy["questions"];
+}) {
   return (
     <section className="sec sec-tight">
       <div className="wrap faq">
-        <h2 className="d2">Questions.</h2>
+        <h2 className="d2">{questions.title}</h2>
         <div>
-          {FAQ.map(([q, a]) => (
+          {questions.items.map(([q, a]) => (
             <details key={q}>
               <summary>
                 {q}

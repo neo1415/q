@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 
 import { HERO } from "@/features/landing/landing-content";
+import { landingCopyFrom } from "@/features/landing/landing-copy";
 import { LandingPage } from "@/features/landing/landing-page";
+import { publishedLanding } from "@/features/site-content/public-site";
 
 /**
  * The landing page, for signed-out visitors in a browser (founder-approved
@@ -9,8 +11,13 @@ import { LandingPage } from "@/features/landing/landing-page";
  * reach it: the request proxy sends them into the app first
  * (src/auth/landing-route.ts). The page reads no request data, so it
  * prerenders; the splash still plays over it first, from the root layout.
+ * Decision 107: its words come from the content editor's published
+ * landing sections, regenerated at most a minute after a publish (or at
+ * once, when the console revalidates it), with today's copy as the
+ * fallback whenever nothing is published or the API is unreachable.
  */
 export const dynamic = "force-static";
+export const revalidate = 60;
 
 const TITLE = `Capital Q · ${HERO.title}`;
 const DESCRIPTION =
@@ -39,6 +46,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootPage() {
-  return <LandingPage />;
+export default async function RootPage() {
+  return <LandingPage copy={landingCopyFrom(await publishedLanding())} />;
 }

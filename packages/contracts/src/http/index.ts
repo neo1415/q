@@ -1623,3 +1623,6 @@ export * from "./engagement.js";
 export * from "./claims.js";
 // Decision 107: download my data, delete my account.
 export * from "./data-rights.js";
+// Decision 107: the site content editor (CMS).
+export * from "./site-content.js";
+export * from "./site-content-markdown.js";

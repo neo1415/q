@@ -26,6 +26,8 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/admin/billing",
   "/admin/brand",
   "/admin/claims",
+  "/admin/content",
+  "/admin/content/[slug]",
   "/admin/email",
   "/admin/etiquette",
   "/admin/flags",

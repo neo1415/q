@@ -564,3 +564,14 @@ export {
   type OperatorAlertEmail,
   type OperatorAlertLogger,
 } from "./operator-alerts.js";
+
+// Decision 107: the site content editor (CMS).
+export {
+  createSiteContentStore,
+  seedSiteContent,
+  SiteContentGrantError,
+  type SiteContentStore,
+  type SiteImageAsset,
+  type SiteImageResolver,
+  type SitePublishOutcome,
+} from "./site-content.js";

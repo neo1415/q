@@ -2057,6 +2057,28 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.lp footer .foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.lp footer .foot-links a {
+  color: var(--cq-stage-text-muted);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.lp footer .foot-links a:hover {
+  color: var(--cq-stage-text);
+}
+.lp footer .foot-small {
+  margin-top: 8px;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 72ch;
+  font-size: 0.8rem;
+}
 
 .lp .illus {
   display: inline-flex;

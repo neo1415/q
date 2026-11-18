@@ -44,6 +44,8 @@ const ROOTS = [
   "admin/billing",
   "admin/brand",
   "admin/claims",
+  // Decision 107: the site content editor's page list.
+  "admin/content",
   "admin/email",
   "admin/etiquette",
   "admin/flags",
@@ -109,6 +111,7 @@ function relationshipPages(base: string): Record<string, Interior> {
  */
 const INTERIOR: Readonly<Record<string, Interior>> = {
   "admin/accounts/[userId]": { parent: "/admin/accounts" },
+  "admin/content/[slug]": { parent: "/admin/content" },
   "admin/organisations/[organisationId]": { parent: "/admin/organisations" },
   "admin/q/runs/[runId]": { parent: "/admin/q" },
   "admin/safety/break-glass/[requestId]": { parent: "/admin/safety" },

@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations'), ('gateq'), ('workspace'), ('analytics');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations'), ('gateq'), ('workspace'), ('analytics'), ('site_content');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -233,6 +233,14 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- Admin-controlled analytics settings and their audited history: server only.
   ('analytics', 'platform_settings',        'INTERNAL_SERVER_ONLY', '{}'),
   ('analytics', 'platform_setting_changes', 'INTERNAL_SERVER_ONLY', '{}'),
+  -- Decision 107: the site content editor; server only (API reads published
+  -- versions for the public, the console writes). Suite 999_site_content.
+  ('site_content', 'pages',              'INTERNAL_SERVER_ONLY', '{}'),
+  ('site_content', 'page_versions',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('site_content', 'page_drafts',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('site_content', 'published_pointers', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('site_content', 'publish_events',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('site_content', 'settings',           'INTERNAL_SERVER_ONLY', '{}'),
   -- RECOVERY D3: the durable agent work queue; owners read their own rows, suite 892.
   ('q_runtime', 'agent_work_queue', 'RLS_REQUIRED', '{SELECT}'),
   ('q_runtime', 'workforce_agent_runs', 'RLS_REQUIRED', '{SELECT}'),

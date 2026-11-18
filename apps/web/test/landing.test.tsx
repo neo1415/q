@@ -572,7 +572,9 @@ describe("the root page is the landing", () => {
   it("renders the landing, prerendered, instead of redirecting", async () => {
     const page = await import("../app/page");
     expect(page.dynamic).toBe("force-static");
-    const element = page.default();
+    // Decision 107: regenerated from the content editor's published sections.
+    expect(page.revalidate).toBe(60);
+    const element = await page.default();
     expect(element.type).toBe(LandingPage);
   });
 });

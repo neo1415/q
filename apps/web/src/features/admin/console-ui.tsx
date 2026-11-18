@@ -161,6 +161,14 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
   );
 }
 
+/**
+ * The step-up guard itself, for an editor that runs its own writes (the
+ * site content editor's autosave, decision 107). Null outside the console.
+ */
+export function useStepUpGuard(): Guard | null {
+  return useContext(StepUpContext);
+}
+
 export function useConsoleAction() {
   const guard = useContext(StepUpContext);
   const router = useRouter();
@@ -322,6 +330,8 @@ const SECTIONS: readonly {
   },
   // P14: claims on unclaimed companies, and public company profiles.
   { href: "/admin/claims", label: "Claims", permission: "claims.read" },
+  // Decision 107: the public site's pages (landing, pricing, FAQ, legal).
+  { href: "/admin/content", label: "Site content", permission: "content.read" },
   { href: "/admin/brand", label: "Brand", permission: "flags.write" },
   { href: "/admin/etiquette", label: "Etiquette", permission: "flags.write" },
   // BILLING block (ADR 0034)

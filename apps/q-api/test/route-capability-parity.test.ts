@@ -72,6 +72,9 @@ const OPERATIONS_CONSOLE = exempt(
   "Capital Q's operations console (ADR 0033): platform operators only, step-up for writes; never Q's to act on, never a tenant's",
 );
 // end ADMIN block
+const PUBLIC_SITE = exempt(
+  "the public website's published pages (pricing, FAQ, legal, landing): anonymous, read-only, no Q session",
+);
 
 const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ---- apps/api ---------------------------------------------------------
@@ -382,6 +385,23 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/brand-theme.ts GET ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
   "api/http/brand-theme.ts POST ADMIN_BRAND_THEME_PATH": OPERATIONS_CONSOLE,
+  // Decision 107: the site content editor is the console's; the public
+  // reads of published pages are anonymous.
+  "api/http/site-content.ts GET SITE_PAGE_PATH": PUBLIC_SITE,
+  "api/http/site-content.ts GET SITE_LANDING_PATH": PUBLIC_SITE,
+  "api/http/site-content.ts GET SITE_IMAGE_PATH": PUBLIC_SITE,
+  "api/http/site-content.ts GET ADMIN_SITE_PAGES_PATH": OPERATIONS_CONSOLE,
+  "api/http/site-content.ts GET ADMIN_SITE_PAGE_PATH": OPERATIONS_CONSOLE,
+  "api/http/site-content.ts GET ADMIN_SITE_PAGE_VERSION_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/site-content.ts PUT ADMIN_SITE_PAGE_DRAFT_PATH": OPERATIONS_CONSOLE,
+  "api/http/site-content.ts POST ADMIN_SITE_PAGE_PUBLISH_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/site-content.ts POST ADMIN_SITE_PAGE_UNPUBLISH_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/site-content.ts POST ADMIN_SITE_PAGE_RESTORE_PATH":
+    OPERATIONS_CONSOLE,
+  "api/http/site-content.ts POST ADMIN_SITE_SETTINGS_PATH": OPERATIONS_CONSOLE,
   // end P5 block
   // ETIQUETTE block (ADR 0050). Saving and removing their own guide are
   // declared app actions (set_my_speaking_guide, remove_my_speaking_guide).
@@ -1142,6 +1162,14 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ADMIN block
   "/admin/accounts": OPERATIONS_CONSOLE,
   "/admin/brand": OPERATIONS_CONSOLE,
+  "/admin/content": OPERATIONS_CONSOLE,
+  "/admin/content/[slug]": OPERATIONS_CONSOLE,
+  "/pricing": PUBLIC_SITE,
+  "/faq": PUBLIC_SITE,
+  "/legal/[slug]": PUBLIC_SITE,
+  "/dev/site-content": exempt("development-only page"),
+  "/dev/site-content/landing": exempt("development-only page"),
+  "/dev/site-content/public/[slug]": exempt("development-only page"),
   "/admin/etiquette": OPERATIONS_CONSOLE,
   "/admin/accounts/[userId]": OPERATIONS_CONSOLE,
   "/admin/organisations": OPERATIONS_CONSOLE,

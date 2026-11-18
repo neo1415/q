@@ -586,3 +586,6 @@ export {
   requestAccountDeletion,
   requestDataExport,
 } from "./data-rights.js";
+
+// Decision 107: the site content editor (CMS).
+export * from "./site-content.js";

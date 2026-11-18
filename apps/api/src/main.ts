@@ -81,6 +81,7 @@ import {
   createBrandThemeStore,
   createEtiquetteGuideAdminStore,
   createPlatformAdmin,
+  createSiteContentStore,
   recordingEmailSender,
 } from "@capital-q/platform-admin";
 import { houseEtiquetteOf } from "@capital-q/q-core";
@@ -3424,6 +3425,52 @@ const { app, logger } = createApp(config, security, {
   })(),
   // P5: brand colour
   brand: brandThemes,
+  // Decision 107: the site content editor. Images are the admin's own
+  // uploads through Evidence (PNG or JPEG, scanned CLEAN), pinned to the
+  // exact version at publish, and served as one-minute signed links.
+  siteContent: {
+    content: createSiteContentStore({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
+    ownImage: async (actor, documentId) => {
+      const parsed = DocumentIdSchema.safeParse(documentId);
+      if (!parsed.success) return null;
+      const { currentVersion } = await evidence.getDocumentWithVersion({
+        actor,
+        documentId: parsed.data,
+      });
+      return currentVersion === null ||
+        currentVersion.malwareScanStatus !== "CLEAN" ||
+        !["image/png", "image/jpeg"].includes(currentVersion.mimeType)
+        ? null
+        : {
+            documentId: parsed.data,
+            tenantId: actor.tenantId,
+            versionId: currentVersion.id,
+          };
+    },
+    imageLink:
+      storage === undefined
+        ? undefined
+        : (() => {
+            const downloads = createSharedDocumentDownloads({
+              sql: database.sql,
+              storage,
+            });
+            return async (asset) => {
+              const link = await downloads.authorizeSharedVersion({
+                documentTenantId: asset.tenantId,
+                documentId: asset.documentId,
+                documentVersionId: asset.versionId,
+                disposition: "INLINE",
+              });
+              return link.scanned && link.mimeType.startsWith("image/")
+                ? { url: link.url, expiresAt: link.expiresAt }
+                : null;
+            };
+          })(),
+  },
   results,
   engagement,
   engagementNotices: createEngagementNotices(database.sql),
