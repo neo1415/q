@@ -856,3 +856,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Defects: the figure was filed as `traction.active_users` instead of the existing `traction.licensed_seats`, and the undo line was emitted twice. A worker is fixing both; an unmatched metric will fall back to the card.
 - **18 Nov 03:24 UTC, `98e45b66e` (rollback point `452dc02f2`):** ci-local PASS (1225 s); all four services SUCCESS. A founder's own figure is now filed under the key their words name; the company's existing key is reused, and an unmatched key falls back to the card. The undo line is said once.
   - Live (Callum, fictional Halyard, $0.037): "licensed seats are now 74000" was recorded under `traction.licensed_seats` with no card. Undo withdrew only that new claim, shown once. Halyard's 4 earlier licensed-seats claims stay CURRENT.
+- **18 Nov 05:35 UTC, `34b1f0d4b` (rollback point `98e45b66e`):** TURN_READER v92 sends its fixed rules as a cacheable instruction message (same words as v91). ci-local PASS (1272 s); all four services SUCCESS.
+  - Live (Savanna): warm reader calls cached 24,094 of 24,097 and 20,506 of 24,195 input tokens, against about 4.6k cached before (3-day average 9.8k of 26.9k). The first cold call cached 0, as expected.
+  - Projected saving: about $0.0024 per run (about 11%).
+  - Scale report: `audits/2026-11-18-scale-ceilings.md`.
+  - Open: the first answer call misses the cache 72% of the time. Its cache key includes the per-person tool list, a privacy choice that needs an owner decision.
