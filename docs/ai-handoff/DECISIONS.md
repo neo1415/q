@@ -455,3 +455,13 @@ Core Seven remains the governing assessment framework. The new directive authori
       - Virus scanning: the owner will provide a ClamAV-based scanner, or approve running one as a service.
       - Virus scanning: approved (17 Nov). The lead runs ClamAV as a service in the project and wires the existing upload scan to it.
       - Voice latency, owner's clarification: the issue was never a repeated "Working on it". It is that every follow-up about the same subject goes through the full working-on-it cycle. Example: Tensorgate, then their deck, then "how much are they raising?", then "how much have they raised already?". Same-subject follow-ups must be answered at once from what this conversation already read, not like a fresh voice-enabled search. This is queued after the current work.
+
+105.  **Demo revenue made public; a founder's own spoken figure needs no confirm card** (owner, 2026-11-18).
+      - Ajopot and Watchly (fictional demo companies) publish their headline revenue on their profiles as a company-stated figure: USER_CLAIM, SELF_REPORTED, network_visible. Investors and Q can then say whether they have revenue.
+        - Source: the evidence fixtures' latest actual month (Ajopot NGN 10,183,680; Watchly USD 8,500; October 2026).
+        - This is a founder-style disclosure decision. It does not widen the organisation-private documents themselves.
+        - Nixo (the owner's account, decision 99) is not included.
+      - When a founder states their own company figure during a question ("our MRR is now X"), Q records it straight away, with no approval card.
+        - Scoped exception to CLAUDE.md's "material Q-extracted facts require confirmation": it covers only the founder's own direct statement about their own company, not figures Q extracts from documents or infers.
+        - It is written as USER_CLAIM / SELF_REPORTED with the source being the founder's statement. It is audited and corrections create history, as with every claim.
+        - Q says what it recorded and offers an immediate correct-or-undo. A low-confidence or garbled voice transcript still asks before recording.
