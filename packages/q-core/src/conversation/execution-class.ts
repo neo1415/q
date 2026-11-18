@@ -52,6 +52,11 @@ export type ExecutionReading = {
   readonly hasPriorResult: boolean;
   /** Code: this turn carries attached documents (they must be read). */
   readonly carriesDocuments?: boolean | undefined;
+  /**
+   * v77/v79 references: a pointing phrase of the turn ("that", "it") is
+   * bound to something this conversation already holds.
+   */
+  readonly refersBack?: boolean | undefined;
 };
 
 const ACK_KINDS: ReadonlySet<string> = new Set([
@@ -146,6 +151,54 @@ export function turnExecutionClassOf(
     return "ANSWER_FROM_CONTEXT";
   }
   return "COMPLEX_ANALYSIS";
+}
+
+/** The work a follow-up on Q's last answer may ask of it. */
+const FOLLOW_UP_ANSWER_KINDS: ReadonlySet<string> = new Set([
+  "FOLLOW_UP",
+  "ANALYSIS",
+  "LOOKUP",
+]);
+
+/**
+ * Live 17 Nov 2026 (conversation ff20af7e): "Why does that matter for an
+ * investor like me?" and "And what is the biggest risk in that?", right
+ * after Q's answer on one company, were read as ADVICE with answerKind
+ * ANALYSIS -- judgement, not "more of the same" -- so they took
+ * COMPLEX_ANALYSIS (15.9 s and 13.3 s, ~7 model calls each) and never the
+ * contextual follow-up fast path, and each searched the public web.
+ *
+ * Principle: a question that points back at what this conversation already
+ * holds (its pointing words are bound to it), names nothing Q has not said,
+ * carries no files and does not ask for the web, follows up Q's previous
+ * answer whatever weight of judgement it asks. It is tried on the fast
+ * path (whose miss falls back to its own class's full path, so its class
+ * and lane are unchanged), and it does no outside research unless asked.
+ * Read from the reading's structure, never a word list; a low-confidence
+ * or unread turn never qualifies.
+ */
+export function followsUpPreviousAnswer(
+  reading: ExecutionReading,
+  executionClass: TurnExecutionClass,
+): boolean {
+  if (executionClass === "CONTEXTUAL_FOLLOW_UP") return true;
+  if (
+    executionClass !== "COMPLEX_ANALYSIS" &&
+    executionClass !== "ANSWER_FROM_CONTEXT"
+  ) {
+    return false;
+  }
+  return (
+    reading.kind === "QUESTION_TO_Q" &&
+    reading.confidence !== "LOW" &&
+    reading.hasPriorResult &&
+    reading.refersBack === true &&
+    reading.namesSomethingNew !== true &&
+    reading.carriesDocuments !== true &&
+    reading.asksForWeb !== true &&
+    (reading.answerKind == null ||
+      FOLLOW_UP_ANSWER_KINDS.has(reading.answerKind))
+  );
 }
 
 /**

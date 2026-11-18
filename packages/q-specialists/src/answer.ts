@@ -8,7 +8,11 @@ import {
   type QAppActionRedirect,
   type TurnAppAction,
 } from "./app-action-turn.js";
-import { executionClassOfTurn } from "./execution-reading.js";
+import {
+  asksNoActionOf,
+  executionClassOfTurn,
+  followsUpAnswer,
+} from "./execution-reading.js";
 import {
   namesWebAddress,
   PLAIN_QUESTION_FOCUS,
@@ -8509,6 +8513,33 @@ export function createSpecialistQAnswer(
         "q kept an own-records question off the public web",
       );
     }
+    // Live 17 Nov 2026 (conversation ff20af7e): "Why does that matter for
+    // an investor like me?" after Q's answer on Halyard Security was read
+    // as advice about a named company, so the named-company rule made its
+    // research EXPLICIT and each follow-up paid for a public web search
+    // (its raw words as the query) that found nothing. A follow-up on what
+    // Q just told them does no outside research unless the reading asks
+    // for the web; recorded in routing.
+    if (
+      researchGuard === null &&
+      read !== null &&
+      read.asksForWeb !== true &&
+      followsUpAnswer({
+        read,
+        history,
+        latestId: latest.id,
+        carriesDocuments:
+          (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
+      }) &&
+      (await research).mode !== "NEVER"
+    ) {
+      research = Promise.resolve(NO_RESEARCH);
+      researchGuard = "FOLLOWS_UP_ANSWER";
+      logger?.info(
+        { qRunId: request.runId, researchGuard },
+        "q kept a follow-up on its own answer off the public web",
+      );
+    }
     if (
       explained !== null &&
       followUpCompanyInRun.get(request.runId)?.toLowerCase() !==
@@ -8898,13 +8929,16 @@ export function createSpecialistQAnswer(
         fromShown?.reshow !== true &&
         !leadInRun.has(request.runId) &&
         !sequences.has(conversationId) &&
-        executionClassOfTurn({
+        // Live 17 Nov 2026 (conversation ff20af7e): also a question that
+        // points back at Q's last answer and was read as judgement
+        // (COMPLEX_ANALYSIS); a miss still answers it the full way.
+        followsUpAnswer({
           read,
           history,
           latestId: latest.id,
           carriesDocuments:
             (request.plan.screen?.attachedDocumentIds?.length ?? 0) > 0,
-        }) === "CONTEXTUAL_FOLLOW_UP";
+        });
       const adoptable = early !== undefined && early.messageId === latest.id;
       if (!fastPath || !adoptable) early?.abort.abort();
       if (fastPath) {
@@ -10217,6 +10251,9 @@ export function createSpecialistQAnswer(
     const finalRequest: QAnswerRequest = {
       ...request,
       executionClass,
+      // Live 17 Nov 2026 (run 0f483277): a question that asks for no action
+      // and takes up no offer is answered; no approval card is prepared.
+      ...(asksNoActionOf(read) ? { asksNoAction: true } : {}),
       // Live 2026-10-30 (founder.ledgerbridge, "What should I do today?",
       // run 2c8fd21b): code's priorities lead this answer from their own
       // records, yet the reading's EXPLICIT research started the public web

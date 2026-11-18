@@ -8482,7 +8482,13 @@ export function createModelGatewayQAnswer(
           ? companyFactAskOf(latest.content)
           : null;
       // Grows only by what use_capability loads (lead 2026-10-04).
-      let toolContext = preparedToolContext;
+      // Live 17 Nov 2026 (run 0f483277): the reading decides whether this
+      // turn asks for any action; a warmed prepare began before it was
+      // read, so the turn's own answer carries it into every tool call.
+      let toolContext: QToolExecutionContext =
+        request.asksNoAction === true
+          ? { ...preparedToolContext, asksNoAction: true }
+          : preparedToolContext;
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
       // The person's settings for this answer, read side by side with the
       // reading wait, the setup reminder and the readiness read below (L1
@@ -8601,16 +8607,23 @@ export function createModelGatewayQAnswer(
       // web in the model's hands. Research a request no reader understood
       // is never run inline: Q says it could not read it and offers to
       // start it (TURN_UNREAD_NOTE).
+      // Live 17 Nov 2026 (run 0f483277): a question that asks for no
+      // action is never offered a tool that prepares an approval card,
+      // whatever a warmed offer (made before the reading) held.
+      const offeredThisTurn =
+        request.asksNoAction === true
+          ? offeredForRun.filter((tool) => tool.preparesCard !== true)
+          : offeredForRun;
       let offered =
         reRender || request.turnUnread === true
-          ? offeredForRun.filter(
+          ? offeredThisTurn.filter(
               (tool) => !PUBLIC_WEB_TOOLS.has(tool.definition.name),
             )
           : research?.mode === "NEVER" && research.fallback !== true
-            ? offeredForRun.filter(
+            ? offeredThisTurn.filter(
                 (tool) => tool.definition.name !== "research_public_web",
               )
-            : offeredForRun;
+            : offeredThisTurn;
       // K8: the cheapest correct path. A question about what is already
       // prepared for this turn is answered over that context with no tool
       // round; everything uncertain keeps the full path.
@@ -12879,6 +12892,10 @@ export function createModelGatewayQAnswer(
               (tool) =>
                 names.includes(tool.definition.name) &&
                 !offeredByName.has(tool.definition.name) &&
+                // Never an approval card on a turn that asks for no action.
+                !(
+                  request.asksNoAction === true && tool.preparesCard === true
+                ) &&
                 // An unread turn never loads the public web either.
                 !(
                   request.turnUnread === true &&

@@ -152,7 +152,40 @@ export function toOfferedTool(record: QToolRecord): QOfferedTool {
     classification: record.definition.classification,
     definition: record.modelDefinition,
     visibleStage: record.definition.visibleStage,
+    ...(preparesApprovalCard(record.definition) ? { preparesCard: true } : {}),
   };
+}
+
+/**
+ * Live 17 Nov 2026 (run 0f483277, "What does Halyard Security do and how
+ * is it doing commercially?" answered only with an Express Interest card):
+ * a tool whose call prepares a card for the person's approval -- a
+ * consequential proposal. Read from the definition's own approval stage,
+ * never its name. A8's own-statement records (a figure a founder tells Q
+ * about their own company, "even inside a question") propose nothing to
+ * anyone else and keep their own rule.
+ */
+export function preparesApprovalCard(definition: {
+  readonly visibleStage: string | null;
+  readonly offeredOnOwnTurns?: boolean | undefined;
+}): boolean {
+  return (
+    definition.visibleStage === "WAITING_FOR_APPROVAL" &&
+    definition.offeredOnOwnTurns !== true
+  );
+}
+
+/**
+ * The turn asks for no action (QToolExecutionContext.asksNoAction): a tool
+ * that prepares an approval card is neither offered, loaded nor executed.
+ */
+export function heldOnThisTurn(
+  context: QToolExecutionContext,
+  record: QToolRecord,
+): boolean {
+  return (
+    context.asksNoAction === true && preparesApprovalCard(record.definition)
+  );
 }
 
 /**
@@ -351,6 +384,7 @@ export function createQToolRegistry(
     const relevant = (record: QToolRecord): boolean => {
       const name = record.definition.providerName;
       if (workspace && record.definition.movesPagePane === true) return false;
+      if (heldOnThisTurn(context, record)) return false;
       if (ownStatement(record)) return true;
       // A question keeps the core's reads, its browser actions (Q shows
       // and navigates while it answers) and use_capability; the core's
@@ -483,8 +517,39 @@ export function createQToolRegistry(
       ...nameable(context).filter(
         ({ definition }) => !names.has(definition.id),
       ),
-    ];
+    ].filter((record) => !heldOnThisTurn(context, record));
   };
+
+  const offeredRecord = (
+    context: QToolExecutionContext,
+    providerName: string,
+  ): QToolRecord | undefined =>
+    unfocused(context).find(
+      (record) => record.definition.providerName === providerName,
+    ) ??
+    (context.focus?.tools.includes(providerName) === true ||
+    inFocusArea(context, providerName)
+      ? nameable(context).find(
+          (record) => record.definition.providerName === providerName,
+        )
+      : undefined) ??
+    // Batch 17: their own organisation's declared action, on a turn
+    // about their own records, executes exactly as it is offered.
+    (ownTurn(context)
+      ? ranked(context).find(
+          (record) =>
+            ownOrganisationAction(record) &&
+            record.definition.providerName === providerName,
+        )
+      : undefined) ??
+    // A tool offered only when named, named by this turn.
+    (context.focus?.tools.includes(providerName) === true
+      ? ranked(context).find(
+          (record) =>
+            record.definition.offeredWhenNamed === true &&
+            record.definition.providerName === providerName,
+        )
+      : undefined);
 
   // use_capability reads what this run may use from here, never more.
   for (const record of records) {
@@ -514,33 +579,15 @@ export function createQToolRegistry(
     // A declared app action the turn named may execute on any purpose its
     // plan's scopes allow, as may a tool offered only when named; nothing
     // else the focus names widens authority.
-    offeredByProviderName: (context, providerName) =>
-      unfocused(context).find(
-        (record) => record.definition.providerName === providerName,
-      ) ??
-      (context.focus?.tools.includes(providerName) === true ||
-      inFocusArea(context, providerName)
-        ? nameable(context).find(
-            (record) => record.definition.providerName === providerName,
-          )
-        : undefined) ??
-      // Batch 17: their own organisation's declared action, on a turn
-      // about their own records, executes exactly as it is offered.
-      (ownTurn(context)
-        ? ranked(context).find(
-            (record) =>
-              ownOrganisationAction(record) &&
-              record.definition.providerName === providerName,
-          )
-        : undefined) ??
-      // A tool offered only when named, named by this turn.
-      (context.focus?.tools.includes(providerName) === true
-        ? ranked(context).find(
-            (record) =>
-              record.definition.offeredWhenNamed === true &&
-              record.definition.providerName === providerName,
-          )
-        : undefined),
+    // The final check (live 17 Nov 2026, run 0f483277): on a turn that asks
+    // for no action, a tool that prepares an approval card never executes,
+    // however it reached the model.
+    offeredByProviderName: (context, providerName) => {
+      const record = offeredRecord(context, providerName);
+      return record !== undefined && heldOnThisTurn(context, record)
+        ? undefined
+        : record;
+    },
     available,
   };
 }

@@ -674,6 +674,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   /** What the turn is about, for the tool offer (QToolFocus). */
   readonly toolFocus?: QToolFocus | undefined;
   /**
+   * The reading asks Q to do nothing and takes up no offer Q made in this
+   * conversation (QToolExecutionContext.asksNoAction): the answer is given
+   * and no approval card is prepared.
+   */
+  readonly asksNoAction?: boolean | undefined;
+  /**
    * This answer was started before its turn was read (voice speculation,
    * latency2). Until `decided` settles true nothing it produces may leave
    * the answer: live text is held, nothing is stored, and only READ_ONLY
@@ -920,6 +926,15 @@ export type QToolExecutionContext = {
    */
   readonly invokedBy?: "CODE" | undefined;
   /**
+   * Live 17 Nov 2026 (run 0f483277): the turn reader read this turn as a
+   * question that asks Q to do nothing and takes up no offer Q made here.
+   * No tool that prepares a card for their approval (a consequential
+   * proposal) is offered, loaded or executed on it; the question is
+   * answered. Decided by code from the reading's fields, never by the
+   * model. Absent: no such limit.
+   */
+  readonly asksNoAction?: boolean | undefined;
+  /**
    * The person's latest message in this run, verbatim (CQ-Q-RESEARCH-001
    * §9). A tool that sends anything outside Capital Q composes its request
    * from these words and from authorised public identity — never from a
@@ -1002,6 +1017,12 @@ export type QOfferedTool = {
   readonly definition: ModelToolDefinition;
   /** The approved stage a person may see while this tool runs, if any. */
   readonly visibleStage: QVisibleStage | null;
+  /**
+   * Calling it prepares a card for the person's approval (a consequential
+   * proposal), other than recording what they told Q about their own
+   * organisation. Held back on a turn that asks for no action.
+   */
+  readonly preparesCard?: true | undefined;
 };
 
 /** A model's proposal, exactly as the gateway normalised it. Untrusted input. */

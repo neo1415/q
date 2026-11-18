@@ -239,6 +239,29 @@ export function createQToolExecutor(
     const started = now();
     const elapsed = () => Math.max(0, now() - started);
     const record = registry.offeredByProviderName(context, proposal.name);
+    // Live 17 Nov 2026 (run 0f483277): a question that asked for no action
+    // is answered; a card for their approval is not prepared on it. Said to
+    // the model plainly, so it answers rather than retries.
+    if (
+      record === undefined &&
+      context.asksNoAction === true &&
+      registry.offeredByProviderName(
+        { ...context, asksNoAction: false },
+        proposal.name,
+      ) !== undefined
+    ) {
+      return finish(
+        context,
+        failed(
+          proposal,
+          undefined,
+          "DENIED",
+          "TOOL_NOT_ELIGIBLE",
+          "They asked a question and asked for no action: nothing was prepared. Answer the question from what you have read; you may mention the action in one sentence, without preparing it.",
+          elapsed(),
+        ),
+      );
+    }
     if (record === undefined) {
       return finish(
         context,

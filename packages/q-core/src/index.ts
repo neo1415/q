@@ -2431,6 +2431,7 @@ export { COMPANY_ANALYST_V36 } from "./prompts/tasks/company-analyst.v36.js";
 // RC3 (Q voice audit, 15 Nov 2026): turn execution classes and the spoken form.
 export {
   EXECUTION_LANES,
+  followsUpPreviousAnswer,
   turnExecutionClassOf,
   type ExecutionLane,
   type ExecutionReading,

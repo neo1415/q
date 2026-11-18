@@ -2612,6 +2612,74 @@ describe("use_capability: a tool outside the turn's focus, loaded and called in 
     }
     expect(executed.at(-1)?.focusTools ?? []).not.toContain("propose_meeting");
   });
+
+  it("live 17 Nov 2026 (run 0f483277): a question asking for no action is never offered or loaded an approval card, and every call carries the limit", async () => {
+    const EXPRESS: QOfferedTool = {
+      toolName: "relationship.interest.express.propose",
+      toolVersion: 1,
+      classification: "SIDE_EFFECT",
+      definition: {
+        name: "propose_express_interest",
+        description: "Prepares Express Interest for their approval.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+      visibleStage: "WAITING_FOR_APPROVAL",
+      preparesCard: true,
+    };
+    const executed: { name: string; asksNoAction: boolean }[] = [];
+    // The warmed offer (made before the reading) held the card tool, as
+    // live; the loader would load it on need.
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([USE_CAPABILITY, GET_COMPANY, EXPRESS]),
+      available: () => Promise.resolve([USE_CAPABILITY, GET_COMPANY, EXPRESS]),
+      execute: (proposal, context) => {
+        executed.push({
+          name: proposal.name,
+          asksNoAction: context.asksNoAction === true,
+        });
+        return Promise.resolve(
+          succeeded(
+            proposal,
+            proposal.name === "use_capability"
+              ? {
+                  loaded: [{ name: "propose_express_interest", does: "" }],
+                  message: "Loaded.",
+                }
+              : {},
+          ),
+        );
+      },
+    };
+    const { seam, alpha, request } = build({
+      said: "What does Halyard Security do and how is it doing commercially?",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "u1",
+              name: "use_capability",
+              arguments: { need: "express interest" },
+            },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("Halyard sells passkeys.")),
+        },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer({ ...request, asksNoAction: true });
+    expect(outcome.kind).toBe("ANSWERED");
+    for (const attempt of alpha.calls) {
+      expect(attempt.request.tools.map((t) => t.name)).not.toContain(
+        "propose_express_interest",
+      );
+    }
+    expect(executed.map((e) => e.name)).toEqual(["use_capability"]);
+    expect(executed.every((e) => e.asksNoAction)).toBe(true);
+  });
 });
 
 describe("approval by conversation (live 2026-09-27 #1, #2)", () => {
