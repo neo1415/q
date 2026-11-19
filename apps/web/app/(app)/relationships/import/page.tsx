@@ -12,6 +12,7 @@ import {
 import { BackLink } from "@/features/company/back-link";
 import { serverT } from "@/features/i18n/server";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 import { PipelineImportScreen } from "@/features/relationships/pipeline-import-screen";
 import { PipelineProspects } from "@/features/relationships/pipeline-prospects";
 
@@ -74,7 +75,9 @@ export default async function PipelineImportPage() {
           }
         />
       </div>
-      <PipelineImportScreen side={side} companyId={companyId} />
+      <QSection id="import" kind="UPLOAD_LIST" label={t("Import a file")}>
+        <PipelineImportScreen side={side} companyId={companyId} />
+      </QSection>
       <PageSection
         id="prospects"
         title={t("Private prospects")}

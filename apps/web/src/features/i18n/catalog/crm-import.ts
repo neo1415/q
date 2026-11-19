@@ -18,6 +18,7 @@ export const CRM_IMPORT_AR: Readonly<Record<string, string>> = {
     "أكمل الإعداد، ثم استورد المسار الذي تحتفظ به.",
   "Your pipeline belongs to your company or firm. Finish your setup first.":
     "مسار صفقاتك يخص شركتك أو مؤسستك. أكمل الإعداد أولاً.",
+  "Import a file": "استيراد ملف",
   // Steps
   "Import steps": "خطوات الاستيراد",
   Columns: "الأعمدة",

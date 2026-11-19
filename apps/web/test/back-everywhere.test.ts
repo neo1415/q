@@ -118,6 +118,8 @@ const INTERIOR: Readonly<Record<string, Interior>> = {
   "company/[companyId]": { parent: "/discover" },
   "company/[companyId]/founder/[position]": { parent: "/company/" },
   "company/interest": { parent: "/home" },
+  // Decision 106: the CRM import, from the pipeline.
+  "relationships/import": { parent: "/relationships" },
   "company/visibility": { parent: "/profile" },
   "daily/[editionId]": { parent: "/daily" },
   "discover/passed": {

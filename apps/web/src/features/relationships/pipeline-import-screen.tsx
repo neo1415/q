@@ -241,7 +241,7 @@ export function PipelineImportScreen({
   const { preview, documentId } = step;
   const applying = step.kind === "APPLYING";
   const groups = groupRows(preview.rows);
-  const columnField = fieldByColumn(draft as PipelineImportPreview["mapping"]);
+  const columnField = fieldByColumn(draft);
   const changed = !sameMapping(draft, preview.mapping);
   const ready = mappingReady(draft);
   const resolutions = resolutionsOf(choices, preview);
@@ -350,7 +350,7 @@ export function PipelineImportScreen({
                 onChange={(event) =>
                   setDraft(
                     assignColumn(
-                      draft as PipelineImportPreview["mapping"],
+                      draft,
                       column,
                       event.target.value as PipelineImportField | "",
                     ),
@@ -400,7 +400,7 @@ export function PipelineImportScreen({
         >
           {t("Rows")}
         </h2>
-        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <Segmented<Group>
             label={t("Rows by how they matched")}
             className="w-max whitespace-nowrap"

@@ -2081,6 +2081,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "If you decide not to go ahead, use “Not proceeding for now” on this relationship. It is archived, never deleted, and you can reconsider later.",
   "If you want to explore {name}, express interest. It is not a commitment to invest.",
   "Import",
+  "Import a file",
   "Import another file",
   "Import steps",
   "Import your pipeline",

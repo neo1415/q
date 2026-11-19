@@ -195,7 +195,7 @@ describe("a side's own pipeline fields (decision 106 gaps)", () => {
         expected: { amount: "750000", currency: "EUR" },
         ownerMembershipId: member.membership_id,
       },
-      { correlationId: "corr-1" as never },
+      { correlationId: "corr-1" },
     );
     expect(repository.write).toHaveBeenCalledWith("tx", {
       relationshipId,
@@ -231,7 +231,7 @@ describe("a side's own pipeline fields (decision 106 gaps)", () => {
           revision: 3,
           ownerMembershipId: "00000000-0000-4000-8000-0000000000ee",
         },
-        { correlationId: "corr-1" as never },
+        { correlationId: "corr-1" },
       ),
     ).rejects.toBeInstanceOf(RelationshipSideOwnerError);
     expect(repository.write).not.toHaveBeenCalled();
@@ -244,7 +244,7 @@ describe("a side's own pipeline fields (decision 106 gaps)", () => {
         actor,
         relationshipId,
         { revision: 2, priority: "LOW" },
-        { correlationId: "corr-1" as never },
+        { correlationId: "corr-1" },
       ),
     ).rejects.toBeInstanceOf(RelationshipSideDetailsConflictError);
     expect(audit.record).not.toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe("a side's own pipeline fields (decision 106 gaps)", () => {
           actor,
           relationshipId,
           { revision: 3, expected },
-          { correlationId: "corr-1" as never },
+          { correlationId: "corr-1" },
         ),
       ).rejects.toThrow();
     }

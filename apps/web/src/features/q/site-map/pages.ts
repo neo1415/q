@@ -641,7 +641,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/relationships": {
     title: "Relationships",
     purpose:
-      "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate and commitments.",
+      "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate.",
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
     tabs: [
@@ -743,6 +743,12 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
         tab: "capital-investors",
       },
     ],
+  },
+  "/relationships/import": {
+    title: "Import pipeline",
+    purpose: "Q reads your CRM file; you approve.",
+    audience: "ANY",
+    sections: [{ id: "import", title: "Import", kind: "UPLOAD_LIST" }],
   },
   "/relationships/company/[companyId]": relationshipPage("company", "record"),
   "/relationships/company/[companyId]/messages": relationshipPage(
@@ -1263,6 +1269,9 @@ export const SITE_MAP_PURPOSES: Readonly<
   "/rehearsals": {
     sections: { rehearsals: "who to practise with, and past sessions" },
   },
+  "/relationships/import": {
+    sections: { import: "the file, columns, rows and private prospects" },
+  },
   "/rehearsals/company/[companyId]": {
     sections: { rehearsal: "the practice session" },
   },
@@ -1283,21 +1292,21 @@ export const SITE_MAP_PURPOSES: Readonly<
   },
   "/relationships": {
     tabs: {
-      overview: "all your relationships at a glance, whatever the stage",
+      overview: "everyone at a glance",
       pipeline: "relationships by stage",
       capital: "a founder's raise; an investor's mandate and book",
       "capital-raise": "the round itself: size, terms, money committed",
       "capital-readiness": "how ready your company looks to investors",
       "capital-action-plan": "the steps to get investor-ready",
       "capital-plan": "your 3, 6 and 12-month plan",
-      "capital-investors": "the people: investors in touch about it",
+      "capital-investors": "investors in touch",
     },
     sections: {
       "hub-overview": "the overview",
       pipeline: "relationships by stage",
       relationships: "everyone, as a list",
       mandate: "what you invest in",
-      commitments: "what you committed and what was received",
+      commitments: "committed and received",
       "capital-overview": "your raise at a glance",
       rounds: "your round",
       readiness: "by pillar",

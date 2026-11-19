@@ -1784,7 +1784,7 @@ export const Q_SITE_MAP: QSiteMap = {
       route: "/relationships",
       title: "Relationships",
       purpose:
-        "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate and commitments.",
+        "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate.",
       audience: "ANY",
       params: [],
       shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
@@ -1798,7 +1798,7 @@ export const Q_SITE_MAP: QSiteMap = {
           href: "/relationships?view=overview",
           destinations: ["RELATIONSHIPS"],
           subs: [],
-          purpose: "all your relationships at a glance, whatever the stage",
+          purpose: "everyone at a glance",
         },
         {
           id: "pipeline",
@@ -1859,7 +1859,7 @@ export const Q_SITE_MAP: QSiteMap = {
           destinations: ["CAPITAL_INVESTORS"],
           subs: [],
           audience: "FOUNDER",
-          purpose: "the people: investors in touch about it",
+          purpose: "investors in touch",
         },
       ],
       sections: [
@@ -1897,7 +1897,7 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "CAPITAL_ROUNDS",
           tab: "capital",
           audience: "INVESTOR",
-          purpose: "what you committed and what was received",
+          purpose: "committed and received",
         },
         {
           id: "capital-overview",
@@ -2144,6 +2144,26 @@ export const Q_SITE_MAP: QSiteMap = {
           title: "Diligence",
           kind: "DILIGENCE",
           purpose: "their questions and the shared documents",
+        },
+      ],
+    },
+    {
+      route: "/relationships/import",
+      title: "Import pipeline",
+      purpose: "Q reads your CRM file; you approve.",
+      audience: "ANY",
+      params: [],
+      shows: [],
+      destinations: [],
+      recordPages: [],
+      settingsSections: [],
+      tabs: [],
+      sections: [
+        {
+          id: "import",
+          title: "Import",
+          kind: "UPLOAD_LIST",
+          purpose: "the file, columns, rows and private prospects",
         },
       ],
     },

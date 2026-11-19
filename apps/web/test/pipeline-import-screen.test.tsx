@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import {
   cleanup,
+  configure,
   fireEvent,
   render,
   screen,
@@ -13,6 +14,9 @@ import type {
   PipelineImportMapping,
   PipelineImportPreview,
 } from "@capital-q/contracts";
+
+// Each step waits on async ops; a loaded machine needs more than 1 s.
+configure({ asyncUtilTimeout: 5000 });
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({

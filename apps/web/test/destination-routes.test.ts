@@ -84,6 +84,8 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/documents/unavailable":
     "the not-found landing for a refused document link (J7); never a destination",
   "/admin": "platform operators only",
+  "/relationships/import":
+    "the CRM import, opened from the pipeline's Import; Q imports through import_my_pipeline",
   // Decision 107: Q starts a download with request_my_data_download and
   // links here (site map route) for deletion, which only the page does.
   "/settings/data":

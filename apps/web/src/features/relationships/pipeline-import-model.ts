@@ -194,7 +194,8 @@ export function invalidReason(
  * it private, or skip it. A row with no choice is skipped (Capital Q never
  * picks between two real organisations on anyone's behalf).
  */
-export type RowChoice = string | "KEEP_PRIVATE" | "SKIP";
+/** A candidate's id, "KEEP_PRIVATE" or "SKIP". */
+export type RowChoice = string;
 
 export function resolutionsOf(
   choices: Readonly<Record<number, RowChoice>>,

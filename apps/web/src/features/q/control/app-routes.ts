@@ -90,6 +90,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/rehearsals/r/[rehearsalId]",
   "/rehearsals/live/[rehearsalId]",
   "/relationships",
+  "/relationships/import",
   "/relationships/company/[companyId]",
   "/relationships/company/[companyId]/calls",
   "/relationships/company/[companyId]/deal",
