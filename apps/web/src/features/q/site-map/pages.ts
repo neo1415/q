@@ -347,8 +347,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/daily": {
     title: "The Q Daily",
-    purpose:
-      "Today's Q Daily, Q's morning briefing for you, and past editions.",
+    purpose: "Q's morning briefing for you today, and past editions.",
     audience: "ANY",
     shows: ["DAILY_EDITION"],
     sections: [{ id: "daily", title: "The Q Daily", kind: "DAILY" }],
@@ -641,7 +640,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   "/relationships": {
     title: "Relationships",
     purpose:
-      "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate.",
+      "Who you're in touch with and where each stands; Capital: a founder's raise, an investor's mandate and commitments.",
     audience: "ANY",
     shows: ["COMPANY", "INVESTOR_ORGANISATION", "CAPITAL_ROUND"],
     tabs: [
@@ -1009,8 +1008,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/settings/plan": {
     title: "Plan and billing",
-    purpose:
-      "Your subscription and billing: your plan, what it allows, and payment.",
+    purpose: "Your subscription and billing: your plan and what it allows.",
     audience: "ANY",
     sections: [{ id: "plan", title: "Your plan", kind: "BILLING" }],
   },
@@ -1141,7 +1139,7 @@ export const SITE_MAP_PURPOSES: Readonly<
   [COMPANY]: {
     tabs: {
       overview: "headline figures, the story and the raise",
-      diligence: "questions to check, the evidence and the risks",
+      diligence: "questions to check, evidence and risks",
       elevator: "the short pitch",
       dataroom: "the company's documents",
       deck: "the deck and Q's reading of it",
@@ -1193,22 +1191,22 @@ export const SITE_MAP_PURPOSES: Readonly<
   },
   "/discover/saved": {
     sections: {
-      saved: "the companies you saved",
-      passed: "the companies you passed on",
+      saved: "companies you saved",
+      passed: "companies you passed on",
       compare: "your saved companies side by side",
     },
   },
   "/discover/passed": {
     sections: {
-      saved: "the companies you saved",
-      passed: "the companies you passed on",
+      saved: "companies you saved",
+      passed: "companies you passed on",
       compare: "your saved companies side by side",
     },
   },
   "/discover/saved/compare": {
     sections: {
-      saved: "the companies you saved",
-      passed: "the companies you passed on",
+      saved: "companies you saved",
+      passed: "companies you passed on",
       compare: "your saved companies side by side",
     },
   },
@@ -1249,7 +1247,7 @@ export const SITE_MAP_PURPOSES: Readonly<
   "/pitch/new": { sections: { pitch: "recording or uploading" } },
   "/profile": {
     sections: {
-      about: "about you, in your words",
+      about: "you, in your words",
       company: "your company's details",
       traction: "traction and numbers",
       team: "your team",
@@ -1292,21 +1290,21 @@ export const SITE_MAP_PURPOSES: Readonly<
   },
   "/relationships": {
     tabs: {
-      overview: "everyone at a glance",
+      overview: "all your relationships at a glance, whatever the stage",
       pipeline: "relationships by stage",
       capital: "a founder's raise; an investor's mandate and book",
       "capital-raise": "the round itself: size, terms, money committed",
       "capital-readiness": "how ready your company looks to investors",
       "capital-action-plan": "the steps to get investor-ready",
       "capital-plan": "your 3, 6 and 12-month plan",
-      "capital-investors": "investors in touch",
+      "capital-investors": "the people: investors in touch about it",
     },
     sections: {
       "hub-overview": "the overview",
       pipeline: "relationships by stage",
       relationships: "everyone, as a list",
       mandate: "what you invest in",
-      commitments: "committed and received",
+      commitments: "what you committed and what was received",
       "capital-overview": "your raise at a glance",
       rounds: "your round",
       readiness: "by pillar",
@@ -1322,8 +1320,8 @@ export const SITE_MAP_PURPOSES: Readonly<
           ? "/relationships/company/[companyId]"
           : "/relationships/investor/[investorOrganisationId]";
       const sections = {
-        calls: "your calls and meetings together",
-        diligence: "their questions and the shared documents",
+        calls: "your calls and meetings",
+        diligence: "their questions and shared documents",
       };
       return [
         [

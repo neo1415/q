@@ -459,7 +459,11 @@ describe("@capital-q/network against local PostgreSQL", () => {
                                     -- a commitment's append-only notes and the
                                     -- admin's review flags, each hanging off
                                     -- one commitment, never a deal record
-                                    'commitment_notes', 'commitment_review_flags')`;
+                                    'commitment_notes', 'commitment_review_flags',
+                                    -- side details (20261231599520, decision 106):
+                                    -- one side's own pipeline fields on the one
+                                    -- canonical relationship, never a deal record
+                                    'relationship_side_details')`;
         expect(tables).toEqual([]);
         // Ensuring a relationship expresses no interest.
         expect(
@@ -467,11 +471,14 @@ describe("@capital-q/network against local PostgreSQL", () => {
             tx.sql`select count(*)::int as count from network.interests where relationship_id = ${relationship.id}`,
           ),
         ).toBe(0);
-        // Nor commits anything: no commitment, note or review flag.
+        // Nor commits anything (no commitment, note or review flag), and
+        // records no side's own pipeline fields: those exist only once a
+        // side sets them (decision 106).
         for (const table of [
           "commitments",
           "commitment_notes",
           "commitment_review_flags",
+          "relationship_side_details",
         ]) {
           expect(
             await count(

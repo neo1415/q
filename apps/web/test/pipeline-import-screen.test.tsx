@@ -264,13 +264,23 @@ describe("the CRM import screen (decision 106)", () => {
         .mockResolvedValue({ ok: false, message: "again" }),
     });
     await upload(o);
-    const press = () =>
-      fireEvent.click(
-        document.querySelector("[data-import-approve-button]") as HTMLElement,
-      );
-    press();
+    // The button stays disabled while a read or an approval is still
+    // settling, and a click on a disabled button is not an approval; under
+    // a loaded machine the click raced that, so each press waits for the
+    // button the person would actually press.
+    const press = async () => {
+      const button = await waitFor(() => {
+        const found = document.querySelector<HTMLButtonElement>(
+          "[data-import-approve-button]",
+        );
+        expect(found?.disabled).toBe(false);
+        return found as HTMLButtonElement;
+      });
+      fireEvent.click(button);
+    };
+    await press();
     await screen.findByText(/Approving again continues it/u);
-    press();
+    await press();
     await screen.findByText("again");
     const keys = (
       o.apply.mock.calls as unknown as [{ idempotencyKey: string }][]
