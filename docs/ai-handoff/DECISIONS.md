@@ -495,3 +495,5 @@ Core Seven remains the governing assessment framework. The new directive authori
       - The organisation admin lives at `/organisation`.
       - Ordinary members can see their organisation's admin page read-only. Changes stay with owners and admins, enforced on the server.
       - An investor's portfolio company names may appear on its Q Card only when the firm itself switches that field on (resolves the open question in ADR 0007).
+
+111.  **CRM naming** (owner, 2026-11-19): the menu entry stays "CRM". The page keeps its role names: "Fundraising Hub" for founders and "Investment Hub" for investors. No relabelling of the menu.
