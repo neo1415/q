@@ -911,3 +911,15 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   Gate fixes (`833fbc21a`): a date's day never grounds a count in the claim check; the commitment evidence tables are known network tables. ci-local PASS (1030 s, rerun after a container restart). Migration `20261231599340` applied; hosted is at 313. All four services SUCCESS.
   - Live smoke (Savanna): no startup errors. The welcome shows "8 pitches that match your mandate"; the exclusion (15) and the contact-status answer are correct.
   - Not wired yet: the typed-chat meeting opener; the admin console view of the digests.
+
+- **19 Nov 04:35–04:47 UTC, incident: `4b0f0904a` was deployed without its migration, then rolled back to `833fbc21a`.**
+  - The gate passed (1184 s). The lead ran the migration and the deploy in parallel instead of in sequence.
+  - The migration `20261231599520_network_relationship_side_details` failed: the Supabase management API returned 401 "Invalid access token" (`SUPABASE_ACCESS_TOKEN` no longer valid). Meanwhile the deploy promoted `4b0f0904a`, whose relationship reads query the missing table.
+  - At 04:46 all four services were rolled back to the `833fbc21a` deployments with Railway `deploymentRollback`. All four were SUCCESS on `833fbc21a` at 04:47. No missing-table errors were found in the q-api logs for the window.
+  - `recovery/2026-09-12` still points at `4b0f0904a`. Until the migration is applied, do NOT trigger a Railway rebuild (a variable change or a redeploy would build `4b0f0904a`).
+  - Next:
+    - the owner supplies a valid `SUPABASE_ACCESS_TOKEN`;
+    - apply `20261231599520`;
+    - then `deploy-promote 4b0f0904a` again;
+    - live-check the CRM import.
+  - Rule from now on: the migration must finish before the deploy starts, never in parallel.
