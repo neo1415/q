@@ -454,7 +454,12 @@ describe("@capital-q/network against local PostgreSQL", () => {
                                     -- CRM import (20261231598370, decision 106): a
                                     -- staged import and its rows, never a deal,
                                     -- match or parallel relationship record
-                                    'pipeline_imports', 'pipeline_import_rows')`;
+                                    'pipeline_imports', 'pipeline_import_rows',
+                                    -- commitment evidence (20261231599340, S9):
+                                    -- a commitment's append-only notes and the
+                                    -- admin's review flags, each hanging off
+                                    -- one commitment, never a deal record
+                                    'commitment_notes', 'commitment_review_flags')`;
         expect(tables).toEqual([]);
         // Ensuring a relationship expresses no interest.
         expect(
@@ -462,6 +467,18 @@ describe("@capital-q/network against local PostgreSQL", () => {
             tx.sql`select count(*)::int as count from network.interests where relationship_id = ${relationship.id}`,
           ),
         ).toBe(0);
+        // Nor commits anything: no commitment, note or review flag.
+        for (const table of [
+          "commitments",
+          "commitment_notes",
+          "commitment_review_flags",
+        ]) {
+          expect(
+            await count(
+              tx.sql`select count(*)::int as count from ${tx.sql("network." + table)} where relationship_id = ${relationship.id}`,
+            ),
+          ).toBe(0);
+        }
       },
     );
   });

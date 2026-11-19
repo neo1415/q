@@ -100,6 +100,22 @@ describe("claim check: true claims pass untouched", () => {
     expect(check("It was founded in 2017.").ungrounded).toEqual(["DATE"]);
   });
 
+  it("a date's day grounds that day, never a count of something", () => {
+    // The turn's situation line says tomorrow's date; on 19 November it
+    // once grounded an invented "I've reached out to 20 companies".
+    const dated = claimCorpus(
+      ["Tomorrow is Friday, 20 November 2026.", TOOL_RESULT],
+      TODAY,
+    );
+    expect(
+      checkSentence("I've reached out to 20 companies so far.", dated)
+        .ungrounded,
+    ).toEqual(["NUMBER"]);
+    expect(
+      checkSentence("The call is on 20 November.", dated).ungrounded,
+    ).toEqual([]);
+  });
+
   it("allows derived arithmetic only when both inputs are present", () => {
     // $1.2M revenue over $3M raise = 40%: both in the corpus, same sentence.
     expect(

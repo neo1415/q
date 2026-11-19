@@ -48,6 +48,11 @@ export interface Claim {
   readonly precision: number;
   /** ISO-4217-ish code where the text names one ("USD", "NGN"). */
   readonly currency: string | null;
+  /**
+   * Said as a day of a month, beside the month's name ("20 November",
+   * "November 20"): only such a figure may be grounded by a date's day.
+   */
+  readonly saidAsDay?: true;
 }
 
 interface SourceNumber {
@@ -253,6 +258,18 @@ function figuresIn(text: string): Figure[] {
           : null;
     const percent = groups["pct"] !== undefined;
     const index = match.index;
+    const end = index + match[0].length;
+    const monthAfter = /^\s+(?<w>[A-Za-z]{3,9})\b/u.exec(text.slice(end));
+    const monthBefore = /\b(?<w>[A-Za-z]{3,9})\.?\s+$/u.exec(
+      text.slice(Math.max(0, index - 12), index),
+    );
+    const saidAsDay =
+      /^\d{1,2}$/u.test(match[0]) &&
+      value >= 1 &&
+      value <= 31 &&
+      [monthAfter, monthBefore].some((month) =>
+        MONTH_INDEX.has((month?.groups?.["w"] ?? "").toLowerCase()),
+      );
     found.push({
       kind: currency !== null ? "MONEY" : percent ? "PERCENT" : "NUMBER",
       text: match[0],
@@ -263,8 +280,9 @@ function figuresIn(text: string): Figure[] {
         scale > 1 ? 1 : 0,
       ),
       currency,
+      ...(saidAsDay ? { saidAsDay: true as const } : {}),
       index,
-      end: index + match[0].length,
+      end,
     });
   }
   return found;
@@ -416,6 +434,10 @@ export function claimCorpus(
           currency: figure.currency,
           ...(figure.kind === "MONEY" || figure.kind === "PERCENT"
             ? { kind: figure.kind }
+            : {}),
+          // A source's "20 November" is a day, not a count of anything.
+          ...(figure.kind === "NUMBER" && figure.saidAsDay === true
+            ? { datePart: true as const }
             : {}),
         });
       }
@@ -594,12 +616,15 @@ function saysKind(claim: Claim, result: ResultKind, after: string): boolean {
 function directlyGrounded(figure: Claim, corpus: ClaimCorpus): boolean {
   // A multiple is a plain number: neither "$3" nor "3%" nor a date's
   // month ("March 2024") grounds "a 3x multiple"; and a day or month of a
-  // date grounds a plain number only ("22 November").
+  // date grounds only a plain number said as a day ("22 November"). Never
+  // a count: "Tomorrow is Friday, 20 November" in the turn's situation
+  // line once grounded an invented "I've reached out to 20 companies".
   const multiple = /[x×]$/u.test(figure.text.trim());
   const plainNumber = figure.kind === "NUMBER" && !multiple;
   const direct = corpus.numbers.some(
     (source) =>
-      (source.datePart !== true || plainNumber) &&
+      (source.datePart !== true ||
+        (plainNumber && figure.saidAsDay === true)) &&
       (!multiple || source.kind === undefined) &&
       roundsTo(figure.value, figure.precision, source.value) &&
       (figure.currency === null ||
