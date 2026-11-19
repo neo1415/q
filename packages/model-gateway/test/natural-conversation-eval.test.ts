@@ -28,7 +28,10 @@ import {
   createStaticModelCatalog,
   type FakeBehaviour,
 } from "../src/index.js";
-import { createModelGatewayQAnswer } from "../src/q/index.js";
+import {
+  ACTS_HELD_BACK_NOTE,
+  createModelGatewayQAnswer,
+} from "../src/q/index.js";
 import { fitFixture } from "./fit-fixture.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
@@ -143,6 +146,8 @@ function tools(options: {
   readonly web?: boolean | undefined;
   /** Round 6: every named company fits the same, so the top cards tie. */
   readonly tied?: boolean | undefined;
+  /** 19 Nov: a tool that prepares a change to their own profile. */
+  readonly canAct?: boolean | undefined;
 }): QToolPort & {
   readonly executed: string[];
 } {
@@ -155,6 +160,14 @@ function tools(options: {
       : []),
     ...(options.web === true
       ? [offered("public_web.search", "research_public_web")]
+      : []),
+    ...(options.canAct === true
+      ? [
+          {
+            ...offered("app.investor.profile.update", "propose_profile_update"),
+            classification: "PREPARE" as const,
+          },
+        ]
       : []),
     ...(options.fit
       ? [
@@ -340,6 +353,7 @@ async function replay(input: {
   readonly mandate?: boolean | undefined;
   readonly web?: boolean | undefined;
   readonly tied?: boolean | undefined;
+  readonly canAct?: boolean | undefined;
   /** K Part 4: the Tier A copy of their own mandate read. */
   readonly ownMandateReads?: {
     readonly get: (actor: unknown) => Promise<unknown>;
@@ -367,6 +381,8 @@ async function replay(input: {
   modelCalls: number;
   toolsOffered: number | null;
   executed: readonly string[];
+  /** Every message of the first model call, joined. */
+  prompt: string;
 }> {
   const run = randomUUID();
   const conversation = randomUUID();
@@ -446,6 +462,7 @@ async function replay(input: {
     mandate: input.mandate,
     web: input.web,
     tied: input.tied,
+    canAct: input.canAct,
   });
   const seam = createModelGatewayQAnswer({
     gateway,
@@ -483,6 +500,9 @@ async function replay(input: {
     modelCalls: alpha.calls.length,
     toolsOffered: alpha.calls[0]?.request.tools.length ?? null,
     executed: port.executed,
+    prompt: (alpha.calls[0]?.request.messages ?? [])
+      .map((message) => message.content)
+      .join("\n"),
   };
 }
 
@@ -992,6 +1012,44 @@ describe("the cheapest correct path (K8)", () => {
     });
     expect(modelCalls).toBe(1);
     expect(toolsOffered).toBe(0);
+  });
+
+  /**
+   * Owner 19 Nov 2026 (run 940deee8): "is there a way for me to put that
+   * there, or do I need to put it in my description?" went the prepared
+   * path with no tools, and Q said "I can't change it from here". The
+   * answer is still written without tools, but Q is told it can make the
+   * change and asks what it should say.
+   */
+  it("a prepared-context answer for someone Q can act for never says Q can take no action", async () => {
+    const { toolsOffered, prompt } = await replay({
+      question:
+        "is there a way for me to put my post-investment support there, or do I need to put it in my description?",
+      mandate: true,
+      canAct: true,
+      script: [answer("I can add it to your description; what should it say?")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+      },
+    });
+    expect(toolsOffered).toBe(0);
+    expect(prompt).toContain(ACTS_HELD_BACK_NOTE);
+    expect(prompt).not.toContain("No tools are available");
+  });
+
+  it("with nothing it could act through, the prepared answer still says no actions", async () => {
+    const { prompt } = await replay({
+      question: "what is my mandate?",
+      mandate: true,
+      script: [answer("Halyard Capital invests as a VC; no mandate yet.")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+      },
+    });
+    expect(prompt).not.toContain(ACTS_HELD_BACK_NOTE);
+    expect(prompt).toContain("No tools are available");
   });
 
   it("the same question with nothing prepared keeps the full path and its tools", async () => {

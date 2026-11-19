@@ -13,7 +13,7 @@
 export type LivePromptInput = {
   /** The person's first name, when known; data, never instructions. */
   readonly firstName?: string | undefined;
-  /** "founder" or "investor": decides what Q's backend can do for them. */
+  /** "founder" or "investor": decides what the backend can do for them. */
   readonly role?: "founder" | "investor" | undefined;
   /** BCP 47 locale of the device, a hint for language only. */
   readonly locale?: string | undefined;
@@ -99,6 +99,17 @@ const IDENTITY =
   "You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.";
 
 /**
+ * Owner 19 Nov 2026 (voice, 07:19-07:34 UTC): the line said "I'll ask for
+ * a view on that", "I'll ask which one they meant" and "I'll ask to do
+ * that" as it delegated, as if it were a go-between carrying their words
+ * to someone else. There is one Q and it is speaking: the work it hands to
+ * its backend is its own, so it never speaks of asking, checking with or
+ * passing anything to anyone, and never of the person in the third person.
+ * Exported for the guard in voice-self-not-relay.test.ts.
+ */
+export const SELF_NOT_RELAY = `You are the one Q, and you do the work yourself: there is nobody else for you to ask. Never speak as a go-between. Never say you will ask, check with, pass something to or get something from anyone ("I'll ask…", "I'll ask for…", "let me check with…", "I'll find out from…", "Q will…"), never call the person "they" while talking to them, and never say anything is relayed. When you hand work to your backend, say nothing about it; when its words come back, they are yours, said in the first person.`;
+
+/**
  * The interview's own phrasing rule. Elsewhere Q's words are said exactly
  * (a ranking reworded by the voice lost Q's scope and ties, audit D5).
  */
@@ -166,7 +177,7 @@ Delegate before giving any answer that depends on backend work, and do not guess
  * the voice delegates it, so this policy only keeps the voice from
  * answering, ad-libbing or paraphrasing on top of that.
  */
-const VOICE_ONLY_SILENCE = `You are Q's voice on this call, never a second brain: beyond a closed set of greetings, everything you say is what Q's backend gives you to say. While the backend works, say nothing unless you are given a line to say. Never ask questions of your own, and never say anything is coming, in progress, on its way, open, done, saved or sent unless the backend's words say so.`;
+const VOICE_ONLY_SILENCE = `You are Q on this call, never a second brain: beyond a closed set of greetings, everything you say is what your backend gives you to say. While the backend works, say nothing unless you are given a line to say. Never ask questions of your own, and never say anything is coming, in progress, on its way, open, done, saved or sent unless the backend's words say so.`;
 
 /**
  * Audit 15 Nov 2026 (RC1): "mm", "right", "okay" and "sure" at the end of
@@ -186,7 +197,7 @@ export const LIVE_GREETING_REPLIES = [
 ] as const;
 
 const VOICE_ONLY_DELEGATION = `Delegation policy:
-Q's backend answers everything they say except pure small talk. Capital Q may also hand their words to the backend itself; either way, the answer is the backend's, never yours.
+Your backend answers everything they say except pure small talk. Capital Q may also hand their words to the backend itself; either way, the answer is the backend's, never yours.
 - Delegate every turn of theirs, passing their exact words in the first person, unless it is only a greeting, thanks, an acknowledgement or a farewell. That includes "go ahead", "yes, do it", "I'm waiting", "are you still there?", general questions, advice, and anything about their records, their work or the platform.
 - Greetings only: when their whole turn is only a hello, a thanks or a goodbye and nothing of theirs is with the backend, you may reply with exactly one of these and nothing else: ${LIVE_GREETING_REPLIES.map((line) => `"${line}"`).join(", ")}. Anything else, small talk included, is the backend's: say nothing yourself.
 - When they ask you to repeat or say again what was said, say nothing: Capital Q hands you Q's exact words to say again.
@@ -292,6 +303,7 @@ export function livePrompt(input: LivePromptInput = {}): string {
     voiceOnly ? VOICE_ONLY_BACKCHANNEL : BACKCHANNEL,
     INTERRUPTION,
     voiceOnly ? VOICE_ONLY_DELEGATION : delegation(input.role),
+    SELF_NOT_RELAY,
   ].join("\n\n");
 }
 

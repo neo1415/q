@@ -540,7 +540,7 @@ describe("fit: an investor's own declared mandate is read, and only theirs", () 
 
   it("states only what was declared, and nothing when nothing was", () => {
     expect(mandateStatement(MANDATE)).toBe(
-      "The person's own declared investment mandate (Savannah Capital): cheque 250000 to 1000000 USD; stages seed to series_a; focus logistics.",
+      "The person's own declared investment mandate (Savannah Capital): cheque 250000 to 1000000 USD; stages seed to series_a; sectors logistics.",
     );
     expect(mandateStatement({ mandates: [] })).toBeNull();
   });

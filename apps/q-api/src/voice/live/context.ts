@@ -140,7 +140,7 @@ export function liveContextPackage(input: {
   // Last, so the length cap trims this list before the call's own context.
   if (prepared.length > 0) {
     lines.push(
-      "Public people and organisations Q has already researched (names only; ask Q for details):",
+      "Public people and organisations you have already researched (names only; their details come from your backend):",
       ...prepared.map((line) => `- ${line}`),
     );
   }
@@ -152,7 +152,7 @@ export function liveContextPackage(input: {
     arrival.length === 0
       ? null
       : [
-          "What Q already told them on arrival (answer follow-ups from this; do not read it out):",
+          "What you already told them on arrival (answer follow-ups from this; do not read it out):",
           ...arrival.map((line) => `- ${line}`),
         ]
           .join("\n")

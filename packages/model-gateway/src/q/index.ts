@@ -1834,6 +1834,29 @@ export const DISCUSS_VERSUS_DO =
   "Reading tools read; propose_* tools only prepare a change for approval.";
 
 /**
+ * Owner 19 Nov 2026 (run 940deee8): asked whether their post-investment
+ * support could go in their profile, an investor was told "I can't change
+ * it from here" -- the turn was answered from their prepared profile with
+ * no tools, and the notes then said Q could take no actions at all. Two
+ * turns later the same change was prepared and approved. When only this
+ * answer is written without tools, Q says it can make the change and asks
+ * what it should say; the change itself is still prepared on their next
+ * turn, under the run's own plan and their approval.
+ */
+export const ACTS_HELD_BACK_NOTE =
+  "This answer is written from what was read for this turn, with no tools and no lookups. You can still act for them: their own profile, description, mandate and records are changed through Capital Q's own actions, prepared for their approval. When they ask whether something can be changed, added or put somewhere, or how, say you can do it for them and ask what it should say, or offer to draft it; never say you can't change it or that it can't be done from here. Do not say it is changed, prepared or saved: nothing is, until they ask.";
+
+/** A tool that acts for them: it prepares a change or loads a capability. */
+function canActFor(tool: QOfferedTool): boolean {
+  return (
+    tool.classification === "PREPARE" ||
+    tool.classification === "SIDE_EFFECT" ||
+    tool.preparesCard === true ||
+    tool.definition.name === USE_CAPABILITY_TOOL
+  );
+}
+
+/**
  * RECOVERY-2026-10 B6: the binding of the turn's reference, as Capital Q's
  * note. Names in it came from records the person saw; still, they are
  * quoted as names, and the note tells the model to read the record by id.
@@ -2884,6 +2907,11 @@ export function environmentNoteParts(
     readonly openDocumentTitle?: string | undefined;
     /** The turn could not be read: nothing can be started this turn. */
     readonly turnUnread?: boolean | undefined;
+    /**
+     * This answer is written without tools, but the run could act for them
+     * (ACTS_HELD_BACK_NOTE): Q offers the change instead of refusing it.
+     */
+    readonly actsHeldBack?: boolean | undefined;
     /** C3: the recorded offer of Q's last answer, taken up this turn. */
     readonly offerTaken?: QRecordedOffer | undefined;
     /** C3: a yes to an offer code holds no record of. */
@@ -2967,7 +2995,9 @@ export function environmentNoteParts(
         : "No facts were supplied up front; the tools below are how you get them, and what they return is yours to answer from. Say you cannot answer only after they return nothing. Assume nothing about the person's own company beyond what they say.";
   const toolsNote =
     tools.length === 0
-      ? "No tools are available; you cannot look anything up, take actions, send messages or schedule anything. Say so if asked."
+      ? options.actsHeldBack === true
+        ? ACTS_HELD_BACK_NOTE
+        : "No tools are available; you cannot look anything up, take actions, send messages or schedule anything. Say so if asked."
       : `Tools available to you in this conversation: ${tools
           .map((tool) => tool.definition.name)
           .join(
@@ -8765,6 +8795,12 @@ export function createModelGatewayQAnswer(
         request.asksNoAction === true
           ? offeredForRun.filter((tool) => tool.preparesCard !== true)
           : offeredForRun;
+      /**
+       * The run could act for them (a change it prepares, a capability it
+       * loads) but this answer was written without tools (the answer path
+       * above): the notes say so, rather than that Q can do nothing.
+       */
+      let actsHeldBack = false;
       let offered =
         reRender || request.turnUnread === true
           ? offeredThisTurn.filter(
@@ -9183,8 +9219,10 @@ export function createModelGatewayQAnswer(
         },
       });
       // T3: the card Q showed is the evidence; one answer call, no tools.
-      if (route.path === "PREPARED_CONTEXT" || coveredFollowUp !== null)
+      if (route.path === "PREPARED_CONTEXT" || coveredFollowUp !== null) {
+        actsHeldBack = offered.some(canActFor);
         offered = [];
+      }
       // Coordinator 2026-10-26 (B, run 42cecfd2: 18.3 s, three ~48k-token
       // rounds): an asked note or email is offered only the reads that
       // find the person and their records, and the tool that prepares it,
@@ -9656,6 +9694,7 @@ export function createModelGatewayQAnswer(
           ),
           ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
           ...(request.turnUnread === true ? { turnUnread: true } : {}),
+          ...(actsHeldBack ? { actsHeldBack: true } : {}),
           ...(request.offerTaken === undefined
             ? {}
             : { offerTaken: request.offerTaken }),

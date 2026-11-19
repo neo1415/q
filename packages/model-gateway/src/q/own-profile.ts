@@ -37,6 +37,7 @@ type MandateRead = {
       readonly isHardExclusion: boolean;
     }[];
     readonly taxonomyPreferences?: readonly {
+      readonly vocabularyCode?: string;
       readonly canonicalCode: string;
       readonly isExclusion: boolean;
     }[];
@@ -44,6 +45,53 @@ type MandateRead = {
 };
 
 const words = (code: string): string => code.toLowerCase().replace(/_/g, " ");
+
+/**
+ * Owner 19 Nov 2026 (run abc106b5): their sectors, customer types and
+ * geographies reached the model as one unlabelled "focus" list (b2b_saas,
+ * consumer, enterprise, enterprise_software, fintech, africa, …), and Q
+ * advised an investor whose sectors were set to state their sectors and
+ * geography. Each declared preference is now said under what it is, from
+ * its vocabulary, so known data never reads as missing. A vocabulary not
+ * named here still reads as focus: nothing declared is dropped.
+ */
+const PREFERENCE_GROUPS: readonly {
+  readonly label: string;
+  readonly vocabularies: ReadonlySet<string>;
+}[] = [
+  // investor-v1's SECTOR_VOCABULARIES, plus the plain name.
+  {
+    label: "sectors",
+    vocabularies: new Set(["industry", "product_category", "sector"]),
+  },
+  { label: "business models", vocabularies: new Set(["business_model"]) },
+  { label: "customer types", vocabularies: new Set(["customer_type"]) },
+  { label: "geographies", vocabularies: new Set(["geography"]) },
+];
+
+function groupedPreferences(
+  preferences: readonly {
+    readonly vocabularyCode?: string;
+    readonly canonicalCode: string;
+  }[],
+): string[] {
+  const parts: string[] = [];
+  const placed = new Set<number>();
+  for (const group of PREFERENCE_GROUPS) {
+    const codes: string[] = [];
+    preferences.forEach((preference, index) => {
+      if (!group.vocabularies.has(preference.vocabularyCode ?? "")) return;
+      placed.add(index);
+      codes.push(preference.canonicalCode);
+    });
+    if (codes.length > 0) parts.push(`${group.label} ${codes.join(", ")}`);
+  }
+  const rest = preferences
+    .filter((_, index) => !placed.has(index))
+    .map((preference) => preference.canonicalCode);
+  if (rest.length > 0) parts.push(`focus ${rest.join(", ")}`);
+  return parts;
+}
 
 function mandateParts(mandate: NonNullable<MandateRead["mandates"]>[number]) {
   const parts: string[] = [];
@@ -67,13 +115,14 @@ function mandateParts(mandate: NonNullable<MandateRead["mandates"]>[number]) {
   // Read defensively: this is a tool result, and a field it did not carry
   // is a criterion not declared, never a crash.
   const preferences = mandate.taxonomyPreferences ?? [];
-  const preferred = preferences
-    .filter((preference) => !preference.isExclusion)
-    .map((preference) => preference.canonicalCode);
+  parts.push(
+    ...groupedPreferences(
+      preferences.filter((preference) => !preference.isExclusion),
+    ),
+  );
   const excluded = preferences
     .filter((preference) => preference.isExclusion)
     .map((preference) => preference.canonicalCode);
-  if (preferred.length > 0) parts.push(`focus ${preferred.join(", ")}`);
   if (excluded.length > 0) parts.push(`excludes ${excluded.join(", ")}`);
   for (const constraint of (mandate.constraints ?? []).slice(0, 20)) {
     parts.push(
@@ -116,7 +165,7 @@ export function ownProfileFact(data: unknown): AuthorisedFact | null {
   const mandateLine =
     mandate === undefined
       ? "no mandate declared yet"
-      : `${mandate.status === "DRAFT" ? "draft mandate (still being declared)" : "mandate"}: ${parts.length === 0 ? "no criteria declared yet" : parts.join("; ")}`;
+      : `${mandate.status === "DRAFT" ? "draft mandate (still being declared)" : "mandate"}: ${parts.length === 0 ? "no criteria declared yet" : `${parts.join("; ")} (each of these is already on their profile: never ask or advise them to add or state it)`}`;
   if (who.length === 0 && mandate === undefined) return null;
   return {
     scope: "INVESTOR_MANDATE",
