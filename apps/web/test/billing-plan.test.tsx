@@ -44,6 +44,16 @@ describe("plan words", () => {
     expect(resetLine(REHEARSALS)).toBe("Resets on 1 November");
   });
 
+  it("keeps a use the server did not measure unknown, never zero", () => {
+    const unmeasured = { ...REHEARSALS, used: null };
+    expect(allowanceLine(unmeasured)).toBe(
+      "Up to 20 rehearsals a month · use not measured yet",
+    );
+    expect(usedPercent(unmeasured)).toBeNull();
+    expect(countLine(unmeasured)).toBe("Up to 20");
+    expect(remainingOf(unmeasured)).toBeNull();
+  });
+
   it("gives a phone row its figure alone (design-48)", () => {
     expect(countLine(REHEARSALS)).toMatch(/^\d+ of \d+$/u);
     expect(countLine({ ...REHEARSALS, limit: null })).toBe("Unlimited");

@@ -36,7 +36,13 @@ export function allowanceLine(feature: BillingFeatureStandingDto): string {
           feature.kind === "MONTHLY" ? "this month" : "now"
         }`;
   }
-  const used = feature.used ?? 0;
+  // Unknown stays unknown: a use not measured is never said as none.
+  if (feature.used === null) {
+    return `Up to ${String(feature.limit)} ${unitsOf(feature, feature.limit)}${
+      feature.kind === "MONTHLY" ? " a month" : ""
+    } · use not measured yet`;
+  }
+  const used = feature.used;
   return feature.kind === "MONTHLY"
     ? `${String(used)} of ${String(feature.limit)} ${unitsOf(feature, feature.limit)} used this month`
     : `${String(used)} of ${String(feature.limit)} ${unitsOf(feature, feature.limit)}`;
@@ -55,7 +61,9 @@ export function countLine(feature: BillingFeatureStandingDto): string {
       : `Up to ${String(feature.limit)}`;
   }
   if (feature.limit === null) return "Unlimited";
-  return `${String(feature.used ?? 0)} of ${String(feature.limit)}`;
+  // A use not measured is not zero.
+  if (feature.used === null) return `Up to ${String(feature.limit)}`;
+  return `${String(feature.used)} of ${String(feature.limit)}`;
 }
 
 /** Units left this month, or null when unlimited / not metered. */
@@ -77,11 +85,12 @@ export function usedPercent(feature: BillingFeatureStandingDto): number | null {
     !feature.included ||
     feature.kind === "VALUE" ||
     feature.limit === null ||
-    feature.limit === 0
+    feature.limit === 0 ||
+    feature.used === null
   ) {
     return null;
   }
-  return Math.round(((feature.used ?? 0) / feature.limit) * 100);
+  return Math.round((feature.used / feature.limit) * 100);
 }
 
 export function sourceLine(input: {

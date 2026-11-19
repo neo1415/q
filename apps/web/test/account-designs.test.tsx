@@ -14,7 +14,7 @@ vi.mock("@/features/profile/profile-actions", () => ({}));
 vi.mock("@/features/team/team-actions", () => ({}));
 vi.mock("@/features/auth", () => ({ SignOutButton: () => null }));
 
-const { tierMark, tierRows, planEnquiry } =
+const { allowanceRows, tierMark, tierRows, planEnquiry } =
   await import("@/features/billing/plan-board");
 const { PLAN_TIERS } = await import("@/features/billing/plan-tiers");
 const { findingTarget } = await import("@/features/profile/found-section");
@@ -67,14 +67,60 @@ describe("plan and billing, three plans side by side", () => {
         },
       ],
     });
+    // Decision 106: plans size usage and never lock features, so what a
+    // plan doesn't include is not listed as a "Not included" row.
     expect(rows.map((row) => [row.name, row.value])).toEqual([
       ["Research", "Up to 100"],
-      ["Pitch rehearsals", "Not included"],
     ]);
     // Without a catalogue, the tier's own highlights, said as included.
-    expect(tierRows(investorTier, null).every((row) => row.included)).toBe(
-      true,
-    );
+    expect(
+      tierRows(investorTier, null).every((row) => row.value === "Included"),
+    ).toBe(true);
+  });
+
+  it("lists the plan's metered allowances, not its access rows or locks", () => {
+    const standing = (
+      key: string,
+      kind: "ACCESS" | "MONTHLY" | "COUNT" | "VALUE",
+      included: boolean,
+    ) => ({
+      key,
+      name: key,
+      description: "",
+      kind,
+      unitSingular: "unit",
+      unitPlural: "units",
+      included,
+      limit: 10,
+      used: null,
+      resetsAt: null,
+      overridden: false,
+    });
+    const rows = allowanceRows({
+      account: "ORGANISATION",
+      plan: {
+        key: "investor_pro",
+        version: 1,
+        name: "Investor Pro",
+        description: "",
+        audience: "INVESTOR",
+      },
+      source: "LAUNCH_DEFAULT",
+      endsAt: null,
+      features: [
+        standing("q.research", "MONTHLY", true),
+        standing("q.access", "ACCESS", true),
+        standing("q.locked", "MONTHLY", false),
+        standing("gateq.gateways", "COUNT", true),
+      ],
+      canManage: true,
+      checkoutAvailable: false,
+      hasBillingCustomer: false,
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "q.research",
+      "gateq.gateways",
+    ]);
   });
 
   it("words a Talk to us request for the person who answers it", () => {

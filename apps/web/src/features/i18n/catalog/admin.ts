@@ -9,6 +9,9 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
   Admin: "الإدارة",
   "Admin console": "لوحة الإدارة",
   "Console sections": "أقسام لوحة الإدارة",
+  Trust: "الثقة",
+  Money: "المال",
+  Platform: "المنصة",
   Overview: "نظرة عامة",
   "Accounts, verification, Q monitor, kill switches, email.":
     "الحسابات، التوثيق، مراقبة Q، مفاتيح الإيقاف، البريد.",

@@ -9,6 +9,13 @@ import { EmptyState, ErrorState } from "@capital-q/ui/states";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
+import {
+  auditResourceHref,
+  auditResourceKey,
+  auditResourceKind,
+  auditResourceNames,
+  type AuditResourceKind,
+} from "@/features/admin/audit-names";
 import { auditFiltersFrom } from "@/features/admin/audit-filters";
 import { ROLE_WORDS, when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
@@ -52,6 +59,14 @@ export default async function AdminAuditPage({
     ),
   );
   const next = page?.nextCursor ?? null;
+  const names =
+    page === null
+      ? new Map<string, string>()
+      : await auditResourceNames(
+          context.session,
+          page.rows,
+          context.can("accounts.read"),
+        );
   return (
     <PageSection
       id="audit"
@@ -182,8 +197,13 @@ export default async function AdminAuditPage({
                   {row.authorityName !== null && row.actorType === "q"
                     ? t(` for ${row.authorityName}`)
                     : ""}{" "}
-                  · {t(words(row.resourceType))} {row.resourceId} ·{" "}
-                  {t(when(row.at))}
+                  · {t(words(row.resourceType))}{" "}
+                  <AuditResource
+                    kind={auditResourceKind(row.resourceType)}
+                    id={row.resourceId}
+                    names={names}
+                  />{" "}
+                  · {t(when(row.at))}
                 </span>
                 {row.reason === null ? null : (
                   <span className="cq-caption text-(--cq-text-primary)">
@@ -204,5 +224,33 @@ export default async function AdminAuditPage({
         )}
       </div>
     </PageSection>
+  );
+}
+
+/**
+ * A resource by its name, linked to its console page, when an existing
+ * detail read gave one; otherwise its id, as the row stores it.
+ */
+function AuditResource({
+  kind,
+  id,
+  names,
+}: {
+  readonly kind: AuditResourceKind | null;
+  readonly id: string;
+  readonly names: ReadonlyMap<string, string>;
+}) {
+  const name =
+    kind === null ? undefined : names.get(auditResourceKey(kind, id));
+  if (kind === null || name === undefined) return <>{id}</>;
+  return (
+    <Link
+      href={auditResourceHref(kind, id)}
+      className="font-medium text-(--cq-text-primary) underline-offset-2 hover:underline"
+      title={id}
+      data-audit-resource-name
+    >
+      {name}
+    </Link>
   );
 }

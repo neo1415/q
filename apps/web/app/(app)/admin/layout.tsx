@@ -8,6 +8,8 @@ import {
 import { ConsoleNav, StepUpProvider } from "@/features/admin/console-ui";
 import { ROLE_WORDS } from "@/features/admin/words";
 import { adminContext } from "@/features/admin/admin-context";
+import type { ConsoleCounts } from "@/features/admin/console-nav";
+import { getAdminOverview } from "@capital-q/api-client";
 import { serverT } from "@/features/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +28,14 @@ export default async function AdminLayout({
 
   const context = await adminContext();
   if (context === null) notFound();
-  const { me } = context;
+  const { me, session } = context;
+  // The overview's own totals, when this role may read them; none rather
+  // than a guess when the read fails.
+  const counts: ConsoleCounts | null = context.can("overview.read")
+    ? await getAdminOverview(session)
+        .then((overview) => ({ people: overview.people }))
+        .catch(() => null)
+    : null;
   return (
     <PageContainer>
       <PageHeader
@@ -40,9 +49,11 @@ export default async function AdminLayout({
         )}
       />
       <StepUpProvider>
-        <div className="flex flex-col gap-8">
-          <ConsoleNav permissions={me.permissions} />
-          {children}
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-10">
+          <div className="lg:sticky lg:top-4 lg:self-start">
+            <ConsoleNav permissions={me.permissions} counts={counts} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-8">{children}</div>
         </div>
       </StepUpProvider>
     </PageContainer>

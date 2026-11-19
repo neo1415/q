@@ -7,6 +7,7 @@
  * currency codes are never translated.
  */
 export const ACCOUNT_AR: Readonly<Record<string, string>> = {
+  "Your allowances": "مخصصاتك",
   // Shared
   "Added to your profile": "أُضيف إلى ملفك",
   Dismissed: "تم التجاهل",
