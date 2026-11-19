@@ -2240,6 +2240,11 @@ html[data-pwa] .cq-landing {
   .lp .nav-links a:not(.btn) {
     display: none;
   }
+  /* D5 (admin design 2026-11-19): pricing stays one tap away on a phone. */
+  .lp .nav-links a[data-lp-pricing] {
+    display: inline-block;
+    padding: 10px 8px;
+  }
   .lp .brand {
     white-space: nowrap;
   }

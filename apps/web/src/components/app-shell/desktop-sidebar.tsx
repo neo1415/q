@@ -21,7 +21,10 @@ import type { ShellContext } from "./app-shell";
 import { useWaitingOnYou } from "@/features/work/notice-store";
 
 import {
+  activeHrefIn,
+  groupHrefs,
   isActiveRoute,
+  activeOrganisation,
   navigationGroupsFor,
   PRIMARY_NAVIGATION,
   WORK_NAVIGATION,
@@ -60,7 +63,10 @@ export function DesktopSidebar({
   const groups = navigationGroupsFor(context.scope, {
     admin: context.admin,
     qPitch: context.qPitch,
+    organisation: activeOrganisation(context.organisations),
   });
+  // One current entry (D7): the most specific match across every group.
+  const current = activeHrefIn(pathname, groupHrefs(groups));
   // What waits on them, from the shell's one notice read (no extra call).
   const needsYou = useNeedsYouCount();
   // You and Admin fold away, closed until opened (2026-10-07).
@@ -147,12 +153,20 @@ export function DesktopSidebar({
             <div
               key={label ?? "main"}
               role={label === null ? undefined : "group"}
-              aria-label={label === null ? undefined : t(label)}
-              className={collapsed ? "flex flex-col items-center" : undefined}
+              aria-label={
+                label === null ? undefined : (group.title ?? t(label))
+              }
+              className={cx(
+                collapsed ? "flex flex-col items-center" : null,
+                // D3: the console reads as leaving the product.
+                label === "Admin"
+                  ? "border-t border-(--cq-border-subtle) pt-3"
+                  : null,
+              )}
             >
               {label === null || listId === undefined ? null : (
                 <NavGroupToggle
-                  label={t(label)}
+                  label={group.title ?? t(label)}
                   open={open}
                   controls={listId}
                   waiting={waiting}
@@ -177,7 +191,7 @@ export function DesktopSidebar({
                       href={item.href === "/home" ? home : item.href}
                       label={t(item.label)}
                       Icon={item.icon}
-                      active={isActiveRoute(pathname, item.href)}
+                      active={item.href === current}
                       compact={collapsed}
                       count={
                         item.href === WORK_NAVIGATION.href

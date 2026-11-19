@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeHrefIn,
+  activeOrganisation,
+  ADMIN_NAVIGATION,
+  groupHrefs,
   isActiveRoute,
   navigationGroupsFor,
   sectionsFor,
@@ -45,6 +49,8 @@ describe("the sidebar's groups", () => {
         "/analytics",
         "/profile",
         "/settings/usage",
+        // D5 (admin design 2026-11-19): plans, from You.
+        "/settings/plan",
         "/settings",
         "/admin",
       ]);
@@ -61,6 +67,88 @@ describe("the sidebar's groups", () => {
       }
     }
     expect(sectionsFor("unset").map((item) => item.href)).toContain("/explore");
+  });
+});
+
+/** Admin design 2026-11-19, slice A1 (D1, D3, D5, D7). */
+describe("the organisation's group and one current entry", () => {
+  const mine = (role: "OWNER" | "ADMIN" | "MEMBER", active = true) => ({
+    organisationId: "8f6f0c1e-2c3b-4f7a-9d1e-0a1b2c3d4e5f",
+    name: "LedgerBridge",
+    kind: "COMPANY" as const,
+    organisationType: "company" as const,
+    role,
+    memberCount: 3,
+    active,
+    companyId: null,
+  });
+
+  it("is headed by the organisation's name, after the main areas", () => {
+    const groups = navigationGroupsFor("founder_private", {
+      organisation: { name: "LedgerBridge", role: "OWNER" },
+    });
+    expect(groups.map((group) => group.label)).toEqual([
+      null,
+      "Organisation",
+      "You",
+    ]);
+    expect(groups[1]?.title).toBe("LedgerBridge");
+  });
+
+  it("offers owners and admins the import; members see Organisation only", () => {
+    const items = (role: "OWNER" | "ADMIN" | "MEMBER") =>
+      navigationGroupsFor("investor_private", {
+        organisation: { name: "Northwind", role },
+      })
+        .find((group) => group.label === "Organisation")
+        ?.items.map((item) => `${item.label} ${item.href}`);
+    expect(items("OWNER")).toEqual([
+      "Organisation /settings/team",
+      "Import pipeline /relationships/import",
+    ]);
+    expect(items("ADMIN")).toEqual(items("OWNER"));
+    expect(items("MEMBER")).toEqual(["Organisation /settings/team"]);
+  });
+
+  it("has no organisation group without an active organisation", () => {
+    expect(activeOrganisation(undefined)).toBeNull();
+    expect(activeOrganisation([mine("OWNER", false)])).toBeNull();
+    expect(activeOrganisation([mine("MEMBER")])).toEqual({
+      name: "LedgerBridge",
+      role: "MEMBER",
+    });
+    expect(
+      navigationGroupsFor("unset", { organisation: null }).map((g) => g.label),
+    ).toEqual([null, "You"]);
+  });
+
+  it("names the console for its work (D3)", () => {
+    expect(ADMIN_NAVIGATION.label).toBe("Operations console");
+  });
+
+  it("marks one entry current, the most specific (D7)", () => {
+    const hrefs = groupHrefs(
+      navigationGroupsFor("founder_private", {
+        admin: true,
+        organisation: { name: "LedgerBridge", role: "OWNER" },
+      }),
+    );
+    const cases: readonly (readonly [string, string | null])[] = [
+      ["/settings/usage", "/settings/usage"],
+      ["/settings/plan", "/settings/plan"],
+      ["/settings/team/abc", "/settings/team"],
+      ["/settings/data", "/settings"],
+      ["/settings", "/settings"],
+      ["/relationships/import", "/relationships/import"],
+      ["/relationships", "/relationships"],
+      ["/results", "/relationships"],
+      ["/documents", "/work"],
+      ["/admin/audit", "/admin"],
+      ["/nowhere", null],
+    ];
+    for (const [path, expected] of cases) {
+      expect(activeHrefIn(path, hrefs), path).toBe(expected);
+    }
   });
 });
 

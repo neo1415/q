@@ -15,10 +15,16 @@ export function RelationshipsEmpty({
   sentence,
   href,
   action,
+  importable = false,
 }: {
   readonly sentence: string;
   readonly href: string;
   readonly action: string;
+  /**
+   * D2 (admin design 2026-11-19): an empty pipeline also offers to bring
+   * the one they already keep, rather than hiding the import a view away.
+   */
+  readonly importable?: boolean | undefined;
 }) {
   const t = useT();
   return (
@@ -26,9 +32,20 @@ export function RelationshipsEmpty({
       <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
         {t(sentence)}
       </p>
-      <Link href={href} className={buttonClassName("secondary")}>
-        {t(action)}
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link href={href} className={buttonClassName("secondary")}>
+          {t(action)}
+        </Link>
+        {importable ? (
+          <Link
+            href="/relationships/import"
+            className={buttonClassName("secondary")}
+            data-import-pipeline
+          >
+            {t("Import your pipeline")}
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

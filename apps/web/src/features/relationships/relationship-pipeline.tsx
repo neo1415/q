@@ -742,29 +742,43 @@ export function RelationshipPipeline({
               {t("Show all relationships")}
             </button>
           ) : (
-            <Link
-              className={crmButton("secondary")}
-              href={
-                unicornNarrowed
-                  ? pipelineHref({ q: query.q, state: query.state }, layout)
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link
+                className={crmButton("secondary")}
+                href={
+                  unicornNarrowed
+                    ? pipelineHref({ q: query.q, state: query.state }, layout)
+                    : filtered
+                      ? pipelineHref(
+                          {
+                            sort: unicornSort === null ? query.sort : undefined,
+                          },
+                          layout,
+                        )
+                      : side === "INVESTOR"
+                        ? "/discover"
+                        : "/company/visibility"
+                }
+              >
+                {unicornNarrowed
+                  ? t("Show all relationships")
                   : filtered
-                    ? pipelineHref(
-                        { sort: unicornSort === null ? query.sort : undefined },
-                        layout,
-                      )
+                    ? t("Clear filters")
                     : side === "INVESTOR"
-                      ? "/discover"
-                      : "/company/visibility"
-              }
-            >
-              {unicornNarrowed
-                ? t("Show all relationships")
-                : filtered
-                  ? t("Clear filters")
-                  : side === "INVESTOR"
-                    ? t("Open Discover")
-                    : t("Check visibility")}
-            </Link>
+                      ? t("Open Discover")
+                      : t("Check visibility")}
+              </Link>
+              {/* D2: an empty pipeline offers the one they already keep. */}
+              {unicornNarrowed || filtered ? null : (
+                <Link
+                  className={crmButton("secondary")}
+                  href="/relationships/import"
+                  data-import-pipeline
+                >
+                  {t("Import your pipeline")}
+                </Link>
+              )}
+            </div>
           )}
         </div>
       ) : layout === "table" ? (

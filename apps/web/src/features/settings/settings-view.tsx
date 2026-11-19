@@ -91,7 +91,6 @@ export type SettingsViewProps = {
   readonly languageName: string | null;
   readonly daily: QDailyPreferences | null;
   readonly plan: BillingAccountPlanDto | null;
-  readonly canBrand: boolean;
   readonly speaking: MyEtiquetteGuideDto | null;
   readonly acting: MyOrganisationDto | null;
   readonly learning: QPreferenceLearningDto | null;
@@ -114,7 +113,6 @@ export function SettingsView({
   languageName,
   daily,
   plan,
-  canBrand,
   speaking,
   acting,
   learning,
@@ -340,36 +338,6 @@ export function SettingsView({
                   >
                     <SoundChoice />
                   </SRow>
-                  {canBrand ? (
-                    <SRow
-                      title={t("Brand")}
-                      description={t(
-                        "Black and gold or blue, for everyone. Admins only.",
-                      )}
-                    >
-                      <Link
-                        href="/admin/brand"
-                        className={accountButton("secondary", "sm")}
-                      >
-                        {t("Customise")}
-                      </Link>
-                    </SRow>
-                  ) : null}
-                  {canBrand ? (
-                    <SRow
-                      title={t("How Q conducts business")}
-                      description={t(
-                        "The house guide for everyone. Admins only.",
-                      )}
-                    >
-                      <Link
-                        href="/admin/etiquette"
-                        className={accountButton("secondary", "sm")}
-                      >
-                        {t("Open")}
-                      </Link>
-                    </SRow>
-                  ) : null}
                 </>,
               )}
 

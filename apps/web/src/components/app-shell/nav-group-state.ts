@@ -2,10 +2,10 @@
 
 import { useCallback, useState, useSyncExternalStore } from "react";
 
-import { isActiveRoute, type NavigationGroup } from "./navigation";
+import { activeHrefIn, groupHrefs, type NavigationGroup } from "./navigation";
 
 /**
- * Whether each labelled navigation group (You, Admin) is open
+ * Whether each labelled navigation group (Organisation, You, Admin) is open
  * (founder direction 2026-10-07: "let all of those be collapsible, and the
  * default should be that it is closed").
  *
@@ -23,7 +23,7 @@ export type GroupLabel = Exclude<NavigationGroup["label"], null>;
 export type GroupChoices = Readonly<Partial<Record<GroupLabel, boolean>>>;
 
 export const NAV_GROUPS_STORAGE_KEY = "cq.nav.groups.v1";
-const LABELS: readonly GroupLabel[] = ["You", "Admin"];
+const LABELS: readonly GroupLabel[] = ["Organisation", "You", "Admin"];
 const EMPTY: GroupChoices = Object.freeze({});
 
 /** Reads the saved choices; anything malformed reads as no choice. */
@@ -49,11 +49,11 @@ export function groupHoldingPage(
   groups: readonly NavigationGroup[],
   pathname: string,
 ): GroupLabel | null {
+  // The group of the one entry marked current, so a page never opens two.
+  const active = activeHrefIn(pathname, groupHrefs(groups));
   for (const group of groups) {
     if (group.label === null) continue;
-    if (group.items.some((item) => isActiveRoute(pathname, item.href))) {
-      return group.label;
-    }
+    if (group.items.some((item) => item.href === active)) return group.label;
   }
   return null;
 }

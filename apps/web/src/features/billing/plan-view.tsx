@@ -48,6 +48,16 @@ export function PlanView({
           <AccountHead
             title={t("Plan and billing")}
             back={{ href: "/settings", label: t("Settings") }}
+            // D5 (admin design 2026-11-19): the public comparison, one tap
+            // from the plan the person is on.
+            right={
+              <Link
+                href="/pricing"
+                className={buttonClassName("secondary", "compact")}
+              >
+                {t("Compare plans")}
+              </Link>
+            }
             sub={
               plan === null
                 ? undefined
