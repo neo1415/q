@@ -324,3 +324,74 @@ describe("an investor's mandate at a glance (founder design 2026-09-28)", () => 
     expect(document.querySelector('[data-card-section="look-for"]')).toBeNull();
   });
 });
+
+describe("the company's longer story (owner 2026-11-19)", () => {
+  const story: PublicCardField = {
+    key: "primaryDescription",
+    value: "MEMBERS-ONLY-STORY: one booking for the whole route.",
+    scope: "network_visible",
+  };
+  const line: PublicCardField = {
+    key: "shortDescription",
+    value: "Cross-border freight booking for East Africa.",
+    scope: "public_external",
+  };
+
+  it("never reaches an anonymous visitor when kept to members, even if the projection carried it", () => {
+    const { container } = render(
+      <PublicCardView card={card("PUBLIC", [line, story])} />,
+    );
+    expect(container.textContent).not.toContain("MEMBERS-ONLY-STORY");
+    expect(container.querySelector("[data-card-description]")).toBeNull();
+    expect(container.textContent).toContain(line.value);
+  });
+
+  it("shows a participant the story under the one-liner, marked members-only", () => {
+    const { container } = render(
+      <PublicCardView card={card("PARTICIPANT", [line, story])} />,
+    );
+    const about = container.querySelector('[data-card-section="story"]');
+    expect(about?.querySelector("h2")?.textContent).toBe("About");
+    const description = about?.querySelector("[data-card-description]");
+    expect(description?.textContent).toContain("MEMBERS-ONLY-STORY");
+    expect(description?.getAttribute("data-scope")).toBe("network_visible");
+    expect(description?.textContent).toContain("Members only");
+    expect(about?.textContent).toContain(line.value);
+  });
+
+  it("leads with what is shared and lets unshared sections follow, never as zero", () => {
+    const { container } = render(
+      <PublicCardView
+        card={card("PUBLIC", [
+          line,
+          {
+            key: "currentRaise",
+            value: "1500000 USD",
+            scope: "public_external",
+            detail: {
+              kind: "RAISE",
+              stageCode: "seed",
+              instrumentCode: "safe",
+              target: { amount: "1500000", currency: "USD" },
+              useOfFunds: null,
+              targetCloseDate: null,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+            },
+          },
+        ])}
+      />,
+    );
+    const order = Array.from(
+      container.querySelectorAll("[data-card-dossier] > [data-card-section]"),
+    ).map((section) => section.getAttribute("data-card-section"));
+    expect(order.slice(0, 2)).toEqual(["story", "raise"]);
+    for (const id of ["numbers", "relationships", "intelligence", "team"]) {
+      expect(order.indexOf(id)).toBeGreaterThan(order.indexOf("raise"));
+    }
+    expect(container.textContent).not.toMatch(/\$0\b/);
+    expect(
+      container.querySelector('[data-card-section="raise"]')?.textContent,
+    ).toContain("Not stated");
+  });
+});

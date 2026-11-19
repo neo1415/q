@@ -97,6 +97,12 @@ export const NETWORK_ONLY_CARD_FIELDS = [
 export const COMPANY_CARD_FIELDS = [
   "canonicalName",
   "shortDescription",
+  /**
+   * The founder's own longer description (owner 2026-11-19: the card
+   * "feels scarce" without the company's story). Declared, never Q's; off
+   * until the owner puts it on the card and chooses who sees it.
+   */
+  "primaryDescription",
   "currentStageCode",
   "headquartersCity",
   "headquartersCountry",

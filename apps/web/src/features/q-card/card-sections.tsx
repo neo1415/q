@@ -214,7 +214,11 @@ export function NumbersSection({
       empty={detail === null}
     >
       {detail === null ? null : (
-        <dl className="grid grid-cols-2 gap-x-5 sm:gap-x-8" data-card-metrics>
+        <dl
+          // Three across only when the numbers fill the rows evenly.
+          className={`grid grid-cols-2 gap-x-5 sm:gap-x-8 ${detail.metrics.length % 3 === 0 ? "@3xl:grid-cols-3" : ""}`}
+          data-card-metrics
+        >
           {detail.metrics.map((metric, index) => (
             <div
               key={`${metric.label}-${index}`}
@@ -333,9 +337,25 @@ export function IntelligenceSection({
               ? `Q's reading on ${detail.method}, from ${detail.areasScored} of ${detail.areasTotal} areas with enough evidence${detail.confidence === null ? "" : ` · ${detail.confidence}`}.`
               : "Q has too little shared evidence to read this company yet. That says nothing about its quality."}
           </p>
+          {detail.status === "ASSESSED" && detail.areasTotal > 0 ? (
+            <Coverage scored={detail.areasScored} total={detail.areasTotal} />
+          ) : null}
           {detail.strengths.length === 0 ? null : (
             <p className="cq-body-sm text-(--cq-text-primary)">
               Strongest areas: {detail.strengths.join(", ")}
+            </p>
+          )}
+          {detail.assessedAt === null ? null : (
+            <p className="cq-caption text-(--cq-text-tertiary)">
+              Read on{" "}
+              <time dateTime={detail.assessedAt}>
+                {new Date(detail.assessedAt).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  timeZone: "UTC",
+                })}
+              </time>
             </p>
           )}
           {/* As legible as any metadata on the card, and never clipped: it
@@ -346,6 +366,31 @@ export function IntelligenceSection({
         </div>
       )}
     </CardSection>
+  );
+}
+
+/**
+ * How much of the method Q could read, drawn as the areas themselves: one
+ * mark per area, filled where there was enough shared evidence. A count,
+ * never a confidence score; the sentence above says the same in words, so
+ * it is decorative to a screen reader.
+ */
+function Coverage({
+  scored,
+  total,
+}: {
+  readonly scored: number;
+  readonly total: number;
+}) {
+  return (
+    <span aria-hidden="true" className="flex gap-1" data-card-coverage>
+      {Array.from({ length: total }, (_, index) => (
+        <span
+          key={index}
+          className={`h-2 w-3 rounded-sm ${index < scored ? "bg-(--cq-text-primary)" : "border border-(--cq-border-strong)"}`}
+        />
+      ))}
+    </span>
   );
 }
 

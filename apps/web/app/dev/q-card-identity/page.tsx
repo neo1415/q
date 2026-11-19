@@ -34,6 +34,12 @@ const COMPANY_FIELDS: readonly PublicCardField[] = [
       "Cross-border freight booking for East African shippers: one quote, one tracking link, customs paperwork done before the truck leaves.",
     scope: "public_external",
   },
+  {
+    key: "primaryDescription",
+    value:
+      "Shippers moving goods between Kenya, Uganda and Rwanda still book trucks by phone, chase drivers on WhatsApp and lose days at the border to missing paperwork.\n\nKivu Freight is one booking for the whole route: an instant quote from vetted carriers, live tracking that the consignee can follow, and customs documents prepared and checked before the truck leaves the yard. Carriers get paid on delivery, not in 60 days.\n\nWe started on the Mombasa–Kampala corridor in 2021 and now move freight for 312 shippers, from flower exporters to regional distributors.",
+    scope: "network_visible",
+  },
   { key: "currentStageCode", value: "seed", scope: "public_external" },
   { key: "headquartersCity", value: "Nairobi", scope: "public_external" },
   { key: "headquartersCountry", value: "KE", scope: "public_external" },

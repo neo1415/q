@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   COMPANY_SECTION_CARD_FIELDS,
   type PublicCardDto,
+  type PublicCardField,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
@@ -12,7 +13,6 @@ import {
   ExternalLink,
   Globe,
   ICON_STROKE,
-  MapPin,
   Search,
   ShieldCheck,
 } from "@capital-q/ui/icons";
@@ -47,16 +47,25 @@ import { QCard } from "./q-card";
 
 /**
  * What someone sees a second after scanning a Q Card, usually on a phone,
- * usually standing up (BIZ-004, R26). One screen answers three things in
- * order: who this is (name, what kind of organisation, their own line),
- * whether Capital Q vouches for anything (only claims it verified, said
- * exactly), and what to do now -- keep the contact, connect on Capital Q,
- * or go to their website. The facts below are there for the second look.
+ * usually standing up (BIZ-004, R26). The stage answers three things in
+ * order: who this is (the card itself), whether Capital Q vouches for
+ * anything (only claims it verified, said exactly), and what to do now --
+ * keep the contact, connect on Capital Q, or go to their website.
+ *
+ * Below it, the board (owner 2026-11-19: "too basic ... it feels scarce"):
+ * everything this visitor may see, laid out as an institutional company
+ * page rather than a list -- the story and the evidence in the main
+ * column, Q's reading and the plain facts beside it from a laptop's width
+ * up, one column on a phone. Shared sections lead; a section with nothing
+ * for this visitor follows as one quiet row in the same words whatever is
+ * behind it, so absence never hints at a reason and never reads as zero.
  *
  * Server-rendered, no client JS of its own: the name is the LCP element
  * and nothing waits on script. Everything shown comes from the API's
  * audience projection, re-filtered here by `fieldsForAudience` so a
  * members-only (network_visible) value can never reach an anonymous page.
+ * The layout follows its own width (container queries), so the same page
+ * reads right inside the Q Story's narrow panel.
  */
 
 const VERIFIED_WORDS: Readonly<Record<string, string>> = {
@@ -75,25 +84,48 @@ const DEMO_WORDS: Readonly<Record<string, string>> = {
   FOUNDER_IDENTITY_VERIFIED: "Founder identity: demo data only, not verified",
 };
 
-/** The facts list leaves out what the hero and actions already say. */
+/** The facts list leaves out what the card, story and actions already say. */
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
-  // The descriptor line.
-  "currentStageCode",
-  "headquartersCity",
-  "headquartersCountry",
-  "investorType",
-  "hqCountry",
-  // The name, the tagline and the website action.
+  // The name, the story and the website action.
   "canonicalName",
   "displayName",
   "shortDescription",
   "publicDescription",
+  "primaryDescription",
   "websiteUrl",
   // A person's name line, role line and headline.
   "headline",
   "roleTitle",
   "affiliation",
 ]);
+
+/** Fields drawn by their own section, never again as a plain row. */
+const SECTION_KEYS: ReadonlySet<string> = new Set([
+  ...COMPANY_SECTION_CARD_FIELDS,
+  "personFocus",
+]);
+
+/** Mandate facts shown in "Investment at a glance", not again below. */
+const GLANCE_KEYS: ReadonlySet<string> = new Set([
+  "mandateTypicalCheque",
+  "mandateStages",
+  "deploymentState",
+  "mandateSectors",
+  "mandateGeographies",
+  "mandateBusinessModels",
+  "mandateCustomerTypes",
+]);
+
+/** The order the plain facts read in, whatever order the projection used. */
+const FACT_ORDER: readonly string[] = [
+  "currentStageCode",
+  "investorType",
+  "headquartersCity",
+  "headquartersCountry",
+  "hqCountry",
+  "countryCode",
+  "foundedDate",
+];
 
 export function PublicCardView({
   card,
@@ -108,30 +140,26 @@ export function PublicCardView({
 }) {
   const fields = fieldsForAudience(card);
   const participant = card.audience === "PARTICIPANT";
+  const company = card.subjectType === "COMPANY";
+  const person = card.subjectType === "PERSON";
+  const byKey = (key: string): PublicCardField | undefined =>
+    fields.find((field) => field.key === key);
   // The owner's own line, in full: long text folds behind "See more".
   const tagline =
-    fields.find(
-      (field) =>
-        field.key ===
-        (card.subjectType === "COMPANY"
-          ? "shortDescription"
-          : card.subjectType === "PERSON"
-            ? "headline"
-            : "publicDescription"),
+    byKey(
+      company ? "shortDescription" : person ? "headline" : "publicDescription",
     )?.value ?? null;
+  // A company's longer story (owner 2026-11-19), when it is shared.
+  const description = company ? byKey("primaryDescription") : undefined;
   const descriptor = cardDescriptor(card.subjectType, fields);
   const photo = cardImage(fields, "photo");
   const cover = cardImage(fields, "cover");
-  const website = fields.find((field) => field.key === "websiteUrl");
-  const facts = textFields(fields).filter(
-    (field) => !SHOWN_ELSEWHERE.has(field.key),
-  );
+  const website = byKey("websiteUrl");
   const demo = new Set<string>(card.demoAttested);
   // On a person's card the organisation is their employer, named.
-  const employer =
-    card.subjectType === "PERSON"
-      ? (fields.find((field) => field.key === "affiliation")?.value ?? null)
-      : null;
+  const employer = person ? (byKey("affiliation")?.value ?? null) : null;
+  // UX-07: a person's role and organisation, each on its own line.
+  const roleField = person ? byKey("roleTitle") : undefined;
   const verified = card.verified.map((label) =>
     demo.has(label)
       ? {
@@ -153,7 +181,6 @@ export function PublicCardView({
   );
   const signIn = `/auth/sign-in?next=${encodeURIComponent(`/@${card.handle}`)}`;
 
-  const byKey = (key: string) => fields.find((field) => field.key === key);
   const glance = [
     { key: "mandateTypicalCheque", label: "Typical cheque size" },
     { key: "mandateStages", label: "Stage focus" },
@@ -166,6 +193,7 @@ export function PublicCardView({
   });
   const chipRows = [
     "mandateSectors",
+    "mandateGeographies",
     "mandateBusinessModels",
     "mandateCustomerTypes",
   ].flatMap((key) => {
@@ -181,41 +209,72 @@ export function PublicCardView({
         ];
   });
   const lookFor = byKey("mandateLookFor");
-  const location = byKey(
-    card.subjectType === "COMPANY"
-      ? "headquartersCountry"
-      : card.subjectType === "PERSON"
-        ? "countryCode"
-        : "hqCountry",
-  );
-  // Said once: an investor's status already leads the glance when shown.
-  const status =
-    card.subjectType === "COMPANY"
-      ? byKey("currentStageCode")
-      : card.subjectType === "PERSON" ||
-          glance.some((item) => item.key === "deploymentState")
-        ? undefined
-        : byKey("deploymentState");
-  const company = card.subjectType === "COMPANY";
-  const person = card.subjectType === "PERSON";
-  // UX-07: a person's role and organisation, each on its own line.
-  const roleField = person ? byKey("roleTitle") : undefined;
-  const storyEmpty =
-    tagline === null && status === undefined && location === undefined;
-  const more = facts.filter(
-    (field) =>
-      !GLANCE_KEYS.has(field.key) &&
-      !SECTION_KEYS.has(field.key) &&
-      field.key !== "mandateLookFor" &&
-      field.key !== location?.key &&
-      field.key !== status?.key,
-  );
+  const storyEmpty = tagline === null && description === undefined;
+  // One marker at the heading when all of the story is members-only; a
+  // members-only description under a public line carries its own.
+  const storyParts = [
+    byKey(
+      company ? "shortDescription" : person ? "headline" : "publicDescription",
+    ),
+    description,
+  ].filter((part) => part !== undefined);
+  const storyMembers =
+    storyParts.length > 0 &&
+    storyParts.every((part) => part.scope === "network_visible");
 
-  const moreAllMembers =
-    more.length > 0 && more.every((field) => field.scope === "network_visible");
+  const facts = textFields(fields)
+    .filter(
+      (field) =>
+        !SHOWN_ELSEWHERE.has(field.key) &&
+        !GLANCE_KEYS.has(field.key) &&
+        !SECTION_KEYS.has(field.key) &&
+        field.key !== "mandateLookFor",
+    )
+    .slice()
+    .sort((a, b) => factRank(a.key) - factRank(b.key));
+  const factsAllMembers =
+    facts.length > 0 &&
+    facts.every((field) => field.scope === "network_visible");
+
+  // A company's sections: the ones this visitor may see lead, the others
+  // follow as quiet rows. Every story section is always drawn, so the Q
+  // Story can point at each (S6).
+  const has = (key: string) => byKey(key)?.detail !== undefined;
+  const intelligence = company && has("investabilitySummary");
+  const documents = company && has("documentsOnRequest");
+  const companySections = company
+    ? [
+        {
+          shown: has("tractionMetrics"),
+          node: (
+            <NumbersSection key="numbers" field={byKey("tractionMetrics")} />
+          ),
+        },
+        {
+          shown: has("currentRaise"),
+          node: <RaiseSection key="raise" field={byKey("currentRaise")} />,
+        },
+        {
+          shown: has("team"),
+          node: <TeamSection key="team" field={byKey("team")} empty />,
+        },
+        {
+          shown: has("relationshipSummary"),
+          node: (
+            <RelationshipsSection
+              key="relationships"
+              field={byKey("relationshipSummary")}
+            />
+          ),
+        },
+      ]
+    : [];
+  const sharedSections = companySections.filter((section) => section.shown);
+  const quietSections = companySections.filter((section) => !section.shown);
+  const side = intelligence || documents || facts.length > 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-4 px-4 pb-12 sm:px-6 sm:pt-4 sm:pb-16">
+    <div className="@container mx-auto flex w-full max-w-(--cq-layout-content) flex-col gap-6 px-4 pb-12 sm:px-6 sm:pt-4 sm:pb-16">
       <nav
         aria-label="Capital Q"
         className="flex min-h-14 items-center justify-between gap-3"
@@ -260,237 +319,267 @@ export function PublicCardView({
         <img
           src={cover}
           alt=""
-          className="aspect-[4/1] w-full rounded-xl object-cover"
+          className="aspect-[3/1] w-full rounded-xl object-cover @3xl:aspect-[4/1]"
           data-card-cover
         />
       )}
-      <QCard
-        nameAs="h1"
-        portraitUrl={photo}
-        name={card.name}
-        descriptor={descriptor}
-        role={roleField === undefined ? null : cardFieldValue(roleField)}
-        organisation={employer}
-        handle={card.handle}
-        displayUrl={displayUrl ?? `@${card.handle}`}
-        href={`/@${card.handle}`}
-        qrSvg={qrSvg}
-        className="max-w-none"
-      />
 
-      {verified.length === 0 ? null : (
-        <ul className="flex flex-col gap-1.5">
-          {verified.map(({ label, text, demo: isDemo }) => (
-            <li
-              key={label}
-              className={`cq-body-sm flex items-center gap-2 ${isDemo ? "text-(--cq-text-secondary)" : "text-(--cq-text-primary)"}`}
-              data-demo-attestation={isDemo ? "" : undefined}
+      {/* The stage: the card, then what Capital Q vouches for and what to
+          do now. Side by side once there is room. */}
+      <header className="grid gap-5 @3xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] @3xl:items-start @3xl:gap-8">
+        <QCard
+          nameAs="h1"
+          portraitUrl={photo}
+          name={card.name}
+          descriptor={descriptor}
+          role={roleField === undefined ? null : cardFieldValue(roleField)}
+          organisation={employer}
+          handle={card.handle}
+          displayUrl={displayUrl ?? `@${card.handle}`}
+          href={`/@${card.handle}`}
+          qrSvg={qrSvg}
+          className="max-w-none"
+        />
+
+        <div className="flex min-w-0 flex-col gap-4">
+          {verified.length === 0 ? null : (
+            <ul className="flex flex-col gap-1.5">
+              {verified.map(({ label, text, demo: isDemo }) => (
+                <li
+                  key={label}
+                  className={`cq-body-sm flex items-center gap-2 ${isDemo ? "text-(--cq-text-secondary)" : "text-(--cq-text-primary)"}`}
+                  data-demo-attestation={isDemo ? "" : undefined}
+                >
+                  {isDemo ? null : (
+                    <Check
+                      aria-hidden="true"
+                      size={16}
+                      strokeWidth={ICON_STROKE}
+                      className="shrink-0 text-(--cq-positive)"
+                    />
+                  )}
+                  {text}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {card.demonstration === true ? (
+            <DemonstrationNote subject="card" />
+          ) : null}
+
+          <section aria-label="Actions" className="flex flex-col gap-2">
+            <a
+              href={`/@${card.handle}.vcf`}
+              download={`${card.handle}.vcf`}
+              data-card-action="save-contact"
+              className={buttonClassName("primary", "large", "w-full")}
             >
-              {isDemo ? null : (
-                <Check
+              <Download
+                aria-hidden="true"
+                size={18}
+                strokeWidth={ICON_STROKE}
+              />
+              Save contact
+            </a>
+            <Link
+              href={participant ? "/home" : signIn}
+              data-card-action="connect"
+              className={buttonClassName("secondary", "large", "w-full")}
+            >
+              {participant ? "Open in Capital Q" : "Connect on Capital Q"}
+              <ExternalLink
+                aria-hidden="true"
+                size={16}
+                strokeWidth={ICON_STROKE}
+              />
+            </Link>
+            {website === undefined ? null : (
+              <a
+                href={website.value}
+                rel="nofollow ugc noopener noreferrer"
+                target="_blank"
+                data-card-action="website"
+                className="flex min-h-12 items-center gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-(--cq-text-primary) hover:border-(--cq-border-strong)"
+              >
+                <Globe aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
+                <span className="cq-body min-w-0 flex-1 truncate">
+                  {websiteLabel(website.value)}
+                </span>
+                <ExternalLink
                   aria-hidden="true"
                   size={16}
                   strokeWidth={ICON_STROKE}
-                  className="shrink-0 text-(--cq-positive)"
+                  className="text-(--cq-text-tertiary)"
                 />
-              )}
-              {text}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {card.demonstration === true ? (
-        <DemonstrationNote subject="card" />
-      ) : null}
-
-      <section aria-label="Actions" className="flex flex-col gap-2">
-        <a
-          href={`/@${card.handle}.vcf`}
-          download={`${card.handle}.vcf`}
-          data-card-action="save-contact"
-          className={buttonClassName("primary", "large", "w-full")}
-        >
-          <Download aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
-          Save contact
-        </a>
-        <Link
-          href={participant ? "/home" : signIn}
-          data-card-action="connect"
-          className={buttonClassName("secondary", "large", "w-full")}
-        >
-          {participant ? "Open in Capital Q" : "Connect on Capital Q"}
-          <ExternalLink
-            aria-hidden="true"
-            size={16}
-            strokeWidth={ICON_STROKE}
-          />
-        </Link>
-        {website === undefined ? null : (
-          <a
-            href={website.value}
-            rel="nofollow ugc noopener noreferrer"
-            target="_blank"
-            data-card-action="website"
-            className="flex min-h-12 items-center gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-(--cq-text-primary) hover:border-(--cq-border-strong)"
-          >
-            <Globe aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
-            <span className="cq-body min-w-0 flex-1 truncate">
-              {websiteLabel(website.value)}
-            </span>
-            <ExternalLink
-              aria-hidden="true"
-              size={16}
-              strokeWidth={ICON_STROKE}
-              className="text-(--cq-text-tertiary)"
-            />
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
-        )}
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          {participant
-            ? `Ask Q about ${card.name}, save them or express interest from inside Capital Q.`
-            : `Sign in to ask Q about ${card.name}, see what they share with members, or express interest.`}
-        </p>
-      </section>
-
-      <article
-        aria-label={`${card.name}'s Q Card`}
-        className="flex flex-col divide-y divide-(--cq-border-subtle) rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-5 py-6 sm:px-8 sm:py-8"
-        data-card-dossier
-      >
-        <CardSection
-          id={CARD_SECTION_IDS.story}
-          label="Story"
-          empty={storyEmpty}
-        >
-          {storyEmpty ? null : (
-            <>
-              {tagline === null ? null : (
-                <div className="cq-body text-(--cq-text-primary)">
-                  <SeeMore text={tagline} />
-                </div>
-              )}
-              {status === undefined && location === undefined ? null : (
-                <dl className="flex flex-wrap gap-x-8 gap-y-2" data-card-tiles>
-                  {status === undefined ? null : (
-                    <Fact
-                      label={
-                        card.subjectType === "COMPANY"
-                          ? "Stage"
-                          : "Current status"
-                      }
-                      value={cardFieldValue(status)}
-                    />
-                  )}
-                  {location === undefined ? null : (
-                    <Fact
-                      label="Location"
-                      value={cardFieldValue(location)}
-                      icon={
-                        <MapPin
-                          aria-hidden="true"
-                          size={14}
-                          strokeWidth={ICON_STROKE}
-                        />
-                      }
-                    />
-                  )}
-                </dl>
-              )}
-            </>
-          )}
-        </CardSection>
-
-        {company ? (
-          <>
-            <NumbersSection field={byKey("tractionMetrics")} />
-            <RaiseSection field={byKey("currentRaise")} />
-            <IntelligenceSection field={byKey("investabilitySummary")} />
-            <RelationshipsSection field={byKey("relationshipSummary")} />
-          </>
-        ) : null}
-
-        {glance.length === 0 && chipRows.length === 0 ? null : (
-          <CardSection id="glance" label="Investment at a glance">
-            {glance.length === 0 ? null : (
-              <dl
-                className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-                data-card-glance
-              >
-                {glance.map((item) => (
-                  <div key={item.key} className="flex flex-col gap-0.5">
-                    <dd className="cq-title-sm cq-numeric order-1">
-                      {item.value}
-                    </dd>
-                    <dt className="cq-caption order-2 text-(--cq-text-secondary)">
-                      {item.label}
-                    </dt>
-                  </div>
-                ))}
-              </dl>
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
             )}
-            {chipRows.map((row) => (
-              <div
-                key={row.key}
-                className="flex flex-col gap-2 pt-1"
-                data-card-field={row.key}
-              >
-                <h3 className="cq-body-sm text-(--cq-text-secondary)">
-                  {row.label}
-                </h3>
-                <Chips items={row.items} />
-              </div>
-            ))}
-          </CardSection>
-        )}
+            <p className="cq-caption text-(--cq-text-tertiary)">
+              {participant
+                ? `Ask Q about ${card.name}, save them or express interest from inside Capital Q.`
+                : `Sign in to ask Q about ${card.name}, see what they share with members, or express interest.`}
+            </p>
+          </section>
+        </div>
+      </header>
 
-        {lookFor === undefined ? null : (
-          <CardSection id="look-for" label="What they look for">
-            <Chips items={cardListItems(lookFor)} />
-          </CardSection>
-        )}
-
-        {person ? <FocusSection field={byKey("personFocus")} /> : null}
-
-        <TeamSection field={byKey("team")} empty={company} />
-        {company ? (
-          <DocumentsSection field={byKey("documentsOnRequest")} />
-        ) : null}
-
-        {more.length === 0 ? null : (
+      {/* The board: one surface for the story and the evidence, hairline
+          rules inside it; Q's reading and the plain facts beside it with no
+          box at all. */}
+      <div
+        className={`grid items-start gap-8 ${side ? "@4xl:grid-cols-[minmax(0,1fr)_20rem] @4xl:gap-10" : ""}`}
+        data-card-board
+      >
+        <article
+          aria-label={`${card.name}'s Q Card`}
+          className="flex min-w-0 flex-col divide-y divide-(--cq-border-subtle) rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-5 py-6 sm:px-8 sm:py-8"
+          data-card-dossier
+        >
           <CardSection
-            id="more"
-            label="Additional information"
-            // One marker at the heading when every row is members-only;
-            // mixed rows carry it inline beside their own label.
-            members={moreAllMembers}
+            id={CARD_SECTION_IDS.story}
+            label="About"
+            members={storyMembers}
+            empty={storyEmpty}
           >
-            <dl className="divide-y divide-(--cq-border-subtle)">
-              {more.map((field) => (
-                <div
-                  key={field.key}
-                  data-card-field={field.key}
-                  data-scope={field.scope}
-                  className="flex items-baseline justify-between gap-6 py-3"
-                >
-                  <dt className="cq-body-sm flex shrink-0 items-baseline gap-2 text-(--cq-text-secondary)">
-                    {cardFieldLabel(field.key)}
-                    {field.scope === "network_visible" && !moreAllMembers ? (
+            {storyEmpty ? null : (
+              <div className="flex flex-col gap-4">
+                {tagline === null ? null : description === undefined ? (
+                  <SeeMore
+                    text={tagline}
+                    className="cq-body-lg text-(--cq-text-primary)"
+                  />
+                ) : (
+                  // With the longer story below, the one-liner is its lead.
+                  <p className="cq-title-sm text-(--cq-text-primary)">
+                    {tagline}
+                  </p>
+                )}
+                {description === undefined ? null : (
+                  <div
+                    className="flex flex-col items-start gap-1"
+                    data-card-description
+                    data-scope={description.scope}
+                  >
+                    <SeeMore
+                      text={description.value}
+                      lines={6}
+                      className="cq-body text-(--cq-text-secondary)"
+                    />
+                    {description.scope === "network_visible" &&
+                    !storyMembers ? (
                       <MembersOnly />
                     ) : null}
-                  </dt>
-                  <dd className="cq-body min-w-0 text-end break-words">
-                    {field.key === "foundedDate"
-                      ? field.value.slice(0, 4)
-                      : cardFieldValue(field)}
-                  </dd>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardSection>
+
+          {sharedSections.map((section) => section.node)}
+
+          {glance.length === 0 && chipRows.length === 0 ? null : (
+            <CardSection id="glance" label="Investment at a glance">
+              {glance.length === 0 ? null : (
+                <dl
+                  className="grid grid-cols-1 gap-4 @xl:grid-cols-3"
+                  data-card-glance
+                >
+                  {glance.map((item) => (
+                    <div key={item.key} className="flex flex-col gap-0.5">
+                      <dd className="cq-numeric order-1 text-[1.5rem] leading-tight font-semibold tracking-tight text-(--cq-text-primary)">
+                        {item.value}
+                      </dd>
+                      <dt className="cq-caption order-2 text-(--cq-text-secondary)">
+                        {item.label}
+                      </dt>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {chipRows.map((row) => (
+                <div
+                  key={row.key}
+                  className="flex flex-col gap-2 pt-1"
+                  data-card-field={row.key}
+                >
+                  <h3 className="cq-body-sm text-(--cq-text-secondary)">
+                    {row.label}
+                  </h3>
+                  <Chips items={row.items} />
                 </div>
               ))}
-            </dl>
-          </CardSection>
-        )}
-      </article>
+            </CardSection>
+          )}
+
+          {lookFor === undefined ? null : (
+            <CardSection id="look-for" label="What they look for">
+              <Chips items={cardListItems(lookFor)} />
+            </CardSection>
+          )}
+
+          {person ? <FocusSection field={byKey("personFocus")} /> : null}
+
+          {company ? null : <TeamSection field={byKey("team")} empty={false} />}
+
+          {quietSections.map((section) => section.node)}
+          {company && !intelligence ? (
+            <IntelligenceSection field={byKey("investabilitySummary")} />
+          ) : null}
+        </article>
+
+        {side ? (
+          <aside
+            aria-label={`More about ${card.name}`}
+            className="flex min-w-0 flex-col divide-y divide-(--cq-border-subtle) @4xl:pt-2"
+            data-card-side
+          >
+            {intelligence ? (
+              <IntelligenceSection field={byKey("investabilitySummary")} />
+            ) : null}
+
+            {facts.length === 0 ? null : (
+              <CardSection
+                id="facts"
+                label={
+                  company ? "Company facts" : person ? "Details" : "Firm facts"
+                }
+                // One marker at the heading when every row is members-only;
+                // mixed rows carry it inline beside their own label.
+                members={factsAllMembers}
+              >
+                <dl className="divide-y divide-(--cq-border-subtle)">
+                  {facts.map((field) => (
+                    <div
+                      key={field.key}
+                      data-card-field={field.key}
+                      data-scope={field.scope}
+                      className="flex min-h-11 items-baseline justify-between gap-6 py-2.5"
+                    >
+                      <dt className="cq-body-sm flex shrink-0 items-baseline gap-2 text-(--cq-text-secondary)">
+                        {cardFieldLabel(field.key)}
+                        {field.scope === "network_visible" &&
+                        !factsAllMembers ? (
+                          <MembersOnly />
+                        ) : null}
+                      </dt>
+                      <dd className="cq-body min-w-0 text-end break-words text-(--cq-text-primary)">
+                        {field.key === "foundedDate"
+                          ? field.value.slice(0, 4)
+                          : cardFieldValue(field)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardSection>
+            )}
+
+            {documents ? (
+              <DocumentsSection field={byKey("documentsOnRequest")} />
+            ) : null}
+          </aside>
+        ) : null}
+      </div>
 
       <footer className="flex items-start gap-2 border-t border-(--cq-border-subtle) pt-4">
         <ShieldCheck
@@ -510,43 +599,12 @@ export function PublicCardView({
   );
 }
 
-/** Fields drawn by their own section, never again as a plain row. */
-const SECTION_KEYS: ReadonlySet<string> = new Set([
-  ...COMPANY_SECTION_CARD_FIELDS,
-  "personFocus",
-]);
-
-/** Mandate facts shown in "Investment at a glance", not again below. */
-const GLANCE_KEYS: ReadonlySet<string> = new Set([
-  "mandateTypicalCheque",
-  "mandateStages",
-  "deploymentState",
-  "mandateSectors",
-  "mandateBusinessModels",
-  "mandateCustomerTypes",
-]);
-
-function Fact({
-  label,
-  value,
-  icon,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly icon?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col">
-      <dt className="cq-caption order-2 text-(--cq-text-secondary)">{label}</dt>
-      <dd className="cq-body order-1 flex items-center gap-1.5 text-(--cq-text-primary)">
-        {icon}
-        {value}
-      </dd>
-    </div>
-  );
+function factRank(key: string): number {
+  const at = FACT_ORDER.indexOf(key);
+  return at === -1 ? FACT_ORDER.length : at;
 }
 
-function Chips({ items }: { readonly items: readonly string[] }) {
+function Chips({ items }: { readonly items: readonly string[] }): ReactNode {
   return (
     <ul className="flex flex-wrap gap-1.5">
       {items.map((item) => (

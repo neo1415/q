@@ -175,6 +175,72 @@ describe("the card projection", () => {
   });
 });
 
+describe("the company's longer description on its card (owner 2026-11-19)", () => {
+  const story = { ...FACTS, primaryDescription: "MEMBERS-ONLY-STORY" };
+
+  it("is off on a new card: no audience sees it until the owner adds it", () => {
+    for (const audience of ["PUBLIC", "PARTICIPANT"] as const) {
+      const fields = projectCardFields(
+        "COMPANY",
+        DEFAULT_FIELD_SCOPES.COMPANY,
+        story,
+        audience,
+      );
+      expect(JSON.stringify(fields)).not.toContain("MEMBERS-ONLY-STORY");
+    }
+  });
+
+  it("kept to members, reaches a signed-in participant and never the public link", () => {
+    const scopes = {
+      ...DEFAULT_FIELD_SCOPES.COMPANY,
+      primaryDescription: "network_visible",
+    } as const;
+    const anonymous = projectCardFields("COMPANY", scopes, story, "PUBLIC");
+    expect(JSON.stringify(anonymous)).not.toContain("MEMBERS-ONLY-STORY");
+    expect(anonymous.some((f) => f.key === "primaryDescription")).toBe(false);
+    const member = projectCardFields("COMPANY", scopes, story, "PARTICIPANT");
+    expect(member.find((f) => f.key === "primaryDescription")).toEqual({
+      key: "primaryDescription",
+      value: "MEMBERS-ONLY-STORY",
+      scope: "network_visible",
+    });
+  });
+
+  it("made public by the owner, reaches anyone; unstated, reaches no one", () => {
+    const scopes = {
+      ...DEFAULT_FIELD_SCOPES.COMPANY,
+      primaryDescription: "public_external",
+    } as const;
+    expect(
+      fitFieldScopes("COMPANY", { primaryDescription: "public_external" }).ok,
+    ).toBe(true);
+    expect(
+      projectCardFields("COMPANY", scopes, story, "PUBLIC").find(
+        (f) => f.key === "primaryDescription",
+      )?.scope,
+    ).toBe("public_external");
+    expect(
+      projectCardFields(
+        "COMPANY",
+        scopes,
+        { ...story, primaryDescription: "   " },
+        "PUBLIC",
+      ).some((f) => f.key === "primaryDescription"),
+    ).toBe(false);
+  });
+
+  it("is not an investor's or a person's field", () => {
+    expect(
+      fitFieldScopes("INVESTOR_ORGANISATION", {
+        primaryDescription: "network_visible",
+      }),
+    ).toEqual({ ok: false, fields: ["primaryDescription"] });
+    expect(
+      fitFieldScopes("PERSON", { primaryDescription: "network_visible" }),
+    ).toEqual({ ok: false, fields: ["primaryDescription"] });
+  });
+});
+
 describe("the subject directory", () => {
   it("copies only card fields from the canonical read, so nothing else can be projected", async () => {
     // What a canonical row also holds, which the directory must drop.
@@ -188,7 +254,9 @@ describe("the subject directory", () => {
       headquartersCountry: "KE",
       websiteUrl: null,
       foundedDate: null,
-      primaryDescription: "ORGANISATION-PRIVATE-DO-NOT-COPY",
+      primaryDescription: "The longer story.",
+      // Not a card field: whatever the read carries, it never travels.
+      legalName: "ORGANISATION-PRIVATE-DO-NOT-COPY",
     };
     const directory = createSubjectDirectory({
       findCompany: () => Promise.resolve(canonical),
@@ -201,6 +269,9 @@ describe("the subject directory", () => {
       subjectId: "00000000-0000-4000-8000-000000000001",
     });
     expect(JSON.stringify(facts)).not.toContain("DO-NOT-COPY");
+    // The longer description is a card field: copied, then shown only
+    // through a scope the owner chose (below).
+    expect(facts?.facts["primaryDescription"]).toBe("The longer story.");
     // Verification that cannot be read is not verified.
     expect(facts?.verified).toEqual({
       organisation: false,

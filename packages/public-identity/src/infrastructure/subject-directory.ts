@@ -24,6 +24,8 @@ export type CompanyProfileRead = {
   readonly organisationId: string;
   readonly canonicalName: string;
   readonly shortDescription: string | null;
+  /** The longer declared description; absent from older reads. */
+  readonly primaryDescription?: string | null | undefined;
   readonly currentStageCode: string | null;
   readonly headquartersCity: string | null;
   readonly headquartersCountry: string | null;
@@ -248,6 +250,7 @@ export function createSubjectDirectory(
           facts: {
             canonicalName: company.canonicalName,
             shortDescription: company.shortDescription,
+            primaryDescription: company.primaryDescription ?? null,
             currentStageCode: company.currentStageCode,
             headquartersCity: company.headquartersCity,
             headquartersCountry: company.headquartersCountry,
