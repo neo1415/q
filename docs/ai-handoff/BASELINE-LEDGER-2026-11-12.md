@@ -923,3 +923,27 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
     - then `deploy-promote 4b0f0904a` again;
     - live-check the CRM import.
   - Rule from now on: the migration must finish before the deploy starts, never in parallel.
+
+## 19 Nov 2026: q-api pool wedge, fix, and owner-reported Q defects
+
+- **Outage 07:34–08:47 UTC.**
+  - q-api's gated round-trips released a pool slot when the caller's deadline fired, while the statement was still running on its connection.
+  - postgres.js then pipelined the next statement behind it, which the transaction pooler never answers, so connections wedged one by one. Every statement then failed with 57014.
+  - Mitigated by restarting the q-api deployment (no rebuild) at about 08:47.
+- **Supabase management token** replaced through the network-secret form (proxy-injected; scripts take `SUPABASE_ACCESS_TOKEN=proxy-injected`). Migration `20261231599520` applied, so the hosted database is at 314.
+- **0b5581d3e deployed 09:34** (gate PASS 09:34:10Z):
+  - a slot is released only when the driver settles;
+  - the `pool-watch` watchdog alerts with `DB_POOL_EXHAUSTED` and recycles the pool;
+  - this release also carried 4b0f0904a: the CRM import screen and the relationship side-detail fields.
+- **b07e0c1db deployed 10:29** (gate PASS 10:28:27Z):
+  - Q Card redesign (2a6df63f5): `primaryDescription` is an opt-in company card field, default off;
+  - own-profile edits are offered on prepared answers;
+  - the voice speaks as Q (`SELF_NOT_RELAY`), with no relay phrasing;
+  - own mandate preferences are labelled by vocabulary, so sectors read as declared.
+  - Live: `/@ledgerfold` and `/@savanna-seed-partners` show the new layout (200); no 57014, QueryDeadline or pool alerts since. Q's wording changes are not yet verified live.
+- **OpenAI spend over 21 days, about $37** (`ai_ops.model_usage`):
+  - the owner's investor org: $15, of which $10 voice;
+  - fictional test orgs: about $13;
+  - other: about $9.
+  - The owner asked that testing not spend GPT credit. A routing override for fictional tenants needs their yes; until then, keep live tests minimal.
+- **Decision 109:** two-level admin. The design audit is in progress at `docs/design/audit-2026-11-19/` and `docs/design/admin-2026-11-19/`.
