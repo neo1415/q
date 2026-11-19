@@ -176,6 +176,8 @@ function tsxFiles(dir: string): string[] {
 const NOT_EDITING = new Set(
   [
     "features/admin/search-form.tsx",
+    // The console table's search and order: a GET filter, nothing to lose.
+    "features/admin/data-table.tsx",
     "features/auth/components/forgot-password-form.tsx",
     "features/auth/components/google-sign-in.tsx",
     "features/auth/components/sign-in-form.tsx",

@@ -281,6 +281,24 @@ const ROUTES: readonly Route[] = [
   },
   {
     method: "GET",
+    url: "/v1/admin/console-overview",
+    permission: "overview.read",
+    listOk: true,
+  },
+  {
+    method: "GET",
+    url: "/v1/admin/accounts",
+    permission: "accounts.read",
+    listOk: true,
+  },
+  {
+    method: "GET",
+    url: "/v1/admin/organisations?sort=name_asc&limit=10",
+    permission: "accounts.read",
+    listOk: true,
+  },
+  {
+    method: "GET",
     url: "/v1/admin/attribution",
     permission: "ledger.read",
     listOk: true,

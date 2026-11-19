@@ -466,6 +466,33 @@ describe("@capital-q/platform-admin against local Postgres", () => {
       expect(
         (await admin.searchOrganisations(grant, "PA C")).length,
       ).toBeGreaterThan(0);
+      // T2: the lists open with rows, narrow by search, and page by cursor.
+      const opened = await admin.listAccounts(grant, { limit: 1 });
+      expect(opened.rows).toHaveLength(1);
+      expect(opened.total).toBeGreaterThan(0);
+      if (opened.total > 1) expect(opened.nextCursor).not.toBeNull();
+      if (opened.nextCursor !== null) {
+        const second = await admin.listAccounts(grant, {
+          limit: 1,
+          cursor: opened.nextCursor,
+        });
+        expect(second.rows[0]?.userId).not.toBe(opened.rows[0]?.userId);
+      }
+      const named = await admin.listAccounts(grant, {
+        q: "member-",
+        sort: "name_asc",
+      });
+      expect(named.rows.length).toBeGreaterThan(0);
+      expect(named.total).toBeGreaterThanOrEqual(named.rows.length);
+      const organisations = await admin.listOrganisations(grant, {
+        q: "PA C",
+        sort: "oldest",
+      });
+      expect(organisations.rows.length).toBeGreaterThan(0);
+      // T1: the overview's own figures read against the real schema.
+      const figures = await admin.consoleOverview(grant);
+      expect(figures.daily).toHaveLength(14);
+      expect(figures.activeOrganisations).toBeGreaterThan(0);
       const orgs = await admin.searchOrganisations(grant, "PA Co");
       const detail = await admin.organisationDetail(
         grant,

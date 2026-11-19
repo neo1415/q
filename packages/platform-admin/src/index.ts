@@ -19,6 +19,12 @@ import {
   suspendOrganisationMembers,
 } from "./accounts.js";
 import { searchAudit } from "./audit-search.js";
+import { consoleOverview } from "./console-overview.js";
+import {
+  listAccounts,
+  listOrganisations,
+  type AdminListQuery,
+} from "./lists.js";
 import {
   decideBreakGlass,
   listBreakGlass,
@@ -370,6 +376,13 @@ export function createPlatformAdmin(options: {
     ...ledger,
     searchAccounts: (grant: AdminGrant, term: string) =>
       searchAccounts(sql, grant, term),
+    // A6/T2: the browse lists, open with rows; search narrows them.
+    listAccounts: (grant: AdminGrant, query: AdminListQuery) =>
+      listAccounts(sql, grant, query),
+    listOrganisations: (grant: AdminGrant, query: AdminListQuery) =>
+      listOrganisations(sql, grant, query),
+    // T1: the overview's own figures (spend, active organisations, outbox).
+    consoleOverview: (grant: AdminGrant) => consoleOverview(sql, grant),
     accountDetail: (grant: AdminGrant, userId: string) =>
       accountDetail(sql, grant, userId),
     setSuspension: (
@@ -575,3 +588,16 @@ export {
   type SiteImageResolver,
   type SitePublishOutcome,
 } from "./site-content.js";
+export {
+  ADMIN_LIST_SORTS,
+  decodeListCursor,
+  encodeListCursor,
+  type AdminListPage,
+  type AdminListQuery,
+  type AdminListSort,
+} from "./lists.js";
+export {
+  CONSOLE_SPEND_DAYS,
+  lastDays,
+  type ConsoleOverview,
+} from "./console-overview.js";

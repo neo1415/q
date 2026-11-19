@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { searchAdminOrganisations } from "@capital-q/api-client";
-import { EmptyState, ErrorState } from "@capital-q/ui/states";
+import { listAdminOrganisations } from "@capital-q/api-client";
+import type { AdminOrganisationRowDto } from "@capital-q/contracts";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
-import { SearchForm } from "@/features/admin/search-form";
-import { words } from "@/features/admin/words";
+import {
+  AdminDataTable,
+  viewFrom,
+  type AdminTableColumn,
+} from "@/features/admin/data-table";
+import { when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,76 +19,82 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("Organisations · Admin") };
 }
 
+const columns = (
+  t: (english: string) => string,
+): readonly AdminTableColumn<AdminOrganisationRowDto>[] => [
+  {
+    id: "name",
+    label: "Name",
+    sort: { asc: "name_asc", desc: "name_desc" },
+    cell: (row) => row.name,
+  },
+  { id: "type", label: "Type", cell: (row) => t(words(row.type)) },
+  { id: "country", label: "Country", cell: (row) => row.country ?? "—" },
+  {
+    id: "members",
+    label: "Active members",
+    numeric: true,
+    cell: (row) => String(row.members),
+  },
+  {
+    id: "created",
+    label: "Created",
+    sort: { asc: "oldest", desc: "newest" },
+    cell: (row) => when(row.createdAt),
+  },
+];
+
+/**
+ * Organisations (admin design 2026-11-19 §4 T2): every company and firm,
+ * newest first, on open; the search narrows the list. The API decides who
+ * may read it (accounts.read); anyone else gets this route's 404.
+ */
 export default async function AdminOrganisationsPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly q?: string | undefined }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await serverT();
-
   const context = await adminContext();
   if (context === null || !context.can("accounts.read")) notFound();
-  const q = ((await searchParams).q ?? "").trim();
-  const rows =
-    q.length < 2
-      ? []
-      : await searchAdminOrganisations(context.session, q)
-          .then((result) => result.rows)
-          .catch(() => null);
+  const view = viewFrom(await searchParams);
+  const page = await listAdminOrganisations(context.session, {
+    ...(view.q.length > 0 ? { q: view.q } : {}),
+    sort: view.sort,
+    ...(view.cursor === undefined ? {} : { cursor: view.cursor }),
+    limit: 25,
+  }).catch(() => null);
   return (
     <PageSection
       id="organisations"
       title={t("Organisations")}
       description={t(
-        "Companies, investment firms and other organisations on Capital Q.",
+        "Every company and firm on Capital Q. Search by name, legal name or handle.",
       )}
     >
-      <div className="flex flex-col gap-4">
-        <SearchForm
-          action="/admin/organisations"
-          value={q}
-          label={t("Search organisations")}
-          placeholder={t("Organisation name")}
-        />
-        {rows === null ? (
-          <ErrorState
-            title={t("Organisations couldn't load")}
-            description={t("Try again in a moment.")}
-          />
-        ) : q.length < 2 ? (
-          <EmptyState
-            compact
-            title={t("Search for an organisation")}
-            description={t("Type at least 2 characters.")}
-          />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            compact
-            title={t("No organisations match")}
-            description={t(`Nothing found for "${q}".`)}
-          />
-        ) : (
-          <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            {rows.map((row) => (
-              <li key={row.organisationId}>
-                <Link
-                  href={`/admin/organisations/${row.organisationId}`}
-                  className="flex min-h-11 flex-col gap-0.5 py-3 hover:bg-(--cq-surface-subtle)"
-                >
-                  <span className="cq-body text-(--cq-text-primary)">
-                    {row.name}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {t(words(row.type))} ·{" "}
-                    {row.country ?? t("Country not stated")} · {row.members}{" "}
-                    {t("active members")}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <AdminDataTable
+        title="Organisations"
+        noun="organisations"
+        basePath="/admin/organisations"
+        csvPath="/admin/organisations.csv"
+        columns={columns(t)}
+        rows={page?.rows ?? null}
+        rowKey={(row) => row.organisationId}
+        rowHref={(row) => `/admin/organisations/${row.organisationId}`}
+        primary={(row) => row.name}
+        secondary={(row) =>
+          [
+            t(words(row.type)),
+            row.country ?? t("Country not stated"),
+            `${String(row.members)} ${t("active members")}`,
+          ].join(" · ")
+        }
+        view={view}
+        total={page?.total ?? null}
+        nextCursor={page?.nextCursor ?? null}
+        searchLabel="Search organisations"
+        placeholder="Name, legal name or handle"
+      />
     </PageSection>
   );
 }

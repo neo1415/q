@@ -25,6 +25,9 @@ export const ADMIN_ACCOUNT_PATH = "/v1/admin/accounts/:userId" as const;
 export const ADMIN_ACCOUNT_SUSPENSION_PATH =
   "/v1/admin/accounts/:userId/suspension" as const;
 export const ADMIN_ORGANISATIONS_PATH = "/v1/admin/organisations" as const;
+/** T1 (admin design 2026-11-19): the overview's own figures. */
+export const ADMIN_CONSOLE_OVERVIEW_PATH =
+  "/v1/admin/console-overview" as const;
 export const ADMIN_ORGANISATION_PATH =
   "/v1/admin/organisations/:organisationId" as const;
 export const ADMIN_ORGANISATION_SUSPENSION_PATH =
@@ -61,6 +64,8 @@ export function adminPath(
 
 const Iso = z.string().max(40);
 const Name = z.string().max(300).nullable();
+/** A count, for schemas declared above the shared `Count` below. */
+const Tally = z.number().int().min(0);
 const Reason = z.string().trim().min(3).max(500);
 
 // --- me / step-up -------------------------------------------------------------
@@ -93,8 +98,36 @@ export const AdminAccountRowDtoSchema = z
     organisations: z.array(z.string().max(300)).max(50),
   })
   .strict();
+/**
+ * The browse lists' query (admin design 2026-11-19 §4 T2): an optional
+ * search, a sort, an opaque cursor and a page size. No offset: a cursor
+ * from a different sort is ignored and the list starts again.
+ */
+export const ADMIN_LIST_SORTS = [
+  "newest",
+  "oldest",
+  "name_asc",
+  "name_desc",
+] as const;
+export const AdminListSortSchema = z.enum(ADMIN_LIST_SORTS);
+export type AdminListSort = z.infer<typeof AdminListSortSchema>;
+export const AdminListQuerySchema = z
+  .object({
+    q: z.string().max(100).optional(),
+    sort: AdminListSortSchema.optional(),
+    cursor: z.string().max(400).optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+export type AdminListQuery = z.infer<typeof AdminListQuerySchema>;
+
 export const AdminAccountListDtoSchema = z
-  .object({ rows: z.array(AdminAccountRowDtoSchema).max(25) })
+  .object({
+    rows: z.array(AdminAccountRowDtoSchema).max(50),
+    nextCursor: z.string().max(400).nullable(),
+    /** How many match the search, across every page. */
+    total: Tally,
+  })
   .strict();
 export type AdminAccountRowDto = z.infer<typeof AdminAccountRowDtoSchema>;
 
@@ -158,8 +191,59 @@ export const AdminOrganisationRowDtoSchema = z
   })
   .strict();
 export const AdminOrganisationListDtoSchema = z
-  .object({ rows: z.array(AdminOrganisationRowDtoSchema).max(25) })
+  .object({
+    rows: z.array(AdminOrganisationRowDtoSchema).max(50),
+    nextCursor: z.string().max(400).nullable(),
+    total: Tally,
+  })
   .strict();
+
+/**
+ * T1: what the overview adds to the existing reads. Spend counts priced
+ * calls only; calls with no price are a count of their own. The outbox
+ * says how many events wait to be handed to the queue and how long the
+ * oldest has waited. `apiVersion` is the deployed commit when the host
+ * says it, else null (never guessed).
+ */
+const Usd = z.string().regex(/^\d{1,12}(\.\d{1,8})?$/u);
+export const AdminConsoleOverviewDtoSchema = z
+  .object({
+    activeOrganisations: Tally,
+    spend: z
+      .object({
+        month: z.string().regex(/^\d{4}-\d{2}$/u),
+        pricedUsd: Usd,
+        pricedCalls: Tally,
+        unpricedCalls: Tally,
+      })
+      .strict(),
+    daily: z
+      .array(
+        z
+          .object({
+            day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+            pricedUsd: Usd,
+            calls: Tally,
+            unpricedCalls: Tally,
+          })
+          .strict(),
+      )
+      .max(31),
+    outbox: z
+      .object({
+        pending: Tally,
+        oldestPendingSeconds: Tally.nullable(),
+      })
+      .strict(),
+    apiVersion: z
+      .string()
+      .regex(/^[0-9a-f]{7,40}$/u)
+      .nullable(),
+  })
+  .strict();
+export type AdminConsoleOverviewDto = z.infer<
+  typeof AdminConsoleOverviewDtoSchema
+>;
 export type AdminOrganisationRowDto = z.infer<
   typeof AdminOrganisationRowDtoSchema
 >;

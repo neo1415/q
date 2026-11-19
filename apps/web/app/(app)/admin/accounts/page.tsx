@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { searchAdminAccounts } from "@capital-q/api-client";
-import { EmptyState, ErrorState } from "@capital-q/ui/states";
+import { listAdminAccounts } from "@capital-q/api-client";
+import type { AdminAccountRowDto } from "@capital-q/contracts";
 
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
-import { SearchForm } from "@/features/admin/search-form";
+import {
+  AdminDataTable,
+  viewFrom,
+  type AdminTableColumn,
+} from "@/features/admin/data-table";
 import { when } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
@@ -16,83 +19,86 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("Accounts · Admin") };
 }
 
+const columns = (
+  t: (english: string) => string,
+): readonly AdminTableColumn<AdminAccountRowDto>[] => [
+  {
+    id: "name",
+    label: "Name",
+    sort: { asc: "name_asc", desc: "name_desc" },
+    cell: (row) => row.name ?? t("Unnamed member"),
+  },
+  { id: "email", label: "Email", cell: (row) => row.email ?? "—" },
+  {
+    id: "organisations",
+    label: "Organisations",
+    cell: (row) =>
+      row.organisations.length === 0 ? "—" : row.organisations.join(", "),
+  },
+  {
+    id: "status",
+    label: "Status",
+    cell: (row) => (row.suspended ? t("Suspended") : t("Active")),
+  },
+  {
+    id: "joined",
+    label: "Joined",
+    sort: { asc: "oldest", desc: "newest" },
+    cell: (row) => when(row.createdAt),
+  },
+];
+
+/**
+ * Accounts (admin design 2026-11-19 §4 T2): every person on Capital Q,
+ * newest first, on open; the search narrows the list. The API decides who
+ * may read it (accounts.read); anyone else gets this route's 404.
+ */
 export default async function AdminAccountsPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly q?: string | undefined }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await serverT();
-
   const context = await adminContext();
   if (context === null || !context.can("accounts.read")) notFound();
-  const q = ((await searchParams).q ?? "").trim();
-  const rows =
-    q.length < 2
-      ? []
-      : await searchAdminAccounts(context.session, q)
-          .then((result) => result.rows)
-          .catch(() => null);
+  const view = viewFrom(await searchParams);
+  const page = await listAdminAccounts(context.session, {
+    ...(view.q.length > 0 ? { q: view.q } : {}),
+    sort: view.sort,
+    ...(view.cursor === undefined ? {} : { cursor: view.cursor }),
+    limit: 25,
+  }).catch(() => null);
   return (
     <PageSection
       id="accounts"
       title={t("Accounts")}
       description={t(
-        "Search by name, email or handle. Private chats are never shown here.",
+        "Every person on Capital Q. Search by name, email or handle. Private chats are never shown here.",
       )}
     >
-      <div className="flex flex-col gap-4">
-        <SearchForm
-          action="/admin/accounts"
-          value={q}
-          label={t("Search accounts")}
-          placeholder={t("Name, email or handle")}
-        />
-        {rows === null ? (
-          <ErrorState
-            title={t("Accounts couldn't load")}
-            description={t("Try again in a moment.")}
-          />
-        ) : q.length < 2 ? (
-          <EmptyState
-            compact
-            title={t("Search for an account")}
-            description={t("Type at least 2 characters.")}
-          />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            compact
-            title={t("No accounts match")}
-            description={t(`Nothing found for "${q}".`)}
-          />
-        ) : (
-          <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-            {rows.map((row) => (
-              <li key={row.userId}>
-                <Link
-                  href={`/admin/accounts/${row.userId}`}
-                  className="flex min-h-11 flex-col gap-0.5 py-3 hover:bg-(--cq-surface-subtle)"
-                >
-                  <span className="cq-body text-(--cq-text-primary)">
-                    {row.name ?? t("Unnamed member")}
-                    {row.suspended ? " · Suspended" : ""}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {t(
-                      [
-                        row.email,
-                        row.organisations.join(", "),
-                        `joined ${when(row.createdAt)}`,
-                      ]
-                        .filter((part) => part !== null && part !== "")
-                        .join(" · "),
-                    )}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <AdminDataTable
+        title="Accounts"
+        noun="accounts"
+        basePath="/admin/accounts"
+        csvPath="/admin/accounts.csv"
+        columns={columns(t)}
+        rows={page?.rows ?? null}
+        rowKey={(row) => row.userId}
+        rowHref={(row) => `/admin/accounts/${row.userId}`}
+        primary={(row) =>
+          `${row.name ?? t("Unnamed member")}${row.suspended ? t(" · Suspended") : ""}`
+        }
+        secondary={(row) =>
+          [row.email, `joined ${when(row.createdAt)}`]
+            .filter((part) => part !== null && part !== "")
+            .join(" · ")
+        }
+        view={view}
+        total={page?.total ?? null}
+        nextCursor={page?.nextCursor ?? null}
+        searchLabel="Search accounts"
+        placeholder="Name, email or handle"
+      />
     </PageSection>
   );
 }

@@ -343,6 +343,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
 
   // Capital Q's own operators; never Q's to act on, never a tenant's.
+  // T1 (admin design 2026-11-19): the console overview's own figures.
+  "api/http/admin.ts GET ADMIN_CONSOLE_OVERVIEW_PATH": exempt(
+    "operators' console overview (overview.read); the API refuses everyone else and no Q tool reads it",
+  ),
   "api/http/admin.ts GET ADMIN_OVERVIEW_PATH": exempt(
     "Capital Q's admin console: platform operators only, not a person's own action",
   ),

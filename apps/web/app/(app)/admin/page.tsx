@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import {
   getAdminAttribution,
   getAdminBreakGlass,
+  getAdminConsoleOverview,
+  getAdminEmail,
+  searchAdminAudit,
   getAdminDisputes,
   getAdminPaused,
   getAdminOverview,
@@ -19,6 +22,18 @@ import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 import { PageSection } from "@/components/app-shell/page-container";
 import { formatDay } from "@/components/date-format";
 import { adminContext } from "@/features/admin/admin-context";
+import { auditResourceNames } from "@/features/admin/audit-names";
+import {
+  HeadlineBand,
+  HealthPanel,
+  NeedsYou,
+  RecentActivity,
+  SpendPanel,
+  type Headline,
+  type Queue,
+} from "@/features/admin/console-overview";
+import { usd } from "@/features/admin/spend-words";
+import { systemHealth, webVersion } from "@/features/admin/system-health";
 import { serverT } from "@/features/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -112,7 +127,25 @@ export default async function AdminPage() {
         () => null,
       )
     : null;
-  const queues = [
+  // T1 (admin design 2026-11-19): the overview's own figures, the email
+  // panel's delivery counts, recent operator activity and what the
+  // services say about themselves. Each is read only for a role that may.
+  const [consoleFigures, email, recent, services] = await Promise.all([
+    getAdminConsoleOverview(session).catch(() => null),
+    can("email.read") ? getAdminEmail(session).catch(() => null) : null,
+    can("audit.read")
+      ? searchAdminAudit(session, { source: "PLATFORM", limit: 6 }).then(
+          (page) => page.rows,
+          () => null,
+        )
+      : null,
+    systemHealth(),
+  ]);
+  const names =
+    recent === null
+      ? new Map<string, string>()
+      : await auditResourceNames(session, recent, can("accounts.read"));
+  const queueList: readonly Queue[] = [
     {
       term: "Verification waiting",
       value: verification,
@@ -129,17 +162,84 @@ export default async function AdminPage() {
       value: glass,
       href: "/admin/safety#break-glass",
     },
+  ].flatMap((queue) =>
+    queue.value === null ? [] : [{ ...queue, value: queue.value }],
+  );
+  const waitingTotal = queueList.reduce((sum, queue) => sum + queue.value, 0);
+  const sent = email?.deliveries.reduce((sum, row) => sum + row.sent, 0);
+  const failed = email?.deliveries.reduce((sum, row) => sum + row.failed, 0);
+  const headlines: readonly Headline[] = [
+    ...(consoleFigures === null
+      ? []
+      : [
+          {
+            term: "Active organisations",
+            value: consoleFigures.activeOrganisations.toLocaleString("en-GB"),
+            href: "/admin/organisations",
+          },
+        ]),
     {
-      term: "Q failures (24 hours)",
-      value:
-        monitor === null
-          ? null
-          : monitor.calls.failed +
-            (monitor.runsByStatus.find((row) => row.status === "FAILED")
-              ?.runs ?? 0),
-      href: "/admin/q",
+      term: "People",
+      value: overview.people.toLocaleString("en-GB"),
+      ...(can("accounts.read") ? { href: "/admin/accounts" } : {}),
     },
-  ].filter((queue) => queue.value !== null);
+    ...(queueList.length === 0
+      ? []
+      : [
+          {
+            term: "Waiting on operators",
+            value: String(waitingTotal),
+            href: "/admin/queue",
+          },
+        ]),
+    ...(consoleFigures === null
+      ? []
+      : [
+          {
+            term: "Model spend this month",
+            value: usd(consoleFigures.spend.pricedUsd),
+            note:
+              consoleFigures.spend.unpricedCalls === 0
+                ? `${consoleFigures.spend.pricedCalls.toLocaleString("en-GB")} priced calls`
+                : `${consoleFigures.spend.unpricedCalls.toLocaleString("en-GB")} calls had no price`,
+          },
+        ]),
+    ...(sent === undefined || failed === undefined
+      ? []
+      : [
+          {
+            term: "Emails, 30 days",
+            value: `${sent.toLocaleString("en-GB")} sent`,
+            note:
+              failed === 0
+                ? "None failed"
+                : `${failed.toLocaleString("en-GB")} failed`,
+            href: "/admin/email",
+          },
+        ]),
+    ...(monitor === null
+      ? []
+      : [
+          {
+            term: "Q failures, 24 hours",
+            value: String(
+              monitor.calls.failed +
+                (monitor.runsByStatus.find((row) => row.status === "FAILED")
+                  ?.runs ?? 0),
+            ),
+            href: "/admin/q",
+          },
+        ]),
+  ];
+  const versions = [
+    ...(consoleFigures?.apiVersion === null ||
+    consoleFigures?.apiVersion === undefined
+      ? []
+      : [{ service: "API", sha: consoleFigures.apiVersion }]),
+    ...(webVersion() === null
+      ? []
+      : [{ service: "Web", sha: webVersion() ?? "" }]),
+  ];
   const figures = [
     { term: "People", value: String(overview.people) },
     { term: "Companies", value: String(overview.companies) },
@@ -156,28 +256,28 @@ export default async function AdminPage() {
   ];
   return (
     <div className="flex flex-col gap-10">
-      {queues.length === 0 ? null : (
-        <PageSection id="queues" title={t("Waiting on you")}>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {queues.map((queue) => (
-              <li key={queue.term}>
-                <a
-                  href={queue.href}
-                  className="flex min-h-11 flex-col gap-1 rounded-lg border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
-                >
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {t(queue.term)}
-                  </span>
-                  <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
-                    {String(queue.value)}
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </PageSection>
-      )}
-      <PageSection id="overview" title={t("Overview")}>
+      <div className="flex flex-col gap-4" data-console-overview>
+        <HeadlineBand figures={headlines} />
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <NeedsYou queues={queueList} />
+            {consoleFigures === null ? null : (
+              <SpendPanel overview={consoleFigures} />
+            )}
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <HealthPanel
+              services={services}
+              outbox={consoleFigures?.outbox ?? null}
+              versions={versions}
+            />
+            {recent === null && !can("audit.read") ? null : (
+              <RecentActivity rows={recent} names={names} />
+            )}
+          </div>
+        </div>
+      </div>
+      <PageSection id="overview" title={t("The network")}>
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {figures.map((figure) => (
             <div key={figure.term} className="flex flex-col gap-1">

@@ -5,6 +5,7 @@ import {
   ADMIN_ACCOUNT_SUSPENSION_PATH,
   ADMIN_ACCOUNTS_PATH,
   ADMIN_AUDIT_PATH,
+  ADMIN_CONSOLE_OVERVIEW_PATH,
   ADMIN_BREAK_GLASS_CHAT_PATH,
   ADMIN_BREAK_GLASS_DECISION_PATH,
   ADMIN_BREAK_GLASS_PATH,
@@ -29,6 +30,8 @@ import {
   AdminAccountListDtoSchema,
   AdminAuditPageDtoSchema,
   AdminBreakGlassChatDtoSchema,
+  AdminConsoleOverviewDtoSchema,
+  type AdminListQuery,
   AdminBreakGlassCreatedDtoSchema,
   AdminBreakGlassDecisionDtoSchema,
   AdminBreakGlassListDtoSchema,
@@ -87,6 +90,36 @@ export const searchAdminAccounts = (session: ApiSession, q: string) =>
     "GET",
     `${ADMIN_ACCOUNTS_PATH}${query({ q })}`,
     AdminAccountListDtoSchema,
+  );
+
+/** T2: the accounts list, open with rows; `q` narrows it. */
+export const listAdminAccounts = (session: ApiSession, list: AdminListQuery) =>
+  call(
+    session,
+    "GET",
+    `${ADMIN_ACCOUNTS_PATH}${query({ ...list })}`,
+    AdminAccountListDtoSchema,
+  );
+
+/** T2: the organisations list, open with rows; `q` narrows it. */
+export const listAdminOrganisations = (
+  session: ApiSession,
+  list: AdminListQuery,
+) =>
+  call(
+    session,
+    "GET",
+    `${ADMIN_ORGANISATIONS_PATH}${query({ ...list })}`,
+    AdminOrganisationListDtoSchema,
+  );
+
+/** T1: the overview's spend by day, active organisations and outbox. */
+export const getAdminConsoleOverview = (session: ApiSession) =>
+  call(
+    session,
+    "GET",
+    ADMIN_CONSOLE_OVERVIEW_PATH,
+    AdminConsoleOverviewDtoSchema,
   );
 
 export const getAdminAccount = (session: ApiSession, userId: string) =>

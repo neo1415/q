@@ -124,7 +124,6 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "section.prospects", kind: "SECTION" },
   { id: "section.publish", kind: "SECTION" },
   { id: "section.q-questions", kind: "SECTION" },
-  { id: "section.queues", kind: "SECTION" },
   { id: "section.readiness", kind: "SECTION" },
   { id: "section.readiness-blueprint", kind: "SECTION" },
   { id: "section.refusals", kind: "SECTION" },

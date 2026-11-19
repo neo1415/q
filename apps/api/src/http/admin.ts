@@ -37,6 +37,7 @@ import {
   ADMIN_ORGANISATION_SUSPENSION_PATH,
   ADMIN_ORGANISATIONS_PATH,
   ADMIN_OVERVIEW_PATH,
+  ADMIN_CONSOLE_OVERVIEW_PATH,
   ADMIN_PAUSED_PATH,
   ADMIN_Q_ERRORS_PATH,
   ADMIN_Q_MONITOR_PATH,
@@ -51,6 +52,8 @@ import {
   ADMIN_VERIFICATION_PATH,
   AdminAccountDetailDtoSchema,
   AdminAccountListDtoSchema,
+  AdminConsoleOverviewDtoSchema,
+  AdminListQuerySchema,
   AdminAuditPageDtoSchema,
   AdminAuditQuerySchema,
   AdminBreakGlassChatDtoSchema,
@@ -354,6 +357,25 @@ export function registerAdminRoutes(
     },
   );
 
+  // T1 (admin design 2026-11-19): spend by day, active organisations and
+  // the outbox, for the overview; overview.read, like the overview itself.
+  app.get(
+    ADMIN_CONSOLE_OVERVIEW_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "overview.read");
+      if (grant === null) return reply;
+      const sha = process.env["RAILWAY_GIT_COMMIT_SHA"];
+      return AdminConsoleOverviewDtoSchema.parse({
+        ...(await admin.consoleOverview(grant)),
+        apiVersion:
+          sha !== undefined && /^[0-9a-f]{7,40}$/u.test(sha)
+            ? sha.slice(0, 9)
+            : null,
+      });
+    },
+  );
+
   app.get(
     ADMIN_ATTRIBUTION_PATH,
     { onRequest: withContext },
@@ -409,11 +431,14 @@ export function registerAdminRoutes(
     async (request, reply) => {
       const grant = await guard(request, reply, "accounts.read");
       if (grant === null) return reply;
-      const q = (request.query as { q?: unknown }).q;
-      const term = typeof q === "string" ? q.trim() : "";
-      return AdminAccountListDtoSchema.parse({
-        rows: term.length < 2 ? [] : await admin.searchAccounts(grant, term),
-      });
+      // T2: open with rows, newest first; a search only narrows them.
+      const parsed = AdminListQuerySchema.safeParse(request.query ?? {});
+      if (!parsed.success) {
+        return send(request, reply, "VALIDATION_FAILED", "Check the filters.");
+      }
+      return AdminAccountListDtoSchema.parse(
+        await admin.listAccounts(grant, parsed.data),
+      );
     },
   );
 
@@ -468,12 +493,13 @@ export function registerAdminRoutes(
     async (request, reply) => {
       const grant = await guard(request, reply, "accounts.read");
       if (grant === null) return reply;
-      const q = (request.query as { q?: unknown }).q;
-      const term = typeof q === "string" ? q.trim() : "";
-      return AdminOrganisationListDtoSchema.parse({
-        rows:
-          term.length < 2 ? [] : await admin.searchOrganisations(grant, term),
-      });
+      const parsed = AdminListQuerySchema.safeParse(request.query ?? {});
+      if (!parsed.success) {
+        return send(request, reply, "VALIDATION_FAILED", "Check the filters.");
+      }
+      return AdminOrganisationListDtoSchema.parse(
+        await admin.listOrganisations(grant, parsed.data),
+      );
     },
   );
 
