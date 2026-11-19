@@ -1,0 +1,3006 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Capital Q admin mockup</title>
+    <!--
+  Static mockup for docs/design/admin-2026-11-19/DESIGN.md. Not product code.
+  Token values are copied verbatim from packages/ui/src/tokens/tokens.css
+  (light :root and dark) on fix/resume-asking-cv9ru3 @ 0b5581d3e. All names
+  and figures are fictional.
+  Screens: #overview  #organisations  #organisation  #members  (add "-k" to
+  open the command palette, e.g. #overview-k). Theme: ?theme=dark|light.
+-->
+    <style>
+      :root {
+        color-scheme: light;
+        --cq-font-ui:
+          -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        --cq-font-mono:
+          ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        --cq-canvas: oklch(0.962 0 0);
+        --cq-surface: oklch(1 0 0);
+        --cq-surface-raised: oklch(1 0 0);
+        --cq-surface-subtle: oklch(0.95 0 0);
+        --cq-surface-strong: oklch(0.925 0 0);
+        --cq-surface-sunken: oklch(0.948 0 0);
+        --cq-panel-surface: oklch(0.992 0 0);
+        --cq-text-primary: oklch(0.19 0.012 258);
+        --cq-text-secondary: oklch(0.43 0.012 258);
+        --cq-text-tertiary: oklch(0.53 0.01 258);
+        --cq-text-inverse: oklch(0.98 0.004 92);
+        --cq-border-subtle: oklch(0.895 0.006 258);
+        --cq-border: oklch(0.845 0.008 258);
+        --cq-border-strong: oklch(0.62 0.012 258);
+        --cq-accent: oklch(0.53 0.18 258);
+        --cq-accent-soft: oklch(0.94 0.035 258);
+        --cq-positive: oklch(0.5 0.13 151);
+        --cq-positive-soft: oklch(0.95 0.035 151);
+        --cq-warning: oklch(0.53 0.12 70);
+        --cq-warning-soft: oklch(0.96 0.045 78);
+        --cq-danger: oklch(0.56 0.2 27);
+        --cq-danger-soft: oklch(0.95 0.04 27);
+        --cq-focus-ring: var(--cq-accent);
+        --cq-overlay: oklch(0.19 0.012 258 / 0.42);
+        --cq-shadow-xs: 0 1px 2px oklch(0.19 0.012 258 / 0.06);
+        --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
+        --cq-charcoal: oklch(0.33 0.014 70);
+        --cq-on-charcoal: oklch(0.96 0.014 85);
+        --cq-gold-action: oklch(0.55 0.11 78);
+        --cq-gold-action-hover: oklch(0.5 0.1 76);
+        --cq-on-gold-action: oklch(0.99 0.004 92);
+        --cq-gold-action-soft: oklch(0.95 0.035 85);
+        --cq-admin-scope: var(--cq-charcoal);
+        --cq-on-admin-scope: var(--cq-on-charcoal);
+        --cq-radius-xs: 4px;
+        --cq-radius-sm: 6px;
+        --cq-radius-md: 8px;
+        --cq-radius-lg: 12px;
+        --cq-radius-full: 9999px;
+        --cq-z-sticky: 10;
+        --cq-z-navigation: 20;
+        --cq-z-modal: 50;
+        --cq-header-height: 52px;
+        --cq-sidebar-width: 240px;
+        --cq-page-gutter: 16px;
+        --cq-motion-fast: 140ms;
+        --cq-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      @media (min-width: 640px) {
+        :root {
+          --cq-page-gutter: 24px;
+        }
+      }
+      @media (min-width: 1024px) {
+        :root {
+          --cq-page-gutter: 32px;
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          color-scheme: dark;
+          --cq-canvas: oklch(0.248 0 0);
+          --cq-surface: oklch(0.268 0 0);
+          --cq-surface-raised: oklch(0.302 0 0);
+          --cq-surface-subtle: oklch(0.285 0 0);
+          --cq-surface-strong: oklch(0.34 0 0);
+          --cq-surface-sunken: oklch(0.205 0 0);
+          --cq-panel-surface: oklch(0.268 0 0);
+          --cq-text-primary: oklch(0.95 0.005 92);
+          --cq-text-secondary: oklch(0.8 0 0);
+          --cq-text-tertiary: oklch(0.7 0 0);
+          --cq-text-inverse: oklch(0.205 0 0);
+          --cq-border-subtle: oklch(0.31 0 0);
+          --cq-border: oklch(0.37 0 0);
+          --cq-border-strong: oklch(0.56 0 0);
+          --cq-accent: oklch(0.72 0.15 258);
+          --cq-accent-soft: oklch(0.27 0.06 258);
+          --cq-positive: oklch(0.72 0.12 151);
+          --cq-positive-soft: oklch(0.27 0.05 151);
+          --cq-warning: oklch(0.79 0.12 78);
+          --cq-warning-soft: oklch(0.3 0.06 78);
+          --cq-danger: oklch(0.7 0.16 27);
+          --cq-danger-soft: oklch(0.28 0.06 27);
+          --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+          --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+          --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+          --cq-charcoal: oklch(0.86 0.018 80);
+          --cq-on-charcoal: oklch(0.2 0.012 70);
+          --cq-gold-action: oklch(0.78 0.12 84);
+          --cq-gold-action-hover: oklch(0.83 0.11 86);
+          --cq-on-gold-action: oklch(0.2 0.03 75);
+          --cq-gold-action-soft: oklch(0.29 0.045 80);
+          --cq-admin-scope: oklch(0.205 0 0);
+          --cq-on-admin-scope: oklch(0.95 0.005 92);
+        }
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --cq-canvas: oklch(0.248 0 0);
+        --cq-surface: oklch(0.268 0 0);
+        --cq-surface-raised: oklch(0.302 0 0);
+        --cq-surface-subtle: oklch(0.285 0 0);
+        --cq-surface-strong: oklch(0.34 0 0);
+        --cq-surface-sunken: oklch(0.205 0 0);
+        --cq-panel-surface: oklch(0.268 0 0);
+        --cq-text-primary: oklch(0.95 0.005 92);
+        --cq-text-secondary: oklch(0.8 0 0);
+        --cq-text-tertiary: oklch(0.7 0 0);
+        --cq-text-inverse: oklch(0.205 0 0);
+        --cq-border-subtle: oklch(0.31 0 0);
+        --cq-border: oklch(0.37 0 0);
+        --cq-border-strong: oklch(0.56 0 0);
+        --cq-accent: oklch(0.72 0.15 258);
+        --cq-accent-soft: oklch(0.27 0.06 258);
+        --cq-positive: oklch(0.72 0.12 151);
+        --cq-positive-soft: oklch(0.27 0.05 151);
+        --cq-warning: oklch(0.79 0.12 78);
+        --cq-warning-soft: oklch(0.3 0.06 78);
+        --cq-danger: oklch(0.7 0.16 27);
+        --cq-danger-soft: oklch(0.28 0.06 27);
+        --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+        --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+        --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+        --cq-charcoal: oklch(0.86 0.018 80);
+        --cq-on-charcoal: oklch(0.2 0.012 70);
+        --cq-gold-action: oklch(0.78 0.12 84);
+        --cq-gold-action-hover: oklch(0.83 0.11 86);
+        --cq-on-gold-action: oklch(0.2 0.03 75);
+        --cq-gold-action-soft: oklch(0.29 0.045 80);
+        --cq-admin-scope: oklch(0.205 0 0);
+        --cq-on-admin-scope: oklch(0.95 0.005 92);
+      }
+
+      /* ---------- base ---------- */
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--cq-canvas);
+        color: var(--cq-text-primary);
+        font: 14px/1.45 var(--cq-font-ui);
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 2px solid var(--cq-focus-ring);
+        outline-offset: 2px;
+        border-radius: var(--cq-radius-xs);
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+      .muted {
+        color: var(--cq-text-secondary);
+      }
+      .faint {
+        color: var(--cq-text-tertiary);
+      }
+      .sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+      svg.i {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      /* ---------- shell ---------- */
+      .screen {
+        display: none;
+      }
+      .screen.on {
+        display: block;
+      }
+      .shell {
+        display: grid;
+        grid-template-columns: var(--cq-sidebar-width) 1fr;
+        min-height: 100vh;
+      }
+      .side {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+        background: var(--cq-panel-surface);
+        border-right: 1px solid var(--cq-border-subtle);
+        display: flex;
+        flex-direction: column;
+        z-index: var(--cq-z-navigation);
+      }
+      .side-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        min-height: var(--cq-header-height);
+        border-bottom: 1px solid var(--cq-border-subtle);
+      }
+      .mark {
+        width: 22px;
+        height: 22px;
+        border-radius: var(--cq-radius-full);
+        border: 2px solid var(--cq-text-primary);
+        position: relative;
+        flex: none;
+      }
+      .mark::after {
+        content: "";
+        position: absolute;
+        width: 7px;
+        height: 2px;
+        background: var(--cq-text-primary);
+        right: -4px;
+        bottom: 1px;
+        transform: rotate(45deg);
+      }
+      .side-title {
+        font-weight: 600;
+        font-size: 14px;
+        line-height: 1.2;
+      }
+      .side-title small {
+        display: block;
+        font-weight: 400;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+      }
+      .side nav {
+        padding: 8px 8px 16px;
+        flex: 1;
+      }
+      .group {
+        margin-top: 14px;
+      }
+      .group h2 {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--cq-text-tertiary);
+        margin: 0 8px 4px;
+      }
+      .nav-a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 34px;
+        padding: 0 8px;
+        border-radius: var(--cq-radius-sm);
+        color: var(--cq-text-secondary);
+        position: relative;
+      }
+      .nav-a:hover {
+        background: var(--cq-surface-subtle);
+        color: var(--cq-text-primary);
+      }
+      .nav-a[aria-current="page"] {
+        background: var(--cq-gold-action-soft);
+        color: var(--cq-text-primary);
+        font-weight: 500;
+      }
+      .nav-a[aria-current="page"]::before {
+        content: "";
+        position: absolute;
+        left: -8px;
+        top: 8px;
+        bottom: 8px;
+        width: 3px;
+        border-radius: 2px;
+        background: var(--cq-gold-action);
+      }
+      .nav-a .count {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+        font-variant-numeric: tabular-nums;
+      }
+      .nav-a .count.due {
+        color: var(--cq-warning);
+        font-weight: 600;
+      }
+      .side-foot {
+        border-top: 1px solid var(--cq-border-subtle);
+        padding: 12px 16px;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      /* The scope bar: the one memorable element. It says, at all times, whose
+   authority you are acting under and what it can touch. */
+      .scope {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        min-height: 36px;
+        padding: 6px var(--cq-page-gutter);
+        background: var(--cq-admin-scope);
+        color: var(--cq-on-admin-scope);
+        font-size: 12.5px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+      }
+      .scope b {
+        font-weight: 600;
+      }
+      .scope .sep {
+        width: 1px;
+        height: 14px;
+        background: currentColor;
+        opacity: 0.35;
+      }
+      .scope .right {
+        margin-left: auto;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .scope.org {
+        background: var(--cq-surface-strong);
+        color: var(--cq-text-primary);
+      }
+      .top {
+        position: sticky;
+        top: 0;
+        z-index: var(--cq-z-sticky);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: var(--cq-header-height);
+        padding: 0 var(--cq-page-gutter);
+        background: var(--cq-canvas);
+        border-bottom: 1px solid var(--cq-border-subtle);
+      }
+      .crumbs {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .crumbs a:hover {
+        color: var(--cq-text-primary);
+        text-decoration: underline;
+      }
+      .crumbs [aria-current] {
+        color: var(--cq-text-primary);
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        width: 320px;
+        max-width: 40vw;
+        padding: 0 10px;
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-md);
+        background: var(--cq-surface);
+        color: var(--cq-text-tertiary);
+        cursor: pointer;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .search span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      kbd {
+        font: 11px/1 var(--cq-font-mono);
+        padding: 3px 5px;
+        border: 1px solid var(--cq-border);
+        border-bottom-width: 2px;
+        border-radius: var(--cq-radius-xs);
+        color: var(--cq-text-secondary);
+        background: var(--cq-surface-subtle);
+      }
+      .search kbd {
+        margin-left: auto;
+      }
+      .menu-btn {
+        display: none;
+      }
+      .content {
+        padding: 24px var(--cq-page-gutter) 64px;
+        max-width: 1360px;
+        width: 100%;
+      }
+
+      /* ---------- page header ---------- */
+      .ph {
+        display: flex;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .ph h1 {
+        font-size: 24px;
+        line-height: 1.2;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .ph p {
+        margin: 4px 0 0;
+        color: var(--cq-text-secondary);
+        max-width: 68ch;
+      }
+      .ph .actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--cq-radius-md);
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface);
+        font-weight: 500;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn:hover {
+        border-color: var(--cq-border-strong);
+      }
+      .btn.primary {
+        background: var(--cq-gold-action);
+        border-color: var(--cq-gold-action);
+        color: var(--cq-on-gold-action);
+      }
+      .btn.primary:hover {
+        background: var(--cq-gold-action-hover);
+      }
+      .btn.quiet {
+        border-color: transparent;
+        background: transparent;
+        color: var(--cq-text-secondary);
+      }
+      .btn.danger {
+        color: var(--cq-danger);
+      }
+      .btn .lock {
+        opacity: 0.8;
+      }
+
+      /* ---------- panels ---------- */
+      .panel {
+        background: var(--cq-surface);
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+      }
+      .panel-h {
+        display: flex;
+        align-items: baseline;
+        gap: 4px 12px;
+        flex-wrap: wrap;
+        padding: 14px 16px 10px;
+      }
+      .panel-h h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .panel-h .more {
+        margin-left: auto;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+      }
+      .panel-h .more:hover {
+        color: var(--cq-text-primary);
+        text-decoration: underline;
+      }
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+      .g-main {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      }
+
+      /* KPI strip: one band with hairline dividers, not a row of cards. */
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        background: var(--cq-surface);
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        margin-bottom: 16px;
+      }
+      .kpi {
+        padding: 14px 16px;
+        border-left: 1px solid var(--cq-border-subtle);
+        min-width: 0;
+      }
+      .kpi:first-child {
+        border-left: 0;
+      }
+      .kpi .label {
+        font-size: 12.5px;
+        color: var(--cq-text-secondary);
+      }
+      .kpi .value {
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin-top: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      .kpi .delta {
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .kpi .delta.up {
+        color: var(--cq-positive);
+      }
+      .kpi .delta.warn {
+        color: var(--cq-warning);
+      }
+      .kpi a.value:hover {
+        text-decoration: underline;
+      }
+
+      /* tables */
+      .tbl-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        font-weight: 500;
+        color: var(--cq-text-secondary);
+        font-size: 12.5px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        white-space: nowrap;
+        background: var(--cq-surface);
+        position: sticky;
+        top: 0;
+      }
+      th button {
+        all: unset;
+        cursor: pointer;
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      td {
+        padding: 0 12px;
+        height: 44px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        white-space: nowrap;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      tbody tr:hover td {
+        background: var(--cq-surface-subtle);
+      }
+      tr.sel td {
+        background: var(--cq-gold-action-soft);
+      }
+      td.r,
+      th.r {
+        text-align: right;
+      }
+      td .name {
+        font-weight: 500;
+        color: var(--cq-text-primary);
+      }
+      td .sub {
+        display: block;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+      }
+      .cb {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--cq-gold-action);
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex: none;
+        background: var(--cq-text-tertiary);
+      }
+      .dot.ok {
+        background: var(--cq-positive);
+      }
+      .dot.warn {
+        background: var(--cq-warning);
+      }
+      .dot.bad {
+        background: var(--cq-danger);
+      }
+      .dot.hollow {
+        background: transparent;
+        border: 1.5px solid var(--cq-text-tertiary);
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: var(--cq-radius-full);
+        font-size: 12px;
+        background: var(--cq-surface-strong);
+        color: var(--cq-text-primary);
+      }
+      .bar {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--cq-surface-strong);
+        overflow: hidden;
+        min-width: 64px;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        background: var(--cq-text-secondary);
+        border-radius: 3px;
+      }
+      .bar.high > span {
+        background: var(--cq-warning);
+      }
+
+      /* toolbar, views, bulk */
+      .views {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        margin-bottom: 12px;
+        overflow-x: auto;
+      }
+      .views a {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 12px;
+        color: var(--cq-text-secondary);
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      .views a[aria-current] {
+        color: var(--cq-text-primary);
+        border-bottom-color: var(--cq-text-primary);
+        font-weight: 500;
+      }
+      .views a .num {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+      }
+      .views .add {
+        color: var(--cq-text-tertiary);
+      }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 10px;
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-md);
+        background: var(--cq-surface);
+        min-width: 240px;
+        color: var(--cq-text-tertiary);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 1px dashed var(--cq-border-strong);
+        border-radius: var(--cq-radius-full);
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        background: transparent;
+        cursor: pointer;
+      }
+      .chip.set {
+        border-style: solid;
+        border-color: var(--cq-border);
+        background: var(--cq-surface);
+        color: var(--cq-text-primary);
+      }
+      .chip.set b {
+        font-weight: 500;
+      }
+      .toolbar .end {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .bulk {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--cq-admin-scope);
+        color: var(--cq-on-admin-scope);
+        border-radius: var(--cq-radius-md);
+        margin-bottom: 8px;
+        font-size: 13px;
+        flex-wrap: wrap;
+      }
+      .bulk .btn {
+        background: transparent;
+        color: inherit;
+        border-color: color-mix(in oklch, currentColor 35%, transparent);
+        min-height: 32px;
+      }
+      .tfoot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-top: 1px solid var(--cq-border-subtle);
+        font-size: 12.5px;
+        color: var(--cq-text-secondary);
+      }
+      .tfoot .end {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+
+      /* lists used on both sizes */
+      .rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .rows li {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 16px;
+        border-top: 1px solid var(--cq-border-subtle);
+        min-height: 52px;
+      }
+      .rows li .t {
+        font-weight: 500;
+      }
+      .rows li .s {
+        font-size: 12.5px;
+        color: var(--cq-text-secondary);
+      }
+      .rows li .end {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .age {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
+      .age.late {
+        color: var(--cq-warning);
+        font-weight: 500;
+      }
+
+      /* timeline */
+      .tl {
+        list-style: none;
+        margin: 0;
+        padding: 4px 16px 16px;
+      }
+      .tl li {
+        position: relative;
+        padding: 8px 0 8px 22px;
+        font-size: 13px;
+      }
+      .tl li::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 14px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--cq-border-strong);
+      }
+      .tl li::after {
+        content: "";
+        position: absolute;
+        left: 7px;
+        top: 24px;
+        bottom: -8px;
+        width: 1px;
+        background: var(--cq-border-subtle);
+      }
+      .tl li:last-child::after {
+        display: none;
+      }
+      .tl .who {
+        font-weight: 500;
+      }
+      .tl .when {
+        display: block;
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+      }
+      .tl .why {
+        display: block;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+      }
+
+      /* health */
+      .health {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0;
+      }
+      .health > div {
+        padding: 9px 16px;
+        border-top: 1px solid var(--cq-border-subtle);
+        font-size: 13px;
+      }
+      .health > div:nth-child(even) {
+        text-align: right;
+        color: var(--cq-text-secondary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* chart */
+      .chart {
+        padding: 4px 16px 12px;
+      }
+      .chart svg {
+        width: 100%;
+        height: 132px;
+        display: block;
+      }
+      .chart .legend {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+        margin-top: 6px;
+        flex-wrap: wrap;
+      }
+      .sw {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+
+      /* entity header + tabs */
+      .entity {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--cq-radius-md);
+        background: var(--cq-surface-strong);
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        font-size: 16px;
+        flex: none;
+      }
+      .entity h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin: 0;
+        line-height: 1.2;
+      }
+      .facts {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        margin-top: 6px;
+      }
+      .facts span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .entity .actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        margin: 16px 0 20px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .tabs a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 12px;
+        color: var(--cq-text-secondary);
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      .tabs a[aria-current] {
+        color: var(--cq-text-primary);
+        border-bottom-color: var(--cq-text-primary);
+        font-weight: 500;
+      }
+      .tabs a .num {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+      }
+      dl.kv {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        margin: 0;
+      }
+      dl.kv dt,
+      dl.kv dd {
+        padding: 9px 16px;
+        border-top: 1px solid var(--cq-border-subtle);
+        margin: 0;
+        font-size: 13px;
+      }
+      dl.kv dt {
+        color: var(--cq-text-secondary);
+      }
+      .meter {
+        padding: 10px 16px;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      .meter .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+      .meter .row .num {
+        color: var(--cq-text-secondary);
+      }
+      .note {
+        font-size: 12.5px;
+        color: var(--cq-text-secondary);
+        padding: 10px 16px 14px;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+
+      /* org-admin subnav */
+      .sub-shell {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 32px;
+      }
+      .subnav h2 {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--cq-text-tertiary);
+        margin: 16px 8px 4px;
+      }
+      .subnav h2:first-child {
+        margin-top: 0;
+      }
+      .subnav a {
+        display: flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 8px;
+        border-radius: var(--cq-radius-sm);
+        color: var(--cq-text-secondary);
+        font-size: 13.5px;
+      }
+      .subnav a:hover {
+        background: var(--cq-surface-subtle);
+        color: var(--cq-text-primary);
+      }
+      .subnav a[aria-current] {
+        background: var(--cq-surface-strong);
+        color: var(--cq-text-primary);
+        font-weight: 500;
+      }
+      .subnav .phone-only {
+        display: none;
+      }
+      .allow {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .allow .meter {
+        border-left: 1px solid var(--cq-border-subtle);
+      }
+      .allow .meter:nth-child(3n + 1) {
+        border-left: 0;
+      }
+      select.role {
+        min-height: 32px;
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-sm);
+        background: var(--cq-surface);
+        padding: 0 8px;
+        font-size: 13px;
+      }
+      .inline-note {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px 16px;
+        border-radius: var(--cq-radius-md);
+        background: var(--cq-surface-subtle);
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        margin-top: 16px;
+      }
+
+      /* command palette */
+      .palette-back {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: var(--cq-overlay);
+        z-index: var(--cq-z-modal);
+      }
+      .palette-back.on {
+        display: block;
+      }
+      .palette {
+        position: absolute;
+        left: 50%;
+        top: 12vh;
+        transform: translateX(-50%);
+        width: min(640px, calc(100vw - 32px));
+        background: var(--cq-surface-raised);
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-lg);
+        box-shadow: var(--cq-shadow-overlay);
+        overflow: hidden;
+      }
+      .palette .q {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        font-size: 15px;
+      }
+      .palette .q .typed {
+        color: var(--cq-text-primary);
+      }
+      .palette .q .caret {
+        width: 1.5px;
+        height: 18px;
+        background: var(--cq-text-primary);
+      }
+      .palette h3 {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--cq-text-tertiary);
+        margin: 10px 16px 4px;
+      }
+      .palette .opt {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px;
+        min-height: 40px;
+        font-size: 13.5px;
+      }
+      .palette .opt .s {
+        color: var(--cq-text-secondary);
+        font-size: 12.5px;
+      }
+      .palette .opt .end {
+        margin-left: auto;
+        color: var(--cq-text-tertiary);
+        font-size: 12px;
+      }
+      .palette .opt[aria-selected="true"] {
+        background: var(--cq-surface-strong);
+      }
+      .palette .foot {
+        display: flex;
+        gap: 14px;
+        padding: 10px 16px;
+        border-top: 1px solid var(--cq-border-subtle);
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+      }
+
+      /* desktop-only vs phone-only */
+      .only-phone {
+        display: none;
+      }
+
+      /* ---------- phone ---------- */
+      @media (max-width: 1023px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .side {
+          display: none;
+        }
+        .menu-btn {
+          display: inline-flex;
+          width: 44px;
+          height: 44px;
+          margin-left: -10px;
+          align-items: center;
+          justify-content: center;
+          border: 0;
+          background: transparent;
+          border-radius: var(--cq-radius-md);
+        }
+        .search {
+          width: 44px;
+          max-width: none;
+          padding: 0;
+          justify-content: center;
+          border-color: transparent;
+          background: transparent;
+          color: var(--cq-text-secondary);
+        }
+        .search span,
+        .search kbd {
+          display: none;
+        }
+        .kpis {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .kpi {
+          border-left: 0;
+          border-top: 1px solid var(--cq-border-subtle);
+        }
+        .kpi:nth-child(-n + 2) {
+          border-top: 0;
+        }
+        .kpi:nth-child(even) {
+          border-left: 1px solid var(--cq-border-subtle);
+        }
+        .g-main {
+          grid-template-columns: 1fr;
+        }
+        .only-desk {
+          display: none !important;
+        }
+        .only-phone {
+          display: block;
+        }
+        .sub-shell {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+        .subnav {
+          display: none;
+        }
+        .allow {
+          grid-template-columns: 1fr;
+        }
+        .allow .meter {
+          border-left: 0;
+        }
+        .scope .right .hide-sm {
+          display: none;
+        }
+        .scope .sep:last-of-type {
+          display: none;
+        }
+        .field {
+          min-width: 0;
+          flex: 1;
+        }
+        .toolbar .end {
+          margin-left: 0;
+        }
+        dl.kv {
+          grid-template-columns: 120px 1fr;
+        }
+        .ph .actions {
+          margin-left: 0;
+          width: 100%;
+        }
+        .ph .actions .btn {
+          flex: 1;
+        }
+        .entity .actions {
+          margin-left: 0;
+          width: 100%;
+        }
+        .entity .actions .btn {
+          flex: 1;
+        }
+        .rows li {
+          padding: 10px 16px;
+          align-items: flex-start;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .nav-a,
+        .btn,
+        .tabs a {
+          transition:
+            background-color var(--cq-motion-fast) var(--cq-ease),
+            color var(--cq-motion-fast) var(--cq-ease),
+            border-color var(--cq-motion-fast) var(--cq-ease);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-home" viewBox="0 0 24 24">
+          <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+        </symbol>
+        <symbol id="i-inbox" viewBox="0 0 24 24">
+          <path d="M3 13h5l2 3h4l2-3h5" />
+          <path d="M5 5h14l2 8v6H3v-6z" />
+        </symbol>
+        <symbol id="i-users" viewBox="0 0 24 24">
+          <circle cx="9" cy="8" r="3.5" />
+          <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+          <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" />
+        </symbol>
+        <symbol id="i-building" viewBox="0 0 24 24">
+          <path d="M4 21V4h11v17M15 9h5v12M8 8h3M8 12h3M8 16h3M3 21h18" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+          <path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z" />
+        </symbol>
+        <symbol id="i-q" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M15.5 15.5L20 20" />
+        </symbol>
+        <symbol id="i-coins" viewBox="0 0 24 24">
+          <ellipse cx="9" cy="7" rx="6" ry="3" />
+          <path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7" />
+          <path d="M9 15v2c0 1.7 2.7 3 6 3s6-1.3 6-3v-5c0-1.7-2.7-3-6-3" />
+        </symbol>
+        <symbol id="i-mail" viewBox="0 0 24 24">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3.5 6.5L12 13l8.5-6.5" />
+        </symbol>
+        <symbol id="i-file" viewBox="0 0 24 24">
+          <path d="M6 3h8l4 4v14H6z" />
+          <path d="M14 3v4h4M9 12h6M9 16h6" />
+        </symbol>
+        <symbol id="i-toggle" viewBox="0 0 24 24">
+          <rect x="2.5" y="7" width="19" height="10" rx="5" />
+          <circle cx="16.5" cy="12" r="3" />
+        </symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24">
+          <path d="M4 20V10M10 20V4M16 20v-7M21 20H3" />
+        </symbol>
+        <symbol id="i-list" viewBox="0 0 24 24">
+          <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+        </symbol>
+        <symbol id="i-pulse" viewBox="0 0 24 24">
+          <path d="M3 12h4l2-6 4 12 2-6h6" />
+        </symbol>
+        <symbol id="i-key" viewBox="0 0 24 24">
+          <circle cx="8" cy="15" r="4" />
+          <path d="M11 12l9-9M17 6l3 3" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="M16 16l4.5 4.5" />
+        </symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </symbol>
+        <symbol id="i-chev" viewBox="0 0 24 24">
+          <path d="M9 6l6 6-6 6" />
+        </symbol>
+        <symbol id="i-down" viewBox="0 0 24 24">
+          <path d="M6 9l6 6 6-6" />
+        </symbol>
+        <symbol id="i-sort" viewBox="0 0 24 24">
+          <path d="M8 9l4-4 4 4M8 15l4 4 4-4" />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="i-export" viewBox="0 0 24 24">
+          <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+        </symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </symbol>
+        <symbol id="i-dots" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1" />
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="19" cy="12" r="1" />
+        </symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24">
+          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+          <circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24">
+          <path d="M12 21V9M7 14l5-5 5 5M4 3h16" />
+        </symbol>
+        <symbol id="i-plug" viewBox="0 0 24 24">
+          <path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 0 1-12 0zM12 18v3" />
+        </symbol>
+        <symbol id="i-gauge" viewBox="0 0 24 24">
+          <path d="M4 18a8 8 0 1 1 16 0" />
+          <path d="M12 14l4-4" />
+        </symbol>
+        <symbol id="i-card" viewBox="0 0 24 24">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 10h18M7 15h4" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <!-- =====================================================================
+     PLATFORM CONSOLE: shared sidebar (rendered into each platform screen)
+     ===================================================================== -->
+    <template id="platform-side">
+      <aside class="side" aria-label="Console">
+        <div class="side-head">
+          <span class="mark" aria-hidden="true"></span>
+          <div class="side-title">
+            Capital Q<small>Operations console</small>
+          </div>
+        </div>
+        <nav aria-label="Console sections">
+          <a class="nav-a" data-k="overview" href="#overview"
+            ><svg class="i"><use href="#i-home" /></svg>Overview</a
+          >
+          <a class="nav-a" href="#overview"
+            ><svg class="i"><use href="#i-inbox" /></svg>Needs you<span
+              class="count due"
+              >14</span
+            ></a
+          >
+          <div class="group">
+            <h2>Customers</h2>
+            <a class="nav-a" data-k="organisations" href="#organisations"
+              ><svg class="i"><use href="#i-building" /></svg>Organisations<span
+                class="count"
+                >412</span
+              ></a
+            >
+            <a class="nav-a" href="#organisations"
+              ><svg class="i"><use href="#i-users" /></svg>People<span
+                class="count"
+                >1,906</span
+              ></a
+            >
+          </div>
+          <div class="group">
+            <h2>Trust</h2>
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-check" /></svg>Verification and
+              claims<span class="count due">9</span></a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-shield" /></svg>Safety and
+              break-glass<span class="count due">2</span></a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-file" /></svg>Documents and scans</a
+            >
+          </div>
+          <div class="group">
+            <h2>Q</h2>
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-q" /></svg>Runs and errors</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-coins" /></svg>Model spend</a
+            >
+          </div>
+          <div class="group">
+            <h2>Money</h2>
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-card" /></svg>Plans and billing</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-list" /></svg>Facilitation ledger</a
+            >
+          </div>
+          <div class="group">
+            <h2>Platform</h2>
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-file" /></svg>Site content</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-mail" /></svg>Email</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-toggle" /></svg>Kill switches</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-chart" /></svg>Analytics</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-pulse" /></svg>System health</a
+            >
+          </div>
+          <div class="group">
+            <h2>Governance</h2>
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-list" /></svg>Audit log</a
+            >
+            <a class="nav-a" href="#overview"
+              ><svg class="i"><use href="#i-key" /></svg>Operators and roles</a
+            >
+          </div>
+        </nav>
+        <div class="side-foot">
+          <span class="dot ok" aria-hidden="true"></span>All services up ·
+          v0b5581d
+        </div>
+      </aside>
+    </template>
+
+    <template id="platform-scope">
+      <div class="scope" role="note" aria-label="Acting as">
+        <span><b>Platform console</b></span
+        ><span class="sep" aria-hidden="true"></span> <span>Operator</span
+        ><span class="sep" aria-hidden="true"></span>
+        <span class="status"
+          ><svg class="i lock"><use href="#i-lock" /></svg>Confirmed until 14:20
+          UTC</span
+        >
+        <span class="right"
+          ><span class="hide-sm"
+            >Every view and change here is recorded</span
+          ></span
+        >
+      </div>
+    </template>
+
+    <!-- ============================ 1. OVERVIEW ============================ -->
+    <section class="screen" id="s-overview" data-side="platform">
+      <div class="shell">
+        <div data-slot="side"></div>
+        <div class="main">
+          <div data-slot="scope"></div>
+          <header class="top">
+            <button class="menu-btn" aria-label="Open console menu">
+              <svg class="i"><use href="#i-menu" /></svg>
+            </button>
+            <nav class="crumbs" aria-label="Breadcrumb">
+              <span aria-current="page">Overview</span>
+            </nav>
+            <button
+              class="search"
+              data-open-palette
+              aria-label="Search or jump to (Ctrl K)"
+            >
+              <svg class="i"><use href="#i-search" /></svg
+              ><span>Search people, organisations, runs…</span><kbd>⌘K</kbd>
+            </button>
+          </header>
+          <main class="content">
+            <div class="ph">
+              <div>
+                <h1>Overview</h1>
+                <p>
+                  Today, 19 Nov. Figures cover the last 7 days unless a column
+                  says otherwise.
+                </p>
+              </div>
+              <div class="actions">
+                <button class="btn">
+                  Last 7 days<svg class="i"><use href="#i-down" /></svg></button
+                ><button class="btn">
+                  <svg class="i"><use href="#i-export" /></svg>Export
+                </button>
+              </div>
+            </div>
+
+            <div class="kpis" role="list">
+              <div class="kpi" role="listitem">
+                <div class="label">Active organisations</div>
+                <a class="value" href="#organisations">287</a>
+                <div class="delta up">+12 on last week</div>
+              </div>
+              <div class="kpi" role="listitem">
+                <div class="label">People active</div>
+                <div class="value">1,140</div>
+                <div class="delta up">+4.1%</div>
+              </div>
+              <div class="kpi" role="listitem">
+                <div class="label">Waiting on operators</div>
+                <a class="value" href="#overview">14</a>
+                <div class="delta warn">3 past 24 h</div>
+              </div>
+              <div class="kpi" role="listitem">
+                <div class="label">Model spend, month</div>
+                <div class="value">$412.80</div>
+                <div class="delta">38 calls unpriced</div>
+              </div>
+              <div class="kpi" role="listitem">
+                <div class="label">Email delivered</div>
+                <div class="value">98.6%</div>
+                <div class="delta">4 bounced</div>
+              </div>
+              <div class="kpi" role="listitem">
+                <div class="label">Facilitated, confirmed</div>
+                <div class="value">$2.4M</div>
+                <div class="delta">USD, both sides confirmed</div>
+              </div>
+            </div>
+
+            <div class="grid g-main">
+              <div class="grid">
+                <section class="panel" aria-labelledby="h-needs">
+                  <div class="panel-h">
+                    <h2 id="h-needs">Needs you</h2>
+                    <span class="muted num">14</span
+                    ><a class="more" href="#overview">Open the queue</a>
+                  </div>
+                  <ul class="rows">
+                    <li>
+                      <span class="dot warn" aria-hidden="true"></span>
+                      <div>
+                        <div class="t">
+                          Verify Amani Logistics' registration
+                        </div>
+                        <div class="s">
+                          Verification · Kenya registry match, director name
+                          differs
+                        </div>
+                      </div>
+                      <div class="end">
+                        <span class="age late">31 h</span
+                        ><button class="btn">Review</button>
+                      </div>
+                    </li>
+                    <li>
+                      <span class="dot warn" aria-hidden="true"></span>
+                      <div>
+                        <div class="t">
+                          Report from chat about a shared deck
+                        </div>
+                        <div class="s">
+                          Safety · reported by an investor at Kestrel Partners
+                        </div>
+                      </div>
+                      <div class="end">
+                        <span class="age late">26 h</span
+                        ><button class="btn">Review</button>
+                      </div>
+                    </li>
+                    <li>
+                      <span class="dot hollow" aria-hidden="true"></span>
+                      <div>
+                        <div class="t">
+                          Claim of LedgerBridge's public profile
+                        </div>
+                        <div class="s">Claims · domain email matches</div>
+                      </div>
+                      <div class="end">
+                        <span class="age">5 h</span
+                        ><button class="btn">Review</button>
+                      </div>
+                    </li>
+                    <li>
+                      <span class="dot hollow" aria-hidden="true"></span>
+                      <div>
+                        <div class="t">
+                          Break-glass request: read a Q run's content
+                        </div>
+                        <div class="s">
+                          Safety · asked by support, needs a second operator
+                        </div>
+                      </div>
+                      <div class="end">
+                        <span class="age">2 h</span
+                        ><button class="btn">Review</button>
+                      </div>
+                    </li>
+                    <li class="only-desk">
+                      <span class="dot hollow" aria-hidden="true"></span>
+                      <div>
+                        <div class="t">
+                          Commitment confirmed by one side only
+                        </div>
+                        <div class="s">
+                          Ledger · Okoye Capital to Sabi Health, $250,000
+                        </div>
+                      </div>
+                      <div class="end">
+                        <span class="age">1 h</span
+                        ><button class="btn">Review</button>
+                      </div>
+                    </li>
+                  </ul>
+                </section>
+
+                <section class="panel" aria-labelledby="h-spend">
+                  <div class="panel-h">
+                    <h2 id="h-spend">Model spend per day</h2>
+                    <span class="muted">USD, last 14 days</span
+                    ><a class="more" href="#overview">By organisation</a>
+                  </div>
+                  <div class="chart">
+                    <svg
+                      viewBox="0 0 560 132"
+                      preserveAspectRatio="none"
+                      role="img"
+                      aria-label="Model spend per day for 14 days, between 18 and 41 dollars, highest on 17 November"
+                    >
+                      <g stroke="var(--cq-border-subtle)" stroke-width="1">
+                        <line x1="0" y1="20" x2="560" y2="20" />
+                        <line x1="0" y1="66" x2="560" y2="66" />
+                        <line x1="0" y1="112" x2="560" y2="112" />
+                      </g>
+                      <g transform="scale(0.93 1)">
+                        <g fill="var(--cq-text-secondary)">
+                          <rect x="6" y="62" width="28" height="50" rx="2" />
+                          <rect x="46" y="70" width="28" height="42" rx="2" />
+                          <rect x="86" y="58" width="28" height="54" rx="2" />
+                          <rect x="126" y="74" width="28" height="38" rx="2" />
+                          <rect x="166" y="66" width="28" height="46" rx="2" />
+                          <rect x="206" y="80" width="28" height="32" rx="2" />
+                          <rect x="246" y="84" width="28" height="28" rx="2" />
+                          <rect x="286" y="54" width="28" height="58" rx="2" />
+                          <rect x="326" y="48" width="28" height="64" rx="2" />
+                          <rect x="366" y="52" width="28" height="60" rx="2" />
+                          <rect x="406" y="42" width="28" height="70" rx="2" />
+                        </g>
+                        <rect
+                          x="446"
+                          y="22"
+                          width="28"
+                          height="90"
+                          rx="2"
+                          fill="var(--cq-gold-action)"
+                        />
+                        <g fill="var(--cq-text-secondary)">
+                          <rect x="486" y="46" width="28" height="66" rx="2" />
+                          <rect x="526" y="60" width="28" height="52" rx="2" />
+                        </g>
+                      </g>
+                      <g
+                        fill="var(--cq-text-tertiary)"
+                        font-size="10"
+                        font-family="system-ui"
+                      >
+                        <text x="556" y="17" text-anchor="end">$40</text>
+                        <text x="556" y="63" text-anchor="end">$20</text>
+                        <text x="2" y="128">6 Nov</text>
+                        <text x="415" y="128">17 Nov</text>
+                        <text x="488" y="128">19 Nov</text>
+                      </g>
+                    </svg>
+                    <div class="legend">
+                      <span
+                        ><span
+                          class="sw"
+                          style="background: var(--cq-text-secondary)"
+                        ></span
+                        >Priced calls</span
+                      ><span
+                        ><span
+                          class="sw"
+                          style="background: var(--cq-gold-action)"
+                        ></span
+                        >Highest day, $41.20</span
+                      ><span
+                        >38 calls have no price yet and are not in the
+                        total</span
+                      >
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div class="grid" style="align-content: start">
+                <section class="panel" aria-labelledby="h-health">
+                  <div class="panel-h">
+                    <h2 id="h-health">System health</h2>
+                    <a class="more" href="#overview">Details</a>
+                  </div>
+                  <div class="health">
+                    <div class="status"><span class="dot ok"></span>Web</div>
+                    <div>Up · 212 ms p75</div>
+                    <div class="status"><span class="dot ok"></span>API</div>
+                    <div>Up · 0.1% errors</div>
+                    <div class="status">
+                      <span class="dot ok"></span>Q service
+                    </div>
+                    <div>Up · 2.8 s first word</div>
+                    <div class="status">
+                      <span class="dot warn"></span>Workers
+                    </div>
+                    <div>Outbox 41 behind</div>
+                    <div class="status">
+                      <span class="dot ok"></span>File scanning
+                    </div>
+                    <div>Up · 0 blocked today</div>
+                    <div class="status">
+                      <span class="dot ok"></span>Email sender
+                    </div>
+                    <div>Authenticated</div>
+                  </div>
+                </section>
+                <section class="panel" aria-labelledby="h-audit">
+                  <div class="panel-h">
+                    <h2 id="h-audit">Recent operator activity</h2>
+                    <a class="more" href="#overview">Audit log</a>
+                  </div>
+                  <ol class="tl">
+                    <li>
+                      <span class="who">A. Mensah</span> assigned the Fund plan
+                      to Kestrel Partners<span class="why"
+                        >Reason: signed order form</span
+                      ><span class="when">12 min ago · confirmed</span>
+                    </li>
+                    <li>
+                      <span class="who">R. Haddad</span> approved Sabi Health's
+                      verification<span class="when"
+                        >48 min ago · confirmed</span
+                      >
+                    </li>
+                    <li>
+                      <span class="who">A. Mensah</span> turned the web research
+                      switch on<span class="when">2 h ago · confirmed</span>
+                    </li>
+                    <li>
+                      <span class="who">J. Okafor</span> opened 3 accounts in
+                      People<span class="when">3 h ago · read</span>
+                    </li>
+                  </ol>
+                </section>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= 2. ORGANISATIONS ========================= -->
+    <section class="screen" id="s-organisations" data-side="platform">
+      <div class="shell">
+        <div data-slot="side"></div>
+        <div class="main">
+          <div data-slot="scope"></div>
+          <header class="top">
+            <button class="menu-btn" aria-label="Open console menu">
+              <svg class="i"><use href="#i-menu" /></svg>
+            </button>
+            <nav class="crumbs" aria-label="Breadcrumb">
+              <a href="#overview">Customers</a
+              ><svg class="i" aria-hidden="true"><use href="#i-chev" /></svg
+              ><span aria-current="page">Organisations</span>
+            </nav>
+            <button
+              class="search"
+              data-open-palette
+              aria-label="Search or jump to (Ctrl K)"
+            >
+              <svg class="i"><use href="#i-search" /></svg
+              ><span>Search people, organisations, runs…</span><kbd>⌘K</kbd>
+            </button>
+          </header>
+          <main class="content">
+            <div class="ph">
+              <div>
+                <h1>Organisations</h1>
+                <p>
+                  Every company and investor organisation on Capital Q. Opening
+                  one is recorded in the audit log.
+                </p>
+              </div>
+              <div class="actions">
+                <button class="btn">
+                  <svg class="i"><use href="#i-export" /></svg>Export<svg
+                    class="i"
+                  >
+                    <use href="#i-down" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <nav class="views" aria-label="Saved views">
+              <a href="#organisations" aria-current="page"
+                >All <span class="num">412</span></a
+              >
+              <a href="#organisations"
+                >Founder companies <span class="num">301</span></a
+              >
+              <a href="#organisations"
+                >Investor organisations <span class="num">111</span></a
+              >
+              <a href="#organisations"
+                >Not verified <span class="num">57</span></a
+              >
+              <a href="#organisations"
+                >Near an allowance <span class="num">8</span></a
+              >
+              <a class="add" href="#organisations"
+                ><svg class="i"><use href="#i-plus" /></svg>Save view</a
+              >
+            </nav>
+
+            <div class="toolbar">
+              <label class="field"
+                ><svg class="i"><use href="#i-search" /></svg
+                ><span class="sr">Filter by name</span
+                ><span>Name, domain or ID</span></label
+              >
+              <button class="chip set">
+                Country <b>Nigeria, Kenya</b
+                ><svg class="i"><use href="#i-down" /></svg>
+              </button>
+              <button class="chip">
+                Plan<svg class="i"><use href="#i-plus" /></svg>
+              </button>
+              <button class="chip">
+                Verification<svg class="i"><use href="#i-plus" /></svg>
+              </button>
+              <button class="chip only-desk">
+                Last active<svg class="i"><use href="#i-plus" /></svg>
+              </button>
+              <div class="end only-desk">
+                <button class="btn quiet">Columns</button>
+              </div>
+            </div>
+
+            <div class="bulk" role="region" aria-label="Bulk actions">
+              <b>2 selected</b><span style="opacity: 0.6">·</span>
+              <button class="btn">Assign plan</button
+              ><button class="btn">Export selected</button
+              ><button class="btn">Message admins</button>
+              <button class="btn" style="margin-left: auto">Clear</button>
+            </div>
+
+            <div class="panel only-desk">
+              <div class="tbl-wrap">
+                <table>
+                  <caption class="sr">
+                    Organisations, filtered to Nigeria and Kenya, sorted by last
+                    active
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th style="width: 36px">
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          aria-label="Select all on this page"
+                        />
+                      </th>
+                      <th>
+                        <button>
+                          Name<svg class="i"><use href="#i-sort" /></svg>
+                        </button>
+                      </th>
+                      <th>Type</th>
+                      <th>Country</th>
+                      <th>Plan</th>
+                      <th>Seats</th>
+                      <th>Verification</th>
+                      <th class="r">
+                        <button>
+                          Q spend, month<svg class="i">
+                            <use href="#i-sort" />
+                          </svg>
+                        </button>
+                      </th>
+                      <th class="r" aria-sort="descending">
+                        <button>
+                          Last active<svg class="i"><use href="#i-down" /></svg>
+                        </button>
+                      </th>
+                      <th style="width: 44px">
+                        <span class="sr">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="sel">
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          checked
+                          aria-label="Select LedgerBridge"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">LedgerBridge</span
+                          ><span class="sub">ledgerbridge.example</span></a
+                        >
+                      </td>
+                      <td>Founder company</td>
+                      <td>Nigeria</td>
+                      <td>Founder</td>
+                      <td>
+                        <div
+                          style="display: flex; gap: 8px; align-items: center"
+                        >
+                          <span class="num">3 of 5</span>
+                          <div class="bar">
+                            <span style="width: 60%"></span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot ok"></span>Verified</span
+                        >
+                      </td>
+                      <td class="r num">$18.40</td>
+                      <td class="r num">4 min ago</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for LedgerBridge"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr class="sel">
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          checked
+                          aria-label="Select Kestrel Partners"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">Kestrel Partners</span
+                          ><span class="sub">kestrel.example</span></a
+                        >
+                      </td>
+                      <td>Investor organisation</td>
+                      <td>Kenya</td>
+                      <td>Fund</td>
+                      <td>
+                        <div
+                          style="display: flex; gap: 8px; align-items: center"
+                        >
+                          <span class="num">9 of 10</span>
+                          <div class="bar high">
+                            <span style="width: 90%"></span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot ok"></span>Verified</span
+                        >
+                      </td>
+                      <td class="r num">$61.02</td>
+                      <td class="r num">11 min ago</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Kestrel Partners"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          aria-label="Select Amani Logistics"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">Amani Logistics</span
+                          ><span class="sub">amani-logistics.example</span></a
+                        >
+                      </td>
+                      <td>Founder company</td>
+                      <td>Kenya</td>
+                      <td>Launch</td>
+                      <td><span class="num">1 of 2</span></td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot warn"></span>In review, 31 h</span
+                        >
+                      </td>
+                      <td class="r num">$2.10</td>
+                      <td class="r num">1 h ago</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Amani Logistics"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          aria-label="Select Sabi Health"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">Sabi Health</span
+                          ><span class="sub">sabihealth.example</span></a
+                        >
+                      </td>
+                      <td>Founder company</td>
+                      <td>Nigeria</td>
+                      <td>Founder</td>
+                      <td><span class="num">4 of 5</span></td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot ok"></span>Verified</span
+                        >
+                      </td>
+                      <td class="r num">$24.77</td>
+                      <td class="r num">2 h ago</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Sabi Health"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          aria-label="Select Okoye Capital"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">Okoye Capital</span
+                          ><span class="sub">okoye.example</span></a
+                        >
+                      </td>
+                      <td>Investor organisation</td>
+                      <td>Nigeria</td>
+                      <td>Investor</td>
+                      <td><span class="num">2 of 3</span></td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot hollow"></span>Not started</span
+                        >
+                      </td>
+                      <td class="r num">$9.35</td>
+                      <td class="r num">Yesterday</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Okoye Capital"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          aria-label="Select Tamu Foods"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">Tamu Foods</span
+                          ><span class="sub">No website stated</span></a
+                        >
+                      </td>
+                      <td>Founder company</td>
+                      <td>Kenya</td>
+                      <td>Launch</td>
+                      <td><span class="num">1 of 2</span></td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot bad"></span>Rejected, can
+                          retry</span
+                        >
+                      </td>
+                      <td class="r num">$0.00</td>
+                      <td class="r num">3 days ago</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Tamu Foods"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input
+                          class="cb"
+                          type="checkbox"
+                          aria-label="Select Harbour Angels"
+                        />
+                      </td>
+                      <td>
+                        <a href="#organisation"
+                          ><span class="name">Harbour Angels</span
+                          ><span class="sub">harbourangels.example</span></a
+                        >
+                      </td>
+                      <td>Investor organisation</td>
+                      <td>Nigeria</td>
+                      <td>Investor</td>
+                      <td><span class="num">5 of 5</span></td>
+                      <td>
+                        <span class="status"
+                          ><span class="dot ok"></span>Verified</span
+                        >
+                      </td>
+                      <td class="r num">$33.18</td>
+                      <td class="r num">5 days ago</td>
+                      <td>
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Harbour Angels"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="tfoot">
+                <span>Showing 7 of 148 that match</span>
+                <div class="end">
+                  <button class="btn" disabled>Previous</button
+                  ><button class="btn">Next</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- phone: the same rows as a list; one tap opens the record -->
+            <div class="panel only-phone">
+              <ul class="rows">
+                <li>
+                  <div style="min-width: 0">
+                    <a href="#organisation" class="t">LedgerBridge</a>
+                    <div class="s">
+                      Founder company · Nigeria · Founder plan
+                    </div>
+                    <div class="s status" style="margin-top: 2px">
+                      <span class="dot ok"></span>Verified · 3 of 5 seats ·
+                      $18.40
+                    </div>
+                  </div>
+                  <div class="end"><span class="age">4 min</span></div>
+                </li>
+                <li>
+                  <div style="min-width: 0">
+                    <a href="#organisation" class="t">Kestrel Partners</a>
+                    <div class="s">
+                      Investor organisation · Kenya · Fund plan
+                    </div>
+                    <div class="s status" style="margin-top: 2px">
+                      <span class="dot ok"></span>Verified · 9 of 10 seats ·
+                      $61.02
+                    </div>
+                  </div>
+                  <div class="end"><span class="age">11 min</span></div>
+                </li>
+                <li>
+                  <div style="min-width: 0">
+                    <a href="#organisation" class="t">Amani Logistics</a>
+                    <div class="s">Founder company · Kenya · Launch plan</div>
+                    <div class="s status" style="margin-top: 2px">
+                      <span class="dot warn"></span>In review, 31 h · 1 of 2
+                      seats
+                    </div>
+                  </div>
+                  <div class="end"><span class="age">1 h</span></div>
+                </li>
+                <li>
+                  <div style="min-width: 0">
+                    <a href="#organisation" class="t">Sabi Health</a>
+                    <div class="s">
+                      Founder company · Nigeria · Founder plan
+                    </div>
+                    <div class="s status" style="margin-top: 2px">
+                      <span class="dot ok"></span>Verified · 4 of 5 seats ·
+                      $24.77
+                    </div>
+                  </div>
+                  <div class="end"><span class="age">2 h</span></div>
+                </li>
+                <li>
+                  <div style="min-width: 0">
+                    <a href="#organisation" class="t">Okoye Capital</a>
+                    <div class="s">
+                      Investor organisation · Nigeria · Investor plan
+                    </div>
+                    <div class="s status" style="margin-top: 2px">
+                      <span class="dot hollow"></span>Not started · 2 of 3 seats
+                    </div>
+                  </div>
+                  <div class="end"><span class="age">1 d</span></div>
+                </li>
+              </ul>
+              <div class="tfoot">
+                <span>7 of 148</span>
+                <div class="end"><button class="btn">More</button></div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== 3. ORGANISATION DETAIL ====================== -->
+    <section class="screen" id="s-organisation" data-side="platform">
+      <div class="shell">
+        <div data-slot="side"></div>
+        <div class="main">
+          <div data-slot="scope"></div>
+          <header class="top">
+            <button class="menu-btn" aria-label="Open console menu">
+              <svg class="i"><use href="#i-menu" /></svg>
+            </button>
+            <nav class="crumbs" aria-label="Breadcrumb">
+              <a href="#organisations" class="only-desk">Customers</a
+              ><svg class="i only-desk" aria-hidden="true">
+                <use href="#i-chev" /></svg
+              ><a href="#organisations">Organisations</a
+              ><svg class="i" aria-hidden="true"><use href="#i-chev" /></svg
+              ><span aria-current="page">LedgerBridge</span>
+            </nav>
+            <button
+              class="search"
+              data-open-palette
+              aria-label="Search or jump to (Ctrl K)"
+            >
+              <svg class="i"><use href="#i-search" /></svg
+              ><span>Search people, organisations, runs…</span><kbd>⌘K</kbd>
+            </button>
+          </header>
+          <main class="content">
+            <div class="entity">
+              <div class="avatar" aria-hidden="true">LB</div>
+              <div style="min-width: 0">
+                <h1>LedgerBridge</h1>
+                <div class="facts">
+                  <span>Founder company</span><span>Lagos, Nigeria</span
+                  ><span class="status"
+                    ><span class="dot ok"></span>Verified 12 Nov</span
+                  ><span>Founder plan, monthly</span><span>Joined 3 Oct</span>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="btn">Assign plan</button>
+                <button class="btn">Change an allowance</button>
+                <button class="btn danger">
+                  <svg class="i lock"><use href="#i-lock" /></svg>Suspend…
+                </button>
+              </div>
+            </div>
+            <nav class="tabs" aria-label="Organisation sections">
+              <a href="#organisation" aria-current="page">Overview</a>
+              <a href="#organisation">Members <span class="num">3</span></a>
+              <a href="#organisation">Plan and usage</a>
+              <a href="#organisation">Billing</a>
+              <a href="#organisation">Verification</a>
+              <a href="#organisation">Documents <span class="num">27</span></a>
+              <a href="#organisation"
+                >Relationships <span class="num">41</span></a
+              >
+              <a href="#organisation">Q activity</a>
+              <a href="#organisation">Audit</a>
+            </nav>
+
+            <div class="grid g-main">
+              <div class="grid">
+                <section class="panel" aria-labelledby="h-facts">
+                  <div class="panel-h"><h2 id="h-facts">Record</h2></div>
+                  <dl class="kv">
+                    <dt>Legal name</dt>
+                    <dd>LedgerBridge Technologies Ltd</dd>
+                    <dt>Registry</dt>
+                    <dd>
+                      Corporate Affairs Commission, RC 1874220
+                      <span class="faint">· matched by provider, 12 Nov</span>
+                    </dd>
+                    <dt>Domain</dt>
+                    <dd>
+                      ledgerbridge.example
+                      <span class="faint">· control proved</span>
+                    </dd>
+                    <dt>Owner</dt>
+                    <dd>Tunde Bello</dd>
+                    <dt>Raise</dt>
+                    <dd>Seed, $750,000 target</dd>
+                    <dt>Organisation ID</dt>
+                    <dd
+                      class="num"
+                      style="font-family: var(--cq-font-mono); font-size: 12px"
+                    >
+                      org_7f3c…a91e
+                      <button
+                        class="btn quiet"
+                        style="min-height: 24px; padding: 0 6px"
+                      >
+                        Copy
+                      </button>
+                    </dd>
+                  </dl>
+                </section>
+                <section class="panel" aria-labelledby="h-allow">
+                  <div class="panel-h">
+                    <h2 id="h-allow">Allowances this month</h2>
+                    <span class="muted">Resets 1 Dec</span
+                    ><a class="more" href="#organisation">Plan and usage</a>
+                  </div>
+                  <div class="allow">
+                    <div class="meter">
+                      <div class="row">
+                        <span>Seats</span><span class="num">3 of 5</span>
+                      </div>
+                      <div class="bar"><span style="width: 60%"></span></div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>Q's agents</span
+                        ><span class="num">62 of 100</span>
+                      </div>
+                      <div class="bar"><span style="width: 62%"></span></div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>Web research</span
+                        ><span class="num">241 of 300</span>
+                      </div>
+                      <div class="bar high">
+                        <span style="width: 80%"></span>
+                      </div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>Rehearsals</span><span class="num">4 of 20</span>
+                      </div>
+                      <div class="bar"><span style="width: 20%"></span></div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>GateQ gateways</span
+                        ><span class="num">1 of 1</span>
+                      </div>
+                      <div class="bar high">
+                        <span style="width: 100%"></span>
+                      </div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>Q spend</span><span class="num">$18.40</span>
+                      </div>
+                      <div class="bar"><span style="width: 18%"></span></div>
+                    </div>
+                  </div>
+                  <p class="note">
+                    Allowances size how much, never what. Nothing on Capital Q
+                    is locked by plan, and no plan changes ranking.
+                  </p>
+                </section>
+              </div>
+              <section
+                class="panel"
+                aria-labelledby="h-act"
+                style="align-self: start"
+              >
+                <div class="panel-h">
+                  <h2 id="h-act">Activity</h2>
+                  <a class="more" href="#organisation">All</a>
+                </div>
+                <ol class="tl">
+                  <li>
+                    <span class="who">Tunde Bello</span> invited a member as
+                    Admin<span class="when">Today, 09:12</span>
+                  </li>
+                  <li>
+                    <span class="who">Q</span> imported 38 investors from a CSV,
+                    approved by Tunde Bello<span class="when"
+                      >Yesterday, 17:40</span
+                    >
+                  </li>
+                  <li>
+                    <span class="who">R. Haddad</span> approved
+                    verification<span class="why"
+                      >Registry matched; director confirmed</span
+                    ><span class="when">12 Nov · operator</span>
+                  </li>
+                  <li>
+                    <span class="who">A. Mensah</span> assigned the Founder
+                    plan<span class="when">4 Nov · operator</span>
+                  </li>
+                  <li>
+                    <span class="who">Tunde Bello</span> created the
+                    organisation<span class="when">3 Oct</span>
+                  </li>
+                </ol>
+              </section>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================ 4. ORGANISATION ADMIN: MEMBERS AND USAGE ================ -->
+    <section class="screen" id="s-members" data-side="app">
+      <div class="shell">
+        <aside class="side" aria-label="Capital Q">
+          <div class="side-head">
+            <span class="mark" aria-hidden="true"></span>
+            <div class="side-title">Capital Q</div>
+          </div>
+          <nav aria-label="Main">
+            <a class="nav-a" href="#members"
+              ><svg class="i"><use href="#i-eye" /></svg>Discover</a
+            >
+            <a class="nav-a" href="#members"
+              ><svg class="i"><use href="#i-chart" /></svg>Explore</a
+            >
+            <a class="nav-a" href="#members"
+              ><svg class="i"><use href="#i-q" /></svg>Q</a
+            >
+            <a class="nav-a" href="#members"
+              ><svg class="i"><use href="#i-users" /></svg>CRM</a
+            >
+            <a class="nav-a" href="#members"
+              ><svg class="i"><use href="#i-list" /></svg>Work<span
+                class="count"
+                >1</span
+              ></a
+            >
+            <div class="group">
+              <h2>LedgerBridge</h2>
+              <a class="nav-a" aria-current="page" href="#members"
+                ><svg class="i"><use href="#i-building" /></svg>Organisation</a
+              >
+              <a class="nav-a" href="#members"
+                ><svg class="i"><use href="#i-upload" /></svg>Import
+                investors</a
+              >
+            </div>
+            <div class="group">
+              <h2>You</h2>
+              <a class="nav-a" href="#members"
+                ><svg class="i"><use href="#i-users" /></svg>Profile</a
+              >
+              <a class="nav-a" href="#members"
+                ><svg class="i"><use href="#i-toggle" /></svg>Settings</a
+              >
+            </div>
+          </nav>
+          <div class="side-foot">Plans and pricing · Help</div>
+        </aside>
+        <div class="main">
+          <div class="scope org" role="note" aria-label="Acting as">
+            <span class="status"
+              ><svg class="i"><use href="#i-building" /></svg
+              ><b>LedgerBridge</b></span
+            ><span class="sep" aria-hidden="true"></span>
+            <span>You are the Owner</span>
+            <span class="right"
+              ><span class="hide-sm"
+                >Changes here apply to LedgerBridge only</span
+              ><button
+                class="btn quiet"
+                style="min-height: 28px; color: inherit"
+              >
+                Switch<svg class="i"><use href="#i-down" /></svg></button
+            ></span>
+          </div>
+          <header class="top">
+            <button class="menu-btn" aria-label="Open menu">
+              <svg class="i"><use href="#i-menu" /></svg>
+            </button>
+            <nav class="crumbs" aria-label="Breadcrumb">
+              <a href="#members">Organisation</a
+              ><svg class="i" aria-hidden="true"><use href="#i-chev" /></svg
+              ><span aria-current="page">Members and usage</span>
+            </nav>
+            <button
+              class="search"
+              data-open-palette
+              aria-label="Search or jump to (Ctrl K)"
+            >
+              <svg class="i"><use href="#i-search" /></svg
+              ><span>Search or jump to…</span><kbd>⌘K</kbd>
+            </button>
+          </header>
+          <main class="content">
+            <div class="sub-shell">
+              <nav class="subnav" aria-label="Organisation settings">
+                <h2>Organisation</h2>
+                <a href="#members">General</a>
+                <a href="#members" aria-current="page">Members and usage</a>
+                <a href="#members">Roles</a>
+                <a href="#members">Plan and billing</a>
+                <h2>Data</h2>
+                <a href="#members">Import investors</a>
+                <a href="#members">Connections</a>
+                <a href="#members">Export and deletion</a>
+                <a href="#members">Privacy</a>
+                <h2>Q and brand</h2>
+                <a href="#members">How Q speaks for us</a>
+                <a href="#members">Gateway and Q Card brand</a>
+                <h2>Governance</h2>
+                <a href="#members">Activity log</a>
+              </nav>
+
+              <div>
+                <!-- phone: the section list collapses to one selector -->
+                <div class="only-phone" style="margin-bottom: 16px">
+                  <button
+                    class="btn"
+                    style="width: 100%; justify-content: space-between"
+                  >
+                    Members and usage<svg class="i"><use href="#i-down" /></svg>
+                  </button>
+                </div>
+
+                <div class="ph">
+                  <div>
+                    <h1>Members and usage</h1>
+                    <p>
+                      Who works on LedgerBridge, what they can do, and how much
+                      of this month's allowance the team has used.
+                    </p>
+                  </div>
+                  <div class="actions">
+                    <button class="btn">
+                      <svg class="i"><use href="#i-export" /></svg
+                      >Export</button
+                    ><button class="btn primary">
+                      <svg class="i"><use href="#i-plus" /></svg>Invite people
+                    </button>
+                  </div>
+                </div>
+
+                <section
+                  class="panel"
+                  aria-labelledby="h-usage"
+                  style="margin-bottom: 16px"
+                >
+                  <div class="panel-h">
+                    <h2 id="h-usage">This month</h2>
+                    <span class="muted">Founder plan · resets 1 Dec</span
+                    ><a class="more" href="#members">Plan and billing</a>
+                  </div>
+                  <div class="allow">
+                    <div class="meter">
+                      <div class="row">
+                        <span>Seats</span><span class="num">3 of 5</span>
+                      </div>
+                      <div class="bar"><span style="width: 60%"></span></div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>Q's agents</span
+                        ><span class="num">62 of 100</span>
+                      </div>
+                      <div class="bar"><span style="width: 62%"></span></div>
+                    </div>
+                    <div class="meter">
+                      <div class="row">
+                        <span>Web research</span
+                        ><span class="num">241 of 300</span>
+                      </div>
+                      <div class="bar high">
+                        <span style="width: 80%"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="note">
+                    When an allowance runs out, Q tells the person and the owner
+                    and offers more. Nothing stops working without warning, and
+                    the plan never changes who sees LedgerBridge.
+                  </p>
+                </section>
+
+                <section class="panel" aria-labelledby="h-people">
+                  <div class="panel-h">
+                    <h2 id="h-people">People</h2>
+                    <span class="muted num">3 members · 1 invitation</span>
+                  </div>
+                  <div class="tbl-wrap only-desk">
+                    <table>
+                      <caption class="sr">
+                        Members of LedgerBridge
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Role</th>
+                          <th>Two-step</th>
+                          <th class="r">Q use, month</th>
+                          <th class="r">Last active</th>
+                          <th style="width: 44px">
+                            <span class="sr">Actions</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <span class="name">Tunde Bello</span
+                            ><span class="sub">tunde@ledgerbridge.example</span>
+                          </td>
+                          <td>Owner</td>
+                          <td>
+                            <span class="status"
+                              ><span class="dot ok"></span>On</span
+                            >
+                          </td>
+                          <td class="r num">38 runs</td>
+                          <td class="r num">Now</td>
+                          <td>
+                            <button
+                              class="btn quiet"
+                              aria-label="More for Tunde Bello"
+                            >
+                              <svg class="i"><use href="#i-dots" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="name">Ngozi Ade</span
+                            ><span class="sub">ngozi@ledgerbridge.example</span>
+                          </td>
+                          <td>
+                            <label class="sr" for="r2">Role for Ngozi Ade</label
+                            ><select id="r2" class="role">
+                              <option>Admin</option>
+                              <option>Member</option>
+                            </select>
+                          </td>
+                          <td>
+                            <span class="status"
+                              ><span class="dot ok"></span>On</span
+                            >
+                          </td>
+                          <td class="r num">19 runs</td>
+                          <td class="r num">2 h ago</td>
+                          <td>
+                            <button
+                              class="btn quiet"
+                              aria-label="More for Ngozi Ade"
+                            >
+                              <svg class="i"><use href="#i-dots" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="name">Femi Johnson</span
+                            ><span class="sub">femi@ledgerbridge.example</span>
+                          </td>
+                          <td>
+                            <label class="sr" for="r3"
+                              >Role for Femi Johnson</label
+                            ><select id="r3" class="role">
+                              <option>Member</option>
+                              <option>Admin</option>
+                            </select>
+                          </td>
+                          <td>
+                            <span class="status"
+                              ><span class="dot warn"></span>Off</span
+                            >
+                          </td>
+                          <td class="r num">5 runs</td>
+                          <td class="r num">Yesterday</td>
+                          <td>
+                            <button
+                              class="btn quiet"
+                              aria-label="More for Femi Johnson"
+                            >
+                              <svg class="i"><use href="#i-dots" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="name faint"
+                              >kemi@ledgerbridge.example</span
+                            ><span class="sub"
+                              >Invited by Tunde Bello, 2 days ago</span
+                            >
+                          </td>
+                          <td class="faint">Member</td>
+                          <td class="faint">–</td>
+                          <td class="r faint">–</td>
+                          <td class="r">
+                            <button class="btn quiet">Resend</button>
+                          </td>
+                          <td>
+                            <button
+                              class="btn quiet"
+                              aria-label="More for the invitation to kemi"
+                            >
+                              <svg class="i"><use href="#i-dots" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <ul class="rows only-phone">
+                    <li>
+                      <div>
+                        <div class="t">Tunde Bello</div>
+                        <div class="s">Owner · two-step on · 38 runs</div>
+                      </div>
+                      <div class="end"><span class="age">Now</span></div>
+                    </li>
+                    <li>
+                      <div>
+                        <div class="t">Ngozi Ade</div>
+                        <div class="s">Admin · two-step on · 19 runs</div>
+                      </div>
+                      <div class="end">
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Ngozi Ade"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </div>
+                    </li>
+                    <li>
+                      <div>
+                        <div class="t">Femi Johnson</div>
+                        <div class="s status">
+                          Member · <span class="dot warn"></span>two-step off ·
+                          5 runs
+                        </div>
+                      </div>
+                      <div class="end">
+                        <button
+                          class="btn quiet"
+                          aria-label="More for Femi Johnson"
+                        >
+                          <svg class="i"><use href="#i-dots" /></svg>
+                        </button>
+                      </div>
+                    </li>
+                    <li>
+                      <div>
+                        <div class="t faint">kemi@ledgerbridge.example</div>
+                        <div class="s">Invited 2 days ago · Member</div>
+                      </div>
+                      <div class="end"><button class="btn">Resend</button></div>
+                    </li>
+                  </ul>
+                </section>
+
+                <div class="inline-note">
+                  <svg class="i" style="margin-top: 2px">
+                    <use href="#i-shield" /></svg
+                  ><span
+                    >Only owners and admins of LedgerBridge see this page.
+                    Capital Q checks the role on every request, not just here.
+                    Role changes and invitations appear in the activity
+                    log.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </section>
+
+    <!-- command palette -->
+    <div
+      class="palette-back"
+      id="palette"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search and jump"
+    >
+      <div class="palette">
+        <div class="q">
+          <svg class="i"><use href="#i-search" /></svg
+          ><span class="typed">ledg</span
+          ><span class="caret" aria-hidden="true"></span
+          ><kbd style="margin-left: auto">Esc</kbd>
+        </div>
+        <h3>Organisations</h3>
+        <div class="opt" aria-selected="true">
+          <svg class="i"><use href="#i-building" /></svg>LedgerBridge<span
+            class="s"
+            >Founder company · Nigeria</span
+          ><span class="end">↵ Open</span>
+        </div>
+        <div class="opt">
+          <svg class="i"><use href="#i-building" /></svg>Ledgerfold<span
+            class="s"
+            >Founder company · Ghana</span
+          >
+        </div>
+        <h3>People</h3>
+        <div class="opt">
+          <svg class="i"><use href="#i-users" /></svg>Tunde Bello<span class="s"
+            >Owner, LedgerBridge</span
+          >
+        </div>
+        <h3>Go to</h3>
+        <div class="opt">
+          <svg class="i"><use href="#i-list" /></svg>Facilitation ledger<span
+            class="end"
+            >G then L</span
+          >
+        </div>
+        <div class="opt">
+          <svg class="i"><use href="#i-list" /></svg>Audit log, filtered to
+          LedgerBridge
+        </div>
+        <div class="foot">
+          <span><kbd>↑</kbd> <kbd>↓</kbd> move</span
+          ><span><kbd>↵</kbd> open</span
+          ><span>Searches only what your role can see</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const params = new URLSearchParams(location.search);
+        const theme = params.get("theme");
+        if (theme === "dark" || theme === "light")
+          document.documentElement.dataset.theme = theme;
+        const side = document.getElementById("platform-side");
+        const scope = document.getElementById("platform-scope");
+        for (const screen of document.querySelectorAll(
+          '[data-side="platform"]',
+        )) {
+          screen
+            .querySelector('[data-slot="side"]')
+            .replaceWith(side.content.cloneNode(true));
+          screen
+            .querySelector('[data-slot="scope"]')
+            .replaceWith(scope.content.cloneNode(true));
+        }
+        const palette = document.getElementById("palette");
+        function show() {
+          const raw = (location.hash || "#overview").slice(1);
+          const [name, k] = raw.split("-");
+          const id = [
+            "overview",
+            "organisations",
+            "organisation",
+            "members",
+          ].includes(name)
+            ? name
+            : "overview";
+          for (const s of document.querySelectorAll(".screen"))
+            s.classList.toggle("on", s.id === "s-" + id);
+          for (const a of document.querySelectorAll(
+            ".screen.on .nav-a[data-k]",
+          )) {
+            const current =
+              a.dataset.k === id ||
+              (id === "organisation" && a.dataset.k === "organisations");
+            if (current) a.setAttribute("aria-current", "page");
+            else a.removeAttribute("aria-current");
+          }
+          palette.classList.toggle("on", k === "k");
+          window.scrollTo(0, 0);
+        }
+        addEventListener("hashchange", show);
+        addEventListener("keydown", (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+            e.preventDefault();
+            palette.classList.add("on");
+          }
+          if (e.key === "Escape") palette.classList.remove("on");
+        });
+        document.addEventListener("click", (e) => {
+          if (e.target.closest("[data-open-palette]"))
+            palette.classList.add("on");
+          else if (e.target === palette) palette.classList.remove("on");
+        });
+        show();
+      })();
+    </script>
+  </body>
+</html>
