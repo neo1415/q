@@ -31,7 +31,80 @@ export type ConsoleOverview = {
     readonly pending: number;
     readonly oldestPendingSeconds: number | null;
   };
+  /** The workers' last heartbeat; null when none was ever recorded. */
+  readonly workers: WorkersHeartbeat | null;
 };
+
+export type HeartbeatPool = {
+  readonly slots: number;
+  readonly held: number;
+  readonly waiting: number;
+  readonly oldestHeldMs: number | null;
+  readonly recycles: number;
+  readonly lastRecycledAt: string | null;
+};
+
+export type WorkersHeartbeat = {
+  readonly beatAt: string;
+  readonly pool: HeartbeatPool | null;
+  readonly checkedAt: string | null;
+  readonly findings: readonly string[];
+};
+
+const count = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : null;
+const instant = (value: unknown): string | null =>
+  typeof value === "string" && !Number.isNaN(Date.parse(value))
+    ? new Date(value).toISOString()
+    : null;
+
+/**
+ * The stored heartbeat, re-read field by field: the row is the workers'
+ * own write, but only counts, instants and finding codes leave here, and
+ * a malformed pool reads as not reported rather than failing the page.
+ */
+export function heartbeatOf(row: {
+  readonly beat_at: Date | string;
+  readonly pool: unknown;
+  readonly ops_check: unknown;
+}): WorkersHeartbeat {
+  const pool =
+    typeof row.pool === "object" && row.pool !== null
+      ? (row.pool as Record<string, unknown>)
+      : {};
+  const slots = count(pool["slots"]);
+  const held = count(pool["held"]);
+  const waiting = count(pool["waiting"]);
+  const recycles = count(pool["recycles"]);
+  const check =
+    typeof row.ops_check === "object" && row.ops_check !== null
+      ? (row.ops_check as Record<string, unknown>)
+      : {};
+  const findings = Array.isArray(check["findings"])
+    ? check["findings"].filter(
+        (code): code is string =>
+          typeof code === "string" && /^[A-Z_]{1,40}$/u.test(code),
+      )
+    : [];
+  return {
+    beatAt: new Date(row.beat_at).toISOString(),
+    pool:
+      slots === null || held === null || waiting === null || recycles === null
+        ? null
+        : {
+            slots,
+            held,
+            waiting,
+            oldestHeldMs: count(pool["oldestHeldMs"]),
+            recycles,
+            lastRecycledAt: instant(pool["lastRecycledAt"]),
+          },
+    checkedAt: instant(check["checkedAt"]),
+    findings: findings.slice(0, 20),
+  };
+}
 
 export const CONSOLE_SPEND_DAYS = 14;
 
@@ -57,7 +130,7 @@ export async function consoleOverview(
   const days = lastDays(now, CONSOLE_SPEND_DAYS);
   const first = days[0] ?? now.toISOString().slice(0, 10);
   const month = now.toISOString().slice(0, 7);
-  const [counts, spend, daily, outbox] = await Promise.all([
+  const [counts, spend, daily, outbox, beats] = await Promise.all([
     sql<{ active: number }[]>`
       select count(*)::int as active from identity.organisations o
        where exists (select 1 from identity.organisation_memberships m
@@ -83,6 +156,9 @@ export async function consoleOverview(
              extract(epoch from (${now.toISOString()}::timestamptz - min(available_at)))::int as oldest
         from events.outbox
        where published_at is null`,
+    sql<{ beat_at: Date; pool: unknown; ops_check: unknown }[]>`
+      select beat_at, pool, ops_check from platform_ops.service_heartbeats
+       where service = 'workers'`,
   ]);
   const byDay = new Map(daily.map((row) => [row.day, row]));
   return {
@@ -109,5 +185,6 @@ export async function consoleOverview(
           ? null
           : Math.max(0, outbox[0]?.oldest ?? 0),
     },
+    workers: beats[0] === undefined ? null : heartbeatOf(beats[0]),
   };
 }

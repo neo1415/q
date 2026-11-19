@@ -493,6 +493,10 @@ describe("@capital-q/platform-admin against local Postgres", () => {
       const figures = await admin.consoleOverview(grant);
       expect(figures.daily).toHaveLength(14);
       expect(figures.activeOrganisations).toBeGreaterThan(0);
+      // The workers' heartbeat reads from its table (none in a fresh stack).
+      expect(
+        figures.workers === null || typeof figures.workers.beatAt === "string",
+      ).toBe(true);
       const orgs = await admin.searchOrganisations(grant, "PA Co");
       const detail = await admin.organisationDetail(
         grant,

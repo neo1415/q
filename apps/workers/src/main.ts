@@ -58,6 +58,7 @@ import {
 import {
   createRequestDatabaseClient,
   databasePoolExhaustionsObserved,
+  databasePoolSnapshot,
   databaseTimeoutsObserved,
   watchConnectionPool,
 } from "@capital-q/database";
@@ -289,6 +290,7 @@ import {
   parseOpsThresholds,
   runOpsWatch,
 } from "./reliability/ops-check.js";
+import { createPostgresHeartbeat } from "./reliability/heartbeat.js";
 import { runProviderBalanceWatch } from "./reliability/provider-balance.js";
 import {
   composeRecommendationEmbedder,
@@ -1943,6 +1945,11 @@ await Promise.all([
           alert: (alert) => operatorAlert.send(alert),
           signal: shutdownController.signal,
           logger,
+          // Console System health: the workers say they are alive here.
+          heartbeat: createPostgresHeartbeat({
+            sql: database.sql,
+            pool: () => databasePoolSnapshot(database.sql),
+          }),
         }),
       ]),
   // DAILY block

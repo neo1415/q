@@ -14,7 +14,12 @@ import {
   auditResourceKey,
   auditResourceKind,
 } from "./audit-names";
-import { heartbeatLine, poolLine, type HealthLine } from "./health-words";
+import {
+  checkLine,
+  heartbeatLine,
+  poolLine,
+  type HealthLine,
+} from "./health-words";
 import type { ServiceHealth } from "./system-health";
 import { SpendChart } from "./spend-chart";
 import { when, words } from "./words";
@@ -165,7 +170,7 @@ export function HealthPanel({
   outbox,
   versions,
   qApiPool,
-  workersHeartbeatAt,
+  workers,
   now,
 }: {
   readonly services: readonly ServiceHealth[];
@@ -176,8 +181,8 @@ export function HealthPanel({
   }[];
   /** q-api's pool; null when not reported. */
   readonly qApiPool: ServicePoolDto | null;
-  /** The workers' last heartbeat; null when none is recorded. */
-  readonly workersHeartbeatAt: string | null;
+  /** The workers' last heartbeat, pool and check; null when none. */
+  readonly workers: AdminConsoleOverviewDto["workers"];
   readonly now: number;
 }) {
   const t = serverTNow();
@@ -186,7 +191,9 @@ export function HealthPanel({
     readonly line: HealthLine;
   }[] = [
     { term: "Q API database pool", line: poolLine(qApiPool, now) },
-    { term: "Workers", line: heartbeatLine(workersHeartbeatAt, now) },
+    { term: "Workers", line: heartbeatLine(workers?.beatAt, now) },
+    { term: "Workers database pool", line: poolLine(workers?.pool, now) },
+    { term: "Workers last check", line: checkLine(workers) },
   ];
   return (
     <Panel title="System health" id="console-health">

@@ -13,7 +13,7 @@ vi.mock("@/features/i18n/server-now", () => ({
   serverTNow: () => (text: string) => text,
 }));
 
-const { heartbeatLine, poolLine, seconds, NOT_REPORTED } =
+const { checkLine, heartbeatLine, poolLine, seconds, NOT_REPORTED } =
   await import("../src/features/admin/health-words");
 const { HealthPanel } = await import("../src/features/admin/console-overview");
 
@@ -100,7 +100,7 @@ describe("the health card", () => {
         outbox={null}
         versions={[]}
         qApiPool={null}
-        workersHeartbeatAt={null}
+        workers={null}
         now={NOW}
       />,
     );
@@ -108,10 +108,14 @@ describe("the health card", () => {
     expect(rows.map((row) => row.getAttribute("data-health-tone"))).toEqual([
       "UNKNOWN",
       "UNKNOWN",
+      "UNKNOWN",
+      "UNKNOWN",
     ]);
     expect(rows.map((row) => row.textContent)).toEqual([
       "Q API database poolNot reported",
       "WorkersNot reported",
+      "Workers database poolNot reported",
+      "Workers last checkNot reported",
     ]);
   });
 
@@ -126,11 +130,72 @@ describe("the health card", () => {
           recycles: 1,
           lastRecycledAt: "2026-11-19T11:00:00.000Z",
         }}
-        workersHeartbeatAt={null}
+        workers={null}
         now={NOW}
       />,
     );
     const pool = document.querySelector('[data-health-tone="WARNING"]');
     expect(pool?.textContent).toContain("3 of 10 in use · oldest 0.4 s");
+  });
+});
+
+describe("the workers' row from their stored heartbeat", () => {
+  const workers = {
+    beatAt: "2026-11-19T11:59:48.000Z",
+    pool: { ...POOL, held: 1, slots: 5, oldestHeldMs: 90 },
+    checkedAt: "2026-11-19T11:59:48.000Z",
+    findings: [] as string[],
+  };
+
+  it("reads fresh, with the pool and a clean check", () => {
+    render(
+      <HealthPanel
+        services={[]}
+        outbox={null}
+        versions={[]}
+        qApiPool={null}
+        workers={workers}
+        now={NOW}
+      />,
+    );
+    const text = [...document.querySelectorAll("[data-health-tone]")].map(
+      (row) =>
+        `${row.getAttribute("data-health-tone") ?? ""} ${row.textContent ?? ""}`,
+    );
+    expect(text).toContain("OK Workersheartbeat 12 s ago");
+    expect(text).toContain(
+      "OK Workers database pool1 of 5 in use · oldest 0.1 s",
+    );
+    expect(text).toContain("OK Workers last checkNo findings");
+  });
+
+  it("reads as down once the heartbeat is over two minutes old", () => {
+    render(
+      <HealthPanel
+        services={[]}
+        outbox={null}
+        versions={[]}
+        qApiPool={null}
+        workers={{ ...workers, beatAt: "2026-11-19T11:55:00.000Z" }}
+        now={NOW}
+      />,
+    );
+    const down = document.querySelector('[data-health-tone="DOWN"]');
+    expect(down?.textContent).toContain("Down: last heartbeat 5 min ago");
+  });
+
+  it("says a check's findings, and a check that could not read", () => {
+    expect(
+      checkLine({ checkedAt: workers.checkedAt, findings: ["DB_TIMEOUTS"] }),
+    ).toEqual({
+      tone: "WARNING",
+      text: "db timeouts",
+    });
+    expect(
+      checkLine({ checkedAt: workers.checkedAt, findings: ["CHECK_FAILED"] })
+        .tone,
+    ).toBe("DOWN");
+    expect(checkLine(null)).toEqual(NOT_REPORTED);
+    expect(checkLine({ checkedAt: null, findings: [] })).toEqual(NOT_REPORTED);
   });
 });

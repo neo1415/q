@@ -88,6 +88,7 @@ const OVERVIEW: AdminConsoleOverviewDto = {
   })),
   outbox: { pending: 3, oldestPendingSeconds: 42 },
   apiVersion: "862090033",
+  workers: null,
 };
 
 const RECENT: readonly AdminAuditRowDto[] = [
@@ -412,7 +413,19 @@ export default async function ConsoleReviewPage({
                       recycles: 1,
                       lastRecycledAt: "2026-11-19T09:12:00.000Z",
                     }}
-                    workersHeartbeatAt={null}
+                    workers={{
+                      beatAt: "2026-11-19T11:59:48.000Z",
+                      pool: {
+                        slots: 5,
+                        held: 1,
+                        waiting: 0,
+                        oldestHeldMs: 90,
+                        recycles: 0,
+                        lastRecycledAt: null,
+                      },
+                      checkedAt: "2026-11-19T11:59:48.000Z",
+                      findings: [],
+                    }}
                     now={Date.UTC(2026, 10, 19, 12)}
                     versions={[
                       { service: "API", sha: "862090033" },

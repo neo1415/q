@@ -276,9 +276,9 @@ export default async function AdminPage() {
               outbox={consoleFigures?.outbox ?? null}
               versions={versions}
               qApiPool={pool}
-              // No durable worker heartbeat exists yet (it needs a table):
-              // the workers are "Not reported", never shown as healthy.
-              workersHeartbeatAt={null}
+              // The workers' heartbeat (platform_ops.service_heartbeats);
+              // none recorded, or no overview read, is "Not reported".
+              workers={consoleFigures?.workers ?? null}
               now={readClock()}
             />
             {recent === null && !can("audit.read") ? null : (

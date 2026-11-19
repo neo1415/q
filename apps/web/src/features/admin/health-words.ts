@@ -74,3 +74,29 @@ export function heartbeatLine(
     ? { tone: "DOWN", text: `Down: last heartbeat ${seconds(age)} ago` }
     : { tone: "OK", text: `heartbeat ${seconds(age)} ago` };
 }
+
+/** The workers' last operational check: its finding codes, in words. */
+export function checkLine(
+  check:
+    | {
+        readonly checkedAt: string | null;
+        readonly findings: readonly string[];
+      }
+    | null
+    | undefined,
+): HealthLine {
+  if (check === null || check === undefined || check.checkedAt === null) {
+    return NOT_REPORTED;
+  }
+  if (check.findings.includes("CHECK_FAILED")) {
+    return { tone: "DOWN", text: "Could not read the database" };
+  }
+  return check.findings.length === 0
+    ? { tone: "OK", text: "No findings" }
+    : {
+        tone: "WARNING",
+        text: check.findings
+          .map((code) => code.toLowerCase().replaceAll("_", " "))
+          .join(", "),
+      };
+}

@@ -205,6 +205,25 @@ export const AdminOrganisationListDtoSchema = z
   })
   .strict();
 
+/** A service's database pool: counts and ages only, never statements. */
+export const ServicePoolDtoSchema = z
+  .object({
+    slots: Tally,
+    held: Tally,
+    waiting: Tally,
+    oldestHeldMs: Tally.nullable(),
+    recycles: Tally,
+    lastRecycledAt: z.string().max(40).nullable(),
+  })
+  .strict();
+export type ServicePoolDto = z.infer<typeof ServicePoolDtoSchema>;
+
+/** Null when the service's executor is not a watched pool. */
+export const QApiOpsPoolDtoSchema = z
+  .object({ pool: ServicePoolDtoSchema.nullable() })
+  .strict();
+export type QApiOpsPoolDto = z.infer<typeof QApiOpsPoolDtoSchema>;
+
 /**
  * T1: what the overview adds to the existing reads. Spend counts priced
  * calls only; calls with no price are a count of their own. The outbox
@@ -246,27 +265,22 @@ export const AdminConsoleOverviewDtoSchema = z
       .string()
       .regex(/^[0-9a-f]{7,40}$/u)
       .nullable(),
+    /**
+     * The workers' last heartbeat (platform_ops.service_heartbeats), its
+     * pool and its last operational check's finding codes; null when none
+     * was ever recorded.
+     */
+    workers: z
+      .object({
+        beatAt: z.string().max(40),
+        pool: ServicePoolDtoSchema.nullable(),
+        checkedAt: z.string().max(40).nullable(),
+        findings: z.array(z.string().regex(/^[A-Z_]{1,40}$/u)).max(20),
+      })
+      .strict()
+      .nullable(),
   })
   .strict();
-/** A service's database pool: counts and ages only, never statements. */
-export const ServicePoolDtoSchema = z
-  .object({
-    slots: Tally,
-    held: Tally,
-    waiting: Tally,
-    oldestHeldMs: Tally.nullable(),
-    recycles: Tally,
-    lastRecycledAt: z.string().max(40).nullable(),
-  })
-  .strict();
-export type ServicePoolDto = z.infer<typeof ServicePoolDtoSchema>;
-
-/** Null when the service's executor is not a watched pool. */
-export const QApiOpsPoolDtoSchema = z
-  .object({ pool: ServicePoolDtoSchema.nullable() })
-  .strict();
-export type QApiOpsPoolDto = z.infer<typeof QApiOpsPoolDtoSchema>;
-
 export type AdminConsoleOverviewDto = z.infer<
   typeof AdminConsoleOverviewDtoSchema
 >;

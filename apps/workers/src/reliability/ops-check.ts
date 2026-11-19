@@ -3,6 +3,8 @@ import type { OperatorAlert } from "@capital-q/platform-admin";
 
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 
+import type { Heartbeat } from "./heartbeat.js";
+
 /**
  * Launch readiness item 7: one operational check the workers run on an
  * interval. It reads (never writes) a few bounded aggregates and, when any
@@ -462,6 +464,11 @@ export async function runOpsWatch(options: {
   readonly now?: (() => Date) | undefined;
   readonly sleep?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
+  /**
+   * The console's System health: told after every check, the finding codes
+   * or CHECK_FAILED. A failure to record it is logged, never fatal.
+   */
+  readonly heartbeat?: Heartbeat | undefined;
 }): Promise<void> {
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? (() => new Date());
@@ -471,17 +478,20 @@ export async function runOpsWatch(options: {
   while (!options.signal.aborted) {
     const timeoutsNow = options.dbTimeouts();
     const exhaustionsNow = exhaustions();
+    const at = now();
+    let findings: readonly string[] = ["CHECK_FAILED"];
     try {
-      await checkOps({
+      const found = await checkOps({
         read: options.read,
         dbTimeoutsSinceLastCheck: timeoutsNow - timeoutsSeen,
         dbPoolExhaustionsSinceLastCheck: exhaustionsNow - exhaustionsSeen,
         thresholds: options.thresholds,
         dailyCapUsd: options.dailyCapUsd,
         alert: options.alert,
-        now: now(),
+        now: at,
         logger: options.logger,
       });
+      findings = found.map((finding) => finding.code);
       timeoutsSeen = timeoutsNow;
       exhaustionsSeen = exhaustionsNow;
     } catch (error: unknown) {
@@ -498,6 +508,16 @@ export async function runOpsWatch(options: {
         },
         "operational check could not read the database",
       );
+    }
+    if (options.heartbeat !== undefined) {
+      try {
+        await options.heartbeat({ at, findings });
+      } catch (error: unknown) {
+        options.logger.warn(
+          { err: error },
+          "operational check: the heartbeat could not be recorded",
+        );
+      }
     }
     await sleep(options.thresholds.intervalMs, options.signal);
   }

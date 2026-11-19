@@ -598,6 +598,8 @@ export {
 } from "./lists.js";
 export {
   CONSOLE_SPEND_DAYS,
+  heartbeatOf,
   lastDays,
   type ConsoleOverview,
+  type WorkersHeartbeat,
 } from "./console-overview.js";

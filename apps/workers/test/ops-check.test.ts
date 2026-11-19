@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { OperatorAlert } from "@capital-q/platform-admin";
 
+import { heartbeatRow } from "../src/reliability/heartbeat.js";
+
 import {
   assessOps,
   checkOps,
@@ -239,6 +241,100 @@ describe("pool exhaustion (incident 19 Nov 2026)", () => {
     ]);
     expect(alertLines[0]?.fields["dbPoolExhaustions"]).toBe(1);
     expect(alertLines[1]?.fields["dbPoolExhaustions"]).toBe(2);
+  });
+});
+
+describe("the heartbeat (console System health)", () => {
+  it("beats after every check with its finding codes, CHECK_FAILED when unreadable", async () => {
+    const { logger } = recorder();
+    const controller = new AbortController();
+    const beats: { at: Date; findings: readonly string[] }[] = [];
+    let reads = 0;
+    await runOpsWatch({
+      read: () => {
+        reads += 1;
+        if (reads === 2) return Promise.reject(new Error("db down"));
+        return Promise.resolve(quietReading);
+      },
+      dbTimeouts: () => 0,
+      thresholds: DEFAULT_OPS_THRESHOLDS,
+      dailyCapUsd: undefined,
+      alert: () => Promise.resolve(true),
+      signal: controller.signal,
+      logger,
+      now: () => new Date("2026-11-19T12:00:00.000Z"),
+      sleep: () => {
+        if (reads >= 2) controller.abort();
+        return Promise.resolve();
+      },
+      heartbeat: (beat) => {
+        beats.push(beat);
+        return Promise.resolve();
+      },
+    });
+    expect(beats.map((beat) => beat.findings)).toEqual([[], ["CHECK_FAILED"]]);
+    expect(beats[0]?.at.toISOString()).toBe("2026-11-19T12:00:00.000Z");
+  });
+
+  it("logs a heartbeat that cannot be written, and keeps checking", async () => {
+    const { lines, logger } = recorder();
+    const controller = new AbortController();
+    let reads = 0;
+    await runOpsWatch({
+      read: () => {
+        reads += 1;
+        return Promise.resolve(quietReading);
+      },
+      dbTimeouts: () => 0,
+      thresholds: DEFAULT_OPS_THRESHOLDS,
+      dailyCapUsd: undefined,
+      alert: () => Promise.resolve(true),
+      signal: controller.signal,
+      logger,
+      sleep: () => {
+        if (reads >= 2) controller.abort();
+        return Promise.resolve();
+      },
+      heartbeat: () => Promise.reject(new Error("no table")),
+    });
+    expect(reads).toBe(2);
+    expect(
+      lines.filter(
+        (line) => line.level === "warn" && line.fields["err"] instanceof Error,
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("stores the pool's counts and the check's codes, nothing else", () => {
+    const row = heartbeatRow(
+      { at: new Date("2026-11-19T12:00:00.000Z"), findings: ["DB_TIMEOUTS"] },
+      {
+        slots: 10,
+        held: 2,
+        waiting: 0,
+        oldestHeldMs: 120,
+        recycles: 0,
+        lastRecycledAt: null,
+      },
+    );
+    expect(row).toEqual({
+      beatAt: "2026-11-19T12:00:00.000Z",
+      pool: {
+        slots: 10,
+        held: 2,
+        waiting: 0,
+        oldestHeldMs: 120,
+        recycles: 0,
+        lastRecycledAt: null,
+      },
+      opsCheck: {
+        checkedAt: "2026-11-19T12:00:00.000Z",
+        findings: ["DB_TIMEOUTS"],
+      },
+    });
+    expect(
+      heartbeatRow({ at: new Date(0), findings: [] }, undefined).pool,
+    ).toEqual({});
   });
 });
 

@@ -1526,6 +1526,10 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: "Delivery outcomes keyed by a hash of the address and its domain only.",
   },
   N(
+    "platform_ops.service_heartbeats",
+    "Console System health: a background service's last heartbeat, its database pool counts and its last check's finding codes; no person.",
+  ),
+  N(
     "platform_ops.meeting_digests",
     "The facilitation record of a meeting: counts and figures keyed by the meeting and the relationship, no person.",
   ),

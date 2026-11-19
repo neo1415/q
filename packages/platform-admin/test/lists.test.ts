@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeListCursor, encodeListCursor, lastDays } from "../src/index.js";
+import {
+  decodeListCursor,
+  encodeListCursor,
+  heartbeatOf,
+  lastDays,
+} from "../src/index.js";
 
 const ID = "8f6f0c1e-2c3b-4f7a-9d1e-0a1b2c3d4e5f";
 
@@ -50,5 +55,51 @@ describe("the overview's 14 days", () => {
       "2026-03-01",
       "2026-03-02",
     ]);
+  });
+});
+
+describe("the workers' heartbeat as the console reads it", () => {
+  it("passes counts, instants and finding codes, and nothing else", () => {
+    expect(
+      heartbeatOf({
+        beat_at: new Date("2026-11-19T12:00:00.000Z"),
+        pool: {
+          slots: 10,
+          held: 2,
+          waiting: 0,
+          oldestHeldMs: 120,
+          recycles: 0,
+          lastRecycledAt: null,
+          statement: "select secret",
+        },
+        ops_check: {
+          checkedAt: "2026-11-19T12:00:00.000Z",
+          findings: ["DB_TIMEOUTS", "not a code", 7],
+        },
+      }),
+    ).toEqual({
+      beatAt: "2026-11-19T12:00:00.000Z",
+      pool: {
+        slots: 10,
+        held: 2,
+        waiting: 0,
+        oldestHeldMs: 120,
+        recycles: 0,
+        lastRecycledAt: null,
+      },
+      checkedAt: "2026-11-19T12:00:00.000Z",
+      findings: ["DB_TIMEOUTS"],
+    });
+  });
+
+  it("reads a malformed pool as not reported, not as healthy", () => {
+    const beat = heartbeatOf({
+      beat_at: "2026-11-19T12:00:00.000Z",
+      pool: { slots: "ten" },
+      ops_check: [],
+    });
+    expect(beat.pool).toBeNull();
+    expect(beat.checkedAt).toBeNull();
+    expect(beat.findings).toEqual([]);
   });
 });
