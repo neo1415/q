@@ -902,3 +902,12 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
     - The welcome said "nothing on Capital Q matches it yet" despite matches; under investigation.
 - **18 Nov 22:32 UTC, `491ece443` (web only; the other services are unchanged on `dd18752b4`):** ci-local PASS (1676 s). The welcome says "nothing matches" only when the slate itself is empty, and is silent during a rebuild (`6fde24973`).
   - Site content seeded through the management API with `--hold-pricing`: 21 pages. FAQ and the 12 landing sections are published; pricing is a draft until billing is live; the 7 legal pages are drafts pending lawyer review. A re-run writes 0.
+- **19 Nov 01:22 UTC, `833fbc21a` (rollback point `491ece443`):** meetings S5–S7 and S9 (`6ce3cf87b`):
+  - post-call outcomes, with soft and firm commitments, requests and promises tied to transcript evidence;
+  - an admin digest without the transcript; the transcript to both sides;
+  - next-conversation openers, plus reminders behind approval;
+  - commitment evidence grades and notes, with an admin review queue for mismatches.
+
+  Gate fixes (`833fbc21a`): a date's day never grounds a count in the claim check; the commitment evidence tables are known network tables. ci-local PASS (1030 s, rerun after a container restart). Migration `20261231599340` applied; hosted is at 313. All four services SUCCESS.
+  - Live smoke (Savanna): no startup errors. The welcome shows "8 pitches that match your mandate"; the exclusion (15) and the contact-status answer are correct.
+  - Not wired yet: the typed-chat meeting opener; the admin console view of the digests.
