@@ -952,3 +952,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Live as the fictional LedgerBridge founder: the sidebar has a "LedgerBridge" group (Organisation, Import pipeline). It is collapsed on `/settings` and open, with Import pipeline the only current item, on `/relationships/import`.
   - Personal Settings no longer shows Brand or the house guide. "Plans and pricing" is under You.
   - Still open (with a worker): the Plan page's "Not included" rows, the console's grouped sidebar, and names in audit rows.
+- **6470d442d deployed 15:28 UTC** (gate PASS 15:27:48Z), with the rest of admin clean-up A1:
+  - Live as the LedgerBridge founder: `/settings/plan` shows "Your allowances" and no "Not included" row, and only "Plans and pricing" is marked current.
+  - The console's grouped sidebar and names in audit rows are not live-checked: fictional accounts get a 404 on `/admin`. Evidence is the screenshots in `docs/design/a1b-2026-11-19/` and the tests.
