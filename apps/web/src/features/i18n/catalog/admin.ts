@@ -32,6 +32,8 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
   "Not ready": "غير جاهز",
   "Not answering": "لا يستجيب",
   "Not configured here": "غير مُعدّ هنا",
+  "Q API database pool": "مجمّع قاعدة بيانات Q API",
+  "Not reported": "لم يُبلَّغ عنه",
   "Active organisations": "المؤسسات النشطة",
   "Waiting on operators": "بانتظار المشغّلين",
   "Model spend this month": "إنفاق النماذج هذا الشهر",

@@ -33,7 +33,11 @@ import {
   type Queue,
 } from "@/features/admin/console-overview";
 import { usd } from "@/features/admin/spend-words";
-import { systemHealth, webVersion } from "@/features/admin/system-health";
+import {
+  qApiPool,
+  systemHealth,
+  webVersion,
+} from "@/features/admin/system-health";
 import { serverT } from "@/features/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -130,7 +134,7 @@ export default async function AdminPage() {
   // T1 (admin design 2026-11-19): the overview's own figures, the email
   // panel's delivery counts, recent operator activity and what the
   // services say about themselves. Each is read only for a role that may.
-  const [consoleFigures, email, recent, services] = await Promise.all([
+  const [consoleFigures, email, recent, services, pool] = await Promise.all([
     getAdminConsoleOverview(session).catch(() => null),
     can("email.read") ? getAdminEmail(session).catch(() => null) : null,
     can("audit.read")
@@ -140,6 +144,7 @@ export default async function AdminPage() {
         )
       : null,
     systemHealth(),
+    can("overview.read") ? qApiPool() : null,
   ]);
   const names =
     recent === null
@@ -270,6 +275,11 @@ export default async function AdminPage() {
               services={services}
               outbox={consoleFigures?.outbox ?? null}
               versions={versions}
+              qApiPool={pool}
+              // No durable worker heartbeat exists yet (it needs a table):
+              // the workers are "Not reported", never shown as healthy.
+              workersHeartbeatAt={null}
+              now={readClock()}
             />
             {recent === null && !can("audit.read") ? null : (
               <RecentActivity rows={recent} names={names} />
@@ -391,4 +401,9 @@ export default async function AdminPage() {
       ) : null}
     </div>
   );
+}
+
+/** The request's clock, read once outside render's pure part. */
+function readClock(): number {
+  return Date.now();
 }

@@ -786,6 +786,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/work.ts GET Q_WORK_PATH": cap("tool.list_q_work"),
   // Lead 2026-10-03: what Q used for them; Q opens it (navigate USAGE).
   "q-api/http/usage.ts GET Q_USAGE_PATH": cap("navigate.USAGE"),
+  // The console's System health (incident 19 Nov 2026): q-api's own pool,
+  // counts and ages, for platform operators holding overview.read.
+  "q-api/http/ops-pool.ts GET Q_API_OPS_POOL_PATH": exempt(
+    "operators' console health reading (overview.read); a 404 for everyone else, no Q tool reads it",
+  ),
   "q-api/http/work.ts GET Q_WORK_ITEM_PATH": cap("tool.list_q_work"),
   "q-api/http/work.ts DELETE Q_WORK_ITEM_PATH": cap("tool.stop_q_work"),
   "q-api/http/work.ts DELETE Q_WORK_LANE_PATH": cap("tool.stop_q_work"),

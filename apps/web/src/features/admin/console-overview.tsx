@@ -3,6 +3,7 @@ import Link from "next/link";
 import type {
   AdminAuditRowDto,
   AdminConsoleOverviewDto,
+  ServicePoolDto,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 
@@ -13,6 +14,7 @@ import {
   auditResourceKey,
   auditResourceKind,
 } from "./audit-names";
+import { heartbeatLine, poolLine, type HealthLine } from "./health-words";
 import type { ServiceHealth } from "./system-health";
 import { SpendChart } from "./spend-chart";
 import { when, words } from "./words";
@@ -162,6 +164,9 @@ export function HealthPanel({
   services,
   outbox,
   versions,
+  qApiPool,
+  workersHeartbeatAt,
+  now,
 }: {
   readonly services: readonly ServiceHealth[];
   readonly outbox: AdminConsoleOverviewDto["outbox"] | null;
@@ -169,8 +174,20 @@ export function HealthPanel({
     readonly service: string;
     readonly sha: string;
   }[];
+  /** q-api's pool; null when not reported. */
+  readonly qApiPool: ServicePoolDto | null;
+  /** The workers' last heartbeat; null when none is recorded. */
+  readonly workersHeartbeatAt: string | null;
+  readonly now: number;
 }) {
   const t = serverTNow();
+  const readings: readonly {
+    readonly term: string;
+    readonly line: HealthLine;
+  }[] = [
+    { term: "Q API database pool", line: poolLine(qApiPool, now) },
+    { term: "Workers", line: heartbeatLine(workersHeartbeatAt, now) },
+  ];
   return (
     <Panel title="System health" id="console-health">
       <ul className="m-0 flex list-none flex-col gap-2 p-0" data-console-health>
@@ -211,6 +228,37 @@ export function HealthPanel({
             </li>
           );
         })}
+        {readings.map((reading) => (
+          <li
+            key={reading.term}
+            className="flex items-start justify-between gap-3 cq-body-sm"
+            data-health-tone={reading.line.tone}
+          >
+            <span className="text-(--cq-text-primary)">{t(reading.term)}</span>
+            <span
+              className={cx(
+                "inline-flex items-center gap-1.5 text-end tabular-nums",
+                reading.line.tone === "OK"
+                  ? "text-(--cq-text-secondary)"
+                  : "text-(--cq-text-primary)",
+              )}
+            >
+              {/* Words carry the state; the mark only echoes them. */}
+              <span
+                aria-hidden="true"
+                className={cx(
+                  "size-2 shrink-0 rounded-full",
+                  reading.line.tone === "OK"
+                    ? "bg-(--cq-positive)"
+                    : reading.line.tone === "UNKNOWN"
+                      ? "border border-(--cq-border)"
+                      : "bg-(--cq-warning)",
+                )}
+              />
+              {t(reading.line.text)}
+            </span>
+          </li>
+        ))}
         {outbox === null ? null : (
           <li className="flex items-center justify-between gap-3 cq-body-sm">
             <span className="text-(--cq-text-primary)">

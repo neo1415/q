@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toDatabaseError } from "../src/errors.js";
 import {
   databasePoolExhaustionsObserved,
+  databasePoolSnapshot,
   watchConnectionPool,
 } from "../src/pool-watch.js";
 import {
@@ -414,6 +415,24 @@ describe("watchConnectionPool (fake clock)", () => {
     // The statement that waited fails (deadline or recycle), never hangs.
     expect(toDatabaseError(await waiting).kind).toMatch(/TIMEOUT|CONNECTION/);
     expect(pool.inspect()).toMatchObject({ held: 0, waiting: 0, recycles: 1 });
+    // The operator's snapshot: counts, ages and the recycle, nothing else.
+    const snapshot = databasePoolSnapshot(sql);
+    expect(snapshot).toEqual({
+      slots: 2,
+      held: 0,
+      waiting: 0,
+      oldestHeldMs: null,
+      recycles: 1,
+      lastRecycledAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/u) as unknown,
+    });
+    expect(Object.keys(snapshot ?? {}).sort()).toEqual([
+      "held",
+      "lastRecycledAt",
+      "oldestHeldMs",
+      "recycles",
+      "slots",
+      "waiting",
+    ]);
     // The fresh pool serves at once.
     const after = outcome(sql());
     await vi.advanceTimersByTimeAsync(10);
@@ -494,6 +513,8 @@ describe("watchConnectionPool (fake clock)", () => {
     );
     const watch = watchConnectionPool({ sql: plain, logger: log });
     expect(watch.check()).toBeUndefined();
+    // No pool, no snapshot: the console says "not reported", not "fine".
+    expect(databasePoolSnapshot(plain)).toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
     expect(lines).toEqual([]);
   });

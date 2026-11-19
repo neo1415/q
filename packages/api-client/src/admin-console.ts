@@ -6,6 +6,8 @@ import {
   ADMIN_ACCOUNTS_PATH,
   ADMIN_AUDIT_PATH,
   ADMIN_CONSOLE_OVERVIEW_PATH,
+  Q_API_OPS_POOL_PATH,
+  QApiOpsPoolDtoSchema,
   ADMIN_BREAK_GLASS_CHAT_PATH,
   ADMIN_BREAK_GLASS_DECISION_PATH,
   ADMIN_BREAK_GLASS_PATH,
@@ -112,6 +114,13 @@ export const listAdminOrganisations = (
     `${ADMIN_ORGANISATIONS_PATH}${query({ ...list })}`,
     AdminOrganisationListDtoSchema,
   );
+
+/**
+ * q-api's database pool, for System health; call with a q-api session. A
+ * 404 for anyone but a platform operator holding overview.read.
+ */
+export const getQApiOpsPool = (session: ApiSession) =>
+  call(session, "GET", Q_API_OPS_POOL_PATH, QApiOpsPoolDtoSchema);
 
 /** T1: the overview's spend by day, active organisations and outbox. */
 export const getAdminConsoleOverview = (session: ApiSession) =>

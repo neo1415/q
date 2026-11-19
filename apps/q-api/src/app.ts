@@ -10,6 +10,10 @@ import type { DatabaseHealth } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
+import {
+  registerOpsPoolRoute,
+  type OpsPoolDependencies,
+} from "./http/ops-pool.js";
 import { registerBriefingCommandRoutes } from "./http/briefing-command.js";
 import type { BriefingCommandReader } from "./composition/briefing-command.js";
 import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
@@ -223,6 +227,8 @@ export type QApiModules = {
   readonly namedPhotos?: WorkRoutesDependencies["namedPhotos"] | undefined;
   /** The person's own usage this month (lead 2026-10-03). */
   readonly usage?: OwnUsage | undefined;
+  /** The console's System health: this process's pool, for operators only. */
+  readonly opsPool?: OpsPoolDependencies | undefined;
   /** Zino 2026-10-08: the briefing's free-form words, read into card verbs. */
   readonly briefingCommand?: BriefingCommandReader | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
@@ -660,6 +666,19 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       read: modules.briefingCommand,
+    });
+  }
+
+  if (
+    modules.opsPool !== undefined &&
+    security.resolver !== undefined &&
+    security.identity !== undefined
+  ) {
+    registerOpsPoolRoute(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identity: security.identity,
+      ops: modules.opsPool,
     });
   }
 

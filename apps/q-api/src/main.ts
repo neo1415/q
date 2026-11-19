@@ -422,6 +422,7 @@ import {
   cachedInRun,
   checkDatabaseReadiness,
   createRequestDatabaseClient,
+  databasePoolSnapshot,
   watchConnectionPool,
   watchDatabaseTimeouts,
 } from "@capital-q/database";
@@ -9080,6 +9081,14 @@ const { app, logger: appLogger } = createApp(
       principalName: (who) => workforceDisplayName(who.userId),
       logger,
     }),
+    // The console's System health (incident 19 Nov 2026): this process's
+    // pool, counts and ages only, for platform operators (overview.read).
+    opsPool: {
+      pool: () => databasePoolSnapshot(database.sql) ?? null,
+      isOperator: async (userId) =>
+        (await humanReviews.authorize(userId, "overview.read")).kind ===
+        "GRANTED",
+    },
     // Lead 2026-10-03: the person's own usage this month.
     usage: createOwnUsage({
       ownMonth: createPostgresUsageReader(database.sql).ownMonth,

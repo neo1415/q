@@ -37,7 +37,9 @@ export { decodeJsonbString, jsonbParam } from "./jsonb.js";
 export { watchDatabaseTimeouts } from "./timeout-watch.js";
 export {
   databasePoolExhaustionsObserved,
+  databasePoolSnapshot,
   watchConnectionPool,
+  type DatabasePoolSnapshot,
 } from "./pool-watch.js";
 export {
   countRoundTrip,

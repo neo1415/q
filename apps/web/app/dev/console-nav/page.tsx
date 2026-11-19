@@ -404,6 +404,16 @@ export default async function ConsoleReviewPage({
                       },
                     ]}
                     outbox={OVERVIEW.outbox}
+                    qApiPool={{
+                      slots: 10,
+                      held: 3,
+                      waiting: 0,
+                      oldestHeldMs: 400,
+                      recycles: 1,
+                      lastRecycledAt: "2026-11-19T09:12:00.000Z",
+                    }}
+                    workersHeartbeatAt={null}
+                    now={Date.UTC(2026, 10, 19, 12)}
                     versions={[
                       { service: "API", sha: "862090033" },
                       { service: "Web", sha: "862090033" },

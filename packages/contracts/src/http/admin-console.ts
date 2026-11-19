@@ -25,6 +25,13 @@ export const ADMIN_ACCOUNT_PATH = "/v1/admin/accounts/:userId" as const;
 export const ADMIN_ACCOUNT_SUSPENSION_PATH =
   "/v1/admin/accounts/:userId/suspension" as const;
 export const ADMIN_ORGANISATIONS_PATH = "/v1/admin/organisations" as const;
+/**
+ * q-api's database pool, for the console's System health (19 Nov 2026
+ * pool wedge). Served by q-api to platform operators only (overview.read);
+ * a 404 for anyone else, like every console read.
+ */
+export const Q_API_OPS_POOL_PATH = "/v1/ops/pool" as const;
+
 /** T1 (admin design 2026-11-19): the overview's own figures. */
 export const ADMIN_CONSOLE_OVERVIEW_PATH =
   "/v1/admin/console-overview" as const;
@@ -241,6 +248,25 @@ export const AdminConsoleOverviewDtoSchema = z
       .nullable(),
   })
   .strict();
+/** A service's database pool: counts and ages only, never statements. */
+export const ServicePoolDtoSchema = z
+  .object({
+    slots: Tally,
+    held: Tally,
+    waiting: Tally,
+    oldestHeldMs: Tally.nullable(),
+    recycles: Tally,
+    lastRecycledAt: z.string().max(40).nullable(),
+  })
+  .strict();
+export type ServicePoolDto = z.infer<typeof ServicePoolDtoSchema>;
+
+/** Null when the service's executor is not a watched pool. */
+export const QApiOpsPoolDtoSchema = z
+  .object({ pool: ServicePoolDtoSchema.nullable() })
+  .strict();
+export type QApiOpsPoolDto = z.infer<typeof QApiOpsPoolDtoSchema>;
+
 export type AdminConsoleOverviewDto = z.infer<
   typeof AdminConsoleOverviewDtoSchema
 >;

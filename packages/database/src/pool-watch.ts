@@ -11,6 +11,39 @@ export function databasePoolExhaustionsObserved(): number {
   return exhaustionsObserved;
 }
 
+/** When this process last recycled its pool; null when it never has. */
+let lastRecycledAt: Date | null = null;
+
+/**
+ * The pool as an operator may see it (console System health, 19 Nov 2026):
+ * counts and ages only, never statement text, kinds or ids. Undefined when
+ * the executor is not a watched pool.
+ */
+export type DatabasePoolSnapshot = {
+  readonly slots: number;
+  readonly held: number;
+  readonly waiting: number;
+  readonly oldestHeldMs: number | null;
+  readonly recycles: number;
+  readonly lastRecycledAt: string | null;
+};
+
+export function databasePoolSnapshot(
+  sql: object,
+): DatabasePoolSnapshot | undefined {
+  const control = connectionPoolOf(sql);
+  if (control === undefined) return undefined;
+  const state = control.inspect();
+  return {
+    slots: state.slots,
+    held: state.held,
+    waiting: state.waiting,
+    oldestHeldMs: state.oldestHeldMs,
+    recycles: state.recycles,
+    lastRecycledAt: lastRecycledAt?.toISOString() ?? null,
+  };
+}
+
 /** Below this, a slot held "too long" could still be honest work. */
 const MIN_STUCK_AFTER_MS = 30_000;
 
@@ -71,6 +104,7 @@ export function watchConnectionPool(options: {
     if (!wedged) return state;
     exhaustionsObserved += 1;
     const recycled = control.recycle();
+    if (recycled) lastRecycledAt = new Date();
     options.logger.error(
       {
         alert: "DB_POOL_EXHAUSTED",

@@ -1,6 +1,10 @@
 import "server-only";
 
+import { getQApiOpsPool } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
+import type { ServicePoolDto } from "@capital-q/contracts";
+
+import { qApiSession } from "@/features/q/context";
 
 /**
  * What the console can measure about the running services, server-side
@@ -64,6 +68,19 @@ export async function systemHealth(): Promise<readonly ServiceHealth[]> {
     readiness("API", apiBaseUrl),
     readiness("Q API", qApiBaseUrl),
   ]);
+}
+
+/**
+ * q-api's database pool, read under the operator's own session (q-api
+ * answers platform operators holding overview.read, and 404s everyone
+ * else). Null when it could not be read: the console says "Not reported".
+ */
+export async function qApiPool(): Promise<ServicePoolDto | null> {
+  const session = await qApiSession();
+  if (session === null) return null;
+  return getQApiOpsPool(session)
+    .then((body) => body.pool)
+    .catch(() => null);
 }
 
 /** This web server's deployed commit, when the host states it. */
