@@ -955,3 +955,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **6470d442d deployed 15:28 UTC** (gate PASS 15:27:48Z), with the rest of admin clean-up A1:
   - Live as the LedgerBridge founder: `/settings/plan` shows "Your allowances" and no "Not included" row, and only "Plans and pricing" is marked current.
   - The console's grouped sidebar and names in audit rows are not live-checked: fictional accounts get a 404 on `/admin`. Evidence is the screenshots in `docs/design/a1b-2026-11-19/` and the tests.
+- **1c51df617 deployed 16:54 UTC** (gate PASS 16:53:43Z): the organisation admin home at `/organisation` (decisions 109 and 110).
+  - Live as the LedgerBridge founder: the scope bar reads "LedgerBridge · You are an owner · Changes here apply to LedgerBridge only", with the section nav listing all 11 sections. `/organisation/members` shows the team and allowances.
+  - The site-map digest cap was raised from 12,000 to 12,800 characters (now 12,655).
+  - Pipeline import is still allowed for any CRM member at the service level, pending the owner's call.
+  - Member read-only access is not live-checked (no fictional plain-member account was used). Evidence is the tests.
