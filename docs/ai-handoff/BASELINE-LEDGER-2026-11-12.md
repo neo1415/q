@@ -960,3 +960,9 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The site-map digest cap was raised from 12,000 to 12,800 characters (now 12,655).
   - Pipeline import is still allowed for any CRM member at the service level, pending the owner's call.
   - Member read-only access is not live-checked (no fictional plain-member account was used). Evidence is the tests.
+- **622571e1f deployed 20:44 UTC** (gate PASS 20:43:44Z): console overview (headline figures, model spend chart, health, operator activity) and browsable Organisations and Accounts tables (cursor paging, sorting, CSV).
+  - New endpoint: `GET /v1/admin/console-overview` (`overview.read`).
+  - Live check as the LedgerBridge founder (non-operator): `/admin` and `/admin/organisations` return "This page isn't here".
+  - The operator view was not live-checked, because no fictional operator account exists. The owner should open `/admin` with their own account.
+  - No q-api errors since the deploy.
+  - Known gap: the pool watchdog and worker health are not exposed to the console.
