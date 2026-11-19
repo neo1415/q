@@ -164,6 +164,9 @@ class FakeQuery extends Promise<unknown> {
   static override get [Symbol.species]() {
     return Promise;
   }
+  /** Own properties, as postgres.js has them: what the driver calls. */
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
   constructor() {
     let resolve!: (v: unknown) => void;
     let reject!: (e: unknown) => void;
@@ -172,9 +175,12 @@ class FakeQuery extends Promise<unknown> {
       reject = b;
     });
     this.settle = { resolve, reject };
-  }
-  reject(error: unknown): void {
-    this.settle.reject(error);
+    this.resolve = (value) => {
+      this.settle.resolve(value);
+    };
+    this.reject = (error) => {
+      this.settle.reject(error);
+    };
   }
   cancel(): Promise<void> {
     this.cancelled += 1;
@@ -185,7 +191,7 @@ class FakeQuery extends Promise<unknown> {
     this.executed = true;
     if (this.answerMs !== null) {
       setTimeout(() => {
-        this.settle.resolve([{ ok: 1 }]);
+        this.resolve([{ ok: 1 }]);
       }, this.answerMs);
     }
   }

@@ -171,13 +171,14 @@ export function createPostgresClient(
   // The per-run round-trip counter and run read cache (R5): each query is
   // counted as it is handed to the driver, in its caller's context (no-op
   // outside a run; never keeps parameters).
-  return instrumentSql(
-    postgres(connectionString, resolvePostgresOptions(config, accessClass)),
-    {
-      queryDeadlineMs: resolveSqlTimeouts(config, accessClass).queryDeadlineMs,
-      connectionSlots: connectionSlotsFor(config, accessClass),
-    },
-  );
+  const open = () =>
+    postgres(connectionString, resolvePostgresOptions(config, accessClass));
+  return instrumentSql(open(), {
+    queryDeadlineMs: resolveSqlTimeouts(config, accessClass).queryDeadlineMs,
+    connectionSlots: connectionSlotsFor(config, accessClass),
+    // The pool watchdog's way out of a wedged pool (watchConnectionPool).
+    reopen: open,
+  });
 }
 
 /**

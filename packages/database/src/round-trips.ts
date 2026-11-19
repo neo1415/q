@@ -211,7 +211,11 @@ type Fn = (...args: unknown[]) => unknown;
 type QueryLike = Promise<unknown> & {
   handle: Fn;
   executed?: boolean;
-  /** The driver's own; settles the awaited query (postgres.js Query). */
+  /**
+   * The driver's own; settle the awaited query (postgres.js Query). The
+   * driver calls them when the connection is done with the query.
+   */
+  resolve?: (result: unknown) => void;
   reject?: (error: unknown) => void;
   cancel?: () => unknown;
   /** Set for a cursor or forEach read, which governs its own pace. */
@@ -233,6 +237,48 @@ export type SqlInstrumentOptions = {
    * Undefined: no gate.
    */
   readonly connectionSlots?: number | undefined;
+  /**
+   * Gated only: opens a fresh driver with the same settings, so a pool
+   * whose every connection is wedged can be replaced while the process
+   * keeps running (`connectionPoolOf(sql).recycle()`, used by
+   * `watchConnectionPool`). Absent: the pool can be inspected, not
+   * recycled.
+   */
+  readonly reopen?: (() => object) | undefined;
+};
+
+/** What a held slot is for; never any statement text. */
+export type ConnectionPermitKind =
+  "statement" | "transaction" | "reserved" | "notify";
+
+type Permit = { readonly kind: ConnectionPermitKind; readonly since: number };
+
+/** A snapshot of the gate, for the pool watchdog. Counts and ages only. */
+export type ConnectionPoolState = {
+  readonly slots: number;
+  readonly held: number;
+  readonly waiting: number;
+  /** Age of the longest-held slot; null when none is held. */
+  readonly oldestHeldMs: number | null;
+  /** Age of the most recently taken slot; null when none is held. */
+  readonly youngestHeldMs: number | null;
+  readonly heldByKind: Readonly<Record<ConnectionPermitKind, number>>;
+  /** Times this pool was replaced since the process started. */
+  readonly recycles: number;
+};
+
+export type ConnectionPoolControl = {
+  readonly inspect: () => ConnectionPoolState;
+  /**
+   * Replaces the driver with a fresh one and ends the old one at once: its
+   * connections are destroyed, so every statement or transaction still
+   * holding one rejects (CONNECTION) and its holder unwinds; whoever was
+   * waiting for a slot fails the same way. False when it cannot (no
+   * `reopen`).
+   */
+  readonly recycle: () => boolean;
+  /** The client deadline each query carries; undefined: none. */
+  readonly deadlineMs: number | undefined;
 };
 
 /**
@@ -246,43 +292,118 @@ export type SqlInstrumentOptions = {
  * ReadyForQuery and never answers the one written behind it, so that
  * await hangs. So the driver is never handed more work than it has
  * connections: each statement outside a transaction, and each transaction
- * as a whole, holds one slot from before the driver sees it until it
- * settles; the driver then always finds a free or unopened connection.
- * A statement waiting for a slot is already under its client deadline; a
- * transaction waits at most that long for one.
+ * as a whole, holds one slot from before the driver sees it until the
+ * driver is done with it; the driver then always finds a free or unopened
+ * connection. A statement waiting for a slot is already under its client
+ * deadline; a transaction waits at most that long for one.
+ *
+ * Each held slot is a permit with the time it was taken, so the pool
+ * watchdog can tell a busy pool from a wedged one (19 Nov 2026).
  */
 type ConnectionGate = {
-  /** True when a slot was free and is now held. */
-  readonly tryAcquire: () => boolean;
-  /** Queue for the next slot; returns a function that leaves the queue. */
-  readonly wait: (grant: () => void) => () => void;
-  readonly release: () => void;
+  /** A permit when a slot was free and is now held. */
+  readonly tryAcquire: (kind: ConnectionPermitKind) => Permit | undefined;
+  /**
+   * Queue for the next slot; returns a function that leaves the queue.
+   * `fail` is called instead of `grant` when the gate is closed.
+   */
+  readonly wait: (
+    kind: ConnectionPermitKind,
+    grant: (permit: Permit) => void,
+    fail: (error: Error) => void,
+  ) => () => void;
+  /** Gives the slot back. Idempotent per permit. */
+  readonly release: (permit: Permit) => void;
+  readonly inspect: () => Omit<ConnectionPoolState, "recycles">;
+  /** The pool behind it is gone: drop every permit, fail every waiter. */
+  readonly close: (error: Error) => void;
+};
+
+type Waiter = {
+  readonly kind: ConnectionPermitKind;
+  readonly grant: (permit: Permit) => void;
+  readonly fail: (error: Error) => void;
 };
 
 function createConnectionGate(size: number): ConnectionGate {
-  let free = size;
-  const waiters: (() => void)[] = [];
+  const held = new Set<Permit>();
+  const waiters: Waiter[] = [];
+  let closed = false;
+  const take = (kind: ConnectionPermitKind): Permit => {
+    const permit: Permit = { kind, since: Date.now() };
+    held.add(permit);
+    return permit;
+  };
   return {
-    tryAcquire: () => {
-      if (free <= 0) return false;
-      free -= 1;
-      return true;
-    },
-    wait: (grant) => {
-      waiters.push(grant);
+    tryAcquire: (kind) =>
+      closed || held.size >= size || waiters.length > 0
+        ? undefined
+        : take(kind),
+    wait: (kind, grant, fail) => {
+      if (closed) {
+        fail(new ConnectionPoolRecycledError());
+        return () => undefined;
+      }
+      const waiter: Waiter = { kind, grant, fail };
+      waiters.push(waiter);
       return () => {
-        const index = waiters.indexOf(grant);
+        const index = waiters.indexOf(waiter);
         if (index >= 0) waiters.splice(index, 1);
       };
     },
-    release: () => {
+    release: (permit) => {
+      // A second release of one permit, or one from before a close, is a
+      // no-op: it can never free a slot someone else holds.
+      if (!held.delete(permit)) return;
       // The slot passes straight to the next waiter, so a newcomer's
       // tryAcquire cannot overtake the queue.
       const next = waiters.shift();
-      if (next === undefined) free += 1;
-      else next();
+      if (next !== undefined) next.grant(take(next.kind));
+    },
+    inspect: () => {
+      const now = Date.now();
+      let oldest: number | null = null;
+      let youngest: number | null = null;
+      const heldByKind: Record<ConnectionPermitKind, number> = {
+        statement: 0,
+        transaction: 0,
+        reserved: 0,
+        notify: 0,
+      };
+      for (const permit of held) {
+        const age = now - permit.since;
+        oldest = oldest === null ? age : Math.max(oldest, age);
+        youngest = youngest === null ? age : Math.min(youngest, age);
+        heldByKind[permit.kind] += 1;
+      }
+      return {
+        slots: size,
+        held: held.size,
+        waiting: waiters.length,
+        oldestHeldMs: oldest,
+        youngestHeldMs: youngest,
+        heldByKind,
+      };
+    },
+    close: (error) => {
+      closed = true;
+      held.clear();
+      for (const waiter of waiters.splice(0)) waiter.fail(error);
     },
   };
+}
+
+/**
+ * The error a statement or transaction gets when the pool it was using, or
+ * waiting for, was recycled by the watchdog. SQLSTATE 08006 (connection
+ * failure), so it is classified as CONNECTION.
+ */
+export class ConnectionPoolRecycledError extends Error {
+  readonly code = "08006";
+  constructor() {
+    super("the database connection pool was recycled");
+    this.name = "ConnectionPoolRecycledError";
+  }
 }
 
 /**
@@ -316,17 +437,30 @@ function observeTimeout(query: QueryLike): void {
 /** Resolves once a slot is held; rejects as 57014 after `deadlineMs`. */
 function acquireSlot(
   gate: ConnectionGate,
+  kind: ConnectionPermitKind,
   deadlineMs: number | undefined,
-): Promise<void> {
-  if (gate.tryAcquire()) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
+): Promise<Permit> {
+  const free = gate.tryAcquire(kind);
+  if (free !== undefined) return Promise.resolve(free);
+  return new Promise<Permit>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const leave = gate.wait(() => {
-      if (timer !== undefined) clearTimeout(timer);
-      resolve();
-    });
-    if (deadlineMs !== undefined) {
+    let done = false;
+    const leave = gate.wait(
+      kind,
+      (permit) => {
+        done = true;
+        if (timer !== undefined) clearTimeout(timer);
+        resolve(permit);
+      },
+      (error) => {
+        done = true;
+        if (timer !== undefined) clearTimeout(timer);
+        reject(error);
+      },
+    );
+    if (deadlineMs !== undefined && !done) {
       timer = setTimeout(() => {
+        done = true;
         leave();
         timeoutsObserved += 1;
         reject(new QueryDeadlineError(deadlineMs));
@@ -338,14 +472,15 @@ function acquireSlot(
 
 async function withSlot<T>(
   gate: ConnectionGate,
+  kind: ConnectionPermitKind,
   deadlineMs: number | undefined,
   work: () => Promise<T>,
 ): Promise<T> {
-  await acquireSlot(gate, deadlineMs);
+  const permit = await acquireSlot(gate, kind, deadlineMs);
   try {
     return await work();
   } finally {
-    gate.release();
+    gate.release(permit);
   }
 }
 
@@ -371,8 +506,17 @@ export class QueryDeadlineError extends Error {
  * and the await rejects at once, whether or not the cancel lands: a
  * pooler that never answers must not hold the caller. A late answer from
  * the server then settles nothing. Cursor and forEach reads are left alone.
+ *
+ * `rejectCaller` settles the caller's await; by default the query's own
+ * reject. Behind the gate it is the driver's original reject, so that
+ * rejecting the caller is not mistaken for the driver being done with the
+ * connection.
  */
-function armDeadline(query: QueryLike, deadlineMs: number): void {
+function armDeadline(
+  query: QueryLike,
+  deadlineMs: number,
+  rejectCaller?: (error: unknown) => void,
+): void {
   const timer = setTimeout(() => {
     if (query.cursorFn !== undefined || query.forEachFn !== undefined) return;
     try {
@@ -380,7 +524,9 @@ function armDeadline(query: QueryLike, deadlineMs: number): void {
     } catch {
       // Best effort: the rejection below is what bounds the caller.
     }
-    query.reject?.(new QueryDeadlineError(deadlineMs));
+    const error = new QueryDeadlineError(deadlineMs);
+    if (rejectCaller === undefined) query.reject?.(error);
+    else rejectCaller(error);
   }, deadlineMs);
   timer.unref();
   const clear = () => {
@@ -433,45 +579,107 @@ function track(
     return query;
   }
   // Gated (transaction pooler): the driver's own handle runs only once a
-  // slot is held, and the slot is released when the query settles. The
-  // deadline is armed first, so it bounds the wait for a slot too.
+  // slot is held. The deadline is armed first, so it bounds the wait for a
+  // slot too.
   let started = false;
   query.handle = function (this: QueryLike, ...args: unknown[]) {
     if (started) return undefined;
     started = true;
     querySent(text, stack);
     observeTimeout(this);
-    if (deadlineMs !== undefined) armDeadline(this, deadlineMs);
-    let settled = false;
-    let held = false;
-    const settle = () => {
-      settled = true;
-      if (held) {
-        held = false;
-        gate.release();
-      }
+    // The slot follows the CONNECTION, never the caller's await (incident
+    // 19 Nov 2026). The client deadline rejects the caller while the
+    // statement may still be running on its connection; releasing the
+    // slot then let the next statement be written behind it, which
+    // Supavisor never answers, and every such connection stayed wedged
+    // until the process restarted. The driver settles a query (its own
+    // resolve or reject, at ReadyForQuery or when the connection fails)
+    // only once the connection is free, so the slot is released there.
+    const driverResolve = this.resolve;
+    const driverReject = this.reject;
+    const followsDriver =
+      typeof driverResolve === "function" && typeof driverReject === "function";
+    let permit: Permit | undefined;
+    let driverDone = false;
+    let callerDone = false;
+    const releaseHeld = () => {
+      const held = permit;
+      permit = undefined;
+      if (held !== undefined) gate.release(held);
+    };
+    if (followsDriver) {
+      const driverSettled = () => {
+        if (driverDone) return;
+        driverDone = true;
+        // After the driver's own bookkeeping for this answer has run, as
+        // the caller's continuation would.
+        queueMicrotask(releaseHeld);
+      };
+      this.resolve = (result: unknown) => {
+        driverSettled();
+        driverResolve(result);
+      };
+      this.reject = (error: unknown) => {
+        driverSettled();
+        driverReject(error);
+      };
+    }
+    if (deadlineMs !== undefined) {
+      armDeadline(
+        this,
+        deadlineMs,
+        followsDriver
+          ? (error) => {
+              callerDone = true;
+              driverReject(error);
+            }
+          : undefined,
+      );
+    }
+    const callerSettled = () => {
+      callerDone = true;
+      // A driver of unknown shape: the caller's settlement is all there is.
+      if (!followsDriver) releaseHeld();
     };
     // The native then: the driver's own `then` would hand the query over.
-    void Promise.prototype.then.call(this, settle, settle);
-    const run = () => {
-      // Rejected while it waited (its deadline): never handed to the
-      // driver, which would park a connection on a cancelled query.
-      if (settled) {
-        gate.release();
+    void Promise.prototype.then.call(this, callerSettled, callerSettled);
+    const run = (granted: Permit) => {
+      // Rejected while it waited (its deadline, or the pool recycled):
+      // never handed to the driver, which would park a connection on a
+      // cancelled query.
+      if (callerDone || driverDone) {
+        gate.release(granted);
         return;
       }
-      held = true;
+      permit = granted;
       handle.apply(this, args);
     };
-    if (gate.tryAcquire()) {
-      run();
+    const fail = (error: Error) => {
+      callerDone = true;
+      (followsDriver ? driverReject : this.reject)?.(error);
+    };
+    const free = gate.tryAcquire("statement");
+    if (free !== undefined) {
+      run(free);
       return undefined;
     }
-    const leave = gate.wait(run);
+    const leave = gate.wait("statement", run, fail);
     void Promise.prototype.then.call(this, leave, leave);
     return undefined;
   };
   return query;
+}
+
+const pools = new WeakMap<object, ConnectionPoolControl>();
+
+/**
+ * The gate and recycle control of a request client behind the transaction
+ * pooler; undefined for any other client (no gate, nothing to watch).
+ */
+export function connectionPoolOf(
+  sql: object,
+): ConnectionPoolControl | undefined {
+  return pools.get(sql);
 }
 
 /**
@@ -479,6 +687,10 @@ function track(
  * read cache. Every query this client, its transactions and its reserved
  * connections send is counted where it is sent; BEGIN and COMMIT (or
  * ROLLBACK) count one each. Arguments, results and errors pass through.
+ *
+ * Gated, the driver behind the client can be replaced (`recycle`): every
+ * call reads the current driver and its gate, so callers keep the same
+ * client object across a recycle.
  */
 export function instrumentSql<T extends object>(
   sql: T,
@@ -486,29 +698,35 @@ export function instrumentSql<T extends object>(
 ): T {
   // Only the pool itself is gated: the statements of a transaction or a
   // reserved connection run on the connection its slot already holds.
-  const gate =
-    options.connectionSlots === undefined
-      ? undefined
-      : createConnectionGate(options.connectionSlots);
+  const slots = options.connectionSlots;
+  let current: { driver: object; gate: ConnectionGate | undefined } = {
+    driver: sql,
+    gate: slots === undefined ? undefined : createConnectionGate(slots),
+  };
+  let recycles = 0;
   const inner: SqlInstrumentOptions = {
     queryDeadlineMs: options.queryDeadlineMs,
   };
   const deadlineMs = options.queryDeadlineMs;
-  const wrapFunction =
-    (fn: Fn, target: object): Fn =>
-    (...args: unknown[]) =>
-      track(fn.apply(target, args), args[0], options, gate);
-  return new Proxy(sql, {
-    apply(target, thisArg, args: unknown[]) {
+  const proxy = new Proxy(sql, {
+    apply(_target, thisArg, args: unknown[]) {
+      const { driver, gate } = current;
       return track(
-        Reflect.apply(target as Fn, thisArg, args),
+        Reflect.apply(driver as Fn, thisArg, args),
         args[0],
         options,
         gate,
       );
     },
     get(target, property, receiver) {
-      const value: unknown = Reflect.get(target, property, receiver);
+      const { driver, gate } = current;
+      const own = Reflect.getOwnPropertyDescriptor(target, property);
+      // A proxy must report a non-configurable own property of its target
+      // as it is; nothing reads those (a function's `prototype`).
+      const value: unknown =
+        driver === target || own?.configurable === false
+          ? Reflect.get(target, property, receiver)
+          : Reflect.get(driver, property, driver);
       if (typeof value !== "function") return value;
       const fn = value as Fn;
       if (property === "begin" || property === "savepoint") {
@@ -521,41 +739,39 @@ export function instrumentSql<T extends object>(
           }
           const run = () => {
             querySent(property === "begin" ? "begin" : "savepoint", undefined);
-            const done = fn.apply(target, args) as Promise<unknown>;
+            const done = fn.apply(driver, args) as Promise<unknown>;
             return done.finally(() => {
               querySent("commit", undefined);
             });
           };
-          return gate === undefined ? run() : withSlot(gate, deadlineMs, run);
+          return gate === undefined
+            ? run()
+            : withSlot(gate, "transaction", deadlineMs, run);
         };
       }
       if (property === "reserve") {
         return async (...args: unknown[]) => {
           if (gate === undefined) {
             return instrumentSql(
-              (await fn.apply(target, args)) as object,
+              (await fn.apply(driver, args)) as object,
               inner,
             );
           }
           // The slot is held until the caller releases the connection.
-          await acquireSlot(gate, deadlineMs);
+          const permit = await acquireSlot(gate, "reserved", deadlineMs);
           let reserved: { release: () => void };
           try {
-            reserved = (await fn.apply(target, args)) as {
+            reserved = (await fn.apply(driver, args)) as {
               release: () => void;
             };
           } catch (error) {
-            gate.release();
+            gate.release(permit);
             throw error;
           }
           const free = reserved.release.bind(reserved);
-          let released = false;
           reserved.release = () => {
             free();
-            if (!released) {
-              released = true;
-              gate.release();
-            }
+            gate.release(permit);
           };
           return instrumentSql(reserved, inner);
         };
@@ -563,13 +779,62 @@ export function instrumentSql<T extends object>(
       if (property === "notify" && gate !== undefined) {
         // The driver sends pg_notify through its own pool, uninstrumented.
         return (...args: unknown[]) =>
-          withSlot(gate, deadlineMs, () =>
-            Promise.resolve(fn.apply(target, args)),
+          withSlot(gate, "notify", deadlineMs, () =>
+            Promise.resolve(fn.apply(driver, args)),
           );
       }
-      return wrapFunction(fn, target);
+      return (...args: unknown[]) =>
+        track(fn.apply(driver, args), args[0], options, gate);
     },
   });
+  if (slots !== undefined) {
+    pools.set(proxy, {
+      deadlineMs,
+      inspect: () => {
+        const gate = current.gate;
+        return {
+          ...(gate === undefined
+            ? {
+                slots,
+                held: 0,
+                waiting: 0,
+                oldestHeldMs: null,
+                youngestHeldMs: null,
+                heldByKind: {
+                  statement: 0,
+                  transaction: 0,
+                  reserved: 0,
+                  notify: 0,
+                },
+              }
+            : gate.inspect()),
+          recycles,
+        };
+      },
+      recycle: () => {
+        const reopen = options.reopen;
+        if (reopen === undefined) return false;
+        const old = current;
+        current = { driver: reopen(), gate: createConnectionGate(slots) };
+        recycles += 1;
+        // Waiters fail now; holders unwind as the old driver destroys
+        // their connections (each statement and transaction rejects).
+        old.gate?.close(new ConnectionPoolRecycledError());
+        const end = (old.driver as { end?: unknown }).end;
+        if (typeof end === "function") {
+          try {
+            void Promise.resolve(
+              (end as Fn).call(old.driver, { timeout: 0 }),
+            ).catch(() => undefined);
+          } catch {
+            // Best effort: the new pool is already serving.
+          }
+        }
+        return true;
+      },
+    });
+  }
+  return proxy;
 }
 
 if (TRACE) Error.stackTraceLimit = 40;

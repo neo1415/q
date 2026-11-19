@@ -186,6 +186,62 @@ describe("runOpsWatch", () => {
   });
 });
 
+describe("pool exhaustion (incident 19 Nov 2026)", () => {
+  it("any exhaustion since the last check is a finding; none is silence", () => {
+    const base = {
+      reading: quietReading,
+      dbTimeoutsSinceLastCheck: 0,
+      thresholds: DEFAULT_OPS_THRESHOLDS,
+      dailyCapUsd: undefined,
+    };
+    expect(assessOps({ ...base, dbPoolExhaustionsSinceLastCheck: 0 })).toEqual(
+      [],
+    );
+    const [finding] = assessOps({
+      ...base,
+      dbPoolExhaustionsSinceLastCheck: 1,
+    });
+    expect(finding).toMatchObject({
+      code: "DB_POOL_EXHAUSTED",
+      key: "ops:db-pool-exhausted",
+      fields: { dbPoolExhaustions: 1 },
+    });
+  });
+
+  it("is reported between checks, and still counted on the line when the database cannot be read", async () => {
+    const { lines, logger } = recorder();
+    const controller = new AbortController();
+    let exhaustions = 3;
+    let reads = 0;
+    await runOpsWatch({
+      read: () => {
+        reads += 1;
+        if (reads === 2) return Promise.reject(new Error("db down"));
+        return Promise.resolve(quietReading);
+      },
+      dbTimeouts: () => 0,
+      dbPoolExhaustions: () => exhaustions,
+      thresholds: DEFAULT_OPS_THRESHOLDS,
+      dailyCapUsd: undefined,
+      alert: () => Promise.resolve(true),
+      signal: controller.signal,
+      logger,
+      sleep: () => {
+        exhaustions += 1;
+        if (reads >= 3) controller.abort();
+        return Promise.resolve();
+      },
+    });
+    const alertLines = lines.filter((line) => line.fields["alert"]);
+    expect(alertLines.map((line) => line.fields["findings"])).toEqual([
+      ["CHECK_FAILED"],
+      ["DB_POOL_EXHAUSTED"],
+    ]);
+    expect(alertLines[0]?.fields["dbPoolExhaustions"]).toBe(1);
+    expect(alertLines[1]?.fields["dbPoolExhaustions"]).toBe(2);
+  });
+});
+
 describe("parseOpsThresholds", () => {
   it("reads bounded values and keeps the default for a typo", () => {
     const parsed = parseOpsThresholds({

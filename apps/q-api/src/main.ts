@@ -422,6 +422,7 @@ import {
   cachedInRun,
   checkDatabaseReadiness,
   createRequestDatabaseClient,
+  watchConnectionPool,
   watchDatabaseTimeouts,
 } from "@capital-q/database";
 import {
@@ -1484,6 +1485,23 @@ logger.info(
 // Launch readiness 7: this process's 57014 statements, as one
 // `alert: "DB_TIMEOUTS"` line a minute when they cross the threshold.
 watchDatabaseTimeouts({ logger });
+// Incident 19 Nov 2026: a wedged pool starved q-api for 72 minutes until a
+// manual restart. The watchdog recycles a pool whose every slot has been
+// held past its limit, with an `alert: "DB_POOL_EXHAUSTED"` line, and tells
+// the operators (sent once the fresh pool can read their addresses).
+watchConnectionPool({
+  sql: database.sql,
+  logger,
+  onExhausted: ({ state, recycled }) => {
+    void operatorAlert
+      .send({
+        key: "ops:db-pool-exhausted:q-api",
+        subject: "q-api's database pool was exhausted",
+        text: `Every one of q-api's ${String(state.slots)} database connections was held for over ${String(Math.round((state.youngestHeldMs ?? 0) / 1000))} s (${String(state.waiting)} statements waiting). ${recycled ? "The pool was recycled; the statements holding it failed." : "The pool could not be recycled; restart q-api."}`,
+      })
+      .catch(() => false);
+  },
+});
 /**
  * Whether this deployment attested its material is invented, and on what
  * grounds (ADR 0014).

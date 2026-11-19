@@ -57,7 +57,9 @@ import {
 } from "@capital-q/public-identity";
 import {
   createRequestDatabaseClient,
+  databasePoolExhaustionsObserved,
   databaseTimeoutsObserved,
+  watchConnectionPool,
 } from "@capital-q/database";
 import {
   createOutboxPublisher,
@@ -337,6 +339,9 @@ const logger = createLogger(
 // The publisher writes outbox bookkeeping and the queue: ordinary server
 // access, no elevation required.
 const database = createRequestDatabaseClient(databaseConfig);
+// Incident 19 Nov 2026: a pool whose every slot is held past its limit is
+// recycled, with an alert line; the operational check reports it too.
+watchConnectionPool({ sql: database.sql, logger });
 // P14: saved startup alerts, matched when a company becomes ready.
 const startupAlertWatcher = createStartupAlertWatcher({ sql: database.sql });
 const registry = createProductionEventRegistry();
@@ -1932,6 +1937,7 @@ await Promise.all([
         runOpsWatch({
           read: createPostgresOpsReader({ sql: database.sql }),
           dbTimeouts: databaseTimeoutsObserved,
+          dbPoolExhaustions: databasePoolExhaustionsObserved,
           thresholds: opsThresholds.thresholds,
           dailyCapUsd: parseDailySpendCapUsd(process.env),
           alert: (alert) => operatorAlert.send(alert),

@@ -21,6 +21,9 @@ import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
  *   FAILED, once enough runs exist to make a rate mean something.
  * - DB_TIMEOUTS: statements this worker process saw end in 57014 since the
  *   previous check (q-api logs its own; see the runbook).
+ * - DB_POOL_EXHAUSTED: this worker process's connection pool had every
+ *   slot held past its limit and was recycled by `watchConnectionPool`
+ *   since the previous check (q-api alerts on its own; 19 Nov 2026).
  * - MODEL_PROVIDER_FAILURE_RATE: per provider, failed attempts in the
  *   window, not counting our own refusals (cancelled, over budget, policy).
  * - MODEL_SPEND_NEAR_CAP: today's ledger spend against the aggregate daily
@@ -33,6 +36,7 @@ export type OpsFindingCode =
   | "Q_RUN_STUCK"
   | "Q_RUN_FAILURE_RATE"
   | "DB_TIMEOUTS"
+  | "DB_POOL_EXHAUSTED"
   | "MODEL_PROVIDER_FAILURE_RATE"
   | "MODEL_SPEND_NEAR_CAP";
 
@@ -174,6 +178,8 @@ const pct = (value: number): string => `${String(Math.round(value * 100))}%`;
 export function assessOps(input: {
   readonly reading: OpsReading;
   readonly dbTimeoutsSinceLastCheck: number;
+  /** Pool exhaustions detected since the last check; absent: none. */
+  readonly dbPoolExhaustionsSinceLastCheck?: number | undefined;
   readonly thresholds: OpsThresholds;
   readonly dailyCapUsd: number | undefined;
 }): readonly OpsFinding[] {
@@ -216,6 +222,17 @@ export function assessOps(input: {
       subject: "Database statements are timing out",
       text: `${String(input.dbTimeoutsSinceLastCheck)} database statements in the workers timed out (57014) since the last check.`,
       fields: { dbTimeouts: input.dbTimeoutsSinceLastCheck },
+    });
+  }
+
+  const exhaustions = input.dbPoolExhaustionsSinceLastCheck ?? 0;
+  if (exhaustions > 0) {
+    findings.push({
+      code: "DB_POOL_EXHAUSTED",
+      key: "ops:db-pool-exhausted",
+      subject: "The workers' database pool was exhausted",
+      text: `The workers' database pool had every connection held past its limit ${String(exhaustions)} time(s) since the last check and was recycled.`,
+      fields: { dbPoolExhaustions: exhaustions },
     });
   }
 
@@ -384,6 +401,7 @@ export function createPostgresOpsReader(options: {
 export async function checkOps(input: {
   readonly read: ReturnType<typeof createPostgresOpsReader>;
   readonly dbTimeoutsSinceLastCheck: number;
+  readonly dbPoolExhaustionsSinceLastCheck?: number | undefined;
   readonly thresholds: OpsThresholds;
   readonly dailyCapUsd: number | undefined;
   readonly alert: (alert: OperatorAlert) => Promise<boolean>;
@@ -397,6 +415,7 @@ export async function checkOps(input: {
   const findings = assessOps({
     reading,
     dbTimeoutsSinceLastCheck: input.dbTimeoutsSinceLastCheck,
+    dbPoolExhaustionsSinceLastCheck: input.dbPoolExhaustionsSinceLastCheck,
     thresholds: input.thresholds,
     dailyCapUsd: input.dailyCapUsd,
   });
@@ -433,6 +452,8 @@ export async function runOpsWatch(options: {
   readonly read: ReturnType<typeof createPostgresOpsReader>;
   /** Monotonic count of this process's 57014 statements. */
   readonly dbTimeouts: () => number;
+  /** Monotonic count of this process's pool exhaustions; absent: none. */
+  readonly dbPoolExhaustions?: (() => number) | undefined;
   readonly thresholds: OpsThresholds;
   readonly dailyCapUsd: number | undefined;
   readonly alert: (alert: OperatorAlert) => Promise<boolean>;
@@ -444,13 +465,17 @@ export async function runOpsWatch(options: {
 }): Promise<void> {
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? (() => new Date());
+  const exhaustions = options.dbPoolExhaustions ?? (() => 0);
   let timeoutsSeen = options.dbTimeouts();
+  let exhaustionsSeen = exhaustions();
   while (!options.signal.aborted) {
     const timeoutsNow = options.dbTimeouts();
+    const exhaustionsNow = exhaustions();
     try {
       await checkOps({
         read: options.read,
         dbTimeoutsSinceLastCheck: timeoutsNow - timeoutsSeen,
+        dbPoolExhaustionsSinceLastCheck: exhaustionsNow - exhaustionsSeen,
         thresholds: options.thresholds,
         dailyCapUsd: options.dailyCapUsd,
         alert: options.alert,
@@ -458,11 +483,19 @@ export async function runOpsWatch(options: {
         logger: options.logger,
       });
       timeoutsSeen = timeoutsNow;
+      exhaustionsSeen = exhaustionsNow;
     } catch (error: unknown) {
       // The check failing is itself worth an alert line: an unreadable
-      // database is exactly when the owner needs to look.
+      // database is exactly when the owner needs to look. The process's
+      // own counts still go out, since they need no read.
       options.logger.error(
-        { alert: OPS_CHECK_ALERT, findings: ["CHECK_FAILED"], err: error },
+        {
+          alert: OPS_CHECK_ALERT,
+          findings: ["CHECK_FAILED"],
+          err: error,
+          dbTimeouts: timeoutsNow - timeoutsSeen,
+          dbPoolExhaustions: exhaustionsNow - exhaustionsSeen,
+        },
         "operational check could not read the database",
       );
     }

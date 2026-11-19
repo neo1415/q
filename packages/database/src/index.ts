@@ -36,6 +36,10 @@ export {
 export { decodeJsonbString, jsonbParam } from "./jsonb.js";
 export { watchDatabaseTimeouts } from "./timeout-watch.js";
 export {
+  databasePoolExhaustionsObserved,
+  watchConnectionPool,
+} from "./pool-watch.js";
+export {
   countRoundTrip,
   createRoundTripCounter,
   currentRoundTripCounter,
@@ -44,6 +48,10 @@ export {
   withRoundTripCounter,
   withRoundTripPhase,
   cachedInRun,
+  connectionPoolOf,
+  ConnectionPoolRecycledError,
+  type ConnectionPoolControl,
+  type ConnectionPoolState,
   type RunCacheKey,
   type RoundTripCounter,
 } from "./round-trips.js";
