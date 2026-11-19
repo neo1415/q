@@ -9,6 +9,8 @@
 export const ORGANISATION_AR: Readonly<Record<string, string>> = {
   // The organisation admin (decisions 109 and 110)
   General: "عام",
+  "Company details": "تفاصيل الشركة",
+  "Firm details": "تفاصيل الشركة الاستثمارية",
   "Only owners and admins can change this.":
     "يمكن للمالكين والمسؤولين فقط تغيير هذا.",
   "Organisation admin": "إدارة المؤسسة",

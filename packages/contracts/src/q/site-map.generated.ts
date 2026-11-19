@@ -1422,6 +1422,12 @@ export const Q_SITE_MAP: QSiteMap = {
           kind: "TEAM",
           purpose: "what Capital Q holds about it",
         },
+        {
+          id: "org-general",
+          title: "Organisation details",
+          kind: "OTHER",
+          purpose: "its name, website, description, logo and headquarters",
+        },
       ],
     },
     {

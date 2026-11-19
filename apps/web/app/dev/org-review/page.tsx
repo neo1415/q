@@ -26,7 +26,11 @@ import { INVESTOR_FIELDS } from "@/features/profile/profile-fields";
 import { AccountColumn, AccountHead } from "@/features/settings/account-layout";
 import { TeamSettingsView } from "@/features/team/team-settings-view";
 
-import { HARBOURLINE } from "../account-review/fixtures";
+import {
+  HARBOURLINE,
+  investor as investorFixture,
+} from "../account-review/fixtures";
+import { OrgGeneralView } from "@/features/organisation/org-general";
 import {
   PEOPLE,
   activityPage,
@@ -51,6 +55,11 @@ const PAGES = [
   {
     id: "org-admin",
     title: "Organisation admin (Members), by role",
+    states: ROLES,
+  },
+  {
+    id: "org-general",
+    title: "Organisation admin (General), by role",
     states: ROLES,
   },
   {
@@ -150,6 +159,39 @@ function ReviewPage({
     avatarUrl: member.avatarUrl ?? null,
   }));
   switch (id) {
+    case "org-general": {
+      const name = `${HARBOURLINE.name} (fictional)`;
+      const organisation = {
+        organisationId: team.organisation.organisationId,
+        name,
+        kind: team.organisation.kind,
+        organisationType: "investment_firm" as const,
+        role,
+        memberCount: team.members.length,
+        active: true,
+        companyId: null,
+      };
+      return (
+        <OrgAdminFrame
+          name={name}
+          role={role}
+          organisations={[organisation]}
+          section="/organisation"
+        >
+          <OrgReadOnly readOnly={!manages(role)}>
+            <OrgGeneralView
+              t={t}
+              organisation={organisation}
+              role={role}
+              canManage={manages(role)}
+              company={null}
+              investor={investorFixture(now)}
+              images={null}
+            />
+          </OrgReadOnly>
+        </OrgAdminFrame>
+      );
+    }
     case "org-admin": {
       const name = `${HARBOURLINE.name} (fictional)`;
       return (

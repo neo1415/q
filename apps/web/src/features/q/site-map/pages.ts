@@ -994,6 +994,7 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
     audience: "ANY",
     sections: [
       { id: "organisation", title: "Your organisation", kind: "TEAM" },
+      { id: "org-general", title: "Organisation details", kind: "OTHER" },
     ],
   },
   "/organisation/members": {
@@ -1437,7 +1438,10 @@ export const SITE_MAP_PURPOSES: Readonly<
     },
   },
   "/organisation": {
-    sections: { organisation: "what Capital Q holds about it" },
+    sections: {
+      organisation: "what Capital Q holds about it",
+      "org-general": "its name, website, description, logo and headquarters",
+    },
   },
   "/organisation/activity": { sections: { activity: "your team's actions" } },
   "/organisation/import": { sections: { import: "where to import from" } },
