@@ -656,3 +656,24 @@ export function FocusSection({
     </CardSection>
   );
 }
+
+/**
+ * An investor's declared cheque envelope (owner 2026-11-19), from its exact
+ * ends: "$250K to $2M", "From $250K", "Up to $2M". An end the mandate does
+ * not state is left unsaid, never shown as zero; no detail, no text.
+ */
+export function chequeRangeText(
+  field: PublicCardField | undefined,
+): string | null {
+  const detail = detailOf(field, "METRICS");
+  if (detail === null) return null;
+  const [low, high] = detail.metrics;
+  const end = (metric: CardMetric | undefined): string | null =>
+    metric === undefined || metric.amount === null ? null : metricText(metric);
+  const min = end(low);
+  const max = end(high);
+  if (min !== null && max !== null) return `${min} to ${max}`;
+  if (min !== null) return `From ${min}`;
+  if (max !== null) return `Up to ${max}`;
+  return null;
+}

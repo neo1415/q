@@ -467,6 +467,7 @@ import {
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorOrganisationRepository,
+  createPostgresInvestorPortfolioCardRead,
   createPostgresInvestorProfileQueryPort,
   InvestorOrganisationIdSchema,
 } from "@capital-q/investors";
@@ -2600,6 +2601,10 @@ const cardSubjects = createSubjectDirectory({
   },
   findInvestor: (investorOrganisationId) =>
     cardInvestorFacts.findCanonicalInvestorProfile(investorOrganisationId),
+  // The same named portfolio the application API's cards carry.
+  findInvestorPortfolio: createPostgresInvestorPortfolioCardRead({
+    sql: database.sql,
+  }),
   // QA F-77: the same mandate facts the application API's cards carry, so
   // Q reads what an investor's card publishes (each still off until its
   // owner turns it on).

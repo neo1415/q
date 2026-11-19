@@ -127,6 +127,30 @@ export const INVESTOR_MANDATE_CARD_FIELDS = [
   "mandateCustomerTypes",
   "mandateGeographies",
   "mandateLookFor",
+  /**
+   * The mandate's declared cheque envelope, smallest to largest (owner
+   * 2026-11-19: investor cards "feel scarce"). Carries a METRICS detail so
+   * each end stays numeric plus currency; an end not stated is unknown.
+   */
+  "mandateChequeRange",
+  /** Lead, co-invest or follow, as the mandate declares it. */
+  "mandateInvestmentRole",
+] as const;
+
+/**
+ * More of what the investor organisation itself declared (owner
+ * 2026-11-19), each off until the owner puts it on the card:
+ * - `inboundPreference`: how founders may approach them, the firm's own
+ *   stated rule (OPEN, QUALIFIED or CLOSED); the reader words it.
+ * - `portfolioHighlights`: representative portfolio companies the firm
+ *   named itself (ADR 0007), "; "-separated names only. Never linked to a
+ *   Capital Q company, never checked, never an amount or a stake; putting
+ *   it on the card is the firm's decision to show it.
+ * Never observed behaviour or Q's inference: neither has a field here.
+ */
+export const INVESTOR_DECLARED_CARD_FIELDS = [
+  "inboundPreference",
+  "portfolioHighlights",
 ] as const;
 
 /** The declared fields an investor organisation card may show. */
@@ -140,6 +164,7 @@ export const INVESTOR_CARD_FIELDS = [
   "photo",
   "cover",
   ...INVESTOR_MANDATE_CARD_FIELDS,
+  ...INVESTOR_DECLARED_CARD_FIELDS,
   /** The people who represent the firm, with their roles. */
   "team",
 ] as const;
@@ -168,6 +193,7 @@ export const QCardFieldSchema = z.enum([
   "hqCountry",
   "deploymentState",
   ...INVESTOR_MANDATE_CARD_FIELDS,
+  ...INVESTOR_DECLARED_CARD_FIELDS,
   "headline",
   "roleTitle",
   "affiliation",

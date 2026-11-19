@@ -40,6 +40,11 @@ const IMAGE_LABELS: Readonly<Partial<Record<QCardField, string>>> = {
   mandateCustomerTypes: "Customer types",
   mandateGeographies: "Geographies",
   mandateLookFor: "What they look for",
+  // More of what the firm declared (owner 2026-11-19).
+  mandateChequeRange: "Cheque range",
+  mandateInvestmentRole: "Role in a round",
+  inboundPreference: "How to approach them",
+  portfolioHighlights: "Portfolio",
   // The card's richer sections (Q Story S6).
   tractionMetrics: "Numbers",
   currentRaise: "The raise",
@@ -74,6 +79,24 @@ export const CARD_SECTION_HINTS: Readonly<Partial<Record<QCardField, string>>> =
       "Titles of data room documents investors can request. Never the files.",
     personFocus:
       "From your firm's or company's own Q Card, showing only what that card shows the same audience.",
+    // An investor's declared mandate (founder design 2026-09-28, owner
+    // 2026-11-19): from the active mandate, never rewritten from behaviour.
+    mandateTypicalCheque: "From your active mandate, as you declared it.",
+    mandateStages: "From your active mandate, as you declared it.",
+    mandateSectors: "From your active mandate, as you declared it.",
+    mandateBusinessModels: "From your active mandate, as you declared it.",
+    mandateCustomerTypes: "From your active mandate, as you declared it.",
+    mandateGeographies: "From your active mandate, as you declared it.",
+    mandateLookFor:
+      "The founder qualities and green flags in your active mandate.",
+    mandateChequeRange:
+      "Your smallest and largest cheque, exactly as your active mandate states them.",
+    mandateInvestmentRole:
+      "Whether you lead, co-invest or follow, from your active mandate.",
+    inboundPreference:
+      "How founders may approach you: open, only when they fit your mandate, or closed.",
+    portfolioHighlights:
+      "The portfolio companies you named yourself, names only. Capital Q does not check them.",
     roleTitle: "Your title where you work now.",
     affiliation: "The company or firm you work at now.",
     countryCode: "Your country, from your profile.",
@@ -87,7 +110,28 @@ export const CARD_LIST_FIELDS: ReadonlySet<QCardField> = new Set([
   "mandateCustomerTypes",
   "mandateGeographies",
   "mandateLookFor",
+  "mandateInvestmentRole",
+  "portfolioHighlights",
 ]);
+
+/**
+ * Where an investor card's facts come from, said on the card (owner
+ * 2026-11-19): declared mandate, observed behaviour and Q's inference are
+ * kept apart, and nothing observed or inferred has a field yet, so every
+ * one of these is the firm's own statement.
+ */
+export const INVESTOR_PROVENANCE = {
+  mandate: "As declared in the firm's mandate",
+  portfolio: "Named by the firm. Capital Q has not checked these.",
+  approach: "The firm's own stated rule",
+} as const;
+
+/** The firm's inbound rule, in words (core.investor_organisations). */
+const INBOUND_WORDS: Readonly<Record<string, string>> = {
+  OPEN: "Open to founders reaching out",
+  QUALIFIED: "Open to founders whose company fits their declared mandate",
+  CLOSED: "Not taking approaches from founders right now",
+};
 
 /** A list field's names, for chips. */
 export function cardListItems(field: PublicCardField): readonly string[] {
@@ -119,6 +163,9 @@ export function cardImage(
 
 export function cardFieldValue(field: PublicCardField): string {
   if (CARD_LIST_FIELDS.has(field.key)) return cardListItems(field).join(", ");
+  if (field.key === "inboundPreference") {
+    return INBOUND_WORDS[field.value] ?? field.value;
+  }
   // A person's country reads by the same country names as a company's.
   if (field.key === "countryCode") {
     return cardFieldValue({ ...field, key: "headquartersCountry" });

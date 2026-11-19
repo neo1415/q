@@ -6,6 +6,7 @@ import {
 import type { SubjectDirectory, SubjectFacts } from "../application/ports.js";
 import {
   companySections,
+  investorChequeRangeSection,
   investorTeamSection,
   personFocus,
   type CompanySectionInputs,
@@ -45,12 +46,29 @@ export type InvestorProfileRead = {
   readonly websiteUrl: string | null;
   readonly deploymentState: string | null;
   readonly verificationState: string;
+  /**
+   * How founders may approach them, the firm's own declared rule (OPEN,
+   * QUALIFIED, CLOSED); null not stated. Absent from older reads.
+   */
+  readonly inboundPreference?: string | null | undefined;
 };
 
 /** The active mandate's shareable facts by card field; absent reads as none. */
 export type InvestorMandateCardFacts = Readonly<
-  Partial<Record<(typeof INVESTOR_MANDATE_CARD_FIELDS)[number], string | null>>
+  Partial<
+    Record<(typeof INVESTOR_MANDATE_CARD_FIELDS)[number], string | null>
+  > & {
+    /** The cheque envelope's ends, exact, behind `mandateChequeRange`. */
+    readonly chequeRange?: {
+      readonly currency: string;
+      readonly min: string | null;
+      readonly max: string | null;
+    } | null;
+  }
 >;
+
+/** At most this many portfolio names reach a card, in the firm's order. */
+const PORTFOLIO_ON_CARD = 12;
 
 /** A person's own declared profile and current affiliation. */
 export type PersonProfileRead = {
@@ -135,6 +153,17 @@ export type SubjectDirectoryPorts = {
    */
   readonly findInvestorMandateFacts?:
     | ((investorOrganisationId: string) => Promise<InvestorMandateCardFacts>)
+    | undefined;
+  /**
+   * The representative portfolio companies the firm named itself (ADR
+   * 0007), current ones only, oldest first: names only. Optional; absent,
+   * a card never shows a portfolio.
+   */
+  readonly findInvestorPortfolio?:
+    | ((subject: {
+        readonly tenantId: string;
+        readonly investorOrganisationId: string;
+      }) => Promise<readonly string[]>)
     | undefined;
   readonly findCompany: (
     companyId: string,
@@ -276,6 +305,24 @@ export function createSubjectDirectory(
           })
           .catch(() => null)) ?? null;
       const team = people === null ? null : investorTeamSection(people);
+      const cheque = investorChequeRangeSection(
+        mandate.chequeRange ?? null,
+        mandate.mandateChequeRange ?? null,
+      );
+      const portfolio =
+        (await ports
+          .findInvestorPortfolio?.({
+            tenantId: investor.tenantId,
+            investorOrganisationId: subject.subjectId,
+          })
+          .catch(() => null)) ?? null;
+      const portfolioNames = [
+        ...new Set(
+          (portfolio ?? [])
+            .map((name) => name.replace(/;/g, ",").trim())
+            .filter((name) => name.length > 0),
+        ),
+      ].slice(0, PORTFOLIO_ON_CARD);
       return {
         tenantId: investor.tenantId,
         organisationId: investor.organisationId,
@@ -293,9 +340,14 @@ export function createSubjectDirectory(
               mandate[key] ?? null,
             ]),
           ),
+          // Only with its exact two ends: never a text no detail backs.
+          ...cheque.facts,
+          inboundPreference: investor.inboundPreference ?? null,
+          portfolioHighlights:
+            portfolioNames.length === 0 ? null : portfolioNames.join("; "),
           ...team?.facts,
         },
-        ...(team === null ? {} : { details: team.details }),
+        details: { ...team?.details, ...cheque.details },
         // The investors context's own presentation state; anything other
         // than unverified is Capital Q's decision about the organisation.
         verified: {

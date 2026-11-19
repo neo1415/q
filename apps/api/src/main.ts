@@ -165,6 +165,7 @@ import {
   createInvestorService,
   createPostgresInvestorMandateQueryPort,
   createPostgresInvestorOrganisationQueryPort,
+  createPostgresInvestorPortfolioCardRead,
   createPostgresInvestorProfileQueryPort,
   InvestorOrganisationIdSchema,
   createPostgresInvestorTeamRead,
@@ -2737,6 +2738,11 @@ const cardSubjects = createSubjectDirectory({
       ? companyFacts.findCanonicalCompanyProfile(id.data)
       : null;
   },
+  // Owner 2026-11-19: the firm's own named portfolio, off on every card
+  // until its owner turns it on.
+  findInvestorPortfolio: createPostgresInvestorPortfolioCardRead({
+    sql: database.sql,
+  }),
   findInvestor: (investorOrganisationId) =>
     investorFacts.findCanonicalInvestorProfile(investorOrganisationId),
   companyVerification: async (subject) => {

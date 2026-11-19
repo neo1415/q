@@ -1,6 +1,7 @@
 import {
   FOUNDER_PREFERENCE_OPTIONS,
   GREEN_FLAG_OPTIONS,
+  INVESTMENT_ROLE_OPTIONS,
   STAGE_OPTIONS,
 } from "./definition/index.js";
 import {
@@ -16,7 +17,9 @@ import { REFERENCE_TAXONOMY } from "@capital-q/taxonomy";
  * design 2026-09-28, "Investment at a glance"). Names only, from the
  * mandate's own declared codes and taxonomy nodes: the typical cheque,
  * stages, sectors, business models, customer types, geographies and what
- * they look for. Never the narrative, never exclusions or things to avoid.
+ * they look for; since 2026-11-19 also the cheque envelope (its two ends,
+ * exact) and the role they take in a round. Never the narrative, never
+ * exclusions or things to avoid.
  * The card shows none of these unless the owner puts it on the card.
  *
  * QA F-77 (2026-10-24): one builder for every process that reads a card.
@@ -33,15 +36,30 @@ export type InvestorCardFacts = {
   readonly mandateCustomerTypes?: string | null;
   readonly mandateGeographies?: string | null;
   readonly mandateLookFor?: string | null;
+  readonly mandateChequeRange?: string | null;
+  readonly mandateInvestmentRole?: string | null;
+  /**
+   * The envelope behind `mandateChequeRange`, exact: numeric strings plus
+   * the currency, an end the mandate does not state is null (unknown,
+   * never zero). Null when neither end is stated.
+   */
+  readonly chequeRange?: {
+    readonly currency: string;
+    readonly min: string | null;
+    readonly max: string | null;
+  } | null;
 };
 
 const TAXONOMY = new Map(
   REFERENCE_TAXONOMY.nodes.map((node) => [node.id, node] as const),
 );
 const LABELS = new Map(
-  [...STAGE_OPTIONS, ...FOUNDER_PREFERENCE_OPTIONS, ...GREEN_FLAG_OPTIONS].map(
-    (option) => [option.optionKey, option.label] as const,
-  ),
+  [
+    ...STAGE_OPTIONS,
+    ...FOUNDER_PREFERENCE_OPTIONS,
+    ...GREEN_FLAG_OPTIONS,
+    ...INVESTMENT_ROLE_OPTIONS,
+  ].map((option) => [option.optionKey, option.label] as const),
 );
 
 /** "1500000.50" -> "1,500,000.50", exactly; never through floating point. */
@@ -99,6 +117,12 @@ export function createInvestorCardFacts(deps: {
         });
     const typical = typicalCheque(mandate.constraints);
     const currency = mandate.cheque?.currency ?? null;
+    const min = mandate.cheque?.min ?? null;
+    const max = mandate.cheque?.max ?? null;
+    const chequeRange =
+      currency === null || (min === null && max === null)
+        ? null
+        : { currency, min, max };
     return {
       mandateTypicalCheque:
         typical === undefined
@@ -113,6 +137,16 @@ export function createInvestorCardFacts(deps: {
         ...codes("founder.business_attribute"),
         ...codes("green_flag"),
       ]),
+      mandateChequeRange:
+        chequeRange === null
+          ? null
+          : min === null
+            ? `${chequeRange.currency} up to ${grouped(max ?? "")}`
+            : max === null
+              ? `${chequeRange.currency} from ${grouped(min)}`
+              : `${chequeRange.currency} ${grouped(min)} to ${grouped(max)}`,
+      mandateInvestmentRole: list(codes("investment_role")),
+      chequeRange,
     };
   };
 }

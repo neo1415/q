@@ -25,6 +25,7 @@ export {
 } from "./domain/card.js";
 export {
   companySections,
+  investorChequeRangeSection,
   investorTeamSection,
   personFocus,
   type CompanySectionInputs,

@@ -28,6 +28,7 @@ import {
   cardImage,
   cardListItems,
   fieldsForAudience,
+  INVESTOR_PROVENANCE,
   textFields,
   websiteLabel,
 } from "./card-content";
@@ -42,6 +43,7 @@ import {
   RaiseSection,
   RelationshipsSection,
   TeamSection,
+  chequeRangeText,
 } from "./card-sections";
 import { QCard } from "./q-card";
 
@@ -114,6 +116,11 @@ const GLANCE_KEYS: ReadonlySet<string> = new Set([
   "mandateGeographies",
   "mandateBusinessModels",
   "mandateCustomerTypes",
+  "mandateChequeRange",
+  "mandateInvestmentRole",
+  // Their own sections (owner 2026-11-19).
+  "inboundPreference",
+  "portfolioHighlights",
 ]);
 
 /** The order the plain facts read in, whatever order the projection used. */
@@ -183,19 +190,32 @@ export function PublicCardView({
 
   const glance = [
     { key: "mandateTypicalCheque", label: "Typical cheque size" },
+    { key: "mandateChequeRange", label: "Cheque range" },
     { key: "mandateStages", label: "Stage focus" },
     { key: "deploymentState", label: "Current status" },
   ].flatMap((item) => {
     const field = byKey(item.key);
-    return field === undefined
-      ? []
-      : [{ ...item, value: cardFieldValue(field) }];
+    if (field === undefined) return [];
+    // The envelope reads from its exact ends, never from the text line.
+    const value =
+      item.key === "mandateChequeRange"
+        ? chequeRangeText(field)
+        : cardFieldValue(field);
+    return value === null ? [] : [{ ...item, value, scope: field.scope }];
   });
+  // Three across fills three or six; four reads as two by two, then a row.
+  const glanceColumns =
+    glance.length % 3 === 0
+      ? "@xl:grid-cols-3"
+      : glance.length >= 2
+        ? "@xl:grid-cols-2 @4xl:grid-cols-4"
+        : "";
   const chipRows = [
     "mandateSectors",
     "mandateGeographies",
     "mandateBusinessModels",
     "mandateCustomerTypes",
+    "mandateInvestmentRole",
   ].flatMap((key) => {
     const field = byKey(key);
     return field === undefined
@@ -204,11 +224,34 @@ export function PublicCardView({
           {
             key,
             label: cardFieldLabel(field.key),
+            scope: field.scope,
             items: cardListItems(field),
           },
         ];
   });
   const lookFor = byKey("mandateLookFor");
+  // More of what the firm declared (owner 2026-11-19).
+  const portfolio =
+    company || person ? undefined : byKey("portfolioHighlights");
+  const approach = company || person ? undefined : byKey("inboundPreference");
+  // A section's marker when everything in it is the members' projection.
+  const allMembers = (keys: readonly string[]) => {
+    const shown = keys.flatMap((key) => {
+      const field = byKey(key);
+      return field === undefined ? [] : [field];
+    });
+    return (
+      shown.length > 0 &&
+      shown.every((field) => field.scope === "network_visible")
+    );
+  };
+  const glanceKeys = [
+    ...glance.map((item) => item.key),
+    ...chipRows.map((row) => row.key),
+  ];
+  // One marker at the heading when all of it is members-only; mixed rows
+  // carry it beside their own label.
+  const glanceMembers = allMembers(glanceKeys);
   const storyEmpty = tagline === null && description === undefined;
   // One marker at the heading when all of the story is members-only; a
   // members-only description under a public line carries its own.
@@ -271,7 +314,8 @@ export function PublicCardView({
     : [];
   const sharedSections = companySections.filter((section) => section.shown);
   const quietSections = companySections.filter((section) => !section.shown);
-  const side = intelligence || documents || facts.length > 0;
+  const side =
+    intelligence || documents || facts.length > 0 || approach !== undefined;
 
   return (
     <div className="@container mx-auto flex w-full max-w-(--cq-layout-content) flex-col gap-6 px-4 pb-12 sm:px-6 sm:pt-4 sm:pb-16">
@@ -479,19 +523,31 @@ export function PublicCardView({
           {sharedSections.map((section) => section.node)}
 
           {glance.length === 0 && chipRows.length === 0 ? null : (
-            <CardSection id="glance" label="Investment at a glance">
+            <CardSection
+              id="glance"
+              label="Investment at a glance"
+              members={glanceMembers}
+            >
+              <Provenance text={INVESTOR_PROVENANCE.mandate} />
               {glance.length === 0 ? null : (
                 <dl
-                  className="grid grid-cols-1 gap-4 @xl:grid-cols-3"
+                  className={`grid grid-cols-1 gap-4 ${glanceColumns}`}
                   data-card-glance
                 >
                   {glance.map((item) => (
-                    <div key={item.key} className="flex flex-col gap-0.5">
+                    <div
+                      key={item.key}
+                      className="flex flex-col gap-0.5"
+                      data-card-field={item.key}
+                    >
                       <dd className="cq-numeric order-1 text-[1.5rem] leading-tight font-semibold tracking-tight text-(--cq-text-primary)">
                         {item.value}
                       </dd>
-                      <dt className="cq-caption order-2 text-(--cq-text-secondary)">
+                      <dt className="cq-caption order-2 flex flex-wrap items-baseline gap-x-2 text-(--cq-text-secondary)">
                         {item.label}
+                        {item.scope === "network_visible" && !glanceMembers ? (
+                          <MembersOnly />
+                        ) : null}
                       </dt>
                     </div>
                   ))}
@@ -503,8 +559,11 @@ export function PublicCardView({
                   className="flex flex-col gap-2 pt-1"
                   data-card-field={row.key}
                 >
-                  <h3 className="cq-body-sm text-(--cq-text-secondary)">
+                  <h3 className="cq-body-sm flex items-baseline gap-2 text-(--cq-text-secondary)">
                     {row.label}
+                    {row.scope === "network_visible" && !glanceMembers ? (
+                      <MembersOnly />
+                    ) : null}
                   </h3>
                   <Chips items={row.items} />
                 </div>
@@ -513,8 +572,26 @@ export function PublicCardView({
           )}
 
           {lookFor === undefined ? null : (
-            <CardSection id="look-for" label="What they look for">
+            <CardSection
+              id="look-for"
+              label="What they look for"
+              members={lookFor.scope === "network_visible"}
+            >
+              <Provenance text={INVESTOR_PROVENANCE.mandate} />
               <Chips items={cardListItems(lookFor)} />
+            </CardSection>
+          )}
+
+          {portfolio === undefined ? null : (
+            <CardSection
+              id="portfolio"
+              label="Portfolio"
+              members={portfolio.scope === "network_visible"}
+            >
+              <Provenance text={INVESTOR_PROVENANCE.portfolio} />
+              <div data-card-field="portfolioHighlights">
+                <Chips items={cardListItems(portfolio)} />
+              </div>
             </CardSection>
           )}
 
@@ -537,6 +614,22 @@ export function PublicCardView({
             {intelligence ? (
               <IntelligenceSection field={byKey("investabilitySummary")} />
             ) : null}
+
+            {approach === undefined ? null : (
+              <CardSection
+                id="approach"
+                label="How to approach them"
+                members={approach.scope === "network_visible"}
+              >
+                <p
+                  className="cq-body text-(--cq-text-primary)"
+                  data-card-field="inboundPreference"
+                >
+                  {cardFieldValue(approach)}
+                </p>
+                <Provenance text={INVESTOR_PROVENANCE.approach} />
+              </CardSection>
+            )}
 
             {facts.length === 0 ? null : (
               <CardSection
@@ -602,6 +695,18 @@ export function PublicCardView({
 function factRank(key: string): number {
   const at = FACT_ORDER.indexOf(key);
   return at === -1 ? FACT_ORDER.length : at;
+}
+
+/** Where a section's facts come from, in words: always the firm's own. */
+function Provenance({ text }: { readonly text: string }): ReactNode {
+  return (
+    <p
+      className="cq-caption -mt-1 text-(--cq-text-tertiary)"
+      data-card-provenance
+    >
+      {text}
+    </p>
+  );
 }
 
 function Chips({ items }: { readonly items: readonly string[] }): ReactNode {

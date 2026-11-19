@@ -189,7 +189,10 @@ export {
   type ListInvestorPortfolioReferencesQuery,
   type RemoveInvestorPortfolioReferenceCommand,
 } from "./application/portfolio-use-cases.js";
-export { createPostgresInvestorPortfolioReferenceRepository } from "./infrastructure/postgres-portfolio-repository.js";
+export {
+  createPostgresInvestorPortfolioCardRead,
+  createPostgresInvestorPortfolioReferenceRepository,
+} from "./infrastructure/postgres-portfolio-repository.js";
 
 export {
   INVESTOR_VISIBILITY_CHOICES,

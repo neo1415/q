@@ -395,3 +395,132 @@ describe("the company's longer story (owner 2026-11-19)", () => {
     ).toContain("Not stated");
   });
 });
+
+describe("an investor card's wider declared fields (owner 2026-11-19)", () => {
+  const range = (scope: PublicCardField["scope"]): PublicCardField => ({
+    key: "mandateChequeRange",
+    value: "USD 250,000 to 2,000,000",
+    scope,
+    detail: {
+      kind: "METRICS",
+      metrics: [
+        {
+          label: "Smallest cheque",
+          amount: "250000",
+          currency: "USD",
+          unit: null,
+          period: null,
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+        },
+        {
+          label: "Largest cheque",
+          amount: "2000000",
+          currency: "USD",
+          unit: null,
+          period: null,
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+        },
+      ],
+    },
+  });
+  const investor = (
+    audience: PublicCardDto["audience"],
+    fields: readonly PublicCardField[],
+  ): PublicCardDto => ({
+    ...card(audience, fields),
+    subjectType: "INVESTOR_ORGANISATION",
+    name: "Savanna Capital",
+  });
+  const membersOnly: readonly PublicCardField[] = [
+    range("network_visible"),
+    {
+      key: "mandateInvestmentRole",
+      value: "MEMBERS-ROLE Lead rounds",
+      scope: "network_visible",
+    },
+    {
+      key: "inboundPreference",
+      value: "QUALIFIED",
+      scope: "network_visible",
+    },
+    {
+      key: "portfolioHighlights",
+      value: "MEMBERS-PORTFOLIO Kivu Freight; Lake Cold Chain",
+      scope: "network_visible",
+    },
+  ];
+
+  it("never draws a members-only field on the anonymous page, even if the projection carried it", () => {
+    const { container } = render(
+      <PublicCardView card={investor("PUBLIC", membersOnly)} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/MEMBERS-|\$250K|\$2M|fits their declared/);
+    for (const id of ["portfolio", "approach", "glance"]) {
+      expect(container.querySelector(`[data-card-section="${id}"]`)).toBeNull();
+    }
+  });
+
+  it("shows a participant each one, labelled as the firm's own and marked members-only", () => {
+    const { container } = render(
+      <PublicCardView card={investor("PARTICIPANT", membersOnly)} />,
+    );
+    const glance = container.querySelector('[data-card-section="glance"]');
+    expect(
+      glance?.querySelector('[data-card-field="mandateChequeRange"]')
+        ?.textContent,
+    ).toContain("$250K to $2M");
+    expect(glance?.textContent).toContain("As declared in the firm's mandate");
+    expect(glance?.querySelector("[data-members-only]")).not.toBeNull();
+    const portfolio = container.querySelector(
+      '[data-card-section="portfolio"]',
+    );
+    expect(portfolio?.querySelectorAll("li")).toHaveLength(2);
+    expect(portfolio?.textContent).toContain("Capital Q has not checked these");
+    const approach = container.querySelector('[data-card-section="approach"]');
+    expect(approach?.textContent).toContain(
+      "Open to founders whose company fits their declared mandate",
+    );
+    expect(approach?.textContent).toContain("The firm's own stated rule");
+    // Never as a plain fact row as well.
+    expect(
+      container.querySelector('[data-card-side] [data-card-section="facts"]'),
+    ).toBeNull();
+  });
+
+  it("says an unstated end of the range by leaving it out, never as zero", () => {
+    const onlyMax = range("public_external");
+    if (onlyMax.detail?.kind !== "METRICS") throw new Error("fixture");
+    const [low, high] = onlyMax.detail.metrics;
+    if (low === undefined || high === undefined) throw new Error("fixture");
+    const { container } = render(
+      <PublicCardView
+        card={investor("PUBLIC", [
+          {
+            ...onlyMax,
+            detail: {
+              kind: "METRICS",
+              metrics: [
+                {
+                  ...low,
+                  amount: null,
+                  currency: null,
+                  truthClass: "UNKNOWN",
+                  evidenceStatus: "NO_EVIDENCE",
+                },
+                high,
+              ],
+            },
+          },
+        ])}
+      />,
+    );
+    const cell = container.querySelector(
+      '[data-card-field="mandateChequeRange"]',
+    );
+    expect(cell?.textContent).toContain("Up to $2M");
+    expect(container.textContent).not.toMatch(/\$0\b/);
+  });
+});

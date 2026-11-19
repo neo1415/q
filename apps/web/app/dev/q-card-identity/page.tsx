@@ -24,7 +24,8 @@ export const metadata: Metadata = {
  *
  * Development only; a production build serves it only when
  * CQ_DEV_PREVIEW=1 is set on that server. `?subject=company|investor|person`,
- * `?audience=public|participant`, `?empty=1` (a company with nothing shared).
+ * `?audience=public|participant`, `?empty=1` (a company with nothing shared),
+ * `?full=1` (an investor with every declared field on the card).
  */
 
 const COMPANY_FIELDS: readonly PublicCardField[] = [
@@ -186,7 +187,7 @@ const INVESTOR_FIELDS: readonly PublicCardField[] = [
   },
   {
     key: "mandateTypicalCheque",
-    value: "$250K–$1.5M",
+    value: "USD 750,000",
     scope: "public_external",
   },
   { key: "mandateStages", value: "Seed; Series A", scope: "public_external" },
@@ -217,6 +218,64 @@ const INVESTOR_FIELDS: readonly PublicCardField[] = [
       ],
     },
   },
+];
+
+/** Every other declared investor field (owner 2026-11-19), for `?full=1`. */
+const INVESTOR_FULL_FIELDS: readonly PublicCardField[] = [
+  {
+    key: "mandateChequeRange",
+    value: "USD 250,000 to 2,000,000",
+    scope: "public_external",
+    detail: {
+      kind: "METRICS",
+      metrics: [
+        {
+          label: "Smallest cheque",
+          amount: "250000",
+          currency: "USD",
+          unit: null,
+          period: null,
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+        },
+        {
+          label: "Largest cheque",
+          amount: "2000000",
+          currency: "USD",
+          unit: null,
+          period: null,
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+        },
+      ],
+    },
+  },
+  {
+    key: "mandateGeographies",
+    value: "Kenya; Uganda; Rwanda; Nigeria; Ghana",
+    scope: "public_external",
+  },
+  {
+    key: "mandateBusinessModels",
+    value: "B2B SaaS; Marketplace",
+    scope: "public_external",
+  },
+  {
+    key: "mandateCustomerTypes",
+    value: "SMEs; Enterprises",
+    scope: "network_visible",
+  },
+  {
+    key: "mandateInvestmentRole",
+    value: "Lead rounds; Co-invest alongside a lead",
+    scope: "public_external",
+  },
+  {
+    key: "portfolioHighlights",
+    value: "Kivu Freight; Lake Cold Chain; Ledgerline; Pesa Rails; Kazi Health",
+    scope: "public_external",
+  },
+  { key: "inboundPreference", value: "QUALIFIED", scope: "network_visible" },
 ];
 
 const PERSON_FIELDS: readonly PublicCardField[] = [
@@ -271,6 +330,7 @@ export default async function QCardIdentityHarness({
   const audience =
     one(params["audience"]) === "participant" ? "PARTICIPANT" : "PUBLIC";
   const empty = one(params["empty"]) === "1";
+  const full = one(params["full"]) === "1";
   const handle = person
     ? "wanjiku-kamau"
     : investor
@@ -295,7 +355,7 @@ export default async function QCardIdentityHarness({
           ...(person
             ? PERSON_FIELDS
             : investor
-              ? INVESTOR_FIELDS
+              ? [...INVESTOR_FIELDS, ...(full ? INVESTOR_FULL_FIELDS : [])]
               : COMPANY_FIELDS),
         ],
     verified: ["ORGANISATION_VERIFIED"],

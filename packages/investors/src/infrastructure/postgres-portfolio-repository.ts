@@ -117,3 +117,33 @@ export function createPostgresInvestorPortfolioReferenceRepository(): InvestorPo
     },
   };
 }
+
+/**
+ * The firm's own current portfolio names, oldest first, for a Q Card
+ * (owner 2026-11-19). Permission-neutral like the profile read: the card
+ * shows them only under a scope the firm's owner chose, so this is the
+ * firm's decision to make them visible (ADR 0007 §4). Names only: the
+ * website, the author and the provenance stay behind. A malformed id
+ * reads as no portfolio.
+ */
+export function createPostgresInvestorPortfolioCardRead(options: {
+  readonly sql: DatabaseExecutor;
+}) {
+  const repository = createPostgresInvestorPortfolioReferenceRepository();
+  return async (subject: {
+    readonly tenantId: string;
+    readonly investorOrganisationId: string;
+  }): Promise<readonly string[]> => {
+    const tenant = TenantIdSchema.safeParse(subject.tenantId);
+    const investor = InvestorOrganisationIdSchema.safeParse(
+      subject.investorOrganisationId,
+    );
+    if (!tenant.success || !investor.success) return [];
+    const references = await repository.listCurrent(
+      options.sql,
+      tenant.data,
+      investor.data,
+    );
+    return references.map((reference) => reference.companyName);
+  };
+}

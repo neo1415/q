@@ -475,6 +475,58 @@ export function investorTeamSection(
   };
 }
 
+/**
+ * An investor's declared cheque envelope (owner 2026-11-19) as its two
+ * ends, each exact (numeric plus currency) and labelled as the firm's own
+ * statement. An end the mandate does not state is unknown, never zero;
+ * with neither end stated, or an amount that is not a plain decimal, there
+ * is no section. The same content at either scope: the envelope is one
+ * declared fact, not rows with scopes of their own.
+ */
+export function investorChequeRangeSection(
+  range: {
+    readonly currency: string;
+    readonly min: string | null;
+    readonly max: string | null;
+  } | null,
+  value: string | null,
+): {
+  readonly facts: Readonly<Record<string, string | null>>;
+  readonly details: Readonly<
+    Record<string, Readonly<Partial<Record<QCardScope, CardDetail | null>>>>
+  >;
+} {
+  const amount = (raw: string | null): string | null =>
+    raw === null
+      ? null
+      : DecimalStringSchema.safeParse(raw).success
+        ? raw
+        : null;
+  const min = range === null ? null : amount(range.min);
+  const max = range === null ? null : amount(range.max);
+  if (range === null || (min === null && max === null) || value === null) {
+    return { facts: { mandateChequeRange: null }, details: {} };
+  }
+  const end = (label: string, at: string | null): CardMetric => ({
+    label,
+    amount: at,
+    currency: at === null ? null : range.currency,
+    unit: null,
+    period: null,
+    truthClass: at === null ? "UNKNOWN" : "USER_CLAIM",
+    evidenceStatus: at === null ? "NO_EVIDENCE" : "SELF_REPORTED",
+  });
+  return {
+    facts: { mandateChequeRange: value },
+    details: {
+      mandateChequeRange: same({
+        kind: "METRICS",
+        metrics: [end("Smallest cheque", min), end("Largest cheque", max)],
+      }),
+    },
+  };
+}
+
 /** What a person's focus may echo from their organisation's own card. */
 const FOCUS_KEYS: Readonly<
   Record<"INVESTOR" | "FOUNDER", readonly QCardField[]>

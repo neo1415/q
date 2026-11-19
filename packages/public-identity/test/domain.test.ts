@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { CardDetail } from "@capital-q/contracts";
+
 import {
   companyCardSharesRaise,
   createSubjectDirectory,
@@ -238,6 +240,209 @@ describe("the company's longer description on its card (owner 2026-11-19)", () =
     expect(
       fitFieldScopes("PERSON", { primaryDescription: "network_visible" }),
     ).toEqual({ ok: false, fields: ["primaryDescription"] });
+  });
+});
+
+describe("an investor card's wider declared fields (owner 2026-11-19)", () => {
+  const NEW_FIELDS = [
+    "mandateChequeRange",
+    "mandateInvestmentRole",
+    "inboundPreference",
+    "portfolioHighlights",
+  ] as const;
+  const INVESTOR_FACTS = {
+    displayName: "Savanna Capital",
+    investorType: "VC",
+    publicDescription: "Seed funds for East African logistics.",
+    mandateChequeRange: "SECRET-RANGE USD 250,000 to 2,000,000",
+    mandateInvestmentRole: "SECRET-ROLE Lead rounds",
+    inboundPreference: "QUALIFIED",
+    portfolioHighlights: "SECRET-PORTFOLIO Kivu Freight; Lake Cold Chain",
+  };
+  const RANGE: CardDetail = {
+    kind: "METRICS",
+    metrics: [
+      {
+        label: "Smallest cheque",
+        amount: "250000",
+        currency: "USD",
+        unit: null,
+        period: null,
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+      },
+      {
+        label: "Largest cheque",
+        amount: "2000000",
+        currency: "USD",
+        unit: null,
+        period: null,
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    ],
+  };
+  const DETAILS = {
+    mandateChequeRange: { public_external: RANGE, network_visible: RANGE },
+  };
+  const project = (
+    scopes: Parameters<typeof projectCardFields>[1],
+    audience: "PUBLIC" | "PARTICIPANT",
+  ) =>
+    projectCardFields(
+      "INVESTOR_ORGANISATION",
+      scopes,
+      INVESTOR_FACTS,
+      audience,
+      DETAILS,
+    );
+
+  it("is off on a new card: no audience sees any of them until the owner adds it", () => {
+    for (const key of NEW_FIELDS) {
+      expect(DEFAULT_FIELD_SCOPES.INVESTOR_ORGANISATION[key]).toBeUndefined();
+    }
+    for (const audience of ["PUBLIC", "PARTICIPANT"] as const) {
+      const fields = project(
+        DEFAULT_FIELD_SCOPES.INVESTOR_ORGANISATION,
+        audience,
+      );
+      expect(JSON.stringify(fields)).not.toMatch(/SECRET-|QUALIFIED|250000/);
+    }
+    // A stored card from before these fields existed reads the same.
+    const stored = readStoredScopes("INVESTOR_ORGANISATION", {
+      displayName: "public_external",
+    });
+    for (const key of NEW_FIELDS) expect(stored[key]).toBeUndefined();
+  });
+
+  it("follows the scope the owner chose: off, members only or public, per audience", () => {
+    const matrix: Record<string, Record<"PUBLIC" | "PARTICIPANT", boolean>> = {
+      off: { PUBLIC: false, PARTICIPANT: false },
+      network_visible: { PUBLIC: false, PARTICIPANT: true },
+      public_external: { PUBLIC: true, PARTICIPANT: true },
+    };
+    for (const key of NEW_FIELDS) {
+      for (const [scope, expected] of Object.entries(matrix)) {
+        const requested = scope === "off" ? {} : { [key]: scope };
+        const fit = fitFieldScopes("INVESTOR_ORGANISATION", requested);
+        expect(fit.ok).toBe(true);
+        if (!fit.ok) continue;
+        for (const audience of ["PUBLIC", "PARTICIPANT"] as const) {
+          const field = project(fit.scopes, audience).find(
+            (candidate) => candidate.key === key,
+          );
+          expect(field !== undefined, `${key} ${scope} ${audience}`).toBe(
+            expected[audience],
+          );
+          if (field !== undefined) expect(field.scope).toBe(scope);
+        }
+      }
+    }
+  });
+
+  it("carries the cheque range's exact ends only beside its own field and scope", () => {
+    const members = project(
+      { mandateChequeRange: "network_visible" },
+      "PARTICIPANT",
+    ).find((field) => field.key === "mandateChequeRange");
+    expect(members?.detail).toEqual(RANGE);
+    // Without a detail built for it, the range is not shown at all.
+    expect(
+      projectCardFields(
+        "INVESTOR_ORGANISATION",
+        { mandateChequeRange: "public_external" },
+        INVESTOR_FACTS,
+        "PUBLIC",
+        { mandateChequeRange: { network_visible: RANGE } },
+      ).some((field) => field.key === "mandateChequeRange"),
+    ).toBe(false);
+  });
+
+  it("is refused on a company's or a person's card", () => {
+    for (const key of NEW_FIELDS) {
+      for (const subjectType of ["COMPANY", "PERSON"] as const) {
+        expect(
+          fitFieldScopes(subjectType, { [key]: "network_visible" }),
+        ).toEqual({ ok: false, fields: [key] });
+        // And dropped if somehow stored there.
+        expect(
+          readStoredScopes(subjectType, { [key]: "public_external" })[key],
+        ).toBeUndefined();
+      }
+    }
+  });
+
+  it("the directory copies the firm's own declared facts, the range only with its exact ends", async () => {
+    const directory = createSubjectDirectory({
+      findCompany: () => Promise.resolve(null),
+      findInvestor: () =>
+        Promise.resolve({
+          tenantId: "00000000-0000-4000-8000-0000000000a1",
+          organisationId: "00000000-0000-4000-8000-0000000000a2",
+          displayName: "Savanna Capital",
+          investorType: "VC",
+          publicDescription: null,
+          hqCountry: "KE",
+          websiteUrl: null,
+          deploymentState: null,
+          verificationState: "unverified",
+          inboundPreference: "OPEN",
+        }),
+      findInvestorMandateFacts: () =>
+        Promise.resolve({
+          mandateInvestmentRole: "Lead rounds",
+          mandateChequeRange: "USD 250,000 to 2,000,000",
+          chequeRange: { currency: "USD", min: "250000", max: "2000000" },
+        }),
+      findInvestorPortfolio: () =>
+        Promise.resolve([" Kivu Freight ", "Lake; Cold Chain", "Kivu Freight"]),
+      companyVerification: () =>
+        Promise.resolve({ organisation: false, founderIdentity: false }),
+    });
+    const read = await directory.find({
+      subjectType: "INVESTOR_ORGANISATION",
+      subjectId: "00000000-0000-4000-8000-0000000000a3",
+    });
+    expect(read?.facts).toMatchObject({
+      mandateInvestmentRole: "Lead rounds",
+      mandateChequeRange: "USD 250,000 to 2,000,000",
+      inboundPreference: "OPEN",
+      // Names only, deduplicated; a ";" can never split one name in two.
+      portfolioHighlights: "Kivu Freight; Lake, Cold Chain",
+    });
+    expect(read?.details?.["mandateChequeRange"]?.public_external).toEqual(
+      RANGE,
+    );
+
+    // A text with no exact ends behind it, a failed portfolio read and no
+    // stated rule: each unknown, never a guess.
+    const sparse = createSubjectDirectory({
+      findCompany: () => Promise.resolve(null),
+      findInvestor: () =>
+        Promise.resolve({
+          tenantId: "00000000-0000-4000-8000-0000000000a1",
+          organisationId: "00000000-0000-4000-8000-0000000000a2",
+          displayName: "Savanna Capital",
+          investorType: "VC",
+          publicDescription: null,
+          hqCountry: null,
+          websiteUrl: null,
+          deploymentState: null,
+          verificationState: "unverified",
+        }),
+      findInvestorMandateFacts: () =>
+        Promise.resolve({ mandateChequeRange: "USD 250,000 to 2,000,000" }),
+      findInvestorPortfolio: () => Promise.reject(new Error("down")),
+      companyVerification: () =>
+        Promise.resolve({ organisation: false, founderIdentity: false }),
+    });
+    const thin = await sparse.find({
+      subjectType: "INVESTOR_ORGANISATION",
+      subjectId: "00000000-0000-4000-8000-0000000000a3",
+    });
+    expect(thin?.facts["mandateChequeRange"]).toBeNull();
+    expect(thin?.facts["portfolioHighlights"]).toBeNull();
+    expect(thin?.facts["inboundPreference"]).toBeNull();
   });
 });
 

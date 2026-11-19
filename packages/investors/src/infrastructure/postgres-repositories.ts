@@ -433,6 +433,8 @@ export type InvestorProfileFacts = {
   readonly publicDescription: string | null;
   readonly deploymentState: string | null;
   readonly verificationState: string;
+  /** How founders may approach them, as the firm declared it; null not stated. */
+  readonly inboundPreference: string | null;
 };
 
 export type InvestorProfileQueryPort = {
@@ -450,7 +452,7 @@ export function createPostgresInvestorProfileQueryPort(options: {
       const rows = await sql`
         select i.id, i.tenant_id, i.organisation_id, i.investor_type, i.display_name,
                i.website_url, i.hq_country, i.public_description, i.deployment_state,
-               i.verification_state
+               i.verification_state, i.inbound_preference
           from core.investor_organisations i
          where i.id = ${id}`;
       if (rows.length === 0) return null;
@@ -465,6 +467,7 @@ export function createPostgresInvestorProfileQueryPort(options: {
         public_description: true,
         deployment_state: true,
         verification_state: true,
+        inbound_preference: true,
       }).parse(rows[0]);
       return {
         id: parsed.id,
@@ -477,6 +480,7 @@ export function createPostgresInvestorProfileQueryPort(options: {
         publicDescription: parsed.public_description,
         deploymentState: parsed.deployment_state,
         verificationState: parsed.verification_state,
+        inboundPreference: parsed.inbound_preference,
       };
     },
   };
