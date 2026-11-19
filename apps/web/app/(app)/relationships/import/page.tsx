@@ -15,6 +15,7 @@ import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { PipelineImportScreen } from "@/features/relationships/pipeline-import-screen";
 import { PipelineProspects } from "@/features/relationships/pipeline-prospects";
+import { hubTitle } from "@/features/relationships/hub-view";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -61,7 +62,8 @@ export default async function PipelineImportPage() {
   return (
     <PageContainer width="content" className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <BackLink fallbackHref="/relationships" label={t("Relationships")} />
+        {/* D8: back to the place by the name its page carries. */}
+        <BackLink fallbackHref="/relationships" label={t(hubTitle(side))} />
         <PageHeader
           title={t("Import your pipeline")}
           description={

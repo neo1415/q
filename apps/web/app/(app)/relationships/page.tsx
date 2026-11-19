@@ -522,7 +522,12 @@ export default async function RelationshipsPage({
       <PageContainer
         className={`flex flex-col gap-6 sm:gap-8 ${HUB_PAGE_PENDING}`}
       >
-        <HubHeader side={side} view={view} />
+        {/* D2: the import from the CRM's own header, on its first view. */}
+        <HubHeader
+          side={side}
+          view={view}
+          actions={side === "NONE" ? null : <ImportPipelineLink />}
+        />
         {unset ? (
           <EmptyState
             title={t("Set up your organisation")}

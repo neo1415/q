@@ -9,7 +9,6 @@ import {
 import { languageInfo } from "@capital-q/q-core/language";
 
 import { getSessionUser, twoStepEnabled } from "@/auth/session";
-import { adminContext } from "@/features/admin/admin-context";
 import { machineUiText } from "@/features/i18n/machine";
 import { translate, uiLanguageOf } from "@/features/i18n/messages";
 import { deviceLanguages } from "@/features/i18n/server";
@@ -58,7 +57,6 @@ export default async function SettingsPage({
     daily,
     user,
     plan,
-    admin,
     speaking,
     mine,
     learning,
@@ -73,7 +71,6 @@ export default async function SettingsPage({
     billingSession === null
       ? Promise.resolve(null)
       : getMyPlan(billingSession).catch(() => null),
-    adminContext().catch(() => null),
     billingSession === null
       ? Promise.resolve(null)
       : getMyEtiquetteGuide(billingSession).catch(() => null),
@@ -97,7 +94,6 @@ export default async function SettingsPage({
   );
   await machineUiText(pageLanguage);
   const t = (english: string) => translate(pageLanguage, english);
-  const canBrand = admin?.can("flags.write") === true;
   const language = standing?.language ?? "AUTO";
   return (
     <SettingsView
@@ -114,7 +110,6 @@ export default async function SettingsPage({
       }
       daily={daily}
       plan={plan}
-      canBrand={canBrand}
       speaking={speaking}
       acting={acting}
       learning={learning}

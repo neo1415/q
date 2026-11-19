@@ -286,7 +286,6 @@ async function ReviewPage({
           languageName={null}
           daily={unavailable ? null : daily(now)}
           plan={unavailable ? null : plan(side, "LAUNCH_DEFAULT", now)}
-          canBrand={false}
           speaking={unavailable ? null : speaking(now)}
           acting={workspaceOf(side, state === "solo")}
           learning={unavailable ? null : LEARNING}

@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 
+import type { MyOrganisationDto, TeamRole } from "@capital-q/contracts";
 import {
+  Building2,
   ChartColumn,
   CircleUser,
   FileText,
@@ -15,6 +17,8 @@ import {
   Play,
   Presentation,
   Settings,
+  Tag,
+  Upload,
   Users,
   Wrench,
 } from "@capital-q/ui/icons";
@@ -49,6 +53,9 @@ export type NavigationItem = {
     | "/daily"
     | "/settings"
     | "/settings/usage"
+    | "/settings/team"
+    | "/settings/plan"
+    | "/relationships/import"
     | "/documents"
     | "/work"
     | "/analytics"
@@ -213,13 +220,46 @@ export const USAGE_NAVIGATION: NavigationItem = {
 };
 
 /**
+ * Plans and pricing (D5, admin design 2026-11-19): the plan they are on and
+ * what each plan sizes, from the You group. The public /pricing page stays
+ * unlinked from here while its prices are pending (decision 110).
+ */
+export const PLANS_NAVIGATION: NavigationItem = {
+  href: "/settings/plan",
+  label: "Plans and pricing",
+  icon: Tag,
+};
+
+/**
+ * The organisation they act for (D1, admin design 2026-11-19): its members,
+ * roles and seats. Today that is /settings/team; the organisation admin
+ * home (/organisation, slice A6) takes it over later.
+ */
+export const ORGANISATION_NAVIGATION: NavigationItem = {
+  href: "/settings/team",
+  label: "Organisation",
+  icon: Building2,
+};
+
+/**
+ * Bring the pipeline they already keep (D1; decision 106). Called "Import
+ * pipeline", not "Import investors": an investor's pipeline is companies.
+ */
+export const PIPELINE_IMPORT_NAVIGATION: NavigationItem = {
+  href: "/relationships/import",
+  label: "Import pipeline",
+  icon: Upload,
+};
+
+/**
  * Capital Q's operations console (ADR 0033), shown only to platform
  * admins. The flag comes from the server; the console's own route still
- * refuses everyone else whatever the navigation shows.
+ * refuses everyone else whatever the navigation shows. Named for the work
+ * (D3) so it reads as leaving the product, not as the organisation's admin.
  */
 export const ADMIN_NAVIGATION: NavigationItem = {
   href: "/admin",
-  label: "Admin console",
+  label: "Operations console",
   icon: Wrench,
 };
 
@@ -264,16 +304,62 @@ export const ACCOUNT_NAVIGATION: readonly NavigationItem[] = [
  * drift. Showing a link is not access: each route's server decides.
  */
 export type NavigationGroup = {
-  /** Null for the main areas, which need no label. */
-  readonly label: "You" | "Admin" | null;
+  /**
+   * Null for the main areas, which need no label. A stable key: it names
+   * the group's remembered open state and is translated for display.
+   */
+  readonly label: "Organisation" | "You" | "Admin" | null;
+  /**
+   * Shown instead of the label, untranslated: the Organisation group is
+   * headed by the organisation's own name.
+   */
+  readonly title?: string | undefined;
   readonly items: readonly NavigationItem[];
+};
+
+/** The organisation the person acts for, read on the server. */
+export type NavigationOrganisation = {
+  readonly name: string;
+  readonly role: TeamRole;
 };
 
 export type NavigationOptions = {
   readonly admin?: boolean | undefined;
   /** The server enabled Q Pitch (CQ_Q_PITCH_TOUR=1). */
   readonly qPitch?: boolean | undefined;
+  /** The active organisation; adds its group (D1). */
+  readonly organisation?: NavigationOrganisation | null | undefined;
 };
+
+/** The organisation the person acts for, from the shell's list (D1). */
+export function activeOrganisation(
+  organisations: readonly MyOrganisationDto[] | undefined,
+): NavigationOrganisation | null {
+  const acting = organisations?.find((organisation) => organisation.active);
+  return acting === undefined ? null : { name: acting.name, role: acting.role };
+}
+
+/**
+ * The Organisation group (D1): every member sees Organisation; owners and
+ * admins also see the import. Showing a link is a courtesy: the API's
+ * membership checks decide what each role may do there.
+ */
+function organisationGroup(
+  organisation: NavigationOrganisation | null | undefined,
+): readonly NavigationGroup[] {
+  if (organisation === null || organisation === undefined) return [];
+  const manages =
+    organisation.role === "OWNER" || organisation.role === "ADMIN";
+  return [
+    {
+      label: "Organisation",
+      title: organisation.name,
+      items: manages
+        ? [ORGANISATION_NAVIGATION, PIPELINE_IMPORT_NAVIGATION]
+        : [ORGANISATION_NAVIGATION],
+    },
+  ];
+}
 
 export function navigationGroupsFor(
   // Every side sees the same entries since Work's tabs took the
@@ -289,9 +375,15 @@ export function navigationGroupsFor(
     // and addresses are unchanged (Q still opens them).
     // Integration 2026-11-07 (Q Workspace §8): Analytics after Work.
     { label: null, items: [...PRIMARY_NAVIGATION, ANALYTICS_NAVIGATION] },
+    ...organisationGroup(options.organisation),
     {
       label: "You",
-      items: [PROFILE_NAVIGATION, USAGE_NAVIGATION, SETTINGS_NAVIGATION],
+      items: [
+        PROFILE_NAVIGATION,
+        USAGE_NAVIGATION,
+        PLANS_NAVIGATION,
+        SETTINGS_NAVIGATION,
+      ],
     },
     ...(options.admin === true
       ? [{ label: "Admin" as const, items: [ADMIN_NAVIGATION] }]
@@ -329,6 +421,7 @@ export function youGroupsFor(
   return navigationGroupsFor(scope, options)
     .map((group) => ({
       label: group.label,
+      title: group.title,
       items: group.items.filter(
         (item) => !onTabs.has(item.href) && item.href !== "/profile",
       ),
@@ -373,4 +466,37 @@ export function isActiveRoute(pathname: string, href: string): boolean {
   return [href, ...(AREA_ALIASES[href] ?? [])].some(
     (root) => pathname === root || pathname.startsWith(`${root}/`),
   );
+}
+
+/**
+ * The one entry a page marks as current, among those shown together (D7):
+ * the entry whose address, or alias, matches the page most specifically.
+ * On /settings/usage that is Usage, not Settings as well; on
+ * /relationships/import it is the import, not the CRM as well.
+ */
+export function activeHrefIn(
+  pathname: string,
+  hrefs: readonly string[],
+): string | null {
+  let best: string | null = null;
+  let bestLength = -1;
+  for (const href of hrefs) {
+    for (const root of [href, ...(AREA_ALIASES[href] ?? [])]) {
+      if (
+        (pathname === root || pathname.startsWith(`${root}/`)) &&
+        root.length > bestLength
+      ) {
+        best = href;
+        bestLength = root.length;
+      }
+    }
+  }
+  return best;
+}
+
+/** Every address the given groups show, for activeHrefIn. */
+export function groupHrefs(
+  groups: readonly NavigationGroup[],
+): readonly string[] {
+  return groups.flatMap((group) => group.items.map((item) => item.href));
 }

@@ -26,6 +26,8 @@ import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
 import type { VerifyNudge } from "@/features/verification/verify-state";
 
 import {
+  activeHrefIn,
+  activeOrganisation,
   isActiveRoute,
   MOBILE_CENTRE_HREF,
   MOBILE_NAVIGATION,
@@ -266,16 +268,26 @@ export function YouSheet({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const items = youSectionsFor(scope, { admin, qPitch });
-  const groups = youGroupsFor(scope, { admin, qPitch });
-  const inside = items.some((item) => isActiveRoute(pathname, item.href));
+  const options = {
+    admin,
+    qPitch,
+    organisation: activeOrganisation(organisations),
+  };
+  const items = youSectionsFor(scope, options);
+  const groups = youGroupsFor(scope, options);
+  // One current entry (D7), the most specific match among the sheet's.
+  const current = activeHrefIn(
+    pathname,
+    items.map((item) => item.href),
+  );
+  const inside = current !== null;
   // The same remembered groups as the desktop sidebar, closed by default.
   const disclosure = useNavGroups(groups, pathname);
   const t = useT();
   const close = () => {
     setOpen(false);
   };
-  const profileActive = isActiveRoute(pathname, PROFILE_NAVIGATION.href);
+  const profileActive = current === PROFILE_NAVIGATION.href;
   return (
     <SheetRoot open={open} onOpenChange={setOpen}>
       <SheetTrigger>
@@ -342,6 +354,7 @@ export function YouSheet({
             const label = group.label;
             // The sheet is You itself, so its own group is never folded
             // (Settings stays one tap in); Admin folds as in the sidebar.
+            // The organisation's two entries stay in view (D1).
             const folded = label === "Admin";
             const listId = folded ? `cq-you-group-${label}` : undefined;
             const open = !folded || disclosure.isOpen(label);
@@ -349,9 +362,16 @@ export function YouSheet({
               <div
                 key={label ?? "main"}
                 role="group"
-                aria-label={label === null ? "Sections" : t(label)}
+                aria-label={
+                  label === null ? "Sections" : (group.title ?? t(label))
+                }
                 className="mt-3"
               >
+                {label === "Organisation" ? (
+                  <span className="cq-label block px-3 pb-1 text-(--cq-text-secondary)">
+                    {group.title ?? t(label)}
+                  </span>
+                ) : null}
                 {!folded || listId === undefined ? null : (
                   <NavGroupToggle
                     label={t(label)}
@@ -376,7 +396,7 @@ export function YouSheet({
                     <li key={item.href}>
                       <YouLink
                         item={item}
-                        active={isActiveRoute(pathname, item.href)}
+                        active={item.href === current}
                         onNavigate={close}
                       />
                     </li>

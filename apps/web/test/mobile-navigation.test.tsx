@@ -107,6 +107,8 @@ describe("MobileNavigation (option B, owner 2026-10-18)", () => {
       // Q Workspace §8: not a tab, so the phone reaches it here.
       "/analytics",
       "/settings/usage",
+      // D5 (admin design 2026-11-19): plans, from You.
+      "/settings/plan",
       "/settings",
       "/admin",
     ]);
@@ -118,6 +120,38 @@ describe("MobileNavigation (option B, owner 2026-10-18)", () => {
     // Appearance and sign-out stay reachable on a phone.
     expect(screen.getByRole("group", { name: "Appearance" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Sign out/ })).toBeTruthy();
+  });
+
+  it("lists the organisation's entries and marks only the most specific page (A1)", () => {
+    pathname = "/settings/usage";
+    render(
+      <YouSheet
+        scope="founder_private"
+        organisations={[
+          {
+            organisationId: "8f6f0c1e-2c3b-4f7a-9d1e-0a1b2c3d4e5f",
+            name: "LedgerBridge",
+            kind: "COMPANY",
+            organisationType: "company",
+            role: "OWNER",
+            memberCount: 3,
+            active: true,
+            companyId: null,
+          },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "You" }));
+    const org = screen.getByRole("group", { name: "LedgerBridge" });
+    expect(
+      [...org.querySelectorAll("a")].map((link) => link.getAttribute("href")),
+    ).toEqual(["/settings/team", "/relationships/import"]);
+    const sheet = screen.getByRole("navigation", { name: "Your sections" });
+    const current = [...sheet.querySelectorAll('[aria-current="page"]')].map(
+      (link) => link.getAttribute("href"),
+    );
+    // D7: Usage alone, not Settings as well.
+    expect(current).toEqual(["/settings/usage"]);
   });
 
   it("marks the current route with aria-current and nothing else", () => {

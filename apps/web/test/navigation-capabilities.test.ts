@@ -25,6 +25,13 @@ const EXCLUDED: Readonly<Record<string, string>> = {
   // Until W3 adds an ANALYTICS destination (contracts), Q reaches it by
   // the page's own Q tools and the site map, not by NAVIGATE.
   "/analytics": "no NAVIGATE destination yet (W3 owns the contract)",
+  // Admin design D1/D5 (2026-11-19, slice A1: web navigation and copy
+  // only). A NAVIGATE destination is a contracts change outside A1; Q
+  // reaches these through the site map (pages.ts) until one is added.
+  "/settings/plan": "no NAVIGATE destination yet (A1 changes no contracts)",
+  "/settings/team": "no NAVIGATE destination yet (A1 changes no contracts)",
+  "/relationships/import":
+    "no NAVIGATE destination yet (A1 changes no contracts)",
 };
 
 describe("every navigation screen is a screen Q can open", () => {
@@ -36,13 +43,17 @@ describe("every navigation screen is a screen Q can open", () => {
     );
     // Every section either side can reach, on the desktop and the phone.
     const scopes = ["founder_private", "investor_private", "unset"] as const;
+    // An owner of an organisation sees every entry its group offers.
+    const options = {
+      organisation: { name: "LedgerBridge", role: "OWNER" as const },
+    };
     const hrefs = new Set([
       ...scopes
         .flatMap((scope) => [
-          ...sectionsFor(scope),
+          ...sectionsFor(scope, options),
           ...ACCOUNT_NAVIGATION,
           ...MOBILE_NAVIGATION,
-          ...youSectionsFor(scope),
+          ...youSectionsFor(scope, options),
         ])
         .map((item) => item.href),
       // Work's tabs (owner 2026-10-18) and the data room reached from Pitch.
