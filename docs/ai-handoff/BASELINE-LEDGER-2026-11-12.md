@@ -947,3 +947,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - other: about $9.
   - The owner asked that testing not spend GPT credit. A routing override for fictional tenants needs their yes; until then, keep live tests minimal.
 - **Decision 109:** two-level admin. The design audit is in progress at `docs/design/audit-2026-11-19/` and `docs/design/admin-2026-11-19/`.
+
+- **862090033 deployed 14:36 UTC** (gate PASS 14:35:43Z): the investor Q Card's opt-in fields (7ab448fde) and admin clean-up A1 (discoverability).
+  - Live as the fictional LedgerBridge founder: the sidebar has a "LedgerBridge" group (Organisation, Import pipeline). It is collapsed on `/settings` and open, with Import pipeline the only current item, on `/relationships/import`.
+  - Personal Settings no longer shows Brand or the house guide. "Plans and pricing" is under You.
+  - Still open (with a worker): the Plan page's "Not included" rows, the console's grouped sidebar, and names in audit rows.
