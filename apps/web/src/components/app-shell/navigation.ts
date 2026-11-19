@@ -221,8 +221,8 @@ export const USAGE_NAVIGATION: NavigationItem = {
 
 /**
  * Plans and pricing (D5, admin design 2026-11-19): the plan they are on and
- * what each plan sizes, from the You group; the Plan page links on to the
- * public comparison.
+ * what each plan sizes, from the You group. The public /pricing page stays
+ * unlinked from here while its prices are pending (decision 110).
  */
 export const PLANS_NAVIGATION: NavigationItem = {
   href: "/settings/plan",

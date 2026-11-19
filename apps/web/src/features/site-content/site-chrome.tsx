@@ -42,7 +42,7 @@ function BrandMark() {
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-(--cq-z-sticky) border-b border-(--cq-border-subtle) bg-(--cq-canvas)">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-4 sm:px-8">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-8">
         <a
           href="/"
           className="cq-body flex min-h-11 items-center gap-2.5 font-semibold tracking-[-0.02em] text-(--cq-text-primary)"
@@ -55,10 +55,7 @@ export function SiteHeader() {
             <a
               key={link.href}
               href={link.href}
-              // D5: Pricing stays in the bar on a phone; FAQ waits for room.
-              className={`cq-body-sm min-h-11 items-center rounded-(--cq-radius-md) px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) sm:inline-flex sm:px-3 ${
-                link.href === "/pricing" ? "inline-flex" : "hidden"
-              }`}
+              className="cq-body-sm hidden min-h-11 items-center rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) sm:inline-flex"
             >
               {link.label}
             </a>
@@ -70,7 +67,7 @@ export function SiteHeader() {
           />
           <a
             href="/auth/sign-in"
-            className="cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-md) px-2 sm:px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+            className="cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
           >
             Sign in
           </a>

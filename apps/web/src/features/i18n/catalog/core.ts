@@ -27,7 +27,6 @@ export const CORE_AR: Readonly<Record<string, string>> = {
   "Operations console": "وحدة تحكم العمليات",
   "Import pipeline": "استيراد مسار الصفقات",
   "Plans and pricing": "الخطط والأسعار",
-  "Compare plans": "قارن الخطط",
   Workspace: "مساحة العمل",
   You: "أنت",
   Admin: "الإدارة",

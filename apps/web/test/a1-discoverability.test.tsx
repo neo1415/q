@@ -18,12 +18,6 @@ describe("A1 discoverability", () => {
     expect(settings).not.toContain("/admin/etiquette");
   });
 
-  it("links the Plan page to the public comparison (D5)", () => {
-    const plan = source("src/features/billing/plan-view.tsx");
-    expect(plan).toContain('href="/pricing"');
-    expect(plan).toContain('t("Compare plans")');
-  });
-
   it("offers the import from an empty pipeline (D2)", () => {
     render(
       <RelationshipsEmpty

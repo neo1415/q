@@ -1024,7 +1024,6 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Company, round, your rules and how they stood",
   "Compare",
   "Compare drafts",
-  "Compare plans",
   "Compare side by side",
   "Compare submitted applications",
   "Compare up to three at once",

@@ -72,9 +72,7 @@ export function LandingPage({
           <nav className="nav-links" aria-label="Primary">
             <a href={`#${GATEQ_ANCHOR}`}>Try GateQ</a>
             <a href={`#${HOW_ANCHOR}`}>How Q works</a>
-            <a href="/pricing" data-lp-pricing="">
-              Pricing
-            </a>
+            <a href="/pricing">Pricing</a>
             <ThemeToggle display="icons" size="touch" />
             <a href={SIGN_IN_HREF}>Sign in</a>
             <a className="btn btn-primary" href={SIGN_UP_HREF}>
