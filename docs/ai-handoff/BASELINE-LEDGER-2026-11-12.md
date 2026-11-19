@@ -966,3 +966,7 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The operator view was not live-checked, because no fictional operator account exists. The owner should open `/admin` with their own account.
   - No q-api errors since the deploy.
   - Known gap: the pool watchdog and worker health are not exposed to the console.
+- **ca3831238 deployed 22:52 UTC** (gate PASS 22:51:36Z, pgTAP included). Migration `20261231599600` (`platform_ops.service_heartbeats`) was applied BEFORE the deploy; hosted is at 315.
+  - q-api `GET /v1/ops/pool` (`overview.read`) feeds the console's database pool line.
+  - The workers upsert a heartbeat after each ops check. Live: the row for `workers` is 40 s old, with no findings.
+  - Its `pool` is `{}`: the workers' pool reports no snapshot, so the card shows the workers' pool as not reported. This is a follow-up, not a fault.
