@@ -145,7 +145,7 @@ describe("MobileNavigation (option B, owner 2026-10-18)", () => {
     const org = screen.getByRole("group", { name: "LedgerBridge" });
     expect(
       [...org.querySelectorAll("a")].map((link) => link.getAttribute("href")),
-    ).toEqual(["/settings/team", "/relationships/import"]);
+    ).toEqual(["/organisation", "/relationships/import"]);
     const sheet = screen.getByRole("navigation", { name: "Your sections" });
     const current = [...sheet.querySelectorAll('[aria-current="page"]')].map(
       (link) => link.getAttribute("href"),

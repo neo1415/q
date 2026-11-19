@@ -7,6 +7,27 @@
  * figures and email addresses are never translated.
  */
 export const ORGANISATION_AR: Readonly<Record<string, string>> = {
+  // The organisation admin (decisions 109 and 110)
+  General: "عام",
+  "Only owners and admins can change this.":
+    "يمكن للمالكين والمسؤولين فقط تغيير هذا.",
+  "Organisation admin": "إدارة المؤسسة",
+  "Organisation sections": "أقسام المؤسسة",
+  "Read only": "للقراءة فقط",
+  Roles: "الأدوار",
+  Section: "القسم",
+  Switch: "تبديل",
+  "importing your pipeline": "استيراد مسار صفقاتك",
+  "what each role can do": "ما يمكن لكل دور فعله",
+  "your organisation": "مؤسستك",
+  "Members and usage": "الأعضاء والاستخدام",
+  "Export and deletion": "التصدير والحذف",
+  "How Q speaks for us": "كيف يتحدث Q باسمنا",
+  "Gateway and Q Card brand": "هوية البوابة وبطاقة Q",
+  "Activity log": "سجل النشاط",
+  Data: "البيانات",
+  "Q and brand": "Q والهوية",
+  "Not built yet": "لم يُبنَ بعد",
   // Roles
   Owner: "المالك",
   Admin: "مسؤول",

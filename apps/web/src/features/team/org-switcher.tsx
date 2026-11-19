@@ -139,6 +139,40 @@ function OrganisationList({
   );
 }
 
+/**
+ * The organisation admin's scope bar (admin design §3.2): "Switch", for
+ * people in two or more organisations. Switching is the server's to do.
+ */
+export function ScopeOrganisationSwitch({
+  organisations,
+}: {
+  readonly organisations: readonly MyOrganisationDto[];
+}) {
+  const t = useT();
+  if (organisations.length < 2) return null;
+  return (
+    <PopoverRoot>
+      <PopoverTrigger>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-(--cq-radius-md) px-2.5 cq-body-sm font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) pointer-fine:min-h-9"
+          data-org-scope-switch
+        >
+          {t("Switch")}
+          <ChevronsUpDown
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-1.5">
+        <OrganisationList organisations={organisations} />
+      </PopoverContent>
+    </PopoverRoot>
+  );
+}
+
 /** Desktop: the sidebar's header button and its menu. */
 export function SidebarOrganisationSwitcher({
   organisations,

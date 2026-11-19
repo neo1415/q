@@ -54,6 +54,7 @@ export type NavigationItem = {
     | "/settings"
     | "/settings/usage"
     | "/settings/team"
+    | "/organisation"
     | "/settings/plan"
     | "/relationships/import"
     | "/documents"
@@ -231,12 +232,12 @@ export const PLANS_NAVIGATION: NavigationItem = {
 };
 
 /**
- * The organisation they act for (D1, admin design 2026-11-19): its members,
- * roles and seats. Today that is /settings/team; the organisation admin
- * home (/organisation, slice A6) takes it over later.
+ * The organisation they act for (D1, admin design 2026-11-19; decisions
+ * 109 and 110): the organisation admin at /organisation, read-only for
+ * members. Settings → Team still works and marks this entry current.
  */
 export const ORGANISATION_NAVIGATION: NavigationItem = {
-  href: "/settings/team",
+  href: "/organisation",
   label: "Organisation",
   icon: Building2,
 };
@@ -448,6 +449,8 @@ export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
  * the Results URL, and /crm is the CRM's alias.
  */
 const AREA_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  // The organisation admin re-homes Team; its old address still works.
+  "/organisation": ["/settings/team"],
   // GateQ and company requests are CRM tabs (owner 2026-10-17).
   "/relationships": ["/results", "/crm", "/capital", "/gateq", "/investors"],
   // Work's tabs keep their own addresses (owner 2026-10-18); the data

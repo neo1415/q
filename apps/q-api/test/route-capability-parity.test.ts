@@ -1261,6 +1261,34 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/daily": cap("navigate.DAILY"),
   "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/team": cap("tool.read_my"),
+  // The organisation admin (decisions 109 and 110): the same screens Q
+  // already reads or operates elsewhere, read-only for members; no
+  // NAVIGATE destination yet, so Q reaches each by the site map route.
+  "/organisation": cap("tool.read_my"),
+  "/organisation/members": cap("tool.read_my"),
+  "/organisation/roles": cap("tool.read_my"),
+  "/organisation/plan": cap("tool.get_my_plan"),
+  "/organisation/import": exempt(
+    "points to the CRM's import page (/relationships/import), where Q's import tools act",
+  ),
+  "/organisation/activity": exempt(
+    "admins' and owners' activity feed (organisation.activity.view, decided by the API); no Q tool reads it, by design",
+  ),
+  "/organisation/connections": exempt(
+    "the organisation admin's not-built section: it says only that nothing is here yet",
+  ),
+  "/organisation/data": exempt(
+    "the organisation admin's not-built section: it says only that nothing is here yet",
+  ),
+  "/organisation/privacy": exempt(
+    "the organisation admin's not-built section: it says only that nothing is here yet",
+  ),
+  "/organisation/speaking": exempt(
+    "the organisation admin's not-built section: it says only that nothing is here yet",
+  ),
+  "/organisation/brand": exempt(
+    "the organisation admin's not-built section: it says only that nothing is here yet",
+  ),
   // Organisation administration (2026-10-21): admins' and owners' reads
   // of the accountability record. The API refuses anyone without
   // organisation.activity.view; Q has no read of the feed by design, so a

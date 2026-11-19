@@ -43,6 +43,8 @@ export const config = {
     "/crm/:path*",
     "/q-pitch/:path*",
     "/settings/:path*",
+    // Decisions 109 and 110: the organisation admin.
+    "/organisation/:path*",
     // G1/G2: an invitation's link.
     "/join/:path*",
     // AUTO (ADR 0030): Q's work.

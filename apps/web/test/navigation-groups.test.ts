@@ -103,11 +103,11 @@ describe("the organisation's group and one current entry", () => {
         .find((group) => group.label === "Organisation")
         ?.items.map((item) => `${item.label} ${item.href}`);
     expect(items("OWNER")).toEqual([
-      "Organisation /settings/team",
+      "Organisation /organisation",
       "Import pipeline /relationships/import",
     ]);
     expect(items("ADMIN")).toEqual(items("OWNER"));
-    expect(items("MEMBER")).toEqual(["Organisation /settings/team"]);
+    expect(items("MEMBER")).toEqual(["Organisation /organisation"]);
   });
 
   it("has no organisation group without an active organisation", () => {
@@ -136,7 +136,10 @@ describe("the organisation's group and one current entry", () => {
     const cases: readonly (readonly [string, string | null])[] = [
       ["/settings/usage", "/settings/usage"],
       ["/settings/plan", "/settings/plan"],
-      ["/settings/team/abc", "/settings/team"],
+      // Decision 110: the old Team address still marks Organisation.
+      ["/organisation", "/organisation"],
+      ["/organisation/plan", "/organisation"],
+      ["/settings/team/abc", "/organisation"],
       ["/settings/data", "/settings"],
       ["/settings", "/settings"],
       ["/relationships/import", "/relationships/import"],

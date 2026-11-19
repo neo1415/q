@@ -987,6 +987,72 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
       })),
     ],
   },
+  // Decisions 109 and 110: the organisation admin (read-only for members).
+  "/organisation": {
+    title: "Organisation",
+    purpose: "Your organisation's admin.",
+    audience: "ANY",
+    sections: [
+      { id: "organisation", title: "Your organisation", kind: "TEAM" },
+    ],
+  },
+  "/organisation/members": {
+    title: "Members and usage",
+    purpose: "Members, invitations and allowances.",
+    audience: "ANY",
+    sections: [{ id: "team", title: "Your team", kind: "TEAM" }],
+  },
+  "/organisation/roles": {
+    title: "Roles",
+    purpose: "What each role can do.",
+    audience: "ANY",
+    sections: [{ id: "roles", title: "Roles", kind: "TEAM" }],
+  },
+  "/organisation/plan": {
+    title: "Plan and billing",
+    purpose: "The organisation's plan.",
+    audience: "ANY",
+    sections: [{ id: "plan", title: "Your plan", kind: "BILLING" }],
+  },
+  "/organisation/import": {
+    title: "Import",
+    purpose: "Where to import a pipeline.",
+    audience: "ANY",
+    sections: [{ id: "import", title: "Import", kind: "OTHER" }],
+  },
+  "/organisation/connections": {
+    title: "Connections",
+    purpose: "Not built yet.",
+    audience: "ANY",
+  },
+  "/organisation/data": {
+    title: "Export and deletion",
+    purpose: "Not built yet.",
+    audience: "ANY",
+  },
+  "/organisation/privacy": {
+    title: "Privacy",
+    purpose: "Not built yet.",
+    audience: "ANY",
+  },
+  "/organisation/speaking": {
+    title: "How Q speaks for us",
+    purpose: "Not built yet.",
+    audience: "ANY",
+  },
+  "/organisation/brand": {
+    title: "Gateway and Q Card brand",
+    purpose: "Not built yet.",
+    audience: "ANY",
+  },
+  "/organisation/activity": {
+    title: "Activity log",
+    purpose: "Who did what, and when.",
+    audience: "ANY",
+    sections: [
+      { id: "activity", title: "Your team's activity", kind: "OTHER" },
+    ],
+  },
   "/settings/activity": {
     title: "Team activity",
     purpose: "What people on your team did, and when.",
@@ -1370,6 +1436,16 @@ export const SITE_MAP_PURPOSES: Readonly<
       privacy: "your data choices",
     },
   },
+  "/organisation": {
+    sections: { organisation: "what Capital Q holds about it" },
+  },
+  "/organisation/activity": { sections: { activity: "your team's actions" } },
+  "/organisation/import": { sections: { import: "where to import from" } },
+  "/organisation/roles": { sections: { roles: "what each role can do" } },
+  "/organisation/members": {
+    sections: { team: "members, roles and invitations" },
+  },
+  "/organisation/plan": { sections: { plan: "your plan and what it allows" } },
   "/settings/activity": { sections: { activity: "your team's actions" } },
   "/settings/memory": { sections: { memory: "what Q remembers" } },
   "/settings/plan": { sections: { plan: "your plan and what it allows" } },

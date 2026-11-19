@@ -21,6 +21,7 @@ export function TeamSettingsView({
   claims,
   claimsFor,
   reviewRoleFor,
+  back = { href: "/settings", label: "Settings" },
 }: {
   readonly t: (english: string) => string;
   readonly team: TeamDto | null;
@@ -28,13 +29,22 @@ export function TeamSettingsView({
   readonly claimsFor: string | null;
   /** Design review only (passed through to TeamPage) */
   readonly reviewRoleFor?: string | undefined;
+  /**
+   * Where the back link goes; null for none (the organisation admin's own
+   * section index stands in for it).
+   */
+  readonly back?: { readonly href: string; readonly label: string } | null;
 }) {
   return (
     <AccountColumn>
       <QSection id="team" kind="TEAM" label={t("your team")}>
         <AccountHead
           title={t("Team")}
-          back={{ href: "/settings", label: t("Settings") }}
+          back={
+            back === null
+              ? undefined
+              : { href: back.href, label: t(back.label) }
+          }
         />
         {team === null ? (
           <TeamError />

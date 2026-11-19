@@ -29,6 +29,7 @@ export function PlanView({
   accountName,
   checkoutDone,
   reviewSheet,
+  back = { href: "/settings", label: "Settings" },
 }: {
   readonly t: (english: string) => string;
   readonly plan: BillingAccountPlanDto | null;
@@ -39,6 +40,11 @@ export function PlanView({
   readonly checkoutDone: boolean;
   /** Design review only (passed through to PlanBoard) */
   readonly reviewSheet?: "billing" | "talk" | undefined;
+  /**
+   * Where the back link goes; null for none (the organisation admin's own
+   * section index stands in for it).
+   */
+  readonly back?: { readonly href: string; readonly label: string } | null;
 }) {
   const free = plan?.source === "LAUNCH_DEFAULT";
   return (
@@ -47,7 +53,11 @@ export function PlanView({
         <QSection id="plan" kind="BILLING" label={t("your plan")}>
           <AccountHead
             title={t("Plan and billing")}
-            back={{ href: "/settings", label: t("Settings") }}
+            back={
+              back === null
+                ? undefined
+                : { href: back.href, label: t(back.label) }
+            }
             sub={
               plan === null
                 ? undefined

@@ -271,9 +271,11 @@ export type QSiteMap = z.infer<typeof QSiteMapSchema>;
 /**
  * W2.4: the most the digest may be, in characters (about 3k tokens). A test
  * holds the generated map's digest under it, so a page added later cannot
- * silently grow the cached prefix past its budget.
+ * silently grow the cached prefix past its budget. Raised from 12,000 for
+ * the organisation admin's eleven sections (decisions 109 and 110): the
+ * both-sides digest stood at 11,995 before them.
  */
-export const Q_SITE_MAP_DIGEST_MAX_CHARS = 12_000;
+export const Q_SITE_MAP_DIGEST_MAX_CHARS = 12_800;
 
 export type QSiteMapDigestOptions = {
   /** The person's side: pages for the other side are left out. Absent: both. */

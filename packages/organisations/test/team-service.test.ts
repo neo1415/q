@@ -586,6 +586,41 @@ describe("role enforcement on the server", () => {
     expect(promote.ok).toBe(false);
   });
 
+  // Decision 110: members see the organisation admin read-only; each write
+  // the page could reach is refused here, whatever the page renders.
+  it("a member cannot resend or cancel an invitation, or offer ownership", async () => {
+    const w = world();
+    ok(
+      await w.service.invite(
+        w.actorOf(SARA),
+        { emails: ["grace@northbound.example"], role: "MEMBER" },
+        correlation,
+      ),
+    );
+    const invitation = w.db.invitations[0]?.id ?? "";
+    expect(invitation).not.toBe("");
+    const resend = await w.service.resendInvitation(
+      w.actorOf(JAMES),
+      invitation,
+      correlation,
+    );
+    expect(resend.ok === false && resend.code).toBe("NOT_ALLOWED");
+    const revoke = await w.service.revokeInvitation(
+      w.actorOf(JAMES),
+      invitation,
+      correlation,
+    );
+    expect(revoke.ok === false && revoke.code).toBe("NOT_ALLOWED");
+    expect(w.db.invitations[0]?.status).toBe("pending");
+    const sara = w.db.memberships.find((m) => m.userId === SARA)?.id ?? "";
+    const offer = await w.service.offerOwnership(
+      w.actorOf(JAMES),
+      sara,
+      correlation,
+    );
+    expect(offer.ok).toBe(false);
+  });
+
   it("an admin changes members and admins, but not an owner", async () => {
     const w = world();
     const james = w.db.memberships.find((m) => m.userId === JAMES)?.id ?? "";

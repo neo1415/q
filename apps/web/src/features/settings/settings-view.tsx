@@ -294,6 +294,24 @@ export function SettingsView({
                 "team",
                 t("Team"),
                 <>
+                  {acting === null ? null : (
+                    // Decisions 109 and 110: the organisation's own admin,
+                    // read-only for members.
+                    <SRow
+                      title={t("Organisation admin")}
+                      description={t(
+                        `Members, plan, import, data and activity for ${acting.name}, in one place.`,
+                      )}
+                    >
+                      <Link
+                        href="/organisation"
+                        className={accountButton("secondary", "sm")}
+                        data-settings-organisation
+                      >
+                        {t("Open")}
+                      </Link>
+                    </SRow>
+                  )}
                   <SRow
                     title={acting?.name ?? t("Your team")}
                     description={

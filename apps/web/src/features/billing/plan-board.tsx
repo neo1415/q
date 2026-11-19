@@ -580,7 +580,11 @@ export function allowanceRows(
  * plan read the page already has. A use the server did not measure is said
  * as not known, never drawn as zero.
  */
-function PlanAllowances({ plan }: { readonly plan: BillingAccountPlanDto }) {
+export function PlanAllowances({
+  plan,
+}: {
+  readonly plan: BillingAccountPlanDto;
+}) {
   const t = useT();
   const rows = allowanceRows(plan);
   if (rows.length === 0) return null;

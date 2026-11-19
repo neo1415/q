@@ -13,6 +13,7 @@ import { parseApiConfig } from "@capital-q/config/api";
 import {
   BILLING_CHECKOUT_PATH,
   BILLING_PLAN_PATH,
+  BILLING_PORTAL_PATH,
   BILLING_STRIPE_WEBHOOK_PATH,
   EntitlementProblemExtensionSchema,
   GATEQ_GATEWAYS_PATH,
@@ -271,6 +272,22 @@ describe("checkout", () => {
     });
     const unknown = await post(app, { planKey: "launch" });
     expect(unknown.statusCode).toBe(404);
+    await close(app);
+  });
+});
+
+describe("the billing portal", () => {
+  // Decision 110: a member sees the organisation's plan read-only; the
+  // server refuses them the portal whatever the page shows.
+  it("is refused to a member who is not the organisation's admin", async () => {
+    const { app } = build({ admin: false, provider: true });
+    const response = await app.inject({
+      method: "POST",
+      url: BILLING_PORTAL_PATH,
+      headers: { "idempotency-key": "portal-key-00000001" },
+      payload: {},
+    });
+    expect(response.statusCode).toBe(403);
     await close(app);
   });
 });

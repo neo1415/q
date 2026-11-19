@@ -48,13 +48,15 @@ export function OrgDenied({
 }: {
   readonly t: T;
   readonly role: TeamRole | null;
-  readonly back?: { readonly href: string; readonly label: string };
+  readonly back?: { readonly href: string; readonly label: string } | null;
 }) {
   return (
     <AccountColumn>
       <AccountHead
         title={t("Activity")}
-        back={{ href: back.href, label: t(back.label) }}
+        back={
+          back === null ? undefined : { href: back.href, label: t(back.label) }
+        }
       />
       <div
         className="flex max-w-[60ch] flex-col items-start gap-3 py-2"
@@ -112,6 +114,7 @@ export function ActivityPageView({
   people,
   filters,
   review,
+  back = { href: "/settings/team", label: "Team" },
 }: {
   readonly t: T;
   readonly organisationName: string | null;
@@ -120,16 +123,25 @@ export function ActivityPageView({
   readonly people: readonly ActivityPerson[];
   readonly filters?: ActivityFilters | undefined;
   readonly review?: { readonly loading?: boolean } | undefined;
+  /**
+   * Where the back link goes; null for none (the organisation admin's own
+   * section index stands in for it).
+   */
+  readonly back?: { readonly href: string; readonly label: string } | null;
 }) {
   if (activity.status === "DENIED") {
-    return <OrgDenied t={t} role={activity.role} />;
+    return <OrgDenied t={t} role={activity.role} back={back} />;
   }
   return (
     <AccountColumn>
       <QSection id="activity" kind="OTHER" label={t("your team's activity")}>
         <AccountHead
           title={t("Activity")}
-          back={{ href: "/settings/team", label: t("Team") }}
+          back={
+            back === null
+              ? undefined
+              : { href: back.href, label: t(back.label) }
+          }
           sub={
             organisationName === null
               ? t(

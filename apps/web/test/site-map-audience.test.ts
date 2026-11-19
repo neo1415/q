@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   audienceOf,
   Q_SITE_MAP,
+  Q_SITE_MAP_DIGEST_MAX_CHARS,
   qSiteMapDigest,
   type QSiteMapAudience,
   type QSiteMapPage,
@@ -219,7 +220,7 @@ describe("every place says what it is for, in everyday words (DECISIONS 75)", ()
   it("the digest keeps every place within the budget", () => {
     for (const side of [undefined, "FOUNDER", "INVESTOR"] as const) {
       expect(qSiteMapDigest(Q_SITE_MAP, { side }).length).toBeLessThanOrEqual(
-        12_000,
+        Q_SITE_MAP_DIGEST_MAX_CHARS,
       );
     }
   });

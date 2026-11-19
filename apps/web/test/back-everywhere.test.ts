@@ -36,6 +36,19 @@ const ROOTS = [
   "q-pitch",
   "daily",
   "gateq",
+  // The organisation admin (decisions 109 and 110): reached from the
+  // sidebar, each section an entry of its own section index.
+  "organisation",
+  "organisation/activity",
+  "organisation/brand",
+  "organisation/connections",
+  "organisation/data",
+  "organisation/import",
+  "organisation/members",
+  "organisation/plan",
+  "organisation/privacy",
+  "organisation/roles",
+  "organisation/speaking",
   // The admin console and its sections, each a tab of its own nav.
   "admin",
   "admin/accounts",
@@ -173,7 +186,10 @@ const INTERIOR: Readonly<Record<string, Interior>> = {
   search: { parent: "/home" },
   "settings/activity": {
     parent: "/settings/team",
-    via: ["features/organisation/admin-pages.tsx"],
+    via: [
+      "features/organisation/activity-section.tsx",
+      "features/organisation/admin-pages.tsx",
+    ],
   },
   "settings/data": {
     parent: "/settings",
@@ -185,12 +201,18 @@ const INTERIOR: Readonly<Record<string, Interior>> = {
   },
   "settings/plan": {
     parent: "/settings",
-    via: ["features/billing/plan-view.tsx"],
+    via: [
+      "features/billing/plan-section.tsx",
+      "features/billing/plan-view.tsx",
+    ],
   },
   "settings/security": { parent: "/settings" },
   "settings/team": {
     parent: "/settings",
-    via: ["features/team/team-settings-view.tsx"],
+    via: [
+      "features/team/team-section.tsx",
+      "features/team/team-settings-view.tsx",
+    ],
   },
   "settings/team/[userId]": {
     parent: "/settings/team",
@@ -215,9 +237,13 @@ const INTERIOR: Readonly<Record<string, Interior>> = {
   },
 };
 
-/** The shared Back, rendered directly or through its two wrappers. */
+/**
+ * The shared Back, rendered directly or through its two wrappers. A screen
+ * shared with the organisation admin takes its Back as a prop (null there,
+ * where the section index stands in), defaulting to its Settings parent.
+ */
 const BACK =
-  /<BackLink\b|<BackToRelationships\b|<AccountHead\b[^>]*?\bback=\{\{\s*href:/su;
+  /<BackLink\b|<BackToRelationships\b|<AccountHead\b[^>]*?\bback=\{\{\s*href:|<AccountHead\b[^>]*?\bback=\{\s*back === null\s*\?\s*undefined\s*:\s*\{\s*href:/su;
 
 function pages(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -249,14 +275,21 @@ describe("Back on every interior page", () => {
     "%s renders the shared Back, falling back to its parent",
     (route, { parent, via }) => {
       const page = pageSource(route);
-      const sources = [
-        page,
-        ...(via ?? []).map((file) => {
-          // The page really renders the module that carries its Back.
-          expect(page).toContain(`@/${file.replace(/\.tsx$/u, "")}"`);
-          return readFileSync(join(SRC, file), "utf8");
-        }),
-      ];
+      const sources = [page];
+      for (const file of via ?? []) {
+        // The page really renders the module that carries its Back: it, or
+        // a module already on the chain (a shared section), imports it.
+        const name = file.replace(/\.tsx$/u, "");
+        expect(
+          sources.some(
+            (source) =>
+              source.includes(`@/${name}"`) ||
+              source.includes(`./${name.split("/").at(-1) ?? name}"`),
+          ),
+          file,
+        ).toBe(true);
+        sources.push(readFileSync(join(SRC, file), "utf8"));
+      }
       expect(sources.some((source) => BACK.test(source))).toBe(true);
       const all = sources.join("\n");
       expect(all.includes(`"${parent}`) || all.includes(`\`${parent}`)).toBe(

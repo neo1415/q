@@ -14,6 +14,11 @@ import {
   OrgDenied,
 } from "@/features/organisation/admin-pages";
 import { CapabilitiesProvider } from "@/features/organisation/capabilities";
+import {
+  OrgAdminFrame,
+  OrgReadOnly,
+} from "@/features/organisation/org-admin-shell";
+import { manages } from "@/features/organisation/org-admin-sections";
 import { RoleCard } from "@/features/organisation/role-card";
 import { CAP } from "@/features/organisation/role-words";
 import { EditableSection } from "@/features/profile/editable-section";
@@ -41,6 +46,13 @@ const ROLES = ["owner", "admin", "member"] as const;
 
 const PAGES = [
   { id: "team", title: "Team, by role", states: ROLES },
+  // Decisions 109 and 110: the organisation admin's frame on its Members
+  // section, read-only for a member.
+  {
+    id: "org-admin",
+    title: "Organisation admin (Members), by role",
+    states: ROLES,
+  },
   {
     id: "activity",
     title: "Activity (admins and owners)",
@@ -138,6 +150,38 @@ function ReviewPage({
     avatarUrl: member.avatarUrl ?? null,
   }));
   switch (id) {
+    case "org-admin": {
+      const name = `${HARBOURLINE.name} (fictional)`;
+      return (
+        <OrgAdminFrame
+          name={name}
+          role={role}
+          section="/organisation/members"
+          organisations={[
+            {
+              organisationId: team.organisation.organisationId,
+              name,
+              kind: team.organisation.kind,
+              organisationType: "investment_firm",
+              role,
+              memberCount: team.members.length,
+              active: true,
+              companyId: null,
+            },
+          ]}
+        >
+          <OrgReadOnly readOnly={!manages(role)}>
+            <TeamSettingsView
+              t={t}
+              team={team}
+              claims={[]}
+              claimsFor={null}
+              back={null}
+            />
+          </OrgReadOnly>
+        </OrgAdminFrame>
+      );
+    }
     case "team":
       return (
         <TeamSettingsView t={t} team={team} claims={[]} claimsFor={null} />

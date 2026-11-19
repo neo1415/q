@@ -40,6 +40,8 @@ export const PROTECTED_PATH_PREFIXES = [
   // Q Pitch (2026-10-15): the guided tour entry; signed in only.
   "/q-pitch",
   "/settings",
+  // Decisions 109 and 110: the organisation admin; signed in only.
+  "/organisation",
   // AUTO (ADR 0030): Q's work.
   "/work",
   // The work board (owner 2026-10-23), a Work tab.

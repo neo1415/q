@@ -30,6 +30,10 @@ const EXCLUDED: Readonly<Record<string, string>> = {
   // reaches these through the site map (pages.ts) until one is added.
   "/settings/plan": "no NAVIGATE destination yet (A1 changes no contracts)",
   "/settings/team": "no NAVIGATE destination yet (A1 changes no contracts)",
+  // Decisions 109 and 110: a NAVIGATE destination touches contracts, Q
+  // tools and the model gateway's receipts; Q reaches it by the site map.
+  "/organisation":
+    "no NAVIGATE destination yet (a contracts and Q-tools change)",
   "/relationships/import":
     "no NAVIGATE destination yet (A1 changes no contracts)",
 };

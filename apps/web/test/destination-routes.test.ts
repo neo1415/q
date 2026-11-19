@@ -112,6 +112,11 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/discover/yours": "old address, redirects to /discover?tab=yours",
   "/settings/reconnect/google": "a hand-off from Google, not a page to visit",
   "/join": "an invitation link",
+  // Decisions 109 and 110: the organisation admin has no NAVIGATE
+  // destination yet (one is a contracts and Q-tools change outside this
+  // slice); Q reaches it through the site map route.
+  "/organisation":
+    "the organisation admin: reached by Q through the site map route, no named destination yet",
   "/settings/activity":
     "the organisation's accountability record, for admins and owners from Team; Q reads no one's activity by design",
 };
