@@ -489,3 +489,9 @@ Core Seven remains the governing assessment framework. The new directive authori
       - The platform admin is Capital Q's own back office: eventually its own application on its own subdomain, connected to the same backend, where operators can see and do everything under least privilege and audit. It has charts, exports in several formats, operator emails and alerts, proper access control (model to be recommended), support (support email plus a self-help centre), and third-party business verification worldwide, not just Nigeria.
       - Every organisation (founder company or investor firm) has its own admin area scoped to that organisation: members, roles, plan usage, billing, brand, import, privacy and data rights, its activity log and Q settings.
       - Now: make what exists clean, consistent and discoverable (one admin shell, navigation and menu links for import, pricing and the organisation admin), designed to an enterprise standard and shown to the owner before building. The full platform-admin product specification is a later piece of work.
+
+110.  **Admin details** (owner, 2026-11-19).
+      - Pricing stays unpublished while the prices are pending. The default pricing and legal content are not published to production yet.
+      - The organisation admin lives at `/organisation`.
+      - Ordinary members can see their organisation's admin page read-only. Changes stay with owners and admins, enforced on the server.
+      - An investor's portfolio company names may appear on its Q Card only when the firm itself switches that field on (resolves the open question in ADR 0007).
