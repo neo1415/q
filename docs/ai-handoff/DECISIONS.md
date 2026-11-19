@@ -484,3 +484,8 @@ Core Seven remains the governing assessment framework. The new directive authori
       - A pricing page and an FAQ page, with default content that matches what the product does today, styled with the existing design system.
 
 108.  **Q stays in meetings** (owner, 2026-11-18). Q is there to monitor and keep the record, so it does not leave because a participant asks. The request is recorded. Q answers once, briefly (it keeps notes for both sides as part of the platform, and the organiser can remove it), then goes quiet. Only the organiser can remove it. The recording notice already says this; the lawyer reviews it where all parties must consent to recording.
+
+109.  **Admin: two levels, clean up first, full spec later** (owner, 2026-11-19).
+      - The platform admin is Capital Q's own back office: eventually its own application on its own subdomain, connected to the same backend, where operators can see and do everything under least privilege and audit. It has charts, exports in several formats, operator emails and alerts, proper access control (model to be recommended), support (support email plus a self-help centre), and third-party business verification worldwide, not just Nigeria.
+      - Every organisation (founder company or investor firm) has its own admin area scoped to that organisation: members, roles, plan usage, billing, brand, import, privacy and data rights, its activity log and Q settings.
+      - Now: make what exists clean, consistent and discoverable (one admin shell, navigation and menu links for import, pricing and the organisation admin), designed to an enterprise standard and shown to the owner before building. The full platform-admin product specification is a later piece of work.
