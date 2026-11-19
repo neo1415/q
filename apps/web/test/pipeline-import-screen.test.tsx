@@ -217,19 +217,29 @@ describe("the CRM import screen (decision 106)", () => {
       }),
     );
     await screen.findByText("Read with the columns you chose.");
-    expect(
-      document.querySelector<HTMLButtonElement>("[data-import-approve-button]")
-        ?.disabled,
-    ).toBe(false);
+    // The button enables once the re-read settles, a tick after the notice
+    // renders; on a loaded machine that tick is visible (gate 19 Nov).
+    await waitFor(() =>
+      expect(
+        document.querySelector<HTMLButtonElement>(
+          "[data-import-approve-button]",
+        )?.disabled,
+      ).toBe(false),
+    );
   });
 
   it("approves the exact proposal with the person's choices, then links the relationships", async () => {
     const o = ops();
     await upload(o);
     fireEvent.click(screen.getByLabelText("Atlas Robotics Inc"));
-    fireEvent.click(
-      document.querySelector("[data-import-approve-button]") as HTMLElement,
-    );
+    const approve = await waitFor(() => {
+      const button = document.querySelector<HTMLButtonElement>(
+        "[data-import-approve-button]",
+      );
+      expect(button?.disabled).toBe(false);
+      return button as HTMLButtonElement;
+    });
+    fireEvent.click(approve);
     await screen.findByText("Imported");
     expect(o.apply).toHaveBeenCalledTimes(1);
     const sent = (o.apply.mock.calls[0] as unknown[])[0] as Record<
