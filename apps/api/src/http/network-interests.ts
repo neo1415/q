@@ -5,6 +5,12 @@ import {
   NETWORK_RELATIONSHIP_VIEWS_PATH,
   NETWORK_RELATIONSHIP_NOTES_PATH,
   NETWORK_COMPANY_RELATIONSHIP_NOTES_PATH,
+  NETWORK_RELATIONSHIP_SIDE_DETAILS_PATH,
+  NETWORK_COMPANY_RELATIONSHIP_SIDE_DETAILS_PATH,
+  PIPELINE_PROSPECTS_PATH,
+  COMPANY_PIPELINE_PROSPECTS_PATH,
+  PipelineProspectListSchema,
+  RelationshipSideDetailsReadSchema,
   RelationshipNoteListSchema,
   SavedRelationshipViewListSchema,
   CompanyInterestStatusDtoSchema,
@@ -60,6 +66,7 @@ import {
   toRelationshipSummaryDto,
   type ConnectionService,
   type InterestService,
+  type PipelineImportService,
   type RelationshipBriefBatchSources,
   type RelationshipBriefSources,
   type RelationshipOutcomeService,
@@ -137,6 +144,11 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
         }[]
       >)
     | undefined;
+  /**
+   * Decision 106, gap 7: the organisation's private prospects from its
+   * imports. Absent: those routes do not register.
+   */
+  readonly pipelineProspects?: PipelineImportService["prospects"] | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -176,6 +188,32 @@ export function registerNetworkInterestRoutes(
       ...item,
       counterpart: { ...item.counterpart, photoUrl: photo(subjectOf(item)) },
     }));
+  };
+
+  // The reader's own side's pipeline fields on each row of a page (decision
+  // 106 gaps): read as the reader, for their side only. A failed read
+  // leaves the rows as they were, never failing the pipeline.
+  const withMySide = async (
+    request: FastifyRequest,
+    items: readonly RelationshipSummaryDto[],
+    company: boolean,
+  ): Promise<RelationshipSummaryDto[]> => {
+    const details = service.relationshipSideDetails;
+    if (details === undefined || items.length === 0) return [...items];
+    const mine = await details
+      .summaries(
+        getActorContext(request),
+        items.map((item) => item.relationshipId),
+        company ? companyIdOf(request) : undefined,
+      )
+      .catch((error: unknown) => {
+        request.log.warn({ err: error }, "side details unavailable");
+        return new Map<string, never>();
+      });
+    return items.map((item) => {
+      const own = mine.get(item.relationshipId);
+      return own === undefined ? item : { ...item, mySide: own };
+    });
   };
 
   app.get(
@@ -460,7 +498,9 @@ export function registerNetworkInterestRoutes(
       void reply.header("Cache-Control", "no-store");
       return RelationshipPipelineDtoSchema.parse({
         ...page,
-        items: await withCounterpartPhotos(page.items),
+        items: await withCounterpartPhotos(
+          await withMySide(request, page.items, false),
+        ),
       });
     },
   );
@@ -482,7 +522,9 @@ export function registerNetworkInterestRoutes(
       void reply.header("Cache-Control", "no-store");
       return RelationshipPipelineDtoSchema.parse({
         ...page,
-        items: await withCounterpartPhotos(page.items),
+        items: await withCounterpartPhotos(
+          await withMySide(request, page.items, true),
+        ),
       });
     },
   );
@@ -593,6 +635,58 @@ export function registerNetworkInterestRoutes(
           ),
         );
       });
+    }
+  }
+
+  // Decision 106 gaps: the side's own pipeline fields, the read. Changing
+  // them is an app action (@capital-q/app-actions relationship-side-details).
+  const sideDetails = service.relationshipSideDetails;
+  if (sideDetails !== undefined) {
+    for (const [detailsPath, company] of [
+      [NETWORK_RELATIONSHIP_SIDE_DETAILS_PATH, false],
+      [NETWORK_COMPANY_RELATIONSHIP_SIDE_DETAILS_PATH, true],
+    ] as const) {
+      app.get(
+        detailsPath,
+        { onRequest: withContext },
+        async (request, reply) => {
+          void reply.header("Cache-Control", "no-store");
+          // Validated by the service; an invalid id is the same not-found.
+          const raw = (request.params as { relationshipId?: unknown })
+            .relationshipId;
+          return RelationshipSideDetailsReadSchema.parse(
+            await sideDetails.read(
+              getActorContext(request),
+              typeof raw === "string" ? raw : "",
+              company ? companyIdOf(request) : undefined,
+            ),
+          );
+        },
+      );
+    }
+  }
+
+  // Decision 106, gap 7: the organisation's private prospects (rows it
+  // kept from its imports because the counterpart is not on Capital Q).
+  const prospects = dependencies.pipelineProspects;
+  if (prospects !== undefined) {
+    for (const [prospectsPath, company] of [
+      [PIPELINE_PROSPECTS_PATH, false],
+      [COMPANY_PIPELINE_PROSPECTS_PATH, true],
+    ] as const) {
+      app.get(
+        prospectsPath,
+        { onRequest: withContext },
+        async (request, reply) => {
+          void reply.header("Cache-Control", "no-store");
+          return PipelineProspectListSchema.parse(
+            await prospects(
+              getActorContext(request),
+              company ? companyIdOf(request) : undefined,
+            ),
+          );
+        },
+      );
     }
   }
 

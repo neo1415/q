@@ -173,3 +173,21 @@ export class RelationshipNoteSupersededError extends Error {
     this.name = "RelationshipNoteSupersededError";
   }
 }
+
+/** Someone on the same side saved the relationship's fields first. */
+export class RelationshipSideDetailsConflictError extends Error {
+  constructor() {
+    super(
+      "Someone on your side changed these just now. Reload to see the latest.",
+    );
+    this.name = "RelationshipSideDetailsConflictError";
+  }
+}
+
+/** The chosen deal owner is not an active member of the side's organisation. */
+export class RelationshipSideOwnerError extends Error {
+  constructor() {
+    super("Choose someone from your own team as the owner.");
+    this.name = "RelationshipSideOwnerError";
+  }
+}

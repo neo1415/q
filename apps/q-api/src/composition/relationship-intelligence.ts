@@ -398,6 +398,13 @@ export function createRelationshipIntelligencePort(dependencies: {
               sources: briefSources,
             }),
         }),
+    ...(interests.relationshipSideDetails === undefined
+      ? {}
+      : {
+          sideDetails: (actor: ActorContext, relationshipId: string) =>
+            interests.relationshipSideDetails?.own(actor, relationshipId) ??
+            Promise.resolve(null),
+        }),
     byRelationship: async (actor, relationshipId) => {
       const view = await interests.relationshipById({ actor, relationshipId });
       return view === null

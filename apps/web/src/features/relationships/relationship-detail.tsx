@@ -140,6 +140,7 @@ export function RelationshipDetail({
   work = null,
   gateq = null,
   notes = null,
+  sideDetails = null,
   decision = null,
   review,
 }: {
@@ -187,6 +188,8 @@ export function RelationshipDetail({
   readonly gateq?: ReactNode;
   /** This side's private notes (CRM S3); null when there is no record. */
   readonly notes?: ReactNode;
+  /** This side's own pipeline fields (decision 106); null: no record. */
+  readonly sideDetails?: ReactNode;
   /** The latest decision with why and how much (CRM S5); null: none. */
   readonly decision?: ReactNode;
 }) {
@@ -463,6 +466,17 @@ export function RelationshipDetail({
               className="max-lg:order-last"
             >
               {decision}
+            </RecCard>
+          )}
+
+          {sideDetails === null || sideDetails === undefined ? null : (
+            <RecCard
+              title={t("Your pipeline")}
+              icon={<Lock size={ICON_SIZE.compact} aria-hidden="true" />}
+              id="your-pipeline"
+              className="max-lg:order-last"
+            >
+              {sideDetails}
             </RecCard>
           )}
 

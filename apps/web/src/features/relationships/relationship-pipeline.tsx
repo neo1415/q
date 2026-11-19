@@ -53,6 +53,7 @@ import {
   SuitabilityFigure,
 } from "./pipeline-toolbar";
 import { crmButton, StateTag, UnknownValue } from "./crm-kit";
+import { mySideWords } from "./pipeline-import-model";
 import { peekClick, RelationshipPeek } from "./relationship-peek";
 import { CounterpartAvatar } from "./relationships-board";
 import { isOwnStep, since, type NextStep } from "./relationships-view";
@@ -348,6 +349,9 @@ export function RelationshipPipeline({
       ? null
       : Object.values(overview.steps).filter((step) => isOwnStep(step)).length;
   const shownRows = needsOnly ? rows.filter(needsOf) : rows;
+  // Decision 106 gaps: the reader's own stage, priority and owner, a
+  // column only once their side has set one on this page.
+  const showMine = shownRows.some((row) => mySideWords(row.mySide, t) !== null);
   const stateCount = (state: RelationshipStateV2) =>
     overview === null || overview === undefined
       ? null
@@ -784,6 +788,9 @@ export function RelationshipPipeline({
                 {preferences.columns.includes("state") ? (
                   <th className={cx(th, "text-start")}>{t("State")}</th>
                 ) : null}
+                {showMine ? (
+                  <th className={cx(th, "text-start")}>{t("Your stage")}</th>
+                ) : null}
                 {scores === undefined ? null : (
                   <>
                     {headerSort("suitability", "Suitability", "text-start")}
@@ -869,6 +876,16 @@ export function RelationshipPipeline({
                               : undefined
                           }
                         />
+                      </td>
+                    ) : null}
+                    {showMine ? (
+                      <td
+                        className={cx(td, "text-(--cq-text-secondary)")}
+                        data-pipeline-mine
+                      >
+                        {mySideWords(row.mySide, t) ?? (
+                          <span className="text-(--cq-text-tertiary)">—</span>
+                        )}
                       </td>
                     ) : null}
                     {scores === undefined ? null : (
@@ -1022,6 +1039,14 @@ export function RelationshipPipeline({
                         {about === null ? null : (
                           <span className="line-clamp-2 text-xs leading-[1.35] text-(--cq-text-secondary)">
                             {t(about)}
+                          </span>
+                        )}
+                        {mySideWords(row.mySide, t) === null ? null : (
+                          <span
+                            className="truncate text-xs text-(--cq-text-secondary)"
+                            data-pipeline-mine
+                          >
+                            {mySideWords(row.mySide, t)}
                           </span>
                         )}
                         <span className="flex items-center justify-between gap-2 text-xs text-(--cq-text-tertiary)">

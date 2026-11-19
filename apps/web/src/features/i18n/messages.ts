@@ -13,6 +13,7 @@ import { CORE_AR } from "./catalog/core";
 import { ACCOUNT_AR } from "./catalog/account";
 import { ORGANISATION_AR } from "./catalog/organisation";
 import { CRM_DESIGN_AR } from "./catalog/crm-design";
+import { CRM_IMPORT_AR } from "./catalog/crm-import";
 import { WORK_DESIGN_AR } from "./catalog/work-design";
 import { CRM_RECORD_AR } from "./catalog/crm-record";
 import { DAILY_AR } from "./catalog/daily";
@@ -75,6 +76,9 @@ const ARABIC: Readonly<Record<string, string>> = {
   // Decision 107: the site content editor; first, so a shared word
   // ("Publish", "History") keeps its area's own Arabic.
   ...SITE_CONTENT_AR,
+  // Decision 106: the CRM import; first too, so an area's own word for a
+  // shared one ("Import", "Stage") keeps its Arabic.
+  ...CRM_IMPORT_AR,
   ...ACCOUNT_AR,
   ...CRM_DESIGN_AR,
   ...DISCOVERY_PAGES_AR,

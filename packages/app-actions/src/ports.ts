@@ -48,6 +48,7 @@ import type {
   RelationshipOutcomeService,
   RelationshipViewService,
   RelationshipNoteService,
+  RelationshipSideDetailService,
   PipelineImportService,
 } from "@capital-q/network";
 import type {
@@ -277,6 +278,9 @@ export type AppActionPorts = {
     Pick<RelationshipViewService, "save" | "remove"> | undefined;
   /** CRM private notes (S3, 2026-10-15): the network service's own. */
   readonly relationshipNotes?: Pick<RelationshipNoteService, "add"> | undefined;
+  /** Decision 106 gaps: each side's own pipeline fields on a relationship. */
+  readonly relationshipSideDetails?:
+    Pick<RelationshipSideDetailService, "update"> | undefined;
   /** Decision 106: an uploaded CRM or pipeline file, prepared and applied. */
   readonly pipelineImport?:
     Pick<PipelineImportService, "prepare" | "apply"> | undefined;

@@ -9,6 +9,8 @@ import {
   PIPELINE_IMPORT_APPLY_PATH,
   PIPELINE_IMPORTS_PATH,
   PipelineImportPreviewSchema,
+  PipelineImportLinkSchema,
+  PipelineImportMappingSchema,
   PipelineImportResultSchema,
   UuidSchema,
   type KnownErrorCode,
@@ -76,6 +78,7 @@ const problemOf = (
     case "TOO_MANY_COLUMNS":
     case "UNREADABLE":
     case "NO_NAME_COLUMN":
+    case "INVALID_MAPPING":
     case "INVALID_RESOLUTION":
       return { code: "VALIDATION_FAILED", detail: out.message };
   }
@@ -86,6 +89,8 @@ const problemOf = (
 const Prepare = z
   .object({
     documentId: UuidSchema,
+    /** The person's own column mapping (the import screen); absent: Q proposes. */
+    mapping: PipelineImportMappingSchema.optional(),
     /** A founder's company: their side. Absent: an investor's. */
     companyId: UuidSchema.optional(),
   })
@@ -111,6 +116,7 @@ function prepareAction(path: string, company: boolean) {
       imports(ports).prepare(context.actor, {
         documentId: input.documentId,
         companyId: input.companyId,
+        mapping: input.mapping,
         correlationId: context.correlationId,
       }),
     targets: (input) => [{ kind: "DOCUMENT", documentId: input.documentId }],
@@ -265,6 +271,9 @@ function applyAction(path: string, company: boolean) {
               importId: out.value.importId,
               replayed: out.value.replayed,
               result: PipelineImportResultSchema.parse(out.value.result),
+              relationships: out.value.relationships.map((link) =>
+                PipelineImportLinkSchema.parse(link),
+              ),
             }
           : undefined,
     },

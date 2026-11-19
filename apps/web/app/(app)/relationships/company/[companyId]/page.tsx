@@ -9,12 +9,14 @@ import {
 } from "@/features/relationships/relationship-detail";
 import { DecisionRecord } from "@/features/relationships/decision-record";
 import { RelationshipNotes } from "@/features/relationships/relationship-notes";
+import { RelationshipSideDetailsCard } from "@/features/relationships/relationship-side-details";
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 import {
   recordFitRead,
   recordGateqRead,
   recordDecisionRead,
   recordNotesRead,
+  recordSideDetailsRead,
   recordWorkRead,
 } from "@/features/relationships/record-workspace-data";
 import {
@@ -62,13 +64,14 @@ export default async function InvestorRelationshipPage({
   }
   // GateQ applications on this relationship, by its canonical id (lane G).
   // GateQ and this side's private notes: their own reads, side by side.
-  const [gateq, notes, decision] =
+  const [gateq, notes, decision, sideDetails] =
     loaded.relationship === null
-      ? [null, null, null]
+      ? [null, null, null, null]
       : await Promise.all([
           recordGateqRead(loaded.relationship.relationshipId),
           recordNotesRead(loaded.relationship.relationshipId),
           recordDecisionRead(loaded.relationship, "INVESTOR"),
+          recordSideDetailsRead(loaded.relationship.relationshipId),
         ]);
   const { relationship, own, counterpart } = loaded;
 
@@ -111,6 +114,15 @@ export default async function InvestorRelationshipPage({
         gateq={gateq === null ? null : recordGateqSlot(gateq)}
         decision={
           decision === null ? null : <DecisionRecord decision={decision} />
+        }
+        sideDetails={
+          sideDetails === null || relationship === null ? null : (
+            <RelationshipSideDetailsCard
+              relationshipId={relationship.relationshipId}
+              side="INVESTOR"
+              read={sideDetails}
+            />
+          )
         }
         notes={
           notes === null || relationship === null ? null : (

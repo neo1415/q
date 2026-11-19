@@ -12,6 +12,10 @@ import {
   createRelationshipNoteService,
   type RelationshipNoteService,
 } from "./relationship-notes.js";
+import {
+  createRelationshipSideDetailService,
+  type RelationshipSideDetailService,
+} from "./relationship-side-details.js";
 
 import type { Interest } from "../contracts/index.js";
 import {
@@ -156,6 +160,8 @@ export type InterestService = {
   readonly relationshipViews?: RelationshipViewService | undefined;
   /** CRM private notes on a relationship record (S3, 2026-10-15). */
   readonly relationshipNotes?: RelationshipNoteService | undefined;
+  /** Each side's own pipeline fields on a relationship (decision 106 gaps). */
+  readonly relationshipSideDetails?: RelationshipSideDetailService | undefined;
   readonly expressInterest: (
     command: ExpressInterestCommand,
   ) => Promise<ExpressInterestResult>;
@@ -264,6 +270,7 @@ export function createInterestService(
   return {
     relationshipViews: createRelationshipViewService(dependencies),
     relationshipNotes: createRelationshipNoteService(dependencies),
+    relationshipSideDetails: createRelationshipSideDetailService(dependencies),
     relationshipPipeline: createRelationshipPipelineQuery(dependencies),
     expressInterest: createExpressInterest(dependencies),
     getOwnInterest: createGetOwnInterest(dependencies),

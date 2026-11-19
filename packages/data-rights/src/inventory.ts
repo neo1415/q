@@ -1324,6 +1324,12 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: "Notes the person wrote for their organisation's side of a relationship.",
   },
   N("network.relationship_party_states", ORG_DATA),
+  {
+    table: "network.relationship_side_details",
+    class: "ANONYMISE",
+    person: by("updated_by_user_id", "owner_user_id"),
+    why: "A side's own pipeline fields (stage, deal owner, source, expected cheque, priority): the organisation's record of the relationship. Kept; the person is a former member.",
+  },
   N("network.relationship_pass_reasons", REFERENCE),
   {
     table: "network.relationship_passes",

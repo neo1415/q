@@ -3,7 +3,10 @@ import {
   type SiteContentRoutesDependencies,
 } from "./http/site-content.js";
 import type { DatabaseHealth } from "@capital-q/database";
-import type { DealCloseService } from "@capital-q/network";
+import type {
+  DealCloseService,
+  PipelineImportService,
+} from "@capital-q/network";
 import {
   createRelationshipBriefBatchSources,
   createRelationshipBriefSources,
@@ -375,7 +378,8 @@ export type ApiModules = {
   /** The work board (owner 2026-10-23). Absent: /v1/board does not register. */
   readonly board?: BoardRoutesDependencies["board"] | undefined;
   /** Decision 106: CRM import. Absent: its routes answer not found. */
-  readonly pipelineImport?: AppActionPorts["pipelineImport"];
+  readonly pipelineImport?:
+    Pick<PipelineImportService, "prepare" | "apply" | "prospects"> | undefined;
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
   readonly commitments?:
     CommitmentRoutesDependencies["commitments"] | undefined;
@@ -782,6 +786,11 @@ export function createApp(
       ...(modules.interests?.relationshipNotes === undefined
         ? {}
         : { relationshipNotes: modules.interests.relationshipNotes }),
+      ...(modules.interests?.relationshipSideDetails === undefined
+        ? {}
+        : {
+            relationshipSideDetails: modules.interests.relationshipSideDetails,
+          }),
       ...(modules.connections === undefined
         ? {}
         : { connections: modules.connections }),
@@ -1059,6 +1068,7 @@ export function createApp(
       diligence: modules.diligence,
       namedPhotos: modules.namedPhotos,
       gateqApplications: modules.gateqRelationshipApplications,
+      pipelineProspects: modules.pipelineImport?.prospects,
       // R1: the Relationship Brief over the same services as the screens.
       // Without chat or schedule composed, those sources read UNAVAILABLE.
       briefSources:

@@ -4,6 +4,8 @@ import {
   InterestNoteSchema,
   Q_TASK_CLASSES,
   RelationshipBriefSchema,
+  RelationshipSidePrioritySchema,
+  RelationshipSideStageSchema,
   RelationshipStateV2Schema,
   RELATIONSHIP_NEXT_STEPS,
   UtcTimestampSchema,
@@ -215,6 +217,34 @@ export const GetRelationshipOutputSchema = z
       .strict()
       .nullable(),
     /**
+     * The asker's own side's pipeline fields (decision 106 gaps): their own
+     * stage, deal owner, source and introducer, expected cheque and
+     * priority. The side's own claims, private to it; never the
+     * counterpart's, never the shared state. Absent: not composed or none
+     * set; UNAVAILABLE: unknown right now.
+     */
+    yourPipeline: z
+      .discriminatedUnion("status", [
+        z
+          .object({
+            status: z.literal("OK"),
+            stage: RelationshipSideStageSchema.nullable(),
+            stageLabel: z.string().max(80).nullable(),
+            owner: z.string().max(200).nullable(),
+            source: z.string().max(200).nullable(),
+            introducer: z.string().max(200).nullable(),
+            expected: z
+              .object({ amount: z.string().max(40), currency: z.string() })
+              .strict()
+              .nullable(),
+            priority: RelationshipSidePrioritySchema.nullable(),
+            truthClass: z.literal("USER_CLAIM"),
+          })
+          .strict(),
+        z.object({ status: z.literal("UNAVAILABLE") }).strict(),
+      ])
+      .optional(),
+    /**
      * The diligence area, once diligence started (2026-10-02): what the
      * investor asked for, which requests are answered, what was shared.
      * Absent when there is none or it cannot be read.
@@ -332,7 +362,7 @@ function createGetRelationshipTool(
     status: "ACTIVE",
     providerName: "get_relationship",
     description:
-      "Where the person's own side stands with one counterparty: the relationship's state and since when, dated milestones, their next step, and the brief: how many chat messages there are and who sent the latest when, calls booked (upcoming, past, cancelled), whose move it is, open diligence requests and shared documents. Pass companyId (investor asking about a company), investorOrganisationId (company asking about an investor) or relationshipId. Call it whenever a question touches their dealings with a specific counterparty, including 'did they reply?', 'what did they say last?', 'did they accept the call?': answer those from brief.facts. A brief source UNAVAILABLE means unknown right now: never say no message was sent or no call was booked unless the brief says so. A null relationship means nothing is on record that they can see.",
+      "Where the person's own side stands with one counterparty: the relationship's state and since when, dated milestones, their next step, and the brief: how many chat messages there are and who sent the latest when, calls booked (upcoming, past, cancelled), whose move it is, open diligence requests and shared documents. Pass companyId (investor asking about a company), investorOrganisationId (company asking about an investor) or relationshipId. Call it whenever a question touches their dealings with a specific counterparty, including 'did they reply?', 'what did they say last?', 'did they accept the call?': answer those from brief.facts. A brief source UNAVAILABLE means unknown right now: never say no message was sent or no call was booked unless the brief says so. A null relationship means nothing is on record that they can see. yourPipeline is their own side's stage, deal owner, source, expected cheque and priority as they recorded them (their claims, private to their side).",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [
@@ -487,10 +517,40 @@ function createGetRelationshipTool(
               .catch((): GetRelationshipOutput["brief"] => ({
                 status: "UNAVAILABLE",
               }));
+      // The asker's own side's pipeline fields, read as the actor through
+      // the Network context's own party check; never the counterpart's.
+      const yourPipeline: GetRelationshipOutput["yourPipeline"] =
+        grant.status === null || relationships.sideDetails === undefined
+          ? undefined
+          : await relationships
+              .sideDetails(context.actor, grant.status.relationshipId)
+              .then((own): GetRelationshipOutput["yourPipeline"] =>
+                own === null || own.revision === 0
+                  ? undefined
+                  : {
+                      status: "OK",
+                      stage: own.stage,
+                      stageLabel: own.stageLabel,
+                      owner: own.owner?.name ?? null,
+                      source: own.source,
+                      introducer:
+                        [own.introducerName, own.introducerEmail]
+                          .filter((part) => part !== null)
+                          .join(", ")
+                          .slice(0, 200) || null,
+                      expected: own.expected,
+                      priority: own.priority,
+                      truthClass: "USER_CLAIM",
+                    },
+              )
+              .catch((): GetRelationshipOutput["yourPipeline"] => ({
+                status: "UNAVAILABLE",
+              }));
       return {
         yourSide: grant.side,
         counterpart: grant.counterpart,
         relationship: relationshipOut(grant.status),
+        ...(yourPipeline === undefined ? {} : { yourPipeline }),
         ...(brief === undefined ? {} : { brief }),
         ...(diligence === null
           ? {}

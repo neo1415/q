@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CorrelationIdSchema, UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { MarketplaceVisibilitySchema } from "./companies.js";
+import { RelationshipMySideSummarySchema } from "./relationship-side-details.js";
 
 /**
  * Relationship contracts (CQ-NET-001).
@@ -381,6 +382,12 @@ export const RelationshipSummaryDtoSchema = z
     state: RelationshipStateV2Schema,
     stateSince: UtcTimestampSchema,
     nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
+    /**
+     * The reader's own side's pipeline fields (CRM import gaps): their own
+     * stage, priority and deal owner, never the counterpart's. Absent: none
+     * set, or not read on this path.
+     */
+    mySide: RelationshipMySideSummarySchema.optional(),
   })
   .strict();
 export type RelationshipSummaryDto = z.infer<

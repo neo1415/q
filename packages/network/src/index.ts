@@ -403,6 +403,22 @@ export {
   createRelationshipNoteService,
   type RelationshipNoteService,
 } from "./application/relationship-notes.js";
+// CRM import gaps (decision 106): each side's own pipeline fields.
+export {
+  RelationshipSideDetailsConflictError,
+  RelationshipSideOwnerError,
+} from "./domain/errors.js";
+export {
+  createRelationshipSideDetailService,
+  exactAmount,
+  type RelationshipSideDetailService,
+} from "./application/relationship-side-details.js";
+export {
+  createPostgresRelationshipSideDetails,
+  type RelationshipSideDetailRepository,
+  type RelationshipSideOf,
+  type SideDetailValues,
+} from "./infrastructure/postgres-relationship-side-details.js";
 // CRM pipeline read model (slice 3b, 2026-10-15).
 export {
   createRelationshipPipelineQuery,

@@ -33,7 +33,7 @@ import {
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
 import { Suspense, use, type ReactNode } from "react";
 import { buttonClassName } from "@capital-q/ui/button";
-import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
+import { ICON_SIZE, Plus, Upload } from "@capital-q/ui/icons";
 
 import { getSessionUser } from "@/auth/session";
 import {
@@ -107,6 +107,7 @@ import {
   type PipelineScores,
 } from "@/features/relationships/pipeline-scores";
 import { serverT } from "@/features/i18n/server";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /** The API's widest page: what a Suitability-ranked Table/Board ranks. */
 const RANKED_PAGE_SIZE = 50;
@@ -290,7 +291,11 @@ export default async function RelationshipsPage({
       // The Overview's blocks are separate questions (what needs me, what
       // I hold, how the period went): more air between them than within.
       <PageContainer className={`flex flex-col gap-8 ${HUB_PAGE_PENDING}`}>
-        <HubHeader side={side} view={view} />
+        <HubHeader
+          side={side}
+          view={view}
+          actions={side === "NONE" ? null : <ImportPipelineLink />}
+        />
         {data === null ||
         user === null ||
         subjectId === null ||
@@ -654,6 +659,7 @@ export default async function RelationshipsPage({
                 <Plus size={ICON_SIZE.compact} aria-hidden="true" />
                 {t("Add")}
               </Link>
+              <ImportPipelineLink />
             </>
           )
         }
@@ -1122,4 +1128,22 @@ async function relationshipScores(
       found.flatMap((f) => (f.scores === undefined ? [] : [f.scores])),
     ),
   };
+}
+
+/**
+ * Decision 106: bring the pipeline they already keep (a CRM or spreadsheet
+ * export), read by Q and approved before anything changes.
+ */
+function ImportPipelineLink() {
+  const t = serverTNow();
+  return (
+    <Link
+      href="/relationships/import"
+      className={buttonClassName("secondary", "compact")}
+      data-import-pipeline
+    >
+      <Upload size={ICON_SIZE.compact} aria-hidden="true" />
+      {t("Import")}
+    </Link>
+  );
 }

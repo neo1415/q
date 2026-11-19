@@ -3,15 +3,21 @@ import { randomUUID } from "node:crypto";
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
   ApplyPipelineImportRequestSchema,
+  PIPELINE_IMPORT_LINKS_MAX,
   PIPELINE_IMPORT_PREVIEW_ROWS,
+  PIPELINE_PROSPECTS_MAX,
   PipelineImportPreviewSchema,
+  PipelineProspectListSchema,
+  SIDE_AMOUNT_PATTERN,
   type CorrelationId,
   type DisclosureScope,
   type PipelineImportCounts,
+  type PipelineImportLink,
   type PipelineImportMapping,
   type PipelineImportPreview,
   type PipelineImportResult,
   type PipelineImportStage,
+  type PipelineProspectList,
 } from "@capital-q/contracts";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import {
@@ -36,7 +42,18 @@ import {
   createPostgresRelationshipNotes,
   type RelationshipNoteRepository,
 } from "../infrastructure/postgres-relationship-notes.js";
-import { isUsableMapping, mapHeadersBySynonyms } from "./columns.js";
+import {
+  createPostgresRelationshipSideDetails,
+  type RelationshipSideDetailRepository,
+  type RelationshipSideMemberRow,
+  type SideDetailValues,
+} from "../infrastructure/postgres-relationship-side-details.js";
+import {
+  headerKey,
+  isUsableMapping,
+  mapHeadersBySynonyms,
+  readPriority,
+} from "./columns.js";
 import {
   createPostgresPipelineImports,
   type ImportSide,
@@ -153,6 +170,7 @@ export type PipelineImportDependencies = Pick<
   readonly tasks?: PipelineImportTasks | undefined;
   readonly store?: PipelineImportStore | undefined;
   readonly notes?: RelationshipNoteRepository | undefined;
+  readonly sideDetails?: RelationshipSideDetailRepository | undefined;
 };
 
 export type PipelineImportRefusalCode =
@@ -162,6 +180,7 @@ export type PipelineImportRefusalCode =
   | "BLOCKED"
   | "UNAVAILABLE"
   | "NO_NAME_COLUMN"
+  | "INVALID_MAPPING"
   | "STALE"
   | "INVALID_RESOLUTION";
 
@@ -179,6 +198,8 @@ export type PipelineImportApplied = {
   /** True when this key (or an earlier apply) had already run it. */
   readonly replayed: boolean;
   readonly result: PipelineImportResult;
+  /** The relationships it linked, for the result's links. */
+  readonly relationships: readonly PipelineImportLink[];
 };
 
 export type PipelineImportService = {
@@ -188,9 +209,16 @@ export type PipelineImportService = {
       readonly documentId: string;
       /** A founder's company: their side. Absent: an investor's. */
       readonly companyId?: string | undefined;
+      /** The person's own mapping (the import screen). Absent: Q proposes. */
+      readonly mapping?: PipelineImportMapping | undefined;
       readonly correlationId: CorrelationId;
     },
   ) => Promise<PipelineImportOutcome<PipelineImportPreview>>;
+  /** The organisation's private prospects (rows kept, not on Capital Q). */
+  readonly prospects: (
+    actor: ActorContext,
+    companyId?: string,
+  ) => Promise<PipelineProspectList>;
   readonly preview: (
     actor: ActorContext,
     importId: string,
@@ -244,6 +272,8 @@ export function createPipelineImportService(
   };
   const store = dependencies.store ?? createPostgresPipelineImports();
   const notes = dependencies.notes ?? createPostgresRelationshipNotes();
+  const sideDetails =
+    dependencies.sideDetails ?? createPostgresRelationshipSideDetails();
   const ensureInTransaction =
     createEnsureRelationshipInTransaction(dependencies);
   const appender = createRelationshipEventAppender(dependencies);
@@ -325,6 +355,9 @@ export function createPipelineImportService(
   ): PipelineImportPreview {
     const counts = countStored(rows);
     const mapped = new Set(Object.values(stored.mapping));
+    // A stored import keeps its mapping, not the file's headers: its
+    // columns then are the mapped ones.
+    const columns = headers ?? [...mapped];
     const shown = rows.filter(
       (row, index) =>
         index < PIPELINE_IMPORT_PREVIEW_ROWS || row.status === "AMBIGUOUS",
@@ -336,6 +369,7 @@ export function createPipelineImportService(
       side: stored.party,
       mapping: stored.mapping,
       mappingSource: stored.mappingSource,
+      columns,
       unmappedColumns: (headers ?? []).filter((h) => !mapped.has(h)),
       counts,
       status: stored.status,
@@ -406,8 +440,19 @@ export function createPipelineImportService(
       }
 
       let mapping: PipelineImportMapping | null = null;
-      let mappingSource: "Q" | "HEADERS" = "HEADERS";
-      if (dependencies.mapper !== undefined) {
+      let mappingSource: "Q" | "HEADERS" | "PERSON" = "HEADERS";
+      if (input.mapping !== undefined) {
+        // The person's own choice on the import screen: used as given, or
+        // refused; never mixed with a model's reading.
+        if (!isUsableMapping(input.mapping, sheet.headers)) {
+          return refused(
+            "INVALID_MAPPING",
+            "Each column can go to one field only, and one column must name the company or investor.",
+          );
+        }
+        mapping = input.mapping;
+        mappingSource = "PERSON";
+      } else if (dependencies.mapper !== undefined) {
         const proposed = await dependencies.mapper
           .propose({
             side: side.party,
@@ -530,6 +575,36 @@ export function createPipelineImportService(
       return { outcome: "OK", value: previewOf(stored, null, rows, names) };
     },
 
+    async prospects(actor, companyId) {
+      const side = await sideOf(actor, companyId);
+      const rows = await store.prospects(
+        dependencies.sql,
+        side,
+        PIPELINE_PROSPECTS_MAX,
+      );
+      return PipelineProspectListSchema.parse({
+        visibility: "organisation_private",
+        items: rows.map((row) => ({
+          importId: row.import_id,
+          rowNumber: row.row_number,
+          name: row.counterpart_name.slice(0, 200),
+          website: row.website_domain,
+          stage: row.fields.stage ?? null,
+          stageLabel: row.fields.stageLabel ?? null,
+          priority: row.fields.priority ?? null,
+          source: row.fields.source ?? null,
+          contactName: row.fields.contactName ?? null,
+          amount:
+            row.fields.amount !== undefined && row.fields.amount.length <= 40
+              ? row.fields.amount
+              : null,
+          currency: row.fields.currency ?? null,
+          fileName: row.file_name,
+          importedAt: new Date(row.applied_at).toISOString(),
+        })),
+      });
+    },
+
     async apply(actor, input) {
       const request = ApplyPipelineImportRequestSchema.parse(input.request);
       const side = await sideOf(actor, input.companyId);
@@ -549,7 +624,12 @@ export function createPipelineImportService(
         // import: what the first one did, never a second run.
         return {
           outcome: "OK",
-          value: { importId: stored.id, replayed: true, result: stored.result },
+          value: {
+            importId: stored.id,
+            replayed: true,
+            result: stored.result,
+            relationships: await linksOf(side, stored.id),
+          },
         };
       }
       const rows = await store.listRows(dependencies.sql, side, stored.id);
@@ -595,7 +675,16 @@ export function createPipelineImportService(
         stageEvents: 0,
         notes: 0,
         tasks: 0,
+        details: 0,
       };
+      // A row's owner is matched to an active member of the side's own
+      // organisation by name or email, or not set.
+      const members = await sideDetails.activeMembers(dependencies.sql, {
+        tenantId: side.tenantId,
+        organisationId: side.organisationId,
+        party: side.party,
+        partyId: side.partyId,
+      });
       const noteSide = {
         tenantId: side.tenantId,
         organisationId: side.organisationId,
@@ -631,6 +720,7 @@ export function createPipelineImportService(
             scope,
             noteSide,
             input.correlationId,
+            members,
           );
           if (linked === null) {
             await store.settleRow(
@@ -648,6 +738,7 @@ export function createPipelineImportService(
           if (linked.created) totals.relationshipsCreated += 1;
           if (linked.stage) totals.stageEvents += 1;
           if (linked.note) totals.notes += 1;
+          if (linked.details) totals.details += 1;
         } else if (keep) {
           await store.settleRow(
             dependencies.sql,
@@ -728,23 +819,43 @@ export function createPipelineImportService(
               importId: stored.id,
               replayed: true,
               result: finished.result,
+              relationships: await linksOf(side, stored.id),
             },
           };
         }
       }
       return {
         outcome: "OK",
-        value: { importId: stored.id, replayed: false, result },
+        value: {
+          importId: stored.id,
+          replayed: false,
+          result,
+          relationships: await linksOf(side, stored.id),
+        },
       };
     },
   };
+
+  function linksOf(
+    side: ImportSide,
+    importId: string,
+  ): Promise<readonly PipelineImportLink[]> {
+    return store.linkedRelationships(
+      dependencies.sql,
+      side,
+      importId,
+      PIPELINE_IMPORT_LINKS_MAX,
+    );
+  }
 
   /**
    * One row onto the ONE canonical relationship, in one short transaction:
    * ensure the pair (created private to the importing side), append its
    * imported stage unless this very row was imported before, keep its notes
-   * as the side's private note, and settle the row. Null: the counterpart
-   * is no longer one the actor may link (hidden since the preview).
+   * as the side's private note, set the side's own pipeline fields the row
+   * names (stage, owner, source, expected cheque, priority), and settle the
+   * row. Null: the counterpart is no longer one the actor may link (hidden
+   * since the preview).
    */
   async function linkRow(
     actor: ActorContext,
@@ -755,10 +866,12 @@ export function createPipelineImportService(
     scope: DisclosureScope,
     noteSide: Parameters<RelationshipNoteRepository["insert"]>[1]["side"],
     correlationId: CorrelationId,
+    members: readonly RelationshipSideMemberRow[],
   ): Promise<{
     readonly created: boolean;
     readonly stage: boolean;
     readonly note: boolean;
+    readonly details: boolean;
   } | null> {
     const companyId = CompanyIdSchema.parse(
       side.party === "INVESTOR" ? counterpartId : side.partyId,
@@ -859,6 +972,18 @@ export function createPipelineImportService(
             })) !== null;
         }
       }
+      // The side's own pipeline fields: only what the row names, merged
+      // onto what the side already keeps (the file is their approved claim).
+      const values = sideValuesOf(row.fields, members);
+      const details =
+        Object.keys(values).length > 0 &&
+        (await sideDetails.write(tx.sql, {
+          relationshipId,
+          side,
+          userId: actor.userId,
+          expectedRevision: null,
+          values,
+        })) !== null;
       await store.settleRow(
         tx.sql,
         side,
@@ -868,12 +993,71 @@ export function createPipelineImportService(
         relationshipId,
       );
       return {
+        details,
         created: ensured.created,
         stage: stageWritten,
         note: noteWritten,
       };
     });
   }
+}
+
+/**
+ * What an imported row sets on the side's own pipeline fields. Each value
+ * only when the row gives it exactly: an UNKNOWN stage keeps the label
+ * only, an owner must be the one member of the side's organisation with
+ * that name, an amount needs its currency, a priority must read as one. What
+ * cannot be read stays in the row's note, never guessed.
+ */
+export function sideValuesOf(
+  fields: ImportRowFields,
+  members: readonly Pick<
+    RelationshipSideMemberRow,
+    "membership_id" | "user_id" | "name"
+  >[],
+): SideDetailValues {
+  const values: {
+    -readonly [K in keyof SideDetailValues]: SideDetailValues[K];
+  } = {};
+  if (fields.stageLabel !== undefined) {
+    values.stageLabel = fields.stageLabel.slice(0, 80);
+    values.stage =
+      fields.stage === undefined || fields.stage === "UNKNOWN"
+        ? null
+        : fields.stage;
+  }
+  const owner = fields.owner?.trim();
+  if (owner !== undefined && owner !== "") {
+    const key = headerKey(owner);
+    // Two members of the same name are no match: never a guess.
+    const named = members.filter(
+      (one) => key !== "" && headerKey(one.name) === key,
+    );
+    const member = named.length === 1 ? named[0] : undefined;
+    if (member !== undefined) {
+      values.owner = {
+        membershipId: member.membership_id,
+        userId: member.user_id,
+      };
+    }
+  }
+  const source = fields.source?.trim();
+  if (source !== undefined && source !== "") {
+    values.source = source.slice(0, 200);
+  }
+  if (
+    fields.amount !== undefined &&
+    fields.currency !== undefined &&
+    SIDE_AMOUNT_PATTERN.test(fields.amount) &&
+    /[1-9]/.test(fields.amount)
+  ) {
+    values.expected = { amount: fields.amount, currency: fields.currency };
+  }
+  if (fields.priority !== undefined) {
+    const priority = readPriority(fields.priority);
+    if (priority !== null) values.priority = priority;
+  }
+  return values;
 }
 
 function countStored(

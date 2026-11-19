@@ -18,7 +18,9 @@ import {
   proposalHash,
   readRows,
   readSheet,
+  readPriority,
   readStage,
+  sideValuesOf,
   SheetError,
   type ImportRow,
   type MatchCandidate,
@@ -452,5 +454,85 @@ describe("rows, matches and the proposal", () => {
     expect(body).toContain("Amount: USD 500000");
     expect(body).toContain("Strong team");
     expect(noteBody("deals.csv", { rowNumber: 9, fields: {} })).toBeNull();
+  });
+});
+
+describe("the side's own pipeline fields from a row (decision 106 gaps)", () => {
+  const members = [
+    {
+      membership_id: "00000000-0000-4000-8000-0000000000a1",
+      user_id: "00000000-0000-4000-8000-0000000000b1",
+      name: "Ada Obi",
+    },
+    {
+      membership_id: "00000000-0000-4000-8000-0000000000c2",
+      user_id: "00000000-0000-4000-8000-0000000000d2",
+      name: "Kwame Mensah",
+    },
+  ];
+
+  it("reads priorities and tiers; anything else is no priority", () => {
+    expect(readPriority("High")).toBe("HIGH");
+    expect(readPriority("Tier 1")).toBe("HIGH");
+    expect(readPriority("P2")).toBe("MEDIUM");
+    expect(readPriority("warm")).toBe("MEDIUM");
+    expect(readPriority("Low")).toBe("LOW");
+    expect(readPriority("tier 3")).toBe("LOW");
+    expect(readPriority("maybe later")).toBeNull();
+    expect(readPriority("")).toBeNull();
+  });
+
+  it("sets only what the row gives exactly: stage, owner by unique name, source, amount with currency, priority", () => {
+    const values = sideValuesOf(
+      {
+        stage: "DILIGENCE",
+        stageLabel: "Deep dive",
+        owner: "ada obi",
+        source: "Warm intro from Tunde",
+        amount: "500000",
+        currency: "USD",
+        priority: "Tier 1",
+      },
+      members,
+    );
+    expect(values).toEqual({
+      stage: "DILIGENCE",
+      stageLabel: "Deep dive",
+      owner: {
+        membershipId: members[0]?.membership_id,
+        userId: members[0]?.user_id,
+      },
+      source: "Warm intro from Tunde",
+      expected: { amount: "500000", currency: "USD" },
+      priority: "HIGH",
+    });
+  });
+
+  it("never guesses: an unclear stage keeps its words, an unknown owner, an amount without currency and an unread priority are left unset", () => {
+    const values = sideValuesOf(
+      {
+        stage: "UNKNOWN",
+        stageLabel: "Tracking",
+        owner: "Someone Else",
+        amount: "250000",
+        priority: "maybe",
+      },
+      members,
+    );
+    expect(values).toEqual({ stage: null, stageLabel: "Tracking" });
+    // Two members of one name: no owner.
+    expect(
+      sideValuesOf({ owner: "Ada Obi" }, [
+        ...members,
+        { ...members[1], name: "Ada Obi" } as (typeof members)[number],
+      ]),
+    ).toEqual({});
+    // More than two decimals or zero is no expected amount.
+    expect(
+      sideValuesOf({ amount: "0", currency: "USD" }, members).expected,
+    ).toBeUndefined();
+    expect(
+      sideValuesOf({ amount: "10.125", currency: "USD" }, members).expected,
+    ).toBeUndefined();
   });
 });

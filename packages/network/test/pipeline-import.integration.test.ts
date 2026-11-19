@@ -395,6 +395,45 @@ describe("CRM import against local PostgreSQL", () => {
       expect(byRow.get(5)?.match).toBe("NEW");
       expect(await count(world.tx, "relationships", world.investorA)).toBe(0);
       expect(await count(world.tx, "notes", world.investorA)).toBe(0);
+      expect(preview.columns).toEqual([
+        "Company",
+        "Website",
+        "Status",
+        "Stage date",
+        "Check size",
+        "Notes",
+        "Next step",
+        "Follow-up date",
+      ]);
+
+      // The import screen: the person's own columns, read again as PERSON;
+      // an unusable choice is refused, never mixed with Q's.
+      const mine = await world.service.prepare(world.investorRep, {
+        documentId,
+        mapping: { counterpartName: "Company", stage: "Status" },
+        correlationId: CORRELATION(),
+      });
+      if (mine.outcome !== "OK") throw new Error(mine.message);
+      expect(mine.value.mappingSource).toBe("PERSON");
+      expect(mine.value.mapping).toEqual({
+        counterpartName: "Company",
+        stage: "Status",
+      });
+      expect(mine.value.proposalHash).not.toBe(preview.proposalHash);
+      expect(
+        await world.service.prepare(world.investorRep, {
+          documentId,
+          mapping: { counterpartName: "Company", stage: "Company" },
+          correlationId: CORRELATION(),
+        }),
+      ).toMatchObject({ outcome: "REFUSED", code: "INVALID_MAPPING" });
+      expect(
+        await world.service.prepare(world.investorRep, {
+          documentId,
+          mapping: { counterpartName: "No such column" },
+          correlationId: CORRELATION(),
+        }),
+      ).toMatchObject({ outcome: "REFUSED", code: "INVALID_MAPPING" });
     });
   });
 
@@ -436,7 +475,50 @@ describe("CRM import against local PostgreSQL", () => {
         stageEvents: 2,
         notes: 1,
         tasks: 1,
+        details: 2,
       });
+      // The result links the relationships it filled, by canonical name.
+      expect(
+        applied.value.relationships.map((link) => link.counterpartId).sort(),
+      ).toEqual([world.companyA, twin].sort());
+      // Decision 106 gaps: the side's own stage and expected ticket, exact,
+      // on the investor's side only; the company's side has none.
+      const sides = await world.tx.sql<
+        {
+          party: string;
+          stage: string | null;
+          stage_label: string | null;
+          expected_amount: string | null;
+          expected_currency: string | null;
+          organisation_id: string;
+        }[]
+      >`
+        select d.party, d.stage, d.stage_label, d.expected_amount::text as expected_amount,
+               d.expected_currency, d.organisation_id
+          from network.relationship_side_details d
+          join network.relationships r on r.id = d.relationship_id
+         where r.company_id = ${world.companyA}`;
+      expect(sides).toEqual([
+        {
+          party: "INVESTOR",
+          stage: "MEETING",
+          stage_label: "Partner meeting",
+          expected_amount: "500000.00",
+          expected_currency: "USD",
+          organisation_id: world.investorRep.organisationId,
+        },
+      ]);
+      // Gap 7: the rows kept private are the organisation's prospects, and
+      // only its own.
+      const prospects = await world.service.prospects(world.investorRep);
+      expect(prospects.items.map((one) => one.name).sort()).toEqual([
+        "Not On Capital Q Ltd",
+        "Quiet Co",
+      ]);
+      expect(prospects.visibility).toBe("organisation_private");
+      expect(
+        (await world.service.prospects(world.otherInvestorRep)).items,
+      ).toEqual([]);
       expect(await count(world.tx, "relationships", world.investorA)).toBe(2);
       const events = await world.tx.sql<
         {
@@ -678,6 +760,17 @@ describe("CRM import against local PostgreSQL", () => {
           visibility_scope: "founder_private",
           event_type: "crm_stage_imported",
         },
+      ]);
+      // The founder's own stage and expected cheque, on their side only.
+      const founderSide = await world.tx.sql<
+        { party: string; stage: string | null; expected: string | null }[]
+      >`
+        select d.party, d.stage, d.expected_amount::text || ' ' || d.expected_currency as expected
+          from network.relationship_side_details d
+          join network.relationships r on r.id = d.relationship_id
+         where r.company_id = ${world.companyOfFounder} and r.investor_organisation_id = ${world.investorA}`;
+      expect(founderSide).toEqual([
+        { party: "COMPANY", stage: "COMMITTED", expected: "250000.00 USD" },
       ]);
       // Another company's id in the path is input, never proof.
       await expect(

@@ -1,6 +1,7 @@
 export {
   createPipelineImportService,
   noteBody,
+  sideValuesOf,
   type PipelineColumnMapper,
   type PipelineImportApplied,
   type PipelineImportDependencies,
@@ -16,6 +17,7 @@ export {
   headerKey,
   isUsableMapping,
   mapHeadersBySynonyms,
+  readPriority,
   readStage,
 } from "./columns.js";
 export {

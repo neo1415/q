@@ -544,6 +544,16 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "A private note is the person's own record for their side only; Q does not write or read it, and takes them to the relationship where they write it.",
   ),
+  // Decision 106 gaps: the side's own stage, owner, source, expected cheque
+  // and priority. Q reads them for the person's own side (get_relationship)
+  // and takes them to the relationship, where they set them.
+  offer(
+    "crm_side_details",
+    "RELATIONSHIP",
+    "Set their own stage, deal owner, source or introducer, expected cheque and priority on one of their relationships (the relationship's page, Your pipeline)",
+    "RELATIONSHIPS",
+    "These are the person's own pipeline fields for their side only; they set them on the relationship, or by importing their CRM file.",
+  ),
   // --- DOCS block: the person's own say over their brand ------------------
   offer(
     "confirm_brand",

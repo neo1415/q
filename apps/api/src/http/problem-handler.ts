@@ -63,6 +63,8 @@ import {
   RelationshipPipelineQueryError,
   RelationshipViewLimitError,
   RelationshipNoteSupersededError,
+  RelationshipSideDetailsConflictError,
+  RelationshipSideOwnerError,
   InterestNotPermittedError,
 } from "@capital-q/network";
 import {
@@ -534,6 +536,21 @@ function toProblem(
   if (error instanceof RelationshipNoteSupersededError) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  // About the caller's own side's fields: safe to say plainly.
+  if (error instanceof RelationshipSideDetailsConflictError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof RelationshipSideOwnerError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
       requestId,
       detail: error.message,
     });

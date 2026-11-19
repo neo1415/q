@@ -27,6 +27,7 @@ import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { RELATIONSHIP_VIEW_ACTIONS } from "./actions/relationship-views.js";
 import { RELATIONSHIP_NOTE_ACTIONS } from "./actions/relationship-notes.js";
 import { PIPELINE_IMPORT_ACTIONS } from "./actions/pipeline-import.js";
+import { RELATIONSHIP_SIDE_DETAIL_ACTIONS } from "./actions/relationship-side-details.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
@@ -77,6 +78,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...RELATIONSHIP_NOTE_ACTIONS,
   // Decision 106: import an existing CRM or pipeline file.
   ...PIPELINE_IMPORT_ACTIONS,
+  ...RELATIONSHIP_SIDE_DETAIL_ACTIONS,
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
   ...DATA_ROOM_ACTIONS,

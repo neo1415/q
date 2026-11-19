@@ -77,6 +77,7 @@ import type {
   IncomingInterestDto,
   PermittedContextPlan,
   RelationshipBrief,
+  RelationshipSideDetails,
   RelationshipStatusDto,
   RelationshipSummaryDto,
   VisibilityStateDto,
@@ -293,6 +294,17 @@ export type RelationshipIntelligencePort = {
         actor: ActorContext,
         relationshipId: string,
       ) => Promise<RelationshipBrief | null>)
+    | undefined;
+  /**
+   * The actor's own side's pipeline fields on one relationship (decision
+   * 106 gaps), read by the Network context as the actor. Null: not a
+   * party. Absent: not composed.
+   */
+  readonly sideDetails?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<RelationshipSideDetails | null>)
     | undefined;
   readonly byRelationship: (
     actor: ActorContext,

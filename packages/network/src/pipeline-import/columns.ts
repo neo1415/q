@@ -514,3 +514,33 @@ export function readStage(label: string): PipelineImportStage {
   }
   return "UNKNOWN";
 }
+
+// --- priority -----------------------------------------------------------
+
+const PRIORITY_EXACT: ReadonlyArray<
+  readonly ["HIGH" | "MEDIUM" | "LOW", readonly string[]]
+> = [
+  [
+    "HIGH",
+    ["high", "hot", "top", "a", "p1", "p0", "1", "tier 1", "tier a", "urgent"],
+  ],
+  ["MEDIUM", ["medium", "med", "mid", "warm", "b", "p2", "2", "tier 2"]],
+  ["LOW", ["low", "cold", "c", "p3", "3", "tier 3", "tier c"]],
+];
+
+/**
+ * A priority, ranking or tier cell (Techstars Ranking, Getdex Priority) as
+ * the side's own priority. Null when it says something else: the words stay
+ * in the side's note, never guessed into a level.
+ */
+export function readPriority(label: string): "HIGH" | "MEDIUM" | "LOW" | null {
+  const key = headerKey(label);
+  if (key === "") return null;
+  for (const [priority, phrases] of PRIORITY_EXACT) {
+    if (phrases.includes(key)) return priority;
+  }
+  if (/^(high|very high|highest|critical)\b/.test(key)) return "HIGH";
+  if (/^(medium|normal|moderate)\b/.test(key)) return "MEDIUM";
+  if (/^(low|lowest|very low)\b/.test(key)) return "LOW";
+  return null;
+}

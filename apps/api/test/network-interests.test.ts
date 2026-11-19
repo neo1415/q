@@ -27,6 +27,9 @@ import {
   type RelationshipPipelineQueryService,
   type RelationshipViewService,
   type RelationshipNoteService,
+  type RelationshipSideDetailService,
+  type PipelineImportService,
+  RelationshipSideDetailsConflictError,
   RelationshipNoteSupersededError,
   type RespondToInterestCommand,
 } from "@capital-q/network";
@@ -174,6 +177,10 @@ function buildApp(
     readonly views?: RelationshipViewService | undefined;
     /** CRM private notes (S3); composed only when given. */
     readonly notes?: RelationshipNoteService | undefined;
+    /** Decision 106 gaps: the side's own fields; composed only when given. */
+    readonly sideDetails?: RelationshipSideDetailService | undefined;
+    /** Decision 106: the CRM import (its prospects read); only when given. */
+    readonly pipelineImport?: PipelineImportService | undefined;
     /** The pipeline read model (slice 3b); composed only when given. */
     readonly pipeline?: RelationshipPipelineQueryService | undefined;
     /** The party side relationshipById answers; null: not a party. */
@@ -318,12 +325,18 @@ function buildApp(
       ...(options.notes === undefined
         ? {}
         : { relationshipNotes: options.notes }),
+      ...(options.sideDetails === undefined
+        ? {}
+        : { relationshipSideDetails: options.sideDetails }),
       ...(options.pipeline === undefined
         ? {}
         : { relationshipPipeline: options.pipeline }),
     },
     namedPhotos,
     gateqRelationshipApplications: gateqApplications,
+    ...(options.pipelineImport === undefined
+      ? {}
+      : { pipelineImport: options.pipelineImport }),
   });
   return { app, calls, answers, reads, asked };
 }
@@ -1206,5 +1219,200 @@ describe("CRM private notes HTTP boundary (S3)", () => {
     expect(refused.json()).toMatchObject({
       detail: "That note was already corrected. Reload to see the latest.",
     });
+  });
+});
+
+describe("a side's own pipeline fields and private prospects HTTP boundary (decision 106)", () => {
+  const RELATIONSHIP = "a0000000-0000-4000-8000-000000000101";
+  const COMPANY_ID = "c0000000-0000-4000-8000-000000000101";
+  const details = {
+    relationshipId: RELATIONSHIP,
+    side: "INVESTOR" as const,
+    stage: "DILIGENCE" as const,
+    stageLabel: null,
+    owner: null,
+    source: "Warm intro",
+    introducerName: null,
+    introducerEmail: null,
+    expected: { amount: "250000", currency: "USD" },
+    priority: "HIGH" as const,
+    revision: 2,
+    updatedAt: "2026-11-18T10:00:00.000Z",
+    visibility: "organisation_private" as const,
+  };
+  function sideDetails(fail?: Error) {
+    const seen: unknown[][] = [];
+    const service: RelationshipSideDetailService = {
+      read: (...args) => {
+        seen.push(["read", ...args]);
+        return Promise.resolve({ details, members: [] });
+      },
+      update: (actor, relationshipId, input, options) => {
+        seen.push(["update", actor, relationshipId, input, options.companyId]);
+        return fail === undefined
+          ? Promise.resolve({ ...details, revision: 3 })
+          : Promise.reject(fail);
+      },
+      own: () => Promise.resolve(details),
+      summaries: (...args) => {
+        seen.push(["summaries", ...args]);
+        return Promise.resolve(
+          new Map([
+            [
+              String(args[1][0]),
+              {
+                stage: "DILIGENCE" as const,
+                stageLabel: null,
+                priority: "HIGH" as const,
+                ownerName: "Ada Obi",
+              },
+            ],
+          ]),
+        );
+      },
+    };
+    return { service, seen };
+  }
+
+  it("reads the actor's own side's fields on both paths, never cached", async () => {
+    const { service, seen } = sideDetails();
+    const { app } = buildApp({ sideDetails: service });
+    const investor = await app.inject({
+      method: "GET",
+      url: `/v1/network/relationships/${RELATIONSHIP}/side-details`,
+    });
+    expect(investor.statusCode).toBe(200);
+    expect(investor.headers["cache-control"]).toBe("no-store");
+    expect(investor.json()).toMatchObject({
+      details: { visibility: "organisation_private", revision: 2 },
+    });
+    await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY_ID}/relationships/${RELATIONSHIP}/side-details`,
+    });
+    expect(seen).toEqual([
+      ["read", CONTEXT, RELATIONSHIP, undefined],
+      ["read", CONTEXT, RELATIONSHIP, COMPANY_ID],
+    ]);
+  });
+
+  it("saves through the contract and refuses floats, missing currencies and extra fields", async () => {
+    const { service, seen } = sideDetails();
+    const { app } = buildApp({ sideDetails: service });
+    const saved = await app.inject({
+      method: "PUT",
+      url: `/v1/network/companies/${COMPANY_ID}/relationships/${RELATIONSHIP}/side-details`,
+      payload: { revision: 2, priority: "LOW" },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({ revision: 3 });
+    for (const bad of [
+      { revision: 2, expected: { amount: 250000, currency: "USD" } },
+      { revision: 2, expected: { amount: "250000" } },
+      { revision: 2, priority: "URGENT" },
+      { revision: 2, visibility: "public_external" },
+      { priority: "LOW" },
+    ]) {
+      const refused = await app.inject({
+        method: "PUT",
+        url: `/v1/network/relationships/${RELATIONSHIP}/side-details`,
+        payload: bad,
+      });
+      expect(refused.statusCode).toBe(422);
+    }
+    expect(seen).toEqual([
+      [
+        "update",
+        CONTEXT,
+        RELATIONSHIP,
+        { revision: 2, priority: "LOW" },
+        COMPANY_ID,
+      ],
+    ]);
+  });
+
+  it("says a newer save conflicts, in words", async () => {
+    const { service } = sideDetails(new RelationshipSideDetailsConflictError());
+    const { app } = buildApp({ sideDetails: service });
+    const refused = await app.inject({
+      method: "PUT",
+      url: `/v1/network/relationships/${RELATIONSHIP}/side-details`,
+      payload: { revision: 1, priority: "LOW" },
+    });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({
+      detail:
+        "Someone on your side changed these just now. Reload to see the latest.",
+    });
+  });
+
+  it("adds the reader's own side to each pipeline row", async () => {
+    const { service, seen } = sideDetails();
+    const { app } = buildApp({ sideDetails: service });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline?state=CONNECTED&q=Kora&pageSize=1",
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: { mySide?: unknown }[] }>();
+    expect(body.items[0]?.mySide).toEqual({
+      stage: "DILIGENCE",
+      stageLabel: null,
+      priority: "HIGH",
+      ownerName: "Ada Obi",
+    });
+    expect(seen[0]?.[0]).toBe("summaries");
+    expect(seen[0]?.[3]).toBeUndefined();
+  });
+
+  it("lists the organisation's private prospects for its own side", async () => {
+    const asked: unknown[][] = [];
+    const pipelineImport = {
+      prepare: () => Promise.reject(new Error("not used")),
+      apply: () => Promise.reject(new Error("not used")),
+      preview: () => Promise.reject(new Error("not used")),
+      prospects: (...args: unknown[]) => {
+        asked.push(args);
+        return Promise.resolve({
+          visibility: "organisation_private" as const,
+          items: [
+            {
+              importId: "d0000000-0000-4000-8000-000000000101",
+              rowNumber: 7,
+              name: "Harmattan Foods",
+              website: null,
+              stage: "RESEARCH" as const,
+              stageLabel: "Lead",
+              priority: null,
+              source: null,
+              contactName: null,
+              amount: null,
+              currency: null,
+              fileName: "deals.csv",
+              importedAt: "2026-11-18T10:00:00.000Z",
+            },
+          ],
+        });
+      },
+    } as unknown as PipelineImportService;
+    const { app } = buildApp({ pipelineImport });
+    const investor = await app.inject({
+      method: "GET",
+      url: "/v1/network/pipeline-imports/prospects",
+    });
+    expect(investor.statusCode).toBe(200);
+    expect(investor.headers["cache-control"]).toBe("no-store");
+    expect(investor.json()).toMatchObject({
+      visibility: "organisation_private",
+      items: [{ name: "Harmattan Foods" }],
+    });
+    await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY_ID}/pipeline-imports/prospects`,
+    });
+    expect(asked).toEqual([
+      [CONTEXT, undefined],
+      [CONTEXT, COMPANY_ID],
+    ]);
   });
 });

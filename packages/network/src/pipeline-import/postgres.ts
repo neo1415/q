@@ -42,7 +42,7 @@ export type StoredImport = {
   readonly fileName: string;
   readonly sourceFormat: "CSV" | "XLSX";
   readonly mapping: PipelineImportMapping;
-  readonly mappingSource: "Q" | "HEADERS";
+  readonly mappingSource: "Q" | "HEADERS" | "PERSON";
   readonly proposalHash: string;
   readonly status: "PREPARED" | "APPLIED";
   readonly applyIdempotencyKey: string | null;
@@ -71,7 +71,7 @@ const ImportRowSchema = z.object({
   file_name: z.string(),
   source_format: z.enum(["CSV", "XLSX"]),
   mapping: PipelineImportMappingSchema,
-  mapping_source: z.enum(["Q", "HEADERS"]),
+  mapping_source: z.enum(["Q", "HEADERS", "PERSON"]),
   proposal_hash: z.string(),
   status: z.enum(["PREPARED", "APPLIED"]),
   apply_idempotency_key: UuidSchema.nullable(),
@@ -182,7 +182,7 @@ export function createPostgresPipelineImports() {
         readonly sourceFormat: "CSV" | "XLSX";
         readonly rowCount: number;
         readonly mapping: PipelineImportMapping;
-        readonly mappingSource: "Q" | "HEADERS";
+        readonly mappingSource: "Q" | "HEADERS" | "PERSON";
         readonly proposalHash: string;
         readonly rows: readonly {
           readonly rowNumber: number;
@@ -357,5 +357,121 @@ export function createPostgresPipelineImports() {
          limit 1`;
       return row !== undefined;
     },
+
+    /**
+     * The relationships an applied import linked, with the counterpart's
+     * canonical name, for the result's links. The rows are the side's own;
+     * the relationship's other party is the counterpart.
+     */
+    async linkedRelationships(
+      sql: DatabaseExecutor,
+      side: ImportSide,
+      importId: string,
+      limit: number,
+    ): Promise<
+      readonly {
+        readonly relationshipId: string;
+        readonly counterpartId: string;
+        readonly name: string;
+      }[]
+    > {
+      const raw =
+        side.party === "INVESTOR"
+          ? await sql`
+              select distinct on (r.relationship_id)
+                     r.relationship_id, rel.company_id as counterpart_id,
+                     c.canonical_name as name, r.row_number
+                from network.pipeline_import_rows r
+                join network.relationships rel on rel.id = r.relationship_id
+                join core.companies c on c.id = rel.company_id
+               where r.import_id = ${importId}
+                 and r.tenant_id = ${side.tenantId}
+                 and r.organisation_id = ${side.organisationId}
+                 and r.outcome = 'LINKED'
+                 and rel.investor_organisation_id = ${side.partyId}
+               order by r.relationship_id, r.row_number
+               limit ${limit}`
+          : await sql`
+              select distinct on (r.relationship_id)
+                     r.relationship_id, rel.investor_organisation_id as counterpart_id,
+                     i.display_name as name, r.row_number
+                from network.pipeline_import_rows r
+                join network.relationships rel on rel.id = r.relationship_id
+                join core.investor_organisations i on i.id = rel.investor_organisation_id
+               where r.import_id = ${importId}
+                 and r.tenant_id = ${side.tenantId}
+                 and r.organisation_id = ${side.organisationId}
+                 and r.outcome = 'LINKED'
+                 and rel.company_id = ${side.partyId}
+               order by r.relationship_id, r.row_number
+               limit ${limit}`;
+      return raw
+        .map((one) =>
+          LinkSchema.parse({
+            relationshipId: (one as Record<string, unknown>)["relationship_id"],
+            counterpartId: (one as Record<string, unknown>)["counterpart_id"],
+            name: (one as Record<string, unknown>)["name"],
+            rowNumber: (one as Record<string, unknown>)["row_number"],
+          }),
+        )
+        .sort((a, b) => a.rowNumber - b.rowNumber)
+        .map(({ relationshipId, counterpartId, name }) => ({
+          relationshipId,
+          counterpartId,
+          name: name.slice(0, 200),
+        }));
+    },
+
+    /**
+     * The organisation's private prospects (decision 106, gap 7): rows it
+     * kept because the counterpart is not on Capital Q, for this side, the
+     * latest import's row per name. Never a canonical record.
+     */
+    async prospects(
+      sql: DatabaseExecutor,
+      side: ImportSide,
+      limit: number,
+    ): Promise<readonly ProspectRow[]> {
+      const raw = await sql`
+        select * from (
+          select distinct on (lower(btrim(r.counterpart_name)))
+                 r.import_id, r.row_number, r.counterpart_name, r.website_domain,
+                 r.fields, i.file_name, i.applied_at
+            from network.pipeline_import_rows r
+            join network.pipeline_imports i
+              on i.id = r.import_id
+             and i.tenant_id = r.tenant_id
+             and i.organisation_id = r.organisation_id
+           where r.tenant_id = ${side.tenantId}
+             and r.organisation_id = ${side.organisationId}
+             and r.outcome = 'KEPT_PRIVATE'
+             and r.counterpart_name is not null
+             and i.status = 'APPLIED'
+             and i.company_id is not distinct from ${side.party === "COMPANY" ? side.partyId : null}::uuid
+             and i.investor_organisation_id is not distinct from ${side.party === "INVESTOR" ? side.partyId : null}::uuid
+           order by lower(btrim(r.counterpart_name)), i.applied_at desc, r.row_number
+        ) latest
+        order by applied_at desc, row_number
+        limit ${limit}`;
+      return raw.map((one) => ProspectRowSchema.parse(one));
+    },
   };
 }
+
+const LinkSchema = z.object({
+  relationshipId: UuidSchema,
+  counterpartId: UuidSchema,
+  name: z.string(),
+  rowNumber: z.number().int(),
+});
+
+const ProspectRowSchema = z.object({
+  import_id: UuidSchema,
+  row_number: z.number().int(),
+  counterpart_name: z.string(),
+  website_domain: z.string().nullable(),
+  fields: ImportRowFieldsSchema,
+  file_name: z.string(),
+  applied_at: z.union([z.date(), z.string()]),
+});
+export type ProspectRow = z.infer<typeof ProspectRowSchema>;

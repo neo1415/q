@@ -2,6 +2,7 @@ import {
   getFitProfiles,
   getRelationshipGateqApplications,
   listQWork,
+  getRelationshipSideDetails,
   listRelationshipNotes,
   getRelationshipCommitments,
   getRelationshipPass,
@@ -10,6 +11,7 @@ import type {
   FitProfileDto,
   RelationshipGateqApplicationsDto,
   RelationshipNoteList,
+  RelationshipSideDetailsRead,
   RelationshipStatusDto,
 } from "@capital-q/contracts";
 
@@ -93,6 +95,35 @@ export async function recordNotesRead(
     return {
       kind: "READ",
       value: await listRelationshipNotes(
+        session,
+        relationshipId,
+        context.kind === "FOUNDER" ? context.companyId : undefined,
+      ),
+    };
+  } catch {
+    return { kind: "UNAVAILABLE" };
+  }
+}
+
+/**
+ * The side's own pipeline fields on this relationship (decision 106 gaps),
+ * with the members who may own it. The side is the person's own active
+ * context, never the URL; the API answers only for that side.
+ */
+export async function recordSideDetailsRead(
+  relationshipId: string,
+): Promise<Read<RelationshipSideDetailsRead>> {
+  const [session, context] = await Promise.all([
+    apiSession(),
+    resolveOwnContext(),
+  ]);
+  if (session === null) return { kind: "UNAVAILABLE" };
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR")
+    return { kind: "UNAVAILABLE" };
+  try {
+    return {
+      kind: "READ",
+      value: await getRelationshipSideDetails(
         session,
         relationshipId,
         context.kind === "FOUNDER" ? context.companyId : undefined,

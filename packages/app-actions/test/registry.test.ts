@@ -285,6 +285,9 @@ describe("the action registry", () => {
       ["crm.company_import.prepare", "via:import_my_pipeline", "INSTANT"],
       ["crm.investor_import.apply", "import_my_pipeline", "CONSEQUENTIAL"],
       ["crm.company_import.apply", "via:import_my_pipeline", "CONSEQUENTIAL"],
+      // Decision 106 gaps: the side's own pipeline fields.
+      ["crm.investor_side_details.update", "offer.crm_side_details", "INSTANT"],
+      ["crm.company_side_details.update", "offer.crm_side_details", "INSTANT"],
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],

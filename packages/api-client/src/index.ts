@@ -578,6 +578,14 @@ export {
   addRelationshipNote,
   listRelationshipNotes,
 } from "./relationship-notes.js";
+// Decision 106: CRM import, and each side's own pipeline fields.
+export {
+  applyPipelineImport,
+  getRelationshipSideDetails,
+  listPipelineProspects,
+  preparePipelineImport,
+  updateRelationshipSideDetails,
+} from "./pipeline-import.js";
 // Decision 107: download my data, delete my account.
 export {
   cancelAccountDeletion,

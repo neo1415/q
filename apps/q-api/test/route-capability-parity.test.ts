@@ -605,6 +605,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // opens. Q itself never reads notes (they are not Q context); adding
   // one is an app action (offer.crm_notes).
   "api/http/network-interests.ts GET notesPath": cap("navigate.RELATIONSHIPS"),
+  // Decision 106 gaps: Q reads the side's own fields through get_relationship.
+  "api/http/network-interests.ts GET detailsPath": cap("tool.get_relationship"),
+  // Decision 106, gap 7: the organisation's private prospects (its import page).
+  "api/http/network-interests.ts GET prospectsPath": cap(
+    "navigate.RELATIONSHIPS",
+  ),
   "api/http/network-interests.ts GET `${NETWORK_INVESTOR_PIPELINE_PATH}/export`":
     DOWNLOAD,
   "api/http/network-interests.ts GET `${NETWORK_COMPANY_PIPELINE_PATH}/export`":
@@ -1092,6 +1098,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "development-only page (design review, fictional data)",
   ),
   "/dev/crm": exempt("development-only page"),
+  "/dev/pipeline-import": exempt("development-only page"),
   "/dev/work-review": exempt(
     "development-only page (design review, fictional data)",
   ),
@@ -1230,6 +1237,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Founder docs (2026-10-15): "open my data room / deck" lands here.
   "/company/data-room": cap("navigate.OWN_DATA_ROOM"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
+  // Decision 106: import a CRM file; Q's side is import_my_pipeline.
+  "/relationships/import": cap("tool.import_my_pipeline"),
   // CRM (2026-10-15): the alias of the Hub; it only redirects there.
   "/crm": cap("navigate.RELATIONSHIPS"),
   "/settings": cap("navigate.SETTINGS"),

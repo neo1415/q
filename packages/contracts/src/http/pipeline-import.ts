@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { UtcTimestampSchema } from "../common/time.js";
 
 /**
  * CRM import (owner decision 106, 2026-11-18): an investor or a founder
@@ -101,6 +102,11 @@ export const PreparePipelineImportRequestSchema = z
   .object({
     /** An uploaded CSV or XLSX of the actor's own organisation. */
     documentId: UuidSchema,
+    /**
+     * The person's own column mapping, edited on the import screen: the file
+     * is read again with it (mapping source PERSON). Absent: Q proposes one.
+     */
+    mapping: PipelineImportMappingSchema.optional(),
   })
   .strict();
 export type PreparePipelineImportRequest = z.infer<
@@ -147,7 +153,10 @@ export const PipelineImportPreviewSchema = z
     fileName: z.string().min(1).max(255),
     side: z.enum(["INVESTOR", "COMPANY"]),
     mapping: PipelineImportMappingSchema,
-    mappingSource: z.enum(["Q", "HEADERS"]),
+    /** Q proposed it, the headers' usual names did, or the person chose it. */
+    mappingSource: z.enum(["Q", "HEADERS", "PERSON"]),
+    /** Every column of the file, in its order (for the mapping choices). */
+    columns: z.array(z.string().max(200)).max(PIPELINE_IMPORT_MAX_COLUMNS),
     unmappedColumns: z.array(z.string().max(200)).max(64),
     counts: PipelineImportCountsSchema,
     rows: z.array(PipelineImportPreviewRowSchema).max(PIPELINE_IMPORT_MAX_ROWS),
@@ -192,11 +201,89 @@ export const PipelineImportResultSchema = z
     stageEvents: z.number().int().min(0),
     notes: z.number().int().min(0),
     tasks: z.number().int().min(0),
+    /**
+     * Relationships whose side fields (stage, owner, source, expected
+     * cheque, priority) the import set. Absent on imports applied before
+     * those fields existed.
+     */
+    details: z.number().int().min(0).optional(),
   })
   .strict();
 export type PipelineImportResult = z.infer<typeof PipelineImportResultSchema>;
 
+/** A relationship an applied import linked, for the result's links. */
+export const PipelineImportLinkSchema = z
+  .object({
+    relationshipId: UuidSchema,
+    /** The counterpart: a company (investor import) or investor organisation. */
+    counterpartId: UuidSchema,
+    name: z.string().max(200),
+  })
+  .strict();
+export type PipelineImportLink = z.infer<typeof PipelineImportLinkSchema>;
+
+/** Links the result carries, at most; the pipeline lists every one. */
+export const PIPELINE_IMPORT_LINKS_MAX = 200;
+
+export const PipelineImportAppliedSchema = z
+  .object({
+    importId: UuidSchema,
+    /** True when an earlier approval had already run it. */
+    replayed: z.boolean(),
+    result: PipelineImportResultSchema,
+    relationships: z
+      .array(PipelineImportLinkSchema)
+      .max(PIPELINE_IMPORT_LINKS_MAX),
+  })
+  .strict();
+export type PipelineImportAppliedDto = z.infer<
+  typeof PipelineImportAppliedSchema
+>;
+
+/**
+ * Decision 106, gap 7: a row the organisation kept private because the
+ * counterpart is not on Capital Q. Its own prospect, never a canonical
+ * company or investor; read only by the importing organisation.
+ */
+export const PipelineProspectSchema = z
+  .object({
+    importId: UuidSchema,
+    rowNumber: z.number().int().min(1),
+    name: z.string().min(1).max(200),
+    website: z.string().max(253).nullable(),
+    stage: PipelineImportStageSchema.nullable(),
+    stageLabel: z.string().max(80).nullable(),
+    priority: z.string().max(300).nullable(),
+    source: z.string().max(300).nullable(),
+    contactName: z.string().max(300).nullable(),
+    /** As the file gave it: an exact decimal, with its currency if named. */
+    amount: z.string().max(40).nullable(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .nullable(),
+    fileName: z.string().min(1).max(255),
+    importedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type PipelineProspect = z.infer<typeof PipelineProspectSchema>;
+
+/** Prospects one read returns, the latest row per name. */
+export const PIPELINE_PROSPECTS_MAX = 500;
+
+export const PipelineProspectListSchema = z
+  .object({
+    items: z.array(PipelineProspectSchema).max(PIPELINE_PROSPECTS_MAX),
+    visibility: z.literal("organisation_private"),
+  })
+  .strict();
+export type PipelineProspectList = z.infer<typeof PipelineProspectListSchema>;
+
 export const PIPELINE_IMPORTS_PATH = "/v1/network/pipeline-imports" as const;
+export const PIPELINE_PROSPECTS_PATH =
+  "/v1/network/pipeline-imports/prospects" as const;
+export const COMPANY_PIPELINE_PROSPECTS_PATH =
+  "/v1/network/companies/:companyId/pipeline-imports/prospects" as const;
 export const PIPELINE_IMPORT_APPLY_PATH =
   "/v1/network/pipeline-imports/:importId/apply" as const;
 /** A founder's import, under their company (the id is checked, never proof). */
