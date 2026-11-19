@@ -7,7 +7,7 @@ import type {
   BillingCatalogueDto,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
-import { Check, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
+import { Check, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { CrmSheet, Tag } from "@/features/relationships/crm-kit";
 import { requestReviewAction } from "@/features/reviews/review-actions";
@@ -21,12 +21,13 @@ import {
 import { useT } from "@/features/i18n/language";
 
 import { checkoutAction, portalAction } from "./billing-actions";
+import { allowanceLine, resetLine, usedPercent } from "./plan-words";
 import { PLAN_TIERS, tierPrice, type PlanTier } from "./plan-tiers";
 
 /**
  * Plan and billing (chosen design "Three plans side by side",
  * 2026-10-21): the three tiers in one row, the same kind of rows in each
- * (included or not, limits as plain numbers), the person's own plan marked
+ * (what each includes, limits as plain numbers), the person's own plan marked
  * in words. The tier names and prices are the labelled preview in
  * plan-tiers.ts; what each includes is the billing catalogue's own answer
  * (ADR 0034). Checkout and the billing portal are the payment provider's
@@ -40,10 +41,13 @@ type Row = {
   readonly key: string;
   readonly name: string;
   readonly value: string;
-  readonly included: boolean;
 };
 
-/** A tier's rows: the catalogue's features for its plan, else its highlights. */
+/**
+ * A tier's rows: the catalogue's features for its plan, else its highlights.
+ * Only what the plan includes: plans size usage and never lock features
+ * (decision 106), so a "Not included" row would read as a lock.
+ */
 export function tierRows(
   tier: PlanTier,
   catalogue: BillingCatalogueDto | null,
@@ -56,23 +60,22 @@ export function tierRows(
       key: line,
       name: line,
       value: "Included",
-      included: true,
     }));
   }
-  return plan.features.map((feature) => ({
-    key: feature.key,
-    name: feature.name,
-    included: feature.included,
-    value: !feature.included
-      ? "Not included"
-      : feature.kind === "ACCESS"
-        ? "Included"
-        : feature.limit === null
-          ? feature.kind === "VALUE"
-            ? "No limit"
-            : "Unlimited"
-          : `Up to ${String(feature.limit)}`,
-  }));
+  return plan.features
+    .filter((feature) => feature.included)
+    .map((feature) => ({
+      key: feature.key,
+      name: feature.name,
+      value:
+        feature.kind === "ACCESS"
+          ? "Included"
+          : feature.limit === null
+            ? feature.kind === "VALUE"
+              ? "No limit"
+              : "Unlimited"
+            : `Up to ${String(feature.limit)}`,
+    }));
 }
 
 /** Which mark a tier carries, in words: never colour alone. */
@@ -117,6 +120,7 @@ export function PlanBoard({
   );
   return (
     <>
+      <PlanAllowances plan={plan} />
       <ul
         className="cq-crm-stagger m-0 grid list-none grid-cols-1 items-stretch gap-4 p-0 lg:grid-cols-3"
         data-plan-tiers
@@ -166,35 +170,15 @@ export function PlanBoard({
                 {tierRows(tier, catalogue).map((row) => (
                   <li
                     key={row.key}
-                    className={cx(
-                      "flex items-start gap-2.5 border-t border-(--cq-border-subtle) py-2 text-sm",
-                      row.included
-                        ? "text-(--cq-text-primary)"
-                        : "text-(--cq-text-tertiary)",
-                    )}
-                    data-plan-row={row.included ? "included" : "not-included"}
+                    className="flex items-start gap-2.5 border-t border-(--cq-border-subtle) py-2 text-sm text-(--cq-text-primary)"
+                    data-plan-row="included"
                   >
-                    <span
-                      className={cx(
-                        "mt-px inline-flex",
-                        row.included
-                          ? "text-(--cq-positive)"
-                          : "text-(--cq-text-tertiary)",
-                      )}
-                    >
-                      {row.included ? (
-                        <Check
-                          size={ICON_SIZE.compact}
-                          strokeWidth={ICON_STROKE}
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <X
-                          size={ICON_SIZE.compact}
-                          strokeWidth={ICON_STROKE}
-                          aria-hidden="true"
-                        />
-                      )}
+                    <span className="mt-px inline-flex text-(--cq-positive)">
+                      <Check
+                        size={ICON_SIZE.compact}
+                        strokeWidth={ICON_STROKE}
+                        aria-hidden="true"
+                      />
                     </span>
                     <span className="min-w-0">{row.name}</span>
                     <span className="ms-auto text-[13px] whitespace-nowrap text-(--cq-text-secondary)">
@@ -576,4 +560,78 @@ export function planEnquiry(
   const line = `Plan enquiry: ${tierName}, for ${String(people)} ${people === 1 ? "person" : "people"}.`;
   const extra = notes.trim();
   return (extra === "" ? line : `${line} ${extra}`).slice(0, 2000);
+}
+
+/** The metered allowances of the plan the person is on. */
+export function allowanceRows(
+  plan: BillingAccountPlanDto,
+): BillingAccountPlanDto["features"] {
+  return plan.features.filter(
+    (feature) =>
+      feature.included &&
+      (feature.kind === "MONTHLY" ||
+        feature.kind === "COUNT" ||
+        feature.kind === "VALUE"),
+  );
+}
+
+/**
+ * What the plan they are on allows, and how much of it is used, from the
+ * plan read the page already has. A use the server did not measure is said
+ * as not known, never drawn as zero.
+ */
+function PlanAllowances({ plan }: { readonly plan: BillingAccountPlanDto }) {
+  const t = useT();
+  const rows = allowanceRows(plan);
+  if (rows.length === 0) return null;
+  return (
+    <section
+      className="mb-6"
+      aria-labelledby="plan-allowances"
+      data-plan-allowances
+    >
+      <h2
+        id="plan-allowances"
+        className="m-0 mb-3 text-[15px] font-semibold text-(--cq-text-primary)"
+      >
+        {t("Your allowances")}
+      </h2>
+      <ul className="m-0 grid list-none grid-cols-1 gap-2.5 p-0 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map((feature) => {
+          const percent = usedPercent(feature);
+          const resets = resetLine(feature);
+          return (
+            <li
+              key={feature.key}
+              className="flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+              data-plan-allowance={feature.key}
+            >
+              <span className="text-sm font-medium text-(--cq-text-primary)">
+                {feature.name}
+              </span>
+              <span className="text-sm text-(--cq-text-secondary) tabular-nums">
+                {t(allowanceLine(feature))}
+              </span>
+              {percent === null ? null : (
+                <span
+                  aria-hidden="true"
+                  className="h-2 overflow-hidden rounded-full bg-(--cq-surface-subtle)"
+                >
+                  <span
+                    className="block h-full rounded-full bg-(--cq-positive)"
+                    style={{ width: `${String(Math.min(100, percent))}%` }}
+                  />
+                </span>
+              )}
+              {resets === null ? null : (
+                <span className="text-xs text-(--cq-text-tertiary)">
+                  {t(resets)}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }

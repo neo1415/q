@@ -15,13 +15,20 @@ import {
 
 import { Button, type ButtonVariant } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
+import { ChevronDown, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { Input, Textarea } from "@capital-q/ui/input";
+import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 
 import {
   sendStepUpCodeAction,
   stepUpAction,
   type ConsoleResult,
 } from "./console-actions";
+import {
+  activeConsoleHref,
+  consoleGroupsFor,
+  type ConsoleCounts,
+} from "./console-nav";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -300,87 +307,123 @@ export function ReasonAction({
   );
 }
 
-const SECTIONS: readonly {
-  readonly href: string;
-  readonly label: string;
-  /** Shown to a role holding any of these. */
-  readonly permission: string | readonly string[];
-}[] = [
-  { href: "/admin", label: "Overview", permission: "overview.read" },
-  { href: "/admin/accounts", label: "Accounts", permission: "accounts.read" },
-  {
-    href: "/admin/organisations",
-    label: "Organisations",
-    permission: "accounts.read",
-  },
-  {
-    href: "/admin/queue",
-    label: "Queue",
-    permission: ["verification.read", "reviews.read"],
-  },
-  { href: "/admin/safety", label: "Safety", permission: "safety.read" },
-  { href: "/admin/q", label: "Q monitor", permission: "q.monitor.read" },
-  { href: "/admin/audit", label: "Audit", permission: "audit.read" },
-  { href: "/admin/flags", label: "Kill switches", permission: "flags.read" },
-  // Q Workspace §8: viewer identity, reveal and passive analytics settings.
-  {
-    href: "/admin/analytics",
-    label: "Analytics privacy",
-    permission: "analytics_settings.read",
-  },
-  // P14: claims on unclaimed companies, and public company profiles.
-  { href: "/admin/claims", label: "Claims", permission: "claims.read" },
-  // Decision 107: the public site's pages (landing, pricing, FAQ, legal).
-  { href: "/admin/content", label: "Site content", permission: "content.read" },
-  { href: "/admin/brand", label: "Brand", permission: "flags.write" },
-  { href: "/admin/etiquette", label: "Etiquette", permission: "flags.write" },
-  // BILLING block (ADR 0034)
-  { href: "/admin/billing", label: "Billing", permission: "billing.fees.read" },
-  { href: "/admin/email", label: "Email", permission: "email.read" },
-  { href: "/admin/team", label: "Team", permission: "overview.read" },
-];
-
+/**
+ * The console's grouped sidebar (admin design 2026-11-19 §3.1). Desktop:
+ * a column beside the page. Phone: one "Sections" button opening a sheet.
+ * Labels are sentence case; the current page is marked by a bar and a
+ * fill, never colour alone. Counts come only from a server total.
+ */
 export function ConsoleNav({
   permissions,
+  counts = null,
 }: {
   readonly permissions: readonly string[];
+  readonly counts?: ConsoleCounts | null | undefined;
 }) {
   const t = useT();
-
   const pathname = usePathname();
-  const allowed = SECTIONS.filter((section) =>
-    typeof section.permission === "string"
-      ? permissions.includes(section.permission)
-      : section.permission.some((one) => permissions.includes(one)),
+  const [open, setOpen] = useState(false);
+  const groups = consoleGroupsFor(permissions);
+  const current = activeConsoleHref(
+    pathname,
+    groups.flatMap((group) => group.sections.map((section) => section.href)),
+  );
+  const currentLabel = groups
+    .flatMap((group) => group.sections)
+    .find((section) => section.href === current)?.label;
+  const list = (onNavigate?: () => void) => (
+    <div className="flex flex-col gap-4">
+      {groups.map((group) => (
+        <div
+          key={group.label ?? "top"}
+          role={group.label === null ? undefined : "group"}
+          aria-label={group.label === null ? undefined : t(group.label)}
+        >
+          {group.label === null ? null : (
+            <span className="block px-3 pb-1 text-xs text-(--cq-text-tertiary)">
+              {t(group.label)}
+            </span>
+          )}
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+            {group.sections.map((section) => {
+              const active = section.href === current;
+              const count =
+                section.count === undefined || counts === null
+                  ? null
+                  : counts[section.count];
+              return (
+                <li key={section.href}>
+                  <Link
+                    href={section.href}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => onNavigate?.()}
+                    className={`cq-body-sm relative flex min-h-11 items-center gap-2 rounded-(--cq-radius-md) px-3 pointer-fine:min-h-9 ${
+                      active
+                        ? "bg-(--cq-accent-soft) font-medium text-(--cq-text-primary)"
+                        : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
+                    }`}
+                  >
+                    {active ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-(--cq-accent)"
+                      />
+                    ) : null}
+                    <span className="min-w-0 flex-1 truncate">
+                      {t(section.label)}
+                    </span>
+                    {count === null ? null : (
+                      <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+                        {count.toLocaleString("en-GB")}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
   );
   return (
-    <nav
-      aria-label={t("Console sections")}
-      className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
-    >
-      <ul className="flex gap-1 border-b border-(--cq-border-subtle)">
-        {allowed.map((section) => {
-          const active =
-            section.href === "/admin"
-              ? pathname === "/admin"
-              : pathname.startsWith(section.href);
-          return (
-            <li key={section.href}>
-              <Link
-                href={section.href}
-                aria-current={active ? "page" : undefined}
-                className={`cq-body-sm inline-flex min-h-11 items-center px-3 whitespace-nowrap border-b-2 ${
-                  active
-                    ? "border-(--cq-text-primary) text-(--cq-text-primary)"
-                    : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-                }`}
-              >
-                {t(section.label)}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <>
+      <nav
+        aria-label={t("Console sections")}
+        className="hidden lg:block"
+        data-console-nav
+      >
+        {list()}
+      </nav>
+      <div className="lg:hidden" data-console-nav-phone>
+        <SheetRoot open={open} onOpenChange={setOpen}>
+          <SheetTrigger>
+            <button
+              type="button"
+              className="cq-body-sm inline-flex min-h-11 items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border) px-3 text-(--cq-text-primary)"
+            >
+              {t("Sections")}
+              {currentLabel === undefined ? null : (
+                <span className="text-(--cq-text-secondary)">
+                  · {t(currentLabel)}
+                </span>
+              )}
+              <ChevronDown
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            </button>
+          </SheetTrigger>
+          <SheetContent title={t("Console sections")}>
+            <nav aria-label={t("Console sections")}>
+              {list(() => {
+                setOpen(false);
+              })}
+            </nav>
+          </SheetContent>
+        </SheetRoot>
+      </div>
+    </>
   );
 }

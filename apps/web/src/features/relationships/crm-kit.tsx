@@ -212,7 +212,10 @@ type TagTone = "positive" | "accent" | "stone" | "dash";
 
 const TAG_TONE: Readonly<Record<TagTone, string>> = {
   positive: "bg-(--cq-positive-soft) text-(--cq-positive)",
-  accent: "bg-(--cq-accent-soft) text-(--cq-accent)",
+  // Gold text on the soft gold measured 4.21:1 (WCAG 1.4.3 asks 4.5:1):
+  // the words take the primary ink, the icon keeps the accent.
+  accent:
+    "bg-(--cq-accent-soft) text-(--cq-text-primary) [&_svg]:text-(--cq-accent)",
   stone: "bg-(--cq-surface-strong) text-(--cq-text-secondary)",
   dash: "border border-dashed border-(--cq-border) text-(--cq-text-tertiary)",
 };
