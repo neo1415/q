@@ -254,6 +254,7 @@ export {
 
 export {
   getCompanyVerification,
+  getVerificationProviders,
   requestCompanyVerification,
 } from "./verification.js";
 export {

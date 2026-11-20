@@ -337,6 +337,8 @@ import {
 } from "@capital-q/public-identity";
 import {
   createCompanyVerificationService,
+  createVerificationProviders,
+  providerConnections,
   closeKybForClaim,
   createDecideByOperator,
   createKybService,
@@ -3936,6 +3938,11 @@ const { app, logger } = createApp(config, security, {
       }),
   media,
   verification,
+  // V1: whether each verification provider is connected (its keys set);
+  // names only, read once at start.
+  verificationProviders: providerConnections(
+    createVerificationProviders(process.env),
+  ),
   visibility,
   publicIdentity,
   profileImages,

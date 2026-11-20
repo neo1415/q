@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import {
   getAdminReviews,
   getAdminVerificationQueue,
+  getVerificationProviders,
 } from "@capital-q/api-client";
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
 
@@ -12,6 +13,7 @@ import { adminContext } from "@/features/admin/admin-context";
 import { QueueKeys } from "@/features/admin/queue-keys";
 import { ReviewQueue } from "@/features/admin/review-queue";
 import { VerificationQueue } from "@/features/admin/verification-queue";
+import { ProviderConnections } from "@/features/verification/provider-connections";
 import { serverT } from "@/features/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,7 +45,7 @@ export default async function AdminQueuePage({
   if (context === null || (!canVerify && !canReview)) notFound();
   const query = await searchParams;
   const all = query.all === "1";
-  const [verification, reviews] = await Promise.all([
+  const [verification, reviews, providers] = await Promise.all([
     canVerify
       ? getAdminVerificationQueue(context.session)
           .then((result) => result.rows)
@@ -54,6 +56,12 @@ export default async function AdminQueuePage({
           .then((result) => result.rows)
           .catch(() => null)
       : Promise.resolve(undefined),
+    // V1: which providers are connected; unreadable shows nothing.
+    canVerify
+      ? getVerificationProviders(context.session)
+          .then((result) => result.providers)
+          .catch(() => [])
+      : Promise.resolve([]),
   ]);
   const tab: Tab =
     query.tab === "reviews" && canReview
@@ -104,6 +112,13 @@ export default async function AdminQueuePage({
           </Link>
         ))}
       </nav>
+      {tab === "verification" ? (
+        <ProviderConnections
+          t={t}
+          providers={providers}
+          heading={t("Verification providers")}
+        />
+      ) : null}
       {tab === "verification" ? (
         verification === null || verification === undefined ? (
           <ErrorState

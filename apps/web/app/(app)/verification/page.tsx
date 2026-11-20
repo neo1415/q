@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { getKyb } from "@capital-q/api-client";
+import { getKyb, getVerificationProviders } from "@capital-q/api-client";
 
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import {
@@ -60,7 +60,16 @@ export default async function VerificationPage({
         ? "/discover"
         : "/home";
   const session = context.kind === "NONE" ? null : await apiSession();
-  const kyb = session === null ? null : await getKyb(session).catch(() => null);
+  const [kyb, providers] =
+    session === null
+      ? [null, []]
+      : await Promise.all([
+          getKyb(session).catch(() => null),
+          // V1: which automatic checks are connected; unreadable: none shown.
+          getVerificationProviders(session)
+            .then((result) => result.providers)
+            .catch(() => []),
+        ]);
   // A member the verified organisation confirmed is asked for nothing
   // (founder 2026-10-08): setup does not stop here for them.
   const optional = kyb !== null && personVerificationOptional(kyb);
@@ -80,6 +89,7 @@ export default async function VerificationPage({
       notice={notice}
       fromSetup={fromSetup}
       skipTo={skipTo}
+      providers={providers}
     />
   );
 }

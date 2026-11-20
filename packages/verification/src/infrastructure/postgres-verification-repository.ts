@@ -14,7 +14,11 @@ import type {
   SyntheticPrincipalPort,
   VerificationClaimRepository,
 } from "../application/ports.js";
-import { SUBJECT_TYPE_OF, type VerificationClaim } from "../domain/claims.js";
+import {
+  SUBJECT_TYPE_OF,
+  VERIFICATION_PROVIDER_CODES,
+  type VerificationClaim,
+} from "../domain/claims.js";
 
 /**
  * PostgreSQL for `evidence.verification_claims` (server-only: RLS on, no
@@ -47,9 +51,7 @@ const Row = z.object({
   revision: z.number().int().min(1),
   decides_claim_id: z.string().uuid().nullable(),
   method: VerificationMethodSchema.nullable(),
-  provider: z
-    .enum(["CAPITAL_Q_SYNTHETIC_DEMO", "CAPITAL_Q_OPERATOR"])
-    .nullable(),
+  provider: z.enum(VERIFICATION_PROVIDER_CODES).nullable(),
   decision_basis: z.string().nullable(),
   decided_by_actor_type: z.enum(["HUMAN", "SYSTEM"]).nullable(),
   decided_by_user_id: z.string().uuid().nullable(),
@@ -90,6 +92,9 @@ function toClaim(row: unknown): VerificationClaim {
     createdAt: r.created_at,
   };
 }
+
+/** A claim row read back, validated (shared with the provider decisions). */
+export const toVerificationClaim = toClaim;
 
 const RevisionRow = z.object({ revision: z.coerce.number().int().min(0) });
 const SyntheticRow = z.object({ synthetic: z.boolean() });
