@@ -976,3 +976,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **fb65b66ff deployed 01:05 UTC on 20 Nov** (gate PASS 01:05:00Z; web only, the other services skipped and stayed on 75979e5f4). Q greeting: items deduplicated, counted merges ("Your plan is ready (2)"), and the briefing collapses when it would cover main content.
   - Live as the LedgerBridge founder on `/organisation`: the briefing shows as the collapsed "Q's briefing" button and no longer covers the General card.
   - The deduplicated sentence is evidenced by tests (the exact live case), not seen live.
+- **14d51ec53 deployed 02:10 UTC on 20 Nov** (gate PASS 02:09:57Z): the workers' heartbeat states that its pool is not gated.
+  - Live: the `workers` heartbeat is 16 s old, with `pool: {"gated": false, "maxConnections": 3}`. The workers connect directly, so in-use counts aren't measurable; the card says "Not reported: not gated, up to 3 connections".
+  - Real counts would need `DATABASE_CONNECTION_MODE=transaction_pooler` on workers. That is the owner's config call and is not changed.
