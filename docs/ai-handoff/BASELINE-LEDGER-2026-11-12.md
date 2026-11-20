@@ -994,3 +994,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **e9db7a4e6 deployed 17:40 UTC on 20 Nov** (gate PASS). HQ-1: the answer plan (skim v12 and reader v95 add `underspecified` and `costlyIfWrong`; eight shapes with templates after the cached prefix), typed quick-lookup speculation, and a holding line within 1 s.
   - One live typed turn as fictional Savanna, "What stage is Ledgerfold at?": first text in the browser at 2.68 s (the 18–20 Nov p50 to first content was 6.6 s). The `q typed speculation` line fired with reason SKIM. The answer was correct and said it wasn't verified ("declares on Capital Q; it isn't verified").
   - Watch the typed-speculation cancel rate; the budget is 10% or less.
+- **1e170deb8 deployed 19:53 UTC on 20 Nov.** HQ-2: conversation rules (analyst v38, charter v3, voice charter v4, spoken reply v2), offers only at natural breaks, and the attribution helper.
+  - The 6cd0d1238 gate failed on a pinned `q-system.v2` in an integration test, fixed in fa25ce453. The fa25ce453 gate then failed on a wall-clock flake in `interview-client-stream.test.ts`; its margins were widened in 1e170deb8.
+  - Live as fictional Savanna, "What stage is Ledgerfold at?": "Ledgerfold describes itself as being at the seed stage." First text at 2.60 s.
