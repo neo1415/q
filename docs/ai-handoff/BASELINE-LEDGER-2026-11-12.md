@@ -979,3 +979,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **14d51ec53 deployed 02:10 UTC on 20 Nov** (gate PASS 02:09:57Z): the workers' heartbeat states that its pool is not gated.
   - Live: the `workers` heartbeat is 16 s old, with `pool: {"gated": false, "maxConnections": 3}`. The workers connect directly, so in-use counts aren't measurable; the card says "Not reported: not gated, up to 3 connections".
   - Real counts would need `DATABASE_CONNECTION_MODE=transaction_pooler` on workers. That is the owner's config call and is not changed.
+- **f3ecc8a3f deployed 03:16 UTC on 20 Nov** (gate PASS 03:15:33Z; q-api only, the other services skipped). Cost pass (`audits/2026-11-20-cost-pass.md`): the knowledge reconcile now backs off when idle (10 to 20 to 40 to 60 min).
+  - **Migration `20261231599700` is NOT applied.** `hosted-migrate-https` refused it on `/delete from/`. The line is the pre-existing "company gone, so remove its profile" branch of `knowledge.refresh_company_profile`, unchanged from the prior definition. It needs the owner's `--founder-approved`.
+  - Until it is applied, reconcile keeps rebuilding about 426 profiles a run (load only, not money), and the backoff never triggers.
