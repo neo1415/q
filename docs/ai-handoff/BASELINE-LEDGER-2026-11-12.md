@@ -997,3 +997,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **1e170deb8 deployed 19:53 UTC on 20 Nov.** HQ-2: conversation rules (analyst v38, charter v3, voice charter v4, spoken reply v2), offers only at natural breaks, and the attribution helper.
   - The 6cd0d1238 gate failed on a pinned `q-system.v2` in an integration test, fixed in fa25ce453. The fa25ce453 gate then failed on a wall-clock flake in `interview-client-stream.test.ts`; its margins were widened in 1e170deb8.
   - Live as fictional Savanna, "What stage is Ledgerfold at?": "Ledgerfold describes itself as being at the seed stage." First text at 2.60 s.
+- **1c2363e9c deployed 20:40 UTC on 20 Nov** (gate PASS). HQ-3 voice changes:
+  - patient turn-taking in onboarding and the welcome call, on the realtime and Deepgram lines (not the GPT-Live line, which has no documented setting);
+  - the stage's approved line within 1 s once a tool stage starts;
+  - "Picking up where we were." on a reconnect or replaced line, instead of a re-introduction.
+  - No q-api errors since. Not live-tested in a voice call, which is a paid realtime session; the evidence is fake-timer tests.
