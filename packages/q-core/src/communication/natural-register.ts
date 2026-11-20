@@ -82,6 +82,21 @@ export const NATURAL_REGISTER_ISSUES = [
   "TOO_LONG_TO_SAY",
   "LIST_READ_ALOUD",
   "REPEATED_DISCLAIMER",
+  // HQ-2 (conversation audit §2.3, §2.8): the robotic tells.
+  /** Q speaks for itself, never as a go-between ("I'll ask them"). */
+  "RELAY_PHRASE",
+  /** An automatic closing offer ("Want me to…?") where none is allowed. */
+  "CHATBAIT_ENDING",
+  /** More than one question in one turn. */
+  "STACKED_QUESTIONS",
+  /** Praise or flattery before the answer ("Great question", "Love that"). */
+  "SYCOPHANTIC_OPENER",
+  /**
+   * Provenance bolted on after a fact ("That is what the company declares
+   * on Capital Q; it isn't verified.") instead of carried by the sentence
+   * ("Ledgerfold describes itself as…"). Owner, 20 Nov 2026.
+   */
+  "BOLTED_ON_DISCLAIMER",
 ] as const;
 export type NaturalRegisterIssue = (typeof NATURAL_REGISTER_ISSUES)[number];
 
@@ -108,15 +123,80 @@ const CHECKS: readonly (readonly [NaturalRegisterIssue, RegExp])[] = [
   ],
 ];
 
+/**
+ * HQ-2: Q relaying between people instead of speaking for itself (live
+ * voice audit D3: "I'll ask", "pass that on"). First person about its own
+ * work is right; a promise to carry words to someone is not.
+ */
+const RELAY_PHRASE =
+  /\b(?:I'?ll (?:ask(?! you\b)|check with|pass (?:that|this|it) (?:on|along)|let (?:them|him|her) know|relay)|let me (?:ask|check with) (?:them|him|her|the (?:founder|investor|team))|pass(?:ing)? (?:that|this|it) (?:on|along) to|the (?:investor|founder) would like (?:to|you))\b/iu;
+
+/** HQ-2: a closing offer of more ("Want me to…?", "Shall I…?", "Anything else?"). */
+const CHATBAIT =
+  /^(?:(?:so|and|also),?\s+)?(?:want me to|would you like(?: me)? to|shall I|should I|do you want me to|if you(?:'d| would) like|let me know if|happy to\b|anything else\b|is there anything else)/iu;
+
+/** HQ-2: praise or a reflex reaction before the answer. */
+const SYCOPHANTIC =
+  /^\s*(?:great|good|excellent|fantastic|love (?:that|this)|what a great|that's a (?:great|good|fantastic) (?:question|point))\b[^.!?\n]{0,40}[,.!—–-]/iu;
+
+/** HQ-2: the old disclaimer forms; provenance belongs in the sentence. */
+const BOLTED_ON_DISCLAIMER =
+  /\b(?:(?:that|this) is what (?:the company|each(?: company)?|they) declares? on Capital Q|(?:locations|figures|values|revenue) (?:are|is) (?:what|as) each company (?:declares|states)(?: it)? on Capital Q)|[;,]\s*(?:it|they) (?:isn't|aren't|is not|are not) verified\b/iu;
+
+/** The text with quoted words and code removed: a quoted question is theirs. */
+function unquoted(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/gu, " ")
+    .replace(/`[^`]*`/gu, " ")
+    .replace(/"[^"\n]*"|“[^”\n]*”/gu, " ");
+}
+
+/** The answer's last sentence, for the closing-offer check. */
+function lastSentence(text: string): string {
+  const sentences = text
+    .trim()
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return sentences.at(-1) ?? "";
+}
+
+/** How many questions the answer asks, outside quotes and code. */
+export function questionCount(text: string): number {
+  return (unquoted(text).match(/\?(?=\s|$|["”’)])/gu) ?? []).length;
+}
+
+/**
+ * Whether the answer ends on a closing offer of more ("Want me to…?").
+ * Code allows one only at a natural break (answer-plan offerAllowed).
+ */
+export function endsWithOffer(text: string): boolean {
+  return CHATBAIT.test(lastSentence(text));
+}
+
 /** What reads unnatural in an answer; empty when nothing does. */
 export function naturalRegisterIssues(
   text: string,
-  options: { readonly spoken?: boolean | undefined } = {},
+  options: {
+    readonly spoken?: boolean | undefined;
+    /**
+     * HQ-2: whether a closing offer is allowed this turn (a natural break).
+     * Absent: an ending offer is not judged.
+     */
+    readonly offerAllowed?: boolean | undefined;
+  } = {},
 ): NaturalRegisterIssue[] {
   const issues: NaturalRegisterIssue[] = [];
   for (const [issue, pattern] of CHECKS) {
     if (pattern.test(text)) issues.push(issue);
   }
+  if (RELAY_PHRASE.test(unquoted(text))) issues.push("RELAY_PHRASE");
+  if (options.offerAllowed === false && endsWithOffer(text)) {
+    issues.push("CHATBAIT_ENDING");
+  }
+  if (questionCount(text) > 1) issues.push("STACKED_QUESTIONS");
+  if (SYCOPHANTIC.test(text)) issues.push("SYCOPHANTIC_OPENER");
+  if (BOLTED_ON_DISCLAIMER.test(text)) issues.push("BOLTED_ON_DISCLAIMER");
   if (options.spoken === true) {
     const words = text.trim().split(/\s+/u).filter(Boolean).length;
     if (words > SPOKEN_WORDS_MAX) issues.push("TOO_LONG_TO_SAY");

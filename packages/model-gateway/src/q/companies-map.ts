@@ -6,11 +6,14 @@ import type {
   QToolPort,
 } from "@capital-q/q-runtime";
 
+import { attributedFact, attributedListLead } from "./attribution.js";
 import { RunRead } from "./card-subjects.js";
 import { refersToShown, type FitSweepResult, ownSetOf } from "./fit-sweep.js";
 import {
   companyNameCandidates,
   countryWords,
+  DECLARED_PROFILE_EVIDENCE,
+  placeWords,
   profileOf,
   readNamedVisibleCompany,
   type DeclaredProfile,
@@ -107,24 +110,35 @@ function placeLine(profile: DeclaredProfile): string {
     : `${profile.canonicalName} (${[profile.headquartersCity, country].filter((part) => part !== null).join(", ")})`;
 }
 
-/** The answer's words: where each is, as declared, and what is not known. */
+/**
+ * The answer's words: where each says it is, and what is not known. The
+ * places are each company's own (SELF_REPORTED), so the lead attributes
+ * them (HQ-2, owner 20 Nov 2026), never a disclaimer after the list.
+ */
 export function companiesMapLine(profiles: readonly DeclaredProfile[]): string {
   const placed = profiles.filter((one) => one.headquartersCountry !== null);
   const unknown = profiles.filter((one) => one.headquartersCountry === null);
   if (placed.length === 0) {
     return profiles.length === 1
-      ? `${profiles[0]?.canonicalName ?? "That company"} hasn't declared where it is based on Capital Q, so I can't place it on a map.`
-      : "None of them has declared where it is based on Capital Q, so I can't place them on a map.";
+      ? `${profiles[0]?.canonicalName ?? "That company"} hasn't said where it's based yet, so I can't place it on a map.`
+      : "None of them has said where it's based yet, so I can't place them on a map.";
   }
+  const only = placed[0];
   const lead =
-    placed.length === 1 && profiles.length === 1
-      ? `Here's ${placed[0]?.canonicalName ?? "it"} on the map: ${placed.map(placeLine).join("")}.`
-      : `Here's where they're based: ${placed.map(placeLine).join("; ")}.`;
+    placed.length === 1 && profiles.length === 1 && only !== undefined
+      ? `${attributedFact({
+          name: only.canonicalName,
+          field: "HEADQUARTERS",
+          value: placeWords(only),
+          evidence: DECLARED_PROFILE_EVIDENCE,
+          seed: only.companyId,
+        })} It's on the map.`
+      : `${attributedListLead("HEADQUARTERS", DECLARED_PROFILE_EVIDENCE)} ${placed.map(placeLine).join("; ")}.`;
   const rest =
     unknown.length === 0
       ? ""
-      : ` ${unknown.map((one) => one.canonicalName).join(", ")} ${unknown.length === 1 ? "hasn't" : "haven't"} declared a location, so ${unknown.length === 1 ? "it isn't" : "they aren't"} placed.`;
-  return `${lead}${rest} Locations are what each company declares on Capital Q; they aren't verified.`;
+      : ` ${unknown.map((one) => one.canonicalName).join(", ")} ${unknown.length === 1 ? "hasn't" : "haven't"} said where ${unknown.length === 1 ? "it's" : "they're"} based yet, so ${unknown.length === 1 ? "it isn't" : "they aren't"} on the map.`;
+  return `${lead}${rest}`;
 }
 
 /**

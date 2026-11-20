@@ -143,6 +143,9 @@ import {
   ANALYTICAL_QUESTION_KINDS,
   answerPlanNote,
   answerPlanOf,
+  endsWithOffer,
+  naturalRegisterIssues,
+  offerAllowedFor,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import { fittedVariables } from "./prompt-variables-fit.js";
@@ -1329,14 +1332,46 @@ export function answerShapeNoteOf(request: {
   ) {
     return null;
   }
-  const plan = answerPlanOf({
+  const plan = answerPlanOf(answerPlanInputOf(request));
+  return plan === null ? null : answerPlanNote(plan);
+}
+
+function answerPlanInputOf(request: Parameters<typeof answerShapeNoteOf>[0]) {
+  return {
     answerKinds: readAnswerKinds(request),
     questionKind: request.questionKind,
     turnKind: request.turnKind,
     underspecified: request.underspecified,
     costlyIfWrong: request.costlyIfWrong,
-  });
-  return plan === null ? null : answerPlanNote(plan);
+  };
+}
+
+/**
+ * HQ-2 slice 3 (conversation audit §2.6): false when this answer must not
+ * end on an offer of more; true or null (not judged: unshaped) otherwise.
+ * Decided by code from the plan, never by the model.
+ */
+export function modelOfferAllowed(
+  request: Parameters<typeof answerShapeNoteOf>[0],
+): boolean | null {
+  if (request.capability !== "ANSWER" || request.writingDocument === true) {
+    return null;
+  }
+  return offerAllowedFor(answerPlanOf(answerPlanInputOf(request)));
+}
+
+/**
+ * HQ-2 slice 3: the answer without the closing offers it ends on ("Want me
+ * to pull their deck?"), when no offer is allowed. Only offers: a real
+ * question (a clarifying one) is kept, and so is an offer with the
+ * answer's own prose after it.
+ */
+export function withoutTrailingOffers(text: string): string {
+  const sentences = splitSentences(text);
+  let end = sentences.length;
+  while (end > 0 && endsWithOffer(sentences[end - 1] ?? "")) end -= 1;
+  if (end === sentences.length || end === 0) return text;
+  return sentences.slice(0, end).join("").trim();
 }
 
 /**
@@ -2788,6 +2823,15 @@ export const NEXT_STEP_NOTE =
   'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as a question ("Want me to draft the intro to Ada?"), never as a statement. Offer only what one of your tools does, and record it in offer with the exact name of that tool (an offer of what no tool does is removed); one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
 
 /**
+ * HQ-2 slice 3 (conversation audit §2.6): the ending where code allows no
+ * offer of more (a quick answer, small talk, a clarifying question). The
+ * rest of NEXT_STEP_NOTE stands: an accepted offer is acted on, and
+ * nothing is promised for later. Code also drops a trailing offer.
+ */
+export const NO_OFFER_NOTE =
+  'HOW YOU END A REPLY: this reply ends where the answer ends: no offer of a next step, no "want me to", and no closing question unless you genuinely cannot answer without one. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool.';
+
+/**
  * Answer what they mean, not only what they literally asked (founder
  * report 2026-10-01: "am I interested in this company?" got "there is no
  * recorded interest" and nothing else). The literal record is stated
@@ -2958,6 +3002,8 @@ export function environmentNoteParts(
      * turn only, so it rides in the turn notes after the cached prefix.
      */
     readonly answerShape?: string | undefined;
+    /** HQ-2 slice 3: false when this answer may not end on an offer. */
+    readonly offerAllowed?: boolean | undefined;
     /** C3: the recorded offer of Q's last answer, taken up this turn. */
     readonly offerTaken?: QRecordedOffer | undefined;
     /** C3: a yes to an offer code holds no record of. */
@@ -3151,7 +3197,7 @@ export function environmentNoteParts(
     options.questionSequence?.kind === "ASK" ||
     options.questionSequence?.kind === "REASK"
       ? []
-      : [NEXT_STEP_NOTE]),
+      : [options.offerAllowed === false ? NO_OFFER_NOTE : NEXT_STEP_NOTE]),
     factsNote,
     ...(tools.length === 0 ? [] : [subjectIdentifierNotes(subjects)]),
     toolsNote,
@@ -9768,6 +9814,9 @@ export function createModelGatewayQAnswer(
             const shape = answerShapeNoteOf(request);
             return shape === null ? {} : { answerShape: shape };
           })(),
+          ...(modelOfferAllowed(request) === false
+            ? { offerAllowed: false }
+            : {}),
           ...(onboardingNudge === null ? {} : { onboardingNudge }),
           ...(wideReads.capitalQAsCompany ? { capitalQCompany: true } : {}),
           ...(personality === null ? {} : { personality }),
@@ -10140,6 +10189,8 @@ export function createModelGatewayQAnswer(
       let heldPromise: string | null = null;
       /** A question of the model's, held while code closes with its offer. */
       let heldAsk: string | null = null;
+      /** HQ-2 slice 3: whether this answer may end on an offer of more. */
+      const offerAllowed = modelOfferAllowed(request);
       /** Code's lead list was the last thing said (see publish below). */
       let leadListOpen = leadLines !== undefined;
       /** When the person got the first sentence, from the seam's start. */
@@ -10536,6 +10587,13 @@ export function createModelGatewayQAnswer(
           heldAsk = null;
         }
         if (request.closingLines !== undefined && isAsk(said)) {
+          heldAsk = said;
+          return;
+        }
+        // HQ-2 slice 3: no closing offer where code allows none; an offer
+        // is held until a sentence follows it (the stored answer drops a
+        // trailing one the same way, withoutTrailingOffers).
+        if (offerAllowed === false && endsWithOffer(said)) {
           heldAsk = said;
           return;
         }
@@ -15957,14 +16015,20 @@ export function createModelGatewayQAnswer(
                           : madeLines.length === 0
                             ? said
                             : atMostOneOffer(said))(
-                        withoutRememberTalk(
-                          leadLines === undefined
-                            ? (statusTalk?.text ?? guarded.text)
-                            : afterLeadLines(
-                                statusTalk?.text ?? guarded.text,
-                                leadLines,
-                              ),
-                          rememberLine,
+                        // HQ-2 slice 3: no closing offer where none is allowed.
+                        ((kept: string) =>
+                          modelOfferAllowed(request) === false
+                            ? withoutTrailingOffers(kept)
+                            : kept)(
+                          withoutRememberTalk(
+                            leadLines === undefined
+                              ? (statusTalk?.text ?? guarded.text)
+                              : afterLeadLines(
+                                  statusTalk?.text ?? guarded.text,
+                                  leadLines,
+                                ),
+                            rememberLine,
+                          ),
                         ),
                       ),
                     ]),
@@ -16571,6 +16635,13 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             routingPolicy: final.routingPolicyCode,
             responseShape: analyst.responseShape,
             insufficientEvidence: analyst.insufficientEvidence,
+            // HQ-2: what still reads robotic in the stored answer, by kind
+            // only (never the words), and whether an offer was allowed.
+            registerIssues: naturalRegisterIssues(content, {
+              spoken: request.spoken === true,
+              offerAllowed: modelOfferAllowed(request) ?? undefined,
+            }),
+            offerAllowed: modelOfferAllowed(request),
             attempts: final.attempts.length,
             fallbackUsed: final.fallbackUsed,
             latencyMs: final.latencyMs,

@@ -935,7 +935,8 @@ async function conditionedCompanyListOnce(
           : `${scope}, ranked by fit with your mandate: ${listed(named)}.`;
   const revenueNote =
     conditions.revenue !== null && shown.length > 0
-      ? " Revenue is as each company states it on Capital Q, in its published figures or its confirmed deck, not verified."
+      ? // HQ-2: attributed, not a trailing disclaimer; still their own.
+        " The revenue figures are each company's own, from its published figures or its confirmed deck."
       : "";
   const onScreen =
     shown.length === 0

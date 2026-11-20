@@ -41,7 +41,7 @@ function render(
 ) {
   return renderPrompt<CompanyAnalystVariables>(registry, {
     task: "COMPANY_ANALYST",
-    taskVersion: options.version,
+    taskVersion: options.version ?? 37,
     operatingMode: options.operatingMode ?? "DEBRIEF",
     communicationProfile: options.profile ?? DEFAULT_COMMUNICATION_PROFILE,
     environmentNotes: options.environmentNotes ?? "test environment",
@@ -58,7 +58,7 @@ function render(
 
 describe("COMPANY_ANALYST v37: shared instructions first", () => {
   it("is active, on v36's template, schema and variables, with v36 deprecated", () => {
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(37);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(38);
     expect(registry.get("COMPANY_ANALYST", 36)?.definition.status).toBe(
       "DEPRECATED",
     );

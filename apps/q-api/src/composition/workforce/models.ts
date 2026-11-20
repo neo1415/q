@@ -82,6 +82,9 @@ import { etiquetteFor, type EtiquetteSource } from "../etiquette.js";
  * run in its correlation id, so the usage ledger prices each (J6).
  */
 
+/** HQ-2: the charter version workforce tasks render with (see below). */
+export const WORKFORCE_CHARTER_VERSION = 2;
+
 export type Who = { readonly tenantId: string; readonly userId: string };
 export type Trace = { readonly jobId: string; readonly runId: string } | null;
 
@@ -462,6 +465,12 @@ export function createWorkforceModels(dependencies: {
             );
       const rendered = renderPrompt<V>(registry, {
         task: input.task,
+        // HQ-2 (20 Nov 2026): Q_SYSTEM v3 changed only how Q talks turn by
+        // turn (one question a turn, no closing offers). The workforce's
+        // background work (research, drafts, plans) is not a conversation,
+        // so it keeps the charter its outputs and recorded acceptance
+        // cases were made with.
+        charterVersion: WORKFORCE_CHARTER_VERSION,
         ...(etiquette === undefined ? {} : { etiquette }),
         operatingMode: "CONTINUOUS_INTELLIGENCE",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,

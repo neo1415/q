@@ -1,7 +1,7 @@
 import type { ModelToolDefinition } from "@capital-q/contracts";
 import {
   Q_SYSTEM_VOICE_V3,
-  SPEAK_FROM_FACTS_V1,
+  SPEAK_FROM_FACTS_V2,
   spokenLanguageNote,
   supportedLanguageOf,
 } from "@capital-q/q-core";
@@ -148,7 +148,7 @@ CARDS ON SCREEN
 - Never say a message was sent, changed or dropped until decide_card says so. An edited message is read back and needs their yes before it goes.`;
 
 /** The stable prefix: identical for every line, so the provider caches it. */
-export const DUPLEX_INSTRUCTIONS_PREFIX = `${CHARTER}\n\n${DUPLEX_CONDUCT}\n\n${SPEAK_FROM_FACTS_V1}`;
+export const DUPLEX_INSTRUCTIONS_PREFIX = `${CHARTER}\n\n${DUPLEX_CONDUCT}\n\n${SPEAK_FROM_FACTS_V2}`;
 
 const LISTENING_CONDUCT = `LISTENING
 - While they talk you stay quiet; Q's small listening sounds and its short lines while an answer is slow are produced separately, never by you.

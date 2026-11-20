@@ -164,31 +164,40 @@ describe("companyFactAskOf", () => {
 });
 
 describe("a declared company fact, by code (S2b)", () => {
-  it("answers the stage from get_company, said as declared, through the tool port only", async () => {
+  it("answers the stage from get_company, attributed to the company, through the tool port only", async () => {
     const { result, asked } = await answer("What stage is Maji Loop at?");
-    expect(result?.text).toBe(
-      "Maji Loop is at the seed stage. That is what the company declares on Capital Q; it isn't verified.",
+    // HQ-2 (owner 20 Nov 2026): its own claim, said as its own, never a
+    // disclaimer after a plain fact.
+    expect(result?.text).toMatch(
+      /\b(?:describes itself|describes what it does|own profile|own words|lists|says it|gives)\b/u,
     );
+    expect(result?.text).toContain("seed");
+    expect(result?.text).not.toMatch(/declares on Capital Q|isn't verified/u);
     expect(result?.companyId).toBe(MAJI);
     expect(asked).toEqual(["search_companies", "get_company"]);
   });
 
   it("answers place, founding year and what it does", async () => {
-    expect((await answer("Where is Maji Loop based?")).result?.text).toMatch(
-      /^Maji Loop is based in Nairobi, Kenya\./u,
-    );
-    expect((await answer("When was Maji Loop founded?")).result?.text).toMatch(
-      /^Maji Loop was founded in 2022\./u,
-    );
-    expect((await answer("What does Maji Loop do?")).result?.text).toMatch(
-      /^In its own words: Solar-pumped, metered water kiosks in Nairobi\./u,
-    );
+    for (const [said, value] of [
+      ["Where is Maji Loop based?", "Nairobi, Kenya"],
+      ["When was Maji Loop founded?", "2022"],
+      [
+        "What does Maji Loop do?",
+        "Solar-pumped, metered water kiosks in Nairobi.",
+      ],
+    ] as const) {
+      const text = (await answer(said)).result?.text ?? "";
+      expect(text, said).toContain(value);
+      expect(text, said).toMatch(
+        /\b(?:describes itself|describes what it does|own profile|own words|lists|says it|gives)\b/u,
+      );
+    }
   });
 
   it("keeps an undeclared field unknown, never guessed", async () => {
     const { result } = await answer("What stage is Maji Health at?");
     expect(result?.text).toBe(
-      "Maji Health hasn't declared its stage on Capital Q, so I don't know it.",
+      "Maji Health hasn't said what stage it's at yet.",
     );
   });
 

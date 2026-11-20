@@ -79,6 +79,18 @@ export {
 } from "./prompts/charter/q-system-voice.v3.js";
 export { Q_SYSTEM_V2, Q_VOICE_SECTION } from "./prompts/charter/q-system.v2.js";
 export {
+  Q_SYSTEM_V3,
+  V2_QUESTIONS,
+  V3_QUESTIONS,
+} from "./prompts/charter/q-system.v3.js";
+export {
+  Q_SYSTEM_VOICE_V4,
+  VOICE_CALL_SECTION_V4,
+  V4_ANSWER_LINE,
+  V4_CONVERSATION_LINES,
+  V4_FIRST_PERSON_LINE,
+} from "./prompts/charter/q-system-voice.v4.js";
+export {
   Q_PERSONALITIES,
   Q_PERSONALITY_CODES,
   personalityOf,
@@ -1406,6 +1418,8 @@ export {
   withOneCaveat,
   NATURAL_REGISTER_ISSUES,
   naturalRegisterIssues,
+  questionCount,
+  endsWithOffer,
   SPOKEN_WORDS_MAX,
   type NaturalRegisterIssue,
 } from "./communication/natural-register.js";
@@ -1928,6 +1942,10 @@ export {
   SPEAK_FROM_FACTS_V1,
   SPOKEN_REPLY_V1,
 } from "./prompts/tasks/spoken-reply.v1.js";
+export {
+  SPEAK_FROM_FACTS_V2,
+  SPOKEN_REPLY_V2,
+} from "./prompts/tasks/spoken-reply.v2.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
 export { CALL_PREP_V1 } from "./prompts/tasks/call-prep.v1.js";
@@ -2482,6 +2500,18 @@ export {
   COMPANY_ANALYST_V37,
   V37_RULES_END_BEFORE,
 } from "./prompts/tasks/company-analyst.v37.js";
+export {
+  COMPANY_ANALYST_V38,
+  V37_ASK_BACK,
+  V37_CAVEAT,
+  V37_CLARIFYING,
+  V37_ENDING,
+  V38_ASK_BACK,
+  V38_CAVEAT,
+  V38_CLARIFYING,
+  V38_ENDING,
+  V38_PLAIN_WORDS,
+} from "./prompts/tasks/company-analyst.v38.js";
 
 // RC3 (Q voice audit, 15 Nov 2026): turn execution classes and the spoken form.
 export {

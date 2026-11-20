@@ -175,7 +175,7 @@ export function comparisonLead(
   const lines = profiles.slice(0, 4).map((profile) => {
     const stage =
       profile.currentStageCode === null
-        ? "stage not declared"
+        ? "no stage given yet"
         : `${stageWords(profile.currentStageCode)} stage`;
     const where = [
       profile.headquartersCity,
@@ -183,9 +183,11 @@ export function comparisonLead(
         ? null
         : countryWords(profile.headquartersCountry),
     ].filter((part): part is string => part !== null);
-    return `${profile.canonicalName}: ${stage}, ${where.length === 0 ? "location not declared" : `based in ${where.join(", ")}`}.`;
+    return `${profile.canonicalName}: ${stage}, ${where.length === 0 ? "no base given yet" : `based in ${where.join(", ")}`}.`;
   });
-  return `${lines.join(" ")} That is what each declares on Capital Q.`;
+  // HQ-2 (owner 20 Nov 2026): each company's own profile, attributed in the
+  // lead, never "That is what each declares on Capital Q." after it.
+  return `Here's how each describes itself. ${lines.join(" ")}`;
 }
 
 /**

@@ -111,6 +111,21 @@ export function answerPlanOf(input: AnswerPlanInput): AnswerPlan | null {
   return work === null ? null : { shape: work, then: null };
 }
 
+/**
+ * HQ-2 slice 3 (conversation audit §2.6): whether a closing offer of more
+ * ("Want me to…?") may end this answer. Only at a natural break: an
+ * analysis, a comparison or advice was just delivered. A quick answer,
+ * small talk, a clarifying or discovery question ends where it ends.
+ * Null plan (unread, a document): unchanged, not judged here. Code's own
+ * deterministic offers (a plan offer beside code's priorities, a material
+ * uncertainty) are not the model's, and are not affected.
+ */
+export function offerAllowedFor(plan: AnswerPlan | null): boolean | null {
+  if (plan === null) return null;
+  const shape = plan.shape === "ASSUME_AND_DO" ? plan.then : plan.shape;
+  return shape === "ANALYSIS" || shape === "COMPARISON" || shape === "ADVICE";
+}
+
 export type AnswerShapeTemplate = {
   /** What the answer's model is told, in one block. */
   readonly template: string;

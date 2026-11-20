@@ -4,6 +4,8 @@ import type {
   QToolPort,
 } from "@capital-q/q-runtime";
 
+import { attributedFact } from "./attribution.js";
+
 /**
  * S2b (lane S, 2026-10-15): one basic profile fact about a company named
  * outright ("what stage is Maji Loop at?", "where is Baridi based?",
@@ -194,42 +196,55 @@ export function countryWords(code: string): string {
   }
 }
 
-const DECLARED =
-  "That is what the company declares on Capital Q; it isn't verified.";
+/**
+ * Where a declared profile's fields stand on the evidence axes: what the
+ * company itself put on Capital Q (SELF_REPORTED). The words carry that
+ * (attribution.ts), never a disclaimer after them.
+ */
+export const DECLARED_PROFILE_EVIDENCE = "SELF_REPORTED" as const;
 
-/** The answer line; an empty field stays unknown, never guessed. */
+/** Where it is based, as said: "Lagos, Nigeria"; null when not given. */
+export function placeWords(p: DeclaredProfile): string | null {
+  const place = [
+    p.headquartersCity,
+    p.headquartersCountry === null ? null : countryWords(p.headquartersCountry),
+  ].filter((part): part is string => part !== null);
+  return place.length === 0 ? null : place.join(", ");
+}
+
+/**
+ * The answer line, attributed to the company by its evidence status (HQ-2,
+ * owner 20 Nov 2026: "describes itself as…", never "That is what the
+ * company declares on Capital Q; it isn't verified."). An empty field is
+ * unknown, said as unknown, never guessed.
+ */
 export function companyFactLine(
   aspect: CompanyFactAspect,
   p: DeclaredProfile,
 ): string {
-  const name = p.canonicalName;
-  switch (aspect) {
-    case "STAGE":
-      return p.currentStageCode === null
-        ? `${name} hasn't declared its stage on Capital Q, so I don't know it.`
-        : `${name} is at the ${stageWords(p.currentStageCode)} stage. ${DECLARED}`;
-    case "HEADQUARTERS": {
-      const place = [
-        p.headquartersCity,
-        p.headquartersCountry === null
+  const value = ((): string | null => {
+    switch (aspect) {
+      case "STAGE":
+        return p.currentStageCode === null
           ? null
-          : countryWords(p.headquartersCountry),
-      ].filter((part): part is string => part !== null);
-      return place.length === 0
-        ? `${name} hasn't declared where it is based on Capital Q, so I don't know.`
-        : `${name} is based in ${place.join(", ")}. ${DECLARED}`;
+          : stageWords(p.currentStageCode);
+      case "HEADQUARTERS":
+        return placeWords(p);
+      case "FOUNDED":
+        return /^(\d{4})/u.exec(p.foundedDate ?? "")?.[1] ?? null;
+      case "WHAT":
+        return p.shortDescription === null
+          ? null
+          : p.shortDescription.replace(/\s+/gu, " ");
     }
-    case "FOUNDED": {
-      const year = /^(\d{4})/u.exec(p.foundedDate ?? "")?.[1];
-      return year === undefined
-        ? `${name} hasn't declared when it was founded on Capital Q, so I don't know.`
-        : `${name} was founded in ${year}. ${DECLARED}`;
-    }
-    case "WHAT":
-      return p.shortDescription === null
-        ? `${name} hasn't described what it does on Capital Q yet.`
-        : `In its own words: ${p.shortDescription.replace(/\s+/gu, " ")} ${DECLARED}`;
-  }
+  })();
+  return attributedFact({
+    name: p.canonicalName,
+    field: aspect,
+    value,
+    evidence: DECLARED_PROFILE_EVIDENCE,
+    seed: p.companyId,
+  });
 }
 
 export type CompanyFactAnswer = {

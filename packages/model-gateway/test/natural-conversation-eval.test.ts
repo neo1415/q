@@ -374,6 +374,9 @@ async function replay(input: {
     | "aboutNamedOther"
     | "webDiscovery"
     | "compare"
+    | "answerKind"
+    | "underspecified"
+    | "costlyIfWrong"
   >;
 }): Promise<{
   text: string;
@@ -1278,5 +1281,55 @@ describe("round 6: no stray tie line after a web discovery (live 2026-11-06)", (
     expect(text).not.toMatch(/\btied\b/u);
     expect(text).not.toContain("(on the cards)");
     expect(text).toContain("**Owo Rails**");
+  });
+});
+
+describe("HQ-2: offers only at natural breaks, and the humanness lint", () => {
+  const SAID =
+    "I read your records and the companies you ask about, and say what the evidence shows and what it doesn't. Want me to show you how I'd look at a company?";
+
+  it("drops a closing offer after a quick answer: it ends where the answer ends", async () => {
+    const { text } = await replay({
+      question: "What do you actually do?",
+      reading: { answerKind: "LOOKUP" },
+      script: [answer(SAID)],
+    });
+    expect(text).toMatch(/^I read your records/u);
+    expect(text).not.toMatch(/Want me to/u);
+    expect(naturalRegisterIssues(text, { offerAllowed: false })).toEqual([]);
+  });
+
+  it("keeps it after an analysis was delivered: a natural break", async () => {
+    const { text } = await replay({
+      question: "What do you actually do?",
+      reading: { answerKind: "ANALYSIS" },
+      script: [answer(SAID)],
+    });
+    expect(text).toMatch(/Want me to show you how I'd look at a company\?$/u);
+  });
+
+  it("keeps a real clarifying question: only offers are dropped", async () => {
+    const { text } = await replay({
+      question: "Help me with investors",
+      reading: {
+        answerKind: "ANALYSIS",
+        underspecified: true,
+        costlyIfWrong: true,
+      },
+      script: [
+        answer(
+          "Happy to dig in on investors for your raise. Is this about finding new ones, or about the ones you're already talking to?",
+        ),
+      ],
+    });
+    expect(text).toMatch(/already talking to\?$/u);
+  });
+
+  it("an unshaped turn keeps today's behaviour", async () => {
+    const { text } = await replay({
+      question: "What do you actually do?",
+      script: [answer(SAID)],
+    });
+    expect(text).toMatch(/Want me to/u);
   });
 });

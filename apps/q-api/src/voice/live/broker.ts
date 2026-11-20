@@ -662,7 +662,7 @@ export const LIVE_HOLDING_LINES = [
   "Working on it.",
   "On it.",
   "Bear with me.",
-  "Sure, on it.",
+  // HQ-2: "Sure, on it." was a banned reflex opener; removed.
   "Right, working on it.",
 ] as const;
 

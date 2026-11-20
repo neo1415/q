@@ -17,7 +17,9 @@ import type { OnboardingRecordResult } from "@capital-q/q-tools";
 const LEADS = [
   "Got it, I've saved",
   "Thanks, I've noted",
-  "Great, I've saved",
+  // HQ-2 (conversation audit §2.3): "Great, I've saved" was a reflex
+  // praise opener; a plain receipt replaces it.
+  "Right, I've saved",
   "Noted, I've saved",
 ] as const;
 

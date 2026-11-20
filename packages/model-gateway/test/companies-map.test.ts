@@ -170,8 +170,12 @@ describe("runCompaniesMap", () => {
         ],
       }),
     ]);
-    expect(drawn?.text).toContain("Maji Loop (Nairobi, Kenya)");
-    expect(drawn?.text).toContain("aren't verified");
+    // HQ-2: each company's own place, attributed in the sentence.
+    expect(drawn?.text).toContain("Nairobi, Kenya");
+    expect(drawn?.text).toMatch(
+      /\b(?:describes itself|describes what it does|own profile|own words|lists|says it|gives)\b/u,
+    );
+    expect(drawn?.text).not.toMatch(/aren't verified|declares on Capital Q/u);
   });
 
   it("places the shown companies, and leaves an undeclared one unplaced, never guessed", async () => {
@@ -190,7 +194,12 @@ describe("runCompaniesMap", () => {
     expect(
       map?.kind === "MAP" ? map.places.map((one) => one.countryCode) : [],
     ).toEqual(["KE", null]);
-    expect(drawn?.text).toContain("Maji Health hasn't declared a location");
+    expect(drawn?.text).toContain(
+      "Here's where each says it's based: Maji Loop (Nairobi, Kenya).",
+    );
+    expect(drawn?.text).toContain(
+      "Maji Health hasn't said where it's based yet",
+    );
   });
 
   it("leaves a company the plan does not admit off the map", async () => {
@@ -219,7 +228,7 @@ describe("runCompaniesMap", () => {
         available: AVAILABLE,
       });
     expect((await run("put it on a map"))?.text).toContain(
-      "hasn't declared where it is based",
+      "hasn't said where it's based yet",
     );
     expect(await run("look it up online and put it on a map")).toBeNull();
   });

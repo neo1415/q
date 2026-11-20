@@ -897,7 +897,13 @@ export function analystResultBlocks(input: {
   // a card asking me another question"). Beside an answer, the question
   // is already in the words, said once, in voice or text.
   if (couldNotAnswer(input.result)) {
-    for (const clarification of input.result.clarifyingQuestions ?? []) {
+    // HQ-2 (conversation audit §2.3): one question a turn. The prompt asks
+    // for one; a list that still comes back is never shown as a
+    // questionnaire: the first, the one that matters most, is asked.
+    for (const clarification of (input.result.clarifyingQuestions ?? []).slice(
+      0,
+      1,
+    )) {
       const question = clarification.question.trim();
       if (question.length === 0) continue;
       blocks.push({ kind: "CLARIFICATION_REQUEST", question });

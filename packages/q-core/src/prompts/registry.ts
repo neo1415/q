@@ -51,8 +51,10 @@ import {
 import { Q_SYSTEM_VOICE_V1 } from "./charter/q-system-voice.v1.js";
 import { Q_SYSTEM_VOICE_V2 } from "./charter/q-system-voice.v2.js";
 import { Q_SYSTEM_VOICE_V3 } from "./charter/q-system-voice.v3.js";
+import { Q_SYSTEM_VOICE_V4 } from "./charter/q-system-voice.v4.js";
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
 import { Q_SYSTEM_V2 } from "./charter/q-system.v2.js";
+import { Q_SYSTEM_V3 } from "./charter/q-system.v3.js";
 import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
 import { CLAIM_EXTRACTION_V2 } from "./tasks/claim-extraction.v2.js";
 import { COMPANY_ANALYST_V1 } from "./tasks/company-analyst.v1.js";
@@ -92,6 +94,7 @@ import { COMPANY_ANALYST_V34 } from "./tasks/company-analyst.v34.js";
 import { COMPANY_ANALYST_V35 } from "./tasks/company-analyst.v35.js";
 import { COMPANY_ANALYST_V36 } from "./tasks/company-analyst.v36.js";
 import { COMPANY_ANALYST_V37 } from "./tasks/company-analyst.v37.js";
+import { COMPANY_ANALYST_V38 } from "./tasks/company-analyst.v38.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -243,6 +246,7 @@ import { PIPELINE_COLUMN_MAPPING_V1 } from "./tasks/pipeline-column-mapping.v1.j
 import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
 import { PITCH_SECTION_EXTRACTION_V1 } from "./tasks/pitch-section-extraction.v1.js";
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
+import { SPOKEN_REPLY_V2 } from "./tasks/spoken-reply.v2.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
 import { CALL_PREP_V1 } from "./tasks/call-prep.v1.js";
 import { CALL_PREP_V2 } from "./tasks/call-prep.v2.js";
@@ -571,10 +575,13 @@ export function createPromptRegistry(
 export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
   [
     Q_SYSTEM_V1,
-    Q_SYSTEM_V2,
+    { ...Q_SYSTEM_V2, status: "DEPRECATED" },
+    // HQ-2: one question a turn, reflected first; uncertainty by evidence.
+    Q_SYSTEM_V3,
     Q_SYSTEM_VOICE_V1,
     Q_SYSTEM_VOICE_V2,
-    Q_SYSTEM_VOICE_V3,
+    { ...Q_SYSTEM_VOICE_V3, status: "DEPRECATED" },
+    Q_SYSTEM_VOICE_V4,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
     { ...FOUNDER_ONBOARDING_EXTRACTION_V2, status: "DEPRECATED" },
     { ...FOUNDER_ONBOARDING_EXTRACTION_V3, status: "DEPRECATED" },
@@ -738,7 +745,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // RC3 (Q voice audit, 15 Nov): the concise spoken form.
     { ...COMPANY_ANALYST_V36, status: "DEPRECATED" },
     // Model spend (18 Nov): fixed instructions shared, private tail after tools.
-    COMPANY_ANALYST_V37,
+    { ...COMPANY_ANALYST_V37, status: "DEPRECATED" },
+    COMPANY_ANALYST_V38,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,
@@ -1008,7 +1016,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // PROFILE block (overnight A5)
     DECK_EXTRACTION_V1,
     PITCH_SECTION_EXTRACTION_V1,
-    SPOKEN_REPLY_V1,
+    { ...SPOKEN_REPLY_V1, status: "DEPRECATED" },
+    SPOKEN_REPLY_V2,
     SMALL_TALK_V1,
     CALL_PREP_V1,
     CALL_PREP_V2,

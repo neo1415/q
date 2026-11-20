@@ -64,10 +64,12 @@ function render(
   profile = DEFAULT_COMMUNICATION_PROFILE,
   variables = analystVariables(),
   taskVersion?: number,
+  charterVersion?: number,
 ) {
   return renderPrompt<CompanyAnalystVariables>(registry, {
     task: "COMPANY_ANALYST",
     taskVersion,
+    charterVersion,
     operatingMode: "DEBRIEF",
     communicationProfile: profile,
     environmentNotes: "test environment",
@@ -337,7 +339,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[2]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v37_comm.v1",
+      "q-system.v3_company-analyst.v38_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -460,10 +462,12 @@ describe("renderer", () => {
     // the synthetic render grows from 4,497 to 5,127.75 estimated tokens.
     // This versioned template check does not change gateway admission,
     // provider context/output limits or production validators.
+    // The historical render keeps the charter it was measured with (v2).
     const historical = render(
       DEFAULT_COMMUNICATION_PROFILE,
       analystVariables(),
       22,
+      2,
     );
     expect(historical.characters / 4).toBeLessThan(4_500);
     // v26 (L-13): ~40 tokens for PICTURE and pictureQuery, then ~280 tokens
@@ -483,7 +487,9 @@ describe("renderer", () => {
     // v35 (addendum 14 Nov): v34's template; uncertainties[] in the schema.
     // v36 (RC3, 15 Nov): v35's template; spoken in the schema.
     // v37 (model spend, 18 Nov): v36's words; fixed parts lead, shared.
-    expect(rendered.bundle.task).toBe("company-analyst/v37");
+    // v38 (HQ-2, 20 Nov): the conversation rules as edits, paid for by two
+    // repeated lines; with Q_SYSTEM v3 the render is ~2.5 tokens longer.
+    expect(rendered.bundle.task).toBe("company-analyst/v38");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

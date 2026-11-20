@@ -88,7 +88,7 @@ describe("comparisonLead", () => {
         profile("Ledgerfold", null, null),
       ]),
     ).toBe(
-      "Tensorgate: seed stage, based in United States. Ledgerfold: stage not declared, location not declared. That is what each declares on Capital Q.",
+      "Here's how each describes itself. Tensorgate: seed stage, based in United States. Ledgerfold: no stage given yet, no base given yet.",
     );
     expect(comparisonLead([profile("Tensorgate", "seed", "US")])).toBeNull();
   });
