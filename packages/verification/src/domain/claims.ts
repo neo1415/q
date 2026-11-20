@@ -20,8 +20,36 @@ import type {
  * here writes them.
  */
 
-export type VerificationProvider =
-  "CAPITAL_Q_SYNTHETIC_DEMO" | "CAPITAL_Q_OPERATOR";
+/**
+ * The deciding party, mirroring verification_claims_provider_check
+ * (20261231599900). Reference values, never a Postgres enum.
+ */
+export const VERIFICATION_PROVIDER_CODES = [
+  "CAPITAL_Q_SYNTHETIC_DEMO",
+  "CAPITAL_Q_OPERATOR",
+  "DOJAH",
+  "COMPANIES_HOUSE",
+  "SUMSUB",
+  "CAPITAL_Q_EMAIL_CODE",
+] as const;
+export type VerificationProviderCode =
+  (typeof VERIFICATION_PROVIDER_CODES)[number];
+
+/**
+ * Which party may decide by which method (verification_claims_method_
+ * provider_check). Every provider method is the system deciding.
+ */
+export const METHOD_PROVIDERS: Readonly<
+  Record<VerificationMethod, readonly VerificationProviderCode[]>
+> = {
+  SYNTHETIC_DEMO_ATTESTATION: ["CAPITAL_Q_SYNTHETIC_DEMO"],
+  OPERATOR_DECISION: ["CAPITAL_Q_OPERATOR"],
+  REGISTRY_LOOKUP: ["DOJAH", "COMPANIES_HOUSE", "SUMSUB"],
+  ID_SELFIE: ["DOJAH", "SUMSUB"],
+  DIRECTOR_MATCH: ["DOJAH", "COMPANIES_HOUSE", "SUMSUB"],
+  BANK_NAME_MATCH: ["DOJAH"],
+  DOMAIN_EMAIL: ["CAPITAL_Q_EMAIL_CODE"],
+};
 
 export type VerificationClaim = {
   readonly id: string;
@@ -37,7 +65,7 @@ export type VerificationClaim = {
   readonly revision: number;
   readonly decidesClaimId: string | null;
   readonly method: VerificationMethod | null;
-  readonly provider: VerificationProvider | null;
+  readonly provider: VerificationProviderCode | null;
   readonly decisionBasis: string | null;
   readonly decidedByActorType: "HUMAN" | "SYSTEM" | null;
   readonly decidedByUserId: string | null;
@@ -177,12 +205,31 @@ export function describeStanding(
     case "PENDING":
       return "Requested; Capital Q has not decided yet.";
     case "VERIFIED":
-      return method === "SYNTHETIC_DEMO_ATTESTATION"
-        ? "Verified (synthetic demo attestation). This is demo data on a demo deployment, not a real-world check."
-        : "Verified by a Capital Q operator.";
+      return verifiedBy(method);
     case "EXPIRED":
       return "The earlier verification has expired. You can ask Capital Q again.";
     case "REVOKED":
       return "Not verified: a Capital Q operator declined this request or withdrew an earlier verification. You can ask again.";
+  }
+}
+
+/** How a VERIFIED standing was reached, in plain words (always named). */
+function verifiedBy(method: VerificationMethod | null): string {
+  switch (method) {
+    case "SYNTHETIC_DEMO_ATTESTATION":
+      return "Verified (synthetic demo attestation). This is demo data on a demo deployment, not a real-world check.";
+    case "REGISTRY_LOOKUP":
+      return "Verified against the official company register.";
+    case "ID_SELFIE":
+      return "Verified with a government ID and a live selfie.";
+    case "DIRECTOR_MATCH":
+      return "Verified as a director or owner on the company register.";
+    case "BANK_NAME_MATCH":
+      return "Verified: the bank account name matches the legal name.";
+    case "DOMAIN_EMAIL":
+      return "Verified with a code sent to an address on the company's domain.";
+    case "OPERATOR_DECISION":
+    case null:
+      return "Verified by a Capital Q operator.";
   }
 }

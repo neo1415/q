@@ -463,6 +463,9 @@ export type ApiModules = {
   /** CQ-VERIFY-001: a founder asks and reads; nothing here decides. */
   readonly verification?:
     VerificationRoutesDependencies["verification"] | undefined;
+  /** V1: each verification provider's connection, read from its keys. */
+  readonly verificationProviders?:
+    VerificationRoutesDependencies["providers"] | undefined;
   /** CQ-BIZ-003: the visibility control centre. */
   readonly visibility?: VisibilityRoutesDependencies["visibility"] | undefined;
   /** BIZ-007: a person's own connected Gmail and reply push. */
@@ -1258,6 +1261,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       verification: modules.verification,
+      providers: modules.verificationProviders,
     });
   }
 

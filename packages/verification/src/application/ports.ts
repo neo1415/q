@@ -6,7 +6,7 @@ import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 
 import type {
   VerificationClaim,
-  VerificationProvider,
+  VerificationProviderCode,
 } from "../domain/claims.js";
 
 export type NewPendingClaim = {
@@ -21,7 +21,10 @@ export type NewSyntheticDecision = {
   readonly decides: VerificationClaim;
   readonly status: "VERIFIED";
   readonly method: Extract<VerificationMethod, "SYNTHETIC_DEMO_ATTESTATION">;
-  readonly provider: Extract<VerificationProvider, "CAPITAL_Q_SYNTHETIC_DEMO">;
+  readonly provider: Extract<
+    VerificationProviderCode,
+    "CAPITAL_Q_SYNTHETIC_DEMO"
+  >;
   readonly decisionBasis: string;
 };
 

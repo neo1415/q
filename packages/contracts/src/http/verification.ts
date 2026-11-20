@@ -75,12 +75,19 @@ export type VerificationStandingStatus = z.infer<
 >;
 
 /**
- * How Capital Q decided. Both deterministic; both recorded on the row and
- * shown to the founder in plain words. No LLM decides a verification.
+ * How Capital Q decided. Every method is deterministic, recorded on the row
+ * and shown in plain words. No LLM decides a verification. V1 (migration
+ * 20261231599900, decision 113): the provider methods, each decided by the
+ * system against a provider's record, never by the provider's say-so alone.
  */
 export const VERIFICATION_METHODS = [
   "SYNTHETIC_DEMO_ATTESTATION",
   "OPERATOR_DECISION",
+  "REGISTRY_LOOKUP",
+  "ID_SELFIE",
+  "DIRECTOR_MATCH",
+  "BANK_NAME_MATCH",
+  "DOMAIN_EMAIL",
 ] as const;
 export const VerificationMethodSchema = z.enum(VERIFICATION_METHODS);
 export type VerificationMethod = z.infer<typeof VerificationMethodSchema>;
@@ -149,3 +156,33 @@ export type RequestCompanyVerificationRequest = z.infer<
 export const COMPANY_VERIFICATION_SEGMENT = "/verification" as const;
 export const COMPANY_VERIFICATION_REQUESTS_SEGMENT =
   "/verification/requests" as const;
+
+/**
+ * V1 (decision 113): `GET /v1/verification/providers`. Whether each
+ * verification provider is connected on this deployment, so the screen and
+ * the admin say "not connected" plainly instead of implying a check ran.
+ * Names and coverage only; never a key, never a setting.
+ */
+export const VERIFICATION_PROVIDERS_PATH = "/v1/verification/providers";
+
+export const VerificationProviderConnectionDtoSchema = z
+  .object({
+    provider: z.enum(["COMPANIES_HOUSE", "DOJAH", "SUMSUB"]),
+    label: z.string().min(1).max(60),
+    covers: z.string().min(1).max(200),
+    connected: z.boolean(),
+    description: z.string().min(1).max(300),
+  })
+  .strict();
+export type VerificationProviderConnectionDto = z.infer<
+  typeof VerificationProviderConnectionDtoSchema
+>;
+
+export const VerificationProvidersDtoSchema = z
+  .object({
+    providers: z.array(VerificationProviderConnectionDtoSchema).max(10),
+  })
+  .strict();
+export type VerificationProvidersDto = z.infer<
+  typeof VerificationProvidersDtoSchema
+>;
