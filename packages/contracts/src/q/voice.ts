@@ -386,6 +386,12 @@ export const QVoiceDuplexCredentialSchema = z
      * Q answers it (ask_q) or the voice may (small talk).
      */
     routeTurns: z.boolean().optional(),
+    /**
+     * HQ-3: patient turn-taking (an onboarding interview, a discovery
+     * conversation): the turn detector waits longer before it takes the
+     * turn, whatever the listening level. Absent: as before.
+     */
+    patient: z.boolean().optional(),
   })
   .strict();
 export type QVoiceDuplexCredential = z.infer<

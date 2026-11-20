@@ -201,6 +201,41 @@ describe("GPT-Live as the product voice", () => {
     expect(standardStart).not.toHaveBeenCalled();
   });
 
+  it("HQ-3: a replaced or reconnected line picks up where it was, never greets or introduces itself again", async () => {
+    const { RESUME_LINE, RESUME_OPENING } =
+      await import("../src/features/voice/provider/live-session");
+    const { result } = renderHook(() => useVoiceSession());
+    await ready();
+    await act(async () => {
+      await result.current.start({
+        credential,
+        resume: true,
+        firstMessage: "Which quarter's revenue did you mean?",
+      });
+    });
+    expect(calls).toHaveLength(1);
+    const opening = calls[0]?.["opening"] as {
+      greeting?: string;
+      content?: string;
+    };
+    expect(opening.greeting).toBe(RESUME_OPENING);
+    expect(opening.greeting).toContain(`Say exactly "${RESUME_LINE}"`);
+    expect(opening.greeting).toMatch(/do not introduce yourself/u);
+    expect(opening.greeting).not.toMatch(/Greet them warmly/u);
+    expect(opening.content).toBe("Which quarter's revenue did you mean?");
+  });
+
+  it("a new line still greets: only a line that came back resumes", async () => {
+    const { result } = renderHook(() => useVoiceSession());
+    await ready();
+    await act(async () => {
+      await result.current.start({ credential });
+    });
+    expect((calls[0]?.["opening"] as { greeting?: string })?.greeting).toMatch(
+      /Greet them warmly/u,
+    );
+  });
+
   it("opens every voice start on GPT-Live, attached to the issued session", async () => {
     const { result } = renderHook(() => useVoiceSession());
     await ready();

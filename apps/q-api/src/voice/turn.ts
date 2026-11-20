@@ -1716,7 +1716,16 @@ export function createVoiceTurnHandler(
               live.handOff?.();
               return;
             }
-            if (WORKING_STAGES.has(event.data.stage)) speaker.working?.();
+            // HQ-3: which work started, and about whom (the run's own
+            // authorised reads), so the line can say it within a second.
+            if (WORKING_STAGES.has(event.data.stage)) {
+              speaker.working?.({
+                stage: event.data.stage,
+                ...(event.data.about === undefined
+                  ? {}
+                  : { about: event.data.about }),
+              });
+            }
             // ADR 0062 (amends R38): the stage is what the silence ladder
             // may say while nothing of the answer has been heard; it is
             // never itself spoken as part of the answer.

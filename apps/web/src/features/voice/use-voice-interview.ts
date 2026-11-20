@@ -709,6 +709,8 @@ export function useVoiceInterview(
               ? withGreeting(started.value, opening)
               : started.value,
           firstMessage: opening,
+          // HQ-3: a line that came back picks up where it was.
+          ...(resume ? { resume: true } : {}),
         });
       });
       const attempt = { promise: lineOpening };

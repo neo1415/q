@@ -1305,7 +1305,14 @@ export class DuplexLine {
           input: {
             turn_detection: {
               type: "semantic_vad",
-              eagerness: level === "OFF" ? "high" : "auto",
+              // HQ-3: a patient line (onboarding, discovery) waits longest,
+              // whatever the listening level.
+              eagerness:
+                this.#credential.patient === true
+                  ? "low"
+                  : level === "OFF"
+                    ? "high"
+                    : "auto",
               // VOICE-BRAIN: on a routed line the server decides who answers.
               create_response: !this.#routeTurns,
               // The browser decides a barge-in (BARGE_CONFIRM_MS), so a blip

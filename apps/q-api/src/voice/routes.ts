@@ -30,6 +30,7 @@ import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
 import { signupContextFromToken } from "./interview-steps.js";
 import type { OnboardingConversation } from "./onboarding-conversation.js";
+import { patientTurnTaking } from "./turn-patience.js";
 import { extractBearerToken } from "@capital-q/security/supabase";
 
 import {
@@ -1143,9 +1144,15 @@ export function registerQVoiceRoutes(
             greeting: firstMessage,
             thinkToken,
             ...(input.locale === undefined ? {} : { locale: input.locale }),
-            ...(personaVoice === null
-              ? {}
-              : { turnTaking: personaVoice.turnTaking }),
+            ...(personaVoice !== null
+              ? { turnTaking: personaVoice.turnTaking }
+              : // HQ-3: people pause mid-thought in onboarding.
+                patientTurnTaking({
+                    onboarding: input.onboarding !== undefined,
+                    welcome: input.welcome === true,
+                  })
+                ? { turnTaking: "PATIENT" as const }
+                : {}),
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
             terms: [

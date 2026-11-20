@@ -163,6 +163,12 @@ export type VoiceSessionStart = {
   readonly firstMessage?: string | undefined;
   /** Stay in the owned rehearsal: no general Q greeting or navigation shortcuts. */
   readonly rehearsal?: boolean;
+  /**
+   * HQ-3: the same conversation's line coming back (a reconnect, or a line
+   * that replaced a dropped one): they have already met, so Q picks up
+   * where they were instead of greeting or introducing itself again.
+   */
+  readonly resume?: boolean;
 };
 
 /** The live session, as the UI drives it. */

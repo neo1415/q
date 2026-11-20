@@ -1,6 +1,10 @@
 import type { Server as HttpServer } from "node:http";
 
-import type { QSilenceBeat, QVoiceChoice } from "@capital-q/contracts";
+import type {
+  QSilenceBeat,
+  QStageAbout,
+  QVoiceChoice,
+} from "@capital-q/contracts";
 import type { SpokenFacts } from "@capital-q/q-core";
 
 /**
@@ -71,7 +75,12 @@ export type VoiceSpeaker = {
    * holds only a wait that is real (owner 18 Nov: no "working on it" on a
    * turn answered from the conversation). Absent: nobody asks.
    */
-  readonly working?: (() => void) | undefined;
+  readonly working?:
+    | ((stage?: {
+        readonly stage: string;
+        readonly about?: QStageAbout | undefined;
+      }) => void)
+    | undefined;
 };
 
 export type VoiceChannelHandlers = {

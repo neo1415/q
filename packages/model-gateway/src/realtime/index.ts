@@ -72,9 +72,10 @@ export type RealtimeSessionRequest = {
   /**
    * BACKCHANNEL: how readily the turn detector ends the person's turn.
    * HIGH answers soonest; AUTO leaves room for mid-turn pauses, where Q's
-   * reactions go. Default HIGH.
+   * reactions go. LOW (HQ-3) waits longest: an onboarding interview or a
+   * discovery conversation, where people pause mid-thought. Default HIGH.
    */
-  readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
+  readonly turnEagerness?: "HIGH" | "AUTO" | "LOW" | undefined;
   /** BACKCHANNEL: transcribe the person's speech (for context and quotes). */
   readonly transcribeInput?: boolean | undefined;
   /**
@@ -148,7 +149,7 @@ export type RealtimeMintRequest = {
   readonly voice: RealtimeVoice;
   readonly maxOutputTokens: number;
   readonly secretTtlSeconds: number;
-  readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
+  readonly turnEagerness?: "HIGH" | "AUTO" | "LOW" | undefined;
   readonly transcribeInput?: boolean | undefined;
   readonly routeTurns?: boolean | undefined;
   readonly speechSpeed?: number | undefined;

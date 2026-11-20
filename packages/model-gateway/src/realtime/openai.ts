@@ -110,7 +110,11 @@ export function createOpenAIRealtimeProvider(options: {
                   turn_detection: {
                     type: "semantic_vad",
                     eagerness:
-                      request.turnEagerness === "AUTO" ? "auto" : "high",
+                      request.turnEagerness === "LOW"
+                        ? "low"
+                        : request.turnEagerness === "AUTO"
+                          ? "auto"
+                          : "high",
                     // VOICE-BRAIN: on a routed line the server decides who
                     // answers each turn; the model never answers by itself.
                     create_response: request.routeTurns !== true,

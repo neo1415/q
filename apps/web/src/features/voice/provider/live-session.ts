@@ -75,6 +75,16 @@ export const LIVE_IDLE_ENDED_NOTICE =
 const GREETING =
   "The call has just connected. Greet them warmly now, in one short natural sentence: no question, no filler.";
 
+/** HQ-3: what Q says first on a line that came back, before carrying on. */
+export const RESUME_LINE = "Picking up where we were.";
+
+/**
+ * HQ-3 (conversation audit §2.7): a reconnect or a replaced line is the
+ * same conversation coming back. Q does not greet them or introduce itself
+ * again; it says the resume line, exactly, then carries on.
+ */
+export const RESUME_OPENING = `The call has just reconnected after a short break; you have already met and this is the same conversation. Do not greet them and do not introduce yourself or explain anything again. Say exactly "${RESUME_LINE}" and nothing before it.`;
+
 export function useLiveVoiceSession(
   events: VoiceSessionEvents = {},
   options: {
@@ -156,6 +166,7 @@ export function useLiveVoiceSession(
       credential,
       firstMessage,
       rehearsal = false,
+      resume = false,
     }: VoiceSessionStart): Promise<LiveStart> => {
       const mine = (startsRef.current += 1);
       setTranscript([]);
@@ -176,7 +187,9 @@ export function useLiveVoiceSession(
           opening: {
             greeting: rehearsal
               ? "Speak only the supplied counterpart opening line exactly. Do not add a greeting or question."
-              : GREETING,
+              : resume
+                ? RESUME_OPENING
+                : GREETING,
             ...(opening === undefined ? {} : { content: opening }),
           },
           fastNavigation: !rehearsal,

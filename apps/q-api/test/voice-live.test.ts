@@ -159,10 +159,15 @@ function setup(
     /** One answer per run, in order (the last one repeats). */
     answers?: readonly string[];
     /** The run starts work that takes a while (a tool stage). */
-    working?: boolean;
+    working?:
+      | boolean
+      | {
+          readonly stage: string;
+          readonly about?: { readonly subjects?: readonly string[] };
+        };
     /** Each run records its conversation on the board first, as turn.ts does. */
     recordsConversation?: boolean;
-    holding?: { afterMs?: number; longMs?: number };
+    holding?: { afterMs?: number; longMs?: number; preambleAfterMs?: number };
     rehearsalLine?: Parameters<typeof createLiveBroker>[0]["rehearsalLine"];
     /** The provider's ceiling, as main.ts reads it from the review. */
     ceiling?: () => Promise<"PUBLIC" | "INTERNAL" | "CONFIDENTIAL">;
@@ -206,6 +211,15 @@ function setup(
       board = { ...board, sequence: board.sequence + 1, navigate: null };
     }
     if (options.working === true) speaker.working?.();
+    else if (typeof options.working === "object") {
+      const subjects = options.working.about?.subjects;
+      speaker.working?.({
+        stage: options.working.stage,
+        ...(subjects === undefined
+          ? {}
+          : { about: { subjects: [...subjects] } }),
+      });
+    }
     if (options.hold === true) {
       await new Promise<void>((resolve) => {
         holds.push({ resolve });
@@ -776,6 +790,84 @@ describe("GPT-Live line", () => {
     finish();
     const rest = await ask(broker, "dlg_1", "What did Halyard file?");
     expect(rest?.said).toBe("Nothing else changed.");
+  });
+
+  it("HQ-3: a real tool stage says its own approved line within a second, not the generic one at 3 s", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      let speak!: () => void;
+      const start = new Promise<void>((resolve) => {
+        speak = resolve;
+      });
+      const { broker } = setup({
+        working: {
+          stage: "CHECKING_EVIDENCE",
+          about: { subjects: ["Halyard"] },
+        },
+        holding: { afterMs: 3_000, longMs: 3_600_000 },
+        stream: {
+          first: "Halyard filed in March. ",
+          rest: "",
+          until: Promise.resolve(),
+          start,
+        },
+      });
+      await open(broker);
+      let held: Awaited<ReturnType<typeof broker.delegate>> | undefined;
+      void broker
+        .delegate({
+          actor: ACTOR,
+          voiceSessionId: SESSION,
+          delegation: {
+            delegationId: "dlg_1",
+            request: "What did Halyard file?",
+            early: true,
+          },
+        })
+        .then((result) => {
+          held = result;
+        });
+      await vi.advanceTimersByTimeAsync(999);
+      expect(held).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(held?.holding).toBe(true);
+      expect(held?.said).toBe("Reading Halyard's deck and documents.");
+      expect(held?.commentary).toContain(
+        '"Reading Halyard\'s deck and documents."',
+      );
+      speak();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("HQ-3: a stage that names nothing says its approved label; web research is never about anyone", async () => {
+    for (const [working, said] of [
+      [
+        { stage: "SEARCHING_PUBLIC_SOURCES", about: { subjects: ["Halyard"] } },
+        "Looking into it.",
+      ],
+      [{ stage: "REVIEWING_RELATIONSHIP" }, "Checking where things stand."],
+    ] as const) {
+      const { broker } = setup({
+        working,
+        holding: { afterMs: 3_600_000, longMs: 3_600_000, preambleAfterMs: 0 },
+        stream: {
+          first: "Done. ",
+          rest: "",
+          until: Promise.resolve(),
+          start: new Promise<void>(() => undefined),
+        },
+      });
+      await open(broker);
+      const held = await broker.delegate({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        delegation: { delegationId: "dlg_1", request: "Go on", early: true },
+      });
+      expect(held?.holding).toBe(true);
+      expect(held?.said).toBe(said);
+    }
   });
 
   it("never holds a turn that started no work: it is answered from the conversation", async () => {

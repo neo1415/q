@@ -10,7 +10,7 @@ import {
   type ModelSensitivity,
   type QVoiceLiveTrial,
 } from "@capital-q/contracts";
-import type { ArrivalSnapshot } from "@capital-q/contracts";
+import type { ArrivalSnapshot, QStageAbout } from "@capital-q/contracts";
 import type { ModelUsageRepository } from "@capital-q/model-gateway";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
@@ -34,6 +34,7 @@ import type {
   VoiceLineTelemetry,
 } from "../duplex/transcript.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
+import { STAGE_PREAMBLE_AFTER_MS, stagePreamble } from "../stage-preamble.js";
 import {
   GPT_LIVE_USD_PER_SECOND,
   LiveProviderError,
@@ -251,6 +252,12 @@ type Delegation = {
   holdDue: Promise<void>;
   /** The holding line was handed over for this delegation. */
   held: boolean;
+  /**
+   * HQ-3: the approved line for the work this run really started ("Looking
+   * at Halyard."), said in place of the generic holding line; null until
+   * a tool stage starts, or when it names nothing Q may say.
+   */
+  preamble: () => string | null;
   /** Everything the run said and the facts it held, when it ended. */
   ended: { readonly said: string; readonly facts: SpokenFacts | null } | null;
   /** The Q run this delegation started, once known (RC5). */
@@ -439,7 +446,13 @@ export type LiveBrokerDependencies = {
   readonly now?: (() => number) | undefined;
   /** When a wait earns the holding line (LIVE_HOLD_* by default). */
   readonly holding?:
-    { readonly afterMs?: number; readonly longMs?: number } | undefined;
+    | {
+        readonly afterMs?: number;
+        readonly longMs?: number;
+        /** HQ-3: how soon a real tool stage's own line is said. */
+        readonly preambleAfterMs?: number;
+      }
+    | undefined;
   /**
    * The trial's persisted use (q_runtime.voice_live_trial_usage). Absent,
    * a trial person's line is refused: their use could not be counted.
@@ -556,7 +569,10 @@ function collector(
   /** Called once, with the first words, while the run is still going. */
   onFirstWords?: (said: string, facts: SpokenFacts | null) => void,
   /** Called when the run starts work that takes a while (see `working`). */
-  onWorking?: () => void,
+  onWorking?: (stage?: {
+    readonly stage: string;
+    readonly about?: QStageAbout | undefined;
+  }) => void,
 ): {
   readonly speaker: VoiceSpeaker;
   readonly said: () => string;
@@ -597,7 +613,7 @@ function collector(
       run: (id) => {
         runId ??= id;
       },
-      working: () => onWorking?.(),
+      working: (stage) => onWorking?.(stage),
     },
     said: () => text.slice(0, SPOKEN_MAX),
     held: () => held,
@@ -813,6 +829,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   const { config, provider, firewall, turn, spend, logger } = deps;
   const now = deps.now ?? Date.now;
   const holdAfterMs = deps.holding?.afterMs ?? LIVE_HOLD_AFTER_MS;
+  const preambleAfterMs =
+    deps.holding?.preambleAfterMs ?? STAGE_PREAMBLE_AFTER_MS;
   const holdLongMs = deps.holding?.longMs ?? LIVE_HOLD_LONG_MS;
   const lines = new Map<string, LiveLine>();
   // A failed write leaves speech unaccounted for; this process must not
@@ -1182,18 +1200,24 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     const holdTimers: ReturnType<typeof setTimeout>[] = [];
     let runStartedAt: number | null = null;
     let working = false;
-    const onWorking = () => {
+    let preamble: string | null = null;
+    const onWorking = (stage?: {
+      readonly stage: string;
+      readonly about?: QStageAbout | undefined;
+    }) => {
       // Right after a turn that held, only the long wait holds (see
       // LIVE_HOLD_AFTER_MS): a holding line on every question is the
       // robot. Runs on a line go one after another, so the turn before
       // has settled by now.
       if (working || runStartedAt === null || line.lastTurnHeld) return;
       working = true;
+      // HQ-3: a tool stage that names its work is said within a second,
+      // in its approved words; the generic line stays the 3 s fallback.
+      preamble =
+        stage === undefined ? null : stagePreamble(stage.stage, stage.about);
+      const after = preamble === null ? holdAfterMs : preambleAfterMs;
       holdTimers.push(
-        setTimeout(
-          releaseHold,
-          Math.max(0, holdAfterMs - (now() - runStartedAt)),
-        ),
+        setTimeout(releaseHold, Math.max(0, after - (now() - runStartedAt))),
       );
     };
     const speaker = collector(
@@ -1234,6 +1258,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       partialSent: null,
       holdDue,
       held: false,
+      preamble: () => preamble,
       ended: null,
       runId: speaker.runId,
       merged: false,
@@ -1868,7 +1893,13 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           line.rehearsalId === undefined
         ) {
           current.held = true;
-          const holding = holdingLineFor(line.holds, line.lastHold);
+          // HQ-3: the work's own approved line, unless it was the line's
+          // last words (never the same words twice in a row).
+          const specific = current.preamble();
+          const holding =
+            specific !== null && specific !== line.lastHold
+              ? specific
+              : holdingLineFor(line.holds, line.lastHold);
           line.holds += 1;
           line.lastHold = holding;
           const runId = current.runId();

@@ -74,6 +74,7 @@ import { routeDuplexTurn, routedAs, type DuplexRoutedAs } from "./routing.js";
 import type { DuplexSideband } from "./sideband.js";
 import type { DuplexSpendLedger } from "./spend.js";
 import type { DuplexTranscriptStore } from "./transcript.js";
+import { patientTurnTaking } from "../turn-patience.js";
 
 /**
  * The full-duplex voice broker (DUPLEX; flag CQ_VOICE_REALTIME, off by
@@ -956,6 +957,11 @@ export function createDuplexBroker(
     const guided =
       binding.thread.welcome === true ||
       binding.thread.onboarding !== undefined;
+    // HQ-3: people pause mid-thought in onboarding; the detector waits.
+    const patient = patientTurnTaking({
+      welcome: binding.thread.welcome === true,
+      onboarding: binding.thread.onboarding !== undefined,
+    });
     // Step 1: from the firewall's plan screen, never the thread's raw one.
     let situation: string | null = null;
     try {
@@ -990,12 +996,15 @@ export function createDuplexBroker(
       ...(listens
         ? {
             transcribeInput: true,
-            turnEagerness:
-              listening?.level === "OFF"
+            turnEagerness: patient
+              ? ("LOW" as const)
+              : listening?.level === "OFF"
                 ? ("HIGH" as const)
                 : ("AUTO" as const),
           }
-        : {}),
+        : patient
+          ? { turnEagerness: "LOW" as const }
+          : {}),
       transcriptionHint: transcriptionHintFor({ locale, vocabulary }),
       sensitivity: decision.plan.maxSensitivity,
       attribution: {
@@ -1090,6 +1099,7 @@ export function createDuplexBroker(
           idleMs: config.idleMs,
           ...(listening === undefined ? {} : { listening }),
           ...(config.routeTurns ? { routeTurns: true } : {}),
+          ...(prepared.mint.turnEagerness === "LOW" ? { patient: true } : {}),
         },
       };
     },
@@ -1441,6 +1451,7 @@ export function createDuplexBroker(
             ? {}
             : { listening: line.listeningCredential }),
           ...(line.mint.routeTurns === true ? { routeTurns: true } : {}),
+          ...(line.mint.turnEagerness === "LOW" ? { patient: true } : {}),
         },
       };
     },
