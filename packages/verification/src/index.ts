@@ -29,9 +29,11 @@ export {
   organisationIdentityOf,
   personClaimTypeFor,
   standingOf,
+  METHOD_PROVIDERS,
   SUBJECT_TYPE_OF,
+  VERIFICATION_PROVIDER_CODES,
   type VerificationClaim,
-  type VerificationProvider,
+  type VerificationProviderCode,
 } from "./domain/claims.js";
 export {
   decisionBasisOf,
@@ -129,3 +131,68 @@ export {
   createDecidedClaimOwnerLookup,
   type DecidedClaimOwner,
 } from "./infrastructure/decided-claim-owner.js";
+// V1 (decision 113): providers, the linking rule, the badges.
+export * from "./providers/contract.js";
+export {
+  companiesHouseNumber,
+  COMPANIES_HOUSE_BASE_URL,
+  createCompaniesHouseProvider,
+} from "./providers/companies-house.js";
+export {
+  createDojahProvider,
+  DOJAH_BASE_URL,
+  DOJAH_KYB_COUNTRIES,
+} from "./providers/dojah.js";
+export {
+  createSumsubProvider,
+  SUMSUB_BASE_URL,
+  sumsubSignature,
+  type SumsubProvider,
+} from "./providers/sumsub.js";
+export {
+  createVerificationProviders,
+  identityProviderFor,
+  providerConnections,
+  registryProviderFor,
+  VERIFICATION_PROVIDER_ENV,
+  type ProviderConnection,
+  type VerificationProviders,
+} from "./providers/index.js";
+export { matchNames, nameParts, type NameMatch } from "./domain/name-match.js";
+export {
+  BIOMETRIC_CONSENT_TEXT,
+  BIOMETRIC_CONSENT_TEXT_VERSION,
+  linkDecisionBasis,
+  linkFounder,
+  linkReviewReason,
+  type LinkInput,
+  type LinkMissing,
+  type LinkOutcome,
+  type LinkReviewReason,
+} from "./domain/founder-link.js";
+export {
+  FULL_VERIFICATION_WINDOW_DAYS,
+  foundersLine,
+  VERIFICATION_BADGES,
+  verificationTier,
+  type BadgeView,
+  type VerificationBadge,
+  type VerificationTier,
+} from "./domain/tiers.js";
+export {
+  FOUNDER_ID_VALID_MONTHS,
+  settleFounderLink,
+  type FounderLinkSettlement,
+  type NewProviderDecision,
+  type ProviderDecisionWriter,
+  type VerificationReviewQueue,
+} from "./application/founder-link.js";
+export {
+  startIdentityCheck,
+  type IdentityCheckStart,
+} from "./application/identity-check.js";
+export {
+  createPostgresProviderDecisionWriter,
+  createPostgresVerificationReviewQueue,
+  VERIFICATION_REVIEW_DUE_HOURS,
+} from "./infrastructure/postgres-provider-decisions.js";

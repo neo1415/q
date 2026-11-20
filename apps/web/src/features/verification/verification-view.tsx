@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-import type { KybDto } from "@capital-q/contracts";
+import type {
+  KybDto,
+  VerificationProviderConnectionDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -13,6 +16,7 @@ import type {
   VerificationLoad,
   VerificationNotice,
 } from "./verification-actions";
+import { ProviderConnections } from "./provider-connections";
 import { VerificationStandings } from "./verification-standings";
 import { personVerificationOptional } from "./verify-state";
 
@@ -33,6 +37,7 @@ export function VerificationView({
   fromSetup,
   skipTo,
   review,
+  providers,
 }: {
   readonly t: (english: string) => string;
   readonly side: "FOUNDER" | "INVESTOR" | "NONE";
@@ -46,6 +51,8 @@ export function VerificationView({
   readonly skipTo: string;
   /** Design review only (passed through to KybSection) */
   readonly review?: KybReview | undefined;
+  /** V1: which automatic checks are connected; absent shows nothing. */
+  readonly providers?: readonly VerificationProviderConnectionDto[] | undefined;
 }) {
   const optional = kyb !== null && personVerificationOptional(kyb);
   return (
@@ -123,6 +130,11 @@ export function VerificationView({
               .
             </p>
           )}
+          <ProviderConnections
+            t={t}
+            providers={providers ?? []}
+            heading={t("Automatic checks")}
+          />
         </QSection>
       </AccountColumn>
     </AccountToastProvider>

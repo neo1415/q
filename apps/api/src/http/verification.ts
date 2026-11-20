@@ -5,6 +5,9 @@ import {
   CompanyVerificationDtoSchema,
   parseContract,
   UuidSchema,
+  VERIFICATION_PROVIDERS_PATH,
+  VerificationProvidersDtoSchema,
+  type VerificationProviderConnectionDto,
 } from "@capital-q/contracts";
 import type { CompanyVerificationService } from "@capital-q/verification";
 
@@ -26,6 +29,11 @@ import {
 
 export type VerificationRoutesDependencies = ActorContextDependencies & {
   readonly verification: CompanyVerificationService;
+  /**
+   * V1: each verification provider's connection on this deployment, read
+   * from its keys at start. Absent: none is reported.
+   */
+  readonly providers?: readonly VerificationProviderConnectionDto[] | undefined;
 };
 
 function companyIdParam(request: FastifyRequest): string {
@@ -55,6 +63,20 @@ export function registerVerificationRoutes(
       });
       void reply.header("Cache-Control", "no-store");
       return CompanyVerificationDtoSchema.parse(verification);
+    },
+  );
+
+  // V1: whether each provider is connected, for any signed-in person, so
+  // the screen never implies a check ran through one that is not. Only
+  // names, coverage and a yes or no.
+  app.get(
+    VERIFICATION_PROVIDERS_PATH,
+    { onRequest: withContext },
+    async (_request, reply) => {
+      void reply.header("Cache-Control", "no-store");
+      return VerificationProvidersDtoSchema.parse({
+        providers: dependencies.providers ?? [],
+      });
     },
   );
 }

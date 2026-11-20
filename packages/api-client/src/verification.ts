@@ -4,6 +4,8 @@ import {
   COMPANY_VERIFICATION_SEGMENT,
   CompanyVerificationDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
+  VERIFICATION_PROVIDERS_PATH,
+  VerificationProvidersDtoSchema,
 } from "@capital-q/contracts";
 
 import { call, type ApiSession } from "./request.js";
@@ -34,5 +36,15 @@ export function requestCompanyVerification(
     `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_VERIFICATION_REQUESTS_SEGMENT}`,
     CompanyVerificationDtoSchema,
     { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** V1: whether each verification provider is connected (never a key). */
+export function getVerificationProviders(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    VERIFICATION_PROVIDERS_PATH,
+    VerificationProvidersDtoSchema,
   );
 }
