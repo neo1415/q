@@ -1002,3 +1002,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - the stage's approved line within 1 s once a tool stage starts;
   - "Picking up where we were." on a reconnect or replaced line, instead of a re-introduction.
   - No q-api errors since. Not live-tested in a voice call, which is a paid realtime session; the evidence is fake-timer tests.
+- **1979b9975 deployed 21:44 UTC on 20 Nov** (gate PASS). HQ-5 adds discovery mode: a reducer state, a gap model, a 12-question cap and a "Just show me" exit.
+  - Live as fictional Savanna, "I'm not really sure what I'm looking for right now": first text in 2.62 s, and a grounded suggestion ("You don't need to have a particular task in mind… Watchly and Clinicrest need replies…").
+  - **Follow-up:** it did NOT enter discovery and asked no question. An explicit "not sure what I want" should enter discovery on the first turn, not only after two underspecified reads.
