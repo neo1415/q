@@ -970,3 +970,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - q-api `GET /v1/ops/pool` (`overview.read`) feeds the console's database pool line.
   - The workers upsert a heartbeat after each ops check. Live: the row for `workers` is 40 s old, with no findings.
   - Its `pool` is `{}`: the workers' pool reports no snapshot, so the card shows the workers' pool as not reported. This is a follow-up, not a fault.
+- **75979e5f4 deployed 00:21 UTC on 20 Nov** (gate PASS 00:20:47Z): `/organisation` General (owner and admin edits through the existing profile actions, carrying the version the page read; members read-only).
+  - Live as the LedgerBridge founder: the General page lists company details with Edit, and Logo and cover.
+  - Seen in the same check: Q's greeting bubble repeats "Your plan is ready" and covers page content (also in the 19 Nov audit, item 8). Queued as a fix.
