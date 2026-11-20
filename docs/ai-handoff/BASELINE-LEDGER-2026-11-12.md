@@ -973,3 +973,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **75979e5f4 deployed 00:21 UTC on 20 Nov** (gate PASS 00:20:47Z): `/organisation` General (owner and admin edits through the existing profile actions, carrying the version the page read; members read-only).
   - Live as the LedgerBridge founder: the General page lists company details with Edit, and Logo and cover.
   - Seen in the same check: Q's greeting bubble repeats "Your plan is ready" and covers page content (also in the 19 Nov audit, item 8). Queued as a fix.
+- **fb65b66ff deployed 01:05 UTC on 20 Nov** (gate PASS 01:05:00Z; web only, the other services skipped and stayed on 75979e5f4). Q greeting: items deduplicated, counted merges ("Your plan is ready (2)"), and the briefing collapses when it would cover main content.
+  - Live as the LedgerBridge founder on `/organisation`: the briefing shows as the collapsed "Q's briefing" button and no longer covers the General card.
+  - The deduplicated sentence is evidenced by tests (the exact live case), not seen live.
