@@ -112,6 +112,15 @@ export function researchDirectiveFor(
      * public web ("online", "on the web", "what's out there about us").
      */
     readonly asksForWeb?: boolean | undefined;
+    /**
+     * VOICE-FIX: the reader's `nextSteps` (v52, by meaning): they ask what
+     * to do next in their own work on Capital Q.
+     */
+    readonly nextSteps?: boolean | undefined;
+    /** The reader's `seeksGuidance` (v96): they do not yet know what they want. */
+    readonly seeksGuidance?: boolean | undefined;
+    /** The turn was spoken on a voice line. */
+    readonly spoken?: boolean | undefined;
   },
 ): ResearchDirective {
   // Owner replay batch 8 (#10): "what can you find about me online?" ran
@@ -130,6 +139,41 @@ export function researchDirectiveFor(
     return environment.available && !isExhausted(state.failures, "RESEARCH")
       ? { mode: "EXPLICIT", announceSourceChange: false }
       : NO_RESEARCH;
+  }
+  // VOICE-FIX (owner live 20 Nov 2026, voice 40e55b83): "I'm not really
+  // sure what the next I should do" was read as ADVICE, which researches
+  // by default (research-policy.ts), and went to the web: 15-44 s before
+  // the first word, with every search provider resting. What to do next
+  // in their own work, a wish to be guided, or a question about Capital Q
+  // itself is answered from their records and the product, never the
+  // public web (asking for the web, by meaning, is still honoured above).
+  // Shaped as every other question the web does not answer (the platform
+  // fallback stays as it is), so an early spoken answer still matches it.
+  const notTheWeb = (): ResearchDirective =>
+    reading.kind === "QUESTION_TO_Q" &&
+    environment.available &&
+    !isExhausted(state.failures, "RESEARCH") &&
+    state.research === null
+      ? { ...NO_RESEARCH, fallback: true }
+      : NO_RESEARCH;
+  if (
+    reading.kind === "QUESTION_TO_Q" &&
+    (environment.nextSteps === true ||
+      environment.seeksGuidance === true ||
+      reading.question?.kind === "ABOUT_CAPITAL_Q")
+  ) {
+    return notTheWeb();
+  }
+  // On a voice line, a correction or a question about their own records
+  // is about the conversation and what is theirs: the web's answer would
+  // come long after the moment, so it is not searched.
+  if (
+    environment.spoken === true &&
+    (reading.kind === "CORRECTION" ||
+      (reading.kind === "QUESTION_TO_Q" &&
+        reading.question?.kind === "THEIR_OWN_RECORDS"))
+  ) {
+    return notTheWeb();
   }
   // Which companies on Capital Q they could invest in is computed against
   // their mandate from Capital Q's own companies; the public web never

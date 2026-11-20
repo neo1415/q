@@ -19,7 +19,7 @@ import { TURN_READER_V95, V95_ANSWER_PLAN } from "./turn-reader.v95.js";
  * first turn (answer-plan.ts). One sentence after v95's ANSWER PLAN,
  * inside the rules v92 sends as cacheable instructions; same boundary.
  */
-export const V96_SEEKS_GUIDANCE = `seeksGuidance is true when they say they do not yet know what they want or where to start and want help working it out -- by meaning, in any language ("not sure what I'm looking for", "I don't know what I want", "where do I start?", "help me figure out what to do") -- and false when they ask for something, even vaguely, or ask for advice on a plain question. It is about form only.`;
+export const V96_SEEKS_GUIDANCE = `seeksGuidance is true when they say they do not yet know what they want or where to start and want help working it out -- by meaning, in any language ("not sure what I'm looking for", "I don't know what I want", "where do I start?", "help me figure out what to do") -- and false when they ask for something, even vaguely, or ask for advice on a plain question. It is about form only. excludes lists, by name as they said it (resolve "them" or "that one" from RECENT TURNS), each company, person or topic they ask you to leave out from now on ("not Tensorgate", "I don't want anything about them"); empty when they exclude nothing, and never a name they merely mention. choiceUnclear is true when their turn is only a yes (or go ahead) to your last question that offered more than one option, and they did not say which; false when that question offered one thing, or they named or pointed at an option.`;
 
 if (TURN_READER_V95.template.split(V95_ANSWER_PLAN).length !== 2) {
   throw new Error(
@@ -35,7 +35,7 @@ export const TURN_READER_V96: PromptDefinition<
   version: 96,
   status: "ACTIVE",
   changeDescription:
-    "HQ-5 follow-up (20 Nov 2026): v95 plus seeksGuidance -- they say they do not yet know what they want and want help working it out -- read by meaning in any language; code opens discovery on that first turn. Same rules boundary as v92; no extra model call.",
+    "HQ-5 follow-up and VOICE-FIX (20 Nov 2026): v95 plus seeksGuidance (they do not yet know what they want: code opens discovery on that first turn), excludes (what they asked Q to leave out from now on, held by code) and choiceUnclear (a bare yes to a question of several options: code asks which). Read by meaning in any language. Same rules boundary as v92; no extra model call.",
   effectiveFrom: "2026-11-20",
   variables: {
     schema: TurnReaderV76VariablesSchema,

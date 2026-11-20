@@ -54,6 +54,11 @@ export type ConversationCoreSnapshot = {
    * instance. Optional: older snapshots carry none (not in discovery).
    */
   readonly discovery?: DiscoveryState | null | undefined;
+  /**
+   * VOICE-FIX: what they asked Q to leave out, held until they name it
+   * again (q-core exclusions.ts). Optional: older snapshots carry none.
+   */
+  readonly excluded?: readonly string[] | undefined;
 };
 
 /** A recorded action offer, as the core keeps it (answer.ts RecordedOffer). */
@@ -147,6 +152,7 @@ const SnapshotSchema = z.object({
     })
     .nullable()
     .optional(),
+  excluded: z.array(z.string().min(1).max(80)).max(8).optional(),
 });
 
 /**
@@ -171,12 +177,14 @@ export function readCoreSnapshot(
     offer,
     resolution,
     discovery,
+    excluded,
   } = read.data;
   return {
     unclearInARow,
     lastAction,
     sequence,
     ...(discovery === undefined || discovery === null ? {} : { discovery }),
+    ...(excluded === undefined || excluded.length === 0 ? {} : { excluded }),
     ...(offer === undefined || offer === null ? {} : { offer }),
     ...(resolution === undefined || resolution === null ? {} : { resolution }),
     focus:

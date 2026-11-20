@@ -159,3 +159,9 @@ export {
   type DiscoverySide,
   type DiscoveryTurn,
 } from "./discovery.js";
+export {
+  CHOICE_UNCLEAR_NOTE,
+  exclusionNote,
+  EXCLUSIONS_MAX,
+  nextExclusions,
+} from "./exclusions.js";

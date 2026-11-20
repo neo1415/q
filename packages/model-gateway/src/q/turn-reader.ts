@@ -177,6 +177,10 @@ export type QTurnReading = Omit<
   readonly costlyIfWrong?: boolean | undefined;
   /** v96 (HQ-5 follow-up): they want help working out what they want. */
   readonly seeksGuidance?: boolean | undefined;
+  /** v96 (VOICE-FIX): what they asked Q to leave out from now on, by name. */
+  readonly excludes?: readonly string[] | undefined;
+  /** v96 (VOICE-FIX): a bare yes to a question of several options. */
+  readonly choiceUnclear?: boolean | undefined;
   /** v15: false when spoken words were plainly for someone else. */
   readonly addressedToQ?: boolean | undefined;
   readonly moreDocuments?: TurnReaderV14Result["moreDocuments"] | undefined;

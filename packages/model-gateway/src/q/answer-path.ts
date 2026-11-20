@@ -41,6 +41,11 @@ export type AnswerPathInput = {
   readonly askedAction: boolean;
   readonly researchMode: "EXPLICIT" | "ONLY_IF_EMPTY" | "OFFERED" | "NEVER";
   readonly aboutNamedOther: boolean;
+  /**
+   * VOICE-FIX: code's discovery asks its one question this turn (HQ-5):
+   * a reflection and a question need no tool round and no web.
+   */
+  readonly discoveryQuestion?: boolean | undefined;
   /** What is prepared for this turn, by subject. */
   readonly prepared: {
     readonly mandate: boolean;
@@ -113,6 +118,9 @@ export function answerPathOf(input: AnswerPathInput): AnswerPathChoice {
       input.preparedSubject === "ON_SCREEN_RECORD")
   ) {
     return { path: "PREPARED_CONTEXT", because: "GATEQ_DOSSIER" };
+  }
+  if (input.discoveryQuestion === true && input.researchMode !== "EXPLICIT") {
+    return { path: "PREPARED_CONTEXT", because: "DISCOVERY" };
   }
   if (input.researchMode === "EXPLICIT") {
     return { path: "DEEP_ANALYSIS", because: "RESEARCH" };

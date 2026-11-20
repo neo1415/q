@@ -5,6 +5,7 @@ import {
   QClientActionIntentSchema,
   QNavigateTargetDetailSchema,
   QRunIdSchema,
+  Q_VISIBLE_STAGE_LABELS,
   QVoiceDestinationSchema,
   sensitivityWithin,
   type ModelSensitivity,
@@ -731,6 +732,68 @@ export function liveSpoken(words: string): string {
  * the rest of the words (never the start again), or the run's own facts
  * and flags when it ended differently from how it began.
  */
+const spokenKey = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/gu, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, " ")
+    .trim();
+
+/**
+ * VOICE-FIX (owner live 20 Nov 2026, voice 40e55b83: Q repeated itself):
+ * the rest of an answer after the start the voice already said. The run's
+ * final words are checked after the start was handed over (offers trimmed,
+ * attributions worded), so they rarely begin with the start byte for byte;
+ * the old exact-prefix test then sent the whole answer again and the voice
+ * said its first sentences twice. Here every leading sentence already said
+ * (case, quotes, spacing and punctuation aside) is dropped, and nothing
+ * already said is said again.
+ */
+export function afterAlreadySaid(sent: string, said: string): string {
+  if (sent.length === 0) return said.trim();
+  if (said.startsWith(sent)) return said.slice(sent.length).trim();
+  const already = spokenKey(sent);
+  const sentences = said.match(
+    /[^.!?]+[.!?]+["\u201d\u2019)]*\s*|[^.!?]+$/gu,
+  ) ?? [said];
+  let index = 0;
+  while (index < sentences.length) {
+    const key = spokenKey(sentences[index] ?? "");
+    if (key.length > 0 && !already.includes(key)) break;
+    index += 1;
+  }
+  return sentences.slice(index).join("").trim();
+}
+
+/**
+ * VOICE-FIX: the code-chosen holding lines and stage lines, which are said
+ * while Q works and are never Q's content. A Q segment that begins with one
+ * ("Working on it. The next step is…") is stored without it, and one that
+ * is only that is not stored as a Q turn at all.
+ */
+const HOLDING_WORDS: ReadonlySet<string> = new Set(
+  [
+    ...LIVE_HOLDING_LINES,
+    "Working on it.",
+    "On it.",
+    ...Object.values(Q_VISIBLE_STAGE_LABELS),
+  ].map(spokenKey),
+);
+
+export function withoutHoldingLines(text: string): string {
+  const sentences = text.match(
+    /[^.!?\u2026]+[.!?\u2026]+\s*|[^.!?\u2026]+$/gu,
+  ) ?? [text];
+  let index = 0;
+  while (
+    index < sentences.length &&
+    HOLDING_WORDS.has(spokenKey(sentences[index] ?? ""))
+  ) {
+    index += 1;
+  }
+  return sentences.slice(index).join("").trim();
+}
+
 function restOf(
   running: Pick<Delegation, "partialSent" | "ended">,
   result: Omit<LiveDelegationResult, "stale">,
@@ -748,9 +811,7 @@ function restOf(
         result.commentary === null ? null : `${already}${result.commentary}`,
     };
   }
-  const whole = ended.said.startsWith(sent)
-    ? ended.said.slice(sent.length).trim()
-    : ended.said;
+  const whole = afterAlreadySaid(sent, ended.said);
   const rest = freshOn(line, whole);
   if (rest.length > 0) rememberOn(line, rest);
   const words = qSpokenWords({
@@ -2001,7 +2062,13 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       // In order, one at a time: the segments are one conversation. D10
       // (audit 14 Nov): a pause split one utterance into word fragments,
       // each stored on its own; consecutive pieces of one side are one.
-      for (const segment of coalescedSegments(report.segments)) {
+      for (const coalesced of coalescedSegments(report.segments)) {
+        // VOICE-FIX: holding lines are never stored as Q's words.
+        const segment =
+          coalesced.role === "Q"
+            ? { ...coalesced, text: withoutHoldingLines(coalesced.text) }
+            : coalesced;
+        if (segment.text.length === 0) continue;
         try {
           await store.record({
             actor: line.actor,

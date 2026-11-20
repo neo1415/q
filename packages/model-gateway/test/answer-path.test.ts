@@ -28,6 +28,22 @@ const input = (overrides: Partial<AnswerPathInput>): AnswerPathInput => ({
 });
 
 describe("answerPathOf (K8)", () => {
+  it("VOICE-FIX: discovery's one question needs no tool round and no web", () => {
+    expect(
+      answerPathOf(input({ questionKind: "ADVICE", discoveryQuestion: true })),
+    ).toEqual({ path: "PREPARED_CONTEXT", because: "DISCOVERY" });
+    // Their own next steps, now off the web, never take the research path.
+    expect(
+      answerPathOf(input({ questionKind: "ADVICE", researchMode: "NEVER" }))
+        .because,
+    ).not.toBe("RESEARCH");
+    // Asking for the web still goes to the web.
+    expect(
+      answerPathOf(input({ discoveryQuestion: true, researchMode: "EXPLICIT" }))
+        .because,
+    ).toBe("RESEARCH");
+  });
+
   it("A: companies of a kind and computed fit are direct app queries", () => {
     expect(answerPathOf(input({ discover: true })).path).toBe("APP_QUERY");
     expect(answerPathOf(input({ fit: true })).path).toBe("APP_QUERY");

@@ -1727,9 +1727,12 @@ export const TurnReaderV95ResultSchema = TurnReaderV94ResultSchema.extend({
 export type TurnReaderV95Result = z.infer<typeof TurnReaderV95ResultSchema>;
 
 /**
- * v96 (HQ-5 follow-up, 20 Nov 2026): they say they do not yet know what
- * they want and want help working it out; code opens discovery on that
- * first turn. Lenient: a malformed value reads as false.
+ * v96 (HQ-5 follow-up and VOICE-FIX, 20 Nov 2026): `seeksGuidance` (they
+ * say they do not yet know what they want; code opens discovery on that
+ * first turn), `excludes` (what they asked Q to leave out from now on, by
+ * name, as they said it: "not Tensorgate", "nothing about them"), and
+ * `choiceUnclear` (a bare yes to a question of Q's that offered more than
+ * one option, without saying which). Lenient: malformed reads as empty.
  */
 export const TURN_READER_V96_SCHEMA_VERSION = 96;
 // One flat object, not a 96th .extend(): the chained type grew past what
@@ -1738,6 +1741,12 @@ export const TurnReaderV96ResultSchema = z
   .object({
     ...TurnReaderV95ResultSchema.shape,
     seeksGuidance: z.boolean().default(false).catch(false),
+    excludes: z
+      .array(z.string().trim().min(1).max(80))
+      .max(5)
+      .default([])
+      .catch([]),
+    choiceUnclear: z.boolean().default(false).catch(false),
   })
   .strict();
 export type TurnReaderV96Result = z.infer<typeof TurnReaderV96ResultSchema>;

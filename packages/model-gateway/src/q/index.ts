@@ -144,7 +144,9 @@ import {
   answerPlanNote,
   answerPlanOf,
   atMostOneQuestion,
+  CHOICE_UNCLEAR_NOTE,
   discoveryNote,
+  exclusionNote,
   endsWithOffer,
   naturalRegisterIssues,
   offerAllowedFor,
@@ -3047,6 +3049,10 @@ export function environmentNoteParts(
     readonly offerTaken?: QRecordedOffer | undefined;
     /** C3: a yes to an offer code holds no record of. */
     readonly offerUnrecorded?: boolean | undefined;
+    /** VOICE-FIX: a bare yes to several options; the answer asks which. */
+    readonly choiceUnclear?: boolean | undefined;
+    /** VOICE-FIX: what they asked Q to leave out (held by code). */
+    readonly excluded?: readonly string[] | undefined;
     /**
      * D11: the line code closes this answer with (request.closingLines),
      * so the answer does not say it too.
@@ -3194,6 +3200,11 @@ export function environmentNoteParts(
       ? []
       : [offerTakenNote(options.offerTaken)]),
     ...(options.offerUnrecorded === true ? [OFFER_UNRECORDED_NOTE] : []),
+    ...(options.choiceUnclear === true ? [CHOICE_UNCLEAR_NOTE] : []),
+    ...(() => {
+      const note = exclusionNote(options.excluded ?? []);
+      return note === null ? [] : [note];
+    })(),
     ...(options.closingLine === undefined
       ? []
       : [closingLineNote(options.closingLine)]),
@@ -8964,6 +8975,7 @@ export function createModelGatewayQAnswer(
         askedAction: request.askedAction !== undefined,
         researchMode: research?.mode ?? "NEVER",
         aboutNamedOther: request.aboutNamedOther === true,
+        discoveryQuestion: request.discovery?.kind === "ASK",
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
@@ -9342,6 +9354,7 @@ export function createModelGatewayQAnswer(
         askedAction: request.askedAction !== undefined,
         researchMode: research?.mode ?? "NEVER",
         aboutNamedOther: request.aboutNamedOther === true,
+        discoveryQuestion: request.discovery?.kind === "ASK",
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
@@ -9834,6 +9847,10 @@ export function createModelGatewayQAnswer(
           ...(request.offerTakenUnrecorded === true
             ? { offerUnrecorded: true }
             : {}),
+          ...(request.choiceUnclear === true ? { choiceUnclear: true } : {}),
+          ...(request.excludedSubjects === undefined
+            ? {}
+            : { excluded: request.excludedSubjects }),
           ...(request.closingLines === undefined
             ? {}
             : { closingLine: request.closingLines }),

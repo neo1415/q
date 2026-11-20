@@ -102,6 +102,7 @@ import {
 } from "@capital-q/contracts";
 import {
   answerPlanOf,
+  nextExclusions,
   coverageFromMandate,
   discoveryTurn,
   INITIAL_DISCOVERY_STATE,
@@ -5964,6 +5965,18 @@ export function createSpecialistQAnswer(
    * the core's snapshot so it holds across instances.
    */
   const discoveries = new Map<string, DiscoveryState>();
+  /** VOICE-FIX: what each conversation asked Q to leave out (v96 excludes). */
+  const exclusions = new Map<string, readonly string[]>();
+  const keepExclusions = (conversationId: string, next: readonly string[]) => {
+    exclusions.delete(conversationId);
+    if (next.length === 0) return;
+    exclusions.set(conversationId, next);
+    while (exclusions.size > MAX_CONVERSATIONS) {
+      const oldest = exclusions.keys().next().value;
+      if (oldest === undefined) break;
+      exclusions.delete(oldest);
+    }
+  };
   const keepDiscovery = (conversationId: string, next: DiscoveryState) => {
     discoveries.delete(conversationId);
     discoveries.set(conversationId, next);
@@ -6117,6 +6130,10 @@ export function createSpecialistQAnswer(
     if (!discoveries.has(id) && discovery !== null) {
       keepDiscovery(id, discovery);
     }
+    const excluded = snapshot.excluded ?? [];
+    if (!exclusions.has(id) && excluded.length > 0) {
+      keepExclusions(id, excluded);
+    }
   };
   const persistCore = async (runId: string): Promise<void> => {
     const scope = scopeOfRun.get(runId);
@@ -6135,6 +6152,7 @@ export function createSpecialistQAnswer(
           offer: coreOfferOf(offers.get(id)),
           resolution: resolutions.get(id) ?? null,
           discovery: discoveries.get(id) ?? null,
+          excluded: exclusions.get(id) ?? [],
         } as const),
       )
       .catch((error: unknown) => {
@@ -8530,6 +8548,28 @@ export function createSpecialistQAnswer(
     if (read !== null && researchedMemo) {
       read = { ...read, teamJob: true, handOver: null };
     }
+    // VOICE-FIX (owner live 20 Nov 2026): a bare yes to Q's question of
+    // several options ("rehearse with a different company, review a
+    // document, or explore Discover?") opened the Tensorgate rehearsal.
+    // Read by meaning (v96 choiceUnclear), it moves nothing, takes up no
+    // offer and acts on nothing: the answer asks which (CHOICE_UNCLEAR_NOTE).
+    const choiceUnclear = read?.choiceUnclear === true;
+    if (read !== null && choiceUnclear) {
+      read = {
+        ...read,
+        navigation: null,
+        acceptsOffer: false,
+        workFromEarlier: false,
+        askedAction: null,
+      };
+    }
+    // VOICE-FIX: what they asked Q to leave out stays left out (v96
+    // excludes), held per conversation until they name it again.
+    const excludedNow = nextExclusions(exclusions.get(conversationId) ?? [], {
+      excludes: read?.excludes ?? [],
+      words: latest.content,
+    });
+    keepExclusions(conversationId, excludedNow);
     let research: Promise<QResearchDirective> = Promise.resolve(
       read === null ||
         // Lane S / C10 (audit item 6): a turn the reader read as answered
@@ -8545,6 +8585,11 @@ export function createSpecialistQAnswer(
             aboutNamedOther: read.aboutNamedOther,
             // Owner replay batch 8 (#10): asking for the web, by meaning.
             asksForWeb: read.asksForWeb ?? false,
+            // VOICE-FIX: their own next steps, a wish to be guided, and a
+            // spoken correction or own-records question stay off the web.
+            nextSteps: read.nextSteps === true,
+            seeksGuidance: read.seeksGuidance === true,
+            spoken: request.spoken === true,
           }),
     );
     if (read !== null) {
@@ -10865,6 +10910,9 @@ export function createSpecialistQAnswer(
       ...(read?.costlyIfWrong === true ? { costlyIfWrong: true } : {}),
       // v96 (HQ-5 follow-up): they want help working out what they want.
       ...(read?.seeksGuidance === true ? { seeksGuidance: true } : {}),
+      // VOICE-FIX: a yes to several options asks which; exclusions held.
+      ...(choiceUnclear ? { choiceUnclear: true } : {}),
+      ...(excludedNow.length === 0 ? {} : { excludedSubjects: excludedNow }),
       // v88 (owner live 14 Nov 2026, D1): companies other than those they
       // are already in contact with, on a FIT or catalog question.
       // v89 (audit 2026-11-15, RC2): a founder's investors too ("which

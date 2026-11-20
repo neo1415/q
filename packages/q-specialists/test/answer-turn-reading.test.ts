@@ -290,6 +290,7 @@ function seam(options: {
   const stored: QConversationMessage[] = [];
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
+  const requests: QAnswerRequest[] = [];
   const compares: unknown[] = [];
   const leadBlocks: unknown[] = [];
   const leads: (string | undefined)[] = [];
@@ -325,6 +326,7 @@ function seam(options: {
       },
       answer: async (req) => {
         delegated += 1;
+        requests.push(req);
         unread.push(req.turnUnread === true);
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
@@ -488,6 +490,7 @@ function seam(options: {
     stored,
     events,
     delegated: () => delegated,
+    requests,
     compares,
     leadBlocks,
     warmed: () => warmed,
@@ -7267,7 +7270,7 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     expect(run.investigated()).toBe(0);
   });
 
-  it("live 2026-10-30 (run 2c8fd21b): with code's priorities leading, a forced web search becomes the model's to reach for (OFFERED), decided by the lead, never by words", async () => {
+  it("live 2026-10-30 (run 2c8fd21b): with code's priorities leading, their own next steps never go to the public web (VOICE-FIX)", async () => {
     const run = seam({
       said: "What should I do today?",
       reading: advice(),
@@ -7276,15 +7279,18 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     });
     await run.answer.answer(request());
     expect(run.leads).toEqual([LEAD]);
-    expect(run.directives[0]?.mode).toBe("OFFERED");
-    // Without code's lead, the reading's own decision stands.
+    // VOICE-FIX (owner live 20 Nov 2026): what to do next in their own
+    // work is answered from their records, never the public web, lead or
+    // no lead (asking for the web, by meaning, still searches).
+    expect(run.directives[0]?.mode).toBe("NEVER");
+    // Without code's lead, the same.
     const plain = seam({
       said: "What should I do today?",
       reading: advice(),
       outcomes: [],
     });
     await plain.answer.answer(request());
-    expect(plain.directives[0]?.mode).toBe("EXPLICIT");
+    expect(plain.directives[0]?.mode).toBe("NEVER");
   });
 
   it("live 2026-10-30 (latency): code's priorities reach the person the moment they are composed, before the answer is asked, as the answer's own message", async () => {
@@ -9362,5 +9368,57 @@ describe("garbled speech is answered from the first reading where safe", () => {
     });
     await run.answer.answer(request());
     expect(run.reads()).toBe(2);
+  });
+});
+
+describe("VOICE-FIX (owner live 20 Nov 2026): exclusions held, a yes to several options asks which", () => {
+  const reading = (extra: Record<string, unknown>) =>
+    ({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: { kind: "OPTIONS", text: "what else can I do" },
+      aboutNamedOther: false,
+      tool: null,
+      handOver: null,
+      ...extra,
+    }) as unknown as TurnReaderResult;
+
+  it("'not Tensorgate' reaches the answer and stays on later turns", async () => {
+    let turn = 0;
+    const run = seam({
+      said: "No, not Tensorgate. Something new on Capital Q",
+      reading: () => {
+        turn += 1;
+        return turn === 1
+          ? reading({ excludes: ["Tensorgate"] })
+          : reading({ excludes: [] });
+      },
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.requests[0]?.excludedSubjects).toEqual(["Tensorgate"]);
+  });
+
+  it("a bare yes to several options moves nothing and asks which", async () => {
+    const run = seam({
+      said: "Yes",
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        acceptsOffer: true,
+        choiceUnclear: true,
+        navigation: { intent: "GO", destination: "REHEARSALS" },
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.requests[0]?.choiceUnclear).toBe(true);
+    expect(run.requests[0]?.offerTaken).toBeUndefined();
   });
 });

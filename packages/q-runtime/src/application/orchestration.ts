@@ -403,6 +403,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly seeksGuidance?: boolean | undefined;
   /**
+   * VOICE-FIX (TURN_READER v96): their yes answers a question of Q's that
+   * offered several options without saying which; the answer asks which.
+   */
+  readonly choiceUnclear?: boolean | undefined;
+  /** VOICE-FIX: what they asked Q to leave out, held by code (by name). */
+  readonly excludedSubjects?: readonly string[] | undefined;
+  /**
    * HQ-5: discovery's decision for this turn, made by code (q-core
    * discovery.ts). ASK: reflect, then ask exactly `question`, shown with
    * `chips` (the exit always among them). EXIT: no question; a concrete
