@@ -181,6 +181,9 @@ export function speculationMisfit(input: {
   const { final, speculative } = input;
   if (final.turnUnread === true) return "UNREAD";
   if (final.turnKind !== speculative.turnKind) return "KIND";
+  // HQ-5: a discovery turn is code's question or code's exit, never an
+  // answer written before discovery decided.
+  if (final.discovery !== undefined) return "SHAPE";
   // HQ-1: a typed speculation was written as a quick lookup. Adopted only
   // where the reading reads exactly that: the same work and shape, so the
   // same task class, reasoning level and shape note (no part, no question

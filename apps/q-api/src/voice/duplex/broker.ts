@@ -440,6 +440,13 @@ export type DuplexBrokerDependencies = {
         screen: QScreenContext | undefined,
       ) => Promise<string | null>)
     | undefined;
+  /**
+   * HQ-5: whether the person's own conversation on this line is in
+   * discovery (opening up a vague ask). Absent or false: not patient for it.
+   */
+  readonly discovering?:
+    | ((actor: ActorContext, conversationId: string) => Promise<boolean>)
+    | undefined;
   /** VOICE-BRAIN: the line's transcript, both sides (server-only). */
   readonly transcript?: DuplexTranscriptStore | undefined;
   readonly now?: (() => number) | undefined;
@@ -957,10 +964,19 @@ export function createDuplexBroker(
     const guided =
       binding.thread.welcome === true ||
       binding.thread.onboarding !== undefined;
+    // HQ-5: a conversation opening up a vague ask is thinking aloud too.
+    const conversationId = binding.thread.conversationId;
+    const discovering =
+      conversationId === undefined || dependencies.discovering === undefined
+        ? false
+        : await dependencies
+            .discovering(actor, conversationId)
+            .catch(() => false);
     // HQ-3: people pause mid-thought in onboarding; the detector waits.
     const patient = patientTurnTaking({
       welcome: binding.thread.welcome === true,
       onboarding: binding.thread.onboarding !== undefined,
+      discovery: discovering,
     });
     // Step 1: from the firewall's plan screen, never the thread's raw one.
     let situation: string | null = null;

@@ -155,6 +155,13 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly provider?: RealtimeVoiceProvider | undefined;
   /** The Deepgram transport, when composed; preferred when both exist. */
   readonly deepgram?: DeepgramVoiceProvider | undefined;
+  /**
+   * HQ-5: whether the person's own conversation is in discovery, so a line
+   * continuing it takes turns patiently. Absent or false: not for that.
+   */
+  readonly discovering?:
+    | ((actor: ActorContext, conversationId: string) => Promise<boolean>)
+    | undefined;
   readonly bindings: VoiceSessionBindings;
   /**
    * REHEARSE: what the person Q plays says first on a rehearsal line (the
@@ -1150,6 +1157,13 @@ export function registerQVoiceRoutes(
                 patientTurnTaking({
                     onboarding: input.onboarding !== undefined,
                     welcome: input.welcome === true,
+                    // HQ-5: and while a vague ask is being opened up.
+                    discovery:
+                      input.conversationId !== undefined &&
+                      dependencies.discovering !== undefined &&
+                      (await dependencies
+                        .discovering(actor, input.conversationId)
+                        .catch(() => false)),
                   })
                 ? { turnTaking: "PATIENT" as const }
                 : {}),

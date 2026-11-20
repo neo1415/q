@@ -68,8 +68,15 @@ export {
   type ResearchDecision,
 } from "./research-policy.js";
 export {
+  conversationMode,
+  DISCOVERY_ENTRY_STREAK,
+  DISCOVERY_EXIT_REASONS,
   disposeTurn,
   INITIAL_CONVERSATION_STATE,
+  INITIAL_DISCOVERY_STATE,
+  reduceDiscovery,
+  type DiscoveryExitReason,
+  type DiscoveryState,
   reduceAll,
   reduceConversation,
   resumeTarget,
@@ -132,3 +139,23 @@ export {
   type TheirWordsOptions,
 } from "./their-words.js";
 export * from "./answer-plan.js";
+export {
+  asksToSkipDiscovery,
+  atMostOneQuestion,
+  coverageFromCompany,
+  coverageFromMandate,
+  coverageFromOnboarding,
+  DISCOVERY_EXIT_CHIP,
+  DISCOVERY_GAPS,
+  DISCOVERY_QUESTION_CAP,
+  DISCOVERY_SIDES,
+  DISCOVERY_UNSURE_CHIP,
+  discoveryNote,
+  discoveryTurn,
+  nextDiscoveryGap,
+  type DiscoveryCoverage,
+  type DiscoveryGapDefinition,
+  type DiscoveryMandate,
+  type DiscoverySide,
+  type DiscoveryTurn,
+} from "./discovery.js";

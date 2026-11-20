@@ -85,7 +85,42 @@ export type ConversationState = {
   readonly repair: RepairHistory | null;
   /** Consecutive turns that produced no progress on the topic in hand. */
   readonly stalled: number;
+  /** HQ-5: opening up a vague ask (discovery.ts). */
+  readonly discovery: DiscoveryState;
 };
+
+export const DISCOVERY_EXIT_REASONS = [
+  "ASKED_TO_SKIP",
+  "CAP",
+  "COVERED",
+  "NO_GAP_MODEL",
+  "TASK",
+] as const;
+export type DiscoveryExitReason = (typeof DISCOVERY_EXIT_REASONS)[number];
+
+/**
+ * HQ-5: discovery's own state. `asked` holds the gaps already asked about
+ * (one question a turn); `exited` why it last ended. An exit they asked
+ * for, or the question cap, holds for the rest of the conversation: a
+ * "just show me" is never answered by more questions later.
+ */
+export type DiscoveryState = {
+  readonly active: boolean;
+  readonly asked: readonly string[];
+  /** Turns in a row read as underspecified; two in a row enters. */
+  readonly underspecifiedInARow: number;
+  readonly exited: DiscoveryExitReason | null;
+};
+
+export const INITIAL_DISCOVERY_STATE: DiscoveryState = {
+  active: false,
+  asked: [],
+  underspecifiedInARow: 0,
+  exited: null,
+};
+
+/** Underspecified turns in a row that enter discovery. */
+export const DISCOVERY_ENTRY_STREAK = 2;
 
 export const INITIAL_CONVERSATION_STATE: ConversationState = {
   turn: 0,
@@ -100,6 +135,7 @@ export const INITIAL_CONVERSATION_STATE: ConversationState = {
   failures: EMPTY_FAILURES,
   repair: null,
   stalled: 0,
+  discovery: INITIAL_DISCOVERY_STATE,
 };
 
 const MAX_SELECTIONS = 12;
@@ -148,7 +184,81 @@ export type ConversationEvent =
       readonly strategy: RepairStrategy;
     }
   | { readonly type: "PROGRESSED" }
-  | { readonly type: "STALLED" };
+  | { readonly type: "STALLED" }
+  | {
+      /** HQ-5: the answer plan for the turn, as discovery reads it. */
+      readonly type: "PLANNED";
+      readonly discoveryShape: boolean;
+      readonly underspecified: boolean;
+      /** A clear ask for something: it is answered as itself. */
+      readonly task: boolean;
+    }
+  | { readonly type: "DISCOVERY_ASKED"; readonly gap: string }
+  | { readonly type: "DISCOVERY_EXITED"; readonly reason: DiscoveryExitReason };
+
+/** An exit that holds for the rest of the conversation. */
+const STICKY_EXITS: ReadonlySet<DiscoveryExitReason> = new Set([
+  "ASKED_TO_SKIP",
+  "CAP",
+]);
+
+/** HQ-5: discovery's transition; the one source of it (discovery.ts uses it). */
+export function reduceDiscovery(
+  discovery: DiscoveryState,
+  event: ConversationEvent,
+): DiscoveryState {
+  if (event.type === "PLANNED") {
+    const streak = event.underspecified
+      ? discovery.underspecifiedInARow + 1
+      : 0;
+    if (discovery.active) {
+      // A clear ask, read as neither vague nor discovery: answered as
+      // itself, and discovery ends.
+      return event.task && !event.underspecified && !event.discoveryShape
+        ? {
+            ...discovery,
+            active: false,
+            underspecifiedInARow: 0,
+            exited: "TASK",
+          }
+        : { ...discovery, underspecifiedInARow: streak };
+    }
+    const held =
+      discovery.exited !== null && STICKY_EXITS.has(discovery.exited);
+    const enters =
+      !held && (event.discoveryShape || streak >= DISCOVERY_ENTRY_STREAK);
+    return enters
+      ? {
+          active: true,
+          asked: [],
+          underspecifiedInARow: streak,
+          exited: null,
+        }
+      : { ...discovery, underspecifiedInARow: streak };
+  }
+  if (event.type === "DISCOVERY_ASKED") {
+    return discovery.asked.includes(event.gap)
+      ? discovery
+      : { ...discovery, asked: [...discovery.asked, event.gap].slice(-32) };
+  }
+  if (event.type === "DISCOVERY_EXITED") {
+    return {
+      ...discovery,
+      active: false,
+      underspecifiedInARow: 0,
+      exited: event.reason,
+    };
+  }
+  // Every other event leaves discovery as it is.
+  return discovery;
+}
+
+/** HQ-5: whether the conversation is opening up a vague ask or doing a task. */
+export function conversationMode(
+  state: Pick<ConversationState, "discovery">,
+): "DISCOVERY" | "TASK" {
+  return state.discovery.active ? "DISCOVERY" : "TASK";
+}
 
 export function reduceConversation(
   state: ConversationState,
@@ -284,6 +394,10 @@ export function reduceConversation(
       return { ...state, stalled: 0 };
     case "STALLED":
       return { ...state, stalled: state.stalled + 1 };
+    case "PLANNED":
+    case "DISCOVERY_ASKED":
+    case "DISCOVERY_EXITED":
+      return { ...state, discovery: reduceDiscovery(state.discovery, event) };
   }
 }
 

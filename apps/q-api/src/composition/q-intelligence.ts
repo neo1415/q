@@ -280,6 +280,8 @@ export type QIntelligenceDependencies = {
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
   readonly ownOnboarding?: QOwnOnboardingPort | undefined;
+  /** HQ-5: what their onboarding already declared, for discovery's gaps. */
+  readonly discoveryCoverage?: SpecialistQAnswerDependencies["discoveryCoverage"];
   /** Setup reminders at a natural pause (founder directive 2026-09-27). */
   readonly onboardingNudge?: QOnboardingNudgePort | undefined;
   /** ADR 0050: the business etiquette guides in force for this person. */
@@ -885,6 +887,9 @@ export function composeQIntelligence(
     // Their own mandate, for a mandate document (gap 3): read through the
     // same tool, under the run's plan.
     ownMandate: createToolOwnMandatePort(tools, logger, MANDATE_LABELS),
+    ...(dependencies.discoveryCoverage === undefined
+      ? {}
+      : { discoveryCoverage: dependencies.discoveryCoverage }),
     // The names on their own records, so a company name they said —
     // misheard by speech-to-text or not — resolves to what is theirs
     // before anything is researched (founder live 2026-09-27, #6).
