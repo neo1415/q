@@ -1325,6 +1325,7 @@ export function answerShapeNoteOf(request: {
     readonly { readonly ask: string; readonly kind: string }[] | undefined;
   readonly underspecified?: boolean | undefined;
   readonly costlyIfWrong?: boolean | undefined;
+  readonly seeksGuidance?: boolean | undefined;
   readonly discovery?: QAnswerRequest["discovery"];
 }): string | null {
   if (
@@ -1348,6 +1349,7 @@ function answerPlanInputOf(request: Parameters<typeof answerShapeNoteOf>[0]) {
     turnKind: request.turnKind,
     underspecified: request.underspecified,
     costlyIfWrong: request.costlyIfWrong,
+    seeksGuidance: request.seeksGuidance,
   };
 }
 

@@ -204,6 +204,7 @@ import { TURN_READER_V92 } from "./tasks/turn-reader.v92.js";
 import { TURN_READER_V93 } from "./tasks/turn-reader.v93.js";
 import { TURN_READER_V94 } from "./tasks/turn-reader.v94.js";
 import { TURN_READER_V95 } from "./tasks/turn-reader.v95.js";
+import { TURN_READER_V96 } from "./tasks/turn-reader.v96.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -277,6 +278,7 @@ import { TURN_SKIM_V9 } from "./tasks/turn-skim.v9.js";
 import { TURN_SKIM_V10 } from "./tasks/turn-skim.v10.js";
 import { TURN_SKIM_V11 } from "./tasks/turn-skim.v11.js";
 import { TURN_SKIM_V12 } from "./tasks/turn-skim.v12.js";
+import { TURN_SKIM_V13 } from "./tasks/turn-skim.v13.js";
 import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { WEB_DISCOVERY_READER_V1 } from "./tasks/web-discovery-reader.v1.js";
 import { NAVIGATION_DECISION_V1 } from "./tasks/navigation-decision.v1.js";
@@ -852,7 +854,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...TURN_READER_V92, status: "DEPRECATED" },
     { ...TURN_READER_V93, status: "DEPRECATED" },
     { ...TURN_READER_V94, status: "DEPRECATED" },
-    TURN_READER_V95,
+    { ...TURN_READER_V95, status: "DEPRECATED" },
+    TURN_READER_V96,
     MEMORY_EXTRACTOR_V1,
     { ...MEMORY_EXTRACTOR_V2, status: "DEPRECATED" },
     // Decision 97: extraction lists with no count ceiling.
@@ -1051,7 +1054,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...TURN_SKIM_V9, status: "DEPRECATED" },
     { ...TURN_SKIM_V10, status: "DEPRECATED" },
     { ...TURN_SKIM_V11, status: "DEPRECATED" },
-    TURN_SKIM_V12,
+    { ...TURN_SKIM_V12, status: "DEPRECATED" },
+    TURN_SKIM_V13,
     PERSON_BRIEF_READER_V1,
     WEB_DISCOVERY_READER_V1,
     { ...NAVIGATION_DECISION_V1, status: "DEPRECATED" },

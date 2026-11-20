@@ -28,6 +28,26 @@ const reviewRows = vi.fn<() => Promise<unknown>>();
 vi.mock("@capital-q/api-client", () => ({
   getAdminVerificationQueue: () => verificationRows(),
   getAdminReviews: () => reviewRows(),
+  // V1: one provider connected, one not, as the API reports them.
+  getVerificationProviders: () =>
+    Promise.resolve({
+      providers: [
+        {
+          provider: "COMPANIES_HOUSE",
+          label: "Companies House",
+          covers: "UK company register",
+          connected: true,
+          description: "Companies House is connected.",
+        },
+        {
+          provider: "SUMSUB",
+          label: "Sumsub",
+          covers: "ID, selfie and company checks in other countries",
+          connected: false,
+          description: "Sumsub is not connected.",
+        },
+      ],
+    }),
 }));
 vi.mock("../src/features/admin/verification-queue", () => ({
   VerificationQueue: ({ rows }: { rows: readonly unknown[] }) => (
@@ -68,6 +88,20 @@ describe("the merged admin queue (design-48)", () => {
     ).toBe("page");
     expect(screen.getByRole("link", { name: "Reviews 3" })).toBeTruthy();
     expect(screen.getByText("verification rows 2")).toBeTruthy();
+  });
+
+  it("says plainly which verification providers are not connected (V1)", async () => {
+    permissions = ["verification.read"];
+    verificationRows.mockResolvedValue({ rows: [] });
+    await page({});
+    const sumsub = document.querySelector('[data-provider="SUMSUB"]');
+    expect(sumsub?.getAttribute("data-connected")).toBe("no");
+    expect(sumsub?.textContent).toContain("Not connected");
+    expect(
+      document
+        .querySelector('[data-provider="COMPANIES_HOUSE"]')
+        ?.getAttribute("data-connected"),
+    ).toBe("yes");
   });
 
   it("opens the reviews tab when asked", async () => {

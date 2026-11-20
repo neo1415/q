@@ -280,3 +280,15 @@ export const TurnSkimV12ResultSchema = TurnSkimV11ResultSchema.extend({
   costlyIfWrong: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnSkimV12Result = z.infer<typeof TurnSkimV12ResultSchema>;
+
+export const TURN_SKIM_V13_SCHEMA_VERSION = 13;
+
+/**
+ * v13 (HQ-5 follow-up, 20 Nov 2026): they say they do not yet know what
+ * they want and want help working it out; discovery opens on that turn.
+ * Lenient: a malformed value reads as false.
+ */
+export const TurnSkimV13ResultSchema = TurnSkimV12ResultSchema.extend({
+  seeksGuidance: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnSkimV13Result = z.infer<typeof TurnSkimV13ResultSchema>;

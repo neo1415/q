@@ -398,6 +398,11 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly underspecified?: boolean | undefined;
   readonly costlyIfWrong?: boolean | undefined;
   /**
+   * HQ-5 follow-up (TURN_READER v96): they say they do not yet know what
+   * they want and want help working it out; discovery opens on this turn.
+   */
+  readonly seeksGuidance?: boolean | undefined;
+  /**
    * HQ-5: discovery's decision for this turn, made by code (q-core
    * discovery.ts). ASK: reflect, then ask exactly `question`, shown with
    * `chips` (the exit always among them). EXIT: no question; a concrete

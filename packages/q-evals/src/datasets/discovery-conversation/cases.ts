@@ -1,4 +1,5 @@
 import {
+  answerPlanOf,
   DISCOVERY_EXIT_CHIP,
   DISCOVERY_GAPS,
   INITIAL_CONVERSATION_STATE,
@@ -39,6 +40,11 @@ export type DiscoveryScriptTurn = {
   readonly discoveryShape?: boolean | undefined;
   /** A clear ask for something (a typed question, analysis). */
   readonly task?: boolean | undefined;
+  /**
+   * HQ-5 follow-up: the readers read that they want help working out what
+   * they want (seeksGuidance), beside advice; the plan picks the shape.
+   */
+  readonly seeksGuidance?: boolean | undefined;
   /** What the model wrote back, before code's post-processing. */
   readonly reply: string;
 };
@@ -51,6 +57,8 @@ export type DiscoveryCase = {
   readonly turns: readonly DiscoveryScriptTurn[];
   /** The exit they took, if any: the turn index of it. */
   readonly exitAt?: number | undefined;
+  /** Discovery must open on this turn (a question asked there). */
+  readonly entersAt?: number | undefined;
 };
 
 export type DiscoveryTranscriptTurn = {
@@ -162,6 +170,30 @@ export const DISCOVERY_CASES: readonly DiscoveryCase[] = [
     ],
   },
   {
+    // Live 20 Nov 2026, fictional Savanna: this first turn got a grounded
+    // suggestion and no question. Seeking guidance opens discovery at once.
+    id: "investor-not-sure-first-turn",
+    coverage: { side: "INVESTOR", known: ["SECTORS", "STAGES"] },
+    evidence: ["Maji Loop"],
+    entersAt: 0,
+    turns: [
+      {
+        words: "I'm not really sure what I'm looking for right now",
+        underspecified: false,
+        seeksGuidance: true,
+        reply:
+          "Not sure yet, that's fine. Maji Loop and two other matches are waiting on Capital Q. How much did you put into the last company you backed?",
+      },
+      {
+        words: DISCOVERY_EXIT_CHIP,
+        underspecified: false,
+        reply:
+          "Open Maji Loop first: it matches your sectors and stage and has its revenue documents on Capital Q. I assumed a seed-sized cheque.",
+      },
+    ],
+    exitAt: 1,
+  },
+  {
     id: "investor-vague-stop-asking",
     coverage: { side: "INVESTOR", known: ["SECTORS"] },
     evidence: ["Tessellate Health"],
@@ -219,9 +251,19 @@ export function runDiscoveryCase(
 ): readonly DiscoveryTranscriptTurn[] {
   let state: ConversationState = INITIAL_CONVERSATION_STATE;
   return one.turns.map((turn) => {
+    // The plan as the seam picks it: seeking guidance read beside advice.
+    const planned =
+      turn.seeksGuidance === true
+        ? answerPlanOf({
+            answerKinds: ["CHAT"],
+            questionKind: "ADVICE",
+            seeksGuidance: true,
+          })
+        : null;
     const decided = discoveryTurn(state, {
       words: turn.words,
-      discoveryShape: turn.discoveryShape === true,
+      discoveryShape:
+        turn.discoveryShape === true || planned?.shape === "DISCOVERY",
       underspecified: turn.underspecified,
       task: turn.task === true,
       coverage: one.coverage,
@@ -294,6 +336,9 @@ export function gradeDiscoveryConversation(
       if (reask !== undefined && reask.test(words(turn.said))) {
         failures.push(`${at}: re-asked the declared ${key}`);
       }
+    }
+    if (one.entersAt === index && decision?.kind !== "ASK") {
+      failures.push(`${at}: discovery did not open`);
     }
     if (one.exitAt === index) {
       if (decision?.kind !== "EXIT" || decision.reason !== "ASKED_TO_SKIP") {

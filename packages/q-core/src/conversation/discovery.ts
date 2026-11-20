@@ -369,7 +369,13 @@ export function discoveryNote(
       ? ""
       : ` Already on record, so never ask about it: ${turn.known.join("; ")}.`;
   if (turn.kind === "ASK") {
-    return `DISCOVERY (question ${String(turn.asked)} of at most ${String(DISCOVERY_QUESTION_CAP)}): what they want is not yet clear. Reflect back in one short line what they just told you, in their words. Then ask exactly this one question, and no other: "${turn.question}"${known} No list, no recommendation and no offer yet. At most about 50 words.`;
+    // HQ-5 follow-up: the first turn may open with what is already waiting
+    // for them, grounded in what Q holds, before the one question.
+    const opening =
+      turn.asked === 1
+        ? " On this first turn you may first say, in one short line, what is already waiting for them on Capital Q, only from what you hold; never invent it."
+        : "";
+    return `DISCOVERY (question ${String(turn.asked)} of at most ${String(DISCOVERY_QUESTION_CAP)}): what they want is not yet clear. Reflect back in one short line what they just told you, in their words.${opening} Then ask exactly this one question, and no other: "${turn.question}"${known} No list, no recommendation and no offer yet. At most about ${turn.asked === 1 ? "70" : "50"} words.`;
   }
   return `DISCOVERY IS OVER (${EXIT_WORDS.get(turn.reason) ?? "Q works with what it has"}). Ask no question. Give one concrete recommendation or next step now, grounded only in what Capital Q holds for them and what they have said here. Where something is still unknown, say in a few words the default you assumed; never record one.${known}`;
 }

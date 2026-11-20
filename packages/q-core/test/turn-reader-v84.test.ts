@@ -12,7 +12,7 @@ import {
   TurnReaderV84ResultSchema,
   V83_NAVIGATION,
   V84_NAVIGATION,
-  TurnReaderV95ResultSchema,
+  TurnReaderV96ResultSchema,
 } from "../src/index.js";
 
 /**
@@ -24,12 +24,12 @@ describe("TURN_READER v84", () => {
   it("v83 with its NAVIGATION paragraph replaced (v87 is active, on its schema)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(95);
+    expect(active.version).toBe(96);
     expect(registry.get("TURN_READER", 83)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV95ResultSchema,
+      TurnReaderV96ResultSchema,
     );
     expect(TURN_READER_V84.variables).toEqual(TURN_READER_V83.variables);
     expect(TURN_READER_V84.template).not.toContain(V83_NAVIGATION);

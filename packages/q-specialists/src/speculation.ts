@@ -45,6 +45,7 @@ export function typedSkimQuick(
     readonly onWeb?: boolean | undefined;
     readonly underspecified?: boolean | undefined;
     readonly costlyIfWrong?: boolean | undefined;
+    readonly seeksGuidance?: boolean | undefined;
   } | null,
 ): boolean {
   return (
@@ -55,7 +56,9 @@ export function typedSkimQuick(
     skimmed.document !== true &&
     skimmed.onWeb !== true &&
     skimmed.underspecified !== true &&
-    skimmed.costlyIfWrong !== true
+    skimmed.costlyIfWrong !== true &&
+    // HQ-5 follow-up: opening up what they want is discovery's, not a lookup.
+    skimmed.seeksGuidance !== true
   );
 }
 

@@ -6003,6 +6003,7 @@ export function createSpecialistQAnswer(
       turnKind: request.turnKind,
       underspecified: request.underspecified,
       costlyIfWrong: request.costlyIfWrong,
+      seeksGuidance: request.seeksGuidance,
     });
     const reading = {
       words,
@@ -10862,6 +10863,8 @@ export function createSpecialistQAnswer(
       // v95 (HQ-1): the answer's shape, with the kinds already read.
       ...(read?.underspecified === true ? { underspecified: true } : {}),
       ...(read?.costlyIfWrong === true ? { costlyIfWrong: true } : {}),
+      // v96 (HQ-5 follow-up): they want help working out what they want.
+      ...(read?.seeksGuidance === true ? { seeksGuidance: true } : {}),
       // v88 (owner live 14 Nov 2026, D1): companies other than those they
       // are already in contact with, on a FIT or catalog question.
       // v89 (audit 2026-11-15, RC2): a founder's investors too ("which

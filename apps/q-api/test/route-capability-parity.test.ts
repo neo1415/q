@@ -768,6 +768,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/verification.ts GET `${base}${COMPANY_VERIFICATION_SEGMENT}`": cap(
     "tool.read_my_record",
   ),
+  "api/http/verification.ts GET VERIFICATION_PROVIDERS_PATH": exempt(
+    "deployment status for the screen (which verification providers are connected); no person's data, nothing to act on",
+  ),
 
   "api/http/visibility.ts GET COMPANY_VISIBILITY_STATE_PATH": cap(
     "tool.get_disclosure_state",

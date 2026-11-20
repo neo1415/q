@@ -15,7 +15,7 @@ describe("discovery conversations ($0, graded by code)", () => {
     const ids = DISCOVERY_CASES.map((one) => one.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter((id) => id.startsWith("founder-")).length).toBe(2);
-    expect(ids.filter((id) => id.startsWith("investor-")).length).toBe(3);
+    expect(ids.filter((id) => id.startsWith("investor-")).length).toBe(4);
     expect(
       DISCOVERY_CASES.filter((one) => one.exitAt !== undefined).length,
     ).toBeGreaterThanOrEqual(3);
@@ -64,5 +64,20 @@ describe("discovery conversations ($0, graded by code)", () => {
     expect(failures).toContain("turn 3: re-asked the declared STAGE");
     expect(failures).toContain("turn 3: no visible exit");
     expect(failures).toContain("ended on a question, not a next step");
+  });
+
+  it("seeking guidance opens discovery on the first turn; without it, it does not", () => {
+    const one = DISCOVERY_CASES.find(
+      (candidate) => candidate.id === "investor-not-sure-first-turn",
+    );
+    if (one === undefined) throw new Error("case missing");
+    expect(runDiscoveryCase(one)[0]?.decision?.kind).toBe("ASK");
+    const unsignalled = {
+      ...one,
+      turns: one.turns.map((turn) => ({ ...turn, seeksGuidance: false })),
+    };
+    expect(
+      gradeDiscoveryConversation(unsignalled, runDiscoveryCase(unsignalled)),
+    ).toContain("turn 0: discovery did not open");
   });
 });
