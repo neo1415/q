@@ -1,5 +1,9 @@
 import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
-import type { ConversationCoreStore } from "@capital-q/q-specialists";
+import type { ActorContext } from "@capital-q/security";
+import {
+  discoveryActiveIn,
+  type ConversationCoreStore,
+} from "@capital-q/q-specialists";
 
 /** conversations_core_state_check (20261220200000). */
 const CORE_STATE_MAX_CHARS = 16_384;
@@ -43,5 +47,43 @@ export function createPostgresConversationCore(dependencies: {
            and jsonb_typeof(candidate.value) = 'object'
            and length(candidate.value::text) <= ${CORE_STATE_MAX_CHARS}`;
     },
+  };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+/** A voice line opens without waiting longer than this for the read. */
+export const DISCOVERY_READ_DEADLINE_MS = 300;
+
+/**
+ * HQ-5: whether the person's own conversation is in discovery (its core
+ * snapshot), so a voice line opened on it takes turns patiently. Read by
+ * tenant, conversation and owner: never another person's conversation.
+ * Slow, failed or unreadable: false, and the line opens as before.
+ */
+export function createConversationDiscoveryRead(dependencies: {
+  readonly sql: DatabaseExecutor;
+  readonly deadlineMs?: number | undefined;
+}): (actor: ActorContext, conversationId: string) => Promise<boolean> {
+  const { sql } = dependencies;
+  const deadline = dependencies.deadlineMs ?? DISCOVERY_READ_DEADLINE_MS;
+  return async (actor, conversationId) => {
+    if (!UUID.test(conversationId)) return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), deadline);
+    });
+    const read = sql<{ core_state: unknown }[]>`
+      select core_state from q_runtime.conversations
+       where id = ${conversationId}
+         and tenant_id = ${actor.tenantId}
+         and user_id = ${actor.userId}`.then(
+      (rows) => rows[0]?.core_state ?? null,
+      () => null,
+    );
+    const stored = await Promise.race([read, late]).finally(() => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
+    return discoveryActiveIn(stored);
   };
 }

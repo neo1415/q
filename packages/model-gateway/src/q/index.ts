@@ -143,6 +143,8 @@ import {
   ANALYTICAL_QUESTION_KINDS,
   answerPlanNote,
   answerPlanOf,
+  atMostOneQuestion,
+  discoveryNote,
   endsWithOffer,
   naturalRegisterIssues,
   offerAllowedFor,
@@ -1323,6 +1325,7 @@ export function answerShapeNoteOf(request: {
     readonly { readonly ask: string; readonly kind: string }[] | undefined;
   readonly underspecified?: boolean | undefined;
   readonly costlyIfWrong?: boolean | undefined;
+  readonly discovery?: QAnswerRequest["discovery"];
 }): string | null {
   if (
     request.capability !== "ANSWER" ||
@@ -1332,6 +1335,8 @@ export function answerShapeNoteOf(request: {
   ) {
     return null;
   }
+  // HQ-5: discovery's own note, decided by code, in the plan's place.
+  if (request.discovery !== undefined) return discoveryNote(request.discovery);
   const plan = answerPlanOf(answerPlanInputOf(request));
   return plan === null ? null : answerPlanNote(plan);
 }
@@ -1357,6 +1362,8 @@ export function modelOfferAllowed(
   if (request.capability !== "ANSWER" || request.writingDocument === true) {
     return null;
   }
+  // HQ-5: a discovery question is the turn's one ask; no offer beside it.
+  if (request.discovery?.kind === "ASK") return false;
   return offerAllowedFor(answerPlanOf(answerPlanInputOf(request)));
 }
 
@@ -1372,6 +1379,36 @@ export function withoutTrailingOffers(text: string): string {
   while (end > 0 && endsWithOffer(sentences[end - 1] ?? "")) end -= 1;
   if (end === sentences.length || end === 0) return text;
   return sentences.slice(0, end).join("").trim();
+}
+
+/** HQ-5: a discovery question turn says one question, whatever was written. */
+export function discoveryAsked(
+  request: { readonly discovery?: QAnswerRequest["discovery"] },
+  text: string,
+): string {
+  return request.discovery?.kind === "ASK"
+    ? atMostOneQuestion(text, request.discovery.question)
+    : text;
+}
+
+/**
+ * HQ-5: the discovery question as a card with its chips, the exit
+ * ("Just show me") always among them, so leaving is one tap. A chip
+ * comes back as their own words, which discovery reads.
+ */
+export function discoveryBlocks(request: {
+  readonly discovery?: QAnswerRequest["discovery"];
+}): readonly QResultBlock[] {
+  const turn = request.discovery;
+  if (turn?.kind !== "ASK") return [];
+  const options = turn.chips.slice(0, 6);
+  return [
+    {
+      kind: "CLARIFICATION_REQUEST",
+      question: turn.question,
+      ...(options.length >= 2 ? { options } : {}),
+    },
+  ];
 }
 
 /**
@@ -16017,9 +16054,13 @@ export function createModelGatewayQAnswer(
                             : atMostOneOffer(said))(
                         // HQ-2 slice 3: no closing offer where none is allowed.
                         ((kept: string) =>
-                          modelOfferAllowed(request) === false
-                            ? withoutTrailingOffers(kept)
-                            : kept)(
+                          // HQ-5: a discovery turn asks one question.
+                          discoveryAsked(
+                            request,
+                            modelOfferAllowed(request) === false
+                              ? withoutTrailingOffers(kept)
+                              : kept,
+                          ))(
                           withoutRememberTalk(
                             leadLines === undefined
                               ? (statusTalk?.text ?? guarded.text)
@@ -16482,6 +16523,7 @@ export function createModelGatewayQAnswer(
         const ownPictureShown = companyMedia.some((block) => block.image);
         const codeBlocks = [
           ...conflicts,
+          ...discoveryBlocks(request),
           ...(builtCards === null ? [] : [builtCards]),
           ...(tableToShow === null ? [] : [tableToShow]),
           ...(chartToShow === null ? [] : [chartToShow]),

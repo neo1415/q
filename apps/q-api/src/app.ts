@@ -358,6 +358,7 @@ export type QApiModules = {
         | "board"
         | "welcome"
         | "deepgram"
+        | "discovering"
         | "duplex"
         | "live"
         | "speech"
@@ -885,6 +886,7 @@ export function createApp(
       board: modules.voice.board,
       welcome: modules.voice.welcome,
       deepgram: modules.voice.deepgram,
+      discovering: modules.voice.discovering,
       speech: modules.voice.speech,
       speechThrottle: modules.voice.speechThrottle,
       speechDailyThrottle: modules.voice.speechDailyThrottle,

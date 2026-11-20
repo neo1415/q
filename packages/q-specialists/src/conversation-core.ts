@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { QuestionSequence } from "@capital-q/q-core";
+import {
+  DISCOVERY_EXIT_REASONS,
+  type DiscoveryState,
+  type QuestionSequence,
+} from "@capital-q/q-core";
 import type {
   QOpenResolution,
   QResolutionCounterparty,
@@ -44,6 +48,12 @@ export type ConversationCoreSnapshot = {
    * a deploy or on another instance. Optional: older snapshots carry none.
    */
   readonly resolution?: QOpenResolution | null | undefined;
+  /**
+   * HQ-5: discovery's state (q-core state.ts), so the questions already
+   * asked, the cap and a "just show me" hold after a deploy and on every
+   * instance. Optional: older snapshots carry none (not in discovery).
+   */
+  readonly discovery?: DiscoveryState | null | undefined;
 };
 
 /** A recorded action offer, as the core keeps it (answer.ts RecordedOffer). */
@@ -128,7 +138,24 @@ const SnapshotSchema = z.object({
     })
     .nullable()
     .optional(),
+  discovery: z
+    .object({
+      active: z.boolean(),
+      asked: z.array(z.string().min(1).max(40)).max(32),
+      underspecifiedInARow: z.number().int().min(0).max(50),
+      exited: z.enum(DISCOVERY_EXIT_REASONS).nullable(),
+    })
+    .nullable()
+    .optional(),
 });
+
+/**
+ * HQ-5: whether a stored snapshot has the conversation in discovery, so a
+ * voice line opened on it takes turns patiently. Anything unreadable: no.
+ */
+export function discoveryActiveIn(stored: unknown): boolean {
+  return readCoreSnapshot(stored)?.discovery?.active === true;
+}
 
 /** A stored snapshot, or null when it is absent or not one we wrote. */
 export function readCoreSnapshot(
@@ -136,12 +163,20 @@ export function readCoreSnapshot(
 ): ConversationCoreSnapshot | null {
   const read = SnapshotSchema.safeParse(stored);
   if (!read.success) return null;
-  const { focus, unclearInARow, lastAction, sequence, offer, resolution } =
-    read.data;
+  const {
+    focus,
+    unclearInARow,
+    lastAction,
+    sequence,
+    offer,
+    resolution,
+    discovery,
+  } = read.data;
   return {
     unclearInARow,
     lastAction,
     sequence,
+    ...(discovery === undefined || discovery === null ? {} : { discovery }),
     ...(offer === undefined || offer === null ? {} : { offer }),
     ...(resolution === undefined || resolution === null ? {} : { resolution }),
     focus:

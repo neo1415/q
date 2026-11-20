@@ -377,6 +377,7 @@ export {
   createToolReadinessLead,
 } from "./readiness-lead.js";
 export {
+  discoveryActiveIn,
   readCoreSnapshot,
   type ConversationCoreScope,
   type ConversationCoreSnapshot,

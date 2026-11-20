@@ -398,6 +398,28 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly underspecified?: boolean | undefined;
   readonly costlyIfWrong?: boolean | undefined;
   /**
+   * HQ-5: discovery's decision for this turn, made by code (q-core
+   * discovery.ts). ASK: reflect, then ask exactly `question`, shown with
+   * `chips` (the exit always among them). EXIT: no question; a concrete
+   * next step from what is held. `known` names what is already declared,
+   * never asked. Form only, never what may be read. Absent: not discovery.
+   */
+  readonly discovery?:
+    | {
+        readonly kind: "ASK";
+        readonly gap: string;
+        readonly question: string;
+        readonly known: readonly string[];
+        readonly asked: number;
+        readonly chips: readonly string[];
+      }
+    | {
+        readonly kind: "EXIT";
+        readonly reason: string;
+        readonly known: readonly string[];
+      }
+    | undefined;
+  /**
    * Whom the turn is about, as the turn reader understood it (v58): the
    * only name the public web and its pictures are searched by -- never one
    * guessed from capital letters (production 2026-10-23: "Yes" was).

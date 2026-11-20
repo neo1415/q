@@ -23,6 +23,8 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createEvidenceWatermark } from "./composition/evidence-watermark.js";
+import { createConversationDiscoveryRead } from "./composition/conversation-core-state.js";
+import { discoveryCoverageOf } from "./composition/discovery-coverage.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
 import { createOrganisationRoleReader } from "./composition/organisation-role.js";
 import {
@@ -2953,6 +2955,10 @@ const profileFindingsReader = createProfileFindingsReader({
 // Lane ob1 (owner decision 2026-10-16): Q infers communication
 // preferences only with the person's consent, per tenant; no row is no.
 const preferenceLearningConsent = createPostgresPreferenceLearningConsent({
+  sql: database.sql,
+});
+// HQ-5: whether the person's own conversation is in discovery (voice lines).
+const conversationDiscovery = createConversationDiscoveryRead({
   sql: database.sql,
 });
 const ownOnboardingSummaryReads = createOwnOnboardingSummaryReader({
@@ -6005,6 +6011,13 @@ const qIntelligence = composeQIntelligence({
       journeys: await ownOnboardingSummaries.read(actor.userId),
     }),
   },
+  // HQ-5: discovery never asks what their own setup already declared.
+  discoveryCoverage: {
+    read: async (request) =>
+      discoveryCoverageOf(
+        await ownOnboardingSummaries.read(request.actor.userId),
+      ),
+  },
   onboardingNudge: {
     peek: (actor: ActorContext, conversationId: string) =>
       onboardingNudges.peek(actor.userId, {
@@ -8750,6 +8763,8 @@ const duplexBroker =
         spend: createPostgresDuplexSpend(database.sql),
         // BACKCHANNEL: the person's listening level, through the Write Gate.
         listening: createMemoryListeningStore(memoryService),
+        // HQ-5: a conversation in discovery takes turns patiently.
+        discovering: conversationDiscovery,
         // Step 1: the line is told the date, their time and who is asking.
         situation: async (actor, screen) =>
           situationHeader({
@@ -9220,6 +9235,8 @@ const { app, logger: appLogger } = createApp(
               quota: speechQuotaFrom(process.env),
             }),
             bindings: voiceBindings,
+            // HQ-5: a conversation in discovery takes turns patiently.
+            discovering: conversationDiscovery,
             // DECISIONS 68: OpenAI's account out -> ElevenLabs speech,
             // Q's own brain (the Model Gateway, on Claude) answering.
             openAiExhausted: () => providerAccounts.exhausted("openai"),

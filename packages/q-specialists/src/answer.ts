@@ -101,6 +101,15 @@ import {
   type QVisibleStage,
 } from "@capital-q/contracts";
 import {
+  answerPlanOf,
+  coverageFromMandate,
+  discoveryTurn,
+  INITIAL_DISCOVERY_STATE,
+  reduceAll,
+  reduceDiscovery,
+  TurnAnswerKindSchema,
+  type DiscoveryCoverage,
+  type DiscoveryState,
   INITIAL_CONVERSATION_STATE,
   isUnclearTurn,
   NO_RESEARCH,
@@ -1791,6 +1800,19 @@ export type SpecialistQAnswerDependencies = {
    * is resolved and the reading is used as said.
    */
   readonly ownRecords?: QOwnRecordsPort | undefined;
+  /**
+   * HQ-5: what Q already holds for this person against the discovery gap
+   * model (their onboarding answers, mandate, company record), read as
+   * them. Read only while the conversation is in discovery. Absent or
+   * null: no gap model, so discovery asks nothing and moves to a next step.
+   */
+  readonly discoveryCoverage?:
+    | {
+        readonly read: (
+          request: QAnswerRequest,
+        ) => Promise<DiscoveryCoverage | null>;
+      }
+    | undefined;
   /**
    * Acceptance 2026-11-04 (J3): a company named in a document request,
    * resolved to the Capital Q record the person may open and planned by
@@ -5937,6 +5959,121 @@ export function createSpecialistQAnswer(
    * store leaves the turn on memory, never fails it.
    */
   const coreStore = dependencies.coreState;
+  /**
+   * HQ-5: discovery's state per conversation (q-core state.ts), kept with
+   * the core's snapshot so it holds across instances.
+   */
+  const discoveries = new Map<string, DiscoveryState>();
+  const keepDiscovery = (conversationId: string, next: DiscoveryState) => {
+    discoveries.delete(conversationId);
+    discoveries.set(conversationId, next);
+    while (discoveries.size > MAX_CONVERSATIONS) {
+      const oldest = discoveries.keys().next().value;
+      if (oldest === undefined) break;
+      discoveries.delete(oldest);
+    }
+  };
+  /**
+   * HQ-5: discovery's decision for this turn, by code. Entered when the
+   * answer plan picks DISCOVERY or an ask reads underspecified twice in a
+   * row; a clear task ends it. The gap model is read only while it is on.
+   */
+  const withDiscovery = async (
+    request: QAnswerRequest,
+    conversationId: string,
+    words: string,
+  ): Promise<QAnswerRequest> => {
+    if (
+      request.capability !== "ANSWER" ||
+      request.writingDocument === true ||
+      request.turnUnread === true ||
+      request.questionSequence !== undefined
+    ) {
+      return request;
+    }
+    const plan = answerPlanOf({
+      answerKinds: [
+        request.answerKind,
+        ...(request.askParts ?? []).map((part) => part.kind),
+      ].flatMap((kind) => {
+        const parsed = TurnAnswerKindSchema.safeParse(kind);
+        return parsed.success ? [parsed.data] : [];
+      }),
+      questionKind: request.questionKind,
+      turnKind: request.turnKind,
+      underspecified: request.underspecified,
+      costlyIfWrong: request.costlyIfWrong,
+    });
+    const reading = {
+      words,
+      discoveryShape: plan?.shape === "DISCOVERY",
+      underspecified: request.underspecified === true,
+      // A typed question, or work read as analysis or a comparison, is a
+      // clear ask; a reply to Q's own question is neither.
+      task:
+        request.questionKind !== undefined ||
+        plan?.shape === "ANALYSIS" ||
+        plan?.shape === "COMPARISON",
+    };
+    const state = {
+      ...INITIAL_CONVERSATION_STATE,
+      discovery: discoveries.get(conversationId) ?? INITIAL_DISCOVERY_STATE,
+    };
+    const on = reduceDiscovery(state.discovery, {
+      type: "PLANNED",
+      discoveryShape: reading.discoveryShape,
+      underspecified: reading.underspecified,
+      task: reading.task,
+    }).active;
+    const coverage = on ? await discoveryCoverageFor(request) : null;
+    const decided = discoveryTurn(state, { ...reading, coverage });
+    keepDiscovery(conversationId, reduceAll(state, decided.events).discovery);
+    if (decided.turn !== null) {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          discovery: decided.turn.kind,
+          ...(decided.turn.kind === "ASK"
+            ? { gap: decided.turn.gap, asked: decided.turn.asked }
+            : { reason: decided.turn.reason }),
+        },
+        "q discovery turn",
+      );
+    }
+    return decided.turn === null
+      ? request
+      : { ...request, discovery: decided.turn };
+  };
+  /**
+   * HQ-5: what is declared, from their setup (the composed port) and their
+   * own mandate as it stands now. Each read is bounded; a slow or failed
+   * one is no coverage from it, never a guess.
+   */
+  const discoveryCoverageFor = async (
+    request: QAnswerRequest,
+  ): Promise<DiscoveryCoverage | null> => {
+    const setupPort = dependencies.discoveryCoverage;
+    const mandatePort = dependencies.ownMandate;
+    const [fromSetup, mandate] = await Promise.all([
+      setupPort === undefined
+        ? null
+        : loadWithin(setupPort.read(request), CORE_LOAD_DEADLINE_MS),
+      mandatePort === undefined
+        ? null
+        : loadWithin(mandatePort.read(request), CORE_LOAD_DEADLINE_MS),
+    ]);
+    if (fromSetup?.side === "FOUNDER") return fromSetup;
+    if (mandate === null || mandate === "NOT_AN_INVESTOR") return fromSetup;
+    return {
+      side: "INVESTOR",
+      known: [
+        ...new Set([
+          ...(fromSetup?.known ?? []),
+          ...mandate.mandates.flatMap((one) => coverageFromMandate(one)),
+        ]),
+      ],
+    };
+  };
   const hydrated = new Set<string>();
   const scopeOfRun = new Map<string, ConversationCoreScope>();
   const hydrate = async (scope: ConversationCoreScope): Promise<void> => {
@@ -5975,6 +6112,10 @@ export function createSpecialistQAnswer(
     if (!resolutions.has(id) && resolution !== null) {
       keepResolution(id, resolution);
     }
+    const discovery = snapshot.discovery ?? null;
+    if (!discoveries.has(id) && discovery !== null) {
+      keepDiscovery(id, discovery);
+    }
   };
   const persistCore = async (runId: string): Promise<void> => {
     const scope = scopeOfRun.get(runId);
@@ -5992,6 +6133,7 @@ export function createSpecialistQAnswer(
           focus: focuses.get(id) ?? null,
           offer: coreOfferOf(offers.get(id)),
           resolution: resolutions.get(id) ?? null,
+          discovery: discoveries.get(id) ?? null,
         } as const),
       )
       .catch((error: unknown) => {
@@ -10519,7 +10661,7 @@ export function createSpecialistQAnswer(
       { qRunId: request.runId, executionClass },
       "q turn execution class",
     );
-    const finalRequest: QAnswerRequest = {
+    const plainRequest: QAnswerRequest = {
       ...request,
       executionClass,
       // Live 17 Nov 2026 (run 0f483277): a question that asks for no action
@@ -10848,6 +10990,12 @@ export function createSpecialistQAnswer(
       ...(series.step === null ? {} : { questionSequence: series.step }),
       ...(toolFocus === null ? {} : { toolFocus }),
     };
+    // HQ-5: discovery's decision, with the reading complete.
+    const finalRequest = await withDiscovery(
+      plainRequest,
+      conversationId,
+      latest.content,
+    );
     const finalRoute = {
       ownRecords,
       reading:
