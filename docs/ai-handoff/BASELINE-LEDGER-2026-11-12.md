@@ -991,3 +991,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - No q-api errors since the deploy.
   - Not live-tested in a voice call, because that is a paid realtime session; the evidence is fake-timer tests.
   - The Claude-first migration `20261231599800` was withdrawn (decision 114) and never applied.
+- **e9db7a4e6 deployed 17:40 UTC on 20 Nov** (gate PASS). HQ-1: the answer plan (skim v12 and reader v95 add `underspecified` and `costlyIfWrong`; eight shapes with templates after the cached prefix), typed quick-lookup speculation, and a holding line within 1 s.
+  - One live typed turn as fictional Savanna, "What stage is Ledgerfold at?": first text in the browser at 2.68 s (the 18–20 Nov p50 to first content was 6.6 s). The `q typed speculation` line fired with reason SKIM. The answer was correct and said it wasn't verified ("declares on Capital Q; it isn't verified").
+  - Watch the typed-speculation cancel rate; the budget is 10% or less.
