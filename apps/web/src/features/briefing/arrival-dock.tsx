@@ -10,7 +10,12 @@ import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 
 import { ArrivalBriefing } from "./arrival-briefing";
 import { useArrivalStatus } from "./arrival-store";
-import { useClearBottom, useOpenedPlacement, useOverPane } from "./over-pane";
+import {
+  dockBox,
+  useClearBottom,
+  useOpenedPlacement,
+  useOverPane,
+} from "./over-pane";
 import { useT } from "@/features/i18n/language";
 
 /** The Q page gives the briefing itself; everywhere else, the dock does. */
@@ -52,15 +57,7 @@ export function ArrivalDock() {
       if (rect.height > 0) fullHeight.current = rect.height;
       return rect;
     }
-    const width = Math.min(380, window.innerWidth - 32);
-    const bottom = window.innerHeight - (window.innerWidth >= 640 ? 24 : 96);
-    const right = window.innerWidth - 16;
-    return {
-      left: right - width,
-      right,
-      top: bottom - fullHeight.current,
-      bottom,
-    };
+    return dockBox(window.innerWidth, window.innerHeight, fullHeight.current);
   }, pathname);
   // New cards later (an agent needs them): the dock opens again.
   const status = useArrivalStatus();

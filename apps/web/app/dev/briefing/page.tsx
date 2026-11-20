@@ -44,7 +44,13 @@ export default async function BriefingHarnessPage({
   };
   return (
     <BriefingHarness
-      state={one("state") === "quiet" ? "quiet" : "cards"}
+      state={
+        one("state") === "quiet"
+          ? "quiet"
+          : one("state") === "plans"
+            ? "plans"
+            : "cards"
+      }
       at={one("at") ?? "2026-10-08T13:30:00.000Z"}
       timeZone={one("tz") ?? "Africa/Lagos"}
       fail={one("fail") === "changed"}

@@ -24,7 +24,44 @@ import type {
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
-function fixture(state: "quiet" | "cards", timeZone: string): ArrivalData {
+function fixture(
+  state: "quiet" | "cards" | "plans",
+  timeZone: string,
+): ArrivalData {
+  if (state === "plans") {
+    // The live case of 20 Nov: two plans ready (distinct items, the same
+    // words) and seven more things waiting, said once each.
+    const line = (n: number, title: string) => ({
+      key: `AGENT_BLOCKED:${uuid(n)}`,
+      source: "AGENT_BLOCKED" as const,
+      title,
+      since: "2026-11-20T08:00:00.000Z",
+      decidable: false,
+    });
+    return {
+      firstName: "Zino",
+      timeZone,
+      activity: {},
+      hoursAway: 3,
+      cards: [],
+      attention: {
+        items: [
+          line(51, "Your plan is ready."),
+          line(52, "Your plan is ready."),
+          line(53, "Kora Health asked for your data room"),
+          line(54, "Finish your company profile"),
+          line(55, "Answer Harbourline's question"),
+          line(56, "Review the deck reading"),
+          line(57, "Confirm your round size"),
+          line(58, "Book the call with Lagoon Angels"),
+          line(59, "Add your cap table"),
+        ],
+        activity: null,
+        unread: [],
+        readAt: "2026-11-20T09:00:00.000Z",
+      },
+    };
+  }
   if (state === "quiet") {
     return {
       firstName: "Zino",
@@ -143,7 +180,7 @@ export function BriefingHarness({
   dock,
   room = false,
 }: {
-  readonly state: "quiet" | "cards";
+  readonly state: "quiet" | "cards" | "plans";
   readonly at: string;
   readonly timeZone: string;
   readonly fail: boolean;

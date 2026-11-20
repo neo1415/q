@@ -326,12 +326,22 @@ function listOf(words: readonly string[]): string {
 export function attentionLines(
   report: QAttentionReport,
 ): readonly QAttentionItem[] {
-  return report.items.filter(
-    (item) =>
-      item.source !== "APPROVAL" &&
-      item.source !== "HELD_DRAFT" &&
-      item.source !== "NEW_MATCHES",
-  );
+  // One line per item: an item read twice (its stable key repeated) is
+  // still one thing waiting (live 20 Nov: "Your plan is ready, Your plan
+  // is ready and 7 more").
+  const seen = new Set<string>();
+  return report.items.filter((item) => {
+    if (
+      item.source === "APPROVAL" ||
+      item.source === "HELD_DRAFT" ||
+      item.source === "NEW_MATCHES" ||
+      seen.has(item.key)
+    ) {
+      return false;
+    }
+    seen.add(item.key);
+    return true;
+  });
 }
 
 /** Where an attention line is acted on, from its own notice link or kind. */

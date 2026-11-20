@@ -132,6 +132,38 @@ function cardPhrase(card: ArrivalData["cards"][number]): string {
  * phrase comes from data the arrival already holds: no read of its own.
  */
 export function waitingPhrases(data: ArrivalData): readonly WaitingPhrase[] {
+  return mergeSamePhrases(namedPhrases(data));
+}
+
+/**
+ * Distinct items that read the same are said once with their number:
+ * "Your plan is ready (2)", never the same words twice. The weights add
+ * up, so the count of the rest stays right. First-seen order is kept.
+ */
+export function mergeSamePhrases(
+  phrases: readonly WaitingPhrase[],
+): readonly WaitingPhrase[] {
+  const merged = new Map<
+    string,
+    { words: string; weight: number; n: number }
+  >();
+  for (const phrase of phrases) {
+    const key = phrase.words.trim().toLowerCase();
+    const found = merged.get(key);
+    if (found === undefined) {
+      merged.set(key, { words: phrase.words, weight: phrase.weight, n: 1 });
+    } else {
+      found.weight += phrase.weight;
+      found.n += 1;
+    }
+  }
+  return [...merged.values()].map(({ words, weight, n }) => ({
+    words: n === 1 ? words : `${words} (${String(n)})`,
+    weight,
+  }));
+}
+
+function namedPhrases(data: ArrivalData): readonly WaitingPhrase[] {
   const phrases: WaitingPhrase[] = data.cards.map((card) => ({
     words: cardPhrase(card),
     weight: 1,

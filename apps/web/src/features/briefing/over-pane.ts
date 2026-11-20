@@ -34,15 +34,66 @@ export function overlaps(
 
 type Box = Pick<DOMRect, "left" | "right" | "top" | "bottom">;
 
+/**
+ * What counts as page content the briefing must not cover (live 20 Nov:
+ * it opened over Organisation → General on desktop and over Settings on a
+ * phone): a marked pane, and the main column's own blocks, including the
+ * boxes inside each section Q can name.
+ */
+export const CONTENT_SELECTOR = [
+  "[data-content-pane]",
+  "main section",
+  "main article",
+  "main form",
+  "main table",
+  "main [role='region']",
+  // A section Q can name lays out as its children (display: contents).
+  "main [data-q-section] > *",
+].join(", ");
+
+/**
+ * The page's content boxes, leaving out floating things (the briefing
+ * itself, the Q dock, dialogs and sheets): those are not content.
+ */
+export function contentBoxes(root: ParentNode = document): readonly Box[] {
+  return [...root.querySelectorAll(CONTENT_SELECTOR)]
+    .filter(
+      (element) =>
+        element.closest(
+          "aside, [role='dialog'], [data-arrival-dock], [data-q-dock-stash], [data-q-dock-pill]",
+        ) === null,
+    )
+    .map((element) => element.getBoundingClientRect())
+    .filter((rect) => rect.width > 0 && rect.height > 0);
+}
+
+/** Whether a box would cover any content in `root`. */
+export function coversContent(mine: Box, root: ParentNode = document): boolean {
+  if (mine.right <= mine.left || mine.bottom <= mine.top) return false;
+  return contentBoxes(root).some((rect) => overlaps(mine, rect));
+}
+
+/**
+ * Where the briefing sits in full, from its fixed corner (end-4, and
+ * bottom-24 on a phone or bottom-6 from 640 px): the box it is checked
+ * with, so its tucked form never decides it. Pure, for its test.
+ */
+export function dockBox(
+  viewportWidth: number,
+  viewportHeight: number,
+  height: number,
+): Box {
+  const width = Math.min(380, viewportWidth - 32);
+  const bottom = viewportHeight - (viewportWidth >= 640 ? 24 : 96);
+  const right = viewportWidth - 16;
+  return { left: right - width, right, top: bottom - height, bottom };
+}
+
 function overAnyPane(mine: Box): boolean {
   if (mine.right <= mine.left || mine.bottom <= mine.top) return false;
-  const pane = [...document.querySelectorAll("[data-content-pane]")].some(
-    (element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && overlaps(mine, rect);
-    },
+  return (
+    coversContent(mine) || avoidRects().some((rect) => overlaps(mine, rect))
   );
-  return pane || avoidRects().some((rect) => overlaps(mine, rect));
 }
 
 /**
