@@ -1,5 +1,23 @@
 # Capital Q — Current shared engineering state
 
+## CURRENT — 20 November 2026, 05:40 UTC (integration lead, Claude session_01Wncmn73d4XJWmh1N9ECao7)
+
+- **Production:** `recovery/2026-09-12` = `1d40130b0` on all four Railway services. Rollback point: `f3ecc8a3f` (q-api) / `14d51ec53` (the other three).
+- **Integration:** `fix/resume-asking-cv9ru3` (mirror `claude/confident-keller-v0ug6h`).
+- **Hosted migrations: 315.** Pending: `20261231599700` (reconcile settle). `hosted-migrate-https` refused it on a pre-existing `delete from` branch, so it awaits the owner's `--founder-approved`.
+- **Supabase management token:** saved as a network secret for api.supabase.com (proxy-injected). Scripts run with `SUPABASE_ACCESS_TOKEN=proxy-injected`.
+- **19–20 Nov releases**, each gated, deployed and live-checked; detail in `BASELINE-LEDGER-2026-11-12.md`:
+  - the q-api pool wedge fix plus watchdog (`0b5581d3e`);
+  - Q card redesign, profile edits, the one-Q voice, sectors (`b07e0c1db`);
+  - investor card fields and admin A1 (`862090033`, `6470d442d`);
+  - the `/organisation` admin home (`1c51df617`) and General (`75979e5f4`);
+  - console overview and tables (`622571e1f`);
+  - pool and worker health with heartbeats (`ca3831238`, `14d51ec53`, migration 315);
+  - Q greeting dedupe and collapse (`fb65b66ff`);
+  - reconcile backoff (`f3ecc8a3f`);
+  - Q navigation to organisation pages (`1d40130b0`).
+- **Decisions 109–111:** two-level admin; `/organisation`, members read-only, pricing held, portfolio opt-in; CRM naming.
+
 > **DEPLOYED 2026-11-04 09:49 UTC:** web on `d25c0843c` (CI green); q-api on `c53a08055`; api and workers on `b10cd6c87`. Q page opens clean; Q / Chat always shown; a typed turn that closes a call is answered in writing. Live-checked as a fictional investor: switch on a fresh page, no opening lists. **Newest audit: `Q_MULTIMODAL_DEMO_AUDIT_2026-11-04.md`, including a P0: text typed in the ~3.5 s before hydration is destroyed.**
 
 ## DEPLOYED 811202101 (q-api) — 9 November 2026, 21:28 UTC — demo 10 Nov

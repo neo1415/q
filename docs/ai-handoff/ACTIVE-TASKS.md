@@ -1,5 +1,21 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 20 November 2026, 05:40 UTC (integration lead, Claude)
+
+- Production is `1d40130b0`. No gate or deploy is running.
+- **Waiting on the owner:**
+  1. apply migration `20261231599700` (`--founder-approved`);
+  2. voice idle close after about 60 s with "Still there?" (about $4/month);
+  3. test accounts on Claude instead of GPT (a routing change for fictional tenants only);
+  4. pipeline import restricted to owners and admins at the service level;
+  5. pricing and legal publish (held until prices are set);
+  6. workers on the transaction pooler for live pool counts.
+- **Open, unblocked:**
+  - organisation admin sections still "Not built yet": Connections, Export and deletion (org-level deletion has legal weight, so agree scope with the owner first), Privacy, How Q speaks for us, Brand;
+  - investor HQ city (needs a contract and a migration);
+  - the cache-breakpoint saving (needs one approved paid call).
+- **Later:** subscriptions (Stripe and Paystack; needs company and KYC details), the full platform-admin product spec (decision 109), third-party business verification.
+
 ## Live board — 9 November 2026, 15:20 UTC (integration owner session_01Wncmn73d4XJWmh1N9ECao7)
 
 See `HANDOFF-2026-11-09.md` §4 for the exact next actions per lane.

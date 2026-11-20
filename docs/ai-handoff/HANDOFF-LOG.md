@@ -2313,3 +2313,9 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - Other demo companies have no evidence packs yet.
 
 **Test spend 16 Nov:** about USD 2.03 of 5.
+
+## 20 Nov 2026, 06:40 Lagos — integration lead (Claude)
+
+- 19 Nov at 07:34 UTC: an outage, the q-api pool wedge, fixed the same day.
+- Then 12 gated releases through `1d40130b0`, all live-checked. The owner's voice-test defects, the Q card redesign, the admin clean-up (decisions 109–111), health heartbeats, the cost pass and Q navigation. STATE.md and ACTIVE-TASKS.md have the current board and the owner's pending decisions.
+- Lesson recorded: apply a migration and wait for it to finish before deploying; never run the two in parallel.
