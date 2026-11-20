@@ -40,10 +40,8 @@ select throws_ok(
      values ('Not A Tag', 'ui-text.v1', encode(sha256(convert_to('Work', 'UTF8')), 'hex'), 'Work', 'ACCEPTED', 'x') $$,
   '23514', null, 'the language is a well-formed tag');
 select is(
-  -- Decision 112 (20261231599800) adds version 3 (Claude first) beside it.
-  (select count(*)::int from ai_ops.routing_policies
-    where task_class = 'UI_TRANSLATION' and status = 'ACTIVE' and version = 1),
-  1, 'one active version-1 routing policy for UI_TRANSLATION');
+  (select count(*)::int from ai_ops.routing_policies where task_class = 'UI_TRANSLATION' and status = 'ACTIVE'),
+  1, 'one active routing policy for UI_TRANSLATION');
 
 select pg_temp.act_as_user_a();
 select throws_ok($$ select * from q_runtime.ui_translations $$, '42501', null,

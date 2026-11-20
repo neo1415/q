@@ -512,3 +512,5 @@ Core Seven remains the governing assessment framework. The new directive authori
         - UK: Companies House (free).
         - Rest of the world: Sumsub (lead's pick: ID, selfie and company registries across most countries in one contract).
       - A full codebase audit to an enterprise standard comes after these.
+
+114.  **Owner, 2026-11-20: GPT stays first.** Shown the Claude-first cost (about $350/month against about $57/month on GPT at current traffic), the owner reversed decision 112's routing part: GPT goes first. Migration `20261231599800` is withdrawn and was never applied. The Anthropic spend-cap failover (a refused Claude call falls over to the next model with no error) stays.

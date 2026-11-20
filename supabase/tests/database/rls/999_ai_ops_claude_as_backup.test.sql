@@ -62,9 +62,7 @@ update ai_ops.routing_policies set status = 'ACTIVE' where version = 2;
 select is(
   (select m.model_code
      from ai_ops.routing_policies rp join ai_ops.models m on m.id = rp.preferred_models[1]
-    -- Among v1 and v2: decision 112's v3 (20261231599800) puts Claude first.
     where rp.status = 'ACTIVE' and rp.task_class = 'NORMAL_DIALOGUE'
-      and rp.version <= 2
     order by rp.version desc limit 1),
   'gpt-5.6-luna',
   'switched on: dialogue still starts with OpenAI');

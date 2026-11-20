@@ -99,8 +99,7 @@ select is(
 
 select is(
   (select count(*)::int from ai_ops.routing_policies
-    -- version 2 only: decision 112 (20261231599800) gives UI_TRANSLATION a v3.
-    where task_class in ('REALTIME_VOICE', 'UI_TRANSLATION', 'EMBEDDING') and version = 2),
+    where task_class in ('REALTIME_VOICE', 'UI_TRANSLATION', 'EMBEDDING') and version > 1),
   0,
   'voice, translation and embedding routes untouched');
 
@@ -172,10 +171,8 @@ select is(
   (select array_agg(distinct rp.code order by rp.code)
      from ai_ops.routing_policies rp
     where rp.status = 'ACTIVE' and rp.task_class = 'NORMAL_DIALOGUE'
-      -- Among v1 and v2: decision 112's v3 (20261231599800) supersedes both.
       and rp.version = (select max(version) from ai_ops.routing_policies x
-                         where x.task_class = rp.task_class and x.status = 'ACTIVE'
-                           and x.version <= 2)),
+                         where x.task_class = rp.task_class and x.status = 'ACTIVE')),
   array['normal_dialogue.v2'],
   'switched on: the highest active version is v2');
 
