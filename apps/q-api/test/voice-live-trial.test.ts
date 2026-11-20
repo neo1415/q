@@ -904,8 +904,9 @@ describe("the trial line (broker)", () => {
       remainingSeconds: 300,
     });
     converse(line, 10);
-    // Four minutes of idle silence with the line open.
-    line.tick(4 * 60 * 1000);
+    // Two minutes of silence with the line open (decision 112: inside the
+    // one-minute idle window plus the server's grace, so it is still open).
+    line.tick(2 * 60 * 1000);
     const report = await line.broker.usage({
       actor: TRIAL,
       voiceSessionId,
