@@ -207,7 +207,7 @@ export const boundedFetch: ProviderFetch = async (url, init) => {
   });
   return {
     status: response.status,
-    json: () => response.json() as Promise<unknown>,
+    json: (): Promise<unknown> => response.json(),
   };
 };
 

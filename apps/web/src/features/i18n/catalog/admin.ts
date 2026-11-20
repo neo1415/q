@@ -200,6 +200,15 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
     "هذه الشركة مملوكة لأحد: لا يختار من يراها إلا أصحابها.",
   // Verification and claims
   Verification: "التوثيق",
+  // V1: verification providers, connected or not (names are not translated)
+  "Verification providers": "مزودو التوثيق",
+  "Automatic checks": "الفحوص التلقائية",
+  "Not connected": "غير متصل",
+  "UK company register": "سجل الشركات في المملكة المتحدة",
+  "Company registers in Nigeria, Kenya and South Africa; Nigerian ID and selfie":
+    "سجلات الشركات في نيجيريا وكينيا وجنوب أفريقيا؛ الهوية النيجيرية والصورة الذاتية",
+  "ID, selfie and company checks in other countries":
+    "فحوص الهوية والصورة الذاتية والشركات في الدول الأخرى",
   "Verification waiting": "توثيق بالانتظار",
   "Verification decision": "قرار التوثيق",
   "Nobody has asked Capital Q to verify this organisation.":
