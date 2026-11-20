@@ -476,11 +476,13 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v2");
       // The bundle of the ACTIVE analyst, read from the registry: a pin to
       // one version (v19) went stale when v22 shipped (F, 2026-10-09).
-      const analyst =
-        createDefaultPromptRegistry().getActive("COMPANY_ANALYST").definition
-          .version;
+      // Both halves come from the registry: a pinned charter version went
+      // stale when Q_SYSTEM v3 shipped (HQ-2, 2026-11-20).
+      const registry = createDefaultPromptRegistry();
+      const analyst = registry.getActive("COMPANY_ANALYST").definition.version;
+      const charter = registry.getActive("Q_SYSTEM").definition.version;
       expect(final.run.promptBundleVersion).toBe(
-        `q-system.v2_company-analyst.v${String(analyst)}_comm.v1`,
+        `q-system.v${String(charter)}_company-analyst.v${String(analyst)}_comm.v1`,
       );
       const sent = google.calls[0]?.request.messages;
       const userAt = expectPromptLayout(sent, "Say hello to the test.");
