@@ -503,3 +503,12 @@ Core Seven remains the governing assessment framework. The new directive authori
       - Voice calls close after about a minute of silence, with a spoken "Still there?" first.
       - Model routing: Claude first, then GPT as the fallback, for test accounts and normal accounts alike.
       - The organisation admin pages that say "doesn't exist yet" must be built.
+
+113.  **Owner, 2026-11-20: priorities.**
+      - Next priorities after the current work: (1) the human Q conversation (speed and humanness from `docs/research/2026-11-20-human-q-conversation.md`, including fast answer planning that shapes each answer to the question); (2) business verification.
+      - Hard rule: none of this may cost intelligence, accuracy, precision or speed. Every change is measured against the existing evals before and after.
+      - Verification providers:
+        - Africa: Dojah (owner's choice).
+        - UK: Companies House (free).
+        - Rest of the world: Sumsub (lead's pick: ID, selfie and company registries across most countries in one contract).
+      - A full codebase audit to an enterprise standard comes after these.
