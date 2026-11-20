@@ -536,6 +536,76 @@ const BANKS: readonly {
       ["How many people watched my video?"],
     ),
   },
+  // Q-NAV (decisions 109 and 110): the organisation admin, its sections
+  // and the CRM's pipeline import.
+  {
+    page: "ORGANISATION",
+    dev: bank(
+      ["my organisation settings", "the organisation admin"],
+      ["Where do I change our organisation's name?"],
+    ),
+    heldout: bank(
+      ["our org's admin page"],
+      ["Where are the settings for our firm as a whole?"],
+    ),
+  },
+  {
+    page: "ORGANISATION_MEMBERS",
+    dev: bank(
+      ["the organisation's members", "members and usage"],
+      ["Who is in my organisation?"],
+    ),
+    heldout: bank(
+      ["the list of our members"],
+      ["How many seats is my team using?"],
+    ),
+  },
+  {
+    page: "ORGANISATION_ROLES",
+    dev: bank(
+      ["the organisation roles", "roles and permissions"],
+      ["What can an admin do that a member can't?"],
+    ),
+    heldout: bank(
+      ["our roles page"],
+      ["What is each role in my organisation allowed to do?"],
+    ),
+  },
+  {
+    page: "ORGANISATION_PLAN",
+    dev: bank(
+      ["the organisation's plan", "plan and billing for my organisation"],
+      ["What plan is our organisation on?"],
+    ),
+    heldout: bank(
+      ["our firm's billing"],
+      ["How much is my organisation paying?"],
+    ),
+  },
+  {
+    page: "ORGANISATION_IMPORT",
+    dev: bank(["the organisation's import section", "organisation import"], []),
+    heldout: bank(["the import section of our org admin"], []),
+  },
+  {
+    page: "ORGANISATION_ACTIVITY",
+    dev: bank(
+      ["the organisation's activity log", "the activity log"],
+      ["Who changed things in our organisation this week?"],
+    ),
+    heldout: bank(["our audit trail"], ["Who on my team did what recently?"]),
+  },
+  {
+    page: "PIPELINE_IMPORT",
+    dev: bank(
+      ["the pipeline import", "the CRM import"],
+      ["I want to bring in my deals from a spreadsheet."],
+    ),
+    heldout: bank(
+      ["the import page"],
+      ["Can I upload my existing CRM export?"],
+    ),
+  },
 ];
 
 /**

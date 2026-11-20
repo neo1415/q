@@ -83,8 +83,11 @@ export type QNavSide = (typeof Q_NAV_SIDES)[number];
  * "heldout4" (batch 8, 7 Nov 2026): a fourth set, written by a separate
  * author after NAVIGATION_DECISION v10, on conversation-driven placement
  * and tabs; sealed and measured once like "heldout".
+ * "heldout5" (Q-NAV, 20 Nov 2026): the destinations added after those two
+ * were sealed (the organisation admin and the pipeline import), so the
+ * earlier sealed sets stay as measured; sealed itself.
  */
-export const Q_NAV_SPLITS = ["dev", "heldout", "heldout4"] as const;
+export const Q_NAV_SPLITS = ["dev", "heldout", "heldout4", "heldout5"] as const;
 export type QNavSplit = (typeof Q_NAV_SPLITS)[number];
 
 export { QNavigateTargetSchema as QNavTargetSchema };

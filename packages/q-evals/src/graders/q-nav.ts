@@ -293,6 +293,7 @@ export function summariseQNav(grades: readonly QNavTurnGrade[]): QNavSummary {
     dev: metricsOf(grades.filter((g) => g.split === "dev")),
     heldout: metricsOf(grades.filter((g) => g.split === "heldout")),
     heldout4: metricsOf(grades.filter((g) => g.split === "heldout4")),
+    heldout5: metricsOf(grades.filter((g) => g.split === "heldout5")),
   };
   const byCategory: Partial<Record<QNavCategory, QNavMetrics>> = {};
   for (const category of new Set(grades.map((g) => g.category))) {

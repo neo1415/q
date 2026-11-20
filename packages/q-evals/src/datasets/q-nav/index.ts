@@ -17,6 +17,7 @@ import {
 import { coverage } from "./coverage.js";
 import { devCurveballs } from "./curveballs.js";
 import { heldoutFourth } from "./heldout-fourth.js";
+import { heldoutFifth } from "./heldout-fifth.js";
 import { heldoutThird } from "./heldout-third.js";
 import {
   destinationDef,
@@ -62,8 +63,11 @@ export function buildQNavCases(): QNavCase[] {
   // Batch 8: the fourth held-out set, after v10 (sealed in heldout-seal.ts).
   const heldout4 = new CaseSet("heldout4");
   heldoutFourth(heldout4);
-  return [...dev.out, ...heldout.out, ...heldout4.out].map((c) =>
-    QNavCaseSchema.parse(c),
+  // Q-NAV: the fifth held-out set, for destinations added after the seals.
+  const heldout5 = new CaseSet("heldout5");
+  heldoutFifth(heldout5);
+  return [...dev.out, ...heldout.out, ...heldout4.out, ...heldout5.out].map(
+    (c) => QNavCaseSchema.parse(c),
   );
 }
 
@@ -192,14 +196,16 @@ export function lintQNavDataset(
           `${at}: a ${t.expect.decision} to where the pane already is`,
         );
       if (t.expect.decision === "MOVE" && t.expect.target !== null) {
-        const set = moved.get(c.split) ?? new Set<string>();
+        // Every sealed held-out set covers the held-out split's pages.
+        const split = c.split === "dev" ? "dev" : "heldout";
+        const set = moved.get(split) ?? new Set<string>();
         set.add(`${t.expect.target.page}:${c.side}`);
         // A section also covers the destination folded into it.
         if (t.expect.target.sectionId !== undefined)
           set.add(
             `${t.expect.target.page}#${t.expect.target.sectionId}:${c.side}`,
           );
-        moved.set(c.split, set);
+        moved.set(split, set);
       }
       if (
         (t.context.dirty || t.context.busy !== null) &&

@@ -25,3 +25,15 @@ export const Q_NAV_HELDOUT4_SEAL = {
   turns: 120,
   sealedAt: "2026-11-07",
 } as const;
+
+/**
+ * The fifth held-out set (Q-NAV, 20 Nov 2026): `heldout-fifth.ts`, for the
+ * destinations added after the third and fourth sets were sealed (the
+ * organisation admin, its sections and the pipeline import). Sealed when
+ * written; the earlier seals are unchanged.
+ */
+export const Q_NAV_HELDOUT5_SEAL = {
+  sha256: "19e5bc116fdfe49e7aaccb92149f587d98f12efd639c0630e3d08496baf5875a",
+  turns: 14,
+  sealedAt: "2026-11-20",
+} as const;

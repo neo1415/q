@@ -22,6 +22,7 @@ import {
 } from "../src/datasets/q-nav/index.js";
 import {
   Q_NAV_HELDOUT4_SEAL,
+  Q_NAV_HELDOUT5_SEAL,
   Q_NAV_HELDOUT_SEAL,
 } from "../src/datasets/q-nav/heldout-seal.js";
 import { canonicalTarget, gradeQNavTurn } from "../src/graders/q-nav.js";
@@ -101,6 +102,17 @@ describe("Q-NAV dataset", () => {
     }).toEqual({
       sha256: Q_NAV_HELDOUT4_SEAL.sha256,
       turns: Q_NAV_HELDOUT4_SEAL.turns,
+    });
+  });
+
+  it("keeps the fifth held-out split sealed too (Q-NAV)", () => {
+    const held = Q_NAV_DATASET.cases.filter((c) => c.split === "heldout5");
+    expect({
+      sha256: createHash("sha256").update(JSON.stringify(held)).digest("hex"),
+      turns: turns(held),
+    }).toEqual({
+      sha256: Q_NAV_HELDOUT5_SEAL.sha256,
+      turns: Q_NAV_HELDOUT5_SEAL.turns,
     });
   });
 
