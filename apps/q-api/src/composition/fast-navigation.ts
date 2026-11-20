@@ -86,6 +86,10 @@ export function createFastNavigation(dependencies: {
   readonly askerSide?:
     | ((actor: ActorContext) => Promise<"FOUNDER" | "INVESTOR" | null>)
     | undefined;
+  /** Q-NAV: their membership's role, for the organisation screens. */
+  readonly organisationRole?:
+    | ((actor: ActorContext) => Promise<"OWNER" | "ADMIN" | "MEMBER" | null>)
+    | undefined;
   readonly logger?: Logger | undefined;
   readonly now?: (() => number) | undefined;
   /** Wall clock for the prepared context's freshness (tests). */
@@ -238,9 +242,11 @@ export function createFastNavigation(dependencies: {
               dependencies.askerSide?.(actor) ?? Promise.resolve(null)
             ).catch(() => null)) ??
             askerSideOf({ plan: (await planNow(context)) ?? { scopes: [] } }));
+      const role = dependencies.organisationRole;
       const decided = await resolveFastNavigation({
         text,
         side,
+        ...(role === undefined ? {} : { organisationRole: () => role(actor) }),
         ...(context === null
           ? {}
           : { openDocument: documentOpener(context, actor, screen.companyId) }),

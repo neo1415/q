@@ -132,6 +132,8 @@ import {
   closestByName,
   eligibleCapabilities,
   INVESTOR_SCREENS,
+  MANAGER_SCREENS,
+  ORGANISATION_SCREENS,
   Q_CAPABILITIES,
   SPREADSHEET_ARTIFACT_TYPE,
   spreadsheetReceipt,
@@ -1756,6 +1758,14 @@ export type SpecialistQAnswerDependencies = {
   readonly offeredTools?:
     ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
   /**
+   * Q-NAV: the role their own membership holds in the organisation they
+   * act for, read on the server. It decides which organisation screens the
+   * run may open (the sidebar's rule). Absent or failed: none of them.
+   */
+  readonly organisationRole?:
+    | ((actor: ActorContext) => Promise<"OWNER" | "ADMIN" | "MEMBER" | null>)
+    | undefined;
+  /**
    * The person's own investment mandate, read under this run's plan (the
    * firewall binds it only to the investor's own organisation). NOT_AN_
    * INVESTOR: the person has no investor organisation in this run. Absent:
@@ -2451,6 +2461,23 @@ export function notTheirSideLine(
 }
 
 /**
+ * Q-NAV: an organisation screen this person is not offered. The import is
+ * for the organisation's owners and admins; the rest is for anyone acting
+ * for an organisation. Never "Opening …" for a page they cannot open.
+ */
+export function notTheirOrganisationScreenLine(
+  asked: QNavigateDestination,
+  organisation: boolean,
+): string {
+  if (MANAGER_SCREENS.has(asked)) {
+    return organisation
+      ? "Importing a pipeline is for your organisation's owners and admins, so I'm opening your organisation instead. An owner or admin can import it, or change your role."
+      : "Importing a pipeline is for an organisation's owners and admins, and you aren't acting for an organisation.";
+  }
+  return "You aren't acting for an organisation, so there's no organisation page to open. Switch to your organisation first, then ask again.";
+}
+
+/**
  * Their own counterpart of an investor's screen, when this run may open
  * it (a founder's raise, else their profile); null when neither.
  */
@@ -2542,6 +2569,13 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   BOARD: "Opening your board.",
   MANDATE: "Opening your mandate.",
   ANALYTICS: "Opening your analytics.",
+  ORGANISATION: "Opening your organisation.",
+  ORGANISATION_MEMBERS: "Opening your organisation's members.",
+  ORGANISATION_ROLES: "Opening your organisation's roles.",
+  ORGANISATION_PLAN: "Opening your organisation's plan.",
+  ORGANISATION_IMPORT: "Opening your organisation's import.",
+  ORGANISATION_ACTIVITY: "Opening your organisation's activity log.",
+  PIPELINE_IMPORT: "Opening the pipeline import.",
 };
 
 /**
@@ -2661,6 +2695,13 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   BOARD: "Work (Board)",
   MANDATE: "your mandate",
   ANALYTICS: "your analytics",
+  ORGANISATION: "your organisation",
+  ORGANISATION_MEMBERS: "your organisation's members",
+  ORGANISATION_ROLES: "your organisation's roles",
+  ORGANISATION_PLAN: "your organisation's plan",
+  ORGANISATION_IMPORT: "your organisation's import",
+  ORGANISATION_ACTIVITY: "your organisation's activity log",
+  PIPELINE_IMPORT: "the pipeline import",
 };
 
 /**
@@ -4947,6 +4988,33 @@ export function createSpecialistQAnswer(
           other.blocks.length === 0 ? undefined : other.blocks,
         );
       }
+      // Q-NAV: an organisation screen this run may not open (the sidebar's
+      // rule: no organisation, or the import for a member) is never
+      // claimed; Q says whose it is and opens the organisation when it may.
+      if (
+        (ORGANISATION_SCREENS.has(destination) ||
+          MANAGER_SCREENS.has(destination)) &&
+        !navigable.includes(destination)
+      ) {
+        const organisation = navigable.includes("ORGANISATION");
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "q was asked for an organisation screen this person is not offered",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          notTheirOrganisationScreenLine(destination, organisation),
+          organisation
+            ? [
+                {
+                  kind: "UI_INTENT",
+                  intent: { kind: "NAVIGATE", destination: "ORGANISATION" },
+                },
+              ]
+            : undefined,
+        );
+      }
       const words = askedIn(history);
       // C10 (TURN_READER v84): whether they asked to go is the reading's
       // navigation intent, by meaning, in any language. Negated ("don't
@@ -5107,10 +5175,14 @@ export function createSpecialistQAnswer(
   const capabilitiesOf = async (
     request: QAnswerRequest,
   ): Promise<readonly QCapability[]> => {
-    const offeredTools =
+    const [offeredTools, organisationRole] = await Promise.all([
       dependencies.offeredTools === undefined
         ? []
-        : await dependencies.offeredTools(request).catch(() => []);
+        : dependencies.offeredTools(request).catch(() => []),
+      dependencies.organisationRole === undefined
+        ? null
+        : dependencies.organisationRole(request.actor).catch(() => null),
+    ]);
     return eligibleCapabilities({
       surface: "HOME_Q",
       offeredTools: new Set(offeredTools),
@@ -5119,6 +5191,7 @@ export function createSpecialistQAnswer(
       artifacts: artifacts !== undefined,
       ownMandate: dependencies.ownMandate !== undefined,
       visibility: dependencies.visibility !== undefined,
+      organisationRole,
     });
   };
   /** The manifest the answer's note renders, from the registry's hands. */

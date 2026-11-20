@@ -79,6 +79,12 @@ export type QCapabilityRunFacts = {
   readonly ownMandate: boolean;
   /** A visibility proposer is composed. */
   readonly visibility: boolean;
+  /**
+   * Q-NAV: the role their actor context's own membership holds in the
+   * organisation they act for, read on the server (never from the client);
+   * null when they act for no organisation or it could not be read.
+   */
+  readonly organisationRole: "OWNER" | "ADMIN" | "MEMBER" | null;
 };
 
 /**
@@ -334,6 +340,18 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // Q Workspace batch 2.
   ANALYTICS:
     "Opens Analytics: who engaged with what (views, deck and video engagement, Q Card views), within each viewer's visibility choice.",
+  ORGANISATION:
+    "Opens the organisation admin (/organisation): the organisation's details and its sections; read-only for members.",
+  ORGANISATION_MEMBERS:
+    "Opens the organisation's members and usage: members, invitations and allowances.",
+  ORGANISATION_ROLES: "Opens the organisation's roles: what each role can do.",
+  ORGANISATION_PLAN: "Opens the organisation's plan and billing.",
+  ORGANISATION_IMPORT:
+    "Opens the organisation's Import section, which leads to the pipeline import (owners and admins).",
+  ORGANISATION_ACTIVITY:
+    "Opens the organisation's activity log: who did what, and when.",
+  PIPELINE_IMPORT:
+    "Opens the pipeline import (/relationships/import): Q reads a CRM or spreadsheet export and shows every change before it is made (owners and admins).",
 };
 
 /** Screens that belong to a company's own people. */
@@ -356,6 +374,54 @@ export const INVESTOR_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
   "MANDATE",
 ]);
 
+/**
+ * Q-NAV (decisions 109 and 110): the organisation admin's screens, for
+ * anyone acting for an organisation (members see them read-only), the
+ * sidebar's own rule (navigation.ts organisationGroup).
+ */
+export const ORGANISATION_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
+  "ORGANISATION",
+  "ORGANISATION_MEMBERS",
+  "ORGANISATION_ROLES",
+  "ORGANISATION_PLAN",
+  "ORGANISATION_ACTIVITY",
+]);
+
+/**
+ * Q-NAV: the pipeline import, which the sidebar shows only to the
+ * organisation's owners and admins. Q never offers a member a screen
+ * their navigation does not show them; the page and the API still decide.
+ */
+export const MANAGER_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
+  "ORGANISATION_IMPORT",
+  "PIPELINE_IMPORT",
+]);
+
+/** The sidebar's rule (navigation.ts): owners and admins manage. */
+export function managesOrganisation(
+  role: QCapabilityRunFacts["organisationRole"],
+): boolean {
+  return role === "OWNER" || role === "ADMIN";
+}
+
+/** Whether these facts may be offered this screen, by side and by role. */
+export function screenEligible(
+  destination: QNavigateDestination,
+  facts: Pick<
+    QCapabilityRunFacts,
+    "company" | "ownInvestorOrganisation" | "organisationRole"
+  >,
+): boolean {
+  return (
+    (!COMPANY_SCREENS.has(destination) || facts.company) &&
+    (!INVESTOR_SCREENS.has(destination) || facts.ownInvestorOrganisation) &&
+    (!ORGANISATION_SCREENS.has(destination) ||
+      facts.organisationRole !== null) &&
+    (!MANAGER_SCREENS.has(destination) ||
+      managesOrganisation(facts.organisationRole))
+  );
+}
+
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
   (destination): QCapability => ({
     id: `navigate.${destination}`,
@@ -370,11 +436,13 @@ const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
       ? "a company is a subject of the run"
       : INVESTOR_SCREENS.has(destination)
         ? "their own investor organisation is in the plan"
-        : "always, on Home Q",
+        : MANAGER_SCREENS.has(destination)
+          ? "they are an owner or admin of the organisation they act for"
+          : ORGANISATION_SCREENS.has(destination)
+            ? "they act for an organisation"
+            : "always, on Home Q",
     eligible: (facts) =>
-      facts.surface === "HOME_Q" &&
-      (!COMPANY_SCREENS.has(destination) || facts.company) &&
-      (!INVESTOR_SCREENS.has(destination) || facts.ownInvestorOrganisation),
+      facts.surface === "HOME_Q" && screenEligible(destination, facts),
   }),
 );
 
@@ -1516,6 +1584,7 @@ function factsKey(facts: QCapabilityRunFacts): string {
     facts.artifacts ? 1 : 0,
     facts.ownMandate ? 1 : 0,
     facts.visibility ? 1 : 0,
+    facts.organisationRole ?? "",
     [...facts.offeredTools].sort().join(","),
   ].join("|");
 }

@@ -43,6 +43,15 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   // Q Workspace batch 2: "open analytics" is opened by code
   // (page-request.ts); no reader version names it.
   "ANALYTICS",
+  // Q-NAV: the organisation admin, its sections and the pipeline import
+  // are opened by code (page-request.ts); no reader version names them.
+  "ORGANISATION",
+  "ORGANISATION_MEMBERS",
+  "ORGANISATION_ROLES",
+  "ORGANISATION_PLAN",
+  "ORGANISATION_IMPORT",
+  "ORGANISATION_ACTIVITY",
+  "PIPELINE_IMPORT",
 ]);
 
 export const READER_DESTINATIONS = Q_NAVIGATE_DESTINATIONS.filter(

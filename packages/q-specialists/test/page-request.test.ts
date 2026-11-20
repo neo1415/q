@@ -130,6 +130,23 @@ const TABLE: readonly (readonly [string, string])[] = [
   ["open privacy settings", "settings:privacy"],
   ["open account settings", "settings:account"],
   ["open team settings", "settings:team"],
+  // Q-NAV (decisions 109 and 110): the organisation admin, its sections,
+  // the pipeline import, and the plan and team under You.
+  ["open my organisation settings", "ORGANISATION"],
+  ["take me to my organization", "ORGANISATION"],
+  ["open the organisation admin", "ORGANISATION"],
+  ["show me our organisation's members", "ORGANISATION_MEMBERS"],
+  ["open members", "ORGANISATION_MEMBERS"],
+  ["open roles", "ORGANISATION_ROLES"],
+  ["take me to the organisation roles", "ORGANISATION_ROLES"],
+  ["open the organisation plan", "ORGANISATION_PLAN"],
+  ["open plan and billing", "ORGANISATION_PLAN"],
+  ["open the organisation import", "ORGANISATION_IMPORT"],
+  ["open the activity log", "ORGANISATION_ACTIVITY"],
+  ["take me to import", "PIPELINE_IMPORT"],
+  ["open the pipeline import", "PIPELINE_IMPORT"],
+  ["show my plan", "settings:plan"],
+  ["open my team", "settings:team"],
 ];
 
 function key(target: PageTarget): string {

@@ -72,6 +72,13 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   // Q Workspace batch 2: who engaged with what, within the visibility
   // each viewer chose (plan §8); both sides.
   ANALYTICS: "/analytics",
+  ORGANISATION: "/organisation",
+  ORGANISATION_MEMBERS: "/organisation/members",
+  ORGANISATION_ROLES: "/organisation/roles",
+  ORGANISATION_PLAN: "/organisation/plan",
+  ORGANISATION_IMPORT: "/organisation/import",
+  ORGANISATION_ACTIVITY: "/organisation/activity",
+  PIPELINE_IMPORT: "/relationships/import",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

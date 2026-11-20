@@ -233,6 +233,7 @@ describe("a run's capabilities come from composed facts, never words", () => {
     artifacts: false,
     ownMandate: false,
     visibility: false,
+    organisationRole: null,
     ...over,
   });
   const ids = (f: QCapabilityRunFacts) =>
@@ -280,6 +281,35 @@ describe("a run's capabilities come from composed facts, never words", () => {
     expect(ids(facts({ ownInvestorOrganisation: true }))).toContain(
       "navigate.YOUR_COMPANIES",
     );
+  });
+
+  it("Q-NAV: the organisation's screens follow the sidebar's rule; a member is not offered import", () => {
+    const organisation = [
+      "navigate.ORGANISATION",
+      "navigate.ORGANISATION_MEMBERS",
+      "navigate.ORGANISATION_ROLES",
+      "navigate.ORGANISATION_PLAN",
+      "navigate.ORGANISATION_ACTIVITY",
+    ];
+    const imports = [
+      "navigate.ORGANISATION_IMPORT",
+      "navigate.PIPELINE_IMPORT",
+    ];
+    // Acting for no organisation: none of them.
+    const none = ids(facts({ organisationRole: null }));
+    for (const id of [...organisation, ...imports]) {
+      expect(none, id).not.toContain(id);
+    }
+    // A member: the organisation (read-only), never the import.
+    const member = ids(facts({ organisationRole: "MEMBER" }));
+    expect(member).toEqual(expect.arrayContaining(organisation));
+    for (const id of imports) expect(member, id).not.toContain(id);
+    // Owners and admins: everything, the import included.
+    for (const role of ["OWNER", "ADMIN"] as const) {
+      expect(ids(facts({ organisationRole: role }))).toEqual(
+        expect.arrayContaining([...organisation, ...imports]),
+      );
+    }
   });
 
   it("the onboarding loop has its own hands and none of Home Q's", () => {

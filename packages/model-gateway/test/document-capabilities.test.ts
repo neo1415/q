@@ -38,6 +38,7 @@ describe("every registered document is reachable and named", () => {
       artifacts: true,
       ownMandate: false,
       visibility: false,
+      organisationRole: null,
     }).map((capability) => capability.id);
     expect(eligible).toEqual(
       expect.arrayContaining(["document.ANSWER_EXPORT", "document.Q_REPORT"]),

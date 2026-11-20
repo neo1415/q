@@ -202,6 +202,13 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   BOARD: "Work (Board)",
   MANDATE: "your mandate",
   ANALYTICS: "your analytics",
+  ORGANISATION: "your organisation",
+  ORGANISATION_MEMBERS: "your organisation's members",
+  ORGANISATION_ROLES: "your organisation's roles",
+  ORGANISATION_PLAN: "your organisation's plan",
+  ORGANISATION_IMPORT: "your organisation's import",
+  ORGANISATION_ACTIVITY: "your organisation's activity log",
+  PIPELINE_IMPORT: "the pipeline import",
 };
 
 /** Where the person is, in their terms (R21). */

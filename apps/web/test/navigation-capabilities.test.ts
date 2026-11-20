@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
+import {
+  Q_NAVIGATE_DESTINATIONS,
+  Q_SETTINGS_SECTIONS,
+} from "@capital-q/contracts";
 
 import {
   ACCOUNT_NAVIGATION,
@@ -8,42 +11,28 @@ import {
   youSectionsFor,
   sectionsFor,
 } from "../src/components/app-shell/navigation";
+import { settingsPath } from "../src/features/q/client-actions";
 import { destinationPath } from "../src/features/voice/destinations";
 import { WORK_DATA_ROOM_HREF, workTabs } from "../src/features/work/work-tabs";
 
 /**
  * Every screen in the navigation is one Q can open (R20): a destination
- * of Q's navigation hand maps to it, or it is excluded here with a reason.
+ * of Q's navigation hand (or a Settings section) maps to it.
  * The capability registry lists one entry per destination (its own
  * completeness test in q-tools), so a screen added to the navigation
  * without a destination fails here.
  */
-const EXCLUDED: Readonly<Record<string, string>> = {
-  // Owner 2026-10-23: Work's Board tab (tab.work-board); Q reads and
-  // changes the board with my_board, and opens it from Work's tab strip.
-  // Q Workspace §8 (integration 2026-11-07): the sidebar's Analytics entry.
-  // Until W3 adds an ANALYTICS destination (contracts), Q reaches it by
-  // the page's own Q tools and the site map, not by NAVIGATE.
-  "/analytics": "no NAVIGATE destination yet (W3 owns the contract)",
-  // Admin design D1/D5 (2026-11-19, slice A1: web navigation and copy
-  // only). A NAVIGATE destination is a contracts change outside A1; Q
-  // reaches these through the site map (pages.ts) until one is added.
-  "/settings/plan": "no NAVIGATE destination yet (A1 changes no contracts)",
-  "/settings/team": "no NAVIGATE destination yet (A1 changes no contracts)",
-  // Decisions 109 and 110: a NAVIGATE destination touches contracts, Q
-  // tools and the model gateway's receipts; Q reaches it by the site map.
-  "/organisation":
-    "no NAVIGATE destination yet (a contracts and Q-tools change)",
-  "/relationships/import":
-    "no NAVIGATE destination yet (A1 changes no contracts)",
-};
-
 describe("every navigation screen is a screen Q can open", () => {
-  it("maps each navigation href to a Q destination, or states why not", () => {
+  it("maps each navigation href to a Q destination", () => {
+    // A NAVIGATE destination, or a Settings section Q opens by name
+    // (OPEN_SETTINGS: "show my plan" is /settings/plan).
     const reachable = new Set(
-      Q_NAVIGATE_DESTINATIONS.map(
-        (destination) => destinationPath(destination)?.split(/[?#]/u)[0],
-      ),
+      [
+        ...Q_NAVIGATE_DESTINATIONS.map((destination) =>
+          destinationPath(destination),
+        ),
+        ...Q_SETTINGS_SECTIONS.map((section) => settingsPath(section)),
+      ].map((path) => path?.split(/[?#]/u)[0]),
     );
     // Every section either side can reach, on the desktop and the phone.
     const scopes = ["founder_private", "investor_private", "unset"] as const;
@@ -69,9 +58,9 @@ describe("every navigation screen is a screen Q can open", () => {
     // Results is the CRM's Reports tab now; the CRM entry is /relationships.
     expect(hrefs).toContain("/relationships");
     expect(hrefs).not.toContain("/results");
-    const missing = [...hrefs].filter(
-      (href) => !reachable.has(href) && (EXCLUDED[href] ?? "").length === 0,
-    );
+    // Q-NAV (2026-11-20): no exceptions. A screen added to the navigation
+    // without a destination or a Settings section fails here.
+    const missing = [...hrefs].filter((href) => !reachable.has(href));
     expect(missing).toEqual([]);
   });
 

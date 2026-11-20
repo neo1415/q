@@ -800,6 +800,16 @@ export const Q_VOICE_DESTINATIONS = [
   "MANDATE",
   // Q Workspace batch 2: Analytics, for both sides (/analytics).
   "ANALYTICS",
+  // Q-NAV (decisions 109 and 110): the organisation admin and its
+  // sections, and the CRM's pipeline import. Who may be offered each is
+  // the capability registry's (q-tools), by the sidebar's own rule.
+  "ORGANISATION",
+  "ORGANISATION_MEMBERS",
+  "ORGANISATION_ROLES",
+  "ORGANISATION_PLAN",
+  "ORGANISATION_IMPORT",
+  "ORGANISATION_ACTIVITY",
+  "PIPELINE_IMPORT",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

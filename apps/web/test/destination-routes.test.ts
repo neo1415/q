@@ -73,6 +73,13 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   // investor's mandate on their profile.
   MANDATE: "/mandate",
   ANALYTICS: "/analytics",
+  ORGANISATION: "/organisation",
+  ORGANISATION_MEMBERS: "/organisation/members",
+  ORGANISATION_ROLES: "/organisation/roles",
+  ORGANISATION_PLAN: "/organisation/plan",
+  ORGANISATION_IMPORT: "/organisation/import",
+  ORGANISATION_ACTIVITY: "/organisation/activity",
+  PIPELINE_IMPORT: "/relationships/import",
 };
 
 /**
@@ -84,8 +91,6 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/documents/unavailable":
     "the not-found landing for a refused document link (J7); never a destination",
   "/admin": "platform operators only",
-  "/relationships/import":
-    "the CRM import, opened from the pipeline's Import; Q imports through import_my_pipeline",
   // Decision 107: Q starts a download with request_my_data_download and
   // links here (site map route) for deletion, which only the page does.
   "/settings/data":
@@ -112,11 +117,13 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/discover/yours": "old address, redirects to /discover?tab=yours",
   "/settings/reconnect/google": "a hand-off from Google, not a page to visit",
   "/join": "an invitation link",
-  // Decisions 109 and 110: the organisation admin has no NAVIGATE
-  // destination yet (one is a contracts and Q-tools change outside this
-  // slice); Q reaches it through the site map route.
-  "/organisation":
-    "the organisation admin: reached by Q through the site map route, no named destination yet",
+  // Q-NAV: the organisation admin's built sections are destinations
+  // (ORGANISATION...); these sections say only that they are not built yet.
+  "/organisation/connections": "not built yet (the page says so)",
+  "/organisation/data": "not built yet (the page says so)",
+  "/organisation/privacy": "not built yet (the page says so)",
+  "/organisation/speaking": "not built yet (the page says so)",
+  "/organisation/brand": "not built yet (the page says so)",
   "/settings/activity":
     "the organisation's accountability record, for admins and owners from Team; Q reads no one's activity by design",
 };

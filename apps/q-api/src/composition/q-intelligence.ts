@@ -361,6 +361,10 @@ export type QIntelligenceDependencies = {
   readonly askerSide?:
     | ((actor: ActorContext) => Promise<"FOUNDER" | "INVESTOR" | null>)
     | undefined;
+  /** Q-NAV: their membership's role, for the organisation screens. */
+  readonly organisationRole?:
+    | ((actor: ActorContext) => Promise<"OWNER" | "ADMIN" | "MEMBER" | null>)
+    | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -904,6 +908,9 @@ export function composeQIntelligence(
           plan: request.plan,
         })
       ).map((tool) => tool.definition.name),
+    ...(dependencies.organisationRole === undefined
+      ? {}
+      : { organisationRole: dependencies.organisationRole }),
     ...(logger === undefined ? {} : { logger }),
     // Every turn is read before it is answered (CQ-QX-005): research and
     // failure notices are decided by the conversation core, not by a word

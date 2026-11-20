@@ -338,6 +338,13 @@ const DESTINATION_LABELS: Readonly<
   BOARD: "Open your board",
   MANDATE: "Open your mandate",
   ANALYTICS: "Open analytics",
+  ORGANISATION: "Open your organisation",
+  ORGANISATION_MEMBERS: "Open members",
+  ORGANISATION_ROLES: "Open roles",
+  ORGANISATION_PLAN: "Open the organisation's plan",
+  ORGANISATION_IMPORT: "Open import",
+  ORGANISATION_ACTIVITY: "Open the activity log",
+  PIPELINE_IMPORT: "Import your pipeline",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

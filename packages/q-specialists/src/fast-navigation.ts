@@ -4,6 +4,11 @@ import {
   type QRecordPage,
   type QUiIntent,
 } from "@capital-q/contracts";
+import {
+  MANAGER_SCREENS,
+  ORGANISATION_SCREENS,
+  screenEligible,
+} from "@capital-q/q-tools";
 
 import { openingLine, spokenRecordName } from "./references.js";
 import {
@@ -251,6 +256,14 @@ export async function resolveFastNavigation(input: {
    */
   readonly openDocument?:
     ((ask: DocumentAsk) => Promise<OpenRecordIntent | null>) | undefined;
+  /**
+   * Q-NAV: the role their own membership holds in the organisation they
+   * act for, read on the server. An organisation screen is opened by code
+   * only when the capability registry would offer it (screenEligible);
+   * otherwise, or when absent, the words are left to Q, which says why.
+   */
+  readonly organisationRole?:
+    (() => Promise<"OWNER" | "ADMIN" | "MEMBER" | null>) | undefined;
 }): Promise<FastNavigation> {
   const text = input.text.trim();
   if (text.length === 0 || text.length > 300 || takenBack(text)) {
@@ -260,6 +273,26 @@ export async function resolveFastNavigation(input: {
   // N1: "show me my pipeline" is answered where they are, with the page
   // offered; the screen does not move before Q has said what is there.
   if (offeredFirst(page)) return { kind: "LEAVE_TO_Q" };
+  if (
+    page?.kind === "PAGE" &&
+    page.target.kind === "DESTINATION" &&
+    (ORGANISATION_SCREENS.has(page.target.destination) ||
+      MANAGER_SCREENS.has(page.target.destination))
+  ) {
+    const role =
+      input.organisationRole === undefined
+        ? null
+        : await input.organisationRole().catch(() => null);
+    if (
+      !screenEligible(page.target.destination, {
+        company: false,
+        ownInvestorOrganisation: false,
+        organisationRole: role,
+      })
+    ) {
+      return { kind: "LEAVE_TO_Q" };
+    }
+  }
   if (page?.kind === "PAGE") {
     return page.target.kind === "SETTINGS"
       ? {

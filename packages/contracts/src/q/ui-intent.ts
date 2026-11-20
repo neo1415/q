@@ -189,6 +189,16 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "MANDATE",
   // Q Workspace batch 2: Analytics (/analytics), founders and investors.
   "ANALYTICS",
+  // Q-NAV (decisions 109 and 110): the organisation admin and its
+  // sections, and the CRM's pipeline import. Who may be offered each is
+  // the capability registry's (q-tools), by the sidebar's own rule.
+  "ORGANISATION",
+  "ORGANISATION_MEMBERS",
+  "ORGANISATION_ROLES",
+  "ORGANISATION_PLAN",
+  "ORGANISATION_IMPORT",
+  "ORGANISATION_ACTIVITY",
+  "PIPELINE_IMPORT",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

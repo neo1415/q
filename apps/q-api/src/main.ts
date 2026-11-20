@@ -24,6 +24,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createEvidenceWatermark } from "./composition/evidence-watermark.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
+import { createOrganisationRoleReader } from "./composition/organisation-role.js";
 import {
   createIdleSweepSchedule,
   KNOWLEDGE_RECONCILE_SCHEDULE,
@@ -5569,9 +5570,12 @@ async function onScreenOf(
   }
   return null;
 }
+// Q-NAV: their membership's role, for the organisation screens Q may open.
+const organisationRoleOf = createOrganisationRoleReader(database.sql);
 const qIntelligence = composeQIntelligence({
   // Batch 13: the side their membership puts them on, for every answer.
   askerSide: askerSideOfActor,
+  organisationRole: organisationRoleOf,
   readCache: qReadCache,
   conversationEvidence: qConversationEvidence,
   // Situation-first planning (S5, S6): the reader's planAsk starts the plan
@@ -8960,6 +8964,7 @@ const accessTokens =
 const fastNavigation = createFastNavigation({
   firewall: baseFirewall,
   askerSide: askerSideOfActor,
+  organisationRole: organisationRoleOf,
   tools: qTools.port,
   ownRelationships: errandRelationships.ownRelationships,
   logger,

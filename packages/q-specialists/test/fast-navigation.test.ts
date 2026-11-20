@@ -488,3 +488,60 @@ describe("acceptance 2026-11-04 J6: an exact name wins over a close one of their
     });
   });
 });
+
+describe("Q-NAV: organisation screens by name, by the sidebar's rule", () => {
+  const ask = (
+    text: string,
+    role: "OWNER" | "ADMIN" | "MEMBER" | null | undefined,
+  ) =>
+    resolveFastNavigation({
+      ...reader([]).input(text),
+      ...(role === undefined
+        ? {}
+        : { organisationRole: () => Promise.resolve(role) }),
+    });
+  const to = (destination: string) => ({
+    kind: "NAVIGATE",
+    intent: { kind: "NAVIGATE", destination },
+  });
+
+  it("an admin is taken to import, the organisation and its sections", async () => {
+    expect(await ask("take me to import", "ADMIN")).toEqual(
+      to("PIPELINE_IMPORT"),
+    );
+    expect(await ask("open my organisation settings", "OWNER")).toEqual(
+      to("ORGANISATION"),
+    );
+    expect(await ask("open the organisation roles", "ADMIN")).toEqual(
+      to("ORGANISATION_ROLES"),
+    );
+  });
+
+  it("a member is taken to the organisation but never to import", async () => {
+    expect(await ask("open my organisation settings", "MEMBER")).toEqual(
+      to("ORGANISATION"),
+    );
+    expect(await ask("take me to import", "MEMBER")).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+    expect(await ask("open the organisation import", "MEMBER")).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+  });
+
+  it("no organisation, or no role read, opens none of them by code", async () => {
+    expect(await ask("open my organisation settings", null)).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+    expect(await ask("take me to import", undefined)).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+  });
+
+  it("the plan and the team are Settings sections for everyone", async () => {
+    expect(await ask("show my plan", "MEMBER")).toEqual({
+      kind: "NAVIGATE",
+      intent: { kind: "OPEN_SETTINGS", section: "plan" },
+    });
+  });
+});
