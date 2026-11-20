@@ -633,6 +633,9 @@ export {
   TURN_READER_V95_SCHEMA_VERSION,
   TurnReaderV95ResultSchema,
   type TurnReaderV95Result,
+  TURN_READER_V96_SCHEMA_VERSION,
+  TurnReaderV96ResultSchema,
+  type TurnReaderV96Result,
   TURN_READER_V89_SCHEMA_VERSION,
   TurnListConditionsV89Schema,
   type TurnListConditionsV89,
@@ -2058,6 +2061,9 @@ export {
   TurnSkimV12ResultSchema,
   TURN_SKIM_V12_SCHEMA_VERSION,
   type TurnSkimV12Result,
+  TurnSkimV13ResultSchema,
+  TURN_SKIM_V13_SCHEMA_VERSION,
+  type TurnSkimV13Result,
   type TurnSkimV8Result,
   type TurnSkimV10Result,
   type TurnSkimV7Result,
@@ -2394,6 +2400,10 @@ export {
   TURN_READER_V95,
   V95_ANSWER_PLAN,
 } from "./prompts/tasks/turn-reader.v95.js";
+export {
+  TURN_READER_V96,
+  V96_SEEKS_GUIDANCE,
+} from "./prompts/tasks/turn-reader.v96.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {
@@ -2444,6 +2454,10 @@ export { TURN_SKIM_V9, V9_ASKS_OF_IT } from "./prompts/tasks/turn-skim.v9.js";
 export { TURN_SKIM_V10, V10_DOCUMENT } from "./prompts/tasks/turn-skim.v10.js";
 export { TURN_SKIM_V11, V11_ON_WEB } from "./prompts/tasks/turn-skim.v11.js";
 export { TURN_SKIM_V12, V12_PLAN } from "./prompts/tasks/turn-skim.v12.js";
+export {
+  TURN_SKIM_V13,
+  V13_SEEKS_GUIDANCE,
+} from "./prompts/tasks/turn-skim.v13.js";
 
 export {
   COMPANY_ANALYST_V23,

@@ -133,6 +133,19 @@ const GOLDEN: readonly Row[] = [
     { answerKinds: [], underspecified: true },
     { shape: "DISCOVERY", then: null },
   ],
+  // HQ-5 follow-up (live, fictional Savanna): "I'm not really sure what
+  // I'm looking for" was read as advice and answered; seeking guidance
+  // opens discovery on the first turn, whatever work was read, costly or not.
+  [
+    "seeks guidance: discovery on the first turn",
+    {
+      answerKinds: ["CHAT"],
+      questionKind: "ADVICE",
+      costlyIfWrong: true,
+      seeksGuidance: true,
+    },
+    { shape: "DISCOVERY", then: null },
+  ],
   [
     "costly alone changes nothing",
     { answerKinds: ["LOOKUP"], costlyIfWrong: true },
@@ -245,8 +258,9 @@ describe("TURN_SKIM v12 and TURN_READER v95 (HQ-1)", () => {
   const registry = createDefaultPromptRegistry();
 
   it("are active, extend v11 and v94 by one rule each, with the old ones deprecated", () => {
-    expect(registry.getActive("TURN_SKIM").definition.version).toBe(12);
-    expect(registry.getActive("TURN_READER").definition.version).toBe(95);
+    // Superseded by v13 and v96 (HQ-5 follow-up), kept for rollback.
+    expect(registry.get("TURN_SKIM", 12)?.definition.version).toBe(12);
+    expect(registry.get("TURN_READER", 95)?.definition.version).toBe(95);
     expect(registry.get("TURN_SKIM", 11)?.definition.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 94)?.definition.status).toBe(
       "DEPRECATED",

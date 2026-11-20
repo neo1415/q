@@ -1725,3 +1725,19 @@ export const TurnReaderV95ResultSchema = TurnReaderV94ResultSchema.extend({
   costlyIfWrong: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV95Result = z.infer<typeof TurnReaderV95ResultSchema>;
+
+/**
+ * v96 (HQ-5 follow-up, 20 Nov 2026): they say they do not yet know what
+ * they want and want help working it out; code opens discovery on that
+ * first turn. Lenient: a malformed value reads as false.
+ */
+export const TURN_READER_V96_SCHEMA_VERSION = 96;
+// One flat object, not a 96th .extend(): the chained type grew past what
+// the compiler instantiates (TS2589).
+export const TurnReaderV96ResultSchema = z
+  .object({
+    ...TurnReaderV95ResultSchema.shape,
+    seeksGuidance: z.boolean().default(false).catch(false),
+  })
+  .strict();
+export type TurnReaderV96Result = z.infer<typeof TurnReaderV96ResultSchema>;

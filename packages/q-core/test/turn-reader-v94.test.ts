@@ -11,7 +11,7 @@ import {
   V93_OTHERS_ACTIVITY,
   V94_CONTACT_STATUS,
   type TurnReaderV76Variables,
-  TurnReaderV95ResultSchema,
+  TurnReaderV96ResultSchema,
 } from "../src/index.js";
 
 /**
@@ -64,12 +64,12 @@ describe("TURN_READER v94", () => {
   it("is active on its own schema; v93 is deprecated and kept for rollback", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(95);
+    expect(active.version).toBe(96);
     expect(registry.get("TURN_READER", 93)?.definition.status).toBe(
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV95ResultSchema,
+      TurnReaderV96ResultSchema,
     );
     expect(TURN_READER_V94.variables).toEqual(TURN_READER_V93.variables);
     expect(TURN_READER_V94.rulesEndBefore).toBe(V92_RULES_END_BEFORE);

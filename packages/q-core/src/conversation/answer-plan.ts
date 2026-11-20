@@ -49,6 +49,12 @@ export type AnswerPlanInput = {
   readonly underspecified?: boolean | undefined;
   /** A wrong guess would waste real work or mislead. */
   readonly costlyIfWrong?: boolean | undefined;
+  /**
+   * HQ-5 follow-up (TURN_SKIM v13, TURN_READER v96): they say they do not
+   * yet know what they want and want help working it out. Discovery opens
+   * on that first turn, whatever work the words were read as.
+   */
+  readonly seeksGuidance?: boolean | undefined;
 };
 
 export type AnswerPlan = {
@@ -100,6 +106,7 @@ export function answerPlanOf(input: AnswerPlanInput): AnswerPlan | null {
   const kind = heaviest(input.answerKinds);
   if (kind === "DOCUMENT") return null;
   if (input.turnKind === "SMALL_TALK") return { shape: "SOCIAL", then: null };
+  if (input.seeksGuidance === true) return { shape: "DISCOVERY", then: null };
   const questionKind = input.questionKind ?? null;
   const work = workShape(kind, questionKind);
   if (input.underspecified === true && work !== "SOCIAL") {

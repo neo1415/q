@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
-import { PLAN_F03_ASK, TurnReaderV95ResultSchema } from "@capital-q/q-core";
+import { PLAN_F03_ASK, TurnReaderV96ResultSchema } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
 import { acceptStructuredOutput } from "../src/policy/structured.js";
@@ -52,7 +52,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
   it("asks the provider with the active (v83) schema and the lenient fields", async () => {
     const { gateway, options } = fake(BASE);
     await read(gateway, "What should I do this week?");
-    expect(options[0]).toMatchObject({ schema: TurnReaderV95ResultSchema });
+    expect(options[0]).toMatchObject({ schema: TurnReaderV96ResultSchema });
     expect(TURN_READER_LENIENT_FIELDS).toEqual(
       expect.arrayContaining([
         "planAsk",
@@ -132,7 +132,7 @@ describe("the turn reader's planAsk and directsWork (v70)", () => {
       directsWork: "maybe",
       discoverWhom: "INVESTORS",
     });
-    const kept = acceptStructuredOutput(raw, TurnReaderV95ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV96ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);
@@ -229,7 +229,7 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination
     expect(TURN_READER_LENIENT_FIELDS).toContain("companyMedia");
     const kept = acceptStructuredOutput(
       JSON.stringify({ ...BASE, companyMedia: "the video" }),
-      TurnReaderV95ResultSchema,
+      TurnReaderV96ResultSchema,
       { lenientFields: TURN_READER_LENIENT_FIELDS },
     );
     expect(kept.ok && kept.value.companyMedia).toBeNull();
@@ -237,7 +237,7 @@ describe("the turn reader's navigation intent (v83, v84 CONTEXT, v85 destination
 
   it("a malformed navigation intent costs itself, never the reading", () => {
     const raw = JSON.stringify({ ...BASE, navigation: "take me there" });
-    const kept = acceptStructuredOutput(raw, TurnReaderV95ResultSchema, {
+    const kept = acceptStructuredOutput(raw, TurnReaderV96ResultSchema, {
       lenientFields: TURN_READER_LENIENT_FIELDS,
     });
     expect(kept.ok).toBe(true);

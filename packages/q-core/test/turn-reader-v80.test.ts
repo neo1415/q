@@ -8,7 +8,7 @@ import {
   V78_WHAT_WAS_ASKED,
   V79_REFERENCE_NAMES,
   V80_NAME_AS_SAID,
-  TurnReaderV95ResultSchema,
+  TurnReaderV96ResultSchema,
 } from "../src/index.js";
 
 /**
@@ -20,7 +20,7 @@ describe("TURN_READER v80", () => {
   it("v79 kept whole plus one line after REFERENCES BY NAME, on v79's schema (v81 is active)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(95);
+    expect(active.version).toBe(96);
     expect(registry.get("TURN_READER", 80)?.definition.status).toBe(
       "DEPRECATED",
     );
@@ -28,7 +28,7 @@ describe("TURN_READER v80", () => {
       "DEPRECATED",
     );
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV95ResultSchema,
+      TurnReaderV96ResultSchema,
     );
     expect(TURN_READER_V80.variables).toEqual(TURN_READER_V79.variables);
     expect(TURN_READER_V80.template.replace(V80_NAME_AS_SAID, "")).toBe(
