@@ -58,7 +58,7 @@ import {
 import {
   createRequestDatabaseClient,
   databasePoolExhaustionsObserved,
-  databasePoolSnapshot,
+  databasePoolReading,
   databaseTimeoutsObserved,
   watchConnectionPool,
 } from "@capital-q/database";
@@ -1948,7 +1948,7 @@ await Promise.all([
           // Console System health: the workers say they are alive here.
           heartbeat: createPostgresHeartbeat({
             sql: database.sql,
-            pool: () => databasePoolSnapshot(database.sql),
+            pool: () => databasePoolReading(database.sql),
           }),
         }),
       ]),

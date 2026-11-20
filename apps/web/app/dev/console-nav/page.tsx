@@ -423,6 +423,7 @@ export default async function ConsoleReviewPage({
                         recycles: 0,
                         lastRecycledAt: null,
                       },
+                      ungatedMaxConnections: null,
                       checkedAt: "2026-11-19T11:59:48.000Z",
                       findings: [],
                     }}

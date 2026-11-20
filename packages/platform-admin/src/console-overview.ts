@@ -47,6 +47,11 @@ export type HeartbeatPool = {
 export type WorkersHeartbeat = {
   readonly beatAt: string;
   readonly pool: HeartbeatPool | null;
+  /**
+   * Set when the workers' pool is not gated (direct or session mode): the
+   * driver's pool size, the one thing it exposes. Its use is not measured.
+   */
+  readonly ungatedMaxConnections: number | null;
   readonly checkedAt: string | null;
   readonly findings: readonly string[];
 };
@@ -90,6 +95,8 @@ export function heartbeatOf(row: {
     : [];
   return {
     beatAt: new Date(row.beat_at).toISOString(),
+    ungatedMaxConnections:
+      pool["gated"] === false ? count(pool["maxConnections"]) : null,
     pool:
       slots === null || held === null || waiting === null || recycles === null
         ? null

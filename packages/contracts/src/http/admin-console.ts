@@ -274,6 +274,8 @@ export const AdminConsoleOverviewDtoSchema = z
       .object({
         beatAt: z.string().max(40),
         pool: ServicePoolDtoSchema.nullable(),
+        /** Not gated: the driver's pool size; its use is not measured. */
+        ungatedMaxConnections: Tally.nullable(),
         checkedAt: z.string().max(40).nullable(),
         findings: z.array(z.string().regex(/^[A-Z_]{1,40}$/u)).max(20),
       })

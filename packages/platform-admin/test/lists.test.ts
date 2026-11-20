@@ -79,6 +79,7 @@ describe("the workers' heartbeat as the console reads it", () => {
       }),
     ).toEqual({
       beatAt: "2026-11-19T12:00:00.000Z",
+      ungatedMaxConnections: null,
       pool: {
         slots: 10,
         held: 2,
@@ -90,6 +91,24 @@ describe("the workers' heartbeat as the console reads it", () => {
       checkedAt: "2026-11-19T12:00:00.000Z",
       findings: ["DB_TIMEOUTS"],
     });
+  });
+
+  it("says an ungated pool's size and leaves its use unreported", () => {
+    const beat = heartbeatOf({
+      beat_at: "2026-11-20T12:00:00.000Z",
+      pool: { gated: false, maxConnections: 10 },
+      ops_check: { checkedAt: "2026-11-20T12:00:00.000Z", findings: [] },
+    });
+    expect(beat.pool).toBeNull();
+    expect(beat.ungatedMaxConnections).toBe(10);
+    // The rows written before 20 Nov ({}): nothing measured, nothing said.
+    expect(
+      heartbeatOf({
+        beat_at: "2026-11-20T12:00:00.000Z",
+        pool: {},
+        ops_check: {},
+      }).ungatedMaxConnections,
+    ).toBeNull();
   });
 
   it("reads a malformed pool as not reported, not as healthy", () => {

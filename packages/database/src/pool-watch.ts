@@ -28,6 +28,34 @@ export type DatabasePoolSnapshot = {
   readonly lastRecycledAt: string | null;
 };
 
+/**
+ * What can be measured of a pool, gated or not (20 Nov 2026: the workers'
+ * heartbeat carried an empty pool). Behind the transaction pooler the
+ * client is gated and every count above is known. Elsewhere (direct or
+ * session mode) the driver keeps its own pool and exposes only its size,
+ * so that is all this says: never a guessed "0 in use".
+ */
+export type DatabasePoolReading =
+  | ({ readonly gated: true } & DatabasePoolSnapshot)
+  | { readonly gated: false; readonly maxConnections: number };
+
+export function databasePoolReading(
+  sql: object,
+): DatabasePoolReading | undefined {
+  const snapshot = databasePoolSnapshot(sql);
+  if (snapshot !== undefined) return { gated: true, ...snapshot };
+  // postgres.js keeps its settings on `options`; the instrumented client
+  // forwards the read to the driver.
+  const options: unknown = Reflect.get(sql, "options");
+  const max: unknown =
+    typeof options === "object" && options !== null
+      ? Reflect.get(options, "max")
+      : undefined;
+  return typeof max === "number" && Number.isInteger(max) && max > 0
+    ? { gated: false, maxConnections: max }
+    : undefined;
+}
+
 export function databasePoolSnapshot(
   sql: object,
 ): DatabasePoolSnapshot | undefined {

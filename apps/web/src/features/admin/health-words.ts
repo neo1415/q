@@ -75,6 +75,17 @@ export function heartbeatLine(
     : { tone: "OK", text: `heartbeat ${seconds(age)} ago` };
 }
 
+/**
+ * A pool that is not gated (direct or session mode) exposes only its size:
+ * its use is not measured, so it is "Not reported", with the size said.
+ */
+export function ungatedPoolLine(maxConnections: number): HealthLine {
+  return {
+    tone: "UNKNOWN",
+    text: `Not reported: not gated, up to ${String(maxConnections)} connections`,
+  };
+}
+
 /** The workers' last operational check: its finding codes, in words. */
 export function checkLine(
   check:

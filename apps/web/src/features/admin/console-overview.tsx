@@ -18,6 +18,7 @@ import {
   checkLine,
   heartbeatLine,
   poolLine,
+  ungatedPoolLine,
   type HealthLine,
 } from "./health-words";
 import type { ServiceHealth } from "./system-health";
@@ -192,7 +193,15 @@ export function HealthPanel({
   }[] = [
     { term: "Q API database pool", line: poolLine(qApiPool, now) },
     { term: "Workers", line: heartbeatLine(workers?.beatAt, now) },
-    { term: "Workers database pool", line: poolLine(workers?.pool, now) },
+    {
+      term: "Workers database pool",
+      line:
+        workers !== null &&
+        workers.pool === null &&
+        workers.ungatedMaxConnections !== null
+          ? ungatedPoolLine(workers.ungatedMaxConnections)
+          : poolLine(workers?.pool, now),
+    },
     { term: "Workers last check", line: checkLine(workers) },
   ];
   return (

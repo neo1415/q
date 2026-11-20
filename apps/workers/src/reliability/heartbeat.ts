@@ -1,7 +1,7 @@
 import {
   jsonbParam,
   type DatabaseExecutor,
-  type DatabasePoolSnapshot,
+  type DatabasePoolReading,
 } from "@capital-q/database";
 
 /**
@@ -22,7 +22,7 @@ export type Heartbeat = (beat: OpsBeat) => Promise<void>;
 
 export function heartbeatRow(
   beat: OpsBeat,
-  pool: DatabasePoolSnapshot | undefined,
+  pool: DatabasePoolReading | undefined,
 ): {
   readonly beatAt: string;
   readonly pool: Readonly<Record<string, unknown>>;
@@ -40,7 +40,7 @@ export function heartbeatRow(
 
 export function createPostgresHeartbeat(options: {
   readonly sql: DatabaseExecutor;
-  readonly pool: () => DatabasePoolSnapshot | undefined;
+  readonly pool: () => DatabasePoolReading | undefined;
 }): Heartbeat {
   return async (beat) => {
     const row = heartbeatRow(beat, options.pool());

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toDatabaseError } from "../src/errors.js";
 import {
   databasePoolExhaustionsObserved,
+  databasePoolReading,
   databasePoolSnapshot,
   watchConnectionPool,
 } from "../src/pool-watch.js";
@@ -425,6 +426,8 @@ describe("watchConnectionPool (fake clock)", () => {
       recycles: 1,
       lastRecycledAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/u) as unknown,
     });
+    // Gated (transaction pooler, q-api): the reading is the full snapshot.
+    expect(databasePoolReading(sql)).toEqual({ gated: true, ...snapshot });
     expect(Object.keys(snapshot ?? {}).sort()).toEqual([
       "held",
       "lastRecycledAt",
@@ -515,6 +518,18 @@ describe("watchConnectionPool (fake clock)", () => {
     expect(watch.check()).toBeUndefined();
     // No pool, no snapshot: the console says "not reported", not "fine".
     expect(databasePoolSnapshot(plain)).toBeUndefined();
+    // Ungated (direct or session mode, the workers' case on 20 Nov): only
+    // the driver's pool size is measurable, and that is all it says.
+    expect(databasePoolReading(plain)).toBeUndefined();
+    const sized = instrumentSql(
+      Object.assign(fakeDriver({ answerMs: 1, cancelAnswersMs: 1 }), {
+        options: { max: 10 },
+      }),
+    );
+    expect(databasePoolReading(sized)).toEqual({
+      gated: false,
+      maxConnections: 10,
+    });
     expect(vi.getTimerCount()).toBe(0);
     expect(lines).toEqual([]);
   });

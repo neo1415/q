@@ -309,6 +309,7 @@ describe("the heartbeat (console System health)", () => {
     const row = heartbeatRow(
       { at: new Date("2026-11-19T12:00:00.000Z"), findings: ["DB_TIMEOUTS"] },
       {
+        gated: true,
         slots: 10,
         held: 2,
         waiting: 0,
@@ -320,6 +321,7 @@ describe("the heartbeat (console System health)", () => {
     expect(row).toEqual({
       beatAt: "2026-11-19T12:00:00.000Z",
       pool: {
+        gated: true,
         slots: 10,
         held: 2,
         waiting: 0,
@@ -335,6 +337,13 @@ describe("the heartbeat (console System health)", () => {
     expect(
       heartbeatRow({ at: new Date(0), findings: [] }, undefined).pool,
     ).toEqual({});
+    // Ungated (the workers on 20 Nov): the pool size, said as ungated.
+    expect(
+      heartbeatRow(
+        { at: new Date(0), findings: [] },
+        { gated: false, maxConnections: 10 },
+      ).pool,
+    ).toEqual({ gated: false, maxConnections: 10 });
   });
 });
 

@@ -143,6 +143,7 @@ describe("the workers' row from their stored heartbeat", () => {
   const workers = {
     beatAt: "2026-11-19T11:59:48.000Z",
     pool: { ...POOL, held: 1, slots: 5, oldestHeldMs: 90 },
+    ungatedMaxConnections: null,
     checkedAt: "2026-11-19T11:59:48.000Z",
     findings: [] as string[],
   };
@@ -182,6 +183,26 @@ describe("the workers' row from their stored heartbeat", () => {
     );
     const down = document.querySelector('[data-health-tone="DOWN"]');
     expect(down?.textContent).toContain("Down: last heartbeat 5 min ago");
+  });
+
+  it("says an ungated pool's size, and that its use is not reported", () => {
+    render(
+      <HealthPanel
+        services={[]}
+        outbox={null}
+        versions={[]}
+        qApiPool={null}
+        workers={{ ...workers, pool: null, ungatedMaxConnections: 10 }}
+        now={NOW}
+      />,
+    );
+    const rows = [...document.querySelectorAll("[data-health-tone]")].map(
+      (row) =>
+        `${row.getAttribute("data-health-tone") ?? ""} ${row.textContent ?? ""}`,
+    );
+    expect(rows).toContain(
+      "UNKNOWN Workers database poolNot reported: not gated, up to 10 connections",
+    );
   });
 
   it("says a check's findings, and a check that could not read", () => {
