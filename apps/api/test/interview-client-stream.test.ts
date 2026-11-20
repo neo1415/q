@@ -167,8 +167,10 @@ describe("a long streamed turn (QA F-67)", () => {
   const talking = (everyMs: number, forMs: number) =>
     createQInterviewClient({
       baseUrl: "http://q-api.test",
-      timeoutMs: 60,
-      streamMaxMs: 400,
+      // Margins are wide so a loaded machine (the release gate runs beside
+      // other work) cannot stall a 20 ms heartbeat past the idle limit.
+      timeoutMs: 300,
+      streamMaxMs: 2_000,
       fetch: (_input, init) => {
         const encoder = new TextEncoder();
         const body = new ReadableStream<Uint8Array>({
@@ -205,20 +207,20 @@ describe("a long streamed turn (QA F-67)", () => {
     });
 
   it("is never cut for being long while the interviewer keeps talking", async () => {
-    // 200 ms of heartbeats every 20 ms: over three times the 60 ms limit.
-    await expect(run(talking(20, 200))).resolves.toMatchObject({
+    // 1 s of heartbeats every 20 ms: over three times the 300 ms limit.
+    await expect(run(talking(20, 1_000))).resolves.toMatchObject({
       reply: TURN.reply,
     });
   });
 
   it("lets go of a stream that goes silent", async () => {
-    await expect(run(talking(150, 300))).rejects.toBeInstanceOf(
+    await expect(run(talking(750, 1_500))).rejects.toBeInstanceOf(
       QInterviewUnavailableError,
     );
   });
 
   it("lets go at the overall cap, heartbeats or not", async () => {
-    await expect(run(talking(20, 2_000))).rejects.toBeInstanceOf(
+    await expect(run(talking(20, 10_000))).rejects.toBeInstanceOf(
       QInterviewUnavailableError,
     );
   });
