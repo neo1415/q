@@ -4,10 +4,10 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnSkimV11ResultSchema,
+  TurnSkimV12ResultSchema,
   type PromptRegistry,
   type TurnSkimV8Result,
-  type TurnSkimV11Result,
+  type TurnSkimV12Result,
   type TurnSkimV3Variables,
 } from "@capital-q/q-core";
 
@@ -87,6 +87,10 @@ export type QTurnSkim = Omit<
   readonly subject?: TurnSkimV8Result["subject"] | undefined;
   /** v7: they ask Q to write or send something to someone; absent is false. */
   readonly writes?: boolean | undefined;
+  /** v12 (HQ-1): the goal or subject is unclear; absent is false. */
+  readonly underspecified?: boolean | undefined;
+  /** v12 (HQ-1): a wrong guess would waste real work or mislead. */
+  readonly costlyIfWrong?: boolean | undefined;
   /** v8 adds `kinds` (family offices, angel networks); absent is none. */
   readonly investors?:
     | (Omit<NonNullable<TurnSkimV8Result["investors"]>, "kinds"> & {
@@ -136,7 +140,7 @@ export function createTurnSkimmer(dependencies: {
             ).slice(0, 1_500),
           },
         });
-        const response = await dependencies.gateway.execute<TurnSkimV11Result>(
+        const response = await dependencies.gateway.execute<TurnSkimV12Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -158,12 +162,12 @@ export function createTurnSkimmer(dependencies: {
             },
           },
           {
-            schema: TurnSkimV11ResultSchema,
+            schema: TurnSkimV12ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const read = TurnSkimV11ResultSchema.safeParse(
+        const read = TurnSkimV12ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return read.success ? read.data : null;

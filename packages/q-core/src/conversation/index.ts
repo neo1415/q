@@ -131,3 +131,4 @@ export {
   type TheirWordsCheck,
   type TheirWordsOptions,
 } from "./their-words.js";
+export * from "./answer-plan.js";

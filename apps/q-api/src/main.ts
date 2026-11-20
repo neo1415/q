@@ -1298,9 +1298,10 @@ const qRuntime = createQRuntimeService({
 
 // The resumable run stream (CQ-Q-009). Truth stays in q_runtime.run_events;
 // the Postgres notifier is the wake-up that reaches every instance, and the
-// in-process delta bus is the seam a streaming answer path will publish
-// into. No provider streams today, so the bus carries nothing in
-// production and the stream shows stages and the persisted message.
+// in-process delta bus carries the answer as it is written: the provider
+// streams, and each sentence is published only after it passes the
+// per-sentence guards and the claim check (model-gateway q/index.ts
+// takeSentence). The completed message then replaces the streamed partial.
 const runEventNotifier = createPostgresQRunEventNotifier({
   listen: database.listen,
   logger,

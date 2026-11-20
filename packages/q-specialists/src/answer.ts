@@ -50,7 +50,10 @@ import {
   startSpeculation,
   type QSpeculationEvent,
   type Speculation,
+  TYPED_SPECULATIVE_ANSWER_KIND,
+  typedSkimQuick,
 } from "./speculation.js";
+import { startFirstLineBudget, type FirstLineBudget } from "./first-line.js";
 
 /**
  * The investor organisation's own visibility action (app action
@@ -1811,6 +1814,13 @@ export type SpecialistQAnswerDependencies = {
   readonly speculation?:
     | {
         readonly spoken: boolean;
+        /**
+         * HQ-1 (conversation audit §2.2): a typed quick question starts too,
+         * gated on the skim as voice is, and is adopted only where the full
+         * reading reads the same quick lookup (speculationMisfit). Absent
+         * or false: typed turns never speculate.
+         */
+        readonly typed?: boolean | undefined;
         readonly observe?: ((event: QSpeculationEvent) => void) | undefined;
       }
     | undefined;
@@ -6270,6 +6280,10 @@ export function createSpecialistQAnswer(
    * way round.
    */
   const heldRuns = new Map<string, "HINT" | "WRITE_HINT" | "NAMED">();
+  /** HQ-1: each run's first-line budget, until it is said or not needed. */
+  const firstLines = new Map<string, FirstLineBudget>();
+  const spokenTurn = (message: QConversationMessage): boolean =>
+    message.utteranceRef !== undefined;
   const sayHolding = (
     request: QAnswerRequest,
     name: string | null,
@@ -7266,6 +7280,9 @@ export function createSpecialistQAnswer(
       // Any path that did not adopt the speculation drops it (a no-op once
       // adopted): nothing of it is said, stored or done.
       speculative.current?.cancel("ACTED");
+      // HQ-1: a first line not yet due is never said after the turn.
+      firstLines.get(request.runId)?.cancel();
+      firstLines.delete(request.runId);
       // The same for an early context follow-up (DECISIONS 104).
       dropContextEarly(request.runId);
     });
@@ -7783,6 +7800,48 @@ export function createSpecialistQAnswer(
     };
     // No skim composed: nothing to gate on, so it starts at once.
     if (speculate && dependencies.turnSkim === undefined) startSpoken();
+    // HQ-1: a typed turn speculates only behind the skim, never without
+    // one, under the same gates as voice, as the quick lookup it most
+    // often is (TYPED_SPECULATIVE_ANSWER_KIND). The full reading must read
+    // the same lookup, or it is dropped unseen (speculationMisfit).
+    const speculateTyped =
+      dependencies.speculation?.typed === true &&
+      dependencies.turnSkim !== undefined &&
+      !spoken &&
+      request.speculation === undefined &&
+      request.signal?.aborted !== true &&
+      (request.plan.viewing !== undefined ||
+        !request.subjects.some((subject) => subject.kind === "COMPANY")) &&
+      !namesWebAddress(latest.content) &&
+      !mentionsOwnBoard(latest.content) &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId);
+    const startTyped = (): void => {
+      speculative.current = startSpeculation({
+        request: {
+          ...request,
+          research: Promise.resolve(speculativeResearch),
+          capabilities: manifestOf(capabilities),
+          turnKind: SPECULATIVE_READING.kind,
+          answerKind: TYPED_SPECULATIVE_ANSWER_KIND,
+          toolFocus: PLAIN_QUESTION_FOCUS,
+        },
+        answer: (shaped) => delegate.answer(shaped),
+        observe: (event) => {
+          logger?.info(
+            {
+              qRunId: event.runId,
+              speculation:
+                event.outcome === "ADOPTED" ? "adopted" : "cancelled",
+              reason: event.reason,
+              decidedAfterMs: event.decidedAfterMs,
+            },
+            "q typed speculation",
+          );
+          dependencies.speculation?.observe?.(event);
+        },
+      });
+    };
     // DECISIONS 104: the context follow-up overlaps the full reading (it
     // takes ~2.6 s live), only for a spoken turn whose skim reads no app
     // query, and only while this conversation's evidence is held. It is a
@@ -7899,6 +7958,18 @@ export function createSpecialistQAnswer(
     // whatever the reading decides; whom Q is looking into is named only
     // from a model's understanding (the skim's, below), which replaces it.
     if (ASKS_SOMETHING.test(latest.content.trim())) sayHolding(request, null);
+    // HQ-1: any other typed turn still shows a line within a second
+    // (first-line.ts), unless the reading, a fast lane or the answer comes
+    // first. The same nameless holding line: it claims nothing.
+    else if (
+      !spokenTurn(latest) &&
+      offerOfLastTurn(conversationId, history) === null
+    ) {
+      firstLines.set(
+        request.runId,
+        startFirstLineBudget({ say: () => sayHolding(request, null) }),
+      );
+    }
     // Live 2026-10-30 ("yes" to Q's plan offer: no Q line in the thread for
     // 6.1 s while the reading ran): a reply to the offer code recorded with
     // Q's last answer is a turn Q acts on whatever it says, so it hears
@@ -7971,6 +8042,8 @@ export function createSpecialistQAnswer(
         },
       };
     };
+    // HQ-1: once the reading lands the answer is near; no budget line.
+    const cancelFirstLine = () => firstLines.get(request.runId)?.cancel();
     const readingFirst = (async () => {
       const heard = heardReadings.get(request.runId);
       if (heard !== undefined) {
@@ -7999,6 +8072,7 @@ export function createSpecialistQAnswer(
       }
       return heldInPlace(earlyRead ?? (await readTurn().catch(() => null)));
     })();
+    void readingFirst.then(cancelFirstLine, cancelFirstLine);
     // C10 (TURN_READER v83): the page-move decision moves or offers a page
     // only where this reading asks for navigation; it is told the reading's
     // navigation intent the moment the reading lands (null: not read).
@@ -8167,6 +8241,21 @@ export function createSpecialistQAnswer(
         !readerAbort.signal.aborted
       ) {
         startContextEarly();
+      }
+      if (speculateTyped && lane === null) {
+        if (typedSkimQuick(skimmed) && !readerAbort.signal.aborted) {
+          startTyped();
+        } else {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              speculation: "skipped",
+              reason: skimmed === null ? "UNSKIMMED" : "SKIM",
+              decidedAfterMs: Date.now() - skimStarted,
+            },
+            "q typed speculation",
+          );
+        }
       }
       if (speculate && lane === null) {
         if (skimmed?.kind === "OTHER" && !readerAbort.signal.aborted) {
@@ -10628,6 +10717,9 @@ export function createSpecialistQAnswer(
       ...(read?.kind === "QUESTION_TO_Q" && read.contactStatus === true
         ? { contactStatusAsked: true }
         : {}),
+      // v95 (HQ-1): the answer's shape, with the kinds already read.
+      ...(read?.underspecified === true ? { underspecified: true } : {}),
+      ...(read?.costlyIfWrong === true ? { costlyIfWrong: true } : {}),
       // v88 (owner live 14 Nov 2026, D1): companies other than those they
       // are already in contact with, on a FIT or catalog question.
       // v89 (audit 2026-11-15, RC2): a founder's investors too ("which

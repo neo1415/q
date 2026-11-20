@@ -138,6 +138,8 @@ function seam(options: {
   readonly firstSentenceMs?: number;
   /** The early skim, when one is composed. */
   readonly skim?: TurnSkimResult | null;
+  /** HQ-1: typed turns speculate too. */
+  readonly typed?: boolean;
   /** Their own work board. */
   readonly board?: BoardKeeper;
 }) {
@@ -225,6 +227,7 @@ function seam(options: {
       : {
           speculation: {
             spoken: true,
+            ...(options.typed === true ? { typed: true } : {}),
             observe: (event: QSpeculationEvent) => {
               events.push(event);
             },
@@ -489,5 +492,114 @@ describe("a spoken board ask takes the board's own path", () => {
       { kind: "TASK", title: "review Basketari's repeat order data" },
     ]);
     expect(run.stored.join(" ")).not.toMatch(/Ledgerfold/u);
+  });
+});
+
+describe("HQ-1: a typed quick question answered speculatively", () => {
+  const SKIM_PLAIN = {
+    kind: "OTHER",
+    confidence: "HIGH",
+    count: null,
+    discover: null,
+    person: null,
+  } as TurnSkimResult;
+  const LOOKUP = {
+    ...QUESTION,
+    question: null,
+    answerKind: "LOOKUP",
+  } as unknown as TurnReaderV8Result;
+  const typed = (
+    reading: TurnReaderV8Result | null,
+    skim: TurnSkimResult | null = SKIM_PLAIN,
+  ) =>
+    seam({
+      said: "Remind me what a SAFE is",
+      reading,
+      spoken: false,
+      typed: true,
+      skim,
+      readerMs: 30,
+    });
+
+  it("starts behind the skim as a quick lookup and is adopted when the reading reads the same: one answer", async () => {
+    const run = typed(LOOKUP);
+    const outcome = await run.answer.answer(request());
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(run.calls).toHaveLength(1);
+    expect(run.calls[0]?.speculation).toBeDefined();
+    expect(run.calls[0]?.answerKind).toBe("LOOKUP");
+    expect(run.events).toMatchObject([{ outcome: "ADOPTED", reason: null }]);
+    expect(run.heard.map((h) => h.text)).toEqual(["Answer 1."]);
+    expect(run.stored).toEqual(["Answer 1."]);
+  });
+
+  it("drops it unseen when the reading reads an analysis: answered once, on the full path", async () => {
+    const run = typed({
+      ...LOOKUP,
+      answerKind: "ANALYSIS",
+    } as unknown as TurnReaderV8Result);
+    await run.answer.answer(request());
+    expect(run.events).toMatchObject([
+      { outcome: "CANCELLED", reason: "SHAPE" },
+    ]);
+    expect(run.calls).toHaveLength(2);
+    expect(run.calls[1]?.speculation).toBeUndefined();
+    expect(run.calls[1]?.answerKind).toBe("ANALYSIS");
+    expect(run.heard.map((h) => h.text)).toEqual(["Answer 2."]);
+    expect(run.stored).toEqual(["Answer 2."]);
+  });
+
+  it("drops it when the reading hears a question kind, an unclear ask or parts", async () => {
+    for (const reading of [
+      QUESTION,
+      { ...LOOKUP, underspecified: true },
+      {
+        ...LOOKUP,
+        parts: [
+          { ask: "a", kind: "LOOKUP" },
+          { ask: "b", kind: "LOOKUP" },
+        ],
+      },
+    ] as unknown as TurnReaderV8Result[]) {
+      const run = typed(reading);
+      await run.answer.answer(request());
+      expect(run.events[0]?.outcome).toBe("CANCELLED");
+      expect(run.heard).toHaveLength(1);
+      expect(run.stored).toHaveLength(1);
+    }
+  });
+
+  it("never starts without a skim, or when the skim reads it unclear, costly or about someone", async () => {
+    const unskimmed = seam({
+      said: "Remind me what a SAFE is",
+      reading: LOOKUP,
+      spoken: false,
+      typed: true,
+      readerMs: 30,
+    });
+    await unskimmed.answer.answer(request());
+    expect(unskimmed.events).toEqual([]);
+    for (const skim of [
+      { ...SKIM_PLAIN, underspecified: true },
+      { ...SKIM_PLAIN, costlyIfWrong: true },
+      { ...SKIM_PLAIN, subject: { name: "Nixo", kind: "COMPANY" } },
+      { ...SKIM_PLAIN, kind: "FIT" },
+    ] as unknown as TurnSkimResult[]) {
+      const run = typed(LOOKUP, skim);
+      await run.answer.answer(request());
+      expect(run.calls.every((c) => c.speculation === undefined)).toBe(true);
+    }
+  });
+
+  it("voice is unchanged: a spoken speculation is not held to the quick shape", async () => {
+    const run = seam({
+      said: "What can you do for me?",
+      reading: {
+        ...QUESTION,
+        answerKind: "ANALYSIS",
+      } as unknown as TurnReaderV8Result,
+    });
+    await run.answer.answer(request());
+    expect(run.events).toMatchObject([{ outcome: "ADOPTED", reason: null }]);
   });
 });

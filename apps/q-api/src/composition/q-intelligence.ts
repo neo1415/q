@@ -694,6 +694,9 @@ export function composeQIntelligence(
       : {
           speculation: {
             spoken: true,
+            // HQ-1: typed quick questions too, behind the skim; adopted
+            // only where the full reading reads the same quick lookup.
+            typed: true,
             observe: dependencies.speculation.observe,
           },
         }),

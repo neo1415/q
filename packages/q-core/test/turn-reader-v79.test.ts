@@ -5,9 +5,9 @@ import {
   TURN_READER_V78,
   TURN_READER_V79,
   TurnReaderV79ResultSchema,
-  TurnReaderV94ResultSchema,
   V78_WHAT_WAS_ASKED,
   V79_REFERENCE_NAMES,
+  TurnReaderV95ResultSchema,
 } from "../src/index.js";
 
 /**
@@ -25,9 +25,9 @@ describe("TURN_READER v79", () => {
   it("is the active reader: v78 kept whole plus one REFERENCES BY NAME rule", () => {
     const active =
       createDefaultPromptRegistry().getActive("TURN_READER").definition;
-    expect(active.version).toBe(94);
+    expect(active.version).toBe(95);
     expect(active.output.kind === "STRUCTURED" && active.output.schema).toBe(
-      TurnReaderV94ResultSchema,
+      TurnReaderV95ResultSchema,
     );
     expect(
       TURN_READER_V79.template.replace(

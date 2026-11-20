@@ -140,6 +140,9 @@ import {
   TurnAnswerKindSchema,
   type TurnAnswerKind,
   templateRulesHead,
+  ANALYTICAL_QUESTION_KINDS,
+  answerPlanNote,
+  answerPlanOf,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import { fittedVariables } from "./prompt-variables-fit.js";
@@ -1296,7 +1299,45 @@ export function taskClassForCapability(
 }
 
 /** Reader question kinds whose answers are analysis. */
-const ANALYTICAL_QUESTIONS = new Set(["ADVICE", "OPTIONS", "PROGRESS", "FIT"]);
+const ANALYTICAL_QUESTIONS = ANALYTICAL_QUESTION_KINDS;
+
+/**
+ * HQ-1 (conversation audit §2.2): the answer plan's note for this turn, or
+ * null. Only a conversational answer is shaped: a document keeps the
+ * artifact path's form, a series of questions keeps its own, and an unread
+ * turn keeps the neutral default. Form only: the reasoning level, the
+ * tools, the reads and every check stay as they are.
+ */
+export function answerShapeNoteOf(request: {
+  readonly capability: QCapability;
+  readonly writingDocument?: boolean | undefined;
+  readonly turnUnread?: boolean | undefined;
+  readonly questionSequence?: unknown;
+  readonly questionKind?: string | undefined;
+  readonly turnKind?: string | undefined;
+  readonly answerKind?: string | undefined;
+  readonly askParts?:
+    readonly { readonly ask: string; readonly kind: string }[] | undefined;
+  readonly underspecified?: boolean | undefined;
+  readonly costlyIfWrong?: boolean | undefined;
+}): string | null {
+  if (
+    request.capability !== "ANSWER" ||
+    request.writingDocument === true ||
+    request.turnUnread === true ||
+    request.questionSequence !== undefined
+  ) {
+    return null;
+  }
+  const plan = answerPlanOf({
+    answerKinds: readAnswerKinds(request),
+    questionKind: request.questionKind,
+    turnKind: request.turnKind,
+    underspecified: request.underspecified,
+    costlyIfWrong: request.costlyIfWrong,
+  });
+  return plan === null ? null : answerPlanNote(plan);
+}
 
 /**
  * Q intelligence step 4: the answer's work as the reader read it (TURN_READER
@@ -2912,6 +2953,11 @@ export function environmentNoteParts(
      * (ACTS_HELD_BACK_NOTE): Q offers the change instead of refusing it.
      */
     readonly actsHeldBack?: boolean | undefined;
+    /**
+     * HQ-1: the answer plan's template (q-core answer-plan.ts), for this
+     * turn only, so it rides in the turn notes after the cached prefix.
+     */
+    readonly answerShape?: string | undefined;
     /** C3: the recorded offer of Q's last answer, taken up this turn. */
     readonly offerTaken?: QRecordedOffer | undefined;
     /** C3: a yes to an offer code holds no record of. */
@@ -3091,6 +3137,8 @@ export function environmentNoteParts(
     ...(options.questionSequence === undefined
       ? []
       : [questionSequenceNote(options.questionSequence)]),
+    // HQ-1: the shape the reading picked (form only), among this turn's own.
+    ...(options.answerShape === undefined ? [] : [options.answerShape]),
     ...(options.openDocumentTitle === undefined
       ? []
       : [
@@ -9715,6 +9763,11 @@ export function createModelGatewayQAnswer(
           ...(request.questionSequence === undefined
             ? {}
             : { questionSequence: request.questionSequence }),
+          // HQ-1: the answer's shape, picked by code from the reading.
+          ...(() => {
+            const shape = answerShapeNoteOf(request);
+            return shape === null ? {} : { answerShape: shape };
+          })(),
           ...(onboardingNudge === null ? {} : { onboardingNudge }),
           ...(wideReads.capitalQAsCompany ? { capitalQCompany: true } : {}),
           ...(personality === null ? {} : { personality }),

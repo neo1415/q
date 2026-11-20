@@ -23,6 +23,42 @@ import { RESEARCH_TOOLS } from "./tool-focus.js";
  * adopted (see the model gateway's speculation gate).
  */
 
+/**
+ * HQ-1 (conversation audit §2.2): what a typed speculation is started as.
+ * A quick lookup: the QUICK shape, the dialogue task class and no
+ * reasoning step. Adopted only where the full reading reads exactly that.
+ */
+export const TYPED_SPECULATIVE_ANSWER_KIND = "LOOKUP";
+
+/**
+ * HQ-1: whether the skim leaves a typed turn to be the quick lookup the
+ * speculation writes: a plain question (OTHER), nothing unclear or costly
+ * to guess, nothing to write, no one named (who it is about may need a
+ * lookup the speculation would not make). Anything else waits.
+ */
+export function typedSkimQuick(
+  skimmed: {
+    readonly kind: string;
+    readonly subject?: unknown;
+    readonly writes?: boolean | undefined;
+    readonly document?: boolean | undefined;
+    readonly onWeb?: boolean | undefined;
+    readonly underspecified?: boolean | undefined;
+    readonly costlyIfWrong?: boolean | undefined;
+  } | null,
+): boolean {
+  return (
+    skimmed !== null &&
+    skimmed.kind === "OTHER" &&
+    (skimmed.subject ?? null) === null &&
+    skimmed.writes !== true &&
+    skimmed.document !== true &&
+    skimmed.onWeb !== true &&
+    skimmed.underspecified !== true &&
+    skimmed.costlyIfWrong !== true
+  );
+}
+
 /** The conservative default: a general question to Q, nothing else. */
 export const SPECULATIVE_READING: TurnReaderResult = {
   kind: "QUESTION_TO_Q",
@@ -44,7 +80,9 @@ export type QSpeculationCancelReason =
   /** A note the default lacks: a lead, a document, a series, an action. */
   | "NOTE"
   /** The turn went another way: a decision, a hand, an action, silence. */
-  | "ACTED";
+  | "ACTED"
+  /** HQ-1, typed: the reading is not the same quick lookup (shape, work). */
+  | "SHAPE";
 
 export type QSpeculationEvent = {
   readonly runId: string;
@@ -143,6 +181,21 @@ export function speculationMisfit(input: {
   const { final, speculative } = input;
   if (final.turnUnread === true) return "UNREAD";
   if (final.turnKind !== speculative.turnKind) return "KIND";
+  // HQ-1: a typed speculation was written as a quick lookup. Adopted only
+  // where the reading reads exactly that: the same work and shape, so the
+  // same task class, reasoning level and shape note (no part, no question
+  // kind, nothing unclear). Anything else is a different answer.
+  if (
+    speculative.spoken !== true &&
+    (final.spoken === true ||
+      final.answerKind !== speculative.answerKind ||
+      (final.askParts?.length ?? 0) > 0 ||
+      final.questionKind !== undefined ||
+      final.underspecified === true ||
+      final.costlyIfWrong === true)
+  ) {
+    return "SHAPE";
+  }
   if (
     JSON.stringify(input.finalResearch) !==
     JSON.stringify(input.speculativeResearch)

@@ -265,3 +265,18 @@ export const TurnSkimV11ResultSchema = TurnSkimV10ResultSchema.extend({
   onWeb: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnSkimV11Result = z.infer<typeof TurnSkimV11ResultSchema>;
+
+export const TURN_SKIM_V12_SCHEMA_VERSION = 12;
+
+/**
+ * v12 (HQ-1, 20 Nov 2026; answer plan, conversation audit §2.2): the skim
+ * also says whether the ask is underspecified (its goal or subject is
+ * unclear) and whether a wrong guess would be costly (waste real work or
+ * mislead), so the answer's shape is known at skim time. Read by meaning in
+ * any language. Lenient: a malformed value reads as false.
+ */
+export const TurnSkimV12ResultSchema = TurnSkimV11ResultSchema.extend({
+  underspecified: z.boolean().default(false).catch(false),
+  costlyIfWrong: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnSkimV12Result = z.infer<typeof TurnSkimV12ResultSchema>;

@@ -58,7 +58,7 @@ function render(version: number, vars: Variables) {
 describe("TURN_READER v92", () => {
   it("is v91 unchanged in words, schema and variables (v93 is active)", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(94);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(95);
     const v92 = registry.get("TURN_READER", 92)?.definition;
     expect(v92?.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 91)?.definition.status).toBe(

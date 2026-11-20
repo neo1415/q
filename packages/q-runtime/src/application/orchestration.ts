@@ -390,6 +390,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly contactStatusAsked?: boolean | undefined;
   /**
+   * HQ-1 (TURN_READER v95): the reader read the ask as underspecified (its
+   * goal or subject unclear) and a wrong guess as costly. With the kinds
+   * already read they pick the answer's shape (q-core answer-plan.ts):
+   * form only, never what may be read or said. Absent is false.
+   */
+  readonly underspecified?: boolean | undefined;
+  readonly costlyIfWrong?: boolean | undefined;
+  /**
    * Whom the turn is about, as the turn reader understood it (v58): the
    * only name the public web and its pictures are searched by -- never one
    * guessed from capital letters (production 2026-10-23: "Yes" was).

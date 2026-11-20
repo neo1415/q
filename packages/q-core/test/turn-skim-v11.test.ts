@@ -17,7 +17,7 @@ import {
 describe("TURN_SKIM v11: a turn asking for the public web waits for the full reading", () => {
   it("is active, v10 kept whole plus the onWeb rule, by meaning", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_SKIM");
-    expect(active.definition.version).toBe(11);
+    expect(active.definition.version).toBe(12);
     expect(
       TURN_SKIM_V11.template.replace(
         `${V10_DOCUMENT}${V11_ON_WEB}`,

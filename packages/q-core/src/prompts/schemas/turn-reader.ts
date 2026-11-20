@@ -1711,3 +1711,17 @@ export const TurnReaderV94ResultSchema = TurnReaderV93ResultSchema.extend({
   contactStatus: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnReaderV94Result = z.infer<typeof TurnReaderV94ResultSchema>;
+
+/**
+ * v95 (HQ-1, 20 Nov 2026; answer plan, conversation audit §2.2): whether
+ * the ask is underspecified (its goal or subject is unclear) and whether a
+ * wrong guess would be costly (waste real work or mislead). Code picks the
+ * answer's shape from these and the kinds already read (answer-plan.ts).
+ * Lenient: a malformed value reads as false and never costs the reading.
+ */
+export const TURN_READER_V95_SCHEMA_VERSION = 95;
+export const TurnReaderV95ResultSchema = TurnReaderV94ResultSchema.extend({
+  underspecified: z.boolean().default(false).catch(false),
+  costlyIfWrong: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV95Result = z.infer<typeof TurnReaderV95ResultSchema>;
