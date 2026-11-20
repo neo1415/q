@@ -24,6 +24,11 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createEvidenceWatermark } from "./composition/evidence-watermark.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
+import {
+  createIdleSweepSchedule,
+  KNOWLEDGE_RECONCILE_SCHEDULE,
+  startIdleSweep,
+} from "./composition/idle-sweep.js";
 import { modelHostedSearchPort } from "./composition/model-hosted-search.js";
 import { createWebsiteIdentityReader } from "@capital-q/q-research/website-identity";
 import { webOriginFrom } from "./composition/web-origin.js";
@@ -6152,22 +6157,22 @@ await orphanSweep.sweep();
 
 // Recovery K: Tier B knowledge is kept current by same-transaction triggers;
 // this reconciles anything missed (a failed refresh, a projection rule that
-// changed), every ten minutes.
+// changed): every ten minutes, backing off to at most an hour while it keeps
+// finding nothing (cost pass 2026-11-20; a missed change waits ≤ 60 min).
 const knowledgeReconciler = createKnowledgeReconciler({ sql: database.sql });
-setInterval(
-  () => {
-    knowledgeReconciler
-      .reconcile()
-      .then((touched) => {
-        if (touched > 0)
-          logger.info({ touched }, "knowledge projections reconciled");
-      })
-      .catch((error: unknown) => {
-        logger.warn({ err: error }, "knowledge reconciliation failed");
-      });
+startIdleSweep({
+  run: async () => {
+    const touched = await knowledgeReconciler.reconcile();
+    if (touched > 0)
+      logger.info({ touched }, "knowledge projections reconciled");
+    return touched;
   },
-  10 * 60 * 1000,
-).unref();
+  schedule: createIdleSweepSchedule(KNOWLEDGE_RECONCILE_SCHEDULE),
+  firstDelayMs: KNOWLEDGE_RECONCILE_SCHEDULE.baseMs,
+  onError: (error) => {
+    logger.warn({ err: error }, "knowledge reconciliation failed");
+  },
+});
 
 const workforceDocuments = createWorkforceDocuments({
   freshActor: (actor) =>
