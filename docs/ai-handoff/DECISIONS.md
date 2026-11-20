@@ -497,3 +497,9 @@ Core Seven remains the governing assessment framework. The new directive authori
       - An investor's portfolio company names may appear on its Q Card only when the firm itself switches that field on (resolves the open question in ADR 0007).
 
 111.  **CRM naming** (owner, 2026-11-19): the menu entry stays "CRM". The page keeps its role names: "Fundraising Hub" for founders and "Investment Hub" for investors. No relabelling of the menu.
+
+112.  **Owner, 2026-11-20:**
+      - Migration `20261231599700` (reconcile settle) approved and applied.
+      - Voice calls close after about a minute of silence, with a spoken "Still there?" first.
+      - Model routing: Claude first, then GPT as the fallback, for test accounts and normal accounts alike.
+      - The organisation admin pages that say "doesn't exist yet" must be built.
