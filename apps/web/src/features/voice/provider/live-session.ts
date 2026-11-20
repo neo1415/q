@@ -3,6 +3,8 @@
 import type { VoiceEndDetail } from "../session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useT } from "@/features/i18n/language";
+
 import { liveUnavailableForTab } from "../live/availability";
 import {
   isLiveTrialSpent,
@@ -18,6 +20,7 @@ import {
   liveTrialLeftNotice,
   noteLiveTrialSpent,
 } from "../live/trial";
+import { VOICE_IDLE_PROMPT } from "../live/voice-idle";
 import type { VoiceAudioOwner } from "../voice-audio";
 import type {
   VoiceSessionClient,
@@ -62,6 +65,13 @@ export const LIVE_COULD_NOT_CONNECT =
 /** How long a status line (time left on the trial) stays up. */
 const STATUS_SHOWN_MS = 6_000;
 
+/**
+ * Decision 112: a call closed after a quiet minute says so, and the
+ * microphone (the surface's own control) starts a new one.
+ */
+export const LIVE_IDLE_ENDED_NOTICE =
+  "The call ended after a quiet minute. Tap the microphone to start again.";
+
 const GREETING =
   "The call has just connected. Greet them warmly now, in one short natural sentence: no question, no filler.";
 
@@ -85,6 +95,12 @@ export function useLiveVoiceSession(
   useEffect(() => {
     eventsRef.current = events;
   }, [events]);
+  // The interface language for the lines the call says or shows itself.
+  const t = useT();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const startCall = options.startCall ?? startLiveCall;
   const callRef = useRef<LiveCall | null>(null);
   const startsRef = useRef(0);
@@ -164,6 +180,7 @@ export function useLiveVoiceSession(
             ...(opening === undefined ? {} : { content: opening }),
           },
           fastNavigation: !rehearsal,
+          idlePrompt: tRef.current(VOICE_IDLE_PROMPT),
           ...(options.audioOwner === undefined
             ? {}
             : { audioOwner: options.audioOwner }),
@@ -195,6 +212,8 @@ export function useLiveVoiceSession(
             callRef.current = null;
             setConnected(false);
             setState("IDLE");
+            if (reason === "idle")
+              showStatus(tRef.current(LIVE_IDLE_ENDED_NOTICE));
             if (reason === "trial") {
               // The standard voice takes over, and says why once it is up.
               liveUnavailableForTab();

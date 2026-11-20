@@ -17,7 +17,14 @@ import {
 } from "../voice-audio";
 import { interceptHeard } from "../heard-intercept";
 import { watchSpokenMove } from "../use-follow-turn";
-import { idleEnds } from "./line-hold";
+import { lineHeld } from "./line-hold";
+import {
+  createVoiceIdle,
+  promptMsFor,
+  VOICE_IDLE_CLOSE_MS,
+  VOICE_IDLE_PROMPT,
+  type VoiceIdle,
+} from "./voice-idle";
 import {
   noteForMove,
   receiptForMove,
@@ -94,6 +101,11 @@ export type LiveTranscript = {
 
 export type LiveCallOptions = {
   readonly voice: "FEMALE" | "MALE";
+  /**
+   * Decision 112: what Q says before a quiet call closes ("Still there?"),
+   * in the person's language. Absent: the English line.
+   */
+  readonly idlePrompt?: string | undefined;
   /** The standard voice session this call carries (its thread, its board). */
   readonly attach?:
     | { readonly voiceSessionId: string; readonly sessionToken?: string }
@@ -519,7 +531,10 @@ export async function startLiveCall(
   let id = options.attach?.voiceSessionId ?? null;
   let token = options.attach?.sessionToken ?? null;
   let maxSessionMs = 20 * 60_000;
-  let idleMs = 3 * 60_000;
+  // Decision 112: the server's close window (CQ_VOICE_LIVE_IDLE_SECONDS),
+  // a minute by default; the idle guard is made once the line is up.
+  let idleMs = VOICE_IDLE_CLOSE_MS;
+  let idle: VoiceIdle | null = null;
   // Owner 14 Nov 2026: the Q API says whether code routes this line's
   // turns (absent: the voice holds the call, as on the interview).
   let routing: LiveRoutingMode | null = null;
@@ -876,6 +891,7 @@ export async function startLiveCall(
         heardWords(ms);
         lastInputAt = ms;
         lastSpeechAt = performance.now();
+        idle?.heard("PERSON", lastSpeechAt);
         // Interrupted mid-sentence: what it had said is still kept. Only a
         // real interruption ends Q's reply: a "mm" or Q's own voice heard
         // back cut Q's lines mid-sentence (owner, live onboarding 9 Nov).
@@ -922,6 +938,7 @@ export async function startLiveCall(
         heardWords(ms);
         finishUtterance();
         lastSpeechAt = performance.now();
+        idle?.heard("Q", lastSpeechAt);
         firstOutputMs ??= Math.round(ms);
         if (lastInputAt !== null) {
           stats = {
@@ -1126,11 +1143,19 @@ export async function startLiveCall(
     throw error;
   }
 
+  idle = createVoiceIdle({
+    closeMs: idleMs,
+    promptMs: promptMsFor(idleMs),
+    startedAt: performance.now(),
+  });
   // The speaking indicator follows the player, not generation: audio can
   // play after the model has finished producing it.
   const meter = setInterval(() => {
     const speaking = levelOf(output, outBuffer) > SPEAKING_LEVEL;
-    if (speaking) lastSpeechAt = performance.now();
+    if (speaking) {
+      lastSpeechAt = performance.now();
+      idle?.heard("Q", lastSpeechAt);
+    }
     if (speaking !== stats.qSpeaking) {
       // RC5: the reply's audio as the player gave it out.
       if (speaking) replyAudio.start ??= Date.now();
@@ -1140,11 +1165,25 @@ export async function startLiveCall(
       update();
     }
     watchPage();
-    // Runaway guard: nobody has spoken for the idle window -- unless work
-    // promised on this line is still running (bounded; line-hold.ts).
+    // Decision 112: a minute after the last spoken turn the call closes,
+    // and Q asks "Still there?" before -- unless work promised on this line
+    // is still running (bounded; line-hold.ts). Said through the approved
+    // spoken-line path, never a model turn.
+    const held = lineHeld();
+    const step = idle?.step(performance.now(), held) ?? null;
+    if (step === "CLOSE") {
+      void end("idle");
+      return;
+    }
+    if (step === "PROMPT") {
+      bridge.narrate(options.idlePrompt ?? VOICE_IDLE_PROMPT);
+    }
     const silentMs = performance.now() - lastSpeechAt;
-    if (idleEnds(silentMs, idleMs)) void end("idle");
-    else if (silentMs > idleMs && performance.now() - heldReportAt > 60_000) {
+    if (
+      held &&
+      silentMs > idleMs &&
+      performance.now() - heldReportAt > 60_000
+    ) {
       // Held past the idle window: the Q API hears from the line (its
       // usage, unchanged, so nothing is counted twice) so it does not
       // close it as abandoned.

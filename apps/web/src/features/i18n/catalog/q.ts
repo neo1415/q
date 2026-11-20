@@ -15,6 +15,9 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "Ask about this": "اسأل عن هذا",
   "Ask next": "اسأل بعد ذلك",
   "Which one?": "أيّها؟",
+  "Still there?": "هل ما زلت معي؟",
+  "The call ended after a quiet minute. Tap the microphone to start again.":
+    "انتهت المكالمة بعد دقيقة من الصمت. اضغط على الميكروفون للبدء من جديد.",
   Attribute: "السمة",
   "Comparison table, scrolls sideways": "جدول مقارنة، يُمرَّر أفقياً",
   "Looking at {name}": "يطّلع على {name}",

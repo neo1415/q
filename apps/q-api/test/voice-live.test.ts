@@ -504,7 +504,7 @@ describe("GPT-Live config", () => {
       liveConfigFrom({ CQ_VOICE_LIVE_MAX_SESSION_SECONDS: "3600" }, "local")
         .maxSessionMs,
     ).toBe(60 * 60_000);
-    expect(liveConfigFrom({}, "local").idleMs).toBe(180_000);
+    expect(liveConfigFrom({}, "local").idleMs).toBe(60_000);
     expect(liveConfigFrom({}, "local").delegationDeadlineMs).toBe(90_000);
     expect(liveConfigFrom({ CQ_VOICE_PREVIEW: "on" }, "local").preview).toBe(
       true,

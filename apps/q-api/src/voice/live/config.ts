@@ -56,7 +56,9 @@ export type LiveConfig = {
 export const LIVE_DEFAULTS: LiveConfig = {
   enabled: false,
   maxSessionMs: 20 * 60 * 1000,
-  idleMs: 3 * 60 * 1000,
+  // Decision 112: a minute after the last spoken turn (it was three); the
+  // browser asks "Still there?" 15 s before (web voice-idle.ts).
+  idleMs: 60 * 1000,
   dailyCapUsd: 1,
   sessionReserveUsd: 0.15,
   delegationDeadlineMs: 90_000,
