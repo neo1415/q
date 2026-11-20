@@ -57,7 +57,9 @@ const tx = {} as TransactionContext;
 
 function ports() {
   const decisions: ProviderDecisionWriter = {
-    insertProviderDecision: vi.fn((_tx, decision) =>
+    insertProviderDecision: vi.fn<
+      ProviderDecisionWriter["insertProviderDecision"]
+    >((_tx, decision) =>
       Promise.resolve({
         ...decision.decides,
         status: "VERIFIED" as const,
