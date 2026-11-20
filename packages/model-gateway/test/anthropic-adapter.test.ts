@@ -631,6 +631,17 @@ describe("anthropic adapter: failures, in the gateway's classes", () => {
         "Your credit balance is too low to access the Anthropic API.",
       ),
       apiError(402, "billing_error", "Billing issue"),
+      // Decision 112: the owner's hard spend limit set in the console.
+      apiError(
+        400,
+        "invalid_request_error",
+        "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC.",
+      ),
+      apiError(
+        400,
+        "invalid_request_error",
+        "You have reached your specified workspace API usage limits.",
+      ),
     ]) {
       const failure = normalizeError(error);
       expect(failure.failureClass).toBe("PERMANENT");

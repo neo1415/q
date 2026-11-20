@@ -18,10 +18,12 @@ select is(
       and rp.version <> (select max(x.version) from ai_ops.routing_policies x
                           where x.task_class = rp.task_class
                             and x.sensitivity_class = rp.sensitivity_class
-                            and x.status = 'ACTIVE')
+                            and x.status = 'ACTIVE'
+                            -- decision 112's v3 (20261231599800) now serves
+                            and x.version <= 2)
       and rp.version = 2),
   0,
-  'v2 is the highest active version for each class, so it serves');
+  'v2 is the highest of v1 and v2 for each class (v3 serves since decision 112)');
 
 select is(
   (select count(*)::int from ai_ops.routing_policies where version = 1 and status = 'ACTIVE'),

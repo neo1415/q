@@ -763,13 +763,23 @@ function result(
  * bad request is retried on every turn instead of being set aside.
  */
 const CREDIT_EXHAUSTED_MESSAGE = /credit balance is too low/i;
+/**
+ * Decision 112: the owner's hard spend limit in the Anthropic console
+ * refuses with a 400 `invalid_request_error` saying the account "reached
+ * your specified API usage limits" until a date. That is the account too:
+ * the turn falls over to the next model (OpenAI), never an error to the
+ * person, and the provider is set aside until a probe finds it open.
+ */
+const SPEND_LIMIT_MESSAGE =
+  /reached your specified (?:workspace |organi[sz]ation )?API usage limits?/i;
 
 export function accountExhausted(error: APIError): boolean {
   if (error.status === 402 || error.type === "billing_error") return true;
   return (
     error.status === 400 &&
     error.type === "invalid_request_error" &&
-    CREDIT_EXHAUSTED_MESSAGE.test(error.message)
+    (CREDIT_EXHAUSTED_MESSAGE.test(error.message) ||
+      SPEND_LIMIT_MESSAGE.test(error.message))
   );
 }
 
