@@ -985,3 +985,9 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **1d40130b0 deployed 04:53 UTC on 20 Nov** (gate PASS 04:53:22Z, after the e517e726a gate FAILED on spoken-place names and Q-NAV dataset coverage). Q navigation adds seven destinations: the organisation pages and pipeline import. The two import destinations are offered to owners and admins only, from the server-side role.
   - Live as the fictional Savanna account: "take me to import" from `/settings` opened `/relationships/import` in about 0.3 s, and Q said "Opened the pipeline import." That was one live turn.
   - The Q-NAV sealed split `heldout5` (14 turns) was written by the implementing agent, not an independent author. Its score is reported separately.
+- **Migration `20261231599700` applied 20 Nov at about 13:40 UTC** under the owner's `--founder-approved` (decision 112). Hosted is at 316.
+- **642258888 deployed 16:41 UTC on 20 Nov** (gate PASS; the a99f3a73d gate FAILED its integration tests only because of the withdrawn Claude-first migration). The voice line says "Still there?" at 45 s of silence and closes at 60 s; meetings are excluded. The Anthropic spend-cap refusal now falls over to the next model.
+  - No `*IDLE*` override variable is set on q-api or web, so the 60 s default applies.
+  - No q-api errors since the deploy.
+  - Not live-tested in a voice call, because that is a paid realtime session; the evidence is fake-timer tests.
+  - The Claude-first migration `20261231599800` was withdrawn (decision 114) and never applied.
