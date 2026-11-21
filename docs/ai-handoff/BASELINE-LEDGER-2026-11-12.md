@@ -1076,3 +1076,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The LCP element on `/home` and `/settings` is the Q pane greeting `p[data-q-greeting]`, which renders only after hydration because the conversation lives in the browser.
   - Live: `/home` LCP 2.38–2.94 s (the 7.6 s did not reproduce), `/settings` 4.0–4.25 s.
   - The real fix is to server-render the greeting in the placeholder, which flashes for returning users with an open thread. Awaiting the owner's decision.
+- **46bb5c1b8 deployed 21:01 UTC on 21 Nov.** The first gate (32290088e) failed the bundle budget: brand and privacy had been budgeted as placeholders, and were re-budgeted in 46bb5c1b8.
+  - ORG-SECTIONS adds the organisation Privacy, Brand, Connections and How Q speaks pages, plus the personal export/delete link from Export and deletion.
+  - Brand-kit writes now require `organisation.admin` (members lose edit, decision 110).
+  - Live as the LedgerBridge founder: `/organisation/privacy`, `/organisation/brand` and `/organisation/connections` render their sections.
+  - The organisation etiquette store (approved) is being built.
