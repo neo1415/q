@@ -295,6 +295,37 @@ type ProfileBody = {
 };
 
 describe("GET /v1/companies/:id/profile", () => {
+  it("W4-D: reads the pitch claims, the pitch sections and the founder's sections side by side", async () => {
+    const { profile } = ports({ investor: true, findable: true });
+    const log: string[] = [];
+    const slow = <T>(name: string, value: T): Promise<T> => {
+      log.push(`start ${name}`);
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          log.push(`end ${name}`);
+          resolve(value);
+        }, 5),
+      );
+    };
+    const app = buildApp({
+      profile: {
+        ...profile,
+        pitchCues: () => slow("cues", null),
+        pitchSections: () => slow("sections", null),
+        founderSections: () => slow("founder", []),
+      },
+    });
+    const response = await app.inject({ method: "GET", url: PROFILE_URL });
+    expect(response.statusCode).toBe(200);
+    const firstEnd = log.findIndex((entry) => entry.startsWith("end"));
+    const starts = log.slice(0, firstEnd);
+    // Every read began before any of them finished.
+    expect(starts).toContain("start cues");
+    expect(starts).toContain("start sections");
+    expect(starts).toContain("start founder");
+    await app.close();
+  });
+
   it("an investor receives the overview, the disclosed raise, the shared deck's name and every playable video", async () => {
     const { profile, calls } = ports({ investor: true });
     const app = buildApp({ profile });

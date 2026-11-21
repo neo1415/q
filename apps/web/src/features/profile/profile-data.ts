@@ -215,6 +215,19 @@ export async function loadProfileAnswers(
   };
 }
 
+/**
+ * W4-D (audit finding 6): only the person's own profile, as
+ * loadProfilePage reads it (same call, same budget), for a page that
+ * shows nothing else of it (Settings): no company, investor or
+ * verification reads it would discard.
+ */
+export async function loadOwnPerson(
+  session: ApiSession | null,
+): Promise<ProfilePageData["person"]> {
+  if (session === null) return null;
+  return (await within(() => getMyProfile(session))) ?? null;
+}
+
 export async function loadProfilePage(
   session: ApiSession | null,
   context: OwnContext,

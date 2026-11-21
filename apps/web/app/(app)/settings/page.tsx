@@ -13,13 +13,12 @@ import { machineUiText } from "@/features/i18n/machine";
 import { translate, uiLanguageOf } from "@/features/i18n/messages";
 import { deviceLanguages } from "@/features/i18n/server";
 import {
+  loadOwnPerson,
   loadProfileImages,
-  loadProfilePage,
 } from "@/features/profile/profile-data";
 import {
   apiSession,
   qApiSession,
-  resolveOwnContext,
   resolveQStanding,
 } from "@/features/q/context";
 import { SettingsView } from "@/features/settings/settings-view";
@@ -47,11 +46,11 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const google = params["google"];
-  const [session, billingSession, context] = await Promise.all([
+  const [session, billingSession] = await Promise.all([
     qApiSession(),
     apiSession(),
-    resolveOwnContext(),
   ]);
+  const personRead = loadOwnPerson(billingSession).catch(() => null);
   const [
     standing,
     daily,
@@ -60,7 +59,8 @@ export default async function SettingsPage({
     speaking,
     mine,
     learning,
-    profile,
+    person,
+    images,
     twoStep,
   ] = await Promise.all([
     resolveQStanding(),
@@ -78,14 +78,17 @@ export default async function SettingsPage({
     session === null
       ? Promise.resolve(null)
       : getQPreferenceLearning(session).catch(() => null),
-    loadProfilePage(billingSession, context).catch(() => null),
+    // W4-D (audit finding 6): only the person (Settings shows nothing
+    // else of the profile page), and their photo as soon as it is known,
+    // beside the other reads rather than after all of them.
+    personRead,
+    personRead.then((found) =>
+      found === null
+        ? null
+        : loadProfileImages(billingSession, "PERSON", found.userId),
+    ),
     twoStepEnabled().catch(() => null),
   ]);
-  const person = profile?.person ?? null;
-  const images =
-    person === null
-      ? null
-      : await loadProfileImages(billingSession, "PERSON", person.userId);
   const acting = mine.find((organisation) => organisation.active) ?? null;
   // Any language: this page in their chosen language.
   const pageLanguage = uiLanguageOf(

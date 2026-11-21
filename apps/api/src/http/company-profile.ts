@@ -408,38 +408,40 @@ export function registerCompanyProfileRoutes(
       // What the pitches say, only from videos this reader may play (the
       // list above is already the player's own rule; the transcript read
       // asks it again). A founder viewing another company gets none.
-      const claims =
+      // Lane ov: the same pitches, read into the profile's sections.
+      // The founder's own words for the profile's sections: the owner and
+      // an investor the pitch rule admits (ADR 0041, as the team); never
+      // asked for anyone else, so it cannot reach them.
+      // W4-D (audit finding 6): the three are independent of each other,
+      // so they are read side by side (they ran one after another, after
+      // the wave above; hosted p50 1.8 s), each exactly as before.
+      const [claims, sections, founderSections] = await Promise.all([
         full && profile.pitchCues !== undefined
-          ? await pitchClaimsFor(videos, (mediaAssetId) =>
+          ? pitchClaimsFor(videos, (mediaAssetId) =>
               quietly(
                 profile.pitchCues?.(actor, company.id, mediaAssetId) ??
                   Promise.resolve(null),
                 null,
               ),
             )
-          : [];
-      // Lane ov: the same pitches, read into the profile's sections.
-      const sections =
+          : [],
         full && profile.pitchSections !== undefined
-          ? await pitchSectionsFor(videos, (mediaAssetId) =>
+          ? pitchSectionsFor(videos, (mediaAssetId) =>
               quietly(
                 profile.pitchSections?.(actor, company.id, mediaAssetId) ??
                   Promise.resolve(null),
                 null,
               ),
             )
-          : [];
-      // The founder's own words for the profile's sections: the owner and
-      // an investor the pitch rule admits (ADR 0041, as the team); never
-      // asked for anyone else, so it cannot reach them.
-      const founderSections =
+          : [],
         (viewer === "OWNER" || findable) &&
         profile.founderSections !== undefined
-          ? await quietly(
+          ? quietly(
               profile.founderSections(company),
               [] as readonly FounderSectionAnswerDto[],
             )
-          : ([] as readonly FounderSectionAnswerDto[]);
+          : ([] as readonly FounderSectionAnswerDto[]),
+      ]);
       const sharing: RaiseSharing =
         claims.some((claim) => claim.kind === "RAISE") &&
         profile.raiseSharing !== undefined
