@@ -27,7 +27,7 @@ describe("seeksGuidance (TURN_SKIM v13, TURN_READER v96)", () => {
 
   it("are active, add one rule each, with v12 and v95 deprecated", () => {
     expect(registry.getActive("TURN_SKIM").definition.version).toBe(13);
-    expect(registry.getActive("TURN_READER").definition.version).toBe(96);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(97);
     expect(registry.get("TURN_SKIM", 12)?.definition.status).toBe("DEPRECATED");
     expect(registry.get("TURN_READER", 95)?.definition.status).toBe(
       "DEPRECATED",

@@ -2405,6 +2405,7 @@ export {
   TURN_READER_V96,
   V96_SEEKS_GUIDANCE,
 } from "./prompts/tasks/turn-reader.v96.js";
+export { TURN_READER_V97 } from "./prompts/tasks/turn-reader.v97.js";
 // Situation-first planning (design 2026-10-28, S3).
 export * from "./prompts/schemas/plan.js";
 export {

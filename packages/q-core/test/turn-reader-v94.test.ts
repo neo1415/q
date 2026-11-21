@@ -64,7 +64,7 @@ describe("TURN_READER v94", () => {
   it("is active on its own schema; v93 is deprecated and kept for rollback", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(96);
+    expect(active.version).toBe(97);
     expect(registry.get("TURN_READER", 93)?.definition.status).toBe(
       "DEPRECATED",
     );

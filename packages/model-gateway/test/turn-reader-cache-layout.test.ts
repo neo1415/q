@@ -68,19 +68,33 @@ function input(utterance: string, signal?: AbortSignal) {
 const ok = () => ({ output: { kind: "STRUCTURED", value: READING } });
 
 describe("the turn reader's prompt layout (v92)", () => {
-  it("makes one call a reading, with the rules as a second instruction and the turn as the user message", async () => {
+  it("makes one call a reading: the charter's fixed head and the rules shared, then the charter's tail, then the turn (v97)", async () => {
     const seen = recording(ok);
     const reader = createQTurnReader({ gateway: seen.gateway, logger });
     const read = await reader.read(input("Which of these have revenue?"));
     expect(read?.kind).toBe("QUESTION_TO_Q");
     expect(seen.requests).toHaveLength(1);
     const messages = seen.requests[0]?.messages ?? [];
-    expect(messages.map((m) => m.role)).toEqual(["SYSTEM", "SYSTEM", "USER"]);
+    expect(messages.map((m) => m.role)).toEqual([
+      "SYSTEM",
+      "SYSTEM",
+      "SYSTEM",
+      "USER",
+    ]);
+    // HQ-8 (v97): the fixed text leads, marked shared, before anything
+    // of the person.
+    const shared = (m: (typeof messages)[number] | undefined) =>
+      m !== undefined &&
+      m.role === "SYSTEM" &&
+      "shared" in m &&
+      m.shared === true;
+    expect(messages.slice(0, 2).map(shared)).toEqual([true, true]);
+    expect(shared(messages[2])).toBe(false);
     expect(messages[1]?.content.startsWith("TASK: TURN_READER")).toBe(true);
     expect(messages[1]?.content).not.toContain("Which of these have revenue?");
     expect(messages[1]?.content).not.toContain("Zorvanta");
-    expect(messages[2]?.content).toContain("Which of these have revenue?");
-    expect(messages[2]?.content).toContain("Zorvanta");
+    expect(messages[3]?.content).toContain("Which of these have revenue?");
+    expect(messages[3]?.content).toContain("Zorvanta");
   });
 
   it("sends identical instructions for two different turns, so the cached prefix holds", async () => {
@@ -94,9 +108,10 @@ describe("the turn reader's prompt layout (v92)", () => {
     );
     expect(one?.instructions).toBeDefined();
     expect(two?.instructions).toBe(one?.instructions);
-    // The rules are in the instructions; only the turn is user input.
+    // The rules are in the shared instructions; the charter's per-person
+    // tail follows as a developer message, then the turn (v97).
     expect(one?.instructions).toContain("TASK: TURN_READER");
-    expect(one?.input).toHaveLength(1);
+    expect(one?.input).toHaveLength(2);
     expect(JSON.stringify(two?.input)).toContain("And the weakest first?");
     expect(JSON.stringify(two?.input)).not.toContain("TASK: TURN_READER");
   });

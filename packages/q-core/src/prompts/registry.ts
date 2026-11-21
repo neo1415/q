@@ -205,6 +205,7 @@ import { TURN_READER_V93 } from "./tasks/turn-reader.v93.js";
 import { TURN_READER_V94 } from "./tasks/turn-reader.v94.js";
 import { TURN_READER_V95 } from "./tasks/turn-reader.v95.js";
 import { TURN_READER_V96 } from "./tasks/turn-reader.v96.js";
+import { TURN_READER_V97 } from "./tasks/turn-reader.v97.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -855,7 +856,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     { ...TURN_READER_V93, status: "DEPRECATED" },
     { ...TURN_READER_V94, status: "DEPRECATED" },
     { ...TURN_READER_V95, status: "DEPRECATED" },
-    TURN_READER_V96,
+    { ...TURN_READER_V96, status: "DEPRECATED" },
+    TURN_READER_V97,
     MEMORY_EXTRACTOR_V1,
     { ...MEMORY_EXTRACTOR_V2, status: "DEPRECATED" },
     // Decision 97: extraction lists with no count ceiling.

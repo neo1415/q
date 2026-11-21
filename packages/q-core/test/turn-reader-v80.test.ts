@@ -20,7 +20,7 @@ describe("TURN_READER v80", () => {
   it("v79 kept whole plus one line after REFERENCES BY NAME, on v79's schema (v81 is active)", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("TURN_READER").definition;
-    expect(active.version).toBe(96);
+    expect(active.version).toBe(97);
     expect(registry.get("TURN_READER", 80)?.definition.status).toBe(
       "DEPRECATED",
     );
