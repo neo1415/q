@@ -226,6 +226,10 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # W4-A: first-load JS per web route may not grow past its budget.
+      - name: Bundle budget
+        run: node apps/web/scripts/bundle-budget.mjs
   quality:
     name: quality
     # The database (pgTAP: RLS, grants, append-only guards) and integration

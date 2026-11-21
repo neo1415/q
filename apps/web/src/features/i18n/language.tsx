@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UiTextProvider } from "@capital-q/ui/ui-text";
 import {
   createContext,
+  use,
   useContext,
   useEffect,
   useMemo,
@@ -16,6 +17,8 @@ import { QLanguagePreferenceSchema } from "@capital-q/contracts";
 
 import {
   directionOf,
+  handCatalogueReady,
+  loadHandCatalogue,
   registerMachineCatalogue,
   translate,
   uiLanguageOf,
@@ -87,6 +90,11 @@ export function LanguageProvider({
   } | null>(null);
   const language =
     announced !== null && announced.from === initial ? announced.to : initial;
+  // W4-A: a hand-translated language's catalogue loads on demand rather
+  // than with every page. Until it has, this waits (on the server it is
+  // registered already; in the browser, hydration waits for the chunk),
+  // so the words rendered are the same as before, never English first.
+  if (!handCatalogueReady(language)) use(loadHandCatalogue(language));
   const router = useRouter();
   useEffect(() => {
     const onChange = (event: Event) => {
@@ -94,12 +102,16 @@ export function LanguageProvider({
         (event as CustomEvent<unknown>).detail,
       );
       if (!detail.success) return;
-      setAnnounced({
-        from: initial,
-        to: uiLanguageOf(detail.data, window.navigator.languages),
-      });
-      // Server-rendered words (Settings, page titles) follow on refresh.
-      router.refresh();
+      const to = uiLanguageOf(detail.data, window.navigator.languages);
+      const apply = () => {
+        setAnnounced({ from: initial, to });
+        // Server-rendered words (Settings, page titles) follow on refresh.
+        router.refresh();
+      };
+      // W4-A: a hand catalogue not loaded yet loads first, so the switch
+      // shows the new words at once, as it did; otherwise at once.
+      if (handCatalogueReady(to)) apply();
+      else void loadHandCatalogue(to).then(apply);
     };
     window.addEventListener(LANGUAGE_EVENT, onChange);
     return () => {

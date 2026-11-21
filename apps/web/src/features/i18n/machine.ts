@@ -1,5 +1,7 @@
 import "server-only";
 
+import "./hand-server";
+
 import { getUiText } from "@capital-q/api-client";
 
 import { qApiSession } from "@/features/q/context";

@@ -1,5 +1,7 @@
 import "server-only";
 
+import "./hand-server";
+
 import { headers } from "next/headers";
 
 import { resolveQStanding } from "@/features/q/context";

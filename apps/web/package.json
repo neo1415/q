@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "NODE_OPTIONS=\"--max-old-space-size=6144 ${NODE_OPTIONS:-}\" next build",
     "start": "next start",
+    "bundle:check": "node scripts/bundle-budget.mjs",
     "typecheck": "NODE_OPTIONS=\"--max-old-space-size=6144 ${NODE_OPTIONS:-}\" tsc --noEmit",
     "clean": "node -e \"require('node:fs').rmSync('.next',{recursive:true,force:true})\"",
     "icons": "node scripts/generate-pwa-icons.mjs"

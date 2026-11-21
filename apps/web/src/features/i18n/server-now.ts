@@ -1,5 +1,7 @@
 import "server-only";
 
+import "./hand-server";
+
 import { cache } from "react";
 
 import { translate, type UiLanguage } from "./messages";

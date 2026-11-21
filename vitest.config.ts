@@ -210,6 +210,9 @@ export default defineConfig({
           include: ["apps/web/**/*.{test,spec}.{ts,tsx}", ...NEEDS_ISOLATION],
           exclude: [...TEST_EXCLUDE],
           isolate: true,
+          // W4-A: the browser loads hand catalogues on demand and the server
+          // registers them at start; web tests translate as the server does.
+          setupFiles: ["apps/web/test/support/hand-catalogues.ts"],
         },
       },
     ],

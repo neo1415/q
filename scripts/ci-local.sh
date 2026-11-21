@@ -164,7 +164,11 @@ step_typecheck() {
   pnpm exec turbo run typecheck --only &&
     node --max-old-space-size=7168 node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
 }
-step_build() { pnpm exec turbo run build --filter=./apps/* --only; }
+# W4-A: then each web route's first-load JS against apps/web/bundle-budget.json.
+step_build() {
+  pnpm exec turbo run build --filter=./apps/* --only &&
+    node apps/web/scripts/bundle-budget.mjs
+}
 step_test() { pnpm test; }
 step_database() {
   fresh_supabase || return 1
