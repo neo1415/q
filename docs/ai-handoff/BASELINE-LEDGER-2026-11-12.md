@@ -1005,3 +1005,11 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **1979b9975 deployed 21:44 UTC on 20 Nov** (gate PASS). HQ-5 adds discovery mode: a reducer state, a gap model, a 12-question cap and a "Just show me" exit.
   - Live as fictional Savanna, "I'm not really sure what I'm looking for right now": first text in 2.62 s, and a grounded suggestion ("You don't need to have a particular task in mind… Watchly and Clinicrest need replies…").
   - **Follow-up:** it did NOT enter discovery and asked no question. An explicit "not sure what I want" should enter discovery on the first turn, not only after two underspecified reads.
+- **86145c7b4 deployed 00:59 UTC on 21 Nov** (gate PASS). VOICE-FIX for the owner's 20 Nov 22:18 session:
+  - no web research for the person's own next steps, guidance requests or product questions;
+  - `seeksGuidance` opens discovery on the first turn (TURN_SKIM v13, TURN_READER v96);
+  - a sentence already spoken is never re-spoken, and holding lines are stripped before storing;
+  - exclusions are held per conversation, and a bare "yes" to several options asks which.
+  - Live (typed, fictional Savanna), "I'm not really sure what I'm looking for right now": first text in 2.62 s. Discovery entered with a grounded line plus one past-behaviour question ("What was the last deal you looked at closely and passed on…") and the "Just show me" and "Not sure yet" chips.
+  - Voice not live-tested (paid realtime). The live model talking over a delegation is fixed by a prompt rule only.
+  - Research providers tavily, serper and brave are resting (key refused or credit spent); the owner was told.
