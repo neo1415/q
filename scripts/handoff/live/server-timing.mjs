@@ -1,4 +1,4 @@
-/* global performance -- read inside the page */
+/* global PerformanceObserver -- read inside the page */
 // W4-C (enterprise audit finding 6): production server speed, read-only.
 // Signs in as a FICTIONAL account in headless Chromium (phone profile, no
 // throttling: this measures the server, not the phone), loads each page

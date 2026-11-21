@@ -2623,8 +2623,7 @@ export function createRehearsalService(dependencies: {
     partners: async (actor) => {
       const viewer = await viewerOf(actor);
       if (viewer === null) return { role: null, upcoming: [], people: [] };
-      // W4-C (audit finding 6): the researched list needs only the role,
-      // so it is read beside the other three, not after them.
+      // W4-C: the researched list needs only the role; read beside these.
       const [relationships, meetings, history, entitled] = await Promise.all([
         material.relationships(actor).catch(() => []),
         material.upcomingMeetings(actor).catch(() => []),
