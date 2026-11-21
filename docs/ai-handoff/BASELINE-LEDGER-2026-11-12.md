@@ -1022,3 +1022,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
     - `evidence.verification_consents` (append-only, server-only).
   - Live as the LedgerBridge founder: `/verification` shows "Automatic checks: Companies House · Not connected; Dojah · Not connected; …" because no keys are set.
   - The owner must set `COMPANIES_HOUSE_API_KEY`, `DOJAH_APP_ID`, `DOJAH_SECRET_KEY`, `SUMSUB_APP_TOKEN` and `SUMSUB_SECRET_KEY`.
+- **23cd44da3 deployed 04:20 UTC on 21 Nov** (gate PASS).
+  - **HQ-6:** per-row table claim checks ("not known" cells), retraction counts, a sycophancy eval set (not run on a model; running it needs owner approval), and latency-budget tests.
+  - **HQ-7:** scoped, paraphrased memory callbacks, at most one per answer.
+  - Live as fictional Savanna: the Ledgerfold stage question answered with attribution, first text in 2.59 s. No q-api errors.
+  - Remote branch deletes are refused by the proxy (403), so a dozen merged worker branches remain; the owner may delete them.
