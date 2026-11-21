@@ -523,6 +523,8 @@ export type ModelGatewayQAnswerDependencies = {
     | ((request: {
         readonly tenantId: string;
         readonly userId: string;
+        /** Decision 112: the organisation acted for; its guide applies. */
+        readonly organisationId?: string | undefined;
       }) => Promise<EtiquetteGuides | null>)
     | undefined;
   /**

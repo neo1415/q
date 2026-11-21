@@ -4,12 +4,18 @@ import {
   ME_ETIQUETTE_GUIDE_PATH,
   ME_ETIQUETTE_GUIDE_VERSIONS_PATH,
   MyEtiquetteGuideDtoSchema,
+  ORGANISATION_ETIQUETTE_GUIDE_PATH,
+  OrganisationEtiquetteGuideDtoSchema,
   PERSONAL_ETIQUETTE_TEXT_MAX,
   SaveEtiquetteGuideRequestSchema,
   type MyEtiquetteGuideDto,
+  type OrganisationEtiquetteGuideDto,
 } from "@capital-q/contracts";
 import type {
   EtiquetteGuideOwner,
+  OrganisationEtiquetteGuide,
+  OrganisationEtiquetteStore,
+  OrganisationEtiquetteVersion,
   PersonalEtiquetteGuide,
   PersonalEtiquetteGuideStore,
 } from "@capital-q/q-runtime";
@@ -21,6 +27,7 @@ import {
   type AnyAppAction,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
+import type { ActorContext } from "@capital-q/security";
 
 /**
  * How Q speaks for you (ADR 0050): a person's own business etiquette guide,
@@ -233,4 +240,134 @@ const REMOVE = defineAppAction<z.infer<typeof Remove>, Mine>({
   },
 });
 
-export const ETIQUETTE_ACTIONS: readonly AnyAppAction[] = [SAVE, REMOVE];
+/**
+ * Decision 112: the organisation's own guide ("How Q speaks for us"),
+ * between the house guide and each person's own. Every member reads it;
+ * its owners and admins (organisation.admin) write a new version; none is
+ * ever rewritten. Always the actor's active organisation: nothing in the
+ * input names one. A new version is reversible (write another), so
+ * INSTANT, like a team's saved CRM view; Q offers the page rather than
+ * writing the organisation's words itself.
+ */
+export type OrganisationEtiquettePort = OrganisationEtiquetteStore & {
+  /** organisation.admin on the actor's active organisation. */
+  readonly mayManage: (actor: ActorContext) => Promise<boolean>;
+  readonly house: () => Promise<HouseEtiquette>;
+};
+
+type Ours = {
+  readonly guide: OrganisationEtiquetteGuide | null;
+  readonly versions: readonly OrganisationEtiquetteVersion[];
+  readonly house: HouseEtiquette;
+  readonly canChange: boolean;
+};
+
+const ORGANISATION_HISTORY = 20;
+
+const organisationGuides = (ports: AppActionPorts) =>
+  ports.organisationEtiquette ?? portMissing("organisationEtiquette");
+
+/** What a member of the actor's active organisation sees; null: none. */
+export async function readOrganisationEtiquette(
+  port: OrganisationEtiquettePort,
+  actor: ActorContext,
+): Promise<Ours | null> {
+  if (actor.organisationId === undefined) return null;
+  const owner = {
+    tenantId: actor.tenantId,
+    organisationId: actor.organisationId,
+  };
+  const [guide, versions, house, canChange] = await Promise.all([
+    port.read(owner),
+    port.history(owner, ORGANISATION_HISTORY),
+    port.house(),
+    port.mayManage(actor),
+  ]);
+  return { guide, versions, house, canChange };
+}
+
+export const toOrganisationEtiquetteDto = (
+  ours: Ours,
+): OrganisationEtiquetteGuideDto =>
+  OrganisationEtiquetteGuideDtoSchema.parse({
+    guide:
+      ours.guide === null
+        ? null
+        : {
+            version: ours.guide.version,
+            sourceKind: ours.guide.sourceKind,
+            fileName: ours.guide.fileName,
+            mediaType: ours.guide.mediaType,
+            text: ours.guide.text,
+            savedAt: ours.guide.savedAt,
+          },
+    versions: ours.versions.map((one) => ({
+      version: one.version,
+      sourceKind: one.sourceKind,
+      fileName: one.fileName,
+      characters: one.characters,
+      savedAt: one.savedAt,
+    })),
+    house: ours.house,
+    canChange: ours.canChange,
+  });
+
+const ORGANISATION_SAVE = defineAppAction<SaveInput, Ours>({
+  name: "organisation.etiquette_guide.save",
+  short: "change the organisation's speaking guide",
+  area: "settings",
+  classification: "INSTANT",
+  does: "Saves a new version of the organisation's own guide to how Q writes and speaks for its members, as How Q speaks for us does (owners and admins); it shapes Q's wording only.",
+  input: Save,
+  output: serviceResult(),
+  // Decision 110: owners and admins change it; members read it.
+  authorize: async (ports, context) =>
+    context.actor.organisationId !== undefined &&
+    (await organisationGuides(ports).mayManage(context.actor))
+      ? { ok: true as const }
+      : {
+          ok: false as const,
+          reason:
+            "Only the organisation's owners and admins can change how Q speaks for it.",
+        },
+  run: async (ports, context, input) => {
+    const port = organisationGuides(ports);
+    const { actor } = context;
+    if (actor.organisationId === undefined) {
+      throw new Error("authorize admits only an organisation's admin");
+    }
+    await port.save(
+      { tenantId: actor.tenantId, organisationId: actor.organisationId },
+      actor.userId,
+      {
+        sourceKind: input.input.sourceKind,
+        fileName: input.input.fileName,
+        mediaType: input.input.mediaType,
+        text: input.input.text,
+      },
+    );
+    const ours = await readOrganisationEtiquette(port, actor);
+    if (ours === null) throw new Error("the organisation was just written");
+    return ours;
+  },
+  targets: () => [],
+  card: () => ({
+    summary: "Change how Q speaks for the organisation",
+    preview: "",
+  }),
+  done: (out) =>
+    `Saved: Q follows version ${String(out.guide?.version ?? 1)} of the organisation's guide when it writes or speaks for its members.`,
+  http: {
+    method: "PUT",
+    path: ORGANISATION_ETIQUETTE_GUIDE_PATH,
+    fromRequest: (_params, body) => ({ input: body }),
+    respond: (out) => toOrganisationEtiquetteDto(out),
+  },
+  qCapability: "offer.organisation_speaking_guide",
+});
+
+export const ETIQUETTE_ACTIONS: readonly AnyAppAction[] = [
+  SAVE,
+  REMOVE,
+  ORGANISATION_SAVE,
+];

@@ -121,7 +121,7 @@
     "packages/communication/src/schedule/service.ts": 2065,
     "packages/contracts/src/http/index.ts": 1636,
     "packages/contracts/src/q/site-map.generated.ts": 3049,
-    "packages/data-rights/src/inventory.ts": 2142,
+    "packages/data-rights/src/inventory.ts": 1964,
     "packages/database/src/generated/database.types.ts": 7382,
     "packages/deck-render/src/layout.ts": 2507,
     "packages/gateq-intake/src/application/statement-plan.ts": 2663,

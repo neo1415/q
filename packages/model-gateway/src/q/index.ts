@@ -5772,8 +5772,7 @@ export function createModelGatewayQAnswer(
         dependencies.receipts === undefined
           ? Promise.resolve([])
           : collectReceipts(history, dependencies.receipts, request.actor);
-      // Awaited where it is used; a failure still fails the answer there.
-      receiptsRead.catch(() => undefined);
+      receiptsRead.catch(() => undefined); // Awaited, and fails, where used.
       const etiquetteRead =
         dependencies.etiquetteOf === undefined
           ? Promise.resolve(null)
@@ -5781,6 +5780,7 @@ export function createModelGatewayQAnswer(
               .etiquetteOf({
                 tenantId: request.tenantId,
                 userId: request.actorUserId,
+                organisationId: request.actor.organisationId,
               })
               .catch(() => null);
       /**

@@ -224,6 +224,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'instruction_delegations',  'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'daily_preferences',        'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'etiquette_guide_versions', 'RLS_REQUIRED',         '{SELECT}'),
+  -- Decision 112: an organisation's own guide; members read (suite 999_organisation_etiquette).
+  ('q_runtime', 'organisation_etiquette_versions', 'RLS_REQUIRED',  '{SELECT}'),
   ('q_runtime', 'workforce_jobs', 'RLS_REQUIRED', '{SELECT}'),
   -- Work board (owner 2026-10-23): the person's own board, server-only; suite 987.
   ('workspace', 'board_items',       'INTERNAL_SERVER_ONLY', '{}'),

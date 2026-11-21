@@ -140,6 +140,14 @@ const N = (table: string, why: string): InventoryEntry => ({
   why,
 });
 
+/** Kept, the person only named in it, now a former user (class ANONYMISE). */
+const A = (table: string, column: string, why: string): InventoryEntry => ({
+  table,
+  class: "ANONYMISE",
+  person: by(column),
+  why,
+});
+
 const REFERENCE = "Reference data; no personal data.";
 const ORG_DATA =
   "Organisation-level data keyed by an organisation, company or investor, not a person.";
@@ -224,24 +232,9 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: ORG_AUTHORED,
   },
-  {
-    table: "artifacts.brand_kit_versions",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
-  {
-    table: "artifacts.document_images",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
-  {
-    table: "artifacts.document_jobs",
-    class: "ANONYMISE",
-    person: by("requested_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("artifacts.brand_kit_versions", "created_by_user_id", ORG_AUTHORED),
+  A("artifacts.document_images", "created_by_user_id", ORG_AUTHORED),
+  A("artifacts.document_jobs", "requested_by_user_id", ORG_AUTHORED),
 
   // --- audit ----------------------------------------------------------------
   {
@@ -402,12 +395,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     },
     why: "The shared record of a meeting. What was said stays in the other side's record; the speaker's name becomes 'Former user'.",
   },
-  {
-    table: "communication.meeting_face_sessions",
-    class: "ANONYMISE",
-    person: by("organiser_user_id"),
-    why: COUNTERPART,
-  },
+  A("communication.meeting_face_sessions", "organiser_user_id", COUNTERPART),
   {
     table: "communication.meeting_follow_up_seen",
     class: "DELETE",
@@ -450,12 +438,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     },
     why: "Who was in a call; the other attendees' record. The name is removed.",
   },
-  {
-    table: "communication.meeting_time_proposal_events",
-    class: "ANONYMISE",
-    person: by("actor_user_id"),
-    why: COUNTERPART,
-  },
+  A("communication.meeting_time_proposal_events", "actor_user_id", COUNTERPART),
   {
     table: "communication.meeting_time_proposals",
     class: "ANONYMISE",
@@ -545,18 +528,8 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     person: q("actor_id = $1", (sql, p) => sql`actor_id = ${p.userId}`),
     why: ORG_AUTHORED,
   },
-  {
-    table: "core.capital_objectives",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
-  {
-    table: "core.capital_round_events",
-    class: "ANONYMISE",
-    person: by("actor_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("core.capital_objectives", "created_by_user_id", ORG_AUTHORED),
+  A("core.capital_round_events", "actor_user_id", ORG_AUTHORED),
   {
     table: "core.capital_rounds",
     class: "ANONYMISE",
@@ -589,12 +562,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: "The company's team history; the person's place in it becomes a former member.",
   },
-  {
-    table: "core.company_readiness_action_events",
-    class: "ANONYMISE",
-    person: by("actor_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("core.company_readiness_action_events", "actor_user_id", ORG_AUTHORED),
   N("core.company_readiness_assessments", ORG_DATA),
   N("core.company_team_facts", ORG_DATA),
   N("core.company_unicorn_potential_assessments", ORG_DATA),
@@ -659,19 +627,9 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     person: by("user_id"),
     why: "An idempotency record of the person's request.",
   },
-  {
-    table: "core.investor_mandates",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("core.investor_mandates", "created_by_user_id", ORG_AUTHORED),
   N("core.investor_organisations", ORG_DATA),
-  {
-    table: "core.investor_portfolio_references",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("core.investor_portfolio_references", "created_by_user_id", ORG_AUTHORED),
   {
     table: "core.investor_representatives",
     class: "ANONYMISE",
@@ -722,12 +680,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
   },
 
   // --- evidence -------------------------------------------------------------
-  {
-    table: "evidence.claim_evidence",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.claim_evidence", "created_by_user_id", ORG_AUTHORED),
   {
     table: "evidence.claim_revisions",
     class: "ANONYMISE",
@@ -753,25 +706,10 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: COUNTERPART,
   },
   N("evidence.data_room_checklist_items", ORG_DATA),
-  {
-    table: "evidence.data_room_entries",
-    class: "ANONYMISE",
-    person: by("updated_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.data_room_entries", "updated_by_user_id", ORG_AUTHORED),
   N("evidence.data_room_folders", ORG_DATA),
-  {
-    table: "evidence.data_room_request_decisions",
-    class: "ANONYMISE",
-    person: by("decided_by_user_id"),
-    why: COUNTERPART,
-  },
-  {
-    table: "evidence.data_room_settings",
-    class: "ANONYMISE",
-    person: by("updated_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.data_room_request_decisions", "decided_by_user_id", COUNTERPART),
+  A("evidence.data_room_settings", "updated_by_user_id", ORG_AUTHORED),
   {
     table: "evidence.data_room_views",
     class: "ANONYMISE",
@@ -779,26 +717,15 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: "Data-room access history the company relies on; the viewer becomes a former user.",
   },
-  {
-    table: "evidence.deck_extraction_confirmations",
-    class: "ANONYMISE",
-    person: by("confirmed_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A(
+    "evidence.deck_extraction_confirmations",
+    "confirmed_by_user_id",
+    ORG_AUTHORED,
+  ),
   N("evidence.deck_extractions", ORG_DATA),
   N("evidence.deck_read_again_outcomes", ORG_DATA),
-  {
-    table: "evidence.deck_read_again_requests",
-    class: "ANONYMISE",
-    person: by("requested_by_user_id"),
-    why: ORG_AUTHORED,
-  },
-  {
-    table: "evidence.deck_section_reviews",
-    class: "ANONYMISE",
-    person: by("reviewed_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.deck_read_again_requests", "requested_by_user_id", ORG_AUTHORED),
+  A("evidence.deck_section_reviews", "reviewed_by_user_id", ORG_AUTHORED),
   N("evidence.document_claim_readings", ORG_DATA),
   N("evidence.document_extractions", ORG_DATA),
   N("evidence.document_pages", ORG_DATA),
@@ -809,12 +736,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     person: by("user_id"),
     why: "An idempotency record of the person's upload request.",
   },
-  {
-    table: "evidence.document_upload_sessions",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.document_upload_sessions", "created_by_user_id", ORG_AUTHORED),
   {
     table: "evidence.document_versions",
     class: "ANONYMISE",
@@ -829,19 +751,9 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: ORG_AUTHORED,
   },
-  {
-    table: "evidence.evidence_items",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.evidence_items", "created_by_user_id", ORG_AUTHORED),
   N("evidence.gateq_application_document_disclosures", ORG_DATA),
-  {
-    table: "evidence.sources",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("evidence.sources", "created_by_user_id", ORG_AUTHORED),
   N("evidence.verification_claim_reclassifications", ORG_DATA),
   {
     table: "evidence.verification_claims",
@@ -874,12 +786,11 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: "A founder's application is the investor's intake record. It stays; the founder's contact details are removed.",
   },
   N("gateq.application_disagreement_events", ORG_DATA),
-  {
-    table: "gateq.application_document_selections",
-    class: "ANONYMISE",
-    person: by("selected_by_user_id"),
-    why: COUNTERPART,
-  },
+  A(
+    "gateq.application_document_selections",
+    "selected_by_user_id",
+    COUNTERPART,
+  ),
   N("gateq.application_documents", ORG_DATA),
   N("gateq.application_facts", ORG_DATA),
   {
@@ -916,58 +827,23 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: COUNTERPART,
   },
   N("gateq.contact_verification_limits", WORKING),
-  {
-    table: "gateq.gateway_appearances",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.gateway_appearances", "created_by_user_id", ORG_AUTHORED),
   N("gateq.gateway_criteria", ORG_DATA),
-  {
-    table: "gateq.gateway_logo_assets",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.gateway_logo_assets", "created_by_user_id", ORG_AUTHORED),
   {
     table: "gateq.gateway_versions",
     class: "ANONYMISE",
     person: by("created_by_user_id", "published_by_user_id"),
     why: ORG_AUTHORED,
   },
-  {
-    table: "gateq.gateways",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.gateways", "created_by_user_id", ORG_AUTHORED),
   N("gateq.guest_throttle_buckets", WORKING),
-  {
-    table: "gateq.inbox_activity",
-    class: "ANONYMISE",
-    person: by("actor_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.inbox_activity", "actor_user_id", ORG_AUTHORED),
   N("gateq.inbox_item_labels", ORG_DATA),
-  {
-    table: "gateq.inbox_items",
-    class: "ANONYMISE",
-    person: by("assignee_user_id"),
-    why: ORG_AUTHORED,
-  },
-  {
-    table: "gateq.inbox_labels",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.inbox_items", "assignee_user_id", ORG_AUTHORED),
+  A("gateq.inbox_labels", "created_by_user_id", ORG_AUTHORED),
   N("gateq.inbox_message_deliveries", ORG_DATA),
-  {
-    table: "gateq.inbox_messages",
-    class: "ANONYMISE",
-    person: by("approved_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.inbox_messages", "approved_by_user_id", ORG_AUTHORED),
   {
     table: "gateq.inbox_notes",
     class: "ANONYMISE",
@@ -975,12 +851,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: ORG_AUTHORED,
   },
-  {
-    table: "gateq.inbox_settings",
-    class: "ANONYMISE",
-    person: by("updated_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.inbox_settings", "updated_by_user_id", ORG_AUTHORED),
   {
     table: "gateq.inbox_user_state",
     class: "DELETE",
@@ -988,12 +859,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: "The person's own inbox view state.",
   },
   N("gateq.pass_reasons", REFERENCE),
-  {
-    table: "gateq.policy_extractions",
-    class: "ANONYMISE",
-    person: by("created_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("gateq.policy_extractions", "created_by_user_id", ORG_AUTHORED),
   {
     table: "gateq.startup_alerts",
     class: "DELETE",
@@ -1224,18 +1090,8 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: COUNTERPART,
   },
-  {
-    table: "network.deal_close_checklist",
-    class: "ANONYMISE",
-    person: by("done_by_user_id"),
-    why: COUNTERPART,
-  },
-  {
-    table: "network.deal_closes",
-    class: "ANONYMISE",
-    person: by("closed_by_user_id"),
-    why: COUNTERPART,
-  },
+  A("network.deal_close_checklist", "done_by_user_id", COUNTERPART),
+  A("network.deal_closes", "closed_by_user_id", COUNTERPART),
   {
     table: "network.deal_terms",
     class: "ANONYMISE",
@@ -1243,18 +1099,8 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: COUNTERPART,
   },
   N("network.diligence_document_summaries", ORG_DATA),
-  {
-    table: "network.diligence_document_views",
-    class: "ANONYMISE",
-    person: by("viewed_by_user_id"),
-    why: COUNTERPART,
-  },
-  {
-    table: "network.diligence_fulfilments",
-    class: "ANONYMISE",
-    person: by("fulfilled_by_user_id"),
-    why: COUNTERPART,
-  },
+  A("network.diligence_document_views", "viewed_by_user_id", COUNTERPART),
+  A("network.diligence_fulfilments", "fulfilled_by_user_id", COUNTERPART),
   {
     table: "network.diligence_question_answers",
     class: "ANONYMISE",
@@ -1269,12 +1115,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     export: true,
     why: COUNTERPART,
   },
-  {
-    table: "network.diligence_request_declines",
-    class: "ANONYMISE",
-    person: by("declined_by_user_id"),
-    why: COUNTERPART,
-  },
+  A("network.diligence_request_declines", "declined_by_user_id", COUNTERPART),
   {
     table: "network.diligence_requests",
     class: "ANONYMISE",
@@ -1294,12 +1135,7 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     person: by("user_id"),
     why: "An idempotency record of the person's request.",
   },
-  {
-    table: "network.interest_responses",
-    class: "ANONYMISE",
-    person: by("responded_by_user_id"),
-    why: COUNTERPART,
-  },
+  A("network.interest_responses", "responded_by_user_id", COUNTERPART),
   {
     table: "network.interests",
     class: "ANONYMISE",
@@ -1339,18 +1175,8 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: "A side's own pipeline fields (stage, deal owner, source, expected cheque, priority): the organisation's record of the relationship. Kept; the person is a former member.",
   },
   N("network.relationship_pass_reasons", REFERENCE),
-  {
-    table: "network.relationship_passes",
-    class: "ANONYMISE",
-    person: by("passed_by_user_id"),
-    why: COUNTERPART,
-  },
-  {
-    table: "network.relationship_reports",
-    class: "ANONYMISE",
-    person: by("generated_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("network.relationship_passes", "passed_by_user_id", COUNTERPART),
+  A("network.relationship_reports", "generated_by_user_id", ORG_AUTHORED),
   {
     table: "network.relationship_views",
     class: "DELETE",
@@ -1768,6 +1594,12 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     why: "The person's own guide for how Q speaks for them.",
   },
   {
+    table: "q_runtime.organisation_etiquette_versions",
+    class: "ANONYMISE",
+    person: by("created_by_user_id"),
+    why: "The organisation's guide for how Q speaks for it (an owner or admin wrote it); append-only like the house guide.",
+  },
+  {
     table: "q_runtime.external_entity_aliases",
     class: "DELETE",
     person: viaResearch,
@@ -2009,19 +1841,9 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
 
   // --- taxonomy -------------------------------------------------------------
   N("taxonomy.aliases", REFERENCE),
-  {
-    table: "taxonomy.classification_candidates",
-    class: "ANONYMISE",
-    person: by("decided_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("taxonomy.classification_candidates", "decided_by_user_id", ORG_AUTHORED),
   N("taxonomy.classification_runs", DERIVED),
-  {
-    table: "taxonomy.entity_assignments",
-    class: "ANONYMISE",
-    person: by("confirmed_by_user_id"),
-    why: ORG_AUTHORED,
-  },
+  A("taxonomy.entity_assignments", "confirmed_by_user_id", ORG_AUTHORED),
   N("taxonomy.mandate_preferences", ORG_DATA),
   N("taxonomy.node_edges", REFERENCE),
   N("taxonomy.nodes", REFERENCE),

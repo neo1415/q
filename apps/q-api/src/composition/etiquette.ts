@@ -23,6 +23,12 @@ import {
 export type EtiquetteOwner = {
   readonly tenantId: string;
   readonly userId: string;
+  /**
+   * Decision 112: the organisation Q works for with this person, when the
+   * work is on its behalf; its own guide then sits between the house
+   * guide and theirs. Absent: house and personal only, as before.
+   */
+  readonly organisationId?: string | undefined;
 };
 
 export type EtiquetteSource = (
@@ -37,6 +43,13 @@ export function createEtiquetteSource(dependencies: {
   readonly personal: (
     owner: EtiquetteOwner,
   ) => Promise<{ readonly version: number; readonly text: string } | null>;
+  /** Decision 112: the organisation's newest guide, or null. */
+  readonly organisation?:
+    | ((owner: {
+        readonly tenantId: string;
+        readonly organisationId: string;
+      }) => Promise<{ readonly version: number; readonly text: string } | null>)
+    | undefined;
   /**
    * Founder brief J3: the person's "what worked" notes (their approvals and
    * edits, kept by the memory Write Gate as their preferences). They join
@@ -54,6 +67,42 @@ export function createEtiquetteSource(dependencies: {
     string,
     { at: number; value: EtiquetteGuides["personal"] }
   >();
+  const organisations = new Map<
+    string,
+    { at: number; value: EtiquetteGuides["personal"] }
+  >();
+
+  async function organisationGuide(
+    owner: EtiquetteOwner,
+  ): Promise<EtiquetteGuides["personal"]> {
+    const read = dependencies.organisation;
+    const organisationId = owner.organisationId;
+    if (read === undefined || organisationId === undefined) return null;
+    const key = `${owner.tenantId}:${organisationId}`;
+    const cached = organisations.get(key);
+    if (cached !== undefined && now() - cached.at < TTL_MS) {
+      return cached.value;
+    }
+    const value = await read({ tenantId: owner.tenantId, organisationId })
+      .then((guide) =>
+        guide === null
+          ? null
+          : {
+              version: `organisation/v${String(guide.version)}`,
+              text: guide.text,
+            },
+      )
+      .catch((error: unknown) => {
+        dependencies.logger?.warn(
+          { err: error },
+          "organisation etiquette guide not read; the house and personal guides apply",
+        );
+        return null;
+      });
+    if (organisations.size >= PEOPLE_CACHED) organisations.clear();
+    organisations.set(key, { at: now(), value });
+    return value;
+  }
 
   async function platformGuide(): Promise<EtiquetteGuides["platform"]> {
     if (platform !== null && now() - platform.at < TTL_MS) {
@@ -107,11 +156,15 @@ export function createEtiquetteSource(dependencies: {
   }
 
   return async (owner) => {
-    const [house, own] = await Promise.all([
+    const [house, ours, own] = await Promise.all([
       platformGuide(),
+      organisationGuide(owner),
       personalGuide(owner),
     ]);
-    return { platform: house, personal: own };
+    // No organisation guide: exactly the two-guide shape, as before.
+    return ours === null
+      ? { platform: house, personal: own }
+      : { platform: house, organisation: ours, personal: own };
   };
 }
 

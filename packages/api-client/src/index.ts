@@ -518,9 +518,11 @@ export {
   activateAdminEtiquetteGuide,
   getAdminEtiquetteGuide,
   getMyEtiquetteGuide,
+  getOrganisationEtiquetteGuide,
   recordAdminEtiquetteGuide,
   removeMyEtiquetteGuide,
   saveMyEtiquetteGuide,
+  saveOrganisationEtiquetteGuide,
 } from "./etiquette.js";
 export * from "./fit.js";
 // PROFILE block (overnight A1-A8)

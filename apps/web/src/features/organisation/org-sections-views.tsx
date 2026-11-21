@@ -201,19 +201,31 @@ export function OrgConnectionsView({
 export function OrgSpeakingView({
   t,
   guide,
+  ours,
 }: {
   readonly t: T;
-  /** Null: could not be read. */
+  /** The house guide and the person's own; null: could not be read. */
   readonly guide: MyEtiquetteGuideDto | null;
+  /**
+   * Decision 112: the organisation's own guide, drawn by the page (its
+   * client editor is imported there only, so the other organisation
+   * pages do not carry it); null: it could not be read.
+   */
+  readonly ours: ReactNode | null;
 }) {
   return (
     <>
-      <GroupHead title={t("The guide Q follows now")} />
+      <GroupHead title={t("The organisation's guide")} />
+      <AccountCard data-org-speaking="organisation">
+        {ours === null ? <State tone="unknown">{t(UNREAD)}</State> : ours}
+      </AccountCard>
+
+      <GroupHead title={t("The guides around it")} />
       <AccountCard data-org-speaking="house">
         <SRow
           title={t("Capital Q's house guide")}
           description={t(
-            "How Q writes and speaks for everyone, unless a person has their own guide.",
+            "How Q writes and speaks for everyone, unless the organisation or a person has their own guide.",
           )}
         >
           {guide === null ? (
@@ -241,14 +253,6 @@ export function OrgSpeakingView({
           <Go href="/settings#speaking">{t("Open your guide")}</Go>
         </SRow>
       </AccountCard>
-      <p
-        className="mt-3 max-w-[70ch] cq-body-sm text-(--cq-text-secondary)"
-        data-org-speaking="none"
-      >
-        {t(
-          "An organisation-wide guide isn't built yet: Capital Q doesn't store one, so nothing here can be changed and nothing is saved.",
-        )}
-      </p>
     </>
   );
 }

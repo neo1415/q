@@ -203,7 +203,10 @@ import { registerDataRightsRoutes } from "./http/data-rights.js";
 // ETIQUETTE block (ADR 0050)
 import type { EtiquetteGuidePort } from "@capital-q/app-actions";
 import type { EtiquetteGuideAdminStore } from "@capital-q/platform-admin";
-import { registerEtiquetteRoutes } from "./http/etiquette.js";
+import {
+  registerEtiquetteRoutes,
+  type EtiquetteRoutesDependencies,
+} from "./http/etiquette.js";
 import { registerTeamRoutes } from "./http/team.js";
 import type {
   OrganisationAdminService,
@@ -336,6 +339,9 @@ export type ApiModules = {
     | {
         readonly guides: EtiquetteGuidePort;
         readonly adminStore?: EtiquetteGuideAdminStore | undefined;
+        /** Decision 112: the organisation's own guide; absent, no route. */
+        readonly organisation?:
+          EtiquetteRoutesDependencies["organisation"] | undefined;
       }
     | undefined;
   /** G1/G2: the company or firm as a team. Absent: no team route registers. */
@@ -717,6 +723,9 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       guides: modules.etiquette.guides,
+      ...(modules.etiquette.organisation === undefined
+        ? {}
+        : { organisation: modules.etiquette.organisation }),
       ...(modules.admin === undefined || adminStore === undefined
         ? {}
         : { admin: { platform: modules.admin, store: adminStore } }),
@@ -904,7 +913,12 @@ export function createApp(
         : { workforceJobs: modules.workforceJobs }),
       ...(modules.etiquette === undefined
         ? {}
-        : { etiquetteGuides: modules.etiquette.guides }),
+        : {
+            etiquetteGuides: modules.etiquette.guides,
+            ...(modules.etiquette.organisation === undefined
+              ? {}
+              : { organisationEtiquette: modules.etiquette.organisation }),
+          }),
       ...(modules.gateqPolicyExtraction === undefined
         ? {}
         : { gateqPolicyExtraction: modules.gateqPolicyExtraction }),

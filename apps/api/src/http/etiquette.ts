@@ -1,8 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
+  readOrganisationEtiquette,
   toMyEtiquetteDto,
+  toOrganisationEtiquetteDto,
   type EtiquetteGuidePort,
+  type OrganisationEtiquettePort,
 } from "@capital-q/app-actions";
 import {
   ADMIN_ETIQUETTE_GUIDE_ACTIVE_PATH,
@@ -12,6 +15,7 @@ import {
   AdminEtiquetteGuideRequestSchema,
   createProblemDetails,
   ME_ETIQUETTE_GUIDE_PATH,
+  ORGANISATION_ETIQUETTE_GUIDE_PATH,
   PROBLEM_CONTENT_TYPE,
   type AdminEtiquetteGuideDto,
   type KnownErrorCode,
@@ -51,6 +55,13 @@ export const ETIQUETTE_WRITE_PERMISSION: AdminPermission = "flags.write";
 
 export type EtiquetteRoutesDependencies = ActorContextDependencies & {
   readonly guides: EtiquetteGuidePort;
+  /**
+   * Decision 112: the organisation's own guide, which every member of the
+   * active organisation reads here (saving a version is the app action
+   * `organisation.etiquette_guide.save`, owners and admins only). Absent:
+   * the route does not register.
+   */
+  readonly organisation?: OrganisationEtiquettePort | undefined;
   /** Absent: the console's routes do not register. */
   readonly admin?:
     | {
@@ -113,6 +124,30 @@ export function registerEtiquetteRoutes(
       return toMyEtiquetteDto({ guide, house });
     },
   );
+
+  const organisation = dependencies.organisation;
+  if (organisation !== undefined) {
+    app.get(
+      ORGANISATION_ETIQUETTE_GUIDE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const ours = await readOrganisationEtiquette(
+          organisation,
+          getActorContext(request),
+        );
+        if (ours === null) {
+          return send(
+            request,
+            reply,
+            "RESOURCE_NOT_FOUND",
+            "A guide belongs to a company or firm workspace.",
+          );
+        }
+        void reply.header("Cache-Control", "no-store");
+        return toOrganisationEtiquetteDto(ours);
+      },
+    );
+  }
 
   if (dependencies.admin === undefined) return;
   const admin = dependencies.admin;

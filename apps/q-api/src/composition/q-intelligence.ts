@@ -289,6 +289,8 @@ export type QIntelligenceDependencies = {
     | ((who: {
         readonly tenantId: string;
         readonly userId: string;
+        /** Decision 112: the organisation acted for; its guide applies. */
+        readonly organisationId?: string | undefined;
       }) => Promise<EtiquetteGuides | null>)
     | undefined;
   /** Who Q is with each person (founder direction 2026-09-30). */

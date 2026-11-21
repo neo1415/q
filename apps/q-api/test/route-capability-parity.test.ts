@@ -412,6 +412,11 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/etiquette.ts GET ME_ETIQUETTE_GUIDE_PATH": exempt(
     "the person reading their own speaking guide and which house guide applies, in Settings; Q already follows it whenever it speaks for them",
   ),
+  // Decision 112: saving a version is the app action
+  // organisation.etiquette_guide.save (offer.organisation_speaking_guide).
+  "api/http/etiquette.ts GET ORGANISATION_ETIQUETTE_GUIDE_PATH": exempt(
+    "a member reading the organisation's own speaking guide and its versions on How Q speaks for us; Q already follows it whenever it speaks for them",
+  ),
   "api/http/etiquette.ts GET ADMIN_ETIQUETTE_GUIDE_PATH": OPERATIONS_CONSOLE,
   "api/http/etiquette.ts POST ADMIN_ETIQUETTE_GUIDE_PATH": OPERATIONS_CONSOLE,
   "api/http/etiquette.ts POST ADMIN_ETIQUETTE_GUIDE_ACTIVE_PATH":

@@ -5,6 +5,8 @@ import {
   ME_ETIQUETTE_GUIDE_PATH,
   ME_ETIQUETTE_GUIDE_VERSIONS_PATH,
   MyEtiquetteGuideDtoSchema,
+  ORGANISATION_ETIQUETTE_GUIDE_PATH,
+  OrganisationEtiquetteGuideDtoSchema,
   type AdminEtiquetteGuideActiveRequest,
   type AdminEtiquetteGuideRequest,
   type SaveEtiquetteGuideRequest,
@@ -66,5 +68,27 @@ export const activateAdminEtiquetteGuide = (
     "POST",
     ADMIN_ETIQUETTE_GUIDE_ACTIVE_PATH,
     AdminEtiquetteGuideDtoSchema,
+    { body },
+  );
+
+/** Decision 112: the active organisation's own guide, as a member reads it. */
+export const getOrganisationEtiquetteGuide = (session: ApiSession) =>
+  call(
+    session,
+    "GET",
+    ORGANISATION_ETIQUETTE_GUIDE_PATH,
+    OrganisationEtiquetteGuideDtoSchema,
+  );
+
+/** Decision 112: a new version (owners and admins; the API refuses others). */
+export const saveOrganisationEtiquetteGuide = (
+  session: ApiSession,
+  body: SaveEtiquetteGuideRequest,
+) =>
+  call(
+    session,
+    "PUT",
+    ORGANISATION_ETIQUETTE_GUIDE_PATH,
+    OrganisationEtiquetteGuideDtoSchema,
     { body },
   );

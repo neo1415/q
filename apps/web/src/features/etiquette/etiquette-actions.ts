@@ -8,11 +8,13 @@ import {
   recordAdminEtiquetteGuide,
   removeMyEtiquetteGuide,
   saveMyEtiquetteGuide,
+  saveOrganisationEtiquetteGuide,
 } from "@capital-q/api-client";
 import {
   AdminEtiquetteGuideRequestSchema,
   SaveEtiquetteGuideRequestSchema,
   type MyEtiquetteGuideDto,
+  type OrganisationEtiquetteGuideDto,
 } from "@capital-q/contracts";
 
 import type { ConsoleResult } from "@/features/admin/console-actions";
@@ -150,4 +152,42 @@ export async function activateHouseGuideAction(
       ? "Q now follows Capital Q's built-in guide."
       : "That version is now the one Q follows.",
   );
+}
+
+export type OrganisationGuideResult =
+  | { readonly ok: true; readonly ours: OrganisationEtiquetteGuideDto }
+  | { readonly ok: false; readonly message: string };
+
+/**
+ * Decision 112: a new version of the organisation's guide. The API asks
+ * organisation.admin (owners and admins) and refuses anyone else, whatever
+ * the page drew.
+ */
+export async function saveOrganisationGuideAction(
+  input: unknown,
+): Promise<OrganisationGuideResult> {
+  const parsed = SaveEtiquetteGuideRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message === "at least a sentence or two"
+          ? "Write at least a sentence or two."
+          : "That can't be saved as the guide. Check its length and try again.",
+    };
+  }
+  const session = await apiSession();
+  if (session === null) {
+    return { ok: false, message: "Please sign in again to continue." };
+  }
+  try {
+    const ours = await saveOrganisationEtiquetteGuide(session, parsed.data);
+    revalidatePath("/organisation/speaking");
+    return { ok: true, ours };
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      message: problemWords(error, "Couldn't save that just now. Try again."),
+    };
+  }
 }

@@ -315,3 +315,11 @@ export {
   type PersonalEtiquetteSourceKind,
   type SavePersonalEtiquetteGuide,
 } from "./infrastructure/postgres-etiquette-guides.js";
+// Decision 112: an organisation's own guide ("How Q speaks for us").
+export {
+  createPostgresOrganisationEtiquetteStore,
+  type OrganisationEtiquetteGuide,
+  type OrganisationEtiquetteOwner,
+  type OrganisationEtiquetteStore,
+  type OrganisationEtiquetteVersion,
+} from "./infrastructure/postgres-organisation-etiquette.js";

@@ -661,6 +661,7 @@ import {
   createSelfUserQSubjectResolver,
   neverPause,
   createPostgresEtiquetteGuideStore,
+  createPostgresOrganisationEtiquetteStore,
 } from "@capital-q/q-runtime";
 import {
   createInvestorAnswerRecorder,
@@ -1033,8 +1034,7 @@ const database = createRequestDatabaseClient(databaseConfig);
 // QA F-85: every public link q-api writes (a Q Card's address) is built
 // from this origin, checked once here: an https URL, or q-api does not start.
 const webOrigin = webOriginFrom(process.env["CQ_WEB_ORIGIN"]);
-// ETIQUETTE block (ADR 0050): the business etiquette guides Q follows when
-// it writes or speaks for a person: the house guide and their own.
+// ETIQUETTE block (ADR 0050, decision 112): house, organisation and own guides.
 const etiquetteAdmin = createEtiquetteGuideAdminStore({
   sql: database.sql,
   transactions: database.transactions,
@@ -1043,12 +1043,12 @@ const etiquettePersonal = createPostgresEtiquetteGuideStore({
   sql: database.sql,
   transactions: database.transactions,
 });
-// Founder brief J3: what worked for the person (their approvals and edits,
-// kept by the memory Write Gate as their preferences) joins their guide.
+// Founder brief J3: their approved edits (memory Write Gate) join their guide.
 const learnedMemory = createPostgresMemoryRepository();
 const etiquette = createEtiquetteSource({
   platform: () => etiquetteAdmin.active(),
   personal: (owner) => etiquettePersonal.read(owner),
+  organisation: createPostgresOrganisationEtiquetteStore(database).read,
   learned: async (owner) =>
     learnedNotesFrom(
       await learnedMemory.listLive(

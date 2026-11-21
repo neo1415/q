@@ -271,6 +271,12 @@ describe("the action registry", () => {
         "remove_my_speaking_guide",
         "CONSEQUENTIAL",
       ],
+      // Decision 112: the organisation's guide, written on its own page.
+      [
+        "organisation.etiquette_guide.save",
+        "offer.organisation_speaking_guide",
+        "INSTANT",
+      ],
       // CRM saved views (2026-10-15): the person's own view preferences.
       ["crm.investor_view.save", "offer.crm_saved_views", "INSTANT"],
       ["crm.company_view.save", "offer.crm_saved_views", "INSTANT"],

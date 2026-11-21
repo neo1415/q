@@ -70,12 +70,17 @@ vi.mock("@/features/documents/brand-kit-panel", () => ({
   ),
 }));
 
+vi.mock("@/features/etiquette/etiquette-actions", () => ({
+  saveOrganisationGuideAction: vi.fn(),
+}));
+
 const api = {
   kyb: vi.fn<() => Promise<unknown>>(),
   providers: vi.fn<() => Promise<unknown>>(),
   google: vi.fn<() => Promise<unknown>>(),
   inbound: vi.fn<() => Promise<unknown>>(),
   guide: vi.fn<() => Promise<unknown>>(),
+  ours: vi.fn<() => Promise<unknown>>(),
   brandKit: vi.fn<() => Promise<unknown>>(),
   gateways: vi.fn<() => Promise<unknown>>(),
   appearance: vi.fn<() => Promise<unknown>>(),
@@ -86,6 +91,7 @@ vi.mock("@capital-q/api-client", () => ({
   getGoogleConnection: () => api.google(),
   getInboundEmailAddress: () => api.inbound(),
   getMyEtiquetteGuide: () => api.guide(),
+  getOrganisationEtiquetteGuide: () => api.ours(),
   getQBrandKit: () => api.brandKit(),
   listGateways: () => api.gateways(),
   getGatewayAppearance: () => api.appearance(),
@@ -121,6 +127,35 @@ const asRole = (role: TeamRole) => {
   };
 };
 
+const OURS = (canChange: boolean) => ({
+  guide: {
+    version: 2,
+    sourceKind: "PASTE",
+    fileName: null,
+    mediaType: null,
+    text: "We write to investors as the Savanna team.",
+    savedAt: "2026-11-20T10:00:00.000Z",
+  },
+  versions: [
+    {
+      version: 2,
+      sourceKind: "PASTE",
+      fileName: null,
+      savedAt: "2026-11-20T10:00:00.000Z",
+      characters: 42,
+    },
+    {
+      version: 1,
+      sourceKind: "PASTE",
+      fileName: null,
+      savedAt: "2026-11-19T10:00:00.000Z",
+      characters: 30,
+    },
+  ],
+  house: { source: "BUILT_IN", title: "Capital Q etiquette", version: "v1" },
+  canChange,
+});
+
 const FIRM = "9a6f0c1e-2c3b-4f7a-9d1e-0a1b2c3d4e51";
 
 beforeEach(() => {
@@ -143,6 +178,7 @@ beforeEach(() => {
     guide: null,
     house: { source: "BUILT_IN", title: "Capital Q etiquette", version: "v1" },
   });
+  api.ours.mockResolvedValue(OURS(true));
   api.brandKit.mockResolvedValue({});
   api.gateways.mockResolvedValue({
     gateways: [
@@ -283,17 +319,46 @@ describe("Connections: each line is what is true now", () => {
 });
 
 describe("How Q speaks for us", () => {
-  it("shows the guide in force read-only and says an organisation guide isn't built", async () => {
+  it("shows the organisation's guide in force, its versions, and the guides around it", async () => {
     asRole("OWNER");
     render(await SpeakingPage());
+    expect(
+      screen.getByText("We write to investors as the Savanna team."),
+    ).toBeTruthy();
+    expect(
+      document.querySelector('[data-org-guide-version="1"]'),
+    ).not.toBeNull();
     expect(screen.getByText("Capital Q etiquette · Built in")).toBeTruthy();
     expect(screen.getByText("None")).toBeTruthy();
+  });
+
+  it("an owner or admin may write a new version", async () => {
+    for (const role of ["OWNER", "ADMIN"] as const) {
+      asRole(role);
+      render(await SpeakingPage());
+      expect(
+        screen.getByRole("button", { name: "Write a new version" }),
+      ).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it("a member reads it and gets no way to change it", async () => {
+    asRole("MEMBER");
+    api.ours.mockResolvedValue(OURS(false));
+    render(await SpeakingPage());
     expect(
-      screen.getByText(
-        "An organisation-wide guide isn't built yet: Capital Q doesn't store one, so nothing here can be changed and nothing is saved.",
-      ),
+      screen.getByText("We write to investors as the Savanna team."),
     ).toBeTruthy();
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /version/i })).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("says a guide that could not be read, never an empty one", async () => {
+    asRole("OWNER");
+    api.ours.mockRejectedValue(new Error("down"));
+    render(await SpeakingPage());
+    expect(screen.getByText("Couldn't be read just now.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /version/i })).toBeNull();
   });
 });

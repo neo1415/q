@@ -26,6 +26,9 @@ export const ME_ETIQUETTE_GUIDE_PATH = "/v1/me/etiquette-guide" as const;
 export const ME_ETIQUETTE_GUIDE_VERSIONS_PATH =
   "/v1/me/etiquette-guide/versions" as const;
 export const ADMIN_ETIQUETTE_GUIDE_PATH = "/v1/admin/etiquette-guide" as const;
+/** Decision 112: the organisation's own guide ("How Q speaks for us"). */
+export const ORGANISATION_ETIQUETTE_GUIDE_PATH =
+  "/v1/organisation/etiquette-guide" as const;
 export const ADMIN_ETIQUETTE_GUIDE_ACTIVE_PATH =
   "/v1/admin/etiquette-guide/active" as const;
 
@@ -187,4 +190,35 @@ export const AdminEtiquetteGuideDtoSchema = z
   .strict();
 export type AdminEtiquetteGuideDto = z.infer<
   typeof AdminEtiquetteGuideDtoSchema
+>;
+
+/**
+ * Decision 112: the active organisation's own guide, as a member reads it:
+ * the version in force (null: none yet), its history newest first, the
+ * house guide beneath it, and whether this reader may save a new version
+ * (owners and admins; the API refuses anyone else regardless).
+ */
+export const OrganisationEtiquetteVersionDtoSchema = z
+  .object({
+    version: z.number().int().positive(),
+    sourceKind: EtiquetteSourceKindSchema,
+    fileName: z.string().nullable(),
+    characters: z.number().int().nonnegative(),
+    savedAt: At,
+  })
+  .strict();
+export type OrganisationEtiquetteVersionDto = z.infer<
+  typeof OrganisationEtiquetteVersionDtoSchema
+>;
+
+export const OrganisationEtiquetteGuideDtoSchema = z
+  .object({
+    guide: PersonalEtiquetteGuideDtoSchema.nullable(),
+    versions: z.array(OrganisationEtiquetteVersionDtoSchema).max(50),
+    house: HouseEtiquetteDtoSchema,
+    canChange: z.boolean(),
+  })
+  .strict();
+export type OrganisationEtiquetteGuideDto = z.infer<
+  typeof OrganisationEtiquetteGuideDtoSchema
 >;

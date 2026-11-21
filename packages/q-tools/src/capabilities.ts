@@ -629,7 +629,6 @@ const OFFERS: readonly QCapability[] = [
     "Confirm or decline a brand suggestion (colours, fonts, logo), upload their logo, or set their own colours and fonts for their documents",
     "DOCUMENTS",
     "A suggestion Q read from their website becomes their brand only when they press Use this brand on Documents; a logo file comes from their own device through the browser's file picker.",
-    false,
   ),
   offer(
     "export_answer_pdf",
@@ -637,7 +636,6 @@ const OFFERS: readonly QCapability[] = [
     "Download any one of Q's answers as a PDF (the PDF control under the answer)",
     "HOME",
     "The control sits under each answer in their conversation; Q can also file the answer it just gave with the Answer export document.",
-    false,
   ),
   // --- end DOCS block -------------------------------------------------------
   // XLSX-001: a spreadsheet of their data, every cell written by code.
@@ -670,7 +668,6 @@ const OFFERS: readonly QCapability[] = [
     "Accept or decline Company requests (companies' Connection Requests to their investor organisation, linked from Relationships)",
     "RELATIONSHIPS",
     "Accepting or declining is the investor's own decision about a founder; Q prepares it for their approval and never answers a request without it.",
-    false,
   ),
   offer(
     "verification_request",
@@ -693,7 +690,6 @@ const OFFERS: readonly QCapability[] = [
     "Find their company on Capital Q and claim it, or ask to join it",
     "GATEWAY",
     "Claiming a company is the founder's own act on the GateQ Find tab, where they show it is theirs with a work email, a registry document or the members' yes.",
-    false,
   ),
   offer(
     "gateq_inbox",
@@ -701,7 +697,13 @@ const OFFERS: readonly QCapability[] = [
     "Pass on or reply to a founder in their GateQ inbox: Q drafts the words, they read, change and send them there",
     "GATEWAY",
     "Words to a founder are sent from the inbox screen, where the investor approves exactly what goes; Q drafts them and opens it.",
-    false,
+  ),
+  offer(
+    "organisation_speaking_guide",
+    "SETTINGS",
+    "Write a new version of the organisation's own guide to how Q speaks for its members (Organisation, How Q speaks for us; owners and admins)",
+    "ORGANISATION",
+    "The organisation's guide speaks for every member, so its owners and admins write each version themselves on How Q speaks for us; Q follows it and does not write it for them.",
   ),
   offer(
     "gateway_mandate",
@@ -709,7 +711,6 @@ const OFFERS: readonly QCapability[] = [
     "Set up their GateQ gateway from their Capital Q mandate: the Gateway page opens with their active mandate already written in (or they paste or upload another), Q drafts the rules, they confirm and publish, then copy the website snippet",
     "GATEWAY",
     "Q drafts the rules from their mandate on the Gateway page, but publishing who may approach their organisation is the investor's own act there, after reviewing every rule.",
-    false,
   ),
 ];
 
@@ -972,9 +973,8 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Edits a document Q prepared for them (a deck, brief, one-pager or mandate) with the changes they ask for, as a new version: the earlier version is kept and the new card has fresh PDF and PowerPoint downloads.",
     { acts: true },
   ),
-  // The work board (owner 2026-10-23): their own items, INSTANT; Q's work
-  // on them is own-account, and anything outward is still propose_q_job's
-  // card.
+  // The work board (owner 2026-10-23): their own items, INSTANT; Q's work on
+  // them is own-account, and anything outward is still propose_q_job's card.
   tool(
     "my_board",
     "RECORDS",

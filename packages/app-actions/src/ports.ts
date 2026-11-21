@@ -72,7 +72,10 @@ import type {
   StartupAlertsPort,
 } from "./actions/gateq-find.js";
 import type { QWorkPagePort, WorkforceJobPort } from "./actions/work.js";
-import type { EtiquetteGuidePort } from "./actions/etiquette.js";
+import type {
+  EtiquetteGuidePort,
+  OrganisationEtiquettePort,
+} from "./actions/etiquette.js";
 import type { ReadinessService } from "@capital-q/readiness";
 import type { TeamPort } from "./actions/team.js";
 
@@ -191,6 +194,8 @@ export type AppActionPorts = {
     | undefined;
   /** ADR 0050: their own business etiquette guide (How Q speaks for you). */
   readonly etiquetteGuides?: EtiquetteGuidePort | undefined;
+  /** Decision 112: the organisation's own guide (How Q speaks for us). */
+  readonly organisationEtiquette?: OrganisationEtiquettePort | undefined;
   /**
    * A8: a figure they told Q about their own company, recorded on their
    * approval as their private, dated claim (the Evidence services).

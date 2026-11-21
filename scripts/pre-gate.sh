@@ -85,6 +85,26 @@ for app in $apps_to_check; do
   fi
 done
 
+step "web bundle budget (when web or a package it bundles changed)"
+# The gate's build step checks every route's first-load JS against
+# apps/web/bundle-budget.json; two new pages failed it late on 21 Nov. A new
+# or grown route needs its budget in the same commit, with a reason
+# (bundle-budget.mjs --write measures every route; keep only that route's
+# line from its diff, since the rest is hash noise). NODE_OPTIONS is cleared because the
+# sandbox's --use-openssl-ca is refused by the Next build workers.
+if printf '%s\n' "${changed[@]}" | grep -qE '^(apps/web/|packages/[^/]+/src/)'; then
+  wb_out=$(cd apps/web && NODE_OPTIONS= pnpm run -s build 2>&1)
+  wb_status=$?
+  if [ "$wb_status" -ne 0 ]; then
+    printf '%s\n' "$wb_out" | tail -20
+    bad "web build (exit $wb_status)"
+  else
+    node apps/web/scripts/bundle-budget.mjs 2>&1 | tail -12 || bad "bundle budget (budget the new or grown route in apps/web/bundle-budget.json; --write measures them all)"
+  fi
+else
+  echo "web and its packages unchanged"
+fi
+
 step "repository-scan tests (not reachable by vitest related)"
 # These read the source tree rather than importing it, so a changed file never
 # makes them "related" (an unmarked form reached the gate, 14 Nov).

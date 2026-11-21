@@ -79,13 +79,11 @@ import {
 } from "@capital-q/contracts";
 import {
   createBrandThemeStore,
-  createEtiquetteGuideAdminStore,
   createPlatformAdmin,
   createSiteContentStore,
   recordingEmailSender,
 } from "@capital-q/platform-admin";
-import { houseEtiquetteOf } from "@capital-q/q-core";
-import { createPostgresEtiquetteGuideStore } from "@capital-q/q-runtime";
+import { createEtiquetteModule } from "./etiquette-module.js";
 import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
@@ -3414,23 +3412,8 @@ const { app, logger } = createApp(config, security, {
     transactions: database.transactions,
     audit,
   }),
-  // ADR 0050: business etiquette guides (a person's own; the console's).
-  etiquette: (() => {
-    const adminStore = createEtiquetteGuideAdminStore({
-      sql: database.sql,
-      transactions: database.transactions,
-    });
-    return {
-      adminStore,
-      guides: {
-        ...createPostgresEtiquetteGuideStore({
-          sql: database.sql,
-          transactions: database.transactions,
-        }),
-        house: async () => houseEtiquetteOf(await adminStore.active()),
-      },
-    };
-  })(),
+  // ADR 0050 and decision 112: personal, house and organisation guides.
+  etiquette: createEtiquetteModule({ database, authorization }),
   // P5: brand colour
   brand: brandThemes,
   // Decision 107: the site content editor. Images are the admin's own

@@ -116,8 +116,11 @@ export {
 // ETIQUETTE block (ADR 0050): how Q speaks for you.
 export {
   ETIQUETTE_ACTIONS,
+  readOrganisationEtiquette,
   toMyEtiquetteDto,
+  toOrganisationEtiquetteDto,
   type EtiquetteGuidePort,
+  type OrganisationEtiquettePort,
   type HouseEtiquette,
 } from "./actions/etiquette.js";
 // G1/G2 block: the company or firm as a team.

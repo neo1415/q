@@ -315,7 +315,6 @@ export const ORGANISATION_AR: Readonly<Record<string, string>> = {
   "Pasted text": "نص ملصق",
   "Q's email address": "عنوان البريد الإلكتروني لـ Q",
   "Set by each person": "يحدده كل شخص",
-  "The guide Q follows now": "الدليل الذي يتبعه Q الآن",
   "Verify you and the organisation": "تحقق من هويتك ومن المنظمة",
   "Your Q Card": "بطاقة Q الخاصة بك",
   "Your own connections": "اتصالاتك الخاصة",
@@ -329,4 +328,19 @@ export const ORGANISATION_AR: Readonly<Record<string, string>> = {
   "Export or delete your own data": "صدّر بياناتك الخاصة أو احذفها",
   "Exporting or deleting the organisation as a whole isn't built yet. Your own data is yours to export or delete now, in Settings; it covers you, not the organisation.":
     "لم يُبنَ بعد تصدير المنظمة أو حذفها بالكامل. بياناتك الخاصة يمكنك تصديرها أو حذفها الآن من الإعدادات؛ وهذا يشملك أنت، لا المنظمة.",
+  // The organisation's own guide (decision 112)
+  "The organisation's guide": "دليل المنظمة",
+  "The guides around it": "الأدلة المحيطة به",
+  "How Q writes and speaks for everyone, unless the organisation or a person has their own guide.":
+    "كيف يكتب Q ويتحدث نيابة عن الجميع، ما لم يكن للمنظمة أو للشخص دليله الخاص.",
+  "How the organisation comes across when Q writes or speaks for its members. It wins over Capital Q's house guide; a person's own guide wins over it. It shapes Q's wording only.":
+    "كيف تبدو المنظمة عندما يكتب Q أو يتحدث نيابة عن أعضائها. يتقدّم على الدليل العام لـ Capital Q، ويتقدّم عليه دليل الشخص الخاص. وهو يحدد صياغة Q فقط.",
+  "Saved as a new version. Q follows it from its next message for the organisation.":
+    "حُفظ كنسخة جديدة. يتبعه Q بدءًا من رسالته التالية نيابة عن المنظمة.",
+  "Save a new version": "احفظ نسخة جديدة",
+  "No organisation guide yet: Q follows the house guide.":
+    "لا يوجد دليل للمنظمة بعد: يتبع Q الدليل العام.",
+  "Write the organisation's guide": "اكتب دليل المنظمة",
+  "Write a new version": "اكتب نسخة جديدة",
+  "Earlier versions": "النسخ السابقة",
 };
