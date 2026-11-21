@@ -1046,3 +1046,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - the console card showing the error rate and the last alert.
   - The lead set `CQ_HEALTH_PROBE_TARGETS` on workers (api and q-api production hosts) at 08:44, which redeployed workers on the same SHA.
   - Live: the heartbeat `ops_check.services` shows api and q-api ready, 0 failures in a row, 0 server errors in 15 min.
+- **988eced0b deployed 09:42 UTC on 21 Nov** (gate PASS). W2-A: one shared `ownsConversation` replaces 27 copies.
+  - Fixed the looser variant, `note-preference.ts:166`, which had no person check.
+  - Every site now requires the plan's tenant and actor to match the actor, which refuses a revoked membership.
+  - The debt guard allows zero new copies.
+  - Live: a typed turn as fictional Savanna is answered normally (first text 2.60 s). No refusals or errors in q-api.
