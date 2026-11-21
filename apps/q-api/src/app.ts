@@ -26,6 +26,7 @@ import {
 import { attachWebSocketReceiver } from "./http/ws-receiver.js";
 import { randomUUID } from "node:crypto";
 
+import { DEFAULT_GENERAL_RATE_LIMITS } from "@capital-q/security";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
 import {
@@ -44,6 +45,7 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerGeneralRateLimit } from "./http/general-rate-limit.js";
 import { registerWorkspaceGate } from "./security/workspace-gate.js";
 import { registerRequestTiming } from "./http/request-timing.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
@@ -440,6 +442,11 @@ export function createApp(
 
   registerProblemHandling(app, logger);
   registerRequestTiming(app);
+  // W1-A: the general rate limit, before every route (health aside).
+  registerGeneralRateLimit(
+    app,
+    config.rateLimit ?? DEFAULT_GENERAL_RATE_LIMITS,
+  );
   // Before every route: the workspace hint survives only for a person who
   // opted in (Q's page moves run for nobody else).
   registerWorkspaceGate(app);

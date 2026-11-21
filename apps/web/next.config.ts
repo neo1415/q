@@ -1,12 +1,42 @@
 import type { NextConfig } from "next";
 
 /**
+ * W1-A: the policy the app is meant to keep, report-only today; reports go
+ * to /api/csp-report (src/security/csp.ts logs them as kinds only).
+ */
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https: wss:",
+  "media-src 'self' blob: https:",
+  "frame-src 'self' https://tavus.daily.co",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "report-uri /api/csp-report",
+].join("; ");
+
+/**
+ * HSTS: two years, subdomains included. Safe on Railway's
+ * `*.up.railway.app` (always HTTPS) and on a custom domain served only
+ * over HTTPS. Not preloaded: preload is a separate, hard-to-undo step.
+ */
+const HSTS = "max-age=63072000; includeSubDomains";
+
+/**
  * Baseline response headers. Conservative and additive: nothing here loosens
- * framing, content-type or referrer protection. A full Content-Security-Policy
- * needs nonce plumbing through the request path and arrives with the
- * identity/auth application slice rather than as an afterthought here.
+ * framing, content-type or referrer protection. W1-A (enterprise audit 21
+ * Nov 2026): HSTS, and the Content-Security-Policy in REPORT-ONLY mode
+ * (src/security/csp.ts), which blocks nothing and reports to
+ * /api/csp-report until a nonce-based policy is enforced.
  */
 const securityHeaders = [
+  { key: "Strict-Transport-Security", value: HSTS },
+  { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Microphone: Q's voice. Camera: the rehearsal room's self-view, which

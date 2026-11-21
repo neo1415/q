@@ -39,11 +39,75 @@ export type NetworkConfig = {
   readonly port: number;
 };
 
+/**
+ * W1-A (enterprise audit 21 Nov 2026): CAPITAL_Q_ENV is read the same way
+ * everywhere, here: surrounding spaces and letter case do not matter
+ * ("Production " is production), an unset or empty value is `local`, and
+ * anything else that is not one of DEPLOYMENT_ENVIRONMENTS fails the
+ * service's start rather than being guessed at. Production must say
+ * `production` (docs/modules/hosted-deployment.md: what changes with it).
+ */
+export function normalisedDeploymentEnvironment(raw: unknown): unknown {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "string") return raw;
+  const value = raw.trim().toLowerCase();
+  return value.length === 0 ? undefined : value;
+}
+
+/** The deployment class from a raw environment, the same way config reads it. */
+export function deploymentEnvironmentOf(
+  env: Readonly<Record<string, string | undefined>>,
+): DeploymentEnvironment | null {
+  const value = normalisedDeploymentEnvironment(env["CAPITAL_Q_ENV"]);
+  if (value === undefined) return "local";
+  return DEPLOYMENT_ENVIRONMENTS.find((known) => known === value) ?? null;
+}
+
 /** Runtime variables every deployable shares. */
 export const runtimeEnvShape = {
   NODE_ENV: z.enum(NODE_ENVS).default("development"),
-  CAPITAL_Q_ENV: z.enum(DEPLOYMENT_ENVIRONMENTS).default("local"),
+  CAPITAL_Q_ENV: z.preprocess(
+    normalisedDeploymentEnvironment,
+    z.enum(DEPLOYMENT_ENVIRONMENTS).default("local"),
+  ),
 };
+
+/**
+ * W1-A: the general rate limit's allowances, per minute (generous; a
+ * backstop, never a product quota). Unset: the defaults. A value that is
+ * not a positive whole number fails the service's start.
+ */
+export const RATE_LIMIT_DEFAULT_PER_USER = 600;
+export const RATE_LIMIT_DEFAULT_PER_ADDRESS = 300;
+const positiveWhole = (fallback: number) =>
+  z
+    .string()
+    .trim()
+    .regex(/^[1-9]\d{0,6}$/u, "expected a positive whole number")
+    .transform(Number)
+    .optional()
+    .transform((value) => value ?? fallback);
+export const rateLimitEnvShape = {
+  CQ_RATE_LIMIT_PER_USER: positiveWhole(RATE_LIMIT_DEFAULT_PER_USER),
+  CQ_RATE_LIMIT_PER_ADDRESS: positiveWhole(RATE_LIMIT_DEFAULT_PER_ADDRESS),
+};
+
+export type RateLimitConfig = {
+  readonly perUser: number;
+  readonly perAddress: number;
+  readonly windowMs: number;
+};
+
+export function toRateLimitConfig(parsed: {
+  readonly CQ_RATE_LIMIT_PER_USER: number;
+  readonly CQ_RATE_LIMIT_PER_ADDRESS: number;
+}): RateLimitConfig {
+  return {
+    perUser: parsed.CQ_RATE_LIMIT_PER_USER,
+    perAddress: parsed.CQ_RATE_LIMIT_PER_ADDRESS,
+    windowMs: 60_000,
+  };
+}
 
 /**
  * Network variables for deployables that listen. `PORT` is commonly injected by

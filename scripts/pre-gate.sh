@@ -112,5 +112,59 @@ if [ ${#src[@]} -gt 0 ]; then
   [ "$vt_status" -eq 0 ] || bad "vitest related (exit $vt_status)"
 fi
 
+step "integration tests and pgTAP touching what changed (local Supabase)"
+# W1-A (enterprise audit 21 Nov 2026, finding 7): two gates failed late on
+# 20 Nov on integration tests that pinned a prompt version the change had
+# moved. Here: every *.integration.test.ts in a changed package or app,
+# plus every one that imports a changed package, runs against a fresh local
+# Supabase, the same way the gate runs them; a changed migration or pgTAP
+# file runs the database suite too. PRE_GATE_INTEGRATION=0 skips this step
+# only with a loud line (the full gate still runs everything).
+integration_files=()
+changed_units=$(printf '%s\n' "${changed[@]}" | grep -oE '^(apps|packages)/[^/]+' | sort -u)
+for unit in $changed_units; do
+  while IFS= read -r f; do [ -n "$f" ] && integration_files+=("$f"); done < <(find "$unit" -name '*.integration.test.ts' -not -path '*/node_modules/*' 2>/dev/null)
+  if [ "${unit%%/*}" = packages ] && [ -f "$unit/package.json" ]; then
+    name=$(node -e 'process.stdout.write(require("./'"$unit"'/package.json").name)' 2>/dev/null)
+    if [ -n "$name" ]; then
+      while IFS= read -r f; do [ -n "$f" ] && integration_files+=("$f"); done < <(grep -rlF --include='*.integration.test.ts' "\"$name" apps packages 2>/dev/null | grep -v node_modules)
+    fi
+  fi
+done
+mapfile -t integration_files < <(printf '%s\n' "${integration_files[@]}" | grep -v '^$' | sort -u)
+db_changed=$(printf '%s\n' "${changed[@]}" | grep -E '^supabase/(migrations|tests)/' | head -1)
+if [ "${PRE_GATE_INTEGRATION:-1}" = 0 ]; then
+  echo "SKIPPED by PRE_GATE_INTEGRATION=0: ${#integration_files[@]} integration file(s)${db_changed:+ and the pgTAP suite} not run here"
+elif [ ${#integration_files[@]} -gt 0 ] || [ -n "$db_changed" ]; then
+  echo "${#integration_files[@]} integration file(s)${db_changed:+, and pgTAP for changed database files}"
+  if ! timeout 10 docker info >/dev/null 2>&1; then
+    bad "integration step needs Docker for the local Supabase (or PRE_GATE_INTEGRATION=0 to skip it here)"
+  else
+    pnpm exec supabase stop --no-backup >/dev/null 2>&1
+    if pnpm exec supabase start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api,realtime,postgres-meta,supavisor >/dev/null 2>&1; then
+      if [ -n "$db_changed" ]; then
+        db_out=$(pnpm exec supabase test db 2>&1)
+        db_status=$?
+        printf '%s\n' "$db_out" | grep -E 'Failed test|not ok|Result' | head -20
+        [ "$db_status" -eq 0 ] || bad "pgTAP (exit $db_status)"
+      fi
+      if [ ${#integration_files[@]} -gt 0 ]; then
+        it_out=$(CQ_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          NODE_OPTIONS=--max-old-space-size=6144 npx vitest run --config vitest.integration.config.ts "${integration_files[@]}" 2>&1)
+        it_status=$?
+        printf '%s\n' "$it_out" | grep -E '^ FAIL ' | sort -u
+        printf '%s\n' "$it_out" | tail -6
+        [ "$it_status" -eq 0 ] || bad "integration tests (exit $it_status)"
+      fi
+    else
+      bad "local Supabase did not start"
+    fi
+    pnpm exec supabase stop --no-backup >/dev/null 2>&1
+  fi
+else
+  echo "no integration test or database file touches what changed"
+fi
+
 echo
 if [ $fail -eq 0 ]; then echo "pre-gate PASS sha=$(git rev-parse --short HEAD)"; else echo "pre-gate FAIL sha=$(git rev-parse --short HEAD)"; exit 1; fi

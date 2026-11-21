@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { parseConfig, type EnvironmentInput } from "./common.js";
+import {
+  deploymentEnvironmentOf,
+  parseConfig,
+  type EnvironmentInput,
+} from "./common.js";
 import { ProviderCredential } from "./model-providers.js";
 
 /**
@@ -108,7 +112,9 @@ function refusedLocally(
   env: EnvironmentInput,
   parsed: Record<string, unknown>,
 ): readonly string[] {
-  const deployment = env["CAPITAL_Q_ENV"]?.trim() || "local";
+  // W1-A: read as config reads it (case and spaces aside); an unknown
+  // label is treated as local here, the safe side for refusing to send.
+  const deployment = deploymentEnvironmentOf(env) ?? "local";
   const localish = deployment === "local" || env["NODE_ENV"] === "test";
   if (!localish || env["CQ_ALLOW_LOCAL_EMAIL"]?.trim() === "on") return [];
   const refused = SENDING_CREDENTIALS.filter(

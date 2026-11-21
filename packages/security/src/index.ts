@@ -96,3 +96,12 @@ export {
 export * from "./authorization/index.js";
 
 export const PACKAGE_NAME = "@capital-q/security" as const;
+
+export {
+  createGeneralRateLimiter,
+  DEFAULT_GENERAL_RATE_LIMITS,
+  RATE_LIMIT_MAX_KEYS,
+  type GeneralRateLimiter,
+  type GeneralRateLimits,
+  type RateLimitVerdict,
+} from "./rate-limit.js";

@@ -3,12 +3,15 @@ import {
   networkEnvShape,
   observabilityEnvShape,
   parseConfig,
+  rateLimitEnvShape,
   runtimeEnvShape,
   toObservabilityConfig,
+  toRateLimitConfig,
   toRuntimeConfig,
   type EnvironmentInput,
   type ObservabilityConfig,
   type NetworkConfig,
+  type RateLimitConfig,
   type RuntimeConfig,
 } from "./common.js";
 import {
@@ -37,6 +40,7 @@ export const API_DEFAULT_PORT = 3001;
 
 const apiEnvSchema = z.object({
   ...runtimeEnvShape,
+  ...rateLimitEnvShape,
   ...observabilityEnvShape,
   ...networkEnvShape(API_DEFAULT_PORT),
   // Optional at parse time so tooling and tests can build a config without an
@@ -115,6 +119,8 @@ export type ApiConfig = {
   readonly supabaseAuth: SupabaseAuthConfig | undefined;
   readonly public: ApiPublicConfig;
   readonly secrets: ApiSecrets;
+  /** W1-A: the general rate limit; absent: the defaults. */
+  readonly rateLimit?: RateLimitConfig | undefined;
 };
 
 export function parseApiConfig(env: EnvironmentInput): ApiConfig {
@@ -126,6 +132,7 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
     runtime,
     observability: toObservabilityConfig(parsed, runtime),
     network: { host: parsed.HOST, port: parsed.PORT },
+    rateLimit: toRateLimitConfig(parsed),
     supabaseAuth:
       parsed.SUPABASE_URL !== undefined &&
       parsed.SUPABASE_PUBLISHABLE_KEY !== undefined

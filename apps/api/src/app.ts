@@ -22,6 +22,7 @@ import {
   type CompanyMaterialRoutesDependencies,
 } from "./http/company-material.js";
 import { pitchSummary } from "@capital-q/media";
+import { DEFAULT_GENERAL_RATE_LIMITS } from "@capital-q/security";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
 import { ADMISSIBLE_MIME_TYPES } from "@capital-q/evidence";
@@ -187,6 +188,7 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerGeneralRateLimit } from "./http/general-rate-limit.js";
 import { registerRequestTiming } from "./http/request-timing.js";
 // P5 block: brand theming
 import type { BrandThemeStore } from "@capital-q/platform-admin";
@@ -555,6 +557,11 @@ export function createApp(
 
   registerProblemHandling(app, logger);
   registerRequestTiming(app);
+  // W1-A: the general rate limit, before every route (health aside).
+  registerGeneralRateLimit(
+    app,
+    config.rateLimit ?? DEFAULT_GENERAL_RATE_LIMITS,
+  );
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
   // process is alive and performs no dependency checks. Readiness asks the

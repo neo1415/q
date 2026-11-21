@@ -27,8 +27,13 @@
 
 export {
   DEPLOYMENT_ENVIRONMENTS,
+  deploymentEnvironmentOf,
   LOG_LEVELS,
   NODE_ENVS,
+  normalisedDeploymentEnvironment,
+  RATE_LIMIT_DEFAULT_PER_ADDRESS,
+  RATE_LIMIT_DEFAULT_PER_USER,
+  type RateLimitConfig,
   type DeploymentEnvironment,
   type EnvironmentInput,
   type LogLevel,

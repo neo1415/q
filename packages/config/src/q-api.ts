@@ -3,12 +3,15 @@ import {
   networkEnvShape,
   observabilityEnvShape,
   parseConfig,
+  rateLimitEnvShape,
   runtimeEnvShape,
   toObservabilityConfig,
+  toRateLimitConfig,
   toRuntimeConfig,
   type EnvironmentInput,
   type ObservabilityConfig,
   type NetworkConfig,
+  type RateLimitConfig,
   type RuntimeConfig,
 } from "./common.js";
 import {
@@ -43,6 +46,7 @@ export const Q_API_DEFAULT_PORT = 3002;
 
 const qApiEnvSchema = z.object({
   ...runtimeEnvShape,
+  ...rateLimitEnvShape,
   ...observabilityEnvShape,
   ...networkEnvShape(Q_API_DEFAULT_PORT),
   // Optional at parse time so tooling and tests can build a config without an
@@ -194,6 +198,8 @@ export type QApiConfig = {
   readonly connectors: QApiConnectorsConfig;
   readonly documentImages: QApiDocumentImagesConfig;
   readonly secrets: QApiSecrets;
+  /** W1-A: the general rate limit; absent: the defaults. */
+  readonly rateLimit?: RateLimitConfig | undefined;
 };
 
 export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
@@ -204,6 +210,7 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
     runtime,
     observability: toObservabilityConfig(parsed, runtime),
     network: { host: parsed.HOST, port: parsed.PORT },
+    rateLimit: toRateLimitConfig(parsed),
     supabaseAuth:
       parsed.SUPABASE_URL !== undefined &&
       parsed.SUPABASE_PUBLISHABLE_KEY !== undefined

@@ -89,6 +89,38 @@ Import the repository with the root directory set to `apps/web`. Environment:
 `CQ_WEB_ORIGIN` (the deployment's own origin), `CQ_API_URL` and
 `CQ_Q_API_URL` (the two Render public URLs), `CAPITAL_Q_ENV=production`.
 
+## 4a. `CAPITAL_Q_ENV`: production must say `production`
+
+Every service reads `CAPITAL_Q_ENV` the same way (`packages/config`,
+`runtimeEnvShape`): case and surrounding spaces do not matter, unset or empty
+is `local`, and any value other than `local`, `preview`, `staging` or
+`production` stops the service at start. The production services (web, api,
+q-api, workers) must say `production`; on 21 Nov 2026 all four said
+`staging` (enterprise audit, finding 5). The owner and the lead change the
+Railway variables; code does not.
+
+What changes when a service says `production` instead of `staging`:
+
+- The synthetic-demo routing allowance refuses to start if
+  `CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED` is still set
+  (`model-gateway/src/policy/synthetic-demo.ts`): remove the synthetic
+  attestation variables from that service first.
+- The workers' synthetic auto-verification (`SYNTHETIC_AUTO_VERIFY_POLICY`)
+  answers only in `staging`, so synthetic accounts are no longer verified on
+  their own; an operator decides them.
+- The web app refuses the onboarding fixture adapter.
+- `/health/ready` reports `production`, so a check can confirm the label.
+
+## 4b. Rate limit and security headers (W1-A)
+
+api and q-api apply a general rate limit before every route but the health
+probes: `CQ_RATE_LIMIT_PER_USER` (default 600 a minute per signed-in person)
+and `CQ_RATE_LIMIT_PER_ADDRESS` (default 300 a minute per client address, for
+requests with no person; our own private network is not counted). Over the
+limit the answer is 429 as problem details with `Retry-After`. The web app
+sends HSTS and a report-only Content-Security-Policy; violations are logged
+as kinds only by `/api/csp-report`.
+
 ## 5. Voice
 
 The Deepgram think route needs q-api reachable at `Q_API_PUBLIC_URL`; on
