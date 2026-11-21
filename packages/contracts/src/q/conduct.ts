@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { canonicalLanguageTag } from "./language-tag.js";
+
 /**
  * Q's patience after a turn (founder direction 2026-09-30). Code decides
  * it from Q's reading of the turn; the screen follows it: ROUTE_AWAY sends
@@ -47,75 +49,10 @@ export type QPersonality = z.infer<typeof QPersonalitySchema>;
  * provider capability table. The stored column accepts the same shape
  * (supabase/migrations/20261228101500_q_runtime_person_language.sql).
  */
-const LANGUAGE_TAG = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/u;
-
-/** The canonical form of a BCP 47 tag ("PT-br" -> "pt-BR"), or null when malformed. */
-export function canonicalLanguageTag(value: string): string | null {
-  const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.length > 35) return null;
-  try {
-    const canonical = Intl.getCanonicalLocales(trimmed)[0];
-    return canonical !== undefined &&
-      canonical.length <= 35 &&
-      LANGUAGE_TAG.test(canonical)
-      ? canonical
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Scripts written right to left (Unicode bidi class R/AL). Used only where
- * a runtime has no Intl.Locale text info.
- */
-const RTL_SCRIPTS: ReadonlySet<string> = new Set([
-  "Adlm",
-  "Arab",
-  "Aran",
-  "Hebr",
-  "Mand",
-  "Mend",
-  "Nkoo",
-  "Rohg",
-  "Samr",
-  "Syrc",
-  "Thaa",
-  "Yezi",
-]);
-
-type TextInfoLocale = Intl.Locale & {
-  readonly getTextInfo?: () => { readonly direction?: string };
-  readonly textInfo?: { readonly direction?: string };
-};
-
-/**
- * Writing direction of a tag, from the runtime's own data: Intl.Locale's
- * text info where the runtime has it, else the script the locale is
- * likely written in. Left to right for anything unknown. No language is
- * named here: Arabic, Urdu, Hebrew, Dhivehi and every other right-to-left
- * language come out of the same lookup.
- */
-export function languageDirectionOf(
-  value: string | null | undefined,
-): "ltr" | "rtl" {
-  if (value === null || value === undefined) return "ltr";
-  const tag = canonicalLanguageTag(value);
-  if (tag === null) return "ltr";
-  try {
-    const locale = new Intl.Locale(tag) as TextInfoLocale;
-    const info =
-      typeof locale.getTextInfo === "function"
-        ? locale.getTextInfo()
-        : locale.textInfo;
-    if (info?.direction === "rtl" || info?.direction === "ltr")
-      return info.direction;
-    const script = locale.script ?? locale.maximize().script;
-    return script !== undefined && RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
-  } catch {
-    return "ltr";
-  }
-}
+// W4-B: the tag helpers live in ./language-tag.ts (no zod), so a browser
+// page can read a direction or check a preference without the schema
+// library; they are re-exported here unchanged.
+export { canonicalLanguageTag, languageDirectionOf } from "./language-tag.js";
 
 /** A canonical, well-formed BCP 47 tag. Whether Capital Q offers it is the registry's call. */
 export const QLanguageCodeSchema = z

@@ -14,7 +14,7 @@ import {
 import { composeBrandStyle } from "@/features/brand-theme/brand-compose";
 import { brandPreset } from "@/features/brand-theme/brand-presets";
 import { BrandStyle } from "@/features/brand-theme/brand-style";
-import { HomeScreen } from "@/features/home/home-screen";
+import { HomeScreen } from "@/features/home/home-screen-view";
 
 export const metadata: Metadata = {
   title: "Brand preview",

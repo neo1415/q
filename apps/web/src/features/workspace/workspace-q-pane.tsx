@@ -1,8 +1,11 @@
-import { ArrivalStage } from "@/features/briefing/arrival-stage";
 import { resolveHomeQ } from "@/features/home/home-screen";
-import { QConversationPanel } from "@/features/q/q-conversation";
 
 import { AfterHydration } from "./after-hydration";
+import {
+  LazyArrivalStage,
+  LazyQConversationPanel,
+} from "./workspace-q-pane-lazy";
+import { WorkspaceQPending } from "./workspace-q-pending";
 
 /**
  * The Q pane's conversation (W1.2): Home's Q, rendered once by the layout.
@@ -17,7 +20,7 @@ export async function WorkspaceQConversation() {
   // panel is drawn after hydration; the server sends the pane's shape.
   return (
     <AfterHydration fallback={<WorkspaceQPending />}>
-      <QConversationPanel
+      <LazyQConversationPanel
         workspace
         connected={home.qConnected}
         context={home.surface}
@@ -26,21 +29,10 @@ export async function WorkspaceQConversation() {
         welcomeLine={home.welcomeLine}
         welcomeLead={home.welcomeLead}
         briefing={home.briefing}
-        stageLayer={home.returning ? <ArrivalStage /> : undefined}
+        stageLayer={home.returning ? <LazyArrivalStage /> : undefined}
       />
     </AfterHydration>
   );
 }
 
-/** The pane's shape while Q's first read lands; no spinner. */
-export function WorkspaceQPending() {
-  return (
-    <div
-      className="cq-stage cq-q-pane gap-3 p-4"
-      aria-busy="true"
-      data-q-pane-pending
-    >
-      <div className="mt-auto h-12 w-full rounded-md bg-(--cq-stage-surface-strong)" />
-    </div>
-  );
-}
+export { WorkspaceQPending } from "./workspace-q-pending";

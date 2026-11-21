@@ -13,7 +13,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { QLanguagePreferenceSchema } from "@capital-q/contracts";
+// W4-B: the same check as QLanguagePreferenceSchema, without zod.
+import { isQLanguagePreference } from "@capital-q/contracts/language-tag";
 
 import {
   directionOf,
@@ -98,11 +99,9 @@ export function LanguageProvider({
   const router = useRouter();
   useEffect(() => {
     const onChange = (event: Event) => {
-      const detail = QLanguagePreferenceSchema.safeParse(
-        (event as CustomEvent<unknown>).detail,
-      );
-      if (!detail.success) return;
-      const to = uiLanguageOf(detail.data, window.navigator.languages);
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isQLanguagePreference(detail)) return;
+      const to = uiLanguageOf(detail, window.navigator.languages);
       const apply = () => {
         setAnnounced({ from: initial, to });
         // Server-rendered words (Settings, page titles) follow on refresh.

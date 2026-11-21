@@ -33,6 +33,10 @@
       "types": "./dist/q/index.d.ts",
       "default": "./dist/q/index.js"
     },
+    "./language-tag": {
+      "types": "./dist/q/language-tag.d.ts",
+      "default": "./dist/q/language-tag.js"
+    },
     "./model": {
       "types": "./dist/model/index.d.ts",
       "default": "./dist/model/index.js"

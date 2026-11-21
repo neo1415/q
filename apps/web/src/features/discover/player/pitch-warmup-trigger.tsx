@@ -7,7 +7,6 @@ import { authorisePlaybackAction } from "../feed/playback-source";
 import { loadSlatePageAction } from "../feed/feed-actions";
 import { budgetFor } from "../feed/use-feed-budget";
 import { CONSTRAINED_PREFETCH_BUDGET } from "../feed/feed-state";
-import { warmPitch } from "./pitch-warmup";
 
 /**
  * An investor's first pitches, warmed while they are anywhere else in the
@@ -57,6 +56,9 @@ export function PitchWarmup() {
       void import("hls.js").catch(() => undefined);
       const page = await loadSlatePageAction(null, null);
       if (!page.ok || controller.signal.aborted) return;
+      // W4-B: the warming code itself loads here, at idle, not with every
+      // page's first download (it only ever runs after this point).
+      const { warmPitch } = await import("./pitch-warmup");
       for (const item of page.value.items.slice(0, FIRST)) {
         if (item.pitch === null || controller.signal.aborted) continue;
         const grant = await authorisePlaybackAction(

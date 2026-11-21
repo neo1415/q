@@ -1,7 +1,6 @@
-import {
-  languageDirectionOf,
-  type QLanguagePreference,
-} from "@capital-q/contracts";
+import type { QLanguagePreference } from "@capital-q/contracts";
+// W4-B: the zod-free subpath, so the root layout ships no schema library.
+import { languageDirectionOf } from "@capital-q/contracts/language-tag";
 import { languageInfo, listSeparator } from "@capital-q/q-core/language";
 
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";

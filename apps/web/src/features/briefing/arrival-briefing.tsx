@@ -10,13 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  AnimatePresence,
-  domAnimation,
-  LazyMotion,
-  m,
-  useReducedMotion,
-} from "motion/react";
+import { AnimatePresence, LazyMotion, m, useReducedMotion } from "motion/react";
 
 import type {
   BriefingCommandRequest,
@@ -93,6 +87,14 @@ import { setRoomFilled, useRoomSlots } from "./arrival-room";
 import { useUiLanguage } from "@/features/i18n/language";
 import { useT } from "@/features/i18n/language";
 import { useQPaneWidth, wideEnough } from "@/features/workspace/q-pane-width";
+
+/**
+ * W4-B (audit finding 6): the cards' fade-in loads after the briefing has
+ * painted, as Q's work list does (work-progress-motion), not with every
+ * page's first download. Reduced motion has no animation either way.
+ */
+const loadArrivalMotion = () =>
+  import("@/features/q/work-progress-motion").then((module) => module.default);
 
 /**
  * Q on arrival (Zino, 2026-10-08; designs docs/design/2026-10-08/briefing
@@ -1070,7 +1072,7 @@ export function Sequence({
           {focusCard}
         </div>
       ) : (
-        <LazyMotion features={domAnimation} strict>
+        <LazyMotion features={loadArrivalMotion} strict>
           {flank && room.left !== null && room.right !== null ? (
             <>
               {createPortal(

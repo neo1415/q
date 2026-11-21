@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { redirect } from "next/navigation";
 
-import { HomeScreen } from "@/features/home/home-screen";
+import { HomeScreen } from "@/features/home/home-screen-view";
 import { PendingInvitations } from "@/features/team/pending-invitations";
 import { onboardingPath, resolveOnboardingState } from "@/features/q/context";
 import { workspaceMode } from "@/features/workspace/mode";
