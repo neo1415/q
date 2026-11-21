@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-import {
-  Q_TASK_CLASSES,
-  VISIBILITY_AUDIENCES,
-  type PermittedContextPlan,
-} from "@capital-q/contracts";
-import type { ActorContext } from "@capital-q/security";
+import { Q_TASK_CLASSES, VISIBILITY_AUDIENCES } from "@capital-q/contracts";
 
 import {
   allow,
@@ -13,7 +8,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import {
   OWN_RECORD_KINDS,
   type EvidenceDocumentsPort,
@@ -40,15 +35,6 @@ export const READ_RELATIONSHIP_EMAIL = "relationship.email.read" as const;
 
 /** How much of one record a model is handed; the screen has the rest. */
 const DATA_MAX_CHARS = 12_000;
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 const INVESTOR_RECORDS: ReadonlySet<OwnRecordKind> = new Set([
   "INVESTOR_ORGANISATION",
@@ -183,7 +169,7 @@ export function createReadMyRecordTool(
     input: ReadMyRecordInputSchema,
     output: OwnRecordOutputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return deny<RecordGrant>("NOT_AVAILABLE");
       }
       const subjectType = subjectKind(input);
@@ -250,7 +236,8 @@ export function createReassessReadinessTool(
     input: ReassessReadinessInputSchema,
     output: OwnRecordOutputSchema,
     authorize: async (_input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) return deny<Subject>("NOT_AVAILABLE");
+      if (!ownsConversation({ actor: actor, plan: plan }))
+        return deny<Subject>("NOT_AVAILABLE");
       const subjectId = await ownSubject(ports, actor, plan, "COMPANY");
       return subjectId === null
         ? deny<Subject>("NOT_AVAILABLE")
@@ -402,7 +389,8 @@ export function createListUploadedDocumentsTool(
     input: ListUploadedDocumentsInputSchema,
     output: ListUploadedDocumentsOutputSchema,
     authorize: async (_input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) return deny<Subject>("NOT_AVAILABLE");
+      if (!ownsConversation({ actor: actor, plan: plan }))
+        return deny<Subject>("NOT_AVAILABLE");
       if (!plan.scopes.some((scope) => scope.kind === "EVIDENCE_DOCUMENTS")) {
         return deny<Subject>("NOT_AVAILABLE");
       }
@@ -504,7 +492,8 @@ export function createReadRelationshipEmailTool(
      * context's own check), and their own mailbox: never another person's.
      */
     authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) return deny<null>("NOT_AVAILABLE");
+      if (!ownsConversation({ actor: actor, plan: plan }))
+        return deny<null>("NOT_AVAILABLE");
       const standing = await relationships
         .byRelationship(actor, input.relationshipId)
         .catch(() => null);

@@ -12,7 +12,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import {
   PROFILE_ANSWER_FIELDS,
   type QToolPorts,
@@ -53,15 +53,6 @@ export type ProposeRecordChangeOutput = z.infer<
 
 type Grant = { readonly subjectId: string };
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 const COMMON = {
   version: 1,
   status: "ACTIVE",
@@ -89,7 +80,8 @@ function subjectAuthorizer(
     _input: unknown,
     { actor, plan }: { actor: ActorContext; plan: PermittedContextPlan },
   ) => {
-    if (!ownConversation(actor, plan)) return deny<Grant>("NOT_AVAILABLE");
+    if (!ownsConversation({ actor: actor, plan: plan }))
+      return deny<Grant>("NOT_AVAILABLE");
     const subjectId = await ownSubject(ports, actor, plan, kind);
     return subjectId === null
       ? deny<Grant>("NOT_AVAILABLE")

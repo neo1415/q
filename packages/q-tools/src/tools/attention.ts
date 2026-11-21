@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   Q_TASK_CLASSES,
   QAttentionReportSchema,
-  type PermittedContextPlan,
   type QActivitySummary,
   type QAttentionItem,
   type QAttentionReport,
@@ -17,7 +16,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type {
   ApprovalInboxPort,
   OwnRelationship,
@@ -620,15 +619,6 @@ export const ReadAttentionInputSchema = z
   .strict();
 export type ReadAttentionInput = z.infer<typeof ReadAttentionInputSchema>;
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 export function createReadAttentionTool(
   reader: AttentionReader,
 ): AnyQToolDefinition {
@@ -654,7 +644,7 @@ export function createReadAttentionTool(
     output: QAttentionReportSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

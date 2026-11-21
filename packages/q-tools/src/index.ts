@@ -48,6 +48,10 @@ export {
   planScopeKinds,
   scopesOfKind,
 } from "./plan.js";
+export {
+  ownsConversation,
+  type OwnConversationAccess,
+} from "./own-conversation.js";
 export type {
   InvestorFeedCompany,
   InvestorFeedDecision,

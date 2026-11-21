@@ -20,7 +20,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * DOCS: the document studio from a conversation (spec §6). Their brand
@@ -97,15 +97,6 @@ export type DocumentStudioPort = {
   >;
 };
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 const OWN = {
   version: 1,
   status: "ACTIVE",
@@ -133,7 +124,7 @@ const authorizeOwn = (
   { actor, plan }: { actor: ActorContext; plan: PermittedContextPlan },
 ) =>
   Promise.resolve(
-    ownConversation(actor, plan)
+    ownsConversation({ actor: actor, plan: plan })
       ? allow<null>("CONFIDENTIAL", null)
       : deny<null>("NOT_AVAILABLE"),
   );

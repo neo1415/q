@@ -9,7 +9,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { QToolPorts } from "../ports.js";
 import {
   matchCounterpart,
@@ -150,13 +150,6 @@ function none(target: ResolvePageTargetInput["target"]) {
 
 const id = (value: string) => value.toLowerCase();
 const seg = (value: string) => encodeURIComponent(id(value));
-
-/** Their own conversation, as themselves (the scope bound to this person). */
-function ownConversation(context: QToolExecutionContext): boolean {
-  if (context.actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(context.plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === context.actor.userId;
-}
 
 async function thread(
   ports: Ports,
@@ -518,7 +511,7 @@ export function createResolvePageTargetTool(
         input.target === "BOARD_ITEM"
       ) {
         // Their own records only, in their own conversation.
-        if (!ownConversation(context)) return deny("NOT_AVAILABLE");
+        if (!ownsConversation(context)) return deny("NOT_AVAILABLE");
         const output =
           input.target === "OWN_DOCUMENT"
             ? await ownDocument(ports, input, context)

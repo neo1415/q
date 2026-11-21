@@ -11,7 +11,6 @@ import {
   QWorkCallWindowSchema,
   handleEverythingGrant,
   type InstructionGrantPayload,
-  type PermittedContextPlan,
   type QWorkDto,
   type QWorkOutreachStartPayload,
   type QWorkStandInStartPayload,
@@ -25,7 +24,7 @@ import {
   QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * Q's delegated work, as Q's own tools (AUTO, ADR 0030; founder direction
@@ -244,15 +243,6 @@ export type QWorkIntelligencePort = {
       ) => Promise<"YES" | "NO" | "UNSURE" | null>)
     | undefined;
 };
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 const OWN = {
   version: 1,
@@ -911,7 +901,8 @@ export function createQWorkTools(
       input: ProposeQOutreachInputSchema,
       output: ProposalOutputSchema,
       authorize: async (_input, { actor, plan }) =>
-        ownConversation(actor, plan) && (await port.isInvestor(actor))
+        ownsConversation({ actor: actor, plan: plan }) &&
+        (await port.isInvestor(actor))
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       execute: (input, context) => {
@@ -966,7 +957,8 @@ export function createQWorkTools(
       input: ProposeStandInInputSchema,
       output: ProposalOutputSchema,
       authorize: async (_input, { actor, plan }) =>
-        ownConversation(actor, plan) && (await port.hasCompany(actor))
+        ownsConversation({ actor: actor, plan: plan }) &&
+        (await port.hasCompany(actor))
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       execute: (input, context) => {
@@ -1007,7 +999,7 @@ export function createQWorkTools(
       output: StandingProposalOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),
@@ -1158,7 +1150,7 @@ export function createQWorkTools(
       output: WorkListOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),
@@ -1224,7 +1216,7 @@ export function createQWorkTools(
       output: ActedOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),
@@ -1274,7 +1266,7 @@ export function createQWorkTools(
       output: ActedOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),
@@ -1317,7 +1309,8 @@ export function createQWorkTools(
       input: AwayInputSchema,
       output: ActedOutputSchema,
       authorize: async (_input, { actor, plan }) =>
-        ownConversation(actor, plan) && (await port.hasCompany(actor))
+        ownsConversation({ actor: actor, plan: plan }) &&
+        (await port.hasCompany(actor))
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       execute: async (input, context) => {

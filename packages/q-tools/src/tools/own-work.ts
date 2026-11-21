@@ -6,9 +6,7 @@ import {
   QDocumentEditSchema,
   QArtifactStatusSchema,
   QArtifactTypeSchema,
-  type PermittedContextPlan,
 } from "@capital-q/contracts";
-import type { ActorContext } from "@capital-q/security";
 
 import {
   allow,
@@ -16,7 +14,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type {
   ApprovalInboxPort,
   DocumentEditPort,
@@ -37,16 +35,6 @@ export const LIST_MY_DOCUMENTS = "documents.own.list" as const;
 export const READ_MY_DOCUMENT = "documents.own.read" as const;
 export const REVISE_MY_DOCUMENT = "documents.own.revise" as const;
 export const EDIT_MY_DOCUMENT = "documents.own.edit" as const;
-
-/** A person, in their own Q conversation. */
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 const OWN = {
   version: 1,
@@ -108,7 +96,7 @@ export function createListPendingApprovalsTool(
     output: ListPendingApprovalsOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
@@ -182,7 +170,7 @@ export function createListMyDocumentsTool(
     output: ListMyDocumentsOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
@@ -275,7 +263,7 @@ export function createReadMyDocumentTool(
     output: ReadMyDocumentOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
@@ -386,7 +374,7 @@ export function createReviseMyDocumentTool(
     output: ReviseMyDocumentOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
@@ -486,7 +474,7 @@ export function createEditMyDocumentTool(
     output: EditMyDocumentOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

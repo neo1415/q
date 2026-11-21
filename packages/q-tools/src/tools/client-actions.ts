@@ -41,7 +41,8 @@ import {
   type AnyQToolDefinition,
   type QToolAuthorization,
 } from "../definition.js";
-import { actorWideScope, scopesOfKind } from "../plan.js";
+import { scopesOfKind } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { QToolPorts } from "../ports.js";
 
 import {
@@ -73,15 +74,6 @@ export const SET_VOICE = "client.voice.set" as const;
 export const SIGN_OUT = "client.session.sign_out" as const;
 export const OPEN_PAGE = "client.page.open" as const;
 export const SET_DISCOVER_FILTERS = "client.discover_filters.set" as const;
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 function allowed(
   clientAction: QClientActionIntent,
@@ -139,7 +131,7 @@ export function createSetThemeTool(): AnyQToolDefinition {
     input: SetThemeInputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allowed({ kind: "SET_THEME", theme: input.theme })
           : deny<QClientActionToolResult>("NOT_AVAILABLE"),
       ),
@@ -163,7 +155,7 @@ export function createReloadPageTool(): AnyQToolDefinition {
     input: ReloadPageInputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allowed({ kind: "RELOAD_PAGE" })
           : deny<QClientActionToolResult>("NOT_AVAILABLE"),
       ),
@@ -241,7 +233,7 @@ export function createOpenWebsiteTool(
      */
     authorize: async (input, context) => {
       const { actor, plan } = context;
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       const host = siteHost(input.url);
@@ -281,7 +273,7 @@ export function createSetQMotionTool(): AnyQToolDefinition {
     input: SetQMotionInputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allowed({ kind: "SET_Q_MOTION", motion: input.motion })
           : deny<QClientActionToolResult>("NOT_AVAILABLE"),
       ),
@@ -351,7 +343,7 @@ export function createSetLayoutTool(
     input: SetLayoutInputSchema,
     authorize: (input, execution) =>
       Promise.resolve(
-        ownConversation(execution.actor, execution.plan) &&
+        ownsConversation({ actor: execution.actor, plan: execution.plan }) &&
           (options.workspaceFor ?? onWorkspaceScreen)(execution)
           ? allowed({
               kind: "LAYOUT_SET",
@@ -391,7 +383,7 @@ export function createSetVoiceTool(): AnyQToolDefinition {
     input: SetVoiceInputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allowed({ kind: "SET_VOICE", voice: input.voice })
           : deny<QClientActionToolResult>("NOT_AVAILABLE"),
       ),
@@ -420,7 +412,7 @@ export function createSignOutTool(): AnyQToolDefinition {
     input: SignOutInputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allowed({ kind: "SIGN_OUT" })
           : deny<QClientActionToolResult>("NOT_AVAILABLE"),
       ),
@@ -781,7 +773,7 @@ export function createOpenPageTool(
       "Opens any one record's own page on their screen, at once: a company's page, an investor organisation's page, their relationship with a company or investor, or the chat with them. Give the id a tool or the screen gave, or just the name they said -- misheard names are matched against the records they can already see (their relationships, Saves, the network). 'Open the deck' or 'open the questions for Priya' is DOCUMENT with that title; 'open my chat with X' is RELATIONSHIP_COMPANY_MESSAGES (X a company) or RELATIONSHIP_INVESTOR_MESSAGES (X an investor) with name X; 'show me X' is COMPANY or INVESTOR; 'rehearse / practise my meeting with X' is INVESTOR_REHEARSAL when X is an investor (they are a founder) and COMPANY_REHEARSAL when X is a company (they are an investor). Call it directly, never send them to a list instead. NOT_AVAILABLE means nothing they can see matches, or that page is not theirs to open.",
     input: OpenPageInputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       if (input.page === "DOCUMENT") {
@@ -1112,7 +1104,7 @@ export function createShowTool(
       "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, the news and web sources this answer read, a founder's own readiness, action plan or open questions, a company's assumptions to test or evidence board, an investor's thesis reading or saved comparison, a founder's investors by published criteria, a founder's 3/6/12-month plan, or what one investor looks for with a draft application for the founder to review (never sent from here). Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
     input: ShowInputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       if (input.object === "SOURCES") {
@@ -1355,7 +1347,7 @@ export function createControlScreenTool(): AnyQToolDefinition {
     input: ControlScreenInputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan) &&
+        ownsConversation({ actor: actor, plan: plan }) &&
           (input.act !== "SHOW_SECTION" || input.section !== undefined)
           ? allowed({
               kind: "SCREEN_ACT",
@@ -1409,7 +1401,7 @@ export function createControlDocumentTool(): AnyQToolDefinition {
     input: ControlDocumentInputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan) &&
+        ownsConversation({ actor: actor, plan: plan }) &&
           (input.act !== "GO_TO_PAGE" || input.page !== undefined)
           ? allowed({
               kind: "DOCUMENT_ACT",
@@ -1502,7 +1494,7 @@ export function createSetDiscoverFiltersTool(): AnyQToolDefinition {
       'Sets the filters on their Discover feed, exactly as the filter control does: sector, stage, country, raise size, verified only, has a pitch video. It replaces the current filters; call it with nothing set to clear them. Call it when they ask Discover to show only some companies ("only fintech in Nigeria").',
     input: SetDiscoverFiltersInputSchema,
     authorize: (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE"));
       }
       const bounded =
@@ -1711,7 +1703,7 @@ export function createOperateScreenTool(
     authorize: (input, execution) => {
       const refuse = (reason: string) =>
         Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE", reason));
-      if (!ownConversation(execution.actor, execution.plan)) {
+      if (!ownsConversation({ actor: execution.actor, plan: execution.plan })) {
         return Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE"));
       }
       const actId = `uia_${randomUUID().replace(/-/g, "").slice(0, 24)}`;

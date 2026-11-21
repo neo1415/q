@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  Q_TASK_CLASSES,
-  type PermittedContextPlan,
-} from "@capital-q/contracts";
-import type { ActorContext } from "@capital-q/security";
+import { Q_TASK_CLASSES } from "@capital-q/contracts";
 
 import {
   allow,
@@ -12,7 +8,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { AttachedDocumentsPort } from "../ports.js";
 import { OWN_COMPANY_READ_LINE } from "./company-documents.js";
 
@@ -123,16 +119,6 @@ export type ReadAttachedDocumentOutput = z.infer<
   typeof ReadAttachedDocumentOutputSchema
 >;
 
-/** A person, in their own Q conversation. */
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 const EMPTY: Omit<ReadAttachedDocumentOutput, "status"> = {
   documentId: null,
   title: null,
@@ -200,7 +186,7 @@ export function createReadAttachedDocumentTool(
     output: ReadAttachedDocumentOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

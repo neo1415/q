@@ -20,7 +20,7 @@ import {
   QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { RelationshipIntelligencePort } from "../ports.js";
 import { appActionKey, type AppApprovalPort } from "./app-actions.js";
 import { closestByName } from "./connection-requests.js";
@@ -256,12 +256,6 @@ function oneTime(input: {
   readonly startsAt?: unknown;
 }): boolean {
   return (input.when === undefined) !== (input.startsAt === undefined);
-}
-
-function ownConversation(actor: ActorContext, plan: PermittedContextPlan) {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
 }
 
 function localLabel(instant: Date, timeZone: string): string {
@@ -1303,7 +1297,8 @@ export function createScheduleTools(
       requiredScopeKinds: ["OWN_Q_CONVERSATION"],
       input: ProposeMeetingChangeInputSchema,
       authorize: async (input, { actor, plan }) => {
-        if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
+        if (!ownsConversation({ actor: actor, plan: plan }))
+          return deny("NOT_AVAILABLE");
         // Live 15 Nov 2026 (D-Q3): "move the call with Savanna to Thursday
         // afternoon" names the call by whom it is with. Their one upcoming
         // call with them that they organised; several are asked about.
@@ -1453,7 +1448,7 @@ export function createScheduleTools(
           input.investorOrganisationId !== undefined ||
           input.counterpartName !== undefined;
         if (!named) {
-          return ownConversation(actor, plan)
+          return ownsConversation({ actor: actor, plan: plan })
             ? allow("INTERNAL", { relationship: null })
             : deny("NOT_AVAILABLE");
         }
@@ -1470,7 +1465,7 @@ export function createScheduleTools(
         ).catch(() => null);
         if (grant !== null)
           return allow("CONFIDENTIAL", { relationship: grant });
-        return ownConversation(actor, plan)
+        return ownsConversation({ actor: actor, plan: plan })
           ? allow("INTERNAL", { relationship: null })
           : deny("NOT_AVAILABLE");
       },
@@ -1550,7 +1545,7 @@ export function createScheduleTools(
       output: ListScheduleOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<OwnGrant>("CONFIDENTIAL", { actor })
             : deny<OwnGrant>("NOT_AVAILABLE"),
         ),
@@ -1652,7 +1647,8 @@ function createDismissReminderTool(
     input: DismissReminderInputSchema,
     output: DismissReminderOutputSchema,
     authorize: async (input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
+      if (!ownsConversation({ actor: actor, plan: plan }))
+        return deny("NOT_AVAILABLE");
       const own = await schedule.upcoming(actor).catch(() => null);
       const reminder = own?.reminders.find(
         (entry) => entry.id === input.reminderId,

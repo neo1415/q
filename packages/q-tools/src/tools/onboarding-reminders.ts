@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   Q_TASK_CLASSES,
   QClientActionToolResultSchema,
-  type PermittedContextPlan,
   type QClientActionToolResult,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -14,7 +13,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * Setup reminders (founder directive 2026-09-27), by text or by voice:
@@ -43,15 +42,6 @@ export type OnboardingRemindersPort = {
     actor: ActorContext,
   ) => Promise<"founder" | "investor" | null>;
 };
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 export const SetOnboardingRemindersInputSchema = z
   .object({
@@ -108,7 +98,7 @@ export function createSetOnboardingRemindersTool(
     output: SetOnboardingRemindersOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<ReminderGrant>("INTERNAL", { actor })
           : deny<ReminderGrant>("NOT_AVAILABLE"),
       ),
@@ -157,7 +147,7 @@ export function createContinueOnboardingTool(
     input: ContinueOnboardingInputSchema,
     output: QClientActionToolResultSchema,
     authorize: async (_input, { actor, plan }) => {
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       const journey = await port.unfinished(actor).catch(() => null);

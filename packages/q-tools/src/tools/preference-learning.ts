@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  Q_TASK_CLASSES,
-  type PermittedContextPlan,
-} from "@capital-q/contracts";
+import { Q_TASK_CLASSES } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -12,7 +9,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * SET_PREFERENCE_LEARNING -- `memory.learning.set` v1 (lane ob1; owner
@@ -60,15 +57,6 @@ export type SetPreferenceLearningOutput = z.infer<
   typeof SetPreferenceLearningOutputSchema
 >;
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 const normal = (text: string) =>
   text
     .toLowerCase()
@@ -103,7 +91,7 @@ export function createSetPreferenceLearningTool(
     input: SetPreferenceLearningInputSchema,
     output: SetPreferenceLearningOutputSchema,
     authorize: (input, { actor, plan, conversation }) => {
-      if (!ownConversation(actor, plan)) {
+      if (!ownsConversation({ actor: actor, plan: plan })) {
         return Promise.resolve(deny<Grant>("NOT_AVAILABLE"));
       }
       // Their decision rests on their words, said now.

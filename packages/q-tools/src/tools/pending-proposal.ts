@@ -11,7 +11,7 @@ import {
   QToolArgumentError,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import {
   PROPOSAL_PLAIN_STATUSES,
   type ConversationProposal,
@@ -193,12 +193,7 @@ export function createApprovePendingProposalTool(
     output: ApprovePendingProposalOutputSchema,
     authorize: (_input, { actor, plan }) => {
       // Only a person approves, and only in their own conversation.
-      const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-      if (
-        actor.actorType !== "HUMAN" ||
-        scope === undefined ||
-        scope.filter.userId !== actor.userId
-      ) {
+      if (!ownsConversation({ actor, plan })) {
         return Promise.resolve(deny<null>("NOT_AVAILABLE"));
       }
       return Promise.resolve(allow<null>("CONFIDENTIAL", null));
@@ -379,12 +374,7 @@ export function createDeclinePendingProposalTool(
     input: DeclinePendingProposalInputSchema,
     output: DeclinePendingProposalOutputSchema,
     authorize: (_input, { actor, plan }) => {
-      const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-      if (
-        actor.actorType !== "HUMAN" ||
-        scope === undefined ||
-        scope.filter.userId !== actor.userId
-      ) {
+      if (!ownsConversation({ actor, plan })) {
         return Promise.resolve(deny<null>("NOT_AVAILABLE"));
       }
       return Promise.resolve(allow<null>("CONFIDENTIAL", null));

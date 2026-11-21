@@ -8,11 +8,17 @@ const actor = {
   tenantId: "c0000000-0000-4000-8000-000000000001",
   actorType: "HUMAN",
 } as never;
+// The plan the firewall builds for this person: same tenant, same person.
 const plan = {
+  tenantId: "c0000000-0000-4000-8000-000000000001",
+  actor: { userId: "b0000000-0000-4000-8000-000000000001" },
   scopes: [
     {
       kind: "OWN_Q_CONVERSATION",
-      filter: { userId: "b0000000-0000-4000-8000-000000000001" },
+      filter: {
+        tenantId: "c0000000-0000-4000-8000-000000000001",
+        userId: "b0000000-0000-4000-8000-000000000001",
+      },
     },
   ],
 } as never;

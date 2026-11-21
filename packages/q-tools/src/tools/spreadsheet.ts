@@ -10,7 +10,6 @@ import {
   QArtifactStatusSchema,
   QArtifactTypeSchema,
   UuidSchema,
-  type PermittedContextPlan,
   type QArtifactContent,
   type QResultBlock,
   type QSubjectRef,
@@ -26,6 +25,7 @@ import {
   type QToolAuthorization,
 } from "../definition.js";
 import { actorWideScope, scopesOfKind } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { QToolPorts } from "../ports.js";
 import { createReadCompanyFiguresTool } from "./company-figures.js";
 import { createGetInvestorMandateTool } from "./get-investor-mandate.js";
@@ -328,15 +328,6 @@ function pipelineFitOf(item: FitItem): PipelineFit {
   };
 }
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 /** The newest block of `kind` Q showed, with the answer it was in. */
 function newestShown<K extends QResultBlock["kind"]>(
   answers: readonly ShownAnswer[],
@@ -498,7 +489,7 @@ export function createMakeSpreadsheetTool(
     input: MakeSpreadsheetInputSchema,
     output: MakeSpreadsheetOutputSchema,
     authorize: async (input, context): Promise<QToolAuthorization<Grant>> => {
-      if (!ownConversation(context.actor, context.plan)) {
+      if (!ownsConversation({ actor: context.actor, plan: context.plan })) {
         return deny("NOT_AVAILABLE");
       }
       if (input.source === "OWN_FINANCIAL_MODEL") {

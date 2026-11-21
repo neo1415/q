@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  Q_TASK_CLASSES,
-  type PermittedContextPlan,
-} from "@capital-q/contracts";
-import type { ActorContext } from "@capital-q/security";
+import { Q_TASK_CLASSES } from "@capital-q/contracts";
 
 import {
   allow,
@@ -12,7 +8,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { InboundEmailPort, InboundEmailSummary } from "../ports.js";
 
 /**
@@ -48,15 +44,6 @@ const READ = {
   owner: "q-tools",
   visibleStage: null,
 } as const;
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 const EmailSummarySchema = z
   .object({
@@ -141,7 +128,7 @@ export function createListMyInboundEmailsTool(
       output: ListMyInboundEmailsOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),
@@ -220,7 +207,7 @@ export function createReadMyInboundEmailTool(
     output: ReadMyInboundEmailOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

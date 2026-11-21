@@ -25,6 +25,7 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope, boundScopeFor } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import { findRecordByName } from "./client-actions.js";
 import { briefFacts } from "./relationship-brief-facts.js";
 import { createProposeConnectionRequestTool } from "./connection-request-send.js";
@@ -1279,11 +1280,8 @@ function createListMyRelationshipsTool(
       authorize: (_input, { actor, plan }) => {
         // Their own conversation, as themselves: the scope the firewall
         // binds to this person only.
-        const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
         return Promise.resolve(
-          actor.actorType === "HUMAN" &&
-            scope !== undefined &&
-            scope.filter.userId === actor.userId
+          ownsConversation({ actor, plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         );

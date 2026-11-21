@@ -14,7 +14,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * NOTE_PREFERENCE — `memory.preference.note` v1 (CQ-QX-007 P0-5; ADR 0012).
@@ -163,10 +163,10 @@ export function createNotePreferenceTool(
     authorize: (_input, context) => {
       // The actor-wide own-conversation scope, filtered to this very
       // person, and a memory port bound to them: all three required.
-      const scope = actorWideScope(context.plan, "OWN_Q_CONVERSATION");
+      // W2-A: the shared check now also requires a person acting; this
+      // copy had not.
       if (
-        scope === undefined ||
-        scope.filter.userId !== context.actor.userId ||
+        !ownsConversation(context) ||
         context.actor.userId !== port.ownerUserId
       ) {
         return Promise.resolve(deny<Grant>("NOT_AVAILABLE"));

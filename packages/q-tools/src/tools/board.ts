@@ -20,7 +20,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { QBoardPort } from "../ports.js";
 import type { QJobPort } from "./q-job.js";
 
@@ -43,15 +43,6 @@ export const MY_BOARD = "board.own" as const;
 /** At most this many items are added or worked on in one call. */
 export const BOARD_TOOL_BATCH_MAX = 12;
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 const OWN = {
   version: 1,
   status: "ACTIVE",
@@ -69,7 +60,7 @@ const authorizeOwn = (
   { actor, plan }: { actor: ActorContext; plan: PermittedContextPlan },
 ) =>
   Promise.resolve(
-    ownConversation(actor, plan)
+    ownsConversation({ actor: actor, plan: plan })
       ? allow<null>("CONFIDENTIAL", null)
       : deny<null>("NOT_AVAILABLE"),
   );

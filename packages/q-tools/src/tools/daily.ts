@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   Q_DAILY_OPTIONAL_SECTIONS,
   Q_TASK_CLASSES,
-  type PermittedContextPlan,
   type QDailyRequestDto,
   type QDailyEdition,
   type QDailyPreferences,
@@ -17,7 +16,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * The Q Daily through Q (DAILY spec §7): "show me today's Q Daily", "make
@@ -46,15 +45,6 @@ export type QDailyToolPort = {
    */
   readonly request?: (actor: ActorContext) => Promise<QDailyRequestDto>;
 };
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 const OWN = {
   version: 1,
@@ -116,7 +106,7 @@ export function createGetQDailyTool(port: QDailyToolPort): AnyQToolDefinition {
     output: GetQDailyOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<ActorContext>("CONFIDENTIAL", actor)
           : deny<ActorContext>("NOT_AVAILABLE"),
       ),
@@ -230,7 +220,7 @@ export function createSetQDailyPreferencesTool(
     output: SetQDailyPreferencesOutputSchema,
     authorize: (input, { actor, plan }) =>
       Promise.resolve(
-        !ownConversation(actor, plan)
+        !ownsConversation({ actor: actor, plan: plan })
           ? deny<ActorContext>("NOT_AVAILABLE")
           : input.frequency === undefined &&
               input.email === undefined &&
@@ -295,7 +285,7 @@ export function createRequestQDailyTool(
     output: RequestQDailyOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<ActorContext>("INTERNAL", actor)
           : deny<ActorContext>("NOT_AVAILABLE"),
       ),

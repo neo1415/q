@@ -22,7 +22,6 @@ import {
   GateqStatementSourceKindSchema,
   Q_TASK_CLASSES,
   type CorrelationId,
-  type PermittedContextPlan,
 } from "@capital-q/contracts";
 import { CompanyIdSchema } from "@capital-q/companies";
 import type { QToolExecutionContext } from "@capital-q/q-runtime";
@@ -34,7 +33,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { QToolPorts } from "../ports.js";
 import { nameableRecords } from "./client-actions.js";
 import { actionTarget } from "./relationships.js";
@@ -281,15 +280,6 @@ export async function closestDocument(
   // Clearly the one: alone, or well ahead of the next.
   if (second !== undefined && second.score >= first.score * 0.8) return null;
   return { id: first.id, name: first.name };
-}
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
 }
 
 function stableJson(value: unknown): string {
@@ -598,7 +588,8 @@ function toolFor(
         }),
     authorize: async (input, execution) => {
       const { actor, plan } = execution;
-      if (!ownConversation(actor, plan)) return deny("NOT_AVAILABLE");
+      if (!ownsConversation({ actor: actor, plan: plan }))
+        return deny("NOT_AVAILABLE");
       // Names to ids, by the one coercion; anything unclear is not acted on.
       const { reason: _reason, ...withoutReason } = input as Record<
         string,
@@ -920,7 +911,7 @@ export function createReadMyTool(own: OwnReadPorts): AnyQToolDefinition {
     output: ReadMyOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<ActorContext>("CONFIDENTIAL", actor)
           : deny<ActorContext>("NOT_AVAILABLE"),
       ),

@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
   Q_TASK_CLASSES,
-  type PermittedContextPlan,
   type QSubjectRef,
   type RelationshipBrief,
 } from "@capital-q/contracts";
@@ -14,7 +13,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 import type { OwnRelationships, QToolPorts } from "../ports.js";
 import { matchCounterpart, nameableRecords } from "./client-actions.js";
 
@@ -363,15 +362,6 @@ const ProposeQJobOutputSchema = z
   .strict();
 type ProposeQJobOutput = z.infer<typeof ProposeQJobOutputSchema>;
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 export function createQJobTools(
   port: QJobPort,
   names?: QJobNamePorts,
@@ -403,7 +393,7 @@ export function createQJobTools(
       output: ProposeQJobOutputSchema,
       authorize: (_input, { actor, plan }) =>
         Promise.resolve(
-          ownConversation(actor, plan)
+          ownsConversation({ actor: actor, plan: plan })
             ? allow<null>("CONFIDENTIAL", null)
             : deny<null>("NOT_AVAILABLE"),
         ),

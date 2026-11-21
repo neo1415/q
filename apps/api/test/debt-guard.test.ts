@@ -46,6 +46,16 @@ function sources(dir: string): string[] {
 /** Tagged SQL templates: sql`…`, tx.sql`…`, sql<Row[]>`…`. */
 const INLINE_SQL = /\bsql\s*(?:<[^`;]{0,200}?>)?\s*`/gu;
 
+/**
+ * W2-A (finding 8): the own-conversation check lives in one place. A copy
+ * of it (a local ownConversation, or a tool reading the OWN_Q_CONVERSATION
+ * scope itself) is refused anywhere else; there is no baseline: zero.
+ */
+const OWN_CONVERSATION_HOME = "packages/q-tools/src/own-conversation.ts";
+const OWN_CONVERSATION_COPY =
+  /\bfunction\s+ownConversations?\b|actorWideScope\(\s*[\w.]+\s*,\s*"OWN_Q_CONVERSATION"\s*\)/gu;
+const ownConversationCopies: string[] = [];
+
 function scan(): Baseline {
   const inlineSql: Record<string, number> = {};
   const longFiles: Record<string, number> = {};
@@ -69,6 +79,12 @@ function scan(): Baseline {
       const text = readFileSync(file, "utf8");
       const lines = text.split("\n").length;
       if (lines > NEW_FILE_MAX_LINES) longFiles[path] = lines;
+      if (
+        path !== OWN_CONVERSATION_HOME &&
+        (text.match(OWN_CONVERSATION_COPY) ?? []).length > 0
+      ) {
+        ownConversationCopies.push(path);
+      }
       if (path.startsWith("apps/")) {
         const count = (text.match(INLINE_SQL) ?? []).length;
         if (count > 0) inlineSql[path] = count;
@@ -106,6 +122,19 @@ describe("no new debt (W1-A)", () => {
       .filter(([file]) => baseline.longFiles[file] === undefined)
       .map(([file, lines]) => `${file}: ${String(lines)} lines`);
     expect(over, "split the file rather than raise its baseline").toEqual([]);
+  });
+
+  it("W2-A: no copy of the own-conversation check outside its home", () => {
+    expect(
+      ownConversationCopies,
+      `use ownsConversation from @capital-q/q-tools (${OWN_CONVERSATION_HOME})`,
+    ).toEqual([]);
+    const copies = [
+      "function ownConversation(actor, plan) {",
+      'const scope = actorWideScope(context.plan, "OWN_Q_CONVERSATION");',
+      'if (!ownsConversation({ actor, plan })) return deny("NOT_AVAILABLE");',
+    ].join("\n");
+    expect(copies.match(OWN_CONVERSATION_COPY)?.length).toBe(2);
   });
 
   it("the rules catch what they are meant to", () => {

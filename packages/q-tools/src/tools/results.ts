@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   Q_TASK_CLASSES,
   RESULTS_RANGES,
-  type PermittedContextPlan,
   type ResultsDto,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -14,7 +13,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * ADMIN (spec docs/specs/2026-10/admin.md §5): "how is my raise going",
@@ -37,15 +36,6 @@ export type ResultsToolPort = {
     },
   ) => Promise<ResultsDto>;
 };
-
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
 
 const OWN = {
   version: 1,
@@ -229,7 +219,7 @@ export function createGetMyResultsTool(
     output: ResultsToolOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
@@ -278,7 +268,7 @@ export function createGetMyResultsReportTool(
     output: ResultsReportOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

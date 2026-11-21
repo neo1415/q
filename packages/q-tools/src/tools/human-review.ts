@@ -4,9 +4,7 @@ import {
   HumanReviewSubjectRefSchema,
   HumanReviewSubjectSchema,
   Q_TASK_CLASSES,
-  type PermittedContextPlan,
 } from "@capital-q/contracts";
-import type { ActorContext } from "@capital-q/security";
 
 import {
   allow,
@@ -14,7 +12,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * ADMIN-3 (PADL #050, appeals Stage 4): when a person disagrees with
@@ -78,14 +76,6 @@ export type ProposeHumanReviewOutput = z.infer<
   typeof ProposeHumanReviewOutputSchema
 >;
 
-function ownConversation(actor: ActorContext, plan: PermittedContextPlan) {
-  if (actor.actorType !== "HUMAN" || actor.organisationId === undefined) {
-    return false;
-  }
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 export function createProposeHumanReviewTool(
   port: HumanReviewPort,
 ): AnyQToolDefinition {
@@ -109,7 +99,10 @@ export function createProposeHumanReviewTool(
     output: ProposeHumanReviewOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation(
+          { actor: actor, plan: plan },
+          { requireOrganisation: true },
+        )
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),

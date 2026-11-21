@@ -2,10 +2,7 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
-import {
-  Q_TASK_CLASSES,
-  type PermittedContextPlan,
-} from "@capital-q/contracts";
+import { Q_TASK_CLASSES } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -14,7 +11,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsConversation } from "../own-conversation.js";
 
 /**
  * BILLING (ADR 0034): what the person's plan includes, and the gate on
@@ -138,15 +135,6 @@ export function gateQTool(
   };
 }
 
-function ownConversation(
-  actor: ActorContext,
-  plan: PermittedContextPlan,
-): boolean {
-  if (actor.actorType !== "HUMAN") return false;
-  const scope = actorWideScope(plan, "OWN_Q_CONVERSATION");
-  return scope !== undefined && scope.filter.userId === actor.userId;
-}
-
 export const MyPlanOutputSchema = z
   .object({
     planName: z.string().max(60),
@@ -202,7 +190,7 @@ export function createGetMyPlanTool(
     output: MyPlanOutputSchema,
     authorize: (_input, { actor, plan }) =>
       Promise.resolve(
-        ownConversation(actor, plan)
+        ownsConversation({ actor: actor, plan: plan })
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
