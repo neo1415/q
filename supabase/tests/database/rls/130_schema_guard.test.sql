@@ -391,7 +391,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('gateq', 'startup_alerts', 'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
 
-select plan(12);
+select plan(13);
 
 -- Completeness ---------------------------------------------------------------
 
@@ -455,9 +455,20 @@ select is(
   (select coalesce(string_agg(i.schema_name || '.' || i.table_name || ':' || p.policyname, ', ' order by 1), '')
      from rls_inventory i
      join pg_policies p on p.schemaname = i.schema_name and p.tablename = i.table_name
-    where i.classification = 'INTERNAL_SERVER_ONLY'),
+    where i.classification = 'INTERNAL_SERVER_ONLY'
+      -- ADR 0082: the server's own non-bypass request role is the one role
+      -- a server-only table may have policies for; never a browser role.
+      and not (p.roles = array['cq_app']::name[])),
   '',
-  'server-only tables carry no policies at all');
+  'server-only tables carry no policies, except for the server''s own request role cq_app');
+
+select is(
+  (select coalesce(string_agg(p.schemaname || '.' || p.tablename || ':' || p.policyname, ', ' order by 1), '')
+     from pg_policies p
+     join guarded_schemas s on s.schema_name = p.schemaname
+    where 'cq_app' = any (p.roles) and array_length(p.roles, 1) > 1),
+  '',
+  'a cq_app policy is for cq_app alone (never shared with a browser role)');
 
 select ok(not has_schema_privilege('anon', 'private', 'usage') and not has_schema_privilege('anon', 'pgmq', 'usage'),
   'anon has no usage on private or pgmq');

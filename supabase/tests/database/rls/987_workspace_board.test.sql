@@ -123,8 +123,11 @@ select throws_ok(
 
 -- Exposure -----------------------------------------------------------------------------
 select is(
-  (select count(*)::int from pg_policies where schemaname = 'workspace'), 0,
-  'no policy: the schema is server-internal');
+  (select count(*)::int from pg_policies
+    where schemaname = 'workspace'
+      -- ADR 0082: the server's own request role only (suite 999_cq_app_workspace).
+      and not (roles = array['cq_app']::name[])), 0,
+  'no policy for any other role: the schema is server-internal');
 select pg_temp.act_as_user_a();
 select throws_ok($$ select * from workspace.board_items $$, '42501', null,
   'browser user A cannot read the board tables, even their own items');

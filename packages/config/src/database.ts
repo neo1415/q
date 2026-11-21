@@ -107,6 +107,11 @@ const databaseEnvSchema = z.object({
   // transaction behind a pooler, and a client-side deadline per query),
   // because Supavisor drops startup parameters (16 Nov 2026).
   DATABASE_STATEMENT_TIMEOUT_MS: boundedInt(10_000, 100, 300_000),
+  // W2-C (ADR 0082): set the request's claims (tenant, user, organisation,
+  // actor type) as transaction-local settings, for the row-level security
+  // policies of the non-bypass request role. Off by default; while the
+  // services connect as they do today it changes nothing they can read.
+  DATABASE_RLS_CLAIMS: z.enum(["off", "on"]).default("off"),
 });
 
 export type DatabaseConfig = {
@@ -118,6 +123,8 @@ export type DatabaseConfig = {
   readonly warmIntervalSeconds: number;
   readonly connectTimeoutSeconds: number;
   readonly statementTimeoutMs: number;
+  /** W2-C: transaction-local RLS claims; absent or "off": none are set. */
+  readonly rlsClaims?: "off" | "on" | undefined;
   readonly secrets: {
     readonly url: string;
     readonly privilegedUrl: string | undefined;
@@ -202,6 +209,7 @@ export function parseDatabaseConfig(
     warmIntervalSeconds: parsed.DATABASE_WARM_INTERVAL_SECONDS,
     connectTimeoutSeconds: parsed.DATABASE_CONNECT_TIMEOUT_SECONDS,
     statementTimeoutMs: parsed.DATABASE_STATEMENT_TIMEOUT_MS,
+    rlsClaims: parsed.DATABASE_RLS_CLAIMS,
     secrets: {
       url: parsed.DATABASE_URL,
       privilegedUrl: parsed.DATABASE_PRIVILEGED_URL,

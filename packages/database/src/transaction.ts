@@ -25,6 +25,18 @@ function isDriverFailure(error: unknown): boolean {
 import type { TransactionContext, TransactionManager } from "./types.js";
 
 /**
+ * W2-C (ADR 0082): the transaction-local settings the non-bypass request
+ * role's policies read (private.cq_claim_* in the database). Names are
+ * fixed here and in the migration; nothing else writes them.
+ */
+export const RLS_CLAIM_SETTINGS = {
+  tenantId: "cq.tenant_id",
+  userId: "cq.user_id",
+  organisationId: "cq.organisation_id",
+  actorType: "cq.actor_type",
+} as const;
+
+/**
  * A TransactionManager whose units are savepoints inside an existing
  * transaction. This is how one bounded context's use case runs inside
  * another's transaction (an onboarding step committing a canonical company
@@ -76,11 +88,21 @@ export function createTransactionManager(
      * the transaction, so safe under transaction pooling. Absent: none.
      */
     readonly limits?: TransactionLimits | undefined;
+    /**
+     * W2-C (ADR 0082): when "on", a unit run with claims sets them as
+     * transaction-local settings (set_config(..., true): gone at COMMIT, so
+     * safe under the transaction pooler) before its first statement, in the
+     * same pipelined round trip as the limits. Absent or "off" (the default
+     * everywhere today): claims are ignored and nothing extra is sent.
+     */
+    readonly rlsClaims?: "off" | "on" | undefined;
   } = {},
 ): TransactionManager {
   const limits = options.limits;
+  const claimsOn = options.rlsClaims === "on";
   return {
-    run: async (work) => {
+    run: async (work, runOptions) => {
+      const claims = claimsOn ? runOptions?.claims : undefined;
       try {
         // The driver unwraps an array-of-promises result; boxing the value
         // keeps `run` honest about returning exactly what `work` returned.
@@ -102,15 +124,31 @@ export function createTransactionManager(
           // Handled at once so an early failure is never an unhandled
           // rejection; still awaited below, where it propagates.
           void applied?.catch(() => undefined);
+          // W2-C: the claims, pipelined the same way. Bound parameters, so a
+          // value can never become SQL.
+          // None ("") reads as null in the policies.
+          const claimed =
+            claims === undefined
+              ? undefined
+              : transactionSql`
+                  select set_config(${RLS_CLAIM_SETTINGS.tenantId}, ${claims.tenantId}, true),
+                         set_config(${RLS_CLAIM_SETTINGS.userId}, ${claims.userId ?? ""}, true),
+                         set_config(${RLS_CLAIM_SETTINGS.organisationId}, ${claims.organisationId ?? ""}, true),
+                         set_config(${RLS_CLAIM_SETTINGS.actorType}, ${claims.actorType}, true)`.then(
+                  () => undefined,
+                );
+          void claimed?.catch(() => undefined);
           const context: TransactionContext = { sql: transactionSql };
           let result: Awaited<ReturnType<typeof work>>;
           try {
             result = await work(context);
           } catch (error) {
             await applied?.catch(() => undefined);
+            await claimed?.catch(() => undefined);
             throw error;
           }
           await applied;
+          await claimed;
           return { value: result };
         });
         return value;

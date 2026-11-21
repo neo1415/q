@@ -51,6 +51,8 @@ export function createRequestDatabaseClient(
     sql,
     transactions: createTransactionManager(sql, {
       limits: transactionLimitsFor(config, "REQUEST"),
+      // W2-C (ADR 0082): off unless DATABASE_RLS_CLAIMS=on.
+      rlsClaims: config.rlsClaims,
     }),
     listen: (channel, onNotify, onListen) =>
       listener.listen(channel, onNotify, onListen),

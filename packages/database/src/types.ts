@@ -47,7 +47,29 @@ export type TransactionContext = {
  * worker do the external work afterwards.
  */
 export type TransactionManager = {
-  readonly run: <T>(work: (tx: TransactionContext) => Promise<T>) => Promise<T>;
+  readonly run: <T>(
+    work: (tx: TransactionContext) => Promise<T>,
+    options?: TransactionOptions,
+  ) => Promise<T>;
+};
+
+/**
+ * W2-C (ADR 0082): who the transaction acts for, as the row-level security
+ * policies of the non-bypass request role read it. Resolved by the server
+ * from the authenticated ActorContext, never from a client. Set only when
+ * the client's RLS claims flag is on; otherwise ignored.
+ */
+export type DatabaseClaims = {
+  readonly tenantId: string;
+  /** The application user (identity.user_profiles.id); null: no person. */
+  readonly userId: string | null;
+  /** The organisation acted for; null: acting personally or none. */
+  readonly organisationId: string | null;
+  readonly actorType: "HUMAN" | "Q" | "SYSTEM" | "CONNECTED_SYSTEM";
+};
+
+export type TransactionOptions = {
+  readonly claims?: DatabaseClaims | undefined;
 };
 
 /**

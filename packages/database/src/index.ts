@@ -27,6 +27,7 @@ export { createRequestDatabaseClient } from "./client.js";
 export {
   createSavepointTransactionManager,
   createTransactionManager,
+  RLS_CLAIM_SETTINGS,
 } from "./transaction.js";
 export {
   checkDatabaseHealth,
@@ -66,6 +67,7 @@ export {
   type DatabaseFailureKind,
 } from "./errors.js";
 export type {
+  DatabaseClaims,
   DatabaseExecutor,
   DatabaseNotificationListener,
   MigrationDatabase,
@@ -73,6 +75,7 @@ export type {
   RequestDatabase,
   TransactionContext,
   TransactionManager,
+  TransactionOptions,
 } from "./types.js";
 
 /**
