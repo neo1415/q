@@ -310,10 +310,10 @@ describe("a stated preference holds, for that person only", () => {
       latestUserText: null,
     });
     const reader = createLoopMemoryReader({ memory });
-    for (const plan of [{ scopes: [] }, ownPlan(randomUUID())] as Pick<
-      PermittedContextPlan,
-      "scopes"
-    >[]) {
+    for (const plan of [
+      { ...ownPlan(alice.userId), scopes: [] },
+      ownPlan(randomUUID()),
+    ]) {
       const read = await reader.read({ actor: alice, plan, sessionKey: null });
       expect(read.memory).toBe("");
       expect(read.profile).toEqual(DEFAULT_COMMUNICATION_PROFILE);
