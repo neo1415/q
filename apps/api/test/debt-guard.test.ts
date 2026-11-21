@@ -126,6 +126,24 @@ describe("no new debt (W1-A)", () => {
     expect(over, "split the file rather than raise its baseline").toEqual([]);
   });
 
+  it("W3-A: a baselined long file may only shrink (the god files being split)", () => {
+    const grown = Object.entries(now.longFiles)
+      .filter(
+        ([file, lines]) =>
+          baseline.longFiles[file] !== undefined &&
+          lines > (baseline.longFiles[file] ?? 0) &&
+          // Generated from the message catalogue; its size follows the UI.
+          !file.endsWith(".generated.ts"),
+      )
+      .map(
+        ([file, lines]) =>
+          `${file}: ${String(lines)} lines (baseline ${String(baseline.longFiles[file] ?? 0)})`,
+      );
+    expect(grown, "move code out of the file rather than add to it").toEqual(
+      [],
+    );
+  });
+
   it("W2-A/B: no copy of the own-conversation or own-onboarding check outside its home", () => {
     expect(
       ownConversationCopies,
