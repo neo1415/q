@@ -74,7 +74,7 @@ export function loadHandCatalogue(language: UiLanguage): Promise<void> {
   if (handCatalogueReady(primary)) return Promise.resolve();
   const loading =
     LOADING.get(primary) ??
-    import("./catalog/arabic").then(
+    import("./arabic").then(
       (module) => {
         registerHandCatalogue(primary, module.ARABIC);
       },

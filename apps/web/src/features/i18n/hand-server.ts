@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ARABIC } from "./catalog/arabic";
+import { ARABIC } from "./arabic";
 import { registerHandCatalogue } from "./messages";
 
 /**
