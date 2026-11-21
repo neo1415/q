@@ -45,13 +45,12 @@ const work = async (context: { sql: (s: TemplateStringsArray) => unknown }) => {
 describe("RLS claims in the transaction helper", () => {
   it("are off by default: claims given are ignored and nothing extra is sent", async () => {
     const { sql, sent } = fakeTransactionSql();
-    await createTransactionManager(sql).run(work as never, { claims: CLAIMS });
+    await createTransactionManager(sql).run(work, { claims: CLAIMS });
     expect(sent.map((s) => s.text)).toEqual(["select 1"]);
     const off = fakeTransactionSql();
-    await createTransactionManager(off.sql, { rlsClaims: "off" }).run(
-      work as never,
-      { claims: CLAIMS },
-    );
+    await createTransactionManager(off.sql, { rlsClaims: "off" }).run(work, {
+      claims: CLAIMS,
+    });
     expect(off.sent.map((s) => s.text)).toEqual(["select 1"]);
   });
 
@@ -59,7 +58,7 @@ describe("RLS claims in the transaction helper", () => {
     const { sql, sent } = fakeTransactionSql();
     const value = await createTransactionManager(sql, {
       rlsClaims: "on",
-    }).run(work as never, { claims: CLAIMS });
+    }).run(work, { claims: CLAIMS });
     expect(value).toBe("done");
     expect(sent).toHaveLength(2);
     expect(sent[0]?.text).toMatch(/set_config\(\?, \?, true\)/u);
@@ -81,7 +80,7 @@ describe("RLS claims in the transaction helper", () => {
 
   it("when on, a unit run without claims sets none", async () => {
     const { sql, sent } = fakeTransactionSql();
-    await createTransactionManager(sql, { rlsClaims: "on" }).run(work as never);
+    await createTransactionManager(sql, { rlsClaims: "on" }).run(work);
     expect(sent.map((s) => s.text)).toEqual(["select 1"]);
   });
 
@@ -90,7 +89,7 @@ describe("RLS claims in the transaction helper", () => {
     await createTransactionManager(sql, {
       limits: { statementTimeoutMs: 10_000, lockTimeoutMs: 5_000 },
       rlsClaims: "on",
-    }).run(work as never, { claims: CLAIMS });
+    }).run(work, { claims: CLAIMS });
     expect(sent[0]?.text).toMatch(/statement_timeout/u);
     expect(sent[1]?.values[0]).toBe(RLS_CLAIM_SETTINGS.tenantId);
     expect(sent[2]?.text).toBe("select 1");
