@@ -1051,3 +1051,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Every site now requires the plan's tenant and actor to match the actor, which refuses a revoked membership.
   - The debt guard allows zero new copies.
   - Live: a typed turn as fictional Savanna is answered normally (first text 2.60 s). No refusals or errors in q-api.
+- **b3f9da6fd deployed 10:46 UTC on 21 Nov** (gate PASS). W2-B adds shared `ownsOnboarding`/`ownsActorScope` in q-runtime.
+  - Fixes OWN_ONBOARDING and memory checks that lacked person, plan and tenant matching, at 7 sites, including 4 found in the sweep: model-gateway `q/index.ts` ×3 and q-specialists `own-records-port.ts`.
+  - Live as fictional Savanna, "What's my investment mandate?": the own declared mandate (sectors, stage, geography, cheque, role, exclusions) answered in 2.64 s. No refusals or errors.
