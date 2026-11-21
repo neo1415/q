@@ -136,7 +136,7 @@ describe("ownsConversation", () => {
     expect(
       ownsConversation({
         actor: owner,
-        plan: { ...plan, scopes: [] } as PermittedContextPlan,
+        plan: { ...plan, scopes: [] },
       }),
     ).toBe(false);
     const bound = {
