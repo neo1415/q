@@ -676,7 +676,6 @@ import {
   AuthUserIdSchema,
   OrganisationIdSchema,
   TenantIdSchema,
-  capability,
   createAuthorizationService,
   ActorContextSchema,
   type ActorContext,
@@ -5243,6 +5242,7 @@ const documentStudioPort = (): DocumentStudioPort => {
   return studioPort;
 };
 const documentStudio = createDocumentsModule({
+  authorization,
   sql: database.sql,
   transactions: database.transactions,
   images: documentImages,
@@ -9007,24 +9007,7 @@ const { app, logger: appLogger } = createApp(
     healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
     qRuntime,
     artifacts: qArtifacts.service,
-    documentStudio: {
-      ...documentStudio,
-      // ORG-SECTIONS (decision 110): the organisation's brand is changed
-      // by its owners and admins only; a member reads it.
-      mayManageBrand: async (actor) =>
-        actor.organisationId !== undefined &&
-        (
-          await authorization.authorize({
-            actor,
-            capability: capability("organisation.admin"),
-            resource: {
-              kind: "ORGANISATION",
-              tenantId: actor.tenantId,
-              organisationId: actor.organisationId,
-            },
-          })
-        ).outcome === "ALLOW",
-    },
+    documentStudio,
     // Q room W5 (R8): a picture dropped on a placeholder (their own
     // upload, read as them, copied into the document's image store).
     ...(ownPictures === undefined ? {} : { ownPictures }),

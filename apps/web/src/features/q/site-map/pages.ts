@@ -1023,8 +1023,9 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/organisation/connections": {
     title: "Connections",
-    purpose: "Not built yet.",
+    purpose: "What is connected.",
     audience: "ANY",
+    sections: [{ id: "connections", title: "Connections", kind: "OTHER" }],
   },
   "/organisation/data": {
     title: "Export and deletion",
@@ -1033,18 +1034,21 @@ export const SITE_MAP_PAGES: Readonly<Record<string, SiteMapPageEntry>> = {
   },
   "/organisation/privacy": {
     title: "Privacy",
-    purpose: "Not built yet.",
+    purpose: "Who can see us.",
     audience: "ANY",
+    sections: [{ id: "privacy", title: "Privacy", kind: "VISIBILITY" }],
   },
   "/organisation/speaking": {
     title: "How Q speaks for us",
-    purpose: "Not built yet.",
+    purpose: "The guide Q follows.",
     audience: "ANY",
+    sections: [{ id: "speaking", title: "How Q speaks for us", kind: "OTHER" }],
   },
   "/organisation/brand": {
     title: "Gateway and Q Card brand",
-    purpose: "Not built yet.",
+    purpose: "Brand kit, gateways.",
     audience: "ANY",
+    sections: [{ id: "brand", title: "Brand", kind: "OTHER" }],
   },
   "/organisation/activity": {
     title: "Activity log",
@@ -1445,6 +1449,18 @@ export const SITE_MAP_PURPOSES: Readonly<
   },
   "/organisation/activity": { sections: { activity: "your team's actions" } },
   "/organisation/import": { sections: { import: "where to import from" } },
+  "/organisation/connections": {
+    sections: { connections: "what is connected" },
+  },
+  "/organisation/privacy": {
+    sections: { privacy: "who can see us" },
+  },
+  "/organisation/speaking": {
+    sections: { speaking: "the guide Q follows" },
+  },
+  "/organisation/brand": {
+    sections: { brand: "brand kit, gateways" },
+  },
   "/organisation/roles": { sections: { roles: "what each role can do" } },
   "/organisation/members": {
     sections: { team: "members, roles and invitations" },

@@ -62,15 +62,7 @@ const EXEMPT_TREES: Readonly<Record<string, string>> = {
 };
 
 const EXEMPT: Readonly<Record<string, string>> = {
-  "organisation/brand/page.tsx":
-    "the organisation admin's not-built section: it says only that nothing is here yet",
-  "organisation/connections/page.tsx":
-    "the organisation admin's not-built section: it says only that nothing is here yet",
   "organisation/data/page.tsx":
-    "the organisation admin's not-built section: it says only that nothing is here yet",
-  "organisation/privacy/page.tsx":
-    "the organisation admin's not-built section: it says only that nothing is here yet",
-  "organisation/speaking/page.tsx":
     "the organisation admin's not-built section: it says only that nothing is here yet",
   "documents/unavailable/page.tsx":
     "the not-found landing for a refused document link (J7): it shows nothing to describe",

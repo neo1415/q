@@ -67,21 +67,21 @@ function harness(actor: ActorContext, admins: readonly string[]) {
     },
     brandKit: {
       state: () => Promise.resolve({ effective: KIT }),
-      set: (who) => {
+      set: (who: ActorContext) => {
         writes.push({ who: who.userId, org: who.organisationId });
         return Promise.resolve(KIT);
       },
-      suggest: (who) => {
+      suggest: (who: ActorContext) => {
         writes.push({ who: who.userId, org: who.organisationId });
         return Promise.resolve(KIT);
       },
-      answer: (who) => {
+      answer: (who: ActorContext) => {
         writes.push({ who: who.userId, org: who.organisationId });
         return Promise.resolve(KIT);
       },
       logo: () => Promise.resolve(null),
       effective: () => Promise.resolve(null),
-    } as never,
+    },
     artifacts: {} as never,
     suggestFromWebsite: () =>
       Promise.resolve({
@@ -140,12 +140,20 @@ describe("the organisation's brand kit: owners and admins change it", () => {
     const { app, writes } = harness(MEMBER, [ADMIN.userId]);
     const read = await app.inject({ method: "GET", url: "/v1/q/brand-kit" });
     expect(read.statusCode).toBe(200);
-    for (const [url, payload] of [
-      ["/v1/q/brand-kit", SET],
-      ["/v1/q/brand-kit/suggest", undefined],
-      ["/v1/q/brand-kit/confirm", { version: 1, decision: "CONFIRM" }],
-    ] as const) {
-      const response = await app.inject({ method: "POST", url, payload });
+    const attempts: readonly { url: string; payload?: object }[] = [
+      { url: "/v1/q/brand-kit", payload: SET },
+      { url: "/v1/q/brand-kit/suggest" },
+      {
+        url: "/v1/q/brand-kit/confirm",
+        payload: { version: 1, decision: "CONFIRM" },
+      },
+    ];
+    for (const { url, payload } of attempts) {
+      const response = await app.inject({
+        method: "POST",
+        url,
+        ...(payload === undefined ? {} : { payload }),
+      });
       expect(response.statusCode, url).toBe(403);
       expect(response.json<{ code: string }>().code).toBe(
         "ORGANISATION_ADMIN_REQUIRED",

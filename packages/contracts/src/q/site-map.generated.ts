@@ -1453,7 +1453,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/organisation/brand",
       title: "Gateway and Q Card brand",
-      purpose: "Not built yet.",
+      purpose: "Brand kit, gateways.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1461,12 +1461,19 @@ export const Q_SITE_MAP: QSiteMap = {
       recordPages: [],
       settingsSections: [],
       tabs: [],
-      sections: [],
+      sections: [
+        {
+          id: "brand",
+          title: "Brand",
+          kind: "OTHER",
+          purpose: "brand kit, gateways",
+        },
+      ],
     },
     {
       route: "/organisation/connections",
       title: "Connections",
-      purpose: "Not built yet.",
+      purpose: "What is connected.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1474,7 +1481,14 @@ export const Q_SITE_MAP: QSiteMap = {
       recordPages: [],
       settingsSections: [],
       tabs: [],
-      sections: [],
+      sections: [
+        {
+          id: "connections",
+          title: "Connections",
+          kind: "OTHER",
+          purpose: "what is connected",
+        },
+      ],
     },
     {
       route: "/organisation/data",
@@ -1552,7 +1566,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/organisation/privacy",
       title: "Privacy",
-      purpose: "Not built yet.",
+      purpose: "Who can see us.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1560,7 +1574,14 @@ export const Q_SITE_MAP: QSiteMap = {
       recordPages: [],
       settingsSections: [],
       tabs: [],
-      sections: [],
+      sections: [
+        {
+          id: "privacy",
+          title: "Privacy",
+          kind: "VISIBILITY",
+          purpose: "who can see us",
+        },
+      ],
     },
     {
       route: "/organisation/roles",
@@ -1585,7 +1606,7 @@ export const Q_SITE_MAP: QSiteMap = {
     {
       route: "/organisation/speaking",
       title: "How Q speaks for us",
-      purpose: "Not built yet.",
+      purpose: "The guide Q follows.",
       audience: "ANY",
       params: [],
       shows: [],
@@ -1593,7 +1614,14 @@ export const Q_SITE_MAP: QSiteMap = {
       recordPages: [],
       settingsSections: [],
       tabs: [],
-      sections: [],
+      sections: [
+        {
+          id: "speaking",
+          title: "How Q speaks for us",
+          kind: "OTHER",
+          purpose: "the guide Q follows",
+        },
+      ],
     },
     {
       route: "/pitch",

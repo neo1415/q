@@ -15,7 +15,11 @@ import {
   type OwnDeckFigure,
 } from "@capital-q/q-specialists";
 import type { DocumentStudioPort } from "@capital-q/q-tools";
-import type { ActorContext } from "@capital-q/security";
+import {
+  capability,
+  type ActorContext,
+  type AuthorizationService,
+} from "@capital-q/security";
 
 import type { QDocumentRoutesDependencies } from "../http/q-documents.js";
 import { suggestBrandFromWebsite } from "./brand-from-website.js";
@@ -274,6 +278,11 @@ export type DocumentsModule = Omit<
 };
 
 export function createDocumentsModule(dependencies: {
+  /**
+   * ORG-SECTIONS (decision 110): who may change the organisation's brand
+   * (organisation.admin: its owners and admins). Absent, no role is asked.
+   */
+  readonly authorization?: Pick<AuthorizationService, "authorize"> | undefined;
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
   readonly runMessages: (
@@ -287,8 +296,26 @@ export function createDocumentsModule(dependencies: {
     sql: dependencies.sql,
     transactions: dependencies.transactions,
   });
+  const authorization = dependencies.authorization;
   return {
     brandKit,
+    ...(authorization === undefined
+      ? {}
+      : {
+          mayManageBrand: async (actor: ActorContext) =>
+            actor.organisationId !== undefined &&
+            (
+              await authorization.authorize({
+                actor,
+                capability: capability("organisation.admin"),
+                resource: {
+                  kind: "ORGANISATION",
+                  tenantId: actor.tenantId,
+                  organisationId: actor.organisationId,
+                },
+              })
+            ).outcome === "ALLOW",
+        }),
     images: dependencies.images,
     runMessages: dependencies.runMessages,
     suggestFromWebsite: async (actor) => {

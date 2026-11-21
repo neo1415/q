@@ -71,14 +71,14 @@ vi.mock("@/features/documents/brand-kit-panel", () => ({
 }));
 
 const api = {
-  kyb: vi.fn(),
-  providers: vi.fn(),
-  google: vi.fn(),
-  inbound: vi.fn(),
-  guide: vi.fn(),
-  brandKit: vi.fn(),
-  gateways: vi.fn(),
-  appearance: vi.fn(),
+  kyb: vi.fn<() => Promise<unknown>>(),
+  providers: vi.fn<() => Promise<unknown>>(),
+  google: vi.fn<() => Promise<unknown>>(),
+  inbound: vi.fn<() => Promise<unknown>>(),
+  guide: vi.fn<() => Promise<unknown>>(),
+  brandKit: vi.fn<() => Promise<unknown>>(),
+  gateways: vi.fn<() => Promise<unknown>>(),
+  appearance: vi.fn<() => Promise<unknown>>(),
 };
 vi.mock("@capital-q/api-client", () => ({
   getKyb: () => api.kyb(),
