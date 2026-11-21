@@ -2623,10 +2623,17 @@ export function createRehearsalService(dependencies: {
     partners: async (actor) => {
       const viewer = await viewerOf(actor);
       if (viewer === null) return { role: null, upcoming: [], people: [] };
-      const [relationships, meetings, history] = await Promise.all([
+      // W4-C (audit finding 6): the researched list needs only the role,
+      // so it is read beside the other three, not after them.
+      const [relationships, meetings, history, entitled] = await Promise.all([
         material.relationships(actor).catch(() => []),
         material.upcomingMeetings(actor).catch(() => []),
         store.list(actor).catch(() => []),
+        viewer.role === "FOUNDER"
+          ? (external?.demoAccess?.list(actor) ?? Promise.resolve([])).catch(
+              () => [],
+            )
+          : Promise.resolve([]),
       ]);
       const byRelationship = new Map(
         relationships.map((item) => [item.relationshipId, item]),
@@ -2636,12 +2643,6 @@ export function createRehearsalService(dependencies: {
         const key = `${row.counterpartKind}:${row.counterpartId}`;
         if (!last.has(key)) last.set(key, row);
       }
-      const entitled =
-        viewer.role === "FOUNDER"
-          ? await (
-              external?.demoAccess?.list(actor) ?? Promise.resolve([])
-            ).catch(() => [])
-          : [];
       return {
         role: viewer.role,
         researched: entitled.map((entity) => ({

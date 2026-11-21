@@ -158,6 +158,20 @@ export type ArtifactRepository = {
     version: number,
   ) => Promise<StoredArtifactVersion | null>;
 
+  /**
+   * W4-C (audit finding 6): the named versions of many artifacts in one
+   * read, under exactly findVersion's scoping (the actor's own, not
+   * archived), keyed by artifact id. Optional: without it a list reads
+   * them one by one, as before.
+   */
+  readonly findVersions?: (
+    actor: ActorContext,
+    wanted: readonly {
+      readonly artifactId: string;
+      readonly version: number;
+    }[],
+  ) => Promise<ReadonlyMap<string, StoredArtifactVersion>>;
+
   readonly history: (
     actor: ActorContext,
     artifactId: string,

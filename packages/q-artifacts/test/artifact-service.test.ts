@@ -928,3 +928,76 @@ describe("SEC-01 · an artifact closes with the documents it was built from", ()
     ).rejects.toThrow();
   });
 });
+
+describe("W4-C · a list in a few reads, not one per artifact", () => {
+  async function seeded(count: number) {
+    const memory = inMemoryRepository();
+    const plain = createArtifactService({
+      repository: memory.repository,
+      transactions,
+    });
+    for (let index = 0; index < count; index += 1) {
+      await plain.prepareArtifact(
+        prepareInput({ content: composed(`Composition ${String(index)}.`) }),
+      );
+    }
+    return memory;
+  }
+
+  it("reads the page's versions in one batch and gives the same items", async () => {
+    const { repository, versions } = await seeded(6);
+    const oneByOne = createArtifactService({ repository, transactions });
+    const before = await oneByOne.list(ACTOR, { limit: 20 });
+
+    const calls = { findVersion: 0, findVersions: 0 };
+    const batched: ArtifactRepository = {
+      ...repository,
+      findVersion: (actor, id, version) => {
+        calls.findVersion += 1;
+        return repository.findVersion(actor, id, version);
+      },
+      findVersions: (_actor, wanted) => {
+        calls.findVersions += 1;
+        return Promise.resolve(
+          new Map(
+            wanted.flatMap(({ artifactId, version }) => {
+              const found = versions.find(
+                (v) => v.artifactId === artifactId && v.version === version,
+              );
+              return found === undefined ? [] : [[artifactId, found] as const];
+            }),
+          ),
+        );
+      },
+    };
+    const after = await createArtifactService({
+      repository: batched,
+      transactions,
+    }).list(ACTOR, { limit: 20 });
+    expect(after).toEqual(before);
+    expect(after.items).toHaveLength(6);
+    expect(calls).toEqual({ findVersion: 0, findVersions: 1 });
+  });
+
+  it("asks about each subject once per list, and still hides what is closed", async () => {
+    const { repository } = await seeded(5);
+    const asked: string[] = [];
+    let open = true;
+    const subject = createArtifactService({
+      repository,
+      transactions,
+      entitlement: (_actor, ref) => {
+        asked.push(JSON.stringify(ref));
+        return Promise.resolve(open);
+      },
+    });
+    expect((await subject.list(ACTOR, { limit: 20 })).items).toHaveLength(5);
+    // Five artifacts about one company: one question, not five.
+    expect(asked).toEqual([
+      JSON.stringify({ kind: "COMPANY", companyId: COMPANY }),
+    ]);
+    open = false;
+    expect(await subject.list(ACTOR, { limit: 20 })).toEqual({ items: [] });
+    expect(asked).toHaveLength(2);
+  });
+});

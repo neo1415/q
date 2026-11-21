@@ -271,6 +271,14 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
       ).not.toBeNull();
       expect(await repository.history(mine.actor, artifact.id)).toHaveLength(1);
       expect(await repository.list(mine.actor, { limit: 20 })).toHaveLength(1);
+      // W4-C: the batched read is findVersion's answer, for many at once.
+      const batch = await repository.findVersions?.(mine.actor, [
+        { artifactId: artifact.id, version: 1 },
+        { artifactId: artifact.id, version: 2 },
+      ]);
+      expect([...(batch?.entries() ?? [])]).toEqual([
+        [artifact.id, await repository.findVersion(mine.actor, artifact.id, 1)],
+      ]);
 
       // Another tenant's, which is to say nobody's.
       expect(await repository.findById(stranger.actor, artifact.id)).toBeNull();
@@ -279,6 +287,13 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
       ).toBeNull();
       expect(await repository.history(stranger.actor, artifact.id)).toEqual([]);
       expect(await repository.list(stranger.actor, { limit: 20 })).toEqual([]);
+      expect(
+        (
+          await repository.findVersions?.(stranger.actor, [
+            { artifactId: artifact.id, version: 1 },
+          ])
+        )?.size,
+      ).toBe(0);
 
       // And the same tenant under a different organisation: ownership is
       // the organisation's, not the tenant's.
@@ -314,6 +329,13 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
       ).toBeNull();
       expect(await repository.history(colleague, artifact.id)).toEqual([]);
       expect(await repository.list(colleague, { limit: 20 })).toEqual([]);
+      expect(
+        (
+          await repository.findVersions?.(colleague, [
+            { artifactId: artifact.id, version: 1 },
+          ])
+        )?.size,
+      ).toBe(0);
     });
   });
 

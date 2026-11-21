@@ -388,6 +388,11 @@ export function createArtifactService(dependencies: {
       (await repository.findById(actor, artifactId)) === null
         ? null
         : store.findVersion(actor, artifactId, version),
+    // Only for artifacts this wrapper's own list already returned (owned);
+    // the read itself is scoped to the actor's own rows like findVersion.
+    ...(store.findVersions === undefined
+      ? {}
+      : { findVersions: store.findVersions }),
     history: async (actor, artifactId) =>
       (await repository.findById(actor, artifactId)) === null
         ? []
@@ -455,12 +460,22 @@ export function createArtifactService(dependencies: {
     actor: ActorContext,
     artifact: StoredArtifact,
     known?: ReadonlyMap<string, readonly ArtifactSourceRef[]> | null,
+    // W4-C: one list's answers per subject, so twenty briefs about the
+    // same company ask about it once. Same actor, same moment: the same
+    // answer each would have had.
+    subjectAnswers?: Map<string, Promise<boolean>>,
   ): Promise<boolean> => {
     const check = dependencies.entitlement;
     const subject = subjectOf(artifact);
     if (check !== undefined && subject !== undefined) {
       try {
-        if (!(await check(actor, subject))) return false;
+        const key = JSON.stringify(subject);
+        let answer = subjectAnswers?.get(key);
+        if (answer === undefined) {
+          answer = check(actor, subject);
+          subjectAnswers?.set(key, answer);
+        }
+        if (!(await answer)) return false;
       } catch (error: unknown) {
         dependencies.logger?.warn(
           { err: error, artifactId: artifact.id },
@@ -996,20 +1011,41 @@ export function createArtifactService(dependencies: {
         actor,
         page.map((artifact) => artifact.id),
       );
+      const subjectAnswers = new Map<string, Promise<boolean>>();
       const entitled = await Promise.all(
-        page.map((artifact) => stillEntitled(actor, artifact, known)),
+        page.map((artifact) =>
+          stillEntitled(actor, artifact, known, subjectAnswers),
+        ),
       );
       const shown = page.filter((_, index) => entitled[index] === true);
+      // W4-C (audit finding 6): the shown artifacts' current versions in
+      // one read where the repository can (it was one read each, two
+      // queries apiece, on a three-connection pool).
+      const versioned = shown.filter(
+        (artifact) => artifact.currentVersion !== 0,
+      );
+      const batch =
+        repository.findVersions === undefined
+          ? null
+          : await repository.findVersions(
+              actor,
+              versioned.map((artifact) => ({
+                artifactId: artifact.id,
+                version: artifact.currentVersion,
+              })),
+            );
       const items = await Promise.all(
         shown.map(async (artifact) => {
           const current =
             artifact.currentVersion === 0
               ? null
-              : await repository.findVersion(
-                  actor,
-                  artifact.id,
-                  artifact.currentVersion,
-                );
+              : batch !== null
+                ? (batch.get(artifact.id) ?? null)
+                : await repository.findVersion(
+                    actor,
+                    artifact.id,
+                    artifact.currentVersion,
+                  );
           return toSummary(artifact, current);
         }),
       );

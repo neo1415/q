@@ -79,6 +79,10 @@ export default async function ApplicationLayout({
   const capabilitiesRead = loadMyCapabilities();
   // Q Workspace (W1.1): off unless CQ_WORKSPACE_MODE allows it.
   const workspaceRead = workspaceMode();
+  // G2: the switcher's list, asked with the others (W4-C: it waited for
+  // context, standing and onboarding before it started).
+  const organisationsRead = loadMyOrganisations();
+  organisationsRead.catch(() => undefined);
   const context = await resolveOwnContext();
   const qPitch = qPitchEnabled();
   const shell: ShellContext =
@@ -142,7 +146,7 @@ export default async function ApplicationLayout({
     adminRead,
     brandRead,
     // G2: the switcher's list (shown only for two or more).
-    loadMyOrganisations(),
+    organisationsRead,
     capabilitiesRead,
     workspaceRead,
   ]);

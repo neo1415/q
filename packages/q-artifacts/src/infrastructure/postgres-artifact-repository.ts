@@ -258,6 +258,29 @@ export function createPostgresArtifactRepository(options: {
       return toVersionRow(rows[0]);
     },
 
+    findVersions: async (actor, wanted) => {
+      if (wanted.length === 0) return new Map();
+      const ids = wanted.map((item) => item.artifactId);
+      const versions = wanted.map((item) => item.version);
+      // findVersion's own conditions, for every pair at once.
+      const rows = await sql`
+        select v.* from artifacts.artifact_versions v
+          join artifacts.artifacts a on a.id = v.artifact_id
+          join unnest(${ids}::uuid[], ${versions}::int[]) as w(artifact_id, version)
+            on w.artifact_id = v.artifact_id and w.version = v.version
+         where a.tenant_id = ${actor.tenantId}
+           and a.organisation_id = ${actor.organisationId ?? null}
+           and a.created_by_user_id = ${actor.userId}
+           and a.archived_at is null
+      `;
+      return new Map(
+        rows.map((row) => {
+          const version = toVersionRow(row);
+          return [version.artifactId, version] as const;
+        }),
+      );
+    },
+
     findVersion: async (actor, artifactId, version) => {
       const rows = await sql`
         select v.* from artifacts.artifact_versions v
