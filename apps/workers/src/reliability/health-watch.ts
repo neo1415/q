@@ -49,12 +49,7 @@ export function parseHealthTargets(
     // No "=": the whole entry is named as invalid, never a cut of it.
     const service = at < 0 ? entry : entry.slice(0, at).trim();
     const url = entry.slice(at + 1).trim();
-    let parsed: URL | null = null;
-    try {
-      parsed = at > 0 ? new URL(url) : null;
-    } catch {
-      parsed = null;
-    }
+    const parsed = at > 0 && URL.canParse(url) ? new URL(url) : null;
     if (
       parsed === null ||
       !/^[a-z][a-z0-9-]{0,30}$/u.test(service) ||
