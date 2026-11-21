@@ -1067,3 +1067,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Live: landing JS went from 860 kB to 582 kB decoded, load from 4.1 s to 3.3 s from the sandbox.
   - A Q turn as fictional Savanna answered normally, first text in 2.64 s.
   - Local phone LCP on all 4 pages is under 2.5 s before and after (even on slow 4G). Production misses are likely server-side; W4-C is measuring TTFB.
+- **3c77f51db deployed 16:47 UTC on 21 Nov** (gate PASS). W4-C: batched artifact versions (the `/v1/q/artifacts` N+1) and parallel partner and switcher reads.
+- **438bf7320 deployed 17:31 UTC** (api and web; gate PASS). W4-D: company-profile pitch reads run in parallel, and Settings reads only the person.
+- **Live `server-timing.mjs`** (fictional Savanna, 2 runs) after 3c77f51db:
+  - LCP: `/home` **7.6 s**, a regression from 2.84 s, suspected to come from W4-B lazy-loading the Q conversation; under investigation. Discover 2.56 s, Plan 1.42 s.
+  - After 438bf7320: `/settings` LCP 4.2 s (no gain yet), `/organisation` 1.45 s. TTFB is 0.3–0.7 s throughout.
