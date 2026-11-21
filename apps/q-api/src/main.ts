@@ -5230,9 +5230,8 @@ const documentImages = createDocumentImages({
   budgets: config.documentImages,
   logger,
 });
-// DOCS block: the document studio (brand kit, answer exports).
-// The Q tools port is built lazily: the tools are composed before the
-// artifact service exists further down.
+// DOCS block: the document studio (brand kit, answer exports). The Q tools
+// port is built lazily: tools are composed before the artifact service.
 let studioPort: DocumentStudioPort | undefined;
 const documentStudioPort = (): DocumentStudioPort => {
   studioPort ??= createDocumentStudioPort({
