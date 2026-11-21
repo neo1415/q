@@ -1013,3 +1013,12 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Live (typed, fictional Savanna), "I'm not really sure what I'm looking for right now": first text in 2.62 s. Discovery entered with a grounded line plus one past-behaviour question ("What was the last deal you looked at closely and passed on…") and the "Just show me" and "Not sure yet" chips.
   - Voice not live-tested (paid realtime). The live model talking over a delegation is fixed by a prompt rule only.
   - Research providers tavily, serper and brave are resting (key refused or credit spent); the owner was told.
+- **05ed3348a deployed 02:31 UTC on 21 Nov.** The first gate failed at build only because the session's `NODE_OPTIONS` held `--use-openssl-ca` after a container restart, which Next workers reject. Re-gated with `NODE_OPTIONS=--max-old-space-size=8192`: PASS.
+  - Migration `20261231599900` was applied first; hosted is at 317.
+  - V1 business verification foundations:
+    - Companies House, Dojah and Sumsub adapters;
+    - the founder-company linking rule;
+    - four badges;
+    - `evidence.verification_consents` (append-only, server-only).
+  - Live as the LedgerBridge founder: `/verification` shows "Automatic checks: Companies House · Not connected; Dojah · Not connected; …" because no keys are set.
+  - The owner must set `COMPANIES_HOUSE_API_KEY`, `DOJAH_APP_ID`, `DOJAH_SECRET_KEY`, `SUMSUB_APP_TOKEN` and `SUMSUB_SECRET_KEY`.
