@@ -1,6 +1,10 @@
 import type { PermittedContextPlan, QSubjectRef } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
+import {
+  callbackCandidates,
+  type MemoryCallbackCandidate,
+} from "./callbacks.js";
 import { planAdmitsOwnMemory } from "./communication.js";
 import { renderMemoryBundle } from "./render.js";
 import type { MemoryService } from "./service.js";
@@ -40,6 +44,11 @@ export type MemoryRecalled = {
    * contradicted one superseded (never a source: Q's own words).
    */
   readonly earlierSummaries: readonly RecalledSummary[];
+  /**
+   * HQ-7: what the person said that Q may call back to (callbacks.ts):
+   * their own items in this bundle, in this tenant and this run's scope.
+   */
+  readonly callbacks: readonly MemoryCallbackCandidate[];
 };
 
 export function createMemoryRecall(memory: Pick<MemoryService, "recall">): {
@@ -71,6 +80,10 @@ export function createMemoryRecall(memory: Pick<MemoryService, "recall">): {
             conversationId: c.conversationId,
             summary: c.summary,
           })),
+        callbacks: callbackCandidates(bundle.person, {
+          actor: input.actor,
+          subjects: input.subjects,
+        }),
       };
     },
   };

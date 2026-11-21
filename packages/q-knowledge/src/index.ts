@@ -340,6 +340,11 @@ export {
   type MemoryRecallInput,
 } from "./memory/recall-port.js";
 export {
+  callbackCandidates,
+  CALLBACK_CANDIDATES_MAX,
+  type MemoryCallbackCandidate,
+} from "./memory/callbacks.js";
+export {
   inferredPresentedAsStated,
   memoryTruthClass,
   Q_READING_LABEL,

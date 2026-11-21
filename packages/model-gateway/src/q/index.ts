@@ -442,6 +442,13 @@ export {
 } from "./person-brief-reader.js";
 import { answerPathOf } from "./answer-path.js";
 import { streamRetractions } from "./stream-fidelity.js";
+import {
+  memoryCallbackFor,
+  memoryCallbackNote,
+  quotesCallback,
+  withoutQuotedCallback,
+  type QMemoryCallbackCandidate,
+} from "./memory-callback.js";
 import { forModelReading } from "./pending-confirmation.js";
 import {
   holdsWebForOwned,
@@ -3052,6 +3059,8 @@ export function environmentNoteParts(
     readonly offerUnrecorded?: boolean | undefined;
     /** VOICE-FIX: a bare yes to several options; the answer asks which. */
     readonly choiceUnclear?: boolean | undefined;
+    /** HQ-7: the one memory callback offered this turn (its note). */
+    readonly memoryCallback?: string | undefined;
     /** VOICE-FIX: what they asked Q to leave out (held by code). */
     readonly excluded?: readonly string[] | undefined;
     /**
@@ -3202,6 +3211,7 @@ export function environmentNoteParts(
       : [offerTakenNote(options.offerTaken)]),
     ...(options.offerUnrecorded === true ? [OFFER_UNRECORDED_NOTE] : []),
     ...(options.choiceUnclear === true ? [CHOICE_UNCLEAR_NOTE] : []),
+    ...(options.memoryCallback === undefined ? [] : [options.memoryCallback]),
     ...(() => {
       const note = exclusionNote(options.excluded ?? []);
       return note === null ? [] : [note];
@@ -3608,6 +3618,11 @@ export type QMemoryRecalled = {
   readonly earlierSummaries?:
     | readonly { readonly conversationId: string; readonly summary: string }[]
     | undefined;
+  /**
+   * HQ-7: what the person said that Q may call back to, already scoped to
+   * them, this tenant and this run (q-knowledge callbacks.ts).
+   */
+  readonly callbacks?: readonly QMemoryCallbackCandidate[] | undefined;
 };
 
 /** A stated summary with nothing left once its contradicted counts go. */
@@ -5003,6 +5018,8 @@ export function createModelGatewayQAnswer(
         ownWords: typeof recalled === "string" ? [] : recalled.ownWords,
         earlierSummaries:
           typeof recalled === "string" ? [] : (recalled.earlierSummaries ?? []),
+        callbacks:
+          typeof recalled === "string" ? [] : (recalled.callbacks ?? []),
       };
     } catch (error: unknown) {
       logger?.warn(
@@ -6274,6 +6291,11 @@ export function createModelGatewayQAnswer(
     // Q's own summaries of other conversations recall rendered: echoes,
     // held to this run's documents after the answer (summaryCorrections).
     const recalledSummaries = recalled.earlierSummaries ?? [];
+    // HQ-7: at most one callback, only one this turn bears on.
+    const memoryCallback = memoryCallbackFor(
+      recalled.callbacks ?? [],
+      latest.content,
+    );
     const { arrivalAnswer, names: prefetchTools } = await prefetchToolsRead;
 
     /**
@@ -8065,6 +8087,7 @@ export function createModelGatewayQAnswer(
       availableForRun,
       memory,
       recalledOwnWords,
+      memoryCallback,
       recalledSummaries,
       ownProfile,
       ownProfileCall,
@@ -8529,6 +8552,7 @@ export function createModelGatewayQAnswer(
         availableForRun,
         memory,
         recalledOwnWords,
+        memoryCallback,
         recalledSummaries,
         ownProfile,
         ownCompany,
@@ -9849,6 +9873,10 @@ export function createModelGatewayQAnswer(
             ? { offerUnrecorded: true }
             : {}),
           ...(request.choiceUnclear === true ? { choiceUnclear: true } : {}),
+          // HQ-7: one callback at most, only one this turn bears on.
+          ...(memoryCallback === null
+            ? {}
+            : { memoryCallback: memoryCallbackNote(memoryCallback) }),
           ...(request.excludedSubjects === undefined
             ? {}
             : { excluded: request.excludedSubjects }),
@@ -10666,6 +10694,8 @@ export function createModelGatewayQAnswer(
           heldPromise = said;
           return;
         }
+        // HQ-7: a callback is a paraphrase; one that quotes is not said.
+        if (quotesCallback(said, memoryCallback)) return;
         publish(said);
       };
       /**
@@ -16083,11 +16113,15 @@ export function createModelGatewayQAnswer(
                         // HQ-2 slice 3: no closing offer where none is allowed.
                         ((kept: string) =>
                           // HQ-5: a discovery turn asks one question.
-                          discoveryAsked(
-                            request,
-                            modelOfferAllowed(request) === false
-                              ? withoutTrailingOffers(kept)
-                              : kept,
+                          // HQ-7: a callback that quotes is not kept.
+                          withoutQuotedCallback(
+                            discoveryAsked(
+                              request,
+                              modelOfferAllowed(request) === false
+                                ? withoutTrailingOffers(kept)
+                                : kept,
+                            ),
+                            memoryCallback,
                           ))(
                           withoutRememberTalk(
                             leadLines === undefined
