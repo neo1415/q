@@ -1027,3 +1027,7 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - **HQ-7:** scoped, paraphrased memory callbacks, at most one per answer.
   - Live as fictional Savanna: the Ledgerfold stage question answered with attribution, first text in 2.59 s. No q-api errors.
   - Remote branch deletes are refused by the proxy (403), so a dozen merged worker branches remain; the owner may delete them.
+- **039b21bf4 deployed 05:41 UTC on 21 Nov** (gate PASS). HQ-8: TURN_READER v97 has the same text as v96, regrouped so the 78 KB fixed part leads and is shared.
+  - Live, two typed turns as fictional Savanna. The reader call (about 23.7k input tokens) was cold on turn 1 (0 cached) and **91% cached on turn 2** (21,689 of 23,831).
+  - Reader latency 1,888 ms then 2,003 ms: no latency gain seen in this two-turn sample. The cache mainly cuts input cost.
+  - First text 2.63 s and 2.57 s, with attributed phrasing.
