@@ -1031,3 +1031,11 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Live, two typed turns as fictional Savanna. The reader call (about 23.7k input tokens) was cold on turn 1 (0 cached) and **91% cached on turn 2** (21,689 of 23,831).
   - Reader latency 1,888 ms then 2,003 ms: no latency gain seen in this two-turn sample. The cache mainly cuts input cost.
   - First text 2.63 s and 2.57 s, with attributed phrasing.
+- **2aabd19c3 deployed 06:58 UTC on 21 Nov** (gate PASS). Audit Week 1 slice W1-A:
+  - pre-gate runs integration tests;
+  - HSTS and a report-only CSP on web, with `/api/csp-report` logging kinds only;
+  - a general rate limit (600/min per user, 300/min per address);
+  - one `CAPITAL_Q_ENV` reader;
+  - a debt guard (no new SQL in apps, no new file over 1,500 lines).
+  - Live: all 4 services started on `staging`. `strict-transport-security` and `content-security-policy-report-only` are present. A signed-in page loads as the LedgerBridge founder. No q-api errors and no 429s since.
+  - Switching `CAPITAL_Q_ENV` to `production` waits for the owner: it ends the synthetic demo attestation and auto-verification.
