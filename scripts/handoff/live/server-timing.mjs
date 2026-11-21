@@ -61,6 +61,7 @@ const out = {};
 for (const path of PAGES) {
   const ttfb = [];
   const lcp = [];
+  const elements = [];
   let landed = "";
   for (let i = 0; i < RUNS; i += 1) {
     const ctx = await browser.newContext({
@@ -76,7 +77,18 @@ for (const path of PAGES) {
       }
       window.__lcp = 0;
       new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) window.__lcp = entry.startTime;
+        for (const entry of list.getEntries()) {
+          window.__lcp = entry.startTime;
+          // Which element it was (W4-E): tag, its data- marks, a few words.
+          const el = entry.element;
+          window.__lcpElement =
+            el === null || el === undefined
+              ? null
+              : `${el.tagName.toLowerCase()}${[...el.attributes]
+                  .filter((a) => a.name.startsWith("data-") || a.name === "id")
+                  .map((a) => `[${a.name}]`)
+                  .join("")} "${(el.textContent ?? "").trim().slice(0, 40)}"`;
+        }
       }).observe({ type: "largest-contentful-paint", buffered: true });
     });
     const page = await ctx.newPage();
@@ -87,11 +99,13 @@ for (const path of PAGES) {
       return {
         ttfb: Math.round(nav.responseStart - nav.requestStart),
         lcp: Math.round(window.__lcp),
+        element: window.__lcpElement ?? null,
       };
     });
     landed = new URL(page.url()).pathname;
     ttfb.push(timing.ttfb);
     lcp.push(timing.lcp);
+    elements.push(timing.element);
     await ctx.close();
   }
   out[path] = {
@@ -100,6 +114,7 @@ for (const path of PAGES) {
     lcpMedian: median(lcp),
     ttfb,
     lcp,
+    elements,
   };
   console.log(JSON.stringify({ path, ...out[path] }));
 }
