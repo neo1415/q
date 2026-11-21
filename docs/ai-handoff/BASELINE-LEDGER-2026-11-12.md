@@ -1072,3 +1072,7 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **Live `server-timing.mjs`** (fictional Savanna, 2 runs) after 3c77f51db:
   - LCP: `/home` **7.6 s**, a regression from 2.84 s, suspected to come from W4-B lazy-loading the Q conversation; under investigation. Discover 2.56 s, Plan 1.42 s.
   - After 438bf7320: `/settings` LCP 4.2 s (no gain yet), `/organisation` 1.45 s. TTFB is 0.3–0.7 s throughout.
+- **a0de9bfb7 deployed 18:15 UTC on 21 Nov** (web; gate PASS). W4-E: the pane chunk is requested alongside hydration.
+  - The LCP element on `/home` and `/settings` is the Q pane greeting `p[data-q-greeting]`, which renders only after hydration because the conversation lives in the browser.
+  - Live: `/home` LCP 2.38–2.94 s (the 7.6 s did not reproduce), `/settings` 4.0–4.25 s.
+  - The real fix is to server-render the greeting in the placeholder, which flashes for returning users with an open thread. Awaiting the owner's decision.
