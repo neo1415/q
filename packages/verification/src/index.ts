@@ -185,6 +185,7 @@ export {
   type FounderLinkSettlement,
   type NewProviderDecision,
   type ProviderDecisionWriter,
+  type VerificationConsentStore,
   type VerificationReviewQueue,
 } from "./application/founder-link.js";
 export {
@@ -193,6 +194,8 @@ export {
 } from "./application/identity-check.js";
 export {
   createPostgresProviderDecisionWriter,
+  createPostgresVerificationConsents,
   createPostgresVerificationReviewQueue,
+  CURRENT_CONSENT_VERSION,
   VERIFICATION_REVIEW_DUE_HOURS,
 } from "./infrastructure/postgres-provider-decisions.js";

@@ -851,6 +851,14 @@ export const PERSONAL_DATA_INVENTORY: readonly InventoryEntry[] = [
     retention: AUDIT_2Y,
     why: "Verification decisions others relied on.",
   },
+  {
+    table: "evidence.verification_consents",
+    class: "RETAIN",
+    person: by("subject_user_id"),
+    export: true,
+    retention: AUDIT_2Y,
+    why: "Proof of the person's explicit biometric consent (NDPA 2023): kept with the checks it allowed.",
+  },
 
   // --- gateq ----------------------------------------------------------------
   {

@@ -169,6 +169,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'document_processing_runs', 'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'claims',                   'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'verification_claims',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'verification_consents',    'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'verification_claim_reclassifications', 'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'claim_revisions',          'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'evidence_items',           'INTERNAL_SERVER_ONLY', '{}'),

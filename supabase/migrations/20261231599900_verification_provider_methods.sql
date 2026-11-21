@@ -56,3 +56,66 @@ alter table core.kyb_submissions
   drop constraint kyb_submissions_provider_check,
   add constraint kyb_submissions_provider_check
     check (provider in ('CAPITAL_Q_OPERATOR', 'DOJAH', 'COMPANIES_HOUSE', 'SUMSUB'));
+
+-- ---------------------------------------------------------------------------
+-- Biometric consent (owner-approved addition, 21 Nov 2026). Before any ID
+-- document or live selfie is sent to a provider, the person's explicit
+-- consent is recorded here, linked to their identity claim (Nigeria Data
+-- Protection Act 2023: biometric data is sensitive and needs explicit
+-- consent). A row of its own, not a claim column: claims are decisions,
+-- consent is the person's act, and the subject alone may read it.
+--
+-- Append-only. Read only by the person it belongs to (through the API) and
+-- by operators (through the privileged console); never by colleagues,
+-- investors or another tenant. No client reads or writes it directly.
+-- ---------------------------------------------------------------------------
+
+create table evidence.verification_consents (
+  id               uuid primary key default gen_random_uuid(),
+  tenant_id        uuid not null references identity.tenants (id) on delete restrict,
+  organisation_id  uuid not null,
+  claim_id         uuid not null,
+  subject_user_id  uuid not null references identity.user_profiles (id) on delete restrict,
+  consent_scope    text not null check (consent_scope in ('BIOMETRIC_ID_SELFIE')),
+  consent_version  text not null check (consent_version ~ '^biometric-consent-v[0-9]{1,4}$'),
+  consent_given_at timestamptz not null,
+  created_at       timestamptz not null default clock_timestamp(),
+  -- Given before it is recorded, and never in the future of the record.
+  check (consent_given_at <= created_at + interval '5 minutes'),
+  unique (claim_id, consent_scope, consent_version),
+  foreign key (organisation_id, tenant_id)
+    references identity.tenant_organisations (organisation_id, tenant_id) on delete restrict,
+  foreign key (claim_id, tenant_id)
+    references evidence.verification_claims (id, tenant_id) on delete restrict
+);
+
+create index verification_consents_subject_idx
+  on evidence.verification_consents (subject_user_id, created_at desc);
+
+comment on table evidence.verification_consents is
+  'A person''s explicit consent to a biometric check (ID document and live selfie), with the version of the words they agreed to, linked to their identity claim. Append-only; read only by that person and the server.';
+
+create function evidence.protect_verification_consents()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'evidence.verification_consents is append-only'
+    using errcode = 'restrict_violation';
+end;
+$$;
+
+revoke all on function evidence.protect_verification_consents() from public;
+
+create trigger verification_consents_append_only
+  before update or delete on evidence.verification_consents
+  for each row execute function evidence.protect_verification_consents();
+
+-- Server-only, like evidence.verification_claims (RLS on, no policy, no
+-- browser grant; the schema guard holds server-only tables to that): the
+-- API reads a person's own consent under their ActorContext with the
+-- subject in the predicate, and operators read it through the privileged
+-- console. No browser session, of any tenant or role, reads a row.
+alter table evidence.verification_consents enable row level security;
+revoke all on evidence.verification_consents from public, anon, authenticated;
+grant select, insert on evidence.verification_consents to postgres, service_role;

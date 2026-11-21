@@ -102,7 +102,7 @@ describe("settling the founder link", () => {
         providerReference: "dojah:NG:RC1234567",
         expiresAt: "2028-11-20T12:00:00.000Z",
         decisionBasis: expect.stringContaining(
-          "biometric consent biometric-consent-v1",
+          "ID and live selfie verified by DOJAH",
         ) as unknown,
       }),
     );

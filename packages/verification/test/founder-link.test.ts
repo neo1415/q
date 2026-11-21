@@ -140,16 +140,14 @@ describe("the linking rule", () => {
     });
   });
 
-  it("the decision basis records the consent and never the ID number", () => {
+  it("the decision basis says what was checked, never the ID number or the consent", () => {
     const basis = linkDecisionBasis({
       registry: registry(),
       officer: { name: "EXAMPLE, Ada Ngozi", role: "DIRECTOR" },
-      consent,
       identityProvider: "SUMSUB",
     });
-    expect(basis).toContain(
-      "biometric consent biometric-consent-v1 given 2026-11-20T10:00:00Z",
-    );
+    // The consent is its own record (evidence.verification_consents).
+    expect(basis).not.toContain("consent");
     expect(basis).toContain("director on the register");
     expect(basis.length).toBeLessThanOrEqual(1000);
   });

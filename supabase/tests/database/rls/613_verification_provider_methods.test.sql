@@ -15,7 +15,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(14);
+select plan(21);
 
 -- A founder's pending identity and organisation requests in tenant A.
 insert into evidence.verification_claims
@@ -91,6 +91,27 @@ select throws_ok($$ insert into core.kyb_submissions
          pg_temp.rls_id('user_a'), 'CAPITAL_Q_EMAIL_CODE', 'v1-kyb-a-0002', '00000000-0000-4000-8000-0000000a1002'::uuid $$,
   '23514', null, 'the email code is not a KYB provider');
 
+-- Biometric consent, recorded with the claim ---------------------------------------
+select lives_ok($$ insert into evidence.verification_consents
+    (tenant_id, organisation_id, claim_id, subject_user_id, consent_scope, consent_version, consent_given_at)
+  values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), '00000000-0000-4000-8000-0000000a1001',
+          pg_temp.rls_id('user_a'), 'BIOMETRIC_ID_SELFIE', 'biometric-consent-v1', now()) $$,
+  'consent is recorded against the founder''s identity claim');
+select throws_ok($$ insert into evidence.verification_consents
+    (tenant_id, organisation_id, claim_id, subject_user_id, consent_scope, consent_version, consent_given_at)
+  values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), '00000000-0000-4000-8000-0000000a1001',
+          pg_temp.rls_id('user_a'), 'BIOMETRIC_ID_SELFIE', 'whatever', now()) $$,
+  '23514', null, 'a consent names a versioned consent text');
+select throws_ok($$ insert into evidence.verification_consents
+    (tenant_id, organisation_id, claim_id, subject_user_id, consent_scope, consent_version, consent_given_at)
+  values (pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), '00000000-0000-4000-8000-0000000a1001',
+          pg_temp.rls_id('user_b'), 'BIOMETRIC_ID_SELFIE', 'biometric-consent-v2', now()) $$,
+  '23503', null, 'a consent cannot point at another tenant''s claim');
+select throws_ok($$ update evidence.verification_consents set consent_version = 'biometric-consent-v2' $$,
+  '23001', null, 'a consent is never rewritten');
+select throws_ok($$ delete from evidence.verification_consents $$,
+  '23001', null, 'a consent is never deleted');
+
 -- An investor's session reads no founder's ID data -----------------------------------
 -- user_b acts for an investment firm (org_b).
 select pg_temp.act_as('auth_b');
@@ -99,6 +120,11 @@ select is((select count(*)::int from core.identity_submissions
   'an investor cannot read a founder''s identity details');
 select throws_ok($$ select count(*) from evidence.verification_claims $$,
   '42501', null, 'an investor''s browser session cannot read verification claims');
+select throws_ok($$ select count(*) from evidence.verification_consents $$,
+  '42501', null, 'an investor in another tenant cannot read a founder''s biometric consent');
+select pg_temp.act_as_anonymous();
+select throws_ok($$ select count(*) from evidence.verification_consents $$,
+  '42501', null, 'anonymous reads no consent');
 
 select * from finish();
 rollback;

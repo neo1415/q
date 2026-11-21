@@ -1,5 +1,6 @@
 import {
   IdentityCheckInputSchema,
+  type BiometricConsent,
   type IdentityCheck,
   type ProviderResult,
   type VerificationProvider,
@@ -20,6 +21,12 @@ export type IdentityCheckStart =
 export async function startIdentityCheck(
   provider: VerificationProvider,
   raw: unknown,
+  /**
+   * Records the consent (evidence.verification_consents) in its own short
+   * transaction before anything is sent; a consent that could not be
+   * recorded sends nothing.
+   */
+  recordConsent?: (consent: BiometricConsent) => Promise<void>,
 ): Promise<IdentityCheckStart> {
   const consent =
     typeof raw === "object" && raw !== null && "consent" in raw
@@ -36,5 +43,12 @@ export async function startIdentityCheck(
   }
   if (!provider.connected)
     return { kind: "NOT_CONNECTED", provider: provider.code };
+  if (recordConsent !== undefined) {
+    try {
+      await recordConsent(parsed.data.consent);
+    } catch {
+      return { kind: "FAILED", reason: "the consent could not be recorded" };
+    }
+  }
   return provider.verifyIdentity(parsed.data);
 }

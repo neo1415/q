@@ -420,6 +420,39 @@ describe("biometric consent before any ID or selfie", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("the consent is recorded before anything is sent; unrecorded, nothing is", async () => {
+    const order: string[] = [];
+    const { fetch } = replay({
+      "/api/v1/kyc/bvn/verify": { status: 200, body: DOJAH_BVN_SELFIE },
+    });
+    const provider = createDojahProvider({
+      appId: "app",
+      secretKey: KEY,
+      fetch: (url, init) => {
+        order.push("sent");
+        return fetch(url, init);
+      },
+    });
+    const recorded = await startIdentityCheck(
+      provider,
+      { ...input, consent },
+      (given) => {
+        order.push(`consent ${given.textVersion}`);
+        return Promise.resolve();
+      },
+    );
+    expect(recorded.kind).toBe("OK");
+    expect(order).toEqual(["consent biometric-consent-v1", "sent"]);
+    order.length = 0;
+    const refused = await startIdentityCheck(
+      provider,
+      { ...input, consent },
+      () => Promise.reject(new Error("down")),
+    );
+    expect(refused.kind).toBe("FAILED");
+    expect(order).toEqual([]);
+  });
+
   it("with consent the check runs", async () => {
     const { fetch } = replay({
       "/api/v1/kyc/bvn/verify": { status: 200, body: DOJAH_BVN_SELFIE },

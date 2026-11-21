@@ -2,8 +2,10 @@ import { z } from "zod";
 
 import type {
   ProviderDecisionWriter,
+  VerificationConsentStore,
   VerificationReviewQueue,
 } from "../application/founder-link.js";
+import { BIOMETRIC_CONSENT_TEXT_VERSION } from "../domain/founder-link.js";
 import { toVerificationClaim } from "./postgres-verification-repository.js";
 
 /**
@@ -71,3 +73,62 @@ export function createPostgresVerificationReviewQueue(): VerificationReviewQueue
     },
   };
 }
+
+const ConsentRow = z.object({
+  consent_version: z.string().regex(/^biometric-consent-v\d+$/u),
+  consent_given_at: z.union([z.string(), z.date()]),
+});
+
+/**
+ * Biometric consent (migration 20261231599900): append-only, one per claim
+ * and version, only ever on the person's own identity claim, and read back
+ * only by that person (the subject is in every predicate).
+ */
+export function createPostgresVerificationConsents(): VerificationConsentStore {
+  return {
+    record: async (tx, input) => {
+      if (
+        input.claim.claimType !== "FOUNDER_IDENTITY" &&
+        input.claim.claimType !== "INVESTOR_IDENTITY"
+      ) {
+        throw new Error(
+          "biometric consent belongs to a person's identity claim",
+        );
+      }
+      await tx.sql`
+        insert into evidence.verification_consents
+          (tenant_id, organisation_id, claim_id, subject_user_id,
+           consent_scope, consent_version, consent_given_at)
+        values (${input.claim.tenantId}, ${input.claim.organisationId},
+                ${input.claim.id}, ${input.subjectUserId},
+                'BIOMETRIC_ID_SELFIE', ${input.consent.textVersion},
+                ${input.consent.givenAt}::timestamptz)
+        on conflict (claim_id, consent_scope, consent_version) do nothing`;
+    },
+    read: async (executor, scope) => {
+      const [row] = await executor`
+        select consent_version, consent_given_at
+          from evidence.verification_consents
+         where tenant_id = ${scope.tenantId}
+           and claim_id = ${scope.claimId}
+           and subject_user_id = ${scope.subjectUserId}
+           and consent_scope = 'BIOMETRIC_ID_SELFIE'
+         order by created_at desc
+         limit 1`;
+      if (row === undefined) return null;
+      const parsed = ConsentRow.parse(row);
+      const givenAt =
+        parsed.consent_given_at instanceof Date
+          ? parsed.consent_given_at.toISOString()
+          : new Date(parsed.consent_given_at).toISOString();
+      return {
+        givenAt,
+        textVersion: parsed.consent_version,
+        explicit: true,
+      };
+    },
+  };
+}
+
+/** The consent text version in force (the screen shows its words). */
+export const CURRENT_CONSENT_VERSION = BIOMETRIC_CONSENT_TEXT_VERSION;

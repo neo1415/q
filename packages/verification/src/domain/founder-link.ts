@@ -132,21 +132,20 @@ export function linkReviewReason(reasons: readonly LinkReviewReason[]): string {
 }
 
 /**
- * The decision basis recorded on the VERIFIED claim, with the biometric
- * consent it relied on (version and time), so the consent is on the
- * record with the claim. Never the ID number, never the selfie.
+ * The decision basis recorded on the VERIFIED claim: what was checked, in
+ * prose for the audit reader. Never the ID number, never the selfie. The
+ * biometric consent it relied on is its own record
+ * (evidence.verification_consents), never words in here.
  */
 export function linkDecisionBasis(input: {
   readonly registry: RegistryRecord;
   readonly officer: Pick<RegistryOfficer, "name" | "role">;
-  readonly consent: { readonly textVersion: string; readonly givenAt: string };
   readonly identityProvider: string;
 }): string {
   return [
     `register ${input.registry.jurisdictionCode} ${input.registry.registrationNumber}: ${input.registry.status}`,
     `ID and live selfie verified by ${input.identityProvider}`,
     `name on ID matches ${input.officer.role.toLowerCase()} on the register`,
-    `biometric consent ${input.consent.textVersion} given ${input.consent.givenAt}`,
   ]
     .join("; ")
     .slice(0, 1000);

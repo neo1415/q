@@ -1,4 +1,4 @@
-import type { TransactionContext } from "@capital-q/database";
+import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 
 import type { VerificationClaim } from "../domain/claims.js";
 import {
@@ -57,6 +57,34 @@ export type VerificationReviewQueue = {
       readonly idempotencyKey: string;
     },
   ) => Promise<{ readonly reviewId: string }>;
+};
+
+/**
+ * Biometric consent, its own record (evidence.verification_consents,
+ * migration 20261231599900): written before any ID or selfie leaves
+ * Capital Q, linked to the person's identity claim, read back as theirs.
+ */
+export type VerificationConsentStore = {
+  readonly record: (
+    tx: TransactionContext,
+    consent: {
+      readonly claim: Pick<
+        VerificationClaim,
+        "id" | "tenantId" | "organisationId" | "claimType"
+      >;
+      readonly subjectUserId: string;
+      readonly consent: BiometricConsent;
+    },
+  ) => Promise<void>;
+  /** The subject's own consent for their claim, or null (scoped by subject). */
+  readonly read: (
+    executor: DatabaseExecutor,
+    scope: {
+      readonly tenantId: string;
+      readonly claimId: string;
+      readonly subjectUserId: string;
+    },
+  ) => Promise<BiometricConsent | null>;
 };
 
 export const FOUNDER_ID_VALID_MONTHS = 24;
@@ -127,7 +155,6 @@ export async function settleFounderLink(
     decisionBasis: linkDecisionBasis({
       registry: input.registry,
       officer: outcome.officer,
-      consent: input.consent,
       identityProvider: input.identityProvider,
     }),
     expiresAt: expires.toISOString(),
