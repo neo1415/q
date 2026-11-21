@@ -841,6 +841,54 @@ describe("GPT-Live line", () => {
     }
   });
 
+  it("HQ-6 latency budget: first words inside the second are said as they are, with no holding line before them", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      let speak!: () => void;
+      const start = new Promise<void>((resolve) => {
+        speak = resolve;
+      });
+      const { broker } = setup({
+        working: {
+          stage: "CHECKING_EVIDENCE",
+          about: { subjects: ["Halyard"] },
+        },
+        holding: { afterMs: 3_000, longMs: 3_600_000 },
+        stream: {
+          first: "Halyard filed in March. ",
+          rest: "",
+          until: Promise.resolve(),
+          start,
+        },
+      });
+      await open(broker);
+      let first: Awaited<ReturnType<typeof broker.delegate>> | undefined;
+      void broker
+        .delegate({
+          actor: ACTOR,
+          voiceSessionId: SESSION,
+          delegation: {
+            delegationId: "dlg_1",
+            request: "What did Halyard file?",
+            early: true,
+          },
+        })
+        .then((result) => {
+          first = result;
+        });
+      await vi.advanceTimersByTimeAsync(600);
+      speak();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.waitFor(() => {
+        expect(first).toBeDefined();
+      });
+      expect(first?.holding).toBeUndefined();
+      expect(first?.said).toContain("Halyard filed in March.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("HQ-3: a stage that names nothing says its approved label; web research is never about anyone", async () => {
     for (const [working, said] of [
       [

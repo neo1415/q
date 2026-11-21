@@ -1510,6 +1510,7 @@ export {
   createSentenceCutter,
   cutAtWord,
   asksForOnePage,
+  isTableRow,
   splitSentences,
   streamedPiece,
   type SentenceCutter,

@@ -2506,6 +2506,37 @@ export interface ClaimChecker {
  * round adds its results between sentences of a long turn; the corpus is
  * rebuilt only when what it returns has changed.
  */
+/** HQ-6: what an ungrounded table cell says instead ("an empty cell is not known"). */
+export const NOT_KNOWN_CELL = "not known";
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/u;
+const TABLE_SEPARATOR = /^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$/u;
+
+/**
+ * HQ-6 (conversation audit §2.1 item 1): a table row is checked cell by
+ * cell, like a sentence each. A cell whose figure, date or name is not
+ * grounded becomes "not known"; the row itself is never dropped, so the
+ * table keeps its shape and nothing ungrounded is shown. Null: not a row.
+ */
+export function checkTableRow(
+  row: string,
+  checkCell: (cell: string) => SentenceCheck,
+): SentenceCheck | null {
+  if (!TABLE_ROW.test(row)) return null;
+  if (TABLE_SEPARATOR.test(row)) return { text: row, ungrounded: [] };
+  const inner = row.trim().slice(1, -1);
+  const ungrounded: ClaimKind[] = [];
+  const cells = inner.split("|").map((cell) => {
+    const content = cell.trim();
+    if (content.length === 0) return cell;
+    const checked = checkCell(content);
+    ungrounded.push(...checked.ungrounded);
+    const text = checked.text?.trim() ?? "";
+    return ` ${text.length === 0 ? NOT_KNOWN_CELL : text} `;
+  });
+  return { text: `|${cells.join("|")}|`, ungrounded };
+}
+
 export function createClaimChecker(
   sources: () => readonly string[],
   today: Date = new Date(),
@@ -2537,6 +2568,18 @@ export function createClaimChecker(
     contradictsCounts: (text) => countsContradicted(text, current()),
     stats: () => ({ ...stats, corpus: corpusShape(current()) }),
     sentence: (sentence) => {
+      // HQ-6: a table row, cell by cell (a cell is its own unit).
+      const row = checkTableRow(
+        sentence,
+        (cell) =>
+          checkOne(cell, current(), said, { before: [], previous: "" }, stats)
+            .check,
+      );
+      if (row !== null) {
+        before = [];
+        previous = "";
+        return row;
+      }
       const checked = checkOne(
         sentence,
         current(),
@@ -2571,6 +2614,16 @@ export function checkAnswer(
   const ungrounded: ClaimKind[] = [];
   const lines = answer.split("\n").map((line) => {
     if (line.trim().length === 0) return line;
+    // HQ-6: a table row, cell by cell; never dropped whole.
+    const row = checkTableRow(
+      line,
+      (cell) =>
+        checkOne(cell, corpus, said, { before: [], previous: "" }, stats).check,
+    );
+    if (row !== null) {
+      ungrounded.push(...row.ungrounded);
+      return row.text;
+    }
     const lead = /^\s*(?:[-*•]|\d+[.)])\s+/u.exec(line)?.[0] ?? "";
     const body = line.slice(lead.length);
     const sentences = body.split(/(?<=[.!?])\s+(?=[\p{Lu}\d"“(*])/u);

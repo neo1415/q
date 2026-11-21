@@ -441,6 +441,7 @@ export {
   type ProposedBriefAssertion,
 } from "./person-brief-reader.js";
 import { answerPathOf } from "./answer-path.js";
+import { streamRetractions } from "./stream-fidelity.js";
 import { forModelReading } from "./pending-confirmation.js";
 import {
   holdsWebForOwned,
@@ -10225,6 +10226,8 @@ export function createModelGatewayQAnswer(
       };
       const cutter = createSentenceCutter();
       let streamedText = "";
+      /** HQ-6: each sentence as it was published, for the retraction count. */
+      const streamedSentences: string[] = [];
       let seenText = "";
       /**
        * The answer's prose as far as it has been read, sentences finished
@@ -10435,8 +10438,14 @@ export function createModelGatewayQAnswer(
         firstPublishedMs ??= Date.now() - startedAt;
         // A heading or list item opens its own line (live6: "## Key Gaps
         // and Risks" was glued to the sentence before it).
-        const piece = streamedPiece(text, streamedText.length === 0);
+        const piece = streamedPiece(
+          text,
+          streamedText.length === 0,
+          streamedSentences.at(-1),
+        );
         streamedText += piece;
+        // HQ-6: what went out, for the retraction count at the end.
+        streamedSentences.push(text);
         sendSaid(piece);
       };
       // Backed only by a screen move a tool of this run authorised.
@@ -16723,6 +16732,9 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             // turn finished. Zero means nobody was listening, or the
             // model wrote its object in an order this cannot read.
             streamedCharacters: streamedText.length,
+            // HQ-6: streamed sentences the stored answer no longer holds,
+            // by kind and count only (never the words; target 0 figures).
+            retractions: streamRetractions(streamedSentences, content),
             firstPublishedMs,
             // Step 11: per-stage timing past the prepare. The model's first
             // words (seam start), the first sentence the person got counted

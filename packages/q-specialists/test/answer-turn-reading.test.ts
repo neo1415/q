@@ -2,7 +2,7 @@ import type { DelegationContext, QDelegationPort } from "../src/delegation.js";
 import { asksToReviseDocument } from "../src/references.js";
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -9420,5 +9420,40 @@ describe("VOICE-FIX (owner live 20 Nov 2026): exclusions held, a yes to several 
     await run.answer.answer(request());
     expect(run.requests[0]?.choiceUnclear).toBe(true);
     expect(run.requests[0]?.offerTaken).toBeUndefined();
+  });
+});
+
+describe("HQ-6 latency budget: a typed turn's first line within a second (fake timers)", () => {
+  it("a reply whose reading is slow shows the nameless holding line at 1 s, not before, and only once", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deltas: { text: string; holding?: true }[] = [];
+      let land: () => void = () => undefined;
+      const run = seam({
+        said: "Yes",
+        reading: null,
+        read: () =>
+          new Promise((resolve) => {
+            land = () => {
+              resolve(null);
+            };
+          }),
+        outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+        deltas,
+        turnRereadDeadlineMs: 40,
+      });
+      const answering = run.answer.answer(request());
+      await vi.advanceTimersByTimeAsync(999);
+      expect(deltas.filter((d) => d.holding === true)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(deltas.filter((d) => d.holding === true)).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(deltas.filter((d) => d.holding === true)).toHaveLength(1);
+      land();
+      await vi.advanceTimersByTimeAsync(100);
+      await answering;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

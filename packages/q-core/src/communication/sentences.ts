@@ -26,6 +26,23 @@ const BOUNDARY = /(?<=[.!?…])["')\]]?\s+(?=[A-Z0-9"'(“])/g;
 /** A paragraph break ends a sentence even without punctuation. */
 const PARAGRAPH = /\n{2,}/g;
 
+/**
+ * HQ-6 (conversation audit §2.1 item 1): a markdown table row is its own
+ * unit, closed by its newline and never inside the line (a cell's "3.5x"
+ * or "Inc." is not a boundary), so the claim check judges each row and a
+ * cell it cannot ground becomes "not known" instead of the row waiting for
+ * a blank line or crossing the check as one block. A list line closes on
+ * its newline too (and at a sentence end within it, as before).
+ */
+const TABLE_ROW_START = /^[ \t]*\|/u;
+const LIST_LINE_START = /^[ \t]*(?:[-*+•]\s|\d{1,2}[.)]\s)/u;
+const LINE_BEFORE_ROW = /\n(?=[ \t]*\|)/gu;
+
+/** A whole markdown table row ("| a | b |"), trimmed. */
+export function isTableRow(text: string): boolean {
+  return /^\|.*\|$/u.test(text.trim());
+}
+
 export type SentenceCutter = {
   /** Add text; returns whatever whole sentences that completed. */
   readonly push: (text: string) => readonly string[];
@@ -74,6 +91,11 @@ function endsMidSentence(before: string): boolean {
 }
 
 function firstBoundary(text: string): number {
+  // A table row closes only on its own newline.
+  if (TABLE_ROW_START.test(text)) {
+    const end = text.indexOf("\n");
+    return end < 0 ? -1 : end + 1;
+  }
   let best = -1;
   BOUNDARY.lastIndex = 0;
   for (
@@ -97,6 +119,16 @@ function firstBoundary(text: string): number {
     if (best < 0 || at < best) {
       best = at;
     }
+  }
+  // A list line ends on its newline; and the line before a table row ends
+  // there too ("Here is the comparison:\n| A | B |").
+  const lineEnd = LIST_LINE_START.test(text) ? text.indexOf("\n") : -1;
+  if (lineEnd >= 0 && (best < 0 || lineEnd + 1 < best)) best = lineEnd + 1;
+  LINE_BEFORE_ROW.lastIndex = 0;
+  const block = LINE_BEFORE_ROW.exec(text);
+  if (block !== null && block.index > 0) {
+    const at = block.index + 1;
+    if (best < 0 || at < best) best = at;
   }
   return best;
 }
@@ -173,7 +205,18 @@ const OPENS_BLOCK = /^(?:#{1,6}\s|[-*+•]\s|\d{1,2}[.)]\s)/u;
  * on its own line after a blank one, so the chat's markdown reads it as
  * the heading or list it is; any other piece follows with a space.
  */
-export function streamedPiece(sentence: string, first: boolean): string {
+export function streamedPiece(
+  sentence: string,
+  first: boolean,
+  /** HQ-6: the piece before it, so a table's rows stay one table. */
+  previous?: string,
+): string {
+  const afterRow = previous !== undefined && isTableRow(previous);
+  if (isTableRow(sentence)) {
+    if (first) return sentence;
+    return afterRow ? `\n${sentence}` : `\n\n${sentence}`;
+  }
+  if (afterRow) return `\n\n${sentence} `;
   return !first && OPENS_BLOCK.test(sentence)
     ? `\n\n${sentence} `
     : `${sentence} `;
