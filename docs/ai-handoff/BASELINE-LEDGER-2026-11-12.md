@@ -1063,3 +1063,7 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **3eb1f6dd1 deployed 14:16 UTC on 21 Nov** (web only; gate PASS; the bundle-budget check now runs in the gate). W4-A: the Arabic catalogue loads only for Arabic, cutting about 546 kB of uncompressed first-load JS on every route; app pages went from about 3.0 MB to about 2.5 MB.
   - Live: the landing page downloads 860 kB of decoded JS and loads in about 4.1 s from the sandbox. `/organisation` renders for the LedgerBridge founder.
   - Phone LCP is not yet measured; that is W4-B.
+- **221d2b7d7 deployed 15:55 UTC on 21 Nov** (gate PASS). W4-B: the Q conversation is lazy, zod is off public pages, and the briefing fade loads late. App pages are about 2.1 MB and landing 720 kB (uncompressed builds).
+  - Live: landing JS went from 860 kB to 582 kB decoded, load from 4.1 s to 3.3 s from the sandbox.
+  - A Q turn as fictional Savanna answered normally, first text in 2.64 s.
+  - Local phone LCP on all 4 pages is under 2.5 s before and after (even on slow 4G). Production misses are likely server-side; W4-C is measuring TTFB.
