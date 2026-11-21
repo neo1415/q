@@ -1039,3 +1039,10 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - a debt guard (no new SQL in apps, no new file over 1,500 lines).
   - Live: all 4 services started on `staging`. `strict-transport-security` and `content-security-policy-report-only` are present. A signed-in page loads as the LedgerBridge founder. No q-api errors and no 429s since.
   - Switching `CAPITAL_Q_ENV` to `production` waits for the owner: it ends the synthetic demo attestation and auto-verification.
+- **add3becf5 deployed 08:35 UTC on 21 Nov** (gate PASS). W1-B adds:
+  - a traffic counter in `/health/ready`;
+  - workers health probes (SERVICE_UNHEALTHY after 3 failures; ERROR_RATE_SPIKE at ≥5% of ≥50 requests);
+  - a stale-heartbeat alert from q-api;
+  - the console card showing the error rate and the last alert.
+  - The lead set `CQ_HEALTH_PROBE_TARGETS` on workers (api and q-api production hosts) at 08:44, which redeployed workers on the same SHA.
+  - Live: the heartbeat `ops_check.services` shows api and q-api ready, 0 failures in a row, 0 server errors in 15 min.
