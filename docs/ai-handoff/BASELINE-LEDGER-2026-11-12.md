@@ -1059,3 +1059,4 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The `cq_app` role exists on hosted with `rolcanlogin=false` and `rolbypassrls=false`, plus workspace policies for `cq_app` only.
   - The claims helper sits behind `DATABASE_RLS_CLAIMS` (off). Services still connect as `postgres`, so production access is unchanged.
   - The shadow-mode grant and the rollout await the owner's sign-off on ADR 0082.
+- **612b5a80c deployed 12:38 UTC on 21 Nov** (gate PASS). W3-A: `q/index.ts` went from 17,393 to 14,036 lines, moved into 7 sibling modules (move only, exports identical), plus a shrink-only guard for long files. Live: a typed turn as fictional Savanna answered normally, first text in 2.62 s.
