@@ -14,7 +14,7 @@ import {
   deny,
   type AnyQToolDefinition,
 } from "../definition.js";
-import { actorWideScope } from "../plan.js";
+import { ownsOnboarding } from "../own-conversation.js";
 
 /**
  * The onboarding interview's tools (ADR 0016).
@@ -507,14 +507,9 @@ function ownSession(port: OnboardingToolPort) {
     _input: unknown,
     context: Parameters<AnyQToolDefinition["authorize"]>[1],
   ) => {
-    // The actor-wide scope, filtered to this very person, and a session
-    // that is theirs: three facts from three places, all required.
-    const scope = actorWideScope(context.plan, "OWN_ONBOARDING");
-    if (
-      scope === undefined ||
-      scope.filter.userId !== context.actor.userId ||
-      context.actor.userId !== port.ownerUserId
-    ) {
+    // Their own onboarding (W2-B: a person, the plan made for them, the
+    // actor-wide scope bound to them) and a session that is theirs.
+    if (!ownsOnboarding(context) || context.actor.userId !== port.ownerUserId) {
       return Promise.resolve(deny<Grant>("NOT_AVAILABLE"));
     }
     return Promise.resolve(

@@ -128,7 +128,14 @@ function build(options: {
     actor: { userId: USER },
     purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
     subjects: [],
-    scopes: options.granted ? [{ kind: "OWN_ONBOARDING" }] : [],
+    scopes: options.granted
+      ? [
+          {
+            kind: "OWN_ONBOARDING",
+            filter: { tenantId: TENANT, userId: USER },
+          },
+        ]
+      : [],
     denied: [],
     maxSensitivity: "PUBLIC",
   } as unknown as PermittedContextPlan;

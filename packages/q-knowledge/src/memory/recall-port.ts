@@ -26,7 +26,7 @@ export type MemoryRecallInput = {
   readonly subjects: readonly QSubjectRef[];
   readonly utterance?: string | undefined;
   readonly earlierWords?: readonly string[] | undefined;
-  readonly plan?: Pick<PermittedContextPlan, "scopes"> | undefined;
+  readonly plan?: PermittedContextPlan | undefined;
 };
 
 /** One earlier conversation's summary as recall rendered it (Q's own words). */

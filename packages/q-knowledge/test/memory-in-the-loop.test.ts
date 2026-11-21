@@ -160,16 +160,22 @@ function store() {
   };
 }
 
-/** The firewall's actor-wide own-conversation scope for `userId`. */
+/**
+ * The plan the firewall builds for `userId`: theirs, in their tenant, with
+ * the actor-wide own-conversation scope (W2-B: the shared check reads all
+ * three).
+ */
 const ownPlan = (userId: string) =>
   ({
+    tenantId: TENANT,
+    actor: { userId },
     scopes: [
       {
         kind: "OWN_Q_CONVERSATION",
         filter: { tenantId: TENANT, userId },
       },
     ],
-  }) as unknown as Pick<PermittedContextPlan, "scopes">;
+  }) as unknown as PermittedContextPlan;
 
 describe("a stated preference holds, for that person only", () => {
   it("holds for every later turn of the conversation, and as a rule in the next, never for anybody else (200 random runs)", async () => {

@@ -113,6 +113,14 @@ export {
   UTTERANCE_REF_PATTERN,
   withoutSupersededUtterances,
 } from "./domain/utterances.js";
+export {
+  ownsActorScope,
+  ownsConversation,
+  ownsOnboarding,
+  type OwnActorScopeKind,
+  type OwnScopeAccess,
+  type OwnScopeOptions,
+} from "./domain/own-scopes.js";
 export { withoutNonSpeechTags } from "./domain/non-speech.js";
 export {
   closestByName,

@@ -475,7 +475,14 @@ function plan(
           investorOrganisationId: SAVANNA,
         },
       },
-      ...(options.ownOnboarding === true ? [{ kind: "OWN_ONBOARDING" }] : []),
+      ...(options.ownOnboarding === true
+        ? [
+            {
+              kind: "OWN_ONBOARDING",
+              filter: { tenantId: TENANT, userId: USER },
+            },
+          ]
+        : []),
     ],
   } as unknown as PermittedContextPlan;
 }

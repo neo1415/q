@@ -47,13 +47,15 @@ function sources(dir: string): string[] {
 const INLINE_SQL = /\bsql\s*(?:<[^`;]{0,200}?>)?\s*`/gu;
 
 /**
- * W2-A (finding 8): the own-conversation check lives in one place. A copy
- * of it (a local ownConversation, or a tool reading the OWN_Q_CONVERSATION
- * scope itself) is refused anywhere else; there is no baseline: zero.
+ * W2-A and W2-B (finding 8): the own-conversation and own-onboarding
+ * checks live in one place. A copy of either (a local ownConversation, or
+ * code reading the OWN_Q_CONVERSATION or OWN_ONBOARDING scope itself,
+ * through actorWideScope or a `.kind ===` test) is refused anywhere else;
+ * there is no baseline: zero.
  */
-const OWN_CONVERSATION_HOME = "packages/q-tools/src/own-conversation.ts";
+const OWN_CONVERSATION_HOME = "packages/q-runtime/src/domain/own-scopes.ts";
 const OWN_CONVERSATION_COPY =
-  /\bfunction\s+ownConversations?\b|actorWideScope\(\s*[\w.]+\s*,\s*"OWN_Q_CONVERSATION"\s*\)/gu;
+  /\bfunction\s+own(?:Conversation|Onboarding)s?\b|actorWideScope\(\s*[\w.]+\s*,\s*"OWN_(?:Q_CONVERSATION|ONBOARDING)"\s*\)|\.kind\s*===\s*"OWN_(?:Q_CONVERSATION|ONBOARDING)"/gu;
 const ownConversationCopies: string[] = [];
 
 function scan(): Baseline {
@@ -124,17 +126,20 @@ describe("no new debt (W1-A)", () => {
     expect(over, "split the file rather than raise its baseline").toEqual([]);
   });
 
-  it("W2-A: no copy of the own-conversation check outside its home", () => {
+  it("W2-A/B: no copy of the own-conversation or own-onboarding check outside its home", () => {
     expect(
       ownConversationCopies,
-      `use ownsConversation from @capital-q/q-tools (${OWN_CONVERSATION_HOME})`,
+      `use ownsConversation or ownsOnboarding from @capital-q/q-runtime (${OWN_CONVERSATION_HOME})`,
     ).toEqual([]);
     const copies = [
       "function ownConversation(actor, plan) {",
       'const scope = actorWideScope(context.plan, "OWN_Q_CONVERSATION");',
+      'const scope = actorWideScope(context.plan, "OWN_ONBOARDING");',
+      'plan.scopes.some((scope) => scope.kind === "OWN_ONBOARDING");',
       'if (!ownsConversation({ actor, plan })) return deny("NOT_AVAILABLE");',
+      'if (!ownsOnboarding(context)) return deny("NOT_AVAILABLE");',
     ].join("\n");
-    expect(copies.match(OWN_CONVERSATION_COPY)?.length).toBe(2);
+    expect(copies.match(OWN_CONVERSATION_COPY)?.length).toBe(4);
   });
 
   it("the rules catch what they are meant to", () => {

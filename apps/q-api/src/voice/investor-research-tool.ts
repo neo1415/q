@@ -2,10 +2,10 @@ import { z } from "zod";
 
 import { quoteOccursIn } from "@capital-q/q-knowledge";
 import {
-  actorWideScope,
   allow,
   defineQTool,
   deny,
+  ownsOnboarding,
   type AnyQToolDefinition,
 } from "@capital-q/q-tools";
 import { capability } from "@capital-q/security";
@@ -136,10 +136,9 @@ export function createResearchPublicLinksTool(
     input: ResearchPublicLinksInputSchema,
     output: ResearchPublicLinksOutputSchema,
     authorize: (_input, context) => {
-      const scope = actorWideScope(context.plan, "OWN_ONBOARDING");
+      // W2-B: their own onboarding, through the one shared check.
       if (
-        scope === undefined ||
-        scope.filter.userId !== context.actor.userId ||
+        !ownsOnboarding(context) ||
         context.actor.userId !== port.ownerUserId
       ) {
         return Promise.resolve(deny<Grant>("NOT_AVAILABLE"));

@@ -50,6 +50,7 @@ export {
 } from "./plan.js";
 export {
   ownsConversation,
+  ownsOnboarding,
   type OwnConversationAccess,
 } from "./own-conversation.js";
 export type {

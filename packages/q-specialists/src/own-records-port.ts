@@ -5,7 +5,11 @@ import {
   GetCompanyOutputSchema,
   GetInvestorMandateOutputSchema,
 } from "@capital-q/q-tools";
-import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
+import {
+  ownsOnboarding,
+  type QAnswerRequest,
+  type QToolPort,
+} from "@capital-q/q-runtime";
 
 import { NO_OWN_RECORDS, type OwnRecordNames } from "./company/own-names.js";
 
@@ -62,10 +66,10 @@ export function createToolOwnRecordsPort(dependencies: {
         (subject) => subject.kind === "COMPANY",
       );
       const firmId = ownInvestorOrganisationIn(request.plan);
-      const mayReadName = request.plan.scopes.some(
-        (scope) =>
-          scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-      );
+      const mayReadName = ownsOnboarding({
+        actor: request.actor,
+        plan: request.plan,
+      });
       const [company, firm, person] = await Promise.all([
         companyRef === undefined || companyRef.kind !== "COMPANY"
           ? null

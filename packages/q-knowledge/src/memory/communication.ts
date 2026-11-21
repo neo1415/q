@@ -9,6 +9,7 @@ import {
   type QCommunicationProfile,
 } from "@capital-q/contracts";
 import { DEFAULT_COMMUNICATION_PROFILE } from "@capital-q/q-core";
+import { ownsConversation } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
 import type { MemoryBundle, MemoryItem } from "./contracts.js";
@@ -206,17 +207,16 @@ function forConversation(
   };
 }
 
-/** Whether the plan lets this actor's own conversation memory in. */
+/**
+ * Whether the plan lets this actor's own conversation memory in (W2-B: the
+ * one shared own-conversation check: a person, the plan made for them, the
+ * actor-wide scope bound to them in their tenant).
+ */
 export function planAdmitsOwnMemory(
-  plan: Pick<PermittedContextPlan, "scopes">,
-  actor: Pick<ActorContext, "userId">,
+  plan: PermittedContextPlan,
+  actor: ActorContext,
 ): boolean {
-  return plan.scopes.some(
-    (scope) =>
-      scope.kind === "OWN_Q_CONVERSATION" &&
-      scope.subject === undefined &&
-      scope.filter.userId === actor.userId,
-  );
+  return ownsConversation({ actor, plan });
 }
 
 export type LoopMemory = {
@@ -230,7 +230,7 @@ export type LoopMemory = {
 export type LoopMemoryReader = {
   readonly read: (input: {
     readonly actor: ActorContext;
-    readonly plan: Pick<PermittedContextPlan, "scopes">;
+    readonly plan: PermittedContextPlan;
     /**
      * Whose session preferences apply: the conversation this loop is in
      * (a Q conversation or an onboarding session). Null: none.

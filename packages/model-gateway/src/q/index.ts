@@ -173,6 +173,7 @@ import {
   type QToolCallOutcome,
   type QToolExecutionContext,
   type QToolPort,
+  ownsOnboarding,
 } from "@capital-q/q-runtime";
 
 import { isModelGatewayError } from "../errors.js";
@@ -3572,7 +3573,7 @@ export type QMemoryRecall = {
      * own past turns only when it admits their own conversations, so
      * authorisation is resolved before that retrieval.
      */
-    readonly plan?: Pick<PermittedContextPlan, "scopes"> | undefined;
+    readonly plan?: PermittedContextPlan | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<string | QMemoryRecalled>;
   /**
@@ -5165,10 +5166,7 @@ export function createModelGatewayQAnswer(
       // questions or on an unread turn, as below.
       request.questionSequence === undefined &&
       request.turnUnread !== true &&
-      plan.scopes.some(
-        (scope) =>
-          scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-      )
+      ownsOnboarding({ actor: request.actor, plan })
         ? dependencies.onboardingNudge.peek(request.actor, conversationId)
         : null;
     nudgePeek?.catch(() => undefined);
@@ -7891,10 +7889,7 @@ export function createModelGatewayQAnswer(
     const onboardingRead = async (): Promise<void> => {
       if (
         dependencies.ownOnboarding !== undefined &&
-        plan.scopes.some(
-          (scope) =>
-            scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-        )
+        ownsOnboarding({ actor: request.actor, plan })
       ) {
         try {
           onboardingFacts = ownOnboardingFacts(
@@ -9505,10 +9500,7 @@ export function createModelGatewayQAnswer(
           !withoutWideReads &&
           request.questionSequence === undefined &&
           request.turnUnread !== true &&
-          plan.scopes.some(
-            (scope) =>
-              scope.kind === "OWN_ONBOARDING" && scope.subject === undefined,
-          )
+          ownsOnboarding({ actor: request.actor, plan })
         ) {
           try {
             // Phase 3: begun with the prepared reads when it could be.

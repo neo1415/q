@@ -20,11 +20,13 @@ function request(options: {
 }): QAnswerRequest {
   return {
     runId: "r",
-    actor: { userId: "u", tenantId: "t" },
+    actor: { userId: "u", tenantId: "t", actorType: "HUMAN" },
     correlationId: "cor",
     capability: "ANSWER",
     subjects: [{ kind: "COMPANY", companyId: COMPANY }],
-    plan: { scopes: options.scopes },
+    // The plan the firewall builds for this person (W2-B: the shared
+    // own-onboarding check reads its tenant and actor).
+    plan: { tenantId: "t", actor: { userId: "u" }, scopes: options.scopes },
   } as unknown as QAnswerRequest;
 }
 
@@ -81,7 +83,10 @@ describe("the person's own record names (Context Firewall)", () => {
               investorOrganisationId: FIRM,
             },
           },
-          { kind: "OWN_ONBOARDING" },
+          {
+            kind: "OWN_ONBOARDING",
+            filter: { tenantId: "t", userId: "u" },
+          },
         ],
       }),
     );
