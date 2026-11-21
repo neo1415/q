@@ -1054,3 +1054,8 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **b3f9da6fd deployed 10:46 UTC on 21 Nov** (gate PASS). W2-B adds shared `ownsOnboarding`/`ownsActorScope` in q-runtime.
   - Fixes OWN_ONBOARDING and memory checks that lacked person, plan and tenant matching, at 7 sites, including 4 found in the sweep: model-gateway `q/index.ts` ×3 and q-specialists `own-records-port.ts`.
   - Live as fictional Savanna, "What's my investment mandate?": the own declared mandate (sectors, stage, geography, cheque, role, exclusions) answered in 2.64 s. No refusals or errors.
+- **Migration `20261231600100` applied 11:5x UTC on 21 Nov** (additive), then **ce9af533f deployed 11:56 UTC** (gate PASS). Hosted is at 318.
+  - W2-C: ADR 0082 (Proposed) for the non-bypass request role and the RLS rollout.
+  - The `cq_app` role exists on hosted with `rolcanlogin=false` and `rolbypassrls=false`, plus workspace policies for `cq_app` only.
+  - The claims helper sits behind `DATABASE_RLS_CLAIMS` (off). Services still connect as `postgres`, so production access is unchanged.
+  - The shadow-mode grant and the rollout await the owner's sign-off on ADR 0082.
