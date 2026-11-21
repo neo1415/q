@@ -5,6 +5,23 @@ import {
   type QNavigateDestination,
 } from "@capital-q/contracts";
 
+import {
+  COMPANY_SCREENS,
+  INVESTOR_SCREENS,
+  MANAGER_SCREENS,
+  managesOrganisation,
+  ORGANISATION_SCREENS,
+  screenEligible,
+} from "./screen-eligibility.js";
+
+export {
+  INVESTOR_SCREENS,
+  MANAGER_SCREENS,
+  managesOrganisation,
+  ORGANISATION_SCREENS,
+  screenEligible,
+};
+
 /**
  * The capability registry (R20, founder 2026-09-26): every action Capital
  * Q can take for a person, in one code-built list, so Q neither denies a
@@ -354,74 +371,6 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens the pipeline import (/relationships/import): Q reads a CRM or spreadsheet export and shows every change before it is made (owners and admins).",
 };
 
-/** Screens that belong to a company's own people. */
-const COMPANY_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
-  "COMPANY_VISIBILITY",
-  "VERIFICATION",
-  "PITCH",
-  "COMPANY_INTEREST",
-  "NEW_PITCH",
-]);
-
-/**
- * Screens that belong to an investor organisation's own people. Live
- * 2026-10-30 (founder.ledgerbridge, "take me to my mandate"): MANDATE was
- * offered to everyone on Home Q, so a founder was told "Opening your
- * mandate…" and sent to an investor's page. A founder has no mandate.
- */
-export const INVESTOR_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
-  "YOUR_COMPANIES",
-  "MANDATE",
-]);
-
-/**
- * Q-NAV (decisions 109 and 110): the organisation admin's screens, for
- * anyone acting for an organisation (members see them read-only), the
- * sidebar's own rule (navigation.ts organisationGroup).
- */
-export const ORGANISATION_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
-  "ORGANISATION",
-  "ORGANISATION_MEMBERS",
-  "ORGANISATION_ROLES",
-  "ORGANISATION_PLAN",
-  "ORGANISATION_ACTIVITY",
-]);
-
-/**
- * Q-NAV: the pipeline import, which the sidebar shows only to the
- * organisation's owners and admins. Q never offers a member a screen
- * their navigation does not show them; the page and the API still decide.
- */
-export const MANAGER_SCREENS: ReadonlySet<QNavigateDestination> = new Set([
-  "ORGANISATION_IMPORT",
-  "PIPELINE_IMPORT",
-]);
-
-/** The sidebar's rule (navigation.ts): owners and admins manage. */
-export function managesOrganisation(
-  role: QCapabilityRunFacts["organisationRole"],
-): boolean {
-  return role === "OWNER" || role === "ADMIN";
-}
-
-/** Whether these facts may be offered this screen, by side and by role. */
-export function screenEligible(
-  destination: QNavigateDestination,
-  facts: Pick<
-    QCapabilityRunFacts,
-    "company" | "ownInvestorOrganisation" | "organisationRole"
-  >,
-): boolean {
-  return (
-    (!COMPANY_SCREENS.has(destination) || facts.company) &&
-    (!INVESTOR_SCREENS.has(destination) || facts.ownInvestorOrganisation) &&
-    (!ORGANISATION_SCREENS.has(destination) ||
-      facts.organisationRole !== null) &&
-    (!MANAGER_SCREENS.has(destination) ||
-      managesOrganisation(facts.organisationRole))
-  );
-}
-
 const NAVIGATION: readonly QCapability[] = Q_NAVIGATE_DESTINATIONS.map(
   (destination): QCapability => ({
     id: `navigate.${destination}`,
@@ -698,13 +647,19 @@ const OFFERS: readonly QCapability[] = [
     "GATEWAY",
     "Words to a founder are sent from the inbox screen, where the investor approves exactly what goes; Q drafts them and opens it.",
   ),
-  offer(
-    "organisation_speaking_guide",
-    "SETTINGS",
-    "Write a new version of the organisation's own guide to how Q speaks for its members (Organisation, How Q speaks for us; owners and admins)",
-    "ORGANISATION",
-    "The organisation's guide speaks for every member, so its owners and admins write each version themselves on How Q speaks for us; Q follows it and does not write it for them.",
-  ),
+  {
+    // Decision 112: only its owners and admins write it, as the page says.
+    ...offer(
+      "organisation_speaking_guide",
+      "SETTINGS",
+      "Write a new version of the organisation's own guide to how Q speaks for its members (Organisation, How Q speaks for us)",
+      "ORGANISATION",
+      "The organisation's guide speaks for every member, so its owners and admins write each version themselves on How Q speaks for us; Q follows it and does not write it for them.",
+    ),
+    eligibility: "they are an owner or admin of the organisation they act for",
+    eligible: (facts) =>
+      facts.surface === "HOME_Q" && managesOrganisation(facts.organisationRole),
+  },
   offer(
     "gateway_mandate",
     "SETTINGS",

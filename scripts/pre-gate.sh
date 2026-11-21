@@ -132,6 +132,58 @@ if [ ${#src[@]} -gt 0 ]; then
   [ "$vt_status" -eq 0 ] || bad "vitest related (exit $vt_status)"
 fi
 
+step "test suites of every package and app that depends on a changed package"
+# `vitest related` follows source imports, but a workspace package is
+# imported through its built dist, so a test in a dependent package is
+# never "related" (21 Nov: a new Q capability changed q-specialists'
+# manifest expectation and only the gate saw it). Here: every unit
+# (apps/* or packages/*) that depends on a changed package, directly or
+# through another, runs its whole unit suite, with the gate's config.
+changed_pkgs=()
+for unit in $(printf '%s\n' "${changed[@]}" | grep -oE '^packages/[^/]+' | sort -u); do
+  [ -f "$unit/package.json" ] || continue
+  name=$(node -e 'process.stdout.write(require("./'"$unit"'/package.json").name)' 2>/dev/null)
+  [ -n "$name" ] && changed_pkgs+=("$name")
+done
+dependents=()
+if [ ${#changed_pkgs[@]} -gt 0 ]; then
+  mapfile -t dependents < <(CHANGED="${changed_pkgs[*]}" node -e '
+    const fs = require("fs");
+    const units = [];
+    for (const top of ["apps", "packages"]) {
+      for (const dir of fs.readdirSync(top)) {
+        const file = `${top}/${dir}/package.json`;
+        if (!fs.existsSync(file)) continue;
+        const json = JSON.parse(fs.readFileSync(file, "utf8"));
+        const deps = { ...json.dependencies, ...json.devDependencies };
+        units.push({ path: `${top}/${dir}/`, name: json.name, deps: Object.keys(deps) });
+      }
+    }
+    // Transitive: a dependent of a dependent sees the change too.
+    const reached = new Set(process.env.CHANGED.split(" "));
+    const out = new Set();
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const unit of units) {
+        if (out.has(unit.path) || !unit.deps.some((d) => reached.has(d))) continue;
+        out.add(unit.path);
+        reached.add(unit.name);
+        grew = true;
+      }
+    }
+    for (const path of out) console.log(path);')
+fi
+if [ ${#dependents[@]} -gt 0 ]; then
+  echo "${#dependents[@]} dependent unit(s): ${dependents[*]}"
+  dp_out=$(NODE_OPTIONS=--max-old-space-size=6144 npx vitest run --maxWorkers=2 --passWithNoTests "${dependents[@]}" 2>&1)
+  dp_status=$?
+  printf '%s\n' "$dp_out" | grep -E '^ FAIL ' | sort -u
+  printf '%s\n' "$dp_out" | tail -4
+  [ "$dp_status" -eq 0 ] || bad "dependent packages' tests (exit $dp_status)"
+else
+  echo "no changed package has a dependent"
+fi
+
 step "integration tests and pgTAP touching what changed (local Supabase)"
 # W1-A (enterprise audit 21 Nov 2026, finding 7): two gates failed late on
 # 20 Nov on integration tests that pinned a prompt version the change had

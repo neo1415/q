@@ -294,6 +294,8 @@ describe("a run's capabilities come from composed facts, never words", () => {
     const imports = [
       "navigate.ORGANISATION_IMPORT",
       "navigate.PIPELINE_IMPORT",
+      // Decision 112: only owners and admins write the organisation's guide.
+      "offer.organisation_speaking_guide",
     ];
     // Acting for no organisation: none of them.
     const none = ids(facts({ organisationRole: null }));

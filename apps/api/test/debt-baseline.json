@@ -140,7 +140,7 @@
     "packages/q-evals/src/datasets/q-iq/cases.ts": 1685,
     "packages/q-evals/src/datasets/q-nav/heldout-third.ts": 2489,
     "packages/q-specialists/src/answer.ts": 12096,
-    "packages/q-tools/src/capabilities.ts": 1619,
+    "packages/q-tools/src/capabilities.ts": 1574,
     "packages/q-tools/src/ports.ts": 1614,
     "packages/q-tools/src/tools/client-actions.ts": 1816,
     "packages/q-tools/src/tools/schedule.ts": 1678
