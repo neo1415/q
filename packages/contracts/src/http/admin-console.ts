@@ -278,6 +278,18 @@ export const AdminConsoleOverviewDtoSchema = z
         ungatedMaxConnections: Tally.nullable(),
         checkedAt: z.string().max(40).nullable(),
         findings: z.array(z.string().regex(/^[A-Z_]{1,40}$/u)).max(20),
+        /**
+         * W1-B: the last operator alert the workers sent, in plain words;
+         * null or absent: none since they started.
+         */
+        lastAlert: z
+          .object({
+            subject: z.string().min(1).max(200),
+            at: z.string().max(40),
+          })
+          .strict()
+          .nullable()
+          .optional(),
       })
       .strict()
       .nullable(),

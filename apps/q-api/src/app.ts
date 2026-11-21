@@ -39,6 +39,7 @@ import type { QApiConfig } from "@capital-q/config/q-api";
 import {
   createFrameworkLogger,
   createLogger,
+  createTrafficCounter,
   createRequestId,
   type Logger,
   type ServiceIdentity,
@@ -442,6 +443,13 @@ export function createApp(
 
   registerProblemHandling(app, logger);
   registerRequestTiming(app);
+  // W1-B: requests and server errors over the last 15 minutes, counts
+  // only, for the readiness answer (the console and the workers' check).
+  const traffic = createTrafficCounter();
+  app.addHook("onResponse", (request, reply, done) => {
+    if (!request.url.startsWith("/health/")) traffic.record(reply.statusCode);
+    done();
+  });
   // W1-A: the general rate limit, before every route (health aside).
   registerGeneralRateLimit(
     app,
@@ -1007,6 +1015,8 @@ export function createApp(
       service: SERVICE_NAME,
       environment: config.runtime.deploymentEnvironment,
       contracts: CONTRACTS_VERSION,
+      // W1-B: counts only, never a route, a person or a message.
+      traffic: traffic.read(),
       checks: {
         database:
           database === undefined

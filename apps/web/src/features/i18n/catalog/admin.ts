@@ -198,6 +198,10 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
     "الشبكة: لا يرى ملفها إلا الأشخاص المسجّلون على Capital Q.",
   "Someone holds this company: only its own people choose who sees it.":
     "هذه الشركة مملوكة لأحد: لا يختار من يراها إلا أصحابها.",
+  // W1-B: system health (service names are not translated)
+  "API error rate": "معدل أخطاء API",
+  "Q API error rate": "معدل أخطاء Q API",
+  "Last alert": "آخر تنبيه",
   // Verification and claims
   Verification: "التوثيق",
   // V1: verification providers, connected or not (names are not translated)

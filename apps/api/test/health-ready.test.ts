@@ -54,6 +54,8 @@ describe("api readiness (DEF-A4)", () => {
       service: "api",
       environment: expect.any(String) as unknown,
       contracts: expect.any(String) as unknown,
+      // W1-B: counts only; the readiness probe itself is not counted.
+      traffic: { windowMinutes: 15, requests: 0, serverErrors: 0 },
       checks: { database: "CONNECTION" },
     });
   });
@@ -77,5 +79,19 @@ describe("api readiness (DEF-A4)", () => {
     expect(response.json()).toMatchObject({
       checks: { database: "NOT_CHECKED" },
     });
+  });
+
+  it("W1-B: carries the requests and server errors of the last 15 minutes, counts only", async () => {
+    const server = app(() => Promise.resolve({ reachable: true }));
+    server.get("/v1/boom", () => {
+      throw new Error("a bug, with private words in it");
+    });
+    await server.inject({ method: "GET", url: "/v1/boom" });
+    await server.inject({ method: "GET", url: "/v1/does-not-exist" });
+    const ready = await server.inject({ method: "GET", url: "/health/ready" });
+    expect(ready.json()).toMatchObject({
+      traffic: { windowMinutes: 15, requests: 2, serverErrors: 1 },
+    });
+    expect(ready.body).not.toContain("private words");
   });
 });

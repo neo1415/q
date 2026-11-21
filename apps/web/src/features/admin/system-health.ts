@@ -22,7 +22,42 @@ export type ServiceHealth = {
   /** The database check the service reported, as it said it. */
   readonly database: string | null;
   readonly millis: number | null;
+  /**
+   * W1-B: the service's own counts over its window, from its readiness
+   * answer; null when it gave none.
+   */
+  readonly traffic?: ServiceTraffic | null | undefined;
 };
+
+export type ServiceTraffic = {
+  readonly windowMinutes: number;
+  readonly requests: number;
+  readonly serverErrors: number;
+};
+
+const whole = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : null;
+
+/** The counts a readiness answer carries, read like any input. */
+export function trafficOf(body: unknown): ServiceTraffic | null {
+  if (typeof body !== "object" || body === null || !("traffic" in body)) {
+    return null;
+  }
+  const traffic = body.traffic;
+  if (typeof traffic !== "object" || traffic === null) return null;
+  const windowMinutes = whole(
+    "windowMinutes" in traffic ? traffic.windowMinutes : null,
+  );
+  const requests = whole("requests" in traffic ? traffic.requests : null);
+  const serverErrors = whole(
+    "serverErrors" in traffic ? traffic.serverErrors : null,
+  );
+  return windowMinutes === null || requests === null || serverErrors === null
+    ? null
+    : { windowMinutes, requests, serverErrors };
+}
 
 const READY_TIMEOUT_MS = 3_000;
 
@@ -56,6 +91,7 @@ async function readiness(
       state: response.ok ? "READY" : "NOT_READY",
       database,
       millis,
+      traffic: trafficOf(body),
     };
   } catch {
     return { service, state: "NOT_ANSWERING", database: null, millis: null };

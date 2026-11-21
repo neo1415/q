@@ -111,3 +111,55 @@ export function checkLine(
           .join(", "),
       };
 }
+
+/**
+ * W1-B: a service's server errors over its window, in words: "0.4% of
+ * 1,240 requests in 15 min"; 5% or more warns. No requests yet is said
+ * as it is; a service that gave no counts is "Not reported".
+ */
+export const ERROR_RATE_WARNING = 0.05;
+
+export function errorRateLine(
+  traffic:
+    | {
+        readonly windowMinutes: number;
+        readonly requests: number;
+        readonly serverErrors: number;
+      }
+    | null
+    | undefined,
+): HealthLine {
+  if (traffic === null || traffic === undefined) return NOT_REPORTED;
+  if (traffic.requests === 0) {
+    return {
+      tone: "OK",
+      text: `No requests in ${String(traffic.windowMinutes)} min`,
+    };
+  }
+  const rate = traffic.serverErrors / traffic.requests;
+  const shown =
+    rate === 0 ? "0" : rate < 0.001 ? "<0.1" : (rate * 100).toFixed(1);
+  return {
+    tone: rate >= ERROR_RATE_WARNING ? "WARNING" : "OK",
+    text: `${shown}% errors of ${traffic.requests.toLocaleString("en-GB")} requests in ${String(traffic.windowMinutes)} min`,
+  };
+}
+
+/** W1-B: the workers' last alert: what and when, or none since they started. */
+export function lastAlertLine(
+  alert: { readonly subject: string; readonly at: string } | null | undefined,
+  now: number,
+): HealthLine {
+  if (alert === null || alert === undefined) {
+    return { tone: "OK", text: "None since the workers started" };
+  }
+  const at = Date.parse(alert.at);
+  const ago = Number.isNaN(at)
+    ? ""
+    : ` · ${seconds(Math.max(0, now - at))} ago`;
+  const recent = !Number.isNaN(at) && now - at <= 24 * 3_600_000;
+  return {
+    tone: recent ? "WARNING" : "OK",
+    text: `${alert.subject}${ago}`,
+  };
+}

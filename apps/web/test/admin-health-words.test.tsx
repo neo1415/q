@@ -13,8 +13,15 @@ vi.mock("@/features/i18n/server-now", () => ({
   serverTNow: () => (text: string) => text,
 }));
 
-const { checkLine, heartbeatLine, poolLine, seconds, NOT_REPORTED } =
-  await import("../src/features/admin/health-words");
+const {
+  checkLine,
+  errorRateLine,
+  heartbeatLine,
+  lastAlertLine,
+  poolLine,
+  seconds,
+  NOT_REPORTED,
+} = await import("../src/features/admin/health-words");
 const { HealthPanel } = await import("../src/features/admin/console-overview");
 
 afterEach(cleanup);
@@ -110,12 +117,14 @@ describe("the health card", () => {
       "UNKNOWN",
       "UNKNOWN",
       "UNKNOWN",
+      "UNKNOWN",
     ]);
     expect(rows.map((row) => row.textContent)).toEqual([
       "Q API database poolNot reported",
       "WorkersNot reported",
       "Workers database poolNot reported",
       "Workers last checkNot reported",
+      "Last alertNot reported",
     ]);
   });
 
@@ -218,5 +227,84 @@ describe("the workers' row from their stored heartbeat", () => {
     ).toBe("DOWN");
     expect(checkLine(null)).toEqual(NOT_REPORTED);
     expect(checkLine({ checkedAt: null, findings: [] })).toEqual(NOT_REPORTED);
+  });
+});
+
+describe("W1-B: error rate and the last alert", () => {
+  it("says each service's server errors over its window, and warns at 5%", () => {
+    expect(
+      errorRateLine({ windowMinutes: 15, requests: 1240, serverErrors: 5 }),
+    ).toEqual({
+      tone: "OK",
+      text: "0.4% errors of 1,240 requests in 15 min",
+    });
+    expect(
+      errorRateLine({ windowMinutes: 15, requests: 200, serverErrors: 10 })
+        .tone,
+    ).toBe("WARNING");
+    expect(
+      errorRateLine({ windowMinutes: 15, requests: 0, serverErrors: 0 }),
+    ).toEqual({ tone: "OK", text: "No requests in 15 min" });
+    expect(errorRateLine(null)).toEqual(NOT_REPORTED);
+  });
+
+  it("says the last alert and its age; a recent one warns", () => {
+    expect(
+      lastAlertLine(
+        { subject: "api is not answering", at: "2026-11-19T11:57:00.000Z" },
+        NOW,
+      ),
+    ).toEqual({ tone: "WARNING", text: "api is not answering · 3 min ago" });
+    expect(
+      lastAlertLine(
+        { subject: "api is not answering", at: "2026-11-17T11:57:00.000Z" },
+        NOW,
+      ).tone,
+    ).toBe("OK");
+    expect(lastAlertLine(null, NOW)).toEqual({
+      tone: "OK",
+      text: "None since the workers started",
+    });
+  });
+
+  it("the card shows each service's error rate and the last alert", () => {
+    render(
+      <HealthPanel
+        services={[
+          {
+            service: "API",
+            state: "READY",
+            database: "CONNECTED",
+            millis: 40,
+            traffic: { windowMinutes: 15, requests: 100, serverErrors: 9 },
+          },
+        ]}
+        outbox={null}
+        versions={[]}
+        qApiPool={null}
+        workers={{
+          beatAt: "2026-11-19T11:59:48.000Z",
+          pool: null,
+          ungatedMaxConnections: null,
+          checkedAt: "2026-11-19T11:59:48.000Z",
+          findings: ["ERROR_RATE_SPIKE"],
+          lastAlert: {
+            subject: "api is returning errors",
+            at: "2026-11-19T11:59:00.000Z",
+          },
+        }}
+        now={NOW}
+      />,
+    );
+    const text = [...document.querySelectorAll("[data-health-tone]")].map(
+      (row) =>
+        `${row.getAttribute("data-health-tone") ?? ""} ${row.textContent ?? ""}`,
+    );
+    expect(text).toContain(
+      "WARNING API error rate9.0% errors of 100 requests in 15 min",
+    );
+    expect(text).toContain(
+      "WARNING Last alertapi is returning errors · 60 s ago",
+    );
   });
 });

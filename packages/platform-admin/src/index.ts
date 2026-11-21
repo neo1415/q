@@ -603,3 +603,12 @@ export {
   type ConsoleOverview,
   type WorkersHeartbeat,
 } from "./console-overview.js";
+
+export {
+  createPostgresWorkersBeat,
+  watchWorkersHeartbeat,
+  workersHeartbeatAlert,
+  WORKERS_HEARTBEAT_ALERT_KEY,
+  WORKERS_HEARTBEAT_STALE_MS,
+  WORKERS_WATCH_INTERVAL_MS,
+} from "./workers-watch.js";

@@ -1,3 +1,4 @@
+import type { ServiceHealthSummary } from "./health-watch.js";
 import {
   jsonbParam,
   type DatabaseExecutor,
@@ -12,10 +13,17 @@ import {
  * codes. One statement, so its transaction is as short as it can be.
  */
 
+/** W1-B: the last operator alert the workers sent, in plain words. */
+export type LastAlert = { readonly subject: string; readonly at: string };
+
 export type OpsBeat = {
   readonly at: Date;
   /** The finding codes, or ["CHECK_FAILED"] when the check could not read. */
   readonly findings: readonly string[];
+  /** W1-B: each probed service's health and counts; absent: none probed. */
+  readonly services?: readonly ServiceHealthSummary[] | undefined;
+  /** W1-B: the last alert sent; null: none since this process started. */
+  readonly lastAlert?: LastAlert | null | undefined;
 };
 
 export type Heartbeat = (beat: OpsBeat) => Promise<void>;
@@ -34,6 +42,12 @@ export function heartbeatRow(
     opsCheck: {
       checkedAt: beat.at.toISOString(),
       findings: [...beat.findings],
+      ...(beat.services === undefined
+        ? {}
+        : { services: beat.services.slice(0, 10) }),
+      ...(beat.lastAlert === undefined || beat.lastAlert === null
+        ? {}
+        : { lastAlert: beat.lastAlert }),
     },
   };
 }

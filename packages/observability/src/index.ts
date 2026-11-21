@@ -73,3 +73,10 @@ export {
   type ObservabilityContext,
   type ServiceIdentity,
 } from "./types.js";
+
+export {
+  createTrafficCounter,
+  TRAFFIC_WINDOW_MS,
+  type TrafficCounter,
+  type TrafficWindow,
+} from "./traffic.js";

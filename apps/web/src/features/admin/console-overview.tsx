@@ -16,7 +16,10 @@ import {
 } from "./audit-names";
 import {
   checkLine,
+  errorRateLine,
   heartbeatLine,
+  lastAlertLine,
+  NOT_REPORTED,
   poolLine,
   ungatedPoolLine,
   type HealthLine,
@@ -203,6 +206,17 @@ export function HealthPanel({
           : poolLine(workers?.pool, now),
     },
     { term: "Workers last check", line: checkLine(workers) },
+    // W1-B: each service's server errors, and the last operator alert.
+    ...services.map((service) => ({
+      term: `${service.service} error rate`,
+      line: errorRateLine(service.traffic),
+    })),
+    {
+      term: "Last alert",
+      // No heartbeat row: not reported, never "none".
+      line:
+        workers === null ? NOT_REPORTED : lastAlertLine(workers.lastAlert, now),
+    },
   ];
   return (
     <Panel title="System health" id="console-health">

@@ -990,6 +990,8 @@ import {
   recordingFirewall,
   createEtiquetteGuideAdminStore,
   createOperatorAlerts,
+  createPostgresWorkersBeat,
+  watchWorkersHeartbeat,
   createPostgresOperatorEmails,
   type OperatorAlert,
 } from "@capital-q/platform-admin";
@@ -8098,6 +8100,13 @@ operatorAlert.send = createOperatorAlerts({
   email: operatorEmail,
   logger,
 }).alert;
+// W1-B: who watches the watcher. The workers alert on everything else; when
+// their heartbeat goes stale, q-api says so through the same channel.
+watchWorkersHeartbeat({
+  readBeat: createPostgresWorkersBeat(database.sql),
+  alert: (alert) => operatorAlert.send(alert),
+  logger,
+});
 const reportPausedAccount = async (
   actor: ActorContext,
   strikes: number,

@@ -90,7 +90,37 @@ describe("the workers' heartbeat as the console reads it", () => {
       },
       checkedAt: "2026-11-19T12:00:00.000Z",
       findings: ["DB_TIMEOUTS"],
+      lastAlert: null,
     });
+  });
+
+  it("W1-B: passes the last alert's subject and time, and drops a malformed one", () => {
+    const row = (lastAlert: unknown) =>
+      heartbeatOf({
+        beat_at: "2026-11-21T12:00:00.000Z",
+        pool: {},
+        ops_check: {
+          checkedAt: "2026-11-21T12:00:00.000Z",
+          findings: [],
+          lastAlert,
+        },
+      }).lastAlert;
+    expect(
+      row({
+        subject: "api is not answering",
+        at: "2026-11-21T11:58:00.000Z",
+        text: "x",
+      }),
+    ).toEqual({
+      subject: "api is not answering",
+      at: "2026-11-21T11:58:00.000Z",
+    });
+    expect(row({ subject: "", at: "2026-11-21T11:58:00.000Z" })).toBeNull();
+    expect(
+      row({ subject: "x".repeat(201), at: "2026-11-21T11:58:00.000Z" }),
+    ).toBeNull();
+    expect(row({ subject: "ok", at: "yesterday" })).toBeNull();
+    expect(row("api down")).toBeNull();
   });
 
   it("says an ungated pool's size and leaves its use unreported", () => {

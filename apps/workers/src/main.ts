@@ -290,6 +290,12 @@ import {
   parseOpsThresholds,
   runOpsWatch,
 } from "./reliability/ops-check.js";
+import {
+  createHealthWatch,
+  DEFAULT_HEALTH_WATCH,
+  parseHealthTargets,
+  probeHealth,
+} from "./reliability/health-watch.js";
 import { createPostgresHeartbeat } from "./reliability/heartbeat.js";
 import { runProviderBalanceWatch } from "./reliability/provider-balance.js";
 import {
@@ -1512,6 +1518,32 @@ if (opsThresholds.invalid.length > 0) {
     "operational check settings out of bounds; defaults kept",
   );
 }
+// W1-B: the services' health checks, probed by the operational check.
+const healthTargets = parseHealthTargets(process.env);
+if (healthTargets.invalid.length > 0) {
+  logger.error(
+    { invalid: healthTargets.invalid },
+    "CQ_HEALTH_PROBE_TARGETS entries ignored: expected service=https://host",
+  );
+}
+if (healthTargets.targets.length === 0) {
+  logger.warn(
+    {},
+    "no service health is probed: CQ_HEALTH_PROBE_TARGETS is not set",
+  );
+}
+const healthWatch =
+  healthTargets.targets.length === 0
+    ? undefined
+    : {
+        probe: () =>
+          probeHealth(
+            healthTargets.targets,
+            (url, init) => fetch(url, { signal: init.signal }),
+            DEFAULT_HEALTH_WATCH.probeTimeoutMs,
+          ),
+        watch: createHealthWatch(DEFAULT_HEALTH_WATCH),
+      };
 const schedule = composeSchedule({
   sql: database.sql,
   transactions: database.transactions,
@@ -1945,6 +1977,7 @@ await Promise.all([
           alert: (alert) => operatorAlert.send(alert),
           signal: shutdownController.signal,
           logger,
+          ...(healthWatch === undefined ? {} : { health: healthWatch }),
           // Console System health: the workers say they are alive here.
           heartbeat: createPostgresHeartbeat({
             sql: database.sql,

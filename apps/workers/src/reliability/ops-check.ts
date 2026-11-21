@@ -3,7 +3,8 @@ import type { OperatorAlert } from "@capital-q/platform-admin";
 
 import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 
-import type { Heartbeat } from "./heartbeat.js";
+import type { Heartbeat, LastAlert } from "./heartbeat.js";
+import type { createHealthWatch, ProbeResult } from "./health-watch.js";
 
 /**
  * Launch readiness item 7: one operational check the workers run on an
@@ -40,7 +41,11 @@ export type OpsFindingCode =
   | "DB_TIMEOUTS"
   | "DB_POOL_EXHAUSTED"
   | "MODEL_PROVIDER_FAILURE_RATE"
-  | "MODEL_SPEND_NEAR_CAP";
+  | "MODEL_SPEND_NEAR_CAP"
+  // W1-B (health-watch.ts): a service failing its health check in a row,
+  // and a service's share of server errors over its window.
+  | "SERVICE_UNHEALTHY"
+  | "ERROR_RATE_SPIKE";
 
 export type OpsThresholds = {
   readonly intervalMs: number;
@@ -469,9 +474,26 @@ export async function runOpsWatch(options: {
    * or CHECK_FAILED. A failure to record it is logged, never fatal.
    */
   readonly heartbeat?: Heartbeat | undefined;
+  /**
+   * W1-B: the services' health checks, probed on every check; their
+   * findings go through the same operator channel. Absent: none probed.
+   */
+  readonly health?:
+    | {
+        readonly probe: () => Promise<readonly ProbeResult[]>;
+        readonly watch: ReturnType<typeof createHealthWatch>;
+      }
+    | undefined;
 }): Promise<void> {
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? (() => new Date());
+  // W1-B: the last alert actually sent (not de-duplicated), for the console.
+  let lastAlert: LastAlert | null = null;
+  const alert = async (one: OperatorAlert): Promise<boolean> => {
+    const sent = await options.alert(one);
+    if (sent) lastAlert = { subject: one.subject, at: now().toISOString() };
+    return sent;
+  };
   const exhaustions = options.dbPoolExhaustions ?? (() => 0);
   let timeoutsSeen = options.dbTimeouts();
   let exhaustionsSeen = exhaustions();
@@ -487,7 +509,7 @@ export async function runOpsWatch(options: {
         dbPoolExhaustionsSinceLastCheck: exhaustionsNow - exhaustionsSeen,
         thresholds: options.thresholds,
         dailyCapUsd: options.dailyCapUsd,
-        alert: options.alert,
+        alert,
         now: at,
         logger: options.logger,
       });
@@ -509,9 +531,56 @@ export async function runOpsWatch(options: {
         "operational check could not read the database",
       );
     }
+    // W1-B: the services' health, beside the database check (a failure to
+    // probe is a finding of its own kind, never a crash of the loop).
+    if (options.health !== undefined) {
+      try {
+        const results = await options.health.probe();
+        const healthFindings = options.health.watch.assess(results);
+        if (healthFindings.length > 0) {
+          options.logger.error(
+            {
+              alert: OPS_CHECK_ALERT,
+              findings: healthFindings.map((finding) => finding.code),
+              ...healthFindings.reduce<Record<string, unknown>>(
+                (fields, finding) => ({ ...fields, ...finding.fields }),
+                {},
+              ),
+            },
+            `operational check: ${healthFindings.map((finding) => finding.code).join(", ")}`,
+          );
+        }
+        for (const finding of healthFindings) {
+          await alert({
+            key: finding.key,
+            subject: finding.subject,
+            text: finding.text,
+          }).catch((error: unknown) => {
+            options.logger.warn(
+              { err: error, alertKey: finding.key },
+              "operational check: operator alert could not be sent",
+            );
+            return false;
+          });
+        }
+        findings = [...findings, ...healthFindings.map((f) => f.code)];
+      } catch (error: unknown) {
+        options.logger.warn(
+          { err: error },
+          "operational check: the services' health could not be probed",
+        );
+      }
+    }
     if (options.heartbeat !== undefined) {
       try {
-        await options.heartbeat({ at, findings });
+        await options.heartbeat({
+          at,
+          findings,
+          ...(options.health === undefined
+            ? {}
+            : { services: options.health.watch.summary() }),
+          lastAlert,
+        });
       } catch (error: unknown) {
         options.logger.warn(
           { err: error },

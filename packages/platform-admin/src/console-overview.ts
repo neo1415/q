@@ -54,6 +54,8 @@ export type WorkersHeartbeat = {
   readonly ungatedMaxConnections: number | null;
   readonly checkedAt: string | null;
   readonly findings: readonly string[];
+  /** W1-B: the last operator alert the workers sent; null: none. */
+  readonly lastAlert: { readonly subject: string; readonly at: string } | null;
 };
 
 const count = (value: unknown): number | null =>
@@ -110,7 +112,23 @@ export function heartbeatOf(row: {
           },
     checkedAt: instant(check["checkedAt"]),
     findings: findings.slice(0, 20),
+    lastAlert: lastAlertOf(check["lastAlert"]),
   };
+}
+
+/** W1-B: the last alert as the heartbeat stored it, read like any input. */
+function lastAlertOf(
+  value: unknown,
+): { readonly subject: string; readonly at: string } | null {
+  if (typeof value !== "object" || value === null) return null;
+  const subject = "subject" in value ? value.subject : null;
+  const at = "at" in value ? instant(value.at) : null;
+  return typeof subject === "string" &&
+    subject.trim().length > 0 &&
+    subject.length <= 200 &&
+    at !== null
+    ? { subject: subject.trim(), at }
+    : null;
 }
 
 export const CONSOLE_SPEND_DAYS = 14;
