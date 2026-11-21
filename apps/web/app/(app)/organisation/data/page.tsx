@@ -23,8 +23,8 @@ export default async function OrganisationDataPage() {
         what="Exporting or deleting the organisation's data as a whole."
         elsewhere={{
           href: "/settings/data",
-          label: "Open your data rights",
-          why: "Your own data rights, export and deletion, are in Settings.",
+          label: "Export or delete your own data",
+          why: "Exporting or deleting the organisation as a whole isn't built yet. Your own data is yours to export or delete now, in Settings; it covers you, not the organisation.",
         }}
       />
     </OrgReadOnly>

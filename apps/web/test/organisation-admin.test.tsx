@@ -43,8 +43,8 @@ const { currentOrgSection, manages, ORG_SECTIONS, scopeParts } =
   await import("../src/features/organisation/org-admin-sections");
 const { default: ImportSection } =
   await import("../app/(app)/organisation/import/page");
-const { default: PrivacySection } =
-  await import("../app/(app)/organisation/privacy/page");
+const { default: DataSection } =
+  await import("../app/(app)/organisation/data/page");
 
 afterEach(cleanup);
 
@@ -241,8 +241,12 @@ describe("decision 110: a member sees the organisation read-only", () => {
 
   it("a section that isn't built says so, and saves nothing", async () => {
     asRole("OWNER");
-    render(await PrivacySection());
+    render(await DataSection());
     expect(screen.getByRole("heading", { name: "Not built yet" })).toBeTruthy();
+    // Decision 112: the person's own export and deletion are one step away.
+    expect(
+      screen.getByRole("link", { name: "Export or delete your own data" }),
+    ).toHaveProperty("pathname", "/settings/data");
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
   });

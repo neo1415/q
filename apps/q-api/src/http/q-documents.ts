@@ -65,6 +65,14 @@ export type QDocumentRoutesDependencies = ActorContextDependencies & {
         readonly suggestion: WebsiteBrandSuggestion;
       }
   >;
+  /**
+   * ORG-SECTIONS (decision 110): whether this actor may change their
+   * organisation's brand (owners and admins: organisation.admin). Asked
+   * before every brand kit write; absent, no role is required (stacks and
+   * tests without an authorization source).
+   */
+  readonly mayManageBrand?:
+    ((actor: ActorContext) => Promise<boolean>) | undefined;
   /** Messages of a run, read as its owner; throws when not theirs. */
   readonly runMessages: (
     actor: ActorContext,
@@ -135,6 +143,27 @@ export function registerQDocumentRoutes(
       : requireActorContextOrPersonalHook({ ...dependencies, identity });
   const { brandKit, artifacts } = dependencies;
 
+  /** Decision 110: a member reads the brand; only owners and admins change it. */
+  const refusedToManage = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<FastifyReply | null> => {
+    const may = dependencies.mayManageBrand;
+    if (may === undefined) return null;
+    const actor = getActorContext(request);
+    if (actor.organisationId !== undefined && (await may(actor))) return null;
+    return refuse(
+      reply,
+      request,
+      problem(
+        403,
+        "Owners and admins only",
+        "Only the organisation's owners and admins can change its brand.",
+        "ORGANISATION_ADMIN_REQUIRED",
+      ),
+    );
+  };
+
   const noOrganisation = () =>
     problem(
       409,
@@ -165,6 +194,8 @@ export function registerQDocumentRoutes(
     Q_BRAND_KIT_PATH,
     { onRequest: withContext, bodyLimit: 1_024 * 1_024 },
     async (request, reply) => {
+      const refused = await refusedToManage(request, reply);
+      if (refused !== null) return refused;
       const body = parseContract(
         SetQBrandKitRequestSchema,
         request.body,
@@ -225,6 +256,8 @@ export function registerQDocumentRoutes(
       if (actor.organisationId === undefined) {
         return refuse(reply, request, noOrganisation());
       }
+      const refused = await refusedToManage(request, reply);
+      if (refused !== null) return refused;
       const found = await dependencies.suggestFromWebsite(actor);
       if (found.status !== "FOUND") {
         return refuse(
@@ -256,6 +289,8 @@ export function registerQDocumentRoutes(
     `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_CONFIRM_SUFFIX}`,
     { onRequest: withContext },
     async (request, reply) => {
+      const refused = await refusedToManage(request, reply);
+      if (refused !== null) return refused;
       const body = parseContract(
         ConfirmQBrandKitRequestSchema,
         request.body,
