@@ -1086,3 +1086,6 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Pre-gate now runs the suites of dependent packages and the bundle budget.
   - Live: `/organisation/speaking` renders for the LedgerBridge founder. A Q turn as Savanna was normal, first text in 2.62 s.
 - **2d2f3b181 deployed 01:46 UTC on 22 Nov** (gate PASS). W3-B: `answer.ts` cut from 12,095 to 9,122 lines into 7 modules, move only. Pre-gate now runs each changed package's own suite plus its dependents. Live: a mandate question as Savanna was answered normally, first text in 2.61 s.
+- **e2b405bcc deployed 03:43 UTC on 22 Nov** (web; gate PASS). W3-C: the voice engine is a lazy chunk fetched on talk-control intent or Ctrl/⌘+K; a talk before the chunk arrives is held. Median first-load JS went from 2,068 to 1,976 kB.
+  - Live: `/discover` loads without an error state.
+  - The intent-prefetch was not exercised live: the sandbox check didn't locate the talk control by label, and a voice session is a paid realtime call. Evidence is fake-timer tests.
